@@ -42,10 +42,11 @@ func (w *projectNetworkPolicyLifecycleAdapter) Updated(obj runtime.Object) (runt
 func NewProjectNetworkPolicyLifecycleAdapter(name string, clusterScoped bool, client ProjectNetworkPolicyInterface, l ProjectNetworkPolicyLifecycle) ProjectNetworkPolicyHandlerFunc {
 	adapter := &projectNetworkPolicyLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *ProjectNetworkPolicy) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *ProjectNetworkPolicy) (*ProjectNetworkPolicy, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*ProjectNetworkPolicy); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

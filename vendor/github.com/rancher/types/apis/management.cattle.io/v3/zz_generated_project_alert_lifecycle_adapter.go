@@ -42,10 +42,11 @@ func (w *projectAlertLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obje
 func NewProjectAlertLifecycleAdapter(name string, clusterScoped bool, client ProjectAlertInterface, l ProjectAlertLifecycle) ProjectAlertHandlerFunc {
 	adapter := &projectAlertLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *ProjectAlert) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *ProjectAlert) (*ProjectAlert, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*ProjectAlert); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

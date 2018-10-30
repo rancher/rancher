@@ -35,7 +35,7 @@ type PipelineExecutionList struct {
 	Items           []PipelineExecution
 }
 
-type PipelineExecutionHandlerFunc func(key string, obj *PipelineExecution) error
+type PipelineExecutionHandlerFunc func(key string, obj *PipelineExecution) (*PipelineExecution, error)
 
 type PipelineExecutionLister interface {
 	List(namespace string, selector labels.Selector) (ret []*PipelineExecution, err error)
@@ -46,8 +46,8 @@ type PipelineExecutionController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() PipelineExecutionLister
-	AddHandler(name string, handler PipelineExecutionHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler PipelineExecutionHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler PipelineExecutionHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler PipelineExecutionHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,10 +65,10 @@ type PipelineExecutionInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PipelineExecutionController
-	AddHandler(name string, sync PipelineExecutionHandlerFunc)
-	AddLifecycle(name string, lifecycle PipelineExecutionLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync PipelineExecutionHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle PipelineExecutionLifecycle)
+	AddHandler(ctx context.Context, name string, sync PipelineExecutionHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle PipelineExecutionLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync PipelineExecutionHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PipelineExecutionLifecycle)
 }
 
 type pipelineExecutionLister struct {
@@ -116,34 +116,27 @@ func (c *pipelineExecutionController) Lister() PipelineExecutionLister {
 	}
 }
 
-func (c *pipelineExecutionController) AddHandler(name string, handler PipelineExecutionHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *pipelineExecutionController) AddHandler(ctx context.Context, name string, handler PipelineExecutionHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*PipelineExecution); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*PipelineExecution))
 	})
 }
 
-func (c *pipelineExecutionController) AddClusterScopedHandler(name, cluster string, handler PipelineExecutionHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *pipelineExecutionController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler PipelineExecutionHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*PipelineExecution); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*PipelineExecution))
 	})
 }
 
@@ -238,20 +231,20 @@ func (s *pipelineExecutionClient) DeleteCollection(deleteOpts *metav1.DeleteOpti
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *pipelineExecutionClient) AddHandler(name string, sync PipelineExecutionHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *pipelineExecutionClient) AddHandler(ctx context.Context, name string, sync PipelineExecutionHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *pipelineExecutionClient) AddLifecycle(name string, lifecycle PipelineExecutionLifecycle) {
+func (s *pipelineExecutionClient) AddLifecycle(ctx context.Context, name string, lifecycle PipelineExecutionLifecycle) {
 	sync := NewPipelineExecutionLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *pipelineExecutionClient) AddClusterScopedHandler(name, clusterName string, sync PipelineExecutionHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *pipelineExecutionClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync PipelineExecutionHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *pipelineExecutionClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle PipelineExecutionLifecycle) {
+func (s *pipelineExecutionClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PipelineExecutionLifecycle) {
 	sync := NewPipelineExecutionLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

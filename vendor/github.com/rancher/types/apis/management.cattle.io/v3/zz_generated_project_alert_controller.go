@@ -35,7 +35,7 @@ type ProjectAlertList struct {
 	Items           []ProjectAlert
 }
 
-type ProjectAlertHandlerFunc func(key string, obj *ProjectAlert) error
+type ProjectAlertHandlerFunc func(key string, obj *ProjectAlert) (*ProjectAlert, error)
 
 type ProjectAlertLister interface {
 	List(namespace string, selector labels.Selector) (ret []*ProjectAlert, err error)
@@ -46,8 +46,8 @@ type ProjectAlertController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ProjectAlertLister
-	AddHandler(name string, handler ProjectAlertHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler ProjectAlertHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler ProjectAlertHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ProjectAlertHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,10 +65,10 @@ type ProjectAlertInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ProjectAlertController
-	AddHandler(name string, sync ProjectAlertHandlerFunc)
-	AddLifecycle(name string, lifecycle ProjectAlertLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync ProjectAlertHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle ProjectAlertLifecycle)
+	AddHandler(ctx context.Context, name string, sync ProjectAlertHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle ProjectAlertLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ProjectAlertHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ProjectAlertLifecycle)
 }
 
 type projectAlertLister struct {
@@ -116,34 +116,27 @@ func (c *projectAlertController) Lister() ProjectAlertLister {
 	}
 }
 
-func (c *projectAlertController) AddHandler(name string, handler ProjectAlertHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *projectAlertController) AddHandler(ctx context.Context, name string, handler ProjectAlertHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*ProjectAlert); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*ProjectAlert))
 	})
 }
 
-func (c *projectAlertController) AddClusterScopedHandler(name, cluster string, handler ProjectAlertHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *projectAlertController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ProjectAlertHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*ProjectAlert); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*ProjectAlert))
 	})
 }
 
@@ -238,20 +231,20 @@ func (s *projectAlertClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, 
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *projectAlertClient) AddHandler(name string, sync ProjectAlertHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *projectAlertClient) AddHandler(ctx context.Context, name string, sync ProjectAlertHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *projectAlertClient) AddLifecycle(name string, lifecycle ProjectAlertLifecycle) {
+func (s *projectAlertClient) AddLifecycle(ctx context.Context, name string, lifecycle ProjectAlertLifecycle) {
 	sync := NewProjectAlertLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *projectAlertClient) AddClusterScopedHandler(name, clusterName string, sync ProjectAlertHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *projectAlertClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ProjectAlertHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *projectAlertClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle ProjectAlertLifecycle) {
+func (s *projectAlertClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ProjectAlertLifecycle) {
 	sync := NewProjectAlertLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

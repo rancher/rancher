@@ -34,7 +34,7 @@ type TemplateContentList struct {
 	Items           []TemplateContent
 }
 
-type TemplateContentHandlerFunc func(key string, obj *TemplateContent) error
+type TemplateContentHandlerFunc func(key string, obj *TemplateContent) (*TemplateContent, error)
 
 type TemplateContentLister interface {
 	List(namespace string, selector labels.Selector) (ret []*TemplateContent, err error)
@@ -45,8 +45,8 @@ type TemplateContentController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() TemplateContentLister
-	AddHandler(name string, handler TemplateContentHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler TemplateContentHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler TemplateContentHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler TemplateContentHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -64,10 +64,10 @@ type TemplateContentInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() TemplateContentController
-	AddHandler(name string, sync TemplateContentHandlerFunc)
-	AddLifecycle(name string, lifecycle TemplateContentLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync TemplateContentHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle TemplateContentLifecycle)
+	AddHandler(ctx context.Context, name string, sync TemplateContentHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle TemplateContentLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync TemplateContentHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle TemplateContentLifecycle)
 }
 
 type templateContentLister struct {
@@ -115,34 +115,27 @@ func (c *templateContentController) Lister() TemplateContentLister {
 	}
 }
 
-func (c *templateContentController) AddHandler(name string, handler TemplateContentHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *templateContentController) AddHandler(ctx context.Context, name string, handler TemplateContentHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*TemplateContent); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*TemplateContent))
 	})
 }
 
-func (c *templateContentController) AddClusterScopedHandler(name, cluster string, handler TemplateContentHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *templateContentController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler TemplateContentHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*TemplateContent); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*TemplateContent))
 	})
 }
 
@@ -237,20 +230,20 @@ func (s *templateContentClient) DeleteCollection(deleteOpts *metav1.DeleteOption
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *templateContentClient) AddHandler(name string, sync TemplateContentHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *templateContentClient) AddHandler(ctx context.Context, name string, sync TemplateContentHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *templateContentClient) AddLifecycle(name string, lifecycle TemplateContentLifecycle) {
+func (s *templateContentClient) AddLifecycle(ctx context.Context, name string, lifecycle TemplateContentLifecycle) {
 	sync := NewTemplateContentLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *templateContentClient) AddClusterScopedHandler(name, clusterName string, sync TemplateContentHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *templateContentClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync TemplateContentHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *templateContentClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle TemplateContentLifecycle) {
+func (s *templateContentClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle TemplateContentLifecycle) {
 	sync := NewTemplateContentLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

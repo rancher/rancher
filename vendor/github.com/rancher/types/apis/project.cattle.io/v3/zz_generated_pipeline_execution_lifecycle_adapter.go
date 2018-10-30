@@ -42,10 +42,11 @@ func (w *pipelineExecutionLifecycleAdapter) Updated(obj runtime.Object) (runtime
 func NewPipelineExecutionLifecycleAdapter(name string, clusterScoped bool, client PipelineExecutionInterface, l PipelineExecutionLifecycle) PipelineExecutionHandlerFunc {
 	adapter := &pipelineExecutionLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *PipelineExecution) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *PipelineExecution) (*PipelineExecution, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*PipelineExecution); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

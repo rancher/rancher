@@ -35,7 +35,7 @@ type ClusterCatalogList struct {
 	Items           []ClusterCatalog
 }
 
-type ClusterCatalogHandlerFunc func(key string, obj *ClusterCatalog) error
+type ClusterCatalogHandlerFunc func(key string, obj *ClusterCatalog) (*ClusterCatalog, error)
 
 type ClusterCatalogLister interface {
 	List(namespace string, selector labels.Selector) (ret []*ClusterCatalog, err error)
@@ -46,8 +46,8 @@ type ClusterCatalogController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ClusterCatalogLister
-	AddHandler(name string, handler ClusterCatalogHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler ClusterCatalogHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler ClusterCatalogHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ClusterCatalogHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,10 +65,10 @@ type ClusterCatalogInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterCatalogController
-	AddHandler(name string, sync ClusterCatalogHandlerFunc)
-	AddLifecycle(name string, lifecycle ClusterCatalogLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync ClusterCatalogHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle ClusterCatalogLifecycle)
+	AddHandler(ctx context.Context, name string, sync ClusterCatalogHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle ClusterCatalogLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ClusterCatalogHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterCatalogLifecycle)
 }
 
 type clusterCatalogLister struct {
@@ -116,34 +116,27 @@ func (c *clusterCatalogController) Lister() ClusterCatalogLister {
 	}
 }
 
-func (c *clusterCatalogController) AddHandler(name string, handler ClusterCatalogHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *clusterCatalogController) AddHandler(ctx context.Context, name string, handler ClusterCatalogHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*ClusterCatalog); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*ClusterCatalog))
 	})
 }
 
-func (c *clusterCatalogController) AddClusterScopedHandler(name, cluster string, handler ClusterCatalogHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *clusterCatalogController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ClusterCatalogHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*ClusterCatalog); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*ClusterCatalog))
 	})
 }
 
@@ -238,20 +231,20 @@ func (s *clusterCatalogClient) DeleteCollection(deleteOpts *metav1.DeleteOptions
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *clusterCatalogClient) AddHandler(name string, sync ClusterCatalogHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *clusterCatalogClient) AddHandler(ctx context.Context, name string, sync ClusterCatalogHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *clusterCatalogClient) AddLifecycle(name string, lifecycle ClusterCatalogLifecycle) {
+func (s *clusterCatalogClient) AddLifecycle(ctx context.Context, name string, lifecycle ClusterCatalogLifecycle) {
 	sync := NewClusterCatalogLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *clusterCatalogClient) AddClusterScopedHandler(name, clusterName string, sync ClusterCatalogHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *clusterCatalogClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ClusterCatalogHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *clusterCatalogClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle ClusterCatalogLifecycle) {
+func (s *clusterCatalogClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterCatalogLifecycle) {
 	sync := NewClusterCatalogLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

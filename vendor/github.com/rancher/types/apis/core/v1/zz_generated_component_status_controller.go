@@ -35,7 +35,7 @@ type ComponentStatusList struct {
 	Items           []v1.ComponentStatus
 }
 
-type ComponentStatusHandlerFunc func(key string, obj *v1.ComponentStatus) error
+type ComponentStatusHandlerFunc func(key string, obj *v1.ComponentStatus) (*v1.ComponentStatus, error)
 
 type ComponentStatusLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.ComponentStatus, err error)
@@ -46,8 +46,8 @@ type ComponentStatusController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ComponentStatusLister
-	AddHandler(name string, handler ComponentStatusHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler ComponentStatusHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler ComponentStatusHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ComponentStatusHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,10 +65,10 @@ type ComponentStatusInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ComponentStatusController
-	AddHandler(name string, sync ComponentStatusHandlerFunc)
-	AddLifecycle(name string, lifecycle ComponentStatusLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync ComponentStatusHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle ComponentStatusLifecycle)
+	AddHandler(ctx context.Context, name string, sync ComponentStatusHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle ComponentStatusLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ComponentStatusHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ComponentStatusLifecycle)
 }
 
 type componentStatusLister struct {
@@ -116,34 +116,27 @@ func (c *componentStatusController) Lister() ComponentStatusLister {
 	}
 }
 
-func (c *componentStatusController) AddHandler(name string, handler ComponentStatusHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *componentStatusController) AddHandler(ctx context.Context, name string, handler ComponentStatusHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1.ComponentStatus); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*v1.ComponentStatus))
 	})
 }
 
-func (c *componentStatusController) AddClusterScopedHandler(name, cluster string, handler ComponentStatusHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *componentStatusController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ComponentStatusHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1.ComponentStatus); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*v1.ComponentStatus))
 	})
 }
 
@@ -238,20 +231,20 @@ func (s *componentStatusClient) DeleteCollection(deleteOpts *metav1.DeleteOption
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *componentStatusClient) AddHandler(name string, sync ComponentStatusHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *componentStatusClient) AddHandler(ctx context.Context, name string, sync ComponentStatusHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *componentStatusClient) AddLifecycle(name string, lifecycle ComponentStatusLifecycle) {
+func (s *componentStatusClient) AddLifecycle(ctx context.Context, name string, lifecycle ComponentStatusLifecycle) {
 	sync := NewComponentStatusLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *componentStatusClient) AddClusterScopedHandler(name, clusterName string, sync ComponentStatusHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *componentStatusClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ComponentStatusHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *componentStatusClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle ComponentStatusLifecycle) {
+func (s *componentStatusClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ComponentStatusLifecycle) {
 	sync := NewComponentStatusLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

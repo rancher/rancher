@@ -36,7 +36,7 @@ type PodList struct {
 	Items           []v1.Pod
 }
 
-type PodHandlerFunc func(key string, obj *v1.Pod) error
+type PodHandlerFunc func(key string, obj *v1.Pod) (*v1.Pod, error)
 
 type PodLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.Pod, err error)
@@ -47,8 +47,8 @@ type PodController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() PodLister
-	AddHandler(name string, handler PodHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler PodHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler PodHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler PodHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -66,10 +66,10 @@ type PodInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PodController
-	AddHandler(name string, sync PodHandlerFunc)
-	AddLifecycle(name string, lifecycle PodLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync PodHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle PodLifecycle)
+	AddHandler(ctx context.Context, name string, sync PodHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle PodLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync PodHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PodLifecycle)
 }
 
 type podLister struct {
@@ -117,34 +117,27 @@ func (c *podController) Lister() PodLister {
 	}
 }
 
-func (c *podController) AddHandler(name string, handler PodHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *podController) AddHandler(ctx context.Context, name string, handler PodHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1.Pod); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*v1.Pod))
 	})
 }
 
-func (c *podController) AddClusterScopedHandler(name, cluster string, handler PodHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *podController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler PodHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1.Pod); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*v1.Pod))
 	})
 }
 
@@ -239,20 +232,20 @@ func (s *podClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts 
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *podClient) AddHandler(name string, sync PodHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *podClient) AddHandler(ctx context.Context, name string, sync PodHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *podClient) AddLifecycle(name string, lifecycle PodLifecycle) {
+func (s *podClient) AddLifecycle(ctx context.Context, name string, lifecycle PodLifecycle) {
 	sync := NewPodLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *podClient) AddClusterScopedHandler(name, clusterName string, sync PodHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *podClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync PodHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *podClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle PodLifecycle) {
+func (s *podClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PodLifecycle) {
 	sync := NewPodLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

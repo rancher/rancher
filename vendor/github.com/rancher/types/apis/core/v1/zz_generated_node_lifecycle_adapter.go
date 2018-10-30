@@ -43,10 +43,11 @@ func (w *nodeLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, erro
 func NewNodeLifecycleAdapter(name string, clusterScoped bool, client NodeInterface, l NodeLifecycle) NodeHandlerFunc {
 	adapter := &nodeLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1.Node) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *v1.Node) (*v1.Node, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*v1.Node); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

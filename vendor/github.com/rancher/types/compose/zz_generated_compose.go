@@ -22,7 +22,6 @@ type Config struct {
 	ClusterRoleTemplateBindings              map[string]managementClient.ClusterRoleTemplateBinding              `json:"clusterRoleTemplateBindings,omitempty" yaml:"clusterRoleTemplateBindings,omitempty"`
 	ProjectRoleTemplateBindings              map[string]managementClient.ProjectRoleTemplateBinding              `json:"projectRoleTemplateBindings,omitempty" yaml:"projectRoleTemplateBindings,omitempty"`
 	Clusters                                 map[string]managementClient.Cluster                                 `json:"clusters,omitempty" yaml:"clusters,omitempty"`
-	ClusterEvents                            map[string]managementClient.ClusterEvent                            `json:"clusterEvents,omitempty" yaml:"clusterEvents,omitempty"`
 	ClusterRegistrationTokens                map[string]managementClient.ClusterRegistrationToken                `json:"clusterRegistrationTokens,omitempty" yaml:"clusterRegistrationTokens,omitempty"`
 	Catalogs                                 map[string]managementClient.Catalog                                 `json:"catalogs,omitempty" yaml:"catalogs,omitempty"`
 	Templates                                map[string]managementClient.Template                                `json:"templates,omitempty" yaml:"templates,omitempty"`

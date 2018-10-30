@@ -34,7 +34,7 @@ type GroupMemberList struct {
 	Items           []GroupMember
 }
 
-type GroupMemberHandlerFunc func(key string, obj *GroupMember) error
+type GroupMemberHandlerFunc func(key string, obj *GroupMember) (*GroupMember, error)
 
 type GroupMemberLister interface {
 	List(namespace string, selector labels.Selector) (ret []*GroupMember, err error)
@@ -45,8 +45,8 @@ type GroupMemberController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() GroupMemberLister
-	AddHandler(name string, handler GroupMemberHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler GroupMemberHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler GroupMemberHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler GroupMemberHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -64,10 +64,10 @@ type GroupMemberInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() GroupMemberController
-	AddHandler(name string, sync GroupMemberHandlerFunc)
-	AddLifecycle(name string, lifecycle GroupMemberLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync GroupMemberHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle GroupMemberLifecycle)
+	AddHandler(ctx context.Context, name string, sync GroupMemberHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle GroupMemberLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync GroupMemberHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle GroupMemberLifecycle)
 }
 
 type groupMemberLister struct {
@@ -115,34 +115,27 @@ func (c *groupMemberController) Lister() GroupMemberLister {
 	}
 }
 
-func (c *groupMemberController) AddHandler(name string, handler GroupMemberHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *groupMemberController) AddHandler(ctx context.Context, name string, handler GroupMemberHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*GroupMember); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*GroupMember))
 	})
 }
 
-func (c *groupMemberController) AddClusterScopedHandler(name, cluster string, handler GroupMemberHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *groupMemberController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler GroupMemberHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*GroupMember); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*GroupMember))
 	})
 }
 
@@ -237,20 +230,20 @@ func (s *groupMemberClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, l
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *groupMemberClient) AddHandler(name string, sync GroupMemberHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *groupMemberClient) AddHandler(ctx context.Context, name string, sync GroupMemberHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *groupMemberClient) AddLifecycle(name string, lifecycle GroupMemberLifecycle) {
+func (s *groupMemberClient) AddLifecycle(ctx context.Context, name string, lifecycle GroupMemberLifecycle) {
 	sync := NewGroupMemberLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *groupMemberClient) AddClusterScopedHandler(name, clusterName string, sync GroupMemberHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *groupMemberClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync GroupMemberHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *groupMemberClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle GroupMemberLifecycle) {
+func (s *groupMemberClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle GroupMemberLifecycle) {
 	sync := NewGroupMemberLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

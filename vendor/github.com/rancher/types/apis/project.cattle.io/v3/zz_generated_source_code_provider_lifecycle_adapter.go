@@ -42,10 +42,11 @@ func (w *sourceCodeProviderLifecycleAdapter) Updated(obj runtime.Object) (runtim
 func NewSourceCodeProviderLifecycleAdapter(name string, clusterScoped bool, client SourceCodeProviderInterface, l SourceCodeProviderLifecycle) SourceCodeProviderHandlerFunc {
 	adapter := &sourceCodeProviderLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *SourceCodeProvider) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *SourceCodeProvider) (*SourceCodeProvider, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*SourceCodeProvider); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

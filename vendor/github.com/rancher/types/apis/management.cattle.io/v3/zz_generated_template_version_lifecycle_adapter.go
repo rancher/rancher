@@ -42,10 +42,11 @@ func (w *templateVersionLifecycleAdapter) Updated(obj runtime.Object) (runtime.O
 func NewTemplateVersionLifecycleAdapter(name string, clusterScoped bool, client TemplateVersionInterface, l TemplateVersionLifecycle) TemplateVersionHandlerFunc {
 	adapter := &templateVersionLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *TemplateVersion) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *TemplateVersion) (*TemplateVersion, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*TemplateVersion); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

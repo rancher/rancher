@@ -42,10 +42,11 @@ func (w *clusterRoleTemplateBindingLifecycleAdapter) Updated(obj runtime.Object)
 func NewClusterRoleTemplateBindingLifecycleAdapter(name string, clusterScoped bool, client ClusterRoleTemplateBindingInterface, l ClusterRoleTemplateBindingLifecycle) ClusterRoleTemplateBindingHandlerFunc {
 	adapter := &clusterRoleTemplateBindingLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *ClusterRoleTemplateBinding) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *ClusterRoleTemplateBinding) (*ClusterRoleTemplateBinding, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*ClusterRoleTemplateBinding); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

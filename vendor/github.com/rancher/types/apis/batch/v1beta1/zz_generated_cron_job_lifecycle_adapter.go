@@ -43,10 +43,11 @@ func (w *cronJobLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, e
 func NewCronJobLifecycleAdapter(name string, clusterScoped bool, client CronJobInterface, l CronJobLifecycle) CronJobHandlerFunc {
 	adapter := &cronJobLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1beta1.CronJob) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *v1beta1.CronJob) (*v1beta1.CronJob, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*v1beta1.CronJob); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

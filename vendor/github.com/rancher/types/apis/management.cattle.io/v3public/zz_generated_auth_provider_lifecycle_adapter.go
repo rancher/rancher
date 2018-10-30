@@ -42,10 +42,11 @@ func (w *authProviderLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obje
 func NewAuthProviderLifecycleAdapter(name string, clusterScoped bool, client AuthProviderInterface, l AuthProviderLifecycle) AuthProviderHandlerFunc {
 	adapter := &authProviderLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *AuthProvider) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *AuthProvider) (*AuthProvider, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*AuthProvider); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

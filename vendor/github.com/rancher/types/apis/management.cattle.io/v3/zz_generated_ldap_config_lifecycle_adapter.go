@@ -42,10 +42,11 @@ func (w *ldapConfigLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object
 func NewLdapConfigLifecycleAdapter(name string, clusterScoped bool, client LdapConfigInterface, l LdapConfigLifecycle) LdapConfigHandlerFunc {
 	adapter := &ldapConfigLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *LdapConfig) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *LdapConfig) (*LdapConfig, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*LdapConfig); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

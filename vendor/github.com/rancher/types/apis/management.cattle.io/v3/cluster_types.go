@@ -237,12 +237,6 @@ type AmazonElasticContainerServiceConfig struct {
 	AssociateWorkerNodePublicIP *bool    `json:"associateWorkerNodePublicIp,omitempty" norman:"default=true"`
 }
 
-type ClusterEvent struct {
-	types.Namespaced
-	v1.Event
-	ClusterName string `json:"clusterName" norman:"type=reference[cluster]"`
-}
-
 type ClusterRegistrationToken struct {
 	types.Namespaced
 

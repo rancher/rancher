@@ -34,7 +34,7 @@ type AuthProviderList struct {
 	Items           []AuthProvider
 }
 
-type AuthProviderHandlerFunc func(key string, obj *AuthProvider) error
+type AuthProviderHandlerFunc func(key string, obj *AuthProvider) (*AuthProvider, error)
 
 type AuthProviderLister interface {
 	List(namespace string, selector labels.Selector) (ret []*AuthProvider, err error)
@@ -45,8 +45,8 @@ type AuthProviderController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() AuthProviderLister
-	AddHandler(name string, handler AuthProviderHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler AuthProviderHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler AuthProviderHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler AuthProviderHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -64,10 +64,10 @@ type AuthProviderInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() AuthProviderController
-	AddHandler(name string, sync AuthProviderHandlerFunc)
-	AddLifecycle(name string, lifecycle AuthProviderLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync AuthProviderHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle AuthProviderLifecycle)
+	AddHandler(ctx context.Context, name string, sync AuthProviderHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle AuthProviderLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync AuthProviderHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle AuthProviderLifecycle)
 }
 
 type authProviderLister struct {
@@ -115,34 +115,27 @@ func (c *authProviderController) Lister() AuthProviderLister {
 	}
 }
 
-func (c *authProviderController) AddHandler(name string, handler AuthProviderHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *authProviderController) AddHandler(ctx context.Context, name string, handler AuthProviderHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*AuthProvider); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*AuthProvider))
 	})
 }
 
-func (c *authProviderController) AddClusterScopedHandler(name, cluster string, handler AuthProviderHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *authProviderController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler AuthProviderHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*AuthProvider); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*AuthProvider))
 	})
 }
 
@@ -237,20 +230,20 @@ func (s *authProviderClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, 
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *authProviderClient) AddHandler(name string, sync AuthProviderHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *authProviderClient) AddHandler(ctx context.Context, name string, sync AuthProviderHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *authProviderClient) AddLifecycle(name string, lifecycle AuthProviderLifecycle) {
+func (s *authProviderClient) AddLifecycle(ctx context.Context, name string, lifecycle AuthProviderLifecycle) {
 	sync := NewAuthProviderLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *authProviderClient) AddClusterScopedHandler(name, clusterName string, sync AuthProviderHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *authProviderClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync AuthProviderHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *authProviderClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle AuthProviderLifecycle) {
+func (s *authProviderClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle AuthProviderLifecycle) {
 	sync := NewAuthProviderLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

@@ -35,7 +35,7 @@ type PreferenceList struct {
 	Items           []Preference
 }
 
-type PreferenceHandlerFunc func(key string, obj *Preference) error
+type PreferenceHandlerFunc func(key string, obj *Preference) (*Preference, error)
 
 type PreferenceLister interface {
 	List(namespace string, selector labels.Selector) (ret []*Preference, err error)
@@ -46,8 +46,8 @@ type PreferenceController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() PreferenceLister
-	AddHandler(name string, handler PreferenceHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler PreferenceHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler PreferenceHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler PreferenceHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,10 +65,10 @@ type PreferenceInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PreferenceController
-	AddHandler(name string, sync PreferenceHandlerFunc)
-	AddLifecycle(name string, lifecycle PreferenceLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync PreferenceHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle PreferenceLifecycle)
+	AddHandler(ctx context.Context, name string, sync PreferenceHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle PreferenceLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync PreferenceHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PreferenceLifecycle)
 }
 
 type preferenceLister struct {
@@ -116,34 +116,27 @@ func (c *preferenceController) Lister() PreferenceLister {
 	}
 }
 
-func (c *preferenceController) AddHandler(name string, handler PreferenceHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *preferenceController) AddHandler(ctx context.Context, name string, handler PreferenceHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*Preference); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*Preference))
 	})
 }
 
-func (c *preferenceController) AddClusterScopedHandler(name, cluster string, handler PreferenceHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *preferenceController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler PreferenceHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*Preference); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*Preference))
 	})
 }
 
@@ -238,20 +231,20 @@ func (s *preferenceClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, li
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *preferenceClient) AddHandler(name string, sync PreferenceHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *preferenceClient) AddHandler(ctx context.Context, name string, sync PreferenceHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *preferenceClient) AddLifecycle(name string, lifecycle PreferenceLifecycle) {
+func (s *preferenceClient) AddLifecycle(ctx context.Context, name string, lifecycle PreferenceLifecycle) {
 	sync := NewPreferenceLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *preferenceClient) AddClusterScopedHandler(name, clusterName string, sync PreferenceHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *preferenceClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync PreferenceHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *preferenceClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle PreferenceLifecycle) {
+func (s *preferenceClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PreferenceLifecycle) {
 	sync := NewPreferenceLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

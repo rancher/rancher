@@ -34,7 +34,7 @@ type TemplateVersionList struct {
 	Items           []TemplateVersion
 }
 
-type TemplateVersionHandlerFunc func(key string, obj *TemplateVersion) error
+type TemplateVersionHandlerFunc func(key string, obj *TemplateVersion) (*TemplateVersion, error)
 
 type TemplateVersionLister interface {
 	List(namespace string, selector labels.Selector) (ret []*TemplateVersion, err error)
@@ -45,8 +45,8 @@ type TemplateVersionController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() TemplateVersionLister
-	AddHandler(name string, handler TemplateVersionHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler TemplateVersionHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler TemplateVersionHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler TemplateVersionHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -64,10 +64,10 @@ type TemplateVersionInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() TemplateVersionController
-	AddHandler(name string, sync TemplateVersionHandlerFunc)
-	AddLifecycle(name string, lifecycle TemplateVersionLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync TemplateVersionHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle TemplateVersionLifecycle)
+	AddHandler(ctx context.Context, name string, sync TemplateVersionHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle TemplateVersionLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync TemplateVersionHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle TemplateVersionLifecycle)
 }
 
 type templateVersionLister struct {
@@ -115,34 +115,27 @@ func (c *templateVersionController) Lister() TemplateVersionLister {
 	}
 }
 
-func (c *templateVersionController) AddHandler(name string, handler TemplateVersionHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *templateVersionController) AddHandler(ctx context.Context, name string, handler TemplateVersionHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*TemplateVersion); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*TemplateVersion))
 	})
 }
 
-func (c *templateVersionController) AddClusterScopedHandler(name, cluster string, handler TemplateVersionHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *templateVersionController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler TemplateVersionHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*TemplateVersion); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*TemplateVersion))
 	})
 }
 
@@ -237,20 +230,20 @@ func (s *templateVersionClient) DeleteCollection(deleteOpts *metav1.DeleteOption
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *templateVersionClient) AddHandler(name string, sync TemplateVersionHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *templateVersionClient) AddHandler(ctx context.Context, name string, sync TemplateVersionHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *templateVersionClient) AddLifecycle(name string, lifecycle TemplateVersionLifecycle) {
+func (s *templateVersionClient) AddLifecycle(ctx context.Context, name string, lifecycle TemplateVersionLifecycle) {
 	sync := NewTemplateVersionLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *templateVersionClient) AddClusterScopedHandler(name, clusterName string, sync TemplateVersionHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *templateVersionClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync TemplateVersionHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *templateVersionClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle TemplateVersionLifecycle) {
+func (s *templateVersionClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle TemplateVersionLifecycle) {
 	sync := NewTemplateVersionLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

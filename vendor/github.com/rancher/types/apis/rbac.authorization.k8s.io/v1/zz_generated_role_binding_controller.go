@@ -36,7 +36,7 @@ type RoleBindingList struct {
 	Items           []v1.RoleBinding
 }
 
-type RoleBindingHandlerFunc func(key string, obj *v1.RoleBinding) error
+type RoleBindingHandlerFunc func(key string, obj *v1.RoleBinding) (*v1.RoleBinding, error)
 
 type RoleBindingLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.RoleBinding, err error)
@@ -47,8 +47,8 @@ type RoleBindingController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() RoleBindingLister
-	AddHandler(name string, handler RoleBindingHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler RoleBindingHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler RoleBindingHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler RoleBindingHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -66,10 +66,10 @@ type RoleBindingInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() RoleBindingController
-	AddHandler(name string, sync RoleBindingHandlerFunc)
-	AddLifecycle(name string, lifecycle RoleBindingLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync RoleBindingHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle RoleBindingLifecycle)
+	AddHandler(ctx context.Context, name string, sync RoleBindingHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle RoleBindingLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync RoleBindingHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle RoleBindingLifecycle)
 }
 
 type roleBindingLister struct {
@@ -117,34 +117,27 @@ func (c *roleBindingController) Lister() RoleBindingLister {
 	}
 }
 
-func (c *roleBindingController) AddHandler(name string, handler RoleBindingHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *roleBindingController) AddHandler(ctx context.Context, name string, handler RoleBindingHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1.RoleBinding); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*v1.RoleBinding))
 	})
 }
 
-func (c *roleBindingController) AddClusterScopedHandler(name, cluster string, handler RoleBindingHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *roleBindingController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler RoleBindingHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1.RoleBinding); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*v1.RoleBinding))
 	})
 }
 
@@ -239,20 +232,20 @@ func (s *roleBindingClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, l
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *roleBindingClient) AddHandler(name string, sync RoleBindingHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *roleBindingClient) AddHandler(ctx context.Context, name string, sync RoleBindingHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *roleBindingClient) AddLifecycle(name string, lifecycle RoleBindingLifecycle) {
+func (s *roleBindingClient) AddLifecycle(ctx context.Context, name string, lifecycle RoleBindingLifecycle) {
 	sync := NewRoleBindingLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *roleBindingClient) AddClusterScopedHandler(name, clusterName string, sync RoleBindingHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *roleBindingClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync RoleBindingHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *roleBindingClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle RoleBindingLifecycle) {
+func (s *roleBindingClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle RoleBindingLifecycle) {
 	sync := NewRoleBindingLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

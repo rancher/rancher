@@ -36,7 +36,7 @@ type DaemonSetList struct {
 	Items           []v1beta2.DaemonSet
 }
 
-type DaemonSetHandlerFunc func(key string, obj *v1beta2.DaemonSet) error
+type DaemonSetHandlerFunc func(key string, obj *v1beta2.DaemonSet) (*v1beta2.DaemonSet, error)
 
 type DaemonSetLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1beta2.DaemonSet, err error)
@@ -47,8 +47,8 @@ type DaemonSetController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() DaemonSetLister
-	AddHandler(name string, handler DaemonSetHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler DaemonSetHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler DaemonSetHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler DaemonSetHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -66,10 +66,10 @@ type DaemonSetInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DaemonSetController
-	AddHandler(name string, sync DaemonSetHandlerFunc)
-	AddLifecycle(name string, lifecycle DaemonSetLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync DaemonSetHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle DaemonSetLifecycle)
+	AddHandler(ctx context.Context, name string, sync DaemonSetHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle DaemonSetLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync DaemonSetHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle DaemonSetLifecycle)
 }
 
 type daemonSetLister struct {
@@ -117,34 +117,27 @@ func (c *daemonSetController) Lister() DaemonSetLister {
 	}
 }
 
-func (c *daemonSetController) AddHandler(name string, handler DaemonSetHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *daemonSetController) AddHandler(ctx context.Context, name string, handler DaemonSetHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1beta2.DaemonSet); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*v1beta2.DaemonSet))
 	})
 }
 
-func (c *daemonSetController) AddClusterScopedHandler(name, cluster string, handler DaemonSetHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *daemonSetController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler DaemonSetHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1beta2.DaemonSet); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*v1beta2.DaemonSet))
 	})
 }
 
@@ -239,20 +232,20 @@ func (s *daemonSetClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, lis
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *daemonSetClient) AddHandler(name string, sync DaemonSetHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *daemonSetClient) AddHandler(ctx context.Context, name string, sync DaemonSetHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *daemonSetClient) AddLifecycle(name string, lifecycle DaemonSetLifecycle) {
+func (s *daemonSetClient) AddLifecycle(ctx context.Context, name string, lifecycle DaemonSetLifecycle) {
 	sync := NewDaemonSetLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *daemonSetClient) AddClusterScopedHandler(name, clusterName string, sync DaemonSetHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *daemonSetClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync DaemonSetHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *daemonSetClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle DaemonSetLifecycle) {
+func (s *daemonSetClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle DaemonSetLifecycle) {
 	sync := NewDaemonSetLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

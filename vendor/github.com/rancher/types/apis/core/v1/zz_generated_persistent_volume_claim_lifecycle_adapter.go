@@ -43,10 +43,11 @@ func (w *persistentVolumeClaimLifecycleAdapter) Updated(obj runtime.Object) (run
 func NewPersistentVolumeClaimLifecycleAdapter(name string, clusterScoped bool, client PersistentVolumeClaimInterface, l PersistentVolumeClaimLifecycle) PersistentVolumeClaimHandlerFunc {
 	adapter := &persistentVolumeClaimLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1.PersistentVolumeClaim) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*v1.PersistentVolumeClaim); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

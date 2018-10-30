@@ -42,10 +42,11 @@ func (w *listenConfigLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obje
 func NewListenConfigLifecycleAdapter(name string, clusterScoped bool, client ListenConfigInterface, l ListenConfigLifecycle) ListenConfigHandlerFunc {
 	adapter := &listenConfigLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *ListenConfig) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *ListenConfig) (*ListenConfig, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*ListenConfig); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

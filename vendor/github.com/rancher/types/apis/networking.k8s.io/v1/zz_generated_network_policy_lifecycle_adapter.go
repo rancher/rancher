@@ -43,10 +43,11 @@ func (w *networkPolicyLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obj
 func NewNetworkPolicyLifecycleAdapter(name string, clusterScoped bool, client NetworkPolicyInterface, l NetworkPolicyLifecycle) NetworkPolicyHandlerFunc {
 	adapter := &networkPolicyLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1.NetworkPolicy) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *v1.NetworkPolicy) (*v1.NetworkPolicy, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*v1.NetworkPolicy); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

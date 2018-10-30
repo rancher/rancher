@@ -42,10 +42,11 @@ func (w *settingLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, e
 func NewSettingLifecycleAdapter(name string, clusterScoped bool, client SettingInterface, l SettingLifecycle) SettingHandlerFunc {
 	adapter := &settingLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *Setting) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *Setting) (*Setting, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*Setting); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

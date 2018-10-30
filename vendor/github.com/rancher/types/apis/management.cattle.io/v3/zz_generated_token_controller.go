@@ -34,7 +34,7 @@ type TokenList struct {
 	Items           []Token
 }
 
-type TokenHandlerFunc func(key string, obj *Token) error
+type TokenHandlerFunc func(key string, obj *Token) (*Token, error)
 
 type TokenLister interface {
 	List(namespace string, selector labels.Selector) (ret []*Token, err error)
@@ -45,8 +45,8 @@ type TokenController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() TokenLister
-	AddHandler(name string, handler TokenHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler TokenHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler TokenHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler TokenHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -64,10 +64,10 @@ type TokenInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() TokenController
-	AddHandler(name string, sync TokenHandlerFunc)
-	AddLifecycle(name string, lifecycle TokenLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync TokenHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle TokenLifecycle)
+	AddHandler(ctx context.Context, name string, sync TokenHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle TokenLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync TokenHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle TokenLifecycle)
 }
 
 type tokenLister struct {
@@ -115,34 +115,27 @@ func (c *tokenController) Lister() TokenLister {
 	}
 }
 
-func (c *tokenController) AddHandler(name string, handler TokenHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *tokenController) AddHandler(ctx context.Context, name string, handler TokenHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*Token); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*Token))
 	})
 }
 
-func (c *tokenController) AddClusterScopedHandler(name, cluster string, handler TokenHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *tokenController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler TokenHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*Token); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*Token))
 	})
 }
 
@@ -237,20 +230,20 @@ func (s *tokenClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpt
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *tokenClient) AddHandler(name string, sync TokenHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *tokenClient) AddHandler(ctx context.Context, name string, sync TokenHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *tokenClient) AddLifecycle(name string, lifecycle TokenLifecycle) {
+func (s *tokenClient) AddLifecycle(ctx context.Context, name string, lifecycle TokenLifecycle) {
 	sync := NewTokenLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *tokenClient) AddClusterScopedHandler(name, clusterName string, sync TokenHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *tokenClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync TokenHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *tokenClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle TokenLifecycle) {
+func (s *tokenClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle TokenLifecycle) {
 	sync := NewTokenLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

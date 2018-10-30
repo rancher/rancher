@@ -42,10 +42,11 @@ func (w *serviceAccountTokenLifecycleAdapter) Updated(obj runtime.Object) (runti
 func NewServiceAccountTokenLifecycleAdapter(name string, clusterScoped bool, client ServiceAccountTokenInterface, l ServiceAccountTokenLifecycle) ServiceAccountTokenHandlerFunc {
 	adapter := &serviceAccountTokenLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *ServiceAccountToken) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *ServiceAccountToken) (*ServiceAccountToken, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*ServiceAccountToken); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

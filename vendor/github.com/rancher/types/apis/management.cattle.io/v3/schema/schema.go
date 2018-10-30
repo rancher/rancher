@@ -128,10 +128,6 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v3.ClusterStatus{},
 			m.Drop{Field: "serviceAccountToken"},
 		).
-		AddMapperForType(&Version, v3.ClusterEvent{}, &m.Move{
-			From: "type",
-			To:   "eventType",
-		}).
 		AddMapperForType(&Version, v3.ClusterRegistrationToken{},
 			&m.Embed{Field: "status"},
 		).
@@ -139,7 +135,6 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 			m.Drop{Field: "systemImages"},
 		).
 		MustImport(&Version, v3.Cluster{}).
-		MustImport(&Version, v3.ClusterEvent{}).
 		MustImport(&Version, v3.ClusterRegistrationToken{}).
 		MustImport(&Version, v3.GenerateKubeConfigOutput{}).
 		MustImport(&Version, v3.ImportClusterYamlInput{}).

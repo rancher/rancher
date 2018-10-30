@@ -36,7 +36,7 @@ type ReplicaSetList struct {
 	Items           []v1beta2.ReplicaSet
 }
 
-type ReplicaSetHandlerFunc func(key string, obj *v1beta2.ReplicaSet) error
+type ReplicaSetHandlerFunc func(key string, obj *v1beta2.ReplicaSet) (*v1beta2.ReplicaSet, error)
 
 type ReplicaSetLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1beta2.ReplicaSet, err error)
@@ -47,8 +47,8 @@ type ReplicaSetController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ReplicaSetLister
-	AddHandler(name string, handler ReplicaSetHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler ReplicaSetHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler ReplicaSetHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ReplicaSetHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -66,10 +66,10 @@ type ReplicaSetInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ReplicaSetController
-	AddHandler(name string, sync ReplicaSetHandlerFunc)
-	AddLifecycle(name string, lifecycle ReplicaSetLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync ReplicaSetHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle ReplicaSetLifecycle)
+	AddHandler(ctx context.Context, name string, sync ReplicaSetHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle ReplicaSetLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ReplicaSetHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ReplicaSetLifecycle)
 }
 
 type replicaSetLister struct {
@@ -117,34 +117,27 @@ func (c *replicaSetController) Lister() ReplicaSetLister {
 	}
 }
 
-func (c *replicaSetController) AddHandler(name string, handler ReplicaSetHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *replicaSetController) AddHandler(ctx context.Context, name string, handler ReplicaSetHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1beta2.ReplicaSet); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*v1beta2.ReplicaSet))
 	})
 }
 
-func (c *replicaSetController) AddClusterScopedHandler(name, cluster string, handler ReplicaSetHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *replicaSetController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ReplicaSetHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1beta2.ReplicaSet); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*v1beta2.ReplicaSet))
 	})
 }
 
@@ -239,20 +232,20 @@ func (s *replicaSetClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, li
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *replicaSetClient) AddHandler(name string, sync ReplicaSetHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *replicaSetClient) AddHandler(ctx context.Context, name string, sync ReplicaSetHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *replicaSetClient) AddLifecycle(name string, lifecycle ReplicaSetLifecycle) {
+func (s *replicaSetClient) AddLifecycle(ctx context.Context, name string, lifecycle ReplicaSetLifecycle) {
 	sync := NewReplicaSetLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *replicaSetClient) AddClusterScopedHandler(name, clusterName string, sync ReplicaSetHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *replicaSetClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ReplicaSetHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *replicaSetClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle ReplicaSetLifecycle) {
+func (s *replicaSetClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ReplicaSetLifecycle) {
 	sync := NewReplicaSetLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

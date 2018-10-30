@@ -42,10 +42,11 @@ func (w *nodePoolLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, 
 func NewNodePoolLifecycleAdapter(name string, clusterScoped bool, client NodePoolInterface, l NodePoolLifecycle) NodePoolHandlerFunc {
 	adapter := &nodePoolLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *NodePool) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *NodePool) (*NodePool, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*NodePool); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

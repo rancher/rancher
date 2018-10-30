@@ -20,7 +20,6 @@ type Client struct {
 	ClusterRoleTemplateBinding              ClusterRoleTemplateBindingOperations
 	ProjectRoleTemplateBinding              ProjectRoleTemplateBindingOperations
 	Cluster                                 ClusterOperations
-	ClusterEvent                            ClusterEventOperations
 	ClusterRegistrationToken                ClusterRegistrationTokenOperations
 	Catalog                                 CatalogOperations
 	Template                                TemplateOperations
@@ -71,7 +70,6 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.ClusterRoleTemplateBinding = newClusterRoleTemplateBindingClient(client)
 	client.ProjectRoleTemplateBinding = newProjectRoleTemplateBindingClient(client)
 	client.Cluster = newClusterClient(client)
-	client.ClusterEvent = newClusterEventClient(client)
 	client.ClusterRegistrationToken = newClusterRegistrationTokenClient(client)
 	client.Catalog = newCatalogClient(client)
 	client.Template = newTemplateClient(client)

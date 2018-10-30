@@ -35,7 +35,7 @@ type PodSecurityPolicyTemplateProjectBindingList struct {
 	Items           []PodSecurityPolicyTemplateProjectBinding
 }
 
-type PodSecurityPolicyTemplateProjectBindingHandlerFunc func(key string, obj *PodSecurityPolicyTemplateProjectBinding) error
+type PodSecurityPolicyTemplateProjectBindingHandlerFunc func(key string, obj *PodSecurityPolicyTemplateProjectBinding) (*PodSecurityPolicyTemplateProjectBinding, error)
 
 type PodSecurityPolicyTemplateProjectBindingLister interface {
 	List(namespace string, selector labels.Selector) (ret []*PodSecurityPolicyTemplateProjectBinding, err error)
@@ -46,8 +46,8 @@ type PodSecurityPolicyTemplateProjectBindingController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() PodSecurityPolicyTemplateProjectBindingLister
-	AddHandler(name string, handler PodSecurityPolicyTemplateProjectBindingHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler PodSecurityPolicyTemplateProjectBindingHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler PodSecurityPolicyTemplateProjectBindingHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler PodSecurityPolicyTemplateProjectBindingHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,10 +65,10 @@ type PodSecurityPolicyTemplateProjectBindingInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PodSecurityPolicyTemplateProjectBindingController
-	AddHandler(name string, sync PodSecurityPolicyTemplateProjectBindingHandlerFunc)
-	AddLifecycle(name string, lifecycle PodSecurityPolicyTemplateProjectBindingLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync PodSecurityPolicyTemplateProjectBindingHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle PodSecurityPolicyTemplateProjectBindingLifecycle)
+	AddHandler(ctx context.Context, name string, sync PodSecurityPolicyTemplateProjectBindingHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle PodSecurityPolicyTemplateProjectBindingLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync PodSecurityPolicyTemplateProjectBindingHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PodSecurityPolicyTemplateProjectBindingLifecycle)
 }
 
 type podSecurityPolicyTemplateProjectBindingLister struct {
@@ -116,34 +116,27 @@ func (c *podSecurityPolicyTemplateProjectBindingController) Lister() PodSecurity
 	}
 }
 
-func (c *podSecurityPolicyTemplateProjectBindingController) AddHandler(name string, handler PodSecurityPolicyTemplateProjectBindingHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *podSecurityPolicyTemplateProjectBindingController) AddHandler(ctx context.Context, name string, handler PodSecurityPolicyTemplateProjectBindingHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*PodSecurityPolicyTemplateProjectBinding); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*PodSecurityPolicyTemplateProjectBinding))
 	})
 }
 
-func (c *podSecurityPolicyTemplateProjectBindingController) AddClusterScopedHandler(name, cluster string, handler PodSecurityPolicyTemplateProjectBindingHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *podSecurityPolicyTemplateProjectBindingController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler PodSecurityPolicyTemplateProjectBindingHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*PodSecurityPolicyTemplateProjectBinding); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*PodSecurityPolicyTemplateProjectBinding))
 	})
 }
 
@@ -238,20 +231,20 @@ func (s *podSecurityPolicyTemplateProjectBindingClient) DeleteCollection(deleteO
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *podSecurityPolicyTemplateProjectBindingClient) AddHandler(name string, sync PodSecurityPolicyTemplateProjectBindingHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *podSecurityPolicyTemplateProjectBindingClient) AddHandler(ctx context.Context, name string, sync PodSecurityPolicyTemplateProjectBindingHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *podSecurityPolicyTemplateProjectBindingClient) AddLifecycle(name string, lifecycle PodSecurityPolicyTemplateProjectBindingLifecycle) {
+func (s *podSecurityPolicyTemplateProjectBindingClient) AddLifecycle(ctx context.Context, name string, lifecycle PodSecurityPolicyTemplateProjectBindingLifecycle) {
 	sync := NewPodSecurityPolicyTemplateProjectBindingLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *podSecurityPolicyTemplateProjectBindingClient) AddClusterScopedHandler(name, clusterName string, sync PodSecurityPolicyTemplateProjectBindingHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *podSecurityPolicyTemplateProjectBindingClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync PodSecurityPolicyTemplateProjectBindingHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *podSecurityPolicyTemplateProjectBindingClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle PodSecurityPolicyTemplateProjectBindingLifecycle) {
+func (s *podSecurityPolicyTemplateProjectBindingClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PodSecurityPolicyTemplateProjectBindingLifecycle) {
 	sync := NewPodSecurityPolicyTemplateProjectBindingLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

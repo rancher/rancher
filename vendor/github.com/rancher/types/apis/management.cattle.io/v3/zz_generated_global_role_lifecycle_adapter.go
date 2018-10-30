@@ -42,10 +42,11 @@ func (w *globalRoleLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object
 func NewGlobalRoleLifecycleAdapter(name string, clusterScoped bool, client GlobalRoleInterface, l GlobalRoleLifecycle) GlobalRoleHandlerFunc {
 	adapter := &globalRoleLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *GlobalRole) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *GlobalRole) (*GlobalRole, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*GlobalRole); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

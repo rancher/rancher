@@ -42,10 +42,11 @@ func (w *appRevisionLifecycleAdapter) Updated(obj runtime.Object) (runtime.Objec
 func NewAppRevisionLifecycleAdapter(name string, clusterScoped bool, client AppRevisionInterface, l AppRevisionLifecycle) AppRevisionHandlerFunc {
 	adapter := &appRevisionLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *AppRevision) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *AppRevision) (*AppRevision, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*AppRevision); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

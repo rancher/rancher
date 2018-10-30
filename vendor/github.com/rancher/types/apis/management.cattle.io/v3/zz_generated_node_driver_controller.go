@@ -34,7 +34,7 @@ type NodeDriverList struct {
 	Items           []NodeDriver
 }
 
-type NodeDriverHandlerFunc func(key string, obj *NodeDriver) error
+type NodeDriverHandlerFunc func(key string, obj *NodeDriver) (*NodeDriver, error)
 
 type NodeDriverLister interface {
 	List(namespace string, selector labels.Selector) (ret []*NodeDriver, err error)
@@ -45,8 +45,8 @@ type NodeDriverController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() NodeDriverLister
-	AddHandler(name string, handler NodeDriverHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler NodeDriverHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler NodeDriverHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler NodeDriverHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -64,10 +64,10 @@ type NodeDriverInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NodeDriverController
-	AddHandler(name string, sync NodeDriverHandlerFunc)
-	AddLifecycle(name string, lifecycle NodeDriverLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync NodeDriverHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle NodeDriverLifecycle)
+	AddHandler(ctx context.Context, name string, sync NodeDriverHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle NodeDriverLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NodeDriverHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NodeDriverLifecycle)
 }
 
 type nodeDriverLister struct {
@@ -115,34 +115,27 @@ func (c *nodeDriverController) Lister() NodeDriverLister {
 	}
 }
 
-func (c *nodeDriverController) AddHandler(name string, handler NodeDriverHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *nodeDriverController) AddHandler(ctx context.Context, name string, handler NodeDriverHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*NodeDriver); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*NodeDriver))
 	})
 }
 
-func (c *nodeDriverController) AddClusterScopedHandler(name, cluster string, handler NodeDriverHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *nodeDriverController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler NodeDriverHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*NodeDriver); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*NodeDriver))
 	})
 }
 
@@ -237,20 +230,20 @@ func (s *nodeDriverClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, li
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *nodeDriverClient) AddHandler(name string, sync NodeDriverHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *nodeDriverClient) AddHandler(ctx context.Context, name string, sync NodeDriverHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *nodeDriverClient) AddLifecycle(name string, lifecycle NodeDriverLifecycle) {
+func (s *nodeDriverClient) AddLifecycle(ctx context.Context, name string, lifecycle NodeDriverLifecycle) {
 	sync := NewNodeDriverLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *nodeDriverClient) AddClusterScopedHandler(name, clusterName string, sync NodeDriverHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *nodeDriverClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NodeDriverHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *nodeDriverClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle NodeDriverLifecycle) {
+func (s *nodeDriverClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NodeDriverLifecycle) {
 	sync := NewNodeDriverLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

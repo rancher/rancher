@@ -42,10 +42,11 @@ func (w *namespacedServiceAccountTokenLifecycleAdapter) Updated(obj runtime.Obje
 func NewNamespacedServiceAccountTokenLifecycleAdapter(name string, clusterScoped bool, client NamespacedServiceAccountTokenInterface, l NamespacedServiceAccountTokenLifecycle) NamespacedServiceAccountTokenHandlerFunc {
 	adapter := &namespacedServiceAccountTokenLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *NamespacedServiceAccountToken) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *NamespacedServiceAccountToken) (*NamespacedServiceAccountToken, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*NamespacedServiceAccountToken); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

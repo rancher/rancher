@@ -34,7 +34,7 @@ type LdapConfigList struct {
 	Items           []LdapConfig
 }
 
-type LdapConfigHandlerFunc func(key string, obj *LdapConfig) error
+type LdapConfigHandlerFunc func(key string, obj *LdapConfig) (*LdapConfig, error)
 
 type LdapConfigLister interface {
 	List(namespace string, selector labels.Selector) (ret []*LdapConfig, err error)
@@ -45,8 +45,8 @@ type LdapConfigController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() LdapConfigLister
-	AddHandler(name string, handler LdapConfigHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler LdapConfigHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler LdapConfigHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler LdapConfigHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -64,10 +64,10 @@ type LdapConfigInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() LdapConfigController
-	AddHandler(name string, sync LdapConfigHandlerFunc)
-	AddLifecycle(name string, lifecycle LdapConfigLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync LdapConfigHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle LdapConfigLifecycle)
+	AddHandler(ctx context.Context, name string, sync LdapConfigHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle LdapConfigLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync LdapConfigHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle LdapConfigLifecycle)
 }
 
 type ldapConfigLister struct {
@@ -115,34 +115,27 @@ func (c *ldapConfigController) Lister() LdapConfigLister {
 	}
 }
 
-func (c *ldapConfigController) AddHandler(name string, handler LdapConfigHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *ldapConfigController) AddHandler(ctx context.Context, name string, handler LdapConfigHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*LdapConfig); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*LdapConfig))
 	})
 }
 
-func (c *ldapConfigController) AddClusterScopedHandler(name, cluster string, handler LdapConfigHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *ldapConfigController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler LdapConfigHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*LdapConfig); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*LdapConfig))
 	})
 }
 
@@ -237,20 +230,20 @@ func (s *ldapConfigClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, li
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *ldapConfigClient) AddHandler(name string, sync LdapConfigHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *ldapConfigClient) AddHandler(ctx context.Context, name string, sync LdapConfigHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *ldapConfigClient) AddLifecycle(name string, lifecycle LdapConfigLifecycle) {
+func (s *ldapConfigClient) AddLifecycle(ctx context.Context, name string, lifecycle LdapConfigLifecycle) {
 	sync := NewLdapConfigLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *ldapConfigClient) AddClusterScopedHandler(name, clusterName string, sync LdapConfigHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *ldapConfigClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync LdapConfigHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *ldapConfigClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle LdapConfigLifecycle) {
+func (s *ldapConfigClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle LdapConfigLifecycle) {
 	sync := NewLdapConfigLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

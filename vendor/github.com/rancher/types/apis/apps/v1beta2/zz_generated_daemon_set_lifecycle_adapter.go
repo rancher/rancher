@@ -43,10 +43,11 @@ func (w *daemonSetLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object,
 func NewDaemonSetLifecycleAdapter(name string, clusterScoped bool, client DaemonSetInterface, l DaemonSetLifecycle) DaemonSetHandlerFunc {
 	adapter := &daemonSetLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1beta2.DaemonSet) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *v1beta2.DaemonSet) (*v1beta2.DaemonSet, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*v1beta2.DaemonSet); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

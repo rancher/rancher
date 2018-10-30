@@ -35,7 +35,7 @@ type SourceCodeRepositoryList struct {
 	Items           []SourceCodeRepository
 }
 
-type SourceCodeRepositoryHandlerFunc func(key string, obj *SourceCodeRepository) error
+type SourceCodeRepositoryHandlerFunc func(key string, obj *SourceCodeRepository) (*SourceCodeRepository, error)
 
 type SourceCodeRepositoryLister interface {
 	List(namespace string, selector labels.Selector) (ret []*SourceCodeRepository, err error)
@@ -46,8 +46,8 @@ type SourceCodeRepositoryController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() SourceCodeRepositoryLister
-	AddHandler(name string, handler SourceCodeRepositoryHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler SourceCodeRepositoryHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler SourceCodeRepositoryHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler SourceCodeRepositoryHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,10 +65,10 @@ type SourceCodeRepositoryInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() SourceCodeRepositoryController
-	AddHandler(name string, sync SourceCodeRepositoryHandlerFunc)
-	AddLifecycle(name string, lifecycle SourceCodeRepositoryLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync SourceCodeRepositoryHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle SourceCodeRepositoryLifecycle)
+	AddHandler(ctx context.Context, name string, sync SourceCodeRepositoryHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle SourceCodeRepositoryLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync SourceCodeRepositoryHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle SourceCodeRepositoryLifecycle)
 }
 
 type sourceCodeRepositoryLister struct {
@@ -116,34 +116,27 @@ func (c *sourceCodeRepositoryController) Lister() SourceCodeRepositoryLister {
 	}
 }
 
-func (c *sourceCodeRepositoryController) AddHandler(name string, handler SourceCodeRepositoryHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *sourceCodeRepositoryController) AddHandler(ctx context.Context, name string, handler SourceCodeRepositoryHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*SourceCodeRepository); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*SourceCodeRepository))
 	})
 }
 
-func (c *sourceCodeRepositoryController) AddClusterScopedHandler(name, cluster string, handler SourceCodeRepositoryHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *sourceCodeRepositoryController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler SourceCodeRepositoryHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*SourceCodeRepository); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*SourceCodeRepository))
 	})
 }
 
@@ -238,20 +231,20 @@ func (s *sourceCodeRepositoryClient) DeleteCollection(deleteOpts *metav1.DeleteO
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *sourceCodeRepositoryClient) AddHandler(name string, sync SourceCodeRepositoryHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *sourceCodeRepositoryClient) AddHandler(ctx context.Context, name string, sync SourceCodeRepositoryHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *sourceCodeRepositoryClient) AddLifecycle(name string, lifecycle SourceCodeRepositoryLifecycle) {
+func (s *sourceCodeRepositoryClient) AddLifecycle(ctx context.Context, name string, lifecycle SourceCodeRepositoryLifecycle) {
 	sync := NewSourceCodeRepositoryLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *sourceCodeRepositoryClient) AddClusterScopedHandler(name, clusterName string, sync SourceCodeRepositoryHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *sourceCodeRepositoryClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync SourceCodeRepositoryHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *sourceCodeRepositoryClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle SourceCodeRepositoryLifecycle) {
+func (s *sourceCodeRepositoryClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle SourceCodeRepositoryLifecycle) {
 	sync := NewSourceCodeRepositoryLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

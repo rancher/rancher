@@ -42,10 +42,11 @@ func (w *sourceCodeCredentialLifecycleAdapter) Updated(obj runtime.Object) (runt
 func NewSourceCodeCredentialLifecycleAdapter(name string, clusterScoped bool, client SourceCodeCredentialInterface, l SourceCodeCredentialLifecycle) SourceCodeCredentialHandlerFunc {
 	adapter := &sourceCodeCredentialLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *SourceCodeCredential) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *SourceCodeCredential) (*SourceCodeCredential, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*SourceCodeCredential); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

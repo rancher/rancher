@@ -42,10 +42,11 @@ func (w *groupLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, err
 func NewGroupLifecycleAdapter(name string, clusterScoped bool, client GroupInterface, l GroupLifecycle) GroupHandlerFunc {
 	adapter := &groupLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *Group) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *Group) (*Group, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*Group); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

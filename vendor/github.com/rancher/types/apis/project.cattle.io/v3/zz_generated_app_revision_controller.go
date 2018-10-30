@@ -35,7 +35,7 @@ type AppRevisionList struct {
 	Items           []AppRevision
 }
 
-type AppRevisionHandlerFunc func(key string, obj *AppRevision) error
+type AppRevisionHandlerFunc func(key string, obj *AppRevision) (*AppRevision, error)
 
 type AppRevisionLister interface {
 	List(namespace string, selector labels.Selector) (ret []*AppRevision, err error)
@@ -46,8 +46,8 @@ type AppRevisionController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() AppRevisionLister
-	AddHandler(name string, handler AppRevisionHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler AppRevisionHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler AppRevisionHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler AppRevisionHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,10 +65,10 @@ type AppRevisionInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() AppRevisionController
-	AddHandler(name string, sync AppRevisionHandlerFunc)
-	AddLifecycle(name string, lifecycle AppRevisionLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync AppRevisionHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle AppRevisionLifecycle)
+	AddHandler(ctx context.Context, name string, sync AppRevisionHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle AppRevisionLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync AppRevisionHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle AppRevisionLifecycle)
 }
 
 type appRevisionLister struct {
@@ -116,34 +116,27 @@ func (c *appRevisionController) Lister() AppRevisionLister {
 	}
 }
 
-func (c *appRevisionController) AddHandler(name string, handler AppRevisionHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *appRevisionController) AddHandler(ctx context.Context, name string, handler AppRevisionHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*AppRevision); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*AppRevision))
 	})
 }
 
-func (c *appRevisionController) AddClusterScopedHandler(name, cluster string, handler AppRevisionHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *appRevisionController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler AppRevisionHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*AppRevision); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*AppRevision))
 	})
 }
 
@@ -238,20 +231,20 @@ func (s *appRevisionClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, l
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *appRevisionClient) AddHandler(name string, sync AppRevisionHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *appRevisionClient) AddHandler(ctx context.Context, name string, sync AppRevisionHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *appRevisionClient) AddLifecycle(name string, lifecycle AppRevisionLifecycle) {
+func (s *appRevisionClient) AddLifecycle(ctx context.Context, name string, lifecycle AppRevisionLifecycle) {
 	sync := NewAppRevisionLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *appRevisionClient) AddClusterScopedHandler(name, clusterName string, sync AppRevisionHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *appRevisionClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync AppRevisionHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *appRevisionClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle AppRevisionLifecycle) {
+func (s *appRevisionClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle AppRevisionLifecycle) {
 	sync := NewAppRevisionLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
