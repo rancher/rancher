@@ -35,7 +35,7 @@ type BasicAuthList struct {
 	Items           []BasicAuth
 }
 
-type BasicAuthHandlerFunc func(key string, obj *BasicAuth) error
+type BasicAuthHandlerFunc func(key string, obj *BasicAuth) (*BasicAuth, error)
 
 type BasicAuthLister interface {
 	List(namespace string, selector labels.Selector) (ret []*BasicAuth, err error)
@@ -46,8 +46,8 @@ type BasicAuthController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() BasicAuthLister
-	AddHandler(name string, handler BasicAuthHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler BasicAuthHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler BasicAuthHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler BasicAuthHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,10 +65,10 @@ type BasicAuthInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() BasicAuthController
-	AddHandler(name string, sync BasicAuthHandlerFunc)
-	AddLifecycle(name string, lifecycle BasicAuthLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync BasicAuthHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle BasicAuthLifecycle)
+	AddHandler(ctx context.Context, name string, sync BasicAuthHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle BasicAuthLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync BasicAuthHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle BasicAuthLifecycle)
 }
 
 type basicAuthLister struct {
@@ -116,34 +116,27 @@ func (c *basicAuthController) Lister() BasicAuthLister {
 	}
 }
 
-func (c *basicAuthController) AddHandler(name string, handler BasicAuthHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *basicAuthController) AddHandler(ctx context.Context, name string, handler BasicAuthHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*BasicAuth); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*BasicAuth))
 	})
 }
 
-func (c *basicAuthController) AddClusterScopedHandler(name, cluster string, handler BasicAuthHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *basicAuthController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler BasicAuthHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*BasicAuth); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*BasicAuth))
 	})
 }
 
@@ -238,20 +231,20 @@ func (s *basicAuthClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, lis
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *basicAuthClient) AddHandler(name string, sync BasicAuthHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *basicAuthClient) AddHandler(ctx context.Context, name string, sync BasicAuthHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *basicAuthClient) AddLifecycle(name string, lifecycle BasicAuthLifecycle) {
+func (s *basicAuthClient) AddLifecycle(ctx context.Context, name string, lifecycle BasicAuthLifecycle) {
 	sync := NewBasicAuthLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *basicAuthClient) AddClusterScopedHandler(name, clusterName string, sync BasicAuthHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *basicAuthClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync BasicAuthHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *basicAuthClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle BasicAuthLifecycle) {
+func (s *basicAuthClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle BasicAuthLifecycle) {
 	sync := NewBasicAuthLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

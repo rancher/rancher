@@ -36,7 +36,7 @@ type NetworkPolicyList struct {
 	Items           []v1.NetworkPolicy
 }
 
-type NetworkPolicyHandlerFunc func(key string, obj *v1.NetworkPolicy) error
+type NetworkPolicyHandlerFunc func(key string, obj *v1.NetworkPolicy) (*v1.NetworkPolicy, error)
 
 type NetworkPolicyLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.NetworkPolicy, err error)
@@ -47,8 +47,8 @@ type NetworkPolicyController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() NetworkPolicyLister
-	AddHandler(name string, handler NetworkPolicyHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler NetworkPolicyHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler NetworkPolicyHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler NetworkPolicyHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -66,10 +66,10 @@ type NetworkPolicyInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NetworkPolicyController
-	AddHandler(name string, sync NetworkPolicyHandlerFunc)
-	AddLifecycle(name string, lifecycle NetworkPolicyLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync NetworkPolicyHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle NetworkPolicyLifecycle)
+	AddHandler(ctx context.Context, name string, sync NetworkPolicyHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle NetworkPolicyLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NetworkPolicyHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NetworkPolicyLifecycle)
 }
 
 type networkPolicyLister struct {
@@ -117,34 +117,27 @@ func (c *networkPolicyController) Lister() NetworkPolicyLister {
 	}
 }
 
-func (c *networkPolicyController) AddHandler(name string, handler NetworkPolicyHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *networkPolicyController) AddHandler(ctx context.Context, name string, handler NetworkPolicyHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1.NetworkPolicy); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*v1.NetworkPolicy))
 	})
 }
 
-func (c *networkPolicyController) AddClusterScopedHandler(name, cluster string, handler NetworkPolicyHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *networkPolicyController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler NetworkPolicyHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1.NetworkPolicy); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*v1.NetworkPolicy))
 	})
 }
 
@@ -239,20 +232,20 @@ func (s *networkPolicyClient) DeleteCollection(deleteOpts *metav1.DeleteOptions,
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *networkPolicyClient) AddHandler(name string, sync NetworkPolicyHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *networkPolicyClient) AddHandler(ctx context.Context, name string, sync NetworkPolicyHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *networkPolicyClient) AddLifecycle(name string, lifecycle NetworkPolicyLifecycle) {
+func (s *networkPolicyClient) AddLifecycle(ctx context.Context, name string, lifecycle NetworkPolicyLifecycle) {
 	sync := NewNetworkPolicyLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *networkPolicyClient) AddClusterScopedHandler(name, clusterName string, sync NetworkPolicyHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *networkPolicyClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NetworkPolicyHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *networkPolicyClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle NetworkPolicyLifecycle) {
+func (s *networkPolicyClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NetworkPolicyLifecycle) {
 	sync := NewNetworkPolicyLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

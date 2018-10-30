@@ -42,10 +42,11 @@ func (w *projectCatalogLifecycleAdapter) Updated(obj runtime.Object) (runtime.Ob
 func NewProjectCatalogLifecycleAdapter(name string, clusterScoped bool, client ProjectCatalogInterface, l ProjectCatalogLifecycle) ProjectCatalogHandlerFunc {
 	adapter := &projectCatalogLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *ProjectCatalog) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *ProjectCatalog) (*ProjectCatalog, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*ProjectCatalog); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

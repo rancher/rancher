@@ -42,10 +42,11 @@ func (w *templateContentLifecycleAdapter) Updated(obj runtime.Object) (runtime.O
 func NewTemplateContentLifecycleAdapter(name string, clusterScoped bool, client TemplateContentInterface, l TemplateContentLifecycle) TemplateContentHandlerFunc {
 	adapter := &templateContentLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *TemplateContent) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *TemplateContent) (*TemplateContent, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*TemplateContent); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

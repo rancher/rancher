@@ -35,7 +35,7 @@ type ProjectRoleTemplateBindingList struct {
 	Items           []ProjectRoleTemplateBinding
 }
 
-type ProjectRoleTemplateBindingHandlerFunc func(key string, obj *ProjectRoleTemplateBinding) error
+type ProjectRoleTemplateBindingHandlerFunc func(key string, obj *ProjectRoleTemplateBinding) (*ProjectRoleTemplateBinding, error)
 
 type ProjectRoleTemplateBindingLister interface {
 	List(namespace string, selector labels.Selector) (ret []*ProjectRoleTemplateBinding, err error)
@@ -46,8 +46,8 @@ type ProjectRoleTemplateBindingController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ProjectRoleTemplateBindingLister
-	AddHandler(name string, handler ProjectRoleTemplateBindingHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler ProjectRoleTemplateBindingHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler ProjectRoleTemplateBindingHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ProjectRoleTemplateBindingHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,10 +65,10 @@ type ProjectRoleTemplateBindingInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ProjectRoleTemplateBindingController
-	AddHandler(name string, sync ProjectRoleTemplateBindingHandlerFunc)
-	AddLifecycle(name string, lifecycle ProjectRoleTemplateBindingLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync ProjectRoleTemplateBindingHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle ProjectRoleTemplateBindingLifecycle)
+	AddHandler(ctx context.Context, name string, sync ProjectRoleTemplateBindingHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle ProjectRoleTemplateBindingLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ProjectRoleTemplateBindingHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ProjectRoleTemplateBindingLifecycle)
 }
 
 type projectRoleTemplateBindingLister struct {
@@ -116,34 +116,27 @@ func (c *projectRoleTemplateBindingController) Lister() ProjectRoleTemplateBindi
 	}
 }
 
-func (c *projectRoleTemplateBindingController) AddHandler(name string, handler ProjectRoleTemplateBindingHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *projectRoleTemplateBindingController) AddHandler(ctx context.Context, name string, handler ProjectRoleTemplateBindingHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*ProjectRoleTemplateBinding); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*ProjectRoleTemplateBinding))
 	})
 }
 
-func (c *projectRoleTemplateBindingController) AddClusterScopedHandler(name, cluster string, handler ProjectRoleTemplateBindingHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *projectRoleTemplateBindingController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ProjectRoleTemplateBindingHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*ProjectRoleTemplateBinding); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*ProjectRoleTemplateBinding))
 	})
 }
 
@@ -238,20 +231,20 @@ func (s *projectRoleTemplateBindingClient) DeleteCollection(deleteOpts *metav1.D
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *projectRoleTemplateBindingClient) AddHandler(name string, sync ProjectRoleTemplateBindingHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *projectRoleTemplateBindingClient) AddHandler(ctx context.Context, name string, sync ProjectRoleTemplateBindingHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *projectRoleTemplateBindingClient) AddLifecycle(name string, lifecycle ProjectRoleTemplateBindingLifecycle) {
+func (s *projectRoleTemplateBindingClient) AddLifecycle(ctx context.Context, name string, lifecycle ProjectRoleTemplateBindingLifecycle) {
 	sync := NewProjectRoleTemplateBindingLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *projectRoleTemplateBindingClient) AddClusterScopedHandler(name, clusterName string, sync ProjectRoleTemplateBindingHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *projectRoleTemplateBindingClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ProjectRoleTemplateBindingHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *projectRoleTemplateBindingClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle ProjectRoleTemplateBindingLifecycle) {
+func (s *projectRoleTemplateBindingClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ProjectRoleTemplateBindingLifecycle) {
 	sync := NewProjectRoleTemplateBindingLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

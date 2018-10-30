@@ -42,10 +42,11 @@ func (w *preferenceLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object
 func NewPreferenceLifecycleAdapter(name string, clusterScoped bool, client PreferenceInterface, l PreferenceLifecycle) PreferenceHandlerFunc {
 	adapter := &preferenceLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *Preference) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *Preference) (*Preference, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*Preference); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

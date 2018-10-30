@@ -42,10 +42,11 @@ func (w *authConfigLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object
 func NewAuthConfigLifecycleAdapter(name string, clusterScoped bool, client AuthConfigInterface, l AuthConfigLifecycle) AuthConfigHandlerFunc {
 	adapter := &authConfigLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *AuthConfig) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *AuthConfig) (*AuthConfig, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*AuthConfig); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

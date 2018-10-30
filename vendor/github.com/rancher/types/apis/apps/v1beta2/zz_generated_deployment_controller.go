@@ -36,7 +36,7 @@ type DeploymentList struct {
 	Items           []v1beta2.Deployment
 }
 
-type DeploymentHandlerFunc func(key string, obj *v1beta2.Deployment) error
+type DeploymentHandlerFunc func(key string, obj *v1beta2.Deployment) (*v1beta2.Deployment, error)
 
 type DeploymentLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1beta2.Deployment, err error)
@@ -47,8 +47,8 @@ type DeploymentController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() DeploymentLister
-	AddHandler(name string, handler DeploymentHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler DeploymentHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler DeploymentHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler DeploymentHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -66,10 +66,10 @@ type DeploymentInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DeploymentController
-	AddHandler(name string, sync DeploymentHandlerFunc)
-	AddLifecycle(name string, lifecycle DeploymentLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync DeploymentHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle DeploymentLifecycle)
+	AddHandler(ctx context.Context, name string, sync DeploymentHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle DeploymentLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync DeploymentHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle DeploymentLifecycle)
 }
 
 type deploymentLister struct {
@@ -117,34 +117,27 @@ func (c *deploymentController) Lister() DeploymentLister {
 	}
 }
 
-func (c *deploymentController) AddHandler(name string, handler DeploymentHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *deploymentController) AddHandler(ctx context.Context, name string, handler DeploymentHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1beta2.Deployment); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*v1beta2.Deployment))
 	})
 }
 
-func (c *deploymentController) AddClusterScopedHandler(name, cluster string, handler DeploymentHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *deploymentController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler DeploymentHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1beta2.Deployment); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*v1beta2.Deployment))
 	})
 }
 
@@ -239,20 +232,20 @@ func (s *deploymentClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, li
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *deploymentClient) AddHandler(name string, sync DeploymentHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *deploymentClient) AddHandler(ctx context.Context, name string, sync DeploymentHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *deploymentClient) AddLifecycle(name string, lifecycle DeploymentLifecycle) {
+func (s *deploymentClient) AddLifecycle(ctx context.Context, name string, lifecycle DeploymentLifecycle) {
 	sync := NewDeploymentLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *deploymentClient) AddClusterScopedHandler(name, clusterName string, sync DeploymentHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *deploymentClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync DeploymentHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *deploymentClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle DeploymentLifecycle) {
+func (s *deploymentClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle DeploymentLifecycle) {
 	sync := NewDeploymentLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

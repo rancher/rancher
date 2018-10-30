@@ -43,10 +43,11 @@ func (w *configMapLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object,
 func NewConfigMapLifecycleAdapter(name string, clusterScoped bool, client ConfigMapInterface, l ConfigMapLifecycle) ConfigMapHandlerFunc {
 	adapter := &configMapLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1.ConfigMap) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *v1.ConfigMap) (*v1.ConfigMap, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*v1.ConfigMap); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

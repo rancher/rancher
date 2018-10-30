@@ -35,7 +35,7 @@ type NodeTemplateList struct {
 	Items           []NodeTemplate
 }
 
-type NodeTemplateHandlerFunc func(key string, obj *NodeTemplate) error
+type NodeTemplateHandlerFunc func(key string, obj *NodeTemplate) (*NodeTemplate, error)
 
 type NodeTemplateLister interface {
 	List(namespace string, selector labels.Selector) (ret []*NodeTemplate, err error)
@@ -46,8 +46,8 @@ type NodeTemplateController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() NodeTemplateLister
-	AddHandler(name string, handler NodeTemplateHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler NodeTemplateHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler NodeTemplateHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler NodeTemplateHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,10 +65,10 @@ type NodeTemplateInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NodeTemplateController
-	AddHandler(name string, sync NodeTemplateHandlerFunc)
-	AddLifecycle(name string, lifecycle NodeTemplateLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync NodeTemplateHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle NodeTemplateLifecycle)
+	AddHandler(ctx context.Context, name string, sync NodeTemplateHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle NodeTemplateLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NodeTemplateHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NodeTemplateLifecycle)
 }
 
 type nodeTemplateLister struct {
@@ -116,34 +116,27 @@ func (c *nodeTemplateController) Lister() NodeTemplateLister {
 	}
 }
 
-func (c *nodeTemplateController) AddHandler(name string, handler NodeTemplateHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *nodeTemplateController) AddHandler(ctx context.Context, name string, handler NodeTemplateHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*NodeTemplate); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*NodeTemplate))
 	})
 }
 
-func (c *nodeTemplateController) AddClusterScopedHandler(name, cluster string, handler NodeTemplateHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *nodeTemplateController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler NodeTemplateHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*NodeTemplate); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*NodeTemplate))
 	})
 }
 
@@ -238,20 +231,20 @@ func (s *nodeTemplateClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, 
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *nodeTemplateClient) AddHandler(name string, sync NodeTemplateHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *nodeTemplateClient) AddHandler(ctx context.Context, name string, sync NodeTemplateHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *nodeTemplateClient) AddLifecycle(name string, lifecycle NodeTemplateLifecycle) {
+func (s *nodeTemplateClient) AddLifecycle(ctx context.Context, name string, lifecycle NodeTemplateLifecycle) {
 	sync := NewNodeTemplateLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *nodeTemplateClient) AddClusterScopedHandler(name, clusterName string, sync NodeTemplateHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *nodeTemplateClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NodeTemplateHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *nodeTemplateClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle NodeTemplateLifecycle) {
+func (s *nodeTemplateClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NodeTemplateLifecycle) {
 	sync := NewNodeTemplateLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

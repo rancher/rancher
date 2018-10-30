@@ -43,10 +43,11 @@ func (w *deploymentLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object
 func NewDeploymentLifecycleAdapter(name string, clusterScoped bool, client DeploymentInterface, l DeploymentLifecycle) DeploymentHandlerFunc {
 	adapter := &deploymentLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1beta2.Deployment) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *v1beta2.Deployment) (*v1beta2.Deployment, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*v1beta2.Deployment); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

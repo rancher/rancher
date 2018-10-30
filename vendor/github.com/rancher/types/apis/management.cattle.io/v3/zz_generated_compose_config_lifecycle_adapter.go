@@ -42,10 +42,11 @@ func (w *composeConfigLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obj
 func NewComposeConfigLifecycleAdapter(name string, clusterScoped bool, client ComposeConfigInterface, l ComposeConfigLifecycle) ComposeConfigHandlerFunc {
 	adapter := &composeConfigLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *ComposeConfig) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *ComposeConfig) (*ComposeConfig, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*ComposeConfig); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

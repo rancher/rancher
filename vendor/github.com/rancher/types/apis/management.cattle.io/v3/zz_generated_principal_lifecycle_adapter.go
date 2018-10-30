@@ -42,10 +42,11 @@ func (w *principalLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object,
 func NewPrincipalLifecycleAdapter(name string, clusterScoped bool, client PrincipalInterface, l PrincipalLifecycle) PrincipalHandlerFunc {
 	adapter := &principalLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *Principal) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *Principal) (*Principal, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*Principal); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

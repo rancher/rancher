@@ -36,7 +36,7 @@ type ConfigMapList struct {
 	Items           []v1.ConfigMap
 }
 
-type ConfigMapHandlerFunc func(key string, obj *v1.ConfigMap) error
+type ConfigMapHandlerFunc func(key string, obj *v1.ConfigMap) (*v1.ConfigMap, error)
 
 type ConfigMapLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.ConfigMap, err error)
@@ -47,8 +47,8 @@ type ConfigMapController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ConfigMapLister
-	AddHandler(name string, handler ConfigMapHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler ConfigMapHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler ConfigMapHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ConfigMapHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -66,10 +66,10 @@ type ConfigMapInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ConfigMapController
-	AddHandler(name string, sync ConfigMapHandlerFunc)
-	AddLifecycle(name string, lifecycle ConfigMapLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync ConfigMapHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle ConfigMapLifecycle)
+	AddHandler(ctx context.Context, name string, sync ConfigMapHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle ConfigMapLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ConfigMapHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ConfigMapLifecycle)
 }
 
 type configMapLister struct {
@@ -117,34 +117,27 @@ func (c *configMapController) Lister() ConfigMapLister {
 	}
 }
 
-func (c *configMapController) AddHandler(name string, handler ConfigMapHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *configMapController) AddHandler(ctx context.Context, name string, handler ConfigMapHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1.ConfigMap); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*v1.ConfigMap))
 	})
 }
 
-func (c *configMapController) AddClusterScopedHandler(name, cluster string, handler ConfigMapHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *configMapController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ConfigMapHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1.ConfigMap); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*v1.ConfigMap))
 	})
 }
 
@@ -239,20 +232,20 @@ func (s *configMapClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, lis
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *configMapClient) AddHandler(name string, sync ConfigMapHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *configMapClient) AddHandler(ctx context.Context, name string, sync ConfigMapHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *configMapClient) AddLifecycle(name string, lifecycle ConfigMapLifecycle) {
+func (s *configMapClient) AddLifecycle(ctx context.Context, name string, lifecycle ConfigMapLifecycle) {
 	sync := NewConfigMapLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *configMapClient) AddClusterScopedHandler(name, clusterName string, sync ConfigMapHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *configMapClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ConfigMapHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *configMapClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle ConfigMapLifecycle) {
+func (s *configMapClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ConfigMapLifecycle) {
 	sync := NewConfigMapLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

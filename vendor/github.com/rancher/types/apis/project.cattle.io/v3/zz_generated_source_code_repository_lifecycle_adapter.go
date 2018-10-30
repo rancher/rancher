@@ -42,10 +42,11 @@ func (w *sourceCodeRepositoryLifecycleAdapter) Updated(obj runtime.Object) (runt
 func NewSourceCodeRepositoryLifecycleAdapter(name string, clusterScoped bool, client SourceCodeRepositoryInterface, l SourceCodeRepositoryLifecycle) SourceCodeRepositoryHandlerFunc {
 	adapter := &sourceCodeRepositoryLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *SourceCodeRepository) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *SourceCodeRepository) (*SourceCodeRepository, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*SourceCodeRepository); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

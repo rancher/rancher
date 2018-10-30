@@ -30,7 +30,7 @@ type objectLifecycleAdapter struct {
 	objectClient  *objectclient.ObjectClient
 }
 
-func NewObjectLifecycleAdapter(name string, clusterScoped bool, lifecycle ObjectLifecycle, objectClient *objectclient.ObjectClient) func(key string, obj runtime.Object) error {
+func NewObjectLifecycleAdapter(name string, clusterScoped bool, lifecycle ObjectLifecycle, objectClient *objectclient.ObjectClient) func(key string, obj interface{}) (interface{}, error) {
 	o := objectLifecycleAdapter{
 		name:          name,
 		clusterScoped: clusterScoped,
@@ -40,30 +40,39 @@ func NewObjectLifecycleAdapter(name string, clusterScoped bool, lifecycle Object
 	return o.sync
 }
 
-func (o *objectLifecycleAdapter) sync(key string, obj runtime.Object) error {
-	if obj == nil {
-		return nil
+func (o *objectLifecycleAdapter) sync(key string, in interface{}) (interface{}, error) {
+	if in == nil || reflect.ValueOf(in).IsNil() {
+		return nil, nil
+	}
+
+	obj, ok := in.(runtime.Object)
+	if !ok {
+		return nil, nil
 	}
 
 	metadata, err := meta.Accessor(obj)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if cont, err := o.finalize(metadata, obj); err != nil || !cont {
-		return err
+	if newObj, cont, err := o.finalize(metadata, obj); err != nil || !cont {
+		return nil, err
+	} else if newObj != nil {
+		obj = newObj
 	}
 
-	if cont, err := o.create(metadata, obj); err != nil || !cont {
-		return err
+	if newObj, cont, err := o.create(metadata, obj); err != nil || !cont {
+		return nil, err
+	} else if newObj != nil {
+		obj = newObj
 	}
 
 	copyObj := obj.DeepCopyObject()
 	newObj, err := o.lifecycle.Updated(copyObj)
 	if newObj != nil {
-		o.update(metadata.GetName(), obj, newObj)
+		return o.update(metadata.GetName(), obj, newObj)
 	}
-	return err
+	return nil, err
 }
 
 func (o *objectLifecycleAdapter) update(name string, orig, obj runtime.Object) (runtime.Object, error) {
@@ -73,34 +82,36 @@ func (o *objectLifecycleAdapter) update(name string, orig, obj runtime.Object) (
 	return obj, nil
 }
 
-func (o *objectLifecycleAdapter) finalize(metadata metav1.Object, obj runtime.Object) (bool, error) {
+func (o *objectLifecycleAdapter) finalize(metadata metav1.Object, obj runtime.Object) (runtime.Object, bool, error) {
 	// Check finalize
 	if metadata.GetDeletionTimestamp() == nil {
-		return true, nil
+		return nil, true, nil
 	}
 
 	if !slice.ContainsString(metadata.GetFinalizers(), o.constructFinalizerKey()) {
-		return false, nil
+		return nil, false, nil
 	}
 
 	copyObj := obj.DeepCopyObject()
 	if newObj, err := o.lifecycle.Finalize(copyObj); err != nil {
 		if newObj != nil {
-			o.update(metadata.GetName(), obj, newObj)
+			newObj, _ := o.update(metadata.GetName(), obj, newObj)
+			return newObj, false, err
 		}
-		return false, err
+		return nil, false, err
 	} else if newObj != nil {
 		copyObj = newObj
 	}
 
-	return false, o.removeFinalizer(o.constructFinalizerKey(), copyObj)
+	newObj, err := o.removeFinalizer(o.constructFinalizerKey(), copyObj)
+	return newObj, false, err
 }
 
-func (o *objectLifecycleAdapter) removeFinalizer(name string, obj runtime.Object) error {
+func (o *objectLifecycleAdapter) removeFinalizer(name string, obj runtime.Object) (runtime.Object, error) {
 	for i := 0; i < 3; i++ {
 		metadata, err := meta.Accessor(obj)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		var finalizers []string
@@ -112,18 +123,18 @@ func (o *objectLifecycleAdapter) removeFinalizer(name string, obj runtime.Object
 		}
 		metadata.SetFinalizers(finalizers)
 
-		_, err = o.objectClient.Update(metadata.GetName(), obj)
+		newObj, err := o.objectClient.Update(metadata.GetName(), obj)
 		if err == nil {
-			return nil
+			return newObj, nil
 		}
 
 		obj, err = o.objectClient.GetNamespaced(metadata.GetNamespace(), metadata.GetName(), metav1.GetOptions{})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return fmt.Errorf("failed to remove finalizer on %s", name)
+	return nil, fmt.Errorf("failed to remove finalizer on %s", name)
 }
 
 func (o *objectLifecycleAdapter) createKey() string {
@@ -137,25 +148,26 @@ func (o *objectLifecycleAdapter) constructFinalizerKey() string {
 	return finalizerKey + o.name
 }
 
-func (o *objectLifecycleAdapter) create(metadata metav1.Object, obj runtime.Object) (bool, error) {
+func (o *objectLifecycleAdapter) create(metadata metav1.Object, obj runtime.Object) (runtime.Object, bool, error) {
 	if o.isInitialized(metadata) {
-		return true, nil
+		return nil, true, nil
 	}
 
 	copyObj := obj.DeepCopyObject()
 	copyObj, err := o.addFinalizer(copyObj)
 	if err != nil {
-		return false, err
+		return copyObj, false, err
 	}
 
 	if newObj, err := o.lifecycle.Create(copyObj); err != nil {
-		o.update(metadata.GetName(), obj, newObj)
-		return false, err
+		newObj, _ = o.update(metadata.GetName(), obj, newObj)
+		return newObj, false, err
 	} else if newObj != nil {
 		copyObj = newObj
 	}
 
-	return false, o.setInitialized(copyObj)
+	newObj, err := o.setInitialized(copyObj)
+	return newObj, false, err
 }
 
 func (o *objectLifecycleAdapter) isInitialized(metadata metav1.Object) bool {
@@ -163,10 +175,10 @@ func (o *objectLifecycleAdapter) isInitialized(metadata metav1.Object) bool {
 	return metadata.GetAnnotations()[initialized] == "true"
 }
 
-func (o *objectLifecycleAdapter) setInitialized(obj runtime.Object) error {
+func (o *objectLifecycleAdapter) setInitialized(obj runtime.Object) (runtime.Object, error) {
 	metadata, err := meta.Accessor(obj)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	initialized := o.createKey()
@@ -176,8 +188,7 @@ func (o *objectLifecycleAdapter) setInitialized(obj runtime.Object) error {
 	}
 	metadata.GetAnnotations()[initialized] = "true"
 
-	_, err = o.objectClient.Update(metadata.GetName(), obj)
-	return err
+	return o.objectClient.Update(metadata.GetName(), obj)
 }
 
 func (o *objectLifecycleAdapter) addFinalizer(obj runtime.Object) (runtime.Object, error) {

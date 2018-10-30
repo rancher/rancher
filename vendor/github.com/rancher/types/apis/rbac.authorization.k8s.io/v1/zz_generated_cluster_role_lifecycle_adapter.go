@@ -43,10 +43,11 @@ func (w *clusterRoleLifecycleAdapter) Updated(obj runtime.Object) (runtime.Objec
 func NewClusterRoleLifecycleAdapter(name string, clusterScoped bool, client ClusterRoleInterface, l ClusterRoleLifecycle) ClusterRoleHandlerFunc {
 	adapter := &clusterRoleLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1.ClusterRole) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *v1.ClusterRole) (*v1.ClusterRole, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*v1.ClusterRole); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

@@ -34,7 +34,7 @@ type ComposeConfigList struct {
 	Items           []ComposeConfig
 }
 
-type ComposeConfigHandlerFunc func(key string, obj *ComposeConfig) error
+type ComposeConfigHandlerFunc func(key string, obj *ComposeConfig) (*ComposeConfig, error)
 
 type ComposeConfigLister interface {
 	List(namespace string, selector labels.Selector) (ret []*ComposeConfig, err error)
@@ -45,8 +45,8 @@ type ComposeConfigController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ComposeConfigLister
-	AddHandler(name string, handler ComposeConfigHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler ComposeConfigHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler ComposeConfigHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ComposeConfigHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -64,10 +64,10 @@ type ComposeConfigInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ComposeConfigController
-	AddHandler(name string, sync ComposeConfigHandlerFunc)
-	AddLifecycle(name string, lifecycle ComposeConfigLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync ComposeConfigHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle ComposeConfigLifecycle)
+	AddHandler(ctx context.Context, name string, sync ComposeConfigHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle ComposeConfigLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ComposeConfigHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ComposeConfigLifecycle)
 }
 
 type composeConfigLister struct {
@@ -115,34 +115,27 @@ func (c *composeConfigController) Lister() ComposeConfigLister {
 	}
 }
 
-func (c *composeConfigController) AddHandler(name string, handler ComposeConfigHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *composeConfigController) AddHandler(ctx context.Context, name string, handler ComposeConfigHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*ComposeConfig); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*ComposeConfig))
 	})
 }
 
-func (c *composeConfigController) AddClusterScopedHandler(name, cluster string, handler ComposeConfigHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *composeConfigController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ComposeConfigHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*ComposeConfig); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*ComposeConfig))
 	})
 }
 
@@ -237,20 +230,20 @@ func (s *composeConfigClient) DeleteCollection(deleteOpts *metav1.DeleteOptions,
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *composeConfigClient) AddHandler(name string, sync ComposeConfigHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *composeConfigClient) AddHandler(ctx context.Context, name string, sync ComposeConfigHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *composeConfigClient) AddLifecycle(name string, lifecycle ComposeConfigLifecycle) {
+func (s *composeConfigClient) AddLifecycle(ctx context.Context, name string, lifecycle ComposeConfigLifecycle) {
 	sync := NewComposeConfigLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *composeConfigClient) AddClusterScopedHandler(name, clusterName string, sync ComposeConfigHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *composeConfigClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ComposeConfigHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *composeConfigClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle ComposeConfigLifecycle) {
+func (s *composeConfigClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ComposeConfigLifecycle) {
 	sync := NewComposeConfigLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

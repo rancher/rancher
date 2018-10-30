@@ -42,10 +42,11 @@ func (w *appLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error
 func NewAppLifecycleAdapter(name string, clusterScoped bool, client AppInterface, l AppLifecycle) AppHandlerFunc {
 	adapter := &appLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *App) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *App) (*App, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*App); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

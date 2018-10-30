@@ -42,10 +42,11 @@ func (w *namespacedBasicAuthLifecycleAdapter) Updated(obj runtime.Object) (runti
 func NewNamespacedBasicAuthLifecycleAdapter(name string, clusterScoped bool, client NamespacedBasicAuthInterface, l NamespacedBasicAuthLifecycle) NamespacedBasicAuthHandlerFunc {
 	adapter := &namespacedBasicAuthLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *NamespacedBasicAuth) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *NamespacedBasicAuth) (*NamespacedBasicAuth, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*NamespacedBasicAuth); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

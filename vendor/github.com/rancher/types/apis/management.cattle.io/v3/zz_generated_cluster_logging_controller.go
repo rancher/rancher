@@ -35,7 +35,7 @@ type ClusterLoggingList struct {
 	Items           []ClusterLogging
 }
 
-type ClusterLoggingHandlerFunc func(key string, obj *ClusterLogging) error
+type ClusterLoggingHandlerFunc func(key string, obj *ClusterLogging) (*ClusterLogging, error)
 
 type ClusterLoggingLister interface {
 	List(namespace string, selector labels.Selector) (ret []*ClusterLogging, err error)
@@ -46,8 +46,8 @@ type ClusterLoggingController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ClusterLoggingLister
-	AddHandler(name string, handler ClusterLoggingHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler ClusterLoggingHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler ClusterLoggingHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ClusterLoggingHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,10 +65,10 @@ type ClusterLoggingInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterLoggingController
-	AddHandler(name string, sync ClusterLoggingHandlerFunc)
-	AddLifecycle(name string, lifecycle ClusterLoggingLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync ClusterLoggingHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle ClusterLoggingLifecycle)
+	AddHandler(ctx context.Context, name string, sync ClusterLoggingHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle ClusterLoggingLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ClusterLoggingHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterLoggingLifecycle)
 }
 
 type clusterLoggingLister struct {
@@ -116,34 +116,27 @@ func (c *clusterLoggingController) Lister() ClusterLoggingLister {
 	}
 }
 
-func (c *clusterLoggingController) AddHandler(name string, handler ClusterLoggingHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *clusterLoggingController) AddHandler(ctx context.Context, name string, handler ClusterLoggingHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*ClusterLogging); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*ClusterLogging))
 	})
 }
 
-func (c *clusterLoggingController) AddClusterScopedHandler(name, cluster string, handler ClusterLoggingHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *clusterLoggingController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ClusterLoggingHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*ClusterLogging); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*ClusterLogging))
 	})
 }
 
@@ -238,20 +231,20 @@ func (s *clusterLoggingClient) DeleteCollection(deleteOpts *metav1.DeleteOptions
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *clusterLoggingClient) AddHandler(name string, sync ClusterLoggingHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *clusterLoggingClient) AddHandler(ctx context.Context, name string, sync ClusterLoggingHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *clusterLoggingClient) AddLifecycle(name string, lifecycle ClusterLoggingLifecycle) {
+func (s *clusterLoggingClient) AddLifecycle(ctx context.Context, name string, lifecycle ClusterLoggingLifecycle) {
 	sync := NewClusterLoggingLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *clusterLoggingClient) AddClusterScopedHandler(name, clusterName string, sync ClusterLoggingHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *clusterLoggingClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ClusterLoggingHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *clusterLoggingClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle ClusterLoggingLifecycle) {
+func (s *clusterLoggingClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterLoggingLifecycle) {
 	sync := NewClusterLoggingLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

@@ -43,10 +43,11 @@ func (w *replicationControllerLifecycleAdapter) Updated(obj runtime.Object) (run
 func NewReplicationControllerLifecycleAdapter(name string, clusterScoped bool, client ReplicationControllerInterface, l ReplicationControllerLifecycle) ReplicationControllerHandlerFunc {
 	adapter := &replicationControllerLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1.ReplicationController) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *v1.ReplicationController) (*v1.ReplicationController, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*v1.ReplicationController); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

@@ -43,10 +43,11 @@ func (w *statefulSetLifecycleAdapter) Updated(obj runtime.Object) (runtime.Objec
 func NewStatefulSetLifecycleAdapter(name string, clusterScoped bool, client StatefulSetInterface, l StatefulSetLifecycle) StatefulSetHandlerFunc {
 	adapter := &statefulSetLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1beta2.StatefulSet) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *v1beta2.StatefulSet) (*v1beta2.StatefulSet, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*v1beta2.StatefulSet); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

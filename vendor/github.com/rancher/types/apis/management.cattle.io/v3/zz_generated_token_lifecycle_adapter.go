@@ -42,10 +42,11 @@ func (w *tokenLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, err
 func NewTokenLifecycleAdapter(name string, clusterScoped bool, client TokenInterface, l TokenLifecycle) TokenHandlerFunc {
 	adapter := &tokenLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *Token) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *Token) (*Token, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*Token); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

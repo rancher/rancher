@@ -35,7 +35,7 @@ type NotifierList struct {
 	Items           []Notifier
 }
 
-type NotifierHandlerFunc func(key string, obj *Notifier) error
+type NotifierHandlerFunc func(key string, obj *Notifier) (*Notifier, error)
 
 type NotifierLister interface {
 	List(namespace string, selector labels.Selector) (ret []*Notifier, err error)
@@ -46,8 +46,8 @@ type NotifierController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() NotifierLister
-	AddHandler(name string, handler NotifierHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler NotifierHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler NotifierHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler NotifierHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,10 +65,10 @@ type NotifierInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NotifierController
-	AddHandler(name string, sync NotifierHandlerFunc)
-	AddLifecycle(name string, lifecycle NotifierLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync NotifierHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle NotifierLifecycle)
+	AddHandler(ctx context.Context, name string, sync NotifierHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle NotifierLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NotifierHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NotifierLifecycle)
 }
 
 type notifierLister struct {
@@ -116,34 +116,27 @@ func (c *notifierController) Lister() NotifierLister {
 	}
 }
 
-func (c *notifierController) AddHandler(name string, handler NotifierHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *notifierController) AddHandler(ctx context.Context, name string, handler NotifierHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*Notifier); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*Notifier))
 	})
 }
 
-func (c *notifierController) AddClusterScopedHandler(name, cluster string, handler NotifierHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *notifierController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler NotifierHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*Notifier); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*Notifier))
 	})
 }
 
@@ -238,20 +231,20 @@ func (s *notifierClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, list
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *notifierClient) AddHandler(name string, sync NotifierHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *notifierClient) AddHandler(ctx context.Context, name string, sync NotifierHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *notifierClient) AddLifecycle(name string, lifecycle NotifierLifecycle) {
+func (s *notifierClient) AddLifecycle(ctx context.Context, name string, lifecycle NotifierLifecycle) {
 	sync := NewNotifierLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *notifierClient) AddClusterScopedHandler(name, clusterName string, sync NotifierHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *notifierClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NotifierHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *notifierClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle NotifierLifecycle) {
+func (s *notifierClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NotifierLifecycle) {
 	sync := NewNotifierLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

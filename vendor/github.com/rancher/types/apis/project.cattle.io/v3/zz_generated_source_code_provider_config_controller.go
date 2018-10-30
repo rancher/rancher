@@ -35,7 +35,7 @@ type SourceCodeProviderConfigList struct {
 	Items           []SourceCodeProviderConfig
 }
 
-type SourceCodeProviderConfigHandlerFunc func(key string, obj *SourceCodeProviderConfig) error
+type SourceCodeProviderConfigHandlerFunc func(key string, obj *SourceCodeProviderConfig) (*SourceCodeProviderConfig, error)
 
 type SourceCodeProviderConfigLister interface {
 	List(namespace string, selector labels.Selector) (ret []*SourceCodeProviderConfig, err error)
@@ -46,8 +46,8 @@ type SourceCodeProviderConfigController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() SourceCodeProviderConfigLister
-	AddHandler(name string, handler SourceCodeProviderConfigHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler SourceCodeProviderConfigHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler SourceCodeProviderConfigHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler SourceCodeProviderConfigHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,10 +65,10 @@ type SourceCodeProviderConfigInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() SourceCodeProviderConfigController
-	AddHandler(name string, sync SourceCodeProviderConfigHandlerFunc)
-	AddLifecycle(name string, lifecycle SourceCodeProviderConfigLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync SourceCodeProviderConfigHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle SourceCodeProviderConfigLifecycle)
+	AddHandler(ctx context.Context, name string, sync SourceCodeProviderConfigHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle SourceCodeProviderConfigLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync SourceCodeProviderConfigHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle SourceCodeProviderConfigLifecycle)
 }
 
 type sourceCodeProviderConfigLister struct {
@@ -116,34 +116,27 @@ func (c *sourceCodeProviderConfigController) Lister() SourceCodeProviderConfigLi
 	}
 }
 
-func (c *sourceCodeProviderConfigController) AddHandler(name string, handler SourceCodeProviderConfigHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *sourceCodeProviderConfigController) AddHandler(ctx context.Context, name string, handler SourceCodeProviderConfigHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*SourceCodeProviderConfig); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*SourceCodeProviderConfig))
 	})
 }
 
-func (c *sourceCodeProviderConfigController) AddClusterScopedHandler(name, cluster string, handler SourceCodeProviderConfigHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *sourceCodeProviderConfigController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler SourceCodeProviderConfigHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*SourceCodeProviderConfig); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*SourceCodeProviderConfig))
 	})
 }
 
@@ -238,20 +231,20 @@ func (s *sourceCodeProviderConfigClient) DeleteCollection(deleteOpts *metav1.Del
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *sourceCodeProviderConfigClient) AddHandler(name string, sync SourceCodeProviderConfigHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *sourceCodeProviderConfigClient) AddHandler(ctx context.Context, name string, sync SourceCodeProviderConfigHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *sourceCodeProviderConfigClient) AddLifecycle(name string, lifecycle SourceCodeProviderConfigLifecycle) {
+func (s *sourceCodeProviderConfigClient) AddLifecycle(ctx context.Context, name string, lifecycle SourceCodeProviderConfigLifecycle) {
 	sync := NewSourceCodeProviderConfigLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *sourceCodeProviderConfigClient) AddClusterScopedHandler(name, clusterName string, sync SourceCodeProviderConfigHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *sourceCodeProviderConfigClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync SourceCodeProviderConfigHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *sourceCodeProviderConfigClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle SourceCodeProviderConfigLifecycle) {
+func (s *sourceCodeProviderConfigClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle SourceCodeProviderConfigLifecycle) {
 	sync := NewSourceCodeProviderConfigLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

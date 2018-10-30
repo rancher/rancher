@@ -35,7 +35,7 @@ type NamespaceList struct {
 	Items           []v1.Namespace
 }
 
-type NamespaceHandlerFunc func(key string, obj *v1.Namespace) error
+type NamespaceHandlerFunc func(key string, obj *v1.Namespace) (*v1.Namespace, error)
 
 type NamespaceLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.Namespace, err error)
@@ -46,8 +46,8 @@ type NamespaceController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() NamespaceLister
-	AddHandler(name string, handler NamespaceHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler NamespaceHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler NamespaceHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler NamespaceHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,10 +65,10 @@ type NamespaceInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NamespaceController
-	AddHandler(name string, sync NamespaceHandlerFunc)
-	AddLifecycle(name string, lifecycle NamespaceLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync NamespaceHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle NamespaceLifecycle)
+	AddHandler(ctx context.Context, name string, sync NamespaceHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle NamespaceLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NamespaceHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NamespaceLifecycle)
 }
 
 type namespaceLister struct {
@@ -116,34 +116,27 @@ func (c *namespaceController) Lister() NamespaceLister {
 	}
 }
 
-func (c *namespaceController) AddHandler(name string, handler NamespaceHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *namespaceController) AddHandler(ctx context.Context, name string, handler NamespaceHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1.Namespace); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*v1.Namespace))
 	})
 }
 
-func (c *namespaceController) AddClusterScopedHandler(name, cluster string, handler NamespaceHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *namespaceController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler NamespaceHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1.Namespace); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*v1.Namespace))
 	})
 }
 
@@ -238,20 +231,20 @@ func (s *namespaceClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, lis
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *namespaceClient) AddHandler(name string, sync NamespaceHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *namespaceClient) AddHandler(ctx context.Context, name string, sync NamespaceHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *namespaceClient) AddLifecycle(name string, lifecycle NamespaceLifecycle) {
+func (s *namespaceClient) AddLifecycle(ctx context.Context, name string, lifecycle NamespaceLifecycle) {
 	sync := NewNamespaceLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *namespaceClient) AddClusterScopedHandler(name, clusterName string, sync NamespaceHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *namespaceClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NamespaceHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *namespaceClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle NamespaceLifecycle) {
+func (s *namespaceClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NamespaceLifecycle) {
 	sync := NewNamespaceLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

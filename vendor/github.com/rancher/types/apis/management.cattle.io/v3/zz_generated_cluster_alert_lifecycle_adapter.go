@@ -42,10 +42,11 @@ func (w *clusterAlertLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obje
 func NewClusterAlertLifecycleAdapter(name string, clusterScoped bool, client ClusterAlertInterface, l ClusterAlertLifecycle) ClusterAlertHandlerFunc {
 	adapter := &clusterAlertLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *ClusterAlert) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *ClusterAlert) (*ClusterAlert, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*ClusterAlert); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

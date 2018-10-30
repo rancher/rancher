@@ -36,7 +36,7 @@ type ReplicationControllerList struct {
 	Items           []v1.ReplicationController
 }
 
-type ReplicationControllerHandlerFunc func(key string, obj *v1.ReplicationController) error
+type ReplicationControllerHandlerFunc func(key string, obj *v1.ReplicationController) (*v1.ReplicationController, error)
 
 type ReplicationControllerLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.ReplicationController, err error)
@@ -47,8 +47,8 @@ type ReplicationControllerController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ReplicationControllerLister
-	AddHandler(name string, handler ReplicationControllerHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler ReplicationControllerHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler ReplicationControllerHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ReplicationControllerHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -66,10 +66,10 @@ type ReplicationControllerInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ReplicationControllerController
-	AddHandler(name string, sync ReplicationControllerHandlerFunc)
-	AddLifecycle(name string, lifecycle ReplicationControllerLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync ReplicationControllerHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle ReplicationControllerLifecycle)
+	AddHandler(ctx context.Context, name string, sync ReplicationControllerHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle ReplicationControllerLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ReplicationControllerHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ReplicationControllerLifecycle)
 }
 
 type replicationControllerLister struct {
@@ -117,34 +117,27 @@ func (c *replicationControllerController) Lister() ReplicationControllerLister {
 	}
 }
 
-func (c *replicationControllerController) AddHandler(name string, handler ReplicationControllerHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *replicationControllerController) AddHandler(ctx context.Context, name string, handler ReplicationControllerHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1.ReplicationController); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*v1.ReplicationController))
 	})
 }
 
-func (c *replicationControllerController) AddClusterScopedHandler(name, cluster string, handler ReplicationControllerHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *replicationControllerController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ReplicationControllerHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1.ReplicationController); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*v1.ReplicationController))
 	})
 }
 
@@ -239,20 +232,20 @@ func (s *replicationControllerClient) DeleteCollection(deleteOpts *metav1.Delete
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *replicationControllerClient) AddHandler(name string, sync ReplicationControllerHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *replicationControllerClient) AddHandler(ctx context.Context, name string, sync ReplicationControllerHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *replicationControllerClient) AddLifecycle(name string, lifecycle ReplicationControllerLifecycle) {
+func (s *replicationControllerClient) AddLifecycle(ctx context.Context, name string, lifecycle ReplicationControllerLifecycle) {
 	sync := NewReplicationControllerLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *replicationControllerClient) AddClusterScopedHandler(name, clusterName string, sync ReplicationControllerHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *replicationControllerClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ReplicationControllerHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *replicationControllerClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle ReplicationControllerLifecycle) {
+func (s *replicationControllerClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ReplicationControllerLifecycle) {
 	sync := NewReplicationControllerLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

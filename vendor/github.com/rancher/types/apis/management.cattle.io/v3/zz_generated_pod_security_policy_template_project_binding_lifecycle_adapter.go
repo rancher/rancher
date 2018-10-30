@@ -42,10 +42,11 @@ func (w *podSecurityPolicyTemplateProjectBindingLifecycleAdapter) Updated(obj ru
 func NewPodSecurityPolicyTemplateProjectBindingLifecycleAdapter(name string, clusterScoped bool, client PodSecurityPolicyTemplateProjectBindingInterface, l PodSecurityPolicyTemplateProjectBindingLifecycle) PodSecurityPolicyTemplateProjectBindingHandlerFunc {
 	adapter := &podSecurityPolicyTemplateProjectBindingLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *PodSecurityPolicyTemplateProjectBinding) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *PodSecurityPolicyTemplateProjectBinding) (*PodSecurityPolicyTemplateProjectBinding, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*PodSecurityPolicyTemplateProjectBinding); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

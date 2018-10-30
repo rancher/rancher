@@ -43,10 +43,11 @@ func (w *resourceQuotaLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obj
 func NewResourceQuotaLifecycleAdapter(name string, clusterScoped bool, client ResourceQuotaInterface, l ResourceQuotaLifecycle) ResourceQuotaHandlerFunc {
 	adapter := &resourceQuotaLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1.ResourceQuota) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *v1.ResourceQuota) (*v1.ResourceQuota, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*v1.ResourceQuota); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

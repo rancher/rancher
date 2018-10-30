@@ -36,7 +36,7 @@ type ResourceQuotaList struct {
 	Items           []v1.ResourceQuota
 }
 
-type ResourceQuotaHandlerFunc func(key string, obj *v1.ResourceQuota) error
+type ResourceQuotaHandlerFunc func(key string, obj *v1.ResourceQuota) (*v1.ResourceQuota, error)
 
 type ResourceQuotaLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.ResourceQuota, err error)
@@ -47,8 +47,8 @@ type ResourceQuotaController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() ResourceQuotaLister
-	AddHandler(name string, handler ResourceQuotaHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler ResourceQuotaHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler ResourceQuotaHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ResourceQuotaHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -66,10 +66,10 @@ type ResourceQuotaInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ResourceQuotaController
-	AddHandler(name string, sync ResourceQuotaHandlerFunc)
-	AddLifecycle(name string, lifecycle ResourceQuotaLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync ResourceQuotaHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle ResourceQuotaLifecycle)
+	AddHandler(ctx context.Context, name string, sync ResourceQuotaHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle ResourceQuotaLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ResourceQuotaHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ResourceQuotaLifecycle)
 }
 
 type resourceQuotaLister struct {
@@ -117,34 +117,27 @@ func (c *resourceQuotaController) Lister() ResourceQuotaLister {
 	}
 }
 
-func (c *resourceQuotaController) AddHandler(name string, handler ResourceQuotaHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *resourceQuotaController) AddHandler(ctx context.Context, name string, handler ResourceQuotaHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1.ResourceQuota); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*v1.ResourceQuota))
 	})
 }
 
-func (c *resourceQuotaController) AddClusterScopedHandler(name, cluster string, handler ResourceQuotaHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *resourceQuotaController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ResourceQuotaHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1.ResourceQuota); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*v1.ResourceQuota))
 	})
 }
 
@@ -239,20 +232,20 @@ func (s *resourceQuotaClient) DeleteCollection(deleteOpts *metav1.DeleteOptions,
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *resourceQuotaClient) AddHandler(name string, sync ResourceQuotaHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *resourceQuotaClient) AddHandler(ctx context.Context, name string, sync ResourceQuotaHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *resourceQuotaClient) AddLifecycle(name string, lifecycle ResourceQuotaLifecycle) {
+func (s *resourceQuotaClient) AddLifecycle(ctx context.Context, name string, lifecycle ResourceQuotaLifecycle) {
 	sync := NewResourceQuotaLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *resourceQuotaClient) AddClusterScopedHandler(name, clusterName string, sync ResourceQuotaHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *resourceQuotaClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ResourceQuotaHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *resourceQuotaClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle ResourceQuotaLifecycle) {
+func (s *resourceQuotaClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ResourceQuotaLifecycle) {
 	sync := NewResourceQuotaLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

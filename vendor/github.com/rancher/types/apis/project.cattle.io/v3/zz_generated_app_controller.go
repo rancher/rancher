@@ -35,7 +35,7 @@ type AppList struct {
 	Items           []App
 }
 
-type AppHandlerFunc func(key string, obj *App) error
+type AppHandlerFunc func(key string, obj *App) (*App, error)
 
 type AppLister interface {
 	List(namespace string, selector labels.Selector) (ret []*App, err error)
@@ -46,8 +46,8 @@ type AppController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() AppLister
-	AddHandler(name string, handler AppHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler AppHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler AppHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler AppHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,10 +65,10 @@ type AppInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() AppController
-	AddHandler(name string, sync AppHandlerFunc)
-	AddLifecycle(name string, lifecycle AppLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync AppHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle AppLifecycle)
+	AddHandler(ctx context.Context, name string, sync AppHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle AppLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync AppHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle AppLifecycle)
 }
 
 type appLister struct {
@@ -116,34 +116,27 @@ func (c *appController) Lister() AppLister {
 	}
 }
 
-func (c *appController) AddHandler(name string, handler AppHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *appController) AddHandler(ctx context.Context, name string, handler AppHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*App); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*App))
 	})
 }
 
-func (c *appController) AddClusterScopedHandler(name, cluster string, handler AppHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *appController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler AppHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*App); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*App))
 	})
 }
 
@@ -238,20 +231,20 @@ func (s *appClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts 
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *appClient) AddHandler(name string, sync AppHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *appClient) AddHandler(ctx context.Context, name string, sync AppHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *appClient) AddLifecycle(name string, lifecycle AppLifecycle) {
+func (s *appClient) AddLifecycle(ctx context.Context, name string, lifecycle AppLifecycle) {
 	sync := NewAppLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *appClient) AddClusterScopedHandler(name, clusterName string, sync AppHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *appClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync AppHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *appClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle AppLifecycle) {
+func (s *appClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle AppLifecycle) {
 	sync := NewAppLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

@@ -36,7 +36,7 @@ type PersistentVolumeClaimList struct {
 	Items           []v1.PersistentVolumeClaim
 }
 
-type PersistentVolumeClaimHandlerFunc func(key string, obj *v1.PersistentVolumeClaim) error
+type PersistentVolumeClaimHandlerFunc func(key string, obj *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error)
 
 type PersistentVolumeClaimLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.PersistentVolumeClaim, err error)
@@ -47,8 +47,8 @@ type PersistentVolumeClaimController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() PersistentVolumeClaimLister
-	AddHandler(name string, handler PersistentVolumeClaimHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler PersistentVolumeClaimHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler PersistentVolumeClaimHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler PersistentVolumeClaimHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -66,10 +66,10 @@ type PersistentVolumeClaimInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PersistentVolumeClaimController
-	AddHandler(name string, sync PersistentVolumeClaimHandlerFunc)
-	AddLifecycle(name string, lifecycle PersistentVolumeClaimLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync PersistentVolumeClaimHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle PersistentVolumeClaimLifecycle)
+	AddHandler(ctx context.Context, name string, sync PersistentVolumeClaimHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle PersistentVolumeClaimLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync PersistentVolumeClaimHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PersistentVolumeClaimLifecycle)
 }
 
 type persistentVolumeClaimLister struct {
@@ -117,34 +117,27 @@ func (c *persistentVolumeClaimController) Lister() PersistentVolumeClaimLister {
 	}
 }
 
-func (c *persistentVolumeClaimController) AddHandler(name string, handler PersistentVolumeClaimHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *persistentVolumeClaimController) AddHandler(ctx context.Context, name string, handler PersistentVolumeClaimHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1.PersistentVolumeClaim); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*v1.PersistentVolumeClaim))
 	})
 }
 
-func (c *persistentVolumeClaimController) AddClusterScopedHandler(name, cluster string, handler PersistentVolumeClaimHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *persistentVolumeClaimController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler PersistentVolumeClaimHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1.PersistentVolumeClaim); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*v1.PersistentVolumeClaim))
 	})
 }
 
@@ -239,20 +232,20 @@ func (s *persistentVolumeClaimClient) DeleteCollection(deleteOpts *metav1.Delete
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *persistentVolumeClaimClient) AddHandler(name string, sync PersistentVolumeClaimHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *persistentVolumeClaimClient) AddHandler(ctx context.Context, name string, sync PersistentVolumeClaimHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *persistentVolumeClaimClient) AddLifecycle(name string, lifecycle PersistentVolumeClaimLifecycle) {
+func (s *persistentVolumeClaimClient) AddLifecycle(ctx context.Context, name string, lifecycle PersistentVolumeClaimLifecycle) {
 	sync := NewPersistentVolumeClaimLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *persistentVolumeClaimClient) AddClusterScopedHandler(name, clusterName string, sync PersistentVolumeClaimHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *persistentVolumeClaimClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync PersistentVolumeClaimHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *persistentVolumeClaimClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle PersistentVolumeClaimLifecycle) {
+func (s *persistentVolumeClaimClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PersistentVolumeClaimLifecycle) {
 	sync := NewPersistentVolumeClaimLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

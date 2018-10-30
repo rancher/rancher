@@ -43,10 +43,11 @@ func (w *serviceAccountLifecycleAdapter) Updated(obj runtime.Object) (runtime.Ob
 func NewServiceAccountLifecycleAdapter(name string, clusterScoped bool, client ServiceAccountInterface, l ServiceAccountLifecycle) ServiceAccountHandlerFunc {
 	adapter := &serviceAccountLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1.ServiceAccount) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *v1.ServiceAccount) (*v1.ServiceAccount, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*v1.ServiceAccount); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

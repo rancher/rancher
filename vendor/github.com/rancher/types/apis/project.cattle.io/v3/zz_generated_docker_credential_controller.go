@@ -35,7 +35,7 @@ type DockerCredentialList struct {
 	Items           []DockerCredential
 }
 
-type DockerCredentialHandlerFunc func(key string, obj *DockerCredential) error
+type DockerCredentialHandlerFunc func(key string, obj *DockerCredential) (*DockerCredential, error)
 
 type DockerCredentialLister interface {
 	List(namespace string, selector labels.Selector) (ret []*DockerCredential, err error)
@@ -46,8 +46,8 @@ type DockerCredentialController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() DockerCredentialLister
-	AddHandler(name string, handler DockerCredentialHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler DockerCredentialHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler DockerCredentialHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler DockerCredentialHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -65,10 +65,10 @@ type DockerCredentialInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DockerCredentialController
-	AddHandler(name string, sync DockerCredentialHandlerFunc)
-	AddLifecycle(name string, lifecycle DockerCredentialLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync DockerCredentialHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle DockerCredentialLifecycle)
+	AddHandler(ctx context.Context, name string, sync DockerCredentialHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle DockerCredentialLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync DockerCredentialHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle DockerCredentialLifecycle)
 }
 
 type dockerCredentialLister struct {
@@ -116,34 +116,27 @@ func (c *dockerCredentialController) Lister() DockerCredentialLister {
 	}
 }
 
-func (c *dockerCredentialController) AddHandler(name string, handler DockerCredentialHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *dockerCredentialController) AddHandler(ctx context.Context, name string, handler DockerCredentialHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*DockerCredential); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*DockerCredential))
 	})
 }
 
-func (c *dockerCredentialController) AddClusterScopedHandler(name, cluster string, handler DockerCredentialHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *dockerCredentialController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler DockerCredentialHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*DockerCredential); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*DockerCredential))
 	})
 }
 
@@ -238,20 +231,20 @@ func (s *dockerCredentialClient) DeleteCollection(deleteOpts *metav1.DeleteOptio
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *dockerCredentialClient) AddHandler(name string, sync DockerCredentialHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *dockerCredentialClient) AddHandler(ctx context.Context, name string, sync DockerCredentialHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *dockerCredentialClient) AddLifecycle(name string, lifecycle DockerCredentialLifecycle) {
+func (s *dockerCredentialClient) AddLifecycle(ctx context.Context, name string, lifecycle DockerCredentialLifecycle) {
 	sync := NewDockerCredentialLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *dockerCredentialClient) AddClusterScopedHandler(name, clusterName string, sync DockerCredentialHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *dockerCredentialClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync DockerCredentialHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *dockerCredentialClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle DockerCredentialLifecycle) {
+func (s *dockerCredentialClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle DockerCredentialLifecycle) {
 	sync := NewDockerCredentialLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

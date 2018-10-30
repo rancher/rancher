@@ -36,7 +36,7 @@ type EndpointsList struct {
 	Items           []v1.Endpoints
 }
 
-type EndpointsHandlerFunc func(key string, obj *v1.Endpoints) error
+type EndpointsHandlerFunc func(key string, obj *v1.Endpoints) (*v1.Endpoints, error)
 
 type EndpointsLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.Endpoints, err error)
@@ -47,8 +47,8 @@ type EndpointsController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() EndpointsLister
-	AddHandler(name string, handler EndpointsHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler EndpointsHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler EndpointsHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler EndpointsHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -66,10 +66,10 @@ type EndpointsInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() EndpointsController
-	AddHandler(name string, sync EndpointsHandlerFunc)
-	AddLifecycle(name string, lifecycle EndpointsLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync EndpointsHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle EndpointsLifecycle)
+	AddHandler(ctx context.Context, name string, sync EndpointsHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle EndpointsLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync EndpointsHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle EndpointsLifecycle)
 }
 
 type endpointsLister struct {
@@ -117,34 +117,27 @@ func (c *endpointsController) Lister() EndpointsLister {
 	}
 }
 
-func (c *endpointsController) AddHandler(name string, handler EndpointsHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *endpointsController) AddHandler(ctx context.Context, name string, handler EndpointsHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1.Endpoints); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*v1.Endpoints))
 	})
 }
 
-func (c *endpointsController) AddClusterScopedHandler(name, cluster string, handler EndpointsHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *endpointsController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler EndpointsHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1.Endpoints); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*v1.Endpoints))
 	})
 }
 
@@ -239,20 +232,20 @@ func (s *endpointsClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, lis
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *endpointsClient) AddHandler(name string, sync EndpointsHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *endpointsClient) AddHandler(ctx context.Context, name string, sync EndpointsHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *endpointsClient) AddLifecycle(name string, lifecycle EndpointsLifecycle) {
+func (s *endpointsClient) AddLifecycle(ctx context.Context, name string, lifecycle EndpointsLifecycle) {
 	sync := NewEndpointsLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *endpointsClient) AddClusterScopedHandler(name, clusterName string, sync EndpointsHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *endpointsClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync EndpointsHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *endpointsClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle EndpointsLifecycle) {
+func (s *endpointsClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle EndpointsLifecycle) {
 	sync := NewEndpointsLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

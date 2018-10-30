@@ -34,7 +34,7 @@ type PodSecurityPolicyTemplateList struct {
 	Items           []PodSecurityPolicyTemplate
 }
 
-type PodSecurityPolicyTemplateHandlerFunc func(key string, obj *PodSecurityPolicyTemplate) error
+type PodSecurityPolicyTemplateHandlerFunc func(key string, obj *PodSecurityPolicyTemplate) (*PodSecurityPolicyTemplate, error)
 
 type PodSecurityPolicyTemplateLister interface {
 	List(namespace string, selector labels.Selector) (ret []*PodSecurityPolicyTemplate, err error)
@@ -45,8 +45,8 @@ type PodSecurityPolicyTemplateController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() PodSecurityPolicyTemplateLister
-	AddHandler(name string, handler PodSecurityPolicyTemplateHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler PodSecurityPolicyTemplateHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler PodSecurityPolicyTemplateHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler PodSecurityPolicyTemplateHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -64,10 +64,10 @@ type PodSecurityPolicyTemplateInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PodSecurityPolicyTemplateController
-	AddHandler(name string, sync PodSecurityPolicyTemplateHandlerFunc)
-	AddLifecycle(name string, lifecycle PodSecurityPolicyTemplateLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync PodSecurityPolicyTemplateHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle PodSecurityPolicyTemplateLifecycle)
+	AddHandler(ctx context.Context, name string, sync PodSecurityPolicyTemplateHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle PodSecurityPolicyTemplateLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync PodSecurityPolicyTemplateHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PodSecurityPolicyTemplateLifecycle)
 }
 
 type podSecurityPolicyTemplateLister struct {
@@ -115,34 +115,27 @@ func (c *podSecurityPolicyTemplateController) Lister() PodSecurityPolicyTemplate
 	}
 }
 
-func (c *podSecurityPolicyTemplateController) AddHandler(name string, handler PodSecurityPolicyTemplateHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *podSecurityPolicyTemplateController) AddHandler(ctx context.Context, name string, handler PodSecurityPolicyTemplateHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*PodSecurityPolicyTemplate); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*PodSecurityPolicyTemplate))
 	})
 }
 
-func (c *podSecurityPolicyTemplateController) AddClusterScopedHandler(name, cluster string, handler PodSecurityPolicyTemplateHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *podSecurityPolicyTemplateController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler PodSecurityPolicyTemplateHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*PodSecurityPolicyTemplate); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*PodSecurityPolicyTemplate))
 	})
 }
 
@@ -237,20 +230,20 @@ func (s *podSecurityPolicyTemplateClient) DeleteCollection(deleteOpts *metav1.De
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *podSecurityPolicyTemplateClient) AddHandler(name string, sync PodSecurityPolicyTemplateHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *podSecurityPolicyTemplateClient) AddHandler(ctx context.Context, name string, sync PodSecurityPolicyTemplateHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *podSecurityPolicyTemplateClient) AddLifecycle(name string, lifecycle PodSecurityPolicyTemplateLifecycle) {
+func (s *podSecurityPolicyTemplateClient) AddLifecycle(ctx context.Context, name string, lifecycle PodSecurityPolicyTemplateLifecycle) {
 	sync := NewPodSecurityPolicyTemplateLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *podSecurityPolicyTemplateClient) AddClusterScopedHandler(name, clusterName string, sync PodSecurityPolicyTemplateHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *podSecurityPolicyTemplateClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync PodSecurityPolicyTemplateHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *podSecurityPolicyTemplateClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle PodSecurityPolicyTemplateLifecycle) {
+func (s *podSecurityPolicyTemplateClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PodSecurityPolicyTemplateLifecycle) {
 	sync := NewPodSecurityPolicyTemplateLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

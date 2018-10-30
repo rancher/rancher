@@ -36,7 +36,7 @@ type CronJobList struct {
 	Items           []v1beta1.CronJob
 }
 
-type CronJobHandlerFunc func(key string, obj *v1beta1.CronJob) error
+type CronJobHandlerFunc func(key string, obj *v1beta1.CronJob) (*v1beta1.CronJob, error)
 
 type CronJobLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1beta1.CronJob, err error)
@@ -47,8 +47,8 @@ type CronJobController interface {
 	Generic() controller.GenericController
 	Informer() cache.SharedIndexInformer
 	Lister() CronJobLister
-	AddHandler(name string, handler CronJobHandlerFunc)
-	AddClusterScopedHandler(name, clusterName string, handler CronJobHandlerFunc)
+	AddHandler(ctx context.Context, name string, handler CronJobHandlerFunc)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler CronJobHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -66,10 +66,10 @@ type CronJobInterface interface {
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() CronJobController
-	AddHandler(name string, sync CronJobHandlerFunc)
-	AddLifecycle(name string, lifecycle CronJobLifecycle)
-	AddClusterScopedHandler(name, clusterName string, sync CronJobHandlerFunc)
-	AddClusterScopedLifecycle(name, clusterName string, lifecycle CronJobLifecycle)
+	AddHandler(ctx context.Context, name string, sync CronJobHandlerFunc)
+	AddLifecycle(ctx context.Context, name string, lifecycle CronJobLifecycle)
+	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync CronJobHandlerFunc)
+	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle CronJobLifecycle)
 }
 
 type cronJobLister struct {
@@ -117,34 +117,27 @@ func (c *cronJobController) Lister() CronJobLister {
 	}
 }
 
-func (c *cronJobController) AddHandler(name string, handler CronJobHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *cronJobController) AddHandler(ctx context.Context, name string, handler CronJobHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1beta1.CronJob); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-		return handler(key, obj.(*v1beta1.CronJob))
 	})
 }
 
-func (c *cronJobController) AddClusterScopedHandler(name, cluster string, handler CronJobHandlerFunc) {
-	c.GenericController.AddHandler(name, func(key string) error {
-		obj, exists, err := c.Informer().GetStore().GetByKey(key)
-		if err != nil {
-			return err
-		}
-		if !exists {
+func (c *cronJobController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler CronJobHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if obj == nil {
 			return handler(key, nil)
+		} else if v, ok := obj.(*v1beta1.CronJob); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
 		}
-
-		if !controller.ObjectInCluster(cluster, obj) {
-			return nil
-		}
-
-		return handler(key, obj.(*v1beta1.CronJob))
 	})
 }
 
@@ -239,20 +232,20 @@ func (s *cronJobClient) DeleteCollection(deleteOpts *metav1.DeleteOptions, listO
 	return s.objectClient.DeleteCollection(deleteOpts, listOpts)
 }
 
-func (s *cronJobClient) AddHandler(name string, sync CronJobHandlerFunc) {
-	s.Controller().AddHandler(name, sync)
+func (s *cronJobClient) AddHandler(ctx context.Context, name string, sync CronJobHandlerFunc) {
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *cronJobClient) AddLifecycle(name string, lifecycle CronJobLifecycle) {
+func (s *cronJobClient) AddLifecycle(ctx context.Context, name string, lifecycle CronJobLifecycle) {
 	sync := NewCronJobLifecycleAdapter(name, false, s, lifecycle)
-	s.AddHandler(name, sync)
+	s.Controller().AddHandler(ctx, name, sync)
 }
 
-func (s *cronJobClient) AddClusterScopedHandler(name, clusterName string, sync CronJobHandlerFunc) {
-	s.Controller().AddClusterScopedHandler(name, clusterName, sync)
+func (s *cronJobClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync CronJobHandlerFunc) {
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *cronJobClient) AddClusterScopedLifecycle(name, clusterName string, lifecycle CronJobLifecycle) {
+func (s *cronJobClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle CronJobLifecycle) {
 	sync := NewCronJobLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.AddClusterScopedHandler(name, clusterName, sync)
+	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }

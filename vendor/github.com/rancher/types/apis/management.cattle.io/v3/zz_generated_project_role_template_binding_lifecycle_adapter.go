@@ -42,10 +42,11 @@ func (w *projectRoleTemplateBindingLifecycleAdapter) Updated(obj runtime.Object)
 func NewProjectRoleTemplateBindingLifecycleAdapter(name string, clusterScoped bool, client ProjectRoleTemplateBindingInterface, l ProjectRoleTemplateBindingLifecycle) ProjectRoleTemplateBindingHandlerFunc {
 	adapter := &projectRoleTemplateBindingLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *ProjectRoleTemplateBinding) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *ProjectRoleTemplateBinding) (*ProjectRoleTemplateBinding, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*ProjectRoleTemplateBinding); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

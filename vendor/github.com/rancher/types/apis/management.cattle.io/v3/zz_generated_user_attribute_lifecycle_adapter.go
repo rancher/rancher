@@ -42,10 +42,11 @@ func (w *userAttributeLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obj
 func NewUserAttributeLifecycleAdapter(name string, clusterScoped bool, client UserAttributeInterface, l UserAttributeLifecycle) UserAttributeHandlerFunc {
 	adapter := &userAttributeLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *UserAttribute) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *UserAttribute) (*UserAttribute, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*UserAttribute); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

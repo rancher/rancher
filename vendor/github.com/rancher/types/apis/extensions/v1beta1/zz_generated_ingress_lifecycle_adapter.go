@@ -43,10 +43,11 @@ func (w *ingressLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, e
 func NewIngressLifecycleAdapter(name string, clusterScoped bool, client IngressInterface, l IngressLifecycle) IngressHandlerFunc {
 	adapter := &ingressLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1beta1.Ingress) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *v1beta1.Ingress) (*v1beta1.Ingress, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*v1beta1.Ingress); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }

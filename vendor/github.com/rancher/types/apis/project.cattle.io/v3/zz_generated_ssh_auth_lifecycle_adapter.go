@@ -42,10 +42,11 @@ func (w *sshAuthLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, e
 func NewSSHAuthLifecycleAdapter(name string, clusterScoped bool, client SSHAuthInterface, l SSHAuthLifecycle) SSHAuthHandlerFunc {
 	adapter := &sshAuthLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *SSHAuth) error {
-		if obj == nil {
-			return syncFn(key, nil)
+	return func(key string, obj *SSHAuth) (*SSHAuth, error) {
+		newObj, err := syncFn(key, obj)
+		if o, ok := newObj.(*SSHAuth); ok {
+			return o, err
 		}
-		return syncFn(key, obj)
+		return nil, err
 	}
 }
