@@ -19,7 +19,6 @@ import (
 
 	"github.com/mattn/go-colorable"
 	"github.com/rancher/rancher/pkg/agent/node"
-	"github.com/rancher/rancher/pkg/remotedialer"
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
 	"github.com/rancher/rancher/pkg/rkeworker"
 	"github.com/sirupsen/logrus"
@@ -355,7 +354,7 @@ func (a *agentService) start(selfChangeRequest chan<- svc.ChangeRequest) error {
 			logrus.Infof("Connecting to proxy %s with token %s", wsURL, token)
 
 			go func() {
-				dialerClose <- remotedialer.ClientConnectWhileWindows(
+				dialerClose <- ClientConnectWhileWindows(
 					ctx,
 					wsURL,
 					http.Header(headers),

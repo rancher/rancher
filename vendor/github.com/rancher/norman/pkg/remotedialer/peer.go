@@ -96,7 +96,7 @@ outer:
 			continue
 		}
 
-		session := newClientSession(func(string, string) bool { return true }, ws)
+		session := NewClientSession(func(string, string) bool { return true }, ws)
 		session.dialer = func(network, address string) (net.Conn, error) {
 			parts := strings.SplitN(network, "::", 2)
 			if len(parts) != 2 {
@@ -106,7 +106,7 @@ outer:
 		}
 
 		s.sessions.addListener(session)
-		_, err = session.serve()
+		_, err = session.Serve()
 		s.sessions.removeListener(session)
 		session.Close()
 

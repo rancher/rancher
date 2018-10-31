@@ -40,8 +40,8 @@ func connectToProxy(proxyURL string, headers http.Header, auth ConnectAuthorizer
 		}
 	}
 
-	session := newClientSession(auth, ws)
-	_, err = session.serve()
+	session := NewClientSession(auth, ws)
+	_, err = session.Serve()
 	session.Close()
 	return err
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (s *session) startPingsWhileWindows(rootCtx context.Context) {
+func (s *Session) startPingsWhileWindows(rootCtx context.Context) {
 	ctx, cancel := context.WithCancel(rootCtx)
 	s.pingCancel = cancel
 	s.pingWait.Add(1)
@@ -35,7 +35,7 @@ func (s *session) startPingsWhileWindows(rootCtx context.Context) {
 	}()
 }
 
-func (s *session) serveWhileWindows(ctx context.Context) (int, error) {
+func (s *Session) ServeWhileWindows(ctx context.Context) (int, error) {
 	if s.client {
 		s.startPingsWhileWindows(ctx)
 	}
