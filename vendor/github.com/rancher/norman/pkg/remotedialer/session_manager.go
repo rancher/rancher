@@ -17,20 +17,20 @@ type sessionListener interface {
 
 type sessionManager struct {
 	sync.Mutex
-	clients   map[string][]*session
-	peers     map[string][]*session
+	clients   map[string][]*Session
+	peers     map[string][]*Session
 	listeners map[sessionListener]bool
 }
 
 func newSessionManager() *sessionManager {
 	return &sessionManager{
-		clients:   map[string][]*session{},
-		peers:     map[string][]*session{},
+		clients:   map[string][]*Session{},
+		peers:     map[string][]*Session{},
 		listeners: map[sessionListener]bool{},
 	}
 }
 
-func toDialer(s *session, prefix string, deadline time.Duration) Dialer {
+func toDialer(s *Session, prefix string, deadline time.Duration) Dialer {
 	return func(proto, address string) (net.Conn, error) {
 		if prefix == "" {
 			return s.serverConnect(deadline, proto, address)
@@ -85,10 +85,10 @@ func (sm *sessionManager) getDialer(clientKey string, deadline time.Duration) (D
 		}
 	}
 
-	return nil, fmt.Errorf("failed to find session for client %s", clientKey)
+	return nil, fmt.Errorf("failed to find Session for client %s", clientKey)
 }
 
-func (sm *sessionManager) add(clientKey string, conn *websocket.Conn, peer bool) *session {
+func (sm *sessionManager) add(clientKey string, conn *websocket.Conn, peer bool) *Session {
 	sessionKey := rand.Int63()
 	session := newSession(sessionKey, clientKey, conn)
 
@@ -108,12 +108,12 @@ func (sm *sessionManager) add(clientKey string, conn *websocket.Conn, peer bool)
 	return session
 }
 
-func (sm *sessionManager) remove(s *session) {
+func (sm *sessionManager) remove(s *Session) {
 	sm.Lock()
 	defer sm.Unlock()
 
-	for _, store := range []map[string][]*session{sm.clients, sm.peers} {
-		var newSessions []*session
+	for _, store := range []map[string][]*Session{sm.clients, sm.peers} {
+		var newSessions []*Session
 
 		for _, v := range store[s.clientKey] {
 			if v.sessionKey == s.sessionKey {

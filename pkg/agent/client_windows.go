@@ -1,4 +1,4 @@
-package remotedialer
+package main
 
 import (
 	"context"
@@ -7,13 +7,14 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/rancher/norman/pkg/remotedialer"
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
 	"github.com/rancher/rancher/pkg/rkeworker"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
-func ClientConnectWhileWindows(ctx context.Context, wsURL string, headers http.Header, dialer *websocket.Dialer, auth ConnectAuthorizer, blockingOnConnect func(context.Context) error) int64 {
+func ClientConnectWhileWindows(ctx context.Context, wsURL string, headers http.Header, dialer *websocket.Dialer, auth remotedialer.ConnectAuthorizer, blockingOnConnect func(context.Context) error) int64 {
 	if err := connectToProxyWhileWindows(ctx, wsURL, headers, auth, dialer, blockingOnConnect); err != nil {
 		errMsg := err.Error()
 
@@ -38,7 +39,7 @@ func ClientConnectWhileWindows(ctx context.Context, wsURL string, headers http.H
 	return 200
 }
 
-func connectToProxyWhileWindows(rootContext context.Context, proxyURL string, headers http.Header, auth ConnectAuthorizer, dialer *websocket.Dialer, blockingOnConnect func(context.Context) error) error {
+func connectToProxyWhileWindows(rootContext context.Context, proxyURL string, headers http.Header, auth remotedialer.ConnectAuthorizer, dialer *websocket.Dialer, blockingOnConnect func(context.Context) error) error {
 	if dialer == nil {
 		dialer = &websocket.Dialer{}
 	}
@@ -62,8 +63,8 @@ func connectToProxyWhileWindows(rootContext context.Context, proxyURL string, he
 				}
 				defer ws.Close()
 
-				session := newClientSession(auth, ws)
-				_, err = session.serveWhileWindows(ctx)
+				session := remotedialer.NewClientSession(auth, ws)
+				_, err = session.ServeWhileWindows(ctx)
 				session.Close()
 				return err
 			}()

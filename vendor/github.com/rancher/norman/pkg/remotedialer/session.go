@@ -17,7 +17,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type session struct {
+type Session struct {
 	sync.Mutex
 
 	nextConnID       int64
@@ -42,8 +42,8 @@ func init() {
 	}
 }
 
-func newClientSession(auth ConnectAuthorizer, conn *websocket.Conn) *session {
-	return &session{
+func NewClientSession(auth ConnectAuthorizer, conn *websocket.Conn) *Session {
+	return &Session{
 		clientKey: "client",
 		conn:      newWSConn(conn),
 		conns:     map[int64]*connection{},
@@ -52,8 +52,8 @@ func newClientSession(auth ConnectAuthorizer, conn *websocket.Conn) *session {
 	}
 }
 
-func newSession(sessionKey int64, clientKey string, conn *websocket.Conn) *session {
-	return &session{
+func newSession(sessionKey int64, clientKey string, conn *websocket.Conn) *Session {
+	return &Session{
 		nextConnID:       1,
 		clientKey:        clientKey,
 		sessionKey:       sessionKey,
@@ -63,7 +63,7 @@ func newSession(sessionKey int64, clientKey string, conn *websocket.Conn) *sessi
 	}
 }
 
-func (s *session) startPings() {
+func (s *Session) startPings() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.pingCancel = cancel
 	s.pingWait.Add(1)
@@ -90,7 +90,7 @@ func (s *session) startPings() {
 	}()
 }
 
-func (s *session) stopPings() {
+func (s *Session) stopPings() {
 	if s.pingCancel == nil {
 		return
 	}
@@ -99,7 +99,7 @@ func (s *session) stopPings() {
 	s.pingWait.Wait()
 }
 
-func (s *session) serve() (int, error) {
+func (s *Session) Serve() (int, error) {
 	if s.client {
 		s.startPings()
 	}
@@ -120,7 +120,7 @@ func (s *session) serve() (int, error) {
 	}
 }
 
-func (s *session) serveMessage(reader io.Reader) error {
+func (s *Session) serveMessage(reader io.Reader) error {
 	message, err := newServerMessage(reader)
 	if err != nil {
 		return err
@@ -180,10 +180,10 @@ func parseAddress(address string) (string, int, error) {
 	return parts[0], v, err
 }
 
-func (s *session) addRemoteClient(address string) error {
+func (s *Session) addRemoteClient(address string) error {
 	clientKey, sessionKey, err := parseAddress(address)
 	if err != nil {
-		return fmt.Errorf("invalid remote session %s: %v", address, err)
+		return fmt.Errorf("invalid remote Session %s: %v", address, err)
 	}
 
 	keys := s.remoteClientKeys[clientKey]
@@ -200,10 +200,10 @@ func (s *session) addRemoteClient(address string) error {
 	return nil
 }
 
-func (s *session) removeRemoteClient(address string) error {
+func (s *Session) removeRemoteClient(address string) error {
 	clientKey, sessionKey, err := parseAddress(address)
 	if err != nil {
-		return fmt.Errorf("invalid remote session %s: %v", address, err)
+		return fmt.Errorf("invalid remote Session %s: %v", address, err)
 	}
 
 	keys := s.remoteClientKeys[clientKey]
@@ -219,7 +219,7 @@ func (s *session) removeRemoteClient(address string) error {
 	return nil
 }
 
-func (s *session) closeConnection(connID int64, err error) {
+func (s *Session) closeConnection(connID int64, err error) {
 	s.Lock()
 	conn := s.conns[connID]
 	delete(s.conns, connID)
@@ -233,7 +233,7 @@ func (s *session) closeConnection(connID int64, err error) {
 	}
 }
 
-func (s *session) clientConnect(message *message) {
+func (s *Session) clientConnect(message *message) {
 	conn := newConnection(message.connID, s, message.proto, message.address)
 
 	s.Lock()
@@ -246,7 +246,7 @@ func (s *session) clientConnect(message *message) {
 	go clientDial(s.dialer, conn, message)
 }
 
-func (s *session) serverConnect(deadline time.Duration, proto, address string) (net.Conn, error) {
+func (s *Session) serverConnect(deadline time.Duration, proto, address string) (net.Conn, error) {
 	connID := atomic.AddInt64(&s.nextConnID, 1)
 	conn := newConnection(connID, s, proto, address)
 
@@ -266,14 +266,14 @@ func (s *session) serverConnect(deadline time.Duration, proto, address string) (
 	return conn, err
 }
 
-func (s *session) writeMessage(message *message) (int, error) {
+func (s *Session) writeMessage(message *message) (int, error) {
 	if PrintTunnelData {
 		logrus.Debug("WRITE ", message)
 	}
 	return message.WriteTo(s.conn)
 }
 
-func (s *session) Close() {
+func (s *Session) Close() {
 	s.Lock()
 	defer s.Unlock()
 
@@ -286,7 +286,7 @@ func (s *session) Close() {
 	s.conns = map[int64]*connection{}
 }
 
-func (s *session) sessionAdded(clientKey string, sessionKey int64) {
+func (s *Session) sessionAdded(clientKey string, sessionKey int64) {
 	client := fmt.Sprintf("%s/%d", clientKey, sessionKey)
 	_, err := s.writeMessage(newAddClient(client))
 	if err != nil {
@@ -294,7 +294,7 @@ func (s *session) sessionAdded(clientKey string, sessionKey int64) {
 	}
 }
 
-func (s *session) sessionRemoved(clientKey string, sessionKey int64) {
+func (s *Session) sessionRemoved(clientKey string, sessionKey int64) {
 	client := fmt.Sprintf("%s/%d", clientKey, sessionKey)
 	_, err := s.writeMessage(newRemoveClient(client))
 	if err != nil {

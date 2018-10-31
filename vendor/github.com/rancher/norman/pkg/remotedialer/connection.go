@@ -19,11 +19,11 @@ type connection struct {
 	buf           chan []byte
 	readBuf       []byte
 	addr          addr
-	session       *session
+	session       *Session
 	connID        int64
 }
 
-func newConnection(connID int64, session *session, proto, address string) *connection {
+func newConnection(connID int64, session *Session, proto, address string) *connection {
 	c := &connection{
 		addr: addr{
 			proto:   proto,
