@@ -19,10 +19,11 @@ func getEmbedded(ctx context.Context) (bool, context.Context, *rest.Config, erro
 
 	sc, ok := ctx.Value(serverConfig).(*server.ServerConfig)
 	if !ok {
-		ctx, sc, _, err = NewK3sConfig(ctx, "./management-state", nil)
+		ctx, obj, _, err := NewK3sConfig(ctx, "./management-state", nil)
 		if err != nil {
 			return false, ctx, nil, err
 		}
+		sc = obj.(*server.ServerConfig)
 		sc.NoScheduler = false
 	}
 
