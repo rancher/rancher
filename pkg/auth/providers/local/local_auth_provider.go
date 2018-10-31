@@ -13,7 +13,6 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
 	"github.com/rancher/types/config"
-	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,17 +30,15 @@ const (
 )
 
 type Provider struct {
-	userLister       v3.UserLister
-	groupLister      v3.GroupLister
-	authConfigLister v3.AuthConfigLister
-	userIndexer      cache.Indexer
-	gmIndexer        cache.Indexer
-	groupIndexer     cache.Indexer
-	userMGR          user.Manager
-	tokenMGR         *tokens.Manager
+	userLister   v3.UserLister
+	groupLister  v3.GroupLister
+	userIndexer  cache.Indexer
+	gmIndexer    cache.Indexer
+	groupIndexer cache.Indexer
+	tokenMGR     *tokens.Manager
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
+func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, tokenMGR *tokens.Manager) common.AuthProvider {
 	informer := mgmtCtx.Management.Users("").Controller().Informer()
 	indexers := map[string]cache.IndexFunc{userNameIndex: userNameIndexer, userSearchIndex: userSearchIndexer}
 	informer.AddIndexers(indexers)
@@ -55,14 +52,12 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	gInformer.AddIndexers(gIndexers)
 
 	l := &Provider{
-		userIndexer:      informer.GetIndexer(),
-		gmIndexer:        gmInformer.GetIndexer(),
-		groupLister:      mgmtCtx.Management.Groups("").Controller().Lister(),
-		groupIndexer:     gInformer.GetIndexer(),
-		userLister:       mgmtCtx.Management.Users("").Controller().Lister(),
-		authConfigLister: mgmtCtx.Management.AuthConfigs("").Controller().Lister(),
-		userMGR:          userMGR,
-		tokenMGR:         tokenMGR,
+		userIndexer:  informer.GetIndexer(),
+		gmIndexer:    gmInformer.GetIndexer(),
+		groupLister:  mgmtCtx.Management.Groups("").Controller().Lister(),
+		groupIndexer: gInformer.GetIndexer(),
+		userLister:   mgmtCtx.Management.Users("").Controller().Lister(),
+		tokenMGR:     tokenMGR,
 	}
 	return l
 }
@@ -116,29 +111,6 @@ func (l *Provider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Princ
 	groupPrincipals, err := l.getGroupPrincipals(user)
 	if err != nil {
 		return v3.Principal{}, nil, "", errors.Wrapf(err, "failed to get groups for %v", user.ObjectMeta.Name)
-	}
-
-	acs, err := l.authConfigLister.List("", labels.Everything())
-	if err != nil {
-		return v3.Principal{}, nil, "", err
-	}
-
-	var checked, allowed bool
-	for _, config := range acs {
-		if config.Name != Name && config.Enabled {
-			checked = true
-			allowed, err = l.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal, groupPrincipals)
-			if err != nil {
-				return v3.Principal{}, nil, "", err
-			}
-			if allowed {
-				break
-			}
-		}
-	}
-
-	if checked && !allowed {
-		return v3.Principal{}, nil, "", httperror.NewAPIError(httperror.Unauthorized, "unauthorized")
 	}
 
 	return userPrincipal, groupPrincipals, "", nil
