@@ -1,3 +1,5 @@
+// +build k8s
+
 package k8s
 
 import (
@@ -10,7 +12,7 @@ import (
 	"k8s.io/kubernetes/pkg/wrapper/server"
 )
 
-func NewK3sConfig(ctx context.Context, dataDir string, authorizer remotedialer.Authorizer) (context.Context, *server.ServerConfig, http.Handler, error) {
+func NewK3sConfig(ctx context.Context, dataDir string, authorizer remotedialer.Authorizer) (context.Context, interface{}, http.Handler, error) {
 	dataDir, err := resolvehome.Resolve(dataDir)
 	if err != nil {
 		return ctx, nil, nil, err

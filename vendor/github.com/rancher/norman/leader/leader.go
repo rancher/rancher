@@ -13,19 +13,26 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+
+	// ensure that core is loaded into legacyschema
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
 type Callback func(cb context.Context)
 
-func RunOrDie(ctx context.Context, name string, client kubernetes.Interface, cb Callback) {
-	err := run(ctx, name, client, cb)
+func RunOrDie(ctx context.Context, namespace, name string, client kubernetes.Interface, cb Callback) {
+	if namespace == "" {
+		namespace = "kube-system"
+	}
+
+	err := run(ctx, namespace, name, client, cb)
 	if err != nil {
 		logrus.Fatalf("Failed to start leader election for %s", name)
 	}
 	panic("Failed to start leader election for " + name)
 }
 
-func run(ctx context.Context, name string, client kubernetes.Interface, cb Callback) error {
+func run(ctx context.Context, namespace, name string, client kubernetes.Interface, cb Callback) error {
 	id, err := os.Hostname()
 	if err != nil {
 		return err
@@ -34,7 +41,7 @@ func run(ctx context.Context, name string, client kubernetes.Interface, cb Callb
 	recorder := createRecorder(name, client)
 
 	rl, err := resourcelock.New(resourcelock.ConfigMapsResourceLock,
-		"kube-system",
+		namespace,
 		name,
 		client.CoreV1(),
 		resourcelock.ResourceLockConfig{
