@@ -23,12 +23,12 @@ func NewTransformStore(store types.Store) types.Store {
 			hide := true
 			if opt != nil && opt.Options["hidden"] == "true" {
 				hide = false
-			}
-			if opt != nil && opt.Options["ByID"] == "true" {
+			} else if opt != nil && opt.Options["ByID"] == "true" {
 				hide = false
+			} else {
+				hide = hideByOwner(data)
 			}
 			typeName := definition.GetType(data)
-			hide = hideByOwner(data)
 			name, _ := data["name"].(string)
 			if hide && data["ownerReferences"] != nil {
 				pod.SaveOwner(apiContext, typeName, name, data)
