@@ -36,6 +36,7 @@ type Provider struct {
 	gmIndexer    cache.Indexer
 	groupIndexer cache.Indexer
 	tokenMGR     *tokens.Manager
+	invalidHash  []byte
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, tokenMGR *tokens.Manager) common.AuthProvider {
@@ -51,6 +52,8 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, tokenMGR *tok
 	gIndexers := map[string]cache.IndexFunc{groupSearchIndex: groupSearchIndexer}
 	gInformer.AddIndexers(gIndexers)
 
+	invalidHash, _ := bcrypt.GenerateFromPassword([]byte("invalid"), bcrypt.DefaultCost)
+
 	l := &Provider{
 		userIndexer:  informer.GetIndexer(),
 		gmIndexer:    gmInformer.GetIndexer(),
@@ -58,6 +61,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, tokenMGR *tok
 		groupIndexer: gInformer.GetIndexer(),
 		userLister:   mgmtCtx.Management.Users("").Controller().Lister(),
 		tokenMGR:     tokenMGR,
+		invalidHash:  invalidHash,
 	}
 	return l
 }
@@ -74,6 +78,27 @@ func (l *Provider) TransformToAuthProvider(authConfig map[string]interface{}) ma
 	return common.TransformToAuthProvider(authConfig)
 }
 
+func (l *Provider) getUser(username string) (*v3.User, error) {
+	objs, err := l.userIndexer.ByIndex(userNameIndex, username)
+
+	if err != nil {
+		return nil, err
+	}
+	if len(objs) == 0 {
+		return nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
+	}
+	if len(objs) > 1 {
+		return nil, fmt.Errorf("found more than one users with username %v", username)
+	}
+
+	user, ok := objs[0].(*v3.User)
+
+	if !ok {
+		return nil, fmt.Errorf("fatal error. %v is not a user", objs[0])
+	}
+	return user, nil
+}
+
 func (l *Provider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, string, error) {
 	localInput, ok := input.(*v3public.BasicLogin)
 	if !ok {
@@ -83,21 +108,13 @@ func (l *Provider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Princ
 	username := localInput.Username
 	pwd := localInput.Password
 
-	objs, err := l.userIndexer.ByIndex(userNameIndex, username)
+	user, err := l.getUser(username)
+
 	if err != nil {
+		// If the user don't exist the password is evaluated
+		// to avoid user enumeration via timing attack (time based side-channel).
+		bcrypt.CompareHashAndPassword(l.invalidHash, []byte(pwd))
 		return v3.Principal{}, nil, "", err
-	}
-	if len(objs) == 0 {
-		return v3.Principal{}, nil, "", httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
-	}
-	if len(objs) > 1 {
-		return v3.Principal{}, nil, "", fmt.Errorf("found more than one users with username %v", username)
-	}
-
-	user, ok := objs[0].(*v3.User)
-	if !ok {
-		return v3.Principal{}, nil, "", fmt.Errorf("fatal error. %v is not a user", objs[0])
-
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(pwd)); err != nil {
