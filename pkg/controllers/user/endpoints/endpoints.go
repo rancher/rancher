@@ -55,13 +55,8 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	workload.Core.Services("").AddHandler(ctx, "servicesEndpointsController", s.sync)
 
 	p := &PodsController{
-		nodeLister:         workload.Core.Nodes("").Controller().Lister(),
-		pods:               workload.Core.Pods(""),
-		serviceLister:      workload.Core.Services("").Controller().Lister(),
 		podLister:          workload.Core.Pods("").Controller().Lister(),
 		workloadController: workloadUtil.NewWorkloadController(ctx, workload.UserOnlyContext(), nil),
-		machinesLister:     workload.Management.Management.Nodes(workload.ClusterName).Controller().Lister(),
-		clusterName:        workload.ClusterName,
 	}
 	workload.Core.Pods("").AddHandler(ctx, "hostPortEndpointsController", p.sync)
 
