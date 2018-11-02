@@ -1,12 +1,19 @@
 package pki
 
 import (
+	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"errors"
 	"fmt"
+	"math"
+	"math/big"
 	"net"
+	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -44,17 +51,21 @@ func GenerateSignedCertAndKey(
 		Usages:       usages,
 		AltNames:     *altNames,
 	}
-	clientCert, err := cert.NewSignedCert(caConfig, rootKey, caCrt, caKey)
+	clientCert, err := newSignedCert(caConfig, rootKey, caCrt, caKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Failed to generate %s certificate: %v", commonName, err)
 	}
 	return clientCert, rootKey, nil
 }
 
-func GenerateCACertAndKey(commonName string) (*x509.Certificate, *rsa.PrivateKey, error) {
-	rootKey, err := cert.NewPrivateKey()
-	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to generate private key for CA certificate: %v", err)
+func GenerateCACertAndKey(commonName string, privateKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
+	var err error
+	rootKey := privateKey
+	if rootKey == nil {
+		rootKey, err = cert.NewPrivateKey()
+		if err != nil {
+			return nil, nil, fmt.Errorf("Failed to generate private key for CA certificate: %v", err)
+		}
 	}
 	caConfig := cert.Config{
 		CommonName: commonName,
@@ -197,7 +208,7 @@ func ToCertObject(componentName, commonName, ouName string, cert *x509.Certifica
 	path := GetCertPath(componentName)
 	keyPath := GetKeyPath(componentName)
 
-	if componentName != CACertName && componentName != KubeAPICertName && !strings.Contains(componentName, EtcdCertName) {
+	if componentName != CACertName && componentName != KubeAPICertName && !strings.Contains(componentName, EtcdCertName) && componentName != ServiceAccountTokenKeyName {
 		config = getKubeConfigX509("https://127.0.0.1:6443", "local", componentName, caCertPath, path, keyPath)
 		configPath = GetConfigPath(componentName)
 		configEnvName = getConfigEnvFromEnv(envName)
@@ -227,6 +238,7 @@ func getControlCertKeys() []string {
 	return []string{
 		CACertName,
 		KubeAPICertName,
+		ServiceAccountTokenKeyName,
 		KubeControllerCertName,
 		KubeSchedulerCertName,
 		KubeProxyCertName,
@@ -292,4 +304,79 @@ func strCrtToEnv(crtName, crt string) string {
 func strKeyToEnv(crtName, key string) string {
 	envName := getEnvFromName(crtName)
 	return fmt.Sprintf("%s=%s", getKeyEnvFromEnv(envName), key)
+}
+
+func getTempPath(s string) string {
+	return TempCertPath + path.Base(s)
+}
+
+func populateCertMap(tmpCerts map[string]CertificatePKI, localConfigPath string, extraHosts []*hosts.Host) map[string]CertificatePKI {
+	certs := make(map[string]CertificatePKI)
+	// CACert
+	certs[CACertName] = ToCertObject(CACertName, "", "", tmpCerts[CACertName].Certificate, tmpCerts[CACertName].Key)
+	// KubeAPI
+	certs[KubeAPICertName] = ToCertObject(KubeAPICertName, "", "", tmpCerts[KubeAPICertName].Certificate, tmpCerts[KubeAPICertName].Key)
+	// kubeController
+	certs[KubeControllerCertName] = ToCertObject(KubeControllerCertName, "", "", tmpCerts[KubeControllerCertName].Certificate, tmpCerts[KubeControllerCertName].Key)
+	// KubeScheduler
+	certs[KubeSchedulerCertName] = ToCertObject(KubeSchedulerCertName, "", "", tmpCerts[KubeSchedulerCertName].Certificate, tmpCerts[KubeSchedulerCertName].Key)
+	// KubeProxy
+	certs[KubeProxyCertName] = ToCertObject(KubeProxyCertName, "", "", tmpCerts[KubeProxyCertName].Certificate, tmpCerts[KubeProxyCertName].Key)
+	// KubeNode
+	certs[KubeNodeCertName] = ToCertObject(KubeNodeCertName, KubeNodeCommonName, KubeNodeOrganizationName, tmpCerts[KubeNodeCertName].Certificate, tmpCerts[KubeNodeCertName].Key)
+	// KubeAdmin
+	kubeAdminCertObj := ToCertObject(KubeAdminCertName, KubeAdminCertName, KubeAdminOrganizationName, tmpCerts[KubeAdminCertName].Certificate, tmpCerts[KubeAdminCertName].Key)
+	kubeAdminCertObj.Config = tmpCerts[KubeAdminCertName].Config
+	kubeAdminCertObj.ConfigPath = localConfigPath
+	certs[KubeAdminCertName] = kubeAdminCertObj
+	// etcd
+	for _, host := range extraHosts {
+		etcdName := GetEtcdCrtName(host.InternalAddress)
+		etcdCrt, etcdKey := tmpCerts[etcdName].Certificate, tmpCerts[etcdName].Key
+		certs[etcdName] = ToCertObject(etcdName, "", "", etcdCrt, etcdKey)
+	}
+
+	return certs
+}
+
+// Overriding k8s.io/client-go/util/cert.NewSignedCert function to extend the expiration date to 10 years instead of 1 year
+func newSignedCert(cfg cert.Config, key *rsa.PrivateKey, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, error) {
+	serial, err := cryptorand.Int(cryptorand.Reader, new(big.Int).SetInt64(math.MaxInt64))
+	if err != nil {
+		return nil, err
+	}
+	if len(cfg.CommonName) == 0 {
+		return nil, errors.New("must specify a CommonName")
+	}
+	if len(cfg.Usages) == 0 {
+		return nil, errors.New("must specify at least one ExtKeyUsage")
+	}
+
+	certTmpl := x509.Certificate{
+		Subject: pkix.Name{
+			CommonName:   cfg.CommonName,
+			Organization: cfg.Organization,
+		},
+		DNSNames:     cfg.AltNames.DNSNames,
+		IPAddresses:  cfg.AltNames.IPs,
+		SerialNumber: serial,
+		NotBefore:    caCert.NotBefore,
+		NotAfter:     time.Now().Add(duration365d * 10).UTC(),
+		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  cfg.Usages,
+	}
+	certDERBytes, err := x509.CreateCertificate(cryptorand.Reader, &certTmpl, caCert, key.Public(), caKey)
+	if err != nil {
+		return nil, err
+	}
+	return x509.ParseCertificate(certDERBytes)
+}
+
+func isFileNotFoundErr(e error) bool {
+	if strings.Contains(e.Error(), "no such file or directory") ||
+		strings.Contains(e.Error(), "Could not find the file") ||
+		strings.Contains(e.Error(), "No such container:path:") {
+		return true
+	}
+	return false
 }

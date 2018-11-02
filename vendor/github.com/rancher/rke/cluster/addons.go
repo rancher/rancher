@@ -28,6 +28,9 @@ const (
 	IngressAddonJobName            = "rke-ingress-controller-deploy-job"
 	IngressAddonDeleteJobName      = "rke-ingress-controller-delete-job"
 	MetricsServerAddonResourceName = "rke-metrics-addon"
+	NginxIngressAddonAppName       = "ingress-nginx"
+	KubeDNSAddonAppName            = "kube-dns"
+	KubeDNSAutoscalerAppName       = "kube-dns-autoscaler"
 )
 
 type ingressOptions struct {

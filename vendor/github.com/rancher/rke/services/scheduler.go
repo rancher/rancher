@@ -22,3 +22,7 @@ func runScheduler(ctx context.Context, host *hosts.Host, df hosts.DialerFactory,
 func removeScheduler(ctx context.Context, host *hosts.Host) error {
 	return docker.DoRemoveContainer(ctx, host.DClient, SchedulerContainerName, host.Address)
 }
+
+func restartScheduler(ctx context.Context, host *hosts.Host) error {
+	return docker.DoRestartContainer(ctx, host.DClient, SchedulerContainerName, host.Address)
+}

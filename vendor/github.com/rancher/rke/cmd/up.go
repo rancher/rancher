@@ -109,7 +109,7 @@ func ClusterUp(
 	if len(kubeCluster.ControlPlaneHosts) > 0 {
 		APIURL = fmt.Sprintf("https://" + kubeCluster.ControlPlaneHosts[0].Address + ":6443")
 	}
-	err = kubeCluster.SetUpHosts(ctx)
+	err = kubeCluster.SetUpHosts(ctx, false)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}

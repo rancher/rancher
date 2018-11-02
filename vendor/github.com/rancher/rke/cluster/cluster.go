@@ -67,6 +67,10 @@ const (
 	WorkerPlane                = "workerPlan"
 	EtcdPlane                  = "etcd"
 
+	KubeAppLabel = "k8s-app"
+	AppLabel     = "app"
+	NameLabel    = "name"
+
 	WorkerThreads = util.WorkerThreads
 )
 
@@ -455,6 +459,50 @@ func ConfigureCluster(
 		if err := kubeCluster.deployAddons(ctx); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func RestartClusterPods(ctx context.Context, kubeCluster *Cluster) error {
+	log.Infof(ctx, "Restarting network, ingress, and metrics pods")
+	// this will remove the pods created by RKE and let the controller creates them again
+	kubeClient, err := k8s.NewClient(kubeCluster.LocalKubeConfigPath, kubeCluster.K8sWrapTransport)
+	if err != nil {
+		return fmt.Errorf("Failed to initialize new kubernetes client: %v", err)
+	}
+	labelsList := []string{
+		fmt.Sprintf("%s=%s", KubeAppLabel, CalicoNetworkPlugin),
+		fmt.Sprintf("%s=%s", KubeAppLabel, FlannelNetworkPlugin),
+		fmt.Sprintf("%s=%s", KubeAppLabel, CanalNetworkPlugin),
+		fmt.Sprintf("%s=%s", NameLabel, WeaveNetworkPlugin),
+		fmt.Sprintf("%s=%s", AppLabel, NginxIngressAddonAppName),
+		fmt.Sprintf("%s=%s", KubeAppLabel, DefaultMonitoringProvider),
+		fmt.Sprintf("%s=%s", KubeAppLabel, KubeDNSAddonAppName),
+		fmt.Sprintf("%s=%s", KubeAppLabel, KubeDNSAutoscalerAppName),
+	}
+	var errgrp errgroup.Group
+	labelQueue := util.GetObjectQueue(labelsList)
+	for w := 0; w < services.WorkerThreads; w++ {
+		errgrp.Go(func() error {
+			var errList []error
+			for label := range labelQueue {
+				runLabel := label.(string)
+				// list pods to be deleted
+				pods, err := k8s.ListPodsByLabel(kubeClient, runLabel)
+				if err != nil {
+					errList = append(errList, err)
+				}
+				// delete pods
+				err = k8s.DeletePods(kubeClient, pods)
+				if err != nil {
+					errList = append(errList, err)
+				}
+			}
+			return util.ErrList(errList)
+		})
+	}
+	if err := errgrp.Wait(); err != nil {
+		return err
 	}
 	return nil
 }
