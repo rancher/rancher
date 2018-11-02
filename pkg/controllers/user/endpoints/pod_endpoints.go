@@ -51,7 +51,21 @@ func (c *PodsController) sync(key string, obj *corev1.Pod) (*corev1.Pod, error) 
 				return nil, err
 			}
 			for _, w := range workloads {
-				workloadsToUpdate[key] = w
+
+				existingPublicEps := getPublicEndpointsFromAnnotations(w.Annotations)
+				found := false
+				for _, ep := range existingPublicEps {
+					if ep.PodName == pod.Name {
+						found = true
+						break
+					}
+				}
+				// push changes only when
+				// a) the workload doesn't have the pod's endpoint for active pod
+				// b) pod is removed
+				if found == (pod.DeletionTimestamp != nil) {
+					workloadsToUpdate[key] = w
+				}
 			}
 		}
 	}
