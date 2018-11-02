@@ -173,11 +173,23 @@ func initLogs(c *cli.Context, cfg app.Config) {
 	logserver.StartServerWithDefaults()
 }
 
+func migrateETCDlocal() {
+	if _, err := os.Stat("etcd"); err != nil {
+		return
+	}
+
+	// Purposely ignoring errors
+	os.Mkdir("management-state", 0700)
+	os.Symlink("../etcd", "management-state/etcd")
+}
+
 func run(cfg app.Config) error {
 	logrus.Infof("Rancher version %s is starting", VERSION)
 	logrus.Infof("Rancher arguments %+v", cfg)
 	dump.GoroutineDumpOn(syscall.SIGUSR1, syscall.SIGILL)
 	ctx := signal.SigTermCancelContext(context.Background())
+
+	migrateETCDlocal()
 
 	embedded, ctx, kubeConfig, err := k8s.GetConfig(ctx, cfg.K8sMode, cfg.KubeConfig)
 	if err != nil {
