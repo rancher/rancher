@@ -160,7 +160,7 @@ func getPipelineSecret(ns string, token string) *corev1.Secret {
 
 func (l *Lifecycle) reconcileRegistryCASecret(clusterID string) error {
 	cn := "docker-registry-ca"
-	CACrt, CAKey, err := pki.GenerateCACertAndKey(cn)
+	CACrt, CAKey, err := pki.GenerateCACertAndKey(cn, nil)
 	if err != nil {
 		return err
 	}
