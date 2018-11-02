@@ -47,7 +47,6 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		services:           workload.Core.Services(""),
 		serviceLister:      workload.Core.Services("").Controller().Lister(),
 		podLister:          workload.Core.Pods("").Controller().Lister(),
-		podController:      workload.Core.Pods("").Controller(),
 		workloadController: workloadUtil.NewWorkloadController(workload.UserOnlyContext(), nil),
 		machinesLister:     workload.Management.Management.Nodes(workload.ClusterName).Controller().Lister(),
 		clusterName:        workload.ClusterName,
