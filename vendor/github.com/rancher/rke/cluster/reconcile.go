@@ -47,6 +47,12 @@ func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster,
 	if err := reconcileControl(ctx, currentCluster, kubeCluster, kubeClient); err != nil {
 		return err
 	}
+	// Handle service account token key issue
+	kubeAPICert := currentCluster.Certificates[pki.KubeAPICertName]
+	if currentCluster.Certificates[pki.ServiceAccountTokenKeyName].Key == nil {
+		log.Infof(ctx, "[certificates] Creating service account token key")
+		currentCluster.Certificates[pki.ServiceAccountTokenKeyName] = pki.ToCertObject(pki.ServiceAccountTokenKeyName, pki.ServiceAccountTokenKeyName, "", kubeAPICert.Certificate, kubeAPICert.Key)
+	}
 	log.Infof(ctx, "[reconcile] Reconciled cluster state successfully")
 	return nil
 }

@@ -31,8 +31,9 @@ const (
 	DefaultNetworkCloudProvider = "none"
 
 	DefaultIngressController         = "nginx"
-	DefaultEtcdBackupCreationPeriod  = "5m0s"
-	DefaultEtcdBackupRetentionPeriod = "24h"
+	DefaultEtcdBackupCreationPeriod  = "12h"
+	DefaultEtcdBackupRetentionPeriod = "3d"
+	DefaultEtcdSnapshot              = true
 	DefaultMonitoringProvider        = "metrics-server"
 
 	DefaultEtcdHeartbeatIntervalName  = "heartbeat-interval"
@@ -126,6 +127,9 @@ func (c *Cluster) setClusterServicesDefaults() {
 	c.Services.Kubelet.Image = c.SystemImages.Kubernetes
 	c.Services.Kubeproxy.Image = c.SystemImages.Kubernetes
 	c.Services.Etcd.Image = c.SystemImages.Etcd
+
+	// enable etcd snapshots by default
+	c.Services.Etcd.Snapshot = DefaultEtcdSnapshot
 
 	serviceConfigDefaultsMap := map[*string]string{
 		&c.Services.KubeAPI.ServiceClusterIPRange:        DefaultServiceClusterIPRange,

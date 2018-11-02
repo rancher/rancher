@@ -22,3 +22,7 @@ func runKubeproxy(ctx context.Context, host *hosts.Host, df hosts.DialerFactory,
 func removeKubeproxy(ctx context.Context, host *hosts.Host) error {
 	return docker.DoRemoveContainer(ctx, host.DClient, KubeproxyContainerName, host.Address)
 }
+
+func restartKubeproxy(ctx context.Context, host *hosts.Host) error {
+	return docker.DoRestartContainer(ctx, host.DClient, KubeproxyContainerName, host.Address)
+}

@@ -71,7 +71,7 @@ func SetUpAuthentication(ctx context.Context, kubeCluster, currentCluster *Clust
 					if err := rebuildLocalAdminConfig(ctx, kubeCluster); err != nil {
 						return err
 					}
-					kubeCluster.Certificates, err = regenerateAPICertificate(kubeCluster, kubeCluster.Certificates)
+					err = pki.GenerateKubeAPICertificate(ctx, kubeCluster.Certificates, kubeCluster.RancherKubernetesEngineConfig, "", "")
 					if err != nil {
 						return fmt.Errorf("Failed to regenerate KubeAPI certificate %v", err)
 					}
@@ -129,6 +129,7 @@ func getClusterCerts(ctx context.Context, kubeClient *kubernetes.Clientset, etcd
 		pki.KubeAdminCertName,
 		pki.APIProxyClientCertName,
 		pki.RequestHeaderCACertName,
+		pki.ServiceAccountTokenKeyName,
 	}
 
 	for _, etcdHost := range etcdHosts {
@@ -141,14 +142,16 @@ func getClusterCerts(ctx context.Context, kubeClient *kubernetes.Clientset, etcd
 		secret, err := k8s.GetSecret(kubeClient, certName)
 		if err != nil && !strings.HasPrefix(certName, "kube-etcd") &&
 			!strings.Contains(certName, pki.RequestHeaderCACertName) &&
-			!strings.Contains(certName, pki.APIProxyClientCertName) {
+			!strings.Contains(certName, pki.APIProxyClientCertName) &&
+			!strings.Contains(certName, pki.ServiceAccountTokenKeyName) {
 			return nil, err
 		}
 		// If I can't find an etcd, requestheader, or proxy client cert, I will not fail and will create it later.
 		if (secret == nil || secret.Data == nil) &&
 			(strings.HasPrefix(certName, "kube-etcd") ||
 				strings.Contains(certName, pki.RequestHeaderCACertName) ||
-				strings.Contains(certName, pki.APIProxyClientCertName)) {
+				strings.Contains(certName, pki.APIProxyClientCertName) ||
+				strings.Contains(certName, pki.ServiceAccountTokenKeyName)) {
 			certMap[certName] = pki.CertificatePKI{}
 			continue
 		}
@@ -346,7 +349,7 @@ func (c *Cluster) getBackupHosts() []*hosts.Host {
 
 func regenerateAPIAggregationCerts(c *Cluster, certificates map[string]pki.CertificatePKI) (map[string]pki.CertificatePKI, error) {
 	logrus.Debugf("[certificates] Regenerating Kubernetes API server aggregation layer requestheader client CA certificates")
-	requestHeaderCACrt, requestHeaderCAKey, err := pki.GenerateCACertAndKey(pki.RequestHeaderCACertName)
+	requestHeaderCACrt, requestHeaderCAKey, err := pki.GenerateCACertAndKey(pki.RequestHeaderCACertName, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -360,4 +363,55 @@ func regenerateAPIAggregationCerts(c *Cluster, certificates map[string]pki.Certi
 	}
 	certificates[pki.APIProxyClientCertName] = pki.ToCertObject(pki.APIProxyClientCertName, "", "", apiserverProxyClientCrt, apiserverProxyClientKey)
 	return certificates, nil
+}
+
+func RotateRKECertificates(ctx context.Context, c *Cluster, configPath, configDir string, components []string, rotateCACerts bool) error {
+	var (
+		serviceAccountTokenKey string
+	)
+	componentsCertsFuncMap := map[string]pki.GenFunc{
+		services.KubeAPIContainerName:        pki.GenerateKubeAPICertificate,
+		services.KubeControllerContainerName: pki.GenerateKubeControllerCertificate,
+		services.SchedulerContainerName:      pki.GenerateKubeSchedulerCertificate,
+		services.KubeproxyContainerName:      pki.GenerateKubeProxyCertificate,
+		services.KubeletContainerName:        pki.GenerateKubeNodeCertificate,
+		services.EtcdContainerName:           pki.GenerateEtcdCertificates,
+	}
+	if rotateCACerts {
+		// rotate CA cert and RequestHeader CA cert
+		if err := pki.GenerateRKECACerts(ctx, c.Certificates, configPath, configDir); err != nil {
+			return err
+		}
+		components = nil
+	}
+	for _, k8sComponent := range components {
+		genFunc := componentsCertsFuncMap[k8sComponent]
+		if genFunc != nil {
+			if err := genFunc(ctx, c.Certificates, c.RancherKubernetesEngineConfig, configPath, configDir); err != nil {
+				return err
+			}
+		}
+	}
+	if len(components) == 0 {
+		// do not rotate service account token
+		if c.Certificates[pki.ServiceAccountTokenKeyName].Key != nil {
+			serviceAccountTokenKey = string(cert.EncodePrivateKeyPEM(c.Certificates[pki.ServiceAccountTokenKeyName].Key))
+		}
+		if err := pki.GenerateRKEServicesCerts(ctx, c.Certificates, c.RancherKubernetesEngineConfig, configPath, configDir); err != nil {
+			return err
+		}
+		if serviceAccountTokenKey != "" {
+			privateKey, err := cert.ParsePrivateKeyPEM([]byte(serviceAccountTokenKey))
+			if err != nil {
+				return err
+			}
+			c.Certificates[pki.ServiceAccountTokenKeyName] = pki.ToCertObject(
+				pki.ServiceAccountTokenKeyName,
+				pki.ServiceAccountTokenKeyName,
+				"",
+				c.Certificates[pki.ServiceAccountTokenKeyName].Certificate,
+				privateKey.(*rsa.PrivateKey))
+		}
+	}
+	return nil
 }

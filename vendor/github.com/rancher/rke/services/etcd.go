@@ -72,6 +72,30 @@ func RunEtcdPlane(
 	return nil
 }
 
+func RestartEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host) error {
+	log.Infof(ctx, "[%s] Restarting up etcd plane..", ETCDRole)
+	var errgrp errgroup.Group
+
+	hostsQueue := util.GetObjectQueue(etcdHosts)
+	for w := 0; w < WorkerThreads; w++ {
+		errgrp.Go(func() error {
+			var errList []error
+			for host := range hostsQueue {
+				runHost := host.(*hosts.Host)
+				if err := docker.DoRestartContainer(ctx, runHost.DClient, EtcdContainerName, runHost.Address); err != nil {
+					errList = append(errList, err)
+				}
+			}
+			return util.ErrList(errList)
+		})
+	}
+	if err := errgrp.Wait(); err != nil {
+		return err
+	}
+	log.Infof(ctx, "[%s] Successfully restarted etcd plane..", ETCDRole)
+	return nil
+}
+
 func RemoveEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host, force bool) error {
 	log.Infof(ctx, "[%s] Tearing down etcd plane..", ETCDRole)
 

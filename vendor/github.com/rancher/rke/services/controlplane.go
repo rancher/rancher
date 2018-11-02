@@ -82,6 +82,42 @@ func RemoveControlPlane(ctx context.Context, controlHosts []*hosts.Host, force b
 	return nil
 }
 
+func RestartControlPlane(ctx context.Context, controlHosts []*hosts.Host) error {
+	log.Infof(ctx, "[%s] Restarting the Controller Plane..", ControlRole)
+	var errgrp errgroup.Group
+
+	hostsQueue := util.GetObjectQueue(controlHosts)
+	for w := 0; w < WorkerThreads; w++ {
+		errgrp.Go(func() error {
+			var errList []error
+			for host := range hostsQueue {
+				runHost := host.(*hosts.Host)
+				// restart KubeAPI
+				if err := restartKubeAPI(ctx, runHost); err != nil {
+					errList = append(errList, err)
+				}
+
+				// restart KubeController
+				if err := restartKubeController(ctx, runHost); err != nil {
+					errList = append(errList, err)
+				}
+
+				// restart scheduler
+				err := restartScheduler(ctx, runHost)
+				if err != nil {
+					errList = append(errList, err)
+				}
+			}
+			return util.ErrList(errList)
+		})
+	}
+	if err := errgrp.Wait(); err != nil {
+		return err
+	}
+	log.Infof(ctx, "[%s] Successfully restarted Controller Plane..", ControlRole)
+	return nil
+}
+
 func doDeployControlHost(ctx context.Context, host *hosts.Host, localConnDialerFactory hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, processMap map[string]v3.Process, alpineImage string, certMap map[string]pki.CertificatePKI) error {
 	if host.IsWorker {
 		if err := removeNginxProxy(ctx, host); err != nil {

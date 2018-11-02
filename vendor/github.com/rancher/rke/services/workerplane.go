@@ -99,6 +99,37 @@ func RemoveWorkerPlane(ctx context.Context, workerHosts []*hosts.Host, force boo
 	return nil
 }
 
+func RestartWorkerPlane(ctx context.Context, workerHosts []*hosts.Host) error {
+	log.Infof(ctx, "[%s] Restarting Worker Plane..", WorkerRole)
+	var errgrp errgroup.Group
+
+	hostsQueue := util.GetObjectQueue(workerHosts)
+	for w := 0; w < WorkerThreads; w++ {
+		errgrp.Go(func() error {
+			var errList []error
+			for host := range hostsQueue {
+				runHost := host.(*hosts.Host)
+				if err := restartKubelet(ctx, runHost); err != nil {
+					errList = append(errList, err)
+				}
+				if err := restartKubeproxy(ctx, runHost); err != nil {
+					errList = append(errList, err)
+				}
+				if err := restartNginxProxy(ctx, runHost); err != nil {
+					errList = append(errList, err)
+				}
+			}
+			return util.ErrList(errList)
+		})
+	}
+	if err := errgrp.Wait(); err != nil {
+		return err
+	}
+	log.Infof(ctx, "[%s] Successfully restarted Worker Plane..", WorkerRole)
+
+	return nil
+}
+
 func doDeployWorkerPlane(ctx context.Context, host *hosts.Host,
 	localConnDialerFactory hosts.DialerFactory,
 	prsMap map[string]v3.PrivateRegistry, processMap map[string]v3.Process, certMap map[string]pki.CertificatePKI, alpineImage string) error {
