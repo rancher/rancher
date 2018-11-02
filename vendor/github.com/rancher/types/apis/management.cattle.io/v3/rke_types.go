@@ -178,11 +178,11 @@ type ETCDService struct {
 	// External etcd prefix
 	Path string `yaml:"path" json:"path,omitempty"`
 	// Etcd Recurring snapshot Service
-	Snapshot bool `yaml:"snapshot" json:"snapshot,omitempty"`
+	Snapshot bool `yaml:"snapshot" json:"snapshot,omitempty" norman:"default=true"`
 	// Etcd snapshot Retention period
-	Retention string `yaml:"retention" json:"retention,omitempty"`
+	Retention string `yaml:"retention" json:"retention,omitempty" norman:"default=3d"`
 	// Etcd snapshot Creation period
-	Creation string `yaml:"creation" json:"creation,omitempty"`
+	Creation string `yaml:"creation" json:"creation,omitempty" norman:"default=12h"`
 }
 
 type KubeAPIService struct {
