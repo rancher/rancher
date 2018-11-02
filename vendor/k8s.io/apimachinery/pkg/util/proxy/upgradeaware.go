@@ -294,6 +294,10 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 		}
 	}
 
+	if rawResponseCode != http.StatusSwitchingProtocols {
+		return true
+	}
+
 	// Proxy the connection.
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
