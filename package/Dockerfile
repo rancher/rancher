@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y git curl ca-certificates unzip xz-utils
     chown -R rancher /var/lib/rancher /var/lib/cattle /usr/local/bin
 RUN mkdir /root/.kube && \
     ln -s /usr/bin/rancher /usr/bin/kubectl && \
-    ln -s /var/lib/rancher/kube_config_cluster.yml /root/.kube/config && \
+    ln -s /var/lib/rancher/management-state/cred/kubeconfig.yaml /root/.kube/config && \
     ln -s /usr/bin/rancher /usr/bin/reset-password && \
     ln -s /usr/bin/rancher /usr/bin/ensure-default-admin
 WORKDIR /var/lib/rancher
