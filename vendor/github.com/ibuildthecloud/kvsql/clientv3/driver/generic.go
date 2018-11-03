@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ibuildthecloud/kvsql/pkg/broadcast"
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/pkg/broadcast"
 	"github.com/sirupsen/logrus"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 )
