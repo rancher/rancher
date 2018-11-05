@@ -165,11 +165,12 @@ func (r *RemoteService) Cluster() *v3.Cluster {
 }
 
 type SimpleProxy struct {
-	url       *url.URL
-	transport http.RoundTripper
+	url                *url.URL
+	transport          http.RoundTripper
+	overrideHostHeader bool
 }
 
-func NewSimpleProxy(host string, caData []byte) (*SimpleProxy, error) {
+func NewSimpleProxy(host string, caData []byte, overrideHostHeader bool) (*SimpleProxy, error) {
 	hostURL, _, err := rest.DefaultServerURL(host, "", schema.GroupVersion{}, true)
 	if err != nil {
 		return nil, err
@@ -185,8 +186,9 @@ func NewSimpleProxy(host string, caData []byte) (*SimpleProxy, error) {
 	}
 
 	return &SimpleProxy{
-		url:       hostURL,
-		transport: ht,
+		url:                hostURL,
+		transport:          ht,
+		overrideHostHeader: overrideHostHeader,
 	}, nil
 }
 
@@ -196,7 +198,9 @@ func (s *SimpleProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	u.RawQuery = req.URL.RawQuery
 	req.URL.Scheme = "https"
 	req.URL.Host = req.Host
+	if s.overrideHostHeader {
+		req.Host = u.Host
+	}
 	httpProxy := proxy.NewUpgradeAwareHandler(&u, s.transport, true, false, er)
 	httpProxy.ServeHTTP(rw, req)
-
 }
