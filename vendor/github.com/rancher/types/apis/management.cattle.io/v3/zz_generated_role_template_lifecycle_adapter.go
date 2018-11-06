@@ -6,9 +6,9 @@ import (
 )
 
 type RoleTemplateLifecycle interface {
-	Create(obj *RoleTemplate) (*RoleTemplate, error)
-	Remove(obj *RoleTemplate) (*RoleTemplate, error)
-	Updated(obj *RoleTemplate) (*RoleTemplate, error)
+	Create(obj *RoleTemplate) (runtime.Object, error)
+	Remove(obj *RoleTemplate) (runtime.Object, error)
+	Updated(obj *RoleTemplate) (runtime.Object, error)
 }
 
 type roleTemplateLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *roleTemplateLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obje
 func NewRoleTemplateLifecycleAdapter(name string, clusterScoped bool, client RoleTemplateInterface, l RoleTemplateLifecycle) RoleTemplateHandlerFunc {
 	adapter := &roleTemplateLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *RoleTemplate) (*RoleTemplate, error) {
+	return func(key string, obj *RoleTemplate) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*RoleTemplate); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

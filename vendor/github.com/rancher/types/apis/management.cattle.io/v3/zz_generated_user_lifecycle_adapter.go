@@ -6,9 +6,9 @@ import (
 )
 
 type UserLifecycle interface {
-	Create(obj *User) (*User, error)
-	Remove(obj *User) (*User, error)
-	Updated(obj *User) (*User, error)
+	Create(obj *User) (runtime.Object, error)
+	Remove(obj *User) (runtime.Object, error)
+	Updated(obj *User) (runtime.Object, error)
 }
 
 type userLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *userLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, erro
 func NewUserLifecycleAdapter(name string, clusterScoped bool, client UserInterface, l UserLifecycle) UserHandlerFunc {
 	adapter := &userLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *User) (*User, error) {
+	return func(key string, obj *User) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*User); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

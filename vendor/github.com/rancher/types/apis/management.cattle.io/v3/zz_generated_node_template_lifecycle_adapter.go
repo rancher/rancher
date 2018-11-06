@@ -6,9 +6,9 @@ import (
 )
 
 type NodeTemplateLifecycle interface {
-	Create(obj *NodeTemplate) (*NodeTemplate, error)
-	Remove(obj *NodeTemplate) (*NodeTemplate, error)
-	Updated(obj *NodeTemplate) (*NodeTemplate, error)
+	Create(obj *NodeTemplate) (runtime.Object, error)
+	Remove(obj *NodeTemplate) (runtime.Object, error)
+	Updated(obj *NodeTemplate) (runtime.Object, error)
 }
 
 type nodeTemplateLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *nodeTemplateLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obje
 func NewNodeTemplateLifecycleAdapter(name string, clusterScoped bool, client NodeTemplateInterface, l NodeTemplateLifecycle) NodeTemplateHandlerFunc {
 	adapter := &nodeTemplateLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *NodeTemplate) (*NodeTemplate, error) {
+	return func(key string, obj *NodeTemplate) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*NodeTemplate); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

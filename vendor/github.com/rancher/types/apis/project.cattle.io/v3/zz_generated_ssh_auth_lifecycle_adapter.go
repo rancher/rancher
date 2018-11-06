@@ -6,9 +6,9 @@ import (
 )
 
 type SSHAuthLifecycle interface {
-	Create(obj *SSHAuth) (*SSHAuth, error)
-	Remove(obj *SSHAuth) (*SSHAuth, error)
-	Updated(obj *SSHAuth) (*SSHAuth, error)
+	Create(obj *SSHAuth) (runtime.Object, error)
+	Remove(obj *SSHAuth) (runtime.Object, error)
+	Updated(obj *SSHAuth) (runtime.Object, error)
 }
 
 type sshAuthLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *sshAuthLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, e
 func NewSSHAuthLifecycleAdapter(name string, clusterScoped bool, client SSHAuthInterface, l SSHAuthLifecycle) SSHAuthHandlerFunc {
 	adapter := &sshAuthLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *SSHAuth) (*SSHAuth, error) {
+	return func(key string, obj *SSHAuth) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*SSHAuth); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

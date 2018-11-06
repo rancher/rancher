@@ -35,7 +35,7 @@ type PodSecurityPolicyList struct {
 	Items           []v1beta1.PodSecurityPolicy
 }
 
-type PodSecurityPolicyHandlerFunc func(key string, obj *v1beta1.PodSecurityPolicy) (*v1beta1.PodSecurityPolicy, error)
+type PodSecurityPolicyHandlerFunc func(key string, obj *v1beta1.PodSecurityPolicy) (runtime.Object, error)
 
 type PodSecurityPolicyLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1beta1.PodSecurityPolicy, err error)

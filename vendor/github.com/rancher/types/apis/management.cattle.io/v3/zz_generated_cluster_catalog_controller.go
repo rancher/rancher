@@ -35,7 +35,7 @@ type ClusterCatalogList struct {
 	Items           []ClusterCatalog
 }
 
-type ClusterCatalogHandlerFunc func(key string, obj *ClusterCatalog) (*ClusterCatalog, error)
+type ClusterCatalogHandlerFunc func(key string, obj *ClusterCatalog) (runtime.Object, error)
 
 type ClusterCatalogLister interface {
 	List(namespace string, selector labels.Selector) (ret []*ClusterCatalog, err error)

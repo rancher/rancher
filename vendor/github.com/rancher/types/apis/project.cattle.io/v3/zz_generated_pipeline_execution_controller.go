@@ -35,7 +35,7 @@ type PipelineExecutionList struct {
 	Items           []PipelineExecution
 }
 
-type PipelineExecutionHandlerFunc func(key string, obj *PipelineExecution) (*PipelineExecution, error)
+type PipelineExecutionHandlerFunc func(key string, obj *PipelineExecution) (runtime.Object, error)
 
 type PipelineExecutionLister interface {
 	List(namespace string, selector labels.Selector) (ret []*PipelineExecution, err error)

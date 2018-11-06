@@ -35,7 +35,7 @@ type PreferenceList struct {
 	Items           []Preference
 }
 
-type PreferenceHandlerFunc func(key string, obj *Preference) (*Preference, error)
+type PreferenceHandlerFunc func(key string, obj *Preference) (runtime.Object, error)
 
 type PreferenceLister interface {
 	List(namespace string, selector labels.Selector) (ret []*Preference, err error)

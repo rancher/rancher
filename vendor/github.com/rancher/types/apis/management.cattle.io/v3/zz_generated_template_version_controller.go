@@ -34,7 +34,7 @@ type TemplateVersionList struct {
 	Items           []TemplateVersion
 }
 
-type TemplateVersionHandlerFunc func(key string, obj *TemplateVersion) (*TemplateVersion, error)
+type TemplateVersionHandlerFunc func(key string, obj *TemplateVersion) (runtime.Object, error)
 
 type TemplateVersionLister interface {
 	List(namespace string, selector labels.Selector) (ret []*TemplateVersion, err error)

@@ -36,7 +36,7 @@ type DeploymentList struct {
 	Items           []v1beta2.Deployment
 }
 
-type DeploymentHandlerFunc func(key string, obj *v1beta2.Deployment) (*v1beta2.Deployment, error)
+type DeploymentHandlerFunc func(key string, obj *v1beta2.Deployment) (runtime.Object, error)
 
 type DeploymentLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1beta2.Deployment, err error)

@@ -34,7 +34,7 @@ type AuthConfigList struct {
 	Items           []AuthConfig
 }
 
-type AuthConfigHandlerFunc func(key string, obj *AuthConfig) (*AuthConfig, error)
+type AuthConfigHandlerFunc func(key string, obj *AuthConfig) (runtime.Object, error)
 
 type AuthConfigLister interface {
 	List(namespace string, selector labels.Selector) (ret []*AuthConfig, err error)

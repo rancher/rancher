@@ -7,9 +7,9 @@ import (
 )
 
 type CronJobLifecycle interface {
-	Create(obj *v1beta1.CronJob) (*v1beta1.CronJob, error)
-	Remove(obj *v1beta1.CronJob) (*v1beta1.CronJob, error)
-	Updated(obj *v1beta1.CronJob) (*v1beta1.CronJob, error)
+	Create(obj *v1beta1.CronJob) (runtime.Object, error)
+	Remove(obj *v1beta1.CronJob) (runtime.Object, error)
+	Updated(obj *v1beta1.CronJob) (runtime.Object, error)
 }
 
 type cronJobLifecycleAdapter struct {
@@ -43,9 +43,9 @@ func (w *cronJobLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, e
 func NewCronJobLifecycleAdapter(name string, clusterScoped bool, client CronJobInterface, l CronJobLifecycle) CronJobHandlerFunc {
 	adapter := &cronJobLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1beta1.CronJob) (*v1beta1.CronJob, error) {
+	return func(key string, obj *v1beta1.CronJob) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*v1beta1.CronJob); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

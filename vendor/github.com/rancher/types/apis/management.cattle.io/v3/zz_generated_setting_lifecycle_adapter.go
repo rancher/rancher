@@ -6,9 +6,9 @@ import (
 )
 
 type SettingLifecycle interface {
-	Create(obj *Setting) (*Setting, error)
-	Remove(obj *Setting) (*Setting, error)
-	Updated(obj *Setting) (*Setting, error)
+	Create(obj *Setting) (runtime.Object, error)
+	Remove(obj *Setting) (runtime.Object, error)
+	Updated(obj *Setting) (runtime.Object, error)
 }
 
 type settingLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *settingLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, e
 func NewSettingLifecycleAdapter(name string, clusterScoped bool, client SettingInterface, l SettingLifecycle) SettingHandlerFunc {
 	adapter := &settingLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *Setting) (*Setting, error) {
+	return func(key string, obj *Setting) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*Setting); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

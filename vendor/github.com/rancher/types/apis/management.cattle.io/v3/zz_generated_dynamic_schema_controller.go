@@ -34,7 +34,7 @@ type DynamicSchemaList struct {
 	Items           []DynamicSchema
 }
 
-type DynamicSchemaHandlerFunc func(key string, obj *DynamicSchema) (*DynamicSchema, error)
+type DynamicSchemaHandlerFunc func(key string, obj *DynamicSchema) (runtime.Object, error)
 
 type DynamicSchemaLister interface {
 	List(namespace string, selector labels.Selector) (ret []*DynamicSchema, err error)

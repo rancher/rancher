@@ -6,9 +6,9 @@ import (
 )
 
 type ClusterAlertLifecycle interface {
-	Create(obj *ClusterAlert) (*ClusterAlert, error)
-	Remove(obj *ClusterAlert) (*ClusterAlert, error)
-	Updated(obj *ClusterAlert) (*ClusterAlert, error)
+	Create(obj *ClusterAlert) (runtime.Object, error)
+	Remove(obj *ClusterAlert) (runtime.Object, error)
+	Updated(obj *ClusterAlert) (runtime.Object, error)
 }
 
 type clusterAlertLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *clusterAlertLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obje
 func NewClusterAlertLifecycleAdapter(name string, clusterScoped bool, client ClusterAlertInterface, l ClusterAlertLifecycle) ClusterAlertHandlerFunc {
 	adapter := &clusterAlertLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *ClusterAlert) (*ClusterAlert, error) {
+	return func(key string, obj *ClusterAlert) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*ClusterAlert); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

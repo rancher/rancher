@@ -34,7 +34,7 @@ type GlobalRoleList struct {
 	Items           []GlobalRole
 }
 
-type GlobalRoleHandlerFunc func(key string, obj *GlobalRole) (*GlobalRole, error)
+type GlobalRoleHandlerFunc func(key string, obj *GlobalRole) (runtime.Object, error)
 
 type GlobalRoleLister interface {
 	List(namespace string, selector labels.Selector) (ret []*GlobalRole, err error)

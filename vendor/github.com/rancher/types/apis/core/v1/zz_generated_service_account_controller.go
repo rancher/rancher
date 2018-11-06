@@ -36,7 +36,7 @@ type ServiceAccountList struct {
 	Items           []v1.ServiceAccount
 }
 
-type ServiceAccountHandlerFunc func(key string, obj *v1.ServiceAccount) (*v1.ServiceAccount, error)
+type ServiceAccountHandlerFunc func(key string, obj *v1.ServiceAccount) (runtime.Object, error)
 
 type ServiceAccountLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.ServiceAccount, err error)

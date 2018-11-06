@@ -6,9 +6,9 @@ import (
 )
 
 type AppRevisionLifecycle interface {
-	Create(obj *AppRevision) (*AppRevision, error)
-	Remove(obj *AppRevision) (*AppRevision, error)
-	Updated(obj *AppRevision) (*AppRevision, error)
+	Create(obj *AppRevision) (runtime.Object, error)
+	Remove(obj *AppRevision) (runtime.Object, error)
+	Updated(obj *AppRevision) (runtime.Object, error)
 }
 
 type appRevisionLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *appRevisionLifecycleAdapter) Updated(obj runtime.Object) (runtime.Objec
 func NewAppRevisionLifecycleAdapter(name string, clusterScoped bool, client AppRevisionInterface, l AppRevisionLifecycle) AppRevisionHandlerFunc {
 	adapter := &appRevisionLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *AppRevision) (*AppRevision, error) {
+	return func(key string, obj *AppRevision) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*AppRevision); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

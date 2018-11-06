@@ -6,9 +6,9 @@ import (
 )
 
 type AuthProviderLifecycle interface {
-	Create(obj *AuthProvider) (*AuthProvider, error)
-	Remove(obj *AuthProvider) (*AuthProvider, error)
-	Updated(obj *AuthProvider) (*AuthProvider, error)
+	Create(obj *AuthProvider) (runtime.Object, error)
+	Remove(obj *AuthProvider) (runtime.Object, error)
+	Updated(obj *AuthProvider) (runtime.Object, error)
 }
 
 type authProviderLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *authProviderLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obje
 func NewAuthProviderLifecycleAdapter(name string, clusterScoped bool, client AuthProviderInterface, l AuthProviderLifecycle) AuthProviderHandlerFunc {
 	adapter := &authProviderLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *AuthProvider) (*AuthProvider, error) {
+	return func(key string, obj *AuthProvider) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*AuthProvider); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

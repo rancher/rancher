@@ -6,9 +6,9 @@ import (
 )
 
 type LdapConfigLifecycle interface {
-	Create(obj *LdapConfig) (*LdapConfig, error)
-	Remove(obj *LdapConfig) (*LdapConfig, error)
-	Updated(obj *LdapConfig) (*LdapConfig, error)
+	Create(obj *LdapConfig) (runtime.Object, error)
+	Remove(obj *LdapConfig) (runtime.Object, error)
+	Updated(obj *LdapConfig) (runtime.Object, error)
 }
 
 type ldapConfigLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *ldapConfigLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object
 func NewLdapConfigLifecycleAdapter(name string, clusterScoped bool, client LdapConfigInterface, l LdapConfigLifecycle) LdapConfigHandlerFunc {
 	adapter := &ldapConfigLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *LdapConfig) (*LdapConfig, error) {
+	return func(key string, obj *LdapConfig) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*LdapConfig); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

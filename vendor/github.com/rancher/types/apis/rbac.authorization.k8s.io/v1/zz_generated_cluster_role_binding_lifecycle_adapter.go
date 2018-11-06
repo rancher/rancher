@@ -7,9 +7,9 @@ import (
 )
 
 type ClusterRoleBindingLifecycle interface {
-	Create(obj *v1.ClusterRoleBinding) (*v1.ClusterRoleBinding, error)
-	Remove(obj *v1.ClusterRoleBinding) (*v1.ClusterRoleBinding, error)
-	Updated(obj *v1.ClusterRoleBinding) (*v1.ClusterRoleBinding, error)
+	Create(obj *v1.ClusterRoleBinding) (runtime.Object, error)
+	Remove(obj *v1.ClusterRoleBinding) (runtime.Object, error)
+	Updated(obj *v1.ClusterRoleBinding) (runtime.Object, error)
 }
 
 type clusterRoleBindingLifecycleAdapter struct {
@@ -43,9 +43,9 @@ func (w *clusterRoleBindingLifecycleAdapter) Updated(obj runtime.Object) (runtim
 func NewClusterRoleBindingLifecycleAdapter(name string, clusterScoped bool, client ClusterRoleBindingInterface, l ClusterRoleBindingLifecycle) ClusterRoleBindingHandlerFunc {
 	adapter := &clusterRoleBindingLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1.ClusterRoleBinding) (*v1.ClusterRoleBinding, error) {
+	return func(key string, obj *v1.ClusterRoleBinding) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*v1.ClusterRoleBinding); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

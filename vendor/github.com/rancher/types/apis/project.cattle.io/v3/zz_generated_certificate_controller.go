@@ -35,7 +35,7 @@ type CertificateList struct {
 	Items           []Certificate
 }
 
-type CertificateHandlerFunc func(key string, obj *Certificate) (*Certificate, error)
+type CertificateHandlerFunc func(key string, obj *Certificate) (runtime.Object, error)
 
 type CertificateLister interface {
 	List(namespace string, selector labels.Selector) (ret []*Certificate, err error)

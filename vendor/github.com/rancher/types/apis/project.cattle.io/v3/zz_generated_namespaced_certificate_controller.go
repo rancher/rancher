@@ -35,7 +35,7 @@ type NamespacedCertificateList struct {
 	Items           []NamespacedCertificate
 }
 
-type NamespacedCertificateHandlerFunc func(key string, obj *NamespacedCertificate) (*NamespacedCertificate, error)
+type NamespacedCertificateHandlerFunc func(key string, obj *NamespacedCertificate) (runtime.Object, error)
 
 type NamespacedCertificateLister interface {
 	List(namespace string, selector labels.Selector) (ret []*NamespacedCertificate, err error)

@@ -35,7 +35,7 @@ type NamespacedSSHAuthList struct {
 	Items           []NamespacedSSHAuth
 }
 
-type NamespacedSSHAuthHandlerFunc func(key string, obj *NamespacedSSHAuth) (*NamespacedSSHAuth, error)
+type NamespacedSSHAuthHandlerFunc func(key string, obj *NamespacedSSHAuth) (runtime.Object, error)
 
 type NamespacedSSHAuthLister interface {
 	List(namespace string, selector labels.Selector) (ret []*NamespacedSSHAuth, err error)

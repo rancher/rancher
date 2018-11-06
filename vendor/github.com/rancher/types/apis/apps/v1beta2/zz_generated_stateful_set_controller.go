@@ -36,7 +36,7 @@ type StatefulSetList struct {
 	Items           []v1beta2.StatefulSet
 }
 
-type StatefulSetHandlerFunc func(key string, obj *v1beta2.StatefulSet) (*v1beta2.StatefulSet, error)
+type StatefulSetHandlerFunc func(key string, obj *v1beta2.StatefulSet) (runtime.Object, error)
 
 type StatefulSetLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1beta2.StatefulSet, err error)

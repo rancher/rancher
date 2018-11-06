@@ -34,7 +34,7 @@ type PodSecurityPolicyTemplateList struct {
 	Items           []PodSecurityPolicyTemplate
 }
 
-type PodSecurityPolicyTemplateHandlerFunc func(key string, obj *PodSecurityPolicyTemplate) (*PodSecurityPolicyTemplate, error)
+type PodSecurityPolicyTemplateHandlerFunc func(key string, obj *PodSecurityPolicyTemplate) (runtime.Object, error)
 
 type PodSecurityPolicyTemplateLister interface {
 	List(namespace string, selector labels.Selector) (ret []*PodSecurityPolicyTemplate, err error)

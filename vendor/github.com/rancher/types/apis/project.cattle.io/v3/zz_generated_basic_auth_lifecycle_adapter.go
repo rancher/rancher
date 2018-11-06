@@ -6,9 +6,9 @@ import (
 )
 
 type BasicAuthLifecycle interface {
-	Create(obj *BasicAuth) (*BasicAuth, error)
-	Remove(obj *BasicAuth) (*BasicAuth, error)
-	Updated(obj *BasicAuth) (*BasicAuth, error)
+	Create(obj *BasicAuth) (runtime.Object, error)
+	Remove(obj *BasicAuth) (runtime.Object, error)
+	Updated(obj *BasicAuth) (runtime.Object, error)
 }
 
 type basicAuthLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *basicAuthLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object,
 func NewBasicAuthLifecycleAdapter(name string, clusterScoped bool, client BasicAuthInterface, l BasicAuthLifecycle) BasicAuthHandlerFunc {
 	adapter := &basicAuthLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *BasicAuth) (*BasicAuth, error) {
+	return func(key string, obj *BasicAuth) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*BasicAuth); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

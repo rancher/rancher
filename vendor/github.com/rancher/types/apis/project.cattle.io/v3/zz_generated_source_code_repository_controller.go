@@ -35,7 +35,7 @@ type SourceCodeRepositoryList struct {
 	Items           []SourceCodeRepository
 }
 
-type SourceCodeRepositoryHandlerFunc func(key string, obj *SourceCodeRepository) (*SourceCodeRepository, error)
+type SourceCodeRepositoryHandlerFunc func(key string, obj *SourceCodeRepository) (runtime.Object, error)
 
 type SourceCodeRepositoryLister interface {
 	List(namespace string, selector labels.Selector) (ret []*SourceCodeRepository, err error)

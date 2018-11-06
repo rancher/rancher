@@ -7,9 +7,9 @@ import (
 )
 
 type StatefulSetLifecycle interface {
-	Create(obj *v1beta2.StatefulSet) (*v1beta2.StatefulSet, error)
-	Remove(obj *v1beta2.StatefulSet) (*v1beta2.StatefulSet, error)
-	Updated(obj *v1beta2.StatefulSet) (*v1beta2.StatefulSet, error)
+	Create(obj *v1beta2.StatefulSet) (runtime.Object, error)
+	Remove(obj *v1beta2.StatefulSet) (runtime.Object, error)
+	Updated(obj *v1beta2.StatefulSet) (runtime.Object, error)
 }
 
 type statefulSetLifecycleAdapter struct {
@@ -43,9 +43,9 @@ func (w *statefulSetLifecycleAdapter) Updated(obj runtime.Object) (runtime.Objec
 func NewStatefulSetLifecycleAdapter(name string, clusterScoped bool, client StatefulSetInterface, l StatefulSetLifecycle) StatefulSetHandlerFunc {
 	adapter := &statefulSetLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1beta2.StatefulSet) (*v1beta2.StatefulSet, error) {
+	return func(key string, obj *v1beta2.StatefulSet) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*v1beta2.StatefulSet); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

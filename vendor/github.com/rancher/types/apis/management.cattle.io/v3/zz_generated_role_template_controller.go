@@ -34,7 +34,7 @@ type RoleTemplateList struct {
 	Items           []RoleTemplate
 }
 
-type RoleTemplateHandlerFunc func(key string, obj *RoleTemplate) (*RoleTemplate, error)
+type RoleTemplateHandlerFunc func(key string, obj *RoleTemplate) (runtime.Object, error)
 
 type RoleTemplateLister interface {
 	List(namespace string, selector labels.Selector) (ret []*RoleTemplate, err error)

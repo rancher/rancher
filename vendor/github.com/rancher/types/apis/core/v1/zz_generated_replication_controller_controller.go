@@ -36,7 +36,7 @@ type ReplicationControllerList struct {
 	Items           []v1.ReplicationController
 }
 
-type ReplicationControllerHandlerFunc func(key string, obj *v1.ReplicationController) (*v1.ReplicationController, error)
+type ReplicationControllerHandlerFunc func(key string, obj *v1.ReplicationController) (runtime.Object, error)
 
 type ReplicationControllerLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.ReplicationController, err error)

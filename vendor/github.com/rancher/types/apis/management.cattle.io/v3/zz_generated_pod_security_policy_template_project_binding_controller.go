@@ -35,7 +35,7 @@ type PodSecurityPolicyTemplateProjectBindingList struct {
 	Items           []PodSecurityPolicyTemplateProjectBinding
 }
 
-type PodSecurityPolicyTemplateProjectBindingHandlerFunc func(key string, obj *PodSecurityPolicyTemplateProjectBinding) (*PodSecurityPolicyTemplateProjectBinding, error)
+type PodSecurityPolicyTemplateProjectBindingHandlerFunc func(key string, obj *PodSecurityPolicyTemplateProjectBinding) (runtime.Object, error)
 
 type PodSecurityPolicyTemplateProjectBindingLister interface {
 	List(namespace string, selector labels.Selector) (ret []*PodSecurityPolicyTemplateProjectBinding, err error)

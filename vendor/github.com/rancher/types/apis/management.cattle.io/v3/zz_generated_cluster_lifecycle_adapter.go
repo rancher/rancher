@@ -6,9 +6,9 @@ import (
 )
 
 type ClusterLifecycle interface {
-	Create(obj *Cluster) (*Cluster, error)
-	Remove(obj *Cluster) (*Cluster, error)
-	Updated(obj *Cluster) (*Cluster, error)
+	Create(obj *Cluster) (runtime.Object, error)
+	Remove(obj *Cluster) (runtime.Object, error)
+	Updated(obj *Cluster) (runtime.Object, error)
 }
 
 type clusterLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *clusterLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, e
 func NewClusterLifecycleAdapter(name string, clusterScoped bool, client ClusterInterface, l ClusterLifecycle) ClusterHandlerFunc {
 	adapter := &clusterLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *Cluster) (*Cluster, error) {
+	return func(key string, obj *Cluster) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*Cluster); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

@@ -35,7 +35,7 @@ type ClusterRoleTemplateBindingList struct {
 	Items           []ClusterRoleTemplateBinding
 }
 
-type ClusterRoleTemplateBindingHandlerFunc func(key string, obj *ClusterRoleTemplateBinding) (*ClusterRoleTemplateBinding, error)
+type ClusterRoleTemplateBindingHandlerFunc func(key string, obj *ClusterRoleTemplateBinding) (runtime.Object, error)
 
 type ClusterRoleTemplateBindingLister interface {
 	List(namespace string, selector labels.Selector) (ret []*ClusterRoleTemplateBinding, err error)

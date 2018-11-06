@@ -6,9 +6,9 @@ import (
 )
 
 type TemplateVersionLifecycle interface {
-	Create(obj *TemplateVersion) (*TemplateVersion, error)
-	Remove(obj *TemplateVersion) (*TemplateVersion, error)
-	Updated(obj *TemplateVersion) (*TemplateVersion, error)
+	Create(obj *TemplateVersion) (runtime.Object, error)
+	Remove(obj *TemplateVersion) (runtime.Object, error)
+	Updated(obj *TemplateVersion) (runtime.Object, error)
 }
 
 type templateVersionLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *templateVersionLifecycleAdapter) Updated(obj runtime.Object) (runtime.O
 func NewTemplateVersionLifecycleAdapter(name string, clusterScoped bool, client TemplateVersionInterface, l TemplateVersionLifecycle) TemplateVersionHandlerFunc {
 	adapter := &templateVersionLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *TemplateVersion) (*TemplateVersion, error) {
+	return func(key string, obj *TemplateVersion) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*TemplateVersion); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

@@ -6,9 +6,9 @@ import (
 )
 
 type ClusterLoggingLifecycle interface {
-	Create(obj *ClusterLogging) (*ClusterLogging, error)
-	Remove(obj *ClusterLogging) (*ClusterLogging, error)
-	Updated(obj *ClusterLogging) (*ClusterLogging, error)
+	Create(obj *ClusterLogging) (runtime.Object, error)
+	Remove(obj *ClusterLogging) (runtime.Object, error)
+	Updated(obj *ClusterLogging) (runtime.Object, error)
 }
 
 type clusterLoggingLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *clusterLoggingLifecycleAdapter) Updated(obj runtime.Object) (runtime.Ob
 func NewClusterLoggingLifecycleAdapter(name string, clusterScoped bool, client ClusterLoggingInterface, l ClusterLoggingLifecycle) ClusterLoggingHandlerFunc {
 	adapter := &clusterLoggingLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *ClusterLogging) (*ClusterLogging, error) {
+	return func(key string, obj *ClusterLogging) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*ClusterLogging); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

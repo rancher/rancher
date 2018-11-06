@@ -36,7 +36,7 @@ type SecretList struct {
 	Items           []v1.Secret
 }
 
-type SecretHandlerFunc func(key string, obj *v1.Secret) (*v1.Secret, error)
+type SecretHandlerFunc func(key string, obj *v1.Secret) (runtime.Object, error)
 
 type SecretLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.Secret, err error)

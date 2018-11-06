@@ -35,7 +35,7 @@ type NamespacedDockerCredentialList struct {
 	Items           []NamespacedDockerCredential
 }
 
-type NamespacedDockerCredentialHandlerFunc func(key string, obj *NamespacedDockerCredential) (*NamespacedDockerCredential, error)
+type NamespacedDockerCredentialHandlerFunc func(key string, obj *NamespacedDockerCredential) (runtime.Object, error)
 
 type NamespacedDockerCredentialLister interface {
 	List(namespace string, selector labels.Selector) (ret []*NamespacedDockerCredential, err error)

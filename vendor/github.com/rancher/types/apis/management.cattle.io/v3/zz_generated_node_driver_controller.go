@@ -34,7 +34,7 @@ type NodeDriverList struct {
 	Items           []NodeDriver
 }
 
-type NodeDriverHandlerFunc func(key string, obj *NodeDriver) (*NodeDriver, error)
+type NodeDriverHandlerFunc func(key string, obj *NodeDriver) (runtime.Object, error)
 
 type NodeDriverLister interface {
 	List(namespace string, selector labels.Selector) (ret []*NodeDriver, err error)

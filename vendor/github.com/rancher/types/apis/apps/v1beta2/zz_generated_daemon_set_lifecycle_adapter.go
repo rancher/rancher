@@ -7,9 +7,9 @@ import (
 )
 
 type DaemonSetLifecycle interface {
-	Create(obj *v1beta2.DaemonSet) (*v1beta2.DaemonSet, error)
-	Remove(obj *v1beta2.DaemonSet) (*v1beta2.DaemonSet, error)
-	Updated(obj *v1beta2.DaemonSet) (*v1beta2.DaemonSet, error)
+	Create(obj *v1beta2.DaemonSet) (runtime.Object, error)
+	Remove(obj *v1beta2.DaemonSet) (runtime.Object, error)
+	Updated(obj *v1beta2.DaemonSet) (runtime.Object, error)
 }
 
 type daemonSetLifecycleAdapter struct {
@@ -43,9 +43,9 @@ func (w *daemonSetLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object,
 func NewDaemonSetLifecycleAdapter(name string, clusterScoped bool, client DaemonSetInterface, l DaemonSetLifecycle) DaemonSetHandlerFunc {
 	adapter := &daemonSetLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1beta2.DaemonSet) (*v1beta2.DaemonSet, error) {
+	return func(key string, obj *v1beta2.DaemonSet) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*v1beta2.DaemonSet); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

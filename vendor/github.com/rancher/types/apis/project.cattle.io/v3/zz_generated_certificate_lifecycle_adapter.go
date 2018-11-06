@@ -6,9 +6,9 @@ import (
 )
 
 type CertificateLifecycle interface {
-	Create(obj *Certificate) (*Certificate, error)
-	Remove(obj *Certificate) (*Certificate, error)
-	Updated(obj *Certificate) (*Certificate, error)
+	Create(obj *Certificate) (runtime.Object, error)
+	Remove(obj *Certificate) (runtime.Object, error)
+	Updated(obj *Certificate) (runtime.Object, error)
 }
 
 type certificateLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *certificateLifecycleAdapter) Updated(obj runtime.Object) (runtime.Objec
 func NewCertificateLifecycleAdapter(name string, clusterScoped bool, client CertificateInterface, l CertificateLifecycle) CertificateHandlerFunc {
 	adapter := &certificateLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *Certificate) (*Certificate, error) {
+	return func(key string, obj *Certificate) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*Certificate); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

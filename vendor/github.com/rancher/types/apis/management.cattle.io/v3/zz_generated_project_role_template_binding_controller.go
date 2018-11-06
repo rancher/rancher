@@ -35,7 +35,7 @@ type ProjectRoleTemplateBindingList struct {
 	Items           []ProjectRoleTemplateBinding
 }
 
-type ProjectRoleTemplateBindingHandlerFunc func(key string, obj *ProjectRoleTemplateBinding) (*ProjectRoleTemplateBinding, error)
+type ProjectRoleTemplateBindingHandlerFunc func(key string, obj *ProjectRoleTemplateBinding) (runtime.Object, error)
 
 type ProjectRoleTemplateBindingLister interface {
 	List(namespace string, selector labels.Selector) (ret []*ProjectRoleTemplateBinding, err error)

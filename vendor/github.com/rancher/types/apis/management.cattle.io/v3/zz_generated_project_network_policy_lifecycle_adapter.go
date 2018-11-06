@@ -6,9 +6,9 @@ import (
 )
 
 type ProjectNetworkPolicyLifecycle interface {
-	Create(obj *ProjectNetworkPolicy) (*ProjectNetworkPolicy, error)
-	Remove(obj *ProjectNetworkPolicy) (*ProjectNetworkPolicy, error)
-	Updated(obj *ProjectNetworkPolicy) (*ProjectNetworkPolicy, error)
+	Create(obj *ProjectNetworkPolicy) (runtime.Object, error)
+	Remove(obj *ProjectNetworkPolicy) (runtime.Object, error)
+	Updated(obj *ProjectNetworkPolicy) (runtime.Object, error)
 }
 
 type projectNetworkPolicyLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *projectNetworkPolicyLifecycleAdapter) Updated(obj runtime.Object) (runt
 func NewProjectNetworkPolicyLifecycleAdapter(name string, clusterScoped bool, client ProjectNetworkPolicyInterface, l ProjectNetworkPolicyLifecycle) ProjectNetworkPolicyHandlerFunc {
 	adapter := &projectNetworkPolicyLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *ProjectNetworkPolicy) (*ProjectNetworkPolicy, error) {
+	return func(key string, obj *ProjectNetworkPolicy) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*ProjectNetworkPolicy); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

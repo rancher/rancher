@@ -6,9 +6,9 @@ import (
 )
 
 type PrincipalLifecycle interface {
-	Create(obj *Principal) (*Principal, error)
-	Remove(obj *Principal) (*Principal, error)
-	Updated(obj *Principal) (*Principal, error)
+	Create(obj *Principal) (runtime.Object, error)
+	Remove(obj *Principal) (runtime.Object, error)
+	Updated(obj *Principal) (runtime.Object, error)
 }
 
 type principalLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *principalLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object,
 func NewPrincipalLifecycleAdapter(name string, clusterScoped bool, client PrincipalInterface, l PrincipalLifecycle) PrincipalHandlerFunc {
 	adapter := &principalLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *Principal) (*Principal, error) {
+	return func(key string, obj *Principal) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*Principal); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

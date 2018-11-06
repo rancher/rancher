@@ -36,7 +36,7 @@ type DaemonSetList struct {
 	Items           []v1beta2.DaemonSet
 }
 
-type DaemonSetHandlerFunc func(key string, obj *v1beta2.DaemonSet) (*v1beta2.DaemonSet, error)
+type DaemonSetHandlerFunc func(key string, obj *v1beta2.DaemonSet) (runtime.Object, error)
 
 type DaemonSetLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1beta2.DaemonSet, err error)

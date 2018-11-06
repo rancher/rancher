@@ -35,7 +35,7 @@ type PipelineSettingList struct {
 	Items           []PipelineSetting
 }
 
-type PipelineSettingHandlerFunc func(key string, obj *PipelineSetting) (*PipelineSetting, error)
+type PipelineSettingHandlerFunc func(key string, obj *PipelineSetting) (runtime.Object, error)
 
 type PipelineSettingLister interface {
 	List(namespace string, selector labels.Selector) (ret []*PipelineSetting, err error)

@@ -6,9 +6,9 @@ import (
 )
 
 type PodSecurityPolicyTemplateProjectBindingLifecycle interface {
-	Create(obj *PodSecurityPolicyTemplateProjectBinding) (*PodSecurityPolicyTemplateProjectBinding, error)
-	Remove(obj *PodSecurityPolicyTemplateProjectBinding) (*PodSecurityPolicyTemplateProjectBinding, error)
-	Updated(obj *PodSecurityPolicyTemplateProjectBinding) (*PodSecurityPolicyTemplateProjectBinding, error)
+	Create(obj *PodSecurityPolicyTemplateProjectBinding) (runtime.Object, error)
+	Remove(obj *PodSecurityPolicyTemplateProjectBinding) (runtime.Object, error)
+	Updated(obj *PodSecurityPolicyTemplateProjectBinding) (runtime.Object, error)
 }
 
 type podSecurityPolicyTemplateProjectBindingLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *podSecurityPolicyTemplateProjectBindingLifecycleAdapter) Updated(obj ru
 func NewPodSecurityPolicyTemplateProjectBindingLifecycleAdapter(name string, clusterScoped bool, client PodSecurityPolicyTemplateProjectBindingInterface, l PodSecurityPolicyTemplateProjectBindingLifecycle) PodSecurityPolicyTemplateProjectBindingHandlerFunc {
 	adapter := &podSecurityPolicyTemplateProjectBindingLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *PodSecurityPolicyTemplateProjectBinding) (*PodSecurityPolicyTemplateProjectBinding, error) {
+	return func(key string, obj *PodSecurityPolicyTemplateProjectBinding) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*PodSecurityPolicyTemplateProjectBinding); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

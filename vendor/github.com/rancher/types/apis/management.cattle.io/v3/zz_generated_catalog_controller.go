@@ -34,7 +34,7 @@ type CatalogList struct {
 	Items           []Catalog
 }
 
-type CatalogHandlerFunc func(key string, obj *Catalog) (*Catalog, error)
+type CatalogHandlerFunc func(key string, obj *Catalog) (runtime.Object, error)
 
 type CatalogLister interface {
 	List(namespace string, selector labels.Selector) (ret []*Catalog, err error)

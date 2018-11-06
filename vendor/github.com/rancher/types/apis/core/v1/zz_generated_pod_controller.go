@@ -36,7 +36,7 @@ type PodList struct {
 	Items           []v1.Pod
 }
 
-type PodHandlerFunc func(key string, obj *v1.Pod) (*v1.Pod, error)
+type PodHandlerFunc func(key string, obj *v1.Pod) (runtime.Object, error)
 
 type PodLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.Pod, err error)

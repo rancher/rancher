@@ -6,9 +6,9 @@ import (
 )
 
 type NotifierLifecycle interface {
-	Create(obj *Notifier) (*Notifier, error)
-	Remove(obj *Notifier) (*Notifier, error)
-	Updated(obj *Notifier) (*Notifier, error)
+	Create(obj *Notifier) (runtime.Object, error)
+	Remove(obj *Notifier) (runtime.Object, error)
+	Updated(obj *Notifier) (runtime.Object, error)
 }
 
 type notifierLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *notifierLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, 
 func NewNotifierLifecycleAdapter(name string, clusterScoped bool, client NotifierInterface, l NotifierLifecycle) NotifierHandlerFunc {
 	adapter := &notifierLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *Notifier) (*Notifier, error) {
+	return func(key string, obj *Notifier) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*Notifier); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

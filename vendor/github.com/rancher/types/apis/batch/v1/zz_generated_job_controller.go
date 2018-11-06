@@ -36,7 +36,7 @@ type JobList struct {
 	Items           []v1.Job
 }
 
-type JobHandlerFunc func(key string, obj *v1.Job) (*v1.Job, error)
+type JobHandlerFunc func(key string, obj *v1.Job) (runtime.Object, error)
 
 type JobLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.Job, err error)

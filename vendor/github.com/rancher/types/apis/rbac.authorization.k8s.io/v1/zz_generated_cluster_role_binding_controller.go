@@ -35,7 +35,7 @@ type ClusterRoleBindingList struct {
 	Items           []v1.ClusterRoleBinding
 }
 
-type ClusterRoleBindingHandlerFunc func(key string, obj *v1.ClusterRoleBinding) (*v1.ClusterRoleBinding, error)
+type ClusterRoleBindingHandlerFunc func(key string, obj *v1.ClusterRoleBinding) (runtime.Object, error)
 
 type ClusterRoleBindingLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.ClusterRoleBinding, err error)

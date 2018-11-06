@@ -35,7 +35,7 @@ type ProjectNetworkPolicyList struct {
 	Items           []ProjectNetworkPolicy
 }
 
-type ProjectNetworkPolicyHandlerFunc func(key string, obj *ProjectNetworkPolicy) (*ProjectNetworkPolicy, error)
+type ProjectNetworkPolicyHandlerFunc func(key string, obj *ProjectNetworkPolicy) (runtime.Object, error)
 
 type ProjectNetworkPolicyLister interface {
 	List(namespace string, selector labels.Selector) (ret []*ProjectNetworkPolicy, err error)

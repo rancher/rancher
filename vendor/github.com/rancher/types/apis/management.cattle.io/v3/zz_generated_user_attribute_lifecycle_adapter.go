@@ -6,9 +6,9 @@ import (
 )
 
 type UserAttributeLifecycle interface {
-	Create(obj *UserAttribute) (*UserAttribute, error)
-	Remove(obj *UserAttribute) (*UserAttribute, error)
-	Updated(obj *UserAttribute) (*UserAttribute, error)
+	Create(obj *UserAttribute) (runtime.Object, error)
+	Remove(obj *UserAttribute) (runtime.Object, error)
+	Updated(obj *UserAttribute) (runtime.Object, error)
 }
 
 type userAttributeLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *userAttributeLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obj
 func NewUserAttributeLifecycleAdapter(name string, clusterScoped bool, client UserAttributeInterface, l UserAttributeLifecycle) UserAttributeHandlerFunc {
 	adapter := &userAttributeLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *UserAttribute) (*UserAttribute, error) {
+	return func(key string, obj *UserAttribute) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*UserAttribute); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

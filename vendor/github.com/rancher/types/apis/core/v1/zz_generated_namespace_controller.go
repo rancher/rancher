@@ -35,7 +35,7 @@ type NamespaceList struct {
 	Items           []v1.Namespace
 }
 
-type NamespaceHandlerFunc func(key string, obj *v1.Namespace) (*v1.Namespace, error)
+type NamespaceHandlerFunc func(key string, obj *v1.Namespace) (runtime.Object, error)
 
 type NamespaceLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.Namespace, err error)

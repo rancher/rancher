@@ -34,7 +34,7 @@ type ListenConfigList struct {
 	Items           []ListenConfig
 }
 
-type ListenConfigHandlerFunc func(key string, obj *ListenConfig) (*ListenConfig, error)
+type ListenConfigHandlerFunc func(key string, obj *ListenConfig) (runtime.Object, error)
 
 type ListenConfigLister interface {
 	List(namespace string, selector labels.Selector) (ret []*ListenConfig, err error)

@@ -34,7 +34,7 @@ type GlobalRoleBindingList struct {
 	Items           []GlobalRoleBinding
 }
 
-type GlobalRoleBindingHandlerFunc func(key string, obj *GlobalRoleBinding) (*GlobalRoleBinding, error)
+type GlobalRoleBindingHandlerFunc func(key string, obj *GlobalRoleBinding) (runtime.Object, error)
 
 type GlobalRoleBindingLister interface {
 	List(namespace string, selector labels.Selector) (ret []*GlobalRoleBinding, err error)

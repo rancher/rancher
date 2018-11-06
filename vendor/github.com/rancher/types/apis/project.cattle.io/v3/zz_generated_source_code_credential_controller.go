@@ -35,7 +35,7 @@ type SourceCodeCredentialList struct {
 	Items           []SourceCodeCredential
 }
 
-type SourceCodeCredentialHandlerFunc func(key string, obj *SourceCodeCredential) (*SourceCodeCredential, error)
+type SourceCodeCredentialHandlerFunc func(key string, obj *SourceCodeCredential) (runtime.Object, error)
 
 type SourceCodeCredentialLister interface {
 	List(namespace string, selector labels.Selector) (ret []*SourceCodeCredential, err error)

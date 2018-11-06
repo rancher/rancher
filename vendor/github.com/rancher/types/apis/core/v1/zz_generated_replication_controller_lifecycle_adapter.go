@@ -7,9 +7,9 @@ import (
 )
 
 type ReplicationControllerLifecycle interface {
-	Create(obj *v1.ReplicationController) (*v1.ReplicationController, error)
-	Remove(obj *v1.ReplicationController) (*v1.ReplicationController, error)
-	Updated(obj *v1.ReplicationController) (*v1.ReplicationController, error)
+	Create(obj *v1.ReplicationController) (runtime.Object, error)
+	Remove(obj *v1.ReplicationController) (runtime.Object, error)
+	Updated(obj *v1.ReplicationController) (runtime.Object, error)
 }
 
 type replicationControllerLifecycleAdapter struct {
@@ -43,9 +43,9 @@ func (w *replicationControllerLifecycleAdapter) Updated(obj runtime.Object) (run
 func NewReplicationControllerLifecycleAdapter(name string, clusterScoped bool, client ReplicationControllerInterface, l ReplicationControllerLifecycle) ReplicationControllerHandlerFunc {
 	adapter := &replicationControllerLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1.ReplicationController) (*v1.ReplicationController, error) {
+	return func(key string, obj *v1.ReplicationController) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*v1.ReplicationController); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

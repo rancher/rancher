@@ -35,7 +35,7 @@ type ServiceAccountTokenList struct {
 	Items           []ServiceAccountToken
 }
 
-type ServiceAccountTokenHandlerFunc func(key string, obj *ServiceAccountToken) (*ServiceAccountToken, error)
+type ServiceAccountTokenHandlerFunc func(key string, obj *ServiceAccountToken) (runtime.Object, error)
 
 type ServiceAccountTokenLister interface {
 	List(namespace string, selector labels.Selector) (ret []*ServiceAccountToken, err error)

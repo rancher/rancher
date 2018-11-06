@@ -36,7 +36,7 @@ type RoleList struct {
 	Items           []v1.Role
 }
 
-type RoleHandlerFunc func(key string, obj *v1.Role) (*v1.Role, error)
+type RoleHandlerFunc func(key string, obj *v1.Role) (runtime.Object, error)
 
 type RoleLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.Role, err error)

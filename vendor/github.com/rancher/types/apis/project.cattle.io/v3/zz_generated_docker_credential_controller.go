@@ -35,7 +35,7 @@ type DockerCredentialList struct {
 	Items           []DockerCredential
 }
 
-type DockerCredentialHandlerFunc func(key string, obj *DockerCredential) (*DockerCredential, error)
+type DockerCredentialHandlerFunc func(key string, obj *DockerCredential) (runtime.Object, error)
 
 type DockerCredentialLister interface {
 	List(namespace string, selector labels.Selector) (ret []*DockerCredential, err error)

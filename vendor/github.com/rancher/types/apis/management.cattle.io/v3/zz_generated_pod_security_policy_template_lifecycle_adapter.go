@@ -6,9 +6,9 @@ import (
 )
 
 type PodSecurityPolicyTemplateLifecycle interface {
-	Create(obj *PodSecurityPolicyTemplate) (*PodSecurityPolicyTemplate, error)
-	Remove(obj *PodSecurityPolicyTemplate) (*PodSecurityPolicyTemplate, error)
-	Updated(obj *PodSecurityPolicyTemplate) (*PodSecurityPolicyTemplate, error)
+	Create(obj *PodSecurityPolicyTemplate) (runtime.Object, error)
+	Remove(obj *PodSecurityPolicyTemplate) (runtime.Object, error)
+	Updated(obj *PodSecurityPolicyTemplate) (runtime.Object, error)
 }
 
 type podSecurityPolicyTemplateLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *podSecurityPolicyTemplateLifecycleAdapter) Updated(obj runtime.Object) 
 func NewPodSecurityPolicyTemplateLifecycleAdapter(name string, clusterScoped bool, client PodSecurityPolicyTemplateInterface, l PodSecurityPolicyTemplateLifecycle) PodSecurityPolicyTemplateHandlerFunc {
 	adapter := &podSecurityPolicyTemplateLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *PodSecurityPolicyTemplate) (*PodSecurityPolicyTemplate, error) {
+	return func(key string, obj *PodSecurityPolicyTemplate) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*PodSecurityPolicyTemplate); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

@@ -36,7 +36,7 @@ type ResourceQuotaList struct {
 	Items           []v1.ResourceQuota
 }
 
-type ResourceQuotaHandlerFunc func(key string, obj *v1.ResourceQuota) (*v1.ResourceQuota, error)
+type ResourceQuotaHandlerFunc func(key string, obj *v1.ResourceQuota) (runtime.Object, error)
 
 type ResourceQuotaLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.ResourceQuota, err error)

@@ -6,9 +6,9 @@ import (
 )
 
 type SourceCodeCredentialLifecycle interface {
-	Create(obj *SourceCodeCredential) (*SourceCodeCredential, error)
-	Remove(obj *SourceCodeCredential) (*SourceCodeCredential, error)
-	Updated(obj *SourceCodeCredential) (*SourceCodeCredential, error)
+	Create(obj *SourceCodeCredential) (runtime.Object, error)
+	Remove(obj *SourceCodeCredential) (runtime.Object, error)
+	Updated(obj *SourceCodeCredential) (runtime.Object, error)
 }
 
 type sourceCodeCredentialLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *sourceCodeCredentialLifecycleAdapter) Updated(obj runtime.Object) (runt
 func NewSourceCodeCredentialLifecycleAdapter(name string, clusterScoped bool, client SourceCodeCredentialInterface, l SourceCodeCredentialLifecycle) SourceCodeCredentialHandlerFunc {
 	adapter := &sourceCodeCredentialLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *SourceCodeCredential) (*SourceCodeCredential, error) {
+	return func(key string, obj *SourceCodeCredential) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*SourceCodeCredential); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

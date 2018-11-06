@@ -35,7 +35,7 @@ type ProjectList struct {
 	Items           []Project
 }
 
-type ProjectHandlerFunc func(key string, obj *Project) (*Project, error)
+type ProjectHandlerFunc func(key string, obj *Project) (runtime.Object, error)
 
 type ProjectLister interface {
 	List(namespace string, selector labels.Selector) (ret []*Project, err error)

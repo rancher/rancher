@@ -6,9 +6,9 @@ import (
 )
 
 type ComposeConfigLifecycle interface {
-	Create(obj *ComposeConfig) (*ComposeConfig, error)
-	Remove(obj *ComposeConfig) (*ComposeConfig, error)
-	Updated(obj *ComposeConfig) (*ComposeConfig, error)
+	Create(obj *ComposeConfig) (runtime.Object, error)
+	Remove(obj *ComposeConfig) (runtime.Object, error)
+	Updated(obj *ComposeConfig) (runtime.Object, error)
 }
 
 type composeConfigLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *composeConfigLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obj
 func NewComposeConfigLifecycleAdapter(name string, clusterScoped bool, client ComposeConfigInterface, l ComposeConfigLifecycle) ComposeConfigHandlerFunc {
 	adapter := &composeConfigLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *ComposeConfig) (*ComposeConfig, error) {
+	return func(key string, obj *ComposeConfig) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*ComposeConfig); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

@@ -7,9 +7,9 @@ import (
 )
 
 type PodSecurityPolicyLifecycle interface {
-	Create(obj *v1beta1.PodSecurityPolicy) (*v1beta1.PodSecurityPolicy, error)
-	Remove(obj *v1beta1.PodSecurityPolicy) (*v1beta1.PodSecurityPolicy, error)
-	Updated(obj *v1beta1.PodSecurityPolicy) (*v1beta1.PodSecurityPolicy, error)
+	Create(obj *v1beta1.PodSecurityPolicy) (runtime.Object, error)
+	Remove(obj *v1beta1.PodSecurityPolicy) (runtime.Object, error)
+	Updated(obj *v1beta1.PodSecurityPolicy) (runtime.Object, error)
 }
 
 type podSecurityPolicyLifecycleAdapter struct {
@@ -43,9 +43,9 @@ func (w *podSecurityPolicyLifecycleAdapter) Updated(obj runtime.Object) (runtime
 func NewPodSecurityPolicyLifecycleAdapter(name string, clusterScoped bool, client PodSecurityPolicyInterface, l PodSecurityPolicyLifecycle) PodSecurityPolicyHandlerFunc {
 	adapter := &podSecurityPolicyLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1beta1.PodSecurityPolicy) (*v1beta1.PodSecurityPolicy, error) {
+	return func(key string, obj *v1beta1.PodSecurityPolicy) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*v1beta1.PodSecurityPolicy); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

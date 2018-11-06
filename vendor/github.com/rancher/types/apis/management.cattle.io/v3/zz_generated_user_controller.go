@@ -34,7 +34,7 @@ type UserList struct {
 	Items           []User
 }
 
-type UserHandlerFunc func(key string, obj *User) (*User, error)
+type UserHandlerFunc func(key string, obj *User) (runtime.Object, error)
 
 type UserLister interface {
 	List(namespace string, selector labels.Selector) (ret []*User, err error)

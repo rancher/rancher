@@ -6,9 +6,9 @@ import (
 )
 
 type NamespacedServiceAccountTokenLifecycle interface {
-	Create(obj *NamespacedServiceAccountToken) (*NamespacedServiceAccountToken, error)
-	Remove(obj *NamespacedServiceAccountToken) (*NamespacedServiceAccountToken, error)
-	Updated(obj *NamespacedServiceAccountToken) (*NamespacedServiceAccountToken, error)
+	Create(obj *NamespacedServiceAccountToken) (runtime.Object, error)
+	Remove(obj *NamespacedServiceAccountToken) (runtime.Object, error)
+	Updated(obj *NamespacedServiceAccountToken) (runtime.Object, error)
 }
 
 type namespacedServiceAccountTokenLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *namespacedServiceAccountTokenLifecycleAdapter) Updated(obj runtime.Obje
 func NewNamespacedServiceAccountTokenLifecycleAdapter(name string, clusterScoped bool, client NamespacedServiceAccountTokenInterface, l NamespacedServiceAccountTokenLifecycle) NamespacedServiceAccountTokenHandlerFunc {
 	adapter := &namespacedServiceAccountTokenLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *NamespacedServiceAccountToken) (*NamespacedServiceAccountToken, error) {
+	return func(key string, obj *NamespacedServiceAccountToken) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*NamespacedServiceAccountToken); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

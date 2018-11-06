@@ -35,7 +35,7 @@ type NodePoolList struct {
 	Items           []NodePool
 }
 
-type NodePoolHandlerFunc func(key string, obj *NodePool) (*NodePool, error)
+type NodePoolHandlerFunc func(key string, obj *NodePool) (runtime.Object, error)
 
 type NodePoolLister interface {
 	List(namespace string, selector labels.Selector) (ret []*NodePool, err error)

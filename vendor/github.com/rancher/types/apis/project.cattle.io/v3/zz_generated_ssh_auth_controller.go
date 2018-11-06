@@ -35,7 +35,7 @@ type SSHAuthList struct {
 	Items           []SSHAuth
 }
 
-type SSHAuthHandlerFunc func(key string, obj *SSHAuth) (*SSHAuth, error)
+type SSHAuthHandlerFunc func(key string, obj *SSHAuth) (runtime.Object, error)
 
 type SSHAuthLister interface {
 	List(namespace string, selector labels.Selector) (ret []*SSHAuth, err error)

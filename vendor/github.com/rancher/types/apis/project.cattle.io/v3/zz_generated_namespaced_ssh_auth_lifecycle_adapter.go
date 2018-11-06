@@ -6,9 +6,9 @@ import (
 )
 
 type NamespacedSSHAuthLifecycle interface {
-	Create(obj *NamespacedSSHAuth) (*NamespacedSSHAuth, error)
-	Remove(obj *NamespacedSSHAuth) (*NamespacedSSHAuth, error)
-	Updated(obj *NamespacedSSHAuth) (*NamespacedSSHAuth, error)
+	Create(obj *NamespacedSSHAuth) (runtime.Object, error)
+	Remove(obj *NamespacedSSHAuth) (runtime.Object, error)
+	Updated(obj *NamespacedSSHAuth) (runtime.Object, error)
 }
 
 type namespacedSshAuthLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *namespacedSshAuthLifecycleAdapter) Updated(obj runtime.Object) (runtime
 func NewNamespacedSSHAuthLifecycleAdapter(name string, clusterScoped bool, client NamespacedSSHAuthInterface, l NamespacedSSHAuthLifecycle) NamespacedSSHAuthHandlerFunc {
 	adapter := &namespacedSshAuthLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *NamespacedSSHAuth) (*NamespacedSSHAuth, error) {
+	return func(key string, obj *NamespacedSSHAuth) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*NamespacedSSHAuth); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

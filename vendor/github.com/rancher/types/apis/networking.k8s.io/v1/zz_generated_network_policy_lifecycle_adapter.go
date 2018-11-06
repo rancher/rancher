@@ -7,9 +7,9 @@ import (
 )
 
 type NetworkPolicyLifecycle interface {
-	Create(obj *v1.NetworkPolicy) (*v1.NetworkPolicy, error)
-	Remove(obj *v1.NetworkPolicy) (*v1.NetworkPolicy, error)
-	Updated(obj *v1.NetworkPolicy) (*v1.NetworkPolicy, error)
+	Create(obj *v1.NetworkPolicy) (runtime.Object, error)
+	Remove(obj *v1.NetworkPolicy) (runtime.Object, error)
+	Updated(obj *v1.NetworkPolicy) (runtime.Object, error)
 }
 
 type networkPolicyLifecycleAdapter struct {
@@ -43,9 +43,9 @@ func (w *networkPolicyLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obj
 func NewNetworkPolicyLifecycleAdapter(name string, clusterScoped bool, client NetworkPolicyInterface, l NetworkPolicyLifecycle) NetworkPolicyHandlerFunc {
 	adapter := &networkPolicyLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1.NetworkPolicy) (*v1.NetworkPolicy, error) {
+	return func(key string, obj *v1.NetworkPolicy) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*v1.NetworkPolicy); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

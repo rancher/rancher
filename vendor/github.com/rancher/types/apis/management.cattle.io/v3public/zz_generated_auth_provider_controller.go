@@ -34,7 +34,7 @@ type AuthProviderList struct {
 	Items           []AuthProvider
 }
 
-type AuthProviderHandlerFunc func(key string, obj *AuthProvider) (*AuthProvider, error)
+type AuthProviderHandlerFunc func(key string, obj *AuthProvider) (runtime.Object, error)
 
 type AuthProviderLister interface {
 	List(namespace string, selector labels.Selector) (ret []*AuthProvider, err error)
