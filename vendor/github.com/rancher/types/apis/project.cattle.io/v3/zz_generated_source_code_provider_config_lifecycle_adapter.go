@@ -6,9 +6,9 @@ import (
 )
 
 type SourceCodeProviderConfigLifecycle interface {
-	Create(obj *SourceCodeProviderConfig) (*SourceCodeProviderConfig, error)
-	Remove(obj *SourceCodeProviderConfig) (*SourceCodeProviderConfig, error)
-	Updated(obj *SourceCodeProviderConfig) (*SourceCodeProviderConfig, error)
+	Create(obj *SourceCodeProviderConfig) (runtime.Object, error)
+	Remove(obj *SourceCodeProviderConfig) (runtime.Object, error)
+	Updated(obj *SourceCodeProviderConfig) (runtime.Object, error)
 }
 
 type sourceCodeProviderConfigLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *sourceCodeProviderConfigLifecycleAdapter) Updated(obj runtime.Object) (
 func NewSourceCodeProviderConfigLifecycleAdapter(name string, clusterScoped bool, client SourceCodeProviderConfigInterface, l SourceCodeProviderConfigLifecycle) SourceCodeProviderConfigHandlerFunc {
 	adapter := &sourceCodeProviderConfigLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *SourceCodeProviderConfig) (*SourceCodeProviderConfig, error) {
+	return func(key string, obj *SourceCodeProviderConfig) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*SourceCodeProviderConfig); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

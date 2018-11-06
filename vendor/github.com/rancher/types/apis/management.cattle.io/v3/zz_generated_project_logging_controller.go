@@ -35,7 +35,7 @@ type ProjectLoggingList struct {
 	Items           []ProjectLogging
 }
 
-type ProjectLoggingHandlerFunc func(key string, obj *ProjectLogging) (*ProjectLogging, error)
+type ProjectLoggingHandlerFunc func(key string, obj *ProjectLogging) (runtime.Object, error)
 
 type ProjectLoggingLister interface {
 	List(namespace string, selector labels.Selector) (ret []*ProjectLogging, err error)

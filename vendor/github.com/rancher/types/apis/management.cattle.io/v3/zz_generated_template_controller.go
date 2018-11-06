@@ -34,7 +34,7 @@ type TemplateList struct {
 	Items           []Template
 }
 
-type TemplateHandlerFunc func(key string, obj *Template) (*Template, error)
+type TemplateHandlerFunc func(key string, obj *Template) (runtime.Object, error)
 
 type TemplateLister interface {
 	List(namespace string, selector labels.Selector) (ret []*Template, err error)

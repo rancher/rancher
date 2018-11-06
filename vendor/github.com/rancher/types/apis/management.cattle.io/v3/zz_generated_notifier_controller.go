@@ -35,7 +35,7 @@ type NotifierList struct {
 	Items           []Notifier
 }
 
-type NotifierHandlerFunc func(key string, obj *Notifier) (*Notifier, error)
+type NotifierHandlerFunc func(key string, obj *Notifier) (runtime.Object, error)
 
 type NotifierLister interface {
 	List(namespace string, selector labels.Selector) (ret []*Notifier, err error)

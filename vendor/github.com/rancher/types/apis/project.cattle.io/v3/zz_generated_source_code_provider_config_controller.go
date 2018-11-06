@@ -35,7 +35,7 @@ type SourceCodeProviderConfigList struct {
 	Items           []SourceCodeProviderConfig
 }
 
-type SourceCodeProviderConfigHandlerFunc func(key string, obj *SourceCodeProviderConfig) (*SourceCodeProviderConfig, error)
+type SourceCodeProviderConfigHandlerFunc func(key string, obj *SourceCodeProviderConfig) (runtime.Object, error)
 
 type SourceCodeProviderConfigLister interface {
 	List(namespace string, selector labels.Selector) (ret []*SourceCodeProviderConfig, err error)

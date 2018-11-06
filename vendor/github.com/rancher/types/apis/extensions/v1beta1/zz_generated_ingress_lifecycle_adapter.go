@@ -7,9 +7,9 @@ import (
 )
 
 type IngressLifecycle interface {
-	Create(obj *v1beta1.Ingress) (*v1beta1.Ingress, error)
-	Remove(obj *v1beta1.Ingress) (*v1beta1.Ingress, error)
-	Updated(obj *v1beta1.Ingress) (*v1beta1.Ingress, error)
+	Create(obj *v1beta1.Ingress) (runtime.Object, error)
+	Remove(obj *v1beta1.Ingress) (runtime.Object, error)
+	Updated(obj *v1beta1.Ingress) (runtime.Object, error)
 }
 
 type ingressLifecycleAdapter struct {
@@ -43,9 +43,9 @@ func (w *ingressLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, e
 func NewIngressLifecycleAdapter(name string, clusterScoped bool, client IngressInterface, l IngressLifecycle) IngressHandlerFunc {
 	adapter := &ingressLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1beta1.Ingress) (*v1beta1.Ingress, error) {
+	return func(key string, obj *v1beta1.Ingress) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*v1beta1.Ingress); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

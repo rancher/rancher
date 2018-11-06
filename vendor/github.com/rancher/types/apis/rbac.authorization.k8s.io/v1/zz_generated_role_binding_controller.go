@@ -36,7 +36,7 @@ type RoleBindingList struct {
 	Items           []v1.RoleBinding
 }
 
-type RoleBindingHandlerFunc func(key string, obj *v1.RoleBinding) (*v1.RoleBinding, error)
+type RoleBindingHandlerFunc func(key string, obj *v1.RoleBinding) (runtime.Object, error)
 
 type RoleBindingLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.RoleBinding, err error)

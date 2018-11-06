@@ -35,7 +35,7 @@ type AppList struct {
 	Items           []App
 }
 
-type AppHandlerFunc func(key string, obj *App) (*App, error)
+type AppHandlerFunc func(key string, obj *App) (runtime.Object, error)
 
 type AppLister interface {
 	List(namespace string, selector labels.Selector) (ret []*App, err error)

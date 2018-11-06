@@ -6,9 +6,9 @@ import (
 )
 
 type TemplateLifecycle interface {
-	Create(obj *Template) (*Template, error)
-	Remove(obj *Template) (*Template, error)
-	Updated(obj *Template) (*Template, error)
+	Create(obj *Template) (runtime.Object, error)
+	Remove(obj *Template) (runtime.Object, error)
+	Updated(obj *Template) (runtime.Object, error)
 }
 
 type templateLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *templateLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, 
 func NewTemplateLifecycleAdapter(name string, clusterScoped bool, client TemplateInterface, l TemplateLifecycle) TemplateHandlerFunc {
 	adapter := &templateLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *Template) (*Template, error) {
+	return func(key string, obj *Template) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*Template); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

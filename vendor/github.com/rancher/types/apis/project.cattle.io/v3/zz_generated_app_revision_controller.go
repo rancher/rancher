@@ -35,7 +35,7 @@ type AppRevisionList struct {
 	Items           []AppRevision
 }
 
-type AppRevisionHandlerFunc func(key string, obj *AppRevision) (*AppRevision, error)
+type AppRevisionHandlerFunc func(key string, obj *AppRevision) (runtime.Object, error)
 
 type AppRevisionLister interface {
 	List(namespace string, selector labels.Selector) (ret []*AppRevision, err error)

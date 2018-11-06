@@ -35,7 +35,7 @@ type ComponentStatusList struct {
 	Items           []v1.ComponentStatus
 }
 
-type ComponentStatusHandlerFunc func(key string, obj *v1.ComponentStatus) (*v1.ComponentStatus, error)
+type ComponentStatusHandlerFunc func(key string, obj *v1.ComponentStatus) (runtime.Object, error)
 
 type ComponentStatusLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.ComponentStatus, err error)

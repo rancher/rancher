@@ -34,7 +34,7 @@ type PrincipalList struct {
 	Items           []Principal
 }
 
-type PrincipalHandlerFunc func(key string, obj *Principal) (*Principal, error)
+type PrincipalHandlerFunc func(key string, obj *Principal) (runtime.Object, error)
 
 type PrincipalLister interface {
 	List(namespace string, selector labels.Selector) (ret []*Principal, err error)

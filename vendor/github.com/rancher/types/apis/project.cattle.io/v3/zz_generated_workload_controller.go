@@ -35,7 +35,7 @@ type WorkloadList struct {
 	Items           []Workload
 }
 
-type WorkloadHandlerFunc func(key string, obj *Workload) (*Workload, error)
+type WorkloadHandlerFunc func(key string, obj *Workload) (runtime.Object, error)
 
 type WorkloadLister interface {
 	List(namespace string, selector labels.Selector) (ret []*Workload, err error)

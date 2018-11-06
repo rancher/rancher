@@ -6,9 +6,9 @@ import (
 )
 
 type NamespacedDockerCredentialLifecycle interface {
-	Create(obj *NamespacedDockerCredential) (*NamespacedDockerCredential, error)
-	Remove(obj *NamespacedDockerCredential) (*NamespacedDockerCredential, error)
-	Updated(obj *NamespacedDockerCredential) (*NamespacedDockerCredential, error)
+	Create(obj *NamespacedDockerCredential) (runtime.Object, error)
+	Remove(obj *NamespacedDockerCredential) (runtime.Object, error)
+	Updated(obj *NamespacedDockerCredential) (runtime.Object, error)
 }
 
 type namespacedDockerCredentialLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *namespacedDockerCredentialLifecycleAdapter) Updated(obj runtime.Object)
 func NewNamespacedDockerCredentialLifecycleAdapter(name string, clusterScoped bool, client NamespacedDockerCredentialInterface, l NamespacedDockerCredentialLifecycle) NamespacedDockerCredentialHandlerFunc {
 	adapter := &namespacedDockerCredentialLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *NamespacedDockerCredential) (*NamespacedDockerCredential, error) {
+	return func(key string, obj *NamespacedDockerCredential) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*NamespacedDockerCredential); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

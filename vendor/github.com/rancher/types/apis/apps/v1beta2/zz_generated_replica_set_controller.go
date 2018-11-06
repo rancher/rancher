@@ -36,7 +36,7 @@ type ReplicaSetList struct {
 	Items           []v1beta2.ReplicaSet
 }
 
-type ReplicaSetHandlerFunc func(key string, obj *v1beta2.ReplicaSet) (*v1beta2.ReplicaSet, error)
+type ReplicaSetHandlerFunc func(key string, obj *v1beta2.ReplicaSet) (runtime.Object, error)
 
 type ReplicaSetLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1beta2.ReplicaSet, err error)

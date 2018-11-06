@@ -35,7 +35,7 @@ type NodeTemplateList struct {
 	Items           []NodeTemplate
 }
 
-type NodeTemplateHandlerFunc func(key string, obj *NodeTemplate) (*NodeTemplate, error)
+type NodeTemplateHandlerFunc func(key string, obj *NodeTemplate) (runtime.Object, error)
 
 type NodeTemplateLister interface {
 	List(namespace string, selector labels.Selector) (ret []*NodeTemplate, err error)

@@ -36,7 +36,7 @@ type IngressList struct {
 	Items           []v1beta1.Ingress
 }
 
-type IngressHandlerFunc func(key string, obj *v1beta1.Ingress) (*v1beta1.Ingress, error)
+type IngressHandlerFunc func(key string, obj *v1beta1.Ingress) (runtime.Object, error)
 
 type IngressLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1beta1.Ingress, err error)

@@ -35,7 +35,7 @@ type NamespacedServiceAccountTokenList struct {
 	Items           []NamespacedServiceAccountToken
 }
 
-type NamespacedServiceAccountTokenHandlerFunc func(key string, obj *NamespacedServiceAccountToken) (*NamespacedServiceAccountToken, error)
+type NamespacedServiceAccountTokenHandlerFunc func(key string, obj *NamespacedServiceAccountToken) (runtime.Object, error)
 
 type NamespacedServiceAccountTokenLister interface {
 	List(namespace string, selector labels.Selector) (ret []*NamespacedServiceAccountToken, err error)

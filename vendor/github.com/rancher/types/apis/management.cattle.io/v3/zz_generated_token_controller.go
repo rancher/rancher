@@ -34,7 +34,7 @@ type TokenList struct {
 	Items           []Token
 }
 
-type TokenHandlerFunc func(key string, obj *Token) (*Token, error)
+type TokenHandlerFunc func(key string, obj *Token) (runtime.Object, error)
 
 type TokenLister interface {
 	List(namespace string, selector labels.Selector) (ret []*Token, err error)

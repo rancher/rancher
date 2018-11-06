@@ -35,7 +35,7 @@ type ProjectAlertList struct {
 	Items           []ProjectAlert
 }
 
-type ProjectAlertHandlerFunc func(key string, obj *ProjectAlert) (*ProjectAlert, error)
+type ProjectAlertHandlerFunc func(key string, obj *ProjectAlert) (runtime.Object, error)
 
 type ProjectAlertLister interface {
 	List(namespace string, selector labels.Selector) (ret []*ProjectAlert, err error)

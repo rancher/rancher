@@ -6,9 +6,9 @@ import (
 )
 
 type PreferenceLifecycle interface {
-	Create(obj *Preference) (*Preference, error)
-	Remove(obj *Preference) (*Preference, error)
-	Updated(obj *Preference) (*Preference, error)
+	Create(obj *Preference) (runtime.Object, error)
+	Remove(obj *Preference) (runtime.Object, error)
+	Updated(obj *Preference) (runtime.Object, error)
 }
 
 type preferenceLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *preferenceLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object
 func NewPreferenceLifecycleAdapter(name string, clusterScoped bool, client PreferenceInterface, l PreferenceLifecycle) PreferenceHandlerFunc {
 	adapter := &preferenceLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *Preference) (*Preference, error) {
+	return func(key string, obj *Preference) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*Preference); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

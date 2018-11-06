@@ -36,7 +36,7 @@ type NetworkPolicyList struct {
 	Items           []v1.NetworkPolicy
 }
 
-type NetworkPolicyHandlerFunc func(key string, obj *v1.NetworkPolicy) (*v1.NetworkPolicy, error)
+type NetworkPolicyHandlerFunc func(key string, obj *v1.NetworkPolicy) (runtime.Object, error)
 
 type NetworkPolicyLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.NetworkPolicy, err error)

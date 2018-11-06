@@ -6,9 +6,9 @@ import (
 )
 
 type ClusterRegistrationTokenLifecycle interface {
-	Create(obj *ClusterRegistrationToken) (*ClusterRegistrationToken, error)
-	Remove(obj *ClusterRegistrationToken) (*ClusterRegistrationToken, error)
-	Updated(obj *ClusterRegistrationToken) (*ClusterRegistrationToken, error)
+	Create(obj *ClusterRegistrationToken) (runtime.Object, error)
+	Remove(obj *ClusterRegistrationToken) (runtime.Object, error)
+	Updated(obj *ClusterRegistrationToken) (runtime.Object, error)
 }
 
 type clusterRegistrationTokenLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *clusterRegistrationTokenLifecycleAdapter) Updated(obj runtime.Object) (
 func NewClusterRegistrationTokenLifecycleAdapter(name string, clusterScoped bool, client ClusterRegistrationTokenInterface, l ClusterRegistrationTokenLifecycle) ClusterRegistrationTokenHandlerFunc {
 	adapter := &clusterRegistrationTokenLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *ClusterRegistrationToken) (*ClusterRegistrationToken, error) {
+	return func(key string, obj *ClusterRegistrationToken) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*ClusterRegistrationToken); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

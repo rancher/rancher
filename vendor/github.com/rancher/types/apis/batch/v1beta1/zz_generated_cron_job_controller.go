@@ -36,7 +36,7 @@ type CronJobList struct {
 	Items           []v1beta1.CronJob
 }
 
-type CronJobHandlerFunc func(key string, obj *v1beta1.CronJob) (*v1beta1.CronJob, error)
+type CronJobHandlerFunc func(key string, obj *v1beta1.CronJob) (runtime.Object, error)
 
 type CronJobLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1beta1.CronJob, err error)

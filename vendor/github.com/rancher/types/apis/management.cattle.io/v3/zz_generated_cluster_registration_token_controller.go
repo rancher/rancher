@@ -35,7 +35,7 @@ type ClusterRegistrationTokenList struct {
 	Items           []ClusterRegistrationToken
 }
 
-type ClusterRegistrationTokenHandlerFunc func(key string, obj *ClusterRegistrationToken) (*ClusterRegistrationToken, error)
+type ClusterRegistrationTokenHandlerFunc func(key string, obj *ClusterRegistrationToken) (runtime.Object, error)
 
 type ClusterRegistrationTokenLister interface {
 	List(namespace string, selector labels.Selector) (ret []*ClusterRegistrationToken, err error)

@@ -34,7 +34,7 @@ type ClusterList struct {
 	Items           []Cluster
 }
 
-type ClusterHandlerFunc func(key string, obj *Cluster) (*Cluster, error)
+type ClusterHandlerFunc func(key string, obj *Cluster) (runtime.Object, error)
 
 type ClusterLister interface {
 	List(namespace string, selector labels.Selector) (ret []*Cluster, err error)

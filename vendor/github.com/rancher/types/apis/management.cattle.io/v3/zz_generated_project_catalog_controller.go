@@ -35,7 +35,7 @@ type ProjectCatalogList struct {
 	Items           []ProjectCatalog
 }
 
-type ProjectCatalogHandlerFunc func(key string, obj *ProjectCatalog) (*ProjectCatalog, error)
+type ProjectCatalogHandlerFunc func(key string, obj *ProjectCatalog) (runtime.Object, error)
 
 type ProjectCatalogLister interface {
 	List(namespace string, selector labels.Selector) (ret []*ProjectCatalog, err error)

@@ -7,9 +7,9 @@ import (
 )
 
 type ConfigMapLifecycle interface {
-	Create(obj *v1.ConfigMap) (*v1.ConfigMap, error)
-	Remove(obj *v1.ConfigMap) (*v1.ConfigMap, error)
-	Updated(obj *v1.ConfigMap) (*v1.ConfigMap, error)
+	Create(obj *v1.ConfigMap) (runtime.Object, error)
+	Remove(obj *v1.ConfigMap) (runtime.Object, error)
+	Updated(obj *v1.ConfigMap) (runtime.Object, error)
 }
 
 type configMapLifecycleAdapter struct {
@@ -43,9 +43,9 @@ func (w *configMapLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object,
 func NewConfigMapLifecycleAdapter(name string, clusterScoped bool, client ConfigMapInterface, l ConfigMapLifecycle) ConfigMapHandlerFunc {
 	adapter := &configMapLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1.ConfigMap) (*v1.ConfigMap, error) {
+	return func(key string, obj *v1.ConfigMap) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*v1.ConfigMap); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

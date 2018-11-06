@@ -34,7 +34,7 @@ type LdapConfigList struct {
 	Items           []LdapConfig
 }
 
-type LdapConfigHandlerFunc func(key string, obj *LdapConfig) (*LdapConfig, error)
+type LdapConfigHandlerFunc func(key string, obj *LdapConfig) (runtime.Object, error)
 
 type LdapConfigLister interface {
 	List(namespace string, selector labels.Selector) (ret []*LdapConfig, err error)

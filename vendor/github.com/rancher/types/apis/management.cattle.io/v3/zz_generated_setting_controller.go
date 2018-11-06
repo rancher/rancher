@@ -34,7 +34,7 @@ type SettingList struct {
 	Items           []Setting
 }
 
-type SettingHandlerFunc func(key string, obj *Setting) (*Setting, error)
+type SettingHandlerFunc func(key string, obj *Setting) (runtime.Object, error)
 
 type SettingLister interface {
 	List(namespace string, selector labels.Selector) (ret []*Setting, err error)

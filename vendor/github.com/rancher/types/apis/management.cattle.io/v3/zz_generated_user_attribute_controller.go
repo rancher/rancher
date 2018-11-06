@@ -34,7 +34,7 @@ type UserAttributeList struct {
 	Items           []UserAttribute
 }
 
-type UserAttributeHandlerFunc func(key string, obj *UserAttribute) (*UserAttribute, error)
+type UserAttributeHandlerFunc func(key string, obj *UserAttribute) (runtime.Object, error)
 
 type UserAttributeLister interface {
 	List(namespace string, selector labels.Selector) (ret []*UserAttribute, err error)

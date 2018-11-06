@@ -36,7 +36,7 @@ type ConfigMapList struct {
 	Items           []v1.ConfigMap
 }
 
-type ConfigMapHandlerFunc func(key string, obj *v1.ConfigMap) (*v1.ConfigMap, error)
+type ConfigMapHandlerFunc func(key string, obj *v1.ConfigMap) (runtime.Object, error)
 
 type ConfigMapLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.ConfigMap, err error)

@@ -7,9 +7,9 @@ import (
 )
 
 type ServiceAccountLifecycle interface {
-	Create(obj *v1.ServiceAccount) (*v1.ServiceAccount, error)
-	Remove(obj *v1.ServiceAccount) (*v1.ServiceAccount, error)
-	Updated(obj *v1.ServiceAccount) (*v1.ServiceAccount, error)
+	Create(obj *v1.ServiceAccount) (runtime.Object, error)
+	Remove(obj *v1.ServiceAccount) (runtime.Object, error)
+	Updated(obj *v1.ServiceAccount) (runtime.Object, error)
 }
 
 type serviceAccountLifecycleAdapter struct {
@@ -43,9 +43,9 @@ func (w *serviceAccountLifecycleAdapter) Updated(obj runtime.Object) (runtime.Ob
 func NewServiceAccountLifecycleAdapter(name string, clusterScoped bool, client ServiceAccountInterface, l ServiceAccountLifecycle) ServiceAccountHandlerFunc {
 	adapter := &serviceAccountLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1.ServiceAccount) (*v1.ServiceAccount, error) {
+	return func(key string, obj *v1.ServiceAccount) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*v1.ServiceAccount); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

@@ -35,7 +35,7 @@ type BasicAuthList struct {
 	Items           []BasicAuth
 }
 
-type BasicAuthHandlerFunc func(key string, obj *BasicAuth) (*BasicAuth, error)
+type BasicAuthHandlerFunc func(key string, obj *BasicAuth) (runtime.Object, error)
 
 type BasicAuthLister interface {
 	List(namespace string, selector labels.Selector) (ret []*BasicAuth, err error)

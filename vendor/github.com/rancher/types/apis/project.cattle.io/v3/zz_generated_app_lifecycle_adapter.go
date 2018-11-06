@@ -6,9 +6,9 @@ import (
 )
 
 type AppLifecycle interface {
-	Create(obj *App) (*App, error)
-	Remove(obj *App) (*App, error)
-	Updated(obj *App) (*App, error)
+	Create(obj *App) (runtime.Object, error)
+	Remove(obj *App) (runtime.Object, error)
+	Updated(obj *App) (runtime.Object, error)
 }
 
 type appLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *appLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error
 func NewAppLifecycleAdapter(name string, clusterScoped bool, client AppInterface, l AppLifecycle) AppHandlerFunc {
 	adapter := &appLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *App) (*App, error) {
+	return func(key string, obj *App) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*App); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

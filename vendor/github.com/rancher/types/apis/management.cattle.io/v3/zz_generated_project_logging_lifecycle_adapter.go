@@ -6,9 +6,9 @@ import (
 )
 
 type ProjectLoggingLifecycle interface {
-	Create(obj *ProjectLogging) (*ProjectLogging, error)
-	Remove(obj *ProjectLogging) (*ProjectLogging, error)
-	Updated(obj *ProjectLogging) (*ProjectLogging, error)
+	Create(obj *ProjectLogging) (runtime.Object, error)
+	Remove(obj *ProjectLogging) (runtime.Object, error)
+	Updated(obj *ProjectLogging) (runtime.Object, error)
 }
 
 type projectLoggingLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *projectLoggingLifecycleAdapter) Updated(obj runtime.Object) (runtime.Ob
 func NewProjectLoggingLifecycleAdapter(name string, clusterScoped bool, client ProjectLoggingInterface, l ProjectLoggingLifecycle) ProjectLoggingHandlerFunc {
 	adapter := &projectLoggingLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *ProjectLogging) (*ProjectLogging, error) {
+	return func(key string, obj *ProjectLogging) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*ProjectLogging); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

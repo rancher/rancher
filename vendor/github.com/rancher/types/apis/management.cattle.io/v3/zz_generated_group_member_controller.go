@@ -34,7 +34,7 @@ type GroupMemberList struct {
 	Items           []GroupMember
 }
 
-type GroupMemberHandlerFunc func(key string, obj *GroupMember) (*GroupMember, error)
+type GroupMemberHandlerFunc func(key string, obj *GroupMember) (runtime.Object, error)
 
 type GroupMemberLister interface {
 	List(namespace string, selector labels.Selector) (ret []*GroupMember, err error)

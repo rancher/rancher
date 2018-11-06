@@ -7,9 +7,9 @@ import (
 )
 
 type PodLifecycle interface {
-	Create(obj *v1.Pod) (*v1.Pod, error)
-	Remove(obj *v1.Pod) (*v1.Pod, error)
-	Updated(obj *v1.Pod) (*v1.Pod, error)
+	Create(obj *v1.Pod) (runtime.Object, error)
+	Remove(obj *v1.Pod) (runtime.Object, error)
+	Updated(obj *v1.Pod) (runtime.Object, error)
 }
 
 type podLifecycleAdapter struct {
@@ -43,9 +43,9 @@ func (w *podLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error
 func NewPodLifecycleAdapter(name string, clusterScoped bool, client PodInterface, l PodLifecycle) PodHandlerFunc {
 	adapter := &podLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1.Pod) (*v1.Pod, error) {
+	return func(key string, obj *v1.Pod) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*v1.Pod); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

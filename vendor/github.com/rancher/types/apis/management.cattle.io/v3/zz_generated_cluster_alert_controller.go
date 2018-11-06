@@ -35,7 +35,7 @@ type ClusterAlertList struct {
 	Items           []ClusterAlert
 }
 
-type ClusterAlertHandlerFunc func(key string, obj *ClusterAlert) (*ClusterAlert, error)
+type ClusterAlertHandlerFunc func(key string, obj *ClusterAlert) (runtime.Object, error)
 
 type ClusterAlertLister interface {
 	List(namespace string, selector labels.Selector) (ret []*ClusterAlert, err error)

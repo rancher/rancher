@@ -6,9 +6,9 @@ import (
 )
 
 type ProjectCatalogLifecycle interface {
-	Create(obj *ProjectCatalog) (*ProjectCatalog, error)
-	Remove(obj *ProjectCatalog) (*ProjectCatalog, error)
-	Updated(obj *ProjectCatalog) (*ProjectCatalog, error)
+	Create(obj *ProjectCatalog) (runtime.Object, error)
+	Remove(obj *ProjectCatalog) (runtime.Object, error)
+	Updated(obj *ProjectCatalog) (runtime.Object, error)
 }
 
 type projectCatalogLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *projectCatalogLifecycleAdapter) Updated(obj runtime.Object) (runtime.Ob
 func NewProjectCatalogLifecycleAdapter(name string, clusterScoped bool, client ProjectCatalogInterface, l ProjectCatalogLifecycle) ProjectCatalogHandlerFunc {
 	adapter := &projectCatalogLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *ProjectCatalog) (*ProjectCatalog, error) {
+	return func(key string, obj *ProjectCatalog) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*ProjectCatalog); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

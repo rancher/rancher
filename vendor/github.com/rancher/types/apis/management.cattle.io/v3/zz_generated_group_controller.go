@@ -34,7 +34,7 @@ type GroupList struct {
 	Items           []Group
 }
 
-type GroupHandlerFunc func(key string, obj *Group) (*Group, error)
+type GroupHandlerFunc func(key string, obj *Group) (runtime.Object, error)
 
 type GroupLister interface {
 	List(namespace string, selector labels.Selector) (ret []*Group, err error)

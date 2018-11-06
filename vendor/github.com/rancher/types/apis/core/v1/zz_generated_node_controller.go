@@ -35,7 +35,7 @@ type NodeList struct {
 	Items           []v1.Node
 }
 
-type NodeHandlerFunc func(key string, obj *v1.Node) (*v1.Node, error)
+type NodeHandlerFunc func(key string, obj *v1.Node) (runtime.Object, error)
 
 type NodeLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.Node, err error)

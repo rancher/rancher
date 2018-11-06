@@ -36,7 +36,7 @@ type PersistentVolumeClaimList struct {
 	Items           []v1.PersistentVolumeClaim
 }
 
-type PersistentVolumeClaimHandlerFunc func(key string, obj *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error)
+type PersistentVolumeClaimHandlerFunc func(key string, obj *v1.PersistentVolumeClaim) (runtime.Object, error)
 
 type PersistentVolumeClaimLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.PersistentVolumeClaim, err error)

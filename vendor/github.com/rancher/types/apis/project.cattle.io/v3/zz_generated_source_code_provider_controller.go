@@ -34,7 +34,7 @@ type SourceCodeProviderList struct {
 	Items           []SourceCodeProvider
 }
 
-type SourceCodeProviderHandlerFunc func(key string, obj *SourceCodeProvider) (*SourceCodeProvider, error)
+type SourceCodeProviderHandlerFunc func(key string, obj *SourceCodeProvider) (runtime.Object, error)
 
 type SourceCodeProviderLister interface {
 	List(namespace string, selector labels.Selector) (ret []*SourceCodeProvider, err error)

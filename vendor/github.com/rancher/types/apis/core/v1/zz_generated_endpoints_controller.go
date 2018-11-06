@@ -36,7 +36,7 @@ type EndpointsList struct {
 	Items           []v1.Endpoints
 }
 
-type EndpointsHandlerFunc func(key string, obj *v1.Endpoints) (*v1.Endpoints, error)
+type EndpointsHandlerFunc func(key string, obj *v1.Endpoints) (runtime.Object, error)
 
 type EndpointsLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.Endpoints, err error)

@@ -7,9 +7,9 @@ import (
 )
 
 type DeploymentLifecycle interface {
-	Create(obj *v1beta2.Deployment) (*v1beta2.Deployment, error)
-	Remove(obj *v1beta2.Deployment) (*v1beta2.Deployment, error)
-	Updated(obj *v1beta2.Deployment) (*v1beta2.Deployment, error)
+	Create(obj *v1beta2.Deployment) (runtime.Object, error)
+	Remove(obj *v1beta2.Deployment) (runtime.Object, error)
+	Updated(obj *v1beta2.Deployment) (runtime.Object, error)
 }
 
 type deploymentLifecycleAdapter struct {
@@ -43,9 +43,9 @@ func (w *deploymentLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object
 func NewDeploymentLifecycleAdapter(name string, clusterScoped bool, client DeploymentInterface, l DeploymentLifecycle) DeploymentHandlerFunc {
 	adapter := &deploymentLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1beta2.Deployment) (*v1beta2.Deployment, error) {
+	return func(key string, obj *v1beta2.Deployment) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*v1beta2.Deployment); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

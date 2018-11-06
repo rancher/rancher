@@ -35,7 +35,7 @@ type NamespacedBasicAuthList struct {
 	Items           []NamespacedBasicAuth
 }
 
-type NamespacedBasicAuthHandlerFunc func(key string, obj *NamespacedBasicAuth) (*NamespacedBasicAuth, error)
+type NamespacedBasicAuthHandlerFunc func(key string, obj *NamespacedBasicAuth) (runtime.Object, error)
 
 type NamespacedBasicAuthLister interface {
 	List(namespace string, selector labels.Selector) (ret []*NamespacedBasicAuth, err error)

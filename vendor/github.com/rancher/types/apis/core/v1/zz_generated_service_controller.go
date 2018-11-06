@@ -36,7 +36,7 @@ type ServiceList struct {
 	Items           []v1.Service
 }
 
-type ServiceHandlerFunc func(key string, obj *v1.Service) (*v1.Service, error)
+type ServiceHandlerFunc func(key string, obj *v1.Service) (runtime.Object, error)
 
 type ServiceLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.Service, err error)

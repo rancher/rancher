@@ -35,7 +35,7 @@ type ClusterLoggingList struct {
 	Items           []ClusterLogging
 }
 
-type ClusterLoggingHandlerFunc func(key string, obj *ClusterLogging) (*ClusterLogging, error)
+type ClusterLoggingHandlerFunc func(key string, obj *ClusterLogging) (runtime.Object, error)
 
 type ClusterLoggingLister interface {
 	List(namespace string, selector labels.Selector) (ret []*ClusterLogging, err error)

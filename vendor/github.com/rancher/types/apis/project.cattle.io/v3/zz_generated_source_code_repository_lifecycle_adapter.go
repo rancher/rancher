@@ -6,9 +6,9 @@ import (
 )
 
 type SourceCodeRepositoryLifecycle interface {
-	Create(obj *SourceCodeRepository) (*SourceCodeRepository, error)
-	Remove(obj *SourceCodeRepository) (*SourceCodeRepository, error)
-	Updated(obj *SourceCodeRepository) (*SourceCodeRepository, error)
+	Create(obj *SourceCodeRepository) (runtime.Object, error)
+	Remove(obj *SourceCodeRepository) (runtime.Object, error)
+	Updated(obj *SourceCodeRepository) (runtime.Object, error)
 }
 
 type sourceCodeRepositoryLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *sourceCodeRepositoryLifecycleAdapter) Updated(obj runtime.Object) (runt
 func NewSourceCodeRepositoryLifecycleAdapter(name string, clusterScoped bool, client SourceCodeRepositoryInterface, l SourceCodeRepositoryLifecycle) SourceCodeRepositoryHandlerFunc {
 	adapter := &sourceCodeRepositoryLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *SourceCodeRepository) (*SourceCodeRepository, error) {
+	return func(key string, obj *SourceCodeRepository) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*SourceCodeRepository); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

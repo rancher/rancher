@@ -6,9 +6,9 @@ import (
 )
 
 type GlobalRoleLifecycle interface {
-	Create(obj *GlobalRole) (*GlobalRole, error)
-	Remove(obj *GlobalRole) (*GlobalRole, error)
-	Updated(obj *GlobalRole) (*GlobalRole, error)
+	Create(obj *GlobalRole) (runtime.Object, error)
+	Remove(obj *GlobalRole) (runtime.Object, error)
+	Updated(obj *GlobalRole) (runtime.Object, error)
 }
 
 type globalRoleLifecycleAdapter struct {
@@ -42,9 +42,9 @@ func (w *globalRoleLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object
 func NewGlobalRoleLifecycleAdapter(name string, clusterScoped bool, client GlobalRoleInterface, l GlobalRoleLifecycle) GlobalRoleHandlerFunc {
 	adapter := &globalRoleLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *GlobalRole) (*GlobalRole, error) {
+	return func(key string, obj *GlobalRole) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
-		if o, ok := newObj.(*GlobalRole); ok {
+		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
 		}
 		return nil, err

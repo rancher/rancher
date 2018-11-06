@@ -34,7 +34,7 @@ type ComposeConfigList struct {
 	Items           []ComposeConfig
 }
 
-type ComposeConfigHandlerFunc func(key string, obj *ComposeConfig) (*ComposeConfig, error)
+type ComposeConfigHandlerFunc func(key string, obj *ComposeConfig) (runtime.Object, error)
 
 type ComposeConfigLister interface {
 	List(namespace string, selector labels.Selector) (ret []*ComposeConfig, err error)

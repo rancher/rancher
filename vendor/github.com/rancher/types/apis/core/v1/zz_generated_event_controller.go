@@ -35,7 +35,7 @@ type EventList struct {
 	Items           []v1.Event
 }
 
-type EventHandlerFunc func(key string, obj *v1.Event) (*v1.Event, error)
+type EventHandlerFunc func(key string, obj *v1.Event) (runtime.Object, error)
 
 type EventLister interface {
 	List(namespace string, selector labels.Selector) (ret []*v1.Event, err error)
