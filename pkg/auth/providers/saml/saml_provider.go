@@ -3,10 +3,9 @@ package saml
 import (
 	"context"
 	"fmt"
+	"github.com/rancher/norman/types/convert"
 	"net/http"
 	"strings"
-
-	"github.com/rancher/norman/types/convert"
 
 	"github.com/crewjam/saml"
 	"github.com/crewjam/saml/samlsp"
@@ -142,6 +141,14 @@ func (s *Provider) getSamlConfig() (*v3.SamlConfig, error) {
 	objectMeta := &metav1.ObjectMeta{}
 	mapstructure.Decode(metadataMap, objectMeta)
 	storedSamlConfig.ObjectMeta = *objectMeta
+
+	if storedSamlConfig.SpKey != "" {
+		value, err := common.ReadFromSecret(s.secrets, storedSamlConfig.SpKey, "spkey")
+		if err != nil {
+			return nil, err
+		}
+		storedSamlConfig.SpKey = value
+	}
 
 	return storedSamlConfig, nil
 }

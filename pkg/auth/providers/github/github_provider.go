@@ -129,7 +129,6 @@ func (g *ghProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Pri
 	if !ok {
 		return v3.Principal{}, nil, "", errors.New("unexpected input type")
 	}
-
 	return g.LoginUser(login, nil, false)
 }
 

@@ -185,6 +185,14 @@ func (p *adProvider) getActiveDirectoryConfig() (*v3.ActiveDirectoryConfig, *x50
 		p.caPool = pool
 	}
 
+	if storedADConfig.ServiceAccountPassword != "" {
+		value, err := common.ReadFromSecret(p.secrets, storedADConfig.ServiceAccountPassword, "serviceaccountpassword")
+		if err != nil {
+			return nil, nil, err
+		}
+		storedADConfig.ServiceAccountPassword = value
+	}
+
 	return storedADConfig, p.caPool, nil
 }
 

@@ -203,6 +203,14 @@ func (p *ldapProvider) getLDAPConfig() (*v3.LdapConfig, *x509.CertPool, error) {
 		p.caPool = pool
 	}
 
+	if storedLdapConfig.ServiceAccountPassword != "" {
+		value, err := common.ReadFromSecret(p.secrets, storedLdapConfig.ServiceAccountPassword, "serviceaccountpassword")
+		if err != nil {
+			return nil, nil, err
+		}
+		storedLdapConfig.ServiceAccountPassword = value
+	}
+
 	return storedLdapConfig, p.caPool, nil
 }
 

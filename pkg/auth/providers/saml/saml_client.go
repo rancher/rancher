@@ -12,8 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/rancher/pkg/auth/providers/common"
-
 	"github.com/crewjam/saml"
 	"github.com/crewjam/saml/samlsp"
 	"github.com/gorilla/mux"
@@ -260,16 +258,6 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		log.Errorf("SAML: Error getting saml config %v", err)
 		http.Redirect(w, r, redirectURL+"/login?errorCode=500", http.StatusFound)
 		return
-	}
-
-	if config.SpKey != "" {
-		value, err := common.ReadFromSecret(s.secrets, config.SpKey, "spkey")
-		if err != nil {
-			log.Errorf("SAML: Error reading from secret %v", err)
-			http.Redirect(w, r, redirectURL+"/login?errorCode=500", http.StatusFound)
-			return
-		}
-		config.SpKey = value
 	}
 
 	userPrincipal, groupPrincipals, err = s.getSamlPrincipals(config, samlData)
