@@ -3,6 +3,8 @@ package resourcequota
 import (
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"fmt"
 
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
@@ -25,7 +27,7 @@ type calculateLimitController struct {
 	clusterName   string
 }
 
-func (c *calculateLimitController) calculateResourceQuotaUsed(key string, ns *corev1.Namespace) (*corev1.Namespace, error) {
+func (c *calculateLimitController) calculateResourceQuotaUsed(key string, ns *corev1.Namespace) (runtime.Object, error) {
 	if ns == nil {
 		return nil, nil
 	}
@@ -36,7 +38,7 @@ func (c *calculateLimitController) calculateResourceQuotaUsed(key string, ns *co
 	return nil, c.calculateProjectResourceQuota(projectID)
 }
 
-func (c *calculateLimitController) calculateResourceQuotaUsedProject(key string, p *v3.Project) (*v3.Project, error) {
+func (c *calculateLimitController) calculateResourceQuotaUsedProject(key string, p *v3.Project) (runtime.Object, error) {
 	if p == nil || p.DeletionTimestamp != nil {
 		return nil, nil
 	}

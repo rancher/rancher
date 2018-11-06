@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/rancher/types/apis/core/v1"
 	typescorev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/config"
@@ -32,7 +34,7 @@ func Register(ctx context.Context, cluster *config.UserOnlyContext) {
 	cluster.Core.Namespaces("").AddHandler(ctx, "namespaceHandler", nsh.Sync)
 }
 
-func (nsh *namespaceHandler) Sync(key string, ns *corev1.Namespace) (*corev1.Namespace, error) {
+func (nsh *namespaceHandler) Sync(key string, ns *corev1.Namespace) (runtime.Object, error) {
 	if ns == nil {
 		return nil, nil
 	}

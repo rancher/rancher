@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
 	"github.com/rancher/rancher/pkg/ticker"
@@ -69,16 +71,16 @@ type ProjectAlertLifecycle struct {
 	podWatcher *PodWatcher
 }
 
-func (l *ProjectAlertLifecycle) Create(obj *v3.ProjectAlert) (*v3.ProjectAlert, error) {
+func (l *ProjectAlertLifecycle) Create(obj *v3.ProjectAlert) (runtime.Object, error) {
 	l.podWatcher.podRestartTrack.Store(obj.Namespace+":"+obj.Name, make([]restartTrack, 0))
 	return obj, nil
 }
 
-func (l *ProjectAlertLifecycle) Updated(obj *v3.ProjectAlert) (*v3.ProjectAlert, error) {
+func (l *ProjectAlertLifecycle) Updated(obj *v3.ProjectAlert) (runtime.Object, error) {
 	return obj, nil
 }
 
-func (l *ProjectAlertLifecycle) Remove(obj *v3.ProjectAlert) (*v3.ProjectAlert, error) {
+func (l *ProjectAlertLifecycle) Remove(obj *v3.ProjectAlert) (runtime.Object, error) {
 	l.podWatcher.podRestartTrack.Delete(obj.Namespace + ":" + obj.Name)
 	return obj, nil
 }

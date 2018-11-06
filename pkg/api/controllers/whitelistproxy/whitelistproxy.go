@@ -6,13 +6,14 @@ import (
 	"github.com/rancher/rancher/server/whitelist"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func Register(ctx context.Context, management *config.ScaledContext) {
 	management.Management.NodeDrivers("").AddHandler(ctx, "whitelist-proxy", sync)
 }
 
-func sync(key string, nodeDriver *v3.NodeDriver) (*v3.NodeDriver, error) {
+func sync(key string, nodeDriver *v3.NodeDriver) (runtime.Object, error) {
 	if key == "" || nodeDriver == nil {
 		return nil, nil
 	}

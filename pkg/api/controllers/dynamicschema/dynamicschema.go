@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/config"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type Controller struct {
@@ -25,7 +26,7 @@ func Register(ctx context.Context, management *config.ScaledContext, schemas *ty
 	management.Management.DynamicSchemas("").AddHandler(ctx, "dynamic-schema", c.Sync)
 }
 
-func (c *Controller) Sync(key string, dynamicSchema *v3.DynamicSchema) (*v3.DynamicSchema, error) {
+func (c *Controller) Sync(key string, dynamicSchema *v3.DynamicSchema) (runtime.Object, error) {
 	c.Lock()
 	defer c.Unlock()
 

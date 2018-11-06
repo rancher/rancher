@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
@@ -46,7 +48,7 @@ type nsLifecycle struct {
 	rq *resourcequota.SyncController
 }
 
-func (n *nsLifecycle) Create(obj *v1.Namespace) (*v1.Namespace, error) {
+func (n *nsLifecycle) Create(obj *v1.Namespace) (runtime.Object, error) {
 	obj, err := n.resourceQuotaInit(obj)
 	if err != nil {
 		return obj, err
@@ -67,15 +69,19 @@ func (n *nsLifecycle) Create(obj *v1.Namespace) (*v1.Namespace, error) {
 }
 
 func (n *nsLifecycle) resourceQuotaInit(obj *v1.Namespace) (*v1.Namespace, error) {
-	return n.rq.CreateResourceQuota(obj)
+	ns, err := n.rq.CreateResourceQuota(obj)
+	if ns, ok := ns.(*v1.Namespace); ok {
+		return ns, err
+	}
+	return nil, err
 }
 
-func (n *nsLifecycle) Updated(obj *v1.Namespace) (*v1.Namespace, error) {
+func (n *nsLifecycle) Updated(obj *v1.Namespace) (runtime.Object, error) {
 	_, err := n.syncNS(obj)
 	return obj, err
 }
 
-func (n *nsLifecycle) Remove(obj *v1.Namespace) (*v1.Namespace, error) {
+func (n *nsLifecycle) Remove(obj *v1.Namespace) (runtime.Object, error) {
 	err := n.reconcileNamespaceProjectClusterRole(obj)
 	return obj, err
 }

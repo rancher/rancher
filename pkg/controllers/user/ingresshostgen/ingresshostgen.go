@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/rancher/rancher/pkg/controllers/user/approuter"
 	"github.com/rancher/rancher/pkg/settings"
 	v1beta12 "github.com/rancher/types/apis/extensions/v1beta1"
@@ -28,7 +30,7 @@ func isGeneratedDomain(obj *v1beta1.Ingress, host, domain string) bool {
 	return strings.HasSuffix(host, "."+domain) && len(parts) == 8 && parts[1] == obj.Namespace
 }
 
-func (i *IngressHostGen) sync(key string, obj *v1beta1.Ingress) (*v1beta1.Ingress, error) {
+func (i *IngressHostGen) sync(key string, obj *v1beta1.Ingress) (runtime.Object, error) {
 	if obj == nil {
 		return nil, nil
 	}

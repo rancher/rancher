@@ -46,18 +46,18 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	management.Management.Nodes("").AddHandler(ctx, "nodepool-provisioner", p.machineChanged)
 }
 
-func (c *Controller) Create(nodePool *v3.NodePool) (*v3.NodePool, error) {
+func (c *Controller) Create(nodePool *v3.NodePool) (runtime.Object, error) {
 	return nodePool, nil
 }
 
-func (c *Controller) Updated(nodePool *v3.NodePool) (*v3.NodePool, error) {
+func (c *Controller) Updated(nodePool *v3.NodePool) (runtime.Object, error) {
 	obj, err := v3.NodePoolConditionUpdated.Do(nodePool, func() (runtime.Object, error) {
 		return nodePool, c.createNodes(nodePool)
 	})
 	return obj.(*v3.NodePool), err
 }
 
-func (c *Controller) Remove(nodePool *v3.NodePool) (*v3.NodePool, error) {
+func (c *Controller) Remove(nodePool *v3.NodePool) (runtime.Object, error) {
 	logrus.Infof("Deleting nodePool [%s]", nodePool.Name)
 
 	allNodes, err := c.nodes(nodePool, false)
@@ -80,7 +80,7 @@ func (c *Controller) Remove(nodePool *v3.NodePool) (*v3.NodePool, error) {
 	return nodePool, nil
 }
 
-func (c *Controller) machineChanged(key string, machine *v3.Node) (*v3.Node, error) {
+func (c *Controller) machineChanged(key string, machine *v3.Node) (runtime.Object, error) {
 	if machine == nil {
 		nps, err := c.NodePoolLister.List("", labels.Everything())
 		if err != nil {

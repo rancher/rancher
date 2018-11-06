@@ -46,7 +46,7 @@ type clusterDeploy struct {
 	clusterroles         rrbacv1.ClusterRoleInterface
 }
 
-func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
+func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
 	var (
 		err, updateErr error
 	)

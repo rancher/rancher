@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	v1beta12 "github.com/rancher/types/apis/extensions/v1beta1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	v12 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
@@ -60,11 +62,11 @@ type Lifecycle struct {
 	clusterRoleIndexer cache.Indexer
 }
 
-func (l *Lifecycle) Create(obj *v3.PodSecurityPolicyTemplate) (*v3.PodSecurityPolicyTemplate, error) {
+func (l *Lifecycle) Create(obj *v3.PodSecurityPolicyTemplate) (runtime.Object, error) {
 	return nil, nil
 }
 
-func (l *Lifecycle) Updated(obj *v3.PodSecurityPolicyTemplate) (*v3.PodSecurityPolicyTemplate, error) {
+func (l *Lifecycle) Updated(obj *v3.PodSecurityPolicyTemplate) (runtime.Object, error) {
 	policies, err := l.policyIndexer.ByIndex(policyByPSPTParentAnnotationIndex, obj.Name)
 	if err != nil {
 		return nil, fmt.Errorf("error getting policies: %v", err)
@@ -88,7 +90,7 @@ func (l *Lifecycle) Updated(obj *v3.PodSecurityPolicyTemplate) (*v3.PodSecurityP
 	return obj, nil
 }
 
-func (l *Lifecycle) Remove(obj *v3.PodSecurityPolicyTemplate) (*v3.PodSecurityPolicyTemplate, error) {
+func (l *Lifecycle) Remove(obj *v3.PodSecurityPolicyTemplate) (runtime.Object, error) {
 	policies, err := l.policyIndexer.ByIndex(policyByPSPTParentAnnotationIndex, obj.Name)
 	if err != nil {
 		return nil, fmt.Errorf("error getting policies: %v", err)

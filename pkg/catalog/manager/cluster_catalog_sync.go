@@ -4,10 +4,11 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
 
-func (m *Manager) ClusterCatalogSync(key string, obj *v3.ClusterCatalog) (*v3.ClusterCatalog, error) {
+func (m *Manager) ClusterCatalogSync(key string, obj *v3.ClusterCatalog) (runtime.Object, error) {
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return nil, err

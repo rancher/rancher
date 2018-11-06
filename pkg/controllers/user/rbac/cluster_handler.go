@@ -36,7 +36,7 @@ type clusterHandler struct {
 	clusterName   string
 }
 
-func (h *clusterHandler) sync(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
+func (h *clusterHandler) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
 	if key == "" || cluster == nil || cluster.Name != h.clusterName {
 		return nil, nil
 	}

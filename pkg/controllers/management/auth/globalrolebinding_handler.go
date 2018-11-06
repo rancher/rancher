@@ -3,6 +3,8 @@ package auth
 import (
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
@@ -33,17 +35,17 @@ type globalRoleBindingLifecycle struct {
 	crbClient rbacv1.ClusterRoleBindingInterface
 }
 
-func (grb *globalRoleBindingLifecycle) Create(obj *v3.GlobalRoleBinding) (*v3.GlobalRoleBinding, error) {
+func (grb *globalRoleBindingLifecycle) Create(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
 	err := grb.reconcileGlobalRoleBinding(obj)
 	return obj, err
 }
 
-func (grb *globalRoleBindingLifecycle) Updated(obj *v3.GlobalRoleBinding) (*v3.GlobalRoleBinding, error) {
+func (grb *globalRoleBindingLifecycle) Updated(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
 	err := grb.reconcileGlobalRoleBinding(obj)
 	return nil, err
 }
 
-func (grb *globalRoleBindingLifecycle) Remove(obj *v3.GlobalRoleBinding) (*v3.GlobalRoleBinding, error) {
+func (grb *globalRoleBindingLifecycle) Remove(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
 	// Don't need to delete the created ClusterRole because owner reference will take care of that
 	return nil, nil
 }

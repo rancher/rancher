@@ -10,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
@@ -31,17 +32,17 @@ type globalRoleLifecycle struct {
 	crClient rbacv1.ClusterRoleInterface
 }
 
-func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (*v3.GlobalRole, error) {
+func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error) {
 	err := gr.reconcileGlobalRole(obj)
 	return obj, err
 }
 
-func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (*v3.GlobalRole, error) {
+func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, error) {
 	err := gr.reconcileGlobalRole(obj)
 	return nil, err
 }
 
-func (gr *globalRoleLifecycle) Remove(obj *v3.GlobalRole) (*v3.GlobalRole, error) {
+func (gr *globalRoleLifecycle) Remove(obj *v3.GlobalRole) (runtime.Object, error) {
 	// Don't need to delete the created ClusterRole because owner reference will take care of that
 	return nil, nil
 }

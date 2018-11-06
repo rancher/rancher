@@ -3,6 +3,8 @@ package ingress
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/rancher/norman/types/convert"
 	util "github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/apis/core/v1"
@@ -34,7 +36,7 @@ func Register(ctx context.Context, workload *config.UserOnlyContext) {
 	workload.Extensions.Ingresses("").AddHandler(ctx, "ingressWorkloadController", c.sync)
 }
 
-func (c *Controller) sync(key string, obj *v1beta1.Ingress) (*v1beta1.Ingress, error) {
+func (c *Controller) sync(key string, obj *v1beta1.Ingress) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}

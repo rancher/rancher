@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
@@ -44,7 +46,7 @@ type Syncer struct {
 	clusterName               string
 }
 
-func (l *Syncer) Sync(key string, obj *v3.Project) (*v3.Project, error) {
+func (l *Syncer) Sync(key string, obj *v3.Project) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		projectID := ""
 		splits := strings.Split(key, "/")

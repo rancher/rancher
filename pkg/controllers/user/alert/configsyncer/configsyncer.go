@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/model"
 	"github.com/rancher/norman/controller"
@@ -46,15 +48,15 @@ type ConfigSyncer struct {
 	alertManager       *manager.Manager
 }
 
-func (d *ConfigSyncer) ProjectSync(key string, alert *v3.ProjectAlert) (*v3.ProjectAlert, error) {
+func (d *ConfigSyncer) ProjectSync(key string, alert *v3.ProjectAlert) (runtime.Object, error) {
 	return nil, d.sync()
 }
 
-func (d *ConfigSyncer) ClusterSync(key string, alert *v3.ClusterAlert) (*v3.ClusterAlert, error) {
+func (d *ConfigSyncer) ClusterSync(key string, alert *v3.ClusterAlert) (runtime.Object, error) {
 	return nil, d.sync()
 }
 
-func (d *ConfigSyncer) NotifierSync(key string, alert *v3.Notifier) (*v3.Notifier, error) {
+func (d *ConfigSyncer) NotifierSync(key string, alert *v3.Notifier) (runtime.Object, error) {
 	return nil, d.sync()
 }
 

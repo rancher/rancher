@@ -42,7 +42,7 @@ type Lifecycle struct {
 	schemaLister     v3.DynamicSchemaLister
 }
 
-func (m *Lifecycle) Create(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
+func (m *Lifecycle) Create(obj *v3.NodeDriver) (runtime.Object, error) {
 	return m.download(obj)
 }
 
@@ -138,7 +138,7 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	return obj, nil
 }
 
-func (m *Lifecycle) Updated(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
+func (m *Lifecycle) Updated(obj *v3.NodeDriver) (runtime.Object, error) {
 	var err error
 
 	obj, err = m.download(obj)
@@ -156,7 +156,7 @@ func (m *Lifecycle) Updated(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	return obj, nil
 }
 
-func (m *Lifecycle) Remove(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
+func (m *Lifecycle) Remove(obj *v3.NodeDriver) (runtime.Object, error) {
 	schemas, err := m.schemaClient.List(metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", driverNameLabel, obj.Spec.DisplayName),
 	})

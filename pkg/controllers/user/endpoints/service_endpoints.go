@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // This controller is responsible for monitoring services
@@ -20,7 +21,7 @@ type ServicesController struct {
 	clusterName        string
 }
 
-func (s *ServicesController) sync(key string, obj *corev1.Service) (*corev1.Service, error) {
+func (s *ServicesController) sync(key string, obj *corev1.Service) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		namespace := ""
 		if obj != nil {

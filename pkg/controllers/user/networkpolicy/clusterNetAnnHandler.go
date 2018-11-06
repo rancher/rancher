@@ -4,6 +4,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const netPolAnnotation = "networking.management.cattle.io/enable-network-policy"
@@ -17,7 +18,7 @@ type clusterNetAnnHandler struct {
 	clusterNamespace string
 }
 
-func (cn *clusterNetAnnHandler) Sync(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
+func (cn *clusterNetAnnHandler) Sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil ||
 		cluster.Name != cn.clusterNamespace ||
 		!v3.ClusterConditionProvisioned.IsTrue(cluster) {

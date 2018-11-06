@@ -3,6 +3,8 @@ package pipeline
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/rancher/rancher/pkg/pipeline/providers"
 	"github.com/rancher/rancher/pkg/pipeline/remote"
 	"github.com/rancher/rancher/pkg/ref"
@@ -32,15 +34,15 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	pipelines.AddClusterScopedLifecycle(ctx, "pipeline-controller", cluster.ClusterName, pipelineLifecycle)
 }
 
-func (l *Lifecycle) Create(obj *v3.Pipeline) (*v3.Pipeline, error) {
+func (l *Lifecycle) Create(obj *v3.Pipeline) (runtime.Object, error) {
 	return l.sync(obj)
 }
 
-func (l *Lifecycle) Updated(obj *v3.Pipeline) (*v3.Pipeline, error) {
+func (l *Lifecycle) Updated(obj *v3.Pipeline) (runtime.Object, error) {
 	return l.sync(obj)
 }
 
-func (l *Lifecycle) Remove(obj *v3.Pipeline) (*v3.Pipeline, error) {
+func (l *Lifecycle) Remove(obj *v3.Pipeline) (runtime.Object, error) {
 	if obj.Status.WebHookID != "" {
 		if err := l.deleteHook(obj); err != nil {
 			return obj, err

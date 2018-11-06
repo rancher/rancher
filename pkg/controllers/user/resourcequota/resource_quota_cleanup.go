@@ -6,6 +6,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 /*
@@ -19,7 +20,7 @@ type cleanupController struct {
 	resourceQuotaLister v1.ResourceQuotaLister
 }
 
-func (c *cleanupController) cleanup(key string, quota *corev1.ResourceQuota) (*corev1.ResourceQuota, error) {
+func (c *cleanupController) cleanup(key string, quota *corev1.ResourceQuota) (runtime.Object, error) {
 	if quota == nil || quota.DeletionTimestamp != nil {
 		return nil, nil
 	}

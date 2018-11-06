@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"fmt"
 
 	"github.com/rancher/norman/controller"
@@ -59,7 +61,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	sync := v1.NewSecretLifecycleAdapter(fmt.Sprintf("secretsController_%s", cluster.ClusterName), true,
 		cluster.Management.Core.Secrets(""), s)
 
-	cluster.Management.Core.Secrets("").AddHandler(ctx, "secretsController", func(key string, obj *corev1.Secret) (*corev1.Secret, error) {
+	cluster.Management.Core.Secrets("").AddHandler(ctx, "secretsController", func(key string, obj *corev1.Secret) (runtime.Object, error) {
 		if obj == nil {
 			return sync(key, nil)
 		}
@@ -82,7 +84,7 @@ type NamespaceController struct {
 	managementSecrets    v1.SecretLister
 }
 
-func (n *NamespaceController) sync(key string, obj *corev1.Namespace) (*corev1.Namespace, error) {
+func (n *NamespaceController) sync(key string, obj *corev1.Namespace) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -107,15 +109,15 @@ func (n *NamespaceController) sync(key string, obj *corev1.Namespace) (*corev1.N
 	return nil, nil
 }
 
-func (s *Controller) Create(obj *corev1.Secret) (*corev1.Secret, error) {
+func (s *Controller) Create(obj *corev1.Secret) (runtime.Object, error) {
 	return nil, s.createOrUpdate(obj, create)
 }
 
-func (s *Controller) Updated(obj *corev1.Secret) (*corev1.Secret, error) {
+func (s *Controller) Updated(obj *corev1.Secret) (runtime.Object, error) {
 	return nil, s.createOrUpdate(obj, update)
 }
 
-func (s *Controller) Remove(obj *corev1.Secret) (*corev1.Secret, error) {
+func (s *Controller) Remove(obj *corev1.Secret) (runtime.Object, error) {
 	clusterNamespaces, err := s.getClusterNamespaces(obj)
 	if err != nil {
 		return nil, err

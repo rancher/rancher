@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -108,7 +109,7 @@ type serviceAccountManager struct {
 	psptpbLister       v3.PodSecurityPolicyTemplateProjectBindingLister
 }
 
-func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) (*v1.ServiceAccount, error) {
+func (m *serviceAccountManager) sync(key string, obj *v1.ServiceAccount) (runtime.Object, error) {
 	if obj == nil {
 		// do nothing
 		return nil, nil

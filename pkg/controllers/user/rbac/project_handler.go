@@ -22,7 +22,7 @@ type pLifecycle struct {
 	m *manager
 }
 
-func (p *pLifecycle) Create(project *v3.Project) (*v3.Project, error) {
+func (p *pLifecycle) Create(project *v3.Project) (runtime.Object, error) {
 	for verb, suffix := range projectNSVerbToSuffix {
 		roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, suffix)
 		_, err := p.m.crLister.Get("", roleName)
@@ -41,11 +41,11 @@ func (p *pLifecycle) Create(project *v3.Project) (*v3.Project, error) {
 	return project, err
 }
 
-func (p *pLifecycle) Updated(project *v3.Project) (*v3.Project, error) {
+func (p *pLifecycle) Updated(project *v3.Project) (runtime.Object, error) {
 	return nil, nil
 }
 
-func (p *pLifecycle) Remove(project *v3.Project) (*v3.Project, error) {
+func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 	for _, suffix := range projectNSVerbToSuffix {
 		roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, suffix)
 

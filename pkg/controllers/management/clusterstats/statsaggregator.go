@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -42,7 +44,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 	machinesClient.AddHandler(ctx, "cluster-stats", s.machineChanged)
 }
 
-func (s *StatsAggregator) sync(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
+func (s *StatsAggregator) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
 	if cluster == nil {
 		return nil, nil
 	}
@@ -210,7 +212,7 @@ func callWithTimeout(do func()) {
 	}
 }
 
-func (s *StatsAggregator) machineChanged(key string, machine *v3.Node) (*v3.Node, error) {
+func (s *StatsAggregator) machineChanged(key string, machine *v3.Node) (runtime.Object, error) {
 	if machine != nil {
 		s.Clusters.Controller().Enqueue("", machine.Namespace)
 	}

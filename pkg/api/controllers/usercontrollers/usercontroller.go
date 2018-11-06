@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -75,7 +77,7 @@ type userControllersController struct {
 	start         time.Time
 }
 
-func (u *userControllersController) sync(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
+func (u *userControllersController) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
 	if cluster != nil && cluster.DeletionTimestamp != nil {
 		err := u.cleanFinalizers(key, cluster)
 		if err != nil {

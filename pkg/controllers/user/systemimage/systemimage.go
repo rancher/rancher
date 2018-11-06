@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/types/apis/apps/v1beta2"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var systemProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/system-project": "true"})
@@ -22,7 +23,7 @@ type Syncer struct {
 	projects         v3.ProjectInterface
 }
 
-func (s *Syncer) Sync(key string, obj *v3.Project) (*v3.Project, error) {
+func (s *Syncer) Sync(key string, obj *v3.Project) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}

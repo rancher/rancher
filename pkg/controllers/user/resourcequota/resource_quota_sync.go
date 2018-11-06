@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/types/convert"
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
@@ -40,7 +42,7 @@ type SyncController struct {
 	NsIndexer           clientcache.Indexer
 }
 
-func (c *SyncController) syncResourceQuota(key string, ns *corev1.Namespace) (*corev1.Namespace, error) {
+func (c *SyncController) syncResourceQuota(key string, ns *corev1.Namespace) (runtime.Object, error) {
 	if ns == nil || ns.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -49,7 +51,7 @@ func (c *SyncController) syncResourceQuota(key string, ns *corev1.Namespace) (*c
 	return nil, err
 }
 
-func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Namespace, error) {
+func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (runtime.Object, error) {
 	existing, err := c.getExistingResourceQuota(ns)
 	if err != nil {
 		return ns, err

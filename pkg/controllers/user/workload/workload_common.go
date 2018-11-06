@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"fmt"
 
 	"encoding/json"
@@ -121,7 +123,7 @@ func NewWorkloadController(ctx context.Context, workload *config.UserOnlyContext
 	return c
 }
 
-func (c *CommonController) syncDeployments(key string, obj *corev1beta2.Deployment) (*corev1beta2.Deployment, error) {
+func (c *CommonController) syncDeployments(key string, obj *corev1beta2.Deployment) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -134,7 +136,7 @@ func (c *CommonController) syncDeployments(key string, obj *corev1beta2.Deployme
 	return nil, c.Sync(key, w)
 }
 
-func (c *CommonController) syncReplicationControllers(key string, obj *corev1.ReplicationController) (*corev1.ReplicationController, error) {
+func (c *CommonController) syncReplicationControllers(key string, obj *corev1.ReplicationController) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -145,7 +147,7 @@ func (c *CommonController) syncReplicationControllers(key string, obj *corev1.Re
 	return nil, c.Sync(key, w)
 }
 
-func (c *CommonController) syncReplicaSet(key string, obj *corev1beta2.ReplicaSet) (*corev1beta2.ReplicaSet, error) {
+func (c *CommonController) syncReplicaSet(key string, obj *corev1beta2.ReplicaSet) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -156,7 +158,7 @@ func (c *CommonController) syncReplicaSet(key string, obj *corev1beta2.ReplicaSe
 	return nil, c.Sync(key, w)
 }
 
-func (c *CommonController) syncDaemonSet(key string, obj *corev1beta2.DaemonSet) (*corev1beta2.DaemonSet, error) {
+func (c *CommonController) syncDaemonSet(key string, obj *corev1beta2.DaemonSet) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -167,7 +169,7 @@ func (c *CommonController) syncDaemonSet(key string, obj *corev1beta2.DaemonSet)
 	return nil, c.Sync(key, w)
 }
 
-func (c *CommonController) syncStatefulSet(key string, obj *corev1beta2.StatefulSet) (*corev1beta2.StatefulSet, error) {
+func (c *CommonController) syncStatefulSet(key string, obj *corev1beta2.StatefulSet) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -178,7 +180,7 @@ func (c *CommonController) syncStatefulSet(key string, obj *corev1beta2.Stateful
 	return nil, c.Sync(key, w)
 }
 
-func (c *CommonController) syncJob(key string, obj *corebatchv1.Job) (*corebatchv1.Job, error) {
+func (c *CommonController) syncJob(key string, obj *corebatchv1.Job) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -189,7 +191,7 @@ func (c *CommonController) syncJob(key string, obj *corebatchv1.Job) (*corebatch
 	return nil, c.Sync(key, w)
 }
 
-func (c *CommonController) syncCronJob(key string, obj *corebatchv1beta1.CronJob) (*corebatchv1beta1.CronJob, error) {
+func (c *CommonController) syncCronJob(key string, obj *corebatchv1beta1.CronJob) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}

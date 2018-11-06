@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/ticker"
@@ -41,7 +43,7 @@ func isGeneratedDomain(obj *extensionsv1beta1.Ingress, host, domain string) bool
 	return strings.HasSuffix(host, "."+domain) && len(parts) == 6 && parts[1] == obj.Namespace
 }
 
-func (c *Controller) sync(key string, obj *extensionsv1beta1.Ingress) (*extensionsv1beta1.Ingress, error) {
+func (c *Controller) sync(key string, obj *extensionsv1beta1.Ingress) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}

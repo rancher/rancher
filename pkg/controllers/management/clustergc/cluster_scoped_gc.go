@@ -55,11 +55,11 @@ type gcLifecycle struct {
 	mgmt               *config.ManagementContext
 }
 
-func (c *gcLifecycle) Create(obj *v3.Cluster) (*v3.Cluster, error) {
+func (c *gcLifecycle) Create(obj *v3.Cluster) (runtime.Object, error) {
 	return obj, nil
 }
 
-func (c *gcLifecycle) Updated(obj *v3.Cluster) (*v3.Cluster, error) {
+func (c *gcLifecycle) Updated(obj *v3.Cluster) (runtime.Object, error) {
 	return nil, nil
 }
 
@@ -87,7 +87,7 @@ func cleanFinalizers(clusterName string, object runtime.Object, client *objectcl
 	return nil
 }
 
-func (c *gcLifecycle) Remove(cluster *v3.Cluster) (*v3.Cluster, error) {
+func (c *gcLifecycle) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 	rts, err := c.rtLister.List("", labels.Everything())
 	if err != nil {
 		return cluster, err

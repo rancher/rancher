@@ -7,6 +7,7 @@ import (
 	v12 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +37,7 @@ type grbHandler struct {
 	grbIndexer          cache.Indexer
 }
 
-func (c *grbHandler) Create(obj *v3.GlobalRoleBinding) (*v3.GlobalRoleBinding, error) {
+func (c *grbHandler) Create(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
 	if obj.GlobalRoleName != "admin" {
 		return obj, nil
 	}
@@ -70,11 +71,11 @@ func (c *grbHandler) Create(obj *v3.GlobalRoleBinding) (*v3.GlobalRoleBinding, e
 	return obj, err
 }
 
-func (c *grbHandler) Updated(obj *v3.GlobalRoleBinding) (*v3.GlobalRoleBinding, error) {
+func (c *grbHandler) Updated(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
 	return nil, nil
 }
 
-func (c *grbHandler) Remove(obj *v3.GlobalRoleBinding) (*v3.GlobalRoleBinding, error) {
+func (c *grbHandler) Remove(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
 	if obj.GlobalRoleName != "admin" {
 		return obj, nil
 	}

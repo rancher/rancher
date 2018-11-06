@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type Controller struct {
@@ -52,7 +53,7 @@ func Start(ctx context.Context, context *config.ScaledContext, httpPort, httpsPo
 	}()
 }
 
-func (c *Controller) sync(key string, listener *v3.ListenConfig) (*v3.ListenConfig, error) {
+func (c *Controller) sync(key string, listener *v3.ListenConfig) (runtime.Object, error) {
 	if listener == nil {
 		return nil, nil
 	}

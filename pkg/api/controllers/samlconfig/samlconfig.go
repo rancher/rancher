@@ -33,7 +33,7 @@ func newAuthProvider(apiContext *config.ScaledContext) *authProvider {
 	return a
 }
 
-func (a *authProvider) sync(key string, config *v3.AuthConfig) (*v3.AuthConfig, error) {
+func (a *authProvider) sync(key string, config *v3.AuthConfig) (runtime.Object, error) {
 	samlConfig := &v3.SamlConfig{}
 	if key == "" || config == nil {
 		return nil, nil

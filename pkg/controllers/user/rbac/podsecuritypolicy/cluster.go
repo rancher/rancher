@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	v12 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/extensions/v1beta1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -49,7 +51,7 @@ func RegisterCluster(ctx context.Context, context *config.UserContext) {
 	context.Management.Management.Clusters("").AddHandler(ctx, "ClusterSyncHandler", m.sync)
 }
 
-func (m *clusterManager) sync(key string, obj *v3.Cluster) (*v3.Cluster, error) {
+func (m *clusterManager) sync(key string, obj *v3.Cluster) (runtime.Object, error) {
 	if obj == nil ||
 		m.clusterName != obj.Name ||
 		obj.Spec.DefaultPodSecurityPolicyTemplateName == obj.Status.AppliedPodSecurityPolicyTemplateName {
