@@ -68,7 +68,7 @@ type projectLifecycle struct {
 	mgr *mgr
 }
 
-func (l *projectLifecycle) sync(key string, orig *v3.Project) (*v3.Project, error) {
+func (l *projectLifecycle) sync(key string, orig *v3.Project) (runtime.Object, error) {
 	if orig == nil {
 		return nil, nil
 	}
@@ -100,17 +100,17 @@ func (l *projectLifecycle) sync(key string, orig *v3.Project) (*v3.Project, erro
 	return nil, nil
 }
 
-func (l *projectLifecycle) Create(obj *v3.Project) (*v3.Project, error) {
+func (l *projectLifecycle) Create(obj *v3.Project) (runtime.Object, error) {
 	// no-op because the sync function will take care of it
 	return obj, nil
 }
 
-func (l *projectLifecycle) Updated(obj *v3.Project) (*v3.Project, error) {
+func (l *projectLifecycle) Updated(obj *v3.Project) (runtime.Object, error) {
 	// no-op because the sync function will take care of it
 	return obj, nil
 }
 
-func (l *projectLifecycle) Remove(obj *v3.Project) (*v3.Project, error) {
+func (l *projectLifecycle) Remove(obj *v3.Project) (runtime.Object, error) {
 	err := l.mgr.deleteNamespace(obj, projectRemoveController)
 	return obj, err
 }
@@ -119,7 +119,7 @@ type clusterLifecycle struct {
 	mgr *mgr
 }
 
-func (l *clusterLifecycle) sync(key string, orig *v3.Cluster) (*v3.Cluster, error) {
+func (l *clusterLifecycle) sync(key string, orig *v3.Cluster) (runtime.Object, error) {
 	if orig == nil {
 		return nil, nil
 	}
@@ -170,17 +170,17 @@ func (l *clusterLifecycle) sync(key string, orig *v3.Cluster) (*v3.Cluster, erro
 	return nil, nil
 }
 
-func (l *clusterLifecycle) Create(obj *v3.Cluster) (*v3.Cluster, error) {
+func (l *clusterLifecycle) Create(obj *v3.Cluster) (runtime.Object, error) {
 	// no-op because the sync function will take care of it
 	return obj, nil
 }
 
-func (l *clusterLifecycle) Updated(obj *v3.Cluster) (*v3.Cluster, error) {
+func (l *clusterLifecycle) Updated(obj *v3.Cluster) (runtime.Object, error) {
 	// no-op because the sync function will take care of it
 	return obj, nil
 }
 
-func (l *clusterLifecycle) Remove(obj *v3.Cluster) (*v3.Cluster, error) {
+func (l *clusterLifecycle) Remove(obj *v3.Cluster) (runtime.Object, error) {
 	err := l.mgr.deleteNamespace(obj, clusterRemoveController)
 	return obj, err
 }

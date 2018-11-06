@@ -25,7 +25,7 @@ type projectSyncer struct {
 // every project created. There is no need to worry about clean up, as
 // this pnp object is tied to the namespace of the project, it's deleted
 // automatically.
-func (ps *projectSyncer) Sync(key string, p *v3.Project) (*v3.Project, error) {
+func (ps *projectSyncer) Sync(key string, p *v3.Project) (runtime.Object, error) {
 	if p == nil || p.DeletionTimestamp != nil {
 		return nil, nil
 	}

@@ -5,6 +5,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func newRTLifecycle(m *manager) *rtLifecycle {
@@ -20,11 +21,11 @@ type rtLifecycle struct {
 	m *manager
 }
 
-func (c *rtLifecycle) Create(obj *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+func (c *rtLifecycle) Create(obj *v3.RoleTemplate) (runtime.Object, error) {
 	return obj, nil
 }
 
-func (c *rtLifecycle) Updated(obj *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+func (c *rtLifecycle) Updated(obj *v3.RoleTemplate) (runtime.Object, error) {
 	// checky if there are any PRTBs/CRTBs referencing this RoleTemplate for this cluster
 	prtbs, err := c.m.prtbIndexer.ByIndex(rtbByClusterAndRoleTemplateIndex, c.m.workload.ClusterName+"-"+obj.Name)
 	if err != nil {
@@ -49,7 +50,7 @@ func (c *rtLifecycle) Updated(obj *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 	return nil, err
 }
 
-func (c *rtLifecycle) Remove(obj *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+func (c *rtLifecycle) Remove(obj *v3.RoleTemplate) (runtime.Object, error) {
 	err := c.ensureRTDelete(obj)
 	return obj, err
 }

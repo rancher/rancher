@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type clusterHandler struct {
@@ -30,7 +31,7 @@ clusterHandler enqueues resources for creating/deleting network policies
 based on cluster.Annotations[netPolAnnotation] and sets status if successful
 */
 
-func (ch *clusterHandler) Sync(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
+func (ch *clusterHandler) Sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil ||
 		cluster.Name != ch.clusterNamespace ||
 		!v3.ClusterConditionReady.IsTrue(cluster) {

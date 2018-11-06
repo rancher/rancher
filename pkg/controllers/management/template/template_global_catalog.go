@@ -8,10 +8,11 @@ import (
 	"k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 )
 
-func (tm *RBACTemplateManager) syncForGlobalCatalog(key string, obj *v3.Catalog) (*v3.Catalog, error) {
+func (tm *RBACTemplateManager) syncForGlobalCatalog(key string, obj *v3.Catalog) (runtime.Object, error) {
 	var templateRuleExists, templateVersionsRuleExists bool
 	// Not going to check here whether obj is nil/deleted or not. Whether global catalog is created, updated or deleted, this method reconciles
 	// the global user role. It gets all templates/templateversions for the global catalogs and updates the user role

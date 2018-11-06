@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/pkg/remotedialer"
 	"github.com/rancher/norman/types/set"
@@ -65,7 +67,7 @@ func startPeerManager(ctx context.Context, context *config.ScaledContext, server
 	return pm, nil
 }
 
-func (p *peerManager) syncService(key string, endpoint *v1.Endpoints) (*v1.Endpoints, error) {
+func (p *peerManager) syncService(key string, endpoint *v1.Endpoints) (runtime.Object, error) {
 	if endpoint == nil {
 		return nil, nil
 	}

@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // this controller monitors services with "field.cattle.io/ipAddresses" annotation
@@ -35,7 +36,7 @@ func Register(ctx context.Context, workload *config.UserOnlyContext) {
 	workload.Core.Services("").AddHandler(ctx, "externalIpServiceController", c.sync)
 }
 
-func (c *Controller) sync(key string, obj *corev1.Service) (*corev1.Service, error) {
+func (c *Controller) sync(key string, obj *corev1.Service) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}

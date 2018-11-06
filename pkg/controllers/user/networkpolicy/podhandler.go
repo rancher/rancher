@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	knetworkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -27,7 +28,7 @@ type podHandler struct {
 	clusterNamespace string
 }
 
-func (ph *podHandler) Sync(key string, pod *corev1.Pod) (*corev1.Pod, error) {
+func (ph *podHandler) Sync(key string, pod *corev1.Pod) (runtime.Object, error) {
 	if pod == nil || pod.DeletionTimestamp != nil {
 		return nil, nil
 	}

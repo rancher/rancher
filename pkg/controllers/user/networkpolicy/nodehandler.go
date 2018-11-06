@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/nodesyncer"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type nodeHandler struct {
@@ -14,7 +15,7 @@ type nodeHandler struct {
 	clusterNamespace string
 }
 
-func (nh *nodeHandler) Sync(key string, machine *v3.Node) (*v3.Node, error) {
+func (nh *nodeHandler) Sync(key string, machine *v3.Node) (runtime.Object, error) {
 	if key == fmt.Sprintf("%s/%s", nh.clusterNamespace, nodesyncer.AllNodeKey) {
 		disabled, err := isNetworkPolicyDisabled(nh.clusterNamespace, nh.clusterLister)
 		if err != nil {

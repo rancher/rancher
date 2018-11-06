@@ -128,7 +128,7 @@ func tokenByUserRefFunc(obj interface{}) ([]string, error) {
 	return []string{token.UserID}, nil
 }
 
-func (l *userLifecycle) Create(user *v3.User) (*v3.User, error) {
+func (l *userLifecycle) Create(user *v3.User) (runtime.Object, error) {
 	var match = false
 	for _, id := range user.PrincipalIDs {
 		if strings.HasPrefix(id, "local://") {
@@ -160,7 +160,7 @@ func (l *userLifecycle) Create(user *v3.User) (*v3.User, error) {
 	return user, nil
 }
 
-func (l *userLifecycle) Updated(user *v3.User) (*v3.User, error) {
+func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
 	err := l.userManager.CreateNewUserClusterRoleBinding(user.Name, user.UID)
 	if err != nil {
 		return nil, err
@@ -168,7 +168,7 @@ func (l *userLifecycle) Updated(user *v3.User) (*v3.User, error) {
 	return user, nil
 }
 
-func (l *userLifecycle) Remove(user *v3.User) (*v3.User, error) {
+func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
 	clusterRoles, err := l.getCRTBByUserName(user.Name)
 	if err != nil {
 		return nil, err

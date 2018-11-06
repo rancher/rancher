@@ -53,7 +53,7 @@ func Register(ctx context.Context, managementContext *config.ManagementContext, 
 	composeClient.AddHandler(ctx, "compose-controller", l.sync)
 }
 
-func (l Lifecycle) sync(key string, obj *v3.ComposeConfig) (*v3.ComposeConfig, error) {
+func (l Lifecycle) sync(key string, obj *v3.ComposeConfig) (runtime.Object, error) {
 	if key == "" || obj == nil {
 		return nil, nil
 	}

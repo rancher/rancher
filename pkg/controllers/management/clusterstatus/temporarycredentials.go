@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 )
@@ -23,7 +25,7 @@ type clusterAnnotations struct {
 	clusters v3.ClusterInterface
 }
 
-func (cd *clusterAnnotations) sync(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
+func (cd *clusterAnnotations) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
 	if key == "" || cluster == nil || cluster.DeletionTimestamp != nil {
 		return nil, nil
 	}

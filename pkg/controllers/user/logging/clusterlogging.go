@@ -115,7 +115,7 @@ func (e *endpointWatcher) watch(ctx context.Context, interval time.Duration) {
 	}
 }
 
-func (c *ClusterLoggingSyncer) Sync(key string, obj *v3.ClusterLogging) (*v3.ClusterLogging, error) {
+func (c *ClusterLoggingSyncer) Sync(key string, obj *v3.ClusterLogging) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil || utils.GetClusterTarget(obj.Spec) == "none" {
 		isAllDisable, err := utils.CleanResource(c.namespaces, c.clusterLoggingLister, c.projectLoggingLister, obj, nil)
 		if err != nil {

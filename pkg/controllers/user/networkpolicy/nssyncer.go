@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type nsSyncer struct {
@@ -22,7 +23,7 @@ type nsSyncer struct {
 }
 
 // Sync invokes Policy Handler to program the native network policies
-func (nss *nsSyncer) Sync(key string, ns *corev1.Namespace) (*corev1.Namespace, error) {
+func (nss *nsSyncer) Sync(key string, ns *corev1.Namespace) (runtime.Object, error) {
 	if ns == nil || ns.DeletionTimestamp != nil {
 		return nil, nil
 	}

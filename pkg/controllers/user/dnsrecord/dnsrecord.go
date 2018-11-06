@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"sync"
 
 	"github.com/pkg/errors"
@@ -67,7 +69,7 @@ func Register(ctx context.Context, workload *config.UserOnlyContext) {
 
 }
 
-func (c *Controller) sync(key string, obj *corev1.Service) (*corev1.Service, error) {
+func (c *Controller) sync(key string, obj *corev1.Service) (runtime.Object, error) {
 	// no need to handle the remove
 	if obj == nil || obj.DeletionTimestamp != nil {
 		c.queueUpdateForExtNameSvc(key, true)
@@ -209,7 +211,7 @@ func (c *Controller) reconcileEndpoints(key string, obj *corev1.Service) error {
 	return nil
 }
 
-func (c *EndpointController) reconcileServicesForEndpoint(key string, obj *corev1.Endpoints) (*corev1.Endpoints, error) {
+func (c *EndpointController) reconcileServicesForEndpoint(key string, obj *corev1.Endpoints) (runtime.Object, error) {
 	var dnsRecordServicesToReconcile []string
 	dnsServiceUUIDToTargetEndpointUUIDs.Range(func(k, v interface{}) bool {
 		if _, ok := v.(map[string]bool)[key]; ok {

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	rrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
@@ -153,7 +155,7 @@ func (tm *RBACTemplateManager) getTemplateAndTemplateVersions(r *labels.Requirem
 	return tempArray, tempVersionArray, err
 }
 
-func (tm *RBACTemplateManager) syncForClusterCatalog(key string, obj *v3.ClusterCatalog) (*v3.ClusterCatalog, error) {
+func (tm *RBACTemplateManager) syncForClusterCatalog(key string, obj *v3.ClusterCatalog) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		// cluster catalog deleted, reconcile this cluster
 		clusterName, _, err := cache.SplitMetaNamespaceKey(key)
@@ -166,7 +168,7 @@ func (tm *RBACTemplateManager) syncForClusterCatalog(key string, obj *v3.Cluster
 	return nil, tm.reconcileClusterCatalog(obj.ClusterName)
 }
 
-func (tm *RBACTemplateManager) syncForProjectCatalog(key string, obj *v3.ProjectCatalog) (*v3.ProjectCatalog, error) {
+func (tm *RBACTemplateManager) syncForProjectCatalog(key string, obj *v3.ProjectCatalog) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		// project catalog deleted, reconcile this project
 		projectName, _, err := cache.SplitMetaNamespaceKey(key)
@@ -199,7 +201,7 @@ func (tm *RBACTemplateManager) syncForProjectCatalog(key string, obj *v3.Project
 	return nil, tm.reconcileProjectCatalog(projectName, clusterName)
 }
 
-func (tm *RBACTemplateManager) syncCRBT(key string, obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+func (tm *RBACTemplateManager) syncCRBT(key string, obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
 	var clusterName string
 	var err error
 	if obj == nil || obj.DeletionTimestamp != nil {
@@ -217,7 +219,7 @@ func (tm *RBACTemplateManager) syncCRBT(key string, obj *v3.ClusterRoleTemplateB
 	return nil, tm.reconcileClusterCatalog(clusterName)
 }
 
-func (tm *RBACTemplateManager) syncPRTB(key string, obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
+func (tm *RBACTemplateManager) syncPRTB(key string, obj *v3.ProjectRoleTemplateBinding) (runtime.Object, error) {
 	var clusterName, projectName string
 
 	if obj == nil || obj.DeletionTimestamp != nil {
@@ -267,14 +269,14 @@ func (tm *RBACTemplateManager) syncPRTB(key string, obj *v3.ProjectRoleTemplateB
 	return nil, nil
 }
 
-func (tm *RBACTemplateManager) syncCluster(key string, obj *v3.Cluster) (*v3.Cluster, error) {
+func (tm *RBACTemplateManager) syncCluster(key string, obj *v3.Cluster) (runtime.Object, error) {
 	if key == "" && obj == nil {
 		return nil, nil
 	}
 	return nil, tm.reconcileClusterCatalog(key)
 }
 
-func (tm *RBACTemplateManager) syncProject(key string, obj *v3.Project) (*v3.Project, error) {
+func (tm *RBACTemplateManager) syncProject(key string, obj *v3.Project) (runtime.Object, error) {
 	if key == "" && obj == nil {
 		return nil, nil
 	}

@@ -78,7 +78,7 @@ func (p *projectLoggingEndpointWatcher) watch(ctx context.Context, interval time
 	}
 }
 
-func (c *ProjectLoggingSyncer) Sync(key string, obj *v3.ProjectLogging) (*v3.ProjectLogging, error) {
+func (c *ProjectLoggingSyncer) Sync(key string, obj *v3.ProjectLogging) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil || utils.GetProjectTarget(obj.Spec) == "none" {
 		isAllDisable, err := utils.CleanResource(c.namespaces, c.clusterLoggingLister, c.projectLoggings.Controller().Lister(), nil, obj)
 		if err != nil {

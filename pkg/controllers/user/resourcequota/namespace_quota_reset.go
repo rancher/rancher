@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	clientcache "k8s.io/client-go/tools/cache"
 )
 
@@ -18,7 +19,7 @@ type quotaResetController struct {
 	nsIndexer  clientcache.Indexer
 }
 
-func (c *quotaResetController) resetNamespaceQuota(key string, project *v3.Project) (*v3.Project, error) {
+func (c *quotaResetController) resetNamespaceQuota(key string, project *v3.Project) (runtime.Object, error) {
 	if project == nil || project.DeletionTimestamp != nil {
 		return nil, nil
 	}

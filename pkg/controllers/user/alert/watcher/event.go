@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -36,7 +38,7 @@ func StartEventWatcher(ctx context.Context, cluster *config.UserContext, manager
 	events.AddHandler(ctx, "cluster-event-alerter", eventWatcher.Sync)
 }
 
-func (l *EventWatcher) Sync(key string, obj *corev1.Event) (*corev1.Event, error) {
+func (l *EventWatcher) Sync(key string, obj *corev1.Event) (runtime.Object, error) {
 	if l.alertManager.IsDeploy == false {
 		return nil, nil
 	}

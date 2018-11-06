@@ -5,9 +5,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func (m *Manager) Sync(key string, obj *v3.Catalog) (*v3.Catalog, error) {
+func (m *Manager) Sync(key string, obj *v3.Catalog) (runtime.Object, error) {
 	if obj == nil {
 		return nil, m.deleteTemplates(key)
 	}

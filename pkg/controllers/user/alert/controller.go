@@ -3,6 +3,8 @@ package alert
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/rancher/rancher/pkg/controllers/user/alert/configsyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/deploy"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
@@ -194,7 +196,7 @@ type ProjectLifecycle struct {
 }
 
 //Create built-in project alerts
-func (l *ProjectLifecycle) Create(obj *v3.Project) (*v3.Project, error) {
+func (l *ProjectLifecycle) Create(obj *v3.Project) (runtime.Object, error) {
 	deploymentAlert := &v3.ProjectAlert{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "projectalert-workload",
@@ -228,10 +230,10 @@ func (l *ProjectLifecycle) Create(obj *v3.Project) (*v3.Project, error) {
 	return obj, nil
 }
 
-func (l *ProjectLifecycle) Updated(obj *v3.Project) (*v3.Project, error) {
+func (l *ProjectLifecycle) Updated(obj *v3.Project) (runtime.Object, error) {
 	return obj, nil
 }
 
-func (l *ProjectLifecycle) Remove(obj *v3.Project) (*v3.Project, error) {
+func (l *ProjectLifecycle) Remove(obj *v3.Project) (runtime.Object, error) {
 	return obj, nil
 }

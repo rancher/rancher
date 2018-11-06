@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,15 +38,15 @@ type lifecycle struct {
 	psptpbIndexer cache.Indexer
 }
 
-func (l *lifecycle) Create(obj *v3.PodSecurityPolicyTemplate) (*v3.PodSecurityPolicyTemplate, error) {
+func (l *lifecycle) Create(obj *v3.PodSecurityPolicyTemplate) (runtime.Object, error) {
 	return obj, nil
 }
 
-func (l *lifecycle) Updated(obj *v3.PodSecurityPolicyTemplate) (*v3.PodSecurityPolicyTemplate, error) {
+func (l *lifecycle) Updated(obj *v3.PodSecurityPolicyTemplate) (runtime.Object, error) {
 	return obj, nil
 }
 
-func (l *lifecycle) Remove(obj *v3.PodSecurityPolicyTemplate) (*v3.PodSecurityPolicyTemplate, error) {
+func (l *lifecycle) Remove(obj *v3.PodSecurityPolicyTemplate) (runtime.Object, error) {
 	psptpbs, err := l.psptpbIndexer.ByIndex(psptpbByPSPTNameIndex, obj.Name)
 	if err != nil {
 		return nil, fmt.Errorf("error getting psptpbs: %v", err)

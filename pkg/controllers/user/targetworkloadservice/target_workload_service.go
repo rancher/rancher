@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"fmt"
 
 	"strings"
@@ -66,7 +68,7 @@ func Register(ctx context.Context, workload *config.UserOnlyContext) {
 	workload.Core.Pods("").AddHandler(ctx, "podToWorkloadServiceController", p.sync)
 }
 
-func (c *Controller) sync(key string, obj *corev1.Service) (*corev1.Service, error) {
+func (c *Controller) sync(key string, obj *corev1.Service) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		if value, ok := workloadServiceUUIDToWorkloadIDs.Load(key); ok {
 			if err := c.updateServiceWorkloadPods(key, value.(map[string]bool)); err != nil {
@@ -252,7 +254,7 @@ func getServiceSelector(serviceName string) string {
 	return fmt.Sprintf("%s_%s", WorkloadIDLabelPrefix, serviceName)
 }
 
-func (c *PodController) sync(key string, obj *corev1.Pod) (*corev1.Pod, error) {
+func (c *PodController) sync(key string, obj *corev1.Pod) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}

@@ -14,6 +14,7 @@ import (
 	rbacV1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 /*
@@ -35,11 +36,11 @@ type ClusterLifecycleCleanup struct {
 	ctx     context.Context
 }
 
-func (c *ClusterLifecycleCleanup) Create(obj *v3.Cluster) (*v3.Cluster, error) {
+func (c *ClusterLifecycleCleanup) Create(obj *v3.Cluster) (runtime.Object, error) {
 	return nil, nil
 }
 
-func (c *ClusterLifecycleCleanup) Remove(obj *v3.Cluster) (*v3.Cluster, error) {
+func (c *ClusterLifecycleCleanup) Remove(obj *v3.Cluster) (runtime.Object, error) {
 	if obj.Status.Driver == v3.ClusterDriverImported {
 		err := c.cleanupImportedCluster(obj)
 		if err != nil {
@@ -59,7 +60,7 @@ func (c *ClusterLifecycleCleanup) Remove(obj *v3.Cluster) (*v3.Cluster, error) {
 	return nil, nil
 }
 
-func (c *ClusterLifecycleCleanup) Updated(obj *v3.Cluster) (*v3.Cluster, error) {
+func (c *ClusterLifecycleCleanup) Updated(obj *v3.Cluster) (runtime.Object, error) {
 	return nil, nil
 }
 

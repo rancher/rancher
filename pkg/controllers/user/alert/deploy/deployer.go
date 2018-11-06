@@ -15,6 +15,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func NewDeployer(cluster *config.UserContext, manager *manager.Manager) *Deployer {
@@ -43,11 +44,11 @@ type Deployer struct {
 	clusterName        string
 }
 
-func (d *Deployer) ProjectSync(key string, alert *v3.ProjectAlert) (*v3.ProjectAlert, error) {
+func (d *Deployer) ProjectSync(key string, alert *v3.ProjectAlert) (runtime.Object, error) {
 	return nil, d.sync()
 }
 
-func (d *Deployer) ClusterSync(key string, alert *v3.ClusterAlert) (*v3.ClusterAlert, error) {
+func (d *Deployer) ClusterSync(key string, alert *v3.ClusterAlert) (runtime.Object, error) {
 	return nil, d.sync()
 }
 

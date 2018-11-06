@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/pipeline/engine"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
@@ -146,15 +148,15 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 
 }
 
-func (l *Lifecycle) Create(obj *v3.PipelineExecution) (*v3.PipelineExecution, error) {
+func (l *Lifecycle) Create(obj *v3.PipelineExecution) (runtime.Object, error) {
 	return l.Sync(obj)
 }
 
-func (l *Lifecycle) Updated(obj *v3.PipelineExecution) (*v3.PipelineExecution, error) {
+func (l *Lifecycle) Updated(obj *v3.PipelineExecution) (runtime.Object, error) {
 	return l.Sync(obj)
 }
 
-func (l *Lifecycle) Sync(obj *v3.PipelineExecution) (*v3.PipelineExecution, error) {
+func (l *Lifecycle) Sync(obj *v3.PipelineExecution) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return obj, nil
 	}
@@ -378,7 +380,7 @@ func (l *Lifecycle) doCleanup(obj *v3.PipelineExecution) error {
 	return nil
 }
 
-func (l *Lifecycle) Remove(obj *v3.PipelineExecution) (*v3.PipelineExecution, error) {
+func (l *Lifecycle) Remove(obj *v3.PipelineExecution) (runtime.Object, error) {
 	return obj, nil
 }
 

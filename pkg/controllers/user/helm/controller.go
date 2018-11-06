@@ -68,12 +68,12 @@ type Lifecycle struct {
 	NsClient              corev1.NamespaceInterface
 }
 
-func (l *Lifecycle) Create(obj *v3.App) (*v3.App, error) {
+func (l *Lifecycle) Create(obj *v3.App) (runtime.Object, error) {
 	v3.AppConditionMigrated.True(obj)
 	return obj, nil
 }
 
-func (l *Lifecycle) Updated(obj *v3.App) (*v3.App, error) {
+func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 	if obj.Spec.ExternalID == "" && len(obj.Spec.Files) == 0 {
 		return obj, nil
 	}
@@ -156,7 +156,7 @@ func (l *Lifecycle) DeployApp(obj *v3.App) (*v3.App, error) {
 	return newObj.(*v3.App), err
 }
 
-func (l *Lifecycle) Remove(obj *v3.App) (*v3.App, error) {
+func (l *Lifecycle) Remove(obj *v3.App) (runtime.Object, error) {
 	_, projectName := ref.Parse(obj.Spec.ProjectName)
 	appRevisionClient := l.AppRevisionGetter.AppRevisions(projectName)
 	revisions, err := appRevisionClient.List(metav1.ListOptions{

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"context"
 
 	"github.com/pkg/errors"
@@ -98,7 +100,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "drainNodeSyncer", d.drainNode)
 }
 
-func (n *NodeSyncer) sync(key string, node *corev1.Node) (*corev1.Node, error) {
+func (n *NodeSyncer) sync(key string, node *corev1.Node) (runtime.Object, error) {
 	needUpdate, err := n.needUpdate(key, node)
 	if err != nil {
 		return nil, err
@@ -137,14 +139,14 @@ func (n *NodeSyncer) needUpdate(key string, node *corev1.Node) (bool, error) {
 	return true, nil
 }
 
-func (m *NodesSyncer) sync(key string, machine *v3.Node) (*v3.Node, error) {
+func (m *NodesSyncer) sync(key string, machine *v3.Node) (runtime.Object, error) {
 	if key == fmt.Sprintf("%s/%s", m.clusterNamespace, AllNodeKey) {
 		return nil, m.reconcileAll()
 	}
 	return nil, nil
 }
 
-func (m *NodesSyncer) syncLabels(key string, obj *v3.Node) (*v3.Node, error) {
+func (m *NodesSyncer) syncLabels(key string, obj *v3.Node) (runtime.Object, error) {
 	if obj == nil {
 		return nil, nil
 	}

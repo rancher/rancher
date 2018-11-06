@@ -8,6 +8,7 @@ import (
 	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type IngressEndpointsController struct {
@@ -18,7 +19,7 @@ type IngressEndpointsController struct {
 	clusterName        string
 }
 
-func (c *IngressEndpointsController) sync(key string, obj *extensionsv1beta1.Ingress) (*extensionsv1beta1.Ingress, error) {
+func (c *IngressEndpointsController) sync(key string, obj *extensionsv1beta1.Ingress) (runtime.Object, error) {
 	namespace := ""
 	if obj != nil {
 		namespace = obj.Namespace

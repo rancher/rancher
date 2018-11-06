@@ -3,6 +3,8 @@ package endpoints
 import (
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"fmt"
 
 	workloadutil "github.com/rancher/rancher/pkg/controllers/user/workload"
@@ -20,7 +22,7 @@ type PodsController struct {
 	workloadController workloadutil.CommonController
 }
 
-func (c *PodsController) sync(key string, obj *corev1.Pod) (*corev1.Pod, error) {
+func (c *PodsController) sync(key string, obj *corev1.Pod) (runtime.Object, error) {
 	if obj == nil && !strings.HasSuffix(key, allEndpoints) {
 		return nil, nil
 	}

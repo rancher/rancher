@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/extensions/v1beta1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -70,19 +72,19 @@ type lifecycle struct {
 	namespaceIndexer cache.Indexer
 }
 
-func (l *lifecycle) Create(obj *v3.PodSecurityPolicyTemplateProjectBinding) (*v3.PodSecurityPolicyTemplateProjectBinding, error) {
+func (l *lifecycle) Create(obj *v3.PodSecurityPolicyTemplateProjectBinding) (runtime.Object, error) {
 	return l.sync(obj)
 }
 
-func (l *lifecycle) Updated(obj *v3.PodSecurityPolicyTemplateProjectBinding) (*v3.PodSecurityPolicyTemplateProjectBinding, error) {
+func (l *lifecycle) Updated(obj *v3.PodSecurityPolicyTemplateProjectBinding) (runtime.Object, error) {
 	return l.sync(obj)
 }
 
-func (l *lifecycle) Remove(obj *v3.PodSecurityPolicyTemplateProjectBinding) (*v3.PodSecurityPolicyTemplateProjectBinding, error) {
+func (l *lifecycle) Remove(obj *v3.PodSecurityPolicyTemplateProjectBinding) (runtime.Object, error) {
 	return obj, l.syncNamespacesInProject(obj.TargetProjectName)
 }
 
-func (l *lifecycle) sync(obj *v3.PodSecurityPolicyTemplateProjectBinding) (*v3.PodSecurityPolicyTemplateProjectBinding, error) {
+func (l *lifecycle) sync(obj *v3.PodSecurityPolicyTemplateProjectBinding) (runtime.Object, error) {
 	if obj.PodSecurityPolicyTemplateName == "" {
 		return obj, nil
 	}

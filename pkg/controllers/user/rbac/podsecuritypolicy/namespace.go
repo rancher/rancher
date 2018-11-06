@@ -3,6 +3,8 @@ package podsecuritypolicy
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	v12 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -29,7 +31,7 @@ func RegisterNamespace(ctx context.Context, context *config.UserContext) {
 	context.Core.Namespaces("").AddHandler(ctx, "NamespaceSyncHandler", m.sync)
 }
 
-func (m *namespaceManager) sync(key string, obj *v1.Namespace) (*v1.Namespace, error) {
+func (m *namespaceManager) sync(key string, obj *v1.Namespace) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil ||
 		obj.Status.Phase == v1.NamespaceTerminating {
 		return nil, nil

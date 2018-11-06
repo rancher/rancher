@@ -97,7 +97,7 @@ func (m *Lifecycle) setWaiting(node *v3.Node) {
 	v3.NodeConditionRegistered.Message(node, "waiting to register with Kubernetes")
 }
 
-func (m *Lifecycle) Create(obj *v3.Node) (*v3.Node, error) {
+func (m *Lifecycle) Create(obj *v3.Node) (runtime.Object, error) {
 	if isCustom(obj) {
 		m.setupCustom(obj)
 		newObj, err := v3.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
@@ -165,7 +165,7 @@ func (m *Lifecycle) getNodeTemplate(nodeTemplateName string) (*v3.NodeTemplate, 
 	return m.nodeTemplateClient.GetNamespaced(ns, n, metav1.GetOptions{})
 }
 
-func (m *Lifecycle) Remove(obj *v3.Node) (*v3.Node, error) {
+func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
 	if obj.Status.NodeTemplateSpec == nil {
 		return obj, nil
 	}
@@ -309,7 +309,7 @@ outer:
 	return obj, err
 }
 
-func (m *Lifecycle) Updated(obj *v3.Node) (*v3.Node, error) {
+func (m *Lifecycle) Updated(obj *v3.Node) (runtime.Object, error) {
 	obj, err := m.checkLabels(obj)
 	if err != nil {
 		return obj, err
