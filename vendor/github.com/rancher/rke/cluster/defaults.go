@@ -129,7 +129,10 @@ func (c *Cluster) setClusterServicesDefaults() {
 	c.Services.Etcd.Image = c.SystemImages.Etcd
 
 	// enable etcd snapshots by default
-	c.Services.Etcd.Snapshot = DefaultEtcdSnapshot
+	if c.Services.Etcd.Snapshot == nil {
+		defaultSnapshot := DefaultEtcdSnapshot
+		c.Services.Etcd.Snapshot = &defaultSnapshot
+	}
 
 	serviceConfigDefaultsMap := map[*string]string{
 		&c.Services.KubeAPI.ServiceClusterIPRange:        DefaultServiceClusterIPRange,

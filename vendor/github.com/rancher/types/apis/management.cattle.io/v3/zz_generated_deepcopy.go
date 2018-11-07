@@ -1725,6 +1725,15 @@ func (in *ETCDService) DeepCopyInto(out *ETCDService) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.Snapshot != nil {
+		in, out := &in.Snapshot, &out.Snapshot
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
 	return
 }
 

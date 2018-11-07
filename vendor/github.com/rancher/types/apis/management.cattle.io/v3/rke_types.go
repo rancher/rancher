@@ -178,7 +178,7 @@ type ETCDService struct {
 	// External etcd prefix
 	Path string `yaml:"path" json:"path,omitempty"`
 	// Etcd Recurring snapshot Service
-	Snapshot bool `yaml:"snapshot" json:"snapshot,omitempty" norman:"default=true"`
+	Snapshot *bool `yaml:"snapshot" json:"snapshot,omitempty" norman:"default=true"`
 	// Etcd snapshot Retention period
 	Retention string `yaml:"retention" json:"retention,omitempty" norman:"default=3d"`
 	// Etcd snapshot Creation period
