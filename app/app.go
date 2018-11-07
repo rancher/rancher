@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/norman/leader"
 	"github.com/rancher/norman/pkg/k8scheck"
+	"github.com/rancher/rancher/pkg/api/controllers/settings"
 	"github.com/rancher/rancher/pkg/audit"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -46,6 +47,10 @@ func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config
 		return nil, nil, err
 	}
 	scaledContext.LocalConfig = &kubeConfig
+
+	if err := settings.Register(scaledContext); err != nil {
+		return nil, nil, err
+	}
 
 	cfg.ListenConfig, err = tls.ReadTLSConfig(cfg.ACMEDomains)
 	if err != nil {
