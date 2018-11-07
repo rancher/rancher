@@ -14,6 +14,7 @@ type ChartVersions []*ChartVersion
 type ChartVersion struct {
 	ChartMetadata `yaml:",inline"`
 	Dir           string   `json:"-" yaml:"-"`
+	LocalFiles    []string `json:"-" yaml:"-"`
 	URLs          []string `json:"urls" yaml:"urls"`
 	Digest        string   `json:"digest,omitempty" yaml:"digest,omitempty"`
 }

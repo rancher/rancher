@@ -1,12 +1,19 @@
 package manager
 
 import (
+	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
+
+func (m *Manager) updateClusterCatalogError(clusterCatalog *v3.ClusterCatalog, err error) (runtime.Object, error) {
+	setRefreshedError(&clusterCatalog.Catalog, err)
+	m.clusterCatalogClient.Update(clusterCatalog)
+	return nil, err
+}
 
 func (m *Manager) ClusterCatalogSync(key string, obj *v3.ClusterCatalog) (runtime.Object, error) {
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
@@ -24,21 +31,13 @@ func (m *Manager) ClusterCatalogSync(key string, obj *v3.ClusterCatalog) (runtim
 		return nil, err
 	}
 
-	repoPath, commit, err := m.prepareRepoPath(obj.Catalog)
+	commit, helm, err := helmlib.NewForceUpdate(&clusterCatalog.Catalog)
 	if err != nil {
-		v3.CatalogConditionRefreshed.False(clusterCatalog)
-		v3.CatalogConditionRefreshed.ReasonAndMessageFromError(clusterCatalog, err)
-		m.clusterCatalogClient.Update(clusterCatalog)
-		return nil, err
+		return m.updateClusterCatalogError(clusterCatalog, err)
 	}
 
-	upgraded := v3.CatalogConditionUpgraded.IsTrue(obj)
-	if commit == clusterCatalog.Status.Commit && upgraded {
-		logrus.Debugf("Catalog %s is already up to date", clusterCatalog.Name)
-		if !v3.CatalogConditionRefreshed.IsTrue(clusterCatalog) {
-			v3.CatalogConditionRefreshed.True(clusterCatalog)
-			v3.CatalogConditionRefreshed.Reason(clusterCatalog, "")
-			v3.CatalogConditionRefreshed.Message(clusterCatalog, "")
+	if isUpToDate(commit, &clusterCatalog.Catalog) {
+		if setRefreshed(&clusterCatalog.Catalog) {
 			m.clusterCatalogClient.Update(clusterCatalog)
 		}
 		return nil, nil
@@ -49,6 +48,6 @@ func (m *Manager) ClusterCatalogSync(key string, obj *v3.ClusterCatalog) (runtim
 		clusterCatalog: clusterCatalog,
 	}
 
-	logrus.Infof("Updating catalog %s", clusterCatalog.Name)
-	return nil, m.traverseAndUpdate(repoPath, commit, cmt, upgraded)
+	logrus.Infof("Updating cluster catalog %s", clusterCatalog.Name)
+	return nil, m.traverseAndUpdate(helm, commit, cmt)
 }

@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"os"
 	"path"
 	"time"
 
@@ -15,8 +16,12 @@ import (
 )
 
 func Register(ctx context.Context, management *config.ManagementContext) {
+	// remove old disk cache
+	oldCache := path.Join("management-state", "catalog-controller")
+	os.RemoveAll(oldCache)
+
 	// TODO: Get values from settings
-	if err := Run(ctx, "", 3600, management); err != nil {
+	if err := Run(ctx, 3600, management); err != nil {
 		panic(err)
 	}
 }
@@ -60,13 +65,22 @@ func runRefreshClusterCatalog(ctx context.Context, interval int, controller v3.C
 	}
 }
 
-func Run(ctx context.Context, cacheRoot string, refreshInterval int, management *config.ManagementContext) error {
-	if cacheRoot == "" {
-		cacheRoot = path.Join("./management-state", "catalog-controller", "cache")
+func doUntilSucceeds(ctx context.Context, retryPeriod time.Duration, f func() bool) {
+	for {
+		if f() {
+			return
+		}
+		select {
+		case <-time.After(retryPeriod):
+		case <-ctx.Done():
+			return
+		}
 	}
+}
 
+func Run(ctx context.Context, refreshInterval int, management *config.ManagementContext) error {
 	logrus.Infof("Starting catalog controller")
-	m := manager.New(management, cacheRoot)
+	m := manager.New(management)
 
 	controller := management.Management.Catalogs("").Controller()
 	controller.AddHandler(ctx, "catalog", m.Sync)
@@ -78,6 +92,10 @@ func Run(ctx context.Context, cacheRoot string, refreshInterval int, management 
 	logrus.Infof("Starting cluster-level catalog controller")
 	clusterCatalogController := management.Management.ClusterCatalogs("").Controller()
 	clusterCatalogController.AddHandler(ctx, "clusterCatalog", m.ClusterCatalogSync)
+
+	var failureRetryPeriod = 15 * time.Minute
+	go doUntilSucceeds(ctx, failureRetryPeriod, m.DeleteOldTemplateContent)
+	go doUntilSucceeds(ctx, failureRetryPeriod, m.DeleteBadCatalogTemplates)
 
 	go runRefreshCatalog(ctx, refreshInterval, controller, m)
 	go runRefreshProjectCatalog(ctx, refreshInterval, projectCatalogController, m)

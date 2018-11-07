@@ -243,7 +243,9 @@ func Templates(ctx context.Context, schemas *types.Schemas, managementContext *c
 		"catalogtemplates")
 	schema.Formatter = catalog.TemplateFormatter
 	wrapper := catalog.TemplateWrapper{
-		TemplateContentClient: managementContext.Management.TemplateContents(""),
+		CatalogLister:        managementContext.Management.Catalogs("").Controller().Lister(),
+		ClusterCatalogLister: managementContext.Management.ClusterCatalogs("").Controller().Lister(),
+		ProjectCatalogLister: managementContext.Management.ProjectCatalogs("").Controller().Lister(),
 	}
 	schema.LinkHandler = wrapper.TemplateIconHandler
 
@@ -263,7 +265,9 @@ func TemplateVersion(ctx context.Context, schemas *types.Schemas, managementCont
 		"CatalogTemplateVersion",
 		"catalogtemplateversions")
 	t := catalog.TemplateVerionFormatterWrapper{
-		TemplateContentClient: managementContext.Management.TemplateContents(""),
+		CatalogLister:        managementContext.Management.Catalogs("").Controller().Lister(),
+		ClusterCatalogLister: managementContext.Management.ClusterCatalogs("").Controller().Lister(),
+		ProjectCatalogLister: managementContext.Management.ProjectCatalogs("").Controller().Lister(),
 	}
 	schema.Formatter = t.TemplateVersionFormatter
 	schema.LinkHandler = t.TemplateVersionReadmeHandler
@@ -424,7 +428,6 @@ func App(schemas *types.Schemas, management *config.ScaledContext, kubeConfigGet
 		Clusters:              management.Management.Clusters(""),
 		TemplateVersionClient: management.Management.CatalogTemplateVersions(""),
 		KubeConfigGetter:      kubeConfigGetter,
-		TemplateContentClient: management.Management.TemplateContents(""),
 		AppGetter:             management.Project,
 		UserLister:            management.Management.Users("").Controller().Lister(),
 		UserManager:           management.UserManager,

@@ -4,11 +4,11 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"crypto/md5"
-	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
 	"io"
 	"io/ioutil"
+	"mime"
 	"net"
 	"net/http"
 	"net/url"
@@ -19,45 +19,80 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blang/semver"
-	"github.com/pkg/errors"
 	"github.com/rancher/norman/controller"
+	nsutil "github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	mgmtv3 "github.com/rancher/types/client/management/v3"
+
+	"github.com/blang/semver"
+	"github.com/docker/docker/pkg/locker"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
 
 var httpTimeout = time.Second * 30
-
 var httpClient = &http.Client{
 	Timeout: httpTimeout,
 }
+var uuid = settings.InstallUUID.Get()
+var Locker = locker.New()
 
-// request makes http request
-func request(pathURL, method, username, password string) (*http.Response, error) {
+var CatalogCache = filepath.Join("management-state", "catalog-cache")
+var IconCache = filepath.Join(CatalogCache, ".icon-cache")
+
+type Helm struct {
+	LocalPath   string
+	IconPath    string
+	catalogName string
+	Hash        string
+	url         string
+	branch      string
+	username    string
+	password    string
+	lastCommit  string
+}
+
+func (h *Helm) lock() {
+	Locker.Lock(h.Hash)
+}
+
+func (h *Helm) unlock() {
+	Locker.Unlock(h.Hash)
+}
+
+func (h *Helm) lockAndVerifyCachePath() error {
+	h.lock()
+	if _, err := os.Stat(h.LocalPath); os.IsNotExist(err) {
+		return err
+	}
+	if _, err := os.Stat(h.IconPath); os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+func (h *Helm) request(pathURL, method string) (*http.Response, error) {
 	baseEndpoint, err := url.Parse(pathURL)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(username) > 0 && len(password) > 0 {
-		baseEndpoint.User = url.UserPassword(username, password)
+	if len(h.username) > 0 && len(h.password) > 0 {
+		baseEndpoint.User = url.UserPassword(h.username, h.password)
 	}
-
 	req, err := http.NewRequest(method, baseEndpoint.String(), nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := httpClient.Do(req)
-
-	return resp, err
+	return httpClient.Do(req)
 }
 
-// DownloadIndex fetchs helm catalog index
-func DownloadIndex(indexURL, username, password string) (*RepoIndex, error) {
+func (h *Helm) downloadIndex(indexURL string) (*RepoIndex, error) {
 	indexURL = strings.TrimSuffix(indexURL, "/")
 	indexURL = indexURL + "/index.yaml"
-	resp, err := request(indexURL, "GET", username, password)
+	resp, err := h.request(indexURL, "GET")
 	if err != nil {
 		if e, ok := err.(net.Error); ok && e.Timeout() {
 			return nil, errors.Errorf("Timeout in HTTP GET to [%s], did not respond in %s", indexURL, httpTimeout)
@@ -94,22 +129,28 @@ func DownloadIndex(indexURL, username, password string) (*RepoIndex, error) {
 	return helmRepoIndex, nil
 }
 
-func SaveIndex(index *RepoIndex, repoPath string) error {
+func (h *Helm) saveIndex(index *RepoIndex) error {
 	fileBytes, err := yaml.Marshal(index.IndexFile)
 	if err != nil {
 		return err
 	}
 
-	indexPath := path.Join(repoPath, "index.yaml")
-	return ioutil.WriteFile(indexPath, fileBytes, 0755)
+	indexPath := filepath.Join(h.LocalPath, "index.yaml")
+	return ioutil.WriteFile(indexPath, fileBytes, 0644)
 }
 
-func LoadIndex(repoPath string) (*RepoIndex, error) {
-	indexPath := path.Join(repoPath, "index.yaml")
+func (h *Helm) LoadIndex() (*RepoIndex, error) {
+	err := h.lockAndVerifyCachePath()
+	defer h.unlock()
+	if err != nil {
+		return nil, err
+	}
+
+	indexPath := filepath.Join(h.LocalPath, "index.yaml")
 
 	body, err := ioutil.ReadFile(indexPath)
 	if os.IsNotExist(err) {
-		return buildIndex(repoPath)
+		return h.buildIndex()
 	}
 	if err != nil {
 		return nil, err
@@ -125,12 +166,11 @@ func LoadIndex(repoPath string) (*RepoIndex, error) {
 	return helmRepoIndex, yaml.Unmarshal(body, helmRepoIndex.IndexFile)
 }
 
-// FetchTgz fetchs artifacts from helm catalog
-func FetchTgz(url, username, password string) ([]v3.File, error) {
+func (h *Helm) fetchTgz(url string) ([]v3.File, error) {
 	var files []v3.File
 
-	logrus.Debugf("Fetching file %s", url)
-	resp, err := request(url, "GET", username, password)
+	logrus.Debugf("Helm fetching file %s", url)
+	resp, err := h.request(url, "GET")
 	if err != nil {
 		return nil, errors.Errorf("Error in HTTP GET of [%s], error: %s", url, err)
 	}
@@ -174,65 +214,172 @@ func FetchTgz(url, username, password string) ([]v3.File, error) {
 	return files, nil
 }
 
-func FetchFiles(version *ChartVersion, urls []string, username, password string) ([]v3.File, error) {
-	if len(urls) == 0 {
-		return nil, nil
-	}
-
-	var files []v3.File
-	for _, url := range urls {
-		if strings.HasPrefix(url, "file://") {
-			newFile, err := LoadFile(version, strings.TrimPrefix(url, "file://"))
-			if err != nil {
-				return nil, err
-			}
-			files = append(files, *newFile)
-			continue
-		}
-
-		newFiles, err := FetchTgz(url, username, password)
-		if err != nil {
-			return nil, err
-		}
-		files = append(files, newFiles...)
-	}
-	return files, nil
-}
-
-func LoadFile(version *ChartVersion, path string) (*v3.File, error) {
-	f, err := os.Open(path)
+func (h *Helm) FetchLocalFiles(version *ChartVersion) ([]v3.File, error) {
+	err := h.lockAndVerifyCachePath()
+	defer h.unlock()
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
 
-	data, err := ioutil.ReadAll(f)
+	if len(version.LocalFiles) == 0 && len(version.URLs) == 0 {
+		return nil, errors.New("No files or urls provided for helm fetch")
+	}
+
+	var files []v3.File
+	for _, file := range version.LocalFiles {
+		newFile, err := h.loadFile(version, file)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, *newFile)
+	}
+
+	return files, nil
+}
+
+func (h *Helm) loadChartFiles(versionDir, prefix string, filters []string) (map[string]string, error) {
+	filemap := map[string]string{}
+	versionPath := filepath.Join(h.LocalPath, versionDir)
+	err := filepath.Walk(versionPath, func(filename string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return err
+		}
+
+		relPath, err := filepath.Rel(versionPath, filename)
+		if err != nil {
+			return err
+		}
+		name := path.Join(prefix, filepath.ToSlash(relPath))
+		if !filterMatch(name, filters) {
+			return nil
+		}
+
+		content, err := ioutil.ReadFile(filename)
+		if err != nil {
+			return err
+		}
+		filemap[name] = string(content)
+		return nil
+	})
+	return filemap, err
+}
+
+func (h *Helm) LoadChart(templateVersion *v3.TemplateVersionSpec, filters []string) (map[string]string, error) {
+	err := h.lockAndVerifyCachePath()
+	defer h.unlock()
+	if err != nil {
+		return nil, err
+	}
+
+	version := templateVersion.Version
+	versionDir := templateVersion.VersionDir
+	versionName := templateVersion.VersionName
+	versionURLs := templateVersion.VersionURLs
+
+	// Read Helm files from Git repo
+	if versionDir != "" {
+		return h.loadChartFiles(versionDir, versionName, filters)
+	}
+	// Fetch Helm URLs or use cached data
+	if len(versionURLs) > 0 {
+		return h.loadChartURLs(version, versionName, versionURLs, filters)
+	}
+
+	return nil, errors.New("Template version has no URLs or directory for chart to load from")
+}
+
+func (h *Helm) fetchAndCacheURLs(versionPath, versionName string, versionURLs, filters []string) (map[string]string, error) {
+	filemap := map[string]string{}
+	if err := os.MkdirAll(versionPath, 0755); err != nil {
+		return nil, err
+	}
+	files, err := h.fetchURLs(versionURLs)
+	if err != nil {
+		return nil, err
+	}
+	for _, file := range files {
+		filename, err := filepath.Rel(versionName, file.Name)
+		if err != nil {
+			return nil, err
+		}
+		fp := filepath.Join(versionPath, filename)
+		if err := os.MkdirAll(filepath.Dir(fp), 0755); err != nil {
+			return nil, err
+		}
+		if err := ioutil.WriteFile(fp, []byte(file.Contents), 0644); err != nil {
+			return nil, err
+		}
+		if filterMatch(file.Name, filters) {
+			filemap[file.Name] = file.Contents
+		}
+	}
+	return filemap, nil
+}
+
+func (h *Helm) loadChartURLs(version, versionName string, versionURLs, filters []string) (map[string]string, error) {
+	versionDir := filepath.Join(versionName, version)
+	versionPath := filepath.Join(h.LocalPath, versionDir)
+	if _, err := os.Stat(versionPath); os.IsNotExist(err) {
+		return h.fetchAndCacheURLs(versionPath, versionName, versionURLs, filters)
+	}
+	return h.loadChartFiles(versionDir, versionName, filters)
+}
+
+func filterMatch(match string, filters []string) bool {
+	if len(filters) == 0 {
+		return true
+	}
+	for _, filter := range filters {
+		if strings.EqualFold(match, filter) {
+			return true
+		}
+	}
+	return false
+}
+
+func (h *Helm) fetchURLs(urls []string) ([]v3.File, error) {
+	var (
+		errs []error
+	)
+	for _, url := range urls {
+		newFiles, err := h.fetchTgz(url)
+		if err == nil {
+			return newFiles, nil
+		}
+		errs = append(errs, err)
+	}
+	return nil, errors.Errorf("Error fetching helm URLs: %v", errs)
+}
+
+func (h *Helm) loadFile(version *ChartVersion, filename string) (*v3.File, error) {
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	versionPath := filepath.Join(h.LocalPath, version.Dir)
+	relPath, err := filepath.Rel(versionPath, filename)
 	if err != nil {
 		return nil, err
 	}
 
 	return &v3.File{
-		Name:     filepath.Join(version.Name, strings.TrimPrefix(f.Name(), version.Dir+"/")),
+		Name:     path.Join(version.Name, filepath.ToSlash(relPath)),
 		Contents: string(data),
 	}, nil
 }
 
-func buildIndex(repoPath string) (*RepoIndex, error) {
+func (h *Helm) buildIndex() (*RepoIndex, error) {
 	index := &RepoIndex{
 		IndexFile: &IndexFile{
 			Entries: map[string]ChartVersions{},
 		},
 	}
 
-	filepath.Walk(repoPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
+	filepath.Walk(h.LocalPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
 			return err
 		}
-
-		if info.IsDir() {
-			return nil
-		}
-
 		if !strings.EqualFold(info.Name(), "Chart.yaml") {
 			return nil
 		}
@@ -242,20 +389,24 @@ func buildIndex(repoPath string) (*RepoIndex, error) {
 		if err != nil {
 			return err
 		}
-
 		if err := yaml.Unmarshal(content, version); err != nil {
 			return err
 		}
 
+		dir := filepath.Dir(path)
+		relDir, err := filepath.Rel(h.LocalPath, dir)
+		if err != nil {
+			return err
+		}
+		version.Dir = relDir
 		digest := md5.New()
-		version.Dir = filepath.Dir(path)
-		filepath.Walk(version.Dir, func(path string, info os.FileInfo, err error) error {
+
+		filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 			if err != nil || info.IsDir() {
 				return err
 			}
 
-			version.URLs = append(version.URLs, "file://"+path)
-
+			version.LocalFiles = append(version.LocalFiles, path)
 			digest.Write([]byte(path))
 
 			b := make([]byte, 8)
@@ -294,49 +445,220 @@ func buildIndex(repoPath string) (*RepoIndex, error) {
 	return index, nil
 }
 
-func iconFromFile(versions ChartVersions) (string, string, error) {
-	for _, version := range versions {
-		if version.Dir == "" || version.Icon == "" {
-			continue
-		}
-
-		filename := filepath.Base(version.Icon)
-		iconFile := filepath.Join(filepath.Dir(version.Dir), filename)
-
-		bytes, err := ioutil.ReadFile(iconFile)
-		if err == nil {
-			return base64.StdEncoding.EncodeToString(bytes), filename, nil
-		}
+func (h *Helm) loadCachedIcon(iconURL string) ([]byte, string, string, error) {
+	hashName := md5Hash(iconURL)
+	matches, err := filepath.Glob(filepath.Join(h.IconPath, hashName+".*"))
+	if err != nil {
+		return nil, "", "", err
 	}
-
-	return "", "", os.ErrNotExist
+	if len(matches) != 1 {
+		return nil, "", "", errors.New("Multiple icon cache matches")
+	}
+	filename := matches[0]
+	iconBytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, "", "", err
+	}
+	cacheFile := filepath.Base(filename)
+	return iconBytes, cacheFile, iconURL, nil
 }
 
-func Icon(versions ChartVersions) (string, string, error) {
-	data, file, err := iconFromFile(versions)
+func (h *Helm) cacheIcon(iconURL, extension string, iconBytes []byte) (string, error) {
+	parsedURL, err := url.Parse(iconURL)
+	var filename string
 	if err == nil {
-		return data, file, nil
+		filename = path.Base(parsedURL.Path)
+	} else {
+		logrus.Debugf("url.Parse(%s) error [%s]", iconURL, err)
+		parts := strings.Split(iconURL, "/")
+		filename = parts[len(parts)-1]
+	}
+	if extension == "" {
+		extension = filepath.Ext(filename)
+	}
+	hashName := md5Hash(iconURL) + extension
+	if filepath.Ext(hashName) == "" {
+		logrus.Debugf("No extension for: %s", hashName)
+	}
+	iconCacheFile := filepath.Join(h.IconPath, hashName)
+	if err := ioutil.WriteFile(iconCacheFile, iconBytes, 0644); err != nil {
+		return "", err
+	}
+	return hashName, nil
+}
+
+func (h *Helm) iconFromFile(iconURL, versionDir string) ([]byte, string, string, error) {
+	filename := strings.TrimPrefix(iconURL, "file://")
+	iconPath := filepath.Join(h.LocalPath, versionDir)
+	iconFile := filepath.Join(iconPath, filename)
+	if !strings.HasPrefix(iconFile, h.LocalPath) {
+		return nil, "", "", errors.Errorf("Won't read [%s], outside of tmp path [%s]", iconFile, h.LocalPath)
 	}
 
-	if len(versions) == 0 || versions[0].Icon == "" {
-		return "", "", nil
-	}
-
-	url := versions[0].Icon
-
-	resp, err := httpClient.Get(url)
+	iconBytes, err := ioutil.ReadFile(iconFile)
 	if err != nil {
-		return "", "", errors.Errorf("Error in HTTP GET of [%s], error: %s", url, err)
+		return nil, "", "", err
+	}
+	newPath, err := filepath.Rel(h.LocalPath, iconFile)
+	if err != nil {
+		return nil, "", "", err
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	iconURL = "file://" + newPath
+	cacheFile, err := h.cacheIcon(iconURL, "", iconBytes)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	return iconBytes, cacheFile, iconURL, nil
+}
+
+func (h *Helm) iconFromHTTP(iconURL string) ([]byte, string, string, error) {
+	if iconBytes, cacheFile, iconURL, err := h.loadCachedIcon(iconURL); err == nil {
+		logrus.Debugf("Helm found cached icon %s for %s", cacheFile, iconURL)
+		return iconBytes, cacheFile, iconURL, nil
+	}
+
+	resp, err := httpClient.Get(iconURL)
+	if err != nil {
+		return nil, "", "", errors.Errorf("Icon URL fetch [%s] error [%s]", iconURL, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, "", "", errors.Errorf("Icon URL fetch [%s] with code [%d]", iconURL, resp.StatusCode)
+	}
+	iconBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	// some iconURLs may not have an extension or the wrong extension, so try to auto-discover
+	// but some sites such as raw.github.com may not provide the mediaType, so we will attempt
+	// to use mediaType for extension, but if value is text/plain use file extension of URL
+	contentType := resp.Header.Get("Content-Type")
+	mediaType, _, _ := mime.ParseMediaType(contentType)
+	if mediaType != "text/plain" && !strings.HasPrefix(mediaType, "image/") {
+		return nil, "", "", errors.Errorf("Icon URL [%s] not image media [%s]", iconURL, mediaType)
+	}
+
+	var extension string
+	if mediaType != "text/plain" {
+		if extensions, _ := mime.ExtensionsByType(contentType); len(extensions) > 0 {
+			extension = extensions[0]
+		}
+	}
+
+	cacheFile, err := h.cacheIcon(iconURL, extension, iconBytes)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	return iconBytes, cacheFile, iconURL, nil
+}
+
+func (h *Helm) fetchIcon(iconURL, versionDir string) ([]byte, string, string, error) {
+	if strings.HasPrefix(iconURL, "http:") || strings.HasPrefix(iconURL, "https:") {
+		return h.iconFromHTTP(iconURL)
+	}
+	if strings.HasPrefix(iconURL, "file:") {
+		return h.iconFromFile(iconURL, versionDir)
+	}
+	return nil, "", "", errors.Errorf("unknown file type [%s]", iconURL)
+}
+
+func (h *Helm) iconFromCache(cacheFile string) ([]byte, error) {
+	filename := filepath.Join(h.IconPath, cacheFile)
+	if !strings.HasPrefix(filename, h.IconPath) {
+		return nil, errors.Errorf("Icon file [%s] outside of icon path [%s]", filename, h.IconPath)
+	}
+	return ioutil.ReadFile(filename)
+}
+
+func (h *Helm) LoadIcon(cacheFile, iconURL string) ([]byte, error) {
+	err := h.lockAndVerifyCachePath()
+	defer h.unlock()
+	if err != nil {
+		return nil, err
+	}
+
+	if iconBytes, err := h.iconFromCache(cacheFile); err == nil {
+		return iconBytes, nil
+	}
+	iconBytes, _, _, err := h.fetchIcon(iconURL, "")
+	return iconBytes, err
+}
+
+func (h *Helm) Icon(versions ChartVersions) (string, string, error) {
+	err := h.lockAndVerifyCachePath()
+	defer h.unlock()
 	if err != nil {
 		return "", "", err
 	}
 
-	parts := strings.Split(url, "/")
-	iconFilename := parts[len(parts)-1]
-	iconData := base64.StdEncoding.EncodeToString(body)
+	failed := map[string]bool{}
+	for _, version := range versions {
+		if version.Icon == "" || failed[version.Icon] {
+			continue
+		}
 
-	return iconData, iconFilename, nil
+		_, filename, url, err := h.fetchIcon(version.Icon, version.Dir)
+		if err != nil {
+			logrus.Debugf("Helm icon error: %s", err)
+			failed[version.Icon] = true
+			continue
+		}
+
+		return filename, url, nil
+	}
+
+	// avoid catalog reload if icon fetch fails
+	return "", "", nil
+}
+
+func SplitNamespaceAndName(id string) (string, string) {
+	parts := strings.SplitN(id, ":", 2)
+	if len(parts) < 2 {
+		return "", id
+	}
+	return parts[0], parts[1]
+}
+
+func GetCatalog(
+	catalogType, namespace, catalogName string,
+	catalogLister v3.CatalogLister,
+	clusterCatalogLister v3.ClusterCatalogLister,
+	projectCatalogLister v3.ProjectCatalogLister,
+) (*v3.Catalog, error) {
+	if catalogType == "" {
+		if namespace == "" || namespace == nsutil.GlobalNamespace {
+			catalogType = mgmtv3.CatalogType
+		} else if strings.HasPrefix(namespace, "p-") {
+			logrus.Warnf("Defaulting catalog type to project for [%s/%s]", namespace, catalogName)
+			catalogType = mgmtv3.ProjectCatalogType
+		} else {
+			logrus.Warnf("Defaulting catalog type to cluster for [%s/%s]", namespace, catalogName)
+			catalogType = mgmtv3.ClusterCatalogType
+		}
+	}
+	switch catalogType {
+	case mgmtv3.CatalogType:
+		catalog, err := catalogLister.Get("", catalogName)
+		if err != nil {
+			return nil, err
+		}
+		return catalog, nil
+	case mgmtv3.ClusterCatalogType:
+		clusterCatalog, err := clusterCatalogLister.Get(namespace, catalogName)
+		if err != nil {
+			return nil, err
+		}
+		return &clusterCatalog.Catalog, nil
+	case mgmtv3.ProjectCatalogType:
+		projectCatalog, err := projectCatalogLister.Get(namespace, catalogName)
+		if err != nil {
+			return nil, err
+		}
+		return &projectCatalog.Catalog, nil
+	}
+	return nil, errors.Errorf("Unknown catalog type in namespace [%s] and name [%s]", namespace, catalogName)
 }

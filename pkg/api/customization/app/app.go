@@ -29,7 +29,6 @@ type Wrapper struct {
 	Clusters              v3.ClusterInterface
 	TemplateVersionClient v3.CatalogTemplateVersionInterface
 	KubeConfigGetter      common.KubeConfigGetter
-	TemplateContentClient v3.TemplateContentInterface
 	AppGetter             pv3.AppsGetter
 	UserLister            v3.UserLister
 	UserManager           user.Manager

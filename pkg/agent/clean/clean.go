@@ -150,7 +150,7 @@ func removeCattleNamespace(client *kubernetes.Clientset) error {
 	})
 }
 
-var listOptions metav1.ListOptions = metav1.ListOptions{
+var listOptions = metav1.ListOptions{
 	LabelSelector: "cattle.io/creator=norman",
 }
 

@@ -1,12 +1,8 @@
 package manager
 
 import (
-	"bytes"
-	"compress/gzip"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/hex"
 	"fmt"
+	"reflect"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/catalog/utils"
@@ -24,7 +20,7 @@ const (
 	TemplateNameLabel = "catalog.cattle.io/template_name"
 )
 
-func (m *Manager) createTemplate(template v3.CatalogTemplate, catalog *v3.Catalog, tagMap map[string]struct{}) error {
+func (m *Manager) createTemplate(template v3.CatalogTemplate, catalog *v3.Catalog) error {
 	template.Labels = labels.Merge(template.Labels, map[string]string{
 		CatalogNameLabel: catalog.Name,
 	})
@@ -35,15 +31,12 @@ func (m *Manager) createTemplate(template v3.CatalogTemplate, catalog *v3.Catalo
 		template.Spec.Versions[i].Readme = ""
 		template.Spec.Versions[i].AppReadme = ""
 	}
-	if err := m.convertTemplateIcon(&template, tagMap); err != nil {
-		return err
-	}
 	logrus.Debugf("Creating template %s", template.Name)
 	createdTemplate, err := m.templateClient.Create(&template)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create template %s", template.Name)
 	}
-	return m.createTemplateVersions(versionFiles, createdTemplate, tagMap)
+	return m.createTemplateVersions(catalog.Name, versionFiles, createdTemplate)
 }
 
 func (m *Manager) getTemplateMap(catalogName string, namespace string) (map[string]*v3.CatalogTemplate, error) {
@@ -59,25 +52,7 @@ func (m *Manager) getTemplateMap(catalogName string, namespace string) (map[stri
 	return templateMap, nil
 }
 
-func (m *Manager) convertTemplateIcon(template *v3.CatalogTemplate, tagMap map[string]struct{}) error {
-	tag, content, err := zipAndHash(template.Spec.Icon)
-	if err != nil {
-		return err
-	}
-	if _, ok := tagMap[tag]; !ok {
-		templateContent := &v3.TemplateContent{}
-		templateContent.Name = tag
-		templateContent.Data = content
-		if _, err := m.templateContentClient.Create(templateContent); err != nil {
-			return err
-		}
-		tagMap[tag] = struct{}{}
-	}
-	template.Spec.Icon = tag
-	return nil
-}
-
-func (m *Manager) updateTemplate(template *v3.CatalogTemplate, toUpdate v3.CatalogTemplate, tagMap map[string]struct{}) error {
+func (m *Manager) updateTemplate(template *v3.CatalogTemplate, toUpdate v3.CatalogTemplate) error {
 	r, _ := labels.NewRequirement(TemplateNameLabel, selection.Equals, []string{template.Name})
 	templateVersions, err := m.templateVersionLister.List(template.Namespace, labels.NewSelector().Add(*r))
 	if err != nil {
@@ -88,18 +63,14 @@ func (m *Manager) updateTemplate(template *v3.CatalogTemplate, toUpdate v3.Catal
 		tvByVersion[ver.Spec.Version] = ver
 	}
 	/*
-		for each templateVersion in toUpdate, calculate each hash value and if doesn't match, do update.
+		For each templateVersion in toUpdate, if spec doesn't match, do update
 		For version that doesn't exist, create a new one
 	*/
 	for _, toUpdateVer := range toUpdate.Spec.Versions {
-		// gzip each file to store the hash value into etcd. Next time if it already exists in etcd then use the existing tag
 		templateVersion := &v3.CatalogTemplateVersion{}
 		templateVersion.Spec = toUpdateVer
-		if err := m.convertFile(templateVersion, toUpdateVer, tagMap); err != nil {
-			return err
-		}
 		if tv, ok := tvByVersion[toUpdateVer.Version]; ok {
-			if tv.Spec.Digest != toUpdateVer.Digest {
+			if !reflect.DeepEqual(tv.Spec, toUpdateVer) {
 				logrus.Debugf("Updating templateVersion %v", tv.Name)
 				newObject := tv.DeepCopy()
 				newObject.Spec = templateVersion.Spec
@@ -144,9 +115,6 @@ func (m *Manager) updateTemplate(template *v3.CatalogTemplate, toUpdate v3.Catal
 	newObj := template.DeepCopy()
 	newObj.Spec = toUpdate.Spec
 	newObj.Labels = mergeLabels(template.Labels, toUpdate.Labels)
-	if err := m.convertTemplateIcon(newObj, tagMap); err != nil {
-		return err
-	}
 	if _, err := m.templateClient.Update(newObj); err != nil {
 		return err
 	}
@@ -190,7 +158,7 @@ func (m *Manager) getTemplateVersion(templateName string, namespace string) (map
 	return tVersion, nil
 }
 
-func (m *Manager) createTemplateVersions(versionsSpec []v3.TemplateVersionSpec, template *v3.CatalogTemplate, tagMap map[string]struct{}) error {
+func (m *Manager) createTemplateVersions(catalogName string, versionsSpec []v3.TemplateVersionSpec, template *v3.CatalogTemplate) error {
 	for _, spec := range versionsSpec {
 		templateVersion := &v3.CatalogTemplateVersion{}
 		templateVersion.Spec = spec
@@ -199,10 +167,6 @@ func (m *Manager) createTemplateVersions(versionsSpec []v3.TemplateVersionSpec, 
 		templateVersion.Labels = map[string]string{
 			TemplateNameLabel: template.Name,
 		}
-		// gzip each file to store the hash value into etcd. Next time if it already exists in etcd then use the existing tag
-		if err := m.convertFile(templateVersion, spec, tagMap); err != nil {
-			return err
-		}
 
 		logrus.Debugf("Creating templateVersion %s", templateVersion.Name)
 		if _, err := m.templateVersionClient.Create(templateVersion); err != nil && !kerrors.IsAlreadyExists(err) {
@@ -210,46 +174,6 @@ func (m *Manager) createTemplateVersions(versionsSpec []v3.TemplateVersionSpec, 
 		}
 	}
 	return nil
-}
-
-func (m *Manager) convertFile(templateVersion *v3.CatalogTemplateVersion, spec v3.TemplateVersionSpec, tagMap map[string]struct{}) error {
-	for name, file := range spec.Files {
-		tag, content, err := zipAndHash(file)
-		if err != nil {
-			return err
-		}
-		if _, ok := tagMap[tag]; !ok {
-			templateContent := &v3.TemplateContent{}
-			templateContent.Name = tag
-			templateContent.Data = content
-			if _, err := m.templateContentClient.Create(templateContent); err != nil {
-				return err
-			}
-			tagMap[tag] = struct{}{}
-		}
-		templateVersion.Spec.Files[name] = tag
-		if file == spec.Readme {
-			templateVersion.Spec.Readme = tag
-		}
-		if file == spec.AppReadme {
-			templateVersion.Spec.AppReadme = tag
-		}
-	}
-	return nil
-}
-
-func zipAndHash(content string) (string, string, error) {
-	var buf bytes.Buffer
-	zw := gzip.NewWriter(&buf)
-	if _, err := zw.Write([]byte(content)); err != nil {
-		return "", "", err
-	}
-	zw.Close()
-	digest := sha256.New()
-	compressedData := buf.Bytes()
-	digest.Write(compressedData)
-	tag := hex.EncodeToString(digest.Sum(nil))
-	return tag, base64.StdEncoding.EncodeToString(compressedData), nil
 }
 
 func showUpgradeLinks(version, upgradeVersion string) bool {

@@ -23,11 +23,11 @@ if [[ -z "${DIRTY}" && -n "${GIT_TAG}" ]]; then
 elif [[ "$DIRTY" ]]; then
     CHART_VERSION="${LAST_TAG}${DIRTY}.${COMMIT}"
 else
-    CHART_VERSION="${LAST_TAG}-${COMMIT_DATE}.${COMMIT_BRANCH}.${COMMIT}"
+    CHART_VERSION="${LAST_TAG}-${COMMIT_DATE}.${COMMIT}.${COMMIT_BRANCH}"
 fi
 
 # Drop the v prefix for Chart Version to follow existing pattern.
-CHART_VERSION="$(echo ${CHART_VERSION} | sed -E 's/^v//')"
+CHART_VERSION="$(echo ${CHART_VERSION} | sed -E 's/^v//' | sed -e 's/^\(.\{55\}\).*/\1/')"
 
 # Chart Repo - Target Repo for releases.
 case $CHART_VERSION in

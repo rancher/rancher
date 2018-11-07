@@ -34,12 +34,21 @@ const (
 )
 
 func ParseExternalID(externalID string) (string, string, error) {
-	var templateVersionNamespace, catalog string
-	values, err := url.Parse(externalID)
+	templateVersionNamespace, catalog, _, template, version, err := SplitExternalID(externalID)
 	if err != nil {
 		return "", "", err
 	}
+	return strings.Join([]string{catalog, template, version}, "-"), templateVersionNamespace, nil
+}
+
+func SplitExternalID(externalID string) (string, string, string, string, string, error) {
+	var templateVersionNamespace, catalog string
+	values, err := url.Parse(externalID)
+	if err != nil {
+		return "", "", "", "", "", err
+	}
 	catalogWithNamespace := values.Query().Get("catalog")
+	catalogType := values.Query().Get("type")
 	template := values.Query().Get("template")
 	version := values.Query().Get("version")
 	split := strings.SplitN(catalogWithNamespace, "/", 2)
@@ -53,7 +62,7 @@ func ParseExternalID(externalID string) (string, string, error) {
 		templateVersionNamespace = namespace.GlobalNamespace
 		catalog = catalogWithNamespace
 	}
-	return strings.Join([]string{catalog, template, version}, "-"), templateVersionNamespace, nil
+	return templateVersionNamespace, catalog, catalogType, template, version, nil
 }
 
 func InjectDefaultRegistry(obj *v3.App) {
