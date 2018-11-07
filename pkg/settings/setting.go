@@ -2,6 +2,7 @@ package settings
 
 import (
 	"encoding/json"
+	"os"
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
@@ -28,8 +29,8 @@ var (
 	KubernetesVersion               = NewSetting("k8s-version", v3.DefaultK8s)
 	KubernetesVersionToSystemImages = NewSetting("k8s-version-to-images", getSystemImages())
 	MachineVersion                  = NewSetting("machine-version", "dev")
-	Namespace                       = NewSetting("namespace", "")
-	PeerServices                    = NewSetting("peer-service", "")
+	Namespace                       = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
+	PeerServices                    = NewSetting("peer-service", os.Getenv("CATTLE_PEER_SERVICE"))
 	RDNSServerBaseURL               = NewSetting("rdns-base-url", "https://api.lb.rancher.cloud/v1")
 	RkeVersion                      = NewSetting("rke-version", RKEVersion)
 	ServerImage                     = NewSetting("server-image", "rancher/rancher")
