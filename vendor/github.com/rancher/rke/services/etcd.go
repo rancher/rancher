@@ -30,7 +30,7 @@ const (
 
 type EtcdSnapshot struct {
 	// Enable or disable snapshot creation
-	Snapshot bool
+	Snapshot *bool
 	// Creation period of the etcd snapshots
 	Creation string
 	// Retention period of the etcd snapshots
@@ -56,7 +56,7 @@ func RunEtcdPlane(
 		if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, EtcdContainerName, host.Address, ETCDRole, prsMap); err != nil {
 			return err
 		}
-		if etcdSnapshot.Snapshot {
+		if *etcdSnapshot.Snapshot == true {
 			if err := RunEtcdSnapshotSave(ctx, host, prsMap, alpineImage, etcdSnapshot.Creation, etcdSnapshot.Retention, EtcdSnapshotContainerName, false); err != nil {
 				return err
 			}
