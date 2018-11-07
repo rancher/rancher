@@ -6,6 +6,6 @@ import (
 	"context"
 )
 
-func RunETCD(ctx context.Context) ([]string, error) {
+func RunETCD(ctx context.Context, dataDir string) ([]string, error) {
 	return nil, nil
 }
