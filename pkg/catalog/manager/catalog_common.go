@@ -12,6 +12,34 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+func hasAllUpdates(catalog *v3.Catalog) bool {
+	upgraded := v3.CatalogConditionUpgraded.IsTrue(catalog)
+	diskCached := v3.CatalogConditionDiskCached.IsTrue(catalog)
+	return upgraded && diskCached
+}
+
+func isUpToDate(commit string, catalog *v3.Catalog) bool {
+	commitsEqual := commit == catalog.Status.Commit
+	updated := hasAllUpdates(catalog)
+	return commitsEqual && updated
+}
+
+func setRefreshed(catalog *v3.Catalog) bool {
+	logrus.Debugf("Catalog %s is already up to date", catalog.Name)
+	if !v3.CatalogConditionRefreshed.IsTrue(catalog) {
+		v3.CatalogConditionRefreshed.True(catalog)
+		v3.CatalogConditionRefreshed.Reason(catalog, "")
+		v3.CatalogConditionRefreshed.Message(catalog, "")
+		return true
+	}
+	return false
+}
+
+func setRefreshedError(catalog *v3.Catalog, err error) {
+	v3.CatalogConditionRefreshed.False(catalog)
+	v3.CatalogConditionRefreshed.ReasonAndMessageFromError(catalog, err)
+}
+
 func (m *Manager) deleteTemplates(key string, namespace string) error {
 	templates, err := m.getTemplateMap(key, namespace)
 	if err != nil {

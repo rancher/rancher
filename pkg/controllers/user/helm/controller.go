@@ -45,9 +45,12 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 		UserManager:           user.Management.UserManager,
 		K8sClient:             user.K8sClient,
 		TemplateVersionClient: user.Management.Management.CatalogTemplateVersions(""),
+		TemplateClient:        user.Management.Management.CatalogTemplates(""),
+		CatalogLister:         user.Management.Management.Catalogs("").Controller().Lister(),
+		ClusterCatalogLister:  user.Management.Management.ClusterCatalogs("").Controller().Lister(),
+		ProjectCatalogLister:  user.Management.Management.ProjectCatalogs("").Controller().Lister(),
 		ListenConfigClient:    user.Management.Management.ListenConfigs(""),
 		ClusterName:           user.ClusterName,
-		TemplateContentClient: user.Management.Management.TemplateContents(""),
 		AppRevisionGetter:     user.Management.Project,
 		AppGetter:             user.Management.Project,
 		NsClient:              user.Core.Namespaces(""),
@@ -64,10 +67,13 @@ type Lifecycle struct {
 	TokenClient           mgmtv3.TokenInterface
 	UserClient            mgmtv3.UserInterface
 	TemplateVersionClient mgmtv3.CatalogTemplateVersionInterface
+	TemplateClient        mgmtv3.CatalogTemplateInterface
+	CatalogLister         mgmtv3.CatalogLister
+	ClusterCatalogLister  mgmtv3.ClusterCatalogLister
+	ProjectCatalogLister  mgmtv3.ProjectCatalogLister
 	K8sClient             kubernetes.Interface
 	ListenConfigClient    mgmtv3.ListenConfigInterface
 	ClusterName           string
-	TemplateContentClient mgmtv3.TemplateContentInterface
 	AppRevisionGetter     v3.AppRevisionsGetter
 	AppGetter             v3.AppsGetter
 	NsClient              corev1.NamespaceInterface
@@ -166,12 +172,12 @@ func (l *Lifecycle) DeployApp(obj *v3.App) (*v3.App, error) {
 		}
 	}
 	newObj, err := v3.AppConditionInstalled.Do(obj, func() (runtime.Object, error) {
-		template, notes, tempDir, err := generateTemplates(obj, l.TemplateVersionClient, l.TemplateContentClient)
+		template, notes, appDir, tempDir, err := l.generateTemplates(obj)
 		defer os.RemoveAll(tempDir)
 		if err != nil {
 			return obj, err
 		}
-		if err := l.Run(obj, template, tempDir, notes); err != nil {
+		if err := l.Run(obj, template, appDir, notes); err != nil {
 			return obj, err
 		}
 		return obj, nil
@@ -205,10 +211,10 @@ func (l *Lifecycle) Remove(obj *v3.App) (runtime.Object, error) {
 	// try three times and succeed
 	start := time.Second * 1
 	for i := 0; i < 3; i++ {
-		if err := helmDelete(kubeConfigPath, obj); err == nil {
+		if err = helmDelete(kubeConfigPath, obj); err == nil {
 			break
 		}
-		logrus.Error(err)
+		logrus.Warn(err)
 		time.Sleep(start)
 		start *= 2
 	}
@@ -274,17 +280,8 @@ func (l *Lifecycle) createAppRevision(obj *v3.App, template, notes string, faile
 	digest := sha256.New()
 	digest.Write([]byte(template))
 	tag := hex.EncodeToString(digest.Sum(nil))
-	if _, err := l.TemplateContentClient.Get(tag, metav1.GetOptions{}); errors.IsNotFound(err) {
-		tc := &mgmtv3.TemplateContent{}
-		tc.Name = tag
-		tc.Data = template
-		if _, err := l.TemplateContentClient.Create(tc); err != nil {
-			return err
-		}
-	} else if err != nil {
-		return err
-	}
 	release.Status.Digest = tag
+
 	createdRevision, err := appRevisionClient.Create(release)
 	if err != nil {
 		return err

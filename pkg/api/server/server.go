@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/api/builtin"
 	"github.com/rancher/norman/pkg/subscribe"
 	rancherapi "github.com/rancher/rancher/pkg/api"
+	"github.com/rancher/rancher/pkg/api/controllers/catalog"
 	"github.com/rancher/rancher/pkg/api/controllers/dynamicschema"
 	"github.com/rancher/rancher/pkg/api/controllers/samlconfig"
 	"github.com/rancher/rancher/pkg/api/controllers/settings"
@@ -43,6 +44,7 @@ func New(ctx context.Context, scaledContext *config.ScaledContext, clusterManage
 	}
 	server.AccessControl = scaledContext.AccessControl
 
+	catalog.Register(ctx, scaledContext)
 	dynamicschema.Register(ctx, scaledContext, server.Schemas)
 	whitelistproxyNodeDriver.Register(ctx, scaledContext)
 	whitelistproxyKontainerDriver.Register(ctx, scaledContext)

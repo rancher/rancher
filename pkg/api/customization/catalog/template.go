@@ -2,7 +2,6 @@ package catalog
 
 import (
 	"bytes"
-	"encoding/base64"
 	"net/http"
 	"strings"
 	"time"
@@ -10,7 +9,7 @@ import (
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/pkg/templatecontent"
+	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
@@ -61,7 +60,9 @@ func TemplateFormatter(apiContext *types.APIContext, resource *types.RawResource
 }
 
 type TemplateWrapper struct {
-	TemplateContentClient v3.TemplateContentInterface
+	CatalogLister        v3.CatalogLister
+	ClusterCatalogLister v3.ClusterCatalogLister
+	ProjectCatalogLister v3.ProjectCatalogLister
 }
 
 func (t TemplateWrapper) TemplateIconHandler(apiContext *types.APIContext, next types.RequestHandler) error {
@@ -71,20 +72,51 @@ func (t TemplateWrapper) TemplateIconHandler(apiContext *types.APIContext, next 
 		if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, template); err != nil {
 			return err
 		}
+		if template.Icon == "" {
+			http.Error(apiContext.Response, "", http.StatusNoContent)
+			return nil
+		}
 
-		data, err := templatecontent.GetTemplateFromTag(template.Icon, t.TemplateContentClient)
+		var (
+			catalogType string
+			catalogName string
+			iconBytes   []byte
+			err         error
+		)
+
+		if template.CatalogID != "" {
+			catalogType = client.CatalogType
+			catalogName = template.CatalogID
+		} else if template.ClusterCatalogID != "" {
+			catalogType = client.ClusterCatalogType
+			catalogName = template.ClusterCatalogID
+		} else if template.ProjectCatalogID != "" {
+			catalogType = client.ProjectCatalogType
+			catalogName = template.ProjectCatalogID
+		}
+
+		namespace, name := helmlib.SplitNamespaceAndName(catalogName)
+		catalog, err := helmlib.GetCatalog(catalogType, namespace, name, t.CatalogLister, t.ClusterCatalogLister, t.ProjectCatalogLister)
 		if err != nil {
 			return err
 		}
+
+		helm, err := helmlib.New(catalog)
+		if err != nil {
+			return err
+		}
+
+		iconBytes, err = helm.LoadIcon(template.IconFilename, template.Icon)
+		if err != nil {
+			return err
+		}
+
 		t, err := time.Parse(time.RFC3339, template.Created)
 		if err != nil {
 			return err
 		}
-		value, err := base64.StdEncoding.DecodeString(data)
-		if err != nil {
-			return err
-		}
-		iconReader := bytes.NewReader(value)
+
+		iconReader := bytes.NewReader(iconBytes)
 		apiContext.Response.Header().Set("Cache-Control", "private, max-age=604800")
 		http.ServeContent(apiContext.Response, apiContext.Request, template.IconFilename, t, iconReader)
 		return nil

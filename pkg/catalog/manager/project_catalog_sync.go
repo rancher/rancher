@@ -1,12 +1,19 @@
 package manager
 
 import (
+	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
+
+func (m *Manager) updateProjectCatalogError(projectCatalog *v3.ProjectCatalog, err error) (runtime.Object, error) {
+	setRefreshedError(&projectCatalog.Catalog, err)
+	m.projectCatalogClient.Update(projectCatalog)
+	return nil, err
+}
 
 func (m *Manager) ProjectCatalogSync(key string, obj *v3.ProjectCatalog) (runtime.Object, error) {
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
@@ -24,21 +31,13 @@ func (m *Manager) ProjectCatalogSync(key string, obj *v3.ProjectCatalog) (runtim
 		return nil, err
 	}
 
-	repoPath, commit, err := m.prepareRepoPath(obj.Catalog)
+	commit, helm, err := helmlib.NewForceUpdate(&projectCatalog.Catalog)
 	if err != nil {
-		v3.CatalogConditionRefreshed.False(projectCatalog)
-		v3.CatalogConditionRefreshed.ReasonAndMessageFromError(projectCatalog, err)
-		m.projectCatalogClient.Update(projectCatalog)
-		return nil, err
+		return m.updateProjectCatalogError(projectCatalog, err)
 	}
 
-	upgraded := v3.CatalogConditionUpgraded.IsTrue(obj)
-	if commit == projectCatalog.Status.Commit && upgraded {
-		logrus.Debugf("Project catalog %s is already up to date", projectCatalog.Name)
-		if !v3.CatalogConditionRefreshed.IsTrue(projectCatalog) {
-			v3.CatalogConditionRefreshed.True(projectCatalog)
-			v3.CatalogConditionRefreshed.Reason(projectCatalog, "")
-			v3.CatalogConditionRefreshed.Message(projectCatalog, "")
+	if isUpToDate(commit, &projectCatalog.Catalog) {
+		if setRefreshed(&projectCatalog.Catalog) {
 			m.projectCatalogClient.Update(projectCatalog)
 		}
 		return nil, nil
@@ -50,5 +49,5 @@ func (m *Manager) ProjectCatalogSync(key string, obj *v3.ProjectCatalog) (runtim
 	}
 
 	logrus.Infof("Updating project catalog %s", projectCatalog.Name)
-	return nil, m.traverseAndUpdate(repoPath, commit, cmt, upgraded)
+	return nil, m.traverseAndUpdate(helm, commit, cmt)
 }
