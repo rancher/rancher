@@ -7,6 +7,9 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/catalog/utils"
@@ -24,7 +27,7 @@ const (
 	CatalogTypeLabel  = "catalog.cattle.io/catalog_type"
 )
 
-func (m *Manager) createTemplate(template v3.Template, catalog *v3.Catalog, tagMap map[string]struct{}) error {
+func (m *Manager) createTemplate(template v3.Template, catalog *v3.Catalog) error {
 	template.Labels = labels.Merge(template.Labels, map[string]string{
 		CatalogNameLabel: catalog.Name,
 	})
@@ -35,7 +38,7 @@ func (m *Manager) createTemplate(template v3.Template, catalog *v3.Catalog, tagM
 		template.Spec.Versions[i].Readme = ""
 		template.Spec.Versions[i].AppReadme = ""
 	}
-	if err := m.convertTemplateIcon(&template, tagMap); err != nil {
+	if err := m.convertTemplateIcon(&template); err != nil {
 		return err
 	}
 	logrus.Debugf("Creating template %s", template.Name)
@@ -43,7 +46,7 @@ func (m *Manager) createTemplate(template v3.Template, catalog *v3.Catalog, tagM
 	if err != nil {
 		return errors.Wrapf(err, "failed to create template %s", template.Name)
 	}
-	return m.createTemplateVersions(versionFiles, createdTemplate, tagMap)
+	return m.createTemplateVersions(versionFiles, createdTemplate)
 }
 
 func (m *Manager) getTemplateMap(catalogName string) (map[string]*v3.Template, error) {
@@ -59,25 +62,29 @@ func (m *Manager) getTemplateMap(catalogName string) (map[string]*v3.Template, e
 	return templateMap, nil
 }
 
-func (m *Manager) convertTemplateIcon(template *v3.Template, tagMap map[string]struct{}) error {
-	tag, content, err := zipAndHash(template.Spec.Icon)
+func (m *Manager) convertTemplateIcon(template *v3.Template) error {
+	tag, content, err := ZipAndHash(template.Spec.Icon)
 	if err != nil {
 		return err
 	}
-	if _, ok := tagMap[tag]; !ok {
-		templateContent := &v3.TemplateContent{}
-		templateContent.Name = tag
-		templateContent.Data = content
-		if _, err := m.templateContentClient.Create(templateContent); err != nil {
-			return err
-		}
-		tagMap[tag] = struct{}{}
+	if err := m.writeTagAndContentToFile(tag, content); err != nil {
+		return err
 	}
 	template.Spec.Icon = tag
 	return nil
 }
 
-func (m *Manager) updateTemplate(template *v3.Template, toUpdate v3.Template, tagMap map[string]struct{}) error {
+func (m *Manager) writeTagAndContentToFile(tag, content string) error {
+	fileLocation := filepath.Join(m.cacheRoot, "templateContent", tag)
+	if _, err := os.Stat(fileLocation); err != nil {
+		if err := ioutil.WriteFile(fileLocation, []byte(content), 0777); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *Manager) updateTemplate(template *v3.Template, toUpdate v3.Template) error {
 	r, _ := labels.NewRequirement(TemplateNameLabel, selection.Equals, []string{template.Name})
 	templateVersions, err := m.templateVersionLister.List("", labels.NewSelector().Add(*r))
 	if err != nil {
@@ -95,7 +102,7 @@ func (m *Manager) updateTemplate(template *v3.Template, toUpdate v3.Template, ta
 		// gzip each file to store the hash value into etcd. Next time if it already exists in etcd then use the existing tag
 		templateVersion := &v3.TemplateVersion{}
 		templateVersion.Spec = toUpdateVer
-		if err := m.convertFile(templateVersion, toUpdateVer, tagMap); err != nil {
+		if err := m.convertFile(templateVersion, toUpdateVer); err != nil {
 			return err
 		}
 		if tv, ok := tvByVersion[toUpdateVer.Version]; ok {
@@ -143,7 +150,7 @@ func (m *Manager) updateTemplate(template *v3.Template, toUpdate v3.Template, ta
 	newObj := template.DeepCopy()
 	newObj.Spec = toUpdate.Spec
 	newObj.Labels = mergeLabels(template.Labels, toUpdate.Labels)
-	if err := m.convertTemplateIcon(newObj, tagMap); err != nil {
+	if err := m.convertTemplateIcon(newObj); err != nil {
 		return err
 	}
 	if _, err := m.templateClient.Update(newObj); err != nil {
@@ -189,7 +196,7 @@ func (m *Manager) getTemplateVersion(templateName string) (map[string]struct{}, 
 	return tVersion, nil
 }
 
-func (m *Manager) createTemplateVersions(versionsSpec []v3.TemplateVersionSpec, template *v3.Template, tagMap map[string]struct{}) error {
+func (m *Manager) createTemplateVersions(versionsSpec []v3.TemplateVersionSpec, template *v3.Template) error {
 	for _, spec := range versionsSpec {
 		templateVersion := &v3.TemplateVersion{}
 		templateVersion.Spec = spec
@@ -197,8 +204,8 @@ func (m *Manager) createTemplateVersions(versionsSpec []v3.TemplateVersionSpec, 
 		templateVersion.Labels = map[string]string{
 			TemplateNameLabel: template.Name,
 		}
-		// gzip each file to store the hash value into etcd. Next time if it already exists in etcd then use the existing tag
-		if err := m.convertFile(templateVersion, spec, tagMap); err != nil {
+		// gzip each file to store the hash value into local disk. Next time if it already exists in etcd then use the existing file
+		if err := m.convertFile(templateVersion, spec); err != nil {
 			return err
 		}
 
@@ -210,20 +217,14 @@ func (m *Manager) createTemplateVersions(versionsSpec []v3.TemplateVersionSpec, 
 	return nil
 }
 
-func (m *Manager) convertFile(templateVersion *v3.TemplateVersion, spec v3.TemplateVersionSpec, tagMap map[string]struct{}) error {
+func (m *Manager) convertFile(templateVersion *v3.TemplateVersion, spec v3.TemplateVersionSpec) error {
 	for name, file := range spec.Files {
-		tag, content, err := zipAndHash(file)
+		tag, content, err := ZipAndHash(file)
 		if err != nil {
 			return err
 		}
-		if _, ok := tagMap[tag]; !ok {
-			templateContent := &v3.TemplateContent{}
-			templateContent.Name = tag
-			templateContent.Data = content
-			if _, err := m.templateContentClient.Create(templateContent); err != nil {
-				return err
-			}
-			tagMap[tag] = struct{}{}
+		if err := m.writeTagAndContentToFile(tag, content); err != nil {
+			return err
 		}
 		templateVersion.Spec.Files[name] = tag
 		if file == spec.Readme {
@@ -236,7 +237,7 @@ func (m *Manager) convertFile(templateVersion *v3.TemplateVersion, spec v3.Templ
 	return nil
 }
 
-func zipAndHash(content string) (string, string, error) {
+func ZipAndHash(content string) (string, string, error) {
 	var buf bytes.Buffer
 	zw := gzip.NewWriter(&buf)
 	if _, err := zw.Write([]byte(content)); err != nil {

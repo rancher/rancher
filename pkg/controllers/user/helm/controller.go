@@ -143,7 +143,7 @@ func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 
 func (l *Lifecycle) DeployApp(obj *v3.App) (*v3.App, error) {
 	newObj, err := v3.AppConditionInstalled.Do(obj, func() (runtime.Object, error) {
-		template, notes, tempDir, err := generateTemplates(obj, l.TemplateVersionClient, l.TemplateContentClient)
+		template, notes, tempDir, err := generateTemplates(obj, l.TemplateVersionClient)
 		defer os.RemoveAll(tempDir)
 		if err != nil {
 			return obj, err

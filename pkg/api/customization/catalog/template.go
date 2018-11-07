@@ -11,7 +11,6 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/templatecontent"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
 )
@@ -61,7 +60,6 @@ func TemplateFormatter(apiContext *types.APIContext, resource *types.RawResource
 }
 
 type TemplateWrapper struct {
-	TemplateContentClient v3.TemplateContentInterface
 }
 
 func (t TemplateWrapper) TemplateIconHandler(apiContext *types.APIContext, next types.RequestHandler) error {
@@ -72,7 +70,7 @@ func (t TemplateWrapper) TemplateIconHandler(apiContext *types.APIContext, next 
 			return err
 		}
 
-		data, err := templatecontent.GetTemplateFromTag(template.Icon, t.TemplateContentClient)
+		data, err := templatecontent.GetTemplateFromTag(template.Icon, []string{template.IconUrl}, true, "", "")
 		if err != nil {
 			return err
 		}

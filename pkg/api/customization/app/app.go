@@ -28,7 +28,6 @@ type Wrapper struct {
 	Clusters              v3.ClusterInterface
 	TemplateVersionClient v3.TemplateVersionInterface
 	KubeConfigGetter      common.KubeConfigGetter
-	TemplateContentClient v3.TemplateContentInterface
 	AppGetter             pv3.AppsGetter
 }
 

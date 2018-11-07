@@ -32,15 +32,6 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogInfo) e
 	if err != nil {
 		return err
 	}
-	// list all templateContent tag
-	templateContentList, err := m.templateContentLister.List("", labels.NewSelector())
-	if err != nil {
-		return err
-	}
-	templateContentMap := map[string]struct{}{}
-	for _, t := range templateContentList {
-		templateContentMap[t.Name] = struct{}{}
-	}
 
 	newHelmVersionCommits := map[string]v3.VersionCommits{}
 	var errs []error
@@ -88,12 +79,13 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogInfo) e
 		if len(metadata[0].Sources) > 0 {
 			template.Spec.ProjectURL = metadata[0].Sources[0]
 		}
-		iconData, iconFilename, err := helm.Icon(metadata)
+		iconData, iconFilename, iconUrl, err := helm.Icon(metadata)
 		if err != nil {
 			errs = append(errs, err)
 		}
 		template.Spec.Icon = iconData
 		template.Spec.IconFilename = iconFilename
+		template.Spec.IconUrl = iconUrl
 		template.Spec.FolderName = chart
 		template.Spec.DisplayName = chart
 		label := map[string]string{}
@@ -102,7 +94,7 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogInfo) e
 			v := v3.TemplateVersionSpec{
 				Version: version.Version,
 			}
-			files, err := helm.FetchFiles(version, version.URLs)
+			files, err := helm.FetchFiles(version.Name, version.Dir, version.URLs)
 			if err != nil {
 				errs = append(errs, err)
 				continue
@@ -137,6 +129,12 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogInfo) e
 			v.Files = filesToAdd
 			v.KubeVersion = version.KubeVersion
 			v.Digest = version.Digest
+
+			// for local cache rebuild
+			v.VersionDir = version.Dir
+			v.VersionName = version.Name
+			v.VersionUrls = version.URLs
+
 			v.UpgradeVersionLinks = map[string]string{}
 			for _, versionSpec := range template.Spec.Versions {
 				if showUpgradeLinks(v.Version, versionSpec.Version) {
@@ -200,12 +198,12 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogInfo) e
 		var temErr error
 		// look template by name, if not found then create it, otherwise do update
 		if existing, ok := templateMap[template.Name]; ok {
-			if err := m.updateTemplate(existing, template, templateContentMap); err != nil {
+			if err := m.updateTemplate(existing, template); err != nil {
 				temErr = err
 			}
 			updatedTemplates++
 		} else {
-			if err := m.createTemplate(template, catalog, templateContentMap); err != nil {
+			if err := m.createTemplate(template, catalog); err != nil {
 				temErr = err
 			}
 			createdTemplates++

@@ -14,25 +14,26 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/templatecontent"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
 )
 
 type TemplateVerionFormatterWrapper struct {
-	TemplateContentClient v3.TemplateContentInterface
 }
 
 func (t TemplateVerionFormatterWrapper) TemplateVersionFormatter(apiContext *types.APIContext, resource *types.RawResource) {
 	// files
 	files := resource.Values["files"]
+	urls := convert.ToStringSlice(resource.Values["versionUrls"])
+	versionName := convert.ToString(resource.Values["versionName"])
+	versionDir := convert.ToString(resource.Values["versionDir"])
 	delete(resource.Values, "files")
 	fileMap := map[string]string{}
 	m, ok := files.(map[string]interface{})
 	if ok {
 		for k, v := range m {
 			tag := convert.ToString(v)
-			data, err := templatecontent.GetTemplateFromTag(tag, t.TemplateContentClient)
+			data, err := templatecontent.GetTemplateFromTag(tag, urls, false, versionName, versionDir)
 			if err != nil {
 				continue
 			}
@@ -101,7 +102,7 @@ func (t TemplateVerionFormatterWrapper) TemplateVersionReadmeHandler(apiContext 
 		if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, templateVersion); err != nil {
 			return err
 		}
-		data, err := templatecontent.GetTemplateFromTag(templateVersion.Readme, t.TemplateContentClient)
+		data, err := templatecontent.GetTemplateFromTag(templateVersion.Readme, templateVersion.VersionUrls, false, templateVersion.VersionName, templateVersion.VersionDir)
 		if err != nil {
 			return err
 		}
@@ -118,7 +119,7 @@ func (t TemplateVerionFormatterWrapper) TemplateVersionReadmeHandler(apiContext 
 		if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, templateVersion); err != nil {
 			return err
 		}
-		data, err := templatecontent.GetTemplateFromTag(templateVersion.AppReadme, t.TemplateContentClient)
+		data, err := templatecontent.GetTemplateFromTag(templateVersion.AppReadme, templateVersion.VersionUrls, false, templateVersion.VersionName, templateVersion.VersionDir)
 		if err != nil {
 			return err
 		}

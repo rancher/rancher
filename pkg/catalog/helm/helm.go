@@ -145,7 +145,7 @@ func FetchTgz(url string) ([]v3.File, error) {
 	return files, nil
 }
 
-func FetchFiles(version *ChartVersion, urls []string) ([]v3.File, error) {
+func FetchFiles(versionName, versionDir string, urls []string) ([]v3.File, error) {
 	if len(urls) == 0 {
 		return nil, nil
 	}
@@ -153,7 +153,7 @@ func FetchFiles(version *ChartVersion, urls []string) ([]v3.File, error) {
 	var files []v3.File
 	for _, url := range urls {
 		if strings.HasPrefix(url, "file://") {
-			newFile, err := LoadFile(version, strings.TrimPrefix(url, "file://"))
+			newFile, err := LoadFile(versionName, versionDir, strings.TrimPrefix(url, "file://"))
 			if err != nil {
 				return nil, err
 			}
@@ -170,7 +170,7 @@ func FetchFiles(version *ChartVersion, urls []string) ([]v3.File, error) {
 	return files, nil
 }
 
-func LoadFile(version *ChartVersion, path string) (*v3.File, error) {
+func LoadFile(versionName, versionDir string, path string) (*v3.File, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -183,7 +183,7 @@ func LoadFile(version *ChartVersion, path string) (*v3.File, error) {
 	}
 
 	return &v3.File{
-		Name:     filepath.Join(version.Name, strings.TrimPrefix(f.Name(), version.Dir+"/")),
+		Name:     filepath.Join(versionName, strings.TrimPrefix(f.Name(), versionDir+"/")),
 		Contents: string(data),
 	}, nil
 }
@@ -265,7 +265,7 @@ func buildIndex(repoPath string) (*RepoIndex, error) {
 	return index, nil
 }
 
-func iconFromFile(versions ChartVersions) (string, string, error) {
+func iconFromFile(versions ChartVersions) (string, string, string, error) {
 	for _, version := range versions {
 		if version.Dir == "" || version.Icon == "" {
 			continue
@@ -276,38 +276,56 @@ func iconFromFile(versions ChartVersions) (string, string, error) {
 
 		bytes, err := ioutil.ReadFile(iconFile)
 		if err == nil {
-			return base64.StdEncoding.EncodeToString(bytes), filename, nil
+			return base64.StdEncoding.EncodeToString(bytes), filename, iconFile, nil
 		}
 	}
 
-	return "", "", os.ErrNotExist
+	return "", "", "", os.ErrNotExist
 }
 
-func Icon(versions ChartVersions) (string, string, error) {
-	data, file, err := iconFromFile(versions)
+func Icon(versions ChartVersions) (string, string, string, error) {
+	data, file, iconpath, err := iconFromFile(versions)
 	if err == nil {
-		return data, file, nil
+		return data, file, iconpath, nil
 	}
 
 	if len(versions) == 0 || versions[0].Icon == "" {
-		return "", "", nil
+		return "", "", "", nil
 	}
 
 	url := versions[0].Icon
 
 	resp, err := httpClient.Get(url)
 	if err != nil {
-		return "", "", errors.Errorf("Error in HTTP GET of [%s], error: %s", url, err)
+		return "", "", "", errors.Errorf("Error in HTTP GET of [%s], error: %s", url, err)
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
 	parts := strings.Split(url, "/")
 	iconFilename := parts[len(parts)-1]
 	iconData := base64.StdEncoding.EncodeToString(body)
 
-	return iconData, iconFilename, nil
+	return iconData, iconFilename, url, nil
+}
+
+func RebuildIcon(url string) ([]byte, error) {
+	if _, err := os.Stat(url); err == nil {
+		return ioutil.ReadFile(url)
+	}
+	resp, err := httpClient.Get(url)
+	if err != nil {
+		return nil, errors.Errorf("Error in HTTP GET of [%s], error: %s", url, err)
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	iconData := base64.StdEncoding.EncodeToString(body)
+	return []byte(iconData), nil
 }

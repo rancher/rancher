@@ -33,10 +33,8 @@ type Manager struct {
 	CatalogLister         v3.CatalogLister
 	templateClient        v3.TemplateInterface
 	templateVersionClient v3.TemplateVersionInterface
-	templateContentClient v3.TemplateContentInterface
 	templateLister        v3.TemplateLister
 	templateVersionLister v3.TemplateVersionLister
-	templateContentLister v3.TemplateContentLister
 	projectCatalogClient  v3.ProjectCatalogInterface
 	ProjectCatalogLister  v3.ProjectCatalogLister
 	clusterCatalogClient  v3.ClusterCatalogInterface
@@ -57,10 +55,8 @@ func New(management *config.ManagementContext, cacheRoot string) *Manager {
 		CatalogLister:         management.Management.Catalogs("").Controller().Lister(),
 		templateClient:        management.Management.Templates(""),
 		templateVersionClient: management.Management.TemplateVersions(""),
-		templateContentClient: management.Management.TemplateContents(""),
 		templateLister:        management.Management.Templates("").Controller().Lister(),
 		templateVersionLister: management.Management.TemplateVersions("").Controller().Lister(),
-		templateContentLister: management.Management.TemplateContents("").Controller().Lister(),
 		projectCatalogClient:  management.Management.ProjectCatalogs(""),
 		ProjectCatalogLister:  management.Management.ProjectCatalogs("").Controller().Lister(),
 		clusterCatalogClient:  management.Management.ClusterCatalogs(""),

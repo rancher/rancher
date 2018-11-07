@@ -200,17 +200,13 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 func Templates(schemas *types.Schemas, managementContext *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.TemplateType)
 	schema.Formatter = catalog.TemplateFormatter
-	wrapper := catalog.TemplateWrapper{
-		TemplateContentClient: managementContext.Management.TemplateContents(""),
-	}
+	wrapper := catalog.TemplateWrapper{}
 	schema.LinkHandler = wrapper.TemplateIconHandler
 }
 
 func TemplateVersion(schemas *types.Schemas, managementContext *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.TemplateVersionType)
-	t := catalog.TemplateVerionFormatterWrapper{
-		TemplateContentClient: managementContext.Management.TemplateContents(""),
-	}
+	t := catalog.TemplateVerionFormatterWrapper{}
 	schema.Formatter = t.TemplateVersionFormatter
 	schema.LinkHandler = t.TemplateVersionReadmeHandler
 	schema.Store = noopwatching.Wrap(schema.Store)
@@ -345,7 +341,6 @@ func App(schemas *types.Schemas, management *config.ScaledContext, kubeConfigGet
 		Clusters:              management.Management.Clusters(""),
 		TemplateVersionClient: management.Management.TemplateVersions(""),
 		KubeConfigGetter:      kubeConfigGetter,
-		TemplateContentClient: management.Management.TemplateContents(""),
 		AppGetter:             management.Project,
 	}
 	schema.Formatter = app.Formatter

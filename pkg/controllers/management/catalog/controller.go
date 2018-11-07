@@ -2,7 +2,9 @@ package catalog
 
 import (
 	"context"
+	"os"
 	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/rancher/rancher/pkg/catalog/manager"
@@ -63,6 +65,9 @@ func runRefreshClusterCatalog(ctx context.Context, interval int, controller v3.C
 func Run(ctx context.Context, cacheRoot string, refreshInterval int, management *config.ManagementContext) error {
 	if cacheRoot == "" {
 		cacheRoot = path.Join("./management-state", "catalog-controller", "cache")
+	}
+	if err := os.MkdirAll(filepath.Join(cacheRoot, "templateContent"), 0777); err != nil {
+		return err
 	}
 
 	logrus.Infof("Starting catalog controller")

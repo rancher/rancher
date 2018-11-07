@@ -62,10 +62,10 @@ func helmDelete(kubeconfigPath string, app *v3.App) error {
 	return common.DeleteCharts(addr, app)
 }
 
-func convertTemplates(files map[string]string, templateContentClient mgmtv3.TemplateContentInterface) (map[string]string, error) {
+func convertTemplates(files map[string]string, versionUrls []string, versionName, versionDir string) (map[string]string, error) {
 	templates := map[string]string{}
 	for name, tag := range files {
-		data, err := templatecontent.GetTemplateFromTag(tag, templateContentClient)
+		data, err := templatecontent.GetTemplateFromTag(tag, versionUrls, false, versionName, versionDir)
 		if err != nil {
 			continue
 		}
@@ -74,7 +74,7 @@ func convertTemplates(files map[string]string, templateContentClient mgmtv3.Temp
 	return templates, nil
 }
 
-func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersionInterface, templateContentClient mgmtv3.TemplateContentInterface) (string, string, string, error) {
+func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersionInterface) (string, string, string, error) {
 	files := map[string]string{}
 	if obj.Spec.ExternalID != "" {
 		templateVersionID, err := common.ParseExternalID(obj.Spec.ExternalID)
@@ -85,7 +85,7 @@ func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersion
 		if err != nil {
 			return "", "", "", err
 		}
-		files, err = convertTemplates(templateVersion.Spec.Files, templateContentClient)
+		files, err = convertTemplates(templateVersion.Spec.Files, templateVersion.Spec.VersionUrls, templateVersion.Spec.VersionName, templateVersion.Spec.VersionDir)
 		if err != nil {
 			return "", "", "", err
 		}
