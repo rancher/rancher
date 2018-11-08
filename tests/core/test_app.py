@@ -3,13 +3,14 @@ from .test_catalog import wait_for_template_to_be_created
 import time
 
 
-def test_app_mysql(admin_pc):
+def test_app_mysql(admin_pc, admin_mc):
     client = admin_pc.client
     name = random_str()
 
     ns = admin_pc.cluster.client.create_namespace(name=random_str(),
                                                   projectId=admin_pc.
                                                   project.id)
+    wait_for_template_to_be_created(admin_mc.client, "library")
     answers = {
         "defaultImage": "true",
         "image": "mysql",
@@ -34,14 +35,14 @@ def test_app_mysql(admin_pc):
     wait_for_workload(client, ns.name, count=1)
 
 
-def test_app_wordpress(admin_pc):
+def test_app_wordpress(admin_pc, admin_mc):
     client = admin_pc.client
     name = random_str()
 
     ns = admin_pc.cluster.client.create_namespace(name=random_str(),
                                                   projectId=admin_pc.
                                                   project.id)
-
+    wait_for_template_to_be_created(admin_mc.client, "library")
     answers = {
         "defaultImage": "true",
         "externalDatabase.database": "",
@@ -112,11 +113,12 @@ def test_prehook_chart(admin_pc, admin_mc):
     assert len(jobs) == 1
 
 
-def test_app_namespace_annotation(admin_pc):
+def test_app_namespace_annotation(admin_pc, admin_mc):
     client = admin_pc.client
     ns = admin_pc.cluster.client.create_namespace(name=random_str(),
                                                   projectId=admin_pc.
                                                   project.id)
+    wait_for_template_to_be_created(admin_mc.client, "library")
     app1 = client.create_app(
         name=random_str(),
         externalId="catalog://?catalog=library&template=mysql&version=0.3.7",
