@@ -8,5 +8,5 @@ pytest-repeat==0.7.0
 pytest-xdist==1.23.0
 pyyaml==3.13
 netaddr==0.7.19
-requests==2.19.1
+requests==2.20.0
 kubernetes==7.0.0
