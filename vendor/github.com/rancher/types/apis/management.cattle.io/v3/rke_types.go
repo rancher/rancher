@@ -180,7 +180,7 @@ type ETCDService struct {
 	// Etcd Recurring snapshot Service
 	Snapshot *bool `yaml:"snapshot" json:"snapshot,omitempty" norman:"default=true"`
 	// Etcd snapshot Retention period
-	Retention string `yaml:"retention" json:"retention,omitempty" norman:"default=3d"`
+	Retention string `yaml:"retention" json:"retention,omitempty" norman:"default=72h"`
 	// Etcd snapshot Creation period
 	Creation string `yaml:"creation" json:"creation,omitempty" norman:"default=12h"`
 }
