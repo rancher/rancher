@@ -152,6 +152,10 @@ func addData(management *config.ManagementContext, cfg Config) error {
 		if err := addLocalCluster(cfg.Embedded, adminName, management); err != nil {
 			return err
 		}
+	} else if cfg.AddLocal == "false" {
+		if err := removeLocalCluster(management); err != nil {
+			return err
+		}
 	}
 
 	if err := addAuthConfigs(management); err != nil {
