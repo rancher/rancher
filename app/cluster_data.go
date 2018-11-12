@@ -30,3 +30,8 @@ func addLocalCluster(embedded bool, adminName string, management *config.Managem
 	management.Management.Clusters("").Create(c)
 	return nil
 }
+
+func removeLocalCluster(management *config.ManagementContext) error {
+	management.Management.Clusters("").Delete("local", &v1.DeleteOptions{})
+	return nil
+}
