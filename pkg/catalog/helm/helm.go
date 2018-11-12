@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -20,6 +21,7 @@ import (
 
 	"github.com/blang/semver"
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/controller"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
@@ -31,10 +33,31 @@ var httpClient = &http.Client{
 	Timeout: httpTimeout,
 }
 
-func DownloadIndex(indexURL string) (*RepoIndex, error) {
+// request makes http request
+func request(pathURL, method, username, password string) (*http.Response, error) {
+	baseEndpoint, err := url.Parse(pathURL)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(username) > 0 && len(password) > 0 {
+		baseEndpoint.User = url.UserPassword(username, password)
+	}
+
+	req, err := http.NewRequest(method, baseEndpoint.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := httpClient.Do(req)
+
+	return resp, err
+}
+
+// DownloadIndex fetchs helm catalog index
+func DownloadIndex(indexURL, username, password string) (*RepoIndex, error) {
 	indexURL = strings.TrimSuffix(indexURL, "/")
 	indexURL = indexURL + "/index.yaml"
-	resp, err := httpClient.Get(indexURL)
+	resp, err := request(indexURL, "GET", username, password)
 	if err != nil {
 		if e, ok := err.(net.Error); ok && e.Timeout() {
 			return nil, errors.Errorf("Timeout in HTTP GET to [%s], did not respond in %s", indexURL, httpTimeout)
@@ -42,6 +65,11 @@ func DownloadIndex(indexURL string) (*RepoIndex, error) {
 		return nil, errors.Errorf("Error in HTTP GET to [%s], error: %s", indexURL, err)
 	}
 	defer resp.Body.Close()
+
+	// only return forgot error if status code is unauthorized.
+	if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusUnauthorized {
+		return nil, &controller.ForgetError{Err: errors.Errorf("Unexpected HTTP status code %d from [%s], expected 200", resp.StatusCode, indexURL)}
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.Errorf("Unexpected HTTP status code %d from [%s], expected 200", resp.StatusCode, indexURL)
@@ -97,11 +125,12 @@ func LoadIndex(repoPath string) (*RepoIndex, error) {
 	return helmRepoIndex, yaml.Unmarshal(body, helmRepoIndex.IndexFile)
 }
 
-func FetchTgz(url string) ([]v3.File, error) {
+// FetchTgz fetchs artifacts from helm catalog
+func FetchTgz(url, username, password string) ([]v3.File, error) {
 	var files []v3.File
 
 	logrus.Debugf("Fetching file %s", url)
-	resp, err := httpClient.Get(url)
+	resp, err := request(url, "GET", username, password)
 	if err != nil {
 		return nil, errors.Errorf("Error in HTTP GET of [%s], error: %s", url, err)
 	}
@@ -145,7 +174,7 @@ func FetchTgz(url string) ([]v3.File, error) {
 	return files, nil
 }
 
-func FetchFiles(version *ChartVersion, urls []string) ([]v3.File, error) {
+func FetchFiles(version *ChartVersion, urls []string, username, password string) ([]v3.File, error) {
 	if len(urls) == 0 {
 		return nil, nil
 	}
@@ -161,7 +190,7 @@ func FetchFiles(version *ChartVersion, urls []string) ([]v3.File, error) {
 			continue
 		}
 
-		newFiles, err := FetchTgz(url)
+		newFiles, err := FetchTgz(url, username, password)
 		if err != nil {
 			return nil, err
 		}

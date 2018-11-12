@@ -102,7 +102,7 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogInfo) e
 			v := v3.TemplateVersionSpec{
 				Version: version.Version,
 			}
-			files, err := helm.FetchFiles(version, version.URLs)
+			files, err := helm.FetchFiles(version, version.URLs, catalog.Spec.Username, catalog.Spec.Password)
 			if err != nil {
 				errs = append(errs, err)
 				continue

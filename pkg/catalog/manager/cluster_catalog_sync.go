@@ -34,9 +34,10 @@ func (m *Manager) ClusterCatalogSync(key string, obj *v3.ClusterCatalog) (runtim
 
 	if commit == clusterCatalog.Status.Commit {
 		logrus.Debugf("Catalog %s is already up to date", clusterCatalog.Name)
-		if v3.CatalogConditionRefreshed.IsUnknown(clusterCatalog) {
+		if !v3.CatalogConditionRefreshed.IsTrue(clusterCatalog) {
 			v3.CatalogConditionRefreshed.True(clusterCatalog)
 			v3.CatalogConditionRefreshed.Reason(clusterCatalog, "")
+			v3.CatalogConditionRefreshed.Message(clusterCatalog, "")
 			m.clusterCatalogClient.Update(clusterCatalog)
 		}
 		return nil, nil

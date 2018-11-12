@@ -69,8 +69,9 @@ func New(management *config.ManagementContext, cacheRoot string) *Manager {
 }
 
 func (m *Manager) prepareRepoPath(catalog v3.Catalog) (path string, commit string, err error) {
-	if git.IsValid(catalog.Spec.URL) {
-		path, commit, err = m.prepareGitRepoPath(catalog)
+	pathURL := git.FormatURL(catalog.Spec.URL, catalog.Spec.Username, catalog.Spec.Password)
+	if git.IsValid(pathURL) {
+		path, commit, err = m.prepareGitRepoPath(catalog, pathURL)
 	} else {
 		path, commit, err = m.prepareHelmRepoPath(catalog)
 	}
@@ -78,7 +79,7 @@ func (m *Manager) prepareRepoPath(catalog v3.Catalog) (path string, commit strin
 }
 
 func (m *Manager) prepareHelmRepoPath(catalog v3.Catalog) (string, string, error) {
-	index, err := helm.DownloadIndex(catalog.Spec.URL)
+	index, err := helm.DownloadIndex(catalog.Spec.URL, catalog.Spec.Username, catalog.Spec.Password)
 	if err != nil {
 		return "", "", err
 	}
@@ -100,7 +101,7 @@ func hash(content string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func (m *Manager) prepareGitRepoPath(catalog v3.Catalog) (string, string, error) {
+func (m *Manager) prepareGitRepoPath(catalog v3.Catalog, repoURL string) (string, string, error) {
 	branch := catalog.Spec.Branch
 	if branch == "" {
 		branch = "master"
@@ -123,7 +124,7 @@ func (m *Manager) prepareGitRepoPath(catalog v3.Catalog) (string, string, error)
 	}
 
 	if empty {
-		if err = git.Clone(repoPath, catalog.Spec.URL, branch); err != nil {
+		if err = git.Clone(repoPath, repoURL, branch); err != nil {
 			return "", "", errors.Wrap(err, "Clone failed")
 		}
 	} else {
@@ -131,7 +132,7 @@ func (m *Manager) prepareGitRepoPath(catalog v3.Catalog) (string, string, error)
 		if _, err := os.Stat(path.Join(repoPath, ".git", "index.lock")); err == nil {
 			os.RemoveAll(path.Join(repoPath, ".git", "index.lock"))
 		}
-		changed, err := m.remoteShaChanged(catalog.Spec.URL, catalog.Spec.Branch, catalog.Status.Commit, m.uuid)
+		changed, err := m.remoteShaChanged(repoURL, catalog.Spec.Branch, catalog.Status.Commit, m.uuid)
 		if err != nil {
 			return "", "", errors.Wrap(err, "Remote commit check failed")
 		}

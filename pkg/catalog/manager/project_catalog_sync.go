@@ -34,9 +34,10 @@ func (m *Manager) ProjectCatalogSync(key string, obj *v3.ProjectCatalog) (runtim
 
 	if commit == projectCatalog.Status.Commit {
 		logrus.Debugf("Project catalog %s is already up to date", projectCatalog.Name)
-		if v3.CatalogConditionRefreshed.IsUnknown(projectCatalog) {
+		if !v3.CatalogConditionRefreshed.IsTrue(projectCatalog) {
 			v3.CatalogConditionRefreshed.True(projectCatalog)
 			v3.CatalogConditionRefreshed.Reason(projectCatalog, "")
+			v3.CatalogConditionRefreshed.Message(projectCatalog, "")
 			m.projectCatalogClient.Update(projectCatalog)
 		}
 		return nil, nil
