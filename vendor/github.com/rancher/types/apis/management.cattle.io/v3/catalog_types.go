@@ -24,6 +24,8 @@ type CatalogSpec struct {
 	URL         string `json:"url,omitempty" norman:"required"`
 	Branch      string `json:"branch,omitempty"`
 	CatalogKind string `json:"catalogKind,omitempty"`
+	Username    string `json:"username,omitempty"`
+	Password    string `json:"password,omitempty" norman:"type=password"`
 }
 
 type CatalogStatus struct {
