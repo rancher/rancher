@@ -3,6 +3,7 @@ package git
 import (
 	"bytes"
 	"fmt"
+	"net/url"
 	"os/exec"
 	"strings"
 
@@ -49,4 +50,15 @@ func runcmd(name string, arg ...string) error {
 		return errors.Wrap(err, bufErr.String())
 	}
 	return nil
+}
+
+// FormatURL generates request url if is a private catalog
+func FormatURL(pathURL, username, password string) string {
+	if len(username) > 0 && len(password) > 0 {
+		if u, err := url.Parse(pathURL); err == nil {
+			u.User = url.UserPassword(username, password)
+			return u.String()
+		}
+	}
+	return pathURL
 }
