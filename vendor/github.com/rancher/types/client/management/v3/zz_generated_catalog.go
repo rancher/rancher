@@ -18,12 +18,14 @@ const (
 	CatalogFieldLastRefreshTimestamp = "lastRefreshTimestamp"
 	CatalogFieldName                 = "name"
 	CatalogFieldOwnerReferences      = "ownerReferences"
+	CatalogFieldPassword             = "password"
 	CatalogFieldRemoved              = "removed"
 	CatalogFieldState                = "state"
 	CatalogFieldTransitioning        = "transitioning"
 	CatalogFieldTransitioningMessage = "transitioningMessage"
 	CatalogFieldURL                  = "url"
 	CatalogFieldUUID                 = "uuid"
+	CatalogFieldUsername             = "username"
 )
 
 type Catalog struct {
@@ -40,12 +42,14 @@ type Catalog struct {
 	LastRefreshTimestamp string             `json:"lastRefreshTimestamp,omitempty" yaml:"lastRefreshTimestamp,omitempty"`
 	Name                 string             `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences      []OwnerReference   `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Password             string             `json:"password,omitempty" yaml:"password,omitempty"`
 	Removed              string             `json:"removed,omitempty" yaml:"removed,omitempty"`
 	State                string             `json:"state,omitempty" yaml:"state,omitempty"`
 	Transitioning        string             `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string             `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	URL                  string             `json:"url,omitempty" yaml:"url,omitempty"`
 	UUID                 string             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Username             string             `json:"username,omitempty" yaml:"username,omitempty"`
 }
 
 type CatalogCollection struct {

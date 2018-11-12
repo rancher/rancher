@@ -20,12 +20,14 @@ const (
 	ClusterCatalogFieldName                 = "name"
 	ClusterCatalogFieldNamespaceId          = "namespaceId"
 	ClusterCatalogFieldOwnerReferences      = "ownerReferences"
+	ClusterCatalogFieldPassword             = "password"
 	ClusterCatalogFieldRemoved              = "removed"
 	ClusterCatalogFieldState                = "state"
 	ClusterCatalogFieldTransitioning        = "transitioning"
 	ClusterCatalogFieldTransitioningMessage = "transitioningMessage"
 	ClusterCatalogFieldURL                  = "url"
 	ClusterCatalogFieldUUID                 = "uuid"
+	ClusterCatalogFieldUsername             = "username"
 )
 
 type ClusterCatalog struct {
@@ -44,12 +46,14 @@ type ClusterCatalog struct {
 	Name                 string             `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId          string             `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	OwnerReferences      []OwnerReference   `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Password             string             `json:"password,omitempty" yaml:"password,omitempty"`
 	Removed              string             `json:"removed,omitempty" yaml:"removed,omitempty"`
 	State                string             `json:"state,omitempty" yaml:"state,omitempty"`
 	Transitioning        string             `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string             `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	URL                  string             `json:"url,omitempty" yaml:"url,omitempty"`
 	UUID                 string             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Username             string             `json:"username,omitempty" yaml:"username,omitempty"`
 }
 
 type ClusterCatalogCollection struct {
