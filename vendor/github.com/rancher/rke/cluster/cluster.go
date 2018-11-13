@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/docker/api/types"
 	"github.com/rancher/rke/authz"
-	"github.com/rancher/rke/cloudprovider"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/k8s"
@@ -28,32 +28,35 @@ import (
 )
 
 type Cluster struct {
-	v3.RancherKubernetesEngineConfig `yaml:",inline"`
 	ConfigPath                       string
-	LocalKubeConfigPath              string
-	EtcdHosts                        []*hosts.Host
-	WorkerHosts                      []*hosts.Host
+	ConfigDir                        string
+	CloudConfigFile                  string
 	ControlPlaneHosts                []*hosts.Host
-	InactiveHosts                    []*hosts.Host
-	EtcdReadyHosts                   []*hosts.Host
-	KubeClient                       *kubernetes.Clientset
-	KubernetesServiceIP              net.IP
 	Certificates                     map[string]pki.CertificatePKI
 	ClusterDomain                    string
 	ClusterCIDR                      string
 	ClusterDNSServer                 string
 	DockerDialerFactory              hosts.DialerFactory
+	EtcdHosts                        []*hosts.Host
+	EtcdReadyHosts                   []*hosts.Host
+	InactiveHosts                    []*hosts.Host
+	K8sWrapTransport                 k8s.WrapTransport
+	KubeClient                       *kubernetes.Clientset
+	KubernetesServiceIP              net.IP
+	LocalKubeConfigPath              string
 	LocalConnDialerFactory           hosts.DialerFactory
 	PrivateRegistriesMap             map[string]v3.PrivateRegistry
-	K8sWrapTransport                 k8s.WrapTransport
+	StateFilePath                    string
 	UseKubectlDeploy                 bool
 	UpdateWorkersOnly                bool
-	CloudConfigFile                  string
+	v3.RancherKubernetesEngineConfig `yaml:",inline"`
+	WorkerHosts                      []*hosts.Host
 }
 
 const (
 	X509AuthenticationProvider = "x509"
 	StateConfigMapName         = "cluster-state"
+	FullStateConfigMapName     = "full-cluster-state"
 	UpdateStateTimeout         = 30
 	GetStateTimeout            = 30
 	KubernetesClientTimeOut    = 30
@@ -143,76 +146,70 @@ func ParseConfig(clusterFile string) (*v3.RancherKubernetesEngineConfig, error) 
 	return &rkeConfig, nil
 }
 
-func ParseCluster(
-	ctx context.Context,
-	rkeConfig *v3.RancherKubernetesEngineConfig,
-	clusterFilePath, configDir string,
-	dockerDialerFactory,
-	localConnDialerFactory hosts.DialerFactory,
-	k8sWrapTransport k8s.WrapTransport) (*Cluster, error) {
-	var err error
+func InitClusterObject(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, flags ExternalFlags) (*Cluster, error) {
+	// basic cluster object from rkeConfig
 	c := &Cluster{
 		RancherKubernetesEngineConfig: *rkeConfig,
-		ConfigPath:                    clusterFilePath,
-		DockerDialerFactory:           dockerDialerFactory,
-		LocalConnDialerFactory:        localConnDialerFactory,
+		ConfigPath:                    flags.ClusterFilePath,
+		ConfigDir:                     flags.ConfigDir,
+		StateFilePath:                 GetStateFilePath(flags.ClusterFilePath, flags.ConfigDir),
 		PrivateRegistriesMap:          make(map[string]v3.PrivateRegistry),
-		K8sWrapTransport:              k8sWrapTransport,
 	}
+	if len(c.ConfigPath) == 0 {
+		c.ConfigPath = pki.ClusterConfig
+	}
+	// set kube_config and state file
+	c.LocalKubeConfigPath = pki.GetLocalKubeConfig(c.ConfigPath, c.ConfigDir)
+	c.StateFilePath = GetStateFilePath(c.ConfigPath, c.ConfigDir)
+
 	// Setting cluster Defaults
 	c.setClusterDefaults(ctx)
-
+	// extract cluster network configuration
+	c.setNetworkOptions()
+	// Register cloud provider
+	if err := c.setCloudProvider(); err != nil {
+		return nil, fmt.Errorf("Failed to register cloud provider: %v", err)
+	}
+	// set hosts groups
 	if err := c.InvertIndexHosts(); err != nil {
 		return nil, fmt.Errorf("Failed to classify hosts from config file: %v", err)
 	}
-
+	// validate cluster configuration
 	if err := c.ValidateCluster(); err != nil {
 		return nil, fmt.Errorf("Failed to validate cluster: %v", err)
 	}
+	return c, nil
+}
 
+func (c *Cluster) setNetworkOptions() error {
+	var err error
 	c.KubernetesServiceIP, err = pki.GetKubernetesServiceIP(c.Services.KubeAPI.ServiceClusterIPRange)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get Kubernetes Service IP: %v", err)
+		return fmt.Errorf("Failed to get Kubernetes Service IP: %v", err)
 	}
 	c.ClusterDomain = c.Services.Kubelet.ClusterDomain
 	c.ClusterCIDR = c.Services.KubeController.ClusterCIDR
 	c.ClusterDNSServer = c.Services.Kubelet.ClusterDNSServer
-	if len(c.ConfigPath) == 0 {
-		c.ConfigPath = pki.ClusterConfig
-	}
-	c.LocalKubeConfigPath = pki.GetLocalKubeConfig(c.ConfigPath, configDir)
+	return nil
+}
 
-	for _, pr := range c.PrivateRegistries {
-		if pr.URL == "" {
-			pr.URL = docker.DockerRegistryURL
-		}
-		c.PrivateRegistriesMap[pr.URL] = pr
-	}
-	// Get Cloud Provider
-	p, err := cloudprovider.InitCloudProvider(c.CloudProvider)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to initialize cloud provider: %v", err)
-	}
-	if p != nil {
-		c.CloudConfigFile, err = p.GenerateCloudConfigFile()
-		if err != nil {
-			return nil, fmt.Errorf("Failed to parse cloud config file: %v", err)
-		}
-		c.CloudProvider.Name = p.GetName()
-		if c.CloudProvider.Name == "" {
-			return nil, fmt.Errorf("Name of the cloud provider is not defined for custom provider")
-		}
-	}
-
+func (c *Cluster) SetupDialers(ctx context.Context, dailersOptions hosts.DialersOptions) error {
+	c.DockerDialerFactory = dailersOptions.DockerDialerFactory
+	c.LocalConnDialerFactory = dailersOptions.LocalConnDialerFactory
+	c.K8sWrapTransport = dailersOptions.K8sWrapTransport
 	// Create k8s wrap transport for bastion host
 	if len(c.BastionHost.Address) > 0 {
 		var err error
 		c.K8sWrapTransport, err = hosts.BastionHostWrapTransport(c.BastionHost)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return c, nil
+	return nil
+}
+
+func RebuildKubeconfig(ctx context.Context, kubeCluster *Cluster) error {
+	return rebuildLocalAdminConfig(ctx, kubeCluster)
 }
 
 func rebuildLocalAdminConfig(ctx context.Context, kubeCluster *Cluster) error {
@@ -281,10 +278,13 @@ func getLocalAdminConfigWithNewAddress(localConfigPath, cpAddress string, cluste
 		string(config.KeyData))
 }
 
-func ApplyAuthzResources(ctx context.Context, rkeConfig v3.RancherKubernetesEngineConfig, clusterFilePath, configDir string, k8sWrapTransport k8s.WrapTransport) error {
+func ApplyAuthzResources(ctx context.Context, rkeConfig v3.RancherKubernetesEngineConfig, flags ExternalFlags, dailersOptions hosts.DialersOptions) error {
 	// dialer factories are not needed here since we are not uses docker only k8s jobs
-	kubeCluster, err := ParseCluster(ctx, &rkeConfig, clusterFilePath, configDir, nil, nil, k8sWrapTransport)
+	kubeCluster, err := InitClusterObject(ctx, &rkeConfig, flags)
 	if err != nil {
+		return err
+	}
+	if err := kubeCluster.SetupDialers(ctx, dailersOptions); err != nil {
 		return err
 	}
 	if len(kubeCluster.ControlPlaneHosts) == 0 {
@@ -439,12 +439,15 @@ func ConfigureCluster(
 	ctx context.Context,
 	rkeConfig v3.RancherKubernetesEngineConfig,
 	crtBundle map[string]pki.CertificatePKI,
-	clusterFilePath, configDir string,
-	k8sWrapTransport k8s.WrapTransport,
+	flags ExternalFlags,
+	dailersOptions hosts.DialersOptions,
 	useKubectl bool) error {
 	// dialer factories are not needed here since we are not uses docker only k8s jobs
-	kubeCluster, err := ParseCluster(ctx, &rkeConfig, clusterFilePath, configDir, nil, nil, k8sWrapTransport)
+	kubeCluster, err := InitClusterObject(ctx, &rkeConfig, flags)
 	if err != nil {
+		return err
+	}
+	if err := kubeCluster.SetupDialers(ctx, dailersOptions); err != nil {
 		return err
 	}
 	kubeCluster.UseKubectlDeploy = useKubectl
@@ -505,4 +508,13 @@ func RestartClusterPods(ctx context.Context, kubeCluster *Cluster) error {
 		return err
 	}
 	return nil
+}
+
+func (c *Cluster) GetHostInfoMap() map[string]types.Info {
+	hostsInfoMap := make(map[string]types.Info)
+	allHosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
+	for _, host := range allHosts {
+		hostsInfoMap[host.Address] = host.DockerInfo
+	}
+	return hostsInfoMap
 }

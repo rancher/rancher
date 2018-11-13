@@ -44,3 +44,7 @@ func UpdateConfigMap(k8sClient *kubernetes.Clientset, configYaml []byte, configM
 func GetConfigMap(k8sClient *kubernetes.Clientset, configMapName string) (*v1.ConfigMap, error) {
 	return k8sClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(configMapName, metav1.GetOptions{})
 }
+
+func DeleteConfigMap(k8sClient *kubernetes.Clientset, configMapName string) error {
+	return k8sClient.CoreV1().ConfigMaps(metav1.NamespaceSystem).Delete(configMapName, &metav1.DeleteOptions{})
+}

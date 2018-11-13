@@ -23,8 +23,8 @@ const (
 	workerRoleLabel       = "node-role.kubernetes.io/worker"
 )
 
-func (c *Cluster) TunnelHosts(ctx context.Context, local bool) error {
-	if local {
+func (c *Cluster) TunnelHosts(ctx context.Context, flags ExternalFlags) error {
+	if flags.Local {
 		if err := c.ControlPlaneHosts[0].TunnelUpLocal(ctx, c.Version); err != nil {
 			return fmt.Errorf("Failed to connect to docker for local host [%s]: %v", c.EtcdHosts[0].Address, err)
 		}
@@ -139,7 +139,7 @@ func (c *Cluster) SetUpHosts(ctx context.Context, rotateCerts bool) error {
 			return err
 		}
 
-		if err := pki.DeployAdminConfig(ctx, c.Certificates[pki.KubeAdminCertName].Config, c.LocalKubeConfigPath); err != nil {
+		if err := rebuildLocalAdminConfig(ctx, c); err != nil {
 			return err
 		}
 		log.Infof(ctx, "[certificates] Successfully deployed kubernetes certificates to Cluster nodes")

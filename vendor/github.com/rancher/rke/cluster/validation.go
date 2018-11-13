@@ -9,11 +9,6 @@ import (
 )
 
 func (c *Cluster) ValidateCluster() error {
-	// make sure cluster has at least one controlplane/etcd host
-	if err := ValidateHostCount(c); err != nil {
-		return err
-	}
-
 	// validate duplicate nodes
 	if err := validateDuplicateNodes(c); err != nil {
 		return err

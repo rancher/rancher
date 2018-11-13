@@ -22,10 +22,11 @@ import (
 )
 
 const (
-	EtcdSnapshotPath = "/opt/rke/etcd-snapshots/"
-	EtcdRestorePath  = "/opt/rke/etcd-snapshots-restore/"
-	EtcdDataDir      = "/var/lib/rancher/etcd/"
-	EtcdInitWaitTime = 10
+	EtcdSnapshotPath     = "/opt/rke/etcd-snapshots/"
+	EtcdRestorePath      = "/opt/rke/etcd-snapshots-restore/"
+	EtcdDataDir          = "/var/lib/rancher/etcd/"
+	EtcdInitWaitTime     = 10
+	EtcdSnapshotWaitTime = 5
 )
 
 type EtcdSnapshot struct {
@@ -61,6 +62,10 @@ func RunEtcdPlane(
 				return err
 			}
 			if err := pki.SaveBackupBundleOnHost(ctx, host, alpineImage, EtcdSnapshotPath, prsMap); err != nil {
+				return err
+			}
+		} else {
+			if err := docker.DoRemoveContainer(ctx, host.DClient, EtcdSnapshotContainerName, host.Address); err != nil {
 				return err
 			}
 		}
@@ -282,7 +287,8 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 		Binds: []string{
 			fmt.Sprintf("%s:/backup", EtcdSnapshotPath),
 			fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(etcdHost.PrefixPath, "/etc/kubernetes"))},
-		NetworkMode: container.NetworkMode("host"),
+		NetworkMode:   container.NetworkMode("host"),
+		RestartPolicy: container.RestartPolicy{Name: "always"},
 	}
 
 	if once {
@@ -295,7 +301,21 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 		}
 		return docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdSnapshotOnceContainerName)
 	}
-	return docker.DoRunContainer(ctx, etcdHost.DClient, imageCfg, hostCfg, EtcdSnapshotContainerName, etcdHost.Address, ETCDRole, prsMap)
+	if err := docker.DoRunContainer(ctx, etcdHost.DClient, imageCfg, hostCfg, EtcdSnapshotContainerName, etcdHost.Address, ETCDRole, prsMap); err != nil {
+		return err
+	}
+	// check if the container exited with error
+	snapshotCont, err := docker.InspectContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdSnapshotContainerName)
+	if err != nil {
+		return err
+	}
+	time.Sleep(EtcdSnapshotWaitTime * time.Second)
+	if snapshotCont.State.Status == "exited" || snapshotCont.State.Restarting {
+		log.Warnf(ctx, "Etcd rolling snapshot container failed to start correctly")
+		return docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdSnapshotContainerName)
+
+	}
+	return nil
 }
 
 func RestoreEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdRestoreImage, snapshotName, initCluster string) error {
