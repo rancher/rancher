@@ -20,9 +20,9 @@ const (
 	unschedulableControlTaint = "node-role.kubernetes.io/controlplane=true:NoSchedule"
 )
 
-func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster, updateOnly bool) error {
+func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster, flags ExternalFlags) error {
 	log.Infof(ctx, "[reconcile] Reconciling cluster state")
-	kubeCluster.UpdateWorkersOnly = updateOnly
+	kubeCluster.UpdateWorkersOnly = flags.UpdateOnly
 	if currentCluster == nil {
 		log.Infof(ctx, "[reconcile] This is newly generated cluster")
 		kubeCluster.UpdateWorkersOnly = false
@@ -46,12 +46,6 @@ func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster,
 
 	if err := reconcileControl(ctx, currentCluster, kubeCluster, kubeClient); err != nil {
 		return err
-	}
-	// Handle service account token key issue
-	kubeAPICert := currentCluster.Certificates[pki.KubeAPICertName]
-	if currentCluster.Certificates[pki.ServiceAccountTokenKeyName].Key == nil {
-		log.Infof(ctx, "[certificates] Creating service account token key")
-		currentCluster.Certificates[pki.ServiceAccountTokenKeyName] = pki.ToCertObject(pki.ServiceAccountTokenKeyName, pki.ServiceAccountTokenKeyName, "", kubeAPICert.Certificate, kubeAPICert.Key)
 	}
 	log.Infof(ctx, "[reconcile] Reconciled cluster state successfully")
 	return nil
@@ -173,30 +167,11 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 	}
 	log.Infof(ctx, "[reconcile] Check etcd hosts to be added")
 	etcdToAdd := hosts.GetToAddHosts(currentCluster.EtcdHosts, kubeCluster.EtcdHosts)
-	crtMap := currentCluster.Certificates
-	var err error
 	for _, etcdHost := range etcdToAdd {
 		kubeCluster.UpdateWorkersOnly = false
 		etcdHost.ToAddEtcdMember = true
-		// Generate new certificate for the new etcd member
-		crtMap, err = pki.RegenerateEtcdCertificate(
-			ctx,
-			crtMap,
-			etcdHost,
-			kubeCluster.EtcdHosts,
-			kubeCluster.ClusterDomain,
-			kubeCluster.KubernetesServiceIP)
-		if err != nil {
-			return err
-		}
 	}
-	currentCluster.Certificates = crtMap
 	for _, etcdHost := range etcdToAdd {
-		// deploy certificates on new etcd host
-		if err := pki.DeployCertificatesOnHost(ctx, etcdHost, currentCluster.Certificates, kubeCluster.SystemImages.CertDownloader, pki.CertPathPrefix, kubeCluster.PrivateRegistriesMap); err != nil {
-			return err
-		}
-
 		// Check if the host already part of the cluster -- this will cover cluster with lost quorum
 		isEtcdMember, err := services.IsEtcdMember(ctx, etcdHost, kubeCluster.EtcdHosts, currentCluster.LocalConnDialerFactory, clientCert, clientkey)
 		if err != nil {

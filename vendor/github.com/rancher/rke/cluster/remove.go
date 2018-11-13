@@ -38,6 +38,7 @@ func (c *Cluster) ClusterRemove(ctx context.Context) error {
 	}
 
 	pki.RemoveAdminConfig(ctx, c.LocalKubeConfigPath)
+	removeStateFile(ctx, c.StateFilePath)
 	return nil
 }
 

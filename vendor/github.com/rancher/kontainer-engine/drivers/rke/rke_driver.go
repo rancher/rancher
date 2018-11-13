@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/kontainer-engine/drivers/util"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/cmd"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/k8s"
@@ -27,8 +28,9 @@ import (
 )
 
 const (
-	kubeConfigFile = "kube_config_cluster.yml"
-	rancherPath    = "./management-state/rke/"
+	kubeConfigFile   = "kube_config_cluster.yml"
+	rancherPath      = "./management-state/rke/"
+	clusterStateFile = "cluster.rkestate"
 )
 
 // Driver is the struct of rke driver
@@ -135,8 +137,8 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions, info *ty
 	defer d.cleanup(stateDir)
 
 	certsStr := ""
-	APIURL, caCrt, clientCert, clientKey, certs, err := clusterUp(ctx, &rkeConfig, d.DockerDialer, d.LocalDialer,
-		d.wrapTransport(&rkeConfig), false, stateDir, false, false)
+	dialers, externalFlags := d.getFlags(rkeConfig, stateDir)
+	APIURL, caCrt, clientCert, clientKey, certs, err := clusterUp(ctx, &rkeConfig, dialers, externalFlags)
 	if len(certs) > 0 {
 		certsStr, err = rkecerts.ToString(certs)
 	}
@@ -179,13 +181,21 @@ func (d *Driver) Update(ctx context.Context, clusterInfo *types.ClusterInfo, opt
 	defer d.cleanup(stateDir)
 
 	certStr := ""
-	APIURL, caCrt, clientCert, clientKey, certs, err := cmd.ClusterUp(ctx, &rkeConfig, d.DockerDialer, d.LocalDialer,
-		d.wrapTransport(&rkeConfig), false, stateDir, false, false)
+
+	dialers, externalFlags := d.getFlags(rkeConfig, stateDir)
+	if err := cmd.ClusterInit(ctx, &rkeConfig, dialers, externalFlags); err != nil {
+		return nil, err
+	}
+	APIURL, caCrt, clientCert, clientKey, certs, err := cmd.ClusterUp(ctx, dialers, externalFlags)
 	if err == nil {
 		certStr, err = rkecerts.ToString(certs)
 	}
 	if err != nil {
-		return nil, err
+		return d.save(&types.ClusterInfo{
+			Metadata: map[string]string{
+				"Config": yaml,
+			},
+		}, stateDir), err
 	}
 
 	if clusterInfo.Metadata == nil {
@@ -312,9 +322,11 @@ func (d *Driver) SetVersion(ctx context.Context, info *types.ClusterInfo, versio
 		return err
 	}
 	defer d.cleanup(stateDir)
-
-	_, _, _, _, _, err = cmd.ClusterUp(ctx, &config, d.DockerDialer, d.LocalDialer,
-		d.wrapTransport(&config), false, stateDir, false, false)
+	dialers, externalFlags := d.getFlags(config, stateDir)
+	if err := cmd.ClusterInit(ctx, &config, dialers, externalFlags); err != nil {
+		return err
+	}
+	_, _, _, _, _, err = cmd.ClusterUp(ctx, dialers, externalFlags)
 
 	if err != nil {
 		return err
@@ -368,7 +380,20 @@ func (d *Driver) Remove(ctx context.Context, clusterInfo *types.ClusterInfo) err
 	}
 	stateDir, _ := d.restore(clusterInfo)
 	defer d.save(nil, stateDir)
-	return cmd.ClusterRemove(ctx, &rkeConfig, d.DockerDialer, d.wrapTransport(&rkeConfig), false, stateDir)
+	dialers, externalFlags := d.getFlags(rkeConfig, stateDir)
+	return cmd.ClusterRemove(ctx, &rkeConfig, dialers, externalFlags)
+}
+
+func (d *Driver) RotateCerts(ctx context.Context, clusterInfo *types.ClusterInfo, rotateCA bool, components []string) error {
+	rkeConfig, err := util.ConvertToRkeConfig(clusterInfo.Metadata["Config"])
+	if err != nil {
+		return err
+	}
+	stateDir, _ := d.restore(clusterInfo)
+	defer d.save(nil, stateDir)
+	dialers, externalFlags := d.getFlags(rkeConfig, stateDir)
+	rotateFlags := cluster.GetRotateCertsFlags(rotateCA, components)
+	return cmd.RotateRKECertificates(ctx, &rkeConfig, dialers, externalFlags, rotateFlags)
 }
 
 func (d *Driver) restore(info *types.ClusterInfo) (string, error) {
@@ -383,6 +408,10 @@ func (d *Driver) restore(info *types.ClusterInfo) (string, error) {
 		if state != "" {
 			ioutil.WriteFile(kubeConfig(dir), []byte(state), 0600)
 		}
+		fullState := info.Metadata["fullState"]
+		if fullState != "" {
+			ioutil.WriteFile(clusterState(dir), []byte(fullState), 0600)
+		}
 	}
 
 	return filepath.Join(dir, "cluster.yml"), nil
@@ -396,6 +425,10 @@ func (d *Driver) save(info *types.ClusterInfo, stateDir string) *types.ClusterIn
 				info.Metadata = map[string]string{}
 			}
 			info.Metadata["state"] = string(b)
+		}
+		s, err := ioutil.ReadFile(clusterState(stateDir))
+		if err == nil {
+			info.Metadata["fullState"] = string(s)
 		}
 	}
 
@@ -412,6 +445,12 @@ func (d *Driver) cleanup(stateDir string) {
 	}
 }
 
+func (d *Driver) getFlags(rkeConfig v3.RancherKubernetesEngineConfig, stateDir string) (hosts.DialersOptions, cluster.ExternalFlags) {
+	dialers := hosts.GetDialerOptions(d.DockerDialer, d.LocalDialer, d.wrapTransport(&rkeConfig))
+	externalFlags := cluster.GetExternalFlags(false, false, false, stateDir, "")
+	return dialers, externalFlags
+}
+
 func kubeConfig(stateDir string) string {
 	if strings.HasSuffix(stateDir, "/cluster.yml") {
 		return filepath.Join(filepath.Dir(stateDir), kubeConfigFile)
@@ -419,13 +458,22 @@ func kubeConfig(stateDir string) string {
 	return filepath.Join(stateDir, kubeConfigFile)
 }
 
+func clusterState(stateDir string) string {
+	if strings.HasSuffix(stateDir, "/cluster.yml") {
+		return filepath.Join(filepath.Dir(stateDir), clusterStateFile)
+	}
+	return filepath.Join(stateDir, clusterStateFile)
+}
+
 func clusterUp(
 	ctx context.Context,
 	rkeConfig *v3.RancherKubernetesEngineConfig,
-	dockerDialerFactory, localConnDialerFactory hosts.DialerFactory,
-	k8sWrapTransport k8s.WrapTransport,
-	local bool, configDir string, updateOnly, disablePortCheck bool) (string, string, string, string, map[string]pki.CertificatePKI, error) {
-	APIURL, caCrt, clientCert, clientKey, certs, err := cmd.ClusterUp(ctx, rkeConfig, dockerDialerFactory, localConnDialerFactory, k8sWrapTransport, local, configDir, updateOnly, disablePortCheck)
+	dialers hosts.DialersOptions,
+	externalFlags cluster.ExternalFlags) (string, string, string, string, map[string]pki.CertificatePKI, error) {
+	if err := cmd.ClusterInit(ctx, rkeConfig, dialers, externalFlags); err != nil {
+		log.Warnf(ctx, "%v", err)
+	}
+	APIURL, caCrt, clientCert, clientKey, certs, err := cmd.ClusterUp(ctx, dialers, externalFlags)
 	if err != nil {
 		log.Warnf(ctx, "%v", err)
 	}

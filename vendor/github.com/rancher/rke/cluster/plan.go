@@ -41,7 +41,7 @@ var admissionControlOptionNames = []string{"enable-admission-plugins", "admissio
 
 func GeneratePlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, hostsInfoMap map[string]types.Info) (v3.RKEPlan, error) {
 	clusterPlan := v3.RKEPlan{}
-	myCluster, err := ParseCluster(ctx, rkeConfig, "", "", nil, nil, nil)
+	myCluster, err := InitClusterObject(ctx, rkeConfig, ExternalFlags{})
 	if err != nil {
 		return clusterPlan, err
 	}

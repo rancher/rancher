@@ -3,7 +3,10 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"github.com/rancher/rke/cloudprovider"
+	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/services"
@@ -32,7 +35,7 @@ const (
 
 	DefaultIngressController         = "nginx"
 	DefaultEtcdBackupCreationPeriod  = "12h"
-	DefaultEtcdBackupRetentionPeriod = "3d"
+	DefaultEtcdBackupRetentionPeriod = "72h"
 	DefaultEtcdSnapshot              = true
 	DefaultMonitoringProvider        = "metrics-server"
 
@@ -41,6 +44,14 @@ const (
 	DefaultEtcdElectionTimeoutName    = "election-timeout"
 	DefaultEtcdElectionTimeoutValue   = "5000"
 )
+
+type ExternalFlags struct {
+	ConfigDir        string
+	ClusterFilePath  string
+	DisablePortCheck bool
+	Local            bool
+	UpdateOnly       bool
+}
 
 func setDefaultIfEmptyMapValue(configMap map[string]string, key string, value string) {
 	if _, ok := configMap[key]; !ok {
@@ -88,6 +99,7 @@ func (c *Cluster) setClusterDefaults(ctx context.Context) {
 			c.Nodes[i].Port = DefaultSSHPort
 		}
 
+		c.Nodes[i].HostnameOverride = strings.ToLower(c.Nodes[i].HostnameOverride)
 		// For now, you can set at the global level only.
 		c.Nodes[i].SSHAgentAuth = c.SSHAgentAuth
 	}
@@ -113,6 +125,14 @@ func (c *Cluster) setClusterDefaults(ctx context.Context) {
 	}
 	if len(c.Monitoring.Provider) == 0 {
 		c.Monitoring.Provider = DefaultMonitoringProvider
+	}
+
+	//set docker private registry URL
+	for _, pr := range c.PrivateRegistries {
+		if pr.URL == "" {
+			pr.URL = docker.DockerRegistryURL
+		}
+		c.PrivateRegistriesMap[pr.URL] = pr
 	}
 	c.setClusterImageDefaults()
 	c.setClusterServicesDefaults()
@@ -250,4 +270,32 @@ func d(image, defaultRegistryURL string) string {
 		return image
 	}
 	return fmt.Sprintf("%s/%s", defaultRegistryURL, image)
+}
+
+func (c *Cluster) setCloudProvider() error {
+	p, err := cloudprovider.InitCloudProvider(c.CloudProvider)
+	if err != nil {
+		return fmt.Errorf("Failed to initialize cloud provider: %v", err)
+	}
+	if p != nil {
+		c.CloudConfigFile, err = p.GenerateCloudConfigFile()
+		if err != nil {
+			return fmt.Errorf("Failed to parse cloud config file: %v", err)
+		}
+		c.CloudProvider.Name = p.GetName()
+		if c.CloudProvider.Name == "" {
+			return fmt.Errorf("Name of the cloud provider is not defined for custom provider")
+		}
+	}
+	return nil
+}
+
+func GetExternalFlags(local, updateOnly, disablePortCheck bool, configDir, clusterFilePath string) ExternalFlags {
+	return ExternalFlags{
+		Local:            local,
+		UpdateOnly:       updateOnly,
+		DisablePortCheck: disablePortCheck,
+		ConfigDir:        configDir,
+		ClusterFilePath:  clusterFilePath,
+	}
 }

@@ -12,6 +12,7 @@ import (
 	"net"
 	"path"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
@@ -196,7 +197,7 @@ func GetConfigTempPath(name string) string {
 	return fmt.Sprintf("%skubecfg-%s.yaml", TempCertPath, name)
 }
 
-func ToCertObject(componentName, commonName, ouName string, cert *x509.Certificate, key *rsa.PrivateKey) CertificatePKI {
+func ToCertObject(componentName, commonName, ouName string, certificate *x509.Certificate, key *rsa.PrivateKey) CertificatePKI {
 	var config, configPath, configEnvName string
 	if len(commonName) == 0 {
 		commonName = getDefaultCN(componentName)
@@ -207,6 +208,8 @@ func ToCertObject(componentName, commonName, ouName string, cert *x509.Certifica
 	caCertPath := GetCertPath(CACertName)
 	path := GetCertPath(componentName)
 	keyPath := GetKeyPath(componentName)
+	certificatePEM := string(cert.EncodeCertPEM(certificate))
+	keyPEM := string(cert.EncodePrivateKeyPEM(key))
 
 	if componentName != CACertName && componentName != KubeAPICertName && !strings.Contains(componentName, EtcdCertName) && componentName != ServiceAccountTokenKeyName {
 		config = getKubeConfigX509("https://127.0.0.1:6443", "local", componentName, caCertPath, path, keyPath)
@@ -215,18 +218,20 @@ func ToCertObject(componentName, commonName, ouName string, cert *x509.Certifica
 	}
 
 	return CertificatePKI{
-		Certificate:   cert,
-		Key:           key,
-		Config:        config,
-		Name:          componentName,
-		CommonName:    commonName,
-		OUName:        ouName,
-		EnvName:       envName,
-		KeyEnvName:    keyEnvName,
-		ConfigEnvName: configEnvName,
-		Path:          path,
-		KeyPath:       keyPath,
-		ConfigPath:    configPath,
+		Certificate:    certificate,
+		Key:            key,
+		CertificatePEM: certificatePEM,
+		KeyPEM:         keyPEM,
+		Config:         config,
+		Name:           componentName,
+		CommonName:     commonName,
+		OUName:         ouName,
+		EnvName:        envName,
+		KeyEnvName:     keyEnvName,
+		ConfigEnvName:  configEnvName,
+		Path:           path,
+		KeyPath:        keyPath,
+		ConfigPath:     configPath,
 	}
 }
 
@@ -379,4 +384,43 @@ func isFileNotFoundErr(e error) bool {
 		return true
 	}
 	return false
+}
+
+func deepEqualIPsAltNames(oldIPs, newIPs []net.IP) bool {
+	if len(oldIPs) != len(newIPs) {
+		return false
+	}
+	oldIPsStrings := make([]string, len(oldIPs))
+	newIPsStrings := make([]string, len(newIPs))
+	for i := range oldIPs {
+		oldIPsStrings = append(oldIPsStrings, oldIPs[i].String())
+		newIPsStrings = append(newIPsStrings, newIPs[i].String())
+	}
+	return reflect.DeepEqual(oldIPsStrings, newIPsStrings)
+}
+
+func TransformPEMToObject(in map[string]CertificatePKI) map[string]CertificatePKI {
+	out := map[string]CertificatePKI{}
+	for k, v := range in {
+		certs, _ := cert.ParseCertsPEM([]byte(v.CertificatePEM))
+		key, _ := cert.ParsePrivateKeyPEM([]byte(v.KeyPEM))
+		o := CertificatePKI{
+			ConfigEnvName:  v.ConfigEnvName,
+			Name:           v.Name,
+			Config:         v.Config,
+			CommonName:     v.CommonName,
+			OUName:         v.OUName,
+			EnvName:        v.EnvName,
+			Path:           v.Path,
+			KeyEnvName:     v.KeyEnvName,
+			KeyPath:        v.KeyPath,
+			ConfigPath:     v.ConfigPath,
+			Certificate:    certs[0],
+			Key:            key.(*rsa.PrivateKey),
+			CertificatePEM: v.CertificatePEM,
+			KeyPEM:         v.KeyPEM,
+		}
+		out[k] = o
+	}
+	return out
 }

@@ -187,10 +187,8 @@ func (g *genericController) Start(ctx context.Context, threadiness int) error {
 	g.Lock()
 	defer g.Unlock()
 
-	if !g.synced {
-		if err := g.sync(ctx); err != nil {
-			return err
-		}
+	if err := g.sync(ctx); err != nil {
+		return err
 	}
 
 	if !g.running {
@@ -202,7 +200,7 @@ func (g *genericController) Start(ctx context.Context, threadiness int) error {
 
 	if g.running {
 		for _, h := range g.handlers {
-			if h.generation != g.generation {
+			if h.generation < g.generation {
 				continue
 			}
 			for _, key := range g.informer.GetStore().ListKeys() {

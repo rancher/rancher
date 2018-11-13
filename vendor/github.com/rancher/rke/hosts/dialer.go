@@ -29,6 +29,20 @@ type dialer struct {
 	bastionDialer   *dialer
 }
 
+type DialersOptions struct {
+	DockerDialerFactory    DialerFactory
+	LocalConnDialerFactory DialerFactory
+	K8sWrapTransport       k8s.WrapTransport
+}
+
+func GetDialerOptions(d, l DialerFactory, w k8s.WrapTransport) DialersOptions {
+	return DialersOptions{
+		DockerDialerFactory:    d,
+		LocalConnDialerFactory: l,
+		K8sWrapTransport:       w,
+	}
+}
+
 func newDialer(h *Host, kind string) (*dialer, error) {
 	// Check for Bastion host connection
 	var bastionDialer *dialer
