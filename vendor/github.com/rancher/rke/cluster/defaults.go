@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
@@ -88,6 +89,7 @@ func (c *Cluster) setClusterDefaults(ctx context.Context) {
 			c.Nodes[i].Port = DefaultSSHPort
 		}
 
+		c.Nodes[i].HostnameOverride = strings.ToLower(c.Nodes[i].HostnameOverride)
 		// For now, you can set at the global level only.
 		c.Nodes[i].SSHAgentAuth = c.SSHAgentAuth
 	}
