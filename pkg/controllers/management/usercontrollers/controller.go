@@ -67,11 +67,17 @@ func (c *ClusterLifecycleCleanup) cleanupLocalCluster(obj *v3.Cluster) error {
 	if err != nil {
 		return err
 	}
-	err = userContext.Apps.Deployments("cattle-system").Delete("cattle-cluster-agent", &metav1.DeleteOptions{})
+
+	propagationBackground := metav1.DeletePropagationBackground
+	deleteOptions := &metav1.DeleteOptions{
+		PropagationPolicy: &propagationBackground,
+	}
+
+	err = userContext.Apps.Deployments("cattle-system").Delete("cattle-cluster-agent", deleteOptions)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
-	err = userContext.Apps.DaemonSets("cattle-system").Delete("cattle-node-agent", &metav1.DeleteOptions{})
+	err = userContext.Apps.DaemonSets("cattle-system").Delete("cattle-node-agent", deleteOptions)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
