@@ -30,6 +30,10 @@ import (
 )
 
 var (
+	// There is a mirror list in pkg/controllers/management/usercontrollers/controller.go.
+	// If these are getting updated consider if that update needs to apply to the
+	// local internal cluster as well
+
 	// List of namespace labels that will be removed
 	nsLabels = []string{
 		nslabels.ProjectIDFieldLabel,
