@@ -6,15 +6,40 @@ import (
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/user/helm"
+	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/sirupsen/logrus"
 	batchV1 "k8s.io/api/batch/v1"
 	coreV1 "k8s.io/api/core/v1"
 	rbacV1 "k8s.io/api/rbac/v1"
+	apierror "k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
+)
+
+var (
+	// There is a mirror list in pkg/agent/clean/clean.go. If these are getting
+	// updated consider if that update needs to apply to the user cluster as well
+
+	// List of namespace labels that will be removed
+	nsLabels = []string{
+		nslabels.ProjectIDFieldLabel,
+	}
+
+	// List of namespace annotations that will be removed
+	nsAnnotations = []string{
+		"cattle.io/status",
+		"field.cattle.io/creatorId",
+		"field.cattle.io/resourceQuotaTemplateId",
+		"lifecycle.cattle.io/create.namespace-auth",
+		nslabels.ProjectIDFieldLabel,
+		helm.AppIDsLabel,
+	}
 )
 
 /*
@@ -42,7 +67,7 @@ func (c *ClusterLifecycleCleanup) Create(obj *v3.Cluster) (runtime.Object, error
 
 func (c *ClusterLifecycleCleanup) Remove(obj *v3.Cluster) (runtime.Object, error) {
 	var err error
-	if obj.Name == "local" {
+	if obj.Name == "local" && obj.Spec.Internal {
 		err = c.cleanupLocalCluster(obj)
 	} else if obj.Status.Driver == v3.ClusterDriverImported {
 		err = c.cleanupImportedCluster(obj)
@@ -65,6 +90,11 @@ func (c *ClusterLifecycleCleanup) Remove(obj *v3.Cluster) (runtime.Object, error
 
 func (c *ClusterLifecycleCleanup) cleanupLocalCluster(obj *v3.Cluster) error {
 	userContext, err := c.Manager.UserContext(obj.Name)
+	if err != nil {
+		return err
+	}
+
+	err = cleanupNamespaces(userContext.K8sClient)
 	if err != nil {
 		return err
 	}
@@ -315,6 +345,75 @@ func (c *ClusterLifecycleCleanup) updateClusterRoleBindingOwner(
 		}
 		return nil
 	})
+}
+
+func cleanupNamespaces(client kubernetes.Interface) error {
+	logrus.Debug("Starting cleanup of local cluster namespaces")
+	namespaces, err := client.CoreV1().Namespaces().List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, ns := range namespaces.Items {
+		err = tryUpdate(func() error {
+			nameSpace, err := client.CoreV1().Namespaces().Get(ns.Name, metav1.GetOptions{})
+			if err != nil {
+				if apierror.IsNotFound(err) {
+					return nil
+				}
+				return err
+			}
+
+			var updated bool
+
+			// Cleanup finalizers
+			if len(nameSpace.Finalizers) > 0 {
+				finalizers := []string{}
+				for _, finalizer := range nameSpace.Finalizers {
+					if finalizer != "controller.cattle.io/namespace-auth" {
+						finalizers = append(finalizers, finalizer)
+					}
+				}
+				if len(nameSpace.Finalizers) != len(finalizers) {
+					updated = true
+					nameSpace.Finalizers = finalizers
+				}
+			}
+
+			// Cleanup labels
+			for _, label := range nsLabels {
+				if _, ok := nameSpace.Labels[label]; ok {
+					updated = ok
+					delete(nameSpace.Labels, label)
+				}
+			}
+
+			// Cleanup annotations
+			for _, anno := range nsAnnotations {
+				if _, ok := nameSpace.Annotations[anno]; ok {
+					updated = ok
+					delete(nameSpace.Annotations, anno)
+				}
+			}
+
+			if updated {
+				logrus.Debugf("Updating local namespace: %v", nameSpace.Name)
+				_, err = client.CoreV1().Namespaces().Update(nameSpace)
+				if err != nil {
+					return err
+				}
+
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // tryUpdate runs the input func and if the error returned is a conflict error
