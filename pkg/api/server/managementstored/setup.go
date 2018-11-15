@@ -64,6 +64,8 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ClusterType,
 		client.ComposeConfigType,
 		client.DynamicSchemaType,
+		client.EtcdBackupConfigType,
+		client.EtcdBackupType,
 		client.GlobalRoleBindingType,
 		client.GlobalRoleType,
 		client.GroupMemberType,
