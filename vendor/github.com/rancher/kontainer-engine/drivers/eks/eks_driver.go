@@ -95,13 +95,14 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Type:  types.StringType,
 		Usage: "The displayed name of the cluster in the Rancher UI",
 	}
-	driverFlag.Options["client-id"] = &types.Flag{
+	driverFlag.Options["access-key"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "The AWS Client ID to use",
 	}
-	driverFlag.Options["client-secret"] = &types.Flag{
-		Type:  types.StringType,
-		Usage: "The AWS Client Secret associated with the Client ID",
+	driverFlag.Options["secret-key"] = &types.Flag{
+		Type:     types.StringType,
+		Password: true,
+		Usage:    "The AWS Client Secret associated with the Client ID",
 	}
 	driverFlag.Options["session-token"] = &types.Flag{
 		Type:  types.StringType,
@@ -110,22 +111,30 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 	driverFlag.Options["region"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "The AWS Region to create the EKS cluster in",
-		Value: "us-west-2",
+		Default: &types.Default{
+			DefaultString: "us-west-2",
+		},
 	}
 	driverFlag.Options["instance-type"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "The type of machine to use for worker nodes",
-		Value: "t2.medium",
+		Default: &types.Default{
+			DefaultString: "t2.medium",
+		},
 	}
 	driverFlag.Options["minimum-nodes"] = &types.Flag{
 		Type:  types.IntType,
 		Usage: "The minimum number of worker nodes",
-		Value: "1",
+		Default: &types.Default{
+			DefaultInt: 1,
+		},
 	}
 	driverFlag.Options["maximum-nodes"] = &types.Flag{
 		Type:  types.IntType,
 		Usage: "The maximum number of worker nodes",
-		Value: "3",
+		Default: &types.Default{
+			DefaultInt: 3,
+		},
 	}
 
 	driverFlag.Options["virtual-network"] = &types.Flag{
@@ -149,8 +158,11 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Usage: "A custom AMI ID to use for the worker nodes instead of the default",
 	}
 	driverFlag.Options["associate-worker-node-public-ip"] = &types.Flag{
-		Type:  types.StringType,
+		Type:  types.BoolPointerType,
 		Usage: "A custom AMI ID to use for the worker nodes instead of the default",
+		Default: &types.Default{
+			DefaultBool: true,
+		},
 	}
 
 	return &driverFlag, nil
@@ -890,4 +902,15 @@ func doesNotExist(err error) bool {
 
 func (d *Driver) GetCapabilities(ctx context.Context) (*types.Capabilities, error) {
 	return &d.driverCapabilities, nil
+}
+
+func (d *Driver) GetK8SCapabilities(ctx context.Context, _ *types.DriverOptions) (*types.K8SCapabilities, error) {
+	return &types.K8SCapabilities{
+		L4LoadBalancer: &types.LoadBalancerCapabilities{
+			Enabled:              true,
+			Provider:             "ELB",
+			ProtocolsSupported:   []string{"TCP"},
+			HealthCheckSupported: true,
+		},
+	}, nil
 }

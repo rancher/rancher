@@ -12,14 +12,11 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-const (
-	listenAddr = "127.0.0.1:"
-)
-
 // GrpcServer defines the server struct
 type GrpcServer struct {
-	driver  Driver
-	address chan string
+	driver     Driver
+	address    chan string
+	grpcServer *grpc.Server
 }
 
 // NewServer creates a grpc server for a specific plugin
@@ -100,20 +97,46 @@ func (s *GrpcServer) GetCapabilities(ctx context.Context, in *Empty) (*Capabilit
 	return s.driver.GetCapabilities(ctx)
 }
 
-// Serve serves a grpc server
-func (s *GrpcServer) Serve() {
+func (s *GrpcServer) GetK8SCapabilities(ctx context.Context, opts *DriverOptions) (*K8SCapabilities, error) {
+	return s.driver.GetK8SCapabilities(ctx, opts)
+}
+
+// Serve serves a grpc server.  Sends errors to the error channel if they occur
+func (s *GrpcServer) Serve(listenAddr string, errChan chan error) {
+	listen, err := net.Listen("tcp", listenAddr)
+	if err != nil {
+		errChan <- err
+	}
+	addr := listen.Addr().String()
+	s.address <- addr
+	s.grpcServer = grpc.NewServer()
+	RegisterDriverServer(s.grpcServer, s)
+	reflection.Register(s.grpcServer)
+	logrus.Debugf("RPC GrpcServer listening on address %s", addr)
+	if err := s.grpcServer.Serve(listen); err != nil {
+		errChan <- err
+	}
+	return
+}
+
+// ServeOrDie serves a grpc server or kills the process
+func (s *GrpcServer) ServeOrDie(listenAddr string) {
 	listen, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		logrus.Fatal(err)
 	}
 	addr := listen.Addr().String()
 	s.address <- addr
-	grpcServer := grpc.NewServer()
-	RegisterDriverServer(grpcServer, s)
-	reflection.Register(grpcServer)
-	logrus.Debugf("RPC GrpcServer listening on address %s", addr)
-	if err := grpcServer.Serve(listen); err != nil {
-		logrus.Fatal(err)
+	s.grpcServer = grpc.NewServer()
+	RegisterDriverServer(s.grpcServer, s)
+	reflection.Register(s.grpcServer)
+	logrus.Infof("RPC GrpcServer listening on address %s", addr)
+	if err := s.grpcServer.Serve(listen); err != nil {
+		logrus.Fatalf("%v", err)
 	}
 	return
+}
+
+func (s *GrpcServer) Stop() {
+	s.grpcServer.Stop()
 }

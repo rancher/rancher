@@ -59,6 +59,7 @@ type Interface interface {
 	ComposeConfigsGetter
 	ProjectCatalogsGetter
 	ClusterCatalogsGetter
+	KontainerDriversGetter
 }
 
 type Clients struct {
@@ -101,6 +102,7 @@ type Clients struct {
 	ComposeConfig                           ComposeConfigClient
 	ProjectCatalog                          ProjectCatalogClient
 	ClusterCatalog                          ClusterCatalogClient
+	KontainerDriver                         KontainerDriverClient
 }
 
 type Client struct {
@@ -147,6 +149,7 @@ type Client struct {
 	composeConfigControllers                           map[string]ComposeConfigController
 	projectCatalogControllers                          map[string]ProjectCatalogController
 	clusterCatalogControllers                          map[string]ClusterCatalogController
+	kontainerDriverControllers                         map[string]KontainerDriverController
 }
 
 func Factory(ctx context.Context, config rest.Config) (context.Context, controller.Starter, error) {
@@ -298,6 +301,9 @@ func NewClientsFromInterface(iface Interface) *Clients {
 		ClusterCatalog: &clusterCatalogClient2{
 			iface: iface.ClusterCatalogs(""),
 		},
+		KontainerDriver: &kontainerDriverClient2{
+			iface: iface.KontainerDrivers(""),
+		},
 	}
 }
 
@@ -353,6 +359,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		composeConfigControllers:                           map[string]ComposeConfigController{},
 		projectCatalogControllers:                          map[string]ProjectCatalogController{},
 		clusterCatalogControllers:                          map[string]ClusterCatalogController{},
+		kontainerDriverControllers:                         map[string]KontainerDriverController{},
 	}, nil
 }
 
@@ -869,6 +876,19 @@ type ClusterCatalogsGetter interface {
 func (c *Client) ClusterCatalogs(namespace string) ClusterCatalogInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ClusterCatalogResource, ClusterCatalogGroupVersionKind, clusterCatalogFactory{})
 	return &clusterCatalogClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type KontainerDriversGetter interface {
+	KontainerDrivers(namespace string) KontainerDriverInterface
+}
+
+func (c *Client) KontainerDrivers(namespace string) KontainerDriverInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &KontainerDriverResource, KontainerDriverGroupVersionKind, kontainerDriverFactory{})
+	return &kontainerDriverClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,
