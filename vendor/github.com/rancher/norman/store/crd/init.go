@@ -60,15 +60,15 @@ func (f *Factory) BatchCreateCRDs(ctx context.Context, storageContext types.Stor
 			schemasToCreate = append(schemasToCreate, s)
 		}
 
-		err := f.AssignStores(ctx, storageContext, schemasToCreate...)
+		err := f.AssignStores(ctx, storageContext, version, schemasToCreate...)
 		if err != nil {
 			panic("creating CRD store " + err.Error())
 		}
 	}()
 }
 
-func (f *Factory) AssignStores(ctx context.Context, storageContext types.StorageContext, schemas ...*types.Schema) error {
-	schemaStatus, err := f.CreateCRDs(ctx, storageContext, schemas...)
+func (f *Factory) AssignStores(ctx context.Context, storageContext types.StorageContext, apiVersion *types.APIVersion, schemas ...*types.Schema) error {
+	schemaStatus, err := f.CreateCRDs(ctx, storageContext, apiVersion, schemas...)
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func (f *Factory) AssignStores(ctx context.Context, storageContext types.Storage
 	return nil
 }
 
-func (f *Factory) CreateCRDs(ctx context.Context, storageContext types.StorageContext, schemas ...*types.Schema) (map[*types.Schema]*apiext.CustomResourceDefinition, error) {
+func (f *Factory) CreateCRDs(ctx context.Context, storageContext types.StorageContext, apiVersion *types.APIVersion, schemas ...*types.Schema) (map[*types.Schema]*apiext.CustomResourceDefinition, error) {
 	schemaStatus := map[*types.Schema]*apiext.CustomResourceDefinition{}
 
 	apiClient, err := f.ClientGetter.APIExtClient(nil, storageContext)
@@ -105,7 +105,7 @@ func (f *Factory) CreateCRDs(ctx context.Context, storageContext types.StorageCo
 	}
 
 	for _, schema := range schemas {
-		crd, err := f.createCRD(apiClient, schema, ready)
+		crd, err := f.createCRD(apiClient, schema, apiVersion, ready)
 		if err != nil {
 			return nil, err
 		}
@@ -164,9 +164,19 @@ func (f *Factory) waitCRD(ctx context.Context, apiClient clientset.Interface, cr
 	})
 }
 
-func (f *Factory) createCRD(apiClient clientset.Interface, schema *types.Schema, ready map[string]*apiext.CustomResourceDefinition) (*apiext.CustomResourceDefinition, error) {
+func (f *Factory) createCRD(apiClient clientset.Interface, schema *types.Schema, groupVersionOverwrite *types.APIVersion, ready map[string]*apiext.CustomResourceDefinition) (*apiext.CustomResourceDefinition, error) {
+	var (
+		group, version string
+	)
+	if groupVersionOverwrite != nil {
+		group = groupVersionOverwrite.Group
+		version = groupVersionOverwrite.Version
+	} else {
+		group = schema.Version.Group
+		version = schema.Version.Version
+	}
 	plural := strings.ToLower(schema.PluralName)
-	name := strings.ToLower(plural + "." + schema.Version.Group)
+	name := strings.ToLower(plural + "." + group)
 
 	crd, ok := ready[name]
 	if ok {
@@ -178,8 +188,8 @@ func (f *Factory) createCRD(apiClient clientset.Interface, schema *types.Schema,
 			Name: name,
 		},
 		Spec: apiext.CustomResourceDefinitionSpec{
-			Group:   schema.Version.Group,
-			Version: schema.Version.Version,
+			Group:   group,
+			Version: version,
 			Names: apiext.CustomResourceDefinitionNames{
 				Plural: plural,
 				Kind:   convert.Capitalize(schema.ID),
