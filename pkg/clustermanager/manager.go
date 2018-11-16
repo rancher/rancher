@@ -249,7 +249,7 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 		TLSClientConfig: rest.TLSClientConfig{
 			CAData: append(caBytes, suffix...),
 		},
-		Timeout: 30 * time.Second,
+		Timeout: 15 * time.Second,
 		WrapTransport: func(rt http.RoundTripper) http.RoundTripper {
 			if ht, ok := rt.(*http.Transport); ok {
 				ht.DialContext = nil
