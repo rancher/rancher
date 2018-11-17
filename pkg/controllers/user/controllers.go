@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/dnsrecord"
 	"github.com/rancher/rancher/pkg/controllers/user/endpoints"
 	"github.com/rancher/rancher/pkg/controllers/user/externalservice"
+	"github.com/rancher/rancher/pkg/controllers/user/globaldns"
 	"github.com/rancher/rancher/pkg/controllers/user/healthsyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/helm"
 	"github.com/rancher/rancher/pkg/controllers/user/ingress"
@@ -55,6 +56,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	endpoints.Register(ctx, cluster)
 	approuter.Register(ctx, cluster)
 	resourcequota.Register(ctx, cluster)
+	globaldns.Register(ctx, cluster)
 
 	c, err := cluster.Management.Management.Clusters("").Get(cluster.ClusterName, metav1.GetOptions{})
 	if err != nil {
