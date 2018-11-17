@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -145,8 +146,19 @@ func (b *Builder) checkDefaultAndRequired(schema *types.Schema, input map[string
 
 		if op.IsList() && fieldMatchesOp(field, List) && definition.IsReferenceType(field.Type) && !hasKey {
 			result[fieldName] = nil
-		} else if op.IsList() && fieldMatchesOp(field, List) && !hasKey && field.Default != nil {
-			result[fieldName] = field.Default
+		} else if op.IsList() && fieldMatchesOp(field, List) && !hasKey {
+			var newRes interface{}
+
+			if !field.Nullable {
+				newRes = convertSimpleNil(field.Type)
+			}
+			if newRes == nil && field.Default != nil {
+				newRes = field.Default
+			}
+
+			if newRes != nil {
+				result[fieldName] = newRes
+			}
 		}
 	}
 
@@ -383,6 +395,40 @@ func ConvertSimple(fieldType string, value interface{}, op Operation) (interface
 	}
 
 	return nil, ErrComplexType
+}
+
+func convertSimpleNil(fieldType string) interface{} {
+	switch fieldType {
+	case "json":
+		return "{}"
+	case "date":
+		var t time.Time
+		return t.Format(time.RFC3339)
+	case "boolean":
+		return false
+	case "enum":
+		return ""
+	case "int":
+		return 0
+	case "password":
+		return ""
+	case "string":
+		return ""
+	case "dnsLabel":
+		return ""
+	case "dnsLabelRestricted":
+		return ""
+	case "hostname":
+		return ""
+	case "intOrString":
+		return 0
+	case "base64":
+		return ""
+	case "reference":
+		return ""
+	}
+
+	return nil
 }
 
 func (b *Builder) convert(fieldType string, value interface{}, op Operation) (interface{}, error) {
