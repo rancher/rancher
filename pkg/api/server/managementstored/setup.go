@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/catalog"
 	ccluster "github.com/rancher/rancher/pkg/api/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
+	"github.com/rancher/rancher/pkg/api/customization/globalresource"
 	"github.com/rancher/rancher/pkg/api/customization/kontainerdriver"
 	"github.com/rancher/rancher/pkg/api/customization/logging"
 	"github.com/rancher/rancher/pkg/api/customization/node"
@@ -71,6 +72,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.GroupType,
 		client.KontainerDriverType,
 		client.ListenConfigType,
+		client.MultiClusterAppType,
 		client.NodeDriverType,
 		client.NodePoolType,
 		client.NodeTemplateType,
@@ -92,7 +94,9 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.TemplateVersionType,
 		client.TokenType,
 		client.UserAttributeType,
-		client.UserType)
+		client.UserType,
+		client.GlobalDNSType,
+		client.GlobalDNSProviderType)
 
 	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &projectschema.Version,
 		projectclient.AppType,
@@ -129,6 +133,8 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	TemplateContent(schemas)
 	PodSecurityPolicyTemplate(schemas, apiContext)
 	RoleTemplate(schemas, apiContext)
+	MultiClusterApps(schemas, apiContext)
+	GlobalDNSs(schemas, apiContext)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
@@ -481,4 +487,20 @@ func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 	}
 	schema.ActionHandler = handler.ActionHandler
 	schema.Formatter = kontainerdriver.Formatter
+}
+
+func MultiClusterApps(schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.MultiClusterAppType)
+	schema.Store = &globalresource.GlobalNamespaceStore{
+		Store:              schema.Store,
+		NamespaceInterface: management.Core.Namespaces(""),
+	}
+}
+
+func GlobalDNSs(schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.GlobalDNSType)
+	schema.Store = &globalresource.GlobalNamespaceStore{
+		Store:              schema.Store,
+		NamespaceInterface: management.Core.Namespaces(""),
+	}
 }

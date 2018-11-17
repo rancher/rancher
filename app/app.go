@@ -173,5 +173,9 @@ func addData(management *config.ManagementContext, cfg Config) error {
 		return err
 	}
 
+	if err := addCattleGlobalNamespace(management); err != nil {
+		return err
+	}
+
 	return addMachineDrivers(management)
 }
