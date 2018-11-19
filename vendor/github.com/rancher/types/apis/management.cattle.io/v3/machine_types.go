@@ -188,6 +188,8 @@ type NodeSpec struct {
 	InternalNodeSpec         v1.NodeSpec       `json:"internalNodeSpec"`
 	DesiredNodeLabels        map[string]string `json:"desiredNodeLabels,omitempty"`
 	DesiredNodeAnnotations   map[string]string `json:"desiredNodeAnnotations,omitempty"`
+	CurrentNodeLabels        map[string]string `json:"currentNodeLabels,omitempty"`
+	CurrentNodeAnnotations   map[string]string `json:"currentNodeAnnotations,omitempty"`
 	DesiredNodeUnschedulable string            `json:"desiredNodeUnschedulable,omitempty"`
 	NodeDrainInput           *NodeDrainInput   `json:"nodeDrainInput,omitempty"`
 }
