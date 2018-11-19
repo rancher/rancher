@@ -26,7 +26,10 @@ import (
 const (
 	AllNodeKey     = "_machine_all_"
 	annotationName = "management.cattle.io/nodesyncer"
+	apiUpdate      = "management.cattle.io/apiUpdate"
 )
+
+var apiUpdateMap = map[string]string{apiUpdate: "true"}
 
 type NodeSyncer struct {
 	machines         v3.NodeInterface
@@ -162,13 +165,25 @@ func (m *NodesSyncer) syncLabels(key string, obj *v3.Node) (runtime.Object, erro
 
 	updateLabels := false
 	updateAnnotations := false
+
 	// set annotations
 	if obj.Spec.DesiredNodeAnnotations != nil && !reflect.DeepEqual(node.Annotations, obj.Spec.DesiredNodeAnnotations) {
-		updateAnnotations = true
+		// check sync from node controller and labels.go has finished if not set by api
+		if reflect.DeepEqual(obj.Spec.CurrentNodeAnnotations, apiUpdateMap) {
+			updateAnnotations = true
+		} else {
+			updateAnnotations = reflect.DeepEqual(node.Annotations, obj.Status.NodeAnnotations) && reflect.DeepEqual(node.Annotations, obj.Spec.CurrentNodeAnnotations)
+		}
 	}
+
 	// set labels
 	if obj.Spec.DesiredNodeLabels != nil && !reflect.DeepEqual(node.Labels, obj.Spec.DesiredNodeLabels) {
-		updateLabels = true
+		// check sync from node controller and labels.go has finished if not set by api
+		if reflect.DeepEqual(obj.Spec.CurrentNodeLabels, apiUpdateMap) {
+			updateLabels = true
+		} else {
+			updateLabels = reflect.DeepEqual(node.Labels, obj.Status.NodeLabels) && reflect.DeepEqual(node.Labels, obj.Spec.CurrentNodeLabels)
+		}
 	}
 
 	if updateLabels || updateAnnotations {
@@ -190,6 +205,8 @@ func (m *NodesSyncer) syncLabels(key string, obj *v3.Node) (runtime.Object, erro
 		machine := obj.DeepCopy()
 		machine.Spec.DesiredNodeAnnotations = nil
 		machine.Spec.DesiredNodeLabels = nil
+		machine.Spec.CurrentNodeAnnotations = nil
+		machine.Spec.CurrentNodeLabels = nil
 		return m.machines.Update(machine)
 	}
 
