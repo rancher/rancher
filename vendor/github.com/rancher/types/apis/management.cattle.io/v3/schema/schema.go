@@ -229,6 +229,8 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Move{From: "nodeAnnotations", To: "annotations"},
 			&m.Drop{Field: "desiredNodeLabels"},
 			&m.Drop{Field: "desiredNodeAnnotations"},
+			&m.Drop{Field: "currentNodeLabels"},
+			&m.Drop{Field: "currentNodeAnnotations"},
 			&m.Drop{Field: "desiredNodeUnschedulable"},
 			&m.Drop{Field: "nodeDrainInput"},
 			&m.AnnotationField{Field: "publicEndpoints", List: true},

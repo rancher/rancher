@@ -3,6 +3,8 @@ package client
 const (
 	NodeSpecType                          = "nodeSpec"
 	NodeSpecFieldControlPlane             = "controlPlane"
+	NodeSpecFieldCurrentNodeAnnotations   = "currentNodeAnnotations"
+	NodeSpecFieldCurrentNodeLabels        = "currentNodeLabels"
 	NodeSpecFieldCustomConfig             = "customConfig"
 	NodeSpecFieldDescription              = "description"
 	NodeSpecFieldDesiredNodeAnnotations   = "desiredNodeAnnotations"
@@ -24,6 +26,8 @@ const (
 
 type NodeSpec struct {
 	ControlPlane             bool              `json:"controlPlane,omitempty" yaml:"controlPlane,omitempty"`
+	CurrentNodeAnnotations   map[string]string `json:"currentNodeAnnotations,omitempty" yaml:"currentNodeAnnotations,omitempty"`
+	CurrentNodeLabels        map[string]string `json:"currentNodeLabels,omitempty" yaml:"currentNodeLabels,omitempty"`
 	CustomConfig             *CustomConfig     `json:"customConfig,omitempty" yaml:"customConfig,omitempty"`
 	Description              string            `json:"description,omitempty" yaml:"description,omitempty"`
 	DesiredNodeAnnotations   map[string]string `json:"desiredNodeAnnotations,omitempty" yaml:"desiredNodeAnnotations,omitempty"`
