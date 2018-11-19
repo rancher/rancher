@@ -13,6 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
+const apiUpdate = "management.cattle.io/apiUpdate"
+
 type nodeStore struct {
 	types.Store
 }
@@ -80,6 +82,8 @@ func (n nodeStore) Update(apiContext *types.APIContext, schema *types.Schema, da
 }
 
 func format(data map[string]interface{}) {
+	data["currentNodeLabels"] = map[string]string{apiUpdate: "true"}
+	data["currentNodeAnnotations"] = map[string]string{apiUpdate: "true"}
 	data["desiredNodeLabels"] = data["labels"]
 	data["desiredNodeAnnotations"] = data["annotations"]
 }
