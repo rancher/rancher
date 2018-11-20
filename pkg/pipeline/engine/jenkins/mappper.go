@@ -155,7 +155,7 @@ const stepBlock = `'%s': {
 
 const pipelineBlock = `import org.jenkinsci.plugins.pipeline.modeldefinition.Utils
 def label = "buildpod.${env.JOB_NAME}.${env.BUILD_NUMBER}".replace('-', '_').replace('/', '_')
-podTemplate(label: label, namespace: '%s', instanceCap: 1, serviceAccount: 'jenkins',volumes: [emptyDirVolume(mountPath: '/var/lib/docker', memory: false), secretVolume(mountPath: '/etc/docker/certs.d/docker-registry.%s', secretName: 'registry-crt')], containers: [
+podTemplate(label: label, namespace: '%s', instanceCap: 1, serviceAccount: 'jenkins',volumes: [secretVolume(mountPath: '/etc/docker/certs.d/docker-registry.%s', secretName: 'registry-crt')], containers: [
 %s
 containerTemplate(name: 'jnlp', image: '%s', envVars: [
 envVar(key: 'JENKINS_URL', value: '%s')], args: '${computer.jnlpmac} ${computer.name}', ttyEnabled: false)], yaml: """
