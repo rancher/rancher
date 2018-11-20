@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -8,18 +9,64 @@ import (
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
+	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/settings"
 	managementv3 "github.com/rancher/types/client/management/v3"
+	"github.com/rancher/types/config"
 )
 
 type Store struct {
 	types.Store
 	ShellHandler types.RequestHandler
 	mu           sync.Mutex
+}
+
+func SetClusterStore(ctx context.Context, schema *types.Schema, mgmt *config.ScaledContext) {
+	t := &transform.Store{
+		Store: schema.Store,
+		Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
+			data = transformSetNilSnapshotFalse(data)
+
+			return data, nil
+		},
+	}
+
+	s := &Store{
+		Store: t,
+	}
+
+	schema.Store = s
+}
+
+func transformSetNilSnapshotFalse(data map[string]interface{}) map[string]interface{} {
+	var (
+		etcd  interface{}
+		found bool
+	)
+
+	etcd, found = values.GetValue(data, "appliedSpec", "rancherKubernetesEngineConfig", "services", "etcd")
+	if found {
+		etcd := convert.ToMapInterface(etcd)
+		val, found := values.GetValue(etcd, "snapshot")
+		if !found || val == nil {
+			values.PutValue(data, false, "appliedSpec", "rancherKubernetesEngineConfig", "services", "etcd", "snapshot")
+		}
+	}
+
+	etcd, found = values.GetValue(data, "rancherKubernetesEngineConfig", "services", "etcd")
+	if found {
+		etcd := convert.ToMapInterface(etcd)
+		val, found := values.GetValue(etcd, "snapshot")
+		if !found || val == nil {
+			values.PutValue(data, false, "rancherKubernetesEngineConfig", "services", "etcd", "snapshot")
+		}
+	}
+
+	return data
 }
 
 func (r *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
