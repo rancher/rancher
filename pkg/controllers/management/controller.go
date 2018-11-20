@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstats"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/controllers/management/compose"
+	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
 	"github.com/rancher/rancher/pkg/controllers/management/etcdbackupconfig"
 	"github.com/rancher/rancher/pkg/controllers/management/node"
 	"github.com/rancher/rancher/pkg/controllers/management/nodedriver"
@@ -44,6 +45,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	podsecuritypolicy.Register(ctx, management)
 	template.Register(ctx, management)
 	etcdbackupconfig.Register(ctx, management)
+	etcdbackup.Register(ctx, management)
 
 	// Register last
 	auth.RegisterLate(ctx, management)

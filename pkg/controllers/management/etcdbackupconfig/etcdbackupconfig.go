@@ -48,14 +48,29 @@ func (c *Controller) syncBackups(ctx context.Context, i time.Duration) {
 
 		//Work on found configs
 		for _, bc := range backupConfigs.Items {
-			logrus.Infof("melsayed found backupConfig %s, lastSeen: %s", bc.Name, getCondition(&bc, "LastSeen").LastUpdateTime)
-			// set seen condition, probably don't need this.
+			lastSeen := getCondition(&bc, "LastSeen")
+			if lastSeen != nil {
+				logrus.Infof("melsayed found backupConfig %s, lastSeen: %s", bc.Name, getCondition(&bc, "LastSeen").LastUpdateTime)
+			}
+			// set seen condition, probably don't need this anymore.
 			if err := c.setSeenCondition(bc.Name); err != nil {
 				logrus.Errorf("melsayed failed to setSeen: %v", err)
 			}
-
-			// kick the backup "thing"
-
+			// set ownerReferences
+			if len(bc.OwnerReferences) == 0 {
+				controller := true
+				cluster, _ := c.getCluster(&bc)
+				r := []metav1.OwnerReference{
+					{
+						Name:       cluster.Name,
+						UID:        cluster.UID,
+						APIVersion: cluster.APIVersion,
+						Kind:       cluster.Kind,
+						Controller: &controller,
+					},
+				}
+				c.updateBackupConfigOwnerReferences(bc.Name, r)
+			}
 			configDuration, err := time.ParseDuration(bc.Creation)
 			if err != nil {
 				logrus.Infof("melsayed can't parse duration %s : %v ", bc.Creation, err)
@@ -80,6 +95,12 @@ func (c *Controller) syncBackups(ctx context.Context, i time.Duration) {
 		}
 	}
 
+}
+
+func (c *Controller) updateBackupConfigOwnerReferences(backupConfigName string, r []metav1.OwnerReference) error {
+	bc, _ := c.getBackupConfig(backupConfigName)
+	bc.SetOwnerReferences(r)
+	return c.updateBackupConfig(bc)
 }
 
 func (c *Controller) setSeenCondition(backupConfigName string) error {
@@ -150,14 +171,35 @@ func getCondition(backupConfig *v3.EtcdBackupConfig, cType string) *v3.EtcdBacku
 	return nil
 }
 
+func (c *Controller) getCluster(backupConfig *v3.EtcdBackupConfig) (*v3.Cluster, error) {
+	return c.clusterClient.Get(backupConfig.ClusterName, metav1.GetOptions{})
+}
+
 func (c *Controller) kickBackup(backupConfigName string) {
 	logrus.Infof("melsayed doing the backup")
+	controller := true
 	backupConfig, _ := c.getBackupConfig(backupConfigName)
+	cluster, _ := c.getCluster(backupConfig)
 	newBackup := &v3.EtcdBackup{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: fmt.Sprintf("%s-", backupConfigName),
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					Name:       backupConfigName,
+					UID:        backupConfig.UID,
+					APIVersion: backupConfig.APIVersion,
+					Kind:       backupConfig.Kind,
+				},
+				{
+					Name:       cluster.Name,
+					UID:        cluster.UID,
+					APIVersion: cluster.APIVersion,
+					Kind:       cluster.Kind,
+					Controller: &controller,
+				},
+			},
 		},
-		BackupConfig: *backupConfig,
+		BackupConfig: backupConfigName,
 		Status: v3.EtcdBackupStatus{
 			Conditions: []v3.EtcdBackupCondition{
 				v3.EtcdBackupCondition{
@@ -168,12 +210,10 @@ func (c *Controller) kickBackup(backupConfigName string) {
 			},
 		},
 	}
-	fmt.Printf("%#v\n", newBackup)
 	_, err := c.backupClient.Create(newBackup)
 	if err != nil {
 		logrus.Errorf("melsayed failed to cteate backup: %v", err)
 		return
 	}
-	c.setLastCompletedConddition(backupConfigName)
 	logrus.Infof("melsayed done with the backup")
 }
