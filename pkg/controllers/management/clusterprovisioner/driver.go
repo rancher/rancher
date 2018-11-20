@@ -34,6 +34,12 @@ func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 		return cluster.Status.APIEndpoint, cluster.Status.ServiceAccountToken, cluster.Status.CACert, nil
 	}
 
+	if spec.RancherKubernetesEngineConfig != nil && spec.RancherKubernetesEngineConfig.Services.Etcd.Snapshot == nil &&
+		applied.RancherKubernetesEngineConfig != nil && applied.RancherKubernetesEngineConfig.Services.Etcd.Snapshot == nil {
+		_false := false
+		cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.Snapshot = &_false
+	}
+
 	if newCluster, err := p.Clusters.Update(cluster); err == nil {
 		cluster = newCluster
 	}
