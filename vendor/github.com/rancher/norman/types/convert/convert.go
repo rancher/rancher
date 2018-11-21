@@ -105,6 +105,30 @@ func ToNumber(value interface{}) (int64, error) {
 	return strconv.ParseInt(ToString(value), 10, 64)
 }
 
+func ToFloat(value interface{}) (float64, error) {
+	value = Singular(value)
+
+	f64, ok := value.(float64)
+	if ok {
+		return f64, nil
+	}
+
+	f32, ok := value.(float32)
+	if ok {
+		return float64(f32), nil
+	}
+
+	if n, ok := value.(json.Number); ok {
+		i, err := n.Int64()
+		if err == nil {
+			return float64(i), nil
+		}
+		f, err := n.Float64()
+		return float64(f), err
+	}
+	return strconv.ParseFloat(ToString(value), 64)
+}
+
 func Capitalize(s string) string {
 	if len(s) <= 1 {
 		return strings.ToUpper(s)

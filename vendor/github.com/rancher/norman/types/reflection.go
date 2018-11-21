@@ -286,7 +286,9 @@ func (s *Schemas) readFields(schema *Schema, t reflect.Type) error {
 			schemaField.Nullable = false
 			schemaField.Default = false
 		} else if fieldType.Kind() == reflect.Int ||
+			fieldType.Kind() == reflect.Uint32 ||
 			fieldType.Kind() == reflect.Int32 ||
+			fieldType.Kind() == reflect.Uint64 ||
 			fieldType.Kind() == reflect.Int64 {
 			schemaField.Nullable = false
 			schemaField.Default = 0
@@ -439,6 +441,8 @@ func (s *Schemas) determineSchemaType(version *APIVersion, t reflect.Type) (stri
 	case reflect.Int32:
 		fallthrough
 	case reflect.Uint32:
+		fallthrough
+	case reflect.Uint64:
 		fallthrough
 	case reflect.Int64:
 		return "int", nil
