@@ -327,6 +327,8 @@ func ConvertSimple(fieldType string, value interface{}, op Operation) (interface
 		return convert.ToString(value), nil
 	case "int":
 		return convert.ToNumber(value)
+	case "float":
+		return convert.ToFloat(value)
 	case "password":
 		return convert.ToString(value), nil
 	case "string":
