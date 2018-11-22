@@ -12,60 +12,104 @@ import (
 	mv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"gopkg.in/yaml.v2"
+	"k8s.io/api/core/v1"
 )
 
-func toJenkinsStep(execution *v3.PipelineExecution, stageOrdinal int, stepOrdinal int) PipelineStep {
-	stage := execution.Spec.PipelineConfig.Stages[stageOrdinal]
+func (c *jenkinsPipelineConverter) getStepContainer(stageOrdinal int, stepOrdinal int) v1.Container {
+	stage := c.execution.Spec.PipelineConfig.Stages[stageOrdinal]
 	step := &stage.Steps[stepOrdinal]
-	var pStep PipelineStep
 
+	container := v1.Container{
+		Name:    fmt.Sprintf("step-%d-%d", stageOrdinal, stepOrdinal),
+		TTY:     true,
+		Command: []string{"cat"},
+		Env:     []v1.EnvVar{},
+	}
 	if step.SourceCodeConfig != nil {
-		pStep = convertSourceCodeConfig(execution, step)
+		container.Image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.AlpineGit)
 	} else if step.RunScriptConfig != nil {
-		pStep = convertRunScriptconfig(execution, step)
+		container.Image = step.RunScriptConfig.Image
 	} else if step.PublishImageConfig != nil {
-		pStep = convertPublishImageconfig(execution, step)
+		c.configPublishStepContainer(&container, step)
 	} else if step.ApplyYamlConfig != nil {
-		pStep = convertApplyYamlconfig(execution, step, stageOrdinal)
+		c.configApplyYamlStepContainer(&container, step, stageOrdinal)
 	} else if step.PublishCatalogConfig != nil {
-		pStep = convertPublishCatalogConfig(execution, step)
+		c.configPublishCatalogContainer(&container, step)
 	} else if step.ApplyAppConfig != nil {
-		pStep = convertApplyAppConfig(execution, step)
+		c.configApplyAppContainer(&container, step)
 	}
 
-	if !utils.MatchAll(stage.When, execution) || !utils.MatchAll(step.When, execution) {
+	//common step configurations
+	for k, v := range utils.GetEnvVarMap(c.execution) {
+		container.Env = append(container.Env, v1.EnvVar{Name: k, Value: v})
+	}
+	for k, v := range step.Env {
+		container.Env = append(container.Env, v1.EnvVar{Name: k, Value: v})
+	}
+	if c.execution.Spec.Event != utils.WebhookEventPullRequest {
+		//expose no secrets on pull_request events
+		for _, e := range step.EnvFrom {
+			envName := e.SourceKey
+			if e.TargetKey != "" {
+				envName = e.TargetKey
+			}
+			container.Env = append(container.Env, v1.EnvVar{
+				Name: envName,
+				ValueFrom: &v1.EnvVarSource{SecretKeyRef: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: e.SourceName,
+					},
+					Key: e.SourceKey,
+				}}})
+		}
+	}
+	if step.Privileged {
+		container.SecurityContext = &v1.SecurityContext{Privileged: &step.Privileged}
+	}
+	return container
+}
+
+func (c *jenkinsPipelineConverter) getJenkinsStepCommand(stageOrdinal int, stepOrdinal int) string {
+	stage := c.execution.Spec.PipelineConfig.Stages[stageOrdinal]
+	step := &stage.Steps[stepOrdinal]
+	command := ""
+
+	if !utils.MatchAll(stage.When, c.execution) || !utils.MatchAll(step.When, c.execution) {
 		stepName := fmt.Sprintf("step-%d-%d", stageOrdinal, stepOrdinal)
-		pStep.command = fmt.Sprintf(markSkipScript, stepName)
+		command = fmt.Sprintf(markSkipScript, stepName)
+	} else if step.SourceCodeConfig != nil {
+		command = fmt.Sprintf("checkout([$class: 'GitSCM', branches: [[name: 'local/temp']], userRemoteConfigs: [[url: '%s', refspec: '+%s:refs/remotes/local/temp', credentialsId: '%s']]])",
+			c.execution.Spec.RepositoryURL, c.execution.Spec.Ref, c.execution.Name)
+	} else if step.RunScriptConfig != nil {
+		command = fmt.Sprintf(`sh ''' %s '''`, step.RunScriptConfig.ShellScript)
+	} else if step.PublishImageConfig != nil {
+		command = `sh '''/usr/local/bin/dockerd-entrypoint.sh /bin/drone-docker'''`
+	} else if step.ApplyYamlConfig != nil {
+		command = `sh ''' kube-apply '''`
+	} else if step.PublishCatalogConfig != nil {
+		command = `sh ''' publish-catalog '''`
+	} else if step.ApplyAppConfig != nil {
+		command = `sh ''' apply-app '''`
 	}
-
-	return pStep
+	return command
 }
 
-func convertSourceCodeConfig(execution *v3.PipelineExecution, step *v3.Step) PipelineStep {
-	pStep := PipelineStep{}
-	pStep.command = fmt.Sprintf("checkout([$class: 'GitSCM', branches: [[name: 'local/temp']], userRemoteConfigs: [[url: '%s', refspec: '+%s:refs/remotes/local/temp', credentialsId: '%s']]])",
-		execution.Spec.RepositoryURL, execution.Spec.Ref, execution.Name)
-	pStep.image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.AlpineGit)
-	pStep.containerOptions = getStepContainerOptions(execution, step.Privileged, step.Env, step.EnvFrom)
-
-	return pStep
+func (c *jenkinsPipelineConverter) getAgentContainer() v1.Container {
+	container := v1.Container{
+		Name:  utils.JenkinsAgentContainerName,
+		Image: images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.JenkinsJnlp),
+		Args:  []string{"$(JENKINS_SECRET)", "$(JENKINS_NAME)"},
+	}
+	cloneContainer := c.getStepContainer(0, 0)
+	container.Env = append(container.Env, cloneContainer.Env...)
+	container.EnvFrom = append(container.EnvFrom, cloneContainer.EnvFrom...)
+	return container
 }
 
-func convertRunScriptconfig(execution *v3.PipelineExecution, step *v3.Step) PipelineStep {
-	config := step.RunScriptConfig
-	pStep := PipelineStep{}
-
-	pStep.image = config.Image
-	pStep.command = fmt.Sprintf(`sh ''' %s '''`, config.ShellScript)
-	pStep.containerOptions = getStepContainerOptions(execution, step.Privileged, step.Env, step.EnvFrom)
-
-	return pStep
-}
-
-func convertPublishImageconfig(execution *v3.PipelineExecution, step *v3.Step) PipelineStep {
+func (c *jenkinsPipelineConverter) configPublishStepContainer(container *v1.Container, step *v3.Step) {
+	ns := utils.GetPipelineCommonName(c.execution.Spec.ProjectName)
 	config := step.PublishImageConfig
-	pStep := PipelineStep{}
-	m := utils.GetEnvVarMap(execution)
+	m := utils.GetEnvVarMap(c.execution)
 	config.Tag = substituteEnvVar(m, config.Tag)
 
 	registry, repo, tag := utils.SplitImageTag(config.Tag)
@@ -73,13 +117,13 @@ func convertPublishImageconfig(execution *v3.PipelineExecution, step *v3.Step) P
 	if config.PushRemote {
 		registry = config.Registry
 	} else {
-		_, projectID := ref.Parse(execution.Spec.ProjectName)
+		_, projectID := ref.Parse(c.execution.Spec.ProjectName)
 		registry = fmt.Sprintf("%s.%s-pipeline", utils.LocalRegistry, projectID)
 	}
 
 	reg, _ := regexp.Compile("[^a-zA-Z0-9]+")
 	processedRegistry := strings.ToLower(reg.ReplaceAllString(registry, ""))
-	secretName := fmt.Sprintf("%s-%s", execution.Namespace, processedRegistry)
+	secretName := fmt.Sprintf("%s-%s", c.execution.Namespace, processedRegistry)
 	secretUserKey := utils.PublishSecretUserKey
 	secretPwKey := utils.PublishSecretPwKey
 	if !config.PushRemote {
@@ -94,8 +138,7 @@ func convertPublishImageconfig(execution *v3.PipelineExecution, step *v3.Step) P
 		registry = ""
 	}
 
-	pStep.image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.PluginsDocker)
-	pStep.command = `sh '''/usr/local/bin/dockerd-entrypoint.sh /bin/drone-docker'''`
+	container.Image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.PluginsDocker)
 	publishEnv := map[string]string{
 		"DOCKER_REGISTRY":   registry,
 		"PLUGIN_REPO":       pluginRepo,
@@ -103,32 +146,39 @@ func convertPublishImageconfig(execution *v3.PipelineExecution, step *v3.Step) P
 		"PLUGIN_DOCKERFILE": config.DockerfilePath,
 		"PLUGIN_CONTEXT":    config.BuildContext,
 	}
-
-	for k, v := range step.Env {
-		publishEnv[k] = v
+	for k, v := range publishEnv {
+		container.Env = append(container.Env, v1.EnvVar{Name: k, Value: v})
 	}
-	envFrom := append(step.EnvFrom, v3.EnvFrom{
-		SourceName: secretName,
-		SourceKey:  secretUserKey,
-		TargetKey:  "DOCKER_USERNAME",
-	}, v3.EnvFrom{
-		SourceName: secretName,
-		SourceKey:  secretPwKey,
-		TargetKey:  "DOCKER_PASSWORD",
-	})
-
-	pStep.containerOptions = getStepContainerOptions(execution, true, publishEnv, envFrom)
-
-	return pStep
+	container.Env = append(container.Env, v1.EnvVar{
+		Name: "DOCKER_USERNAME",
+		ValueFrom: &v1.EnvVarSource{SecretKeyRef: &v1.SecretKeySelector{
+			LocalObjectReference: v1.LocalObjectReference{
+				Name: secretName,
+			},
+			Key: secretUserKey,
+		}}})
+	container.Env = append(container.Env, v1.EnvVar{
+		Name: "DOCKER_PASSWORD",
+		ValueFrom: &v1.EnvVarSource{SecretKeyRef: &v1.SecretKeySelector{
+			LocalObjectReference: v1.LocalObjectReference{
+				Name: secretName,
+			},
+			Key: secretPwKey,
+		}}})
+	privileged := true
+	container.SecurityContext = &v1.SecurityContext{Privileged: &privileged}
+	container.VolumeMounts = []v1.VolumeMount{
+		{
+			Name:      utils.RegistryCrtVolumeName,
+			MountPath: fmt.Sprintf("/etc/docker/certs.d/docker-registry.%s", ns),
+			ReadOnly:  true,
+		},
+	}
 }
 
-func convertApplyYamlconfig(execution *v3.PipelineExecution, step *v3.Step, stageOrdinal int) PipelineStep {
+func (c *jenkinsPipelineConverter) configApplyYamlStepContainer(container *v1.Container, step *v3.Step, stageOrdinal int) {
 	config := step.ApplyYamlConfig
-	pStep := PipelineStep{}
-
-	pStep.image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.KubeApply)
-
-	pStep.command = `sh ''' kube-apply '''`
+	container.Image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.KubeApply)
 
 	applyEnv := map[string]string{
 		"YAML_PATH":    config.Path,
@@ -140,7 +190,7 @@ func convertApplyYamlconfig(execution *v3.PipelineExecution, step *v3.Step, stag
 	var registry, imageRepo string
 StageLoop:
 	for i := stageOrdinal; i >= 0; i-- {
-		stage := execution.Spec.PipelineConfig.Stages[i]
+		stage := c.execution.Spec.PipelineConfig.Stages[i]
 		for j := len(stage.Steps) - 1; j >= 0; j-- {
 			step := stage.Steps[j]
 			if step.PublishImageConfig != nil {
@@ -157,23 +207,15 @@ StageLoop:
 	applyEnv[utils.EnvRegistry] = registry
 	applyEnv[utils.EnvImageRepo] = imageRepo
 
-	for k, v := range step.Env {
-		applyEnv[k] = v
+	for k, v := range applyEnv {
+		container.Env = append(container.Env, v1.EnvVar{Name: k, Value: v})
 	}
-	pStep.containerOptions = getStepContainerOptions(execution, step.Privileged, applyEnv, step.EnvFrom)
-
-	return pStep
 }
 
-func convertPublishCatalogConfig(execution *v3.PipelineExecution, step *v3.Step) PipelineStep {
+func (c *jenkinsPipelineConverter) configPublishCatalogContainer(container *v1.Container, step *v3.Step) {
 	config := step.PublishCatalogConfig
-	pStep := PipelineStep{}
-
-	pStep.image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.KubeApply)
-
-	pStep.command = `sh ''' publish-catalog '''`
-
-	applyEnv := map[string]string{
+	container.Image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.KubeApply)
+	envs := map[string]string{
 		"CATALOG_PATH": config.Path,
 		"CATALOG_NAME": config.Catalog,
 		"VERSION":      config.Version,
@@ -182,25 +224,16 @@ func convertPublishCatalogConfig(execution *v3.PipelineExecution, step *v3.Step)
 		"GIT_URL":      config.GitURL,
 		"GIT_BRANCH":   config.GitBranch,
 	}
-
-	for k, v := range step.Env {
-		applyEnv[k] = v
+	for k, v := range envs {
+		container.Env = append(container.Env, v1.EnvVar{Name: k, Value: v})
 	}
-	pStep.containerOptions = getStepContainerOptions(execution, step.Privileged, applyEnv, step.EnvFrom)
-
-	return pStep
 }
 
-func convertApplyAppConfig(execution *v3.PipelineExecution, step *v3.Step) PipelineStep {
+func (c *jenkinsPipelineConverter) configApplyAppContainer(container *v1.Container, step *v3.Step) {
 	config := step.ApplyAppConfig
-	pStep := PipelineStep{}
-
-	pStep.image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.KubeApply)
-
-	pStep.command = `sh ''' apply-app '''`
-
+	container.Image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.KubeApply)
 	answerBytes, _ := yaml.Marshal(config.Answers)
-	applyEnv := map[string]string{
+	envs := map[string]string{
 		"APP_NAME":         config.Name,
 		"ANSWERS":          string(answerBytes),
 		"CATALOG_NAME":     config.Catalog,
@@ -208,16 +241,15 @@ func convertApplyAppConfig(execution *v3.PipelineExecution, step *v3.Step) Pipel
 		"TARGET_NAMESPACE": config.TargetNamespace,
 		"RANCHER_URL":      settings.ServerURL.Get(),
 	}
-
-	for k, v := range step.Env {
-		applyEnv[k] = v
+	for k, v := range envs {
+		container.Env = append(container.Env, v1.EnvVar{Name: k, Value: v})
 	}
-	envFrom := append(step.EnvFrom, v3.EnvFrom{
-		SourceName: utils.PipelineAPIKeySecretName,
-		SourceKey:  utils.PipelineSecretAPITokenKey,
-	})
-
-	pStep.containerOptions = getStepContainerOptions(execution, step.Privileged, applyEnv, envFrom)
-
-	return pStep
+	container.Env = append(container.Env, v1.EnvVar{
+		Name: utils.PipelineSecretAPITokenKey,
+		ValueFrom: &v1.EnvVarSource{SecretKeyRef: &v1.SecretKeySelector{
+			LocalObjectReference: v1.LocalObjectReference{
+				Name: utils.PipelineAPIKeySecretName,
+			},
+			Key: utils.PipelineSecretAPITokenKey,
+		}}})
 }

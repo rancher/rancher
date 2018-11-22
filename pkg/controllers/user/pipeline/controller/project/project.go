@@ -25,6 +25,7 @@ import (
 var settings = map[string]string{
 	utils.SettingExecutorQuota:   utils.SettingExecutorQuotaDefault,
 	utils.SettingSigningDuration: utils.SettingSigningDurationDefault,
+	utils.SettingGitCaCerts:      "",
 }
 
 func Register(ctx context.Context, cluster *config.UserContext) {

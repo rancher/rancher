@@ -2,12 +2,6 @@ package jenkins
 
 import "encoding/xml"
 
-type PipelineStep struct {
-	command          string
-	image            string
-	containerOptions string
-}
-
 type PipelineJob struct {
 	XMLName    xml.Name   `xml:"flow-definition"`
 	Plugin     string     `xml:"plugin,attr"`

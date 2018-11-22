@@ -48,6 +48,7 @@ type Engine struct {
 	SourceCodeCredentials      v3.SourceCodeCredentialInterface
 	SourceCodeCredentialLister v3.SourceCodeCredentialLister
 	PipelineLister             v3.PipelineLister
+	PipelineSettingLister      v3.PipelineSettingLister
 
 	ClusterName string
 	Dialer      dialer.Factory
@@ -236,7 +237,11 @@ func (j *Engine) prepareRegistryCredential(execution *v3.PipelineExecution, regi
 
 func (j *Engine) createPipelineJob(client *Client, execution *v3.PipelineExecution) error {
 	logrus.Debug("create jenkins job for pipeline")
-	jobconf, err := ConvertPipelineExecutionToJenkinsPipeline(execution)
+	converter, err := initJenkinsPipelineConverter(execution, j.PipelineSettingLister)
+	if err != nil {
+		return err
+	}
+	jobconf, err := converter.convertPipelineExecutionToJenkinsPipeline()
 	if err != nil {
 		return err
 	}
@@ -247,7 +252,11 @@ func (j *Engine) createPipelineJob(client *Client, execution *v3.PipelineExecuti
 
 func (j *Engine) updatePipelineJob(client *Client, execution *v3.PipelineExecution) error {
 	logrus.Debug("update jenkins job for pipeline")
-	jobconf, err := ConvertPipelineExecutionToJenkinsPipeline(execution)
+	converter, err := initJenkinsPipelineConverter(execution, j.PipelineSettingLister)
+	if err != nil {
+		return err
+	}
+	jobconf, err := converter.convertPipelineExecutionToJenkinsPipeline()
 	if err != nil {
 		return err
 	}

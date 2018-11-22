@@ -4,6 +4,7 @@ const (
 	PipelineNamespace              = "cattle-pipeline"
 	PipelineNamespaceSuffix        = "-pipeline"
 	JenkinsName                    = "jenkins"
+	JenkinsAgentContainerName      = "jnlp"
 	PipelineName                   = "pipeline"
 	PipelineSecretName             = "pipeline-secret"
 	PipelineAPIKeySecretName       = "pipeline-api-key"
@@ -13,6 +14,8 @@ const (
 	PipelineSecretAPITokenKey      = "API_TOKEN"
 	PipelineSecretDefaultUser      = "admin"
 	PipelineSecretDefaultToken     = "admin123"
+	GitCaCertVolumeName            = "git-ca-crt"
+	GitCaCertPath                  = "/home/jenkins/certs"
 	RegistryName                   = "docker-registry"
 	RegistryProxyName              = "registry-proxy"
 	RegistryCrt                    = "client.cert"
@@ -95,6 +98,7 @@ const (
 	SettingExecutorQuotaDefault   = "2"
 	SettingSigningDuration        = "registry-signing-duration"
 	SettingSigningDurationDefault = "2160h"
+	SettingGitCaCerts             = "git-cacerts"
 
 	DefaultTimeout = 60
 )
