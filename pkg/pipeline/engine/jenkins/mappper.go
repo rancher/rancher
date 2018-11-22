@@ -8,105 +8,211 @@ import (
 	"github.com/pkg/errors"
 	images "github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
+	"github.com/rancher/rancher/pkg/ref"
 	mv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
+	"github.com/sirupsen/logrus"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 )
 
-func ConvertPipelineExecutionToJenkinsPipeline(execution *v3.PipelineExecution) (*PipelineJob, error) {
-	if execution == nil {
+type jenkinsPipelineConverter struct {
+	execution *v3.PipelineExecution
+	opts      *executeOptions
+}
+
+type executeOptions struct {
+	gitCaCerts string
+}
+
+func initJenkinsPipelineConverter(execution *v3.PipelineExecution, pipelineSettingLister v3.PipelineSettingLister) (*jenkinsPipelineConverter, error) {
+	_, projectID := ref.Parse(execution.Spec.ProjectName)
+	cacertSetting, err := pipelineSettingLister.Get(projectID, utils.SettingGitCaCerts)
+	if err != nil {
+		return nil, err
+	}
+	opts := &executeOptions{
+		gitCaCerts: cacertSetting.Value,
+	}
+	return &jenkinsPipelineConverter{
+		execution: execution.DeepCopy(),
+		opts:      opts,
+	}, nil
+}
+
+func (c *jenkinsPipelineConverter) convertPipelineExecutionToJenkinsPipeline() (*PipelineJob, error) {
+	if c.execution == nil {
 		return nil, errors.New("nil pipeline execution")
 	}
 
-	if err := utils.ValidPipelineConfig(execution.Spec.PipelineConfig); err != nil {
+	if err := utils.ValidPipelineConfig(c.execution.Spec.PipelineConfig); err != nil {
+		return nil, err
+	}
+	script, err := c.convertPipelineExecutionToPipelineScript()
+	if err != nil {
 		return nil, err
 	}
 
-	copyExecution := execution.DeepCopy()
-	parsePreservedEnvVar(copyExecution)
+	parsePreservedEnvVar(c.execution)
 	pipelineJob := &PipelineJob{
 		Plugin: WorkflowJobPlugin,
 		Definition: Definition{
 			Class:   FlowDefinitionClass,
 			Plugin:  FlowDefinitionPlugin,
 			Sandbox: true,
-			Script:  convertPipelineExecution(copyExecution),
+			Script:  script,
 		},
 	}
 	return pipelineJob, nil
 }
 
-func convertStep(execution *v3.PipelineExecution, stageOrdinal int, stepOrdinal int) string {
+func (c *jenkinsPipelineConverter) convertStep(stageOrdinal int, stepOrdinal int) string {
 	stepName := fmt.Sprintf("step-%d-%d", stageOrdinal, stepOrdinal)
 
-	jStep := toJenkinsStep(execution, stageOrdinal, stepOrdinal)
+	command := c.getJenkinsStepCommand(stageOrdinal, stepOrdinal)
 
-	return fmt.Sprintf(stepBlock, stepName, stepName, stepName, jStep.command)
+	return fmt.Sprintf(stepBlock, stepName, stepName, stepName, command)
 }
 
-func convertStage(execution *v3.PipelineExecution, stageOrdinal int) string {
+func (c *jenkinsPipelineConverter) convertStage(stageOrdinal int) string {
 	var buffer bytes.Buffer
-	pipelineConfig := execution.Spec.PipelineConfig
+	pipelineConfig := c.execution.Spec.PipelineConfig
 	stage := pipelineConfig.Stages[stageOrdinal]
 	for i := range stage.Steps {
-		buffer.WriteString(convertStep(execution, stageOrdinal, i))
+		buffer.WriteString(c.convertStep(stageOrdinal, i))
 		if i != len(stage.Steps)-1 {
 			buffer.WriteString(",")
 		}
 	}
 	skipOption := ""
-	if !utils.MatchAll(stage.When, execution) {
+	if !utils.MatchAll(stage.When, c.execution) {
 		skipOption = fmt.Sprintf(markSkipScript, stage.Name)
 	}
 
 	return fmt.Sprintf(stageBlock, stage.Name, skipOption, buffer.String())
 }
 
-func convertPipelineExecution(execution *v3.PipelineExecution) string {
-	var containerbuffer bytes.Buffer
+func (c *jenkinsPipelineConverter) convertPipelineExecutionToPipelineScript() (string, error) {
+	pod := c.getBasePodTemplate()
 	var pipelinebuffer bytes.Buffer
-	for j, stage := range execution.Spec.PipelineConfig.Stages {
-		pipelinebuffer.WriteString(convertStage(execution, j))
+	for j, stage := range c.execution.Spec.PipelineConfig.Stages {
+		pipelinebuffer.WriteString(c.convertStage(j))
 		pipelinebuffer.WriteString("\n")
 		for k := range stage.Steps {
-			stepName := fmt.Sprintf("step-%d-%d", j, k)
-			jStep := toJenkinsStep(execution, j, k)
-			containerDef := fmt.Sprintf(containerBlock, stepName, jStep.image, jStep.containerOptions)
-			containerbuffer.WriteString(containerDef)
-
+			container := c.getStepContainer(j, k)
+			pod.Spec.Containers = append(pod.Spec.Containers, container)
 		}
 	}
-	ns := utils.GetPipelineCommonName(execution.Spec.ProjectName)
-	jenkinsURL := fmt.Sprintf("http://%s:%d", utils.JenkinsName, utils.JenkinsPort)
+	pod.Spec.Containers = append(pod.Spec.Containers, c.getAgentContainer())
 	timeout := utils.DefaultTimeout
-	if execution.Spec.PipelineConfig.Timeout > 0 {
-		timeout = execution.Spec.PipelineConfig.Timeout
+	if c.execution.Spec.PipelineConfig.Timeout > 0 {
+		timeout = c.execution.Spec.PipelineConfig.Timeout
 	}
-	return fmt.Sprintf(pipelineBlock, ns, ns, containerbuffer.String(), images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.JenkinsJnlp), jenkinsURL, execution.Name, timeout, pipelinebuffer.String())
+	if c.opts.gitCaCerts != "" {
+		c.injectGitCaCert(pod)
+	}
+	b := &bytes.Buffer{}
+	e := json.NewYAMLSerializer(json.DefaultMetaFactory, nil, nil)
+	if err := e.Encode(pod, b); err != nil {
+		return "", err
+	}
+	logrus.Info(b.String())
+
+	return fmt.Sprintf(pipelineBlock, b.String(), timeout, pipelinebuffer.String()), nil
 }
 
-func getStepContainerOptions(execution *v3.PipelineExecution, privileged bool, optional map[string]string, envFrom []v3.EnvFrom) string {
-	var buffer bytes.Buffer
-	for k, v := range utils.GetEnvVarMap(execution) {
-		buffer.WriteString(fmt.Sprintf(envVarSkel, k, v))
+func (c *jenkinsPipelineConverter) getBasePodTemplate() *v1.Pod {
+	ns := utils.GetPipelineCommonName(c.execution.Spec.ProjectName)
+	pod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				utils.LabelKeyApp:       utils.JenkinsName,
+				utils.LabelKeyExecution: c.execution.Name,
+			},
+			Namespace: ns,
+		},
+		Spec: v1.PodSpec{
+			ServiceAccountName: utils.JenkinsName,
+			Affinity: &v1.Affinity{
+				PodAntiAffinity: &v1.PodAntiAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
+						{
+							Weight: 100,
+							PodAffinityTerm: v1.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      utils.LabelKeyApp,
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{utils.JenkinsName},
+										},
+									},
+								},
+								TopologyKey: "kubernetes.io/hostname",
+							},
+						},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: utils.RegistryCrtVolumeName,
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
+							SecretName: utils.RegistryCrtSecretName,
+						},
+					},
+				},
+			},
+		},
 	}
-	for k, v := range optional {
-		buffer.WriteString(fmt.Sprintf(envVarSkel, k, v))
+	return pod
+}
+
+func (c *jenkinsPipelineConverter) injectGitCaCert(pod *v1.Pod) {
+	pod.Spec.InitContainers = []v1.Container{
+		{
+			Name:    "config-crt",
+			Image:   images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.AlpineGit),
+			Command: []string{"sh", "-c", "CERT_PATH=/home/jenkins/certs/ca.crt;printf \"%s\" \"$CA_CERT\" > $CERT_PATH;chown 10000:10000 $CERT_PATH;"},
+			Env: []v1.EnvVar{
+				{
+					Name:  "CA_CERT",
+					Value: c.opts.gitCaCerts,
+				},
+			},
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      utils.GitCaCertVolumeName,
+					MountPath: utils.GitCaCertPath,
+				},
+			},
+		},
 	}
-	if execution.Spec.Event != utils.WebhookEventPullRequest {
-		//expose no secrets on pull_request events
-		for _, e := range envFrom {
-			envName := e.SourceKey
-			if e.TargetKey != "" {
-				envName = e.TargetKey
-			}
-			buffer.WriteString(fmt.Sprintf(secretEnvSkel, envName, e.SourceName, e.SourceKey))
+	for i, container := range pod.Spec.Containers {
+		if container.Name == utils.JenkinsAgentContainerName {
+			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, v1.EnvVar{
+				Name:  "GIT_SSL_CAINFO",
+				Value: utils.GitCaCertPath + "/ca.crt",
+			})
+			pod.Spec.Containers[i].VolumeMounts = append(pod.Spec.Containers[i].VolumeMounts, v1.VolumeMount{
+				Name:      utils.GitCaCertVolumeName,
+				MountPath: utils.GitCaCertPath,
+			})
+			break
 		}
 	}
-	result := fmt.Sprintf(envVarsSkel, buffer.String())
-	if privileged {
-		result = ", privileged: true" + result
-	}
-	return result
+	pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
+		Name: utils.GitCaCertVolumeName,
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		},
+	})
 }
 
 func parsePreservedEnvVar(execution *v3.PipelineExecution) {
@@ -167,30 +273,9 @@ const stepBlock = `'%s': {
 
 const pipelineBlock = `import org.jenkinsci.plugins.pipeline.modeldefinition.Utils
 def label = "buildpod.${env.JOB_NAME}.${env.BUILD_NUMBER}".replace('-', '_').replace('/', '_')
-podTemplate(label: label, namespace: '%s', instanceCap: 1, serviceAccount: 'jenkins',volumes: [secretVolume(mountPath: '/etc/docker/certs.d/docker-registry.%s', secretName: 'registry-crt')], containers: [
+podTemplate(label: label, instanceCap: 1, yaml: '''
 %s
-containerTemplate(name: 'jnlp', image: '%s', envVars: [
-envVar(key: 'JENKINS_URL', value: '%s')], args: '${computer.jnlpmac} ${computer.name}', ttyEnabled: false)], yaml: """
-apiVersion: v1
-kind: Pod
-metadata:
-  labels:
-    app: jenkins
-    execution: %s
-spec:
-  affinity:
-    podAntiAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        podAffinityTerm:
-          labelSelector:
-            matchExpressions:
-            - key: app
-              operator: In
-              values:
-              - jenkins
-          topologyKey: kubernetes.io/hostname
-"""
+'''
 ) {
 node(label) {
 timestamps {
@@ -200,13 +285,3 @@ timeout(%d) {
 }
 }
 }`
-
-const containerBlock = `containerTemplate(name: '%s', image: '%s', ttyEnabled: true, command: 'cat' %s),`
-
-const envVarSkel = "envVar(key: '%s', value: '''%s'''),"
-
-const secretEnvSkel = "secretEnvVar(key: '%s', secretName: '%s', secretKey: '%s'),"
-
-const envVarsSkel = `, envVars: [
-    %s
-]`

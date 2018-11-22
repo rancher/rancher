@@ -24,6 +24,7 @@ func New(cluster *config.UserContext, useCache bool) PipelineEngine {
 	sourceCodeCredentials := cluster.Management.Project.SourceCodeCredentials("")
 	sourceCodeCredentialLister := sourceCodeCredentials.Controller().Lister()
 	pipelineLister := cluster.Management.Project.Pipelines("").Controller().Lister()
+	pipelineSettingLister := cluster.Management.Project.PipelineSettings("").Controller().Lister()
 	dialer := cluster.Management.Dialer
 
 	engine := &jenkins.Engine{
@@ -36,6 +37,7 @@ func New(cluster *config.UserContext, useCache bool) PipelineEngine {
 		SourceCodeCredentials:      sourceCodeCredentials,
 		SourceCodeCredentialLister: sourceCodeCredentialLister,
 		PipelineLister:             pipelineLister,
+		PipelineSettingLister:      pipelineSettingLister,
 
 		Dialer:      dialer,
 		ClusterName: cluster.ClusterName,
