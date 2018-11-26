@@ -102,7 +102,7 @@ def test_project_owner(admin_cc, admin_mc, user_mc, remove_resource):
     rbac = kubernetes.client.RbacAuthorizationV1Api(api_client=k8s_client)
     rbs = rbac.list_namespaced_role_binding(ns.name)
     rb_dict = {}
-    assert len(rbs.items) == 2
+    assert len(rbs.items) == 4
     for rb in rbs.items:
         if rb.subjects[0].name == user_mc.user.id:
             rb_dict[rb.role_ref.name] = rb
