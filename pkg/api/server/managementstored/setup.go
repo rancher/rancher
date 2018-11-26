@@ -137,7 +137,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	authn.SetUserStore(schemas.Schema(&managementschema.Version, client.UserType), apiContext)
 	authn.SetRTBStore(ctx, schemas.Schema(&managementschema.Version, client.ClusterRoleTemplateBindingType), apiContext)
 	authn.SetRTBStore(ctx, schemas.Schema(&managementschema.Version, client.ProjectRoleTemplateBindingType), apiContext)
-	cluster.SetClusterStore(ctx, schemas.Schema(&managementschema.Version, client.ClusterType), apiContext)
 	nodeStore.SetupStore(schemas.Schema(&managementschema.Version, client.NodeType))
 	projectStore.SetProjectStore(schemas.Schema(&managementschema.Version, client.ProjectType), apiContext)
 	setupScopedTypes(schemas)
@@ -177,10 +176,6 @@ func setupScopedTypes(schemas *types.Schemas) {
 }
 
 func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler) {
-	linkHandler := &ccluster.ShellLinkHandler{
-		Proxy:          k8sProxy,
-		ClusterManager: clusterManager,
-	}
 	handler := ccluster.ActionHandler{
 		NodepoolGetter:     managementContext.Management,
 		ClusterClient:      managementContext.Management.Clusters(""),
@@ -192,10 +187,7 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 	schema := schemas.Schema(&managementschema.Version, client.ClusterType)
 	schema.Formatter = ccluster.Formatter
 	schema.ActionHandler = handler.ClusterActionHandler
-	schema.Store = &cluster.Store{
-		Store:        schema.Store,
-		ShellHandler: linkHandler.LinkHandler,
-	}
+	cluster.SetClusterStore(schema, managementContext, clusterManager, k8sProxy)
 }
 
 func Templates(schemas *types.Schemas, managementContext *config.ScaledContext) {
