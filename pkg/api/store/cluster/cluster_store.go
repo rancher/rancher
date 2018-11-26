@@ -1,8 +1,8 @@
 package cluster
 
 import (
-	"context"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,6 +13,8 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	ccluster "github.com/rancher/rancher/pkg/api/customization/cluster"
+	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/settings"
 	managementv3 "github.com/rancher/types/client/management/v3"
@@ -25,7 +27,7 @@ type Store struct {
 	mu           sync.Mutex
 }
 
-func SetClusterStore(ctx context.Context, schema *types.Schema, mgmt *config.ScaledContext) {
+func SetClusterStore(schema *types.Schema, mgmt *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler) {
 	t := &transform.Store{
 		Store: schema.Store,
 		Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
@@ -35,8 +37,14 @@ func SetClusterStore(ctx context.Context, schema *types.Schema, mgmt *config.Sca
 		},
 	}
 
+	linkHandler := &ccluster.ShellLinkHandler{
+		Proxy:          k8sProxy,
+		ClusterManager: clusterManager,
+	}
+
 	s := &Store{
-		Store: t,
+		Store:        t,
+		ShellHandler: linkHandler.LinkHandler,
 	}
 
 	schema.Store = s
