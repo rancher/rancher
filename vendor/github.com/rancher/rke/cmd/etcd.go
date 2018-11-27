@@ -68,11 +68,8 @@ func SnapshotSaveEtcdHosts(
 	if err := kubeCluster.TunnelHosts(ctx, flags); err != nil {
 		return err
 	}
-	if err := kubeCluster.SnapshotEtcd(ctx, snapshotName); err != nil {
-		return err
-	}
 
-	if err := kubeCluster.SaveBackupCertificateBundle(ctx); err != nil {
+	if err := kubeCluster.SnapshotEtcd(ctx, snapshotName); err != nil {
 		return err
 	}
 
@@ -98,12 +95,11 @@ func RestoreEtcdSnapshot(
 	if err := kubeCluster.TunnelHosts(ctx, flags); err != nil {
 		return err
 	}
+
 	if err := kubeCluster.RestoreEtcdSnapshot(ctx, snapshotName); err != nil {
 		return err
 	}
-	if err := kubeCluster.ExtractBackupCertificateBundle(ctx); err != nil {
-		return err
-	}
+
 	log.Infof(ctx, "Finished restoring snapshot [%s] on all etcd hosts", snapshotName)
 	return nil
 }
