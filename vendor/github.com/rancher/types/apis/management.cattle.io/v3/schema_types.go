@@ -18,7 +18,6 @@ type DynamicSchema struct {
 }
 
 type DynamicSchemaSpec struct {
-	SchemaName        string            `json:"schemaName,omitempty"`
 	Embed             bool              `json:"embed,omitempty"`
 	EmbedType         string            `json:"embedType,omitempty"`
 	PluralName        string            `json:"pluralName,omitempty"`
@@ -52,7 +51,6 @@ type Field struct {
 	ValidChars   string   `json:"validChars,omitempty"`
 	InvalidChars string   `json:"invalidChars,omitempty"`
 	Description  string   `json:"description,omitempty"`
-	DynamicField bool     `json:"dynamicField,omitempty"`
 }
 
 type Values struct {

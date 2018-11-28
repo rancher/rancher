@@ -13,7 +13,6 @@ const (
 	DynamicSchemaSpecFieldResourceActions   = "resourceActions"
 	DynamicSchemaSpecFieldResourceFields    = "resourceFields"
 	DynamicSchemaSpecFieldResourceMethods   = "resourceMethods"
-	DynamicSchemaSpecFieldSchemaName        = "schemaName"
 )
 
 type DynamicSchemaSpec struct {
@@ -28,5 +27,4 @@ type DynamicSchemaSpec struct {
 	ResourceActions   map[string]Action `json:"resourceActions,omitempty" yaml:"resourceActions,omitempty"`
 	ResourceFields    map[string]Field  `json:"resourceFields,omitempty" yaml:"resourceFields,omitempty"`
 	ResourceMethods   []string          `json:"resourceMethods,omitempty" yaml:"resourceMethods,omitempty"`
-	SchemaName        string            `json:"schemaName,omitempty" yaml:"schemaName,omitempty"`
 }

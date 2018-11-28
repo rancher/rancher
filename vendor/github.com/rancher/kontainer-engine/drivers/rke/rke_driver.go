@@ -81,10 +81,6 @@ func (d *Driver) GetCapabilities(ctx context.Context) (*types.Capabilities, erro
 	return &d.driverCapabilities, nil
 }
 
-func (d *Driver) GetK8SCapabilities(ctx context.Context, _ *types.DriverOptions) (*types.K8SCapabilities, error) {
-	return &types.K8SCapabilities{}, nil
-}
-
 // GetDriverCreateOptions returns create flags for rke driver
 func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags, error) {
 	driverFlag := types.DriverFlags{

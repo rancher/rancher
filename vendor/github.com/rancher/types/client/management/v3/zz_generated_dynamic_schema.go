@@ -24,7 +24,6 @@ const (
 	DynamicSchemaFieldResourceActions      = "resourceActions"
 	DynamicSchemaFieldResourceFields       = "resourceFields"
 	DynamicSchemaFieldResourceMethods      = "resourceMethods"
-	DynamicSchemaFieldSchemaName           = "schemaName"
 	DynamicSchemaFieldState                = "state"
 	DynamicSchemaFieldStatus               = "status"
 	DynamicSchemaFieldTransitioning        = "transitioning"
@@ -52,7 +51,6 @@ type DynamicSchema struct {
 	ResourceActions      map[string]Action    `json:"resourceActions,omitempty" yaml:"resourceActions,omitempty"`
 	ResourceFields       map[string]Field     `json:"resourceFields,omitempty" yaml:"resourceFields,omitempty"`
 	ResourceMethods      []string             `json:"resourceMethods,omitempty" yaml:"resourceMethods,omitempty"`
-	SchemaName           string               `json:"schemaName,omitempty" yaml:"schemaName,omitempty"`
 	State                string               `json:"state,omitempty" yaml:"state,omitempty"`
 	Status               *DynamicSchemaStatus `json:"status,omitempty" yaml:"status,omitempty"`
 	Transitioning        string               `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
