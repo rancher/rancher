@@ -44,7 +44,6 @@ type Driver interface {
 
 	// Get driver capabilities
 	GetCapabilities(ctx context.Context) (*Capabilities, error)
-	GetK8SCapabilities(ctx context.Context, opts *DriverOptions) (*K8SCapabilities, error)
 }
 
 type UnimplementedVersionAccess struct {

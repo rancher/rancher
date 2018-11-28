@@ -271,23 +271,6 @@ func (c *Cluster) GetCapabilities(ctx context.Context) (*types.Capabilities, err
 	return c.Driver.GetCapabilities(ctx)
 }
 
-func (c *Cluster) GetK8SCapabilities(ctx context.Context) (*types.K8SCapabilities, error) {
-	options, err := c.ConfigGetter.GetConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	return c.Driver.GetK8SCapabilities(ctx, &options)
-}
-
-func (c *Cluster) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags, error) {
-	return c.Driver.GetDriverCreateOptions(ctx)
-}
-
-func (c *Cluster) GetDriverUpdateOptions(ctx context.Context) (*types.DriverFlags, error) {
-	return c.Driver.GetDriverUpdateOptions(ctx)
-}
-
 func (c *Cluster) getState() (string, error) {
 	return c.PersistStore.GetStatus(c.Name)
 }
@@ -308,7 +291,7 @@ func (c *Cluster) restore() error {
 }
 
 // NewCluster create a cluster interface to do operations
-func NewCluster(driverName, name, addr string, configGetter ConfigGetter, persistStore PersistentStore) (*Cluster, error) {
+func NewCluster(driverName, addr, name string, configGetter ConfigGetter, persistStore PersistentStore) (*Cluster, error) {
 	rpcClient, err := types.NewClient(driverName, addr)
 	if err != nil {
 		return nil, err

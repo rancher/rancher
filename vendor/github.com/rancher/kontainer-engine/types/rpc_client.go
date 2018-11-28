@@ -98,11 +98,6 @@ func (rpc *grpcClient) GetCapabilities(ctx context.Context) (*Capabilities, erro
 	return rpc.client.GetCapabilities(ctx, &Empty{})
 }
 
-func (rpc *grpcClient) GetK8SCapabilities(ctx context.Context, opts *DriverOptions) (*K8SCapabilities, error) {
-	capabilities, err := rpc.client.GetK8SCapabilities(ctx, opts)
-	return capabilities, handlErr(err)
-}
-
 func handlErr(err error) error {
 	if st, ok := status.FromError(err); ok {
 		if st.Code() == codes.Unknown && st.Message() != "" {
