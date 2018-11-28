@@ -14,7 +14,6 @@ import (
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
-	"github.com/rancher/rancher/pkg/configfield"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/settings"
@@ -33,20 +32,24 @@ const (
 )
 
 type Provisioner struct {
-	ClusterController v3.ClusterController
-	Clusters          v3.ClusterInterface
-	NodeLister        v3.NodeLister
-	Driver            service.EngineService
-	backoff           *flowcontrol.Backoff
+	ClusterController     v3.ClusterController
+	Clusters              v3.ClusterInterface
+	NodeLister            v3.NodeLister
+	Driver                service.EngineService
+	backoff               *flowcontrol.Backoff
+	KontainerDriverLister v3.KontainerDriverLister
+	DynamicSchemasLister  v3.DynamicSchemaLister
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
 	p := &Provisioner{
-		Driver:            service.NewEngineService(NewPersistentStore(management.Core.Namespaces(""), management.Core)),
-		Clusters:          management.Management.Clusters(""),
-		ClusterController: management.Management.Clusters("").Controller(),
-		NodeLister:        management.Management.Nodes("").Controller().Lister(),
-		backoff:           flowcontrol.NewBackOff(30*time.Second, 10*time.Minute),
+		Driver:                service.NewEngineService(NewPersistentStore(management.Core.Namespaces(""), management.Core)),
+		Clusters:              management.Management.Clusters(""),
+		ClusterController:     management.Management.Clusters("").Controller(),
+		NodeLister:            management.Management.Nodes("").Controller().Lister(),
+		backoff:               flowcontrol.NewBackOff(30*time.Second, 10*time.Minute),
+		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
+		DynamicSchemasLister:  management.Management.DynamicSchemas("").Controller().Lister(),
 	}
 
 	// Add handlers
@@ -61,7 +64,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		Docker:  true,
 	}
 
-	driver := service.Drivers["rke"]
+	driver := service.Drivers[service.RancherKubernetesEngineDriverName]
 	rkeDriver := driver.(*rke.Driver)
 	rkeDriver.DockerDialer = docker.Build
 	rkeDriver.LocalDialer = local.Build
@@ -131,7 +134,7 @@ func (p *Provisioner) machineChanged(key string, machine *v3.Node) (runtime.Obje
 
 	p.ClusterController.Enqueue("", parts[0])
 
-	return nil, nil
+	return machine, nil
 }
 
 func (p *Provisioner) Create(cluster *v3.Cluster) (runtime.Object, error) {
@@ -269,7 +272,12 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 			return cluster, err
 		}
 
-		cluster.Status.AppliedSpec = *spec
+		censoredSpec, err := p.censorGenericEngineConfig(*spec)
+		if err != nil {
+			return cluster, err
+		}
+
+		cluster.Status.AppliedSpec = censoredSpec
 		cluster.Status.APIEndpoint = apiEndpoint
 		cluster.Status.ServiceAccountToken = serviceAccountToken
 		cluster.Status.CACert = caCert
@@ -291,19 +299,70 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 	return cluster, nil
 }
 
+func copyMap(toCopy v3.MapStringInterface) v3.MapStringInterface {
+	newMap := v3.MapStringInterface{}
+
+	for k, v := range toCopy {
+		newMap[k] = v
+	}
+
+	return newMap
+}
+
+func (p *Provisioner) censorGenericEngineConfig(input v3.ClusterSpec) (v3.ClusterSpec, error) {
+	if input.GenericEngineConfig == nil {
+		// nothing to do
+		return input, nil
+	}
+
+	config := copyMap(*input.GenericEngineConfig)
+	driverName, ok := config[DriverNameField].(string)
+	if !ok {
+		// can't figure out driver type so blank out the whole thing
+		logrus.Warnf("cluster %v has a generic engine config but no driver type field; can't hide password "+
+			"fields so removing the entire config", input.DisplayName)
+		input.GenericEngineConfig = nil
+		return input, nil
+	}
+
+	driver, err := p.KontainerDriverLister.Get("", driverName)
+	if err != nil {
+		return v3.ClusterSpec{}, err
+	}
+
+	var schemaName string
+	if driver.Spec.BuiltIn {
+		schemaName = driver.Status.DisplayName + "Config"
+	} else {
+		schemaName = driver.Status.DisplayName + "EngineConfig"
+	}
+
+	kontainerDriverSchema, err := p.DynamicSchemasLister.Get("", strings.ToLower(schemaName))
+	if err != nil {
+		return v3.ClusterSpec{}, fmt.Errorf("error getting dynamic schema %v", err)
+	}
+
+	for key := range config {
+		field := kontainerDriverSchema.Spec.ResourceFields[key]
+		if field.Type == "password" {
+			delete(config, key)
+		}
+	}
+
+	input.GenericEngineConfig = &config
+	return input, nil
+}
+
 func skipProvisioning(cluster *v3.Cluster) bool {
 	return cluster.Status.Driver == v3.ClusterDriverLocal || cluster.Status.Driver == v3.ClusterDriverImported
 }
 
 func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, driverName, clusterName string) (*v3.ClusterSpec, interface{}, error) {
-	data, err := convert.EncodeToMap(spec)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	v, ok := data[driverName+"Config"]
-	if !ok || v == nil {
+	var v interface{}
+	if spec.GenericEngineConfig == nil {
 		v = map[string]interface{}{}
+	} else {
+		v = *spec.GenericEngineConfig
 	}
 
 	if driverName == v3.ClusterDriverRKE && reconcileRKE {
@@ -322,24 +381,52 @@ func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, driverNa
 		spec.RancherKubernetesEngineConfig.Nodes = nodes
 		spec.RancherKubernetesEngineConfig.SystemImages = *systemImages
 
-		data, _ = convert.EncodeToMap(spec)
-		v = data[RKEDriverKey]
+		data, _ := convert.EncodeToMap(spec)
+		v, _ = data[RKEDriverKey]
 	}
 
 	return &spec, v, nil
 }
 
-func (p *Provisioner) getDriver(cluster *v3.Cluster) string {
-	driver := configfield.GetDriver(&cluster.Spec)
+func (p *Provisioner) getDriver(cluster *v3.Cluster) (string, error) {
+	var driver *v3.KontainerDriver
+	var err error
 
-	if driver == "" {
-		nodes, err := p.reconcileRKENodes(cluster.Name)
-		if err == nil && len(nodes) > 0 {
-			return v3.ClusterDriverRKE
+	if cluster.Spec.GenericEngineConfig == nil {
+		if cluster.Spec.AmazonElasticContainerServiceConfig != nil {
+			cluster.Spec.GenericEngineConfig = cluster.Spec.AmazonElasticContainerServiceConfig
+			(*cluster.Spec.GenericEngineConfig)["driverName"] = "amazonelasticcontainerservice"
+		}
+
+		if cluster.Spec.AzureKubernetesServiceConfig != nil {
+			cluster.Spec.GenericEngineConfig = cluster.Spec.AzureKubernetesServiceConfig
+			(*cluster.Spec.GenericEngineConfig)["driverName"] = "azurekubernetesservice"
+		}
+
+		if cluster.Spec.GoogleKubernetesEngineConfig != nil {
+			cluster.Spec.GenericEngineConfig = cluster.Spec.GoogleKubernetesEngineConfig
+			(*cluster.Spec.GenericEngineConfig)["driverName"] = "googlekubernetesengine"
 		}
 	}
 
-	return driver
+	if cluster.Spec.GenericEngineConfig != nil {
+		kontainerDriverName := (*cluster.Spec.GenericEngineConfig)["driverName"].(string)
+		driver, err = p.KontainerDriverLister.Get("", kontainerDriverName)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	if driver == nil {
+		nodes, err := p.reconcileRKENodes(cluster.Name)
+		if err == nil && len(nodes) > 0 {
+			return v3.ClusterDriverRKE, nil
+		}
+
+		return "", nil
+	}
+
+	return driver.Status.DisplayName, nil
 }
 
 func (p *Provisioner) validateDriver(cluster *v3.Cluster) (string, error) {
@@ -349,7 +436,10 @@ func (p *Provisioner) validateDriver(cluster *v3.Cluster) (string, error) {
 		return v3.ClusterDriverImported, nil
 	}
 
-	newDriver := p.getDriver(cluster)
+	newDriver, err := p.getDriver(cluster)
+	if err != nil {
+		return "", err
+	}
 
 	if oldDriver == "" && newDriver == "" {
 		return newDriver, nil
@@ -417,16 +507,23 @@ func (p *Provisioner) getSpec(cluster *v3.Cluster) (*v3.ClusterSpec, error) {
 		return nil, err
 	}
 
-	newSpec, newConfig, err := p.getConfig(true, cluster.Spec, driverName, cluster.Name)
+	censoredSpec, err := p.censorGenericEngineConfig(cluster.Spec)
+	if err != nil {
+		return nil, err
+	}
+
+	newSpec, newConfig, err := p.getConfig(true, censoredSpec, driverName, cluster.Name)
 	if err != nil {
 		return nil, err
 	}
 
 	if reflect.DeepEqual(oldConfig, newConfig) {
-		newSpec = nil
+		return nil, nil
 	}
 
-	return newSpec, nil
+	newSpec, _, err = p.getConfig(true, cluster.Spec, driverName, cluster.Name)
+
+	return newSpec, err
 }
 
 func (p *Provisioner) reconcileRKENodes(clusterName string) ([]v3.RKEConfigNode, error) {
