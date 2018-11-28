@@ -34,14 +34,14 @@ var (
 	}
 )
 
-func FlagToField(flag cli.Flag) (string, v3.Field, error) {
+func flagToField(flag cli.Flag) (string, v3.Field, error) {
 	field := v3.Field{
 		Create: true,
 		Update: true,
 		Type:   "string",
 	}
 
-	name, err := ToLowerCamelCase(flag.String())
+	name, err := toLowerCamelCase(flag.String())
 	if err != nil {
 		return name, field, err
 	}
@@ -55,7 +55,6 @@ func FlagToField(flag cli.Flag) (string, v3.Field, error) {
 		field.Default.StringValue = v.Value
 	case *cli.IntFlag:
 		field.Description = v.Usage
-		field.Type = "int"
 		field.Default.StringValue = strconv.Itoa(v.Value)
 	case *cli.BoolFlag:
 		field.Type = "boolean"
@@ -64,9 +63,6 @@ func FlagToField(flag cli.Flag) (string, v3.Field, error) {
 		field.Type = "array[string]"
 		field.Description = v.Usage
 		field.Default.StringSliceValue = v.Value
-	case *BoolPointerFlag:
-		field.Type = "boolean"
-		field.Description = v.Usage
 	default:
 		return name, field, fmt.Errorf("unknown type of flag %v: %v", flag, reflect.TypeOf(flag))
 	}
@@ -79,7 +75,7 @@ func isPassword(key string) bool {
 	return ok
 }
 
-func ToLowerCamelCase(nodeFlagName string) (string, error) {
+func toLowerCamelCase(nodeFlagName string) (string, error) {
 	parts := strings.SplitN(nodeFlagName, "-", 2)
 	if len(parts) != 2 {
 		return "", fmt.Errorf("parameter %s does not follow expected naming convention [DRIVER]-[FLAG-NAME]", nodeFlagName)

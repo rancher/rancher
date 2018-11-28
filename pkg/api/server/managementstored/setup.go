@@ -14,7 +14,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/catalog"
 	ccluster "github.com/rancher/rancher/pkg/api/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
-	"github.com/rancher/rancher/pkg/api/customization/kontainerdriver"
 	"github.com/rancher/rancher/pkg/api/customization/logging"
 	"github.com/rancher/rancher/pkg/api/customization/node"
 	"github.com/rancher/rancher/pkg/api/customization/nodetemplate"
@@ -69,7 +68,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.GlobalRoleType,
 		client.GroupMemberType,
 		client.GroupType,
-		client.KontainerDriverType,
 		client.ListenConfigType,
 		client.NodeDriverType,
 		client.NodePoolType,
@@ -187,10 +185,7 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 	}
 
 	schema := schemas.Schema(&managementschema.Version, client.ClusterType)
-	clusterFormatter := ccluster.Formatter{
-		KontainerDriverLister: managementContext.Management.KontainerDrivers("").Controller().Lister(),
-	}
-	schema.Formatter = clusterFormatter.Formatter
+	schema.Formatter = ccluster.Formatter
 	schema.ActionHandler = handler.ClusterActionHandler
 	cluster.SetClusterStore(schema, managementContext, clusterManager, k8sProxy)
 }
@@ -471,14 +466,4 @@ func RoleTemplate(schemas *types.Schemas, management *config.ScaledContext) {
 	}
 	schema := schemas.Schema(&managementschema.Version, client.RoleTemplateType)
 	schema.Validator = rt.Validator
-}
-
-func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
-	schema := schemas.Schema(&managementschema.Version, client.KontainerDriverType)
-	handler := kontainerdriver.ActionHandler{
-		KontainerDrivers:      management.Management.KontainerDrivers(""),
-		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
-	}
-	schema.ActionHandler = handler.ActionHandler
-	schema.Formatter = kontainerdriver.Formatter
 }

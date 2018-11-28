@@ -11,8 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/controllers/samlconfig"
 	"github.com/rancher/rancher/pkg/api/controllers/settings"
 	"github.com/rancher/rancher/pkg/api/controllers/usercontrollers"
-	whitelistproxyKontainerDriver "github.com/rancher/rancher/pkg/api/controllers/whitelistproxy/kontainerdriver"
-	whitelistproxyNodeDriver "github.com/rancher/rancher/pkg/api/controllers/whitelistproxy/nodedriver"
+	"github.com/rancher/rancher/pkg/api/controllers/whitelistproxy"
 	"github.com/rancher/rancher/pkg/api/server/managementstored"
 	"github.com/rancher/rancher/pkg/api/server/userstored"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -45,8 +44,7 @@ func New(ctx context.Context, scaledContext *config.ScaledContext, clusterManage
 	}
 
 	dynamicschema.Register(ctx, scaledContext, server.Schemas)
-	whitelistproxyNodeDriver.Register(ctx, scaledContext)
-	whitelistproxyKontainerDriver.Register(ctx, scaledContext)
+	whitelistproxy.Register(ctx, scaledContext)
 	samlconfig.Register(ctx, scaledContext)
 	usercontrollers.Register(ctx, scaledContext, clusterManager)
 	err := settings.Register(scaledContext)

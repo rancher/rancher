@@ -71,18 +71,10 @@ func (c *Controller) add(dynamicSchema *v3.DynamicSchema) error {
 			field.Default = defMap["stringSliceValue"]
 		}
 
-		field.DynamicField = true
-
 		schema.ResourceFields[name] = field
 	}
 
-	// we need to maintain backwards compatibility with older dynamic schemas that were created before we had the
-	// schema name field
-	if dynamicSchema.Spec.SchemaName != "" {
-		schema.ID = dynamicSchema.Spec.SchemaName
-	} else {
-		schema.ID = dynamicSchema.Name
-	}
+	schema.ID = dynamicSchema.Name
 	schema.Version = managementSchema.Version
 	c.Schemas.AddSchema(schema)
 
