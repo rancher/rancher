@@ -182,15 +182,7 @@ func (o *objectLifecycleAdapter) record(obj runtime.Object, f func(runtime.Objec
 		newObj, _ = o.update(metadata.GetName(), origObj, newObj)
 		return newObj, err
 	} else if newObj != nil {
-		newMetadata, err := meta.Accessor(newObj)
-		if err != nil {
-			// don't return error, no original error
-			return newObj, nil
-		}
-		if newMetadata.GetResourceVersion() == metadata.GetResourceVersion() {
-			return o.update(metadata.GetName(), origObj, newObj)
-		}
-		return newObj, nil
+		return o.update(metadata.GetName(), origObj, newObj)
 	}
 	return obj, nil
 }
