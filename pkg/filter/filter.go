@@ -2,9 +2,7 @@ package filter
 
 import (
 	"bufio"
-	"context"
 	"errors"
-	"fmt"
 	"net"
 	"net/http"
 
@@ -15,7 +13,6 @@ import (
 	"github.com/rancher/rancher/pkg/audit"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/util"
-	"github.com/rancher/types/config"
 )
 
 type wrapWriter struct {
@@ -46,12 +43,7 @@ func (aw *wrapWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return nil, nil, errors.New("the ResponseWriter doesn't support the Hijacker interface")
 }
 
-func NewAuthenticationFilter(ctx context.Context, managementContext *config.ScaledContext, auditWriter *audit.LogWriter, next http.Handler) (http.Handler, error) {
-	if managementContext == nil {
-		return nil, fmt.Errorf("Failed to build NewAuthenticationFilter, nil ManagementContext")
-	}
-	auth := requests.NewAuthenticator(ctx, managementContext)
-
+func NewAuthenticationFilter(auth requests.Authenticator, auditWriter *audit.LogWriter, next http.Handler) (http.Handler, error) {
 	return &authHandler{
 		auth:        auth,
 		next:        next,

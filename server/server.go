@@ -11,7 +11,9 @@ import (
 	"github.com/rancher/rancher/pkg/audit"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
+	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	webhook2 "github.com/rancher/rancher/pkg/auth/webhook"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	rancherdialer "github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/filter"
@@ -51,7 +53,12 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 
 	rawAuthedAPIs := newAuthed(tokenAPI, managementAPI, k8sProxy)
 
-	authedHandler, err := filter.NewAuthenticationFilter(ctx, scaledContext, auditLogWriter, rawAuthedAPIs)
+	auth := requests.NewAuthenticator(ctx, scaledContext)
+	tokenReview := &webhook2.TokenReviewer{
+		Authenticator: auth,
+	}
+
+	authedHandler, err := filter.NewAuthenticationFilter(auth, auditLogWriter, rawAuthedAPIs)
 	if err != nil {
 		return err
 	}
@@ -71,6 +78,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 	root.Handle("/v3/settings/cacerts", rawAuthedAPIs).Methods(http.MethodGet)
 	root.Handle("/v3/settings/first-login", rawAuthedAPIs).Methods(http.MethodGet)
 	root.Handle("/v3/settings/ui-pl", rawAuthedAPIs).Methods(http.MethodGet)
+	root.Handle("/v3/tokenreview", tokenReview).Methods(http.MethodPost)
 	root.PathPrefix("/v3").Handler(authedHandler)
 	root.PathPrefix("/hooks").Handler(webhookHandler)
 	root.PathPrefix("/k8s/clusters/").Handler(authedHandler)
