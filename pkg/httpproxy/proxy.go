@@ -24,6 +24,7 @@ var (
 		"transfer-encoding": true,
 		"content-length":    true,
 		"x-api-auth-header": true,
+		"cf-connecting-ip":  true,
 		"cf-ray":            true,
 		"impersonate-user":  true,
 		"impersonate-group": true,
