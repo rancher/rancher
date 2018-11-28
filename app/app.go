@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 
-	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/norman/leader"
 	"github.com/rancher/norman/pkg/k8scheck"
 	"github.com/rancher/rancher/pkg/audit"
@@ -82,10 +81,6 @@ func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config
 }
 
 func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
-	if err := service.Start(); err != nil {
-		return err
-	}
-
 	scaledContext, clusterManager, err := buildScaledContext(ctx, kubeConfig, cfg)
 	if err != nil {
 		return err
@@ -171,6 +166,10 @@ func addData(management *config.ManagementContext, cfg Config) error {
 	}
 
 	if err := addDefaultPodSecurityPolicyTemplates(management); err != nil {
+		return err
+	}
+
+	if err := addKontainerDrivers(management); err != nil {
 		return err
 	}
 

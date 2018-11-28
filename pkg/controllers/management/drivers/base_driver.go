@@ -1,4 +1,4 @@
-package nodedriver
+package drivers
 
 import (
 	"bytes"
@@ -23,45 +23,31 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var dockerMachineDriverPrefix = "docker-machine-driver-"
-
-type Driver struct {
-	builtin bool
-	url     string
-	hash    string
-	name    string
+type BaseDriver struct {
+	Builtin      bool
+	URL          string
+	DriverHash   string
+	DriverName   string
+	BinaryPrefix string
 }
 
-func NewDriver(builtin bool, name, url, hash string) *Driver {
-	d := &Driver{
-		builtin: builtin,
-		name:    name,
-		url:     url,
-		hash:    hash,
-	}
-	if !strings.HasPrefix(d.name, dockerMachineDriverPrefix) {
-		d.name = dockerMachineDriverPrefix + d.name
-	}
-	return d
+func (d *BaseDriver) Name() string {
+	return d.DriverName
 }
 
-func (d *Driver) Name() string {
-	return d.name
+func (d *BaseDriver) Hash() string {
+	return d.DriverHash
 }
 
-func (d *Driver) Hash() string {
-	return d.hash
+func (d *BaseDriver) Checksum() string {
+	return d.DriverName
 }
 
-func (d *Driver) Checksum() string {
-	return d.name
+func (d *BaseDriver) FriendlyName() string {
+	return strings.TrimPrefix(d.DriverName, d.BinaryPrefix)
 }
 
-func (d *Driver) FriendlyName() string {
-	return strings.TrimPrefix(d.name, dockerMachineDriverPrefix)
-}
-
-func (d *Driver) Remove() error {
+func (d *BaseDriver) Remove() error {
 	cacheFilePrefix := d.cacheFile()
 	content, err := ioutil.ReadFile(cacheFilePrefix)
 	if os.IsNotExist(err) {
@@ -80,7 +66,7 @@ func (d *Driver) Remove() error {
 	return nil
 }
 
-func (d *Driver) Stage() error {
+func (d *BaseDriver) Stage() error {
 	if err := d.getError(); err != nil {
 		return err
 	}
@@ -88,7 +74,7 @@ func (d *Driver) Stage() error {
 	return d.setError(d.stage())
 }
 
-func (d *Driver) setError(err error) error {
+func (d *BaseDriver) setError(err error) error {
 	errFile := d.cacheFile() + ".error"
 
 	if err != nil {
@@ -98,7 +84,7 @@ func (d *Driver) setError(err error) error {
 	return err
 }
 
-func (d *Driver) getError() error {
+func (d *BaseDriver) getError() error {
 	errFile := d.cacheFile() + ".error"
 
 	if content, err := ioutil.ReadFile(errFile); err == nil {
@@ -110,13 +96,13 @@ func (d *Driver) getError() error {
 	return nil
 }
 
-func (d *Driver) ClearError() {
+func (d *BaseDriver) ClearError() {
 	errFile := d.cacheFile() + ".error"
 	os.Remove(errFile)
 }
 
-func (d *Driver) stage() error {
-	if d.builtin {
+func (d *BaseDriver) stage() error {
+	if d.Builtin {
 		return nil
 	}
 
@@ -124,7 +110,7 @@ func (d *Driver) stage() error {
 
 	driverName, err := isInstalled(cacheFilePrefix)
 	if err != nil || driverName != "" {
-		d.name = driverName
+		d.DriverName = driverName
 		return err
 	}
 
@@ -135,7 +121,7 @@ func (d *Driver) stage() error {
 	defer os.Remove(tempFile.Name())
 	defer tempFile.Close()
 
-	hasher, err := getHasher(d.hash)
+	hasher, err := getHasher(d.DriverHash)
 	if err != nil {
 		return err
 	}
@@ -149,8 +135,8 @@ func (d *Driver) stage() error {
 		return err
 	}
 
-	if got, ok := compare(hasher, d.hash); !ok {
-		return fmt.Errorf("hash does not match, got %s, expected %s", got, d.hash)
+	if got, ok := compare(hasher, d.DriverHash); !ok {
+		return fmt.Errorf("hash does not match, got %s, expected %s", got, d.DriverHash)
 	}
 
 	if err := tempFile.Close(); err != nil {
@@ -162,73 +148,20 @@ func (d *Driver) stage() error {
 		return err
 	}
 
-	d.name = driverName
+	d.DriverName = driverName
 	return nil
 }
 
-func (d *Driver) Exists() bool {
-	if d.name == "" {
+func (d *BaseDriver) Exists() bool {
+	if d.DriverName == "" {
 		return false
 	}
-	if d.builtin {
+	if d.Builtin {
 		return true
 	}
-	binaryPath := path.Join(binDir(), d.name)
+	binaryPath := path.Join(binDir(), d.DriverName)
 	_, err := os.Stat(binaryPath)
 	return err == nil
-}
-
-func (d *Driver) Excutable() error {
-	if d.name == "" {
-		return fmt.Errorf("Empty driver name")
-	}
-
-	if d.builtin {
-		return nil
-	}
-
-	binaryPath := path.Join(binDir(), d.name)
-	_, err := os.Stat(binaryPath)
-	if err != nil {
-		return fmt.Errorf("Driver %s not found", binaryPath)
-	}
-	err = exec.Command(binaryPath).Start()
-	if err != nil {
-		return errors.Wrapf(err, "Driver binary %s couldn't execute", binaryPath)
-	}
-	return nil
-}
-
-func (d *Driver) Install() error {
-	if d.builtin {
-		return nil
-	}
-
-	binaryPath := path.Join(binDir(), d.name)
-	tmpPath := binaryPath + "-tmp"
-	f, err := os.OpenFile(tmpPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
-	if err != nil {
-		return errors.Wrapf(err, "Couldn't open %v for writing", tmpPath)
-	}
-	defer f.Close()
-
-	src, err := os.Open(d.srcBinName())
-	if err != nil {
-		return errors.Wrapf(err, "Couldn't open %v for copying", d.srcBinName())
-	}
-	defer src.Close()
-
-	logrus.Infof("Copying %v => %v", d.srcBinName(), tmpPath)
-	_, err = io.Copy(f, src)
-	if err != nil {
-		return errors.Wrapf(err, "Couldn't copy %v to %v", d.srcBinName(), tmpPath)
-	}
-
-	err = os.Rename(tmpPath, binaryPath)
-	if err != nil {
-		return errors.Wrapf(err, "Couldn't copy driver %v to %v", d.Name(), binaryPath)
-	}
-	return nil
 }
 
 func isElf(input string) bool {
@@ -246,7 +179,7 @@ func isElf(input string) bool {
 	return bytes.Compare(elf, []byte{0x7f, 0x45, 0x4c, 0x46}) == 0 || bytes.Compare(elf, []byte{0xcf, 0xfa, 0xed, 0xfe}) == 0
 }
 
-func (d *Driver) copyBinary(cacheFile, input string) (string, error) {
+func (d *BaseDriver) copyBinary(cacheFile, input string) (string, error) {
 	temp, err := ioutil.TempDir("", "machine-driver-extract")
 	if err != nil {
 		return "", err
@@ -258,24 +191,24 @@ func (d *Driver) copyBinary(cacheFile, input string) (string, error) {
 
 	if isElf(input) {
 		file = input
-		u, err := url.Parse(d.url)
+		u, err := url.Parse(d.URL)
 		if err != nil {
 			return "", err
 		}
 
-		if !strings.HasPrefix(path.Base(u.Path), dockerMachineDriverPrefix) {
-			return "", fmt.Errorf("invalid URL %s, path should be of the format docker-machine-driver-*", d.url)
+		if !strings.HasPrefix(path.Base(u.Path), d.BinaryPrefix) {
+			return "", fmt.Errorf("invalid URL %s, path should be of the format %s*", d.URL, d.BinaryPrefix)
 		}
 
-		s := strings.TrimPrefix(path.Base(u.Path), dockerMachineDriverPrefix)
+		s := strings.TrimPrefix(path.Base(u.Path), d.BinaryPrefix)
 		name := strings.FieldsFunc(s, func(r rune) bool {
 			return r == '-' || r == '_' || r == '.'
 		})[0]
 
 		if name == "" {
-			return "", fmt.Errorf("invalid URL %s, NAME is empty, path should be of the format docker-machine-driver-NAME", d.url)
+			return "", fmt.Errorf("invalid URL %s, NAME is empty, path should be of the format %sNAME", d.URL, d.BinaryPrefix)
 		}
-		driverName = dockerMachineDriverPrefix + name
+		driverName = d.BinaryPrefix + name
 	} else {
 		if err := exec.Command("tar", "xvf", input, "-C", temp).Run(); err != nil {
 			if err := exec.Command("unzip", "-o", input, "-d", temp).Run(); err != nil {
@@ -289,7 +222,7 @@ func (d *Driver) copyBinary(cacheFile, input string) (string, error) {
 			return nil
 		}
 
-		if strings.HasPrefix(path.Base(p), dockerMachineDriverPrefix) {
+		if strings.HasPrefix(path.Base(p), d.BinaryPrefix) {
 			file = p
 		}
 
@@ -328,8 +261,8 @@ func (d *Driver) copyBinary(cacheFile, input string) (string, error) {
 	return driverName, ioutil.WriteFile(cacheFile, []byte(driverName), 0644)
 }
 
-func (d *Driver) srcBinName() string {
-	return d.cacheFile() + "-" + d.name
+func (d *BaseDriver) srcBinName() string {
+	return d.cacheFile() + "-" + d.DriverName
 }
 
 func binDir() string {
@@ -368,9 +301,9 @@ func getHasher(hash string) (hash.Hash, error) {
 	return nil, fmt.Errorf("invalid hash format: %s", hash)
 }
 
-func (d *Driver) download(dest io.Writer) error {
-	logrus.Infof("Download %s", d.url)
-	resp, err := http.Get(d.url)
+func (d *BaseDriver) download(dest io.Writer) error {
+	logrus.Infof("Download %s", d.URL)
+	resp, err := http.Get(d.URL)
 	if err != nil {
 		return err
 	}
@@ -380,8 +313,8 @@ func (d *Driver) download(dest io.Writer) error {
 	return err
 }
 
-func (d *Driver) cacheFile() string {
-	key := sha256Bytes([]byte(d.url + d.hash))
+func (d *BaseDriver) cacheFile() string {
+	key := sha256Bytes([]byte(d.URL + d.DriverHash))
 
 	base := os.Getenv("CATTLE_HOME")
 	if base == "" {

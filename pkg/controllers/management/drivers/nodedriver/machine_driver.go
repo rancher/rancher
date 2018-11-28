@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	errs "github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/controllers/management/drivers"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -16,7 +17,7 @@ import (
 )
 
 var (
-	schemaLock = sync.Mutex{}
+	SchemaLock = sync.Mutex{}
 	driverLock = sync.Mutex{}
 )
 
@@ -55,7 +56,7 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 
 	err := errs.New("not found")
 	// if node driver was created, we also activate the driver by default
-	driver := NewDriver(obj.Spec.Builtin, obj.Spec.DisplayName, obj.Spec.URL, obj.Spec.Checksum)
+	driver := drivers.NewDynamicDriver(obj.Spec.Builtin, obj.Spec.DisplayName, obj.Spec.URL, obj.Spec.Checksum)
 	if obj.Spec.DisplayName != "" {
 		schemaName := obj.Spec.DisplayName + "config"
 		_, err = m.schemaLister.Get("", schemaName)
@@ -94,7 +95,7 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 		if err = driver.Excutable(); err != nil {
 			return nil, err
 		}
-		obj.Spec.DisplayName = strings.TrimPrefix(driver.Name(), dockerMachineDriverPrefix)
+		obj.Spec.DisplayName = strings.TrimPrefix(driver.Name(), drivers.DockerMachineDriverPrefix)
 		return obj, nil
 	})
 	if err != nil {
@@ -102,14 +103,14 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	}
 
 	obj = newObj.(*v3.NodeDriver)
-	driverName := strings.TrimPrefix(driver.Name(), dockerMachineDriverPrefix)
+	driverName := strings.TrimPrefix(driver.Name(), drivers.DockerMachineDriverPrefix)
 	flags, err := getCreateFlagsForDriver(driverName)
 	if err != nil {
 		return nil, err
 	}
 	resourceFields := map[string]v3.Field{}
 	for _, flag := range flags {
-		name, field, err := flagToField(flag)
+		name, field, err := FlagToField(flag)
 		if err != nil {
 			return nil, err
 		}
@@ -177,8 +178,8 @@ func (m *Lifecycle) Remove(obj *v3.NodeDriver) (runtime.Object, error) {
 }
 
 func (m *Lifecycle) createOrUpdateNodeForEmbeddedType(embeddedType, fieldName string, embedded bool) error {
-	schemaLock.Lock()
-	defer schemaLock.Unlock()
+	SchemaLock.Lock()
+	defer SchemaLock.Unlock()
 
 	if err := m.createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, fieldName, "nodeconfig", "node", embedded, false); err != nil {
 		return err
