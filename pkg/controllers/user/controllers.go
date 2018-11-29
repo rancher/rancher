@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	// init upgrade implement
-	_ "github.com/rancher/rancher/pkg/controllers/user/alert/upgrade"
 	_ "github.com/rancher/rancher/pkg/controllers/user/logging/upgrade"
 	_ "github.com/rancher/rancher/pkg/controllers/user/pipeline/upgrade"
 )
@@ -55,6 +54,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	endpoints.Register(ctx, cluster)
 	approuter.Register(ctx, cluster)
 	resourcequota.Register(ctx, cluster)
+	alert.Register(ctx, cluster)
 
 	c, err := cluster.Management.Management.Clusters("").Get(cluster.ClusterName, metav1.GetOptions{})
 	if err != nil {

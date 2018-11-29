@@ -56,9 +56,11 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &managementschema.Version,
 		client.AuthConfigType,
 		client.CatalogType,
-		client.ClusterAlertType,
+		client.ClusterAlertGroupType,
 		client.ClusterCatalogType,
 		client.ClusterLoggingType,
+		client.ClusterAlertRuleType,
+		client.ClusterMonitorGraphType,
 		client.ClusterRegistrationTokenType,
 		client.ClusterRoleTemplateBindingType,
 		client.ClusterType,
@@ -77,9 +79,11 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.PodSecurityPolicyTemplateProjectBindingType,
 		client.PodSecurityPolicyTemplateType,
 		client.PreferenceType,
-		client.ProjectAlertType,
+		client.ProjectAlertGroupType,
 		client.ProjectCatalogType,
 		client.ProjectLoggingType,
+		client.ProjectAlertRuleType,
+		client.ProjectMonitorGraphType,
 		client.ProjectNetworkPolicyType,
 		client.ProjectRoleTemplateBindingType,
 		client.ProjectType,
@@ -362,23 +366,35 @@ func LoggingTypes(schemas *types.Schemas) {
 
 func Alert(schemas *types.Schemas, management *config.ScaledContext) {
 	handler := &alert.Handler{
-		ProjectAlerts: management.Management.ProjectAlerts(""),
-		ClusterAlerts: management.Management.ClusterAlerts(""),
-		Notifiers:     management.Management.Notifiers(""),
+		ClusterAlertGroup: management.Management.ClusterAlertGroups(""),
+		ProjectAlertGroup: management.Management.ProjectAlertGroups(""),
+		ClusterAlertRule:  management.Management.ClusterAlertRules(""),
+		ProjectAlertRule:  management.Management.ProjectAlertRules(""),
+		Notifiers:         management.Management.Notifiers(""),
 	}
 
-	schema := schemas.Schema(&managementschema.Version, client.ClusterAlertType)
-	schema.Formatter = alert.Formatter
-	schema.ActionHandler = handler.ClusterActionHandler
-
-	schema = schemas.Schema(&managementschema.Version, client.ProjectAlertType)
-	schema.Formatter = alert.Formatter
-	schema.ActionHandler = handler.ProjectActionHandler
-
-	schema = schemas.Schema(&managementschema.Version, client.NotifierType)
+	schema := schemas.Schema(&managementschema.Version, client.NotifierType)
 	schema.CollectionFormatter = alert.NotifierCollectionFormatter
 	schema.Formatter = alert.NotifierFormatter
 	schema.ActionHandler = handler.NotifierActionHandler
+
+	schema = schemas.Schema(&managementschema.Version, client.ClusterAlertGroupType)
+	schema.Formatter = alert.GroupFormatter
+	schema.ActionHandler = handler.ClusterAlertGroupActionHandler
+
+	schema = schemas.Schema(&managementschema.Version, client.ProjectAlertGroupType)
+	schema.Formatter = alert.GroupFormatter
+	schema.ActionHandler = handler.ProjectAlertGroupActionHandler
+
+	schema = schemas.Schema(&managementschema.Version, client.ClusterAlertRuleType)
+	schema.Formatter = alert.RuleFormatter
+	schema.Validator = alert.ClusterAlertRuleValidator
+	schema.ActionHandler = handler.ClusterAlertRuleActionHandler
+
+	schema = schemas.Schema(&managementschema.Version, client.ProjectAlertRuleType)
+	schema.Formatter = alert.RuleFormatter
+	schema.Validator = alert.ProjectAlertRuleValidator
+	schema.ActionHandler = handler.ProjectAlertRuleActionHandler
 }
 
 func Pipeline(schemas *types.Schemas, management *config.ScaledContext, clusterManager *clustermanager.Manager) {
