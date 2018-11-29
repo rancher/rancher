@@ -62,6 +62,10 @@ func (a ActionHandler) RefreshActionHandler(actionName string, action *types.Act
 			return err
 		}
 	}
+	data := map[string]interface{}{
+		"catalogs": catalogs,
+	}
+	apiContext.WriteResponse(http.StatusOK, data)
 	return nil
 }
 
@@ -132,6 +136,10 @@ func (a ActionHandler) RefreshProjectCatalogActionHandler(actionName string, act
 			return err
 		}
 	}
+	data := map[string]interface{}{
+		"catalogs": prjCatalogs,
+	}
+	apiContext.WriteResponse(http.StatusOK, data)
 	return nil
 }
 
@@ -164,5 +172,9 @@ func (a ActionHandler) RefreshClusterCatalogActionHandler(actionName string, act
 			return err
 		}
 	}
+	data := map[string]interface{}{
+		"catalogs": clCatalogs,
+	}
+	apiContext.WriteResponse(http.StatusOK, data)
 	return nil
 }

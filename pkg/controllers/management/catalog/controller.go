@@ -42,7 +42,7 @@ func runRefreshProjectCatalog(ctx context.Context, interval int, controller v3.P
 			continue
 		}
 		for _, pc := range projectCatalogs {
-			controller.Enqueue("", pc.Name)
+			controller.Enqueue(pc.Namespace, pc.Name)
 		}
 	}
 }
@@ -55,7 +55,7 @@ func runRefreshClusterCatalog(ctx context.Context, interval int, controller v3.C
 			continue
 		}
 		for _, cc := range clusterCatalogs {
-			controller.Enqueue("", cc.Name)
+			controller.Enqueue(cc.Namespace, cc.Name)
 		}
 	}
 }
