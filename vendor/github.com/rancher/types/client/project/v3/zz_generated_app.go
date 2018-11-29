@@ -18,6 +18,7 @@ const (
 	AppFieldFiles                = "files"
 	AppFieldLabels               = "labels"
 	AppFieldLastAppliedTemplates = "lastAppliedTemplate"
+	AppFieldMultiClusterAppID    = "multiClusterAppId"
 	AppFieldName                 = "name"
 	AppFieldNamespaceId          = "namespaceId"
 	AppFieldNotes                = "notes"
@@ -46,6 +47,7 @@ type App struct {
 	Files                map[string]string `json:"files,omitempty" yaml:"files,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	LastAppliedTemplates string            `json:"lastAppliedTemplate,omitempty" yaml:"lastAppliedTemplate,omitempty"`
+	MultiClusterAppID    string            `json:"multiClusterAppId,omitempty" yaml:"multiClusterAppId,omitempty"`
 	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId          string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	Notes                string            `json:"notes,omitempty" yaml:"notes,omitempty"`

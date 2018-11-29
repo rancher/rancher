@@ -17,14 +17,15 @@ type App struct {
 }
 
 type AppSpec struct {
-	ProjectName     string            `json:"projectName,omitempty" norman:"type=reference[/v3/schemas/project]"`
-	Description     string            `json:"description,omitempty"`
-	TargetNamespace string            `json:"targetNamespace,omitempty"`
-	ExternalID      string            `json:"externalId,omitempty"`
-	Files           map[string]string `json:"files,omitempty"`
-	Answers         map[string]string `json:"answers,omitempty"`
-	AppRevisionName string            `json:"appRevisionName,omitempty" norman:"type=reference[/v3/project/schemas/apprevision]"`
-	Prune           bool              `json:"prune,omitempty"`
+	ProjectName         string            `json:"projectName,omitempty" norman:"type=reference[/v3/schemas/project]"`
+	Description         string            `json:"description,omitempty"`
+	TargetNamespace     string            `json:"targetNamespace,omitempty"`
+	ExternalID          string            `json:"externalId,omitempty"`
+	Files               map[string]string `json:"files,omitempty"`
+	Answers             map[string]string `json:"answers,omitempty"`
+	AppRevisionName     string            `json:"appRevisionName,omitempty" norman:"type=reference[/v3/project/schemas/apprevision]"`
+	Prune               bool              `json:"prune,omitempty"`
+	MultiClusterAppName string            `json:"multiClusterAppName,omitempty" norman:"type=reference[/v3/schemas/multiclusterapp]"`
 }
 
 var (

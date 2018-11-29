@@ -59,6 +59,7 @@ type Interface interface {
 	ComposeConfigsGetter
 	ProjectCatalogsGetter
 	ClusterCatalogsGetter
+	MultiClusterAppsGetter
 }
 
 type Clients struct {
@@ -101,6 +102,7 @@ type Clients struct {
 	ComposeConfig                           ComposeConfigClient
 	ProjectCatalog                          ProjectCatalogClient
 	ClusterCatalog                          ClusterCatalogClient
+	MultiClusterApp                         MultiClusterAppClient
 }
 
 type Client struct {
@@ -147,6 +149,7 @@ type Client struct {
 	composeConfigControllers                           map[string]ComposeConfigController
 	projectCatalogControllers                          map[string]ProjectCatalogController
 	clusterCatalogControllers                          map[string]ClusterCatalogController
+	multiClusterAppControllers                         map[string]MultiClusterAppController
 }
 
 func Factory(ctx context.Context, config rest.Config) (context.Context, controller.Starter, error) {
@@ -298,6 +301,9 @@ func NewClientsFromInterface(iface Interface) *Clients {
 		ClusterCatalog: &clusterCatalogClient2{
 			iface: iface.ClusterCatalogs(""),
 		},
+		MultiClusterApp: &multiClusterAppClient2{
+			iface: iface.MultiClusterApps(""),
+		},
 	}
 }
 
@@ -353,6 +359,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		composeConfigControllers:                           map[string]ComposeConfigController{},
 		projectCatalogControllers:                          map[string]ProjectCatalogController{},
 		clusterCatalogControllers:                          map[string]ClusterCatalogController{},
+		multiClusterAppControllers:                         map[string]MultiClusterAppController{},
 	}, nil
 }
 
@@ -869,6 +876,19 @@ type ClusterCatalogsGetter interface {
 func (c *Client) ClusterCatalogs(namespace string) ClusterCatalogInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ClusterCatalogResource, ClusterCatalogGroupVersionKind, clusterCatalogFactory{})
 	return &clusterCatalogClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type MultiClusterAppsGetter interface {
+	MultiClusterApps(namespace string) MultiClusterAppInterface
+}
+
+func (c *Client) MultiClusterApps(namespace string) MultiClusterAppInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &MultiClusterAppResource, MultiClusterAppGroupVersionKind, multiClusterAppFactory{})
+	return &multiClusterAppClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

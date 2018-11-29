@@ -87,8 +87,8 @@ var (
 		},
 		LoggingSystemImages: LoggingSystemImages{
 			Fluentd:                       m("rancher/fluentd:v0.1.11"),
-			FluentdHelper:                 m("rancher/fluentd-helper:v0.1.4"),
-			LogAggregatorFlexVolumeDriver: m("rancher/log-aggregator:v0.1.3"),
+			FluentdHelper:                 m("rancher/fluentd-helper:v0.1.2"),
+			LogAggregatorFlexVolumeDriver: m("rancher/log-aggregator:v0.1.4"),
 		},
 	}
 
