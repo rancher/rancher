@@ -12,6 +12,8 @@ cd $(dirname $0)/..
 
 CMD=bin/rancher
 
+ln -s "$PWD" /usr/bin/kubectl
+
 if [ ! -x $CMD ]; then
     ./scripts/build
 fi

@@ -15,6 +15,7 @@ import (
 	ccluster "github.com/rancher/rancher/pkg/api/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	"github.com/rancher/rancher/pkg/api/customization/logging"
+	"github.com/rancher/rancher/pkg/api/customization/monitor"
 	"github.com/rancher/rancher/pkg/api/customization/node"
 	"github.com/rancher/rancher/pkg/api/customization/nodetemplate"
 	"github.com/rancher/rancher/pkg/api/customization/pipeline"
@@ -72,6 +73,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.GroupMemberType,
 		client.GroupType,
 		client.ListenConfigType,
+		client.MonitorMetricType,
 		client.NodeDriverType,
 		client.NodePoolType,
 		client.NodeTemplateType,
@@ -140,6 +142,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	TemplateContent(schemas)
 	PodSecurityPolicyTemplate(schemas, apiContext)
 	RoleTemplate(schemas, apiContext)
+	Monitor(schemas, apiContext, clusterManager)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
@@ -404,6 +407,27 @@ func Alert(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.Formatter = alert.RuleFormatter
 	schema.Validator = alert.ProjectAlertRuleValidator
 	schema.ActionHandler = handler.ProjectAlertRuleActionHandler
+}
+
+func Monitor(schemas *types.Schemas, management *config.ScaledContext, clusterManager *clustermanager.Manager) {
+	clusterGraphHandler := monitor.NewClusterGraphHandler(management.Dialer, clusterManager)
+	projectGraphHandler := monitor.NewProjectGraphHandler(management.Dialer, clusterManager)
+	metricHandler := monitor.NewMetricHandler(management.Dialer, clusterManager)
+
+	schema := schemas.Schema(&managementschema.Version, client.ClusterMonitorGraphType)
+	schema.CollectionFormatter = monitor.QueryGraphCollectionFormatter
+	schema.Formatter = monitor.MonitorGraphFormatter
+	schema.ActionHandler = clusterGraphHandler.QuerySeriesAction
+
+	schema = schemas.Schema(&managementschema.Version, client.ProjectMonitorGraphType)
+	schema.CollectionFormatter = monitor.QueryGraphCollectionFormatter
+	schema.Formatter = monitor.MonitorGraphFormatter
+	schema.ActionHandler = projectGraphHandler.QuerySeriesAction
+
+	schema = schemas.Schema(&managementschema.Version, client.MonitorMetricType)
+	schema.Formatter = monitor.MetricFormatter
+	schema.CollectionFormatter = monitor.MetricCollectionFormatter
+	schema.ActionHandler = metricHandler.Action
 }
 
 func Pipeline(schemas *types.Schemas, management *config.ScaledContext, clusterManager *clustermanager.Manager) {

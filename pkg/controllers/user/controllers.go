@@ -75,6 +75,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 
 func RegisterFollower(ctx context.Context, cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter, clusterManager healthsyncer.ClusterControllerLifecycle) error {
 	cluster.Core.Namespaces("").Controller()
+	cluster.Core.Services("").Controller()
 	cluster.RBAC.ClusterRoleBindings("").Controller()
 	cluster.RBAC.RoleBindings("").Controller()
 	return nil
