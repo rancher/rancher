@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/rancher/pkg/controllers/user/alert/common"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
 	"github.com/rancher/rancher/pkg/ticker"
 	"github.com/rancher/types/apis/core/v1"
@@ -18,21 +19,21 @@ import (
 )
 
 type SysComponentWatcher struct {
-	componentStatuses  v1.ComponentStatusInterface
-	clusterAlertLister v3.ClusterAlertLister
-	alertManager       *manager.Manager
-	clusterName        string
-	clusterLister      v3.ClusterLister
+	componentStatuses      v1.ComponentStatusInterface
+	clusterAlertRuleLister v3.ClusterAlertRuleLister
+	alertManager           *manager.AlertManager
+	clusterName            string
+	clusterLister          v3.ClusterLister
 }
 
-func StartSysComponentWatcher(ctx context.Context, cluster *config.UserContext, manager *manager.Manager) {
+func StartSysComponentWatcher(ctx context.Context, cluster *config.UserContext, manager *manager.AlertManager) {
 
 	s := &SysComponentWatcher{
-		componentStatuses:  cluster.Core.ComponentStatuses(""),
-		clusterAlertLister: cluster.Management.Management.ClusterAlerts(cluster.ClusterName).Controller().Lister(),
-		alertManager:       manager,
-		clusterName:        cluster.ClusterName,
-		clusterLister:      cluster.Management.Management.Clusters("").Controller().Lister(),
+		componentStatuses:      cluster.Core.ComponentStatuses(""),
+		clusterAlertRuleLister: cluster.Management.Management.ClusterAlertRules(cluster.ClusterName).Controller().Lister(),
+		alertManager:           manager,
+		clusterName:            cluster.ClusterName,
+		clusterLister:          cluster.Management.Management.Clusters("").Controller().Lister(),
 	}
 	go s.watch(ctx, syncInterval)
 }
@@ -51,7 +52,7 @@ func (w *SysComponentWatcher) watchRule() error {
 		return nil
 	}
 
-	clusterAlerts, err := w.clusterAlertLister.List("", labels.NewSelector())
+	clusterAlerts, err := w.clusterAlertRuleLister.List("", labels.NewSelector())
 	if err != nil {
 		return err
 	}
@@ -60,24 +61,24 @@ func (w *SysComponentWatcher) watchRule() error {
 	if err != nil {
 		return err
 	}
-	for _, alert := range clusterAlerts {
-		if alert.Status.AlertState == "inactive" {
+	for _, rule := range clusterAlerts {
+		if rule.Status.AlertState == "inactive" || rule.Spec.SystemServiceRule == nil {
 			continue
 		}
-		if alert.Spec.TargetSystemService != nil {
-			w.checkComponentHealthy(statuses, alert)
+		if rule.Spec.SystemServiceRule != nil {
+			w.checkComponentHealthy(statuses, rule)
 		}
 	}
 	return nil
 }
 
-func (w *SysComponentWatcher) checkComponentHealthy(statuses *v1.ComponentStatusList, alert *v3.ClusterAlert) {
-	alertID := alert.Namespace + "-" + alert.Name
+func (w *SysComponentWatcher) checkComponentHealthy(statuses *v1.ComponentStatusList, alert *v3.ClusterAlertRule) {
 	for _, cs := range statuses.Items {
-		if strings.HasPrefix(cs.Name, alert.Spec.TargetSystemService.Condition) {
+		if strings.HasPrefix(cs.Name, alert.Spec.SystemServiceRule.Condition) {
 			for _, cond := range cs.Conditions {
 				if cond.Type == corev1.ComponentHealthy {
 					if cond.Status == corev1.ConditionFalse {
+						ruleID := common.GetRuleID(alert.Spec.GroupName, alert.Name)
 
 						clusterDisplayName := w.clusterName
 						cluster, err := w.clusterLister.Get("", w.clusterName)
@@ -88,18 +89,19 @@ func (w *SysComponentWatcher) checkComponentHealthy(statuses *v1.ComponentStatus
 						}
 
 						data := map[string]string{}
+						data["rule_id"] = ruleID
+						data["group_id"] = alert.Spec.GroupName
 						data["alert_type"] = "systemService"
-						data["alert_id"] = alertID
-						data["severity"] = alert.Spec.Severity
 						data["alert_name"] = alert.Spec.DisplayName
+						data["severity"] = alert.Spec.Severity
 						data["cluster_name"] = clusterDisplayName
-						data["component_name"] = alert.Spec.TargetSystemService.Condition + ":" + cs.Name
+						data["component_name"] = alert.Spec.SystemServiceRule.Condition
 
 						if cond.Message != "" {
 							data["logs"] = cond.Message
 						}
 						if err := w.alertManager.SendAlert(data); err != nil {
-							logrus.Debugf("Failed to send alert: %v", err)
+							logrus.Errorf("Failed to send alert: %v", err)
 						}
 						return
 					}

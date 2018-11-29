@@ -24,6 +24,19 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
   </record>
 </filter>
 
+<filter rke.*>
+  @type prometheus
+  <metric>
+    name fluentd_input_status_num_records_total
+    type counter
+    desc The total number of incoming records
+    <labels>
+      tag ${tag}
+      hostname ${hostname}
+    </labels>
+  </metric>
+</filter>
+
 <source>
    @type  tail
    path  /var/log/containers/*.log
@@ -51,6 +64,19 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
   </record>
 </filter>
 
+<filter cluster.**>
+  @type prometheus
+  <metric>
+    name fluentd_input_status_num_records_total
+    type counter
+    desc The total number of incoming records
+    <labels>
+      tag ${tag}
+      hostname ${hostname}
+    </labels>
+  </metric>
+</filter>
+
 {{ if eq .clusterTarget.CurrentTarget "syslog"}}
 {{ if .clusterTarget.SyslogConfig.Token}}
 <filter  cluster.** rke.** cluster-custom.**>
@@ -63,6 +89,8 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
 {{end -}}
 
 <match  cluster.** rke.** cluster-custom.**> 
+  @type copy
+  <store>
     {{ if eq .clusterTarget.CurrentTarget "embedded"}}
     @type elasticsearch
     include_tag_key  true
@@ -246,6 +274,20 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     disable_retry_limit
     num_threads 8
     slow_flush_log_threshold 40.0
+    </store>
+
+    <store>
+    @type prometheus
+    <metric>
+      name fluentd_output_status_num_records_total
+      type counter
+      desc The total number of outgoing records
+      <labels>
+        tag ${tag}
+        hostname ${hostname}
+      </labels>
+    </metric>
+  </store>
 </match>
 {{end -}}
 `

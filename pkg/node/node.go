@@ -46,14 +46,14 @@ func IsNodeForNode(node *corev1.Node, machine *v3.Node) bool {
 		return false
 	}
 
-	if machineAddress == getNodeInternalAddress(node) {
+	if machineAddress == GetNodeInternalAddress(node) {
 		return true
 	}
 
 	return false
 }
 
-func getNodeInternalAddress(node *corev1.Node) string {
+func GetNodeInternalAddress(node *corev1.Node) string {
 	for _, address := range node.Status.Addresses {
 		if address.Type == corev1.NodeInternalIP {
 			return address.Address

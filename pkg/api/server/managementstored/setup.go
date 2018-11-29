@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/globalresource"
 	"github.com/rancher/rancher/pkg/api/customization/kontainerdriver"
 	"github.com/rancher/rancher/pkg/api/customization/logging"
+	"github.com/rancher/rancher/pkg/api/customization/monitor"
 	"github.com/rancher/rancher/pkg/api/customization/node"
 	"github.com/rancher/rancher/pkg/api/customization/nodetemplate"
 	"github.com/rancher/rancher/pkg/api/customization/pipeline"
@@ -59,8 +60,11 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.AuthConfigType,
 		client.CatalogType,
 		client.ClusterAlertType,
+		client.ClusterAlertGroupType,
 		client.ClusterCatalogType,
 		client.ClusterLoggingType,
+		client.ClusterAlertRuleType,
+		client.ClusterMonitorGraphType,
 		client.ClusterRegistrationTokenType,
 		client.ClusterRoleTemplateBindingType,
 		client.ClusterType,
@@ -73,6 +77,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.KontainerDriverType,
 		client.ListenConfigType,
 		client.MultiClusterAppType,
+		client.MonitorMetricType,
 		client.NodeDriverType,
 		client.NodePoolType,
 		client.NodeTemplateType,
@@ -82,8 +87,11 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.PodSecurityPolicyTemplateType,
 		client.PreferenceType,
 		client.ProjectAlertType,
+		client.ProjectAlertGroupType,
 		client.ProjectCatalogType,
 		client.ProjectLoggingType,
+		client.ProjectAlertRuleType,
+		client.ProjectMonitorGraphType,
 		client.ProjectNetworkPolicyType,
 		client.ProjectRoleTemplateBindingType,
 		client.ProjectType,
@@ -135,6 +143,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	RoleTemplate(schemas, apiContext)
 	MultiClusterApps(schemas, apiContext)
 	GlobalDNSs(schemas, apiContext)
+	Monitor(schemas, apiContext, clusterManager)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
@@ -373,23 +382,47 @@ func LoggingTypes(schemas *types.Schemas) {
 
 func Alert(schemas *types.Schemas, management *config.ScaledContext) {
 	handler := &alert.Handler{
-		ProjectAlerts: management.Management.ProjectAlerts(""),
-		ClusterAlerts: management.Management.ClusterAlerts(""),
-		Notifiers:     management.Management.Notifiers(""),
+		ClusterAlertRule: management.Management.ClusterAlertRules(""),
+		ProjectAlertRule: management.Management.ProjectAlertRules(""),
+		Notifiers:        management.Management.Notifiers(""),
 	}
 
-	schema := schemas.Schema(&managementschema.Version, client.ClusterAlertType)
-	schema.Formatter = alert.Formatter
-	schema.ActionHandler = handler.ClusterActionHandler
-
-	schema = schemas.Schema(&managementschema.Version, client.ProjectAlertType)
-	schema.Formatter = alert.Formatter
-	schema.ActionHandler = handler.ProjectActionHandler
-
-	schema = schemas.Schema(&managementschema.Version, client.NotifierType)
+	schema := schemas.Schema(&managementschema.Version, client.NotifierType)
 	schema.CollectionFormatter = alert.NotifierCollectionFormatter
 	schema.Formatter = alert.NotifierFormatter
 	schema.ActionHandler = handler.NotifierActionHandler
+
+	schema = schemas.Schema(&managementschema.Version, client.ClusterAlertRuleType)
+	schema.Formatter = alert.RuleFormatter
+	schema.Validator = alert.ClusterAlertRuleValidator
+	schema.ActionHandler = handler.ClusterAlertRuleActionHandler
+
+	schema = schemas.Schema(&managementschema.Version, client.ProjectAlertRuleType)
+	schema.Formatter = alert.RuleFormatter
+	schema.Validator = alert.ProjectAlertRuleValidator
+	schema.ActionHandler = handler.ProjectAlertRuleActionHandler
+
+	//old schema just for migrate
+	schema = schemas.Schema(&managementschema.Version, client.ClusterAlertType)
+	schema = schemas.Schema(&managementschema.Version, client.ProjectAlertType)
+}
+
+func Monitor(schemas *types.Schemas, management *config.ScaledContext, clusterManager *clustermanager.Manager) {
+	clusterGraphHandler := monitor.NewClusterGraphHandler(management.Dialer, clusterManager)
+	projectGraphHandler := monitor.NewProjectGraphHandler(management.Dialer, clusterManager)
+	metricHandler := monitor.NewMetricHandler(management.Dialer, clusterManager)
+
+	schema := schemas.Schema(&managementschema.Version, client.ClusterMonitorGraphType)
+	schema.CollectionFormatter = monitor.QueryGraphCollectionFormatter
+	schema.ActionHandler = clusterGraphHandler.QuerySeriesAction
+
+	schema = schemas.Schema(&managementschema.Version, client.ProjectMonitorGraphType)
+	schema.CollectionFormatter = monitor.QueryGraphCollectionFormatter
+	schema.ActionHandler = projectGraphHandler.QuerySeriesAction
+
+	schema = schemas.Schema(&managementschema.Version, client.MonitorMetricType)
+	schema.CollectionFormatter = monitor.MetricCollectionFormatter
+	schema.ActionHandler = metricHandler.Action
 }
 
 func Pipeline(schemas *types.Schemas, management *config.ScaledContext, clusterManager *clustermanager.Manager) {

@@ -2,12 +2,12 @@ package project
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
-
-	"encoding/json"
 
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
@@ -26,6 +27,13 @@ import (
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "setpodsecuritypolicytemplate")
 	resource.AddAction(apiContext, "exportYaml")
+
+	if convert.ToBool(resource.Values["enableProjectMonitoring"]) {
+		resource.AddAction(apiContext, "disableMonitoring")
+	} else {
+		resource.AddAction(apiContext, "enableMonitoring")
+	}
+
 }
 
 type Handler struct {
@@ -41,6 +49,10 @@ func (h *Handler) Actions(actionName string, action *types.Action, apiContext *t
 		return h.setPodSecurityPolicyTemplate(actionName, action, apiContext)
 	case "exportYaml":
 		return h.ExportYamlHandler(actionName, action, apiContext)
+	case "enableMonitoring":
+		return h.enableMonitoring(actionName, action, apiContext)
+	case "disableMonitoring":
+		return h.disableMonitoring(actionName, action, apiContext)
 	}
 	return errors.Errorf("unrecognized action %v", actionName)
 }
@@ -77,6 +89,104 @@ func (h *Handler) ExportYamlHandler(actionName string, action *types.Action, api
 	reader := bytes.NewReader(buf)
 	apiContext.Response.Header().Set("Content-Type", "text/yaml")
 	http.ServeContent(apiContext.Response, apiContext.Request, "exportYaml", time.Now(), reader)
+	return nil
+}
+
+func (h *Handler) enableMonitoring(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	rtn := map[string]interface{}{
+		"message": "enabled",
+	}
+
+	namespace, id := ref.Parse(apiContext.ID)
+	project, err := h.ProjectLister.Get(namespace, id)
+	if err != nil {
+		rtn["message"] = "none existent Project"
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+
+		return errors.Wrapf(err, "failed to get Project by ID %s", apiContext.ID)
+	}
+	if project.DeletionTimestamp != nil {
+		rtn["message"] = "deleting Project"
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+
+		return fmt.Errorf("unable to operate deleting %s Project", apiContext.ID)
+	}
+
+	if project.Spec.EnableProjectMonitoring {
+		apiContext.WriteResponse(http.StatusOK, rtn)
+		return nil
+	}
+
+	data, err := ioutil.ReadAll(apiContext.Request.Body)
+	if err != nil {
+		rtn["message"] = "unable to read request content"
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+
+		return errors.Wrap(err, "reading request body error")
+	}
+	var input v3.MonitoringInput
+	if err = json.Unmarshal(data, &input); err != nil {
+		rtn["message"] = "failed to parse request content"
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+
+		return errors.Wrap(err, "unmarshaling input error")
+	}
+
+	project = project.DeepCopy()
+	project.Spec.EnableProjectMonitoring = true
+	project.Annotations = monitoring.AppendAppOverwritingAnswers(project.Annotations, string(data))
+
+	_, err = h.Projects.Update(project)
+	if err != nil {
+		rtn["message"] = "failed to enable monitoring"
+		apiContext.WriteResponse(http.StatusInternalServerError, rtn)
+
+		return errors.Wrapf(err, "unable to update Project %s", project.Name)
+	}
+
+	apiContext.WriteResponse(http.StatusOK, rtn)
+
+	return nil
+}
+
+func (h *Handler) disableMonitoring(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	rtn := map[string]interface{}{
+		"message": "disabled",
+	}
+
+	namespace, id := ref.Parse(apiContext.ID)
+	project, err := h.ProjectLister.Get(namespace, id)
+	if err != nil {
+		rtn["message"] = "none existent Project"
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+
+		return errors.Wrapf(err, "failed to get Project by ID %s", apiContext.ID)
+	}
+	if project.DeletionTimestamp != nil {
+		rtn["message"] = "deleting Project"
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+
+		return fmt.Errorf("unable to operate deleting %s Project", apiContext.ID)
+	}
+
+	if !project.Spec.EnableProjectMonitoring {
+		apiContext.WriteResponse(http.StatusOK, rtn)
+		return nil
+	}
+
+	project = project.DeepCopy()
+	project.Spec.EnableProjectMonitoring = false
+
+	_, err = h.Projects.Update(project)
+	if err != nil {
+		rtn["message"] = "failed to disable monitoring"
+		apiContext.WriteResponse(http.StatusInternalServerError, rtn)
+
+		return errors.Wrapf(err, "unable to update Project %s", project.Name)
+	}
+
+	apiContext.WriteResponse(http.StatusOK, rtn)
+
 	return nil
 }
 
