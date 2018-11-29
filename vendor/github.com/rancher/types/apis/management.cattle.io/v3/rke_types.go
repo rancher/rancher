@@ -250,6 +250,8 @@ type NetworkConfig struct {
 	CanalNetworkProvider *CanalNetworkProvider `yaml:",omitempty" json:"canalNetworkProvider,omitempty"`
 	// FlannelNetworkProvider
 	FlannelNetworkProvider *FlannelNetworkProvider `yaml:",omitempty" json:"flannelNetworkProvider,omitempty"`
+	// WeaveNetworkProvider
+	WeaveNetworkProvider *WeaveNetworkProvider `yaml:",omitempty" json:"weaveNetworkProvider,omitempty"`
 }
 
 type AuthnConfig struct {
@@ -373,6 +375,10 @@ type FlannelNetworkProvider struct {
 
 type CanalNetworkProvider struct {
 	FlannelNetworkProvider `yaml:",inline" json:",inline"`
+}
+
+type WeaveNetworkProvider struct {
+	Password string `yaml:"password,omitempty" json:"password,omitempty"`
 }
 
 type KubernetesServicesOptions struct {
