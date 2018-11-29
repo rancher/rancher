@@ -1,4 +1,4 @@
-package deploy
+package deployer
 
 const (
 	NotificationTmpl = `{{ define "rancher.title" }}
@@ -7,6 +7,9 @@ const (
 
 {{ else if eq (index .Alerts 0).Labels.alert_type "nodeHealthy"}}
 The kubelet on the node {{ (index .Alerts 0).Labels.node_name}} is not healthy
+
+{{ else if eq (index .Alerts 0).Labels.alert_type "systemService"}}
+The system component {{ (index .Alerts 0).Labels.component_name}} is not running
 
 {{ else if eq (index .Alerts 0).Labels.alert_type "nodeCPU"}}
 The CPU usage on the node {{ (index .Alerts 0).Labels.node_name}} is over {{ (index .Alerts 0).Labels.cpu_threshold}}%
@@ -28,10 +31,11 @@ The system component {{ (index .Alerts 0).Labels.component_name}} is not running
 
 {{ else if eq (index .Alerts 0).Labels.alert_type "workload"}}
 The workload {{ if (index .Alerts 0).Labels.workload_namespace}}{{(index .Alerts 0).Labels.workload_namespace}}:{{end}}{{(index .Alerts 0).Labels.workload_name}} has available replicas less than {{ (index .Alerts 0).Labels.available_percentage}}%
-{{ end}}
-{{ end}}
-	
 
+{{ else if eq (index .Alerts 0).Labels.alert_type "metric"}}
+The metric {{ (index .Alerts 0).Labels.alert_name}} crossed the threshold 
+{{ end}}
+{{ end}}
 
 {{ define "slack.text" }}
 {{ if eq (index .Alerts 0).Labels.alert_type "event"}}
@@ -87,13 +91,17 @@ Severity: {{ (index .Alerts 0).Labels.severity}}
 Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
 Available Replicas: {{ (index .Alerts 0).Labels.available_replicas}}
 Desired Replicas: {{ (index .Alerts 0).Labels.desired_replicas}}
+{{ else if eq (index .Alerts 0).Labels.alert_type "metric"}}
+Alert Name: {{ (index .Alerts 0).Labels.alert_name}}
+Severity: {{ (index .Alerts 0).Labels.severity}}
+Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
+Expression: {{(index .Alerts 0).Labels.expression}}
+Description: Threshold Crossed: datapoint was {{ (index .Alerts 0).Labels.comparison}} to the threshold ({{ (index .Alerts 0).Labels.threshold_value}}) for ({{ (index .Alerts 0).Labels.duration}})
 {{ end}}
 {{ if (index .Alerts 0).Labels.logs}}
 Logs: {{ (index .Alerts 0).Labels.logs}}
 {{ end}}
 {{ end}}
-
-
 
 {{ define "email.text" }}
 {{ if eq (index .Alerts 0).Labels.alert_type "event"}}
@@ -149,6 +157,12 @@ Severity: {{ (index .Alerts 0).Labels.severity}}<br>
 Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}<br>
 Available Replicas: {{ (index .Alerts 0).Labels.available_replicas}}<br>
 Desired Replicas: {{ (index .Alerts 0).Labels.desired_replicas}}<br>
+{{ else if eq (index .Alerts 0).Labels.alert_type "metric"}}
+Alert Name: {{ (index .Alerts 0).Labels.alert_name}}<br>
+Severity: {{ (index .Alerts 0).Labels.severity}}<br>
+Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}<br>
+Expression: {{(index .Alerts 0).Labels.expression}}<br>
+Description: Threshold Crossed: datapoint was {{ (index .Alerts 0).Labels.comparison}} to the threshold ({{ (index .Alerts 0).Labels.threshold_value}}) for ({{ (index .Alerts 0).Labels.duration}})<br>
 {{ end}}
 {{ if (index .Alerts 0).Labels.logs}}
 Logs: {{ (index .Alerts 0).Labels.logs}}

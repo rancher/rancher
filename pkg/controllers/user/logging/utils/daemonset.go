@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"strconv"
+
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/image"
 	rv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
@@ -14,9 +16,10 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-func CreateFluentd(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountInterface, rb rrbacv1.ClusterRoleBindingInterface, namespace, dockerRootDir string) (err error) {
+func CreateFluentd(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountInterface, svc rv1.ServiceInterface, rb rrbacv1.ClusterRoleBindingInterface, namespace, dockerRootDir string) (err error) {
 	defer func() {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			if err = removeDeamonset(ds, sa, rb, loggingconfig.FluentdName); err != nil {
@@ -39,6 +42,12 @@ func CreateFluentd(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountInterfac
 
 	daemonset := NewFluentdDaemonset(loggingconfig.FluentdName, namespace, dockerRootDir)
 	_, err = ds.Create(daemonset)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+
+	service := newService(namespace, loggingconfig.FluentdName)
+	_, err = svc.Create(service)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -93,6 +102,31 @@ func removeDeamonset(ds rv1beta2.DaemonSetInterface, sa rv1.ServiceAccountInterf
 		return err
 	}
 	return nil
+}
+
+func newService(namespace, name string) *v1.Service {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+			Labels: map[string]string{
+				loggingconfig.LabelK8sApp: loggingconfig.FluentdName,
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Selector: map[string]string{
+				loggingconfig.LabelK8sApp: loggingconfig.FluentdName,
+			},
+			Ports: []v1.ServicePort{
+				{
+					Name:       "metrics",
+					Port:       24231,
+					TargetPort: intstr.Parse(strconv.FormatInt(24231, 10)),
+					Protocol:   v1.Protocol(v1.ProtocolTCP),
+				},
+			},
+		},
+	}
 }
 
 func newServiceAccount(name, namespace string) *v1.ServiceAccount {

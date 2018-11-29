@@ -197,4 +197,5 @@ spec:
           secretName: cattle-credentials-{{.TokenKey}}
   updateStrategy:
     type: RollingUpdate
+
 `

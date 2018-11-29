@@ -3,6 +3,9 @@ package user
 import (
 	"context"
 
+	monitoringv1 "github.com/coreos/prometheus-operator/pkg/client/monitoring/v1"
+	"github.com/rancher/norman/store/crd"
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	"github.com/rancher/rancher/pkg/controllers/user/alert"
 	"github.com/rancher/rancher/pkg/controllers/user/approuter"
@@ -15,6 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/ingress"
 	"github.com/rancher/rancher/pkg/controllers/user/ingresshostgen"
 	"github.com/rancher/rancher/pkg/controllers/user/logging"
+	"github.com/rancher/rancher/pkg/controllers/user/monitoring"
 	"github.com/rancher/rancher/pkg/controllers/user/multiclusterapp"
 	"github.com/rancher/rancher/pkg/controllers/user/networkpolicy"
 	"github.com/rancher/rancher/pkg/controllers/user/noderemove"
@@ -25,20 +29,22 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/rbac/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/user/resourcequota"
 	"github.com/rancher/rancher/pkg/controllers/user/secret"
+	"github.com/rancher/rancher/pkg/controllers/user/servicemonitor"
 	"github.com/rancher/rancher/pkg/controllers/user/systemimage"
 	"github.com/rancher/rancher/pkg/controllers/user/targetworkloadservice"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
+	pkgmonitoring "github.com/rancher/rancher/pkg/monitoring"
+	projectclient "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/factory"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	// init upgrade implement
-	_ "github.com/rancher/rancher/pkg/controllers/user/alert/upgrade"
 	_ "github.com/rancher/rancher/pkg/controllers/user/logging/upgrade"
 	_ "github.com/rancher/rancher/pkg/controllers/user/pipeline/upgrade"
 )
 
 func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter, clusterManager healthsyncer.ClusterControllerLifecycle) error {
-	alert.Register(ctx, cluster)
 	rbac.Register(ctx, cluster)
 	healthsyncer.Register(ctx, cluster, clusterManager)
 	helm.Register(ctx, cluster, kubeConfigGetter)
@@ -59,6 +65,8 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	approuter.Register(ctx, cluster)
 	resourcequota.Register(ctx, cluster)
 	globaldns.Register(ctx, cluster)
+	alert.Register(ctx, cluster)
+	monitoring.Register(ctx, cluster)
 
 	c, err := cluster.Management.Management.Clusters("").Get(cluster.ClusterName, metav1.GetOptions{})
 	if err != nil {
@@ -77,12 +85,17 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 
 func RegisterFollower(ctx context.Context, cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter, clusterManager healthsyncer.ClusterControllerLifecycle) error {
 	cluster.Core.Namespaces("").Controller()
+	cluster.Core.Services("").Controller()
 	cluster.RBAC.ClusterRoleBindings("").Controller()
 	cluster.RBAC.RoleBindings("").Controller()
 	return nil
 }
 
 func RegisterUserOnly(ctx context.Context, cluster *config.UserOnlyContext) error {
+	if err := createUserClusterCRDs(ctx, cluster); err != nil {
+		return err
+	}
+
 	dnsrecord.Register(ctx, cluster)
 	externalservice.Register(ctx, cluster)
 	ingress.Register(ctx, cluster)
@@ -90,5 +103,34 @@ func RegisterUserOnly(ctx context.Context, cluster *config.UserOnlyContext) erro
 	nslabels.Register(ctx, cluster)
 	targetworkloadservice.Register(ctx, cluster)
 	workload.Register(ctx, cluster)
+	servicemonitor.Register(ctx, cluster)
 	return nil
+}
+
+func createUserClusterCRDs(ctx context.Context, c *config.UserOnlyContext) error {
+	overrided := struct {
+		types.Namespaced
+	}{}
+
+	schemas := factory.Schemas(&pkgmonitoring.APIVersion).
+		MustImport(&pkgmonitoring.APIVersion, monitoringv1.Prometheus{}, overrided).
+		MustImport(&pkgmonitoring.APIVersion, monitoringv1.PrometheusRule{}, overrided).
+		MustImport(&pkgmonitoring.APIVersion, monitoringv1.ServiceMonitor{}, overrided).
+		MustImport(&pkgmonitoring.APIVersion, monitoringv1.Alertmanager{}, overrided)
+
+	f, err := crd.NewFactoryFromClient(c.RESTConfig)
+	if err != nil {
+		return err
+	}
+
+	_, err = f.CreateCRDs(ctx, config.UserStorageContext,
+		schemas.Schema(&pkgmonitoring.APIVersion, projectclient.PrometheusType),
+		schemas.Schema(&pkgmonitoring.APIVersion, projectclient.PrometheusRuleType),
+		schemas.Schema(&pkgmonitoring.APIVersion, projectclient.AlertmanagerType),
+		schemas.Schema(&pkgmonitoring.APIVersion, projectclient.ServiceMonitorType),
+	)
+
+	f.BatchWait()
+
+	return err
 }

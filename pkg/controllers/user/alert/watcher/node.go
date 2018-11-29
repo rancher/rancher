@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/rancher/pkg/controllers/user/alert/common"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
 	nodeHelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/ticker"
@@ -16,28 +17,29 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 )
 
 type NodeWatcher struct {
-	machineLister      v3.NodeLister
-	nodeLister         v1.NodeLister
-	clusterAlerts      v3.ClusterAlertInterface
-	clusterAlertLister v3.ClusterAlertLister
-	alertManager       *manager.Manager
-	clusterName        string
-	clusterLister      v3.ClusterLister
+	machineLister          v3.NodeLister
+	nodeLister             v1.NodeLister
+	clusterAlertRule       v3.ClusterAlertRuleInterface
+	clusterAlertRuleLister v3.ClusterAlertRuleLister
+	alertManager           *manager.AlertManager
+	clusterName            string
+	clusterLister          v3.ClusterLister
 }
 
-func StartNodeWatcher(ctx context.Context, cluster *config.UserContext, manager *manager.Manager) {
-	clusterAlerts := cluster.Management.Management.ClusterAlerts(cluster.ClusterName)
+func StartNodeWatcher(ctx context.Context, cluster *config.UserContext, manager *manager.AlertManager) {
+	clusterAlerts := cluster.Management.Management.ClusterAlertRules(cluster.ClusterName)
 	n := &NodeWatcher{
-		machineLister:      cluster.Management.Management.Nodes(cluster.ClusterName).Controller().Lister(),
-		nodeLister:         cluster.Core.Nodes("").Controller().Lister(),
-		clusterAlerts:      clusterAlerts,
-		clusterAlertLister: clusterAlerts.Controller().Lister(),
-		alertManager:       manager,
-		clusterName:        cluster.ClusterName,
-		clusterLister:      cluster.Management.Management.Clusters("").Controller().Lister(),
+		machineLister:          cluster.Management.Management.Nodes(cluster.ClusterName).Controller().Lister(),
+		nodeLister:             cluster.Core.Nodes("").Controller().Lister(),
+		clusterAlertRule:       clusterAlerts,
+		clusterAlertRuleLister: clusterAlerts.Controller().Lister(),
+		alertManager:           manager,
+		clusterName:            cluster.ClusterName,
+		clusterLister:          cluster.Management.Management.Clusters("").Controller().Lister(),
 	}
 	go n.watch(ctx, syncInterval)
 }
@@ -56,7 +58,7 @@ func (w *NodeWatcher) watchRule() error {
 		return nil
 	}
 
-	clusterAlerts, err := w.clusterAlertLister.List("", labels.NewSelector())
+	clusterAlerts, err := w.clusterAlertRuleLister.List("", labels.NewSelector())
 	if err != nil {
 		return err
 	}
@@ -67,50 +69,49 @@ func (w *NodeWatcher) watchRule() error {
 	}
 
 	for _, alert := range clusterAlerts {
-		if alert.Status.AlertState == "inactive" {
+		if alert.Status.AlertState == "inactive" || alert.Spec.NodeRule == nil {
 			continue
 		}
 
-		if alert.Spec.TargetNode == nil {
-			continue
-		}
-
-		if alert.Spec.TargetNode.NodeName != "" {
-			parts := strings.Split(alert.Spec.TargetNode.NodeName, ":")
+		if alert.Spec.NodeRule.NodeName != "" {
+			parts := strings.Split(alert.Spec.NodeRule.NodeName, ":")
 			if len(parts) != 2 {
 				continue
 			}
 			id := parts[1]
 			machine := getMachineByID(machines, id)
 			if machine == nil {
-				if err = w.clusterAlerts.Delete(alert.Name, &metav1.DeleteOptions{}); err != nil {
+				if err = w.clusterAlertRule.Delete(alert.Name, &metav1.DeleteOptions{}); err != nil {
 					return err
 				}
 				continue
 			}
 			w.checkNodeCondition(alert, machine)
 
-		} else if alert.Spec.TargetNode.Selector != nil {
-			selector := labels.Set(alert.Spec.TargetNode.Selector)
-			nodes, err := w.nodeLister.List("", selector.AsSelector())
+		} else if alert.Spec.NodeRule.Selector != nil {
+
+			selector := labels.NewSelector()
+			for key, value := range alert.Spec.NodeRule.Selector {
+				r, err := labels.NewRequirement(key, selection.Equals, []string{value})
+				if err != nil {
+					logrus.Warnf("Fail to create new requirement foo %s: %v", key, err)
+					continue
+				}
+				selector = selector.Add(*r)
+			}
+			nodes, err := w.nodeLister.List("", selector)
 			if err != nil {
 				logrus.Warnf("Fail to list node: %v", err)
 				continue
 			}
 			for _, node := range nodes {
-				machine, err := nodeHelper.GetMachineForNode(node, w.clusterName, w.machineLister)
-				if err != nil {
-					return err
-				}
-
-				if machine == nil {
-					continue
-				}
-
+				machine := nodeHelper.GetNodeByNodeName(machines, node.Name)
 				w.checkNodeCondition(alert, machine)
 			}
 		}
+
 	}
+
 	return nil
 }
 
@@ -123,8 +124,8 @@ func getMachineByID(machines []*v3.Node, id string) *v3.Node {
 	return nil
 }
 
-func (w *NodeWatcher) checkNodeCondition(alert *v3.ClusterAlert, machine *v3.Node) {
-	switch alert.Spec.TargetNode.Condition {
+func (w *NodeWatcher) checkNodeCondition(alert *v3.ClusterAlertRule, machine *v3.Node) {
+	switch alert.Spec.NodeRule.Condition {
 	case "notready":
 		w.checkNodeReady(alert, machine)
 	case "mem":
@@ -134,13 +135,14 @@ func (w *NodeWatcher) checkNodeCondition(alert *v3.ClusterAlert, machine *v3.Nod
 	}
 }
 
-func (w *NodeWatcher) checkNodeMemUsage(alert *v3.ClusterAlert, machine *v3.Node) {
-	alertID := alert.Namespace + "-" + alert.Name
+func (w *NodeWatcher) checkNodeMemUsage(alert *v3.ClusterAlertRule, machine *v3.Node) {
 	if v3.NodeConditionProvisioned.IsTrue(machine) {
 		total := machine.Status.InternalNodeStatus.Allocatable.Memory()
 		used := machine.Status.Requested.Memory()
 
-		if used.Value()*100.0/total.Value() > int64(alert.Spec.TargetNode.MemThreshold) {
+		if used.Value()*100.0/total.Value() > int64(alert.Spec.NodeRule.MemThreshold) {
+			ruleID := common.GetRuleID(alert.Spec.GroupName, alert.Name)
+
 			clusterDisplayName := w.clusterName
 			cluster, err := w.clusterLister.Get("", w.clusterName)
 			if err != nil {
@@ -150,12 +152,13 @@ func (w *NodeWatcher) checkNodeMemUsage(alert *v3.ClusterAlert, machine *v3.Node
 			}
 
 			data := map[string]string{}
-			data["alert_type"] = "nodeMemory"
-			data["alert_id"] = alertID
-			data["severity"] = alert.Spec.Severity
+			data["rule_id"] = ruleID
+			data["group_id"] = alert.Spec.GroupName
 			data["alert_name"] = alert.Spec.DisplayName
+			data["alert_type"] = "nodeMemory"
+			data["severity"] = alert.Spec.Severity
 			data["cluster_name"] = clusterDisplayName
-			data["mem_threshold"] = strconv.Itoa(alert.Spec.TargetNode.MemThreshold)
+			data["mem_threshold"] = strconv.Itoa(alert.Spec.NodeRule.MemThreshold)
 			data["used_mem"] = used.String()
 			data["total_mem"] = total.String()
 			data["node_name"] = nodeHelper.GetNodeName(machine)
@@ -167,12 +170,13 @@ func (w *NodeWatcher) checkNodeMemUsage(alert *v3.ClusterAlert, machine *v3.Node
 	}
 }
 
-func (w *NodeWatcher) checkNodeCPUUsage(alert *v3.ClusterAlert, machine *v3.Node) {
-	alertID := alert.Namespace + "-" + alert.Name
+func (w *NodeWatcher) checkNodeCPUUsage(alert *v3.ClusterAlertRule, machine *v3.Node) {
 	if v3.NodeConditionProvisioned.IsTrue(machine) {
 		total := machine.Status.InternalNodeStatus.Allocatable.Cpu()
 		used := machine.Status.Requested.Cpu()
-		if used.MilliValue()*100.0/total.MilliValue() > int64(alert.Spec.TargetNode.CPUThreshold) {
+		if used.MilliValue()*100.0/total.MilliValue() > int64(alert.Spec.NodeRule.CPUThreshold) {
+			ruleID := common.GetRuleID(alert.Spec.GroupName, alert.Name)
+
 			clusterDisplayName := w.clusterName
 			cluster, err := w.clusterLister.Get("", w.clusterName)
 			if err != nil {
@@ -182,12 +186,12 @@ func (w *NodeWatcher) checkNodeCPUUsage(alert *v3.ClusterAlert, machine *v3.Node
 			}
 
 			data := map[string]string{}
+			data["rule_id"] = ruleID
+			data["group_id"] = alert.Spec.GroupName
 			data["alert_type"] = "nodeCPU"
-			data["alert_id"] = alertID
 			data["severity"] = alert.Spec.Severity
-			data["alert_name"] = alert.Spec.DisplayName
 			data["cluster_name"] = clusterDisplayName
-			data["cpu_threshold"] = strconv.Itoa(alert.Spec.TargetNode.CPUThreshold)
+			data["cpu_threshold"] = strconv.Itoa(alert.Spec.NodeRule.CPUThreshold)
 			data["used_cpu"] = strconv.FormatInt(used.MilliValue(), 10)
 			data["total_cpu"] = strconv.FormatInt(total.MilliValue(), 10)
 			data["node_name"] = nodeHelper.GetNodeName(machine)
@@ -199,11 +203,12 @@ func (w *NodeWatcher) checkNodeCPUUsage(alert *v3.ClusterAlert, machine *v3.Node
 	}
 }
 
-func (w *NodeWatcher) checkNodeReady(alert *v3.ClusterAlert, machine *v3.Node) {
-	alertID := alert.Namespace + "-" + alert.Name
+func (w *NodeWatcher) checkNodeReady(alert *v3.ClusterAlertRule, machine *v3.Node) {
 	for _, cond := range machine.Status.InternalNodeStatus.Conditions {
 		if cond.Type == corev1.NodeReady {
 			if cond.Status != corev1.ConditionTrue {
+				ruleID := common.GetRuleID(alert.Spec.GroupName, alert.Name)
+
 				clusterDisplayName := w.clusterName
 				cluster, err := w.clusterLister.Get("", w.clusterName)
 				if err != nil {
@@ -213,10 +218,10 @@ func (w *NodeWatcher) checkNodeReady(alert *v3.ClusterAlert, machine *v3.Node) {
 				}
 
 				data := map[string]string{}
+				data["rule_id"] = ruleID
+				data["group_id"] = alert.Spec.GroupName
 				data["alert_type"] = "nodeHealthy"
-				data["alert_id"] = alertID
 				data["severity"] = alert.Spec.Severity
-				data["alert_name"] = alert.Spec.DisplayName
 				data["cluster_name"] = clusterDisplayName
 				data["node_name"] = nodeHelper.GetNodeName(machine)
 
@@ -224,7 +229,7 @@ func (w *NodeWatcher) checkNodeReady(alert *v3.ClusterAlert, machine *v3.Node) {
 					data["logs"] = cond.Message
 				}
 				if err := w.alertManager.SendAlert(data); err != nil {
-					logrus.Debugf("Failed to send alert: %v", err)
+					logrus.Errorf("Failed to send alert: %v", err)
 				}
 				return
 			}

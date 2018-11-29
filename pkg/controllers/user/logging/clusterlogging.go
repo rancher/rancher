@@ -143,7 +143,7 @@ func (c *ClusterLoggingSyncer) Sync(key string, obj *v3.ClusterLogging) (runtime
 
 func (c *ClusterLoggingSyncer) doSync(obj *v3.ClusterLogging) error {
 	_, err := v3.LoggingConditionProvisioned.Do(obj, func() (runtime.Object, error) {
-		return obj, provision(c.namespaces, c.secrets, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.clusterName)
+		return obj, provision(c.namespaces, c.secrets, c.serviceAccounts, c.services, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.clusterName)
 	})
 	if err != nil {
 		return err
@@ -212,7 +212,7 @@ func (e *endpointWatcher) checkTarget() error {
 	return errors.Wrapf(updateErr, "set clusterlogging fail in watch endpoint")
 }
 
-func provision(namespaces v1.NamespaceInterface, secrets v1.SecretInterface, serviceAccounts v1.ServiceAccountInterface, clusterRoleBindings rbacv1.ClusterRoleBindingInterface, daemonsets v1beta2.DaemonSetInterface, clusterLister v3.ClusterLister, clusterName string) error {
+func provision(namespaces v1.NamespaceInterface, secrets v1.SecretInterface, serviceAccounts v1.ServiceAccountInterface, services v1.ServiceInterface, clusterRoleBindings rbacv1.ClusterRoleBindingInterface, daemonsets v1beta2.DaemonSetInterface, clusterLister v3.ClusterLister, clusterName string) error {
 	if err := utils.IniteNamespace(namespaces); err != nil {
 		return err
 	}
@@ -230,7 +230,7 @@ func provision(namespaces v1.NamespaceInterface, secrets v1.SecretInterface, ser
 		return err
 	}
 
-	return utils.CreateFluentd(daemonsets, serviceAccounts, clusterRoleBindings, loggingconfig.LoggingNamespace, cluster.Spec.DockerRootDir)
+	return utils.CreateFluentd(daemonsets, serviceAccounts, services, clusterRoleBindings, loggingconfig.LoggingNamespace, cluster.Spec.DockerRootDir)
 }
 
 func unsetClusterLogging(obj *v3.ClusterLogging, clusterLoggings v3.ClusterLoggingInterface) error {

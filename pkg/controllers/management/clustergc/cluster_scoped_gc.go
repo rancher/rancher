@@ -31,7 +31,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		grbLister:          management.Management.GlobalRoleBindings("").Controller().Lister(),
 		projectLister:      management.Management.Projects("").Controller().Lister(),
 		crtbLister:         management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
-		projectAlertLister: management.Management.ProjectAlerts("").Controller().Lister(),
+		projectAlertLister: management.Management.ProjectAlertGroups("").Controller().Lister(),
 		nodeLister:         management.Management.Nodes("").Controller().Lister(),
 		psptLister:         management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
 		secretsLister:      management.Core.Secrets("").Controller().Lister(),
@@ -45,7 +45,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 type gcLifecycle struct {
 	projectLister      v3.ProjectLister
 	crtbLister         v3.ClusterRoleTemplateBindingLister
-	projectAlertLister v3.ProjectAlertLister
+	projectAlertLister v3.ProjectAlertGroupLister
 	prtbIndexer        cache.Indexer
 	nodeLister         v3.NodeLister
 	rtLister           v3.RoleTemplateLister
@@ -136,7 +136,7 @@ func (c *gcLifecycle) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 	if err != nil {
 		return cluster, err
 	}
-	oClient = c.mgmt.Management.ProjectAlerts("").ObjectClient()
+	oClient = c.mgmt.Management.ProjectAlertGroups("").ObjectClient()
 	for _, p := range alerts {
 		if err := cleanFinalizers(cluster.Name, p, oClient); err != nil {
 			return cluster, err

@@ -25,6 +25,12 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 	resource.AddAction(request, "importYaml")
 	resource.AddAction(request, "exportYaml")
 
+	if convert.ToBool(resource.Values["enableClusterMonitoring"]) {
+		resource.AddAction(request, "disableMonitoring")
+	} else {
+		resource.AddAction(request, "enableMonitoring")
+	}
+
 	if gkeConfig, ok := resource.Values["googleKubernetesEngineConfig"]; ok {
 		configMap, ok := gkeConfig.(map[string]interface{})
 		if !ok {

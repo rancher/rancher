@@ -20,12 +20,12 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/kubeconfig"
 	"github.com/rancher/rancher/pkg/kubectl"
+	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/cluster/v3"
-	managementv3 "github.com/rancher/types/client/management/v3"
 	mgmtclient "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/compose"
 	"github.com/rancher/types/user"
@@ -54,6 +54,10 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 		return a.ImportYamlHandler(actionName, action, apiContext)
 	case "exportYaml":
 		return a.ExportYamlHandler(actionName, action, apiContext)
+	case "enableMonitoring":
+		return a.enableMonitoring(actionName, action, apiContext)
+	case "disableMonitoring":
+		return a.disableMonitoring(actionName, action, apiContext)
 	}
 	return httperror.NewAPIError(httperror.NotFound, "not found")
 }
@@ -64,7 +68,7 @@ func (a ActionHandler) getToken(apiContext *types.APIContext) (string, error) {
 }
 
 func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	var cluster managementv3.Cluster
+	var cluster mgmtclient.Cluster
 	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &cluster); err != nil {
 		return err
 	}
@@ -92,12 +96,12 @@ func (a ActionHandler) ImportYamlHandler(actionName string, action *types.Action
 		return errors.Wrap(err, "reading request body error")
 	}
 
-	input := managementv3.ImportClusterYamlInput{}
+	input := mgmtclient.ImportClusterYamlInput{}
 	if err = json.Unmarshal(data, &input); err != nil {
 		return errors.Wrap(err, "unmarshaling input error")
 	}
 
-	var cluster managementv3.Cluster
+	var cluster mgmtclient.Cluster
 	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &cluster); err != nil {
 		return err
 	}
@@ -212,6 +216,102 @@ func (a ActionHandler) ExportYamlHandler(actionName string, action *types.Action
 	reader := bytes.NewReader(jsonOutput)
 	apiContext.Response.Header().Set("Content-Type", "application/json")
 	http.ServeContent(apiContext.Response, apiContext.Request, "exportYaml", time.Now(), reader)
+	return nil
+}
+
+func (a ActionHandler) enableMonitoring(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	rtn := map[string]interface{}{
+		"message": "enabled",
+	}
+
+	cluster, err := a.ClusterClient.Get(apiContext.ID, metav1.GetOptions{})
+	if err != nil {
+		rtn["message"] = "none existent Cluster"
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+
+		return errors.Wrapf(err, "failed to get Cluster by ID %s", apiContext.ID)
+	}
+	if cluster.DeletionTimestamp != nil {
+		rtn["message"] = "deleting Cluster"
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+
+		return fmt.Errorf("unable to operate deleting %s Cluster", apiContext.ID)
+	}
+
+	if cluster.Spec.EnableClusterMonitoring {
+		apiContext.WriteResponse(http.StatusOK, rtn)
+		return nil
+	}
+
+	data, err := ioutil.ReadAll(apiContext.Request.Body)
+	if err != nil {
+		rtn["message"] = "unable to read request content"
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+
+		return errors.Wrap(err, "reading request body error")
+	}
+	var input v3.MonitoringInput
+	if err = json.Unmarshal(data, &input); err != nil {
+		rtn["message"] = "failed to parse request content"
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+
+		return errors.Wrap(err, "unmarshaling input error")
+	}
+
+	cluster = cluster.DeepCopy()
+	cluster.Spec.EnableClusterMonitoring = true
+	cluster.Annotations = monitoring.AppendAppOverwritingAnswers(cluster.Annotations, string(data))
+
+	_, err = a.ClusterClient.Update(cluster)
+	if err != nil {
+		rtn["message"] = "failed to enable monitoring"
+		apiContext.WriteResponse(http.StatusInternalServerError, rtn)
+
+		return errors.Wrapf(err, "unable to update Cluster %s", cluster.Name)
+	}
+
+	apiContext.WriteResponse(http.StatusOK, rtn)
+
+	return nil
+}
+
+func (a ActionHandler) disableMonitoring(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	rtn := map[string]interface{}{
+		"message": "disabled",
+	}
+
+	cluster, err := a.ClusterClient.Get(apiContext.ID, metav1.GetOptions{})
+	if err != nil {
+		rtn["message"] = "none existent Cluster"
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+
+		return errors.Wrapf(err, "failed to get Cluster by ID %s", apiContext.ID)
+	}
+	if cluster.DeletionTimestamp != nil {
+		rtn["message"] = "deleting Cluster"
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+
+		return fmt.Errorf("unable to operate deleting %s Cluster", apiContext.ID)
+	}
+
+	if !cluster.Spec.EnableClusterMonitoring {
+		apiContext.WriteResponse(http.StatusOK, rtn)
+		return nil
+	}
+
+	cluster = cluster.DeepCopy()
+	cluster.Spec.EnableClusterMonitoring = false
+
+	_, err = a.ClusterClient.Update(cluster)
+	if err != nil {
+		rtn["message"] = "failed to enable monitoring"
+		apiContext.WriteResponse(http.StatusInternalServerError, rtn)
+
+		return errors.Wrapf(err, "unable to update Cluster %s", cluster.Name)
+	}
+
+	apiContext.WriteResponse(http.StatusOK, rtn)
+
 	return nil
 }
 
@@ -373,7 +473,7 @@ func (a ActionHandler) processYAML(apiContext *types.APIContext, clusterName, pr
 	return nil
 }
 
-func (a ActionHandler) getKubeConfig(apiContext *types.APIContext, cluster *managementv3.Cluster) (*clientcmdapi.Config, error) {
+func (a ActionHandler) getKubeConfig(apiContext *types.APIContext, cluster *mgmtclient.Cluster) (*clientcmdapi.Config, error) {
 	token, err := a.getToken(apiContext)
 	if err != nil {
 		return nil, err
