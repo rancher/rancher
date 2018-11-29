@@ -6,12 +6,12 @@ import (
 
 const (
 	ClusterAlertType                       = "clusterAlert"
-	ClusterAlertFieldAlertState            = "alertState"
 	ClusterAlertFieldAnnotations           = "annotations"
 	ClusterAlertFieldClusterID             = "clusterId"
 	ClusterAlertFieldCreated               = "created"
 	ClusterAlertFieldCreatorID             = "creatorId"
 	ClusterAlertFieldDescription           = "description"
+	ClusterAlertFieldDisplayName           = "displayName"
 	ClusterAlertFieldInitialWaitSeconds    = "initialWaitSeconds"
 	ClusterAlertFieldLabels                = "labels"
 	ClusterAlertFieldName                  = "name"
@@ -22,6 +22,7 @@ const (
 	ClusterAlertFieldRepeatIntervalSeconds = "repeatIntervalSeconds"
 	ClusterAlertFieldSeverity              = "severity"
 	ClusterAlertFieldState                 = "state"
+	ClusterAlertFieldStatus                = "status"
 	ClusterAlertFieldTargetEvent           = "targetEvent"
 	ClusterAlertFieldTargetNode            = "targetNode"
 	ClusterAlertFieldTargetSystemService   = "targetSystemService"
@@ -32,12 +33,12 @@ const (
 
 type ClusterAlert struct {
 	types.Resource
-	AlertState            string               `json:"alertState,omitempty" yaml:"alertState,omitempty"`
 	Annotations           map[string]string    `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	ClusterID             string               `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Created               string               `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID             string               `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Description           string               `json:"description,omitempty" yaml:"description,omitempty"`
+	DisplayName           string               `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	InitialWaitSeconds    int64                `json:"initialWaitSeconds,omitempty" yaml:"initialWaitSeconds,omitempty"`
 	Labels                map[string]string    `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                  string               `json:"name,omitempty" yaml:"name,omitempty"`
@@ -48,6 +49,7 @@ type ClusterAlert struct {
 	RepeatIntervalSeconds int64                `json:"repeatIntervalSeconds,omitempty" yaml:"repeatIntervalSeconds,omitempty"`
 	Severity              string               `json:"severity,omitempty" yaml:"severity,omitempty"`
 	State                 string               `json:"state,omitempty" yaml:"state,omitempty"`
+	Status                *AlertStatus         `json:"status,omitempty" yaml:"status,omitempty"`
 	TargetEvent           *TargetEvent         `json:"targetEvent,omitempty" yaml:"targetEvent,omitempty"`
 	TargetNode            *TargetNode          `json:"targetNode,omitempty" yaml:"targetNode,omitempty"`
 	TargetSystemService   *TargetSystemService `json:"targetSystemService,omitempty" yaml:"targetSystemService,omitempty"`
@@ -73,14 +75,6 @@ type ClusterAlertOperations interface {
 	Replace(existing *ClusterAlert) (*ClusterAlert, error)
 	ByID(id string) (*ClusterAlert, error)
 	Delete(container *ClusterAlert) error
-
-	ActionActivate(resource *ClusterAlert) error
-
-	ActionDeactivate(resource *ClusterAlert) error
-
-	ActionMute(resource *ClusterAlert) error
-
-	ActionUnmute(resource *ClusterAlert) error
 }
 
 func newClusterAlertClient(apiClient *Client) *ClusterAlertClient {
@@ -132,24 +126,4 @@ func (c *ClusterAlertClient) ByID(id string) (*ClusterAlert, error) {
 
 func (c *ClusterAlertClient) Delete(container *ClusterAlert) error {
 	return c.apiClient.Ops.DoResourceDelete(ClusterAlertType, &container.Resource)
-}
-
-func (c *ClusterAlertClient) ActionActivate(resource *ClusterAlert) error {
-	err := c.apiClient.Ops.DoAction(ClusterAlertType, "activate", &resource.Resource, nil, nil)
-	return err
-}
-
-func (c *ClusterAlertClient) ActionDeactivate(resource *ClusterAlert) error {
-	err := c.apiClient.Ops.DoAction(ClusterAlertType, "deactivate", &resource.Resource, nil, nil)
-	return err
-}
-
-func (c *ClusterAlertClient) ActionMute(resource *ClusterAlert) error {
-	err := c.apiClient.Ops.DoAction(ClusterAlertType, "mute", &resource.Resource, nil, nil)
-	return err
-}
-
-func (c *ClusterAlertClient) ActionUnmute(resource *ClusterAlert) error {
-	err := c.apiClient.Ops.DoAction(ClusterAlertType, "unmute", &resource.Resource, nil, nil)
-	return err
 }

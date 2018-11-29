@@ -57,6 +57,7 @@ const (
 	DeploymentFieldVolumes                       = "volumes"
 	DeploymentFieldWorkloadAnnotations           = "workloadAnnotations"
 	DeploymentFieldWorkloadLabels                = "workloadLabels"
+	DeploymentFieldWorkloadMetrics               = "workloadMetrics"
 )
 
 type Deployment struct {
@@ -112,6 +113,7 @@ type Deployment struct {
 	Volumes                       []Volume               `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WorkloadAnnotations           map[string]string      `json:"workloadAnnotations,omitempty" yaml:"workloadAnnotations,omitempty"`
 	WorkloadLabels                map[string]string      `json:"workloadLabels,omitempty" yaml:"workloadLabels,omitempty"`
+	WorkloadMetrics               []WorkloadMetric       `json:"workloadMetrics,omitempty" yaml:"workloadMetrics,omitempty"`
 }
 
 type DeploymentCollection struct {
