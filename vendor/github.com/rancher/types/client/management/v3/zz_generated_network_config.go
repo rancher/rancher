@@ -7,6 +7,7 @@ const (
 	NetworkConfigFieldFlannelNetworkProvider = "flannelNetworkProvider"
 	NetworkConfigFieldOptions                = "options"
 	NetworkConfigFieldPlugin                 = "plugin"
+	NetworkConfigFieldWeaveNetworkProvider   = "weaveNetworkProvider"
 )
 
 type NetworkConfig struct {
@@ -15,4 +16,5 @@ type NetworkConfig struct {
 	FlannelNetworkProvider *FlannelNetworkProvider `json:"flannelNetworkProvider,omitempty" yaml:"flannelNetworkProvider,omitempty"`
 	Options                map[string]string       `json:"options,omitempty" yaml:"options,omitempty"`
 	Plugin                 string                  `json:"plugin,omitempty" yaml:"plugin,omitempty"`
+	WeaveNetworkProvider   *WeaveNetworkProvider   `json:"weaveNetworkProvider,omitempty" yaml:"weaveNetworkProvider,omitempty"`
 }
