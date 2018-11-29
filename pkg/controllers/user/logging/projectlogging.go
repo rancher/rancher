@@ -41,6 +41,7 @@ type ProjectLoggingSyncer struct {
 	projectLoggings      v3.ProjectLoggingInterface
 	secrets              v1.SecretInterface
 	serviceAccounts      v1.ServiceAccountInterface
+	services             v1.ServiceInterface
 }
 
 type projectLoggingEndpointWatcher struct {
@@ -59,6 +60,7 @@ func registerProjectLogging(ctx context.Context, cluster *config.UserContext) {
 		projectLoggings:      projectLoggings,
 		secrets:              cluster.Core.Secrets(loggingconfig.LoggingNamespace),
 		serviceAccounts:      cluster.Core.ServiceAccounts(loggingconfig.LoggingNamespace),
+		services:             cluster.Core.Services(loggingconfig.LoggingNamespace),
 	}
 
 	watcher := projectLoggingEndpointWatcher{
@@ -127,7 +129,7 @@ func (c *ProjectLoggingSyncer) Sync(key string, obj *v3.ProjectLogging) (runtime
 func (c *ProjectLoggingSyncer) doSync(obj *v3.ProjectLogging) (*v3.ProjectLogging, error) {
 	newObj := obj.DeepCopy()
 	_, err := v3.LoggingConditionProvisioned.Do(obj, func() (runtime.Object, error) {
-		return obj, provision(c.namespaces, c.secrets, c.serviceAccounts, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.clusterName)
+		return obj, provision(c.namespaces, c.secrets, c.serviceAccounts, c.services, c.clusterRoleBindings, c.daemonsets, c.clusterLister, c.clusterName)
 	})
 	if err != nil {
 		return obj, err

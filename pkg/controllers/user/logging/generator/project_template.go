@@ -44,6 +44,19 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
   remove_keys namespace
 </filter>
 
+<filter {{$store.ProjectName}}.**>
+  @type prometheus
+  <metric>
+    name fluentd_input_status_num_records_total
+    type counter
+    desc The total number of incoming records
+    <labels>
+      tag ${tag}
+      hostname ${hostname}
+    </labels>
+  </metric>
+</filter>
+
 {{ if eq $store.CurrentTarget "syslog"}}
 {{ if $store.SyslogConfig.Token}}
 <filter {{$store.ProjectName}}.** project-custom.{{$store.ProjectName}}.**>
@@ -56,6 +69,8 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
 {{end -}}
 
 <match  {{$store.ProjectName}}.** project-custom.{{$store.ProjectName}}.**> 
+  @type copy
+  <store>
     {{ if eq $store.CurrentTarget "elasticsearch"}}
     @type elasticsearch
     include_tag_key  true
@@ -230,6 +245,20 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
     disable_retry_limit
     num_threads 8
     slow_flush_log_threshold 40.0
+  </store>
+
+  <store>
+  @type prometheus
+  <metric>
+    name fluentd_output_status_num_records_total
+    type counter
+    desc The total number of outgoing records
+    <labels>
+      tag ${tag}
+      hostname ${hostname}
+    </labels>
+  </metric>
+  </store>
 </match>
 {{end -}}
 {{end -}}
