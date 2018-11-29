@@ -24,6 +24,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/rbac/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/user/resourcequota"
 	"github.com/rancher/rancher/pkg/controllers/user/secret"
+	"github.com/rancher/rancher/pkg/controllers/user/servicemonitor"
 	"github.com/rancher/rancher/pkg/controllers/user/systemimage"
 	"github.com/rancher/rancher/pkg/controllers/user/targetworkloadservice"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
@@ -89,5 +90,6 @@ func RegisterUserOnly(ctx context.Context, cluster *config.UserOnlyContext) erro
 	nslabels.Register(ctx, cluster)
 	targetworkloadservice.Register(ctx, cluster)
 	workload.Register(ctx, cluster)
+	servicemonitor.Register(ctx, cluster)
 	return nil
 }
