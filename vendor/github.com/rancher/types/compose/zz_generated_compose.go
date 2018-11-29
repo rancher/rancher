@@ -38,12 +38,19 @@ type Config struct {
 	ProjectLoggings                          map[string]managementClient.ProjectLogging                          `json:"projectLoggings,omitempty" yaml:"projectLoggings,omitempty"`
 	ListenConfigs                            map[string]managementClient.ListenConfig                            `json:"listenConfigs,omitempty" yaml:"listenConfigs,omitempty"`
 	Settings                                 map[string]managementClient.Setting                                 `json:"settings,omitempty" yaml:"settings,omitempty"`
-	Notifiers                                map[string]managementClient.Notifier                                `json:"notifiers,omitempty" yaml:"notifiers,omitempty"`
 	ClusterAlerts                            map[string]managementClient.ClusterAlert                            `json:"clusterAlerts,omitempty" yaml:"clusterAlerts,omitempty"`
 	ProjectAlerts                            map[string]managementClient.ProjectAlert                            `json:"projectAlerts,omitempty" yaml:"projectAlerts,omitempty"`
+	Notifiers                                map[string]managementClient.Notifier                                `json:"notifiers,omitempty" yaml:"notifiers,omitempty"`
+	ClusterAlertGroups                       map[string]managementClient.ClusterAlertGroup                       `json:"clusterAlertGroups,omitempty" yaml:"clusterAlertGroups,omitempty"`
+	ProjectAlertGroups                       map[string]managementClient.ProjectAlertGroup                       `json:"projectAlertGroups,omitempty" yaml:"projectAlertGroups,omitempty"`
+	ClusterAlertRules                        map[string]managementClient.ClusterAlertRule                        `json:"clusterAlertRules,omitempty" yaml:"clusterAlertRules,omitempty"`
+	ProjectAlertRules                        map[string]managementClient.ProjectAlertRule                        `json:"projectAlertRules,omitempty" yaml:"projectAlertRules,omitempty"`
 	ComposeConfigs                           map[string]managementClient.ComposeConfig                           `json:"composeConfigs,omitempty" yaml:"composeConfigs,omitempty"`
 	ProjectCatalogs                          map[string]managementClient.ProjectCatalog                          `json:"projectCatalogs,omitempty" yaml:"projectCatalogs,omitempty"`
 	ClusterCatalogs                          map[string]managementClient.ClusterCatalog                          `json:"clusterCatalogs,omitempty" yaml:"clusterCatalogs,omitempty"`
+	ClusterMonitorGraphs                     map[string]managementClient.ClusterMonitorGraph                     `json:"clusterMonitorGraphs,omitempty" yaml:"clusterMonitorGraphs,omitempty"`
+	ProjectMonitorGraphs                     map[string]managementClient.ProjectMonitorGraph                     `json:"projectMonitorGraphs,omitempty" yaml:"projectMonitorGraphs,omitempty"`
+	MonitorMetrics                           map[string]managementClient.MonitorMetric                           `json:"monitorMetrics,omitempty" yaml:"monitorMetrics,omitempty"`
 
 	// Cluster Client
 	Namespaces        map[string]clusterClient.Namespace        `json:"namespaces,omitempty" yaml:"namespaces,omitempty"`
@@ -86,4 +93,8 @@ type Config struct {
 	PipelineExecutions             map[string]projectClient.PipelineExecution             `json:"pipelineExecutions,omitempty" yaml:"pipelineExecutions,omitempty"`
 	PipelineSettings               map[string]projectClient.PipelineSetting               `json:"pipelineSettings,omitempty" yaml:"pipelineSettings,omitempty"`
 	SourceCodeRepositorys          map[string]projectClient.SourceCodeRepository          `json:"sourceCodeRepositories,omitempty" yaml:"sourceCodeRepositories,omitempty"`
+	Prometheuss                    map[string]projectClient.Prometheus                    `json:"prometheuses,omitempty" yaml:"prometheuses,omitempty"`
+	ServiceMonitors                map[string]projectClient.ServiceMonitor                `json:"serviceMonitors,omitempty" yaml:"serviceMonitors,omitempty"`
+	PrometheusRules                map[string]projectClient.PrometheusRule                `json:"prometheusRules,omitempty" yaml:"prometheusRules,omitempty"`
+	Alertmanagers                  map[string]projectClient.Alertmanager                  `json:"alertmanagers,omitempty" yaml:"alertmanagers,omitempty"`
 }

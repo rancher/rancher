@@ -32,12 +32,14 @@ const (
 	ClusterConditionDefaultNamespaceAssigned condition.Cond = "DefaultNamespaceAssigned"
 	// ClusterConditionSystemNamespacesAssigned true when cluster's system namespaces has been initially assigned to
 	// a system project
-	ClusterConditionSystemNamespacesAssigned condition.Cond = "SystemNamespacesAssigned"
-	ClusterConditionAddonDeploy              condition.Cond = "AddonDeploy"
-	ClusterConditionSystemAccountCreated     condition.Cond = "SystemAccountCreated"
-	ClusterConditionAgentDeployed            condition.Cond = "AgentDeployed"
-	ClusterConditionGlobalAdminsSynced       condition.Cond = "GlobalAdminsSynced"
-	ClusterConditionInitialRolesPopulated    condition.Cond = "InitialRolesPopulated"
+	ClusterConditionSystemNamespacesAssigned   condition.Cond = "SystemNamespacesAssigned"
+	ClusterConditionAddonDeploy                condition.Cond = "AddonDeploy"
+	ClusterConditionSystemAccountCreated       condition.Cond = "SystemAccountCreated"
+	ClusterConditionAgentDeployed              condition.Cond = "AgentDeployed"
+	ClusterConditionGlobalAdminsSynced         condition.Cond = "GlobalAdminsSynced"
+	ClusterConditionInitialRolesPopulated      condition.Cond = "InitialRolesPopulated"
+	ClusterConditionPrometheusOperatorDeployed condition.Cond = "PrometheusOperatorDeployed"
+	ClusterConditionMonitoringEnabled          condition.Cond = "MonitoringEnabled"
 
 	ClusterDriverImported = "imported"
 	ClusterDriverLocal    = "local"
@@ -74,6 +76,7 @@ type ClusterSpec struct {
 	DefaultClusterRoleForProjectMembers  string                               `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
 	DockerRootDir                        string                               `json:"dockerRootDir,omitempty" norman:"default=/var/lib/docker"`
 	EnableNetworkPolicy                  *bool                                `json:"enableNetworkPolicy" norman:"default=false"`
+	EnableClusterMonitoring              *bool                                `json:"enableClusterMonitoring" norman:"default=false"`
 }
 
 type ImportedConfig struct {
@@ -102,6 +105,7 @@ type ClusterStatus struct {
 	AppliedPodSecurityPolicyTemplateName string                   `json:"appliedPodSecurityPolicyTemplateId"`
 	AppliedEnableNetworkPolicy           bool                     `json:"appliedEnableNetworkPolicy" norman:"nocreate,noupdate,default=false"`
 	Capabilities                         Capabilities             `json:"capabilities,omitempty"`
+	MonitoringStatus                     *MonitoringStatus        `json:"monitoringStatus,omitempty" norman:"nocreate,noupdate"`
 }
 
 type ClusterComponentStatus struct {
@@ -301,4 +305,8 @@ type LoadBalancerCapabilities struct {
 type IngressCapabilities struct {
 	IngressProvider      string `json:"ingressProvider,omitempty"`
 	CustomDefaultBackend bool   `json:"customDefaultBackend,omitempty"`
+}
+
+type MonitoringInput struct {
+	Answers map[string]string `json:"answers,omitempty"`
 }

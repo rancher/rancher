@@ -6,11 +6,11 @@ import (
 
 const (
 	ProjectAlertType                       = "projectAlert"
-	ProjectAlertFieldAlertState            = "alertState"
 	ProjectAlertFieldAnnotations           = "annotations"
 	ProjectAlertFieldCreated               = "created"
 	ProjectAlertFieldCreatorID             = "creatorId"
 	ProjectAlertFieldDescription           = "description"
+	ProjectAlertFieldDisplayName           = "displayName"
 	ProjectAlertFieldInitialWaitSeconds    = "initialWaitSeconds"
 	ProjectAlertFieldLabels                = "labels"
 	ProjectAlertFieldName                  = "name"
@@ -22,6 +22,7 @@ const (
 	ProjectAlertFieldRepeatIntervalSeconds = "repeatIntervalSeconds"
 	ProjectAlertFieldSeverity              = "severity"
 	ProjectAlertFieldState                 = "state"
+	ProjectAlertFieldStatus                = "status"
 	ProjectAlertFieldTargetPod             = "targetPod"
 	ProjectAlertFieldTargetWorkload        = "targetWorkload"
 	ProjectAlertFieldTransitioning         = "transitioning"
@@ -31,11 +32,11 @@ const (
 
 type ProjectAlert struct {
 	types.Resource
-	AlertState            string            `json:"alertState,omitempty" yaml:"alertState,omitempty"`
 	Annotations           map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created               string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID             string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Description           string            `json:"description,omitempty" yaml:"description,omitempty"`
+	DisplayName           string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	InitialWaitSeconds    int64             `json:"initialWaitSeconds,omitempty" yaml:"initialWaitSeconds,omitempty"`
 	Labels                map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                  string            `json:"name,omitempty" yaml:"name,omitempty"`
@@ -47,6 +48,7 @@ type ProjectAlert struct {
 	RepeatIntervalSeconds int64             `json:"repeatIntervalSeconds,omitempty" yaml:"repeatIntervalSeconds,omitempty"`
 	Severity              string            `json:"severity,omitempty" yaml:"severity,omitempty"`
 	State                 string            `json:"state,omitempty" yaml:"state,omitempty"`
+	Status                *AlertStatus      `json:"status,omitempty" yaml:"status,omitempty"`
 	TargetPod             *TargetPod        `json:"targetPod,omitempty" yaml:"targetPod,omitempty"`
 	TargetWorkload        *TargetWorkload   `json:"targetWorkload,omitempty" yaml:"targetWorkload,omitempty"`
 	Transitioning         string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
@@ -71,14 +73,6 @@ type ProjectAlertOperations interface {
 	Replace(existing *ProjectAlert) (*ProjectAlert, error)
 	ByID(id string) (*ProjectAlert, error)
 	Delete(container *ProjectAlert) error
-
-	ActionActivate(resource *ProjectAlert) error
-
-	ActionDeactivate(resource *ProjectAlert) error
-
-	ActionMute(resource *ProjectAlert) error
-
-	ActionUnmute(resource *ProjectAlert) error
 }
 
 func newProjectAlertClient(apiClient *Client) *ProjectAlertClient {
@@ -130,24 +124,4 @@ func (c *ProjectAlertClient) ByID(id string) (*ProjectAlert, error) {
 
 func (c *ProjectAlertClient) Delete(container *ProjectAlert) error {
 	return c.apiClient.Ops.DoResourceDelete(ProjectAlertType, &container.Resource)
-}
-
-func (c *ProjectAlertClient) ActionActivate(resource *ProjectAlert) error {
-	err := c.apiClient.Ops.DoAction(ProjectAlertType, "activate", &resource.Resource, nil, nil)
-	return err
-}
-
-func (c *ProjectAlertClient) ActionDeactivate(resource *ProjectAlert) error {
-	err := c.apiClient.Ops.DoAction(ProjectAlertType, "deactivate", &resource.Resource, nil, nil)
-	return err
-}
-
-func (c *ProjectAlertClient) ActionMute(resource *ProjectAlert) error {
-	err := c.apiClient.Ops.DoAction(ProjectAlertType, "mute", &resource.Resource, nil, nil)
-	return err
-}
-
-func (c *ProjectAlertClient) ActionUnmute(resource *ProjectAlert) error {
-	err := c.apiClient.Ops.DoAction(ProjectAlertType, "unmute", &resource.Resource, nil, nil)
-	return err
 }

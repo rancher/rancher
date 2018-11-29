@@ -12,7 +12,9 @@ const (
 	ProjectFieldCreated                       = "created"
 	ProjectFieldCreatorID                     = "creatorId"
 	ProjectFieldDescription                   = "description"
+	ProjectFieldEnableProjectMonitoring       = "enableProjectMonitoring"
 	ProjectFieldLabels                        = "labels"
+	ProjectFieldMonitoringStatus              = "monitoringStatus"
 	ProjectFieldName                          = "name"
 	ProjectFieldNamespaceDefaultResourceQuota = "namespaceDefaultResourceQuota"
 	ProjectFieldNamespaceId                   = "namespaceId"
@@ -34,7 +36,9 @@ type Project struct {
 	Created                       string                  `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                     string                  `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Description                   string                  `json:"description,omitempty" yaml:"description,omitempty"`
+	EnableProjectMonitoring       *bool                   `json:"enableProjectMonitoring,omitempty" yaml:"enableProjectMonitoring,omitempty"`
 	Labels                        map[string]string       `json:"labels,omitempty" yaml:"labels,omitempty"`
+	MonitoringStatus              *MonitoringStatus       `json:"monitoringStatus,omitempty" yaml:"monitoringStatus,omitempty"`
 	Name                          string                  `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceDefaultResourceQuota *NamespaceResourceQuota `json:"namespaceDefaultResourceQuota,omitempty" yaml:"namespaceDefaultResourceQuota,omitempty"`
 	NamespaceId                   string                  `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
@@ -65,6 +69,10 @@ type ProjectOperations interface {
 	Replace(existing *Project) (*Project, error)
 	ByID(id string) (*Project, error)
 	Delete(container *Project) error
+
+	ActionDisableMonitoring(resource *Project) error
+
+	ActionEnableMonitoring(resource *Project, input *MonitoringInput) error
 
 	ActionExportYaml(resource *Project) error
 
@@ -120,6 +128,16 @@ func (c *ProjectClient) ByID(id string) (*Project, error) {
 
 func (c *ProjectClient) Delete(container *Project) error {
 	return c.apiClient.Ops.DoResourceDelete(ProjectType, &container.Resource)
+}
+
+func (c *ProjectClient) ActionDisableMonitoring(resource *Project) error {
+	err := c.apiClient.Ops.DoAction(ProjectType, "disableMonitoring", &resource.Resource, nil, nil)
+	return err
+}
+
+func (c *ProjectClient) ActionEnableMonitoring(resource *Project, input *MonitoringInput) error {
+	err := c.apiClient.Ops.DoAction(ProjectType, "enableMonitoring", &resource.Resource, input, nil)
+	return err
 }
 
 func (c *ProjectClient) ActionExportYaml(resource *Project) error {

@@ -42,6 +42,10 @@ type Client struct {
 	PipelineExecution             PipelineExecutionOperations
 	PipelineSetting               PipelineSettingOperations
 	SourceCodeRepository          SourceCodeRepositoryOperations
+	Prometheus                    PrometheusOperations
+	ServiceMonitor                ServiceMonitorOperations
+	PrometheusRule                PrometheusRuleOperations
+	Alertmanager                  AlertmanagerOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -89,6 +93,10 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.PipelineExecution = newPipelineExecutionClient(client)
 	client.PipelineSetting = newPipelineSettingClient(client)
 	client.SourceCodeRepository = newSourceCodeRepositoryClient(client)
+	client.Prometheus = newPrometheusClient(client)
+	client.ServiceMonitor = newServiceMonitorClient(client)
+	client.PrometheusRule = newPrometheusRuleClient(client)
+	client.Alertmanager = newAlertmanagerClient(client)
 
 	return client, nil
 }

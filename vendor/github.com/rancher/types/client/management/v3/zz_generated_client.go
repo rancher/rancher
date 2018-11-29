@@ -39,12 +39,19 @@ type Client struct {
 	ProjectLogging                          ProjectLoggingOperations
 	ListenConfig                            ListenConfigOperations
 	Setting                                 SettingOperations
-	Notifier                                NotifierOperations
 	ClusterAlert                            ClusterAlertOperations
 	ProjectAlert                            ProjectAlertOperations
+	Notifier                                NotifierOperations
+	ClusterAlertGroup                       ClusterAlertGroupOperations
+	ProjectAlertGroup                       ProjectAlertGroupOperations
+	ClusterAlertRule                        ClusterAlertRuleOperations
+	ProjectAlertRule                        ProjectAlertRuleOperations
 	ComposeConfig                           ComposeConfigOperations
 	ProjectCatalog                          ProjectCatalogOperations
 	ClusterCatalog                          ClusterCatalogOperations
+	ClusterMonitorGraph                     ClusterMonitorGraphOperations
+	ProjectMonitorGraph                     ProjectMonitorGraphOperations
+	MonitorMetric                           MonitorMetricOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -89,12 +96,19 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.ProjectLogging = newProjectLoggingClient(client)
 	client.ListenConfig = newListenConfigClient(client)
 	client.Setting = newSettingClient(client)
-	client.Notifier = newNotifierClient(client)
 	client.ClusterAlert = newClusterAlertClient(client)
 	client.ProjectAlert = newProjectAlertClient(client)
+	client.Notifier = newNotifierClient(client)
+	client.ClusterAlertGroup = newClusterAlertGroupClient(client)
+	client.ProjectAlertGroup = newProjectAlertGroupClient(client)
+	client.ClusterAlertRule = newClusterAlertRuleClient(client)
+	client.ProjectAlertRule = newProjectAlertRuleClient(client)
 	client.ComposeConfig = newComposeConfigClient(client)
 	client.ProjectCatalog = newProjectCatalogClient(client)
 	client.ClusterCatalog = newClusterCatalogClient(client)
+	client.ClusterMonitorGraph = newClusterMonitorGraphClient(client)
+	client.ProjectMonitorGraph = newProjectMonitorGraphClient(client)
+	client.MonitorMetric = newMonitorMetricClient(client)
 
 	return client, nil
 }
