@@ -3,13 +3,12 @@ package schema
 import (
 	"net/http"
 
-	"k8s.io/api/core/v1"
-
 	"github.com/rancher/norman/types"
 	m "github.com/rancher/norman/types/mapper"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/factory"
 	"github.com/rancher/types/mapper"
+	"k8s.io/api/core/v1"
 )
 
 var (
@@ -39,7 +38,9 @@ var (
 		Init(clusterCatalogTypes).
 		Init(multiClusterAppTypes).
 		Init(globalDNSTypes).
-		Init(kontainerTypes)
+		Init(kontainerTypes).
+		Init(monitorTypes)
+
 	TokenSchemas = factory.Schemas(&Version).
 			Init(tokens)
 )
@@ -146,6 +147,7 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.ImportClusterYamlInput{}).
 		MustImport(&Version, v3.ImportYamlOutput{}).
 		MustImport(&Version, v3.ExportOutput{}).
+		MustImport(&Version, v3.MonitoringInput{}).
 		MustImportAndCustomize(&Version, v3.ETCDService{}, func(schema *types.Schema) {
 			schema.MustCustomizeField("extraArgs", func(field types.Field) types.Field {
 				field.Default = map[string]interface{}{
@@ -171,14 +173,20 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 			schema.ResourceActions["exportYaml"] = types.Action{
 				Output: "exportOutput",
 			}
+			schema.ResourceActions["enableMonitoring"] = types.Action{
+				Input: "monitoringInput",
+			}
+			schema.ResourceActions["disableMonitoring"] = types.Action{}
 		})
 }
 
 func authzTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		MustImport(&Version, v3.ProjectStatus{}).
-		AddMapperForType(&Version, v3.Project{}, m.DisplayName{},
-			&m.Embed{Field: "status"}).
+		AddMapperForType(&Version, v3.Project{},
+			m.DisplayName{},
+			&m.Embed{Field: "status"},
+		).
 		AddMapperForType(&Version, v3.GlobalRole{}, m.DisplayName{}).
 		AddMapperForType(&Version, v3.RoleTemplate{}, m.DisplayName{}).
 		AddMapperForType(&Version,
@@ -196,6 +204,10 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 					Output: "project",
 				},
 				"exportYaml": {},
+				"enableMonitoring": {
+					Input: "monitoringInput",
+				},
+				"disableMonitoring": {},
 			}
 		}).
 		MustImportAndCustomize(&Version, v3.GlobalRole{}, func(schema *types.Schema) {
@@ -507,12 +519,8 @@ func alertTypes(schema *types.Schemas) *types.Schemas {
 	return schema.
 		AddMapperForType(&Version, v3.Notifier{},
 			m.DisplayName{}).
-		AddMapperForType(&Version, v3.ClusterAlert{},
-			&m.Embed{Field: "status"},
-			m.DisplayName{}).
-		AddMapperForType(&Version, v3.ProjectAlert{},
-			&m.Embed{Field: "status"},
-			m.DisplayName{}).
+		MustImport(&Version, v3.ClusterAlert{}).
+		MustImport(&Version, v3.ProjectAlert{}).
 		MustImport(&Version, v3.Notification{}).
 		MustImportAndCustomize(&Version, v3.Notifier{}, func(schema *types.Schema) {
 			schema.CollectionActions = map[string]types.Action{
@@ -526,8 +534,22 @@ func alertTypes(schema *types.Schemas) *types.Schemas {
 				},
 			}
 		}).
-		MustImportAndCustomize(&Version, v3.ClusterAlert{}, func(schema *types.Schema) {
-
+		MustImport(&Version, v3.AlertStatus{}).
+		AddMapperForType(&Version, v3.ClusterAlertGroup{},
+			&m.Embed{Field: "status"},
+			m.DisplayName{}).
+		AddMapperForType(&Version, v3.ProjectAlertGroup{},
+			&m.Embed{Field: "status"},
+			m.DisplayName{}).
+		AddMapperForType(&Version, v3.ClusterAlertRule{},
+			&m.Embed{Field: "status"},
+			m.DisplayName{}).
+		AddMapperForType(&Version, v3.ProjectAlertRule{},
+			&m.Embed{Field: "status"},
+			m.DisplayName{}).
+		MustImport(&Version, v3.ClusterAlertGroup{}).
+		MustImport(&Version, v3.ProjectAlertGroup{}).
+		MustImportAndCustomize(&Version, v3.ClusterAlertRule{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
 				"activate":   {},
 				"deactivate": {},
@@ -535,8 +557,7 @@ func alertTypes(schema *types.Schemas) *types.Schemas {
 				"unmute":     {},
 			}
 		}).
-		MustImportAndCustomize(&Version, v3.ProjectAlert{}, func(schema *types.Schema) {
-
+		MustImportAndCustomize(&Version, v3.ProjectAlertRule{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
 				"activate":   {},
 				"deactivate": {},
@@ -618,4 +639,55 @@ func kontainerTypes(schemas *types.Schemas) *types.Schemas {
 				"deactivate": {},
 			}
 		})
+}
+
+func monitorTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.
+		MustImport(&Version, v3.QueryGraphInput{}).
+		MustImport(&Version, v3.QueryClusterGraphOutput{}).
+		MustImport(&Version, v3.QueryProjectGraphOutput{}).
+		MustImport(&Version, v3.QueryClusterMetricInput{}).
+		MustImport(&Version, v3.QueryProjectMetricInput{}).
+		MustImport(&Version, v3.QueryMetricOutput{}).
+		MustImport(&Version, v3.ClusterMetricNamesInput{}).
+		MustImport(&Version, v3.ProjectMetricNamesInput{}).
+		MustImport(&Version, v3.MetricNamesOutput{}).
+		MustImport(&Version, v3.TimeSeries{}).
+		MustImportAndCustomize(&Version, v3.MonitorMetric{}, func(schema *types.Schema) {
+			schema.CollectionActions = map[string]types.Action{
+				"querycluster": {
+					Input:  "queryClusterMetricInput",
+					Output: "queryMetricOutput",
+				},
+				"listclustermetricname": {
+					Input:  "clusterMetricNamesInput",
+					Output: "metricNamesOutput",
+				},
+				"queryproject": {
+					Input:  "queryProjectMetricInput",
+					Output: "queryMetricOutput",
+				},
+				"listprojectmetricname": {
+					Input:  "projectMetricNamesInput",
+					Output: "metricNamesOutput",
+				},
+			}
+		}).
+		MustImportAndCustomize(&Version, v3.ClusterMonitorGraph{}, func(schema *types.Schema) {
+			schema.CollectionActions = map[string]types.Action{
+				"query": {
+					Input:  "queryGraphInput",
+					Output: "queryClusterGraphOutput",
+				},
+			}
+		}).
+		MustImportAndCustomize(&Version, v3.ProjectMonitorGraph{}, func(schema *types.Schema) {
+			schema.CollectionActions = map[string]types.Action{
+				"query": {
+					Input:  "queryGraphInput",
+					Output: "queryProjectGraphOutput",
+				},
+			}
+		})
+
 }

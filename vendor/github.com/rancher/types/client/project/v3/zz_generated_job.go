@@ -56,6 +56,7 @@ const (
 	JobFieldVolumes                       = "volumes"
 	JobFieldWorkloadAnnotations           = "workloadAnnotations"
 	JobFieldWorkloadLabels                = "workloadLabels"
+	JobFieldWorkloadMetrics               = "workloadMetrics"
 )
 
 type Job struct {
@@ -110,6 +111,7 @@ type Job struct {
 	Volumes                       []Volume               `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WorkloadAnnotations           map[string]string      `json:"workloadAnnotations,omitempty" yaml:"workloadAnnotations,omitempty"`
 	WorkloadLabels                map[string]string      `json:"workloadLabels,omitempty" yaml:"workloadLabels,omitempty"`
+	WorkloadMetrics               []WorkloadMetric       `json:"workloadMetrics,omitempty" yaml:"workloadMetrics,omitempty"`
 }
 
 type JobCollection struct {

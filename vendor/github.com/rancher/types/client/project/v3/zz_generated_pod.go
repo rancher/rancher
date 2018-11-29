@@ -53,6 +53,7 @@ const (
 	PodFieldUid                           = "uid"
 	PodFieldVolumes                       = "volumes"
 	PodFieldWorkloadID                    = "workloadId"
+	PodFieldWorkloadMetrics               = "workloadMetrics"
 )
 
 type Pod struct {
@@ -104,6 +105,7 @@ type Pod struct {
 	Uid                           *int64                 `json:"uid,omitempty" yaml:"uid,omitempty"`
 	Volumes                       []Volume               `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WorkloadID                    string                 `json:"workloadId,omitempty" yaml:"workloadId,omitempty"`
+	WorkloadMetrics               []WorkloadMetric       `json:"workloadMetrics,omitempty" yaml:"workloadMetrics,omitempty"`
 }
 
 type PodCollection struct {

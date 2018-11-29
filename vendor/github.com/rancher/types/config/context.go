@@ -17,6 +17,7 @@ import (
 	extv1beta1 "github.com/rancher/types/apis/extensions/v1beta1"
 	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
+	monitoringv1 "github.com/rancher/types/apis/monitoring.coreos.com/v1"
 	knetworkingv1 "github.com/rancher/types/apis/networking.k8s.io/v1"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	projectSchema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
@@ -181,6 +182,7 @@ type UserContext struct {
 	BatchV1      batchv1.Interface
 	BatchV1Beta1 batchv1beta1.Interface
 	Networking   knetworkingv1.Interface
+	Monitoring   monitoringv1.Interface
 }
 
 func (w *UserContext) controllers() []controller.Starter {
@@ -193,6 +195,7 @@ func (w *UserContext) controllers() []controller.Starter {
 		w.BatchV1,
 		w.BatchV1Beta1,
 		w.Networking,
+		w.Monitoring,
 	}
 }
 
@@ -211,6 +214,7 @@ func (w *UserContext) UserOnlyContext() *UserOnlyContext {
 		Extensions:   w.Extensions,
 		BatchV1:      w.BatchV1,
 		BatchV1Beta1: w.BatchV1Beta1,
+		Monitoring:   w.Monitoring,
 	}
 }
 
@@ -228,6 +232,7 @@ type UserOnlyContext struct {
 	Extensions   extv1beta1.Interface
 	BatchV1      batchv1.Interface
 	BatchV1Beta1 batchv1beta1.Interface
+	Monitoring   monitoringv1.Interface
 }
 
 func (w *UserOnlyContext) controllers() []controller.Starter {
@@ -239,6 +244,7 @@ func (w *UserOnlyContext) controllers() []controller.Starter {
 		w.Extensions,
 		w.BatchV1,
 		w.BatchV1Beta1,
+		w.Monitoring,
 	}
 }
 
@@ -375,6 +381,11 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		return nil, err
 	}
 
+	context.Monitoring, err = monitoringv1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
 	dynamicConfig := config
 	if dynamicConfig.NegotiatedSerializer == nil {
 		dynamicConfig.NegotiatedSerializer = dynamic.NegotiatedSerializer
@@ -449,6 +460,11 @@ func NewUserOnlyContext(config rest.Config) (*UserOnlyContext, error) {
 	}
 
 	context.BatchV1Beta1, err = batchv1beta1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Monitoring, err = monitoringv1.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}

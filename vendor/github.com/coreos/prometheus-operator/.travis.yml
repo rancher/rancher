@@ -1,0 +1,35 @@
+sudo: required
+language: go
+go:
+- "1.11"
+services:
+- docker
+before_install:
+  - pip install --user awscli
+  - export PATH=$PATH:$HOME/.local/bin
+jobs:
+  include:
+  - stage: Sanity check and tests
+  # Check generated contents are up to date and code is formatted.
+    script: make --always-make format generate-in-docker && git diff --exit-code
+  - script: cd contrib/kube-prometheus && make test-in-docker
+  # Build Prometheus Operator rule config map to rule file crds cli tool
+  - script: cd cmd/po-rule-migration && go install
+  # Ensure vendor folder matches vendor.json
+  - script: ./scripts/golang-dep-ensure.sh
+  # Unit tests
+  - script: make test-unit
+  # E2e tests
+  - script: ./scripts/travis-e2e.sh
+  - script: ./scripts/travis-e2e-helm.sh
+
+  - stage: deploy
+    script: skip
+    deploy:
+      provider: script
+      script: make helm-sync-s3
+      on:
+        branch: master
+
+  - stage: push-docker-image
+    script: ./scripts/travis-push-docker-image.sh

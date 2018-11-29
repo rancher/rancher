@@ -39,9 +39,13 @@ type Client struct {
 	ProjectLogging                          ProjectLoggingOperations
 	ListenConfig                            ListenConfigOperations
 	Setting                                 SettingOperations
-	Notifier                                NotifierOperations
 	ClusterAlert                            ClusterAlertOperations
 	ProjectAlert                            ProjectAlertOperations
+	Notifier                                NotifierOperations
+	ClusterAlertGroup                       ClusterAlertGroupOperations
+	ProjectAlertGroup                       ProjectAlertGroupOperations
+	ClusterAlertRule                        ClusterAlertRuleOperations
+	ProjectAlertRule                        ProjectAlertRuleOperations
 	ComposeConfig                           ComposeConfigOperations
 	ProjectCatalog                          ProjectCatalogOperations
 	ClusterCatalog                          ClusterCatalogOperations
@@ -49,6 +53,9 @@ type Client struct {
 	GlobalDNS                               GlobalDNSOperations
 	GlobalDNSProvider                       GlobalDNSProviderOperations
 	KontainerDriver                         KontainerDriverOperations
+	MonitorMetric                           MonitorMetricOperations
+	ClusterMonitorGraph                     ClusterMonitorGraphOperations
+	ProjectMonitorGraph                     ProjectMonitorGraphOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -93,9 +100,13 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.ProjectLogging = newProjectLoggingClient(client)
 	client.ListenConfig = newListenConfigClient(client)
 	client.Setting = newSettingClient(client)
-	client.Notifier = newNotifierClient(client)
 	client.ClusterAlert = newClusterAlertClient(client)
 	client.ProjectAlert = newProjectAlertClient(client)
+	client.Notifier = newNotifierClient(client)
+	client.ClusterAlertGroup = newClusterAlertGroupClient(client)
+	client.ProjectAlertGroup = newProjectAlertGroupClient(client)
+	client.ClusterAlertRule = newClusterAlertRuleClient(client)
+	client.ProjectAlertRule = newProjectAlertRuleClient(client)
 	client.ComposeConfig = newComposeConfigClient(client)
 	client.ProjectCatalog = newProjectCatalogClient(client)
 	client.ClusterCatalog = newClusterCatalogClient(client)
@@ -103,6 +114,9 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.GlobalDNS = newGlobalDNSClient(client)
 	client.GlobalDNSProvider = newGlobalDNSProviderClient(client)
 	client.KontainerDriver = newKontainerDriverClient(client)
+	client.MonitorMetric = newMonitorMetricClient(client)
+	client.ClusterMonitorGraph = newClusterMonitorGraphClient(client)
+	client.ProjectMonitorGraph = newProjectMonitorGraphClient(client)
 
 	return client, nil
 }
