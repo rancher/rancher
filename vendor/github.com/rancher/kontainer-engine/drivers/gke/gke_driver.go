@@ -48,8 +48,6 @@ type state struct {
 	ClusterIpv4Cidr string
 	// An optional description of this cluster
 	Description string
-	// The number of nodes to create in this cluster
-	NodeCount int64
 	// the kubernetes master version
 	MasterVersion string
 	// The authentication information for accessing the master
@@ -58,8 +56,16 @@ type state struct {
 	NodeVersion string
 	// The name of this cluster
 	Name string
-	// Parameters used in creating the cluster's nodes
-	NodeConfig *raw.NodeConfig
+	// Configuration options for the master authorized networks feature
+	MasterAuthorizedNetworksConfig *raw.MasterAuthorizedNetworksConfig
+	// The resource labels for the cluster to use to annotate any related Google Compute Engine resources
+	ResourceLabels map[string]string
+	// Configuration options for private clusters
+	PrivateClusterConfig *raw.PrivateClusterConfig
+	// NodePool contains the name and configuration for a cluster's node pool
+	NodePool *raw.NodePool
+	// Configuration for controlling how IPs are allocated in the cluster
+	IPAllocationPolicy *raw.IPAllocationPolicy
 	// The path to the credential file(key.json)
 	CredentialPath string
 	// The content of the credential
@@ -200,6 +206,110 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Type:  types.StringType,
 		Usage: "When to performance updates on the nodes, in 24-hour time (e.g. \"19:00\")",
 	}
+	driverFlag.Options["resource-labels"] = &types.Flag{
+		Type:  types.StringSliceType,
+		Usage: "The map of Kubernetes labels (key/value pairs) to be applied to each cluster",
+	}
+	driverFlag.Options["enable-nodepool-autoscaling"] = &types.Flag{
+		Type:  types.BoolType,
+		Usage: "Enable nodepool autoscaling",
+	}
+	driverFlag.Options["min-node-count"] = &types.Flag{
+		Type:  types.IntType,
+		Usage: "Minimmum number of nodes in the NodePool. Must be >= 1 and <= maxNodeCount",
+	}
+	driverFlag.Options["max-node-count"] = &types.Flag{
+		Type:  types.IntType,
+		Usage: "Maximum number of nodes in the NodePool. Must be >= minNodeCount. There has to enough quota to scale up the cluster",
+	}
+	driverFlag.Options["enable-auto-upgrade"] = &types.Flag{
+		Type:  types.BoolType,
+		Usage: "Specifies whether node auto-upgrade is enabled for the node pool",
+	}
+	driverFlag.Options["enable-auto-repair"] = &types.Flag{
+		Type:  types.BoolType,
+		Usage: "Specifies whether the node auto-repair is enabled for the node pool",
+	}
+	driverFlag.Options["local-ssd-count"] = &types.Flag{
+		Type:  types.IntType,
+		Usage: "he number of local SSD disks to be attached to the node",
+	}
+	driverFlag.Options["preemptible"] = &types.Flag{
+		Type:  types.BoolType,
+		Usage: "Whether the nodes are created as preemptible VM instances",
+	}
+	driverFlag.Options["disk-type"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "Type of the disk attached to each node",
+	}
+	driverFlag.Options["taints"] = &types.Flag{
+		Type:  types.StringSliceType,
+		Usage: "List of kubernetes taints to be applied to each node",
+	}
+	driverFlag.Options["service-account"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The Google Cloud Platform Service Account to be used by the node VMs",
+	}
+	driverFlag.Options["oauth-scopes"] = &types.Flag{
+		Type:  types.StringSliceType,
+		Usage: "The set of Google API scopes to be made available on all of the node VMs under the default service account",
+	}
+	driverFlag.Options["issue-client-certificate"] = &types.Flag{
+		Type:  types.BoolType,
+		Usage: "Issue a client certificate",
+	}
+	driverFlag.Options["enable-master-authorized-network"] = &types.Flag{
+		Type:  types.BoolType,
+		Usage: "Whether or not master authorized network is enabled",
+	}
+	driverFlag.Options["master-authorized-network-cidr-blocks"] = &types.Flag{
+		Type:  types.StringSliceType,
+		Usage: "Define up to 10 external networks that could access Kubernetes master through HTTPS",
+	}
+	driverFlag.Options["enable-private-endpoint"] = &types.Flag{
+		Type:  types.BoolType,
+		Usage: "Whether the master's internal IP address is used as the cluster endpoint",
+	}
+	driverFlag.Options["enable-private-nodes"] = &types.Flag{
+		Type:  types.BoolType,
+		Usage: "Whether nodes have internal IP address only",
+	}
+	driverFlag.Options["master-ipv4-cidr-block"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The IP range in CIDR notation to use for the hosted master network",
+	}
+	driverFlag.Options["use-ip-aliases"] = &types.Flag{
+		Type:  types.BoolType,
+		Usage: "Whether alias IPs will be used for pod IPs in the cluster",
+	}
+	driverFlag.Options["ip-policy-create-subnetwork"] = &types.Flag{
+		Type:  types.BoolType,
+		Usage: "Whether a new subnetwork will be created automatically for the cluster",
+	}
+	driverFlag.Options["ip-policy-subnetwork-name"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "A custom subnetwork name to be used if createSubnetwork is true",
+	}
+	driverFlag.Options["ip-policy-cluster-secondary-range-name"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The name of the secondary range to be used for the cluster CIDR block",
+	}
+	driverFlag.Options["ip-policy-services-secondary-range-name"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The name of the secondary range to be used for the services CIDR block",
+	}
+	driverFlag.Options["ip-policy-cluster-ipv4-cidr-block"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The IP address range for the cluster pod IPs",
+	}
+	driverFlag.Options["ip-policy-node-ipv4-cidr-block"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The IP address range of the instance IPs in this cluster",
+	}
+	driverFlag.Options["ip-policy-services-ipv4-cidr-block"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The IP address range of the services IPs in this cluster",
+	}
 
 	driverFlag.Options["node-pool"] = &types.Flag{
 		Type:  types.StringType,
@@ -289,13 +399,29 @@ func (d *Driver) GetDriverUpdateOptions(ctx context.Context) (*types.DriverFlags
 // SetDriverOptions implements driver interface
 func getStateFromOpts(driverOptions *types.DriverOptions) (state, error) {
 	d := state{
-		NodeConfig: &raw.NodeConfig{
-			Labels: map[string]string{},
-		},
 		ClusterInfo: types.ClusterInfo{
 			Metadata: map[string]string{},
 		},
+		MasterAuth: &raw.MasterAuth{
+			ClientCertificateConfig: &raw.ClientCertificateConfig{},
+		},
+		MasterAuthorizedNetworksConfig: &raw.MasterAuthorizedNetworksConfig{
+			CidrBlocks: []*raw.CidrBlock{},
+		},
+		NodePool: &raw.NodePool{
+			Autoscaling: &raw.NodePoolAutoscaling{},
+			Config: &raw.NodeConfig{
+				Labels:      map[string]string{},
+				OauthScopes: []string{},
+				Taints:      []*raw.NodeTaint{},
+			},
+			Management: &raw.NodeManagement{},
+		},
+		PrivateClusterConfig: &raw.PrivateClusterConfig{},
+		IPAllocationPolicy:   &raw.IPAllocationPolicy{},
+		ResourceLabels:       map[string]string{},
 	}
+
 	d.Name = options.GetValueFromDriverOptions(driverOptions, types.StringType, "name").(string)
 	d.DisplayName = options.GetValueFromDriverOptions(driverOptions, types.StringType, "display-name", "displayName").(string)
 	d.ProjectID = options.GetValueFromDriverOptions(driverOptions, types.StringType, "project-id", "projectId").(string)
@@ -305,8 +431,15 @@ func getStateFromOpts(driverOptions *types.DriverOptions) (state, error) {
 	d.Description = options.GetValueFromDriverOptions(driverOptions, types.StringType, "description").(string)
 	d.MasterVersion = options.GetValueFromDriverOptions(driverOptions, types.StringType, "master-version", "masterVersion").(string)
 	d.NodeVersion = options.GetValueFromDriverOptions(driverOptions, types.StringType, "node-version", "nodeVersion").(string)
-	d.NodeConfig.DiskSizeGb = options.GetValueFromDriverOptions(driverOptions, types.IntType, "disk-size-gb", "diskSizeGb").(int64)
-	d.NodeConfig.MachineType = options.GetValueFromDriverOptions(driverOptions, types.StringType, "machine-type", "machineType").(string)
+	d.NodePool.Config.DiskSizeGb = options.GetValueFromDriverOptions(driverOptions, types.IntType, "disk-size-gb", "diskSizeGb").(int64)
+	d.NodePool.Config.MachineType = options.GetValueFromDriverOptions(driverOptions, types.StringType, "machine-type", "machineType").(string)
+	d.NodePool.Config.DiskType = options.GetValueFromDriverOptions(driverOptions, types.StringType, "disk-type", "diskType").(string)
+	d.NodePool.Config.LocalSsdCount = options.GetValueFromDriverOptions(driverOptions, types.IntType, "local-ssd-count", "localSsdCount").(int64)
+	d.NodePool.Config.Preemptible = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "preemptible").(bool)
+	d.NodePool.Config.ServiceAccount = options.GetValueFromDriverOptions(driverOptions, types.StringType, "service-account", "serviceAccount").(string)
+	d.NodePool.InitialNodeCount = options.GetValueFromDriverOptions(driverOptions, types.IntType, "node-count", "nodeCount").(int64)
+	d.NodePool.Management.AutoRepair = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "enable-auto-repair", "enableAutoRepair").(bool)
+	d.NodePool.Management.AutoUpgrade = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "enable-auto-upgrade", "enableAutoUpgrade").(bool)
 	d.CredentialPath = options.GetValueFromDriverOptions(driverOptions, types.StringType, "gke-credential-path").(string)
 	d.CredentialContent = options.GetValueFromDriverOptions(driverOptions, types.StringType, "credential").(string)
 	d.EnableAlphaFeature = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "enable-alpha-feature", "enableAlphaFeature").(bool)
@@ -314,7 +447,7 @@ func getStateFromOpts(driverOptions *types.DriverOptions) (state, error) {
 	d.EnableNetworkPolicyConfig, _ = options.GetValueFromDriverOptions(driverOptions, types.BoolPointerType, "enableNetworkPolicyConfig").(*bool)
 	d.EnableHTTPLoadBalancing, _ = options.GetValueFromDriverOptions(driverOptions, types.BoolPointerType, "enable-http-load-balancing", "enableHttpLoadBalancing").(*bool)
 	d.EnableKubernetesDashboard = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "kubernetes-dashboard", "enableKubernetesDashboard").(bool)
-	d.NodeConfig.ImageType = options.GetValueFromDriverOptions(driverOptions, types.StringType, "imageType").(string)
+	d.NodePool.Config.ImageType = options.GetValueFromDriverOptions(driverOptions, types.StringType, "imageType").(string)
 	d.Network = options.GetValueFromDriverOptions(driverOptions, types.StringType, "network").(string)
 	d.SubNetwork = options.GetValueFromDriverOptions(driverOptions, types.StringType, "subNetwork").(string)
 	d.LegacyAbac = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "legacy-authorization", "enableLegacyAbac").(bool)
@@ -324,14 +457,77 @@ func getStateFromOpts(driverOptions *types.DriverOptions) (state, error) {
 		d.Locations = append(d.Locations, location)
 	}
 
-	d.NodeCount = options.GetValueFromDriverOptions(driverOptions, types.IntType, "node-count", "nodeCount").(int64)
 	labelValues := options.GetValueFromDriverOptions(driverOptions, types.StringSliceType, "labels").(*types.StringSlice)
 	for _, part := range labelValues.Value {
 		kv := strings.Split(part, "=")
 		if len(kv) == 2 {
-			d.NodeConfig.Labels[kv[0]] = kv[1]
+			d.NodePool.Config.Labels[kv[0]] = kv[1]
 		}
 	}
+	resourceLabelValues := options.GetValueFromDriverOptions(driverOptions, types.StringSliceType, "resource-labels", "resourceLabels").(*types.StringSlice)
+	for _, part := range resourceLabelValues.Value {
+		kv := strings.Split(part, "=")
+		if len(kv) == 2 {
+			d.ResourceLabels[kv[0]] = kv[1]
+		}
+	}
+
+	oauthScopesValues := options.GetValueFromDriverOptions(driverOptions, types.StringSliceType, "oauth-scopes", "oauthScopes").(*types.StringSlice)
+	for _, oauthScope := range oauthScopesValues.Value {
+		d.NodePool.Config.OauthScopes = append(d.NodePool.Config.OauthScopes, oauthScope)
+	}
+
+	// Configuration of Taints
+	taints := options.GetValueFromDriverOptions(driverOptions, types.StringSliceType, "taints").(*types.StringSlice)
+	for _, part := range taints.Value {
+		taint := &raw.NodeTaint{}
+		ekv := strings.Split(part, ":")
+		if len(ekv) == 2 {
+			taint.Effect = ekv[0]
+			kv := strings.Split(ekv[1], "=")
+			if len(kv) == 2 {
+				taint.Key = kv[0]
+				taint.Value = kv[1]
+			}
+		}
+
+		d.NodePool.Config.Taints = append(d.NodePool.Config.Taints, taint)
+	}
+
+	// Configuration of NodePoolAutoscaling
+	d.NodePool.Autoscaling.Enabled = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "enable-nodepool-autoscaling", "enableNodepoolAutoscaling").(bool)
+	d.NodePool.Autoscaling.MinNodeCount = options.GetValueFromDriverOptions(driverOptions, types.IntType, "min-node-count", "minNodeCount").(int64)
+	d.NodePool.Autoscaling.MaxNodeCount = options.GetValueFromDriverOptions(driverOptions, types.IntType, "max-node-count", "maxNodeCount").(int64)
+	d.NodePool.Name = "default-0"
+
+	// Configuration of MasterAuth
+	d.MasterAuth.Username = "admin"
+	d.MasterAuth.ClientCertificateConfig.IssueClientCertificate = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "issue-client-certificate", "issueClientCertificate").(bool)
+
+	// Configuration of MasterAuthorizedNetworksConfig
+	cidrBlocks := options.GetValueFromDriverOptions(driverOptions, types.StringSliceType, "master-authorized-network-cidr-blocks", "masterAuthorizedNetworkCidrBlocks").(*types.StringSlice)
+	for _, cidrBlock := range cidrBlocks.Value {
+		cb := &raw.CidrBlock{
+			CidrBlock: cidrBlock,
+		}
+		d.MasterAuthorizedNetworksConfig.CidrBlocks = append(d.MasterAuthorizedNetworksConfig.CidrBlocks, cb)
+	}
+	d.MasterAuthorizedNetworksConfig.Enabled = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "enable-master-authorized-network", "enableMasterAuthorizedNetwork").(bool)
+
+	// Configuration of PrivateClusterConfig
+	d.PrivateClusterConfig.EnablePrivateEndpoint = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "enable-private-endpoint", "enablePrivateEndpoint").(bool)
+	d.PrivateClusterConfig.EnablePrivateNodes = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "enable-private-nodes", "enablePrivateNodes").(bool)
+	d.PrivateClusterConfig.MasterIpv4CidrBlock = options.GetValueFromDriverOptions(driverOptions, types.StringType, "master-ipv4-cidr-block", "masterIpv4CidrBlock").(string)
+
+	// Configuration of IPAllocationPolicy
+	d.IPAllocationPolicy.UseIpAliases = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "use-ip-aliases", "useIpAliases").(bool)
+	d.IPAllocationPolicy.CreateSubnetwork = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "ip-policy-create-subnetwork", "ipPolicyCreateSubnetwork").(bool)
+	d.IPAllocationPolicy.SubnetworkName = options.GetValueFromDriverOptions(driverOptions, types.StringType, "ip-policy-subnetwork-name", "ipPolicySubnetworkName").(string)
+	d.IPAllocationPolicy.ClusterSecondaryRangeName = options.GetValueFromDriverOptions(driverOptions, types.StringType, "ip-policy-cluster-secondary-range-name", "ipPolicyClusterSecondaryRangeName").(string)
+	d.IPAllocationPolicy.ServicesSecondaryRangeName = options.GetValueFromDriverOptions(driverOptions, types.StringType, "ip-policy-services-secondary-range-name", "ipPolicyServicesSecondaryRangeName").(string)
+	d.IPAllocationPolicy.ClusterIpv4CidrBlock = options.GetValueFromDriverOptions(driverOptions, types.StringType, "ip-policy-cluster-ipv4-cidr-block", "ipPolicyClusterIpv4CidrBlock").(string)
+	d.IPAllocationPolicy.NodeIpv4CidrBlock = options.GetValueFromDriverOptions(driverOptions, types.StringType, "ip-policy-node-ipv4-cidr-block", "ipPolicyNodeIpv4CidrBlock").(string)
+	d.IPAllocationPolicy.ServicesIpv4CidrBlock = options.GetValueFromDriverOptions(driverOptions, types.StringType, "ip-policy-services-ipv4-cidr-block", "ipPolicyServicesIpv4CidrBlock").(string)
 
 	d.EnableStackdriverLogging, _ = options.GetValueFromDriverOptions(driverOptions, types.BoolPointerType, "enable-stackdriver-logging", "enableStackdriverLogging").(*bool)
 	d.EnableStackdriverMonitoring, _ = options.GetValueFromDriverOptions(driverOptions, types.BoolPointerType, "enable-stackdriver-monitoring", "enableStackdriverMonitoring").(*bool)
@@ -348,6 +544,12 @@ func (s *state) validate() error {
 	} else if s.Name == "" {
 		return fmt.Errorf("cluster name is required")
 	}
+
+	if s.NodePool.Autoscaling.Enabled &&
+		(s.NodePool.Autoscaling.MinNodeCount < 1 || s.NodePool.Autoscaling.MaxNodeCount < s.NodePool.Autoscaling.MinNodeCount) {
+		return fmt.Errorf("minNodeCount in the NodePool must be >= 1 and <= maxNodeCount")
+	}
+
 	return nil
 }
 
@@ -429,7 +631,7 @@ func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, opts *type
 		state.NodePoolID = cluster.NodePools[0].Name
 	}
 
-	logrus.Debugf("Updating config. MasterVersion: %s, NodeVersion: %s, NodeCount: %v", state.MasterVersion, state.NodeVersion, state.NodeCount)
+	logrus.Debugf("Updating config. MasterVersion: %s, NodeVersion: %s, NodeCount: %v", state.MasterVersion, state.NodeVersion, state.NodePool.InitialNodeCount)
 
 	if newState.MasterVersion != "" {
 		log.Infof(ctx, "Updating master to %v", newState.MasterVersion)
@@ -463,10 +665,10 @@ func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, opts *type
 		state.NodeVersion = newState.NodeVersion
 	}
 
-	if newState.NodeCount != 0 {
-		log.Infof(ctx, "Updating node number to %v", newState.NodeCount)
+	if newState.NodePool.InitialNodeCount != 0 {
+		log.Infof(ctx, "Updating node number to %v", newState.NodePool.InitialNodeCount)
 		operation, err := svc.Projects.Zones.Clusters.NodePools.SetSize(state.ProjectID, state.Zone, state.Name, state.NodePoolID, &raw.SetNodePoolSizeRequest{
-			NodeCount: newState.NodeCount,
+			NodeCount: newState.NodePool.InitialNodeCount,
 		}).Context(ctx).Do()
 		if err != nil {
 			return nil, err
@@ -477,20 +679,35 @@ func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, opts *type
 		}
 	}
 
+	if newState.NodePool.Autoscaling.Enabled {
+		log.Infof(ctx, "Updating the autoscaling settings for node pool %s", state.NodePoolID)
+		operation, err := svc.Projects.Zones.Clusters.NodePools.Autoscaling(state.ProjectID, state.Zone, state.Name, state.NodePoolID, &raw.SetNodePoolAutoscalingRequest{
+			Autoscaling: newState.NodePool.Autoscaling,
+		}).Context(ctx).Do()
+		if err != nil {
+			return nil, err
+		}
+		logrus.Debugf("Nodepool %s autoscaling is called for project %s, zone %s and cluster %s. Status Code %v", state.NodePoolID, state.ProjectID, state.Zone, state.Name, operation.HTTPStatusCode)
+		if err := d.waitCluster(ctx, svc, &state); err != nil {
+			return nil, err
+		}
+	}
+
 	return info, storeState(info, state)
 }
 
 func (d *Driver) generateClusterCreateRequest(state state) *raw.CreateClusterRequest {
 	request := raw.CreateClusterRequest{
-		Cluster: &raw.Cluster{},
+		Cluster: &raw.Cluster{
+			NodePools: []*raw.NodePool{},
+		},
 	}
 	request.Cluster.Name = state.Name
 	request.Cluster.Zone = state.Zone
 	request.Cluster.InitialClusterVersion = state.MasterVersion
-	request.Cluster.InitialNodeCount = state.NodeCount
-	request.Cluster.ClusterIpv4Cidr = state.ClusterIpv4Cidr
 	request.Cluster.Description = state.Description
 	request.Cluster.EnableKubernetesAlpha = state.EnableAlphaFeature
+	request.Cluster.ClusterIpv4Cidr = state.ClusterIpv4Cidr
 
 	disableHTTPLoadBalancing := state.EnableHTTPLoadBalancing != nil && !*state.EnableHTTPLoadBalancing
 	disableHorizontalPodAutoscaling := state.EnableHorizontalPodAutoscaling != nil && !*state.EnableHorizontalPodAutoscaling
@@ -507,11 +724,23 @@ func (d *Driver) generateClusterCreateRequest(state state) *raw.CreateClusterReq
 	request.Cluster.LegacyAbac = &raw.LegacyAbac{
 		Enabled: state.LegacyAbac,
 	}
-	request.Cluster.MasterAuth = &raw.MasterAuth{
-		Username: "admin",
+	request.Cluster.MasterAuth = state.MasterAuth
+	request.Cluster.NodePools = append(request.Cluster.NodePools, state.NodePool)
+
+	state.ResourceLabels["display-name"] = strings.ToLower(state.DisplayName)
+	request.Cluster.ResourceLabels = state.ResourceLabels
+
+	if state.MasterAuthorizedNetworksConfig.Enabled {
+		request.Cluster.MasterAuthorizedNetworksConfig = state.MasterAuthorizedNetworksConfig
 	}
-	request.Cluster.NodeConfig = state.NodeConfig
-	request.Cluster.ResourceLabels = map[string]string{"display-name": strings.ToLower(state.DisplayName)}
+
+	request.Cluster.PrivateClusterConfig = state.PrivateClusterConfig
+	request.Cluster.IpAllocationPolicy = state.IPAllocationPolicy
+	if request.Cluster.IpAllocationPolicy.UseIpAliases == true &&
+		request.Cluster.IpAllocationPolicy.ClusterIpv4CidrBlock != "" {
+		request.Cluster.ClusterIpv4Cidr = ""
+	}
+
 	// Stackdriver logging and monitoring default to "on" if no parameter is
 	// passed in.  We must explicitly pass "none" if it isn't wanted
 	if state.EnableStackdriverLogging != nil && !*state.EnableStackdriverLogging {
@@ -529,6 +758,7 @@ func (d *Driver) generateClusterCreateRequest(state state) *raw.CreateClusterReq
 			},
 		}
 	}
+	request.Cluster.Locations = state.Locations
 
 	return &request
 }
