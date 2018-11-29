@@ -45,6 +45,7 @@ type Client struct {
 	ComposeConfig                           ComposeConfigOperations
 	ProjectCatalog                          ProjectCatalogOperations
 	ClusterCatalog                          ClusterCatalogOperations
+	MultiClusterApp                         MultiClusterAppOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -95,6 +96,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.ComposeConfig = newComposeConfigClient(client)
 	client.ProjectCatalog = newProjectCatalogClient(client)
 	client.ClusterCatalog = newClusterCatalogClient(client)
+	client.MultiClusterApp = newMultiClusterAppClient(client)
 
 	return client, nil
 }
