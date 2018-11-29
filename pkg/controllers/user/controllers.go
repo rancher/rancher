@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/ingress"
 	"github.com/rancher/rancher/pkg/controllers/user/ingresshostgen"
 	"github.com/rancher/rancher/pkg/controllers/user/logging"
+	"github.com/rancher/rancher/pkg/controllers/user/monitoring"
 	"github.com/rancher/rancher/pkg/controllers/user/networkpolicy"
 	"github.com/rancher/rancher/pkg/controllers/user/noderemove"
 	"github.com/rancher/rancher/pkg/controllers/user/nodesyncer"
@@ -55,6 +56,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	approuter.Register(ctx, cluster)
 	resourcequota.Register(ctx, cluster)
 	alert.Register(ctx, cluster)
+	monitoring.Register(ctx, cluster)
 
 	c, err := cluster.Management.Management.Clusters("").Get(cluster.ClusterName, metav1.GetOptions{})
 	if err != nil {

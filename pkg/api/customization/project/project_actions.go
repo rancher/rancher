@@ -3,6 +3,7 @@ package project
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
@@ -26,6 +28,8 @@ import (
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "setpodsecuritypolicytemplate")
 	resource.AddAction(apiContext, "exportYaml")
+	resource.AddAction(apiContext, "enableMonitoring")
+	resource.AddAction(apiContext, "disableMonitoring")
 }
 
 type Handler struct {
@@ -41,6 +45,10 @@ func (h *Handler) Actions(actionName string, action *types.Action, apiContext *t
 		return h.setPodSecurityPolicyTemplate(actionName, action, apiContext)
 	case "exportYaml":
 		return h.ExportYamlHandler(actionName, action, apiContext)
+	case "enableMonitoring":
+		return h.enableMonitoring(actionName, action, apiContext)
+	case "disableMonitoring":
+		return h.disableMonitoring(actionName, action, apiContext)
 	}
 	return errors.Errorf("unrecognized action %v", actionName)
 }
@@ -77,6 +85,80 @@ func (h *Handler) ExportYamlHandler(actionName string, action *types.Action, api
 	reader := bytes.NewReader(buf)
 	apiContext.Response.Header().Set("Content-Type", "text/yaml")
 	http.ServeContent(apiContext.Response, apiContext.Request, "exportYaml", time.Now(), reader)
+	return nil
+}
+
+func (h *Handler) enableMonitoring(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	namespace, id := ref.Parse(apiContext.ID)
+	project, err := h.ProjectLister.Get(namespace, id)
+	if err != nil {
+		return err
+	}
+	if project.Spec.EnableProjectMonitoring != nil && *project.Spec.EnableProjectMonitoring {
+		return nil
+	}
+	project = project.DeepCopy()
+
+	data, err := ioutil.ReadAll(apiContext.Request.Body)
+	if err != nil {
+		return errors.Wrap(err, "reading request body error")
+	}
+	var input v3.MonitoringInput
+	if err = json.Unmarshal(data, &input); err != nil {
+		return errors.Wrap(err, "unmarshaling input error")
+	}
+
+	enableProjectMonitoring := true
+	project.Spec.EnableProjectMonitoring = &enableProjectMonitoring
+	if project.Annotations == nil {
+		project.Annotations = make(map[string]string, 2)
+	}
+	project.Annotations[monitoring.CattleOverwriteMonitoringAppAnswersAnnotationKey] = string(data)
+
+	_, err = h.Projects.Update(project)
+	rtn := map[string]interface{}{
+		"message": "enabled",
+	}
+	if err == nil {
+		apiContext.WriteResponse(http.StatusOK, rtn)
+	} else {
+		if rtn["message"] == "" {
+			rtn["message"] = err.Error()
+		}
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+	}
+
+	return nil
+}
+
+func (h *Handler) disableMonitoring(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	namespace, id := ref.Parse(apiContext.ID)
+	project, err := h.ProjectLister.Get(namespace, id)
+	if err != nil {
+		return err
+	}
+	if project.Spec.EnableProjectMonitoring == nil || !*project.Spec.EnableProjectMonitoring {
+		return nil
+	}
+	project = project.DeepCopy()
+
+	enableProjectMonitoring := false
+	project.Spec.EnableProjectMonitoring = &enableProjectMonitoring
+	delete(project.Annotations, monitoring.CattleOverwriteMonitoringAppAnswersAnnotationKey)
+
+	_, err = h.Projects.Update(project)
+	rtn := map[string]interface{}{
+		"message": "disabled",
+	}
+	if err == nil {
+		apiContext.WriteResponse(http.StatusOK, rtn)
+	} else {
+		if rtn["message"] == "" {
+			rtn["message"] = err.Error()
+		}
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+	}
+
 	return nil
 }
 

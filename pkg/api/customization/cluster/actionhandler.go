@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/kubeconfig"
 	"github.com/rancher/rancher/pkg/kubectl"
+	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
 	corev1 "github.com/rancher/types/apis/core/v1"
@@ -54,6 +55,10 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 		return a.ImportYamlHandler(actionName, action, apiContext)
 	case "exportYaml":
 		return a.ExportYamlHandler(actionName, action, apiContext)
+	case "enableMonitoring":
+		return a.enableMonitoring(actionName, action, apiContext)
+	case "disableMonitoring":
+		return a.disableMonitoring(actionName, action, apiContext)
 	}
 	return httperror.NewAPIError(httperror.NotFound, "not found")
 }
@@ -212,6 +217,78 @@ func (a ActionHandler) ExportYamlHandler(actionName string, action *types.Action
 	reader := bytes.NewReader(jsonOutput)
 	apiContext.Response.Header().Set("Content-Type", "application/json")
 	http.ServeContent(apiContext.Response, apiContext.Request, "exportYaml", time.Now(), reader)
+	return nil
+}
+
+func (a ActionHandler) enableMonitoring(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	cluster, err := a.ClusterClient.Get(apiContext.ID, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	if cluster.Spec.EnableClusterMonitoring != nil && *cluster.Spec.EnableClusterMonitoring {
+		return nil
+	}
+	cluster = cluster.DeepCopy()
+
+	data, err := ioutil.ReadAll(apiContext.Request.Body)
+	if err != nil {
+		return errors.Wrap(err, "reading request body error")
+	}
+	var input v3.MonitoringInput
+	if err = json.Unmarshal(data, &input); err != nil {
+		return errors.Wrap(err, "unmarshaling input error")
+	}
+
+	enableClusterMonitoring := true
+	cluster.Spec.EnableClusterMonitoring = &enableClusterMonitoring
+	if cluster.Annotations == nil {
+		cluster.Annotations = make(map[string]string, 2)
+	}
+	cluster.Annotations[monitoring.CattleOverwriteMonitoringAppAnswersAnnotationKey] = string(data)
+
+	_, err = a.ClusterClient.Update(cluster)
+	rtn := map[string]interface{}{
+		"message": "enabled",
+	}
+	if err == nil {
+		apiContext.WriteResponse(http.StatusOK, rtn)
+	} else {
+		if rtn["message"] == "" {
+			rtn["message"] = err.Error()
+		}
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+	}
+
+	return nil
+}
+
+func (a ActionHandler) disableMonitoring(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	cluster, err := a.ClusterClient.Get(apiContext.ID, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	if cluster.Spec.EnableClusterMonitoring == nil || !*cluster.Spec.EnableClusterMonitoring {
+		return nil
+	}
+	cluster = cluster.DeepCopy()
+
+	enableClusterMonitoring := false
+	cluster.Spec.EnableClusterMonitoring = &enableClusterMonitoring
+	delete(cluster.Annotations, monitoring.CattleOverwriteMonitoringAppAnswersAnnotationKey)
+
+	_, err = a.ClusterClient.Update(cluster)
+	rtn := map[string]interface{}{
+		"message": "disabled",
+	}
+	if err == nil {
+		apiContext.WriteResponse(http.StatusOK, rtn)
+	} else {
+		if rtn["message"] == "" {
+			rtn["message"] = err.Error()
+		}
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+	}
+
 	return nil
 }
 

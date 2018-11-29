@@ -37,6 +37,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
+	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	sourcecodeproviders "github.com/rancher/rancher/pkg/pipeline/providers"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
@@ -105,6 +106,14 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		projectclient.SourceCodeCredentialType,
 		projectclient.SourceCodeProviderConfigType,
 		projectclient.SourceCodeRepositoryType,
+	)
+
+	// create Prometheus Operator CRD
+	factory.BatchCreateCRDs(ctx, config.UserStorageContext, schemas, &monitoring.APIVersion,
+		projectclient.PrometheusType,
+		projectclient.PrometheusRuleType,
+		projectclient.AlertmanagerType,
+		projectclient.ServiceMonitorType,
 	)
 
 	factory.BatchWait()

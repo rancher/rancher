@@ -20,6 +20,8 @@ func Formatter(request *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(request, "generateKubeconfig")
 	resource.AddAction(request, "importYaml")
 	resource.AddAction(request, "exportYaml")
+	resource.AddAction(request, "enableMonitoring")
+	resource.AddAction(request, "disableMonitoring")
 
 	if gkeConfig, ok := resource.Values[client.ClusterSpecFieldGoogleKubernetesEngineConfig]; ok {
 		configMap, ok := gkeConfig.(map[string]interface{})
