@@ -5,6 +5,7 @@ const (
 	FieldFieldCreate       = "create"
 	FieldFieldDefault      = "default"
 	FieldFieldDescription  = "description"
+	FieldFieldDynamicField = "dynamicField"
 	FieldFieldInvalidChars = "invalidChars"
 	FieldFieldMax          = "max"
 	FieldFieldMaxLength    = "maxLength"
@@ -23,6 +24,7 @@ type Field struct {
 	Create       bool     `json:"create,omitempty" yaml:"create,omitempty"`
 	Default      *Values  `json:"default,omitempty" yaml:"default,omitempty"`
 	Description  string   `json:"description,omitempty" yaml:"description,omitempty"`
+	DynamicField bool     `json:"dynamicField,omitempty" yaml:"dynamicField,omitempty"`
 	InvalidChars string   `json:"invalidChars,omitempty" yaml:"invalidChars,omitempty"`
 	Max          int64    `json:"max,omitempty" yaml:"max,omitempty"`
 	MaxLength    int64    `json:"maxLength,omitempty" yaml:"maxLength,omitempty"`

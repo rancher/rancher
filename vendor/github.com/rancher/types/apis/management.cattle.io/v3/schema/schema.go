@@ -38,8 +38,8 @@ var (
 		Init(projectCatalogTypes).
 		Init(clusterCatalogTypes).
 		Init(multiClusterAppTypes).
-		Init(globalDNSTypes)
-
+		Init(globalDNSTypes).
+		Init(kontainerTypes)
 	TokenSchemas = factory.Schemas(&Version).
 			Init(tokens)
 )
@@ -125,6 +125,10 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		AddMapperForType(&Version, v3.Cluster{},
 			&m.Embed{Field: "status"},
+			mapper.NewDropFromSchema("genericEngineConfig"),
+			mapper.NewDropFromSchema("googleKubernetesEngineConfig"),
+			mapper.NewDropFromSchema("azureKubernetesServiceConfig"),
+			mapper.NewDropFromSchema("amazonElasticContainerServiceConfig"),
 			m.DisplayName{},
 		).
 		AddMapperForType(&Version, v3.ClusterStatus{},
@@ -599,5 +603,19 @@ func globalDNSTypes(schemas *types.Schemas) *types.Schemas {
 		MustImportAndCustomize(&Version, v3.GlobalDNS{}, func(schema *types.Schema) {
 		}).
 		MustImportAndCustomize(&Version, v3.GlobalDNSProvider{}, func(schema *types.Schema) {
+		})
+}
+
+func kontainerTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.
+		AddMapperForType(&Version, v3.KontainerDriver{},
+			&m.Embed{Field: "status"},
+			m.DisplayName{},
+		).
+		MustImportAndCustomize(&Version, v3.KontainerDriver{}, func(schema *types.Schema) {
+			schema.ResourceActions = map[string]types.Action{
+				"activate":   {},
+				"deactivate": {},
+			}
 		})
 }

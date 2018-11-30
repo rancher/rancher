@@ -21,7 +21,6 @@ import (
 	"github.com/rancher/kontainer-engine/drivers/options"
 	"github.com/rancher/kontainer-engine/drivers/util"
 	"github.com/rancher/kontainer-engine/types"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	"k8s.io/client-go/kubernetes"
@@ -39,13 +38,35 @@ type state struct {
 	// Path to the public key to use for SSH into cluster
 	SSHPublicKeyPath string `json:"sshPublicKeyPath,omitempty"`
 
-	v3.AzureKubernetesServiceConfig
-
 	// Cluster Name
 	Name string
 
 	// The name that is displayed to the user on the Rancher UI
 	DisplayName string
+
+	AgentDNSPrefix              string
+	AgentVMSize                 string
+	Count                       int64
+	KubernetesVersion           string
+	Location                    string
+	OsDiskSizeGB                int64
+	SubscriptionID              string
+	ResourceGroup               string
+	AgentPoolName               string
+	MasterDNSPrefix             string
+	SSHPublicKeyContents        string
+	AdminUsername               string
+	BaseURL                     string
+	ClientID                    string
+	TenantID                    string
+	ClientSecret                string
+	VirtualNetwork              string
+	Subnet                      string
+	VirtualNetworkResourceGroup string
+	Tag                         map[string]string
+	ServiceCIDR                 string
+	DNSServiceIP                string
+	DockerBridgeCIDR            string
 
 	// Cluster info
 	ClusterInfo types.ClusterInfo
@@ -71,6 +92,10 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 	driverFlag := types.DriverFlags{
 		Options: make(map[string]*types.Flag),
 	}
+	driverFlag.Options["name"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The internal name of the cluster in Rancher",
+	}
 	driverFlag.Options["display-name"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "The name that is displayed to the user on the Rancher UI",
@@ -86,43 +111,57 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 	driverFlag.Options["location"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "Resource location",
-		Value: "eastus",
+		Default: &types.Default{
+			DefaultString: "eastus",
+		},
 	}
 	driverFlag.Options["tags"] = &types.Flag{
 		Type:  types.StringSliceType,
 		Usage: "Resource tags. For example, foo=bar",
 	}
-	driverFlag.Options["node-count"] = &types.Flag{
+	driverFlag.Options["count"] = &types.Flag{
 		Type:  types.IntType,
 		Usage: "Number of agents (VMs) to host docker containers. Allowed values must be in the range of 1 to 100 (inclusive)",
-		Value: "1",
+		Default: &types.Default{
+			DefaultInt: 1,
+		},
 	}
-	driverFlag.Options["node-dns-prefix"] = &types.Flag{
+	driverFlag.Options["agent-dns-prefix"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "DNS prefix to be used to create the FQDN for the agent pool",
 	}
-	driverFlag.Options["node-pool-name"] = &types.Flag{
+	driverFlag.Options["agent-pool-name"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "Name for the agent pool",
-		Value: "agentpool0",
+		Default: &types.Default{
+			DefaultString: "agentpool0",
+		},
 	}
 	driverFlag.Options["os-disk-size"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "OS Disk Size in GB to be used to specify the disk size for every machine in this master/agent pool. If you specify 0, it will apply the default osDisk size according to the vmSize specified.",
 	}
-	driverFlag.Options["node-vm-size"] = &types.Flag{
+	driverFlag.Options["agent-vm-size"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "Size of agent VMs",
-		Value: "Standard_D1_v2",
+		Default: &types.Default{
+			DefaultString: "Standard_D1_v2",
+		},
 	}
 	driverFlag.Options["kubernetes-version"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "Version of Kubernetes specified when creating the managed cluster",
-		Value: "1.7.9",
+		Default: &types.Default{
+			DefaultString: "1.7.9",
+		},
 	}
 	driverFlag.Options["public-key"] = &types.Flag{
 		Type:  types.StringType,
-		Usage: "SSH public key to use for the cluster",
+		Usage: "Path to the SSH public key to use for the cluster",
+	}
+	driverFlag.Options["ssh-public-key-contents"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "Contents of the SSH public key to use for the cluster",
 	}
 	driverFlag.Options["master-dns-prefix"] = &types.Flag{
 		Type:  types.StringType,
@@ -131,20 +170,25 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 	driverFlag.Options["admin-username"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "Admin username to use for the cluster",
-		Value: "azureuser",
+		Default: &types.Default{
+			DefaultString: "azureuser",
+		},
 	}
 	driverFlag.Options["base-url"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "Different base API url to use",
-		Value: containerservice.DefaultBaseURI,
+		Default: &types.Default{
+			DefaultString: containerservice.DefaultBaseURI,
+		},
 	}
 	driverFlag.Options["client-id"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "Azure client id to use",
 	}
 	driverFlag.Options["client-secret"] = &types.Flag{
-		Type:  types.StringType,
-		Usage: "Client secret associated with the client-id",
+		Type:     types.StringType,
+		Password: true,
+		Usage:    "Client secret associated with the client-id",
 	}
 	driverFlag.Options["tenant-id"] = &types.Flag{
 		Type:  types.StringType,
@@ -189,7 +233,9 @@ func (d *Driver) GetDriverUpdateOptions(ctx context.Context) (*types.DriverFlags
 	driverFlag.Options["node-count"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "Number of agents (VMs) to host docker containers. Allowed values must be in the range of 1 to 100 (inclusive)",
-		Value: "1",
+		Default: &types.Default{
+			DefaultInt: 1,
+		},
 	}
 	driverFlag.Options["kubernetes-version"] = &types.Flag{
 		Type:  types.StringType,
@@ -203,15 +249,15 @@ func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state := state{}
 	state.Name = options.GetValueFromDriverOptions(driverOptions, types.StringType, "name").(string)
 	state.DisplayName = options.GetValueFromDriverOptions(driverOptions, types.StringType, "display-name", "displayName").(string)
-	state.AgentDNSPrefix = options.GetValueFromDriverOptions(driverOptions, types.StringType, "node-dns-prefix", "agentDnsPrefix").(string)
-	state.AgentVMSize = options.GetValueFromDriverOptions(driverOptions, types.StringType, "node-vm-size", "agentVmSize").(string)
-	state.Count = options.GetValueFromDriverOptions(driverOptions, types.IntType, "node-count", "count").(int64)
+	state.AgentDNSPrefix = options.GetValueFromDriverOptions(driverOptions, types.StringType, "agent-dns-prefix", "agentDnsPrefix").(string)
+	state.AgentVMSize = options.GetValueFromDriverOptions(driverOptions, types.StringType, "agent-vm-size", "agentVmSize").(string)
+	state.Count = options.GetValueFromDriverOptions(driverOptions, types.IntType, "count").(int64)
 	state.KubernetesVersion = options.GetValueFromDriverOptions(driverOptions, types.StringType, "kubernetes-version", "kubernetesVersion").(string)
 	state.Location = options.GetValueFromDriverOptions(driverOptions, types.StringType, "location").(string)
 	state.OsDiskSizeGB = options.GetValueFromDriverOptions(driverOptions, types.IntType, "os-disk-size", "osDiskSizeGb").(int64)
 	state.SubscriptionID = options.GetValueFromDriverOptions(driverOptions, types.StringType, "subscription-id", "subscriptionId").(string)
 	state.ResourceGroup = options.GetValueFromDriverOptions(driverOptions, types.StringType, "resource-group", "resourceGroup").(string)
-	state.AgentPoolName = options.GetValueFromDriverOptions(driverOptions, types.StringType, "node-pool-name", "agentPoolName").(string)
+	state.AgentPoolName = options.GetValueFromDriverOptions(driverOptions, types.StringType, "agent-pool-name", "agentPoolName").(string)
 	state.MasterDNSPrefix = options.GetValueFromDriverOptions(driverOptions, types.StringType, "master-dns-prefix", "masterDnsPrefix").(string)
 	state.SSHPublicKeyPath = options.GetValueFromDriverOptions(driverOptions, types.StringType, "public-key").(string)
 	state.SSHPublicKeyContents = options.GetValueFromDriverOptions(driverOptions, types.StringType, "sshPublicKeyContents").(string)
@@ -857,4 +903,15 @@ func logClusterConfig(config containerservice.ManagedCluster) {
 		output = redactionRegex.ReplaceAllString(output, "$1: [REDACTED]")
 		logrus.Debugf("Sending cluster config to AKS: %v", output)
 	}
+}
+
+func (d *Driver) GetK8SCapabilities(ctx context.Context, _ *types.DriverOptions) (*types.K8SCapabilities, error) {
+	return &types.K8SCapabilities{
+		L4LoadBalancer: &types.LoadBalancerCapabilities{
+			Enabled:              true,
+			Provider:             "Azure L4 LB",
+			ProtocolsSupported:   []string{"TCP", "UDP"},
+			HealthCheckSupported: true,
+		},
+	}, nil
 }

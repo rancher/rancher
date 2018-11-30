@@ -17,6 +17,11 @@ const (
 	StringSliceType = "stringSlice"
 )
 
+type CloseableDriver interface {
+	Driver
+	Close() error
+}
+
 // Driver defines the interface that each driver plugin should implement
 type Driver interface {
 	// GetDriverCreateOptions returns cli flags that are used in create
@@ -44,6 +49,7 @@ type Driver interface {
 
 	// Get driver capabilities
 	GetCapabilities(ctx context.Context) (*Capabilities, error)
+	GetK8SCapabilities(ctx context.Context, opts *DriverOptions) (*K8SCapabilities, error)
 }
 
 type UnimplementedVersionAccess struct {
