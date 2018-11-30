@@ -50,7 +50,6 @@ func (p *adProvider) testAndApply(actionName string, action *types.Action, reque
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
 	}
-	logrus.Debugf("configApplyInput %v", configApplyInput)
 
 	config := &configApplyInput.ActiveDirectoryConfig
 

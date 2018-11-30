@@ -145,14 +145,12 @@ func (g *ghProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v
 	}
 
 	securityCode := githubCredential.Code
-	logrus.Debugf("GitHubIdentityProvider AuthenticateUser called for securityCode %v", securityCode)
 
 	accessToken, err := g.githubClient.getAccessToken(securityCode, config)
 	if err != nil {
 		logrus.Infof("Error generating accessToken from github %v", err)
 		return v3.Principal{}, nil, "", err
 	}
-	logrus.Debugf("Received AccessToken from github %v", accessToken)
 
 	user, err := g.githubClient.getUser(accessToken, config)
 	if err != nil {

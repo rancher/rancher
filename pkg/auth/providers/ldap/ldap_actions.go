@@ -55,7 +55,6 @@ func (p *ldapProvider) testAndApply(actionName string, action *types.Action, req
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
 	}
-	logrus.Debugf("configApplyInput %v", configApplyInput)
 
 	config := &configApplyInput.LdapConfig
 
