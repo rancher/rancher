@@ -361,7 +361,7 @@ func RestoreEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 		return err
 	}
 	if status != 0 {
-		containerLog, err := docker.GetContainerLogsStdoutStderr(ctx, etcdHost.DClient, EtcdRestoreContainerName, "5", false)
+		containerLog, _, err := docker.GetContainerLogsStdoutStderr(ctx, etcdHost.DClient, EtcdRestoreContainerName, "5", false)
 		if err != nil {
 			return err
 		}
@@ -372,4 +372,38 @@ func RestoreEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 		return fmt.Errorf("Failed to run etcd restore container, exit status is: %d, container logs: %s", status, containerLog)
 	}
 	return docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdRestoreContainerName)
+}
+
+func GetEtcdSnapshotChecksum(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, alpineImage, snapshotName string) (string, error) {
+	var checksum string
+	var err error
+
+	snapshotPath := fmt.Sprintf("%s%s", EtcdSnapshotPath, snapshotName)
+	imageCfg := &container.Config{
+		Cmd: []string{
+			"sh", "-c", strings.Join([]string{
+				"md5sum", snapshotPath,
+				"|", "cut", "-f1", "-d' '", "|", "tr", "-d", "'\n'"}, " "),
+		},
+		Image: alpineImage,
+	}
+	hostCfg := &container.HostConfig{
+		Binds: []string{
+			"/opt/rke/:/opt/rke/:z",
+		}}
+
+	if err := docker.DoRunContainer(ctx, etcdHost.DClient, imageCfg, hostCfg, EtcdChecksumContainerName, etcdHost.Address, ETCDRole, prsMap); err != nil {
+		return checksum, err
+	}
+	if _, err := docker.WaitForContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdChecksumContainerName); err != nil {
+		return checksum, err
+	}
+	_, checksum, err = docker.GetContainerLogsStdoutStderr(ctx, etcdHost.DClient, EtcdChecksumContainerName, "1", false)
+	if err != nil {
+		return checksum, err
+	}
+	if err := docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdChecksumContainerName); err != nil {
+		return checksum, err
+	}
+	return checksum, nil
 }

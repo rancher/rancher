@@ -63,7 +63,7 @@ func runHealthcheck(ctx context.Context, host *hosts.Host, serviceName string, l
 		return nil
 	}
 	logrus.Debug("Checking container logs")
-	containerLog, logserr := docker.GetContainerLogsStdoutStderr(ctx, host.DClient, serviceName, "1", false)
+	containerLog, _, logserr := docker.GetContainerLogsStdoutStderr(ctx, host.DClient, serviceName, "1", false)
 	containerLog = strings.TrimSuffix(containerLog, "\n")
 	if logserr != nil {
 		return fmt.Errorf("Failed to verify healthcheck for service [%s]: %v", serviceName, logserr)

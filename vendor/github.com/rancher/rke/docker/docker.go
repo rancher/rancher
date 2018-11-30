@@ -388,19 +388,20 @@ func ReadContainerLogs(ctx context.Context, dClient *client.Client, containerNam
 	return dClient.ContainerLogs(ctx, containerName, types.ContainerLogsOptions{Follow: follow, ShowStdout: true, ShowStderr: true, Timestamps: false, Tail: tail})
 }
 
-func GetContainerLogsStdoutStderr(ctx context.Context, dClient *client.Client, containerName, tail string, follow bool) (string, error) {
+func GetContainerLogsStdoutStderr(ctx context.Context, dClient *client.Client, containerName, tail string, follow bool) (string, string, error) {
 	var containerStderr bytes.Buffer
 	var containerStdout bytes.Buffer
-	var containerLog string
+	var containerErrLog, containerStdLog string
 	clogs, logserr := ReadContainerLogs(ctx, dClient, containerName, follow, tail)
 	if logserr != nil {
 		logrus.Debugf("logserr: %v", logserr)
-		return containerLog, fmt.Errorf("Failed to get gather logs from container [%s]: %v", containerName, logserr)
+		return containerErrLog, containerStdLog, fmt.Errorf("Failed to get gather logs from container [%s]: %v", containerName, logserr)
 	}
 	defer clogs.Close()
 	stdcopy.StdCopy(&containerStdout, &containerStderr, clogs)
-	containerLog = containerStderr.String()
-	return containerLog, nil
+	containerErrLog = containerStderr.String()
+	containerStdLog = containerStdout.String()
+	return containerErrLog, containerStdLog, nil
 }
 
 func tryRegistryAuth(pr v3.PrivateRegistry) types.RequestPrivilegeFunc {

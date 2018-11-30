@@ -31,6 +31,7 @@ const (
 	EtcdSnapshotContainerName     = "etcd-rolling-snapshots"
 	EtcdSnapshotOnceContainerName = "etcd-snapshot-once"
 	EtcdRestoreContainerName      = "etcd-restore"
+	EtcdChecksumContainerName     = "etcd-checksum-checker"
 	NginxProxyContainerName       = "nginx-proxy"
 	SidekickContainerName         = "service-sidekick"
 	LogLinkContainerName          = "rke-log-linker"
