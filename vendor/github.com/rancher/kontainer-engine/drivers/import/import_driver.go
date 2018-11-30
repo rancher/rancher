@@ -33,6 +33,10 @@ func (d *Driver) GetCapabilities(ctx context.Context) (*types.Capabilities, erro
 	return &types.Capabilities{Capabilities: make(map[int64]bool)}, nil
 }
 
+func (d *Driver) GetK8SCapabilities(ctx context.Context, opts *types.DriverOptions) (*types.K8SCapabilities, error) {
+	return &types.K8SCapabilities{}, nil
+}
+
 func getDriverOptions() *types.DriverFlags {
 	driverFlag := types.DriverFlags{
 		Options: make(map[string]*types.Flag),

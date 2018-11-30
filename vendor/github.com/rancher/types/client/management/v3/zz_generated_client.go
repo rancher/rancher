@@ -48,6 +48,7 @@ type Client struct {
 	MultiClusterApp                         MultiClusterAppOperations
 	GlobalDNS                               GlobalDNSOperations
 	GlobalDNSProvider                       GlobalDNSProviderOperations
+	KontainerDriver                         KontainerDriverOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -101,6 +102,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.MultiClusterApp = newMultiClusterAppClient(client)
 	client.GlobalDNS = newGlobalDNSClient(client)
 	client.GlobalDNSProvider = newGlobalDNSProviderClient(client)
+	client.KontainerDriver = newKontainerDriverClient(client)
 
 	return client, nil
 }

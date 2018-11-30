@@ -116,6 +116,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&GlobalDNSList{},
 		&GlobalDNSProvider{},
 		&GlobalDNSProviderList{},
+		&KontainerDriver{},
+		&KontainerDriverList{},
 	)
 	return nil
 }
