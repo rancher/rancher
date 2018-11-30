@@ -51,6 +51,7 @@ const (
 	CanalFlannelBackendType = "canal_flannel_backend_type"
 
 	WeaveNetworkPlugin = "weave"
+	WeavePasswordKey   = "weave_password"
 
 	// List of map keys to be used with network templates
 
@@ -88,6 +89,7 @@ const (
 	FlannelInterface = "FlannelInterface"
 	FlannelBackend   = "FlannelBackend"
 	CanalInterface   = "CanalInterface"
+	WeavePassword    = "WeavePassword"
 	RBACConfig       = "RBACConfig"
 	ClusterVersion   = "ClusterVersion"
 )
@@ -190,6 +192,7 @@ func (c *Cluster) doCanalDeploy(ctx context.Context) error {
 func (c *Cluster) doWeaveDeploy(ctx context.Context) error {
 	weaveConfig := map[string]interface{}{
 		ClusterCIDR:        c.ClusterCIDR,
+		WeavePassword:      c.Network.Options[WeavePasswordKey],
 		Image:              c.SystemImages.WeaveNode,
 		CNIImage:           c.SystemImages.WeaveCNI,
 		WeaveLoopbackImage: c.SystemImages.Alpine,
@@ -477,7 +480,7 @@ func checkPlaneTCPPortsFromHost(ctx context.Context, host *hosts.Host, portList 
 		return err
 	}
 
-	containerLog, logsErr := docker.GetContainerLogsStdoutStderr(ctx, host.DClient, PortCheckContainer, "all", true)
+	containerLog, _, logsErr := docker.GetContainerLogsStdoutStderr(ctx, host.DClient, PortCheckContainer, "all", true)
 	if logsErr != nil {
 		log.Warnf(ctx, "[network] Failed to get network port check logs: %v", logsErr)
 	}
