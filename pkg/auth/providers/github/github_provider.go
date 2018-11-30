@@ -96,6 +96,14 @@ func (g *ghProvider) getGithubConfigCR() (*v3.GithubConfig, error) {
 	mapstructure.Decode(metadataMap, typemeta)
 	storedGithubConfig.ObjectMeta = *typemeta
 
+	if storedGithubConfig.ClientSecret != "" {
+		value, err := common.ReadFromSecret(g.secrets, storedGithubConfig.ClientSecret, "clientsecret")
+		if err != nil {
+			return nil, err
+		}
+		storedGithubConfig.ClientSecret = value
+	}
+
 	return storedGithubConfig, nil
 }
 
