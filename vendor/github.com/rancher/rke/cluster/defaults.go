@@ -260,6 +260,9 @@ func (c *Cluster) setClusterNetworkDefaults() {
 	if c.Network.CanalNetworkProvider != nil {
 		networkPluginConfigDefaultsMap[CanalIface] = c.Network.CanalNetworkProvider.Iface
 	}
+	if c.Network.WeaveNetworkProvider != nil {
+		networkPluginConfigDefaultsMap[WeavePassword] = c.Network.WeaveNetworkProvider.Password
+	}
 	for k, v := range networkPluginConfigDefaultsMap {
 		setDefaultIfEmptyMapValue(c.Network.Options, k, v)
 	}

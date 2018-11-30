@@ -83,7 +83,17 @@ func RestoreEtcdSnapshot(
 	dialersOptions hosts.DialersOptions,
 	flags cluster.ExternalFlags, snapshotName string) error {
 
-	log.Infof(ctx, "Starting restoring snapshot on etcd hosts")
+	log.Infof(ctx, "Restoring etcd snapshot %s", snapshotName)
+	stateFilePath := cluster.GetStateFilePath(flags.ClusterFilePath, flags.ConfigDir)
+	rkeFullState, err := cluster.ReadStateFile(ctx, stateFilePath)
+	if err != nil {
+		return err
+	}
+
+	rkeFullState.CurrentState = cluster.State{}
+	if err := rkeFullState.WriteStateFile(ctx, stateFilePath); err != nil {
+		return err
+	}
 	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags)
 	if err != nil {
 		return err
@@ -91,15 +101,30 @@ func RestoreEtcdSnapshot(
 	if err := kubeCluster.SetupDialers(ctx, dialersOptions); err != nil {
 		return err
 	}
-
 	if err := kubeCluster.TunnelHosts(ctx, flags); err != nil {
 		return err
 	}
 
+	log.Infof(ctx, "Cleaning old kubernetes cluster")
+	if err := kubeCluster.CleanupNodes(ctx); err != nil {
+		return err
+	}
 	if err := kubeCluster.RestoreEtcdSnapshot(ctx, snapshotName); err != nil {
 		return err
 	}
 
+	if err := ClusterInit(ctx, rkeConfig, dialersOptions, flags); err != nil {
+		return err
+	}
+	if _, _, _, _, _, err := ClusterUp(ctx, dialersOptions, flags); err != nil {
+		return err
+	}
+	if err := cluster.RestartClusterPods(ctx, kubeCluster); err != nil {
+		return nil
+	}
+	if err := kubeCluster.RemoveOldNodes(ctx); err != nil {
+		return err
+	}
 	log.Infof(ctx, "Finished restoring snapshot [%s] on all etcd hosts", snapshotName)
 	return nil
 }
