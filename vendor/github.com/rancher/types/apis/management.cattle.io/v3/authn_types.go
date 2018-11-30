@@ -280,7 +280,7 @@ type SamlConfig struct {
 
 	IDPMetadataContent string `json:"idpMetadataContent" norman:"required"`
 	SpCert             string `json:"spCert"             norman:"required"`
-	SpKey              string `json:"spKey"              norman:"required"`
+	SpKey              string `json:"spKey"              norman:"required,type=password"`
 	GroupsField        string `json:"groupsField"        norman:"required"`
 	DisplayNameField   string `json:"displayNameField"   norman:"required"`
 	UserNameField      string `json:"userNameField"      norman:"required"`
