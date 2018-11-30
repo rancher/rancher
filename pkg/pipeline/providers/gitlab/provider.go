@@ -39,7 +39,7 @@ func (g *GlProvider) GetName() string {
 }
 
 func (g *GlProvider) TransformToSourceCodeProvider(config map[string]interface{}) map[string]interface{} {
-	m := g.BaseProvider.TransformToSourceCodeProvider(config, client.GithubProviderType)
+	m := g.BaseProvider.TransformToSourceCodeProvider(config, client.GitlabProviderType)
 	m[client.GitlabProviderFieldRedirectURL] = formGitlabRedirectURLFromMap(config)
 	return m
 }
