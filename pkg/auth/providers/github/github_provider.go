@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"github.com/rancher/rancher/pkg/api/store/auth"
 	"net/http"
 	"strconv"
 	"strings"
@@ -97,7 +98,7 @@ func (g *ghProvider) getGithubConfigCR() (*v3.GithubConfig, error) {
 	storedGithubConfig.ObjectMeta = *typemeta
 
 	if storedGithubConfig.ClientSecret != "" {
-		value, err := common.ReadFromSecret(g.secrets, storedGithubConfig.ClientSecret, "clientsecret")
+		value, err := common.ReadFromSecret(g.secrets, storedGithubConfig.ClientSecret, strings.ToLower(auth.TypeToField[client.GithubConfigType]))
 		if err != nil {
 			return nil, err
 		}
@@ -118,12 +119,12 @@ func (g *ghProvider) saveGithubConfig(config *v3.GithubConfig) error {
 	config.ObjectMeta = storedGithubConfig.ObjectMeta
 
 	secretInfo := convert.ToString(config.ClientSecret)
-
-	if err := common.CreateOrUpdateSecrets(g.secrets, secretInfo, "clientsecret", "githubconfig"); err != nil {
+	field := strings.ToLower(auth.TypeToField[config.Type])
+	if err := common.CreateOrUpdateSecrets(g.secrets, secretInfo, field, strings.ToLower(config.Type)); err != nil {
 		return err
 	}
 
-	config.ClientSecret = "mgmt-secrets:githubconfig-clientsecret"
+	config.ClientSecret = common.GetName(config.Type, field)
 
 	_, err = g.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
 	if err != nil {

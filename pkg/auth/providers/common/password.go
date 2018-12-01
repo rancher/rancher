@@ -60,3 +60,7 @@ func ReadFromSecret(secrets corev1.SecretInterface, secretInfo string, field str
 	}
 	return secretInfo, nil
 }
+
+func GetName(configType string, field string) string {
+	return fmt.Sprintf("%s:%s-%s", SecretsNamespace, strings.ToLower(configType), field)
+}

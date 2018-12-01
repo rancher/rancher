@@ -3,7 +3,9 @@ package github
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/rancher/rancher/pkg/api/store/auth"
 	"net/http"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
@@ -95,7 +97,8 @@ func (g *ghProvider) testAndApply(actionName string, action *types.Action, reque
 	}
 
 	if githubConfig.ClientSecret != "" {
-		value, err := common.ReadFromSecret(g.secrets, githubConfig.ClientSecret, "clientsecret")
+		value, err := common.ReadFromSecret(g.secrets, githubConfig.ClientSecret,
+			strings.ToLower(auth.TypeToField[client.GithubConfigType]))
 		if err != nil {
 			return err
 		}

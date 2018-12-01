@@ -2,9 +2,8 @@ package ldap
 
 import (
 	"fmt"
+	"github.com/rancher/rancher/pkg/api/store/auth"
 	"strings"
-
-	"github.com/rancher/norman/types/convert"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/api/handler"
@@ -64,7 +63,8 @@ func (p *ldapProvider) testAndApply(actionName string, action *types.Action, req
 	}
 
 	if config.ServiceAccountPassword != "" {
-		value, err := common.ReadFromSecret(p.secrets, config.ServiceAccountPassword, "serviceaccountpassword")
+		value, err := common.ReadFromSecret(p.secrets, config.ServiceAccountPassword,
+			strings.ToLower(auth.TypeToField[client.FreeIpaConfigType]))
 		if err != nil {
 			return err
 		}
@@ -116,12 +116,13 @@ func (p *ldapProvider) saveLDAPConfig(config *v3.LdapConfig) error {
 
 	config.ObjectMeta = storedConfig.ObjectMeta
 
-	name := fmt.Sprintf("%s:%s-%s", "mgmt-secrets", strings.ToLower(convert.ToString(config.Type)), "serviceaccountpassword")
-	if err := common.CreateOrUpdateSecrets(p.secrets, config.ServiceAccountPassword, "serviceaccountpassword", strings.ToLower(convert.ToString(config.Type))); err != nil {
+	field := strings.ToLower(auth.TypeToField[config.Type])
+	if err := common.CreateOrUpdateSecrets(p.secrets, config.ServiceAccountPassword,
+		strings.ToLower(config.Type), field); err != nil {
 		return err
 	}
 
-	config.ServiceAccountPassword = name
+	config.ServiceAccountPassword = common.GetName(config.Type, field)
 
 	logrus.Debugf("updating %s config", p.providerName)
 	_, err = p.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)

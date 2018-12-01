@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-var typeToField = map[string]string{
+var TypeToField = map[string]string{
 	client.GithubConfigType:          "clientSecret",
 	client.ActiveDirectoryConfigType: "serviceAccountPassword",
 	client.AzureADConfigType:         "applicationSecret",
@@ -34,7 +34,7 @@ type Store struct {
 }
 
 func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-	for kind, field := range typeToField {
+	for kind, field := range TypeToField {
 		if val, ok := data[field]; ok {
 			val := convert.ToString(val)
 			if err := common.CreateOrUpdateSecrets(s.Secrets, val, strings.ToLower(field), strings.ToLower(kind)); err != nil {

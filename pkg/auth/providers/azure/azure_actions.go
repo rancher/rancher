@@ -3,7 +3,9 @@ package azure
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/rancher/rancher/pkg/api/store/auth"
 	"net/http"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/handler"
@@ -70,7 +72,8 @@ func (ap *azureProvider) testAndApply(actionName string, action *types.Action, r
 	}
 
 	if azureADConfig.ApplicationSecret != "" {
-		value, err := common.ReadFromSecret(ap.secrets, azureADConfig.ApplicationSecret, "")
+		value, err := common.ReadFromSecret(ap.secrets, azureADConfig.ApplicationSecret,
+			strings.ToLower(auth.TypeToField[client.AzureADConfigType]))
 		if err != nil {
 			return err
 		}

@@ -4,10 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/rancher/rancher/pkg/api/store/auth"
 	"strings"
 	"time"
-
-	"github.com/rancher/norman/types/convert"
 
 	"github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac"
 	"github.com/Azure/go-autorest/autorest/adal"
@@ -319,12 +318,12 @@ func (ap *azureProvider) saveAzureConfigK8s(config *v3.AzureADConfig) error {
 	config.Type = client.AzureADConfigType
 	config.ObjectMeta = storedAzureConfig.ObjectMeta
 
-	name := fmt.Sprintf("%s:%s-%s", "mgmt-secrets", strings.ToLower(convert.ToString(config.Type)), "applicationsecret")
-	if err := common.CreateOrUpdateSecrets(ap.secrets, config.ApplicationSecret, "applicationsecret", strings.ToLower(convert.ToString(config.Type))); err != nil {
+	field := strings.ToLower(auth.TypeToField[config.Type])
+	if err := common.CreateOrUpdateSecrets(ap.secrets, config.ApplicationSecret, field, strings.ToLower(config.Type)); err != nil {
 		return err
 	}
 
-	config.ApplicationSecret = name
+	config.ApplicationSecret = common.GetName(config.Type, field)
 
 	logrus.Debugf("updating AzureADConfig")
 	_, err = ap.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
@@ -357,6 +356,15 @@ func (ap *azureProvider) getAzureConfigK8s() (*v3.AzureADConfig, error) {
 	objectMeta := &metav1.ObjectMeta{}
 	mapstructure.Decode(metadataMap, objectMeta)
 	storedAzureADConfig.ObjectMeta = *objectMeta
+
+	if storedAzureADConfig.ApplicationSecret != "" {
+		value, err := common.ReadFromSecret(ap.secrets, storedAzureADConfig.ApplicationSecret,
+			strings.ToLower(auth.TypeToField[client.AzureADConfigType]))
+		if err != nil {
+			return nil, err
+		}
+		storedAzureADConfig.ApplicationSecret = value
+	}
 
 	return storedAzureADConfig, nil
 }
