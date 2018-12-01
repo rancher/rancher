@@ -3,7 +3,7 @@ package saml
 import (
 	"context"
 	"fmt"
-	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/api/store/auth"
 	"net/http"
 	"strings"
 
@@ -143,7 +143,8 @@ func (s *Provider) getSamlConfig() (*v3.SamlConfig, error) {
 	storedSamlConfig.ObjectMeta = *objectMeta
 
 	if storedSamlConfig.SpKey != "" {
-		value, err := common.ReadFromSecret(s.secrets, storedSamlConfig.SpKey, "spkey")
+		value, err := common.ReadFromSecret(s.secrets, storedSamlConfig.SpKey,
+			strings.ToLower(auth.TypeToField[client.PingConfigType]))
 		if err != nil {
 			return nil, err
 		}
@@ -176,14 +177,15 @@ func (s *Provider) saveSamlConfig(config *v3.SamlConfig) error {
 	storedSamlConfig.Annotations = config.Annotations
 	config.ObjectMeta = storedSamlConfig.ObjectMeta
 
-	name := fmt.Sprintf("%s:%s-%s", "mgmt-secrets", strings.ToLower(convert.ToString(config.Type)), "spkey")
-	if err := common.CreateOrUpdateSecrets(s.secrets, config.SpKey, "spkey", strings.ToLower(convert.ToString(config.Type))); err != nil {
+	field := strings.ToLower(auth.TypeToField[configType])
+	if err := common.CreateOrUpdateSecrets(s.secrets, config.SpKey,
+		field, strings.ToLower(config.Type)); err != nil {
 		return err
 	}
 
-	config.SpKey = name
+	config.SpKey = common.GetName(config.Type, field)
 
-	logrus.Debugf("updating samlConfig")
+	logrus.Debugf("updating samlConfig %s", s.name)
 	_, err = s.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
 	if err != nil {
 		return err

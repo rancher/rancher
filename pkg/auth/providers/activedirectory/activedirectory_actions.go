@@ -2,6 +2,7 @@ package activedirectory
 
 import (
 	"fmt"
+	"github.com/rancher/rancher/pkg/api/store/auth"
 	"strings"
 
 	"github.com/rancher/norman/types/convert"
@@ -59,7 +60,8 @@ func (p *adProvider) testAndApply(actionName string, action *types.Action, reque
 	}
 
 	if config.ServiceAccountPassword != "" {
-		value, err := common.ReadFromSecret(p.secrets, config.ServiceAccountPassword, "serviceaccountpassword")
+		value, err := common.ReadFromSecret(p.secrets, config.ServiceAccountPassword,
+			strings.ToLower(auth.TypeToField[client.ActiveDirectoryConfigType]))
 		if err != nil {
 			return err
 		}
@@ -108,12 +110,12 @@ func (p *adProvider) saveActiveDirectoryConfig(config *v3.ActiveDirectoryConfig)
 	config.Type = client.ActiveDirectoryConfigType
 	config.ObjectMeta = storedConfig.ObjectMeta
 
-	name := fmt.Sprintf("%s:%s-%s", common.SecretsNamespace, strings.ToLower(convert.ToString(config.Type)), "serviceaccountpassword")
-	if err := common.CreateOrUpdateSecrets(p.secrets, config.ServiceAccountPassword, "serviceaccountpassword", strings.ToLower(convert.ToString(config.Type))); err != nil {
+	field := strings.ToLower(auth.TypeToField[config.Type])
+	if err := common.CreateOrUpdateSecrets(p.secrets, config.ServiceAccountPassword, field, strings.ToLower(convert.ToString(config.Type))); err != nil {
 		return err
 	}
 
-	config.ServiceAccountPassword = name
+	config.ServiceAccountPassword = common.GetName(config.Type, field)
 
 	logrus.Debugf("updating activeDirectoryConfig")
 	_, err = p.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)

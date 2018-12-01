@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
+	"github.com/rancher/rancher/pkg/api/store/auth"
+	"github.com/rancher/types/client/management/v3"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -204,7 +206,8 @@ func (p *ldapProvider) getLDAPConfig() (*v3.LdapConfig, *x509.CertPool, error) {
 	}
 
 	if storedLdapConfig.ServiceAccountPassword != "" {
-		value, err := common.ReadFromSecret(p.secrets, storedLdapConfig.ServiceAccountPassword, "serviceaccountpassword")
+		value, err := common.ReadFromSecret(p.secrets, storedLdapConfig.ServiceAccountPassword,
+			strings.ToLower(auth.TypeToField[client.OpenLdapConfigType]))
 		if err != nil {
 			return nil, nil, err
 		}

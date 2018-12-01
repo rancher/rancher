@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
+	"github.com/rancher/rancher/pkg/api/store/auth"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -15,6 +16,7 @@ import (
 	corev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
+	v3client "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/client/management/v3public"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
@@ -186,7 +188,8 @@ func (p *adProvider) getActiveDirectoryConfig() (*v3.ActiveDirectoryConfig, *x50
 	}
 
 	if storedADConfig.ServiceAccountPassword != "" {
-		value, err := common.ReadFromSecret(p.secrets, storedADConfig.ServiceAccountPassword, "serviceaccountpassword")
+		value, err := common.ReadFromSecret(p.secrets, storedADConfig.ServiceAccountPassword,
+			strings.ToLower(auth.TypeToField[v3client.ActiveDirectoryConfigType]))
 		if err != nil {
 			return nil, nil, err
 		}
