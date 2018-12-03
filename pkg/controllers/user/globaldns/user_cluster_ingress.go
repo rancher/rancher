@@ -207,9 +207,9 @@ func (ic *UserIngressController) checkForMultiClusterApp(obj *v1beta1.Ingress, g
 			if err != nil {
 				return fmt.Errorf("UserIngressController: Cannot find the App with the Id %v", userApp)
 			}
-			/*if !strings.EqualFold(userApp.MultiClusterAppName, globalDNS.Spec.MultiClusterAppName){
-				return nil, fmt.Errorf("Cannot configure DNS since the App is not part of MulticlusterApp %v", globalDNS.Spec.MultiClusterAppName)
-			}*/
+			if !strings.EqualFold(userApp.Spec.MultiClusterAppName, globalDNS.Spec.MultiClusterAppName) {
+				return fmt.Errorf("UserIngressController: Cannot configure DNS since the App is not part of MulticlusterApp %v", globalDNS.Spec.MultiClusterAppName)
+			}
 		}
 	}
 	return nil
