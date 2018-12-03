@@ -28,7 +28,6 @@ const (
 	creatorIDAnn              = "field.cattle.io/creatorId"
 	multiClusterAppIDSelector = "mcapp"
 	projectIDFieldLabel       = "field.cattle.io/projectId"
-	multiClusterAppPrefix     = "mcapp-"
 	globalNamespace           = "cattle-global-data"
 )
 
@@ -83,15 +82,10 @@ func (m *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.O
 		return mcapp, err
 	}
 
-	appName, mcapp, err := m.getAppName(mcapp, externalID)
-	if err != nil {
-		return mcapp, err
-	}
-
 	// for all targets, create the App{} instance, so that helm controller App lifecycle can pick it up
 	// only one app per project named mcapp-{{mcapp.Name}}
 	var mcappToUpdate *v3.MultiClusterApp
-	appNameInProject := multiClusterAppPrefix + appName
+	appNameInProject := mcapp.Name
 	ann := make(map[string]string)
 	ann[creatorIDAnn] = creatorID
 	set := labels.Set(map[string]string{multiClusterAppIDSelector: mcapp.Name})
@@ -338,19 +332,4 @@ func (m *MCAppController) getExternalID(mcapp *v3.MultiClusterApp) (string, *v3.
 
 	externalID := tv.Spec.ExternalID
 	return externalID, mcapp, nil
-}
-
-func (m *MCAppController) getAppName(mcapp *v3.MultiClusterApp, externalID string) (string, *v3.MultiClusterApp, error) {
-	// create a target namespace for this app, it should be the name of the template itself;
-	// templateVersion.Spec.ExternalID is of the form "catalog://?catalog=%s&template=%s&version=%s"
-	ext := strings.Split(externalID, "template=")
-	if len(ext) != 2 {
-		return "", mcapp, fmt.Errorf("TemplateVersion ExternalId malformed")
-	}
-	temp := strings.Split(ext[1], "&version=")
-	if len(temp) != 2 {
-		return "", mcapp, fmt.Errorf("TemplateVersion ExternalId malformed")
-	}
-	appName := temp[0]
-	return appName, mcapp, nil
 }
