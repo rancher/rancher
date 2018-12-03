@@ -5,15 +5,33 @@ import (
 	"github.com/rancher/types/config"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 const (
-	defaultURL    = "https://git.rancher.io/charts"
-	defaultBranch = "master"
-	name          = "library"
+	libraryURL    = "https://git.rancher.io/charts"
+	libraryBranch = "master"
+	libraryName   = "library"
+
+	systemLibraryURL    = "https://github.com/rancher/system-charts"
+	systemLibraryBranch = "master"
+	systemLibraryName   = "system-library"
 )
 
 func addCatalogs(management *config.ManagementContext) error {
+	return utilerrors.AggregateGoroutines(
+		// add charts
+		func() error {
+			return doAddCatalogs(management, libraryName, libraryURL, libraryBranch)
+		},
+		// add rancher-charts
+		func() error {
+			return doAddCatalogs(management, systemLibraryName, systemLibraryURL, systemLibraryBranch)
+		},
+	)
+}
+
+func doAddCatalogs(management *config.ManagementContext, name, url, branch string) error {
 	catalogClient := management.Management.Catalogs("")
 	_, err := catalogClient.Get(name, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
@@ -24,9 +42,9 @@ func addCatalogs(management *config.ManagementContext) error {
 				Name: name,
 			},
 			Spec: v3.CatalogSpec{
-				URL:         defaultURL,
+				URL:         url,
 				CatalogKind: "helm",
-				Branch:      defaultBranch,
+				Branch:      branch,
 			},
 		}
 		if _, err := catalogClient.Create(obj); err != nil {
