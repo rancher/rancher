@@ -31,14 +31,56 @@ type Store struct {
 	KontainerDriverLister v3.KontainerDriverLister
 }
 
-func SetClusterStore(schema *types.Schema, mgmt *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler) {
-	t := &transform.Store{
-		Store: schema.Store,
-		Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
-			data = transformSetNilSnapshotFalse(data)
+type transformer struct {
+	KontainerDriverLister v3.KontainerDriverLister
+}
 
-			return data, nil
-		},
+func (t *transformer) TransformerFunc(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
+	data = transformSetNilSnapshotFalse(data)
+	return t.transposeGenericConfigToDynamicField(data)
+}
+
+func (t *transformer) transposeGenericConfigToDynamicField(data map[string]interface{}) (map[string]interface{}, error) {
+	if data["genericEngineConfig"] != nil {
+		drivers, err := t.KontainerDriverLister.List("", labels.Everything())
+		if err != nil {
+			return nil, err
+		}
+
+		var driver *v3.KontainerDriver
+		driverName := data["genericEngineConfig"].(map[string]interface{})[clusterprovisioner.DriverNameField].(string)
+		for _, candidate := range drivers {
+			if driverName == candidate.Name {
+				driver = candidate
+				break
+			}
+		}
+
+		if driver == nil {
+			return nil, fmt.Errorf("got unknown driver from kontainer-engine: %v", data[clusterprovisioner.DriverNameField])
+		}
+
+		var driverTypeName string
+		if driver.Spec.BuiltIn {
+			driverTypeName = driver.Status.DisplayName + "Config"
+		} else {
+			driverTypeName = driver.Status.DisplayName + "EngineConfig"
+		}
+
+		data[driverTypeName] = data["genericEngineConfig"]
+		delete(data, "genericEngineConfig")
+	}
+
+	return data, nil
+}
+
+func SetClusterStore(schema *types.Schema, mgmt *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler) {
+	transformer := transformer{
+		KontainerDriverLister: mgmt.Management.KontainerDrivers("").Controller().Lister(),
+	}
+	t := &transform.Store{
+		Store:       schema.Store,
+		Transformer: transformer.TransformerFunc,
 	}
 
 	linkHandler := &ccluster.ShellLinkHandler{
@@ -89,12 +131,7 @@ func (r *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id stri
 		return nil, r.ShellHandler(apiContext, nil)
 	}
 
-	data, err := r.Store.ByID(apiContext, schema, id)
-	if err != nil {
-		return nil, err
-	}
-
-	return r.transposeGenericConfigToDynamicField(data)
+	return r.Store.ByID(apiContext, schema, id)
 }
 
 func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
@@ -129,12 +166,7 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		values.PutValue(data, m, managementv3.ClusterFieldAnnotations)
 	}
 
-	data, err = r.Store.Create(apiContext, schema, data)
-	if err != nil {
-		return nil, err
-	}
-
-	return r.transposeGenericConfigToDynamicField(data)
+	return r.Store.Create(apiContext, schema, data)
 }
 
 func toMap(rawMap interface{}) map[string]interface{} {
@@ -181,12 +213,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, httperror.NewFieldAPIError(httperror.InvalidOption, "enableNetworkPolicy", err.Error())
 	}
 
-	data, err = r.Store.Update(apiContext, schema, data, id)
-	if err != nil {
-		return nil, err
-	}
-
-	return r.transposeGenericConfigToDynamicField(data)
+	return r.Store.Update(apiContext, schema, data, id)
 }
 
 // this method moves the cluster config to and from the genericEngineConfig field so that
@@ -205,40 +232,6 @@ func (r *Store) transposeDynamicFieldToGenericConfig(data map[string]interface{}
 	// overwrite generic engine config so it gets saved
 	data["genericEngineConfig"] = data[dynamicField]
 	delete(data, dynamicField)
-
-	return data, nil
-}
-
-func (r *Store) transposeGenericConfigToDynamicField(data map[string]interface{}) (map[string]interface{}, error) {
-	if data["genericEngineConfig"] != nil {
-		drivers, err := r.KontainerDriverLister.List("", labels.Everything())
-		if err != nil {
-			return nil, err
-		}
-
-		var driver *v3.KontainerDriver
-		driverName := data["genericEngineConfig"].(map[string]interface{})[clusterprovisioner.DriverNameField].(string)
-		for _, candidate := range drivers {
-			if driverName == candidate.Name {
-				driver = candidate
-				break
-			}
-		}
-
-		if driver == nil {
-			return nil, fmt.Errorf("got unknown driver from kontainer-engine: %v", data[clusterprovisioner.DriverNameField])
-		}
-
-		var driverTypeName string
-		if driver.Spec.BuiltIn {
-			driverTypeName = driver.Status.DisplayName + "Config"
-		} else {
-			driverTypeName = driver.Status.DisplayName + "EngineConfig"
-		}
-
-		data[driverTypeName] = data["genericEngineConfig"]
-		delete(data, "genericEngineConfig")
-	}
 
 	return data, nil
 }
