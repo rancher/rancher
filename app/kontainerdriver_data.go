@@ -45,6 +45,26 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 		return err
 	}
 
+	if err := creator.addCustomDriver(
+		"aliyunkubernetescontainerservice",
+		"https://github.com/rancher/kontainer-engine-driver-aliyun/releases/download/v0.2.1/kontainer-engine-driver-aliyun-linux",
+		"",
+		"",
+		"*.aliyuncs.com",
+	); err != nil {
+		return err
+	}
+
+	if err := creator.addCustomDriver(
+		"tencentkubernetesengine",
+		"https://github.com/rancher/kontainer-engine-driver-tencent/releases/download/v0.2.0/kontainer-engine-driver-tencent-linux",
+		"",
+		"",
+		"*.tencentcloudapi.com", "*.qcloud.com",
+	); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -88,5 +108,36 @@ func (c *driverCreator) add(name string) error {
 		}
 	}
 
+	return nil
+}
+
+func (c *driverCreator) addCustomDriver(name, url, checksum, uiURL string, domains ...string) error {
+	logrus.Infof("adding kontainer driver %v", name)
+	_, err := c.driversLister.Get("", name)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			_, err = c.drivers.Create(&v3.KontainerDriver{
+				ObjectMeta: v1.ObjectMeta{
+					Name: strings.ToLower(name),
+				},
+				Spec: v3.KontainerDriverSpec{
+					URL:              url,
+					BuiltIn:          false,
+					Active:           true,
+					Checksum:         checksum,
+					UIURL:            uiURL,
+					WhitelistDomains: domains,
+				},
+				Status: v3.KontainerDriverStatus{
+					DisplayName: name,
+				},
+			})
+			if err != nil && !errors.IsAlreadyExists(err) {
+				return fmt.Errorf("error creating driver: %v", err)
+			}
+		} else {
+			return fmt.Errorf("error getting driver: %v", err)
+		}
+	}
 	return nil
 }
