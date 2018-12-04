@@ -21,7 +21,8 @@ import (
 )
 
 const (
-	GlobaldnsController = "mgmt-global-dns-controller"
+	GlobaldnsController    = "mgmt-global-dns-controller"
+	annotationIngressClass = "kubernetes.io/ingress.class"
 )
 
 type GDController struct {
@@ -124,6 +125,9 @@ func (n *GDController) generateNewIngressSpec(globaldns *v3.GlobalDNS) *v1beta1.
 					Kind:       globaldns.Kind,
 					Controller: &controller,
 				},
+			},
+			Annotations: map[string]string{
+				annotationIngressClass: "rancher-external-dns",
 			},
 			Namespace: globaldns.Namespace,
 		},
