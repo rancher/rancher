@@ -75,7 +75,10 @@ func (m *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.O
 		return mcapp, fmt.Errorf("MultiClusterApp %v has no creatorId annotation. Cannot create apps for %v", metaAccessor.GetName(), mcapp.Name)
 	}
 
-	answerMap := m.createAnswerMap(mcapp.Spec.Answers)
+	answerMap, err := m.createAnswerMap(mcapp.Spec.Answers)
+	if err != nil {
+		return mcapp, err
+	}
 
 	externalID, mcapp, err := m.getExternalID(mcapp)
 	if err != nil {
@@ -299,24 +302,54 @@ func (m *MCAppController) update(mcappToUpdate *v3.MultiClusterApp) (*v3.MultiCl
 	return updatedObj, err
 }
 
-func (m *MCAppController) createAnswerMap(answers []v3.Answer) map[string]map[string]string {
-	var answerMap map[string]map[string]string
-
+func (m *MCAppController) createAnswerMap(answers []v3.Answer) (map[string]map[string]string, error) {
 	// create a map, where key is the projectID or clusterID, or "global" if neither is provided, and value is the actual answer values
-	answerMap = make(map[string]map[string]string)
+	// Global scoped answers will have all questions. Project/cluster scoped will only have override keys. So we'll first create a global map,
+	// and then merge with project/cluster map
+	answerMap := make(map[string]map[string]string)
+	globalAnswersMap := make(map[string]string)
 	for _, a := range answers {
-		if a.ProjectName != "" {
-			answerMap[a.ProjectName] = make(map[string]string)
-			answerMap[a.ProjectName] = a.Values
-		} else if a.ClusterName != "" {
-			answerMap[a.ClusterName] = make(map[string]string)
-			answerMap[a.ClusterName] = a.Values
-		} else {
+		if a.ProjectName == "" && a.ClusterName == "" {
+			globalAnswersMap = a.Values
 			answerMap[globalScopeAnswersKey] = make(map[string]string)
 			answerMap[globalScopeAnswersKey] = a.Values
 		}
 	}
-	return answerMap
+
+	for _, a := range answers {
+		if a.ClusterName != "" {
+			// Using k8s labels.Merge, since by definition:
+			// Merge combines given maps, and does not check for any conflicts between the maps. In case of conflicts, second map (labels2) wins
+			// And we want cluster level keys to override keys from global level for that cluster
+			clusterLabels := labels.Merge(globalAnswersMap, a.Values)
+			answerMap[a.ClusterName] = make(map[string]string)
+			answerMap[a.ClusterName] = clusterLabels
+		}
+	}
+
+	for _, a := range answers {
+		if a.ProjectName != "" {
+			// check if answers for the cluster of this project are provided
+			split := strings.SplitN(a.ProjectName, ":", 2)
+			if len(split) != 2 {
+				return answerMap, fmt.Errorf("error in splitting project name: %v", a.ProjectName)
+			}
+			clusterName := split[0]
+			// Using k8s labels.Merge, since by definition:
+			// Merge combines given maps, and does not check for any conflicts between the maps. In case of conflicts, second map (labels2) wins
+			// And we want project level keys to override keys from global level for that project
+			projectLabels := make(map[string]string)
+			if val, ok := answerMap[clusterName]; ok {
+				projectLabels = labels.Merge(val, a.Values)
+			} else {
+				projectLabels = labels.Merge(globalAnswersMap, a.Values)
+			}
+			answerMap[a.ProjectName] = make(map[string]string)
+			answerMap[a.ProjectName] = projectLabels
+		}
+	}
+
+	return answerMap, nil
 }
 
 // getExternalID gets the TemplateVersion.Spec.ExternalID field
