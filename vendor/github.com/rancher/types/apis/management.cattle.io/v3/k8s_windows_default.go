@@ -158,6 +158,14 @@ var (
 			CanalCNIBinaries:   m("rancher/canal-cni:v0.0.1-nanoserver-1803"),
 			KubeletPause:       m("rancher/kubelet-pause:v0.0.1-nanoserver-1803"),
 		},
+		"v1.10.11-rancher1-1": {
+			NginxProxy:         m("rancher/nginx-proxy:v0.0.1-nanoserver-1803"),
+			KubernetesBinaries: m("rancher/hyperkube:v1.10.11-nanoserver-1803"),
+			FlannelCNIBinaries: m("rancher/flannel-cni:v0.0.1-nanoserver-1803"),
+			CalicoCNIBinaries:  m("rancher/calico-cni:v0.0.1-nanoserver-1803"),
+			CanalCNIBinaries:   m("rancher/canal-cni:v0.0.1-nanoserver-1803"),
+			KubeletPause:       m("rancher/kubelet-pause:v0.0.1-nanoserver-1803"),
+		},
 		"v1.11.1-rancher1-1": {
 			NginxProxy:         m("rancher/nginx-proxy:v0.0.1-nanoserver-1803"),
 			KubernetesBinaries: m("rancher/hyperkube:v1.11.1-nanoserver-1803"),
@@ -190,6 +198,14 @@ var (
 			CanalCNIBinaries:   m("rancher/canal-cni:v0.0.1-nanoserver-1803"),
 			KubeletPause:       m("rancher/kubelet-pause:v0.0.1-nanoserver-1803"),
 		},
+		"v1.11.5-rancher1-1": {
+			NginxProxy:         m("rancher/nginx-proxy:v0.0.1-nanoserver-1803"),
+			KubernetesBinaries: m("rancher/hyperkube:v1.11.5-nanoserver-1803"),
+			FlannelCNIBinaries: m("rancher/flannel-cni:v0.0.1-nanoserver-1803"),
+			CalicoCNIBinaries:  m("rancher/calico-cni:v0.0.1-nanoserver-1803"),
+			CanalCNIBinaries:   m("rancher/canal-cni:v0.0.1-nanoserver-1803"),
+			KubeletPause:       m("rancher/kubelet-pause:v0.0.1-nanoserver-1803"),
+		},
 		"v1.12.0-rancher1-1": {
 			NginxProxy:         m("rancher/nginx-proxy:v0.0.1-nanoserver-1803"),
 			KubernetesBinaries: m("rancher/hyperkube:v1.12.0-nanoserver-1803"),
@@ -201,6 +217,14 @@ var (
 		"v1.12.1-rancher1-1": {
 			NginxProxy:         m("rancher/nginx-proxy:v0.0.1-nanoserver-1803"),
 			KubernetesBinaries: m("rancher/hyperkube:v1.12.1-nanoserver-1803"),
+			FlannelCNIBinaries: m("rancher/flannel-cni:v0.0.1-nanoserver-1803"),
+			CalicoCNIBinaries:  m("rancher/calico-cni:v0.0.1-nanoserver-1803"),
+			CanalCNIBinaries:   m("rancher/canal-cni:v0.0.1-nanoserver-1803"),
+			KubeletPause:       m("rancher/kubelet-pause:v0.0.1-nanoserver-1803"),
+		},
+		"v1.12.3-rancher1-1": {
+			NginxProxy:         m("rancher/nginx-proxy:v0.0.1-nanoserver-1803"),
+			KubernetesBinaries: m("rancher/hyperkube:v1.12.3-nanoserver-1803"),
 			FlannelCNIBinaries: m("rancher/flannel-cni:v0.0.1-nanoserver-1803"),
 			CalicoCNIBinaries:  m("rancher/calico-cni:v0.0.1-nanoserver-1803"),
 			CanalCNIBinaries:   m("rancher/canal-cni:v0.0.1-nanoserver-1803"),
