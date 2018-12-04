@@ -2,10 +2,8 @@ package globaldns
 
 import (
 	"context"
-
-	"strings"
-
 	"fmt"
+	"strings"
 
 	v1Rancher "github.com/rancher/types/apis/core/v1"
 	v1beta1Rancher "github.com/rancher/types/apis/extensions/v1beta1"
@@ -33,6 +31,7 @@ type UserIngressController struct {
 	globalDNSLister v3.GlobalDNSLister
 	appLister       projectv3.AppLister
 	namespaceLister v1Rancher.NamespaceLister
+	clusterName     string
 }
 
 func newUserIngressController(ctx context.Context, clusterContext *config.UserContext) *UserIngressController {
@@ -43,6 +42,7 @@ func newUserIngressController(ctx context.Context, clusterContext *config.UserCo
 		globalDNSLister: clusterContext.Management.Management.GlobalDNSs("").Controller().Lister(),
 		appLister:       clusterContext.Management.Project.Apps("").Controller().Lister(),
 		namespaceLister: clusterContext.Core.Namespaces("").Controller().Lister(),
+		clusterName:     clusterContext.ClusterName,
 	}
 	return n
 }
@@ -201,9 +201,14 @@ func (ic *UserIngressController) checkForMultiClusterApp(obj *v1beta1.Ingress, g
 		ingressLabels := obj.Labels
 		appID := ingressLabels[appSelectorLabel]
 
+		split := strings.SplitN(ic.clusterName, ":", 2)
+		if len(split) != 2 {
+			return fmt.Errorf("UserIngressController: Error in splitting cluster name: %v", ic.clusterName)
+		}
+		projectName := split[1]
 		if appID != "" {
 			//find the app CR
-			userApp, err := ic.appLister.Get("", appID)
+			userApp, err := ic.appLister.Get(projectName, appID)
 			if err != nil {
 				return fmt.Errorf("UserIngressController: Cannot find the App with the Id %v", userApp)
 			}
