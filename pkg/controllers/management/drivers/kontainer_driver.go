@@ -14,7 +14,7 @@ type KontainerDriver struct {
 	BaseDriver
 }
 
-var KontainerDriverPrefix = "kontainer-engine-"
+var KontainerDriverPrefix = "kontainer-engine-driver-"
 
 func NewKontainerDriver(builtin bool, name, url, hash string) *KontainerDriver {
 	d := &KontainerDriver{

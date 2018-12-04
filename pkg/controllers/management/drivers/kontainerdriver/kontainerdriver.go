@@ -28,7 +28,7 @@ const (
 	DriverDir       = "./management-state/kontainer-drivers/"
 )
 
-var kontainerDriverName = regexp.MustCompile("kontainer-engine-(.+)$")
+var kontainerDriverName = regexp.MustCompile("kontainer-engine-driver-(.+)$")
 
 func Register(ctx context.Context, management *config.ManagementContext) {
 	lifecycle := &Lifecycle{

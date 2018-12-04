@@ -1,11 +1,12 @@
-import pytest
 import sys
+
+import pytest
 
 from .conftest import wait_for_condition, wait_until
 
-DRIVER_URL = "https://github.com/rancher/kontainer-engine-" + \
-             "example-driver/releases/download/v0.1.0/kontainer-engine-" + \
-             "example-driver-" + sys.platform
+DRIVER_URL = "https://github.com/rancher/kontainer-engine-driver-example/" \
+             "releases/download/v0.2.0/kontainer-engine-driver-example-" \
+             + sys.platform
 
 
 def test_builtin_drivers_are_present(admin_mc):
@@ -36,6 +37,10 @@ def test_kontainer_driver_lifecycle(admin_mc, remove_resource):
                        timeout=90)
     kd = admin_mc.client.reload(kd)
     verify_driver_in_types(admin_mc.client, kd)
+
+    # verify the leading kontainer driver identifier and trailing system
+    # type are removed from the name
+    assert kd.name == "example"
 
     # test driver is removed from schema after deletion
     admin_mc.client.delete(kd)
