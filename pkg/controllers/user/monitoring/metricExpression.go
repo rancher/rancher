@@ -1769,7 +1769,7 @@ metadata:
     app: metric-expression
     component: container
     details: "false"
-    graph: container-cpu-usage-details
+    graph: cpu-usage-details
     level: project
     source: rancher-monitoring
 spec:
@@ -1786,7 +1786,7 @@ metadata:
     app: metric-expression
     component: container
     details: "true"
-    graph: container-cpu-usage-details
+    graph: cpu-usage-details
     level: project
     source: rancher-monitoring
 spec:
@@ -1798,12 +1798,12 @@ spec:
 kind: MonitorMetric
 apiVersion: management.cattle.io/v3
 metadata:
-  name: container-cpu-usage-seconds-sum-rate
+  name: cpu-usage-seconds-sum-rate
   labels:
     app: metric-expression
     component: container
     details: "false"
-    graph: container-cpu-usage
+    graph: cpu-usage
     level: project
     source: rancher-monitoring
 spec:
@@ -1815,12 +1815,12 @@ spec:
 kind: MonitorMetric
 apiVersion: management.cattle.io/v3
 metadata:
-  name: container-cpu-usage-seconds-sum-rate-details
+  name: cpu-usage-seconds-sum-rate-details
   labels:
     app: metric-expression
     component: container
     details: "true"
-    graph: container-cpu-usage
+    graph: cpu-usage
     level: project
     source: rancher-monitoring
 spec:
@@ -1837,7 +1837,7 @@ metadata:
     app: metric-expression
     component: container
     details: "false"
-    graph: container-cpu-usage-details
+    graph: cpu-usage-details
     level: project
     source: rancher-monitoring
 spec:
@@ -1854,7 +1854,7 @@ metadata:
     app: metric-expression
     component: container
     details: "true"
-    graph: container-cpu-usage-details
+    graph: cpu-usage-details
     level: project
     source: rancher-monitoring
 spec:
@@ -1871,7 +1871,7 @@ metadata:
     app: metric-expression
     component: container
     details: "false"
-    graph: container-cpu-usage-details
+    graph: cpu-usage-details
     level: project
     source: rancher-monitoring
 spec:
@@ -1888,7 +1888,7 @@ metadata:
     app: metric-expression
     component: container
     details: "true"
-    graph: container-cpu-usage-details
+    graph: cpu-usage-details
     level: project
     source: rancher-monitoring
 spec:
@@ -4124,7 +4124,7 @@ metadata:
     app: metric-expression
     component: pod
     details: "false"
-    graph: container-cpu-usage-details
+    graph: cpu-usage-details
     level: project
     source: rancher-monitoring
 spec:
@@ -4141,7 +4141,7 @@ metadata:
     app: metric-expression
     component: pod
     details: "true"
-    graph: container-cpu-usage-details
+    graph: cpu-usage-details
     level: project
     source: rancher-monitoring
 spec:
@@ -4300,7 +4300,7 @@ metadata:
     app: metric-expression
     component: pod
     details: "false"
-    graph: container-cpu-usage-details
+    graph: cpu-usage-details
     level: project
     source: rancher-monitoring
 spec:
@@ -4317,7 +4317,7 @@ metadata:
     app: metric-expression
     component: pod
     details: "true"
-    graph: container-cpu-usage-details
+    graph: cpu-usage-details
     level: project
     source: rancher-monitoring
 spec:
@@ -4584,7 +4584,7 @@ metadata:
     app: metric-expression
     component: pod
     details: "false"
-    graph: container-cpu-usage
+    graph: cpu-usage
     level: project
     source: rancher-monitoring
 spec:
@@ -4601,7 +4601,7 @@ metadata:
     app: metric-expression
     component: pod
     details: "true"
-    graph: container-cpu-usage
+    graph: cpu-usage-details
     level: project
     source: rancher-monitoring
 spec:
@@ -4690,7 +4690,7 @@ metadata:
     app: metric-expression
     component: pod
     details: "false"
-    graph: container-cpu-usage-details
+    graph: cpu-usage-details
     level: project
     source: rancher-monitoring
 spec:
@@ -4707,7 +4707,7 @@ metadata:
     app: metric-expression
     component: pod
     details: "true"
-    graph: container-cpu-usage-details
+    graph: cpu-usage-details
     level: project
     source: rancher-monitoring
 spec:
@@ -5006,7 +5006,7 @@ metadata:
     app: metric-expression
     component: workload
     details: "false"
-    graph: container-cpu-usage
+    graph: cpu-usage
     level: project
     metric: cpu-usage-seconds-sum-rate
     source: rancher-monitoring
@@ -5024,7 +5024,7 @@ metadata:
     app: metric-expression
     component: workload
     details: "true"
-    graph: container-cpu-usage
+    graph: cpu-usage
     level: project
     metric: cpu-usage-seconds-sum-rate
     source: rancher-monitoring
@@ -5042,7 +5042,7 @@ metadata:
     app: metric-expression
     component: workload
     details: "false"
-    graph: container-cpu-usage-details
+    graph: cpu-usage-details
     level: project
     metric: cpu-system-seconds-sum-rate
     source: rancher-monitoring
@@ -5060,7 +5060,7 @@ metadata:
     app: metric-expression
     component: workload
     details: "true"
-    graph: container-cpu-usage-details
+    graph: cpu-usage-details
     level: project
     metric: cpu-system-seconds-sum-rate
     source: rancher-monitoring
@@ -5364,7 +5364,7 @@ metadata:
     app: metric-expression
     component: workload
     details: "false"
-    graph: container-cpu-usage-details
+    graph: cpu-usage-details
     level: project
     metric: cpu-user-seconds-sum-rate
     source: rancher-monitoring
@@ -5382,7 +5382,7 @@ metadata:
     app: metric-expression
     component: workload
     details: "true"
-    graph: container-cpu-usage-details
+    graph: cpu-usage-details
     level: project
     metric: cpu-user-seconds-sum-rate
     source: rancher-monitoring
@@ -5445,11 +5445,11 @@ spec:
   metricsSelector:
     details: "false"
     component: container
-    graph: container-cpu-usage
+    graph: cpu-usage
   detailsMetricsSelector:
     details: "true"
     component: container
-    graph: container-cpu-usage-details
+    graph: cpu-usage-details
   yAxis:
     unit: mcpu
 ---
@@ -5565,11 +5565,11 @@ spec:
   metricsSelector:
     details: "false"
     component: pod
-    graph: container-cpu-usage
-  detailsMetailsMetricsSelector:
+    graph: cpu-usage
+  detailsMetricsSelector:
     details: "true"
     component: pod
-    graph: container-cpu-usage-details
+    graph: cpu-usage-details
   yAxis:
     unit: mcpu
 ---
@@ -5685,11 +5685,11 @@ spec:
   metricsSelector:
     details: "false"
     component: workload
-    graph: container-cpu-usage
-  detailsMetailsMetricsSelector:
+    graph: cpu-usage
+  detailsMetricsSelector:
     details: "true"
-    component: pod
-    graph: container-cpu-usage-details
+    component: workload
+    graph: cpu-usage
   yAxis:
     unit: mcpu
 ---

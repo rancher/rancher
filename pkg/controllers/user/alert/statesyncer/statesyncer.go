@@ -71,27 +71,33 @@ func (s *StateSyncer) syncState() error {
 			if ruleNeedUpdate {
 				old, err := s.clusterAlertRules.Get(alert.Name, metav1.GetOptions{})
 				if err != nil {
-					logrus.Errorf("Error occurred while get alert %s: %v", alert.Name, err)
+					logrus.Errorf("Error occurred while get alert %s:%s, %v", alert.Namespace, alert.Name, err)
 					continue
 				}
 				new := old.DeepCopy()
 				new.Status.AlertState = state
 				_, err = s.clusterAlertRules.Update(new)
 				if err != nil {
-					logrus.Errorf("Error occurred while updating alert state : %v", err)
+					logrus.Errorf("Error occurred while updating %s:%s, alert state, %v", alert.Namespace, alert.Name, err)
 				}
 			}
 		}
 
 		for _, alert := range pAlerts {
-			ruleID := common.GetGroupID(alert.Namespace, alert.Name)
+			ruleID := common.GetRuleID(alert.Spec.GroupName, alert.Name)
 			state := s.alertManager.GetState("rule_id", ruleID, apiAlerts)
 			ruleNeedUpdate := s.doSync("rule_id", ruleID, alert.Status.AlertState, state)
-
 			if ruleNeedUpdate {
-				_, err := s.projectAlertRules.Update(alert)
+				old, err := s.projectAlertRules.GetNamespaced(alert.Namespace, alert.Name, metav1.GetOptions{})
 				if err != nil {
-					logrus.Errorf("Error occurred while updating alert state and time: %v", err)
+					logrus.Errorf("Error occurred while get alert %s:%s, %v", alert.Namespace, alert.Name, err)
+					continue
+				}
+				new := old.DeepCopy()
+				new.Status.AlertState = state
+				_, err = s.projectAlertRules.Update(new)
+				if err != nil {
+					logrus.Errorf("Error occurred while updating %s:%s alert state, %v", alert.Namespace, alert.Name, err)
 				}
 			}
 		}
