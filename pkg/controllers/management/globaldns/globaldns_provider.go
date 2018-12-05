@@ -1,16 +1,16 @@
 package globaldns
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"text/template"
 
-	"fmt"
-
-	"bytes"
-
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	k8srbacV1 "k8s.io/api/rbac/v1beta1"
@@ -38,10 +38,10 @@ type ProviderLauncher struct {
 
 func newGlobalDNSProviderLauncher(ctx context.Context, mgmt *config.ManagementContext) *ProviderLauncher {
 	n := &ProviderLauncher{
-		GlobalDNSproviders:      mgmt.Management.GlobalDNSProviders(cattleGlobalNamespace),
-		GlobalDNSproviderLister: mgmt.Management.GlobalDNSProviders(cattleGlobalNamespace).Controller().Lister(),
-		Deployments:             mgmt.K8sClient.ExtensionsV1beta1().Deployments(cattleGlobalNamespace),
-		ServiceAccounts:         mgmt.K8sClient.CoreV1().ServiceAccounts(cattleGlobalNamespace),
+		GlobalDNSproviders:      mgmt.Management.GlobalDNSProviders(namespace.GlobalNamespace),
+		GlobalDNSproviderLister: mgmt.Management.GlobalDNSProviders(namespace.GlobalNamespace).Controller().Lister(),
+		Deployments:             mgmt.K8sClient.ExtensionsV1beta1().Deployments(namespace.GlobalNamespace),
+		ServiceAccounts:         mgmt.K8sClient.CoreV1().ServiceAccounts(namespace.GlobalNamespace),
 		ClusterRoles:            mgmt.K8sClient.RbacV1beta1().ClusterRoles(),
 		ClusterRoleBindings:     mgmt.K8sClient.RbacV1beta1().ClusterRoleBindings(),
 	}
