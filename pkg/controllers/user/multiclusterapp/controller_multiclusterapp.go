@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/rancher/pkg/namespace"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
@@ -28,7 +29,6 @@ const (
 	creatorIDAnn              = "field.cattle.io/creatorId"
 	multiClusterAppIDSelector = "mcapp"
 	projectIDFieldLabel       = "field.cattle.io/projectId"
-	globalNamespace           = "cattle-global-data"
 )
 
 type MCAppController struct {
@@ -220,7 +220,12 @@ func (m *MCAppController) deleteApps(mcAppName string, mcapp *v3.MultiClusterApp
 		}
 	} else {
 		for _, t := range mcapp.Spec.Targets {
-			apps, err := m.appLister.List(t.ProjectName, set.AsSelector())
+			split := strings.SplitN(t.ProjectName, ":", 2)
+			if len(split) != 2 {
+				return mcapp, fmt.Errorf("error in splitting project ID %v", t.ProjectName)
+			}
+			projectNS := split[1]
+			apps, err := m.appLister.List(projectNS, set.AsSelector())
 			if err != nil {
 				return nil, err
 			}
@@ -280,7 +285,7 @@ func (m *MCAppController) update(mcappToUpdate *v3.MultiClusterApp) (*v3.MultiCl
 	if err != nil && apierrors.IsConflict(err) {
 		// retry 5 times
 		for i := 0; i < 5; i++ {
-			latestMcApp, err := m.multiClusterApps.GetNamespaced(globalNamespace, mcappToUpdate.Name, metav1.GetOptions{})
+			latestMcApp, err := m.multiClusterApps.GetNamespaced(namespace.GlobalNamespace, mcappToUpdate.Name, metav1.GetOptions{})
 			if err != nil {
 				return latestMcApp, err
 			}
