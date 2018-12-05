@@ -50,6 +50,7 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 		"https://github.com/rancher/kontainer-engine-driver-aliyun/releases/download/v0.2.1/kontainer-engine-driver-aliyun-linux",
 		"",
 		"",
+		false,
 		"*.aliyuncs.com",
 	); err != nil {
 		return err
@@ -60,6 +61,7 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 		"https://github.com/rancher/kontainer-engine-driver-tencent/releases/download/v0.2.0/kontainer-engine-driver-tencent-linux",
 		"",
 		"",
+		false,
 		"*.tencentcloudapi.com", "*.qcloud.com",
 	); err != nil {
 		return err
@@ -111,7 +113,7 @@ func (c *driverCreator) add(name string) error {
 	return nil
 }
 
-func (c *driverCreator) addCustomDriver(name, url, checksum, uiURL string, domains ...string) error {
+func (c *driverCreator) addCustomDriver(name, url, checksum, uiURL string, active bool, domains ...string) error {
 	logrus.Infof("adding kontainer driver %v", name)
 	_, err := c.driversLister.Get("", name)
 	if err != nil {
@@ -123,7 +125,7 @@ func (c *driverCreator) addCustomDriver(name, url, checksum, uiURL string, domai
 				Spec: v3.KontainerDriverSpec{
 					URL:              url,
 					BuiltIn:          false,
-					Active:           true,
+					Active:           active,
 					Checksum:         checksum,
 					UIURL:            uiURL,
 					WhitelistDomains: domains,
