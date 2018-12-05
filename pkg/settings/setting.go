@@ -43,6 +43,8 @@ var (
 	UIIndex                         = NewSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
 	UIPath                          = NewSetting("ui-path", "")
 	UIPL                            = NewSetting("ui-pl", "rancher")
+	UIKubernetesSupportedVersions   = NewSetting("ui-k8s-supported-versions-range", ">= 1.9.0 <=1.12.x")
+	UIKubernetesDefaultVersion      = NewSetting("ui-k8s-default-version-range", "<=1.11.x")
 	WhitelistDomain                 = NewSetting("whitelist-domain", "forums.rancher.com")
 	SystemMonitoringCatalogID       = NewSetting("system-monitoring-catalog-id", "catalog://?catalog=system-library&template=rancher-monitoring&version=0.0.1")
 	AuthUserInfoResyncCron          = NewSetting("auth-user-info-resync-cron", "0 0 * * *")
