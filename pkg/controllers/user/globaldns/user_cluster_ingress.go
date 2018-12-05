@@ -2,17 +2,17 @@ package globaldns
 
 import (
 	"context"
-
+	"fmt"
 	"strings"
 
-	"fmt"
-
+	"github.com/rancher/rancher/pkg/namespace"
 	v1Rancher "github.com/rancher/types/apis/core/v1"
 	v1beta1Rancher "github.com/rancher/types/apis/extensions/v1beta1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -27,22 +27,24 @@ const (
 )
 
 type UserIngressController struct {
-	ingresses       v1beta1Rancher.IngressInterface
-	ingressLister   v1beta1Rancher.IngressLister
-	globalDNSs      v3.GlobalDNSInterface
-	globalDNSLister v3.GlobalDNSLister
-	appLister       projectv3.AppLister
-	namespaceLister v1Rancher.NamespaceLister
+	ingresses             v1beta1Rancher.IngressInterface
+	ingressLister         v1beta1Rancher.IngressLister
+	globalDNSs            v3.GlobalDNSInterface
+	globalDNSLister       v3.GlobalDNSLister
+	appLister             projectv3.AppLister
+	namespaceLister       v1Rancher.NamespaceLister
+	multiclusterappLister v3.MultiClusterAppLister
 }
 
 func newUserIngressController(ctx context.Context, clusterContext *config.UserContext) *UserIngressController {
 	n := &UserIngressController{
-		ingresses:       clusterContext.Extensions.Ingresses(""),
-		ingressLister:   clusterContext.Extensions.Ingresses("").Controller().Lister(),
-		globalDNSs:      clusterContext.Management.Management.GlobalDNSs(""),
-		globalDNSLister: clusterContext.Management.Management.GlobalDNSs("").Controller().Lister(),
-		appLister:       clusterContext.Management.Project.Apps("").Controller().Lister(),
-		namespaceLister: clusterContext.Core.Namespaces("").Controller().Lister(),
+		ingresses:             clusterContext.Extensions.Ingresses(""),
+		ingressLister:         clusterContext.Extensions.Ingresses("").Controller().Lister(),
+		globalDNSs:            clusterContext.Management.Management.GlobalDNSs(""),
+		globalDNSLister:       clusterContext.Management.Management.GlobalDNSs("").Controller().Lister(),
+		appLister:             clusterContext.Management.Project.Apps("").Controller().Lister(),
+		namespaceLister:       clusterContext.Core.Namespaces("").Controller().Lister(),
+		multiclusterappLister: clusterContext.Management.Management.MultiClusterApps("").Controller().Lister(),
 	}
 	return n
 }
@@ -203,12 +205,24 @@ func (ic *UserIngressController) checkForMultiClusterApp(obj *v1beta1.Ingress, g
 
 		if appID != "" {
 			//find the app CR
-			userApp, err := ic.appLister.Get("", appID)
+			// go through all projects from multiclusterapp's targets
+			mcapp, err := ic.multiclusterappLister.Get(namespace.GlobalNamespace, globalDNS.Spec.MultiClusterAppName)
 			if err != nil {
-				return fmt.Errorf("UserIngressController: Cannot find the App with the Id %v", userApp)
+				return err
 			}
-			if !strings.EqualFold(userApp.Spec.MultiClusterAppName, globalDNS.Spec.MultiClusterAppName) {
-				return fmt.Errorf("UserIngressController: Cannot configure DNS since the App is not part of MulticlusterApp %v", globalDNS.Spec.MultiClusterAppName)
+			for _, t := range mcapp.Spec.Targets {
+				split := strings.SplitN(t.ProjectName, ":", 2)
+				if len(split) != 2 {
+					return fmt.Errorf("error in splitting project ID %v", t.ProjectName)
+				}
+				projectNS := split[1]
+				userApp, err := ic.appLister.Get(projectNS, appID)
+				if err != nil {
+					return fmt.Errorf("UserIngressController: Cannot find the App with the Id %v", userApp)
+				}
+				if !strings.EqualFold(userApp.Spec.MultiClusterAppName, globalDNS.Spec.MultiClusterAppName) {
+					return fmt.Errorf("UserIngressController: Cannot configure DNS since the App is not part of MulticlusterApp %v", globalDNS.Spec.MultiClusterAppName)
+				}
 			}
 		}
 	}
