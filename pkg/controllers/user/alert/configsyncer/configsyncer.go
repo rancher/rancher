@@ -3,6 +3,7 @@ package configsyncer
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 
@@ -17,13 +18,11 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	monitoringv1 "github.com/coreos/prometheus-operator/pkg/client/monitoring/v1"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -47,7 +46,6 @@ func NewConfigSyncer(ctx context.Context, cluster *config.UserContext, alertMana
 		clusterName:             cluster.ClusterName,
 		alertManager:            alertManager,
 		operatorCRDManager:      operatorCRDManager,
-		namespaces:              cluster.Core.Namespaces(metav1.NamespaceAll),
 	}
 }
 
@@ -61,7 +59,6 @@ type ConfigSyncer struct {
 	clusterName             string
 	alertManager            *manager.AlertManager
 	operatorCRDManager      *manager.PromOperatorCRDManager
-	namespaces              v1.NamespaceInterface
 }
 
 func (d *ConfigSyncer) ProjectGroupSync(key string, alert *v3.ProjectAlertGroup) (runtime.Object, error) {
@@ -109,104 +106,53 @@ func (d *ConfigSyncer) sync() error {
 		return errors.Wrapf(err, "List project alert rules")
 	}
 
-	var haveClusterMetrics bool
-	cAlertsAlertmanagerMap, cAlertsOperatorMap := map[string][]*v3.ClusterAlertRule{}, map[string][]*v3.ClusterAlertRule{}
+	cAlertsMap := map[string][]*v3.ClusterAlertRule{}
+	cAlertsKey := []string{}
 	for _, alert := range clusterAlertRules {
 		if alert.Status.AlertState != "inactive" {
-			cAlertsAlertmanagerMap[alert.Spec.GroupName] = append(cAlertsAlertmanagerMap[alert.Spec.GroupName], alert)
-
-			if alert.Spec.MetricRule != nil {
-				haveClusterMetrics = true
-
-				cAlertsOperatorMap[alert.Spec.GroupName] = append(cAlertsOperatorMap[alert.Spec.GroupName], alert)
-			}
+			cAlertsMap[alert.Spec.GroupName] = append(cAlertsMap[alert.Spec.GroupName], alert)
 		}
 	}
 
-	var haveProjectMetrics bool
-	pAlertsAlermanagerMap, pAlertsOperatorMap := make(map[string]map[string][]*v3.ProjectAlertRule), make(map[string]map[string][]*v3.ProjectAlertRule)
+	for k := range cAlertsMap {
+		cAlertsKey = append(cAlertsKey, k)
+	}
+	sort.Strings(cAlertsKey)
+
+	pAlertsMap := map[string]map[string][]*v3.ProjectAlertRule{}
+	pAlertsKey := []string{}
 	for _, alert := range projectAlertRules {
 		if controller.ObjectInCluster(d.clusterName, alert) {
-
 			if alert.Status.AlertState != "inactive" {
-
 				_, projectName := ref.Parse(alert.Spec.ProjectName)
-				if _, ok := pAlertsAlermanagerMap[projectName]; !ok {
-					pAlertsAlermanagerMap[projectName] = make(map[string][]*v3.ProjectAlertRule)
+				if _, ok := pAlertsMap[projectName]; !ok {
+					pAlertsMap[projectName] = make(map[string][]*v3.ProjectAlertRule)
 				}
-				pAlertsAlermanagerMap[projectName][alert.Spec.GroupName] = append(pAlertsAlermanagerMap[projectName][alert.Spec.GroupName], alert)
-
-				if alert.Spec.MetricRule != nil {
-					haveProjectMetrics = true
-
-					if _, ok := pAlertsOperatorMap[projectName]; !ok {
-						pAlertsOperatorMap[projectName] = make(map[string][]*v3.ProjectAlertRule)
-					}
-					pAlertsOperatorMap[projectName][alert.Spec.GroupName] = append(pAlertsOperatorMap[projectName][alert.Spec.GroupName], alert)
-				}
+				pAlertsMap[projectName][alert.Spec.GroupName] = append(pAlertsMap[projectName][alert.Spec.GroupName], alert)
 			}
 		}
 	}
+	for k := range pAlertsMap {
+		pAlertsKey = append(pAlertsKey, k)
+	}
+	sort.Strings(pAlertsKey)
 
-	if haveClusterMetrics {
-		_, prometheusNamespace := monitorutil.ClusterMonitoringInfo()
-		promRule := manager.GetDefaultPrometheusRule(prometheusNamespace, d.clusterName)
-		d.addClusterAlert2Operator(promRule, cAlertsOperatorMap)
-		old, err := d.operatorCRDManager.PrometheusRules.GetNamespaced(prometheusNamespace, d.clusterName, metav1.GetOptions{})
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				if _, err = d.operatorCRDManager.PrometheusRules.Create(promRule); err != nil && !apierrors.IsAlreadyExists(err) {
-					return errors.Wrapf(err, "create prometheus rule %s failed", d.clusterName)
-				}
-			} else {
-				return errors.Wrapf(err, "get prometheus rule %s failed", d.clusterName)
-			}
-		}
-
-		updated := old.DeepCopy()
-		updated.Spec = promRule.Spec
-		if _, err = d.operatorCRDManager.PrometheusRules.Update(updated); err != nil {
-			return errors.Wrapf(err, "update prometheus rule %s failed", d.clusterName)
-		}
+	if err := d.addClusterAlert2Operator(cAlertsMap, cAlertsKey); err != nil {
+		return err
 	}
 
-	if haveProjectMetrics {
-		for projectName, groupRules := range pAlertsOperatorMap {
-			_, ns := monitorutil.ProjectMonitoringInfo(projectName)
-			if err := d.createNamespace(ns); err != nil {
-				return err
-			}
-			promRule := manager.GetDefaultPrometheusRule(ns, projectName)
-
-			d.addProjectAlert2Operator(promRule, groupRules)
-
-			old, err := d.operatorCRDManager.PrometheusRules.GetNamespaced(ns, projectName, metav1.GetOptions{})
-			if err != nil {
-				if apierrors.IsNotFound(err) {
-					if _, err = d.operatorCRDManager.PrometheusRules.Create(promRule); err != nil && !apierrors.IsAlreadyExists(err) {
-						return err
-					}
-				} else {
-					return errors.Wrapf(err, "get prometheus rule %s failed", ns)
-				}
-			}
-
-			updated := old.DeepCopy()
-			updated.Spec = promRule.Spec
-			if _, err = d.operatorCRDManager.PrometheusRules.Update(updated); err != nil {
-				return err
-			}
-		}
+	if err := d.addProjectAlert2Operator(pAlertsMap, pAlertsKey); err != nil {
+		return err
 	}
 
 	config := manager.GetAlertManagerDefaultConfig()
 	config.Global.PagerdutyURL = "https://events.pagerduty.com/generic/2010-04-15/create_event.json"
 
-	if err = d.addClusterAlert2Config(config, cAlertsAlertmanagerMap, notifiers); err != nil {
+	if err = d.addClusterAlert2Config(config, cAlertsMap, cAlertsKey, notifiers); err != nil {
 		return err
 	}
 
-	if err = d.addProjectAlert2Config(config, pAlertsAlermanagerMap, notifiers); err != nil {
+	if err = d.addProjectAlert2Config(config, pAlertsMap, pAlertsKey, notifiers); err != nil {
 		return err
 	}
 
@@ -251,37 +197,84 @@ func (d *ConfigSyncer) getNotifier(id string, notifiers []*v3.Notifier) *v3.Noti
 	return nil
 }
 
-func (d *ConfigSyncer) addProjectAlert2Operator(promRule *monitoringv1.PrometheusRule, groupRules map[string][]*v3.ProjectAlertRule) {
-	for k, rules := range groupRules {
-		ruleGroup := d.operatorCRDManager.GetRuleGroup(k)
-		for _, rule := range rules {
-			if rule.Spec.MetricRule != nil {
-				ruleID := common.GetRuleID(rule.Spec.GroupName, rule.Name)
-				d.operatorCRDManager.AddRule(ruleGroup, rule.Spec.GroupName, ruleID, rule.Spec.DisplayName, rule.Spec.Severity, rule.Spec.MetricRule)
+func (d *ConfigSyncer) addProjectAlert2Operator(projectGroups map[string]map[string][]*v3.ProjectAlertRule, keys []string) error {
+	for _, projectID := range keys {
+		groupRules := projectGroups[projectID]
+		_, projectName := ref.Parse(projectID)
+		_, namespace := monitorutil.ProjectMonitoringInfo(projectName)
+		promRule := d.operatorCRDManager.GetDefaultPrometheusRule(namespace, projectName)
+
+		var groupIDs []string
+		for k := range groupRules {
+			groupIDs = append(groupIDs, k)
+		}
+		sort.Strings(groupIDs)
+
+		var enabled bool
+		for _, groupID := range groupIDs {
+			enabled = true
+			alertRules := groupRules[groupID]
+			ruleGroup := d.operatorCRDManager.GetRuleGroup(groupID)
+			for _, alertRule := range alertRules {
+				if alertRule.Spec.MetricRule != nil {
+					ruleID := common.GetRuleID(alertRule.Spec.GroupName, alertRule.Name)
+					promRule := manager.Metric2Rule(groupID, ruleID, alertRule.Spec.Severity, alertRule.Spec.DisplayName, d.clusterName, alertRule.Spec.MetricRule)
+					d.operatorCRDManager.AddRule(ruleGroup, promRule)
+				}
+			}
+			d.operatorCRDManager.AddRuleGroup(promRule, *ruleGroup)
+		}
+
+		if !enabled {
+			continue
+		}
+
+		if err := d.operatorCRDManager.SyncPrometheusRule(promRule); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (d *ConfigSyncer) addClusterAlert2Operator(groupRules map[string][]*v3.ClusterAlertRule, keys []string) error {
+	var enabled bool
+	_, namespace := monitorutil.ClusterMonitoringInfo()
+	promRule := d.operatorCRDManager.GetDefaultPrometheusRule(namespace, d.clusterName)
+
+	for _, groupID := range keys {
+		enabled = true
+		ruleGroup := d.operatorCRDManager.GetRuleGroup(groupID)
+		alertRules := groupRules[groupID]
+		for _, alertRule := range alertRules {
+			if alertRule.Spec.MetricRule != nil {
+				ruleID := common.GetRuleID(alertRule.Spec.GroupName, alertRule.Name)
+				promRule := manager.Metric2Rule(groupID, ruleID, alertRule.Spec.Severity, alertRule.Spec.DisplayName, d.clusterName, alertRule.Spec.MetricRule)
+				d.operatorCRDManager.AddRule(ruleGroup, promRule)
 			}
 		}
-		manager.AddRuleGroup(promRule, *ruleGroup)
+		d.operatorCRDManager.AddRuleGroup(promRule, *ruleGroup)
 	}
+
+	if !enabled {
+		return nil
+	}
+
+	return d.operatorCRDManager.SyncPrometheusRule(promRule)
 }
 
-func (d *ConfigSyncer) addClusterAlert2Operator(promRule *monitoringv1.PrometheusRule, groupRules map[string][]*v3.ClusterAlertRule) {
-	for k, rules := range groupRules {
-		ruleGroup := d.operatorCRDManager.GetRuleGroup(k)
-		for _, rule := range rules {
-			ruleID := common.GetRuleID(rule.Spec.GroupName, rule.Name)
-			d.operatorCRDManager.AddRule(ruleGroup, rule.Spec.GroupName, ruleID, rule.Spec.DisplayName, rule.Spec.Severity, rule.Spec.MetricRule)
+func (d *ConfigSyncer) addProjectAlert2Config(config *alertconfig.Config, projectGroups map[string]map[string][]*v3.ProjectAlertRule, keys []string, notifiers []*v3.Notifier) error {
+	for _, projectName := range keys {
+		groups := projectGroups[projectName]
+		var groupIDs []string
+		for groupID := range groups {
+			groupIDs = append(groupIDs, groupID)
 		}
-		manager.AddRuleGroup(promRule, *ruleGroup)
-	}
-}
+		sort.Strings(groupIDs)
 
-func (d *ConfigSyncer) addProjectAlert2Config(config *alertconfig.Config, projectGroups map[string]map[string][]*v3.ProjectAlertRule, notifiers []*v3.Notifier) error {
-	for projectName, groupedRules := range projectGroups {
-
-		for groupID, rules := range groupedRules {
-
+		for _, groupID := range groupIDs {
+			rules := groups[groupID]
 			_, groupName := ref.Parse(groupID)
-
 			group, err := d.projectAlertGroupLister.Get(projectName, groupName)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return fmt.Errorf("get project alert group %s:%s failed, %v", projectName, groupName, err)
@@ -318,8 +311,9 @@ func (d *ConfigSyncer) addProjectAlert2Config(config *alertconfig.Config, projec
 	return nil
 }
 
-func (d *ConfigSyncer) addClusterAlert2Config(config *alertconfig.Config, alerts map[string][]*v3.ClusterAlertRule, notifiers []*v3.Notifier) error {
-	for groupID, groupRules := range alerts {
+func (d *ConfigSyncer) addClusterAlert2Config(config *alertconfig.Config, alerts map[string][]*v3.ClusterAlertRule, keys []string, notifiers []*v3.Notifier) error {
+	for _, groupID := range keys {
+		groupRules := alerts[groupID]
 		_, groupName := ref.Parse(groupID)
 
 		receiver := &alertconfig.Receiver{Name: groupID}
@@ -461,18 +455,6 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 
 	return receiverExist
 
-}
-
-func (d *ConfigSyncer) createNamespace(name string) error {
-	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-	}
-	if _, err := d.namespaces.Create(ns); err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "Creating ns")
-	}
-	return nil
 }
 
 func includeProjectMetrics(projectAlerts []*v3.ProjectAlertRule) bool {
