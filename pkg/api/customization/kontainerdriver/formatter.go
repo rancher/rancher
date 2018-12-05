@@ -6,8 +6,16 @@ import (
 )
 
 func Formatter(request *types.APIContext, resource *types.RawResource) {
-	resource.AddAction(request, "activate")
-	resource.AddAction(request, "deactivate")
+	state, ok := resource.Values["state"].(string)
+	if ok {
+		if state == "active" {
+			resource.AddAction(request, "deactivate")
+		}
+
+		if state == "inactive" {
+			resource.AddAction(request, "activate")
+		}
+	}
 
 	if builtIn, _ := resource.Values[client.KontainerDriverFieldBuiltIn].(bool); builtIn {
 		delete(resource.Links, "remove")

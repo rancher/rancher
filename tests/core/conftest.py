@@ -230,6 +230,7 @@ def wait_for_condition(condition_type, status, client, obj, timeout=45):
             msg = 'Timeout waiting for [{}:{}] for condition after {}' \
                 ' seconds'.format(obj.type, obj.id, delta)
             raise Exception(msg)
+    return obj
 
 
 def wait_until(cb, timeout=DEFAULT_TIMEOUT):

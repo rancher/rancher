@@ -144,6 +144,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	MultiClusterApps(schemas, apiContext)
 	GlobalDNSs(schemas, apiContext)
 	Monitor(schemas, apiContext, clusterManager)
+	KontainerDriver(schemas, apiContext)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err

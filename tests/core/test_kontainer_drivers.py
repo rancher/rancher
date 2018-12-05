@@ -13,9 +13,15 @@ def test_builtin_drivers_are_present(admin_mc):
     admin_mc.client.reload_schema()
     types = admin_mc.client.schema.types
 
-    assert 'azureKubernetesServiceConfig' in types
-    assert 'googleKubernetesEngineConfig' in types
-    assert 'amazonElasticContainerServiceConfig' in types
+    for name in ['azureKubernetesService',
+                 'googleKubernetesEngine',
+                 'amazonElasticContainerService']:
+        # check in schema
+        assert name + "Config" in types
+
+        # verify has no delete link because its built in
+        kd = admin_mc.client.by_id_kontainer_driver(name.lower())
+        assert not hasattr(kd.links, 'remove')
 
 
 @pytest.mark.nonparallel
@@ -28,19 +34,28 @@ def test_kontainer_driver_lifecycle(admin_mc, remove_resource):
     remove_resource(kd)
 
     # Test that it is in downloading state while downloading
-    wait_for_condition('Downloaded', 'Unknown', admin_mc.client, kd)
-    kd = admin_mc.client.reload(kd)
+    kd = wait_for_condition('Downloaded', 'Unknown', admin_mc.client, kd)
     assert "downloading" == kd.state
 
+    # no actions should be present while downloading/installing
+    assert not hasattr(kd, 'actions')
+
     # test driver goes active and appears in schema
-    wait_for_condition('Active', 'True', admin_mc.client, kd,
-                       timeout=90)
-    kd = admin_mc.client.reload(kd)
+    kd = wait_for_condition('Active', 'True', admin_mc.client, kd,
+                            timeout=90)
     verify_driver_in_types(admin_mc.client, kd)
 
     # verify the leading kontainer driver identifier and trailing system
     # type are removed from the name
     assert kd.name == "example"
+
+    # verify the kontainer driver has activate and no deactivate links
+    assert not hasattr(kd.actions, "activate")
+    assert hasattr(kd.actions, "deactivate")
+    assert kd.actions.deactivate != ""
+
+    # verify driver has delete link
+    assert kd.links.remove != ""
 
     # test driver is removed from schema after deletion
     admin_mc.client.delete(kd)
@@ -56,18 +71,21 @@ def test_enabling_driver_exposes_schema(admin_mc, remove_resource):
     )
     remove_resource(kd)
 
-    wait_for_condition('Downloaded', 'Unknown', admin_mc.client, kd,
-                       timeout=90)
-    kd = admin_mc.client.reload(kd)
+    kd = wait_for_condition('Installed', 'True', admin_mc.client, kd,
+                            timeout=90)
+
+    # verify the kontainer driver has no activate and a deactivate link
+    assert hasattr(kd.actions, "activate")
+    assert kd.actions.activate != ""
+    assert not hasattr(kd.actions, "deactivate")
 
     verify_driver_not_in_types(admin_mc.client, kd)
 
     kd.active = True
     admin_mc.client.update_by_id_kontainerDriver(kd.id, kd)
 
-    wait_for_condition('Active', 'True', admin_mc.client, kd,
-                       timeout=90)
-    kd = admin_mc.client.reload(kd)
+    kd = wait_for_condition('Active', 'True', admin_mc.client, kd,
+                            timeout=90)
 
     verify_driver_in_types(admin_mc.client, kd)
 
