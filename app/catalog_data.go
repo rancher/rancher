@@ -13,7 +13,7 @@ const (
 	libraryBranch = "master"
 	libraryName   = "library"
 
-	systemLibraryURL    = "https://github.com/rancher/system-charts"
+	systemLibraryURL    = "https://git.rancher.io/system-charts"
 	systemLibraryBranch = "master"
 	systemLibraryName   = "system-library"
 )
