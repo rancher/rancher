@@ -320,6 +320,9 @@ func (l *Lifecycle) Updated(obj *v3.KontainerDriver) (runtime.Object, error) {
 	var err error
 	if obj.Spec.URL != obj.Status.ActualURL || v3.KontainerDriverConditionDownloaded.IsFalse(obj) || !l.driverExists(obj) {
 		obj, err = l.download(obj)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if obj.Spec.Active {
