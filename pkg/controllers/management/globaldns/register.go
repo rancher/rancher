@@ -6,10 +6,6 @@ import (
 	"github.com/rancher/types/config"
 )
 
-const (
-	cattleGlobalNamespace = "cattle-global-data"
-)
-
 func Register(ctx context.Context, management *config.ManagementContext) {
 	n := newGlobalDNSController(ctx, management)
 	if n != nil {

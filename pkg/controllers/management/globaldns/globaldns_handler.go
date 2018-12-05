@@ -2,15 +2,15 @@ package globaldns
 
 import (
 	"context"
-	"net"
-
 	"fmt"
-
+	"net"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,9 +33,9 @@ type GDController struct {
 
 func newGlobalDNSController(ctx context.Context, mgmt *config.ManagementContext) *GDController {
 	n := &GDController{
-		globalDNSs:      mgmt.Management.GlobalDNSs(cattleGlobalNamespace),
-		globalDNSLister: mgmt.Management.GlobalDNSs(cattleGlobalNamespace).Controller().Lister(),
-		ingresses:       mgmt.K8sClient.Extensions().Ingresses(cattleGlobalNamespace),
+		globalDNSs:      mgmt.Management.GlobalDNSs(namespace.GlobalNamespace),
+		globalDNSLister: mgmt.Management.GlobalDNSs(namespace.GlobalNamespace).Controller().Lister(),
+		ingresses:       mgmt.K8sClient.Extensions().Ingresses(namespace.GlobalNamespace),
 	}
 	return n
 }
