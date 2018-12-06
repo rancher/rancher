@@ -20,10 +20,11 @@ import (
 )
 
 const (
-	annotationGlobalDNS       = "rancher.io/globalDNS.hostname"
-	appSelectorLabel          = "io.cattle.field/appId"
-	projectSelectorLabel      = "field.cattle.io/projectId"
-	UserIngressControllerName = "globaldns-useringress-controller"
+	annotationGlobalDNS         = "rancher.io/globalDNS.hostname"
+	appSelectorLabel            = "io.cattle.field/appId"
+	projectSelectorLabel        = "field.cattle.io/projectId"
+	UserIngressControllerName   = "globaldns-useringress-controller"
+	UserGlobalDNSControllerName = "user-controller-watching-globaldns"
 )
 
 type UserIngressController struct {
@@ -52,6 +53,8 @@ func newUserIngressController(ctx context.Context, clusterContext *config.UserCo
 func Register(ctx context.Context, clusterContext *config.UserContext) {
 	n := newUserIngressController(ctx, clusterContext)
 	clusterContext.Extensions.Ingresses("").AddHandler(ctx, UserIngressControllerName, n.sync)
+	g := newUserGlobalDNSController(clusterContext)
+	clusterContext.Management.Management.GlobalDNSs("").AddHandler(ctx, UserGlobalDNSControllerName, g.sync)
 }
 
 func (ic *UserIngressController) sync(key string, obj *v1beta1.Ingress) (runtime.Object, error) {
@@ -74,7 +77,11 @@ func (ic *UserIngressController) sync(key string, obj *v1beta1.Ingress) (runtime
 		//check if the corresponding GlobalDNS CR is present
 		globalDNS, err := ic.findGlobalDNS(fqdnRequested)
 
-		if globalDNS == nil || err != nil {
+		if globalDNS == nil {
+			return nil, nil
+		}
+
+		if err != nil {
 			return nil, fmt.Errorf("UserIngressController: Cannot find GlobalDNS resource for FQDN requested %v", fqdnRequested)
 		}
 
@@ -89,7 +96,7 @@ func (ic *UserIngressController) sync(key string, obj *v1beta1.Ingress) (runtime
 		}
 
 		//update endpoints on GlobalDNS status field
-		ingressEndpoints := ic.gatherIngressEndpoints(obj.Status.LoadBalancer.Ingress)
+		ingressEndpoints := gatherIngressEndpoints(obj.Status.LoadBalancer.Ingress)
 		if obj.DeletionTimestamp != nil {
 			err = ic.removeGlobalDNSEndpoints(globalDNS, ingressEndpoints)
 		} else {
@@ -109,7 +116,7 @@ func (ic *UserIngressController) noGlobalDNS() bool {
 	return len(gd) == 0
 }
 
-func (ic *UserIngressController) gatherIngressEndpoints(ingressEps []v1.LoadBalancerIngress) []string {
+func gatherIngressEndpoints(ingressEps []v1.LoadBalancerIngress) []string {
 	endpoints := []string{}
 	for _, ep := range ingressEps {
 		if ep.IP != "" {
@@ -122,7 +129,15 @@ func (ic *UserIngressController) gatherIngressEndpoints(ingressEps []v1.LoadBala
 }
 
 func (ic *UserIngressController) updateGlobalDNSEndpoints(globalDNS *v3.GlobalDNS, ingressEndpoints []string) error {
+	globalDNS = prepareGlobalDNSForUpdate(globalDNS, ingressEndpoints)
+	_, err := ic.globalDNSs.Update(globalDNS)
+	if err != nil {
+		return fmt.Errorf("UserIngressController: Failed to update GlobalDNS endpoints with error %v", err)
+	}
+	return nil
+}
 
+func prepareGlobalDNSForUpdate(globalDNS *v3.GlobalDNS, ingressEndpoints []string) *v3.GlobalDNS {
 	originalLen := len(globalDNS.Status.Endpoints)
 	globalDNS.Status.Endpoints = append(globalDNS.Status.Endpoints, ingressEndpoints...)
 
@@ -138,12 +153,7 @@ func (ic *UserIngressController) updateGlobalDNSEndpoints(globalDNS *v3.GlobalDN
 		}
 		globalDNS.Status.Endpoints = res
 	}
-	_, err := ic.globalDNSs.Update(globalDNS)
-	if err != nil {
-		return fmt.Errorf("UserIngressController: Failed to update GlobalDNS endpoints with error %v", err)
-	}
-
-	return nil
+	return globalDNS
 }
 
 func (ic *UserIngressController) removeGlobalDNSEndpoints(globalDNS *v3.GlobalDNS, ingressEndpoints []string) error {
@@ -206,11 +216,10 @@ func (ic *UserIngressController) checkForMultiClusterApp(obj *v1beta1.Ingress, g
 		if appID != "" {
 			//find the app CR
 			// go through all projects from multiclusterapp's targets
-			split := strings.SplitN(globalDNS.Spec.MultiClusterAppName, ":", 2)
-			if len(split) != 2 {
-				return fmt.Errorf("error in splitting multiclusterapp ID %v", globalDNS.Spec.MultiClusterAppName)
+			mcappName, err := getMultiClusterAppName(globalDNS.Spec.MultiClusterAppName)
+			if err != nil {
+				return err
 			}
-			mcappName := split[1]
 			mcapp, err := ic.multiclusterappLister.Get(namespace.GlobalNamespace, mcappName)
 			if err != nil {
 				return err
