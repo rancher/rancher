@@ -206,7 +206,12 @@ func (ic *UserIngressController) checkForMultiClusterApp(obj *v1beta1.Ingress, g
 		if appID != "" {
 			//find the app CR
 			// go through all projects from multiclusterapp's targets
-			mcapp, err := ic.multiclusterappLister.Get(namespace.GlobalNamespace, globalDNS.Spec.MultiClusterAppName)
+			split := strings.SplitN(globalDNS.Spec.MultiClusterAppName, ":", 2)
+			if len(split) != 2 {
+				return fmt.Errorf("error in splitting multiclusterapp ID %v", globalDNS.Spec.MultiClusterAppName)
+			}
+			mcappName := split[1]
+			mcapp, err := ic.multiclusterappLister.Get(namespace.GlobalNamespace, mcappName)
 			if err != nil {
 				return err
 			}
