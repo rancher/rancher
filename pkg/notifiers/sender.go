@@ -7,8 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/prometheus/common/model"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"io/ioutil"
 	"mime/multipart"
 	"net"
@@ -18,6 +16,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/prometheus/common/model"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 type Message struct {
@@ -57,14 +58,18 @@ func TestPagerduty(key, msg string) error {
 		msg = "Pagerduty setting validated"
 	}
 
-	pd := &pagerDutyMessage{
-		ServiceKey:  key,
-		EventType:   "trigger",
-		IncidentKey: hashKey("key"),
-		Description: msg,
+	pd := &pagerDutyEvent{
+		RoutingKey:  key,
+		EventAction: "trigger",
+		Payload: pagerDutyEventPayload{
+			Summary:  msg,
+			Source:   "rancher",
+			Severity: "info",
+			Group:    "Rancher alert testing",
+		},
 	}
 
-	url := "https://events.pagerduty.com/generic/2010-04-15/create_event.json"
+	url := "https://events.pagerduty.com/v2/enqueue"
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(pd); err != nil {
@@ -75,8 +80,8 @@ func TestPagerduty(key, msg string) error {
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("http status code is not 200")
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("http status code is %d, not include in the 2xx success HTTP status codes", resp.StatusCode)
 	}
 
 	return nil
@@ -269,13 +274,17 @@ func smtpSend(c *smtp.Client, title, content, receiver, sender string) error {
 	return nil
 }
 
-type pagerDutyMessage struct {
-	RoutingKey  string `json:"routing_key,omitempty"`
-	ServiceKey  string `json:"service_key,omitempty"`
-	DedupKey    string `json:"dedup_key,omitempty"`
-	IncidentKey string `json:"incident_key,omitempty"`
-	EventType   string `json:"event_type,omitempty"`
-	Description string `json:"description,omitempty"`
+type pagerDutyEventPayload struct {
+	Summary  string `json:"summary"`
+	Source   string `json:"source"`
+	Severity string `json:"severity"`
+	Group    string `json:"group"`
+}
+
+type pagerDutyEvent struct {
+	RoutingKey  string                `json:"routing_key"`
+	EventAction string                `json:"event_action"`
+	Payload     pagerDutyEventPayload `json:"payload"`
 }
 
 func hashKey(s string) string {
