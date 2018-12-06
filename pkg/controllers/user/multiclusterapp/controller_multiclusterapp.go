@@ -88,7 +88,6 @@ func (m *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.O
 	// for all targets, create the App{} instance, so that helm controller App lifecycle can pick it up
 	// only one app per project named mcapp-{{mcapp.Name}}
 	var mcappToUpdate *v3.MultiClusterApp
-	appNameInProject := mcapp.Name
 	ann := make(map[string]string)
 	ann[creatorIDAnn] = creatorID
 	set := labels.Set(map[string]string{multiClusterAppIDSelector: mcapp.Name})
@@ -106,16 +105,16 @@ func (m *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.O
 		}
 
 		// check if this app already exists
-		a, err := m.apps.GetNamespaced(projectNS, appNameInProject, metav1.GetOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			return mcapp, fmt.Errorf("error %v for checking if app %v already exists in project %v", err, appNameInProject, projectNS)
-		} else if a != nil && a.Name == appNameInProject {
+		a, err := m.appLister.List(projectNS, set.AsSelector())
+		if err != nil {
+			return nil, fmt.Errorf("Error %v in listing apps using selector in project %v", err, projectNS)
+		}
+		if len(a) > 0 {
 			logrus.Debugf("App for multiclusterapp %v already exists in project %v", mcapp.Name, t.ProjectName)
 			continue
 		}
-
 		// call createNsAndApp method
-		newTarget, mcapp, err := m.createNamespaceAndApp(&t, mcapp, answerMap, ann, set, projectNS, creatorID, appNameInProject, externalID)
+		newTarget, mcapp, err := m.createNamespaceAndApp(&t, mcapp, answerMap, ann, set, projectNS, creatorID, externalID)
 		if err != nil {
 			return mcapp, fmt.Errorf("error %v in creating multiclusterapp: %v", err, mcapp)
 		}
@@ -133,40 +132,32 @@ func (m *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.O
 
 // createNamespaceAndApp creates the namespace for all workloads of the app, and then the app itself
 func (m *MCAppController) createNamespaceAndApp(t *v3.Target, mcapp *v3.MultiClusterApp, answerMap map[string]map[string]string, ann map[string]string,
-	set map[string]string, projectNS string, creatorID string, appNameInProject string, externalID string) (*v3.Target, *v3.MultiClusterApp, error) {
+	set map[string]string, projectNS string, creatorID string, externalID string) (*v3.Target, *v3.MultiClusterApp, error) {
 	var answerFound bool
-	targetNamespace := appNameInProject
 	// Create the target namespace first
 	// Adding the projectId as an annotation is necessary, else the API/UI and UI won't list any of the resources from this namespace
 	n := v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        targetNamespace,
-			Labels:      map[string]string{projectIDFieldLabel: projectNS},
-			Annotations: map[string]string{projectIDFieldLabel: t.ProjectName, creatorIDAnn: creatorID},
+			GenerateName: mcapp.Name + "-",
+			Labels:       map[string]string{projectIDFieldLabel: projectNS},
+			Annotations:  map[string]string{projectIDFieldLabel: t.ProjectName, creatorIDAnn: creatorID},
 		},
 	}
-	_, err := m.namespaces.Get(targetNamespace, metav1.GetOptions{})
+	ns, err := m.namespaces.Create(&n)
 	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, mcapp, err
-		}
-		// namespace doesn't already exist
-		_, err := m.namespaces.Create(&n)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return nil, mcapp, err
-		}
+		return nil, mcapp, err
 	}
 
 	app := pv3.App{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        appNameInProject,
+			Name:        ns.Name,
 			Namespace:   projectNS,
 			Annotations: ann,
 			Labels:      set,
 		},
 		Spec: pv3.AppSpec{
 			ProjectName:         t.ProjectName,
-			TargetNamespace:     targetNamespace,
+			TargetNamespace:     ns.Name,
 			ExternalID:          externalID,
 			MultiClusterAppName: mcapp.Name,
 		},
