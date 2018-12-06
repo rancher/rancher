@@ -160,13 +160,14 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	req.URL.Host = req.Host
-	if r.auth != nil {
+	if r.auth == nil {
+		req.Header.Del("Authorization")
+	} else {
 		token, err := r.auth()
 		if err != nil {
 			er.Error(rw, req, err)
 			return
 		}
-
 		req.Header.Set("Authorization", token)
 	}
 
