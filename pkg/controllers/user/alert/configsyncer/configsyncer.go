@@ -146,7 +146,7 @@ func (d *ConfigSyncer) sync() error {
 	}
 
 	config := manager.GetAlertManagerDefaultConfig()
-	config.Global.PagerdutyURL = "https://events.pagerduty.com/generic/2010-04-15/create_event.json"
+	config.Global.PagerdutyURL = "https://events.pagerduty.com/v2/enqueue"
 
 	if err = d.addClusterAlert2Config(config, cAlertsMap, cAlertsKey, notifiers); err != nil {
 		return err
