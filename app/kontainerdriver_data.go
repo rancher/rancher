@@ -67,6 +67,17 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 		return err
 	}
 
+	if err := creator.addCustomDriver(
+		"huaweicontainercloudengine",
+		"https://github.com/rancher/kontainer-engine-driver-huawei/releases/download/v0.1.0/kontainer-engine-driver-huawei-linux",
+		"",
+		"",
+		false,
+		"*.myhuaweicloud.com",
+	); err != nil {
+		return err
+	}
+
 	return nil
 }
 
