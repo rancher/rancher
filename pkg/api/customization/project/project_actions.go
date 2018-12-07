@@ -11,6 +11,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
@@ -28,10 +29,19 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "setpodsecuritypolicytemplate")
 	resource.AddAction(apiContext, "exportYaml")
 
-	if convert.ToBool(resource.Values["enableProjectMonitoring"]) {
-		resource.AddAction(apiContext, "disableMonitoring")
-	} else {
-		resource.AddAction(apiContext, "enableMonitoring")
+	if clusterID := convert.ToString(resource.Values["clusterId"]); len(clusterID) != 0 {
+		cluster := &client.Cluster{}
+		access.ByID(apiContext, apiContext.Version, client.ClusterType, clusterID, &cluster)
+
+		if !cluster.EnableClusterMonitoring {
+			return
+		}
+
+		if convert.ToBool(resource.Values["enableProjectMonitoring"]) {
+			resource.AddAction(apiContext, "disableMonitoring")
+		} else {
+			resource.AddAction(apiContext, "enableMonitoring")
+		}
 	}
 
 }
