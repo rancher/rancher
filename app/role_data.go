@@ -83,7 +83,8 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("*").resources("storageclasses").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusterloggings").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("clusteralerts").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("clusteralertrules").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("clusteralertgroups").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("notifiers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clustermonitorgraphs").verbs("get", "list", "watch")
@@ -143,7 +144,8 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("*").resources("persistentvolumeclaims").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("notifiers").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("projectalerts").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("projectalertrules").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("projectalertgroups").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("projectloggings").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectcatalogs").verbs("*").
@@ -161,7 +163,8 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("*").resources("persistentvolumeclaims").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("notifiers").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("projectalerts").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("projectalertrules").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("projectalertgroups").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("projectloggings").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectcatalogs").verbs("get", "list", "watch").
@@ -178,7 +181,8 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("*").resources("persistentvolumeclaims").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusterevents").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("notifiers").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("projectalerts").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("projectalertrules").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("projectalertgroups").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectloggings").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectcatalogs").verbs("get", "list", "watch").
