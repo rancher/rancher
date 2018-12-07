@@ -101,7 +101,6 @@ func grantSystemMonitorRBAC(agentServiceAccountGetter corev1.ServiceAccountsGett
 	appServiceAccountName := appName
 	appClusterRoleName := appServiceAccountName
 	appClusterRoleBindingName := appServiceAccountName + "-binding"
-	ownedLabels := OwnedLabels(appName, appTargetNamespace, SystemLevel)
 
 	err := utilerrors.AggregateGoroutines(
 		// detect ServiceAccount (the name as same as App)
@@ -119,7 +118,7 @@ func grantSystemMonitorRBAC(agentServiceAccountGetter corev1.ServiceAccountsGett
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      appServiceAccountName,
 						Namespace: appTargetNamespace,
-						Labels:    ownedLabels,
+						Labels:    OwnedLabels(appName, appTargetNamespace, SystemLevel),
 					},
 				}
 
@@ -186,7 +185,7 @@ func grantSystemMonitorRBAC(agentServiceAccountGetter corev1.ServiceAccountsGett
 				appClusterRole = &k8srbacv1.ClusterRole{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   appClusterRoleName,
-						Labels: ownedLabels,
+						Labels: OwnedLabels(appName, appTargetNamespace, SystemLevel),
 					},
 					Rules: rules,
 				}
@@ -213,7 +212,7 @@ func grantSystemMonitorRBAC(agentServiceAccountGetter corev1.ServiceAccountsGett
 				appClusterRoleBinding = &k8srbacv1.ClusterRoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   appClusterRoleBindingName,
-						Labels: ownedLabels,
+						Labels: OwnedLabels(appName, appTargetNamespace, SystemLevel),
 					},
 					Subjects: []k8srbacv1.Subject{
 						{
