@@ -181,7 +181,6 @@ func (ah *appHandler) grantProjectMonitoringPermissions(appName, appTargetNamesp
 	appServiceAccountName := appName
 	appClusterRoleName := fmt.Sprintf("%s-%s", appName, project.Name)
 	appClusterRoleBindingName := appClusterRoleName + "-binding"
-	ownedLabels := monitoring.OwnedLabels(appName, appTargetNamespace, monitoring.ProjectLevel)
 
 	err := stream(
 		// detect ServiceAccount (the name as same as App)
@@ -199,7 +198,7 @@ func (ah *appHandler) grantProjectMonitoringPermissions(appName, appTargetNamesp
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      appServiceAccountName,
 						Namespace: appTargetNamespace,
-						Labels:    ownedLabels,
+						Labels:    monitoring.OwnedLabels(appName, appTargetNamespace, monitoring.ProjectLevel),
 					},
 				}
 
@@ -225,7 +224,7 @@ func (ah *appHandler) grantProjectMonitoringPermissions(appName, appTargetNamesp
 				appClusterRoleBinding = &k8srbacv1.ClusterRoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   appClusterRoleBindingName,
-						Labels: ownedLabels,
+						Labels: monitoring.OwnedLabels(appName, appTargetNamespace, monitoring.ProjectLevel),
 					},
 					Subjects: []k8srbacv1.Subject{
 						{
