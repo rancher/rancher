@@ -51,7 +51,7 @@ func initClusterPreCanAlerts(clusterAlertGroups v3.ClusterAlertGroupInterface, c
 			MetricRule: &v3.MetricRule{
 				Description:    "Etcd member has no leader",
 				Expression:     `etcd_server_has_leader{job="exporter-kube-etcd-cluster-monitoring"}`,
-				Comparison:     manager.ComparisonLessThan,
+				Comparison:     manager.ComparisonNotEqual,
 				Duration:       "3m",
 				ThresholdValue: 1,
 			},
