@@ -146,6 +146,12 @@ func (ch *clusterHandler) syncClusterMonitoring(cluster *mgmtv3.Cluster) error {
 		mgmtv3.ClusterConditionMonitoringEnabled.True(cluster)
 		mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, "")
 	} else if cluster.Status.MonitoringStatus != nil {
+		if err := ch.disableAllOwnedProjectsMonitoring(cluster.Name); err != nil {
+			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
+			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
+			return errors.Wrap(err, "failed to disable all owned projects monitoring")
+		}
+
 		if err := ch.app.withdrawApp(appName, appTargetNamespace); err != nil {
 			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
 			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
@@ -236,6 +242,32 @@ func (ch *clusterHandler) detectMonitoringComponentsWhileUninstall(appName, appT
 			return isGrafanaWithdrew(ch.app.agentWorkloadsClient, appTargetNamespace, appName, monitoringStatus)
 		},
 	)
+}
+
+func (ch *clusterHandler) disableAllOwnedProjectsMonitoring(clusterID string) error {
+	projectClient := ch.app.cattleProjectsGetter.Projects(clusterID)
+
+	ownedProjectList, err := projectClient.List(metav1.ListOptions{})
+	if err != nil {
+		return errors.Wrap(err, "failed to list all projects")
+	}
+
+	ownedProjectItems := ownedProjectList.Items
+	disableFns := make([]func() error, 0, len(ownedProjectItems))
+	for _, ownedProject := range ownedProjectItems {
+		copyOwnedProject := ownedProject.DeepCopy()
+		if copyOwnedProject.DeletionTimestamp != nil || !copyOwnedProject.Spec.EnableProjectMonitoring {
+			continue
+		}
+		copyOwnedProject.Spec.EnableProjectMonitoring = false
+
+		disableFns = append(disableFns, func() error {
+			_, err := projectClient.Update(copyOwnedProject)
+			return err
+		})
+	}
+
+	return stream(disableFns...)
 }
 
 func (ah *appHandler) deployEtcdCert(clusterName, appTargetNamespace string) ([]*etcdTLSConfig, error) {

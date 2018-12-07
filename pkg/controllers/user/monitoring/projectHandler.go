@@ -40,7 +40,7 @@ func (ph *projectHandler) sync(key string, project *mgmtv3.Project) (runtime.Obj
 	if err != nil {
 		return project, errors.Wrapf(err, "failed to find Cluster %s", clusterID)
 	}
-	if !cluster.Spec.EnableClusterMonitoring {
+	if !cluster.Spec.EnableClusterMonitoring && project.Spec.EnableProjectMonitoring {
 		return project, &controller.ForgetError{
 			Err: errors.New("unable to operate Project Monitoring without enabling Cluster Monitoring"),
 		}
