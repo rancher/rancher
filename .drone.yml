@@ -13,7 +13,7 @@ pipeline:
     commands:
     - cp -r ./bin/* ./package/
     when:
-      branch: [master, release/*]
+      branch: [master, release/*, alpha]
       event: [push,tag]
 
   docker-publish-master:
@@ -58,7 +58,7 @@ pipeline:
     build_args:
     - VERSION=${DRONE_TAG}
     when:
-      branch: [master, release/*]
+      branch: [master, release/*, alpha]
       event: tag
 
   docker-publish-agent:
@@ -73,7 +73,7 @@ pipeline:
     build_args:
     - VERSION=${DRONE_TAG}
     when:
-      branch: [master, release/*]
+      branch: [master, release/*, alpha]
       event: tag
 
   github_binary_prerelease:
@@ -85,10 +85,10 @@ pipeline:
      - sha256
     secrets: [github_token]
     when:
-      branch: [master, release/*]
+      branch: [master, release/*, alpha]
       event: tag
       ref:
-        include: [ refs/tags/*rc* ]
+        include: [ refs/tags/*rc*, refs/tags/*alpha* ]
 
   github_binary_release:
     image: plugins/github-release
@@ -101,4 +101,4 @@ pipeline:
       branch: [master, release/*]
       event: tag
       ref:
-        exclude: [ refs/tags/*rc* ]
+        exclude: [ refs/tags/*rc*, refs/tags/*alpha* ]
