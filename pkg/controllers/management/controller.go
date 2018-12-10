@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
 	"github.com/rancher/rancher/pkg/controllers/management/catalog"
+	"github.com/rancher/rancher/pkg/controllers/management/cloudcredential"
 	"github.com/rancher/rancher/pkg/controllers/management/cluster"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterdeploy"
 	"github.com/rancher/rancher/pkg/controllers/management/clustergc"
@@ -43,6 +44,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	kontainerdriver.Register(ctx, management)
 	nodedriver.Register(ctx, management)
 	nodepool.Register(ctx, management)
+	cloudcredential.Register(ctx, management)
 	node.Register(ctx, management)
 	podsecuritypolicy.Register(ctx, management)
 	etcdbackup.Register(ctx, management)

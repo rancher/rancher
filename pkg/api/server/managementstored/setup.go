@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/catalog"
 	ccluster "github.com/rancher/rancher/pkg/api/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
+	"github.com/rancher/rancher/pkg/api/customization/cred"
 	"github.com/rancher/rancher/pkg/api/customization/globaldns"
 	"github.com/rancher/rancher/pkg/api/customization/globalresource"
 	"github.com/rancher/rancher/pkg/api/customization/kontainerdriver"
@@ -349,6 +350,19 @@ func SecretTypes(ctx context.Context, schemas *types.Schemas, management *config
 
 	secretSchema = schemas.Schema(&projectschema.Version, projectclient.CertificateType)
 	secretSchema.Store = cert.Wrap(secretSchema.Store)
+
+	mgmtSecretSchema := schemas.Schema(&managementschema.Version, client.ManagementSecretType)
+	mgmtSecretSchema.Store = proxy.NewProxyStore(ctx, management.ClientGetter,
+		config.ManagementStorageContext,
+		[]string{"api"},
+		"",
+		"v1",
+		"Secret",
+		"secrets")
+
+	credSchema := schemas.Schema(&managementschema.Version, client.CloudCredentialType)
+	credSchema.Store = cred.Wrap(mgmtSecretSchema.Store, management.Core.Namespaces(""))
+	credSchema.Validator = cred.Validator
 }
 
 func User(schemas *types.Schemas, management *config.ScaledContext) {

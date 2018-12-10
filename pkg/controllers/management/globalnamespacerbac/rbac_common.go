@@ -2,6 +2,7 @@ package globalnamespacerbac
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/types"
 	"reflect"
 	"sort"
 	"strings"
@@ -24,20 +25,23 @@ const (
 	MultiClusterAppResource   = "multiclusterapps"
 	GlobalDNSResource         = "globaldnses"
 	GlobalDNSProviderResource = "globaldnsproviders"
+	CloudCredentialResource   = "secrets"
 	CreatorIDAnn              = "field.cattle.io/creatorId"
 )
 
-func CreateRoleAndRoleBinding(resource string, name string, members []v3.Member, creatorID string, managementContext *config.ManagementContext) error {
+func CreateRoleAndRoleBinding(resource string, name string, UID types.UID, members []v3.Member, creatorID string,
+	managementContext *config.ManagementContext, apiGroup ...string) error {
 	/* Create 3 Roles containing the resource (multiclusterapp or globalDNS), and the current multiclusterapp/globalDNS in resourceNames list
 	1. Role with all verbs (everything access, includes creator); name multiclusterapp.Name + "-ma" / (globalDNS.Name + "-ga")
 	2. Role with "get", "list" "watch" verbs (ReadOnly access); name multiclusterapp.Name + "-mr" / (globalDNS.Name + "-gr")
 	3. Role with "update" verb (Upgrade access); name multiclusterapp.Name + "-mu" / (globalDNS.Name + "-gu")
 	*/
-	accessTypes := []string{allAccess, updateAccess, readOnlyAccess}
-	for _, r := range accessTypes {
-		if _, err := createRole(resource, r, name, managementContext); err != nil {
-			return err
-		}
+	api := []string{"management.cattle.io"}
+	if len(apiGroup) > 0 {
+		api = apiGroup
+	}
+	if _, err := createRole(resource, allAccess, name, managementContext, api); err != nil {
+		return err
 	}
 
 	// Create a roleBinding referring the role with everything access, and containing creator of the multiclusterapp, along with
@@ -61,25 +65,32 @@ func CreateRoleAndRoleBinding(resource string, name string, members []v3.Member,
 		}
 	}
 
-	if _, err := createRoleBinding(allAccess, name, allAccessSubjects, managementContext, resource); err != nil {
+	if _, err := createRoleBinding(allAccess, name, UID, allAccessSubjects, managementContext, resource, api); err != nil {
 		return err
 	}
 
 	// Check if there are members with readonly or update access; if found then create rolebindings for those
 	if len(readOnlyAccessSubjects) > 0 {
-		if _, err := createRoleBinding(readOnlyAccess, name, readOnlyAccessSubjects, managementContext, resource); err != nil {
+		if _, err := createRole(resource, readOnlyAccess, name, managementContext, api); err != nil {
+			return err
+		}
+		if _, err := createRoleBinding(readOnlyAccess, name, UID, readOnlyAccessSubjects, managementContext, resource, api); err != nil {
 			return err
 		}
 	}
 	if len(updateAccessSubjects) > 0 {
-		if _, err := createRoleBinding(updateAccess, name, updateAccessSubjects, managementContext, resource); err != nil {
+		if _, err := createRole(resource, updateAccess, name, managementContext, api); err != nil {
+			return err
+		}
+		if _, err := createRoleBinding(updateAccess, name, UID, updateAccessSubjects, managementContext, resource, api); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func createRole(resource string, roleAccess string, resourceName string, managementContext *config.ManagementContext) (*k8srbacv1.Role, error) {
+func createRole(resource string, roleAccess string, resourceName string,
+	managementContext *config.ManagementContext, apiGroups []string) (*k8srbacv1.Role, error) {
 	roleName, verbs := getRoleNameAndVerbs(roleAccess, resourceName, resource)
 	newRole := &k8srbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
@@ -88,7 +99,7 @@ func createRole(resource string, roleAccess string, resourceName string, managem
 		},
 		Rules: []k8srbacv1.PolicyRule{
 			{
-				APIGroups:     []string{"management.cattle.io"},
+				APIGroups:     apiGroups,
 				Resources:     []string{resource},
 				ResourceNames: []string{resourceName},
 				Verbs:         verbs,
@@ -117,15 +128,29 @@ func createRole(resource string, roleAccess string, resourceName string, managem
 	return role, nil
 }
 
-func createRoleBinding(roleAccess string, name string, subjects []k8srbacv1.Subject, managementContext *config.ManagementContext, resource string) (*k8srbacv1.RoleBinding, error) {
+func createRoleBinding(roleAccess string, name string, UID types.UID,
+	subjects []k8srbacv1.Subject, managementContext *config.ManagementContext, resource string, apiGroups []string) (*k8srbacv1.RoleBinding, error) {
 	roleName, _ := getRoleNameAndVerbs(roleAccess, name, resource)
 	// we can define the rolebinding first, since if it's not already present we can call create. And if it's present then we'll
 	// still need to compare the current members' list
 	sort.Slice(subjects, func(i, j int) bool { return subjects[i].Name < subjects[j].Name })
+
+	apiVersion := "management.cattle.io/v3"
+	if apiGroups[0] != "management.cattle.io" {
+		apiVersion = "v1"
+	}
+	ownerReference := metav1.OwnerReference{
+		APIVersion: apiVersion,
+		Kind:       resource,
+		Name:       name,
+		UID:        UID,
+	}
+
 	newRoleBinding := &k8srbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      roleName,
-			Namespace: namespace.GlobalNamespace,
+			Name:            roleName,
+			Namespace:       namespace.GlobalNamespace,
+			OwnerReferences: []metav1.OwnerReference{ownerReference},
 		},
 		RoleRef: k8srbacv1.RoleRef{
 			Name: roleName,

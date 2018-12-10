@@ -105,7 +105,8 @@ func (n *GDController) sync(key string, obj *v3.GlobalDNS) (runtime.Object, erro
 
 	currentMembers := globalnamespacerbac.GetCurrentMembers(obj.Spec.Members)
 	updatedMembers, err := globalnamespacerbac.GetUpdatedMembers(obj.Spec.ProjectNames, obj.Spec.Members, n.prtbLister)
-	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.GlobalDNSResource, obj.Name, updatedMembers, creatorID, n.managementContext); err != nil {
+	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.GlobalDNSResource, obj.Name,
+		obj.UID, updatedMembers, creatorID, n.managementContext); err != nil {
 		return nil, err
 	}
 

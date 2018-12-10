@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/namespace"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -14,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
+	corev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -47,6 +51,8 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		nodeTemplateGenericClient: management.Management.NodeTemplates("").ObjectClient().UnstructuredClient(),
 		configMapGetter:           management.K8sClient.CoreV1(),
 		clusterLister:             management.Management.Clusters("").Controller().Lister(),
+		schemaLister:              management.Management.DynamicSchemas("").Controller().Lister(),
+		credLister:                management.Core.Secrets("").Controller().Lister(),
 	}
 
 	nodeClient.AddLifecycle(ctx, "node-controller", nodeLifecycle)
@@ -60,6 +66,8 @@ type Lifecycle struct {
 	nodeTemplateClient        v3.NodeTemplateInterface
 	configMapGetter           typedv1.ConfigMapsGetter
 	clusterLister             v3.ClusterLister
+	schemaLister              v3.DynamicSchemaLister
+	credLister                corev1.SecretLister
 }
 
 func (m *Lifecycle) setupCustom(obj *v3.Node) {
@@ -132,20 +140,21 @@ func (m *Lifecycle) Create(obj *v3.Node) (runtime.Object, error) {
 		if err != nil {
 			return obj, err
 		}
-
-		rawConfig, ok := values.GetValue(rawTemplate.(*unstructured.Unstructured).Object, template.Spec.Driver+"Config")
+		data := rawTemplate.(*unstructured.Unstructured).Object
+		rawConfig, ok := values.GetValue(data, template.Spec.Driver+"Config")
 		if !ok {
 			return obj, fmt.Errorf("node config not specified")
 		}
 		if template.Spec.Driver == amazonec2 {
 			setEc2ClusterIDTag(rawConfig, obj.Namespace)
 		}
-
+		if err := m.updateRawConfigFromCredential(data, rawConfig, template); err != nil {
+			return obj, err
+		}
 		bytes, err := json.Marshal(rawConfig)
 		if err != nil {
-			return obj, errors.Wrap(err, "failed to marshal node driver confg")
+			return obj, errors.Wrap(err, "failed to marshal node driver config")
 		}
-
 		config, err := nodeconfig.NewNodeConfig(m.secretStore, obj)
 		if err != nil {
 			return obj, errors.Wrap(err, "failed to save node driver config")
@@ -464,4 +473,42 @@ func roles(node *v3.Node) []string {
 		return []string{"worker"}
 	}
 	return roles
+}
+
+func (m *Lifecycle) setCredFields(data interface{}, fields map[string]v3.Field, credID string) error {
+	splitID := strings.Split(credID, ":")
+	if len(splitID) != 2 {
+		return fmt.Errorf("invalid credential id %s", credID)
+	}
+	cred, err := m.credLister.Get(namespace.GlobalNamespace, splitID[1])
+	if err != nil {
+		return err
+	}
+	if ans := convert.ToMapInterface(data); len(ans) > 0 {
+		for key, val := range cred.Data {
+			splitKey := strings.Split(key, "-")
+			if len(splitKey) == 2 && strings.HasSuffix(splitKey[0], "Config") {
+				if _, ok := fields[splitKey[1]]; ok {
+					ans[splitKey[1]] = string(val)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (m *Lifecycle) updateRawConfigFromCredential(data map[string]interface{}, rawConfig interface{}, template *v3.NodeTemplate) error {
+	credID := convert.ToString(values.GetValueN(data, "spec", "cloudCredentialName"))
+	if credID != "" {
+		existingSchema, err := m.schemaLister.Get("", template.Spec.Driver+"config")
+		if err != nil {
+			return err
+		}
+		logrus.Debugf("setCredFields for credentialName %s", credID)
+		err = m.setCredFields(rawConfig, existingSchema.Spec.ResourceFields, credID)
+		if err != nil {
+			return errors.Wrap(err, "failed to set credential fields")
+		}
+	}
+	return nil
 }
