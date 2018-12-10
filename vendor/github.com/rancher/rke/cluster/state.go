@@ -94,6 +94,7 @@ func (c *Cluster) GetClusterState(ctx context.Context) (*Cluster, error) {
 			}
 			currentCluster.DockerDialerFactory = c.DockerDialerFactory
 			currentCluster.LocalConnDialerFactory = c.LocalConnDialerFactory
+			currentCluster.KubernetesServiceIP = c.KubernetesServiceIP
 
 			// make sure I have all the etcd certs, We need handle dialer failure for etcd nodes https://github.com/rancher/rancher/issues/12898
 			for _, host := range activeEtcdHosts {
