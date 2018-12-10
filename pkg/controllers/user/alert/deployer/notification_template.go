@@ -67,18 +67,21 @@ Total Memory: {{ (index .Alerts 0).Labels.total_mem}}
 Alert Name: {{ (index .Alerts 0).Labels.alert_name}}
 Severity: {{ (index .Alerts 0).Labels.severity}}
 Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
+Project Name: {{(index .Alerts 0).Labels.project_name}}
 Namespace: {{ (index .Alerts 0).Labels.namespace}}
 Container Name: {{(index .Alerts 0).Labels.container_name}}
 {{ else if eq (index .Alerts 0).Labels.alert_type "podNotRunning"}}
 Alert Name: {{ (index .Alerts 0).Labels.alert_name}}
 Severity: {{ (index .Alerts 0).Labels.severity}}
 Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
+Project Name: {{(index .Alerts 0).Labels.project_name}}
 Namespace: {{ (index .Alerts 0).Labels.namespace}}
 Container Name: {{ (index .Alerts 0).Labels.container_name}}
 {{ else if eq (index .Alerts 0).Labels.alert_type "podNotScheduled"}}
 Alert Name: {{ (index .Alerts 0).Labels.alert_name}}
 Severity: {{ (index .Alerts 0).Labels.severity}}
 Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
+Project Name: {{(index .Alerts 0).Labels.project_name}}
 Namespace: {{ (index .Alerts 0).Labels.namespace}}
 Pod Name: {{ (index .Alerts 0).Labels.pod_name}}
 {{ else if eq (index .Alerts 0).Labels.alert_type "systemService"}}
@@ -89,14 +92,18 @@ Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
 Alert Name: {{ (index .Alerts 0).Labels.alert_name}}
 Severity: {{ (index .Alerts 0).Labels.severity}}
 Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
+Project Name: {{(index .Alerts 0).Labels.project_name}}
 Available Replicas: {{ (index .Alerts 0).Labels.available_replicas}}
 Desired Replicas: {{ (index .Alerts 0).Labels.desired_replicas}}
 {{ else if eq (index .Alerts 0).Labels.alert_type "metric"}}
 Alert Name: {{ (index .Alerts 0).Labels.alert_name}}
 Severity: {{ (index .Alerts 0).Labels.severity}}
 Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
+{{ if (index .Alerts 0).Labels.project_name}}Project Name: {{(index .Alerts 0).Labels.project_name}}{{end}}
 Expression: {{(index .Alerts 0).Labels.expression}}
-Description: Threshold Crossed: datapoint was {{ (index .Alerts 0).Labels.comparison}} to the threshold ({{ (index .Alerts 0).Labels.threshold_value}}) for ({{ (index .Alerts 0).Labels.duration}})
+{{ if (index .Alerts 0).Labels.pod_name}}Pod Name: {{(index .Alerts 0).Labels.pod_name}}{{ else if (index .Alerts 0).Labels.pod}}Pod Name: {{(index .Alerts 0).Labels.pod}}{{ end}}
+{{ if (index .Alerts 0).Labels.namespace}}Namespace: {{(index .Alerts 0).Labels.namespace}}{{ end}}
+Description: Threshold Crossed: datapoint value {{ (index .Alerts 0).Labels.current_value}} was {{ (index .Alerts 0).Labels.comparison}} to the threshold ({{ (index .Alerts 0).Labels.threshold_value}}) for ({{ (index .Alerts 0).Labels.duration}})
 {{ end}}
 {{ if (index .Alerts 0).Labels.logs}}
 Logs: {{ (index .Alerts 0).Labels.logs}}
@@ -133,18 +140,21 @@ Total Memory: {{ (index .Alerts 0).Labels.total_mem}}<br>
 Alert Name: {{ (index .Alerts 0).Labels.alert_name}}<br>
 Severity: {{ (index .Alerts 0).Labels.severity}}<br>
 Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}<br>
+Project Name: {{(index .Alerts 0).Labels.project_name}}<br>
 Namespace: {{ (index .Alerts 0).Labels.namespace}}<br>
 Container Name: {{(index .Alerts 0).Labels.container_name}}<br>
 {{ else if eq (index .Alerts 0).Labels.alert_type "podNotRunning"}}
 Alert Name: {{ (index .Alerts 0).Labels.alert_name}}<br>
 Severity: {{ (index .Alerts 0).Labels.severity}}<br>
 Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}<br>
+Project Name: {{(index .Alerts 0).Labels.project_name}}<br>
 Namespace: {{ (index .Alerts 0).Labels.namespace}}<br>
 Container Name: {{ (index .Alerts 0).Labels.container_name}}<br>
 {{ else if eq (index .Alerts 0).Labels.alert_type "podNotScheduled"}}
 Alert Name: {{ (index .Alerts 0).Labels.alert_name}}<br>
 Severity: {{ (index .Alerts 0).Labels.severity}}<br>
 Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}<br>
+Project Name: {{(index .Alerts 0).Labels.project_name}}<br>
 Namespace: {{ (index .Alerts 0).Labels.namespace}}<br>
 Pod Name: {{ (index .Alerts 0).Labels.pod_name}}<br>
 {{ else if eq (index .Alerts 0).Labels.alert_type "systemService"}}
@@ -155,14 +165,18 @@ Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}<br>
 Alert Name: {{ (index .Alerts 0).Labels.alert_name}}<br>
 Severity: {{ (index .Alerts 0).Labels.severity}}<br>
 Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}<br>
+Project Name: {{(index .Alerts 0).Labels.project_name}}<br>
 Available Replicas: {{ (index .Alerts 0).Labels.available_replicas}}<br>
 Desired Replicas: {{ (index .Alerts 0).Labels.desired_replicas}}<br>
 {{ else if eq (index .Alerts 0).Labels.alert_type "metric"}}
 Alert Name: {{ (index .Alerts 0).Labels.alert_name}}<br>
 Severity: {{ (index .Alerts 0).Labels.severity}}<br>
 Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}<br>
+{{ if (index .Alerts 0).Labels.project_name}}Project Name: {{(index .Alerts 0).Labels.project_name}}{{end}}<br>
+{{ if (index .Alerts 0).Labels.pod_name}}Pod Name: {{(index .Alerts 0).Labels.pod_name}}{{ else if (index .Alerts 0).Labels.pod}}Pod Name: {{(index .Alerts 0).Labels.pod}}{{ end}}<br>
+{{ if (index .Alerts 0).Labels.namespace}}Namespace: {{(index .Alerts 0).Labels.namespace}}{{ end}}
 Expression: {{(index .Alerts 0).Labels.expression}}<br>
-Description: Threshold Crossed: datapoint was {{ (index .Alerts 0).Labels.comparison}} to the threshold ({{ (index .Alerts 0).Labels.threshold_value}}) for ({{ (index .Alerts 0).Labels.duration}})<br>
+Description: Threshold Crossed: datapoint value {{ (index .Alerts 0).Labels.current_value}} was {{ (index .Alerts 0).Labels.comparison}} to the threshold ({{ (index .Alerts 0).Labels.threshold_value}}) for ({{ (index .Alerts 0).Labels.duration}})<br>
 {{ end}}
 {{ if (index .Alerts 0).Labels.logs}}
 Logs: {{ (index .Alerts 0).Labels.logs}}

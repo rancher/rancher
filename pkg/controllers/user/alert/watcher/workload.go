@@ -143,6 +143,7 @@ func (w *WorkloadWatcher) checkWorkloadCondition(wl *workload.Workload, alert *v
 
 	if wl.Status.AvailableReplicas < availableThreshold {
 		ruleID := common.GetRuleID(alert.Spec.GroupName, alert.Name)
+		projectName := alert.Namespace
 
 		clusterDisplayName := w.clusterName
 		cluster, err := w.clusterLister.Get("", w.clusterName)
@@ -159,6 +160,7 @@ func (w *WorkloadWatcher) checkWorkloadCondition(wl *workload.Workload, alert *v
 		data["alert_name"] = alert.Spec.DisplayName
 		data["severity"] = alert.Spec.Severity
 		data["cluster_name"] = clusterDisplayName
+		data["project_name"] = projectName
 		data["workload_name"] = wl.Name
 		data["workload_namespace"] = wl.Namespace
 		data["available_percentage"] = strconv.Itoa(percentage)

@@ -153,6 +153,7 @@ func (w *PodWatcher) checkPodRestarts(pod *corev1.Pod, alert *v3.ProjectAlertRul
 
 			if curCount-preCount >= int32(alert.Spec.PodRule.RestartTimes) {
 				ruleID := common.GetRuleID(alert.Spec.GroupName, alert.Name)
+				projectName := alert.Namespace
 
 				details := ""
 				if containerStatus.State.Waiting != nil {
@@ -174,6 +175,7 @@ func (w *PodWatcher) checkPodRestarts(pod *corev1.Pod, alert *v3.ProjectAlertRul
 				data["alert_type"] = "podRestarts"
 				data["severity"] = alert.Spec.Severity
 				data["cluster_name"] = clusterDisplayName
+				data["project_name"] = projectName
 				data["namespace"] = pod.Namespace
 				data["pod_name"] = pod.Name
 				data["container_name"] = containerStatus.Name
