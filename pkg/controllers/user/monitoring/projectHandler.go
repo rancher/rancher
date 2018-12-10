@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/monitoring"
@@ -144,8 +143,6 @@ func (ph *projectHandler) syncProjectMonitoring(project *mgmtv3.Project, project
 }
 
 func (ph *projectHandler) detectMonitoringComponentsWhileInstall(appName, appTargetNamespace string, project *mgmtv3.Project) error {
-	time.Sleep(5 * time.Second)
-
 	if project.Status.MonitoringStatus == nil {
 		project.Status.MonitoringStatus = &mgmtv3.MonitoringStatus{
 			Conditions: []mgmtv3.MonitoringCondition{
@@ -161,8 +158,6 @@ func (ph *projectHandler) detectMonitoringComponentsWhileUninstall(appName, appT
 	if project.Status.MonitoringStatus == nil {
 		return nil
 	}
-
-	time.Sleep(5 * time.Second)
 
 	return isGrafanaWithdrew(ph.app.agentWorkloadsClient, appTargetNamespace, appName, project.Status.MonitoringStatus)
 }
