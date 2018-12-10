@@ -64,7 +64,8 @@ func (mc *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.
 	if err := access.CheckGroupAccess(groups, targets, mc.prtbLister, mc.rtLister, pv3.AppGroupVersionKind.Group, client.MultiClusterAppType); err != nil {
 		return nil, err
 	}
-	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.MultiClusterAppResource, mcapp.Name, updatedMembers, creatorID, mc.managementContext); err != nil {
+	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.MultiClusterAppResource, mcapp.Name, mcapp.UID,
+		updatedMembers, creatorID, mc.managementContext); err != nil {
 		return nil, err
 	}
 	if !reflect.DeepEqual(updatedMembers, currentMembers) {

@@ -50,7 +50,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 	root := mux.NewRouter()
 	root.UseEncodedPath()
 
-	rawAuthedAPIs := newAuthed(tokenAPI, managementAPI, k8sProxy)
+	rawAuthedAPIs := newAuthed(tokenAPI, managementAPI, k8sProxy, scaledContext)
 
 	sar := sar.NewSubjectAccessReview(clusterManager)
 
@@ -106,7 +106,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 	return nil
 }
 
-func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.Handler) *mux.Router {
+func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.Handler, scaledContext *config.ScaledContext) *mux.Router {
 	authed := mux.NewRouter()
 	authed.UseEncodedPath()
 	authed.Path("/meta/gkeMachineTypes").Handler(capabilities.NewGKEMachineTypesHandler())
@@ -114,7 +114,7 @@ func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.
 	authed.Path("/meta/gkeZones").Handler(capabilities.NewGKEZonesHandler())
 	authed.Path("/meta/aksVersions").Handler(capabilities.NewAKSVersionsHandler())
 	authed.Path("/meta/aksVirtualNetworks").Handler(capabilities.NewAKSVirtualNetworksHandler())
-	authed.PathPrefix("/meta/proxy").Handler(newProxy())
+	authed.PathPrefix("/meta/proxy").Handler(newProxy(scaledContext))
 	authed.PathPrefix("/meta").Handler(managementAPI)
 	authed.PathPrefix("/v3/identit").Handler(tokenAPI)
 	authed.PathPrefix("/v3/token").Handler(tokenAPI)
@@ -133,6 +133,6 @@ func connectHandlers(scaledContext *config.ScaledContext) (http.Handler, http.Ha
 	return http.NotFoundHandler(), http.NotFoundHandler()
 }
 
-func newProxy() http.Handler {
-	return httpproxy.NewProxy("/proxy/", whitelist.Proxy.Get)
+func newProxy(scaledContext *config.ScaledContext) http.Handler {
+	return httpproxy.NewProxy("/proxy/", whitelist.Proxy.Get, scaledContext)
 }

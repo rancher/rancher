@@ -98,7 +98,8 @@ func (n *ProviderLauncher) sync(key string, obj *v3.GlobalDNSProvider) (runtime.
 		return n.handleCloudflareProvider(obj)
 	}
 
-	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.GlobalDNSProviderResource, obj.Name, obj.Spec.Members, creatorID, n.managementContext); err != nil {
+	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.GlobalDNSProviderResource, obj.Name,
+		obj.UID, obj.Spec.Members, creatorID, n.managementContext); err != nil {
 		return nil, err
 	}
 	return nil, nil

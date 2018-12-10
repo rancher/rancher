@@ -2,32 +2,36 @@ package httpproxy
 
 import (
 	"fmt"
+	"github.com/rancher/types/apis/core/v1"
+	"github.com/rancher/types/config"
+	"github.com/sirupsen/logrus"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"regexp"
 	"strings"
-
-	"github.com/sirupsen/logrus"
 )
 
 const (
 	ForwardProto = "X-Forwarded-Proto"
 	APIAuth      = "X-API-Auth-Header"
+	CattleAuth   = "X-API-CattleAuth-Header"
+	AuthHeader   = "Authorization"
 )
 
 var (
 	httpStart  = regexp.MustCompile("^http:/([^/])")
 	httpsStart = regexp.MustCompile("^https:/([^/])")
 	badHeaders = map[string]bool{
-		"host":              true,
-		"transfer-encoding": true,
-		"content-length":    true,
-		"x-api-auth-header": true,
-		"cf-connecting-ip":  true,
-		"cf-ray":            true,
-		"impersonate-user":  true,
-		"impersonate-group": true,
+		"host":                    true,
+		"transfer-encoding":       true,
+		"content-length":          true,
+		"x-api-auth-header":       true,
+		"x-api-cattleauth-header": true,
+		"cf-connecting-ip":        true,
+		"cf-ray":                  true,
+		"impersonate-user":        true,
+		"impersonate-group":       true,
 	}
 )
 
@@ -36,6 +40,7 @@ type Supplier func() []string
 type proxy struct {
 	prefix             string
 	validHostsSupplier Supplier
+	credentials        v1.SecretInterface
 }
 
 func (p *proxy) isAllowed(host string) bool {
@@ -52,10 +57,11 @@ func (p *proxy) isAllowed(host string) bool {
 	return false
 }
 
-func NewProxy(prefix string, validHosts Supplier) http.Handler {
+func NewProxy(prefix string, validHosts Supplier, scaledContext *config.ScaledContext) http.Handler {
 	p := proxy{
 		prefix:             prefix,
 		validHostsSupplier: validHosts,
+		credentials:        scaledContext.Core.Secrets(""),
 	}
 
 	return &httputil.ReverseProxy{
@@ -96,12 +102,8 @@ func (p *proxy) proxy(req *http.Request) error {
 	if req.TLS != nil {
 		headerCopy.Set(ForwardProto, "https")
 	}
-
 	auth := req.Header.Get(APIAuth)
-	if auth != "" {
-		headerCopy.Set("Authorization", auth)
-	}
-
+	cAuth := req.Header.Get(CattleAuth)
 	for name, value := range req.Header {
 		if badHeaders[strings.ToLower(name)] {
 			continue
@@ -117,6 +119,18 @@ func (p *proxy) proxy(req *http.Request) error {
 	req.Host = destURL.Hostname()
 	req.URL = destURL
 	req.Header = headerCopy
+
+	if auth != "" { // non-empty AuthHeader is noop
+		req.Header.Set(AuthHeader, auth)
+	} else if cAuth != "" {
+		// setting CattleAuthHeader will replace credential id with secret data
+		// and generate signature
+		signer := newSigner(cAuth)
+		if signer != nil {
+			return signer.sign(req, p.credentials, cAuth)
+		}
+		req.Header.Set(AuthHeader, cAuth)
+	}
 
 	return nil
 }

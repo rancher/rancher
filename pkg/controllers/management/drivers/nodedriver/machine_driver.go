@@ -3,11 +3,14 @@ package nodedriver
 import (
 	"context"
 	"fmt"
+	"github.com/rancher/rancher/pkg/controllers/management/drivers"
 	"strings"
 	"sync"
 
+	"github.com/rancher/norman/types"
+
 	errs "github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/controllers/management/drivers"
+	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -31,6 +34,9 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		nodeDriverClient: nodeDriverClient,
 		schemaClient:     management.Management.DynamicSchemas(""),
 		schemaLister:     management.Management.DynamicSchemas("").Controller().Lister(),
+		secretStore:      management.Core.Secrets(""),
+		nsStore:          management.Core.Namespaces(""),
+		schemas:          management.Schemas,
 	}
 
 	nodeDriverClient.
@@ -41,6 +47,9 @@ type Lifecycle struct {
 	nodeDriverClient v3.NodeDriverInterface
 	schemaClient     v3.DynamicSchemaInterface
 	schemaLister     v3.DynamicSchemaLister
+	secretStore      v1.SecretInterface
+	nsStore          v1.NamespaceInterface
+	schemas          *types.Schemas
 }
 
 func (m *Lifecycle) Create(obj *v3.NodeDriver) (runtime.Object, error) {
@@ -57,13 +66,28 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	err := errs.New("not found")
 	// if node driver was created, we also activate the driver by default
 	driver := drivers.NewDynamicDriver(obj.Spec.Builtin, obj.Spec.DisplayName, obj.Spec.URL, obj.Spec.Checksum)
+	schemaName := obj.Spec.DisplayName + "config"
+	var existingSchema *v3.DynamicSchema
 	if obj.Spec.DisplayName != "" {
-		schemaName := obj.Spec.DisplayName + "config"
-		_, err = m.schemaLister.Get("", schemaName)
+		existingSchema, err = m.schemaLister.Get("", schemaName)
 	}
 
 	if driver.Exists() && err == nil {
-		return obj, nil
+		// add credential schema
+		credFields := map[string]v3.Field{}
+		if err != nil {
+			logrus.Errorf("error getting schema %v", err)
+		}
+		userCredFields, pwdFields := getCredFields(obj.Annotations)
+		for name, field := range existingSchema.Spec.ResourceFields {
+			if pwdFields[name] {
+				field.Type = "password"
+			}
+			if field.Type == "password" || userCredFields[name] {
+				credFields[name] = field
+			}
+		}
+		return m.createCredSchema(obj, credFields)
 	}
 
 	if !driver.Exists() {
@@ -108,14 +132,23 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	if err != nil {
 		return nil, err
 	}
+	credFields := map[string]v3.Field{}
 	resourceFields := map[string]v3.Field{}
+	userCredFields, pwdFields := getCredFields(obj.Annotations)
 	for _, flag := range flags {
 		name, field, err := FlagToField(flag)
 		if err != nil {
 			return nil, err
 		}
+		if pwdFields[name] {
+			field.Type = "password"
+		}
+		if field.Type == "password" || userCredFields[name] {
+			credFields[name] = field
+		}
 		resourceFields[name] = field
 	}
+
 	dynamicSchema := &v3.DynamicSchema{
 		Spec: v3.DynamicSchemaSpec{
 			ResourceFields: resourceFields,
@@ -136,6 +169,33 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return obj, err
 	}
+	return m.createCredSchema(obj, credFields)
+}
+
+func (m *Lifecycle) createCredSchema(obj *v3.NodeDriver, credFields map[string]v3.Field) (*v3.NodeDriver, error) {
+	name := credentialConfigSchemaName(obj.Spec.DisplayName)
+	_, err := m.schemaLister.Get("", name)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			credentialSchema := &v3.DynamicSchema{
+				Spec: v3.DynamicSchemaSpec{
+					ResourceFields: credFields,
+				},
+			}
+			credentialSchema.Name = name
+			credentialSchema.OwnerReferences = []metav1.OwnerReference{
+				{
+					UID:        obj.UID,
+					Kind:       obj.Kind,
+					APIVersion: obj.APIVersion,
+					Name:       obj.Name,
+				},
+			}
+			_, err := m.schemaClient.Create(credentialSchema)
+			return obj, err
+		}
+		return obj, err
+	}
 	return obj, nil
 }
 
@@ -148,6 +208,11 @@ func (m *Lifecycle) Updated(obj *v3.NodeDriver) (runtime.Object, error) {
 	}
 
 	if err := m.createOrUpdateNodeForEmbeddedType(obj.Spec.DisplayName+"config", obj.Spec.DisplayName+"Config", obj.Spec.Active); err != nil {
+		return obj, err
+	}
+
+	if err := m.createOrUpdateNodeForEmbeddedTypeCredential(credentialConfigSchemaName(obj.Spec.DisplayName),
+		obj.Spec.DisplayName+"credentialConfig", obj.Spec.Active); err != nil {
 		return obj, err
 	}
 
@@ -175,6 +240,13 @@ func (m *Lifecycle) Remove(obj *v3.NodeDriver) (runtime.Object, error) {
 		return obj, err
 	}
 	return obj, nil
+}
+
+func (m *Lifecycle) createOrUpdateNodeForEmbeddedTypeCredential(embeddedType, fieldName string, embedded bool) error {
+	SchemaLock.Lock()
+	defer SchemaLock.Unlock()
+
+	return m.createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, fieldName, "credentialconfig", "cloudCredential", embedded, true)
 }
 
 func (m *Lifecycle) createOrUpdateNodeForEmbeddedType(embeddedType, fieldName string, embedded bool) error {
@@ -247,4 +319,19 @@ func (m *Lifecycle) createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, f
 	}
 
 	return nil
+}
+
+func getCredFields(annotations map[string]string) (map[string]bool, map[string]bool) {
+	getMap := func(fields string) map[string]bool {
+		data := map[string]bool{}
+		for _, field := range strings.Split(fields, ",") {
+			data[field] = true
+		}
+		return data
+	}
+	return getMap(annotations["cred"]), getMap(annotations["password"])
+}
+
+func credentialConfigSchemaName(driverName string) string {
+	return fmt.Sprintf("%s%s", driverName, "credentialconfig")
 }

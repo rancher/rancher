@@ -5,7 +5,13 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"strings"
 )
+
+var driverData = map[string]map[string][]string{
+	"amazonec2": {"cred": []string{"accessKey"}},
+	"azure":     {"cred": []string{"clientId"}},
+}
 
 func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver("amazonec2", "local://", "", []string{"*.amazonaws.com", "*.amazonaws.com.cn"}, true, true, management); err != nil {
@@ -42,7 +48,6 @@ func addMachineDrivers(management *config.ManagementContext) error {
 		"c31b9da2c977e70c2eeee5279123a95d", []string{"ecs.aliyuncs.com"}, false, false, management); err != nil {
 		return err
 	}
-
 	return addMachineDriver("vmwarevsphere", "local://", "", nil, true, true, management)
 }
 
@@ -50,14 +55,27 @@ func addMachineDriver(name, url, checksum string, whitelist []string, active, bu
 	lister := management.Management.NodeDrivers("").Controller().Lister()
 	cli := management.Management.NodeDrivers("")
 	m, _ := lister.Get("", name)
+	// annotations can have keys cred and password, values []string to be considered as a part of cloud credential
+	annotations := map[string]string{}
 	if m != nil {
-		if m.Spec.Builtin != builtin || m.Spec.URL != url || m.Spec.Checksum != checksum || m.Spec.DisplayName != name {
+		for k, v := range m.Annotations {
+			annotations[k] = v
+		}
+	}
+	toUpdate := false
+	for key, fields := range driverData[name] {
+		annotations[key] = strings.Join(fields, ",")
+		toUpdate = true
+	}
+	if m != nil {
+		if toUpdate || m.Spec.Builtin != builtin || m.Spec.URL != url || m.Spec.Checksum != checksum || m.Spec.DisplayName != name {
 			logrus.Infof("Updating node driver %v", name)
 			m.Spec.Builtin = builtin
 			m.Spec.URL = url
 			m.Spec.Checksum = checksum
 			m.Spec.DisplayName = name
 			m.Spec.WhitelistDomains = whitelist
+			m.Annotations = annotations
 			_, err := cli.Update(m)
 			return err
 		}
@@ -67,7 +85,8 @@ func addMachineDriver(name, url, checksum string, whitelist []string, active, bu
 	logrus.Infof("Creating node driver %v", name)
 	_, err := cli.Create(&v3.NodeDriver{
 		ObjectMeta: v1.ObjectMeta{
-			Name: name,
+			Name:        name,
+			Annotations: annotations,
 		},
 		Spec: v3.NodeDriverSpec{
 			Active:           active,

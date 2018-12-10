@@ -10,8 +10,6 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/client/management/v3"
-	"github.com/sirupsen/logrus"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -22,8 +20,6 @@ type GlobalNamespaceStore struct {
 }
 
 func (s *GlobalNamespaceStore) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
-	logrus.Infof("Creating a Global CR of type %v, assigning to %v namespace", apiContext.Type, namespace.GlobalNamespace)
-
 	ns, ok := values.GetValue(data, client.PreferenceFieldNamespaceId)
 	if ok && !strings.EqualFold(convert.ToString(ns), namespace.GlobalNamespace) {
 		return nil, fmt.Errorf("Error creating Global resource, cannot assign to %v since already assigned to %v namespace", namespace.GlobalNamespace, ns)
