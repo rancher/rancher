@@ -75,7 +75,10 @@ func (h *ClusterGraphHandler) QuerySeriesAction(actionName string, action *types
 		return err
 	}
 
-	nodeMap, err := getNodeName2InternalIPMap(userContext, clusterName)
+	mgmtClient := h.clustermanager.ScaledContext.Management
+	nodeLister := mgmtClient.Nodes(metav1.NamespaceAll).Controller().Lister()
+
+	nodeMap, err := getNodeName2InternalIPMap(nodeLister, clusterName)
 	if err != nil {
 		return err
 	}
@@ -89,7 +92,7 @@ func (h *ClusterGraphHandler) QuerySeriesAction(actionName string, action *types
 	for _, graph := range graphs {
 		g := graph
 		graphName := getRefferenceGraphName(g.ClusterID, g.Name)
-		monitorMetrics, err := graph2Metrics(userContext, clusterName, g.ResourceType, graphName, g.MetricsSelector, g.DetailsMetricsSelector, inputParser.Input.MetricParams, inputParser.Input.IsDetails)
+		monitorMetrics, err := graph2Metrics(userContext, mgmtClient, clusterName, g.ResourceType, graphName, g.MetricsSelector, g.DetailsMetricsSelector, inputParser.Input.MetricParams, inputParser.Input.IsDetails)
 		if err != nil {
 			return err
 		}
@@ -134,8 +137,9 @@ type metricWrap struct {
 	ReferenceGraphResourceType string
 }
 
-func graph2Metrics(userContext *config.UserContext, clusterName, resourceType, refGraphName string, metricSelector, detailsMetricSelector map[string]string, metricParams map[string]string, isDetails bool) ([]*metricWrap, error) {
-	newMetricParams, err := parseMetricParams(userContext, resourceType, clusterName, metricParams)
+func graph2Metrics(userContext *config.UserContext, mgmtClient v3.Interface, clusterName, resourceType, refGraphName string, metricSelector, detailsMetricSelector map[string]string, metricParams map[string]string, isDetails bool) ([]*metricWrap, error) {
+	nodeLister := mgmtClient.Nodes(metav1.NamespaceAll).Controller().Lister()
+	newMetricParams, err := parseMetricParams(userContext, nodeLister, resourceType, clusterName, metricParams)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +151,7 @@ func graph2Metrics(userContext *config.UserContext, clusterName, resourceType, r
 	} else {
 		set = labels.Set(metricSelector)
 	}
-	metrics, err := userContext.Management.Management.MonitorMetrics(clusterName).List(metav1.ListOptions{LabelSelector: set.AsSelector().String()}) //todo: why cache not work
+	metrics, err := mgmtClient.MonitorMetrics(clusterName).List(metav1.ListOptions{LabelSelector: set.AsSelector().String()})
 	if err != nil {
 		return nil, fmt.Errorf("list metrics failed, %v", err)
 	}
@@ -173,9 +177,9 @@ func metrics2PrometheusQuery(metrics []*metricWrap, start, end time.Time, step t
 	return queries
 }
 
-func nodeName2InternalIP(userContext *config.UserContext, clusterName, nodeName string) (string, error) {
+func nodeName2InternalIP(nodeLister v3.NodeLister, clusterName, nodeName string) (string, error) {
 	_, name := ref.Parse(nodeName)
-	node, err := userContext.Management.Management.Nodes(metav1.NamespaceAll).Controller().Lister().Get(clusterName, name)
+	node, err := nodeLister.Get(clusterName, name)
 	if err != nil {
 		return "", fmt.Errorf("get node from mgnt faild, %v", err)
 	}
@@ -188,9 +192,9 @@ func nodeName2InternalIP(userContext *config.UserContext, clusterName, nodeName 
 	return internalNodeIP, nil
 }
 
-func getNodeName2InternalIPMap(userContext *config.UserContext, clusterName string) (map[string]string, error) {
+func getNodeName2InternalIPMap(nodeLister v3.NodeLister, clusterName string) (map[string]string, error) {
 	nodeMap := make(map[string]string)
-	nodes, err := userContext.Management.Management.Nodes(metav1.NamespaceAll).Controller().Lister().List(clusterName, labels.NewSelector())
+	nodes, err := nodeLister.List(clusterName, labels.NewSelector())
 	if err != nil {
 		return nil, fmt.Errorf("list node from mgnt failed, %v", err)
 	}
