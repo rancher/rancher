@@ -181,7 +181,7 @@ func nodeName2InternalIP(nodeLister v3.NodeLister, clusterName, nodeName string)
 	_, name := ref.Parse(nodeName)
 	node, err := nodeLister.Get(clusterName, name)
 	if err != nil {
-		return "", fmt.Errorf("get node from mgnt faild, %v", err)
+		return "", fmt.Errorf("get node from mgmt failed, %v", err)
 	}
 
 	internalNodeIP := getInternalNodeIP(node)

@@ -320,19 +320,19 @@ func parseTimeParams(from, to, interval string) (start, end time.Time, step time
 	timeRange := NewTimeRange(from, to)
 	start, err = timeRange.ParseFrom()
 	if err != nil {
-		err = fmt.Errorf("parse param from value %s faild, %v", from, err)
+		err = fmt.Errorf("parse param from value %s failed, %v", from, err)
 		return
 	}
 
 	end, err = timeRange.ParseTo()
 	if err != nil {
-		err = fmt.Errorf("parse param to value %s faild, %v", to, err)
+		err = fmt.Errorf("parse param to value %s failed, %v", to, err)
 		return
 	}
 
 	i, err := getIntervalFrom(interval, defaultMinInterval)
 	if err != nil {
-		err = fmt.Errorf("parse param interval value %s faild, %v", i, err)
+		err = fmt.Errorf("parse param interval value %s failed, %v", i, err)
 		return
 	}
 	intervalCalculator := newIntervalCalculator(&IntervalOptions{MinInterval: i})
