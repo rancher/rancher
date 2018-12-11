@@ -58,7 +58,7 @@ func (h *ProjectGraphHandler) QuerySeriesAction(actionName string, action *types
 	}
 
 	prometheusName, prometheusNamespace := monitorutil.ClusterMonitoringInfo()
-	token, err := getAuthToken(userContext, prometheusName, prometheusNamespace) //todo
+	token, err := getAuthToken(userContext, prometheusName, prometheusNamespace)
 	if err != nil {
 		return err
 	}
@@ -77,12 +77,13 @@ func (h *ProjectGraphHandler) QuerySeriesAction(actionName string, action *types
 		return err
 	}
 
+	mgmtClient := h.clustermanager.ScaledContext.Management
 	var queries []*PrometheusQuery
 	for _, graph := range graphs {
 		g := graph
 		_, projectName := ref.Parse(graph.ProjectID)
 		refName := getRefferenceGraphName(projectName, graph.Name)
-		monitorMetrics, err := graph2Metrics(userContext, clusterName, g.ResourceType, refName, graph.MetricsSelector, graph.DetailsMetricsSelector, inputParser.Input.MetricParams, inputParser.Input.IsDetails)
+		monitorMetrics, err := graph2Metrics(userContext, mgmtClient, clusterName, g.ResourceType, refName, graph.MetricsSelector, graph.DetailsMetricsSelector, inputParser.Input.MetricParams, inputParser.Input.IsDetails)
 		if err != nil {
 			return err
 		}
