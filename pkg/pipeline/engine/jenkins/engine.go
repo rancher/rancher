@@ -29,6 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+var (
+	stepNameRe = regexp.MustCompile(`step-\d+-\d+`)
+)
+
 type Engine struct {
 	JenkinsClient    *Client
 	HTTPClient       *http.Client
@@ -319,8 +323,8 @@ func (j *Engine) SyncExecution(execution *v3.PipelineExecution) (bool, error) {
 	}
 	for _, jenkinsStage := range info.Stages {
 		//handle those in step-1-1 format
-		parts := strings.Split(jenkinsStage.Name, "-")
-		if len(parts) == 3 {
+		if stepNameRe.MatchString(jenkinsStage.Name) {
+			parts := strings.Split(jenkinsStage.Name, "-")
 			stage, err := strconv.Atoi(parts[1])
 			if err != nil {
 				return false, err
