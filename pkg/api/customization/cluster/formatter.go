@@ -28,10 +28,12 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 		resource.AddAction(request, "rotateCertificates")
 	}
 
-	if convert.ToBool(resource.Values["enableClusterMonitoring"]) {
-		resource.AddAction(request, "disableMonitoring")
-	} else {
-		resource.AddAction(request, "enableMonitoring")
+	if err := request.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", request, resource.Values, request.Schema); err == nil {
+		if convert.ToBool(resource.Values["enableClusterMonitoring"]) {
+			resource.AddAction(request, "disableMonitoring")
+		} else {
+			resource.AddAction(request, "enableMonitoring")
+		}
 	}
 
 	if gkeConfig, ok := resource.Values["googleKubernetesEngineConfig"]; ok {
