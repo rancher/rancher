@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	kcluster "github.com/rancher/kontainer-engine/cluster"
@@ -174,6 +175,8 @@ func (ch *clusterHandler) syncClusterMonitoring(cluster *mgmtv3.Cluster) error {
 }
 
 func (ch *clusterHandler) detectMonitoringComponentsWhileInstall(appName, appTargetNamespace string, cluster *mgmtv3.Cluster) error {
+	time.Sleep(5 * time.Second)
+
 	if cluster.Status.MonitoringStatus == nil {
 		cluster.Status.MonitoringStatus = &mgmtv3.MonitoringStatus{
 			Conditions: []mgmtv3.MonitoringCondition{
@@ -211,6 +214,8 @@ func (ch *clusterHandler) detectMonitoringComponentsWhileUninstall(appName, appT
 	if cluster.Status.MonitoringStatus == nil {
 		return nil
 	}
+
+	time.Sleep(5 * time.Second)
 
 	monitoringStatus := cluster.Status.MonitoringStatus
 
