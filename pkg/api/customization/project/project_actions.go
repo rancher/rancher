@@ -12,6 +12,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/handler"
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -28,12 +29,13 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "setpodsecuritypolicytemplate")
 	resource.AddAction(apiContext, "exportYaml")
 
-	if convert.ToBool(resource.Values["enableProjectMonitoring"]) {
-		resource.AddAction(apiContext, "disableMonitoring")
-	} else {
-		resource.AddAction(apiContext, "enableMonitoring")
+	if err := apiContext.AccessControl.CanDo(v3.ProjectGroupVersionKind.Group, v3.ProjectResource.Name, "update", apiContext, resource.Values, apiContext.Schema); err == nil {
+		if convert.ToBool(resource.Values["enableProjectMonitoring"]) {
+			resource.AddAction(apiContext, "disableMonitoring")
+		} else {
+			resource.AddAction(apiContext, "enableMonitoring")
+		}
 	}
-
 }
 
 type Handler struct {
@@ -44,16 +46,27 @@ type Handler struct {
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	canUpdateProject := func() bool {
+		return apiContext.AccessControl.CanDo(v3.ProjectGroupVersionKind.Group, v3.ProjectResource.Name, "update", apiContext, nil, apiContext.Schema) == nil
+	}
+
 	switch actionName {
 	case "setpodsecuritypolicytemplate":
 		return h.setPodSecurityPolicyTemplate(actionName, action, apiContext)
 	case "exportYaml":
 		return h.ExportYamlHandler(actionName, action, apiContext)
 	case "enableMonitoring":
+		if !canUpdateProject() {
+			return httperror.NewAPIError(httperror.Unauthorized, "can not access")
+		}
 		return h.enableMonitoring(actionName, action, apiContext)
 	case "disableMonitoring":
+		if !canUpdateProject() {
+			return httperror.NewAPIError(httperror.Unauthorized, "can not access")
+		}
 		return h.disableMonitoring(actionName, action, apiContext)
 	}
+
 	return errors.Errorf("unrecognized action %v", actionName)
 }
 

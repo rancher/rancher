@@ -47,6 +47,10 @@ type ActionHandler struct {
 }
 
 func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	canUpdateCluster := func() bool {
+		return apiContext.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", apiContext, nil, apiContext.Schema) == nil
+	}
+
 	switch actionName {
 	case "generateKubeconfig":
 		return a.GenerateKubeconfigActionHandler(actionName, action, apiContext)
@@ -55,10 +59,17 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 	case "exportYaml":
 		return a.ExportYamlHandler(actionName, action, apiContext)
 	case "enableMonitoring":
+		if !canUpdateCluster() {
+			return httperror.NewAPIError(httperror.Unauthorized, "can not access")
+		}
 		return a.enableMonitoring(actionName, action, apiContext)
 	case "disableMonitoring":
+		if !canUpdateCluster() {
+			return httperror.NewAPIError(httperror.Unauthorized, "can not access")
+		}
 		return a.disableMonitoring(actionName, action, apiContext)
 	}
+
 	return httperror.NewAPIError(httperror.NotFound, "not found")
 }
 
