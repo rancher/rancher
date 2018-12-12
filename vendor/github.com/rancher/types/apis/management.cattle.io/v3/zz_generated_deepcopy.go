@@ -7277,6 +7277,11 @@ func (in *Token) DeepCopyInto(out *Token) {
 			(*out)[key] = val
 		}
 	}
+	if in.Enabled != nil {
+		in, out := &in.Enabled, &out.Enabled
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
