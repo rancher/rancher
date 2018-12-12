@@ -63,7 +63,7 @@ func (n *nsLifecycle) Create(obj *v1.Namespace) (runtime.Object, error) {
 		return obj, err
 	}
 
-	go updateStatusAnnotation(hasPRTBs, *obj, n.m)
+	go updateStatusAnnotation(hasPRTBs, obj.DeepCopy(), n.m)
 
 	return obj, err
 }
@@ -400,7 +400,7 @@ func crByNS(obj interface{}) ([]string, error) {
 	return result, nil
 }
 
-func updateStatusAnnotation(hasPRTBs bool, namespace v1.Namespace, mgr *manager) {
+func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager) {
 	if _, ok := namespace.Annotations[projectIDAnnotation]; ok {
 		for i := 0; i < 10; i++ {
 			time.Sleep(time.Millisecond * 500)
