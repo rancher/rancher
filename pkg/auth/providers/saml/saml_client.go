@@ -268,7 +268,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	}
 	allowedPrincipals := config.AllowedPrincipalIDs
 
-	allowed, err := s.userMGR.CheckAccess(config.AccessMode, allowedPrincipals, userPrincipal, groupPrincipals)
+	allowed, err := s.userMGR.CheckAccess(config.AccessMode, allowedPrincipals, userPrincipal.Name, groupPrincipals)
 	if err != nil {
 		log.Errorf("SAML: Error during login while checking access %v", err)
 		http.Redirect(w, r, redirectURL+"/login?errorCode=500", http.StatusFound)

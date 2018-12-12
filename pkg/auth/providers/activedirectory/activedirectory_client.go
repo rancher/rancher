@@ -78,7 +78,7 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 		return v3.Principal{}, nil, err
 	}
 
-	allowed, err := p.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal, groupPrincipals)
+	allowed, err := p.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal.Name, groupPrincipals)
 	if err != nil {
 		return v3.Principal{}, nil, err
 	}
@@ -87,6 +87,63 @@ func (p *adProvider) loginUser(adCredential *v3public.BasicLogin, config *v3.Act
 	}
 
 	return userPrincipal, groupPrincipals, err
+}
+
+func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
+	config, caPool, err := p.getActiveDirectoryConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	lConn, err := p.ldapConnection(config, caPool)
+	if err != nil {
+		return nil, err
+	}
+	defer lConn.Close()
+
+	serviceAccountPassword := config.ServiceAccountPassword
+	serviceAccountUserName := config.ServiceAccountUsername
+
+	err = ldap.AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUserName, config.DefaultLoginDomain, lConn)
+	if err != nil {
+		return nil, err
+	}
+
+	samName := principalID
+	if strings.Contains(principalID, `\`) {
+		samName = strings.SplitN(principalID, `\`, 2)[1]
+	}
+	query := fmt.Sprintf("(%v=%v)", config.UserLoginAttribute, ldapv2.EscapeFilter(samName))
+	logrus.Debugf("LDAP Search query: {%s}", query)
+	search := ldapv2.NewSearchRequest(
+		config.UserSearchBase,
+		ldapv2.ScopeWholeSubtree,
+		ldapv2.NeverDerefAliases,
+		0,
+		0,
+		false,
+		query,
+		ldap.GetUserSearchAttributes(MemberOfAttribute, ObjectClass, config),
+		nil,
+	)
+
+	result, err := lConn.Search(search)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(result.Entries) < 1 {
+		return nil, fmt.Errorf("Cannot locate user information for %s", search.Filter)
+	} else if len(result.Entries) > 1 {
+		return nil, fmt.Errorf("ldap user search found more than one result")
+	}
+
+	_, groupPrincipals, err := p.getPrincipalsFromSearchResult(result, config, lConn)
+	if err != nil {
+		return nil, err
+	}
+
+	return groupPrincipals, err
 }
 
 func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, config *v3.ActiveDirectoryConfig, lConn *ldapv2.Conn) (v3.Principal, []v3.Principal, error) {

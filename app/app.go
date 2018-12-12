@@ -6,11 +6,13 @@ import (
 	"github.com/rancher/norman/leader"
 	"github.com/rancher/norman/pkg/k8scheck"
 	"github.com/rancher/rancher/pkg/audit"
+	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
 	"github.com/rancher/rancher/pkg/dialer"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/tunnelserver"
@@ -120,6 +122,9 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 		}
 
 		tokens.StartPurgeDaemon(ctx, management)
+		cronTime := settings.AuthUserInfoResyncCron.Get()
+		maxAge := settings.AuthUserInfoMaxAgeSeconds.Get()
+		providerrefresh.StartRefreshDaemon(ctx, scaledContext, management, cronTime, maxAge)
 		logrus.Infof("Rancher startup complete")
 
 		<-ctx.Done()

@@ -8,13 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
-	ldapv2 "gopkg.in/ldap.v2"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
+	ldapv2 "gopkg.in/ldap.v2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type ConfigAttributes struct {

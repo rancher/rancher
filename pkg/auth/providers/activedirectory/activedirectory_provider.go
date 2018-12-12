@@ -4,13 +4,12 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
-	"github.com/rancher/rancher/pkg/api/store/auth"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
-
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/api/store/auth"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	corev1 "github.com/rancher/types/apis/core/v1"
@@ -20,6 +19,7 @@ import (
 	"github.com/rancher/types/client/management/v3public"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -129,12 +129,10 @@ func (p *adProvider) GetPrincipal(principalID string, token v3.Token) (v3.Princi
 		return v3.Principal{}, nil
 	}
 
-	parts := strings.SplitN(principalID, ":", 2)
-	if len(parts) != 2 {
-		return v3.Principal{}, errors.Errorf("invalid id %v", principalID)
+	externalID, scope, err := p.getDNAndScopeFromPrincipalID(principalID)
+	if err != nil {
+		return v3.Principal{}, err
 	}
-	scope := parts[0]
-	externalID := strings.TrimPrefix(parts[1], "//")
 
 	principal, err := p.getPrincipal(externalID, scope, config, caPool)
 	if err != nil {
@@ -206,4 +204,27 @@ func newCAPool(cert string) (*x509.CertPool, error) {
 	}
 	pool.AppendCertsFromPEM([]byte(cert))
 	return pool, nil
+}
+
+func (p *adProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
+	config, _, err := p.getActiveDirectoryConfig()
+	if err != nil {
+		logrus.Errorf("Error fetching AD config: %v", err)
+		return false, err
+	}
+	allowed, err := p.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipalID, groupPrincipals)
+	if err != nil {
+		return false, err
+	}
+	return allowed, nil
+}
+
+func (p *adProvider) getDNAndScopeFromPrincipalID(principalID string) (string, string, error) {
+	parts := strings.SplitN(principalID, ":", 2)
+	if len(parts) != 2 {
+		return "", "", errors.Errorf("invalid id %v", principalID)
+	}
+	scope := parts[0]
+	externalID := strings.TrimPrefix(parts[1], "//")
+	return externalID, scope, nil
 }

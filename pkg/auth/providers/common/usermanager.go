@@ -138,21 +138,21 @@ func (m *userManager) GetUser(apiContext *types.APIContext) string {
 }
 
 // checkis if the supplied principal can login based on the accessMode and allowed principals
-func (m *userManager) CheckAccess(accessMode string, allowedPrincipalIDs []string, userPrinc v3.Principal, groups []v3.Principal) (bool, error) {
+func (m *userManager) CheckAccess(accessMode string, allowedPrincipalIDs []string, userPrincipalID string, groups []v3.Principal) (bool, error) {
 	if accessMode == "unrestricted" || accessMode == "" {
 		return true, nil
 	}
 
 	if accessMode == "required" || accessMode == "restricted" {
-		user, err := m.checkCache(userPrinc.Name)
+		user, err := m.checkCache(userPrincipalID)
 		if err != nil {
 			return false, err
 		}
 
-		userPrincipals := []string{userPrinc.Name}
+		userPrincipals := []string{userPrincipalID}
 		if user != nil {
 			for _, p := range user.PrincipalIDs {
-				if userPrinc.Name != p {
+				if userPrincipalID != p {
 					userPrincipals = append(userPrincipals, p)
 				}
 			}

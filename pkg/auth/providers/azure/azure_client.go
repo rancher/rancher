@@ -74,7 +74,7 @@ func newClientCode(code string, config *v3.AzureADConfig) (*azureClient, error) 
 }
 
 // newClientToken sets up the SPT, user and group client using a current Token
-func newClientToken(token v3.Token, config *v3.AzureADConfig, azureToken adal.Token) (*azureClient, error) {
+func newClientToken(config *v3.AzureADConfig, azureToken adal.Token) (*azureClient, error) {
 	ac := &azureClient{}
 
 	oauthConfig, err := adal.NewOAuthConfig(config.Endpoint, config.TenantID)

@@ -3,13 +3,13 @@ package github
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/rancher/rancher/pkg/api/store/auth"
 	"net/http"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/api/store/auth"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"

@@ -8,7 +8,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
-	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
@@ -86,7 +85,7 @@ func (p *ldapProvider) loginUser(credential *v3public.BasicLogin, config *v3.Lda
 		return v3.Principal{}, nil, err
 	}
 
-	allowed, err := p.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal, groupPrincipals)
+	allowed, err := p.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal.Name, groupPrincipals)
 	if err != nil {
 		return v3.Principal{}, nil, err
 	}
@@ -222,7 +221,7 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult
 func (p *ldapProvider) getPrincipal(distinguishedName string, scope string, config *v3.LdapConfig, caPool *x509.CertPool) (*v3.Principal, error) {
 	var search *ldapv2.SearchRequest
 	var filter string
-	if !slice.ContainsString(freeIpaScopes, scope) && !slice.ContainsString(openLdapScopes, scope) {
+	if (scope != p.userScope) && (scope != p.groupScope) {
 		return nil, fmt.Errorf("Invalid scope")
 	}
 
@@ -428,4 +427,80 @@ func (p *ldapProvider) permissionCheck(attributes []*ldapv2.EntryAttribute, conf
 	userEnabledAttribute := config.UserEnabledAttribute
 	userDisabledBitMask := config.UserDisabledBitMask
 	return ldap.HasPermission(attributes, userObjectClass, userEnabledAttribute, userDisabledBitMask)
+}
+
+func (p *ldapProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
+	config, caPool, err := p.getLDAPConfig()
+	if err != nil {
+		return nil, err
+	}
+	lConn, err := p.ldapConnection(config, caPool)
+	if err != nil {
+		return nil, err
+	}
+	defer lConn.Close()
+
+	serviceAccountPassword := config.ServiceAccountPassword
+	serviceAccountUserName := config.ServiceAccountDistinguishedName
+	err = ldap.AuthenticateServiceAccountUser(serviceAccountPassword, serviceAccountUserName, "", lConn)
+	if err != nil {
+		return nil, err
+	}
+
+	distinguishedName, _, err := p.getDNAndScopeFromPrincipalID(principalID)
+	if err != nil {
+		return nil, err
+	}
+
+	searchRequest := ldapv2.NewSearchRequest(
+		distinguishedName,
+		ldapv2.ScopeBaseObject,
+		ldapv2.NeverDerefAliases,
+		0,
+		0,
+		false,
+		fmt.Sprintf("(%v=%v)", ObjectClass, config.UserObjectClass),
+		ldap.GetUserSearchAttributesForLDAP(ObjectClass, config),
+		nil,
+	)
+
+	result, err := lConn.Search(searchRequest)
+	if err != nil {
+		return nil, errors.New("no access")
+	}
+
+	if len(result.Entries) < 1 {
+		return nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Cannot locate user information for "+searchRequest.Filter)
+	} else if len(result.Entries) > 1 {
+		return nil, fmt.Errorf("ldap user search found more than one result")
+	}
+
+	userDN := result.Entries[0].DN //userDN is externalID
+
+	searchOpRequest := ldapv2.NewSearchRequest(
+		userDN,
+		ldapv2.ScopeBaseObject,
+		ldapv2.NeverDerefAliases,
+		0,
+		0,
+		false,
+		fmt.Sprintf("(%v=%v)", ObjectClass, config.UserObjectClass),
+		operationalAttrList,
+		nil,
+	)
+	opResult, err := lConn.Search(searchOpRequest)
+	if err != nil {
+		return nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed") // need to reload this error
+	}
+
+	if len(opResult.Entries) < 1 {
+		return nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Cannot locate user information for "+searchOpRequest.Filter)
+	}
+
+	_, groupPrincipals, err := p.getPrincipalsFromSearchResult(result, opResult, config, lConn)
+	if err != nil {
+		return nil, err
+	}
+
+	return groupPrincipals, nil
 }
