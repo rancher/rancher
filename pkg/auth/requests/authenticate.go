@@ -62,6 +62,10 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []st
 		return false, "", []string{}, err
 	}
 
+	if token.Enabled != nil && !*token.Enabled {
+		return false, "", []string{}, fmt.Errorf("user's token is not enabled")
+	}
+
 	attribs, err := a.userAttributeLister.Get("", token.UserID)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return false, "", []string{}, err

@@ -127,7 +127,7 @@ func (l *Provider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Princ
 
 	groupPrincipals, err := l.getGroupPrincipals(user)
 	if err != nil {
-		return v3.Principal{}, nil, "", errors.Wrapf(err, "failed to get groups for %v", user.ObjectMeta.Name)
+		return v3.Principal{}, nil, "", errors.Wrapf(err, "failed to get groups for %v", user.Name)
 	}
 
 	return userPrincipal, groupPrincipals, "", nil
@@ -173,6 +173,16 @@ func (l *Provider) getGroupPrincipals(user *v3.User) ([]v3.Principal, error) {
 	}
 
 	return groupPrincipals, nil
+}
+
+func (l *Provider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
+	userID := strings.SplitN(principalID, "://", 2)[1]
+	user, err := l.userLister.Get("", userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return l.getGroupPrincipals(user)
 }
 
 func (l *Provider) SearchPrincipals(searchKey, principalType string, token v3.Token) ([]v3.Principal, error) {
@@ -410,4 +420,13 @@ func indexField(field string, maxindex int) []string {
 		fieldIndexes = append(fieldIndexes, field[0:i])
 	}
 	return fieldIndexes
+}
+
+func (l *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
+	userID := strings.TrimPrefix(userPrincipalID, Name+"://")
+	user, err := l.userLister.Get("", userID)
+	if err != nil {
+		return false, err
+	}
+	return user.Name != "", nil
 }

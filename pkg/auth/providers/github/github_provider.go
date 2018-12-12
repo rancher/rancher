@@ -3,20 +3,16 @@ package github
 import (
 	"context"
 	"fmt"
-	"github.com/rancher/rancher/pkg/api/store/auth"
 	"net/http"
 	"strconv"
 	"strings"
 
-	"github.com/rancher/norman/types/convert"
-
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/mitchellh/mapstructure"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/api/store/auth"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	corev1 "github.com/rancher/types/apis/core/v1"
@@ -29,6 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -193,7 +190,7 @@ func (g *ghProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v
 		testAllowedPrincipals = append(testAllowedPrincipals, userPrincipal.Name)
 	}
 
-	allowed, err := g.userMGR.CheckAccess(config.AccessMode, testAllowedPrincipals, userPrincipal, groupPrincipals)
+	allowed, err := g.userMGR.CheckAccess(config.AccessMode, testAllowedPrincipals, userPrincipal.Name, groupPrincipals)
 	if err != nil {
 		return v3.Principal{}, nil, "", err
 	}
@@ -202,6 +199,41 @@ func (g *ghProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v
 	}
 
 	return userPrincipal, groupPrincipals, accessToken, nil
+}
+
+func (g *ghProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
+	var groupPrincipals []v3.Principal
+	var err error
+	var config *v3.GithubConfig
+
+	if config == nil {
+		config, err = g.getGithubConfigCR()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	orgAccts, err := g.githubClient.getOrgs(secret, config)
+	if err != nil {
+		return nil, err
+	}
+	for _, orgAcct := range orgAccts {
+		groupPrincipal := g.toPrincipal(orgType, orgAcct, nil)
+		groupPrincipal.MemberOf = true
+		groupPrincipals = append(groupPrincipals, groupPrincipal)
+	}
+
+	teamAccts, err := g.githubClient.getTeams(secret, config)
+	if err != nil {
+		return nil, err
+	}
+	for _, teamAcct := range teamAccts {
+		groupPrincipal := g.toPrincipal(teamType, teamAcct, nil)
+		groupPrincipal.MemberOf = true
+		groupPrincipals = append(groupPrincipals, groupPrincipal)
+	}
+
+	return groupPrincipals, nil
 }
 
 func (g *ghProvider) SearchPrincipals(searchKey, principalType string, token v3.Token) ([]v3.Principal, error) {
@@ -213,7 +245,7 @@ func (g *ghProvider) SearchPrincipals(searchKey, principalType string, token v3.
 		return principals, err
 	}
 
-	accessToken, err := g.tokenMGR.GetSecret(&token)
+	accessToken, err := g.tokenMGR.GetSecret(token.UserID, token.AuthProvider, []*v3.Token{&token})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, err
@@ -250,7 +282,7 @@ func (g *ghProvider) GetPrincipal(principalID string, token v3.Token) (v3.Princi
 		return v3.Principal{}, err
 	}
 
-	accessToken, err := g.tokenMGR.GetSecret(&token)
+	accessToken, err := g.tokenMGR.GetSecret(token.UserID, token.AuthProvider, []*v3.Token{&token})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return v3.Principal{}, err
@@ -328,4 +360,17 @@ func (g *ghProvider) isThisUserMe(me v3.Principal, other v3.Principal) bool {
 		return true
 	}
 	return false
+}
+
+func (g *ghProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
+	config, err := g.getGithubConfigCR()
+	if err != nil {
+		logrus.Errorf("Error fetching github config: %v", err)
+		return false, err
+	}
+	allowed, err := g.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipalID, groupPrincipals)
+	if err != nil {
+		return false, err
+	}
+	return allowed, nil
 }

@@ -12,4 +12,6 @@ type AuthProvider interface {
 	GetPrincipal(principalID string, token v3.Token) (v3.Principal, error)
 	CustomizeSchema(schema *types.Schema)
 	TransformToAuthProvider(authConfig map[string]interface{}) map[string]interface{}
+	RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error)
+	CanAccessWithGroupProviders(userPrincipalID string, groups []v3.Principal) (bool, error)
 }

@@ -45,6 +45,8 @@ var (
 	UIPL                            = NewSetting("ui-pl", "rancher")
 	WhitelistDomain                 = NewSetting("whitelist-domain", "forums.rancher.com")
 	SystemMonitoringCatalogID       = NewSetting("system-monitoring-catalog-id", "catalog://?catalog=system-library&template=rancher-monitoring&version=0.0.1")
+	AuthUserInfoResyncCron          = NewSetting("auth-user-info-resync-cron", "0 0 * * *")
+	AuthUserInfoMaxAgeSeconds       = NewSetting("auth-user-info-max-age-seconds", "3600") // 1 hour
 )
 
 type Provider interface {
