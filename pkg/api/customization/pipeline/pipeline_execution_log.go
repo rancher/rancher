@@ -55,7 +55,7 @@ func (h *ExecutionHandler) handleLog(apiContext *types.APIContext) error {
 		return err
 	}
 
-	pipelineEngine := engine.New(userContext)
+	pipelineEngine := engine.New(userContext, false)
 
 	c, err := upgrader.Upgrade(apiContext.Response, apiContext.Request, nil)
 	if err != nil {
