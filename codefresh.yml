@@ -1,0 +1,126 @@
+version: '1.0'
+stages:
+  - Pre-build
+  - Build
+  - Build-images
+  - Push-images
+  - Github-pre-release
+  - Github-release
+  
+steps:
+
+  build_dapper:
+    type: build
+    image_name: dapper
+    build_arguments:
+      - DAPPER_HOST_ARCH=amd64
+    dockerfile: ./Dockerfile.dapper
+    stage: Pre-build
+    
+  build:
+    image: ${{build_dapper}}
+    working_directory: IMAGE_WORK_DIR
+    commands:
+      - rm -r /go/src/github.com/rancher/rancher
+      - ln -s /codefresh/volume/rancher -T /go/src/github.com/rancher/rancher # make a symlink to Codefresh volume from the GOPATH
+      - cd /go/src/github.com/rancher/rancher
+      - ./scripts/entry ci
+    stage: Build
+      
+  stage_binaries:
+    image: rancher/dapper:1.11.2
+    commands:
+      - cp -r ./bin/* ./package/
+    when:
+      condition:
+        any:
+          pushEvent: 'match("${{CF_BRANCH}}", "^master$|release\/.*|^alpha$", false) == true'
+          tagEvent: 'match("${{CF_BASE_BRANCH}}", "^master$|release\/.*|rc", false) == true'
+    stage: Build-images
+    
+  build_images:
+    type: parallel
+    steps:     
+      docker_build_master:
+        type: build
+        image_name: rancher
+        dockerfile: Dockerfile
+        working_directory: './package'
+        build_arguments:
+          - VERSION=master
+        tag: master
+        when:
+         condition:
+           any:
+            pushEvent: 'match("${{CF_BRANCH}}", "master", false) == true'
+            tagEvent: 'match("${{CF_BASE_BRANCH}}", "^master$|release\/.*|^alpha$|rc", false) == true'
+        stage: Build-images
+        
+      docker_build_agent:
+        type: build
+        image_name: rancher-agent
+        dockerfile: Dockerfile.agent
+        working_directory: './package'
+        build_arguments:
+         - VERSION=master
+        tag: master
+        when:
+         condition:
+           any:
+              pushEvent: 'match("${{CF_BRANCH}}", "master", false) == true'
+              tagEvent: 'match("${{CF_BASE_BRANCH}}", "^master$|release\/.*|^alpha$|rc", false) == true'
+        stage: Build-images
+  
+  push_images:
+    type: parallel
+    steps:
+      docker_push_master:
+        type: push
+        candidate: ${{docker_build_master}}
+        image_name: rancher/rancher  
+        tag: ${{CF_BRANCH_TAG_NORMALIZED}}
+        registry: dockerhub
+        when:
+          condition:
+           any:
+              pushEvent: 'match("${{CF_BRANCH}}", "master", false) == true'
+              tagEvent: 'match("${{CF_BASE_BRANCH}}", "^master$|release\/.*|^alpha$|rc", false) == true'
+        stage: Push-images
+        
+      docker_push_agent:
+        type: push
+        candidate: ${{docker_build_agent}}
+        image_name: rancher/rancher-agent  
+        tag: ${{CF_BRANCH_TAG_NORMALIZED}}
+        registry: dockerhub
+        when:
+          condition:
+           any:
+              pushEvent: 'match("${{CF_BRANCH}}", "master", false) == true'
+              tagEvent: 'match("${{CF_BASE_BRANCH}}", "^master$|release\/.*|^alpha$|rc", false) == true'
+        stage: Push-images
+
+  github_binary_prerelease:
+    image: codefresh/cfstep-github-release
+    environment:
+      - GITHUB_TOKEN=${{GITHUB_TOKEN}}
+      - FILES=bin/rancher-*
+      - PRERELEASE=true
+    when:
+      condition:
+        all:
+          tagName: 'match("${{CF_BRANCH}}", "rc|alpha", false) == true'
+          tagBaseBranch: 'match("${{CF_BASE_BRANCH}}", "^master$|release\/.*|^alpha$|rc", false) == true'
+    stage: Github-pre-release
+    
+  github_binary_release:
+    image: codefresh/cfstep-github-release
+    environment:
+      - GITHUB_TOKEN=${{GITHUB_TOKEN}}
+      - FILES=bin/rancher-*
+    when:
+      condition:
+        all:
+          tagName: '!match("${{CF_BRANCH}}", "rc|alpha", false) == true'
+          tagBaseBranch: 'match("${{CF_BASE_BRANCH}}", "^master$|release\/.*|rc", false) == true'
+    stage: Github-release
