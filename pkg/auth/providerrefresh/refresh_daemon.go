@@ -82,6 +82,12 @@ func TriggerUserRefresh(userName string, force bool) {
 		return
 	}
 
+	if force {
+		logrus.Debugf("Triggering auth refresh manually on %v", userName)
+	} else {
+		logrus.Debugf("Triggering auth refresh on %v", userName)
+	}
+
 	if !force && (ref.maxAge <= 0) {
 		logrus.Debugf("Skipping refresh trigger on user %v because max age setting is <= 0", userName)
 		return
@@ -95,10 +101,12 @@ func RefreshAllForCron() {
 		return
 	}
 
+	logrus.Debug("Triggering auth refresh cron")
 	ref.refreshAll(false)
 }
 
 func TriggerAllUserRefresh() {
+	logrus.Debug("Triggering auth refresh manually on all users")
 	ref.refreshAll(true)
 }
 
@@ -107,10 +115,12 @@ func RefreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttribute, error) {
 		return nil, errors.Errorf("refresh daemon not yet initialized")
 	}
 
+	logrus.Debugf("Starting refresh process for %v", attribs.Name)
 	modified, err := ref.refreshAttributes(attribs)
 	if err != nil {
 		return nil, err
 	}
+	logrus.Debugf("Finished refresh process for %v", attribs.Name)
 	modified.LastRefresh = time.Now().UTC().Format(time.RFC3339)
 	modified.NeedsRefresh = false
 	return modified, nil
@@ -137,6 +147,7 @@ func (r *refresher) triggerUserRefresh(userName string, force bool) {
 	lastRefresh, _ := time.Parse(time.RFC3339, attribs.LastRefresh)
 	earliestRefresh := lastRefresh.Add(r.maxAge)
 	if !force && now.Before(earliestRefresh) {
+		logrus.Debugf("Skipping refresh for %v due to max-age", userName)
 		return
 	}
 	attribs.NeedsRefresh = true
