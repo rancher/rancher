@@ -15,7 +15,7 @@ type PipelineEngine interface {
 	SyncExecution(execution *v3.PipelineExecution) (bool, error)
 }
 
-func New(cluster *config.UserContext) PipelineEngine {
+func New(cluster *config.UserContext, useCache bool) PipelineEngine {
 	serviceLister := cluster.Core.Services("").Controller().Lister()
 	podLister := cluster.Core.Pods("").Controller().Lister()
 	secrets := cluster.Core.Secrets("")
@@ -27,6 +27,7 @@ func New(cluster *config.UserContext) PipelineEngine {
 	dialer := cluster.Management.Dialer
 
 	engine := &jenkins.Engine{
+		UseCache:                   useCache,
 		ServiceLister:              serviceLister,
 		PodLister:                  podLister,
 		Secrets:                    secrets,

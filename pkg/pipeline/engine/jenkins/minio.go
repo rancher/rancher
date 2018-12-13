@@ -11,6 +11,8 @@ import (
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type minioClient struct {
@@ -36,7 +38,12 @@ func (j *Engine) getMinioClient(ns string) (*minio.Client, error) {
 	}
 
 	user := utils.PipelineSecretDefaultUser
-	secret, err := j.SecretLister.Get(ns, utils.PipelineSecretName)
+	var secret *corev1.Secret
+	if j.UseCache {
+		secret, err = j.SecretLister.Get(ns, utils.PipelineSecretName)
+	} else {
+		secret, err = j.Secrets.GetNamespaced(ns, utils.PipelineSecretName, metav1.GetOptions{})
+	}
 	if err != nil || secret.Data == nil {
 		return nil, fmt.Errorf("error get minio token - %v", err)
 	}

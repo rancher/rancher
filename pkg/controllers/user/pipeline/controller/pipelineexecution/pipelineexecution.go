@@ -122,7 +122,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	sourceCodeCredentialLister := cluster.Management.Project.SourceCodeCredentials("").Controller().Lister()
 	notifierLister := cluster.Management.Management.Notifiers("").Controller().Lister()
 
-	pipelineEngine := engine.New(cluster)
+	pipelineEngine := engine.New(cluster, true)
 	pipelineExecutionLifecycle := &Lifecycle{
 		namespaces:          namespaces,
 		namespaceLister:     namespaceLister,

@@ -34,6 +34,8 @@ var (
 )
 
 type Engine struct {
+	// UseCache affects resources that is not cached in follower instances of HA mode
+	UseCache         bool
 	JenkinsClient    *Client
 	HTTPClient       *http.Client
 	ServiceLister    v1.ServiceLister
@@ -92,7 +94,12 @@ func (j *Engine) getJenkinsClient(execution *v3.PipelineExecution) (*Client, err
 	}
 	user := utils.PipelineSecretDefaultUser
 	ns := utils.GetPipelineCommonName(execution)
-	secret, err := j.SecretLister.Get(ns, utils.PipelineSecretName)
+	var secret *corev1.Secret
+	if j.UseCache {
+		secret, err = j.SecretLister.Get(ns, utils.PipelineSecretName)
+	} else {
+		secret, err = j.Secrets.GetNamespaced(ns, utils.PipelineSecretName, metav1.GetOptions{})
+	}
 	if err != nil || secret.Data == nil {
 		return nil, fmt.Errorf("error get jenkins token - %v", err)
 	}
