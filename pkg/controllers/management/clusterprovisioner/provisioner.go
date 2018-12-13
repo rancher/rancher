@@ -360,7 +360,15 @@ func skipProvisioning(cluster *v3.Cluster) bool {
 func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, driverName, clusterName string) (*v3.ClusterSpec, interface{}, error) {
 	var v interface{}
 	if spec.GenericEngineConfig == nil {
-		v = map[string]interface{}{}
+		if spec.RancherKubernetesEngineConfig != nil {
+			var err error
+			v, err = convert.EncodeToMap(spec.RancherKubernetesEngineConfig)
+			if err != nil {
+				return nil, nil, err
+			}
+		} else {
+			v = map[string]interface{}{}
+		}
 	} else {
 		v = *spec.GenericEngineConfig
 	}
