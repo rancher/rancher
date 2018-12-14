@@ -118,7 +118,7 @@ func (p *ldapProvider) saveLDAPConfig(config *v3.LdapConfig) error {
 
 	field := strings.ToLower(auth.TypeToField[config.Type])
 	if err := common.CreateOrUpdateSecrets(p.secrets, config.ServiceAccountPassword,
-		strings.ToLower(config.Type), field); err != nil {
+		field, strings.ToLower(config.Type)); err != nil {
 		return err
 	}
 
