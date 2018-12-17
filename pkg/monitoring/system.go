@@ -18,7 +18,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
-func SyncServiceMonitor(cluster *mgmtv3.Cluster, agentCoreClient corev1.Interface, agentRBACClient rbacv1.Interface, cattleAppsGetter projectv3.AppsGetter, cattleProjectsGetter mgmtv3.ProjectsGetter, cattleTemplateVersionsClient mgmtv3.TemplateVersionInterface) error {
+func SyncServiceMonitor(cluster *mgmtv3.Cluster, agentCoreClient corev1.Interface, agentRBACClient rbacv1.Interface, cattleAppsGetter projectv3.AppsGetter, cattleProjectsGetter mgmtv3.ProjectsGetter, cattleTemplateVersionsClient mgmtv3.CatalogTemplateVersionInterface) error {
 	if cluster.Spec.EnableClusterMonitoring || cluster.Spec.EnableClusterAlerting {
 		err := DeploySystemMonitor(cluster, agentCoreClient, agentRBACClient, cattleAppsGetter, cattleProjectsGetter, cattleTemplateVersionsClient)
 		if err != nil {
@@ -33,7 +33,7 @@ func SyncServiceMonitor(cluster *mgmtv3.Cluster, agentCoreClient corev1.Interfac
 	return nil
 }
 
-func DeploySystemMonitor(cluster *mgmtv3.Cluster, agentCoreClient corev1.Interface, agentRBACClient rbacv1.Interface, cattleAppsGetter projectv3.AppsGetter, cattleProjectsGetter mgmtv3.ProjectsGetter, cattleTemplateVersionsClient mgmtv3.TemplateVersionInterface) (backErr error) {
+func DeploySystemMonitor(cluster *mgmtv3.Cluster, agentCoreClient corev1.Interface, agentRBACClient rbacv1.Interface, cattleAppsGetter projectv3.AppsGetter, cattleProjectsGetter mgmtv3.ProjectsGetter, cattleTemplateVersionsClient mgmtv3.CatalogTemplateVersionInterface) (backErr error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil {
 		logrus.Warnf("cluster %s is deleted", cluster.Name)
 		return nil

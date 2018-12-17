@@ -18,6 +18,7 @@ import (
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/config"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -53,7 +54,7 @@ func (l *alertService) Init(ctx context.Context, cluster *config.UserContext) {
 		appsGetter:       cluster.Management.Project,
 		namespaces:       cluster.Management.Core.Namespaces(metav1.NamespaceAll),
 		secrets:          cluster.Core.Secrets(metav1.NamespaceAll),
-		templateVersions: cluster.Management.Management.TemplateVersions(metav1.NamespaceAll),
+		templateVersions: cluster.Management.Management.CatalogTemplateVersions(namespace.GlobalNamespace),
 	}
 
 	l.clusterName = cluster.ClusterName
@@ -72,7 +73,7 @@ func (l *alertService) Init(ctx context.Context, cluster *config.UserContext) {
 
 func (l *alertService) Version() (string, error) {
 	catalogID := settings.SystemMonitoringCatalogID.Get()
-	templateVersionID, err := common.ParseExternalID(catalogID)
+	templateVersionID, _, err := common.ParseExternalID(catalogID)
 	if err != nil {
 		return "", fmt.Errorf("get system monitor catalog version failed, %v", err)
 	}
@@ -82,7 +83,7 @@ func (l *alertService) Version() (string, error) {
 func (l *alertService) Upgrade(currentVersion string) (string, error) {
 	newCatalogID := settings.SystemMonitoringCatalogID.Get()
 
-	NewVersion, err := common.ParseExternalID(newCatalogID)
+	NewVersion, _, err := common.ParseExternalID(newCatalogID)
 	if currentVersion == NewVersion {
 		return currentVersion, nil
 	}

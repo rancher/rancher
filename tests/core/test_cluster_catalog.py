@@ -1,8 +1,6 @@
 from .conftest import wait_until, wait_until_available
 from rancher import ApiError
-from .common import wait_to_ensure_user_in_crb_subject, \
-    wait_to_ensure_user_removed_from_crb_subject, random_str
-import kubernetes
+from .common import random_str
 import time
 
 
@@ -103,8 +101,6 @@ def test_cluster_catalog_templates_access(admin_mc, user_factory,
     # Now create a cluster catalog
     name = random_str()
     catalog_name = "local:" + name
-    template_name = "local-" + name + '-etcd-operator'
-    template_version_name = template_name + "-0.7.6"
     url = "https://github.com/mrajashree/charts.git"
     cc = admin_client.create_cluster_catalog(name=name,
                                              branch="onlyOne",
@@ -112,27 +108,6 @@ def test_cluster_catalog_templates_access(admin_mc, user_factory,
                                              clusterId="local",
                                              )
     wait_for_clustercatalog_template_to_be_created(admin_client, catalog_name)
-
-    # Find the expected k8s clusterRole for the templates and templateversions
-    # of this cluster catalog
-    api_instance = kubernetes.client.RbacAuthorizationV1Api(
-        admin_mc.k8s_client)
-
-    cr_name = "cluster-local-use-templates-templateversions"
-    cr = api_instance.read_cluster_role(cr_name)
-
-    # Ensure that the newly created template name is added to resourenames
-    # of the cluster role
-    cr_rules = cr.rules
-    wait_until(cr_rule_template(api_instance, cr_name, cr, "templates"))
-    wait_until(cr_rule_template(api_instance, cr_name, cr, "templateversions"))
-    for i in range(0, len(cr_rules)):
-        if cr_rules[i].resources[0] == "templates":
-            if cr_rules[i].resource_names is not None:
-                assert template_name in cr_rules[i].resource_names
-        if cr_rules[i].resources[0] == "templateversions":
-            if cr_rules[i].resource_names is not None:
-                assert template_version_name in cr_rules[i].resource_names
 
     # Now add a user to a project within this cluster as project-owner
     user2 = user_factory()
@@ -145,32 +120,28 @@ def test_cluster_catalog_templates_access(admin_mc, user_factory,
     remove_resource(prtb_owner)
     wait_until(prtb_cb(admin_client, prtb_owner))
 
-    # Get cluster role binding for this cluster role
-    # Ensure that cluster-member user1 is added in subjects
-    crb_name = "local-templates-templateversions-crb"
-    wait_to_ensure_user_in_crb_subject(api_instance, crb_name,
-                                       user1.user.id)
-    # Ensure that project-owner user2 is added in subjects
-    wait_to_ensure_user_in_crb_subject(api_instance, crb_name,
-                                       user2.user.id)
-
     wait_until_available(admin_client, prtb_owner)
     project_owner_client = user2.client
 
     templates = \
         project_owner_client.list_template(clusterCatalogId=catalog_name)
     assert len(templates) == 1
+    templateversions = \
+        project_owner_client.list_template(clusterCatalogId=catalog_name)
+    assert len(templateversions) == 1
 
     cluster_member_client = user1.client
     templates = \
         cluster_member_client.list_template(clusterCatalogId=catalog_name)
     assert len(templates) == 1
+    templateversions = \
+        cluster_member_client.list_template(clusterCatalogId=catalog_name)
+    assert len(templateversions) == 1
 
     # Now remove user1 also from the cluster, this should mean user1 should
     # no longer be able to access the catalog and templates
     admin_client.delete(crtb_member)
-    wait_to_ensure_user_removed_from_crb_subject(api_instance, crb_name,
-                                                 user1.user.id)
+
     templates = \
         user1.client.list_template(clusterCatalogId=catalog_name)
     assert len(templates) == 0
@@ -178,11 +149,12 @@ def test_cluster_catalog_templates_access(admin_mc, user_factory,
     # Now remove the user admin_pc from the project of this cluster,
     # so admin_pc should no longer have access to catalog and templates
     admin_client.delete(prtb_owner)
-    wait_to_ensure_user_removed_from_crb_subject(api_instance, crb_name,
-                                                 user2.user.id)
     templates = \
         user2.client.list_template(clusterCatalogId=catalog_name)
     assert len(templates) == 0
+    templateversions = \
+        user2.client.list_template(clusterCatalogId=catalog_name)
+    assert len(templateversions) == 0
 
     admin_client.delete(cc)
     wait_for_clustercatalog_template_to_be_deleted(admin_client, catalog_name)
@@ -216,16 +188,6 @@ def wait_for_clustercatalog_template_to_be_deleted(client, name, timeout=45):
             found = True
         time.sleep(interval)
         interval *= 2
-
-
-def cr_rule_template(api_instance, cr_name, cr, resource):
-    def cb():
-        c = api_instance.read_cluster_role(cr_name)
-        cr_rules = c.rules
-        for i in range(0, len(cr_rules)):
-            if cr_rules[i].resources[0] == resource:
-                return cr_rules[i].resource_names is not None
-    return cb
 
 
 def crtb_cb(client, crtb):

@@ -27,7 +27,8 @@ def test_app_mysql(admin_pc, admin_mc):
     }
     client.create_app(
         name=name,
-        externalId="catalog://?catalog=library&template=mysql&version=0.3.7",
+        externalId="catalog://?catalog=library&template=mysql&version=0.3.7&"
+                   "namespace=cattle-global-data",
         targetNamespace=ns.name,
         projectId=admin_pc.project.id,
         answers=answers
@@ -73,7 +74,8 @@ def test_app_wordpress(admin_pc, admin_mc):
         "wordpressPassword": "",
         "wordpressUsername": "user"
     }
-    external_id = "catalog://?catalog=library&template=wordpress&version=1.0.5"
+    external_id = "catalog://?catalog=library&template=wordpress" \
+                  "&version=1.0.5&namespace=cattle-global-data"
     client.create_app(
         name=name,
         externalId=external_id,
@@ -98,7 +100,8 @@ def test_prehook_chart(admin_pc, admin_mc):
                                              )
     wait_for_template_to_be_created(admin_mc.client, catalog.name)
     external_id = "catalog://?catalog=" + \
-                  catalog.name + "&template=busybox&version=0.0.2"
+                  catalog.name + "&template=busybox&version=0.0.2" \
+                                 "&namespace=cattle-global-data"
     client.create_app(
         name=name,
         externalId=external_id,
@@ -121,13 +124,15 @@ def test_app_namespace_annotation(admin_pc, admin_mc):
     wait_for_template_to_be_created(admin_mc.client, "library")
     app1 = client.create_app(
         name=random_str(),
-        externalId="catalog://?catalog=library&template=mysql&version=0.3.7",
+        externalId="catalog://?catalog=library&template=mysql&version=0.3.7"
+                   "&namespace=cattle-global-data",
         targetNamespace=ns.name,
         projectId=admin_pc.project.id,
     )
     wait_for_workload(client, ns.name, count=1)
 
-    external_id = "catalog://?catalog=library&template=wordpress&version=1.0.5"
+    external_id = "catalog://?catalog=library&template=wordpress" \
+                  "&version=1.0.5&namespace=cattle-global-data"
     app2 = client.create_app(
         name=random_str(),
         externalId=external_id,

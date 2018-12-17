@@ -74,14 +74,14 @@ func convertTemplates(files map[string]string, templateContentClient mgmtv3.Temp
 	return templates, nil
 }
 
-func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersionInterface, templateContentClient mgmtv3.TemplateContentInterface) (string, string, string, error) {
+func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.CatalogTemplateVersionInterface, templateContentClient mgmtv3.TemplateContentInterface) (string, string, string, error) {
 	files := map[string]string{}
 	if obj.Spec.ExternalID != "" {
-		templateVersionID, err := common.ParseExternalID(obj.Spec.ExternalID)
+		templateVersionID, templateVersionNamespace, err := common.ParseExternalID(obj.Spec.ExternalID)
 		if err != nil {
 			return "", "", "", err
 		}
-		templateVersion, err := templateVersionClient.Get(templateVersionID, metav1.GetOptions{})
+		templateVersion, err := templateVersionClient.GetNamespaced(templateVersionNamespace, templateVersionID, metav1.GetOptions{})
 		if err != nil {
 			return "", "", "", err
 		}

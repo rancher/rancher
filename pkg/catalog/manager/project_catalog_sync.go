@@ -15,7 +15,7 @@ func (m *Manager) ProjectCatalogSync(key string, obj *v3.ProjectCatalog) (runtim
 	}
 
 	if obj == nil {
-		return nil, m.deleteTemplates(name)
+		return nil, m.deleteTemplates(name, ns)
 	}
 
 	// always get a refresh catalog from etcd
@@ -32,7 +32,8 @@ func (m *Manager) ProjectCatalogSync(key string, obj *v3.ProjectCatalog) (runtim
 		return nil, err
 	}
 
-	if commit == projectCatalog.Status.Commit {
+	upgraded := v3.CatalogConditionUpgraded.IsTrue(obj)
+	if commit == projectCatalog.Status.Commit && upgraded {
 		logrus.Debugf("Project catalog %s is already up to date", projectCatalog.Name)
 		if !v3.CatalogConditionRefreshed.IsTrue(projectCatalog) {
 			v3.CatalogConditionRefreshed.True(projectCatalog)
@@ -49,5 +50,5 @@ func (m *Manager) ProjectCatalogSync(key string, obj *v3.ProjectCatalog) (runtim
 	}
 
 	logrus.Infof("Updating project catalog %s", projectCatalog.Name)
-	return nil, m.traverseAndUpdate(repoPath, commit, cmt)
+	return nil, m.traverseAndUpdate(repoPath, commit, cmt, upgraded)
 }

@@ -12,6 +12,7 @@ import (
 	kcluster "github.com/rancher/kontainer-engine/cluster"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/monitoring"
+	"github.com/rancher/rancher/pkg/namespace"
 	nodeutil "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
@@ -42,7 +43,7 @@ type etcdTLSConfig struct {
 }
 
 type appHandler struct {
-	cattleTemplateVersionsGetter mgmtv3.TemplateVersionsGetter
+	cattleTemplateVersionsGetter mgmtv3.CatalogTemplateVersionsGetter
 	cattleProjectsGetter         mgmtv3.ProjectsGetter
 	cattleAppsGetter             projectv3.AppsGetter
 	cattleCoreClient             corev1.Interface
@@ -95,7 +96,7 @@ func (ch *clusterHandler) sync(key string, cluster *mgmtv3.Cluster) (runtime.Obj
 }
 
 func (ch *clusterHandler) syncSystemMonitor(cluster *mgmtv3.Cluster) (err error) {
-	return monitoring.SyncServiceMonitor(cluster, ch.app.agentCoreClient, ch.app.agentRBACClient, ch.app.cattleAppsGetter, ch.app.cattleProjectsGetter, ch.app.cattleTemplateVersionsGetter.TemplateVersions(metav1.NamespaceAll))
+	return monitoring.SyncServiceMonitor(cluster, ch.app.agentCoreClient, ch.app.agentRBACClient, ch.app.cattleAppsGetter, ch.app.cattleProjectsGetter, ch.app.cattleTemplateVersionsGetter.CatalogTemplateVersions(namespace.GlobalNamespace))
 }
 
 func (ch *clusterHandler) syncClusterMonitoring(cluster *mgmtv3.Cluster) error {

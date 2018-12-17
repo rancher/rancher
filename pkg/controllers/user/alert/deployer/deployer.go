@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/rancher/pkg/monitoring"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
+	"github.com/rancher/rancher/pkg/namespace"
 	projectutil "github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
@@ -50,12 +51,12 @@ type appDeployer struct {
 	appsGetter       projectv3.AppsGetter
 	namespaces       v1.NamespaceInterface
 	secrets          v1.SecretInterface
-	templateVersions mgmtv3.TemplateVersionInterface
+	templateVersions mgmtv3.CatalogTemplateVersionInterface
 	statefulsets     appsv1beta2.StatefulSetInterface
 }
 
 type operaterDeployer struct {
-	templateVersions mgmtv3.TemplateVersionInterface
+	templateVersions mgmtv3.CatalogTemplateVersionInterface
 	projectsGetter   mgmtv3.ProjectsGetter
 	appsGetter       projectv3.AppsGetter
 	rbacs            rbacv1.Interface
@@ -69,12 +70,12 @@ func NewDeployer(cluster *config.UserContext, manager *manager.AlertManager) *De
 		appsGetter:       appsgetter,
 		namespaces:       cluster.Core.Namespaces(metav1.NamespaceAll),
 		secrets:          cluster.Core.Secrets(metav1.NamespaceAll),
-		templateVersions: cluster.Management.Management.TemplateVersions(metav1.NamespaceAll),
+		templateVersions: cluster.Management.Management.CatalogTemplateVersions(namespace.GlobalNamespace),
 		statefulsets:     cluster.Apps.StatefulSets(metav1.NamespaceAll),
 	}
 
 	op := &operaterDeployer{
-		templateVersions: cluster.Management.Management.TemplateVersions(metav1.NamespaceAll),
+		templateVersions: cluster.Management.Management.CatalogTemplateVersions(namespace.GlobalNamespace),
 		projectsGetter:   cluster.Management.Management,
 		appsGetter:       appsgetter,
 		rbacs:            cluster.RBAC,
@@ -288,11 +289,11 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID, syste
 	}
 
 	catalogID := settings.SystemMonitoringCatalogID.Get()
-	templateVersionID, err := common.ParseExternalID(catalogID)
+	templateVersionID, templateVersionNamespace, err := common.ParseExternalID(catalogID)
 	if err != nil {
 		return false, fmt.Errorf("failed to parse catalog ID %q, %v", catalogID, err)
 	}
-	if _, err := d.templateVersions.Get(templateVersionID, metav1.GetOptions{}); err != nil {
+	if _, err := d.templateVersions.GetNamespaced(templateVersionNamespace, templateVersionID, metav1.GetOptions{}); err != nil {
 		return false, fmt.Errorf("failed to find catalog by ID %q, %v", catalogID, err)
 	}
 

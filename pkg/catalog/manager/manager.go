@@ -31,11 +31,11 @@ type Manager struct {
 	lock                  *locker.Locker
 	catalogClient         v3.CatalogInterface
 	CatalogLister         v3.CatalogLister
-	templateClient        v3.TemplateInterface
-	templateVersionClient v3.TemplateVersionInterface
+	templateClient        v3.CatalogTemplateInterface
+	templateVersionClient v3.CatalogTemplateVersionInterface
 	templateContentClient v3.TemplateContentInterface
-	templateLister        v3.TemplateLister
-	templateVersionLister v3.TemplateVersionLister
+	templateLister        v3.CatalogTemplateLister
+	templateVersionLister v3.CatalogTemplateVersionLister
 	templateContentLister v3.TemplateContentLister
 	projectCatalogClient  v3.ProjectCatalogInterface
 	ProjectCatalogLister  v3.ProjectCatalogLister
@@ -55,11 +55,11 @@ func New(management *config.ManagementContext, cacheRoot string) *Manager {
 		lock:                  locker.New(),
 		catalogClient:         management.Management.Catalogs(""),
 		CatalogLister:         management.Management.Catalogs("").Controller().Lister(),
-		templateClient:        management.Management.Templates(""),
-		templateVersionClient: management.Management.TemplateVersions(""),
+		templateClient:        management.Management.CatalogTemplates(""),
+		templateVersionClient: management.Management.CatalogTemplateVersions(""),
 		templateContentClient: management.Management.TemplateContents(""),
-		templateLister:        management.Management.Templates("").Controller().Lister(),
-		templateVersionLister: management.Management.TemplateVersions("").Controller().Lister(),
+		templateLister:        management.Management.CatalogTemplates("").Controller().Lister(),
+		templateVersionLister: management.Management.CatalogTemplateVersions("").Controller().Lister(),
 		templateContentLister: management.Management.TemplateContents("").Controller().Lister(),
 		projectCatalogClient:  management.Management.ProjectCatalogs(""),
 		ProjectCatalogLister:  management.Management.ProjectCatalogs("").Controller().Lister(),
@@ -205,8 +205,8 @@ func (m *Manager) remoteShaChanged(repoURL, branch, sha, uuid string) (bool, err
 	return true, nil
 }
 
-func (m *Manager) deleteChart(toDelete string) error {
-	toDeleteTvs, err := m.getTemplateVersion(toDelete)
+func (m *Manager) deleteChart(toDelete string, namespace string) error {
+	toDeleteTvs, err := m.getTemplateVersion(toDelete, namespace)
 	if err != nil {
 		return err
 	}

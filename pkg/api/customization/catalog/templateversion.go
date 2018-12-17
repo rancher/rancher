@@ -97,7 +97,7 @@ func extractVersionLinks(apiContext *types.APIContext, resource *types.RawResour
 func (t TemplateVerionFormatterWrapper) TemplateVersionReadmeHandler(apiContext *types.APIContext, next types.RequestHandler) error {
 	switch apiContext.Link {
 	case "readme":
-		templateVersion := &client.TemplateVersion{}
+		templateVersion := &client.CatalogTemplateVersion{}
 		if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, templateVersion); err != nil {
 			return err
 		}
@@ -114,7 +114,7 @@ func (t TemplateVerionFormatterWrapper) TemplateVersionReadmeHandler(apiContext 
 		http.ServeContent(apiContext.Response, apiContext.Request, "readme", t, readmeReader)
 		return nil
 	case "app-readme":
-		templateVersion := &client.TemplateVersion{}
+		templateVersion := &client.CatalogTemplateVersion{}
 		if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, templateVersion); err != nil {
 			return err
 		}

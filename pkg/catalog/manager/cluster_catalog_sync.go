@@ -15,7 +15,7 @@ func (m *Manager) ClusterCatalogSync(key string, obj *v3.ClusterCatalog) (runtim
 	}
 
 	if obj == nil {
-		return nil, m.deleteTemplates(name)
+		return nil, m.deleteTemplates(name, ns)
 	}
 
 	// always get a refresh catalog from etcd
@@ -32,7 +32,8 @@ func (m *Manager) ClusterCatalogSync(key string, obj *v3.ClusterCatalog) (runtim
 		return nil, err
 	}
 
-	if commit == clusterCatalog.Status.Commit {
+	upgraded := v3.CatalogConditionUpgraded.IsTrue(obj)
+	if commit == clusterCatalog.Status.Commit && upgraded {
 		logrus.Debugf("Catalog %s is already up to date", clusterCatalog.Name)
 		if !v3.CatalogConditionRefreshed.IsTrue(clusterCatalog) {
 			v3.CatalogConditionRefreshed.True(clusterCatalog)
@@ -49,5 +50,5 @@ func (m *Manager) ClusterCatalogSync(key string, obj *v3.ClusterCatalog) (runtim
 	}
 
 	logrus.Infof("Updating catalog %s", clusterCatalog.Name)
-	return nil, m.traverseAndUpdate(repoPath, commit, cmt)
+	return nil, m.traverseAndUpdate(repoPath, commit, cmt, upgraded)
 }
