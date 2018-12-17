@@ -428,5 +428,5 @@ func (l *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPrin
 	if err != nil {
 		return false, err
 	}
-	return user.Name != "", nil
+	return user.Username != "", nil
 }

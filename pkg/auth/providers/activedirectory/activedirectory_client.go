@@ -109,9 +109,14 @@ func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) (
 		return nil, err
 	}
 
-	samName := principalID
-	if strings.Contains(principalID, `\`) {
-		samName = strings.SplitN(principalID, `\`, 2)[1]
+	externalID, _, err := p.getDNAndScopeFromPrincipalID(principalID)
+	if err != nil {
+		return nil, err
+	}
+
+	samName := externalID
+	if strings.Contains(externalID, `\`) {
+		samName = strings.SplitN(externalID, `\`, 2)[1]
 	}
 	query := fmt.Sprintf("(%v=%v)", config.UserLoginAttribute, ldapv2.EscapeFilter(samName))
 	logrus.Debugf("LDAP Search query: {%s}", query)
