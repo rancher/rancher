@@ -2,13 +2,13 @@ package authn
 
 import (
 	"net/http"
-
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
@@ -16,16 +16,23 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func UserFormatter(apiContext *types.APIContext, resource *types.RawResource) {
+func (h *Handler) UserFormatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "setpassword")
+	if canRefresh := h.userCanRefresh(apiContext); canRefresh {
+		resource.AddAction(apiContext, "refreshauthprovideraccess")
+	}
 }
 
-func CollectionFormatter(apiContext *types.APIContext, collection *types.GenericCollection) {
+func (h *Handler) CollectionFormatter(apiContext *types.APIContext, collection *types.GenericCollection) {
 	collection.AddAction(apiContext, "changepassword")
+	if canRefresh := h.userCanRefresh(apiContext); canRefresh {
+		collection.AddAction(apiContext, "refreshauthprovideraccess")
+	}
 }
 
 type Handler struct {
-	UserClient v3.UserInterface
+	UserClient               v3.UserInterface
+	GlobalRoleBindingsClient v3.GlobalRoleBindingInterface
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -36,6 +43,10 @@ func (h *Handler) Actions(actionName string, action *types.Action, apiContext *t
 		}
 	case "setpassword":
 		if err := h.setPassword(actionName, action, apiContext); err != nil {
+			return err
+		}
+	case "refreshauthprovideraccess":
+		if err := h.refreshAttributes(actionName, action, apiContext); err != nil {
 			return err
 		}
 	default:
@@ -135,4 +146,25 @@ func (h *Handler) setPassword(actionName string, action *types.Action, request *
 
 	request.WriteResponse(http.StatusOK, userData)
 	return nil
+}
+
+func (h *Handler) refreshAttributes(actionName string, action *types.Action, request *types.APIContext) error {
+	canRefresh := h.userCanRefresh(request)
+
+	if !canRefresh {
+		return errors.New("Not Allowed")
+	}
+
+	if request.ID != "" {
+		providerrefresh.TriggerUserRefresh(request.ID, true)
+	} else {
+		providerrefresh.TriggerAllUserRefresh()
+	}
+
+	request.WriteResponse(http.StatusOK, nil)
+	return nil
+}
+
+func (h *Handler) userCanRefresh(request *types.APIContext) bool {
+	return request.AccessControl.CanDo(v3.UserGroupVersionKind.Group, v3.UserResource.Name, "create", request, nil, request.Schema) == nil
 }

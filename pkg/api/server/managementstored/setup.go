@@ -316,11 +316,13 @@ func SecretTypes(ctx context.Context, schemas *types.Schemas, management *config
 
 func User(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.UserType)
-	schema.Formatter = authn.UserFormatter
-	schema.CollectionFormatter = authn.CollectionFormatter
 	handler := &authn.Handler{
-		UserClient: management.Management.Users(""),
+		UserClient:               management.Management.Users(""),
+		GlobalRoleBindingsClient: management.Management.GlobalRoleBindings(""),
 	}
+
+	schema.Formatter = handler.UserFormatter
+	schema.CollectionFormatter = handler.CollectionFormatter
 	schema.ActionHandler = handler.Actions
 }
 
@@ -373,6 +375,7 @@ func App(schemas *types.Schemas, management *config.ScaledContext, kubeConfigGet
 func Setting(schemas *types.Schemas) {
 	schema := schemas.Schema(&managementschema.Version, client.SettingType)
 	schema.Formatter = setting.Formatter
+	schema.Validator = setting.Validator
 }
 
 func LoggingTypes(schemas *types.Schemas) {
