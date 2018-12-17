@@ -62,7 +62,7 @@ func UpdateRefreshCronTime(refreshCronTime string) {
 		return
 	}
 
-	parsed, err := parseCron(refreshCronTime)
+	parsed, err := ParseCron(refreshCronTime)
 	if err != nil {
 		logrus.Errorf("%v", err)
 		return
@@ -83,7 +83,7 @@ func UpdateRefreshMaxAge(maxAge string) {
 		return
 	}
 
-	parsed, err := parseMaxAge(maxAge)
+	parsed, err := ParseMaxAge(maxAge)
 	if err != nil {
 		logrus.Errorf("%v", err)
 		return
@@ -338,7 +338,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 	return attribs, nil
 }
 
-func parseMaxAge(setting string) (time.Duration, error) {
+func ParseMaxAge(setting string) (time.Duration, error) {
 	durString := fmt.Sprintf("%vs", setting)
 	dur, err := time.ParseDuration(durString)
 	if err != nil {
@@ -347,7 +347,7 @@ func parseMaxAge(setting string) (time.Duration, error) {
 	return dur, nil
 }
 
-func parseCron(setting string) (cron.Schedule, error) {
+func ParseCron(setting string) (cron.Schedule, error) {
 	if setting == "" {
 		return nil, nil
 	}
