@@ -57,25 +57,32 @@ def test_global_catalog_template_access(admin_mc, user_factory,
                                     url=url,
                                     )
     wait_for_template_to_be_created(client, name)
+    updated = False
+    start = time.time()
+    interval = 0.5
+    while not updated:
+        time.sleep(interval)
+        interval *= 2
+        c = client.list_catalog(name=name).data[0]
+        if c.transitioning == "no":
+            updated = True
+            continue
+        if time.time() - start > 90:
+            raise AssertionError(
+                "Timed out waiting for catalog to stop transitioning")
+
     # Now list all templates of this catalog
     new_templates = client.list_template(catalogId=name).data
     for t in new_templates:
         templates.append(name+"-"+t.name)
 
-    # Get the global role user, get all templates in it
-    global_user_role = client.list_global_role(name="User").data[0]
-    rules = global_user_role.rules
-    found_templates = False
-    # all_templates = existing_templates + new_templates
-    # template_names
-    for i in range(0, len(rules)):
-        print("Pritning resource")
-        print(rules[i].resources)
-        if rules[i].resources[0] == "templates":
-            found_templates = True
-            all([z in templates for z in rules[i].resourceNames])
-
-    assert found_templates is True
+    all_templates = existing + new_templates
+    # User should be able to list all these templates
+    user_client = user1.client
+    user_lib_templates = user_client.list_template(catalogId="library").data
+    user_new_templates = user_client.list_template(catalogId=name).data
+    user_templates = user_lib_templates + user_new_templates
+    assert len(user_templates) == len(all_templates)
 
     client.delete(catalog)
     wait_for_template_to_be_deleted(client, name)

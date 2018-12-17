@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -15,8 +18,27 @@ const (
 	ptrbMGMTController = "mgmt-auth-prtb-controller"
 )
 
-var projectManagmentPlaneResources = []string{"projectroletemplatebindings", "apps", "secrets", "pipelines", "pipelineexecutions", "pipelinesettings", "sourcecodeproviderconfigs", "projectloggings", "projectalertrules", "projectalertgroups", "projectcatalogs", "projectmonitorgraphs"}
-var prtbClusterManagmentPlaneResources = []string{"notifiers"}
+var projectManagmentPlaneResources = []string{
+	"apps",
+	"catalogtemplates",
+	"catalogtemplateversions",
+	"pipelines",
+	"pipelineexecutions",
+	"pipelinesettings",
+	"sourcecodeproviderconfigs",
+	"projectloggings",
+	"projectalertrules",
+	"projectalertgroups",
+	"projectcatalogs",
+	"projectmonitorgraphs",
+	"projectroletemplatebindings",
+	"secrets",
+}
+var prtbClusterManagmentPlaneResources = []string{
+	"notifiers",
+	"catalogtemplates",
+	"catalogtemplateversions",
+}
 
 type prtbLifecycle struct {
 	mgr           *manager
@@ -53,6 +75,11 @@ func (p *prtbLifecycle) Remove(obj *v3.ProjectRoleTemplateBinding) (runtime.Obje
 		return nil, err
 	}
 	err = p.mgr.reconcileClusterMembershipBindingForDelete("", string(obj.UID))
+	if err != nil {
+		return nil, err
+	}
+
+	err = p.removeMGMTProjectScopedPrivilegesInClusterNamespace(obj, clusterName)
 	return nil, err
 }
 
@@ -145,4 +172,24 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 		return err
 	}
 	return p.mgr.grantManagementPlanePrivileges(binding.RoleTemplateName, projectManagmentPlaneResources, subject, binding)
+}
+
+// removeMGMTProjectScopedPrivilegesInClusterNamespace revokes access that project roles were granted to certain cluster scoped resources like
+// catalogtemplates, when the prtb is deleted, by deleting the rolebinding created for this prtb in the cluster's namespace
+func (p *prtbLifecycle) removeMGMTProjectScopedPrivilegesInClusterNamespace(binding *v3.ProjectRoleTemplateBinding, clusterName string) error {
+	set := labels.Set(map[string]string{string(binding.UID): prtbInClusterBindingOwner})
+	rbs, err := p.mgr.rbLister.List(clusterName, set.AsSelector())
+	if err != nil {
+		return err
+	}
+	for _, rb := range rbs {
+		sub := rb.Subjects
+		if sub[0].Name == binding.UserName {
+			logrus.Infof("[%v] Deleting rolebinding %v in namespace %v for prtb %v", ptrbMGMTController, rb.Name, clusterName, binding.Name)
+			if err := p.mgr.mgmt.RBAC.RoleBindings(clusterName).Delete(rb.Name, &v1.DeleteOptions{}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

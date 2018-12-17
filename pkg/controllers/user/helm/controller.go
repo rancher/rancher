@@ -44,7 +44,7 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 		UserClient:            user.Management.Management.Users(""),
 		UserManager:           user.Management.UserManager,
 		K8sClient:             user.K8sClient,
-		TemplateVersionClient: user.Management.Management.TemplateVersions(""),
+		TemplateVersionClient: user.Management.Management.CatalogTemplateVersions(""),
 		ListenConfigClient:    user.Management.Management.ListenConfigs(""),
 		ClusterName:           user.ClusterName,
 		TemplateContentClient: user.Management.Management.TemplateContents(""),
@@ -63,7 +63,7 @@ type Lifecycle struct {
 	UserManager           user.Manager
 	TokenClient           mgmtv3.TokenInterface
 	UserClient            mgmtv3.UserInterface
-	TemplateVersionClient mgmtv3.TemplateVersionInterface
+	TemplateVersionClient mgmtv3.CatalogTemplateVersionInterface
 	K8sClient             kubernetes.Interface
 	ListenConfigClient    mgmtv3.ListenConfigInterface
 	ClusterName           string

@@ -41,7 +41,7 @@ type MCAppController struct {
 	multiClusterAppRevisions      v3.MultiClusterAppRevisionInterface
 	multiClusterAppRevisionLister v3.MultiClusterAppRevisionLister
 	namespaces                    corev1.NamespaceInterface
-	templateVersionLister         v3.TemplateVersionLister
+	templateVersionLister         v3.CatalogTemplateVersionLister
 	clusterLister                 v3.ClusterLister
 	projectLister                 v3.ProjectLister
 	clusterName                   string
@@ -60,7 +60,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		clusterLister:                 cluster.Management.Management.Clusters("").Controller().Lister(),
 		projectLister:                 cluster.Management.Management.Projects("").Controller().Lister(),
 		clusterName:                   cluster.ClusterName,
-		templateVersionLister:         cluster.Management.Management.TemplateVersions("").Controller().Lister(),
+		templateVersionLister:         cluster.Management.Management.CatalogTemplateVersions("").Controller().Lister(),
 	}
 	m.multiClusterApps.AddHandler(ctx, "multi-cluster-app-controller", m.sync)
 
@@ -535,7 +535,10 @@ func (m *MCAppController) createAnswerMap(answers []v3.Answer) (map[string]map[s
 // getExternalID gets the TemplateVersion.Spec.ExternalID field
 func (m *MCAppController) getExternalID(mcapp *v3.MultiClusterApp) (string, *v3.MultiClusterApp, error) {
 	// create the externalID field, it's also present on the templateVersion. So get the templateVersion and read its externalID field
-	tv, err := m.templateVersionLister.Get("", mcapp.Spec.TemplateVersionName)
+	split := strings.SplitN(mcapp.Spec.TemplateVersionName, ":", 2)
+	templateVersionNamespace := split[0]
+	templateVersionName := split[1]
+	tv, err := m.templateVersionLister.Get(templateVersionNamespace, templateVersionName)
 	if err != nil {
 		return "", mcapp, err
 	}

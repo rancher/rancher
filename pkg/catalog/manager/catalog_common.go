@@ -12,14 +12,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func (m *Manager) deleteTemplates(key string) error {
-	templates, err := m.getTemplateMap(key)
+func (m *Manager) deleteTemplates(key string, namespace string) error {
+	templates, err := m.getTemplateMap(key, namespace)
 	if err != nil {
 		return err
 	}
 	tvToDelete := map[string]struct{}{}
 	for _, t := range templates {
-		tvs, err := m.getTemplateVersion(t.Name)
+		tvs, err := m.getTemplateVersion(t.Name, namespace)
 		if err != nil {
 			return err
 		}
@@ -30,13 +30,13 @@ func (m *Manager) deleteTemplates(key string) error {
 	go func() {
 		for {
 			for k := range templates {
-				if err := m.templateClient.Delete(k, &metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
+				if err := m.templateClient.DeleteNamespaced(namespace, k, &metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
 					logrus.Warnf("Deleting template %v doesn't succeed. Continue loop", k)
 					continue
 				}
 			}
 			for k := range tvToDelete {
-				if err := m.templateVersionClient.Delete(k, &metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
+				if err := m.templateVersionClient.DeleteNamespaced(namespace, k, &metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
 					logrus.Warnf("Deleting templateVersion %v doesn't succeed. Continue loop", k)
 					continue
 				}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/catalog/helm"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
 	"github.com/sirupsen/logrus"
@@ -15,8 +16,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogInfo) error {
-	var templateName string
+func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogInfo, templateCreationPostUpgradeCompleted bool) error {
+	var templateNamespace string
 	catalog := cmt.catalog
 	projectCatalog := cmt.projectCatalog
 	clusterCatalog := cmt.clusterCatalog
@@ -28,7 +29,16 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogInfo) e
 	}
 
 	// list all existing templates
-	templateMap, err := m.getTemplateMap(catalog.Name)
+	switch catalogType {
+	case client.CatalogType:
+		templateNamespace = namespace.GlobalNamespace
+	case client.ClusterCatalogType:
+		templateNamespace = clusterCatalog.Namespace
+	case client.ProjectCatalogType:
+		templateNamespace = projectCatalog.Namespace
+	}
+
+	templateMap, err := m.getTemplateMap(catalog.Name, templateNamespace)
 	if err != nil {
 		return err
 	}
@@ -72,17 +82,17 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogInfo) e
 		if versionNumber != len(existingHelmVersionCommits) {
 			hasChanged = true
 		}
-		if !hasChanged {
+		if !hasChanged && templateCreationPostUpgradeCompleted {
 			logrus.Debugf("chart %s has not been changed. Skipping generating templates for it", chart)
 			continue
 		}
 
-		template := v3.Template{
+		template := v3.CatalogTemplate{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: chart,
 			},
 		}
-
+		template.Namespace = templateNamespace
 		template.Spec.Description = metadata[0].Description
 		template.Spec.DefaultVersion = metadata[0].Version
 		if len(metadata[0].Sources) > 0 {
@@ -145,17 +155,12 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogInfo) e
 				}
 			}
 
-			if catalogType == client.ClusterCatalogType {
-				v.ExternalID = fmt.Sprintf("catalog://?catalog=%s-%s&template=%s&version=%s", clusterCatalog.ClusterName, catalog.Name, template.Spec.FolderName, v.Version)
-			} else if catalogType == client.ProjectCatalogType {
-				split := strings.SplitN(projectCatalog.ProjectName, ":", 2)
-				if len(split) != 2 {
-					return fmt.Errorf("Project ID invalid while creating template")
-				}
-				v.ExternalID = fmt.Sprintf("catalog://?catalog=%s-%s-%s&template=%s&version=%s", split[0], split[1], catalog.Name, template.Spec.FolderName, v.Version)
-			} else {
+			if catalogType == client.CatalogType {
 				v.ExternalID = fmt.Sprintf("catalog://?catalog=%s&template=%s&version=%s", catalog.Name, template.Spec.FolderName, v.Version)
+			} else {
+				v.ExternalID = fmt.Sprintf("catalog://?catalog=%s/%s&template=%s&version=%s", templateNamespace, catalog.Name, template.Spec.FolderName, v.Version)
 			}
+
 			versions = append(versions, v)
 		}
 		var categories []string
@@ -166,15 +171,19 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogInfo) e
 		template.Labels = label
 		template.Spec.Categories = categories
 		template.Spec.Versions = versions
-		if catalogType == client.CatalogType {
+		template.Name = fmt.Sprintf("%s-%s", catalog.Name, template.Spec.FolderName)
+		switch catalogType {
+		case client.CatalogType:
+			template.Spec.CatalogID = catalog.Name
+		case client.ClusterCatalogType:
 			labelMap := make(map[string]string)
-			labelMap[CatalogTypeLabel] = "globalCatalog"
+			cname := clusterCatalog.Namespace + ":" + clusterCatalog.Name
+			template.Spec.ClusterCatalogID = cname
+			template.Spec.ClusterID = clusterCatalog.ClusterName
+			labelMap[template.Spec.ClusterID+"-"+clusterCatalog.Name] = clusterCatalog.Name
 			newLabels := labels.Merge(template.Labels, labelMap)
 			template.Labels = newLabels
-			template.Spec.CatalogID = catalog.Name
-			template.Name = fmt.Sprintf("%s-%s", catalog.Name, template.Spec.FolderName)
-			templateName = template.Name
-		} else if catalogType == client.ProjectCatalogType {
+		case client.ProjectCatalogType:
 			labelMap := make(map[string]string)
 			pname := projectCatalog.Namespace + ":" + projectCatalog.Name
 			template.Spec.ProjectCatalogID = pname
@@ -183,23 +192,11 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogInfo) e
 			if len(split) != 2 {
 				return fmt.Errorf("Project ID invalid while creating template")
 			}
-			template.Name = fmt.Sprintf("%s-%s-%s-%s", split[0], split[1], projectCatalog.Name, template.Spec.FolderName)
-			templateName = template.Name
 			labelMap[split[0]+"-"+projectCatalog.Namespace+"-"+projectCatalog.Name] = projectCatalog.Name
 			newLabels := labels.Merge(template.Labels, labelMap)
 			template.Labels = newLabels
-		} else if catalogType == client.ClusterCatalogType {
-			labelMap := make(map[string]string)
-			cname := clusterCatalog.Namespace + ":" + clusterCatalog.Name
-			template.Spec.ClusterCatalogID = cname
-			template.Spec.ClusterID = clusterCatalog.ClusterName
-			labelMap[template.Spec.ClusterID+"-"+clusterCatalog.Name] = clusterCatalog.Name
-			newLabels := labels.Merge(template.Labels, labelMap)
-			template.Labels = newLabels
-			template.Name = fmt.Sprintf("%s-%s-%s", clusterCatalog.ClusterName, clusterCatalog.Name, template.Spec.FolderName)
-			templateName = template.Name
 		}
-		cmt, err = m.updateCatalogInfo(cmt, catalogType, templateName, true, false)
+		cmt, err = m.updateCatalogInfo(cmt, catalogType, template.Name, true, false)
 		if err != nil {
 			return err
 		}
@@ -235,7 +232,7 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogInfo) e
 	// delete non-existing templates
 	for _, toDelete := range toDeleteChart {
 		logrus.Debugf("Deleting template %s and its associated templateVersion", toDelete)
-		if err := m.deleteChart(toDelete); err != nil {
+		if err := m.deleteChart(toDelete, templateNamespace); err != nil {
 			return err
 		}
 		deletedTemplates++
@@ -267,6 +264,7 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogInfo) e
 	} else if clusterCatalog != nil {
 		clusterCatalog.Catalog = *catalog
 	}
+	v3.CatalogConditionUpgraded.True(catalog)
 	cmt.catalog = catalog
 	cmt.projectCatalog = projectCatalog
 	cmt.clusterCatalog = clusterCatalog

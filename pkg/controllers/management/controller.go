@@ -21,7 +21,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/node"
 	"github.com/rancher/rancher/pkg/controllers/management/nodepool"
 	"github.com/rancher/rancher/pkg/controllers/management/podsecuritypolicy"
-	"github.com/rancher/rancher/pkg/controllers/management/template"
 	"github.com/rancher/rancher/pkg/controllers/management/usercontrollers"
 	"github.com/rancher/types/config"
 )
@@ -46,7 +45,6 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	nodepool.Register(ctx, management)
 	node.Register(ctx, management)
 	podsecuritypolicy.Register(ctx, management)
-	template.Register(ctx, management)
 	etcdbackup.Register(ctx, management)
 	globaldns.Register(ctx, management)
 	multiclusterapp.Register(ctx, management)

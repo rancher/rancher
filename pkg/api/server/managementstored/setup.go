@@ -61,6 +61,8 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &managementschema.Version,
 		client.AuthConfigType,
 		client.CatalogType,
+		client.CatalogTemplateType,
+		client.CatalogTemplateVersionType,
 		client.ClusterAlertType,
 		client.ClusterAlertGroupType,
 		client.ClusterCatalogType,
@@ -101,9 +103,9 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ProjectType,
 		client.RoleTemplateType,
 		client.SettingType,
-		client.TemplateContentType,
 		client.TemplateType,
 		client.TemplateVersionType,
+		client.TemplateContentType,
 		client.TokenType,
 		client.UserAttributeType,
 		client.UserType,
@@ -125,8 +127,8 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 
 	Clusters(schemas, apiContext, clusterManager, k8sProxy)
 	ClusterRoleTemplateBinding(schemas, apiContext)
-	Templates(schemas, apiContext)
-	TemplateVersion(schemas, apiContext)
+	Templates(ctx, schemas, apiContext)
+	TemplateVersion(ctx, schemas, apiContext)
 	User(schemas, apiContext)
 	Catalog(schemas, apiContext)
 	ProjectCatalog(schemas, apiContext)
@@ -223,23 +225,47 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 	cluster.SetClusterStore(schema, managementContext, clusterManager, k8sProxy)
 }
 
-func Templates(schemas *types.Schemas, managementContext *config.ScaledContext) {
+func Templates(ctx context.Context, schemas *types.Schemas, managementContext *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.TemplateType)
+	schema.Scope = types.NamespaceScope
+	schema.Store = proxy.NewProxyStore(ctx, managementContext.ClientGetter,
+		config.ManagementStorageContext,
+		[]string{"apis"},
+		"management.cattle.io",
+		"v3",
+		"CatalogTemplate",
+		"catalogtemplates")
 	schema.Formatter = catalog.TemplateFormatter
 	wrapper := catalog.TemplateWrapper{
 		TemplateContentClient: managementContext.Management.TemplateContents(""),
 	}
 	schema.LinkHandler = wrapper.TemplateIconHandler
+
+	schemaCatalogTemplate := schemas.Schema(&managementschema.Version, client.CatalogTemplateType)
+	schemaCatalogTemplate.CollectionMethods = []string{}
+	schemaCatalogTemplate.ResourceMethods = []string{}
 }
 
-func TemplateVersion(schemas *types.Schemas, managementContext *config.ScaledContext) {
+func TemplateVersion(ctx context.Context, schemas *types.Schemas, managementContext *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.TemplateVersionType)
+	schema.Scope = types.NamespaceScope
+	schema.Store = proxy.NewProxyStore(ctx, managementContext.ClientGetter,
+		config.ManagementStorageContext,
+		[]string{"apis"},
+		"management.cattle.io",
+		"v3",
+		"CatalogTemplateVersion",
+		"catalogtemplateversions")
 	t := catalog.TemplateVerionFormatterWrapper{
 		TemplateContentClient: managementContext.Management.TemplateContents(""),
 	}
 	schema.Formatter = t.TemplateVersionFormatter
 	schema.LinkHandler = t.TemplateVersionReadmeHandler
 	schema.Store = noopwatching.Wrap(schema.Store)
+
+	schemaCatalogTemplateVersion := schemas.Schema(&managementschema.Version, client.CatalogTemplateVersionType)
+	schemaCatalogTemplateVersion.CollectionMethods = []string{}
+	schemaCatalogTemplateVersion.ResourceMethods = []string{}
 }
 
 func TemplateContent(schemas *types.Schemas) {
@@ -371,7 +397,7 @@ func App(schemas *types.Schemas, management *config.ScaledContext, kubeConfigGet
 	schema := schemas.Schema(&projectschema.Version, projectclient.AppType)
 	wrapper := app.Wrapper{
 		Clusters:              management.Management.Clusters(""),
-		TemplateVersionClient: management.Management.TemplateVersions(""),
+		TemplateVersionClient: management.Management.CatalogTemplateVersions(""),
 		KubeConfigGetter:      kubeConfigGetter,
 		TemplateContentClient: management.Management.TemplateContents(""),
 		AppGetter:             management.Project,

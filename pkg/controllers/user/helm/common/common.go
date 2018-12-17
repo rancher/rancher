@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 )
 
@@ -24,15 +25,27 @@ const (
 	helmName   = "helm"
 )
 
-func ParseExternalID(externalID string) (string, error) {
+func ParseExternalID(externalID string) (string, string, error) {
+	var templateVersionNamespace, catalog string
 	values, err := url.Parse(externalID)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	catalog := values.Query().Get("catalog")
+	catalogWithNamespace := values.Query().Get("catalog")
 	template := values.Query().Get("template")
 	version := values.Query().Get("version")
-	return strings.Join([]string{catalog, template, version}, "-"), nil
+	split := strings.SplitN(catalogWithNamespace, "/", 2)
+	if len(split) == 2 {
+		templateVersionNamespace = split[0]
+		catalog = split[1]
+	}
+	//pre-upgrade setups will have global catalogs, where externalId field on templateversions won't have namespace.
+	// since these are global catalogs, we can default to global namespace
+	if templateVersionNamespace == "" {
+		templateVersionNamespace = namespace.GlobalNamespace
+		catalog = catalogWithNamespace
+	}
+	return strings.Join([]string{catalog, template, version}, "-"), templateVersionNamespace, nil
 }
 
 // StartTiller start tiller server and return the listening address of the grpc address

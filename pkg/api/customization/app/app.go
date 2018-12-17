@@ -1,10 +1,8 @@
 package app
 
 import (
-	"net/http"
-
 	"fmt"
-
+	"net/http"
 	"reflect"
 
 	"github.com/rancher/norman/api/access"
@@ -26,7 +24,7 @@ import (
 
 type Wrapper struct {
 	Clusters              v3.ClusterInterface
-	TemplateVersionClient v3.TemplateVersionInterface
+	TemplateVersionClient v3.CatalogTemplateVersionInterface
 	KubeConfigGetter      common.KubeConfigGetter
 	TemplateContentClient v3.TemplateContentInterface
 	AppGetter             pv3.AppsGetter
@@ -54,11 +52,11 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 	if externalID == "" {
 		return nil
 	}
-	templateVersionID, err := hcommon.ParseExternalID(externalID)
+	templateVersionID, templateVersionNamespace, err := hcommon.ParseExternalID(externalID)
 	if err != nil {
 		return err
 	}
-	templateVersion, err := w.TemplateVersionClient.Get(templateVersionID, metav1.GetOptions{})
+	templateVersion, err := w.TemplateVersionClient.GetNamespaced(templateVersionNamespace, templateVersionID, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
