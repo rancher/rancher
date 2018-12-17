@@ -50,31 +50,45 @@ func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext
 		userAttributes:      mgmt.Management.UserAttributes(""),
 		userAttributeLister: mgmt.Management.UserAttributes("").Controller().Lister(),
 		settingLister:       mgmt.Management.Settings("").Controller().Lister(),
-		maxAge:              parseMaxAge(maxAge),
 	}
 
+	UpdateRefreshMaxAge(maxAge)
 	UpdateRefreshCronTime(refreshCronTime)
 
 }
 
 func UpdateRefreshCronTime(refreshCronTime string) {
-	c.Stop()
-	c = cron.New()
-
-	if refreshCronTime == "" {
+	if ref == nil {
 		return
 	}
 
-	schedule := parseCron(refreshCronTime)
-	if schedule != nil {
+	parsed, err := parseCron(refreshCronTime)
+	if err != nil {
+		logrus.Errorf("%v", err)
+		return
+	}
+
+	c.Stop()
+	c = cron.New()
+
+	if parsed != nil {
 		job := cron.FuncJob(RefreshAllForCron)
-		c.Schedule(schedule, job)
+		c.Schedule(parsed, job)
 		c.Start()
 	}
 }
 
 func UpdateRefreshMaxAge(maxAge string) {
-	ref.maxAge = parseMaxAge(maxAge)
+	if ref == nil {
+		return
+	}
+
+	parsed, err := parseMaxAge(maxAge)
+	if err != nil {
+		logrus.Errorf("%v", err)
+		return
+	}
+	ref.maxAge = parsed
 }
 
 func TriggerUserRefresh(userName string, force bool) {
@@ -132,7 +146,7 @@ func (r *refresher) refreshAll(force bool) {
 		logrus.Errorf("Error listing Users during auth provider refresh: %v", err)
 	}
 	for _, user := range users {
-		r.triggerUserRefresh(user.ObjectMeta.Name, force)
+		r.triggerUserRefresh(user.Name, force)
 	}
 }
 
@@ -175,7 +189,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 
 	attribs = attribs.DeepCopy()
 
-	user, err := r.userLister.Get("", attribs.ObjectMeta.Name)
+	user, err := r.userLister.Get("", attribs.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +206,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 	}
 
 	for _, token := range allTokens {
-		if token.UserID != user.ObjectMeta.Name {
+		if token.UserID != user.Name {
 			continue
 		}
 
@@ -223,7 +237,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 		if principalID != "" {
 			secret := ""
 			if providers.ProvidersWithSecrets[providerName] {
-				secret, err = r.tokenMGR.GetSecret(user.ObjectMeta.Name, providerName, loginTokens[providerName])
+				secret, err = r.tokenMGR.GetSecret(user.Name, providerName, loginTokens[providerName])
 				if err != nil {
 					return nil, err
 				}
@@ -283,7 +297,7 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 		// If the user doesn't have access through this provider, we want to remove their login tokens for this provider
 		if !canAccessProvider {
 			for _, token := range loginTokens[providerName] {
-				err := r.tokens.Delete(token.ObjectMeta.Name, &metav1.DeleteOptions{})
+				err := r.tokens.Delete(token.Name, &metav1.DeleteOptions{})
 				if err != nil {
 					if apierrors.IsNotFound(err) {
 						continue
@@ -310,24 +324,22 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 	return attribs, nil
 }
 
-func parseMaxAge(setting string) time.Duration {
+func parseMaxAge(setting string) (time.Duration, error) {
 	durString := fmt.Sprintf("%vs", setting)
 	dur, err := time.ParseDuration(durString)
 	if err != nil {
-		logrus.Errorf("Error parsing auth refresh max age: %v", err)
-		return 0
+		return 0, errors.New(fmt.Sprintf("Error parsing auth refresh max age: %v", err))
 	}
-	return dur
+	return dur, nil
 }
 
-func parseCron(setting string) cron.Schedule {
+func parseCron(setting string) (cron.Schedule, error) {
 	if setting == "" {
-		return nil
+		return nil, nil
 	}
 	schedule, err := cron.ParseStandard(setting)
 	if err != nil {
-		logrus.Errorf("Error parsing auth refresh cron: %v", err)
-		return nil
+		return nil, errors.New(fmt.Sprintf("Error parsing auth refresh cron: %v", err))
 	}
-	return schedule
+	return schedule, nil
 }

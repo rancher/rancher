@@ -7,11 +7,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+const (
+	authSettingController = "mgmt-auth-settings-controller"
+)
+
 type SettingController struct {
 	settings v3.SettingInterface
 }
 
-func newSettingController(mgmt *config.ManagementContext) *SettingController {
+func newAuthSettingController(mgmt *config.ManagementContext) *SettingController {
 	n := &SettingController{
 		settings: mgmt.Management.Settings(""),
 	}
