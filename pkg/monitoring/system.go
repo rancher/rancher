@@ -111,7 +111,7 @@ func grantSystemMonitorRBAC(agentServiceAccountGetter corev1.ServiceAccountsGett
 			}
 			if appServiceAccount.Name == appServiceAccountName {
 				if appServiceAccount.DeletionTimestamp != nil {
-					return errors.New(fmt.Sprintf("stale %q ServiceAccount is still on terminating", appServiceAccountName))
+					return fmt.Errorf("stale %q ServiceAccount is still on terminating", appServiceAccountName)
 				}
 			} else {
 				appServiceAccount = &k8scorev1.ServiceAccount{
@@ -172,7 +172,7 @@ func grantSystemMonitorRBAC(agentServiceAccountGetter corev1.ServiceAccountsGett
 
 			if appClusterRole.Name == appClusterRoleName {
 				if appClusterRole.DeletionTimestamp != nil {
-					return errors.New(fmt.Sprintf("stale %q ClusterRole is still on terminating", appClusterRoleName))
+					return fmt.Errorf("stale %q ClusterRole is still on terminating", appClusterRoleName)
 				}
 
 				// ensure
@@ -206,7 +206,7 @@ func grantSystemMonitorRBAC(agentServiceAccountGetter corev1.ServiceAccountsGett
 			}
 			if appClusterRoleBinding.Name == appClusterRoleBindingName {
 				if appClusterRoleBinding.DeletionTimestamp != nil {
-					return errors.New(fmt.Sprintf("stale %q ClusterRoleBinding is still on terminating", appClusterRoleBindingName))
+					return fmt.Errorf("stale %q ClusterRoleBinding is still on terminating", appClusterRoleBindingName)
 				}
 			} else {
 				appClusterRoleBinding = &k8srbacv1.ClusterRoleBinding{
