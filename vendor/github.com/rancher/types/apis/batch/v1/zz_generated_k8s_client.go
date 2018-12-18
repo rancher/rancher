@@ -24,6 +24,8 @@ type Interface interface {
 }
 
 type Clients struct {
+	Interface Interface
+
 	Job JobClient
 }
 
@@ -66,6 +68,7 @@ func NewClients(config rest.Config) (*Clients, error) {
 
 func NewClientsFromInterface(iface Interface) *Clients {
 	return &Clients{
+		Interface: iface,
 
 		Job: &jobClient2{
 			iface: iface.Jobs(""),

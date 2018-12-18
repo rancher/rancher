@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -27,6 +28,13 @@ var (
 		Kind:         ComposeConfigGroupVersionKind.Kind,
 	}
 )
+
+func NewComposeConfig(namespace, name string, obj ComposeConfig) *ComposeConfig {
+	obj.APIVersion, obj.Kind = ComposeConfigGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type ComposeConfigList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -223,8 +231,8 @@ func (s *composeConfigClient) Watch(opts metav1.ListOptions) (watch.Interface, e
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *composeConfigClient) Patch(o *ComposeConfig, data []byte, subresources ...string) (*ComposeConfig, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *composeConfigClient) Patch(o *ComposeConfig, patchType types.PatchType, data []byte, subresources ...string) (*ComposeConfig, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*ComposeConfig), err
 }
 
@@ -276,6 +284,7 @@ type ComposeConfigClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() ComposeConfigInterface
 }
 
@@ -294,6 +303,10 @@ func (n *composeConfigClient2) Interface() ComposeConfigInterface {
 
 func (n *composeConfigClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *composeConfigClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *composeConfigClient2) Enqueue(namespace, name string) {

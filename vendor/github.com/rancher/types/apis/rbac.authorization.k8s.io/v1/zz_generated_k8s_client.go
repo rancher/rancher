@@ -27,6 +27,8 @@ type Interface interface {
 }
 
 type Clients struct {
+	Interface Interface
+
 	ClusterRoleBinding ClusterRoleBindingClient
 	ClusterRole        ClusterRoleClient
 	RoleBinding        RoleBindingClient
@@ -75,6 +77,7 @@ func NewClients(config rest.Config) (*Clients, error) {
 
 func NewClientsFromInterface(iface Interface) *Clients {
 	return &Clients{
+		Interface: iface,
 
 		ClusterRoleBinding: &clusterRoleBindingClient2{
 			iface: iface.ClusterRoleBindings(""),

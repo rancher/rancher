@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,13 @@ var (
 		Kind: ResourceQuotaGroupVersionKind.Kind,
 	}
 )
+
+func NewResourceQuota(namespace, name string, obj v1.ResourceQuota) *v1.ResourceQuota {
+	obj.APIVersion, obj.Kind = ResourceQuotaGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type ResourceQuotaList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -225,8 +233,8 @@ func (s *resourceQuotaClient) Watch(opts metav1.ListOptions) (watch.Interface, e
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *resourceQuotaClient) Patch(o *v1.ResourceQuota, data []byte, subresources ...string) (*v1.ResourceQuota, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *resourceQuotaClient) Patch(o *v1.ResourceQuota, patchType types.PatchType, data []byte, subresources ...string) (*v1.ResourceQuota, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*v1.ResourceQuota), err
 }
 
@@ -278,6 +286,7 @@ type ResourceQuotaClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() ResourceQuotaInterface
 }
 
@@ -296,6 +305,10 @@ func (n *resourceQuotaClient2) Interface() ResourceQuotaInterface {
 
 func (n *resourceQuotaClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *resourceQuotaClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *resourceQuotaClient2) Enqueue(namespace, name string) {

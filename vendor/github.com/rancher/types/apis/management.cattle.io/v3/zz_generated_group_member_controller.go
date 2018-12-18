@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -27,6 +28,13 @@ var (
 		Kind:         GroupMemberGroupVersionKind.Kind,
 	}
 )
+
+func NewGroupMember(namespace, name string, obj GroupMember) *GroupMember {
+	obj.APIVersion, obj.Kind = GroupMemberGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type GroupMemberList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -223,8 +231,8 @@ func (s *groupMemberClient) Watch(opts metav1.ListOptions) (watch.Interface, err
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *groupMemberClient) Patch(o *GroupMember, data []byte, subresources ...string) (*GroupMember, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *groupMemberClient) Patch(o *GroupMember, patchType types.PatchType, data []byte, subresources ...string) (*GroupMember, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*GroupMember), err
 }
 
@@ -276,6 +284,7 @@ type GroupMemberClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() GroupMemberInterface
 }
 
@@ -294,6 +303,10 @@ func (n *groupMemberClient2) Interface() GroupMemberInterface {
 
 func (n *groupMemberClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *groupMemberClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *groupMemberClient2) Enqueue(namespace, name string) {

@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -28,6 +29,13 @@ var (
 		Kind: NodeGroupVersionKind.Kind,
 	}
 )
+
+func NewNode(namespace, name string, obj Node) *Node {
+	obj.APIVersion, obj.Kind = NodeGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type NodeList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -224,8 +232,8 @@ func (s *nodeClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *nodeClient) Patch(o *Node, data []byte, subresources ...string) (*Node, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *nodeClient) Patch(o *Node, patchType types.PatchType, data []byte, subresources ...string) (*Node, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*Node), err
 }
 
@@ -277,6 +285,7 @@ type NodeClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() NodeInterface
 }
 
@@ -295,6 +304,10 @@ func (n *nodeClient2) Interface() NodeInterface {
 
 func (n *nodeClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *nodeClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *nodeClient2) Enqueue(namespace, name string) {

@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -27,6 +28,13 @@ var (
 		Kind:         CatalogGroupVersionKind.Kind,
 	}
 )
+
+func NewCatalog(namespace, name string, obj Catalog) *Catalog {
+	obj.APIVersion, obj.Kind = CatalogGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type CatalogList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -223,8 +231,8 @@ func (s *catalogClient) Watch(opts metav1.ListOptions) (watch.Interface, error) 
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *catalogClient) Patch(o *Catalog, data []byte, subresources ...string) (*Catalog, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *catalogClient) Patch(o *Catalog, patchType types.PatchType, data []byte, subresources ...string) (*Catalog, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*Catalog), err
 }
 
@@ -276,6 +284,7 @@ type CatalogClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() CatalogInterface
 }
 
@@ -294,6 +303,10 @@ func (n *catalogClient2) Interface() CatalogInterface {
 
 func (n *catalogClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *catalogClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *catalogClient2) Enqueue(namespace, name string) {

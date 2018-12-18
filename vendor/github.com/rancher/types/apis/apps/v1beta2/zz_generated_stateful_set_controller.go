@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,13 @@ var (
 		Kind: StatefulSetGroupVersionKind.Kind,
 	}
 )
+
+func NewStatefulSet(namespace, name string, obj v1beta2.StatefulSet) *v1beta2.StatefulSet {
+	obj.APIVersion, obj.Kind = StatefulSetGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type StatefulSetList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -225,8 +233,8 @@ func (s *statefulSetClient) Watch(opts metav1.ListOptions) (watch.Interface, err
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *statefulSetClient) Patch(o *v1beta2.StatefulSet, data []byte, subresources ...string) (*v1beta2.StatefulSet, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *statefulSetClient) Patch(o *v1beta2.StatefulSet, patchType types.PatchType, data []byte, subresources ...string) (*v1beta2.StatefulSet, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*v1beta2.StatefulSet), err
 }
 
@@ -278,6 +286,7 @@ type StatefulSetClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() StatefulSetInterface
 }
 
@@ -296,6 +305,10 @@ func (n *statefulSetClient2) Interface() StatefulSetInterface {
 
 func (n *statefulSetClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *statefulSetClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *statefulSetClient2) Enqueue(namespace, name string) {

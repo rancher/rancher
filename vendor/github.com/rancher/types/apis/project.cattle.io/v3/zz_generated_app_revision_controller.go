@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -28,6 +29,13 @@ var (
 		Kind: AppRevisionGroupVersionKind.Kind,
 	}
 )
+
+func NewAppRevision(namespace, name string, obj AppRevision) *AppRevision {
+	obj.APIVersion, obj.Kind = AppRevisionGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type AppRevisionList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -224,8 +232,8 @@ func (s *appRevisionClient) Watch(opts metav1.ListOptions) (watch.Interface, err
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *appRevisionClient) Patch(o *AppRevision, data []byte, subresources ...string) (*AppRevision, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *appRevisionClient) Patch(o *AppRevision, patchType types.PatchType, data []byte, subresources ...string) (*AppRevision, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*AppRevision), err
 }
 
@@ -277,6 +285,7 @@ type AppRevisionClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() AppRevisionInterface
 }
 
@@ -295,6 +304,10 @@ func (n *appRevisionClient2) Interface() AppRevisionInterface {
 
 func (n *appRevisionClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *appRevisionClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *appRevisionClient2) Enqueue(namespace, name string) {

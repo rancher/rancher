@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -28,6 +29,13 @@ var (
 		Kind: MultiClusterAppGroupVersionKind.Kind,
 	}
 )
+
+func NewMultiClusterApp(namespace, name string, obj MultiClusterApp) *MultiClusterApp {
+	obj.APIVersion, obj.Kind = MultiClusterAppGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type MultiClusterAppList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -224,8 +232,8 @@ func (s *multiClusterAppClient) Watch(opts metav1.ListOptions) (watch.Interface,
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *multiClusterAppClient) Patch(o *MultiClusterApp, data []byte, subresources ...string) (*MultiClusterApp, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *multiClusterAppClient) Patch(o *MultiClusterApp, patchType types.PatchType, data []byte, subresources ...string) (*MultiClusterApp, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*MultiClusterApp), err
 }
 
@@ -277,6 +285,7 @@ type MultiClusterAppClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() MultiClusterAppInterface
 }
 
@@ -295,6 +304,10 @@ func (n *multiClusterAppClient2) Interface() MultiClusterAppInterface {
 
 func (n *multiClusterAppClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *multiClusterAppClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *multiClusterAppClient2) Enqueue(namespace, name string) {

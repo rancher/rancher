@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -28,6 +29,13 @@ var (
 		Kind: NamespacedServiceAccountTokenGroupVersionKind.Kind,
 	}
 )
+
+func NewNamespacedServiceAccountToken(namespace, name string, obj NamespacedServiceAccountToken) *NamespacedServiceAccountToken {
+	obj.APIVersion, obj.Kind = NamespacedServiceAccountTokenGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type NamespacedServiceAccountTokenList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -224,8 +232,8 @@ func (s *namespacedServiceAccountTokenClient) Watch(opts metav1.ListOptions) (wa
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *namespacedServiceAccountTokenClient) Patch(o *NamespacedServiceAccountToken, data []byte, subresources ...string) (*NamespacedServiceAccountToken, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *namespacedServiceAccountTokenClient) Patch(o *NamespacedServiceAccountToken, patchType types.PatchType, data []byte, subresources ...string) (*NamespacedServiceAccountToken, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*NamespacedServiceAccountToken), err
 }
 
@@ -277,6 +285,7 @@ type NamespacedServiceAccountTokenClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() NamespacedServiceAccountTokenInterface
 }
 
@@ -295,6 +304,10 @@ func (n *namespacedServiceAccountTokenClient2) Interface() NamespacedServiceAcco
 
 func (n *namespacedServiceAccountTokenClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *namespacedServiceAccountTokenClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *namespacedServiceAccountTokenClient2) Enqueue(namespace, name string) {

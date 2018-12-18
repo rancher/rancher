@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -28,6 +29,13 @@ var (
 		Kind: SourceCodeCredentialGroupVersionKind.Kind,
 	}
 )
+
+func NewSourceCodeCredential(namespace, name string, obj SourceCodeCredential) *SourceCodeCredential {
+	obj.APIVersion, obj.Kind = SourceCodeCredentialGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type SourceCodeCredentialList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -224,8 +232,8 @@ func (s *sourceCodeCredentialClient) Watch(opts metav1.ListOptions) (watch.Inter
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *sourceCodeCredentialClient) Patch(o *SourceCodeCredential, data []byte, subresources ...string) (*SourceCodeCredential, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *sourceCodeCredentialClient) Patch(o *SourceCodeCredential, patchType types.PatchType, data []byte, subresources ...string) (*SourceCodeCredential, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*SourceCodeCredential), err
 }
 
@@ -277,6 +285,7 @@ type SourceCodeCredentialClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() SourceCodeCredentialInterface
 }
 
@@ -295,6 +304,10 @@ func (n *sourceCodeCredentialClient2) Interface() SourceCodeCredentialInterface 
 
 func (n *sourceCodeCredentialClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *sourceCodeCredentialClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *sourceCodeCredentialClient2) Enqueue(namespace, name string) {

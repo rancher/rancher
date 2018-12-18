@@ -25,6 +25,8 @@ type Interface interface {
 }
 
 type Clients struct {
+	Interface Interface
+
 	PodSecurityPolicy PodSecurityPolicyClient
 	Ingress           IngressClient
 }
@@ -69,6 +71,7 @@ func NewClients(config rest.Config) (*Clients, error) {
 
 func NewClientsFromInterface(iface Interface) *Clients {
 	return &Clients{
+		Interface: iface,
 
 		PodSecurityPolicy: &podSecurityPolicyClient2{
 			iface: iface.PodSecurityPolicies(""),

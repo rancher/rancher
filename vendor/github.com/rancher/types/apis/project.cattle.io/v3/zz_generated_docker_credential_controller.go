@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -28,6 +29,13 @@ var (
 		Kind: DockerCredentialGroupVersionKind.Kind,
 	}
 )
+
+func NewDockerCredential(namespace, name string, obj DockerCredential) *DockerCredential {
+	obj.APIVersion, obj.Kind = DockerCredentialGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type DockerCredentialList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -224,8 +232,8 @@ func (s *dockerCredentialClient) Watch(opts metav1.ListOptions) (watch.Interface
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *dockerCredentialClient) Patch(o *DockerCredential, data []byte, subresources ...string) (*DockerCredential, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *dockerCredentialClient) Patch(o *DockerCredential, patchType types.PatchType, data []byte, subresources ...string) (*DockerCredential, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*DockerCredential), err
 }
 
@@ -277,6 +285,7 @@ type DockerCredentialClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() DockerCredentialInterface
 }
 
@@ -295,6 +304,10 @@ func (n *dockerCredentialClient2) Interface() DockerCredentialInterface {
 
 func (n *dockerCredentialClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *dockerCredentialClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *dockerCredentialClient2) Enqueue(namespace, name string) {

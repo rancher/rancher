@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -27,6 +28,13 @@ var (
 		Kind:         AuthConfigGroupVersionKind.Kind,
 	}
 )
+
+func NewAuthConfig(namespace, name string, obj AuthConfig) *AuthConfig {
+	obj.APIVersion, obj.Kind = AuthConfigGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type AuthConfigList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -223,8 +231,8 @@ func (s *authConfigClient) Watch(opts metav1.ListOptions) (watch.Interface, erro
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *authConfigClient) Patch(o *AuthConfig, data []byte, subresources ...string) (*AuthConfig, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *authConfigClient) Patch(o *AuthConfig, patchType types.PatchType, data []byte, subresources ...string) (*AuthConfig, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*AuthConfig), err
 }
 
@@ -276,6 +284,7 @@ type AuthConfigClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() AuthConfigInterface
 }
 
@@ -294,6 +303,10 @@ func (n *authConfigClient2) Interface() AuthConfigInterface {
 
 func (n *authConfigClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *authConfigClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *authConfigClient2) Enqueue(namespace, name string) {

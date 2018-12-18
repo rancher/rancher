@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -28,6 +29,13 @@ var (
 		Kind: ProjectMonitorGraphGroupVersionKind.Kind,
 	}
 )
+
+func NewProjectMonitorGraph(namespace, name string, obj ProjectMonitorGraph) *ProjectMonitorGraph {
+	obj.APIVersion, obj.Kind = ProjectMonitorGraphGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type ProjectMonitorGraphList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -224,8 +232,8 @@ func (s *projectMonitorGraphClient) Watch(opts metav1.ListOptions) (watch.Interf
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *projectMonitorGraphClient) Patch(o *ProjectMonitorGraph, data []byte, subresources ...string) (*ProjectMonitorGraph, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *projectMonitorGraphClient) Patch(o *ProjectMonitorGraph, patchType types.PatchType, data []byte, subresources ...string) (*ProjectMonitorGraph, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*ProjectMonitorGraph), err
 }
 
@@ -277,6 +285,7 @@ type ProjectMonitorGraphClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() ProjectMonitorGraphInterface
 }
 
@@ -295,6 +304,10 @@ func (n *projectMonitorGraphClient2) Interface() ProjectMonitorGraphInterface {
 
 func (n *projectMonitorGraphClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *projectMonitorGraphClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *projectMonitorGraphClient2) Enqueue(namespace, name string) {

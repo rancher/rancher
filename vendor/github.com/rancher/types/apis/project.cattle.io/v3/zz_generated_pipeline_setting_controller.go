@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -28,6 +29,13 @@ var (
 		Kind: PipelineSettingGroupVersionKind.Kind,
 	}
 )
+
+func NewPipelineSetting(namespace, name string, obj PipelineSetting) *PipelineSetting {
+	obj.APIVersion, obj.Kind = PipelineSettingGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type PipelineSettingList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -224,8 +232,8 @@ func (s *pipelineSettingClient) Watch(opts metav1.ListOptions) (watch.Interface,
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *pipelineSettingClient) Patch(o *PipelineSetting, data []byte, subresources ...string) (*PipelineSetting, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *pipelineSettingClient) Patch(o *PipelineSetting, patchType types.PatchType, data []byte, subresources ...string) (*PipelineSetting, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*PipelineSetting), err
 }
 
@@ -277,6 +285,7 @@ type PipelineSettingClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() PipelineSettingInterface
 }
 
@@ -295,6 +304,10 @@ func (n *pipelineSettingClient2) Interface() PipelineSettingInterface {
 
 func (n *pipelineSettingClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *pipelineSettingClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *pipelineSettingClient2) Enqueue(namespace, name string) {

@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -28,6 +29,13 @@ var (
 		Kind: SSHAuthGroupVersionKind.Kind,
 	}
 )
+
+func NewSSHAuth(namespace, name string, obj SSHAuth) *SSHAuth {
+	obj.APIVersion, obj.Kind = SSHAuthGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type SSHAuthList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -224,8 +232,8 @@ func (s *sshAuthClient) Watch(opts metav1.ListOptions) (watch.Interface, error) 
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *sshAuthClient) Patch(o *SSHAuth, data []byte, subresources ...string) (*SSHAuth, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *sshAuthClient) Patch(o *SSHAuth, patchType types.PatchType, data []byte, subresources ...string) (*SSHAuth, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*SSHAuth), err
 }
 
@@ -277,6 +285,7 @@ type SSHAuthClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() SSHAuthInterface
 }
 
@@ -295,6 +304,10 @@ func (n *sshAuthClient2) Interface() SSHAuthInterface {
 
 func (n *sshAuthClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *sshAuthClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *sshAuthClient2) Enqueue(namespace, name string) {

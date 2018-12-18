@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -28,6 +29,13 @@ var (
 		Kind: ProjectCatalogGroupVersionKind.Kind,
 	}
 )
+
+func NewProjectCatalog(namespace, name string, obj ProjectCatalog) *ProjectCatalog {
+	obj.APIVersion, obj.Kind = ProjectCatalogGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type ProjectCatalogList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -224,8 +232,8 @@ func (s *projectCatalogClient) Watch(opts metav1.ListOptions) (watch.Interface, 
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *projectCatalogClient) Patch(o *ProjectCatalog, data []byte, subresources ...string) (*ProjectCatalog, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *projectCatalogClient) Patch(o *ProjectCatalog, patchType types.PatchType, data []byte, subresources ...string) (*ProjectCatalog, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*ProjectCatalog), err
 }
 
@@ -277,6 +285,7 @@ type ProjectCatalogClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() ProjectCatalogInterface
 }
 
@@ -295,6 +304,10 @@ func (n *projectCatalogClient2) Interface() ProjectCatalogInterface {
 
 func (n *projectCatalogClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *projectCatalogClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *projectCatalogClient2) Enqueue(namespace, name string) {

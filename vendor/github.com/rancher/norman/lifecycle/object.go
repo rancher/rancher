@@ -178,13 +178,21 @@ func (o *objectLifecycleAdapter) record(obj runtime.Object, f func(runtime.Objec
 
 	origObj := obj
 	obj = origObj.DeepCopyObject()
-	if newObj, err := f(obj); err != nil {
+	if newObj, err := checkNil(obj, f); err != nil {
 		newObj, _ = o.update(metadata.GetName(), origObj, newObj)
 		return newObj, err
 	} else if newObj != nil {
 		return o.update(metadata.GetName(), origObj, newObj)
 	}
 	return obj, nil
+}
+
+func checkNil(obj runtime.Object, f func(runtime.Object) (runtime.Object, error)) (runtime.Object, error) {
+	obj, err := f(obj)
+	if obj == nil || reflect.ValueOf(obj).IsNil() {
+		return nil, err
+	}
+	return obj, err
 }
 
 func (o *objectLifecycleAdapter) create(obj runtime.Object) (runtime.Object, bool, error) {

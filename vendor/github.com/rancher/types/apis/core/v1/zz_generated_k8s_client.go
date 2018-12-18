@@ -36,6 +36,8 @@ type Interface interface {
 }
 
 type Clients struct {
+	Interface Interface
+
 	Node                  NodeClient
 	ComponentStatus       ComponentStatusClient
 	Namespace             NamespaceClient
@@ -102,6 +104,7 @@ func NewClients(config rest.Config) (*Clients, error) {
 
 func NewClientsFromInterface(iface Interface) *Clients {
 	return &Clients{
+		Interface: iface,
 
 		Node: &nodeClient2{
 			iface: iface.Nodes(""),

@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -28,6 +29,13 @@ var (
 		Kind:         NamespaceGroupVersionKind.Kind,
 	}
 )
+
+func NewNamespace(namespace, name string, obj v1.Namespace) *v1.Namespace {
+	obj.APIVersion, obj.Kind = NamespaceGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type NamespaceList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -224,8 +232,8 @@ func (s *namespaceClient) Watch(opts metav1.ListOptions) (watch.Interface, error
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *namespaceClient) Patch(o *v1.Namespace, data []byte, subresources ...string) (*v1.Namespace, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *namespaceClient) Patch(o *v1.Namespace, patchType types.PatchType, data []byte, subresources ...string) (*v1.Namespace, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*v1.Namespace), err
 }
 
@@ -277,6 +285,7 @@ type NamespaceClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() NamespaceInterface
 }
 
@@ -295,6 +304,10 @@ func (n *namespaceClient2) Interface() NamespaceInterface {
 
 func (n *namespaceClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *namespaceClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *namespaceClient2) Enqueue(namespace, name string) {

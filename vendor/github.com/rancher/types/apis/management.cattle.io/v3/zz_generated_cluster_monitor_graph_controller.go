@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -28,6 +29,13 @@ var (
 		Kind: ClusterMonitorGraphGroupVersionKind.Kind,
 	}
 )
+
+func NewClusterMonitorGraph(namespace, name string, obj ClusterMonitorGraph) *ClusterMonitorGraph {
+	obj.APIVersion, obj.Kind = ClusterMonitorGraphGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type ClusterMonitorGraphList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -224,8 +232,8 @@ func (s *clusterMonitorGraphClient) Watch(opts metav1.ListOptions) (watch.Interf
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *clusterMonitorGraphClient) Patch(o *ClusterMonitorGraph, data []byte, subresources ...string) (*ClusterMonitorGraph, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *clusterMonitorGraphClient) Patch(o *ClusterMonitorGraph, patchType types.PatchType, data []byte, subresources ...string) (*ClusterMonitorGraph, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*ClusterMonitorGraph), err
 }
 
@@ -277,6 +285,7 @@ type ClusterMonitorGraphClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() ClusterMonitorGraphInterface
 }
 
@@ -295,6 +304,10 @@ func (n *clusterMonitorGraphClient2) Interface() ClusterMonitorGraphInterface {
 
 func (n *clusterMonitorGraphClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *clusterMonitorGraphClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *clusterMonitorGraphClient2) Enqueue(namespace, name string) {

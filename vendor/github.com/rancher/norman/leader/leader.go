@@ -52,11 +52,16 @@ func run(ctx context.Context, namespace, name string, client kubernetes.Interfac
 		logrus.Fatalf("error creating leader lock for %s: %v", name, err)
 	}
 
+	t := time.Second
+	if dl := os.Getenv("DEV_LEADERELECTION"); dl != "" {
+		t = time.Hour
+	}
+
 	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
 		Lock:          rl,
-		LeaseDuration: 15 * time.Second,
-		RenewDeadline: 10 * time.Second,
-		RetryPeriod:   2 * time.Second,
+		LeaseDuration: 45 * t,
+		RenewDeadline: 30 * t,
+		RetryPeriod:   2 * t,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
 				go cb(ctx)

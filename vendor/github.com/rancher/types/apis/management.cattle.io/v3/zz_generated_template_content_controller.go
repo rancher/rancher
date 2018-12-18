@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -27,6 +28,13 @@ var (
 		Kind:         TemplateContentGroupVersionKind.Kind,
 	}
 )
+
+func NewTemplateContent(namespace, name string, obj TemplateContent) *TemplateContent {
+	obj.APIVersion, obj.Kind = TemplateContentGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type TemplateContentList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -223,8 +231,8 @@ func (s *templateContentClient) Watch(opts metav1.ListOptions) (watch.Interface,
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *templateContentClient) Patch(o *TemplateContent, data []byte, subresources ...string) (*TemplateContent, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *templateContentClient) Patch(o *TemplateContent, patchType types.PatchType, data []byte, subresources ...string) (*TemplateContent, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*TemplateContent), err
 }
 
@@ -276,6 +284,7 @@ type TemplateContentClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() TemplateContentInterface
 }
 
@@ -294,6 +303,10 @@ func (n *templateContentClient2) Interface() TemplateContentInterface {
 
 func (n *templateContentClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *templateContentClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *templateContentClient2) Enqueue(namespace, name string) {

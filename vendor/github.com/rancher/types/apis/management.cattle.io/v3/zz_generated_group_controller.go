@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -27,6 +28,13 @@ var (
 		Kind:         GroupGroupVersionKind.Kind,
 	}
 )
+
+func NewGroup(namespace, name string, obj Group) *Group {
+	obj.APIVersion, obj.Kind = GroupGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type GroupList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -223,8 +231,8 @@ func (s *groupClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *groupClient) Patch(o *Group, data []byte, subresources ...string) (*Group, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *groupClient) Patch(o *Group, patchType types.PatchType, data []byte, subresources ...string) (*Group, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*Group), err
 }
 
@@ -276,6 +284,7 @@ type GroupClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() GroupInterface
 }
 
@@ -294,6 +303,10 @@ func (n *groupClient2) Interface() GroupInterface {
 
 func (n *groupClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *groupClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *groupClient2) Enqueue(namespace, name string) {

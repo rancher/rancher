@@ -48,7 +48,7 @@ type GenericClient interface {
 	List(opts metav1.ListOptions) (runtime.Object, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOptions *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Patch(name string, o runtime.Object, data []byte, subresources ...string) (runtime.Object, error)
+	Patch(name string, o runtime.Object, patchType types.PatchType, data []byte, subresources ...string) (runtime.Object, error)
 	ObjectFactory() ObjectFactory
 }
 
@@ -284,7 +284,7 @@ func (p *ObjectClient) DeleteCollection(deleteOptions *metav1.DeleteOptions, lis
 		Error()
 }
 
-func (p *ObjectClient) Patch(name string, o runtime.Object, data []byte, subresources ...string) (runtime.Object, error) {
+func (p *ObjectClient) Patch(name string, o runtime.Object, patchType types.PatchType, data []byte, subresources ...string) (runtime.Object, error) {
 	ns := p.ns
 	if obj, ok := o.(metav1.Object); ok && obj.GetNamespace() != "" {
 		ns = obj.GetNamespace()
@@ -293,7 +293,7 @@ func (p *ObjectClient) Patch(name string, o runtime.Object, data []byte, subreso
 	if len(name) == 0 {
 		return result, errors.New("object missing name")
 	}
-	err := p.restClient.Patch(types.StrategicMergePatchType).
+	err := p.restClient.Patch(patchType).
 		Prefix(p.getAPIPrefix(), p.gvk.Group, p.gvk.Version).
 		NamespaceIfScoped(ns, p.resource.Namespaced).
 		Resource(p.resource.Name).
