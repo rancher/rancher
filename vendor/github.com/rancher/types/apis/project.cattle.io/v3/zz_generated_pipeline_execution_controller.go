@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -28,6 +29,13 @@ var (
 		Kind: PipelineExecutionGroupVersionKind.Kind,
 	}
 )
+
+func NewPipelineExecution(namespace, name string, obj PipelineExecution) *PipelineExecution {
+	obj.APIVersion, obj.Kind = PipelineExecutionGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type PipelineExecutionList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -224,8 +232,8 @@ func (s *pipelineExecutionClient) Watch(opts metav1.ListOptions) (watch.Interfac
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *pipelineExecutionClient) Patch(o *PipelineExecution, data []byte, subresources ...string) (*PipelineExecution, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *pipelineExecutionClient) Patch(o *PipelineExecution, patchType types.PatchType, data []byte, subresources ...string) (*PipelineExecution, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*PipelineExecution), err
 }
 
@@ -277,6 +285,7 @@ type PipelineExecutionClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() PipelineExecutionInterface
 }
 
@@ -295,6 +304,10 @@ func (n *pipelineExecutionClient2) Interface() PipelineExecutionInterface {
 
 func (n *pipelineExecutionClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *pipelineExecutionClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *pipelineExecutionClient2) Enqueue(namespace, name string) {

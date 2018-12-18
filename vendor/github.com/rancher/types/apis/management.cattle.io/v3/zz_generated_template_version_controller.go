@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -27,6 +28,13 @@ var (
 		Kind:         TemplateVersionGroupVersionKind.Kind,
 	}
 )
+
+func NewTemplateVersion(namespace, name string, obj TemplateVersion) *TemplateVersion {
+	obj.APIVersion, obj.Kind = TemplateVersionGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type TemplateVersionList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -223,8 +231,8 @@ func (s *templateVersionClient) Watch(opts metav1.ListOptions) (watch.Interface,
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *templateVersionClient) Patch(o *TemplateVersion, data []byte, subresources ...string) (*TemplateVersion, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *templateVersionClient) Patch(o *TemplateVersion, patchType types.PatchType, data []byte, subresources ...string) (*TemplateVersion, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*TemplateVersion), err
 }
 
@@ -276,6 +284,7 @@ type TemplateVersionClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() TemplateVersionInterface
 }
 
@@ -294,6 +303,10 @@ func (n *templateVersionClient2) Interface() TemplateVersionInterface {
 
 func (n *templateVersionClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *templateVersionClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *templateVersionClient2) Enqueue(namespace, name string) {

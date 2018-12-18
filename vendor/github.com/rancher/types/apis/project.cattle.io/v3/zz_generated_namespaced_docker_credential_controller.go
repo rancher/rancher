@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -28,6 +29,13 @@ var (
 		Kind: NamespacedDockerCredentialGroupVersionKind.Kind,
 	}
 )
+
+func NewNamespacedDockerCredential(namespace, name string, obj NamespacedDockerCredential) *NamespacedDockerCredential {
+	obj.APIVersion, obj.Kind = NamespacedDockerCredentialGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type NamespacedDockerCredentialList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -224,8 +232,8 @@ func (s *namespacedDockerCredentialClient) Watch(opts metav1.ListOptions) (watch
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *namespacedDockerCredentialClient) Patch(o *NamespacedDockerCredential, data []byte, subresources ...string) (*NamespacedDockerCredential, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *namespacedDockerCredentialClient) Patch(o *NamespacedDockerCredential, patchType types.PatchType, data []byte, subresources ...string) (*NamespacedDockerCredential, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*NamespacedDockerCredential), err
 }
 
@@ -277,6 +285,7 @@ type NamespacedDockerCredentialClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() NamespacedDockerCredentialInterface
 }
 
@@ -295,6 +304,10 @@ func (n *namespacedDockerCredentialClient2) Interface() NamespacedDockerCredenti
 
 func (n *namespacedDockerCredentialClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *namespacedDockerCredentialClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *namespacedDockerCredentialClient2) Enqueue(namespace, name string) {

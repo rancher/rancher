@@ -29,6 +29,7 @@ type BackReference struct {
 
 type Schemas struct {
 	sync.Mutex
+	processingTypes    map[reflect.Type]*Schema
 	typeNames          map[reflect.Type]string
 	schemasByPath      map[string]map[string]*Schema
 	mappers            map[string]map[string][]Mapper
@@ -44,11 +45,12 @@ type Schemas struct {
 
 func NewSchemas() *Schemas {
 	return &Schemas{
-		typeNames:     map[reflect.Type]string{},
-		schemasByPath: map[string]map[string]*Schema{},
-		mappers:       map[string]map[string][]Mapper{},
-		references:    map[string][]BackReference{},
-		embedded:      map[string]*Schema{},
+		processingTypes: map[reflect.Type]*Schema{},
+		typeNames:       map[reflect.Type]string{},
+		schemasByPath:   map[string]map[string]*Schema{},
+		mappers:         map[string]map[string][]Mapper{},
+		references:      map[string][]BackReference{},
+		embedded:        map[string]*Schema{},
 	}
 }
 

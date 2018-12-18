@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,13 @@ var (
 		Kind: AlertmanagerGroupVersionKind.Kind,
 	}
 )
+
+func NewAlertmanager(namespace, name string, obj v1.Alertmanager) *v1.Alertmanager {
+	obj.APIVersion, obj.Kind = AlertmanagerGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type AlertmanagerList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -225,8 +233,8 @@ func (s *alertmanagerClient) Watch(opts metav1.ListOptions) (watch.Interface, er
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *alertmanagerClient) Patch(o *v1.Alertmanager, data []byte, subresources ...string) (*v1.Alertmanager, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *alertmanagerClient) Patch(o *v1.Alertmanager, patchType types.PatchType, data []byte, subresources ...string) (*v1.Alertmanager, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*v1.Alertmanager), err
 }
 
@@ -278,6 +286,7 @@ type AlertmanagerClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() AlertmanagerInterface
 }
 
@@ -296,6 +305,10 @@ func (n *alertmanagerClient2) Interface() AlertmanagerInterface {
 
 func (n *alertmanagerClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *alertmanagerClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *alertmanagerClient2) Enqueue(namespace, name string) {

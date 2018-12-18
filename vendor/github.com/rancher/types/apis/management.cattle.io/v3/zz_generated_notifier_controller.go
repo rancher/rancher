@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -28,6 +29,13 @@ var (
 		Kind: NotifierGroupVersionKind.Kind,
 	}
 )
+
+func NewNotifier(namespace, name string, obj Notifier) *Notifier {
+	obj.APIVersion, obj.Kind = NotifierGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type NotifierList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -224,8 +232,8 @@ func (s *notifierClient) Watch(opts metav1.ListOptions) (watch.Interface, error)
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *notifierClient) Patch(o *Notifier, data []byte, subresources ...string) (*Notifier, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *notifierClient) Patch(o *Notifier, patchType types.PatchType, data []byte, subresources ...string) (*Notifier, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*Notifier), err
 }
 
@@ -277,6 +285,7 @@ type NotifierClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() NotifierInterface
 }
 
@@ -295,6 +304,10 @@ func (n *notifierClient2) Interface() NotifierInterface {
 
 func (n *notifierClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *notifierClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *notifierClient2) Enqueue(namespace, name string) {

@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,13 @@ var (
 		Kind: ConfigMapGroupVersionKind.Kind,
 	}
 )
+
+func NewConfigMap(namespace, name string, obj v1.ConfigMap) *v1.ConfigMap {
+	obj.APIVersion, obj.Kind = ConfigMapGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type ConfigMapList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -225,8 +233,8 @@ func (s *configMapClient) Watch(opts metav1.ListOptions) (watch.Interface, error
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *configMapClient) Patch(o *v1.ConfigMap, data []byte, subresources ...string) (*v1.ConfigMap, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *configMapClient) Patch(o *v1.ConfigMap, patchType types.PatchType, data []byte, subresources ...string) (*v1.ConfigMap, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*v1.ConfigMap), err
 }
 
@@ -278,6 +286,7 @@ type ConfigMapClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() ConfigMapInterface
 }
 
@@ -296,6 +305,10 @@ func (n *configMapClient2) Interface() ConfigMapInterface {
 
 func (n *configMapClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *configMapClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *configMapClient2) Enqueue(namespace, name string) {

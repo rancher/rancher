@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,13 @@ var (
 		Kind: CronJobGroupVersionKind.Kind,
 	}
 )
+
+func NewCronJob(namespace, name string, obj v1beta1.CronJob) *v1beta1.CronJob {
+	obj.APIVersion, obj.Kind = CronJobGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type CronJobList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -225,8 +233,8 @@ func (s *cronJobClient) Watch(opts metav1.ListOptions) (watch.Interface, error) 
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *cronJobClient) Patch(o *v1beta1.CronJob, data []byte, subresources ...string) (*v1beta1.CronJob, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *cronJobClient) Patch(o *v1beta1.CronJob, patchType types.PatchType, data []byte, subresources ...string) (*v1beta1.CronJob, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*v1beta1.CronJob), err
 }
 
@@ -278,6 +286,7 @@ type CronJobClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() CronJobInterface
 }
 
@@ -296,6 +305,10 @@ func (n *cronJobClient2) Interface() CronJobInterface {
 
 func (n *cronJobClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *cronJobClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *cronJobClient2) Enqueue(namespace, name string) {

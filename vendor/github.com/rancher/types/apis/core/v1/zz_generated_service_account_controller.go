@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,13 @@ var (
 		Kind: ServiceAccountGroupVersionKind.Kind,
 	}
 )
+
+func NewServiceAccount(namespace, name string, obj v1.ServiceAccount) *v1.ServiceAccount {
+	obj.APIVersion, obj.Kind = ServiceAccountGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type ServiceAccountList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -225,8 +233,8 @@ func (s *serviceAccountClient) Watch(opts metav1.ListOptions) (watch.Interface, 
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *serviceAccountClient) Patch(o *v1.ServiceAccount, data []byte, subresources ...string) (*v1.ServiceAccount, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *serviceAccountClient) Patch(o *v1.ServiceAccount, patchType types.PatchType, data []byte, subresources ...string) (*v1.ServiceAccount, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*v1.ServiceAccount), err
 }
 
@@ -278,6 +286,7 @@ type ServiceAccountClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() ServiceAccountInterface
 }
 
@@ -296,6 +305,10 @@ func (n *serviceAccountClient2) Interface() ServiceAccountInterface {
 
 func (n *serviceAccountClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *serviceAccountClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *serviceAccountClient2) Enqueue(namespace, name string) {

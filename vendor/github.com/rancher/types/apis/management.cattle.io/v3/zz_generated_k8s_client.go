@@ -73,6 +73,8 @@ type Interface interface {
 }
 
 type Clients struct {
+	Interface Interface
+
 	NodePool                                NodePoolClient
 	Node                                    NodeClient
 	NodeDriver                              NodeDriverClient
@@ -213,6 +215,7 @@ func NewClients(config rest.Config) (*Clients, error) {
 
 func NewClientsFromInterface(iface Interface) *Clients {
 	return &Clients{
+		Interface: iface,
 
 		NodePool: &nodePoolClient2{
 			iface: iface.NodePools(""),

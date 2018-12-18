@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -27,6 +28,13 @@ var (
 		Kind:         GlobalRoleGroupVersionKind.Kind,
 	}
 )
+
+func NewGlobalRole(namespace, name string, obj GlobalRole) *GlobalRole {
+	obj.APIVersion, obj.Kind = GlobalRoleGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type GlobalRoleList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -223,8 +231,8 @@ func (s *globalRoleClient) Watch(opts metav1.ListOptions) (watch.Interface, erro
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *globalRoleClient) Patch(o *GlobalRole, data []byte, subresources ...string) (*GlobalRole, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *globalRoleClient) Patch(o *GlobalRole, patchType types.PatchType, data []byte, subresources ...string) (*GlobalRole, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*GlobalRole), err
 }
 
@@ -276,6 +284,7 @@ type GlobalRoleClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() GlobalRoleInterface
 }
 
@@ -294,6 +303,10 @@ func (n *globalRoleClient2) Interface() GlobalRoleInterface {
 
 func (n *globalRoleClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *globalRoleClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *globalRoleClient2) Enqueue(namespace, name string) {

@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -27,6 +28,13 @@ var (
 		Kind:         NodeDriverGroupVersionKind.Kind,
 	}
 )
+
+func NewNodeDriver(namespace, name string, obj NodeDriver) *NodeDriver {
+	obj.APIVersion, obj.Kind = NodeDriverGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type NodeDriverList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -223,8 +231,8 @@ func (s *nodeDriverClient) Watch(opts metav1.ListOptions) (watch.Interface, erro
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *nodeDriverClient) Patch(o *NodeDriver, data []byte, subresources ...string) (*NodeDriver, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *nodeDriverClient) Patch(o *NodeDriver, patchType types.PatchType, data []byte, subresources ...string) (*NodeDriver, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*NodeDriver), err
 }
 
@@ -276,6 +284,7 @@ type NodeDriverClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() NodeDriverInterface
 }
 
@@ -294,6 +303,10 @@ func (n *nodeDriverClient2) Interface() NodeDriverInterface {
 
 func (n *nodeDriverClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *nodeDriverClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *nodeDriverClient2) Enqueue(namespace, name string) {

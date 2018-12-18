@@ -43,6 +43,8 @@ type Interface interface {
 }
 
 type Clients struct {
+	Interface Interface
+
 	ServiceAccountToken           ServiceAccountTokenClient
 	DockerCredential              DockerCredentialClient
 	Certificate                   CertificateClient
@@ -123,6 +125,7 @@ func NewClients(config rest.Config) (*Clients, error) {
 
 func NewClientsFromInterface(iface Interface) *Clients {
 	return &Clients{
+		Interface: iface,
 
 		ServiceAccountToken: &serviceAccountTokenClient2{
 			iface: iface.ServiceAccountTokens(""),

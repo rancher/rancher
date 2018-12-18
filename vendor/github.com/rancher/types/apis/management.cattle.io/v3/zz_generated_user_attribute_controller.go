@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -27,6 +28,13 @@ var (
 		Kind:         UserAttributeGroupVersionKind.Kind,
 	}
 )
+
+func NewUserAttribute(namespace, name string, obj UserAttribute) *UserAttribute {
+	obj.APIVersion, obj.Kind = UserAttributeGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type UserAttributeList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -223,8 +231,8 @@ func (s *userAttributeClient) Watch(opts metav1.ListOptions) (watch.Interface, e
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *userAttributeClient) Patch(o *UserAttribute, data []byte, subresources ...string) (*UserAttribute, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *userAttributeClient) Patch(o *UserAttribute, patchType types.PatchType, data []byte, subresources ...string) (*UserAttribute, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*UserAttribute), err
 }
 
@@ -276,6 +284,7 @@ type UserAttributeClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() UserAttributeInterface
 }
 
@@ -294,6 +303,10 @@ func (n *userAttributeClient2) Interface() UserAttributeInterface {
 
 func (n *userAttributeClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *userAttributeClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *userAttributeClient2) Enqueue(namespace, name string) {

@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,13 @@ var (
 		Kind: PersistentVolumeClaimGroupVersionKind.Kind,
 	}
 )
+
+func NewPersistentVolumeClaim(namespace, name string, obj v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
+	obj.APIVersion, obj.Kind = PersistentVolumeClaimGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type PersistentVolumeClaimList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -225,8 +233,8 @@ func (s *persistentVolumeClaimClient) Watch(opts metav1.ListOptions) (watch.Inte
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *persistentVolumeClaimClient) Patch(o *v1.PersistentVolumeClaim, data []byte, subresources ...string) (*v1.PersistentVolumeClaim, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *persistentVolumeClaimClient) Patch(o *v1.PersistentVolumeClaim, patchType types.PatchType, data []byte, subresources ...string) (*v1.PersistentVolumeClaim, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*v1.PersistentVolumeClaim), err
 }
 
@@ -278,6 +286,7 @@ type PersistentVolumeClaimClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() PersistentVolumeClaimInterface
 }
 
@@ -296,6 +305,10 @@ func (n *persistentVolumeClaimClient2) Interface() PersistentVolumeClaimInterfac
 
 func (n *persistentVolumeClaimClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *persistentVolumeClaimClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *persistentVolumeClaimClient2) Enqueue(namespace, name string) {

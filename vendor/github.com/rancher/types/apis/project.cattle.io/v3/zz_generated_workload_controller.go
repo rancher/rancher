@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -28,6 +29,13 @@ var (
 		Kind: WorkloadGroupVersionKind.Kind,
 	}
 )
+
+func NewWorkload(namespace, name string, obj Workload) *Workload {
+	obj.APIVersion, obj.Kind = WorkloadGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type WorkloadList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -224,8 +232,8 @@ func (s *workloadClient) Watch(opts metav1.ListOptions) (watch.Interface, error)
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *workloadClient) Patch(o *Workload, data []byte, subresources ...string) (*Workload, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *workloadClient) Patch(o *Workload, patchType types.PatchType, data []byte, subresources ...string) (*Workload, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*Workload), err
 }
 
@@ -277,6 +285,7 @@ type WorkloadClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() WorkloadInterface
 }
 
@@ -295,6 +304,10 @@ func (n *workloadClient2) Interface() WorkloadInterface {
 
 func (n *workloadClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *workloadClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *workloadClient2) Enqueue(namespace, name string) {

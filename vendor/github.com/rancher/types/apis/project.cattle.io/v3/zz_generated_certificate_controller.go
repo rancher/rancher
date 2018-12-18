@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -28,6 +29,13 @@ var (
 		Kind: CertificateGroupVersionKind.Kind,
 	}
 )
+
+func NewCertificate(namespace, name string, obj Certificate) *Certificate {
+	obj.APIVersion, obj.Kind = CertificateGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type CertificateList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -224,8 +232,8 @@ func (s *certificateClient) Watch(opts metav1.ListOptions) (watch.Interface, err
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *certificateClient) Patch(o *Certificate, data []byte, subresources ...string) (*Certificate, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *certificateClient) Patch(o *Certificate, patchType types.PatchType, data []byte, subresources ...string) (*Certificate, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*Certificate), err
 }
 
@@ -277,6 +285,7 @@ type CertificateClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() CertificateInterface
 }
 
@@ -295,6 +304,10 @@ func (n *certificateClient2) Interface() CertificateInterface {
 
 func (n *certificateClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *certificateClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *certificateClient2) Enqueue(namespace, name string) {

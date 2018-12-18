@@ -24,6 +24,8 @@ type Interface interface {
 }
 
 type Clients struct {
+	Interface Interface
+
 	CronJob CronJobClient
 }
 
@@ -66,6 +68,7 @@ func NewClients(config rest.Config) (*Clients, error) {
 
 func NewClientsFromInterface(iface Interface) *Clients {
 	return &Clients{
+		Interface: iface,
 
 		CronJob: &cronJobClient2{
 			iface: iface.CronJobs(""),

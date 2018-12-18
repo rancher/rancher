@@ -27,6 +27,8 @@ type Interface interface {
 }
 
 type Clients struct {
+	Interface Interface
+
 	Prometheus     PrometheusClient
 	Alertmanager   AlertmanagerClient
 	PrometheusRule PrometheusRuleClient
@@ -75,6 +77,7 @@ func NewClients(config rest.Config) (*Clients, error) {
 
 func NewClientsFromInterface(iface Interface) *Clients {
 	return &Clients{
+		Interface: iface,
 
 		Prometheus: &prometheusClient2{
 			iface: iface.Prometheuses(""),

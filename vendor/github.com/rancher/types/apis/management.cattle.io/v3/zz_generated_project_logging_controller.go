@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -28,6 +29,13 @@ var (
 		Kind: ProjectLoggingGroupVersionKind.Kind,
 	}
 )
+
+func NewProjectLogging(namespace, name string, obj ProjectLogging) *ProjectLogging {
+	obj.APIVersion, obj.Kind = ProjectLoggingGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type ProjectLoggingList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -224,8 +232,8 @@ func (s *projectLoggingClient) Watch(opts metav1.ListOptions) (watch.Interface, 
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *projectLoggingClient) Patch(o *ProjectLogging, data []byte, subresources ...string) (*ProjectLogging, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *projectLoggingClient) Patch(o *ProjectLogging, patchType types.PatchType, data []byte, subresources ...string) (*ProjectLogging, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*ProjectLogging), err
 }
 
@@ -277,6 +285,7 @@ type ProjectLoggingClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() ProjectLoggingInterface
 }
 
@@ -295,6 +304,10 @@ func (n *projectLoggingClient2) Interface() ProjectLoggingInterface {
 
 func (n *projectLoggingClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *projectLoggingClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *projectLoggingClient2) Enqueue(namespace, name string) {

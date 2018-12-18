@@ -83,6 +83,9 @@ func (s *Schemas) newSchemaFromType(version *APIVersion, t reflect.Type, typeNam
 		CollectionActions: map[string]Action{},
 	}
 
+	s.processingTypes[t] = schema
+	defer delete(s.processingTypes, t)
+
 	if err := s.readFields(schema, t); err != nil {
 		return nil, err
 	}
@@ -146,6 +149,11 @@ func (s *Schemas) importType(version *APIVersion, t reflect.Type, overrides ...r
 	existing := s.Schema(version, typeName)
 	if existing != nil {
 		return existing, nil
+	}
+
+	if s, ok := s.processingTypes[t]; ok {
+		logrus.Debugf("Returning half built schema %s for %v", typeName, t)
+		return s, nil
 	}
 
 	logrus.Debugf("Inspecting schema %s for %v", typeName, t)
@@ -289,7 +297,9 @@ func (s *Schemas) readFields(schema *Schema, t reflect.Type) error {
 			fieldType.Kind() == reflect.Uint32 ||
 			fieldType.Kind() == reflect.Int32 ||
 			fieldType.Kind() == reflect.Uint64 ||
-			fieldType.Kind() == reflect.Int64 {
+			fieldType.Kind() == reflect.Int64 ||
+			fieldType.Kind() == reflect.Float32 ||
+			fieldType.Kind() == reflect.Float64 {
 			schemaField.Nullable = false
 			schemaField.Default = 0
 		}
@@ -310,6 +320,12 @@ func (s *Schemas) readFields(schema *Schema, t reflect.Type) error {
 			switch schemaField.Type {
 			case "int":
 				n, err := convert.ToNumber(schemaField.Default)
+				if err != nil {
+					return err
+				}
+				schemaField.Default = n
+			case "float":
+				n, err := convert.ToFloat(schemaField.Default)
 				if err != nil {
 					return err
 				}
@@ -446,6 +462,10 @@ func (s *Schemas) determineSchemaType(version *APIVersion, t reflect.Type) (stri
 		fallthrough
 	case reflect.Int64:
 		return "int", nil
+	case reflect.Float32:
+		fallthrough
+	case reflect.Float64:
+		return "float", nil
 	case reflect.Interface:
 		return "json", nil
 	case reflect.Map:

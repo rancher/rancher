@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,13 @@ var (
 		Kind: SecretGroupVersionKind.Kind,
 	}
 )
+
+func NewSecret(namespace, name string, obj v1.Secret) *v1.Secret {
+	obj.APIVersion, obj.Kind = SecretGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type SecretList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -225,8 +233,8 @@ func (s *secretClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *secretClient) Patch(o *v1.Secret, data []byte, subresources ...string) (*v1.Secret, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *secretClient) Patch(o *v1.Secret, patchType types.PatchType, data []byte, subresources ...string) (*v1.Secret, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*v1.Secret), err
 }
 
@@ -278,6 +286,7 @@ type SecretClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() SecretInterface
 }
 
@@ -296,6 +305,10 @@ func (n *secretClient2) Interface() SecretInterface {
 
 func (n *secretClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *secretClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *secretClient2) Enqueue(namespace, name string) {

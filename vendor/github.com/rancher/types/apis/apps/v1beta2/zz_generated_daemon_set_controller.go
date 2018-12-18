@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,13 @@ var (
 		Kind: DaemonSetGroupVersionKind.Kind,
 	}
 )
+
+func NewDaemonSet(namespace, name string, obj v1beta2.DaemonSet) *v1beta2.DaemonSet {
+	obj.APIVersion, obj.Kind = DaemonSetGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type DaemonSetList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -225,8 +233,8 @@ func (s *daemonSetClient) Watch(opts metav1.ListOptions) (watch.Interface, error
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *daemonSetClient) Patch(o *v1beta2.DaemonSet, data []byte, subresources ...string) (*v1beta2.DaemonSet, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *daemonSetClient) Patch(o *v1beta2.DaemonSet, patchType types.PatchType, data []byte, subresources ...string) (*v1beta2.DaemonSet, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*v1beta2.DaemonSet), err
 }
 
@@ -278,6 +286,7 @@ type DaemonSetClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() DaemonSetInterface
 }
 
@@ -296,6 +305,10 @@ func (n *daemonSetClient2) Interface() DaemonSetInterface {
 
 func (n *daemonSetClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *daemonSetClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *daemonSetClient2) Enqueue(namespace, name string) {

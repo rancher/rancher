@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -28,6 +29,13 @@ var (
 		Kind:         PodSecurityPolicyGroupVersionKind.Kind,
 	}
 )
+
+func NewPodSecurityPolicy(namespace, name string, obj v1beta1.PodSecurityPolicy) *v1beta1.PodSecurityPolicy {
+	obj.APIVersion, obj.Kind = PodSecurityPolicyGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type PodSecurityPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -224,8 +232,8 @@ func (s *podSecurityPolicyClient) Watch(opts metav1.ListOptions) (watch.Interfac
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *podSecurityPolicyClient) Patch(o *v1beta1.PodSecurityPolicy, data []byte, subresources ...string) (*v1beta1.PodSecurityPolicy, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *podSecurityPolicyClient) Patch(o *v1beta1.PodSecurityPolicy, patchType types.PatchType, data []byte, subresources ...string) (*v1beta1.PodSecurityPolicy, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*v1beta1.PodSecurityPolicy), err
 }
 
@@ -277,6 +285,7 @@ type PodSecurityPolicyClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() PodSecurityPolicyInterface
 }
 
@@ -295,6 +304,10 @@ func (n *podSecurityPolicyClient2) Interface() PodSecurityPolicyInterface {
 
 func (n *podSecurityPolicyClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *podSecurityPolicyClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *podSecurityPolicyClient2) Enqueue(namespace, name string) {

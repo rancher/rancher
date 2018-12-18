@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -28,6 +29,13 @@ var (
 		Kind: PreferenceGroupVersionKind.Kind,
 	}
 )
+
+func NewPreference(namespace, name string, obj Preference) *Preference {
+	obj.APIVersion, obj.Kind = PreferenceGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type PreferenceList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -224,8 +232,8 @@ func (s *preferenceClient) Watch(opts metav1.ListOptions) (watch.Interface, erro
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *preferenceClient) Patch(o *Preference, data []byte, subresources ...string) (*Preference, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *preferenceClient) Patch(o *Preference, patchType types.PatchType, data []byte, subresources ...string) (*Preference, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*Preference), err
 }
 
@@ -277,6 +285,7 @@ type PreferenceClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() PreferenceInterface
 }
 
@@ -295,6 +304,10 @@ func (n *preferenceClient2) Interface() PreferenceInterface {
 
 func (n *preferenceClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *preferenceClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *preferenceClient2) Enqueue(namespace, name string) {

@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -27,6 +28,13 @@ var (
 		Kind:         ListenConfigGroupVersionKind.Kind,
 	}
 )
+
+func NewListenConfig(namespace, name string, obj ListenConfig) *ListenConfig {
+	obj.APIVersion, obj.Kind = ListenConfigGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type ListenConfigList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -223,8 +231,8 @@ func (s *listenConfigClient) Watch(opts metav1.ListOptions) (watch.Interface, er
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *listenConfigClient) Patch(o *ListenConfig, data []byte, subresources ...string) (*ListenConfig, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *listenConfigClient) Patch(o *ListenConfig, patchType types.PatchType, data []byte, subresources ...string) (*ListenConfig, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*ListenConfig), err
 }
 
@@ -276,6 +284,7 @@ type ListenConfigClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() ListenConfigInterface
 }
 
@@ -294,6 +303,10 @@ func (n *listenConfigClient2) Interface() ListenConfigInterface {
 
 func (n *listenConfigClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *listenConfigClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *listenConfigClient2) Enqueue(namespace, name string) {

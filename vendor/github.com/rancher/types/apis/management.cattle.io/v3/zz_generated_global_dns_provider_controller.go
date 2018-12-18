@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -27,6 +28,13 @@ var (
 		Kind:         GlobalDNSProviderGroupVersionKind.Kind,
 	}
 )
+
+func NewGlobalDNSProvider(namespace, name string, obj GlobalDNSProvider) *GlobalDNSProvider {
+	obj.APIVersion, obj.Kind = GlobalDNSProviderGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type GlobalDNSProviderList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -223,8 +231,8 @@ func (s *globalDnsProviderClient) Watch(opts metav1.ListOptions) (watch.Interfac
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *globalDnsProviderClient) Patch(o *GlobalDNSProvider, data []byte, subresources ...string) (*GlobalDNSProvider, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *globalDnsProviderClient) Patch(o *GlobalDNSProvider, patchType types.PatchType, data []byte, subresources ...string) (*GlobalDNSProvider, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*GlobalDNSProvider), err
 }
 
@@ -276,6 +284,7 @@ type GlobalDNSProviderClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() GlobalDNSProviderInterface
 }
 
@@ -294,6 +303,10 @@ func (n *globalDnsProviderClient2) Interface() GlobalDNSProviderInterface {
 
 func (n *globalDnsProviderClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *globalDnsProviderClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *globalDnsProviderClient2) Enqueue(namespace, name string) {

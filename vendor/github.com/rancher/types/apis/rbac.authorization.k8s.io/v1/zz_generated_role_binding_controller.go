@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,13 @@ var (
 		Kind: RoleBindingGroupVersionKind.Kind,
 	}
 )
+
+func NewRoleBinding(namespace, name string, obj v1.RoleBinding) *v1.RoleBinding {
+	obj.APIVersion, obj.Kind = RoleBindingGroupVersionKind.ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 
 type RoleBindingList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -225,8 +233,8 @@ func (s *roleBindingClient) Watch(opts metav1.ListOptions) (watch.Interface, err
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (s *roleBindingClient) Patch(o *v1.RoleBinding, data []byte, subresources ...string) (*v1.RoleBinding, error) {
-	obj, err := s.objectClient.Patch(o.Name, o, data, subresources...)
+func (s *roleBindingClient) Patch(o *v1.RoleBinding, patchType types.PatchType, data []byte, subresources ...string) (*v1.RoleBinding, error) {
+	obj, err := s.objectClient.Patch(o.Name, o, patchType, data, subresources...)
 	return obj.(*v1.RoleBinding), err
 }
 
@@ -278,6 +286,7 @@ type RoleBindingClient interface {
 	Enqueue(namespace, name string)
 
 	Generic() controller.GenericController
+	ObjectClient() *objectclient.ObjectClient
 	Interface() RoleBindingInterface
 }
 
@@ -296,6 +305,10 @@ func (n *roleBindingClient2) Interface() RoleBindingInterface {
 
 func (n *roleBindingClient2) Generic() controller.GenericController {
 	return n.iface.Controller().Generic()
+}
+
+func (n *roleBindingClient2) ObjectClient() *objectclient.ObjectClient {
+	return n.Interface().ObjectClient()
 }
 
 func (n *roleBindingClient2) Enqueue(namespace, name string) {
