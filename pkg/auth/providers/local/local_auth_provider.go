@@ -428,5 +428,16 @@ func (l *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPrin
 	if err != nil {
 		return false, err
 	}
-	return user.Username != "", nil
+
+	if user.Username != "" {
+		return true, nil
+	}
+
+	for _, principalID := range user.PrincipalIDs {
+		if strings.HasPrefix(principalID, "system://") {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
