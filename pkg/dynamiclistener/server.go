@@ -430,6 +430,11 @@ func (s *Server) serveHTTPS(config *v3.ListenConfig) error {
 func httpRedirect(next http.Handler) http.Handler {
 	return http.HandlerFunc(
 		func(rw http.ResponseWriter, r *http.Request) {
+			// In case a check requires HTTP 200 instead of HTTP 302
+			if strings.HasPrefix(r.URL.Path, "/ping") || strings.HasPrefix(r.URL.Path, "/healthz") {
+				next.ServeHTTP(rw, r)
+				return
+			}
 			if r.Header.Get("x-Forwarded-Proto") == "https" {
 				next.ServeHTTP(rw, r)
 				return
