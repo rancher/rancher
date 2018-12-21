@@ -42,7 +42,7 @@ type RancherKubernetesEngineConfig struct {
 	// Monitoring Config
 	Monitoring MonitoringConfig `yaml:"monitoring" json:"monitoring,omitempty"`
 	// Rotating Certificates Option
-	RotateCertificates *RotateCertificates `yaml:"-" json:"rotateCertificates,omitempty"`
+	RotateCertificates *RotateCertificates `yaml:"rotate_certificates,omitempty" json:"rotateCertificates,omitempty"`
 }
 
 type BastionHost struct {

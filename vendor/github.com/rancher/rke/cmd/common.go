@@ -1,13 +1,16 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"github.com/rancher/rke/cluster"
+	"github.com/rancher/rke/hosts"
+	"github.com/rancher/rke/log"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/urfave/cli"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-
-	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/urfave/cli"
 )
 
 var commonFlags = []cli.Flag{
@@ -51,4 +54,40 @@ func setOptionsFromCLI(c *cli.Context, rkeConfig *v3.RancherKubernetesEngineConf
 	}
 
 	return rkeConfig, nil
+}
+
+func ClusterInit(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, dialersOptions hosts.DialersOptions, flags cluster.ExternalFlags) error {
+	log.Infof(ctx, "Initiating Kubernetes cluster")
+	var fullState *cluster.FullState
+	stateFilePath := cluster.GetStateFilePath(flags.ClusterFilePath, flags.ConfigDir)
+	rkeFullState, _ := cluster.ReadStateFile(ctx, stateFilePath)
+
+	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags)
+	if err != nil {
+		return err
+	}
+
+	if err := kubeCluster.SetupDialers(ctx, dialersOptions); err != nil {
+		return err
+	}
+
+	err = doUpgradeLegacyCluster(ctx, kubeCluster, rkeFullState)
+	if err != nil {
+		log.Warnf(ctx, "[state] can't fetch legacy cluster state from Kubernetes")
+	}
+	// check if certificate rotate or normal init
+	if kubeCluster.RancherKubernetesEngineConfig.RotateCertificates != nil {
+		fullState, err = rotateRKECertificates(ctx, kubeCluster, flags, rkeFullState)
+	} else {
+		fullState, err = cluster.RebuildState(ctx, &kubeCluster.RancherKubernetesEngineConfig, rkeFullState, flags)
+	}
+	if err != nil {
+		return err
+	}
+
+	rkeState := cluster.FullState{
+		DesiredState: fullState.DesiredState,
+		CurrentState: fullState.CurrentState,
+	}
+	return rkeState.WriteStateFile(ctx, stateFilePath)
 }
