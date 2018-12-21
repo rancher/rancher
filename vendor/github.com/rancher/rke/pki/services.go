@@ -26,7 +26,7 @@ func GenerateKubeAPICertificate(ctx context.Context, certs map[string]Certificat
 	kubeAPICert := certs[KubeAPICertName].Certificate
 	if kubeAPICert != nil &&
 		reflect.DeepEqual(kubeAPIAltNames.DNSNames, kubeAPICert.DNSNames) &&
-		deepEqualIPsAltNames(kubeAPIAltNames.IPs, kubeAPICert.IPAddresses) {
+		deepEqualIPsAltNames(kubeAPIAltNames.IPs, kubeAPICert.IPAddresses) && !rotate {
 		return nil
 	}
 	log.Infof(ctx, "[certificates] Generating Kubernetes API server certificates")

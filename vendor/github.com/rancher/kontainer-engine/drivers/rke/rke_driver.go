@@ -388,18 +388,6 @@ func (d *Driver) Remove(ctx context.Context, clusterInfo *types.ClusterInfo) err
 	return cmd.ClusterRemove(ctx, &rkeConfig, dialers, externalFlags)
 }
 
-func (d *Driver) RotateCerts(ctx context.Context, clusterInfo *types.ClusterInfo, rotateCA bool, components []string) error {
-	rkeConfig, err := util.ConvertToRkeConfig(clusterInfo.Metadata["Config"])
-	if err != nil {
-		return err
-	}
-	stateDir, _ := d.restore(clusterInfo)
-	defer d.save(nil, stateDir)
-	dialers, externalFlags := d.getFlags(rkeConfig, stateDir)
-	rotateFlags := cluster.GetRotateCertsFlags(rotateCA, components)
-	return cmd.RotateRKECertificates(ctx, &rkeConfig, dialers, externalFlags, rotateFlags)
-}
-
 func (d *Driver) restore(info *types.ClusterInfo) (string, error) {
 	os.MkdirAll(rancherPath, 0700)
 	dir, err := ioutil.TempDir(rancherPath, "rke-")
