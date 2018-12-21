@@ -58,6 +58,8 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 		return a.enableMonitoring(actionName, action, apiContext)
 	case "disableMonitoring":
 		return a.disableMonitoring(actionName, action, apiContext)
+	case "rotateCertificates":
+		return a.RotateCertificates(actionName, action, apiContext)
 	}
 	return httperror.NewAPIError(httperror.NotFound, "not found")
 }
@@ -480,4 +482,46 @@ func (a ActionHandler) getKubeConfig(apiContext *types.APIContext, cluster *mgmt
 	}
 
 	return a.ClusterManager.KubeConfig(cluster.ID, token), nil
+}
+
+func (a ActionHandler) RotateCertificates(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	var mgmtCluster mgmtclient.Cluster
+	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &mgmtCluster); err != nil {
+		return err
+	}
+
+	cluster, err := a.ClusterClient.Get(apiContext.ID, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	data, err := ioutil.ReadAll(apiContext.Request.Body)
+	if err != nil {
+		return errors.Wrap(err, "reading request body error")
+	}
+
+	input := mgmtclient.RotateCertificateInput{}
+	if err = json.Unmarshal(data, &input); err != nil {
+		return errors.Wrap(err, "unmarshaling input error")
+	}
+
+	rotateCerts := &v3.RotateCertificates{
+		CACertificates: input.CACertificates,
+		Services:       []string{input.Services},
+	}
+	cluster.Spec.RancherKubernetesEngineConfig.RotateCertificates = rotateCerts
+	if _, err := a.ClusterClient.Update(cluster); err != nil {
+		return err
+	}
+	var reader *bytes.Reader
+	if input.CACertificates {
+		reader = bytes.NewReader([]byte("Rotating CA certificates and all components"))
+	} else if len(input.Services) > 0 {
+		reader = bytes.NewReader([]byte(fmt.Sprintf("Rotating %s certificates", input.Services)))
+	} else {
+		reader = bytes.NewReader([]byte("Rotating certificates for all components"))
+	}
+
+	apiContext.Response.Header().Set("Content-Type", "application/json")
+	http.ServeContent(apiContext.Response, apiContext.Request, "rotate", time.Now(), reader)
+	return nil
 }
