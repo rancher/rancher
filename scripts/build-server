@@ -8,6 +8,6 @@ cd $(dirname $0)/..
 mkdir -p bin
 [ "$(uname)" != "Darwin" ] && LINKFLAGS="-extldflags -static -s"
 
-RKE_VERSION=$(grep -m1 '^github.com/rancher/rke' vendor.conf | awk '{print $2}')
+DEFAULT_VERSIONS=`go run ./pkg/settings/generator/main.go`
 
-CGO_ENABLED=0 go build -i -tags k8s -ldflags "-X main.VERSION=$VERSION -X github.com/rancher/rancher/pkg/settings.RKEVersion=$RKE_VERSION $LINKFLAGS" -o bin/rancher
+CGO_ENABLED=0 go build -i -tags k8s -ldflags "-X main.VERSION=$VERSION -X github.com/rancher/rancher/pkg/settings.InjectDefaults=$DEFAULT_VERSIONS $LINKFLAGS" -o bin/rancher
