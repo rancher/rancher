@@ -510,7 +510,7 @@ func podTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v1.PodSpec{},
 			mapper.InitContainerMapper{},
 			mapper.SchedulingMapper{},
-			m.Move{From: "tolerations", To: "scheduling/tolerations", DestDefined: true},
+			m.Move{From: "tolerations", To: "scheduling/tolerate", DestDefined: true},
 			&m.Embed{Field: "securityContext"},
 			&m.Drop{Field: "serviceAccount"},
 		).
