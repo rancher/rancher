@@ -9,6 +9,7 @@ const (
 	NodeTemplateFieldAnnotations              = "annotations"
 	NodeTemplateFieldAuthCertificateAuthority = "authCertificateAuthority"
 	NodeTemplateFieldAuthKey                  = "authKey"
+	NodeTemplateFieldCloudCredentialID        = "cloudCredentialId"
 	NodeTemplateFieldCreated                  = "created"
 	NodeTemplateFieldCreatorID                = "creatorId"
 	NodeTemplateFieldDescription              = "description"
@@ -38,6 +39,7 @@ type NodeTemplate struct {
 	Annotations              map[string]string   `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	AuthCertificateAuthority string              `json:"authCertificateAuthority,omitempty" yaml:"authCertificateAuthority,omitempty"`
 	AuthKey                  string              `json:"authKey,omitempty" yaml:"authKey,omitempty"`
+	CloudCredentialID        string              `json:"cloudCredentialId,omitempty" yaml:"cloudCredentialId,omitempty"`
 	Created                  string              `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                string              `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Description              string              `json:"description,omitempty" yaml:"description,omitempty"`

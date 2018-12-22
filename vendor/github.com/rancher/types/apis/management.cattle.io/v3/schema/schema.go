@@ -40,7 +40,9 @@ var (
 		Init(globalDNSTypes).
 		Init(kontainerTypes).
 		Init(etcdBackupTypes).
-		Init(monitorTypes)
+		Init(monitorTypes).
+		Init(credTypes).
+		Init(mgmtSecretTypes)
 
 	TokenSchemas = factory.Schemas(&Version).
 			Init(tokens)
@@ -53,6 +55,24 @@ func rkeTypes(schemas *types.Schemas) *types.Schemas {
 func schemaTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		MustImport(&Version, v3.DynamicSchema{})
+}
+
+func credTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.
+		AddMapperForType(&Version, v3.CloudCredential{},
+			&mapper.CredentialMapper{},
+			&m.Move{From: "name", To: "id"},
+			&m.Drop{Field: "namespaceId"}).
+		MustImport(&Version, v3.CloudCredential{})
+}
+
+func mgmtSecretTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.MustImportAndCustomize(&Version, v1.Secret{}, func(schema *types.Schema) {
+		schema.ID = "managementSecret"
+		schema.PluralName = "managementSecrets"
+		schema.CodeName = "ManagementSecret"
+		schema.CodeNamePlural = "ManagementSecrets"
+	})
 }
 
 func catalogTypes(schemas *types.Schemas) *types.Schemas {
