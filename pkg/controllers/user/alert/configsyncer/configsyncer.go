@@ -406,6 +406,30 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 				receiver.PagerdutyConfigs = append(receiver.PagerdutyConfigs, pagerduty)
 				receiverExist = true
 
+			} else if notifier.Spec.WechatConfig != nil {
+				wechat := &alertconfig.WechatConfig{
+					APISecret: alertconfig.Secret(notifier.Spec.WechatConfig.Secret),
+					AgentID:   notifier.Spec.WechatConfig.Agent,
+					CorpID:    notifier.Spec.WechatConfig.Corp,
+				}
+
+				recipient := notifier.Spec.WechatConfig.DefaultRecipient
+				if r.Recipient != "" {
+					recipient = r.Recipient
+				}
+
+				switch notifier.Spec.WechatConfig.RecipientType {
+				case "tag":
+					wechat.ToTag = recipient
+				case "user":
+					wechat.ToUser = recipient
+				default:
+					wechat.ToParty = recipient
+				}
+
+				receiver.WechatConfigs = append(receiver.WechatConfigs, wechat)
+				receiverExist = true
+
 			} else if notifier.Spec.WebhookConfig != nil {
 				webhook := &alertconfig.WebhookConfig{
 					URL: notifier.Spec.WebhookConfig.URL,
