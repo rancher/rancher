@@ -37,6 +37,49 @@ The metric {{ (index .Alerts 0).Labels.alert_name}} crossed the threshold
 {{ end}}
 {{ end}}
 
+{{ define "wechat.default.message" }}Alert Name: {{ (index .Alerts 0).Labels.alert_name}}
+Severity: {{ (index .Alerts 0).Labels.severity}}
+Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
+{{ if eq (index .Alerts 0).Labels.alert_type "event"}}
+Target: {{ if (index .Alerts 0).Labels.target_namespace}}{{(index .Alerts 0).Labels.target_namespace}}:{{end}}{{(index .Alerts 0).Labels.target_name}}
+Count: {{ (index .Alerts 0).Labels.event_count}}
+Event Message: {{ (index .Alerts 0).Labels.event_message}}
+First Seen: {{ (index .Alerts 0).Labels.event_firstseen}}
+Last Seen: {{ (index .Alerts 0).Labels.event_lastseen}}
+{{ else if eq (index .Alerts 0).Labels.alert_type "nodeCPU"}}
+Used CPU: {{ (index .Alerts 0).Labels.used_cpu}} m
+Total CPU: {{ (index .Alerts 0).Labels.total_cpu}} m
+{{ else if eq (index .Alerts 0).Labels.alert_type "nodeMemory"}}
+Used Memory: {{ (index .Alerts 0).Labels.used_mem}}
+Total Memory: {{ (index .Alerts 0).Labels.total_mem}}
+{{ else if eq (index .Alerts 0).Labels.alert_type "podRestarts"}}
+Project Name: {{(index .Alerts 0).Labels.project_name}}
+Namespace: {{ (index .Alerts 0).Labels.namespace}}
+Container Name: {{(index .Alerts 0).Labels.container_name}}
+{{ else if eq (index .Alerts 0).Labels.alert_type "podNotRunning"}}
+Project Name: {{(index .Alerts 0).Labels.project_name}}
+Namespace: {{ (index .Alerts 0).Labels.namespace}}
+Container Name: {{ (index .Alerts 0).Labels.container_name}}
+{{ else if eq (index .Alerts 0).Labels.alert_type "podNotScheduled"}}
+Project Name: {{(index .Alerts 0).Labels.project_name}}
+Namespace: {{ (index .Alerts 0).Labels.namespace}}
+Pod Name: {{ (index .Alerts 0).Labels.pod_name}}
+{{ else if eq (index .Alerts 0).Labels.alert_type "workload"}}
+Project Name: {{(index .Alerts 0).Labels.project_name}}
+Available Replicas: {{ (index .Alerts 0).Labels.available_replicas}}
+Desired Replicas: {{ (index .Alerts 0).Labels.desired_replicas}}
+{{ else if eq (index .Alerts 0).Labels.alert_type "metric"}}
+{{ if (index .Alerts 0).Labels.project_name}}Project Name: {{(index .Alerts 0).Labels.project_name}}{{end}}
+Expression: {{(index .Alerts 0).Labels.expression}}
+{{ if (index .Alerts 0).Labels.pod_name}}Pod Name: {{(index .Alerts 0).Labels.pod_name}}{{ else if (index .Alerts 0).Labels.pod}}Pod Name: {{(index .Alerts 0).Labels.pod}}{{ end}}
+{{ if (index .Alerts 0).Labels.namespace}}Namespace: {{(index .Alerts 0).Labels.namespace}}{{ end}}
+Description: Threshold Crossed: datapoint value {{ (index .Alerts 0).Labels.current_value}} was {{ (index .Alerts 0).Labels.comparison}} to the threshold ({{ (index .Alerts 0).Labels.threshold_value}}) for ({{ (index .Alerts 0).Labels.duration}})
+{{ end}}
+{{ if (index .Alerts 0).Labels.logs}}
+Logs: {{ (index .Alerts 0).Labels.logs}}
+{{ end}}
+{{ end}}
+
 {{ define "slack.text" }}
 {{ if eq (index .Alerts 0).Labels.alert_type "event"}}
 Alert Name: {{ (index .Alerts 0).Labels.alert_name}}

@@ -195,6 +195,14 @@ func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 				pdc.URL = c.Global.PagerdutyURL
 			}
 		}
+		for _, wcc := range rcv.WechatConfigs {
+			if wcc.APIURL == "" {
+				if c.Global.WechatURL == "" {
+					return fmt.Errorf("no global Wechat URL set")
+				}
+				wcc.APIURL = c.Global.WechatURL
+			}
+		}
 		for _, ogc := range rcv.OpsGenieConfigs {
 			if ogc.APIHost == "" {
 				if c.Global.OpsGenieAPIHost == "" {
@@ -269,6 +277,7 @@ var DefaultGlobalConfig = GlobalConfig{
 
 	SMTPRequireTLS:  true,
 	PagerdutyURL:    "https://events.pagerduty.com/v2/enqueue",
+	WechatURL:       "https://qyapi.weixin.qq.com/cgi-bin/",
 	HipchatURL:      "https://api.hipchat.com/",
 	OpsGenieAPIHost: "https://api.opsgenie.com/",
 	VictorOpsAPIURL: "https://alert.victorops.com/integrations/generic/20131114/alert/",
@@ -296,6 +305,7 @@ type GlobalConfig struct {
 	OpsGenieAPIHost  string `yaml:"opsgenie_api_host,omitempty" json:"opsgenie_api_host,omitempty"`
 	VictorOpsAPIURL  string `yaml:"victorops_api_url,omitempty" json:"victorops_api_url,omitempty"`
 	VictorOpsAPIKey  Secret `yaml:"victorops_api_key,omitempty" json:"victorops_api_key,omitempty"`
+	WechatURL        string `yaml:"wechat_url,omitempty" json:"wechat_url,omitempty"`
 
 	// Catches all undefined fields and must be empty after parsing.
 	XXX map[string]interface{} `yaml:",inline" json:"-"`
@@ -431,6 +441,7 @@ type Receiver struct {
 	OpsGenieConfigs  []*OpsGenieConfig  `yaml:"opsgenie_configs,omitempty" json:"opsgenie_configs,omitempty"`
 	PushoverConfigs  []*PushoverConfig  `yaml:"pushover_configs,omitempty" json:"pushover_configs,omitempty"`
 	VictorOpsConfigs []*VictorOpsConfig `yaml:"victorops_configs,omitempty" json:"victorops_configs,omitempty"`
+	WechatConfigs    []*WechatConfig    `yaml:"wechat_configs,omitempty" json:"wechat_configs,omitempty"`
 
 	// Catches all undefined fields and must be empty after parsing.
 	XXX map[string]interface{} `yaml:",inline" json:"-"`

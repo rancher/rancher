@@ -42,6 +42,14 @@ var (
 		},
 	}
 
+	// DefaultWechatConfig defines default values for Wechat configurations.
+	DefaultWechatConfig = WechatConfig{
+		NotifierConfig: NotifierConfig{
+			VSendResolved: true,
+		},
+		Message: `{{ template "wechat.default.message" . }}`,
+	}
+
 	// DefaultSlackConfig defines default values for Slack configurations.
 	DefaultSlackConfig = SlackConfig{
 		NotifierConfig: NotifierConfig{
@@ -187,6 +195,46 @@ func (c *PagerdutyConfig) UnmarshalYAML(unmarshal func(interface{}) error) error
 		return fmt.Errorf("missing service key in PagerDuty config")
 	}
 	return checkOverflow(c.XXX, "pagerduty config")
+}
+
+type WechatConfig struct {
+	NotifierConfig `yaml:",inline" json:",inline"`
+
+	APISecret Secret `yaml:"api_secret,omitempty" json:"api_secret,omitempty"`
+	APIURL    string `yaml:"api_url,omitempty" json:"api_url,omitempty"`
+	CorpID    string `yaml:"corp_id,omitempty" json:"corp_id,omitempty"`
+	Message   string `yaml:"message,omitempty" json:"message,omitempty"`
+	AgentID   string `yaml:"agent_id,omitempty" json:"agent_id,omitempty"`
+	ToParty   string `yaml:"to_party,omitempty" json:"to_party,omitempty"`
+	ToTag     string `yaml:"to_tag,omitempty" json:"to_tag,omitempty"`
+	ToUser    string `yaml:"to_user,omitempty" json:"to_user,omitempty"`
+	// Catches all undefined fields and must be empty after parsing.
+	XXX map[string]interface{} `yaml:",inline" json:"-"`
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+func (c *WechatConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	*c = DefaultWechatConfig
+	type plain WechatConfig
+	if err := unmarshal((*plain)(c)); err != nil {
+		return err
+	}
+	if c.APISecret == "" {
+		return fmt.Errorf("missing api secret in Wechat config")
+	}
+	if c.APIURL == "" {
+		return fmt.Errorf("missing api url in Wechat config")
+	}
+	if c.CorpID == "" {
+		return fmt.Errorf("missing crop id in Wechat config")
+	}
+	if c.AgentID == "" {
+		return fmt.Errorf("missing agent id in Wechat config")
+	}
+	if c.ToParty == "" && c.ToTag == "" && c.ToUser == "" {
+		return fmt.Errorf("missing target id in Wechat config")
+	}
+	return checkOverflow(c.XXX, "wechat config")
 }
 
 // SlackConfig configures notifications via Slack.
