@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/core/v1"
@@ -21,7 +22,6 @@ import (
 	"github.com/rancher/types/config"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -87,13 +87,55 @@ func (l *alertService) Upgrade(currentVersion string) (string, error) {
 		return currentVersion, nil
 	}
 
-	//migrate legacy
 	appName, _ := monitorutil.ClusterAlertManagerInfo()
-	oldClusterAlert, err := l.oldClusterAlerts.List(metav1.ListOptions{})
-	if err != nil {
-		return "", fmt.Errorf("get old cluster alert failed, %s", err)
+	//migrate legacy
+	if !strings.Contains(currentVersion, "system-library-rancher-monitoring") {
+		if err := l.migrateLegacyClusterAlert(); err != nil {
+			return "", err
+		}
+
+		if err := l.migrateLegacyProjectAlert(); err != nil {
+			return "", err
+		}
 	}
 
+	//upgrade old app
+	defaultSystemProjects, err := l.projectLister.List(metav1.NamespaceAll, labels.Set(systemProjectLabel).AsSelector())
+	if err != nil {
+		return "", fmt.Errorf("list system project failed, %v", err)
+	}
+
+	if len(defaultSystemProjects) == 0 {
+		return "", fmt.Errorf("get system project failed")
+	}
+
+	systemProject := defaultSystemProjects[0]
+	if systemProject == nil {
+		return "", fmt.Errorf("get system project failed")
+	}
+	app, err := l.apps.GetNamespaced(systemProject.Name, appName, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return NewVersion, nil
+		}
+		return "", fmt.Errorf("get app %s:%s failed, %v", systemProject.Name, appName, err)
+	}
+	newApp := app.DeepCopy()
+	newApp.Spec.ExternalID = newCatalogID
+
+	if !reflect.DeepEqual(newApp, app) {
+		if _, err = l.apps.Update(newApp); err != nil {
+			return "", fmt.Errorf("update app %s:%s failed, %v", app.Namespace, app.Name, err)
+		}
+	}
+	return NewVersion, nil
+}
+
+func (l *alertService) migrateLegacyClusterAlert() error {
+	oldClusterAlert, err := l.oldClusterAlerts.List(metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("get old cluster alert failed, %s", err)
+	}
 	for _, v := range oldClusterAlert.Items {
 		migrationGroupName := fmt.Sprintf("migrate-group-%s", v.Name)
 		groupID := alertutil.GetGroupID(l.clusterName, migrationGroupName)
@@ -144,20 +186,19 @@ func (l *alertService) Upgrade(currentVersion string) (string, error) {
 		oldClusterRule, err := l.clusterAlertRules.Get(newClusterRule.Name, metav1.GetOptions{})
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
-				return "", fmt.Errorf("migrate %s:%s failed, get alert rule failed, %v", v.Namespace, v.Name, err)
+				return fmt.Errorf("migrate %s:%s failed, get alert rule failed, %v", v.Namespace, v.Name, err)
 			}
 
 			if _, err = l.clusterAlertRules.Create(newClusterRule); err != nil && !apierrors.IsAlreadyExists(err) {
-				return "", fmt.Errorf("migrate %s:%s failed, create alert rule failed, %v", v.Namespace, v.Name, err)
+				return fmt.Errorf("migrate %s:%s failed, create alert rule failed, %v", v.Namespace, v.Name, err)
 			}
 		} else {
 			updatedClusterRule := oldClusterRule.DeepCopy()
 			updatedClusterRule.Spec = newClusterRule.Spec
 			if _, err := l.clusterAlertRules.Update(updatedClusterRule); err != nil {
-				return "", fmt.Errorf("migrate %s:%s failed, update alert rule failed, %v", v.Namespace, v.Name, err)
+				return fmt.Errorf("migrate %s:%s failed, update alert rule failed, %v", v.Namespace, v.Name, err)
 			}
 		}
-
 		legacyGroup := &v3.ClusterAlertGroup{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      migrationGroupName,
@@ -175,13 +216,16 @@ func (l *alertService) Upgrade(currentVersion string) (string, error) {
 
 		legacyGroup, err = l.clusterAlertGroups.Create(legacyGroup)
 		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return "", fmt.Errorf("migrate failed, create alert group %s:%s failed, %v", l.clusterName, migrationGroupName, err)
+			return fmt.Errorf("migrate failed, create alert group %s:%s failed, %v", l.clusterName, migrationGroupName, err)
 		}
 	}
+	return nil
+}
 
+func (l *alertService) migrateLegacyProjectAlert() error {
 	oldProjectAlert, err := l.oldProjectAlerts.List(metav1.ListOptions{})
 	if err != nil {
-		return "", fmt.Errorf("get old project alert failed, %s", err)
+		return fmt.Errorf("get old project alert failed, %s", err)
 	}
 
 	oldProjectAlertGroup := make(map[string][]*v3.ProjectAlert)
@@ -238,17 +282,17 @@ func (l *alertService) Upgrade(currentVersion string) (string, error) {
 			oldProjectRule, err := l.projectAlertRules.GetNamespaced(projectName, newProjectRule.Name, metav1.GetOptions{})
 			if err != nil {
 				if !apierrors.IsNotFound(err) {
-					return "", fmt.Errorf("migrate %s:%s failed, get alert rule failed, %v", v.Namespace, v.Name, err)
+					return fmt.Errorf("migrate %s:%s failed, get alert rule failed, %v", v.Namespace, v.Name, err)
 				}
 
 				if _, err = l.projectAlertRules.Create(newProjectRule); err != nil && !apierrors.IsAlreadyExists(err) {
-					return "", fmt.Errorf("migrate %s:%s failed, create alert rule failed, %v", v.Namespace, v.Name, err)
+					return fmt.Errorf("migrate %s:%s failed, create alert rule failed, %v", v.Namespace, v.Name, err)
 				}
 			} else {
 				updatedProjectRule := oldProjectRule.DeepCopy()
 				updatedProjectRule.Spec = newProjectRule.Spec
 				if _, err := l.projectAlertRules.Update(updatedProjectRule); err != nil {
-					return "", fmt.Errorf("migrate %s:%s failed, update alert rule failed, %v", v.Namespace, v.Name, err)
+					return fmt.Errorf("migrate %s:%s failed, update alert rule failed, %v", v.Namespace, v.Name, err)
 				}
 			}
 
@@ -269,59 +313,9 @@ func (l *alertService) Upgrade(currentVersion string) (string, error) {
 
 			legacyGroup, err = l.projectAlertGroups.Create(legacyGroup)
 			if err != nil && !apierrors.IsAlreadyExists(err) {
-				return "", fmt.Errorf("create migrate alert group %s:%s failed, %v", legacyGroup.Namespace, legacyGroup.Name, err)
+				return fmt.Errorf("create migrate alert group %s:%s failed, %v", legacyGroup.Namespace, legacyGroup.Name, err)
 			}
 		}
-
 	}
-
-	//clean up
-	set := fields.Set{
-		"metadata.namespace": l.clusterName,
-	}
-	if err := l.oldClusterAlerts.DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{
-		FieldSelector: set.AsSelector().String(),
-	}); err != nil && !apierrors.IsNotFound(err) {
-		return "", fmt.Errorf("migrate failed, delete old cluster alert in namespace %s failded, %v", l.clusterName, err)
-	}
-
-	for projectName := range oldProjectAlertGroup {
-		if err := l.oldProjectAlerts.DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{
-			FieldSelector: fmt.Sprintf("metadata.namespace=%s", projectName),
-		}); err != nil && !apierrors.IsNotFound(err) {
-			return "", fmt.Errorf("migrate failed, delete old project alert in namespace %s failded, %v", projectName, err)
-		}
-	}
-	//upgrade old app
-	defaultSystemProjects, err := l.projectLister.List(metav1.NamespaceAll, labels.Set(systemProjectLabel).AsSelector())
-	if err != nil {
-		return "", fmt.Errorf("list system project failed, %v", err)
-	}
-
-	if len(defaultSystemProjects) == 0 {
-		return "", fmt.Errorf("get system project failed")
-	}
-
-	systemProject := defaultSystemProjects[0]
-	if systemProject == nil {
-		return "", fmt.Errorf("get system project failed")
-	}
-
-	app, err := l.apps.GetNamespaced(systemProject.Name, appName, metav1.GetOptions{})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return NewVersion, nil
-		}
-		return "", fmt.Errorf("get app %s:%s failed, %v", systemProject.Name, appName, err)
-	}
-	newApp := app.DeepCopy()
-	newApp.Spec.ExternalID = newCatalogID
-
-	if !reflect.DeepEqual(newApp, app) {
-		if _, err = l.apps.Update(newApp); err != nil {
-			return "", fmt.Errorf("update app %s:%s failed, %v", app.Namespace, app.Name, err)
-		}
-	}
-
-	return NewVersion, nil
+	return nil
 }
