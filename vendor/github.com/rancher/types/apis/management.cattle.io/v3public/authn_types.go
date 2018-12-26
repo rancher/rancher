@@ -95,6 +95,10 @@ type KeyCloakProvider struct {
 	SamlProvider `json:",inline"`
 }
 
+type OKTAProvider struct {
+	SamlProvider `json:",inline"`
+}
+
 type SamlLoginInput struct {
 	FinalRedirectURL string `json:"finalRedirectUrl"`
 }
