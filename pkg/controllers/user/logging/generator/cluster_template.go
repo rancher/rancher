@@ -6,7 +6,7 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
   @type  tail
   path  /var/lib/rancher/rke/log/*.log
   pos_file  /fluentd/log/fluentd-rke-logging.pos
-  time_format  %Y-%m-%dT%H:%M:%S
+  time_format  %Y-%m-%dT%H:%M:%S.%N
   tag  rke.*
   format  json
   read_from_head  true

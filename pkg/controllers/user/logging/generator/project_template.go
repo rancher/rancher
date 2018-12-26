@@ -6,7 +6,7 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
    @type  tail
    path  /var/log/containers/*.log
    pos_file  /fluentd/log/fluentd-project-{{$store.ProjectName}}-logging.pos
-   time_format  %Y-%m-%dT%H:%M:%S
+   time_format  %Y-%m-%dT%H:%M:%S.%N
    tag  {{$store.ProjectName}}.*
    format  json
    read_from_head  true
