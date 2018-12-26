@@ -139,7 +139,7 @@ func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) erro
 	sp.IDPMetadata.EntityID = idm.EntityID
 	sp.IDPMetadata.SPSSODescriptors = idm.SPSSODescriptors
 	sp.IDPMetadata.IDPSSODescriptors = idm.IDPSSODescriptors
-	if name == ADFSName {
+	if name == ADFSName || name == OKTAName {
 		sp.AuthnNameIDFormat = saml.UnspecifiedNameIDFormat
 	}
 
@@ -164,6 +164,9 @@ func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) erro
 	case KeyCloakName:
 		root.Get("KeyCloakACS").HandlerFunc(provider.ServeHTTP)
 		root.Get("KeyCloakMetadata").HandlerFunc(provider.ServeHTTP)
+	case OKTAName:
+		root.Get("OktaACS").HandlerFunc(provider.ServeHTTP)
+		root.Get("OktaMetadata").HandlerFunc(provider.ServeHTTP)
 	}
 
 	appliedVersion = configToSet.ResourceVersion
@@ -181,6 +184,9 @@ func AuthHandler() http.Handler {
 
 	root.Methods("POST").Path("/v1-saml/keycloak/saml/acs").Name("KeyCloakACS")
 	root.Methods("GET").Path("/v1-saml/keycloak/saml/metadata").Name("KeyCloakMetadata")
+
+	root.Methods("POST").Path("/v1-saml/okta/saml/acs").Name("OktaACS")
+	root.Methods("GET").Path("/v1-saml/okta/saml/metadata").Name("OktaMetadata")
 
 	return root
 }

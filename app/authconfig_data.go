@@ -49,6 +49,10 @@ func addAuthConfigs(management *config.ManagementContext) error {
 		return err
 	}
 
+	if err := addAuthConfig(saml.OKTAName, client.OKTAConfigType, false, management); err != nil {
+		return err
+	}
+
 	if err := createMgmtNamespace(management); err != nil {
 		return err
 	}
