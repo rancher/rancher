@@ -31,7 +31,8 @@ func (s *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				log.Debugf("RESPONSE: ===\n%s\n===\nNOW: %s\nERROR: %s",
 					parseErr.Response, parseErr.Now, parseErr.PrivateErr)
 			}
-			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			redirectURL := r.URL.Host + "/login?errorCode=403"
+			http.Redirect(w, r, redirectURL, http.StatusFound)
 			return
 		}
 

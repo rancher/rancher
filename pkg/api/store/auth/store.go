@@ -20,6 +20,7 @@ var TypeToField = map[string]string{
 	client.PingConfigType:            "spKey",
 	client.ADFSConfigType:            "spKey",
 	client.KeyCloakConfigType:        "spKey",
+	client.OKTAConfigType:            "spKey",
 }
 
 func Wrap(store types.Store, secrets corev1.SecretInterface) types.Store {

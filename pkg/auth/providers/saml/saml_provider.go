@@ -29,6 +29,7 @@ import (
 const PingName = "ping"
 const ADFSName = "adfs"
 const KeyCloakName = "keycloak"
+const OKTAName = "okta"
 
 type Provider struct {
 	ctx             context.Context
@@ -78,6 +79,8 @@ func (s *Provider) TransformToAuthProvider(authConfig map[string]interface{}) ma
 		p[publicclient.ADFSProviderFieldRedirectURL] = formSamlRedirectURLFromMap(authConfig, s.name)
 	case KeyCloakName:
 		p[publicclient.KeyCloakProviderFieldRedirectURL] = formSamlRedirectURLFromMap(authConfig, s.name)
+	case OKTAName:
+		p[publicclient.OKTAProviderFieldRedirectURL] = formSamlRedirectURLFromMap(authConfig, s.name)
 	}
 	return p
 }
@@ -168,6 +171,8 @@ func (s *Provider) saveSamlConfig(config *v3.SamlConfig) error {
 		configType = client.ADFSConfigType
 	case KeyCloakName:
 		configType = client.KeyCloakConfigType
+	case OKTAName:
+		configType = client.OKTAConfigType
 	}
 
 	config.APIVersion = "management.cattle.io/v3"
@@ -278,6 +283,8 @@ func formSamlRedirectURLFromMap(config map[string]interface{}, name string) stri
 		hostname, _ = config[client.ADFSConfigFieldRancherAPIHost].(string)
 	case KeyCloakName:
 		hostname, _ = config[client.KeyCloakConfigFieldRancherAPIHost].(string)
+	case OKTAName:
+		hostname, _ = config[client.OKTAConfigFieldRancherAPIHost].(string)
 	}
 
 	path := hostname + "/v1-saml/" + name + "/login"
