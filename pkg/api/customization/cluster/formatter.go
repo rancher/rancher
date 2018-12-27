@@ -26,6 +26,8 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 	resource.AddAction(request, "exportYaml")
 	if _, ok := resource.Values["rancherKubernetesEngineConfig"]; ok {
 		resource.AddAction(request, "rotateCertificates")
+		resource.AddAction(request, "backupEtcd")
+		resource.AddAction(request, "restoreFromEtcdBackup")
 	}
 
 	if err := request.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", request, resource.Values, request.Schema); err == nil {
@@ -35,7 +37,6 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 			resource.AddAction(request, "enableMonitoring")
 		}
 	}
-
 	if gkeConfig, ok := resource.Values["googleKubernetesEngineConfig"]; ok {
 		configMap, ok := gkeConfig.(map[string]interface{})
 		if !ok {

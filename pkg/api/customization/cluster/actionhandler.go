@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/kubeconfig"
 	"github.com/rancher/rancher/pkg/kubectl"
@@ -44,6 +45,7 @@ type ActionHandler struct {
 	NodeTemplateGetter v3.NodeTemplatesGetter
 	UserMgr            user.Manager
 	ClusterManager     *clustermanager.Manager
+	BackupClient       v3.EtcdBackupInterface
 }
 
 func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -68,6 +70,10 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 			return httperror.NewAPIError(httperror.Unauthorized, "can not access")
 		}
 		return a.disableMonitoring(actionName, action, apiContext)
+	case "backupEtcd":
+		return a.BackupEtcdHandler(actionName, action, apiContext)
+	case "restoreFromEtcdBackup":
+		return a.RestoreFromEtcdBackupHandler(actionName, action, apiContext)
 	case "rotateCertificates":
 		return a.RotateCertificates(actionName, action, apiContext)
 	}
@@ -572,5 +578,79 @@ func (a ActionHandler) RotateCertificates(actionName string, action *types.Actio
 	}
 
 	apiContext.WriteResponse(http.StatusOK, rtn)
+	return nil
+}
+
+func (a ActionHandler) BackupEtcdHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	response := map[string]interface{}{
+		"message": "starting ETCD backup",
+	}
+	// checking access
+	var mgmtCluster mgmtclient.Cluster
+	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &mgmtCluster); err != nil {
+		response["message"] = "none existent Cluster"
+		apiContext.WriteResponse(http.StatusBadRequest, response)
+		return errors.Wrapf(err, "failed to get Cluster by ID %s", apiContext.ID)
+	}
+
+	cluster, err := a.ClusterClient.Get(apiContext.ID, metav1.GetOptions{})
+	if err != nil {
+		response["message"] = "none existent Cluster"
+		apiContext.WriteResponse(http.StatusBadRequest, response)
+		return errors.Wrapf(err, "failed to get Cluster by ID %s", apiContext.ID)
+	}
+
+	newBackup := etcdbackup.NewBackupObject(cluster)
+
+	if _, err = a.BackupClient.Create(newBackup); err != nil {
+		response["message"] = "failed to create etcdbackup object"
+		apiContext.WriteResponse(http.StatusInternalServerError, response)
+		return errors.Wrapf(err, "failed to cteate etcdbackup object")
+	}
+	apiContext.WriteResponse(http.StatusCreated, response)
+	return nil
+}
+
+func (a ActionHandler) RestoreFromEtcdBackupHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	response := map[string]interface{}{
+		"message": "restoring etcdbackup for the cluster",
+	}
+
+	data, err := ioutil.ReadAll(apiContext.Request.Body)
+	if err != nil {
+		response["message"] = "reading request body error"
+		apiContext.WriteResponse(http.StatusInternalServerError, response)
+		return errors.Wrap(err, "failed to read request body")
+	}
+
+	input := mgmtclient.RestoreFromEtcdBackupInput{}
+	if err = json.Unmarshal(data, &input); err != nil {
+		response["message"] = "failed to parse request content"
+		apiContext.WriteResponse(http.StatusBadRequest, response)
+		return errors.Wrap(err, "unmarshaling input error")
+	}
+	// checking access
+	var mgmtCluster mgmtclient.Cluster
+	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &mgmtCluster); err != nil {
+		response["message"] = "none existent Cluster"
+		apiContext.WriteResponse(http.StatusBadRequest, response)
+		return errors.Wrapf(err, "failed to get Cluster by ID %s", apiContext.ID)
+	}
+
+	cluster, err := a.ClusterClient.Get(apiContext.ID, metav1.GetOptions{})
+	if err != nil {
+		response["message"] = "none existent Cluster"
+		apiContext.WriteResponse(http.StatusBadRequest, response)
+		return errors.Wrapf(err, "failed to get Cluster by ID %s", apiContext.ID)
+	}
+
+	cluster.Spec.RancherKubernetesEngineConfig.Restore.SnapshotName = input.EtcdBackupID
+	cluster.Spec.RancherKubernetesEngineConfig.Restore.Restore = true
+	if _, err = a.ClusterClient.Update(cluster); err != nil {
+		response["message"] = "failed to update cluster object"
+		apiContext.WriteResponse(http.StatusInternalServerError, response)
+		return errors.Wrapf(err, "unable to update Cluster %s", cluster.Name)
+	}
+	apiContext.WriteResponse(http.StatusCreated, response)
 	return nil
 }

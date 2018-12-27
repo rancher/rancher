@@ -70,6 +70,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ClusterType,
 		client.ComposeConfigType,
 		client.DynamicSchemaType,
+		client.EtcdBackupType,
 		client.GlobalRoleBindingType,
 		client.GlobalRoleType,
 		client.GroupMemberType,
@@ -200,6 +201,7 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 		UserMgr:            managementContext.UserManager,
 		ClusterManager:     clusterManager,
 		NodeTemplateGetter: managementContext.Management,
+		BackupClient:       managementContext.Management.EtcdBackups(""),
 	}
 
 	schema := schemas.Schema(&managementschema.Version, client.ClusterType)

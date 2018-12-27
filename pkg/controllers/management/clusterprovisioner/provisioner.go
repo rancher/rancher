@@ -39,6 +39,7 @@ type Provisioner struct {
 	backoff               *flowcontrol.Backoff
 	KontainerDriverLister v3.KontainerDriverLister
 	DynamicSchemasLister  v3.DynamicSchemaLister
+	Backups               v3.EtcdBackupLister
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
@@ -50,6 +51,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		backoff:               flowcontrol.NewBackOff(30*time.Second, 10*time.Minute),
 		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
 		DynamicSchemasLister:  management.Management.DynamicSchemas("").Controller().Lister(),
+		Backups:               management.Management.EtcdBackups("").Controller().Lister(),
 	}
 
 	// Add handlers
@@ -244,6 +246,9 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 			logrus.Infof("Create done, Updating cluster [%s]", cluster.Name)
 			apiEndpoint, serviceAccountToken, caCert, err = p.driverUpdate(cluster, *spec)
 		}
+	} else if spec.RancherKubernetesEngineConfig.Restore.Restore {
+		logrus.Infof("Restoring cluster [%s] from backup", cluster.Name)
+		apiEndpoint, serviceAccountToken, caCert, err = p.restoreClusterBackup(cluster, *spec)
 	} else if spec.RancherKubernetesEngineConfig.RotateCertificates != nil {
 		logrus.Infof("Rotating certificates for cluster [%s]", cluster.Name)
 		apiEndpoint, serviceAccountToken, caCert, err = p.driverUpdate(cluster, *spec)
@@ -305,8 +310,10 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 func resetRkeConfigFlags(cluster *v3.Cluster) {
 	if cluster.Spec.RancherKubernetesEngineConfig != nil {
 		cluster.Spec.RancherKubernetesEngineConfig.RotateCertificates = nil
+		cluster.Spec.RancherKubernetesEngineConfig.Restore = v3.RestoreConfig{}
 		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
 			cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.RotateCertificates = nil
+			cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Restore = v3.RestoreConfig{}
 		}
 	}
 }
@@ -629,4 +636,16 @@ func (p *Provisioner) recordFailure(cluster *v3.Cluster, spec v3.ClusterSpec, er
 	newCluster, _ := p.Clusters.Update(cluster)
 	// mask the error
 	return newCluster, nil
+}
+
+func (p *Provisioner) restoreClusterBackup(cluster *v3.Cluster, spec v3.ClusterSpec) (api string, token string, cert string, err error) {
+	snapshot := strings.Split(spec.RancherKubernetesEngineConfig.Restore.SnapshotName, ":")[1]
+	backup, err := p.Backups.Get(cluster.Name, snapshot)
+	if err != nil {
+		return "", "", "", err
+	}
+	if backup.ClusterID != cluster.Name {
+		return "", "", "", fmt.Errorf("snapshot [%s] is not a backup of cluster [%s]", backup.Name, cluster.Name)
+	}
+	return p.driverRestore(cluster, spec)
 }
