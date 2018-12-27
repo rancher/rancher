@@ -155,7 +155,8 @@ func (m *Manager) changed(r *record, cluster *v3.Cluster, controllers, clusterOw
 	existing := r.clusterRec
 	if existing.Status.APIEndpoint != cluster.Status.APIEndpoint ||
 		existing.Status.ServiceAccountToken != cluster.Status.ServiceAccountToken ||
-		existing.Status.CACert != cluster.Status.CACert {
+		existing.Status.CACert != cluster.Status.CACert ||
+		existing.Status.AppliedEnableClusterAuth != cluster.Status.AppliedEnableClusterAuth {
 		return true
 	}
 
@@ -174,7 +175,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 	}()
 
 	if clusterOwner {
-		if err := clusterController.Register(rec.ctx, rec.cluster, m, m); err != nil {
+		if err := clusterController.Register(rec.ctx, rec.cluster, rec.clusterRec, m, m); err != nil {
 			return err
 		}
 	} else {

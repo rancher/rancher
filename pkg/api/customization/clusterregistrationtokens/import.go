@@ -22,9 +22,15 @@ func ClusterImportHandler(resp http.ResponseWriter, req *http.Request) {
 		resp.Write([]byte(err.Error()))
 		return
 	}
-
 	url := urlBuilder.RelativeToRoot("")
-	if err := systemtemplate.SystemTemplate(resp, image.Resolve(settings.AgentImage.Get()), token, url); err != nil {
+
+	authImage := ""
+	authImages := req.URL.Query()["authImage"]
+	if len(authImages) > 0 {
+		authImage = authImages[0]
+	}
+
+	if err := systemtemplate.SystemTemplate(resp, image.Resolve(settings.AgentImage.Get()), authImage, token, url); err != nil {
 		resp.WriteHeader(500)
 		resp.Write([]byte(err.Error()))
 	}

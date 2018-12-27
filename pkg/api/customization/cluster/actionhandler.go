@@ -75,6 +75,11 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 	return httperror.NewAPIError(httperror.NotFound, "not found")
 }
 
+func (a ActionHandler) getClusterToken(clusterID string, apiContext *types.APIContext) (string, error) {
+	userName := a.UserMgr.GetUser(apiContext)
+	return a.UserMgr.EnsureClusterToken(clusterID, fmt.Sprintf("kubeconfig-%s.%s", userName, clusterID), "Kubeconfig token", userName)
+}
+
 func (a ActionHandler) getToken(apiContext *types.APIContext) (string, error) {
 	userName := a.UserMgr.GetUser(apiContext)
 	return a.UserMgr.EnsureToken("kubeconfig-"+userName, "Kubeconfig token", userName)
@@ -86,15 +91,32 @@ func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action
 		return err
 	}
 
+	var (
+		cfg   string
+		token string
+		err   error
+	)
+
+	if cluster.EnableClusterAuth {
+		token, err = a.getClusterToken(cluster.ID, apiContext)
+	} else {
+		token, err = a.getToken(apiContext)
+	}
+	if err != nil {
+		return err
+	}
+
 	userName := a.UserMgr.GetUser(apiContext)
-	token, err := a.getToken(apiContext)
+
+	if cluster.EnableClusterAuth {
+		cfg, err = kubeconfig.ForClusterTokenBased(&cluster, apiContext.ID, apiContext.Request.Host, userName, token)
+	} else {
+		cfg, err = kubeconfig.ForTokenBased(cluster.Name, apiContext.ID, apiContext.Request.Host, userName, token)
+	}
 	if err != nil {
 		return err
 	}
-	cfg, err := kubeconfig.ForTokenBased(cluster.Name, apiContext.ID, apiContext.Request.Host, userName, token)
-	if err != nil {
-		return err
-	}
+
 	data := map[string]interface{}{
 		"config": cfg,
 		"type":   "generateKubeconfigOutput",
@@ -173,7 +195,7 @@ func (a ActionHandler) ExportYamlHandler(actionName string, action *types.Action
 	topkey.Clusters[cluster.Spec.DisplayName] = c
 
 	// if driver is rancherKubernetesEngine, add any nodePool if found
-	if cluster.Status.Driver == "rancherKubernetesEngine" {
+	if cluster.Status.Driver == v3.ClusterDriverRKE {
 		nodepools, err := a.NodepoolGetter.NodePools(cluster.Name).List(metav1.ListOptions{})
 		if err != nil {
 			return err

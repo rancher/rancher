@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -64,6 +65,9 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []st
 
 	if token.Enabled != nil && !*token.Enabled {
 		return false, "", []string{}, fmt.Errorf("user's token is not enabled")
+	}
+	if token.ClusterName != "" && token.ClusterName != clusterrouter.GetClusterID(req) {
+		return false, "", []string{}, fmt.Errorf("clusterID does not match")
 	}
 
 	attribs, err := a.userAttributeLister.Get("", token.UserID)

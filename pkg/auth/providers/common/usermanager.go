@@ -189,6 +189,10 @@ func (m *userManager) CheckAccess(accessMode string, allowedPrincipalIDs []strin
 }
 
 func (m *userManager) EnsureToken(tokenName, description, userName string) (string, error) {
+	return m.EnsureClusterToken("", tokenName, description, userName)
+}
+
+func (m *userManager) EnsureClusterToken(clusterName, tokenName, description, userName string) (string, error) {
 	if strings.HasPrefix(tokenName, "token-") {
 		return "", errors.New("token names can't start with token-")
 	}
@@ -219,6 +223,7 @@ func (m *userManager) EnsureToken(tokenName, description, userName string) (stri
 			AuthProvider: "local",
 			IsDerived:    true,
 			Token:        key,
+			ClusterName:  clusterName,
 		}
 
 		logrus.Infof("Creating token for user %v", userName)
