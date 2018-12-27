@@ -164,6 +164,20 @@ func (r *refresher) triggerUserRefresh(userName string, force bool) {
 		logrus.Debugf("Skipping refresh for %v due to max-age", userName)
 		return
 	}
+
+	user, err := ref.userLister.Get("", userName)
+	if err != nil {
+		logrus.Errorf("Error finding user before triggering refresh %v", err)
+		return
+	}
+
+	for _, principalID := range user.PrincipalIDs {
+		if strings.HasPrefix(principalID, "system://") {
+			logrus.Debugf("Skipping refresh for system-user %v ", userName)
+			return
+		}
+	}
+
 	attribs.NeedsRefresh = true
 	if needCreate {
 		_, err := r.userAttributes.Create(attribs)
