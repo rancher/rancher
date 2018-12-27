@@ -21,19 +21,25 @@ var (
 type context struct {
 	CAChecksum string
 	AgentImage string
+	AuthImage  string
 	TokenKey   string
 	Token      string
 	URL        string
 	URLPlain   string
 }
 
-func SystemTemplate(resp io.Writer, agentImage, token, url string) error {
+func SystemTemplate(resp io.Writer, agentImage, authImage, token, url string) error {
 	d := md5.Sum([]byte(token))
 	tokenKey := hex.EncodeToString(d[:])[:7]
+
+	if authImage == "fixed" {
+		authImage = settings.AuthImage.Get()
+	}
 
 	context := &context{
 		CAChecksum: CAChecksum(),
 		AgentImage: agentImage,
+		AuthImage:  authImage,
 		TokenKey:   tokenKey,
 		Token:      base64.StdEncoding.EncodeToString([]byte(token)),
 		URL:        base64.StdEncoding.EncodeToString([]byte(url)),

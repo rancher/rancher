@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	"github.com/rancher/rancher/pkg/controllers/user/alert"
 	"github.com/rancher/rancher/pkg/controllers/user/approuter"
+	"github.com/rancher/rancher/pkg/controllers/user/clusterauthtoken"
 	"github.com/rancher/rancher/pkg/controllers/user/dnsrecord"
 	"github.com/rancher/rancher/pkg/controllers/user/endpoints"
 	"github.com/rancher/rancher/pkg/controllers/user/externalservice"
@@ -34,17 +35,17 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/targetworkloadservice"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
 	pkgmonitoring "github.com/rancher/rancher/pkg/monitoring"
+	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projectclient "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/factory"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	// init upgrade implement
 	_ "github.com/rancher/rancher/pkg/controllers/user/logging/upgrade"
 	_ "github.com/rancher/rancher/pkg/controllers/user/pipeline/upgrade"
 )
 
-func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter, clusterManager healthsyncer.ClusterControllerLifecycle) error {
+func Register(ctx context.Context, cluster *config.UserContext, clusterRec *managementv3.Cluster, kubeConfigGetter common.KubeConfigGetter, clusterManager healthsyncer.ClusterControllerLifecycle) error {
 	rbac.Register(ctx, cluster)
 	healthsyncer.Register(ctx, cluster, clusterManager)
 	helm.Register(ctx, cluster, kubeConfigGetter)
@@ -68,13 +69,16 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	alert.Register(ctx, cluster)
 	monitoring.Register(ctx, cluster)
 
-	c, err := cluster.Management.Management.Clusters("").Get(cluster.ClusterName, metav1.GetOptions{})
-	if err != nil {
-		return err
+	if clusterRec.Spec.EnableClusterAuth {
+		err := clusterauthtoken.CRDSetup(ctx, cluster.UserOnlyContext())
+		if err != nil {
+			return err
+		}
+		clusterauthtoken.Register(ctx, cluster)
 	}
 
-	if c.Spec.Internal {
-		err = RegisterUserOnly(ctx, cluster.UserOnlyContext())
+	if clusterRec.Spec.Internal {
+		err := RegisterUserOnly(ctx, cluster.UserOnlyContext())
 		if err != nil {
 			return err
 		}

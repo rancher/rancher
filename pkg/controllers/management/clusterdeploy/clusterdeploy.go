@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -54,6 +55,21 @@ func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, 
 
 	original := cluster
 	cluster = original.DeepCopy()
+
+	if cluster.Spec.EnableClusterAuth &&
+		cluster.Status.Driver != "" &&
+		cluster.Status.Driver != v3.ClusterDriverRKE &&
+		cluster.Status.Driver != v3.ClusterDriverImported {
+		err = fmt.Errorf("Cannot enable auth for cluster %s with driver [%s] (only RKE)", cluster.Name, cluster.Status.Driver)
+		return nil, err
+	}
+	if cluster.Status.Driver == v3.ClusterDriverRKE {
+		if cluster.Spec.EnableClusterAuth {
+			cluster.Spec.RancherKubernetesEngineConfig.Authentication.Strategy = "x509|webhook"
+		} else {
+			cluster.Spec.RancherKubernetesEngineConfig.Authentication.Strategy = "x509"
+		}
+	}
 
 	err = cd.doSync(cluster)
 	if cluster != nil && !reflect.DeepEqual(cluster, original) {
@@ -94,12 +110,20 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 }
 
 func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
-	desired := cluster.Spec.DesiredAgentImage
-	if desired == "" || desired == "fixed" {
-		desired = image.Resolve(settings.AgentImage.Get())
+	desiredAgent := cluster.Spec.DesiredAgentImage
+	if desiredAgent == "" || desiredAgent == "fixed" {
+		desiredAgent = image.Resolve(settings.AgentImage.Get())
 	}
 
-	if cluster.Status.AgentImage == desired {
+	var desiredAuth string
+	if cluster.Spec.EnableClusterAuth {
+		desiredAuth = cluster.Spec.DesiredAuthImage
+		if desiredAuth == "" || desiredAuth == "fixed" {
+			desiredAuth = image.Resolve(settings.AuthImage.Get())
+		}
+	}
+
+	if cluster.Status.AgentImage == desiredAgent && cluster.Status.AuthImage == desiredAuth {
 		return nil
 	}
 
@@ -109,11 +133,10 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	}
 
 	_, err = v3.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
-		yaml, err := cd.getYAML(cluster, desired)
+		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth)
 		if err != nil {
 			return cluster, err
 		}
-
 		var output []byte
 		for i := 0; i < 3; i++ {
 			// This will fail almost always the first time because when we create the namespace in the file
@@ -128,6 +151,13 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 			return cluster, types.NewErrors(err, errors.New(string(output)))
 		}
 		v3.ClusterConditionAgentDeployed.Message(cluster, string(output))
+		if !cluster.Spec.EnableClusterAuth && cluster.Status.AppliedEnableClusterAuth && cluster.Status.AuthImage != "" {
+			output, err = kubectl.Delete([]byte(systemtemplate.AuthDaemonSet), kubeConfig)
+		}
+		if err != nil {
+			return cluster, types.NewErrors(err, errors.New(string(output)))
+		}
+		v3.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		return cluster, nil
 	})
 	if err != nil {
@@ -135,10 +165,15 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	}
 
 	if err == nil {
-		cluster.Status.AgentImage = desired
+		cluster.Status.AgentImage = desiredAgent
 		if cluster.Spec.DesiredAgentImage == "fixed" {
-			cluster.Spec.DesiredAgentImage = desired
+			cluster.Spec.DesiredAgentImage = desiredAgent
 		}
+		cluster.Status.AuthImage = desiredAuth
+		if cluster.Spec.DesiredAuthImage == "fixed" {
+			cluster.Spec.DesiredAuthImage = desiredAuth
+		}
+		cluster.Status.AppliedEnableClusterAuth = cluster.Spec.EnableClusterAuth
 	}
 
 	return err
@@ -172,7 +207,10 @@ func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Confi
 	return cd.clusterManager.KubeConfig(cluster.Name, token), nil
 }
 
-func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage string) ([]byte, error) {
+func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage string) ([]byte, error) {
+	logrus.Debug("Desired agent image:", agentImage)
+	logrus.Debug("Desired auth image:", authImage)
+
 	token, err := cd.systemAccountManager.GetOrCreateSystemClusterToken(cluster.Name)
 	if err != nil {
 		return nil, err
@@ -184,7 +222,7 @@ func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage string) ([]byte
 	}
 
 	buf := &bytes.Buffer{}
-	err = systemtemplate.SystemTemplate(buf, agentImage, token, url)
+	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, token, url)
 
 	return buf.Bytes(), err
 }

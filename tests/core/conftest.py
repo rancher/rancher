@@ -1,18 +1,45 @@
-import rancher
+import os
 import pytest
 import requests
 import time
 import urllib3
+import yaml
+import socket
+import subprocess
+import json
+import rancher
+from sys import platform
 from .common import random_str
-from kubernetes.client import ApiClient, Configuration
+from kubernetes.client import ApiClient, Configuration, CustomObjectsApi
+from kubernetes.client.rest import ApiException
 from kubernetes.config.kube_config import KubeConfigLoader
 from rancher import ApiError
-import yaml
+from .cluster_common import \
+    generate_cluster_config, \
+    create_cluster, \
+    import_cluster
+
 
 # This stops ssl warnings for unsecure certs
 urllib3.disable_warnings()
 
-BASE_URL = 'https://localhost:8443/v3'
+
+def get_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # doesn't even have to be reachable
+        s.connect(('10.255.255.255', 1))
+        IP = s.getsockname()[0]
+    except Exception:
+        IP = '127.0.0.1'
+    finally:
+        s.close()
+    return IP
+
+
+IP = get_ip()
+SERVER_URL = 'https://' + IP + ':8443'
+BASE_URL = SERVER_URL + '/v3'
 AUTH_URL = BASE_URL + '-public/localproviders/local?action=login'
 DEFAULT_TIMEOUT = 45
 
@@ -49,6 +76,21 @@ class ProjectContext:
         self.cluster = cluster_context
         self.project = project
         self.client = client
+
+
+class DINDContext:
+    """Returns a DINDContext for a new RKE cluster for the default global
+    admin user."""
+
+    def __init__(
+        self, name, admin_mc, cluster, client, cluster_file, kube_file
+    ):
+        self.name = name
+        self.admin_mc = admin_mc
+        self.cluster = cluster
+        self.client = client
+        self.cluster_file = cluster_file
+        self.kube_file = kube_file
 
 
 @pytest.fixture(scope="session")
@@ -149,6 +191,54 @@ def admin_cc_client(admin_cc):
 def admin_pc_client(admin_pc):
     """Returns the client from the default admin's ProjectContext """
     return admin_pc.client
+
+
+@pytest.fixture(scope="session")
+def dind_cc(request, admin_mc):
+    # verify platform is linux
+    if platform != 'linux':
+        raise Exception('rke dind only supported on linux')
+
+    def set_server_url(url):
+        admin_mc.client.update_by_id_setting(id='server-url', value=url)
+
+    original_url = admin_mc.client.by_id_setting('server-url').value
+
+    # make sure server-url is set to IP address for dind accessibility
+    set_server_url(SERVER_URL)
+
+    # revert server url to original when done
+    request.addfinalizer(lambda: set_server_url(original_url))
+
+    # create the cluster & import
+    name, config, cluster_file, kube_file = generate_cluster_config(request, 1)
+    create_cluster(cluster_file)
+    cluster = import_cluster(admin_mc, kube_file, cluster_name=name)
+
+    # delete cluster when done
+    request.addfinalizer(lambda: admin_mc.client.delete(cluster))
+
+    # wait for cluster to completely provision
+    wait_for_condition("Ready", "True", admin_mc.client, cluster, 120)
+    cluster, client = cluster_and_client(cluster.id, admin_mc.client)
+
+    # get ip address of cluster node
+    node_name = config['nodes'][0]['address']
+    node_inspect = subprocess.check_output('docker inspect rke-dind-' +
+                                           node_name, shell=True).decode()
+    node_json = json.loads(node_inspect)
+    node_ip = node_json[0]['NetworkSettings']['IPAddress']
+
+    # update cluster fqdn with node ip
+    admin_mc.client.update_by_id_cluster(
+        id=cluster.id,
+        name=cluster.name,
+        clusterEndpointFQDN=node_ip,
+        clusterEndpointFQDNCaCert=cluster.caCert,
+    )
+    return DINDContext(
+        name, admin_mc, cluster, client, cluster_file, kube_file
+    )
 
 
 def wait_for(callback, timeout=DEFAULT_TIMEOUT, fail_handler=None):
@@ -269,3 +359,56 @@ def protect_response(r):
     if r.status_code >= 300:
         message = 'Server responded with {r.status_code}\nbody:\n{r.text}'
         raise ValueError(message)
+
+
+def create_kubeconfig(request, dind_cc, client):
+    # request cluster scoped kubeconfig, permissions may not be synced yet
+    def generateKubeconfig(max_attempts=5):
+        for attempt in range(1, max_attempts+1):
+            try:
+                # get cluster for client
+                cluster = client.by_id_cluster(dind_cc.cluster.id)
+                return cluster.generateKubeconfig()['config']
+            except ApiError as err:
+                if attempt == max_attempts:
+                    raise err
+            time.sleep(1)
+
+    cluster_kubeconfig = generateKubeconfig()
+
+    # write cluster scoped kubeconfig
+    cluster_kubeconfig_file = "kubeconfig-" + random_str() + ".yml"
+    f = open(cluster_kubeconfig_file, "w")
+    f.write(cluster_kubeconfig)
+    f.close()
+
+    # cleanup file when done
+    request.addfinalizer(lambda: os.remove(cluster_kubeconfig_file))
+
+    # extract token name
+    config = yaml.safe_load(cluster_kubeconfig)
+    token_name = config['users'][0]['user']['token'].split(':')[0]
+
+    # wait for token to sync
+    crd_client = CustomObjectsApi(
+        kubernetes_api_client(
+            dind_cc.admin_mc.client,
+            dind_cc.cluster.id
+        )
+    )
+
+    def cluster_token_available():
+        try:
+            return crd_client.get_namespaced_custom_object(
+                'cluster.cattle.io',
+                'v3',
+                'cattle-system',
+                'clusterauthtokens',
+                token_name
+            )
+        except ApiException:
+            return None
+
+    wait_for(cluster_token_available)
+
+    return cluster_kubeconfig_file

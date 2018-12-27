@@ -6,13 +6,14 @@ const (
 	tokenTemplateText = `apiVersion: v1
 kind: Config
 clusters:
+{{- range .Nodes}}
 - name: "{{.ClusterName}}"
   cluster:
-    server: "https://{{.Host}}/k8s/clusters/{{.ClusterID}}"
-    api-version: v1
+    server: "{{.Server}}"
 {{- if ne .Cert "" }}
     certificate-authority-data: "{{.Cert}}"
 {{- end }}
+{{- end}}
 
 users:
 - name: "{{.User}}"
@@ -20,10 +21,12 @@ users:
     token: "{{.Token}}"
 
 contexts:
+{{- range .Nodes}}
 - name: "{{.ClusterName}}"
   context:
     user: "{{.User}}"
     cluster: "{{.ClusterName}}"
+{{- end}}
 
 current-context: "{{.ClusterName}}"
 `
