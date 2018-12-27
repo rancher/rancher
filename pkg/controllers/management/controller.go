@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/compose"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/kontainerdriver"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
+	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
 	"github.com/rancher/rancher/pkg/controllers/management/globaldns"
 	"github.com/rancher/rancher/pkg/controllers/management/node"
 	"github.com/rancher/rancher/pkg/controllers/management/nodepool"
@@ -45,6 +46,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	node.Register(ctx, management)
 	podsecuritypolicy.Register(ctx, management)
 	template.Register(ctx, management)
+	etcdbackup.Register(ctx, management)
 	globaldns.Register(ctx, management)
 
 	// Register last
