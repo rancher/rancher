@@ -29,6 +29,11 @@ func (h auditHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	user := GetUserInfo(req)
+
+	context := context.WithValue(req.Context(), userKey, user)
+	req = req.WithContext(context)
+
 	auditLog, err := new(h.auditWriter, req)
 	if err != nil {
 		util.ReturnHTTPError(rw, req, 500, err.Error())
@@ -38,7 +43,7 @@ func (h auditHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	wr := &wrapWriter{ResponseWriter: rw, auditWriter: h.auditWriter, statusCode: http.StatusOK}
 	h.next.ServeHTTP(wr, req)
 
-	auditLog.write(req.Header, wr.Header(), wr.statusCode, wr.buf.Bytes())
+	auditLog.write(user, req.Header, wr.Header(), wr.statusCode, wr.buf.Bytes())
 }
 
 type wrapWriter struct {

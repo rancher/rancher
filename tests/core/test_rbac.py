@@ -205,3 +205,100 @@ def test_user_role_permissions(admin_mc, user_factory, remove_resource):
     role_templates = user2.client.list_role_template()
     assert len(role_templates.data) == 0, ("user2 does not have permission " +
                                            "to view roleTemplates")
+
+
+def test_impersonation_passthrough(admin_mc, admin_cc, user_mc, user_factory,
+                                   remove_resource, request):
+    """Test users abalility to impersonate other users"""
+    admin_client = admin_mc.client
+
+    user1 = user_factory()
+    user2 = user_factory()
+
+    admin_client.create_cluster_role_template_binding(
+        userId=user1.user.id,
+        roleTemplateId="cluster-member",
+        clusterId=admin_cc.cluster.id,
+    )
+
+    admin_client.create_cluster_role_template_binding(
+        userId=user2.user.id,
+        roleTemplateId="cluster-owner",
+        clusterId=admin_cc.cluster.id,
+    )
+
+    wait_until_available(user1.client, admin_cc.cluster)
+    wait_until_available(user2.client, admin_cc.cluster)
+
+    admin_k8s_client = kubernetes_api_client(admin_client, 'local')
+    user1_k8s_client = kubernetes_api_client(user1.client, 'local')
+    user2_k8s_client = kubernetes_api_client(user2.client, 'local')
+
+    admin_auth = kubernetes.client.AuthorizationV1Api(admin_k8s_client)
+    user1_auth = kubernetes.client.AuthorizationV1Api(user1_k8s_client)
+    user2_auth = kubernetes.client.AuthorizationV1Api(user2_k8s_client)
+
+    access_review = kubernetes.client.V1SelfSubjectAccessReview(spec={
+        "resourceAttributes": {
+            'verb': 'impersonate',
+            'resource': 'users',
+            'group': '',
+        },
+    })
+
+    # Admin can always impersonate
+    response = admin_auth.create_self_subject_access_review(access_review)
+    assert response.status.allowed is True
+
+    # User1 is a member of the cluster which does not grant impersonate
+    response = user1_auth.create_self_subject_access_review(access_review)
+    assert response.status.allowed is False
+
+    # User2 is an owner/admin which allows them to impersonate
+    response = user2_auth.create_self_subject_access_review(access_review)
+    assert response.status.allowed is True
+
+    # Add a role and role binding to user user1 allowing user1 to impersonate
+    # user2
+    admin_rbac = kubernetes.client.RbacAuthorizationV1Api(admin_k8s_client)
+    body = kubernetes.client.V1ClusterRole(
+        metadata={'name': 'limited-impersonator'},
+        rules=[{
+            'resources': ['users'],
+            'apiGroups':[''],
+            'verbs':['impersonate'],
+            'resourceNames':[user2.user.id]
+        }]
+    )
+    impersonate_role = admin_rbac.create_cluster_role(body)
+
+    request.addfinalizer(lambda: admin_rbac.delete_cluster_role(
+        impersonate_role.metadata.name, {}))
+
+    binding = kubernetes.client.V1ClusterRoleBinding(
+        metadata={'name': 'limited-impersonator-binding'},
+        role_ref={
+            'apiGroups': [''],
+            'kind': 'ClusterRole',
+            'name': 'limited-impersonator'
+        },
+        subjects=[{'kind': 'User', 'name': user1.user.id}]
+    )
+
+    impersonate_role_binding = admin_rbac.create_cluster_role_binding(binding)
+
+    request.addfinalizer(lambda: admin_rbac.delete_cluster_role_binding(
+        impersonate_role_binding.metadata.name, {}))
+
+    access_review2 = kubernetes.client.V1SelfSubjectAccessReview(spec={
+        "resourceAttributes": {
+            'verb': 'impersonate',
+            'resource': 'users',
+            'group': '',
+            'name': user2.user.id
+        },
+    })
+
+    # User1 should now be abele to imerpsonate as user2
+    response = user1_auth.create_self_subject_access_review(access_review2)
+    assert response.status.allowed is True
