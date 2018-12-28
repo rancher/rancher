@@ -175,8 +175,8 @@ func (l *Lifecycle) Remove(obj *v3.App) (runtime.Object, error) {
 		return obj, err
 	}
 	defer os.RemoveAll(tempDir)
-	kubeConfigPath, err := l.writeKubeConfig(obj, tempDir)
-	if err != nil {
+	kubeConfigPath := os.ExpandEnv("$HOME/.kube/config")
+	if _, err := os.Stat(kubeConfigPath); err != nil {
 		return obj, err
 	}
 	// try three times and succeed
