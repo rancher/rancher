@@ -5,6 +5,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/namespace"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/client/management/v3"
 	"strings"
@@ -40,7 +41,7 @@ func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 			if err := common.CreateOrUpdateSecrets(s.Secrets, val, strings.ToLower(field), strings.ToLower(kind)); err != nil {
 				return nil, fmt.Errorf("error creating secret for %s:%s", kind, field)
 			}
-			data[field] = fmt.Sprintf("%s:%s-%s", "mgmt-secrets", strings.ToLower(kind), strings.ToLower(field))
+			data[field] = fmt.Sprintf("%s:%s-%s", namespace.GlobalNamespace, strings.ToLower(kind), strings.ToLower(field))
 			break
 		}
 	}
