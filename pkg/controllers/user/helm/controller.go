@@ -15,6 +15,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rancher/pkg/systemaccount"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
@@ -38,6 +39,7 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 	appClient := user.Management.Project.Apps("")
 	stackLifecycle := &Lifecycle{
 		KubeConfigGetter:      kubeConfigGetter,
+		SystemAccountManager:  systemaccount.NewManager(user.Management),
 		TokenClient:           user.Management.Management.Tokens(""),
 		UserClient:            user.Management.Management.Users(""),
 		UserManager:           user.Management.UserManager,
@@ -55,6 +57,7 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 
 type Lifecycle struct {
 	KubeConfigGetter      common.KubeConfigGetter
+	SystemAccountManager  *systemaccount.Manager
 	UserManager           user.Manager
 	TokenClient           mgmtv3.TokenInterface
 	UserClient            mgmtv3.UserInterface
@@ -175,7 +178,7 @@ func (l *Lifecycle) Remove(obj *v3.App) (runtime.Object, error) {
 		return obj, err
 	}
 	defer os.RemoveAll(tempDir)
-	kubeConfigPath, err := l.writeKubeConfig(obj, tempDir)
+	kubeConfigPath, err := l.writeKubeConfig(obj, tempDir, true)
 	if err != nil {
 		return obj, err
 	}
@@ -221,7 +224,7 @@ func (l *Lifecycle) Run(obj *v3.App, template, templateDir, notes string) error 
 		return err
 	}
 	defer os.RemoveAll(tempDir)
-	kubeConfigPath, err := l.writeKubeConfig(obj, tempDir)
+	kubeConfigPath, err := l.writeKubeConfig(obj, tempDir, false)
 	if err != nil {
 		return err
 	}
@@ -271,13 +274,18 @@ func (l *Lifecycle) createAppRevision(obj *v3.App, template, notes string, faile
 	return err
 }
 
-func (l *Lifecycle) writeKubeConfig(obj *v3.App, tempDir string) (string, error) {
+func (l *Lifecycle) writeKubeConfig(obj *v3.App, tempDir string, remove bool) (string, error) {
+	var token string
+
 	userID := obj.Annotations["field.cattle.io/creatorId"]
 	user, err := l.UserClient.Get(userID, metav1.GetOptions{})
-	if err != nil {
+	if err != nil && !errors.IsNotFound(err) {
 		return "", err
+	} else if errors.IsNotFound(err) && remove {
+		token, err = l.SystemAccountManager.GetOrCreateProjectSystemToken(obj.Namespace)
+	} else if err == nil {
+		token, err = l.UserManager.EnsureToken(helmTokenPrefix+user.Name, description, user.Name)
 	}
-	token, err := l.UserManager.EnsureToken(helmTokenPrefix+user.Name, description, user.Name)
 	if err != nil {
 		return "", err
 	}
