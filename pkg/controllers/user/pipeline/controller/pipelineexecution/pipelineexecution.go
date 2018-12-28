@@ -204,28 +204,7 @@ func (l *Lifecycle) Sync(obj *v3.PipelineExecution) (runtime.Object, error) {
 
 	//doIfFinish
 	if obj.Labels != nil && obj.Labels[utils.PipelineFinishLabel] == "true" {
-		if err := l.doCleanup(obj); err != nil {
-			return obj, err
-		}
-
-		shouldNotify, err := l.shouldNotify(obj)
-		if err != nil {
-			return obj, err
-		}
-		if shouldNotify {
-			newObj, err := v3.PipelineExecutionConditionNotified.Once(obj, func() (runtime.Object, error) {
-				return l.doNotify(obj)
-			})
-			if err != nil {
-				return newObj.(*v3.PipelineExecution), err
-			}
-		}
-		//start a queueing execution if there is any
-		if err := l.startQueueingExecution(obj); err != nil {
-			return obj, err
-		}
-
-		return obj, nil
+		return l.doFinish(obj)
 	}
 
 	//doIfRunning
@@ -247,6 +226,8 @@ func (l *Lifecycle) Sync(obj *v3.PipelineExecution) (runtime.Object, error) {
 		}
 
 		return obj, nil
+	} else if obj.Status.ExecutionState == utils.StateQueueing {
+		obj.Status.ExecutionState = utils.StateWaiting
 	}
 
 	//doIfOnCreation
@@ -264,6 +245,31 @@ func (l *Lifecycle) Sync(obj *v3.PipelineExecution) (runtime.Object, error) {
 	}
 
 	if err := l.markLocalRegistryPort(obj); err != nil {
+		return obj, err
+	}
+
+	return obj, nil
+}
+
+func (l *Lifecycle) doFinish(obj *v3.PipelineExecution) (*v3.PipelineExecution, error) {
+	if err := l.doCleanup(obj); err != nil {
+		return obj, err
+	}
+
+	shouldNotify, err := l.shouldNotify(obj)
+	if err != nil {
+		return obj, err
+	}
+	if shouldNotify {
+		newObj, err := v3.PipelineExecutionConditionNotified.Once(obj, func() (runtime.Object, error) {
+			return l.doNotify(obj)
+		})
+		if err != nil {
+			return newObj.(*v3.PipelineExecution), err
+		}
+	}
+	//start a queueing execution if there is any
+	if err := l.startQueueingExecution(obj); err != nil {
 		return obj, err
 	}
 
@@ -429,7 +435,10 @@ func (l *Lifecycle) doCleanup(obj *v3.PipelineExecution) error {
 }
 
 func (l *Lifecycle) Remove(obj *v3.PipelineExecution) (runtime.Object, error) {
-	return obj, nil
+	if utils.IsFinishState(obj.Status.ExecutionState) {
+		return obj, nil
+	}
+	return l.doFinish(obj)
 }
 
 func (l *Lifecycle) shouldNotify(obj *v3.PipelineExecution) (bool, error) {
