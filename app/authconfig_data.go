@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	localprovider "github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
@@ -73,7 +74,7 @@ func addAuthConfig(name, aType string, enabled bool, management *config.Manageme
 func createMgmtNamespace(management *config.ManagementContext) error {
 	_, err := management.Core.Namespaces("").Create(&corev1.Namespace{
 		ObjectMeta: v1.ObjectMeta{
-			Name: "mgmt-secrets",
+			Name: namespace.GlobalNamespace,
 		},
 	})
 	if err != nil && !apierrors.IsAlreadyExists(err) {

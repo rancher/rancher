@@ -2,6 +2,8 @@ package store
 
 import (
 	"fmt"
+	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/randomtoken"
 	"reflect"
 	"strings"
 
@@ -45,7 +47,7 @@ func SetPasswordStore(schemas *types.Schemas, secretStore v1.SecretInterface, ns
 		nsStore:     nsStore,
 	}
 
-	pwdTypes := []string{}
+	pwdTypes := []string{"cluster"}
 
 	for _, storeType := range pwdTypes {
 		var schema *types.Schema
@@ -54,30 +56,25 @@ func SetPasswordStore(schemas *types.Schemas, secretStore v1.SecretInterface, ns
 		} else {
 			schema = schemas.Schema(&managementschema.Version, storeType)
 		}
-		data := getFields(schema, schemas)
-		id := schema.ID
-		pwdStore.Stores[id] = schema.Store
-		pwdStore.Fields[id] = data
-		schema.Store = pwdStore
-
+		if schema != nil {
+			data := getFields(schema, schemas)
+			id := schema.ID
+			pwdStore.Stores[id] = schema.Store
+			pwdStore.Fields[id] = data
+			schema.Store = pwdStore
+			logrus.Debugf("password fields %v", data)
+		}
 	}
 }
 
 func (p *PasswordStore) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
-	if err := p.replacePasswords(data, schema.ID); err != nil {
+	if err := p.replacePasswords(data, schema.ID, nil); err != nil {
 	}
 	return p.Stores[schema.ID].Create(apiContext, schema, data)
 }
 
 func (p *PasswordStore) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
-	data, err := p.Stores[schema.ID].ByID(apiContext, schema, id)
-	if err != nil {
-		return nil, err
-	}
-	if err := p.assignBack(data, schema.ID); err != nil {
-		return nil, err
-	}
-	return data, err
+	return p.Stores[schema.ID].ByID(apiContext, schema, id)
 }
 
 func (p *PasswordStore) Context() types.StorageContext {
@@ -85,6 +82,11 @@ func (p *PasswordStore) Context() types.StorageContext {
 }
 
 func (p *PasswordStore) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
+	data, err := p.Stores[schema.ID].ByID(apiContext, schema, id)
+	if err != nil {
+		return data, err
+	}
+	p.assignBack(data, schema.ID, true)
 	return p.Stores[schema.ID].Delete(apiContext, schema, id)
 }
 
@@ -93,14 +95,14 @@ func (p *PasswordStore) List(apiContext *types.APIContext, schema *types.Schema,
 }
 
 func (p *PasswordStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-	if err := p.replacePasswords(data, schema.ID); err != nil {
-		return nil, err
-	}
-	data, err := p.Stores[schema.ID].Update(apiContext, schema, data, id)
+	existing, err := p.Stores[schema.ID].ByID(apiContext, schema, id)
 	if err != nil {
 		return nil, err
 	}
-	return data, err
+	if err := p.replacePasswords(data, schema.ID, existing); err != nil {
+		return nil, err
+	}
+	return p.Stores[schema.ID].Update(apiContext, schema, data, id)
 }
 
 func (p *PasswordStore) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
@@ -112,15 +114,15 @@ type fieldInfo struct {
 	value string
 }
 
-func (p *PasswordStore) replacePasswords(data map[string]interface{}, id string) error {
+func (p *PasswordStore) replacePasswords(data map[string]interface{}, id string, existing map[string]interface{}) error {
 	var fieldData []fieldInfo
 	var path []string
 	buildFieldData(convert.ToMapInterface(p.Fields[id]), data, &fieldData, path)
 
-	return p.handlePasswordFields(fieldData, data, id)
+	return p.handlePasswordFields(fieldData, data, id, existing)
 }
 
-func (p *PasswordStore) assignBack(data map[string]interface{}, id string) error {
+func (p *PasswordStore) assignBack(data map[string]interface{}, id string, delete bool) error {
 	var fieldData []fieldInfo
 	var path []string
 
@@ -131,38 +133,38 @@ func (p *PasswordStore) assignBack(data map[string]interface{}, id string) error
 		if len(split) != 2 {
 			continue
 		}
-		value, err := p.getSecret([]string{"mgmt-secrets", "githubconfig-clientsecret"})
-		if err != nil {
-			return fmt.Errorf("error getting secret for field %s", info.value)
+		if delete {
+			p.deleteSecret(split[1], split[0])
+		} else {
+			value, err := p.getSecret([]string{split[0], split[1]})
+			if err != nil {
+				return fmt.Errorf("error getting secret for field %s", info.value)
+			}
+			values.PutValue(data, value, info.paths...)
 		}
-		values.PutValue(data, value, info.paths...)
 	}
 	return nil
 }
 
-func (p *PasswordStore) handlePasswordFields(fieldData []fieldInfo, data map[string]interface{}, id string) error {
+func (p *PasswordStore) handlePasswordFields(fieldData []fieldInfo, data map[string]interface{}, id string, existing map[string]interface{}) error {
 	for _, info := range fieldData {
-		var name, namespace string
-		if _, ok := data["name"]; ok {
-			name = convert.ToString(data["name"])
-		} else {
-			name = fmt.Sprintf("%s-%s", id, info.paths[len(info.paths)-1])
+		key := convert.ToString(values.GetValueN(existing, info.paths...))
+		var err error
+		var name string
+		splitKey := strings.SplitN(key, ":", 2)
+		if len(splitKey) == 2 && splitKey[0] == namespace.GlobalNamespace {
+			name = splitKey[1]
 		}
-		if val, ok := data["id"]; ok {
-			splitID := strings.Split(convert.ToString(val), ":")
-			if len(splitID) == 2 {
-				namespace = splitID[1]
-			} else if len(splitID) == 1 {
-				namespace = splitID[0]
+		if name == "" {
+			name, err = randomtoken.Generate()
+			if err != nil {
+				logrus.Errorf("error generating random name %v", err)
 			}
 		}
-		if namespace == "" {
-			namespace = "mgmt-secrets"
-		}
-		if err := p.createOrUpdateSecrets(info.value, name, namespace); err != nil {
+		if err := p.createOrUpdateSecrets(info.value, name, namespace.GlobalNamespace); err != nil {
 			return err
 		}
-		values.PutValue(data, fmt.Sprintf("%s:%s", namespace, strings.ToLower(name)), info.paths...)
+		values.PutValue(data, fmt.Sprintf("%s:%s", namespace.GlobalNamespace, strings.ToLower(name)), info.paths...)
 	}
 	return nil
 }
@@ -173,15 +175,13 @@ func buildFieldData(data1 map[string]interface{}, data2 map[string]interface{}, 
 			if convert.ToString(val1) == separator {
 				val := convert.ToString(val2)
 				if val != "" {
-					split := strings.Split(val, ":")
-					if len(split) == 2 && (split[0] == "mgmt-secrets") {
-						// rancher referenced
-						logrus.Debugf("rancher referenced, continue %s", val)
+					split := strings.SplitN(val, ":", 2)
+					if len(split) == 2 && split[0] == namespace.GlobalNamespace {
 						continue
 					}
+					path = append(path, key1)
+					*fieldData = append(*fieldData, fieldInfo{path, val})
 				}
-				path = append(path, key1)
-				*fieldData = append(*fieldData, fieldInfo{path, val})
 			} else {
 				valArr := convert.ToMapSlice(val2)
 				if valArr == nil {

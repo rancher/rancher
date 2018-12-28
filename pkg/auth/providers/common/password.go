@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"github.com/rancher/rancher/pkg/namespace"
 	"reflect"
 	"strings"
 
@@ -11,7 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const SecretsNamespace = "mgmt-secrets"
+const SecretsNamespace = namespace.GlobalNamespace
 
 func CreateOrUpdateSecrets(secrets corev1.SecretInterface, secretInfo string, field string, authType string) error {
 	if secretInfo == "" {
