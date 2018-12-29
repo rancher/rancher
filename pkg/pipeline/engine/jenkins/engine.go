@@ -237,7 +237,7 @@ func (j *Engine) prepareRegistryCredential(execution *v3.PipelineExecution, regi
 
 func (j *Engine) createPipelineJob(client *Client, execution *v3.PipelineExecution) error {
 	logrus.Debug("create jenkins job for pipeline")
-	converter, err := initJenkinsPipelineConverter(execution, j.PipelineSettingLister)
+	converter, err := initJenkinsPipelineConverter(execution, j.PipelineSettingLister, j.SecretLister)
 	if err != nil {
 		return err
 	}
@@ -252,7 +252,7 @@ func (j *Engine) createPipelineJob(client *Client, execution *v3.PipelineExecuti
 
 func (j *Engine) updatePipelineJob(client *Client, execution *v3.PipelineExecution) error {
 	logrus.Debug("update jenkins job for pipeline")
-	converter, err := initJenkinsPipelineConverter(execution, j.PipelineSettingLister)
+	converter, err := initJenkinsPipelineConverter(execution, j.PipelineSettingLister, j.SecretLister)
 	if err != nil {
 		return err
 	}
