@@ -9,12 +9,14 @@ import (
 	images "github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
+	apiv1 "github.com/rancher/types/apis/core/v1"
 	mv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/apimachinery/pkg/labels"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 )
 
 type jenkinsPipelineConverter struct {
@@ -23,17 +25,23 @@ type jenkinsPipelineConverter struct {
 }
 
 type executeOptions struct {
-	gitCaCerts string
+	gitCaCerts           string
+	imagePullSecretNames []string
 }
 
-func initJenkinsPipelineConverter(execution *v3.PipelineExecution, pipelineSettingLister v3.PipelineSettingLister) (*jenkinsPipelineConverter, error) {
+func initJenkinsPipelineConverter(execution *v3.PipelineExecution, pipelineSettingLister v3.PipelineSettingLister, secretLister apiv1.SecretLister) (*jenkinsPipelineConverter, error) {
 	_, projectID := ref.Parse(execution.Spec.ProjectName)
 	cacertSetting, err := pipelineSettingLister.Get(projectID, utils.SettingGitCaCerts)
 	if err != nil {
 		return nil, err
 	}
+	secretNames, err := getImagePullSecretNames(secretLister, execution)
+	if err != nil {
+		return nil, err
+	}
 	opts := &executeOptions{
-		gitCaCerts: cacertSetting.Value,
+		gitCaCerts:           cacertSetting.Value,
+		imagePullSecretNames: secretNames,
 	}
 	return &jenkinsPipelineConverter{
 		execution: execution.DeepCopy(),
@@ -112,12 +120,14 @@ func (c *jenkinsPipelineConverter) convertPipelineExecutionToPipelineScript() (s
 	if c.opts.gitCaCerts != "" {
 		c.injectGitCaCert(pod)
 	}
+	if len(c.opts.imagePullSecretNames) > 0 {
+		c.configImagePullSecrets(pod)
+	}
 	b := &bytes.Buffer{}
-	e := json.NewYAMLSerializer(json.DefaultMetaFactory, nil, nil)
+	e := serializer.NewYAMLSerializer(serializer.DefaultMetaFactory, nil, nil)
 	if err := e.Encode(pod, b); err != nil {
 		return "", err
 	}
-	logrus.Info(b.String())
 
 	return fmt.Sprintf(pipelineBlock, b.String(), timeout, pipelinebuffer.String()), nil
 }
@@ -174,6 +184,16 @@ func (c *jenkinsPipelineConverter) getBasePodTemplate() *v1.Pod {
 	return pod
 }
 
+func (c *jenkinsPipelineConverter) configImagePullSecrets(pod *v1.Pod) {
+	var refs []v1.LocalObjectReference
+	for _, secretName := range c.opts.imagePullSecretNames {
+		refs = append(refs, v1.LocalObjectReference{
+			Name: secretName,
+		})
+	}
+	pod.Spec.ImagePullSecrets = refs
+}
+
 func (c *jenkinsPipelineConverter) injectGitCaCert(pod *v1.Pod) {
 	pod.Spec.InitContainers = []v1.Container{
 		{
@@ -213,6 +233,22 @@ func (c *jenkinsPipelineConverter) injectGitCaCert(pod *v1.Pod) {
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		},
 	})
+}
+
+func getImagePullSecretNames(secretLister apiv1.SecretLister, execution *v3.PipelineExecution) ([]string, error) {
+	result := []string{}
+	ns := utils.GetPipelineCommonName(execution.Spec.ProjectName)
+	secrets, err := secretLister.List(ns, labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range secrets {
+		if s.Type == v1.SecretTypeDockerConfigJson {
+			result = append(result, s.Name)
+		}
+	}
+	logrus.Debugf("using imagepullsecrets %v for the build", result)
+	return result, nil
 }
 
 func parsePreservedEnvVar(execution *v3.PipelineExecution) {
