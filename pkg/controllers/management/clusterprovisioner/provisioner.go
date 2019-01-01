@@ -283,8 +283,7 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 		cluster.Status.APIEndpoint = apiEndpoint
 		cluster.Status.ServiceAccountToken = serviceAccountToken
 		cluster.Status.CACert = caCert
-		cluster.Spec.RancherKubernetesEngineConfig.RotateCertificates = nil
-		cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.RotateCertificates = nil
+		resetRkeConfigFlags(cluster)
 
 		if cluster, err = p.Clusters.Update(cluster); err == nil {
 			saved = true
@@ -301,6 +300,15 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 
 	logrus.Infof("Provisioned cluster [%s]", cluster.Name)
 	return cluster, nil
+}
+
+func resetRkeConfigFlags(cluster *v3.Cluster) {
+	if cluster.Spec.RancherKubernetesEngineConfig != nil {
+		cluster.Spec.RancherKubernetesEngineConfig.RotateCertificates = nil
+		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
+			cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.RotateCertificates = nil
+		}
+	}
 }
 
 func copyMap(toCopy v3.MapStringInterface) v3.MapStringInterface {
