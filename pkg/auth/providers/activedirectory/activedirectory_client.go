@@ -114,20 +114,21 @@ func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) (
 		return nil, err
 	}
 
-	samName := externalID
+	dn := externalID
 	if strings.Contains(externalID, `\`) {
-		samName = strings.SplitN(externalID, `\`, 2)[1]
+		dn = strings.SplitN(externalID, `\`, 2)[1]
 	}
-	query := fmt.Sprintf("(%v=%v)", config.UserLoginAttribute, ldapv2.EscapeFilter(samName))
-	logrus.Debugf("LDAP Search query: {%s}", query)
+
+	logrus.Debugf("LDAP Search query: {%s}", dn)
+
 	search := ldapv2.NewSearchRequest(
-		config.UserSearchBase,
-		ldapv2.ScopeWholeSubtree,
+		dn,
+		ldapv2.ScopeBaseObject,
 		ldapv2.NeverDerefAliases,
 		0,
 		0,
 		false,
-		query,
+		fmt.Sprintf("(%v=%v)", ObjectClass, config.UserObjectClass),
 		ldap.GetUserSearchAttributes(MemberOfAttribute, ObjectClass, config),
 		nil,
 	)
