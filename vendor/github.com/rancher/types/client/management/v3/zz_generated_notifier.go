@@ -25,6 +25,7 @@ const (
 	NotifierFieldTransitioningMessage = "transitioningMessage"
 	NotifierFieldUUID                 = "uuid"
 	NotifierFieldWebhookConfig        = "webhookConfig"
+	NotifierFieldWechatConfig         = "wechatConfig"
 )
 
 type Notifier struct {
@@ -48,6 +49,7 @@ type Notifier struct {
 	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	WebhookConfig        *WebhookConfig    `json:"webhookConfig,omitempty" yaml:"webhookConfig,omitempty"`
+	WechatConfig         *WechatConfig     `json:"wechatConfig,omitempty" yaml:"wechatConfig,omitempty"`
 }
 
 type NotifierCollection struct {

@@ -9,6 +9,7 @@ const (
 	NotifierSpecFieldSMTPConfig      = "smtpConfig"
 	NotifierSpecFieldSlackConfig     = "slackConfig"
 	NotifierSpecFieldWebhookConfig   = "webhookConfig"
+	NotifierSpecFieldWechatConfig    = "wechatConfig"
 )
 
 type NotifierSpec struct {
@@ -19,4 +20,5 @@ type NotifierSpec struct {
 	SMTPConfig      *SMTPConfig      `json:"smtpConfig,omitempty" yaml:"smtpConfig,omitempty"`
 	SlackConfig     *SlackConfig     `json:"slackConfig,omitempty" yaml:"slackConfig,omitempty"`
 	WebhookConfig   *WebhookConfig   `json:"webhookConfig,omitempty" yaml:"webhookConfig,omitempty"`
+	WechatConfig    *WechatConfig    `json:"wechatConfig,omitempty" yaml:"wechatConfig,omitempty"`
 }
