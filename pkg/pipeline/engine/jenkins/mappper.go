@@ -267,10 +267,10 @@ func parsePreservedEnvVar(execution *v3.PipelineExecution) {
 				step.ApplyYamlConfig.Content = substituteEnvVar(m, step.ApplyYamlConfig.Content)
 			} else if step.PublishCatalogConfig != nil {
 				step.PublishCatalogConfig.Path = substituteEnvVar(m, step.PublishCatalogConfig.Path)
-				step.PublishCatalogConfig.Catalog = substituteEnvVar(m, step.PublishCatalogConfig.Catalog)
+				step.PublishCatalogConfig.CatalogTemplate = substituteEnvVar(m, step.PublishCatalogConfig.CatalogTemplate)
 				step.PublishCatalogConfig.Version = substituteEnvVar(m, step.PublishCatalogConfig.Version)
 			} else if step.ApplyAppConfig != nil {
-				step.ApplyAppConfig.Catalog = substituteEnvVar(m, step.ApplyAppConfig.Catalog)
+				step.ApplyAppConfig.CatalogTemplate = substituteEnvVar(m, step.ApplyAppConfig.CatalogTemplate)
 				step.ApplyAppConfig.Version = substituteEnvVar(m, step.ApplyAppConfig.Version)
 				step.ApplyAppConfig.Name = substituteEnvVar(m, step.ApplyAppConfig.Name)
 				step.ApplyAppConfig.TargetNamespace = substituteEnvVar(m, step.ApplyAppConfig.TargetNamespace)
