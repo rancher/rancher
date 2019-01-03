@@ -216,13 +216,13 @@ func (c *jenkinsPipelineConverter) configPublishCatalogContainer(container *v1.C
 	config := step.PublishCatalogConfig
 	container.Image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.KubeApply)
 	envs := map[string]string{
-		"CATALOG_PATH": config.Path,
-		"CATALOG_NAME": config.Catalog,
-		"VERSION":      config.Version,
-		"GIT_AUTHOR":   config.GitAuthor,
-		"GIT_EMAIL":    config.GitEmail,
-		"GIT_URL":      config.GitURL,
-		"GIT_BRANCH":   config.GitBranch,
+		"CATALOG_PATH":          config.Path,
+		"CATALOG_TEMPLATE_NAME": config.CatalogTemplate,
+		"VERSION":               config.Version,
+		"GIT_AUTHOR":            config.GitAuthor,
+		"GIT_EMAIL":             config.GitEmail,
+		"GIT_URL":               config.GitURL,
+		"GIT_BRANCH":            config.GitBranch,
 	}
 	for k, v := range envs {
 		container.Env = append(container.Env, v1.EnvVar{Name: k, Value: v})
@@ -234,12 +234,12 @@ func (c *jenkinsPipelineConverter) configApplyAppContainer(container *v1.Contain
 	container.Image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.KubeApply)
 	answerBytes, _ := yaml.Marshal(config.Answers)
 	envs := map[string]string{
-		"APP_NAME":         config.Name,
-		"ANSWERS":          string(answerBytes),
-		"CATALOG_NAME":     config.Catalog,
-		"VERSION":          config.Version,
-		"TARGET_NAMESPACE": config.TargetNamespace,
-		"RANCHER_URL":      settings.ServerURL.Get(),
+		"APP_NAME":              config.Name,
+		"ANSWERS":               string(answerBytes),
+		"CATALOG_TEMPLATE_NAME": config.CatalogTemplate,
+		"VERSION":               config.Version,
+		"TARGET_NAMESPACE":      config.TargetNamespace,
+		"RANCHER_URL":           settings.ServerURL.Get(),
 	}
 	for k, v := range envs {
 		container.Env = append(container.Env, v1.EnvVar{Name: k, Value: v})
