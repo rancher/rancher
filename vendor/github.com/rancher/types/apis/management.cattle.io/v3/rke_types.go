@@ -256,13 +256,20 @@ type NetworkConfig struct {
 	WeaveNetworkProvider *WeaveNetworkProvider `yaml:",omitempty" json:"weaveNetworkProvider,omitempty"`
 }
 
+type AuthWebhookConfig struct {
+	// ConfigFile is a multiline string that represent a custom webhook config file
+	ConfigFile string `yaml:"config_file" json:"configFile,omitempty"`
+	// CacheTimeout controls how long to cache authentication decisions
+	CacheTimeout string `yaml:"cache_timeout" json:"cacheTimeout,omitempty"`
+}
+
 type AuthnConfig struct {
 	// Authentication strategy that will be used in kubernetes cluster
 	Strategy string `yaml:"strategy" json:"strategy,omitempty" norman:"default=x509"`
-	// Authentication options
-	Options map[string]string `yaml:"options" json:"options,omitempty"`
 	// List of additional hostnames and IPs to include in the api server PKI cert
 	SANs []string `yaml:"sans" json:"sans,omitempty"`
+	// Webhook configuration options
+	Webhook *AuthWebhookConfig `yaml:"webhook" json:"webhook,omitempty"`
 }
 
 type AuthzConfig struct {

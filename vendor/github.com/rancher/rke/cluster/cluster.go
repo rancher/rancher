@@ -28,6 +28,7 @@ import (
 )
 
 type Cluster struct {
+	AuthnStrategies                  map[string]bool
 	ConfigPath                       string
 	ConfigDir                        string
 	CloudConfigFile                  string
@@ -54,21 +55,22 @@ type Cluster struct {
 }
 
 const (
-	X509AuthenticationProvider = "x509"
-	StateConfigMapName         = "cluster-state"
-	FullStateConfigMapName     = "full-cluster-state"
-	UpdateStateTimeout         = 30
-	GetStateTimeout            = 30
-	KubernetesClientTimeOut    = 30
-	SyncWorkers                = 10
-	NoneAuthorizationMode      = "none"
-	LocalNodeAddress           = "127.0.0.1"
-	LocalNodeHostname          = "localhost"
-	LocalNodeUser              = "root"
-	CloudProvider              = "CloudProvider"
-	ControlPlane               = "controlPlane"
-	WorkerPlane                = "workerPlan"
-	EtcdPlane                  = "etcd"
+	AuthnX509Provider       = "x509"
+	AuthnWebhookProvider    = "webhook"
+	StateConfigMapName      = "cluster-state"
+	FullStateConfigMapName  = "full-cluster-state"
+	UpdateStateTimeout      = 30
+	GetStateTimeout         = 30
+	KubernetesClientTimeOut = 30
+	SyncWorkers             = 10
+	NoneAuthorizationMode   = "none"
+	LocalNodeAddress        = "127.0.0.1"
+	LocalNodeHostname       = "localhost"
+	LocalNodeUser           = "root"
+	CloudProvider           = "CloudProvider"
+	ControlPlane            = "controlPlane"
+	WorkerPlane             = "workerPlan"
+	EtcdPlane               = "etcd"
 
 	KubeAppLabel = "k8s-app"
 	AppLabel     = "app"
@@ -149,6 +151,7 @@ func ParseConfig(clusterFile string) (*v3.RancherKubernetesEngineConfig, error) 
 func InitClusterObject(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, flags ExternalFlags) (*Cluster, error) {
 	// basic cluster object from rkeConfig
 	c := &Cluster{
+		AuthnStrategies:               make(map[string]bool),
 		RancherKubernetesEngineConfig: *rkeConfig,
 		ConfigPath:                    flags.ClusterFilePath,
 		ConfigDir:                     flags.ConfigDir,
@@ -158,6 +161,7 @@ func InitClusterObject(ctx context.Context, rkeConfig *v3.RancherKubernetesEngin
 	if len(c.ConfigPath) == 0 {
 		c.ConfigPath = pki.ClusterConfig
 	}
+
 	// set kube_config and state file
 	c.LocalKubeConfigPath = pki.GetLocalKubeConfig(c.ConfigPath, c.ConfigDir)
 	c.StateFilePath = GetStateFilePath(c.ConfigPath, c.ConfigDir)
@@ -166,6 +170,7 @@ func InitClusterObject(ctx context.Context, rkeConfig *v3.RancherKubernetesEngin
 	c.setClusterDefaults(ctx)
 	// extract cluster network configuration
 	c.setNetworkOptions()
+
 	// Register cloud provider
 	if err := c.setCloudProvider(); err != nil {
 		return nil, fmt.Errorf("Failed to register cloud provider: %v", err)

@@ -77,6 +77,7 @@ type ClusterSpec struct {
 	Description                          string                         `json:"description"`
 	Internal                             bool                           `json:"internal" norman:"nocreate,noupdate"`
 	DesiredAgentImage                    string                         `json:"desiredAgentImage"`
+	DesiredAuthImage                     string                         `json:"desiredAuthImage"`
 	ImportedConfig                       *ImportedConfig                `json:"importedConfig,omitempty" norman:"nocreate,noupdate"`
 	GoogleKubernetesEngineConfig         *MapStringInterface            `json:"googleKubernetesEngineConfig,omitempty"`
 	AzureKubernetesServiceConfig         *MapStringInterface            `json:"azureKubernetesServiceConfig,omitempty"`
@@ -89,6 +90,9 @@ type ClusterSpec struct {
 	EnableNetworkPolicy                  *bool                          `json:"enableNetworkPolicy" norman:"default=false"`
 	EnableClusterAlerting                bool                           `json:"enableClusterAlerting" norman:"default=false"`
 	EnableClusterMonitoring              bool                           `json:"enableClusterMonitoring" norman:"default=false"`
+	EnableClusterAuth                    bool                           `json:"enableClusterAuth" norman:"default=false"`
+	ClusterEndpointFQDN                  string                         `json:"clusterEndpointFQDN,omitempty"`
+	ClusterEndpointFQDNCaCert            string                         `json:"clusterEndpointFQDNCaCert,omitempty"`
 }
 
 type ImportedConfig struct {
@@ -103,6 +107,7 @@ type ClusterStatus struct {
 	// https://kubernetes.io/docs/api-reference/v1.8/#componentstatus-v1-core
 	Driver                               string                   `json:"driver"`
 	AgentImage                           string                   `json:"agentImage"`
+	AuthImage                            string                   `json:"authImage"`
 	ComponentStatuses                    []ClusterComponentStatus `json:"componentStatuses,omitempty"`
 	APIEndpoint                          string                   `json:"apiEndpoint,omitempty"`
 	ServiceAccountToken                  string                   `json:"serviceAccountToken,omitempty"`
@@ -116,6 +121,7 @@ type ClusterStatus struct {
 	Version                              *version.Info            `json:"version,omitempty"`
 	AppliedPodSecurityPolicyTemplateName string                   `json:"appliedPodSecurityPolicyTemplateId"`
 	AppliedEnableNetworkPolicy           bool                     `json:"appliedEnableNetworkPolicy" norman:"nocreate,noupdate,default=false"`
+	AppliedEnableClusterAuth             bool                     `json:"appliedEnableAuth"`
 	Capabilities                         Capabilities             `json:"capabilities,omitempty"`
 	MonitoringStatus                     *MonitoringStatus        `json:"monitoringStatus,omitempty" norman:"nocreate,noupdate"`
 }

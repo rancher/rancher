@@ -10,12 +10,16 @@ const (
 	ClusterFieldAgentImage                           = "agentImage"
 	ClusterFieldAllocatable                          = "allocatable"
 	ClusterFieldAnnotations                          = "annotations"
+	ClusterFieldAppliedEnableClusterAuth             = "appliedEnableAuth"
 	ClusterFieldAppliedEnableNetworkPolicy           = "appliedEnableNetworkPolicy"
 	ClusterFieldAppliedPodSecurityPolicyTemplateName = "appliedPodSecurityPolicyTemplateId"
 	ClusterFieldAppliedSpec                          = "appliedSpec"
+	ClusterFieldAuthImage                            = "authImage"
 	ClusterFieldCACert                               = "caCert"
 	ClusterFieldCapabilities                         = "capabilities"
 	ClusterFieldCapacity                             = "capacity"
+	ClusterFieldClusterEndpointFQDN                  = "clusterEndpointFQDN"
+	ClusterFieldClusterEndpointFQDNCaCert            = "clusterEndpointFQDNCaCert"
 	ClusterFieldComponentStatuses                    = "componentStatuses"
 	ClusterFieldConditions                           = "conditions"
 	ClusterFieldCreated                              = "created"
@@ -24,9 +28,11 @@ const (
 	ClusterFieldDefaultPodSecurityPolicyTemplateID   = "defaultPodSecurityPolicyTemplateId"
 	ClusterFieldDescription                          = "description"
 	ClusterFieldDesiredAgentImage                    = "desiredAgentImage"
+	ClusterFieldDesiredAuthImage                     = "desiredAuthImage"
 	ClusterFieldDockerRootDir                        = "dockerRootDir"
 	ClusterFieldDriver                               = "driver"
 	ClusterFieldEnableClusterAlerting                = "enableClusterAlerting"
+	ClusterFieldEnableClusterAuth                    = "enableClusterAuth"
 	ClusterFieldEnableClusterMonitoring              = "enableClusterMonitoring"
 	ClusterFieldEnableNetworkPolicy                  = "enableNetworkPolicy"
 	ClusterFieldFailedSpec                           = "failedSpec"
@@ -53,12 +59,16 @@ type Cluster struct {
 	AgentImage                           string                         `json:"agentImage,omitempty" yaml:"agentImage,omitempty"`
 	Allocatable                          map[string]string              `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
 	Annotations                          map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	AppliedEnableClusterAuth             bool                           `json:"appliedEnableAuth,omitempty" yaml:"appliedEnableAuth,omitempty"`
 	AppliedEnableNetworkPolicy           bool                           `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
 	AppliedPodSecurityPolicyTemplateName string                         `json:"appliedPodSecurityPolicyTemplateId,omitempty" yaml:"appliedPodSecurityPolicyTemplateId,omitempty"`
 	AppliedSpec                          *ClusterSpec                   `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
+	AuthImage                            string                         `json:"authImage,omitempty" yaml:"authImage,omitempty"`
 	CACert                               string                         `json:"caCert,omitempty" yaml:"caCert,omitempty"`
 	Capabilities                         *Capabilities                  `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
 	Capacity                             map[string]string              `json:"capacity,omitempty" yaml:"capacity,omitempty"`
+	ClusterEndpointFQDN                  string                         `json:"clusterEndpointFQDN,omitempty" yaml:"clusterEndpointFQDN,omitempty"`
+	ClusterEndpointFQDNCaCert            string                         `json:"clusterEndpointFQDNCaCert,omitempty" yaml:"clusterEndpointFQDNCaCert,omitempty"`
 	ComponentStatuses                    []ClusterComponentStatus       `json:"componentStatuses,omitempty" yaml:"componentStatuses,omitempty"`
 	Conditions                           []ClusterCondition             `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	Created                              string                         `json:"created,omitempty" yaml:"created,omitempty"`
@@ -67,9 +77,11 @@ type Cluster struct {
 	DefaultPodSecurityPolicyTemplateID   string                         `json:"defaultPodSecurityPolicyTemplateId,omitempty" yaml:"defaultPodSecurityPolicyTemplateId,omitempty"`
 	Description                          string                         `json:"description,omitempty" yaml:"description,omitempty"`
 	DesiredAgentImage                    string                         `json:"desiredAgentImage,omitempty" yaml:"desiredAgentImage,omitempty"`
+	DesiredAuthImage                     string                         `json:"desiredAuthImage,omitempty" yaml:"desiredAuthImage,omitempty"`
 	DockerRootDir                        string                         `json:"dockerRootDir,omitempty" yaml:"dockerRootDir,omitempty"`
 	Driver                               string                         `json:"driver,omitempty" yaml:"driver,omitempty"`
 	EnableClusterAlerting                bool                           `json:"enableClusterAlerting,omitempty" yaml:"enableClusterAlerting,omitempty"`
+	EnableClusterAuth                    bool                           `json:"enableClusterAuth,omitempty" yaml:"enableClusterAuth,omitempty"`
 	EnableClusterMonitoring              bool                           `json:"enableClusterMonitoring,omitempty" yaml:"enableClusterMonitoring,omitempty"`
 	EnableNetworkPolicy                  *bool                          `json:"enableNetworkPolicy,omitempty" yaml:"enableNetworkPolicy,omitempty"`
 	FailedSpec                           *ClusterSpec                   `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`
