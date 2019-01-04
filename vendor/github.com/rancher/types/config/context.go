@@ -12,6 +12,7 @@ import (
 	appsv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
 	batchv1 "github.com/rancher/types/apis/batch/v1"
 	batchv1beta1 "github.com/rancher/types/apis/batch/v1beta1"
+	clusterv3 "github.com/rancher/types/apis/cluster.cattle.io/v3"
 	clusterSchema "github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	extv1beta1 "github.com/rancher/types/apis/extensions/v1beta1"
@@ -183,6 +184,7 @@ type UserContext struct {
 	BatchV1Beta1 batchv1beta1.Interface
 	Networking   knetworkingv1.Interface
 	Monitoring   monitoringv1.Interface
+	Cluster      clusterv3.Interface
 }
 
 func (w *UserContext) controllers() []controller.Starter {
@@ -196,6 +198,7 @@ func (w *UserContext) controllers() []controller.Starter {
 		w.BatchV1Beta1,
 		w.Networking,
 		w.Monitoring,
+		w.Cluster,
 	}
 }
 
@@ -215,6 +218,7 @@ func (w *UserContext) UserOnlyContext() *UserOnlyContext {
 		BatchV1:      w.BatchV1,
 		BatchV1Beta1: w.BatchV1Beta1,
 		Monitoring:   w.Monitoring,
+		Cluster:      w.Cluster,
 	}
 }
 
@@ -233,6 +237,7 @@ type UserOnlyContext struct {
 	BatchV1      batchv1.Interface
 	BatchV1Beta1 batchv1beta1.Interface
 	Monitoring   monitoringv1.Interface
+	Cluster      clusterv3.Interface
 }
 
 func (w *UserOnlyContext) controllers() []controller.Starter {
@@ -382,6 +387,7 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 	}
 
 	context.Monitoring, err = monitoringv1.NewForConfig(config)
+	context.Cluster, err = clusterv3.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -465,6 +471,7 @@ func NewUserOnlyContext(config rest.Config) (*UserOnlyContext, error) {
 	}
 
 	context.Monitoring, err = monitoringv1.NewForConfig(config)
+	context.Cluster, err = clusterv3.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}

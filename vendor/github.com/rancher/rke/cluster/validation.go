@@ -39,8 +39,17 @@ func (c *Cluster) ValidateCluster() error {
 }
 
 func validateAuthOptions(c *Cluster) error {
-	if c.Authentication.Strategy != DefaultAuthStrategy {
-		return fmt.Errorf("Authentication strategy [%s] is not supported", c.Authentication.Strategy)
+	for strategy, enabled := range c.AuthnStrategies {
+		if !enabled {
+			continue
+		}
+		strategy = strings.ToLower(strategy)
+		if strategy != AuthnX509Provider && strategy != AuthnWebhookProvider {
+			return fmt.Errorf("Authentication strategy [%s] is not supported", strategy)
+		}
+	}
+	if !c.AuthnStrategies[AuthnX509Provider] {
+		return fmt.Errorf("Authentication strategy must contain [%s]", AuthnX509Provider)
 	}
 	return nil
 }

@@ -81,7 +81,7 @@ func BuildRKEConfigNodePlan(ctx context.Context, myCluster *Cluster, host *hosts
 		portChecks = append(portChecks, BuildPortChecksFromPortList(host, EtcdPortList, ProtocolTCP)...)
 	}
 	cloudConfig := v3.File{
-		Name:     CloudConfigPath,
+		Name:     cloudConfigFileName,
 		Contents: b64.StdEncoding.EncodeToString([]byte(myCluster.CloudConfigFile)),
 	}
 	return v3.RKEConfigNodePlan{
@@ -149,7 +149,11 @@ func (c *Cluster) BuildKubeAPIProcess(prefixPath string) v3.Process {
 		"requestheader-username-headers":     "X-Remote-User",
 	}
 	if len(c.CloudProvider.Name) > 0 && c.CloudProvider.Name != aws.AWSCloudProviderName {
-		CommandArgs["cloud-config"] = CloudConfigPath
+		CommandArgs["cloud-config"] = cloudConfigFileName
+	}
+	if c.Authentication.Webhook != nil {
+		CommandArgs["authentication-token-webhook-config-file"] = authnWebhookFileName
+		CommandArgs["authentication-token-webhook-cache-ttl"] = c.Authentication.Webhook.CacheTimeout
 	}
 	if len(c.CloudProvider.Name) > 0 {
 		c.Services.KubeAPI.ExtraEnv = append(
@@ -253,7 +257,7 @@ func (c *Cluster) BuildKubeControllerProcess(prefixPath string) v3.Process {
 		"root-ca-file":                     pki.GetCertPath(pki.CACertName),
 	}
 	if len(c.CloudProvider.Name) > 0 && c.CloudProvider.Name != aws.AWSCloudProviderName {
-		CommandArgs["cloud-config"] = CloudConfigPath
+		CommandArgs["cloud-config"] = cloudConfigFileName
 	}
 	if len(c.CloudProvider.Name) > 0 {
 		c.Services.KubeController.ExtraEnv = append(
@@ -359,7 +363,7 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 		CommandArgs["node-ip"] = host.InternalAddress
 	}
 	if len(c.CloudProvider.Name) > 0 && c.CloudProvider.Name != aws.AWSCloudProviderName {
-		CommandArgs["cloud-config"] = CloudConfigPath
+		CommandArgs["cloud-config"] = cloudConfigFileName
 	}
 	if len(c.CloudProvider.Name) > 0 {
 		c.Services.Kubelet.ExtraEnv = append(

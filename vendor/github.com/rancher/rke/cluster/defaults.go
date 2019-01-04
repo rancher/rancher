@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/services"
+	"github.com/rancher/rke/templates"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
@@ -29,6 +30,9 @@ const (
 
 	DefaultAuthStrategy      = "x509"
 	DefaultAuthorizationMode = "rbac"
+
+	DefaultAuthnWebhookFile  = templates.AuthnWebhook
+	DefaultAuthnCacheTimeout = "5s"
 
 	DefaultNetworkPlugin        = "canal"
 	DefaultNetworkCloudProvider = "none"
@@ -137,6 +141,7 @@ func (c *Cluster) setClusterDefaults(ctx context.Context) {
 	c.setClusterImageDefaults()
 	c.setClusterServicesDefaults()
 	c.setClusterNetworkDefaults()
+	c.setClusterAuthnDefaults()
 }
 
 func (c *Cluster) setClusterServicesDefaults() {
@@ -162,7 +167,6 @@ func (c *Cluster) setClusterServicesDefaults() {
 		&c.Services.Kubelet.ClusterDNSServer:             DefaultClusterDNSService,
 		&c.Services.Kubelet.ClusterDomain:                DefaultClusterDomain,
 		&c.Services.Kubelet.InfraContainerImage:          c.SystemImages.PodInfraContainer,
-		&c.Authentication.Strategy:                       DefaultAuthStrategy,
 		&c.Services.Etcd.Creation:                        DefaultEtcdBackupCreationPeriod,
 		&c.Services.Etcd.Retention:                       DefaultEtcdBackupRetentionPeriod,
 	}
@@ -265,6 +269,28 @@ func (c *Cluster) setClusterNetworkDefaults() {
 	}
 	for k, v := range networkPluginConfigDefaultsMap {
 		setDefaultIfEmptyMapValue(c.Network.Options, k, v)
+	}
+}
+
+func (c *Cluster) setClusterAuthnDefaults() {
+	setDefaultIfEmpty(&c.Authentication.Strategy, DefaultAuthStrategy)
+
+	for _, strategy := range strings.Split(c.Authentication.Strategy, "|") {
+		strategy = strings.ToLower(strings.TrimSpace(strategy))
+		c.AuthnStrategies[strategy] = true
+	}
+
+	if c.AuthnStrategies[AuthnWebhookProvider] && c.Authentication.Webhook == nil {
+		c.Authentication.Webhook = &v3.AuthWebhookConfig{}
+	}
+	if c.Authentication.Webhook != nil {
+		webhookConfigDefaultsMap := map[*string]string{
+			&c.Authentication.Webhook.ConfigFile:   DefaultAuthnWebhookFile,
+			&c.Authentication.Webhook.CacheTimeout: DefaultAuthnCacheTimeout,
+		}
+		for k, v := range webhookConfigDefaultsMap {
+			setDefaultIfEmpty(k, v)
+		}
 	}
 }
 

@@ -4,13 +4,17 @@ const (
 	ClusterSpecType                                     = "clusterSpec"
 	ClusterSpecFieldAmazonElasticContainerServiceConfig = "amazonElasticContainerServiceConfig"
 	ClusterSpecFieldAzureKubernetesServiceConfig        = "azureKubernetesServiceConfig"
+	ClusterSpecFieldClusterEndpointFQDN                 = "clusterEndpointFQDN"
+	ClusterSpecFieldClusterEndpointFQDNCaCert           = "clusterEndpointFQDNCaCert"
 	ClusterSpecFieldDefaultClusterRoleForProjectMembers = "defaultClusterRoleForProjectMembers"
 	ClusterSpecFieldDefaultPodSecurityPolicyTemplateID  = "defaultPodSecurityPolicyTemplateId"
 	ClusterSpecFieldDescription                         = "description"
 	ClusterSpecFieldDesiredAgentImage                   = "desiredAgentImage"
+	ClusterSpecFieldDesiredAuthImage                    = "desiredAuthImage"
 	ClusterSpecFieldDisplayName                         = "displayName"
 	ClusterSpecFieldDockerRootDir                       = "dockerRootDir"
 	ClusterSpecFieldEnableClusterAlerting               = "enableClusterAlerting"
+	ClusterSpecFieldEnableClusterAuth                   = "enableClusterAuth"
 	ClusterSpecFieldEnableClusterMonitoring             = "enableClusterMonitoring"
 	ClusterSpecFieldEnableNetworkPolicy                 = "enableNetworkPolicy"
 	ClusterSpecFieldGenericEngineConfig                 = "genericEngineConfig"
@@ -23,13 +27,17 @@ const (
 type ClusterSpec struct {
 	AmazonElasticContainerServiceConfig map[string]interface{}         `json:"amazonElasticContainerServiceConfig,omitempty" yaml:"amazonElasticContainerServiceConfig,omitempty"`
 	AzureKubernetesServiceConfig        map[string]interface{}         `json:"azureKubernetesServiceConfig,omitempty" yaml:"azureKubernetesServiceConfig,omitempty"`
+	ClusterEndpointFQDN                 string                         `json:"clusterEndpointFQDN,omitempty" yaml:"clusterEndpointFQDN,omitempty"`
+	ClusterEndpointFQDNCaCert           string                         `json:"clusterEndpointFQDNCaCert,omitempty" yaml:"clusterEndpointFQDNCaCert,omitempty"`
 	DefaultClusterRoleForProjectMembers string                         `json:"defaultClusterRoleForProjectMembers,omitempty" yaml:"defaultClusterRoleForProjectMembers,omitempty"`
 	DefaultPodSecurityPolicyTemplateID  string                         `json:"defaultPodSecurityPolicyTemplateId,omitempty" yaml:"defaultPodSecurityPolicyTemplateId,omitempty"`
 	Description                         string                         `json:"description,omitempty" yaml:"description,omitempty"`
 	DesiredAgentImage                   string                         `json:"desiredAgentImage,omitempty" yaml:"desiredAgentImage,omitempty"`
+	DesiredAuthImage                    string                         `json:"desiredAuthImage,omitempty" yaml:"desiredAuthImage,omitempty"`
 	DisplayName                         string                         `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	DockerRootDir                       string                         `json:"dockerRootDir,omitempty" yaml:"dockerRootDir,omitempty"`
 	EnableClusterAlerting               bool                           `json:"enableClusterAlerting,omitempty" yaml:"enableClusterAlerting,omitempty"`
+	EnableClusterAuth                   bool                           `json:"enableClusterAuth,omitempty" yaml:"enableClusterAuth,omitempty"`
 	EnableClusterMonitoring             bool                           `json:"enableClusterMonitoring,omitempty" yaml:"enableClusterMonitoring,omitempty"`
 	EnableNetworkPolicy                 *bool                          `json:"enableNetworkPolicy,omitempty" yaml:"enableNetworkPolicy,omitempty"`
 	GenericEngineConfig                 map[string]interface{}         `json:"genericEngineConfig,omitempty" yaml:"genericEngineConfig,omitempty"`

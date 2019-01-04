@@ -8,6 +8,7 @@ const (
 	TokenType                 = "token"
 	TokenFieldAnnotations     = "annotations"
 	TokenFieldAuthProvider    = "authProvider"
+	TokenFieldClusterID       = "clusterId"
 	TokenFieldCreated         = "created"
 	TokenFieldCreatorID       = "creatorId"
 	TokenFieldCurrent         = "current"
@@ -34,6 +35,7 @@ type Token struct {
 	types.Resource
 	Annotations     map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	AuthProvider    string            `json:"authProvider,omitempty" yaml:"authProvider,omitempty"`
+	ClusterID       string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Created         string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Current         bool              `json:"current,omitempty" yaml:"current,omitempty"`
