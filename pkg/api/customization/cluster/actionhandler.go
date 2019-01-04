@@ -496,22 +496,37 @@ func (a ActionHandler) getKubeConfig(apiContext *types.APIContext, cluster *mgmt
 }
 
 func (a ActionHandler) RotateCertificates(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	rtn := map[string]interface{}{
+		"message": "rotating certificates for all components",
+	}
 	var mgmtCluster mgmtclient.Cluster
 	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &mgmtCluster); err != nil {
-		return err
+		rtn["message"] = "none existent Cluster"
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+
+		return errors.Wrapf(err, "failed to get Cluster by ID %s", apiContext.ID)
 	}
 
 	cluster, err := a.ClusterClient.Get(apiContext.ID, metav1.GetOptions{})
 	if err != nil {
-		return err
+		rtn["message"] = "none existent Cluster"
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+
+		return errors.Wrapf(err, "failed to get Cluster by ID %s", apiContext.ID)
 	}
 	data, err := ioutil.ReadAll(apiContext.Request.Body)
 	if err != nil {
-		return errors.Wrap(err, "reading request body error")
+		rtn["message"] = "reading request body error"
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+
+		return errors.Wrapf(err, "failed to read request body")
 	}
 
 	input := mgmtclient.RotateCertificateInput{}
 	if err = json.Unmarshal(data, &input); err != nil {
+		rtn["message"] = "failed to parse request content"
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+
 		return errors.Wrap(err, "unmarshaling input error")
 	}
 
@@ -521,18 +536,19 @@ func (a ActionHandler) RotateCertificates(actionName string, action *types.Actio
 	}
 	cluster.Spec.RancherKubernetesEngineConfig.RotateCertificates = rotateCerts
 	if _, err := a.ClusterClient.Update(cluster); err != nil {
-		return err
+		rtn["message"] = "failed to update cluster object"
+		apiContext.WriteResponse(http.StatusInternalServerError, rtn)
+
+		return errors.Wrapf(err, "unable to update Cluster %s", cluster.Name)
 	}
-	var reader *bytes.Reader
 	if input.CACertificates {
-		reader = bytes.NewReader([]byte("Rotating CA certificates and all components"))
+		rtn["message"] = "rotating CA certificates and all components"
 	} else if len(input.Services) > 0 {
-		reader = bytes.NewReader([]byte(fmt.Sprintf("Rotating %s certificates", input.Services)))
+		rtn["message"] = fmt.Sprintf("rotating %s certificates", input.Services)
 	} else {
-		reader = bytes.NewReader([]byte("Rotating certificates for all components"))
+		rtn["message"] = "rotating certificates for all components"
 	}
 
-	apiContext.Response.Header().Set("Content-Type", "application/json")
-	http.ServeContent(apiContext.Response, apiContext.Request, "rotate", time.Now(), reader)
+	apiContext.WriteResponse(http.StatusOK, rtn)
 	return nil
 }
