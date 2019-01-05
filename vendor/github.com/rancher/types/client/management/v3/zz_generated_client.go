@@ -23,6 +23,8 @@ type Client struct {
 	ClusterRegistrationToken                ClusterRegistrationTokenOperations
 	Catalog                                 CatalogOperations
 	Template                                TemplateOperations
+	CatalogTemplate                         CatalogTemplateOperations
+	CatalogTemplateVersion                  CatalogTemplateVersionOperations
 	TemplateVersion                         TemplateVersionOperations
 	TemplateContent                         TemplateContentOperations
 	Group                                   GroupOperations
@@ -86,6 +88,8 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.ClusterRegistrationToken = newClusterRegistrationTokenClient(client)
 	client.Catalog = newCatalogClient(client)
 	client.Template = newTemplateClient(client)
+	client.CatalogTemplate = newCatalogTemplateClient(client)
+	client.CatalogTemplateVersion = newCatalogTemplateVersionClient(client)
 	client.TemplateVersion = newTemplateVersionClient(client)
 	client.TemplateContent = newTemplateContentClient(client)
 	client.Group = newGroupClient(client)

@@ -38,6 +38,7 @@ type CatalogStatus struct {
 
 var (
 	CatalogConditionRefreshed condition.Cond = "Refreshed"
+	CatalogConditionUpgraded  condition.Cond = "Upgraded"
 )
 
 type CatalogCondition struct {
@@ -68,6 +69,18 @@ type Template struct {
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
 	Spec   TemplateSpec   `json:"spec"`
 	Status TemplateStatus `json:"status"`
+}
+
+type CatalogTemplate struct {
+	types.Namespaced
+
+	metav1.TypeMeta `json:",inline"`
+	// Standard object’s metadata. More info:
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	// Specification of the desired behavior of the the cluster. More info:
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+	Template
 }
 
 type TemplateSpec struct {
@@ -108,6 +121,17 @@ type TemplateVersion struct {
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
 	Spec   TemplateVersionSpec   `json:"spec"`
 	Status TemplateVersionStatus `json:"status"`
+}
+
+type CatalogTemplateVersion struct {
+	types.Namespaced
+	metav1.TypeMeta `json:",inline"`
+	// Standard object’s metadata. More info:
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	// Specification of the desired behavior of the the cluster. More info:
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+	TemplateVersion
 }
 
 type TemplateVersionSpec struct {

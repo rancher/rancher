@@ -25,6 +25,8 @@ type Config struct {
 	ClusterRegistrationTokens                map[string]managementClient.ClusterRegistrationToken                `json:"clusterRegistrationTokens,omitempty" yaml:"clusterRegistrationTokens,omitempty"`
 	Catalogs                                 map[string]managementClient.Catalog                                 `json:"catalogs,omitempty" yaml:"catalogs,omitempty"`
 	Templates                                map[string]managementClient.Template                                `json:"templates,omitempty" yaml:"templates,omitempty"`
+	CatalogTemplates                         map[string]managementClient.CatalogTemplate                         `json:"catalogTemplates,omitempty" yaml:"catalogTemplates,omitempty"`
+	CatalogTemplateVersions                  map[string]managementClient.CatalogTemplateVersion                  `json:"catalogTemplateVersions,omitempty" yaml:"catalogTemplateVersions,omitempty"`
 	TemplateVersions                         map[string]managementClient.TemplateVersion                         `json:"templateVersions,omitempty" yaml:"templateVersions,omitempty"`
 	TemplateContents                         map[string]managementClient.TemplateContent                         `json:"templateContents,omitempty" yaml:"templateContents,omitempty"`
 	Groups                                   map[string]managementClient.Group                                   `json:"groups,omitempty" yaml:"groups,omitempty"`

@@ -76,6 +76,17 @@ func catalogTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.Template{}, struct {
 			VersionLinks map[string]string
 		}{}).
+		AddMapperForType(&Version, v3.CatalogTemplate{},
+			m.DisplayName{},
+			m.Drop{Field: "namespaceId"},
+		).
+		MustImport(&Version, v3.CatalogTemplate{}, struct {
+			VersionLinks map[string]string
+		}{}).
+		AddMapperForType(&Version, v3.CatalogTemplateVersion{},
+			m.Drop{Field: "namespaceId"},
+		).
+		MustImport(&Version, v3.CatalogTemplateVersion{}).
 		MustImport(&Version, v3.TemplateVersion{}).
 		MustImport(&Version, v3.TemplateContent{})
 }
