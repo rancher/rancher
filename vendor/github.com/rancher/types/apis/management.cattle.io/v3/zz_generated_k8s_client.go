@@ -36,6 +36,8 @@ type Interface interface {
 	ClusterRegistrationTokensGetter
 	CatalogsGetter
 	TemplatesGetter
+	CatalogTemplatesGetter
+	CatalogTemplateVersionsGetter
 	TemplateVersionsGetter
 	TemplateContentsGetter
 	GroupsGetter
@@ -93,6 +95,8 @@ type Clients struct {
 	ClusterRegistrationToken                ClusterRegistrationTokenClient
 	Catalog                                 CatalogClient
 	Template                                TemplateClient
+	CatalogTemplate                         CatalogTemplateClient
+	CatalogTemplateVersion                  CatalogTemplateVersionClient
 	TemplateVersion                         TemplateVersionClient
 	TemplateContent                         TemplateContentClient
 	Group                                   GroupClient
@@ -152,6 +156,8 @@ type Client struct {
 	clusterRegistrationTokenControllers                map[string]ClusterRegistrationTokenController
 	catalogControllers                                 map[string]CatalogController
 	templateControllers                                map[string]TemplateController
+	catalogTemplateControllers                         map[string]CatalogTemplateController
+	catalogTemplateVersionControllers                  map[string]CatalogTemplateVersionController
 	templateVersionControllers                         map[string]TemplateVersionController
 	templateContentControllers                         map[string]TemplateContentController
 	groupControllers                                   map[string]GroupController
@@ -270,6 +276,12 @@ func NewClientsFromInterface(iface Interface) *Clients {
 		},
 		Template: &templateClient2{
 			iface: iface.Templates(""),
+		},
+		CatalogTemplate: &catalogTemplateClient2{
+			iface: iface.CatalogTemplates(""),
+		},
+		CatalogTemplateVersion: &catalogTemplateVersionClient2{
+			iface: iface.CatalogTemplateVersions(""),
 		},
 		TemplateVersion: &templateVersionClient2{
 			iface: iface.TemplateVersions(""),
@@ -411,6 +423,8 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		clusterRegistrationTokenControllers:                map[string]ClusterRegistrationTokenController{},
 		catalogControllers:                                 map[string]CatalogController{},
 		templateControllers:                                map[string]TemplateController{},
+		catalogTemplateControllers:                         map[string]CatalogTemplateController{},
+		catalogTemplateVersionControllers:                  map[string]CatalogTemplateVersionController{},
 		templateVersionControllers:                         map[string]TemplateVersionController{},
 		templateContentControllers:                         map[string]TemplateContentController{},
 		groupControllers:                                   map[string]GroupController{},
@@ -664,6 +678,32 @@ type TemplatesGetter interface {
 func (c *Client) Templates(namespace string) TemplateInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &TemplateResource, TemplateGroupVersionKind, templateFactory{})
 	return &templateClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type CatalogTemplatesGetter interface {
+	CatalogTemplates(namespace string) CatalogTemplateInterface
+}
+
+func (c *Client) CatalogTemplates(namespace string) CatalogTemplateInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &CatalogTemplateResource, CatalogTemplateGroupVersionKind, catalogTemplateFactory{})
+	return &catalogTemplateClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type CatalogTemplateVersionsGetter interface {
+	CatalogTemplateVersions(namespace string) CatalogTemplateVersionInterface
+}
+
+func (c *Client) CatalogTemplateVersions(namespace string) CatalogTemplateVersionInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &CatalogTemplateVersionResource, CatalogTemplateVersionGroupVersionKind, catalogTemplateVersionFactory{})
+	return &catalogTemplateVersionClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

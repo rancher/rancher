@@ -6,6 +6,7 @@ import (
 
 const (
 	RoleTemplateType                       = "roleTemplate"
+	RoleTemplateFieldAdministrative        = "administrative"
 	RoleTemplateFieldAnnotations           = "annotations"
 	RoleTemplateFieldBuiltin               = "builtin"
 	RoleTemplateFieldClusterCreatorDefault = "clusterCreatorDefault"
@@ -28,6 +29,7 @@ const (
 
 type RoleTemplate struct {
 	types.Resource
+	Administrative        bool              `json:"administrative,omitempty" yaml:"administrative,omitempty"`
 	Annotations           map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Builtin               bool              `json:"builtin,omitempty" yaml:"builtin,omitempty"`
 	ClusterCreatorDefault bool              `json:"clusterCreatorDefault,omitempty" yaml:"clusterCreatorDefault,omitempty"`
