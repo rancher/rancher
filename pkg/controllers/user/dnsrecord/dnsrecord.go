@@ -102,6 +102,7 @@ func (c *Controller) reconcileEndpoints(key string, obj *corev1.Service) error {
 	}
 
 	var newEndpointSubsets []corev1.EndpointSubset
+	var addresses []corev1.EndpointAddress
 	targetEndpointUUIDs := make(map[string]bool)
 	toHandleExternalName := false
 	var externalName string
@@ -137,9 +138,29 @@ func (c *Controller) reconcileEndpoints(key string, obj *corev1.Service) error {
 			logrus.Warnf("Failed to fetch endpoints for dns record [%s]: endpoint is being removed", groomed)
 			continue
 		}
-		newEndpointSubsets = append(newEndpointSubsets, targetEndpoint.Subsets...)
+		for _, subset := range targetEndpoint.Subsets {
+			for _, addr := range subset.Addresses {
+				addresses = append(addresses, addr)
+			}
+		}
 		targetEndpointUUID := fmt.Sprintf("%s/%s", targetEndpoint.Namespace, targetEndpoint.Name)
 		targetEndpointUUIDs[targetEndpointUUID] = true
+	}
+
+	var ports []corev1.EndpointPort
+	if len(addresses) > 0 {
+		for _, p := range obj.Spec.Ports {
+			epPort := corev1.EndpointPort{Name: p.Name, Protocol: p.Protocol, Port: p.TargetPort.IntVal}
+			ports = append(ports, epPort)
+		}
+		if len(ports) == 0 {
+			epPort := corev1.EndpointPort{Name: "default", Protocol: corev1.ProtocolTCP, Port: 42}
+			ports = append(ports, epPort)
+		}
+		newEndpointSubsets = append(newEndpointSubsets, corev1.EndpointSubset{
+			Addresses: addresses,
+			Ports:     ports,
+		})
 	}
 
 	if toHandleExternalName {
