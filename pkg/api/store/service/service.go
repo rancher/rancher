@@ -33,7 +33,7 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 			data["clusterIp"] = ""
 		}
 	}
-	formatData(data)
+	formatData(schema, data)
 	err := p.validateNonSpecialIP(schema, data)
 	if err != nil {
 		return nil, err
@@ -41,20 +41,26 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	return p.Store.Create(apiContext, schema, data)
 }
 
-func formatData(data map[string]interface{}) {
+func formatData(schema *types.Schema, data map[string]interface{}) {
 	var ports []interface{}
-	servicePort := v3.ServicePort{
-		Port:       42,
-		TargetPort: intstr.Parse(strconv.FormatInt(42, 10)),
-		Protocol:   "TCP",
-		Name:       "default",
+	if schema.ID == "service" {
+		ports = convert.ToInterfaceSlice(data["ports"])
 	}
-	m, err := convert.EncodeToMap(servicePort)
-	if err != nil {
-		logrus.Warnf("Failed to transform service port to map: %v", err)
-		return
+	// append default port as sky dns won't work w/o at least one port being set
+	if len(ports) == 0 {
+		servicePort := v3.ServicePort{
+			Port:       42,
+			TargetPort: intstr.Parse(strconv.FormatInt(42, 10)),
+			Protocol:   "TCP",
+			Name:       "default",
+		}
+		m, err := convert.EncodeToMap(servicePort)
+		if err != nil {
+			logrus.Warnf("Failed to transform service port to map: %v", err)
+			return
+		}
+		ports = append(ports, m)
 	}
-	ports = append(ports, m)
 	data["ports"] = ports
 }
 
