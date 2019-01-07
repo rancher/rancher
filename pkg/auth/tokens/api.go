@@ -39,6 +39,7 @@ func NewAPIHandler(ctx context.Context, apiContext *config.ScaledContext) (http.
 	schema.ListHandler = api.tokenListHandler
 	schema.CreateHandler = api.tokenCreateHandler
 	schema.DeleteHandler = api.tokenDeleteHandler
+	schema.UpdateHandler = api.tokenUpdateHandler
 
 	server := normanapi.NewAPIServer()
 	if err := server.AddSchemas(schemas); err != nil {
@@ -76,4 +77,9 @@ func (t *tokenAPI) tokenListHandler(request *types.APIContext, _ types.RequestHa
 func (t *tokenAPI) tokenDeleteHandler(request *types.APIContext, _ types.RequestHandler) error {
 	logrus.Debugf("TokenDeleteHandler called")
 	return t.mgr.removeToken(request)
+}
+
+func (t *tokenAPI) tokenUpdateHandler(request *types.APIContext, _ types.RequestHandler) error {
+	logrus.Debugf("TokenUpdateHandler called")
+	return t.mgr.updateTokenForRequest(request)
 }

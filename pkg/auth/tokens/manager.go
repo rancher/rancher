@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/rancher/norman/httperror"
@@ -238,6 +240,11 @@ func (m *Manager) getTokenByID(tokenAuthValue string, tokenID string) (v3.Token,
 	storedToken, _, err := m.getToken(tokenAuthValue)
 	if err != nil {
 		return *token, 401, err
+	}
+
+	token, err = m.tokensClient.Get(tokenID, metav1.GetOptions{})
+	if err != nil {
+		return v3.Token{}, 404, err
 	}
 
 	token, err = m.tokensClient.Get(tokenID, metav1.GetOptions{})
@@ -654,6 +661,73 @@ func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, group
 	}
 
 	return m.createToken(token)
+}
+
+func (m *Manager) updateTokenForRequest(request *types.APIContext) error {
+	r := request.Request
+
+	tokenAuthValue := GetTokenAuthFromRequest(r)
+	if tokenAuthValue == "" {
+		// no cookie or auth header, cannot authenticate
+		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie or auth header")
+	}
+
+	parts := strings.SplitN(tokenAuthValue, ":", 2)
+	if !strings.HasPrefix(parts[0], "token-") {
+		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie or auth header")
+	}
+
+	storedToken, _, err := m.getToken(tokenAuthValue)
+	if err != nil {
+		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie or auth header")
+	}
+
+	user, err := m.userLister.Get("", storedToken.UserID)
+	if err != nil {
+		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie or auth header")
+	}
+
+	// TODO: if user is not admin, error
+	logrus.Infof("Todo: user making update request: %v", user.Name)
+	existingToken, err := m.tokensClient.Get(request.ID, metav1.GetOptions{})
+	if err != nil {
+		return httperror.NewAPIErrorLong(http.StatusNotFound, util.GetHTTPErrorCode(http.StatusNotFound), "Not found")
+	}
+
+	bytes, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("%s", err))
+	}
+
+	jsonInput := v3.Token{}
+	err = json.Unmarshal(bytes, &jsonInput)
+	if err != nil {
+		return httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("%s", err))
+	}
+
+	existingToken.Enabled = jsonInput.Enabled
+	if IsExpired(*existingToken) {
+		existingToken.Expired = true
+		jsonInput.Expired = true
+	}
+	jsonInput.UserPrincipal = existingToken.UserPrincipal
+
+	if !reflect.DeepEqual(existingToken, jsonInput) {
+		// TODO: this needs love, needs to actually test better and provide better feedback
+		logrus.Infof("Todo: this should fail or be a better check")
+	}
+
+	outputToken, err := m.updateToken(existingToken)
+
+	tokenData, err := ConvertTokenResource(request.Schema, *outputToken)
+	if err != nil {
+		return err
+	}
+	tokenData["token"] = outputToken.ObjectMeta.Name + ":" + outputToken.Token
+
+	request.WriteResponse(http.StatusCreated, tokenData)
+
+	return nil
 }
 
 func (m *Manager) UpdateToken(token *v3.Token) (*v3.Token, error) {
