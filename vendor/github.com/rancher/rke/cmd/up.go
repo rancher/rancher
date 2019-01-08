@@ -315,6 +315,7 @@ func clusterUpDind(ctx *cli.Context) error {
 	dialers := hosts.GetDialerOptions(hosts.DindConnFactory, hosts.DindHealthcheckConnFactory, nil)
 	// setting up flags
 	flags := cluster.GetExternalFlags(false, false, disablePortCheck, "", filePath)
+	flags.DinD = true
 
 	if ctx.Bool("init") {
 		return ClusterInit(context.Background(), rkeConfig, dialers, flags)

@@ -50,6 +50,15 @@ var (
 				"cadvisor-port":            "",
 			},
 		},
+		"v1.13": {
+			Kubelet: map[string]string{
+				"tls-cipher-suites":        "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+				"feature-gates":            "MountPropagation=false,HyperVContainer=true",
+				"cgroups-per-qos":          "false",
+				"enforce-node-allocatable": "",
+				"resolv-conf":              "",
+			},
+		},
 	}
 
 	// AllK8sWindowsVersions - images map for 2.0
@@ -249,6 +258,14 @@ var (
 		"v1.12.4-rancher1-1": {
 			NginxProxy:         m("rancher/nginx-proxy:v0.0.1-nanoserver-1803"),
 			KubernetesBinaries: m("rancher/hyperkube:v1.12.4-nanoserver-1803"),
+			FlannelCNIBinaries: m("rancher/flannel-cni:v0.0.1-nanoserver-1803"),
+			CalicoCNIBinaries:  m("rancher/calico-cni:v0.0.1-nanoserver-1803"),
+			CanalCNIBinaries:   m("rancher/canal-cni:v0.0.1-nanoserver-1803"),
+			KubeletPause:       m("rancher/kubelet-pause:v0.0.1-nanoserver-1803"),
+		},
+		"v1.13.1-rancher1-1": {
+			NginxProxy:         m("rancher/nginx-proxy:v0.0.1-nanoserver-1803"),
+			KubernetesBinaries: m("rancher/hyperkube:v1.13.1-nanoserver-1803"),
 			FlannelCNIBinaries: m("rancher/flannel-cni:v0.0.1-nanoserver-1803"),
 			CalicoCNIBinaries:  m("rancher/calico-cni:v0.0.1-nanoserver-1803"),
 			CanalCNIBinaries:   m("rancher/canal-cni:v0.0.1-nanoserver-1803"),

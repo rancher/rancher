@@ -37,3 +37,17 @@ func ErrList(e []error) error {
 	}
 	return nil
 }
+
+// UniqueStringSlice - Input slice, retrun slice with unique elements. Will not maintain order.
+func UniqueStringSlice(elements []string) []string {
+	encountered := map[string]bool{}
+	result := []string{}
+
+	for v := range elements {
+		if !encountered[elements[v]] {
+			encountered[elements[v]] = true
+			result = append(result, elements[v])
+		}
+	}
+	return result
+}

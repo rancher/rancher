@@ -54,6 +54,7 @@ const (
 type ExternalFlags struct {
 	ConfigDir        string
 	ClusterFilePath  string
+	DinD             bool
 	DisablePortCheck bool
 	Local            bool
 	UpdateOnly       bool
