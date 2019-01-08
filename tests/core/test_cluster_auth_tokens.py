@@ -37,7 +37,8 @@ def kubectl_available(request, dind_cc, client):
 @pytest.mark.skipif(platform != 'linux', reason='requires linux for dind')
 @pytest.mark.nonparallel
 def test_admin_api_resources(request, dind_cc):
-    wait_for(kubectl_available(request, dind_cc, dind_cc.admin_mc.client))
+    wait_for(kubectl_available(request, dind_cc, dind_cc.admin_mc.client),
+             timeout=90)
 
 
 # as a user which has not been given permission, we should fail
@@ -61,7 +62,8 @@ def test_user_with_template(request, dind_cc, user_mc):
         'roleTemplateId': 'cluster-member'
     }
     dind_cc.admin_mc.client.create_clusterRoleTemplateBinding(role_template)
-    wait_for(kubectl_available(request, dind_cc, user_mc.client))
+    wait_for(kubectl_available(request, dind_cc, user_mc.client),
+             timeout=90)
 
 
 # as a user that is part of a group that has access, we should have access
@@ -94,4 +96,5 @@ def test_user_group_with_template(request, dind_cc, user_mc):
         'roleTemplateId': 'cluster-member'
     }
     dind_cc.admin_mc.client.create_clusterRoleTemplateBinding(role_template)
-    wait_for(kubectl_available(request, dind_cc, user_mc.client))
+    wait_for(kubectl_available(request, dind_cc, user_mc.client),
+             timeout=90)
