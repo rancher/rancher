@@ -2,6 +2,7 @@ package client
 
 const (
 	ETCDServiceType              = "etcdService"
+	ETCDServiceFieldBackupConfig = "backupConfig"
 	ETCDServiceFieldCACert       = "caCert"
 	ETCDServiceFieldCert         = "cert"
 	ETCDServiceFieldCreation     = "creation"
@@ -17,6 +18,7 @@ const (
 )
 
 type ETCDService struct {
+	BackupConfig *BackupConfig     `json:"backupConfig,omitempty" yaml:"backupConfig,omitempty"`
 	CACert       string            `json:"caCert,omitempty" yaml:"caCert,omitempty"`
 	Cert         string            `json:"cert,omitempty" yaml:"cert,omitempty"`
 	Creation     string            `json:"creation,omitempty" yaml:"creation,omitempty"`

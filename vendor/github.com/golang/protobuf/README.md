@@ -1,4 +1,4 @@
-# Go support for Protocol Buffers
+# Go support for Protocol Buffers - Google's data interchange format
 
 [![Build Status](https://travis-ci.org/golang/protobuf.svg?branch=master)](https://travis-ci.org/golang/protobuf)
 [![GoDoc](https://godoc.org/github.com/golang/protobuf?status.svg)](https://godoc.org/github.com/golang/protobuf)
@@ -7,7 +7,7 @@ Google's data interchange format.
 Copyright 2010 The Go Authors.
 https://github.com/golang/protobuf
 
-This package and the code it generates requires at least Go 1.6.
+This package and the code it generates requires at least Go 1.9.
 
 This software implements Go bindings for protocol buffers.  For
 information about protocol buffers themselves, see
@@ -24,11 +24,19 @@ To use this software, you must:
 	https://golang.org/doc/install
   for details or, if you are using gccgo, follow the instructions at
 	https://golang.org/doc/install/gccgo
-- Grab the code from the repository and install the proto package.
+- Grab the code from the repository and install the `proto` package.
   The simplest way is to run `go get -u github.com/golang/protobuf/protoc-gen-go`.
-  The compiler plugin, protoc-gen-go, will be installed in $GOBIN,
-  defaulting to $GOPATH/bin.  It must be in your $PATH for the protocol
-  compiler, protoc, to find it.
+  The compiler plugin, `protoc-gen-go`, will be installed in `$GOPATH/bin`
+  unless `$GOBIN` is set. It must be in your `$PATH` for the protocol
+  compiler, `protoc`, to find it.
+- If you need a particular version of `protoc-gen-go` (e.g., to match your
+  `proto` package version), one option is
+  ```shell
+  GIT_TAG="v1.2.0" # change as needed
+  go get -d -u github.com/golang/protobuf/protoc-gen-go
+  git -C "$(go env GOPATH)"/src/github.com/golang/protobuf checkout $GIT_TAG
+  go install github.com/golang/protobuf/protoc-gen-go
+  ```
 
 This software has two parts: a 'protocol compiler plugin' that
 generates Go source files that, once compiled, can access and manage
@@ -83,15 +91,19 @@ be:
 
 - Relative to the import path:
 
-	protoc --go_out=. inputs/x.proto
-	# writes ./github.com/golang/protobuf/p/x.pb.go
+```shell
+  protoc --go_out=. inputs/x.proto
+  # writes ./github.com/golang/protobuf/p/x.pb.go
+```
 
   (This can work well with `--go_out=$GOPATH`.)
 
 - Relative to the input file:
 
-	protoc --go_out=paths=source_relative:. inputs/x.proto
-	# generate ./inputs/x.pb.go
+```shell
+protoc --go_out=paths=source_relative:. inputs/x.proto
+# generate ./inputs/x.pb.go
+```
 
 ## Generated code ##
 
@@ -157,9 +169,6 @@ Consider file test.proto, containing
 	  required string label = 1;
 	  optional int32 type = 2 [default=77];
 	  repeated int64 reps = 3;
-	  optional group OptionalGroup = 4 {
-	    required string RequiredField = 5;
-	  }
 	}
 ```
 
@@ -176,13 +185,10 @@ To create and play with a Test object from the example package,
 	)
 
 	func main() {
-		test := &example.Test {
+		test := &example.Test{
 			Label: proto.String("hello"),
 			Type:  proto.Int32(17),
 			Reps:  []int64{1, 2, 3},
-			Optionalgroup: &example.Test_OptionalGroup {
-				RequiredField: proto.String("good bye"),
-			},
 		}
 		data, err := proto.Marshal(test)
 		if err != nil {

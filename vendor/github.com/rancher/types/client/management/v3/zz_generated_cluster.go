@@ -120,6 +120,8 @@ type ClusterOperations interface {
 	ByID(id string) (*Cluster, error)
 	Delete(container *Cluster) error
 
+	ActionBackupEtcd(resource *Cluster) error
+
 	ActionDisableMonitoring(resource *Cluster) error
 
 	ActionEnableMonitoring(resource *Cluster, input *MonitoringInput) error
@@ -129,6 +131,8 @@ type ClusterOperations interface {
 	ActionGenerateKubeconfig(resource *Cluster) (*GenerateKubeConfigOutput, error)
 
 	ActionImportYaml(resource *Cluster, input *ImportClusterYamlInput) (*ImportYamlOutput, error)
+
+	ActionRestoreFromEtcdBackup(resource *Cluster, input *RestoreFromEtcdBackupInput) error
 
 	ActionRotateCertificates(resource *Cluster, input *RotateCertificateInput) error
 }
@@ -184,6 +188,11 @@ func (c *ClusterClient) Delete(container *Cluster) error {
 	return c.apiClient.Ops.DoResourceDelete(ClusterType, &container.Resource)
 }
 
+func (c *ClusterClient) ActionBackupEtcd(resource *Cluster) error {
+	err := c.apiClient.Ops.DoAction(ClusterType, "backupEtcd", &resource.Resource, nil, nil)
+	return err
+}
+
 func (c *ClusterClient) ActionDisableMonitoring(resource *Cluster) error {
 	err := c.apiClient.Ops.DoAction(ClusterType, "disableMonitoring", &resource.Resource, nil, nil)
 	return err
@@ -210,6 +219,11 @@ func (c *ClusterClient) ActionImportYaml(resource *Cluster, input *ImportCluster
 	resp := &ImportYamlOutput{}
 	err := c.apiClient.Ops.DoAction(ClusterType, "importYaml", &resource.Resource, input, resp)
 	return resp, err
+}
+
+func (c *ClusterClient) ActionRestoreFromEtcdBackup(resource *Cluster, input *RestoreFromEtcdBackupInput) error {
+	err := c.apiClient.Ops.DoAction(ClusterType, "restoreFromEtcdBackup", &resource.Resource, input, nil)
+	return err
 }
 
 func (c *ClusterClient) ActionRotateCertificates(resource *Cluster, input *RotateCertificateInput) error {

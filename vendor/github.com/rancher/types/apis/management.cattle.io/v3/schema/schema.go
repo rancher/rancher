@@ -39,6 +39,7 @@ var (
 		Init(multiClusterAppTypes).
 		Init(globalDNSTypes).
 		Init(kontainerTypes).
+		Init(etcdBackupTypes).
 		Init(monitorTypes)
 
 	TokenSchemas = factory.Schemas(&Version).
@@ -149,6 +150,7 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.ImportYamlOutput{}).
 		MustImport(&Version, v3.ExportOutput{}).
 		MustImport(&Version, v3.MonitoringInput{}).
+		MustImport(&Version, v3.RestoreFromEtcdBackupInput{}).
 		MustImportAndCustomize(&Version, v3.ETCDService{}, func(schema *types.Schema) {
 			schema.MustCustomizeField("extraArgs", func(field types.Field) types.Field {
 				field.Default = map[string]interface{}{
@@ -178,6 +180,10 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 				Input: "monitoringInput",
 			}
 			schema.ResourceActions["disableMonitoring"] = types.Action{}
+			schema.ResourceActions["backupEtcd"] = types.Action{}
+			schema.ResourceActions["restoreFromEtcdBackup"] = types.Action{
+				Input: "restoreFromEtcdBackupInput",
+			}
 			schema.ResourceActions["rotateCertificates"] = types.Action{
 				Input: "rotateCertificateInput",
 			}
@@ -694,4 +700,8 @@ func monitorTypes(schemas *types.Schemas) *types.Schemas {
 			}
 		})
 
+}
+
+func etcdBackupTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.MustImport(&Version, v3.EtcdBackup{})
 }

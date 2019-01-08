@@ -37,11 +37,13 @@ const (
 	DefaultNetworkPlugin        = "canal"
 	DefaultNetworkCloudProvider = "none"
 
-	DefaultIngressController         = "nginx"
-	DefaultEtcdBackupCreationPeriod  = "12h"
-	DefaultEtcdBackupRetentionPeriod = "72h"
-	DefaultEtcdSnapshot              = true
-	DefaultMonitoringProvider        = "metrics-server"
+	DefaultIngressController             = "nginx"
+	DefaultEtcdBackupCreationPeriod      = "12h"
+	DefaultEtcdBackupRetentionPeriod     = "72h"
+	DefaultEtcdSnapshot                  = true
+	DefaultMonitoringProvider            = "metrics-server"
+	DefaultEtcdBackupConfigIntervalHours = 12
+	DefaultEtcdBackupConfigRetention     = 6
 
 	DefaultEtcdHeartbeatIntervalName  = "heartbeat-interval"
 	DefaultEtcdHeartbeatIntervalValue = "500"
@@ -182,6 +184,15 @@ func (c *Cluster) setClusterServicesDefaults() {
 	}
 	if _, ok := c.Services.Etcd.ExtraArgs[DefaultEtcdHeartbeatIntervalName]; !ok {
 		c.Services.Etcd.ExtraArgs[DefaultEtcdHeartbeatIntervalName] = DefaultEtcdHeartbeatIntervalValue
+	}
+
+	if c.Services.Etcd.BackupConfig != nil {
+		if c.Services.Etcd.BackupConfig.IntervalHours == 0 {
+			c.Services.Etcd.BackupConfig.IntervalHours = DefaultEtcdBackupConfigIntervalHours
+		}
+		if c.Services.Etcd.BackupConfig.Retention == 0 {
+			c.Services.Etcd.BackupConfig.Retention = DefaultEtcdBackupConfigRetention
+		}
 	}
 }
 

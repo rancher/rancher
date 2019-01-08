@@ -17,6 +17,7 @@ const (
 	RancherKubernetesEngineConfigFieldNodes               = "nodes"
 	RancherKubernetesEngineConfigFieldPrefixPath          = "prefixPath"
 	RancherKubernetesEngineConfigFieldPrivateRegistries   = "privateRegistries"
+	RancherKubernetesEngineConfigFieldRestore             = "restore"
 	RancherKubernetesEngineConfigFieldRotateCertificates  = "rotateCertificates"
 	RancherKubernetesEngineConfigFieldSSHAgentAuth        = "sshAgentAuth"
 	RancherKubernetesEngineConfigFieldSSHKeyPath          = "sshKeyPath"
@@ -40,6 +41,7 @@ type RancherKubernetesEngineConfig struct {
 	Nodes               []RKEConfigNode     `json:"nodes,omitempty" yaml:"nodes,omitempty"`
 	PrefixPath          string              `json:"prefixPath,omitempty" yaml:"prefixPath,omitempty"`
 	PrivateRegistries   []PrivateRegistry   `json:"privateRegistries,omitempty" yaml:"privateRegistries,omitempty"`
+	Restore             *RestoreConfig      `json:"restore,omitempty" yaml:"restore,omitempty"`
 	RotateCertificates  *RotateCertificates `json:"rotateCertificates,omitempty" yaml:"rotateCertificates,omitempty"`
 	SSHAgentAuth        bool                `json:"sshAgentAuth,omitempty" yaml:"sshAgentAuth,omitempty"`
 	SSHKeyPath          string              `json:"sshKeyPath,omitempty" yaml:"sshKeyPath,omitempty"`

@@ -72,6 +72,14 @@ func (s *GrpcServer) SetNodeCount(ctx context.Context, request *SetNodeCountRequ
 	return &Empty{}, s.driver.SetClusterSize(GetCtx(ctx), request.Info, request.Count)
 }
 
+func (s *GrpcServer) ETCDSave(ctx context.Context, request *SaveETCDSnapshotRequest) (*Empty, error) {
+	return &Empty{}, s.driver.ETCDSave(ctx, request.Info, request.DriverOptions, request.SnapshotName)
+}
+
+func (s *GrpcServer) ETCDRestore(ctx context.Context, request *RestoreETCDSnapshotRequest) (*Empty, error) {
+	return &Empty{}, s.driver.ETCDRestore(ctx, request.Info, request.DriverOptions, request.SnapshotName)
+}
+
 // Remove implements grpc method
 func (s *GrpcServer) Remove(ctx context.Context, clusterInfo *ClusterInfo) (*Empty, error) {
 	return &Empty{}, s.driver.Remove(GetCtx(ctx), clusterInfo)

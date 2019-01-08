@@ -67,6 +67,7 @@ type Interface interface {
 	GlobalDNSsGetter
 	GlobalDNSProvidersGetter
 	KontainerDriversGetter
+	EtcdBackupsGetter
 	MonitorMetricsGetter
 	ClusterMonitorGraphsGetter
 	ProjectMonitorGraphsGetter
@@ -122,6 +123,7 @@ type Clients struct {
 	GlobalDNS                               GlobalDNSClient
 	GlobalDNSProvider                       GlobalDNSProviderClient
 	KontainerDriver                         KontainerDriverClient
+	EtcdBackup                              EtcdBackupClient
 	MonitorMetric                           MonitorMetricClient
 	ClusterMonitorGraph                     ClusterMonitorGraphClient
 	ProjectMonitorGraph                     ProjectMonitorGraphClient
@@ -179,6 +181,7 @@ type Client struct {
 	globalDnsControllers                               map[string]GlobalDNSController
 	globalDnsProviderControllers                       map[string]GlobalDNSProviderController
 	kontainerDriverControllers                         map[string]KontainerDriverController
+	etcdBackupControllers                              map[string]EtcdBackupController
 	monitorMetricControllers                           map[string]MonitorMetricController
 	clusterMonitorGraphControllers                     map[string]ClusterMonitorGraphController
 	projectMonitorGraphControllers                     map[string]ProjectMonitorGraphController
@@ -358,6 +361,9 @@ func NewClientsFromInterface(iface Interface) *Clients {
 		KontainerDriver: &kontainerDriverClient2{
 			iface: iface.KontainerDrivers(""),
 		},
+		EtcdBackup: &etcdBackupClient2{
+			iface: iface.EtcdBackups(""),
+		},
 		MonitorMetric: &monitorMetricClient2{
 			iface: iface.MonitorMetrics(""),
 		},
@@ -430,6 +436,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		globalDnsControllers:                               map[string]GlobalDNSController{},
 		globalDnsProviderControllers:                       map[string]GlobalDNSProviderController{},
 		kontainerDriverControllers:                         map[string]KontainerDriverController{},
+		etcdBackupControllers:                              map[string]EtcdBackupController{},
 		monitorMetricControllers:                           map[string]MonitorMetricController{},
 		clusterMonitorGraphControllers:                     map[string]ClusterMonitorGraphController{},
 		projectMonitorGraphControllers:                     map[string]ProjectMonitorGraphController{},
@@ -1053,6 +1060,19 @@ type KontainerDriversGetter interface {
 func (c *Client) KontainerDrivers(namespace string) KontainerDriverInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &KontainerDriverResource, KontainerDriverGroupVersionKind, kontainerDriverFactory{})
 	return &kontainerDriverClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type EtcdBackupsGetter interface {
+	EtcdBackups(namespace string) EtcdBackupInterface
+}
+
+func (c *Client) EtcdBackups(namespace string) EtcdBackupInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &EtcdBackupResource, EtcdBackupGroupVersionKind, etcdBackupFactory{})
+	return &etcdBackupClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

@@ -35,7 +35,6 @@ var (
 			},
 			Kubelet: map[string]string{
 				"tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
-				"cadvisor-port":     "",
 			},
 		},
 		"v1.11": {
@@ -45,6 +44,7 @@ var (
 			},
 			Kubelet: map[string]string{
 				"tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+				"cadvisor-port":     "0",
 			},
 		},
 		"v1.10": {
@@ -55,12 +55,16 @@ var (
 			},
 			Kubelet: map[string]string{
 				"tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+				"cadvisor-port":     "0",
 			},
 		},
 		"v1.9": {
 			KubeAPI: map[string]string{
 				"endpoint-reconciler-type": "lease",
 				"admission-control":        "ServiceAccount,NamespaceLifecycle,LimitRanger,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
+			},
+			Kubelet: map[string]string{
+				"cadvisor-port": "0",
 			},
 		},
 	}
@@ -709,10 +713,10 @@ var (
 		"v1.12.4-rancher1-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.2.24"),
 			Kubernetes:                m("rancher/hyperkube:v1.12.4-rancher1"),
-			Alpine:                    m("rancher/rke-tools:v0.1.18"),
-			NginxProxy:                m("rancher/rke-tools:v0.1.18"),
-			CertDownloader:            m("rancher/rke-tools:v0.1.18"),
-			KubernetesServicesSidecar: m("rancher/rke-tools:v0.1.18"),
+			Alpine:                    m("rancher/rke-tools:v0.1.20"),
+			NginxProxy:                m("rancher/rke-tools:v0.1.20"),
+			CertDownloader:            m("rancher/rke-tools:v0.1.20"),
+			KubernetesServicesSidecar: m("rancher/rke-tools:v0.1.20"),
 			KubeDNS:                   m("gcr.io/google_containers/k8s-dns-kube-dns-amd64:1.14.13"),
 			DNSmasq:                   m("gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.14.13"),
 			KubeDNSSidecar:            m("gcr.io/google_containers/k8s-dns-sidecar-amd64:1.14.13"),

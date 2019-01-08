@@ -52,6 +52,7 @@ type Config struct {
 	GlobalDNSs                               map[string]managementClient.GlobalDNS                               `json:"globalDnses,omitempty" yaml:"globalDnses,omitempty"`
 	GlobalDNSProviders                       map[string]managementClient.GlobalDNSProvider                       `json:"globalDnsProviders,omitempty" yaml:"globalDnsProviders,omitempty"`
 	KontainerDrivers                         map[string]managementClient.KontainerDriver                         `json:"kontainerDrivers,omitempty" yaml:"kontainerDrivers,omitempty"`
+	EtcdBackups                              map[string]managementClient.EtcdBackup                              `json:"etcdBackups,omitempty" yaml:"etcdBackups,omitempty"`
 	MonitorMetrics                           map[string]managementClient.MonitorMetric                           `json:"monitorMetrics,omitempty" yaml:"monitorMetrics,omitempty"`
 	ClusterMonitorGraphs                     map[string]managementClient.ClusterMonitorGraph                     `json:"clusterMonitorGraphs,omitempty" yaml:"clusterMonitorGraphs,omitempty"`
 	ProjectMonitorGraphs                     map[string]managementClient.ProjectMonitorGraph                     `json:"projectMonitorGraphs,omitempty" yaml:"projectMonitorGraphs,omitempty"`
