@@ -167,6 +167,8 @@ type EngineService interface {
 	GetDriverCreateOptions(ctx context.Context, name string, kontainerDriver *v3.KontainerDriver, clusterSpec v3.ClusterSpec) (*types.DriverFlags, error)
 	GetDriverUpdateOptions(ctx context.Context, name string, kontainerDriver *v3.KontainerDriver, clusterSpec v3.ClusterSpec) (*types.DriverFlags, error)
 	GetK8sCapabilities(ctx context.Context, name string, kontainerDriver *v3.KontainerDriver, clusterSpec v3.ClusterSpec) (*types.K8SCapabilities, error)
+	ETCDSave(ctx context.Context, name string, kontainerDriver *v3.KontainerDriver, clusterSpec v3.ClusterSpec, backup string) error
+	ETCDRestore(ctx context.Context, name string, kontainerDriver *v3.KontainerDriver, clusterSpec v3.ClusterSpec, backup string) (string, string, string, error)
 }
 
 type engineService struct {
@@ -461,4 +463,55 @@ func (r *RunningDriver) Stop() {
 	}
 
 	logrus.Infof("kontainerdriver %v stopped", r.Name)
+}
+
+func (e *engineService) ETCDSave(ctx context.Context, name string, kontainerDriver *v3.KontainerDriver, clusterSpec v3.ClusterSpec, snapshotName string) error {
+	runningDriver, err := e.getRunningDriver(kontainerDriver, clusterSpec)
+	if err != nil {
+		return err
+	}
+
+	listenAddr, err := runningDriver.Start()
+	if err != nil {
+		return fmt.Errorf("error starting driver: %v", err)
+	}
+	defer runningDriver.Stop()
+
+	cls, err := e.convertCluster(name, listenAddr, clusterSpec)
+	if err != nil {
+		return err
+	}
+	defer cls.Driver.Close()
+
+	return cls.ETCDSave(ctx, snapshotName)
+}
+
+func (e *engineService) ETCDRestore(ctx context.Context, name string, kontainerDriver *v3.KontainerDriver, clusterSpec v3.ClusterSpec, backup string) (string, string, string, error) {
+	runningDriver, err := e.getRunningDriver(kontainerDriver, clusterSpec)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	listenAddr, err := runningDriver.Start()
+	if err != nil {
+		return "", "", "", fmt.Errorf("error starting driver: %v", err)
+	}
+	defer runningDriver.Stop()
+
+	cls, err := e.convertCluster(name, listenAddr, clusterSpec)
+	if err != nil {
+		return "", "", "", err
+	}
+	defer cls.Driver.Close()
+
+	if err = cls.ETCDRestore(ctx, backup); err != nil {
+		return "", "", "", err
+	}
+
+	endpoint := cls.Endpoint
+	if !strings.HasPrefix(endpoint, "https://") {
+		endpoint = fmt.Sprintf("https://%s", cls.Endpoint)
+	}
+	return endpoint, cls.ServiceAccountToken, cls.RootCACert, nil
+
 }

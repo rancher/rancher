@@ -126,6 +126,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&GlobalDNSProviderList{},
 		&KontainerDriver{},
 		&KontainerDriverList{},
+		&EtcdBackup{},
+		&EtcdBackupList{},
 		&MonitorMetric{},
 		&MonitorMetricList{},
 		&ClusterMonitorGraph{},

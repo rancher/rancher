@@ -109,6 +109,16 @@ func (rpc *grpcClient) Close() error {
 	return rpc.conn.Close()
 }
 
+func (rpc *grpcClient) ETCDSave(ctx context.Context, clusterInfo *ClusterInfo, opts *DriverOptions, snapshotName string) error {
+	_, err := rpc.client.ETCDSave(ctx, &SaveETCDSnapshotRequest{Info: clusterInfo, SnapshotName: snapshotName, DriverOptions: opts})
+	return handlErr(err)
+}
+
+func (rpc *grpcClient) ETCDRestore(ctx context.Context, clusterInfo *ClusterInfo, opts *DriverOptions, snapshotName string) error {
+	_, err := rpc.client.ETCDRestore(ctx, &RestoreETCDSnapshotRequest{Info: clusterInfo, SnapshotName: snapshotName, DriverOptions: opts})
+	return handlErr(err)
+}
+
 func handlErr(err error) error {
 	if st, ok := status.FromError(err); ok {
 		if st.Code() == codes.Unknown && st.Message() != "" {

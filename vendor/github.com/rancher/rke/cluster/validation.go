@@ -119,6 +119,27 @@ func validateServicesOptions(c *Cluster) error {
 			return fmt.Errorf("External etcd path can't be empty")
 		}
 	}
+
+	// validate etcd s3 backup backend configurations
+	if err := validateEtcdBackupOptions(c); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateEtcdBackupOptions(c *Cluster) error {
+	if c.Services.Etcd.BackupConfig != nil {
+		if c.Services.Etcd.BackupConfig.S3BackupConfig == nil {
+			return fmt.Errorf("etcd backup is enabled but no s3 backend is specified")
+		}
+		if len(c.Services.Etcd.BackupConfig.S3BackupConfig.Endpoint) == 0 {
+			return fmt.Errorf("etcd s3 backup backend endpoint can't be empty")
+		}
+		if len(c.Services.Etcd.BackupConfig.S3BackupConfig.BucketName) == 0 {
+			return fmt.Errorf("etcd s3 backup backend bucketName can't be empty")
+		}
+	}
 	return nil
 }
 

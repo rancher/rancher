@@ -29,15 +29,6 @@ const (
 	EtcdSnapshotWaitTime = 5
 )
 
-type EtcdSnapshot struct {
-	// Enable or disable snapshot creation
-	Snapshot *bool
-	// Creation period of the etcd snapshots
-	Creation string
-	// Retention period of the etcd snapshots
-	Retention string
-}
-
 func RunEtcdPlane(
 	ctx context.Context,
 	etcdHosts []*hosts.Host,
@@ -46,7 +37,7 @@ func RunEtcdPlane(
 	prsMap map[string]v3.PrivateRegistry,
 	updateWorkersOnly bool,
 	alpineImage string,
-	etcdSnapshot EtcdSnapshot) error {
+	es v3.ETCDService) error {
 	log.Infof(ctx, "[%s] Building up etcd plane..", ETCDRole)
 	for _, host := range etcdHosts {
 		if updateWorkersOnly {
@@ -57,8 +48,8 @@ func RunEtcdPlane(
 		if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, EtcdContainerName, host.Address, ETCDRole, prsMap); err != nil {
 			return err
 		}
-		if *etcdSnapshot.Snapshot == true {
-			if err := RunEtcdSnapshotSave(ctx, host, prsMap, alpineImage, etcdSnapshot.Creation, etcdSnapshot.Retention, EtcdSnapshotContainerName, false); err != nil {
+		if *es.Snapshot == true {
+			if err := RunEtcdSnapshotSave(ctx, host, prsMap, alpineImage, EtcdSnapshotContainerName, false, es); err != nil {
 				return err
 			}
 			if err := pki.SaveBackupBundleOnHost(ctx, host, alpineImage, EtcdSnapshotPath, prsMap); err != nil {
@@ -262,12 +253,13 @@ func IsEtcdMember(ctx context.Context, etcdHost *hosts.Host, etcdHosts []*hosts.
 	return false, nil
 }
 
-func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdSnapshotImage string, creation, retention, name string, once bool) error {
+func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdSnapshotImage string, name string, once bool, es v3.ETCDService) error {
 	log.Infof(ctx, "[etcd] Saving snapshot [%s] on host [%s]", name, etcdHost.Address)
 	imageCfg := &container.Config{
 		Cmd: []string{
 			"/opt/rke-tools/rke-etcd-backup",
-			"rolling-backup",
+			"etcd-backup",
+			"save",
 			"--cacert", pki.GetCertPath(pki.CACertName),
 			"--cert", pki.GetCertPath(pki.KubeNodeCertName),
 			"--key", pki.GetKeyPath(pki.KubeNodeCertName),
@@ -278,10 +270,13 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 	}
 	if once {
 		imageCfg.Cmd = append(imageCfg.Cmd, "--once")
+	} else if es.BackupConfig == nil {
+		imageCfg.Cmd = append(imageCfg.Cmd, "--retention="+es.Retention)
+		imageCfg.Cmd = append(imageCfg.Cmd, "--creation="+es.Creation)
 	}
-	if !once {
-		imageCfg.Cmd = append(imageCfg.Cmd, "--retention="+retention)
-		imageCfg.Cmd = append(imageCfg.Cmd, "--creation="+creation)
+
+	if es.BackupConfig != nil && es.BackupConfig.S3BackupConfig != nil {
+		imageCfg = configS3BackupImgCmd(ctx, imageCfg, es.BackupConfig)
 	}
 	hostCfg := &container.HostConfig{
 		Binds: []string{
@@ -297,6 +292,10 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 		}
 		status, err := docker.WaitForContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdSnapshotOnceContainerName)
 		if status != 0 || err != nil {
+			err := docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdSnapshotOnceContainerName)
+			if err != nil {
+				return fmt.Errorf("Failed to take etcd snapshot exit code [%d], failed to exit container [%s]: %v ", status, EtcdDownloadBackupContainerName, err)
+			}
 			return fmt.Errorf("Failed to take etcd snapshot exit code [%d]: %v", status, err)
 		}
 		return docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdSnapshotOnceContainerName)
@@ -316,6 +315,45 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 
 	}
 	return nil
+}
+
+func DownloadEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdSnapshotImage string, name string, es v3.ETCDService) error {
+	log.Infof(ctx, "[etcd] Get snapshot [%s] on host [%s]", name, etcdHost.Address)
+	s3Backend := es.BackupConfig.S3BackupConfig
+	if len(s3Backend.Endpoint) == 0 || len(s3Backend.BucketName) == 0 {
+		return fmt.Errorf("failed to get snapshot [%s] from s3 on host [%s], invalid s3 configurations", name, etcdHost.Address)
+	}
+	imageCfg := &container.Config{
+		Cmd: []string{
+			"/opt/rke-tools/rke-etcd-backup",
+			"etcd-backup",
+			"download",
+			"--name", name,
+		},
+		Image: etcdSnapshotImage,
+	}
+	imageCfg = configS3BackupImgCmd(ctx, imageCfg, es.BackupConfig)
+
+	hostCfg := &container.HostConfig{
+		Binds: []string{
+			fmt.Sprintf("%s:/backup", EtcdSnapshotPath),
+			fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(etcdHost.PrefixPath, "/etc/kubernetes"))},
+		NetworkMode:   container.NetworkMode("host"),
+		RestartPolicy: container.RestartPolicy{Name: "always"},
+	}
+
+	if err := docker.DoRunContainer(ctx, etcdHost.DClient, imageCfg, hostCfg, EtcdDownloadBackupContainerName, etcdHost.Address, ETCDRole, prsMap); err != nil {
+		return err
+	}
+	status, err := docker.WaitForContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdDownloadBackupContainerName)
+	if status != 0 || err != nil {
+		err := docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdDownloadBackupContainerName)
+		if err != nil {
+			return fmt.Errorf("Failed to get etcd snapshot from s3 exit code [%d], failed to exit container [%s]: %v ", status, EtcdDownloadBackupContainerName, err)
+		}
+		return fmt.Errorf("Failed to get etcd snapshot from s3 exit code [%d]: %v", status, err)
+	}
+	return docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdDownloadBackupContainerName)
 }
 
 func RestoreEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdRestoreImage, snapshotName, initCluster string) error {
@@ -406,4 +444,20 @@ func GetEtcdSnapshotChecksum(ctx context.Context, etcdHost *hosts.Host, prsMap m
 		return checksum, err
 	}
 	return checksum, nil
+}
+
+func configS3BackupImgCmd(ctx context.Context, imageCfg *container.Config, bc *v3.BackupConfig) *container.Config {
+	log.Infof(ctx, "Invoking s3 backup server cmd config, bucketName:%s, endpoint:%s", bc.S3BackupConfig.BucketName, bc.S3BackupConfig.Endpoint)
+	cmd := []string{
+		"--s3-backup=true",
+		"--s3-endpoint=" + bc.S3BackupConfig.Endpoint,
+		"--s3-accessKey=" + bc.S3BackupConfig.AccessKey,
+		"--s3-secretKey=" + bc.S3BackupConfig.SecretKey,
+		"--s3-bucketName=" + bc.S3BackupConfig.BucketName,
+		"--s3-region=" + bc.S3BackupConfig.Region,
+		"--creation=" + fmt.Sprintf("%dh", bc.IntervalHours),
+		"--retention=" + fmt.Sprintf("%dh", bc.Retention*bc.IntervalHours),
+	}
+	imageCfg.Cmd = append(imageCfg.Cmd, cmd...)
+	return imageCfg
 }

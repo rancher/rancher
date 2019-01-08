@@ -14,11 +14,13 @@ import (
 	"github.com/urfave/cli"
 )
 
+const s3Endpoint = "s3.amazonaws.com"
+
 func EtcdCommand() cli.Command {
 	snapshotFlags := []cli.Flag{
 		cli.StringFlag{
 			Name:  "name",
-			Usage: "Specify Snapshot name",
+			Usage: "Specify snapshot name",
 		},
 		cli.StringFlag{
 			Name:   "config",
@@ -26,8 +28,32 @@ func EtcdCommand() cli.Command {
 			Value:  pki.ClusterConfig,
 			EnvVar: "RKE_CONFIG",
 		},
+		cli.BoolFlag{
+			Name:  "s3",
+			Usage: "Enabled backup to s3, set true or false",
+		},
+		cli.StringFlag{
+			Name:  "s3-endpoint",
+			Usage: "Specify s3 endpoint url",
+			Value: s3Endpoint,
+		},
+		cli.StringFlag{
+			Name:  "access-key",
+			Usage: "Specify s3 accessKey",
+		},
+		cli.StringFlag{
+			Name:  "secret-key",
+			Usage: "Specify s3 secretKey",
+		},
+		cli.StringFlag{
+			Name:  "bucket-name",
+			Usage: "Specify s3 bucket name",
+		},
+		cli.StringFlag{
+			Name:  "region",
+			Usage: "Specify the s3 bucket location (optional)",
+		},
 	}
-
 	snapshotFlags = append(snapshotFlags, commonFlags...)
 
 	return cli.Command{
@@ -132,12 +158,12 @@ func RestoreEtcdSnapshot(
 func SnapshotSaveEtcdHostsFromCli(ctx *cli.Context) error {
 	clusterFile, filePath, err := resolveClusterFile(ctx)
 	if err != nil {
-		return fmt.Errorf("Failed to resolve cluster file: %v", err)
+		return fmt.Errorf("failed to resolve cluster file: %v", err)
 	}
 
 	rkeConfig, err := cluster.ParseConfig(clusterFile)
 	if err != nil {
-		return fmt.Errorf("Failed to parse cluster file: %v", err)
+		return fmt.Errorf("failed to parse cluster file: %v", err)
 	}
 
 	rkeConfig, err = setOptionsFromCLI(ctx, rkeConfig)
@@ -159,12 +185,12 @@ func SnapshotSaveEtcdHostsFromCli(ctx *cli.Context) error {
 func RestoreEtcdSnapshotFromCli(ctx *cli.Context) error {
 	clusterFile, filePath, err := resolveClusterFile(ctx)
 	if err != nil {
-		return fmt.Errorf("Failed to resolve cluster file: %v", err)
+		return fmt.Errorf("failed to resolve cluster file: %v", err)
 	}
 
 	rkeConfig, err := cluster.ParseConfig(clusterFile)
 	if err != nil {
-		return fmt.Errorf("Failed to parse cluster file: %v", err)
+		return fmt.Errorf("failed to parse cluster file: %v", err)
 	}
 
 	rkeConfig, err = setOptionsFromCLI(ctx, rkeConfig)
@@ -173,7 +199,7 @@ func RestoreEtcdSnapshotFromCli(ctx *cli.Context) error {
 	}
 	etcdSnapshotName := ctx.String("name")
 	if etcdSnapshotName == "" {
-		return fmt.Errorf("You must specify the snapshot name to restore")
+		return fmt.Errorf("you must specify the snapshot name to restore")
 	}
 	// setting up the flags
 	flags := cluster.GetExternalFlags(false, false, false, "", filePath)

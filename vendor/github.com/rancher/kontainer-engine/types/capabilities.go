@@ -5,6 +5,7 @@ const (
 	SetVersionCapability     = iota
 	GetClusterSizeCapability = iota
 	SetClusterSizeCapability = iota
+	EtcdBackupCapability     = iota
 )
 
 func (c *Capabilities) AddCapability(cap int64) {
@@ -25,4 +26,8 @@ func (c *Capabilities) HasGetClusterSizeCapability() bool {
 
 func (c *Capabilities) HasSetClusterSizeCapability() bool {
 	return c.Capabilities[SetClusterSizeCapability]
+}
+
+func (c *Capabilities) HasEtcdBackupCapability() bool {
+	return c.Capabilities[EtcdBackupCapability]
 }

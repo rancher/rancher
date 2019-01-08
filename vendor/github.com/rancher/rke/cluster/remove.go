@@ -85,6 +85,9 @@ func (c *Cluster) RemoveOldNodes(ctx context.Context) error {
 	}
 	uniqueHosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
 	for _, node := range nodeList.Items {
+		if k8s.IsNodeReady(node) {
+			continue
+		}
 		host := &hosts.Host{}
 		host.HostnameOverride = node.Name
 		if !hosts.IsNodeInList(host, uniqueHosts) {
