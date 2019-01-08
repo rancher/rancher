@@ -188,7 +188,7 @@ type ETCDService struct {
 	// Etcd snapshot Creation period
 	Creation string `yaml:"creation" json:"creation,omitempty" norman:"default=12h"`
 	// Backup backend for etcd snapshots, used by rke only
-	BackupConfig *BackupConfig `yaml:"backup_target" json:"backupConfig,omitempty"`
+	BackupConfig *BackupConfig `yaml:"backup_config" json:"backupConfig,omitempty"`
 }
 
 type KubeAPIService struct {
