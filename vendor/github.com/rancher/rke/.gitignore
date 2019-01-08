@@ -7,3 +7,4 @@
 /trash.lock
 kube_config*
 /rke
+.vscode
