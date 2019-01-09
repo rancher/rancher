@@ -48,7 +48,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	projectAlertGroups.AddClusterScopedHandler(ctx, "project-alert-group-deployer", cluster.ClusterName, deploy.ProjectGroupSync)
 
 	clusterAlertRules.AddClusterScopedHandler(ctx, "cluster-alert-rule-deployer", cluster.ClusterName, deploy.ClusterRuleSync)
-	projectAlertRules.AddClusterScopedHandler(ctx, "project-alert-rule- deployer", cluster.ClusterName, deploy.ProjectRuleSync)
+	projectAlertRules.AddClusterScopedHandler(ctx, "project-alert-rule-deployer", cluster.ClusterName, deploy.ProjectRuleSync)
 
 	configSyncer := configsyncer.NewConfigSyncer(ctx, cluster, alertmanager, prometheusCRDManager)
 	clusterAlertGroups.AddClusterScopedHandler(ctx, "cluster-alert-group-controller", cluster.ClusterName, configSyncer.ClusterGroupSync)
