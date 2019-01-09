@@ -1,0 +1,83 @@
+kind: Deployment
+apiVersion: extensions/v1beta1
+metadata:
+  name: {{ template "rancher.fullname" . }}
+  labels:
+    app: {{ template "rancher.fullname" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicas }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "rancher.fullname" . }}
+        release: {{ .Release.Name }}
+    spec:
+      serviceAccountName: {{ template "rancher.fullname" . }}
+{{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+{{ toYaml .Values.imagePullSecrets | indent 6 }}
+{{- end }}
+      containers:
+      - image: {{ .Values.rancherImage }}:{{ default .Chart.AppVersion .Values.rancherImageTag }}
+        name: {{ template "rancher.name" . }}
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        - containerPort: 443
+          protocol: TCP
+        args:
+{{- if .Values.debug }}
+        - "--debug"
+{{- end }}
+{{- if .Values.privateCA }}
+        # Private CA - don't clear ca certs
+{{- else if eq .Values.ingress.tls.source "rancher" }}
+        # Rancher self-signed - don't clear ca certs
+{{- else }}
+        # Public trusted CA - clear ca certs
+        - "--no-cacerts"
+{{- end }}
+        - "--http-listen-port=80"
+        - "--https-listen-port=443"
+{{- if .Values.proxy }}
+        env:
+        - name: HTTP_PROXY
+          value: {{ .Values.proxy }}
+        - name: HTTPS_PROXY
+          value: {{ .Values.proxy }}
+        - name: http_proxy
+          value: {{ .Values.proxy }}
+        - name: https_proxy
+          value: {{ .Values.proxy }}
+        - name: NO_PROXY
+          value: {{ .Values.noProxy }}
+        - name: no_proxy
+          value: {{ .Values.noProxy }}
+{{- end }}
+        livenessProbe:
+          tcpSocket:
+            port: 80
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          tcpSocket:
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 30
+        resources:
+{{ toYaml .Values.resources | indent 10 }}
+{{- if .Values.privateCA }}
+        # Pass CA cert into rancher for private CA
+        volumeMounts:
+        - mountPath: /etc/rancher/ssl
+          name: tls-ca-volume
+          readOnly: true
+      volumes:
+      - name: tls-ca-volume
+        secret:
+          defaultMode: 420
+          secretName: tls-ca
+{{- end }}

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+set -e
+
+echo "-- chart/build --"
+
+cd $(dirname $0)/../..
+. ./scripts/version
+
+rm -rf /tmp/chart
+mkdir -p /tmp/chart/
+cp -Rf ./chart /tmp/chart/rancher
+
+sed -i -e "s/%VERSION%/${CHART_VERSION}/g" /tmp/chart/rancher/Chart.yaml
+sed -i -e "s/%APP_VERSION%/${VERSION}/g" /tmp/chart/rancher/Chart.yaml
