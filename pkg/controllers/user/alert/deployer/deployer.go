@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/rancher/pkg/monitoring"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
+	projectutil "github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
 	appsv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
@@ -18,6 +19,7 @@ import (
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
+
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
@@ -112,19 +114,11 @@ func (d *Deployer) ClusterRuleSync(key string, alert *mgmtv3.ClusterAlertRule) (
 func (d *Deployer) sync() error {
 	appName, appTargetNamespace := monitorutil.ClusterAlertManagerInfo()
 
-	defaultSystemProjects, err := d.projectLister.List(metav1.NamespaceAll, labels.Set(systemProjectLabel).AsSelector())
+	systemProject, err := projectutil.GetSystemProject(d.clusterName, d.projectLister)
 	if err != nil {
-		return fmt.Errorf("list system project failed, %v", err)
+		return err
 	}
 
-	if len(defaultSystemProjects) == 0 {
-		return fmt.Errorf("get system project failed")
-	}
-
-	systemProject := defaultSystemProjects[0]
-	if systemProject == nil {
-		return fmt.Errorf("get system project failed")
-	}
 	systemProjectCreator := systemProject.Annotations[creatorIDAnn]
 	systemProjectID := ref.Ref(systemProject)
 
