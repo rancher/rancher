@@ -232,7 +232,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("*").resources("ingresses").verbs("get", "list", "watch")
 
 	rb.addRoleTemplate("Manage Services", "services-manage", "project", true, false, false, false).
-		addRule().apiGroups("*").resources("services", "endpoints").verbs("*")
+		addRule().apiGroups("*").resources("services", "services/proxy", "endpoints").verbs("*")
 
 	rb.addRoleTemplate("View Services", "services-view", "project", true, false, false, false).
 		addRule().apiGroups("*").resources("services", "endpoints").verbs("get", "list", "watch")
