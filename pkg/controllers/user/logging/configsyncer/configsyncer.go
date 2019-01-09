@@ -1,0 +1,214 @@
+package configsyncer
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+
+	"github.com/rancher/norman/controller"
+	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
+	"github.com/rancher/rancher/pkg/project"
+	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
+	"github.com/rancher/types/config"
+
+	"github.com/pkg/errors"
+	k8scorev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+)
+
+// This controller is responsible for generate fluentd config
+// and updating the config secret
+// so the config reload could detect the file change and reload
+
+func NewConfigSyncer(cluster *config.UserContext, SecretManager *SecretManager) *ConfigSyncer {
+	clusterName := cluster.ClusterName
+	clusterLoggingLister := cluster.Management.Management.ClusterLoggings(clusterName).Controller().Lister()
+	projectLoggingLister := cluster.Management.Management.ProjectLoggings(metav1.NamespaceAll).Controller().Lister()
+	namespaceLister := cluster.Core.Namespaces(metav1.NamespaceAll).Controller().Lister()
+
+	configGenerator := NewConfigGenerator(clusterName, clusterLoggingLister, projectLoggingLister, namespaceLister)
+
+	return &ConfigSyncer{
+		apps:                 cluster.Project.Apps(metav1.NamespaceAll),
+		clusterName:          clusterName,
+		clusterLoggingLister: clusterLoggingLister,
+		projectLoggingLister: projectLoggingLister,
+		projectLister:        cluster.Management.Management.Projects(clusterName).Controller().Lister(),
+		secretManager:        SecretManager,
+		configGenerator:      configGenerator,
+	}
+}
+
+type ConfigSyncer struct {
+	apps                 projectv3.AppInterface
+	clusterName          string
+	clusterLoggingLister mgmtv3.ClusterLoggingLister
+	projectLoggingLister mgmtv3.ProjectLoggingLister
+	projectLister        mgmtv3.ProjectLister
+	secretManager        *SecretManager
+	configGenerator      *ConfigGenerator
+}
+
+func (s *ConfigSyncer) NamespaceSync(key string, obj *k8scorev1.Namespace) (runtime.Object, error) {
+	return obj, s.sync()
+}
+
+func (s *ConfigSyncer) ClusterLoggingSync(key string, obj *mgmtv3.ClusterLogging) (runtime.Object, error) {
+	return obj, s.sync()
+}
+
+func (s *ConfigSyncer) ProjectLoggingSync(key string, obj *mgmtv3.ProjectLogging) (runtime.Object, error) {
+	return obj, s.sync()
+}
+
+func (s *ConfigSyncer) sync() error {
+	project, err := project.GetSystemProject(s.clusterName, s.projectLister)
+	if err != nil {
+		return err
+	}
+
+	systemProjectName := project.Name
+	systemProjectID := fmt.Sprintf("%s:%s", project.Namespace, project.Name)
+
+	isDeployed, err := s.isAppDeploy(systemProjectName)
+	if err != nil {
+		return err
+	}
+
+	if !isDeployed {
+		return nil
+	}
+
+	clusterLoggings, err := s.clusterLoggingLister.List("", labels.NewSelector())
+	if err != nil {
+		return errors.Wrapf(err, "List cluster loggings failed")
+	}
+
+	allProjectLoggings, err := s.projectLoggingLister.List("", labels.NewSelector())
+	if err != nil {
+		return errors.Wrapf(err, "List project logging failed")
+	}
+
+	var projectLoggings []*mgmtv3.ProjectLogging
+	for _, logging := range allProjectLoggings {
+		if controller.ObjectInCluster(s.clusterName, logging) {
+			projectLoggings = append(projectLoggings, logging)
+		}
+	}
+
+	sort.Slice(projectLoggings, func(i, j int) bool {
+		return projectLoggings[i].Name < projectLoggings[j].Name
+	})
+
+	if err = s.syncSSLCert(clusterLoggings, projectLoggings); err != nil {
+		return err
+	}
+
+	if err = s.syncClusterConfig(clusterLoggings, systemProjectID); err != nil {
+		return err
+	}
+
+	return s.syncProjectConfig(projectLoggings, systemProjectID)
+}
+
+func (s *ConfigSyncer) isAppDeploy(appNamespace string) (bool, error) {
+	appName := loggingconfig.AppName
+	app, err := s.apps.GetNamespaced(appNamespace, appName, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+
+		return false, errors.Wrapf(err, "get app %s failed", appName)
+	}
+
+	if app.DeletionTimestamp != nil {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func (s *ConfigSyncer) syncClusterConfig(clusterLoggings []*mgmtv3.ClusterLogging, systemProjectID string) error {
+	secretName := loggingconfig.RancherLoggingConfigSecretName()
+	namespace := loggingconfig.LoggingNamespace
+
+	buf, err := s.configGenerator.GenerateClusterLoggingConfig(clusterLoggings[0], systemProjectID)
+	if err != nil {
+		return err
+	}
+
+	data := map[string][]byte{
+		loggingconfig.LoggingSecretClusterConfigKey: buf,
+	}
+
+	return s.secretManager.updateSecret(secretName, namespace, data)
+}
+
+func (s *ConfigSyncer) syncProjectConfig(projectLoggings []*mgmtv3.ProjectLogging, systemProjectID string) error {
+	secretName := loggingconfig.RancherLoggingConfigSecretName()
+	namespace := loggingconfig.LoggingNamespace
+
+	buf, err := s.configGenerator.GenerateProjectLoggingConfig(projectLoggings, systemProjectID)
+	if err != nil {
+		return err
+	}
+
+	data := map[string][]byte{
+		loggingconfig.LoggingSecretProjectConfigKey: buf,
+	}
+
+	return s.secretManager.updateSecret(secretName, namespace, data)
+}
+
+func (s *ConfigSyncer) syncSSLCert(clusterLoggings []*mgmtv3.ClusterLogging, projectLoggings []*mgmtv3.ProjectLogging) error {
+	secretname := loggingconfig.RancherLoggingSSLSecretName()
+	namespace := loggingconfig.LoggingNamespace
+
+	sslConfig := make(map[string][]byte)
+	for _, v := range clusterLoggings {
+		ca, cert, key := getSSLConfig(v.Spec.ElasticsearchConfig, v.Spec.SplunkConfig, v.Spec.KafkaConfig, v.Spec.SyslogConfig, v.Spec.FluentForwarderConfig)
+		sslConfig[loggingconfig.SecretDataKeyCa(loggingconfig.ClusterLevel, v.Namespace)] = []byte(ca)
+		sslConfig[loggingconfig.SecretDataKeyCert(loggingconfig.ClusterLevel, v.Namespace)] = []byte(cert)
+		sslConfig[loggingconfig.SecretDataKeyCertKey(loggingconfig.ClusterLevel, v.Namespace)] = []byte(key)
+	}
+
+	for _, v := range projectLoggings {
+		ca, cert, key := getSSLConfig(v.Spec.ElasticsearchConfig, v.Spec.SplunkConfig, v.Spec.KafkaConfig, v.Spec.SyslogConfig, v.Spec.FluentForwarderConfig)
+		projectKey := strings.Replace(v.Spec.ProjectName, ":", "_", -1)
+		sslConfig[loggingconfig.SecretDataKeyCa(loggingconfig.ProjectLevel, projectKey)] = []byte(ca)
+		sslConfig[loggingconfig.SecretDataKeyCert(loggingconfig.ProjectLevel, projectKey)] = []byte(cert)
+		sslConfig[loggingconfig.SecretDataKeyCertKey(loggingconfig.ProjectLevel, projectKey)] = []byte(key)
+	}
+
+	return s.secretManager.updateSecret(secretname, namespace, sslConfig)
+}
+
+func getSSLConfig(esConfig *mgmtv3.ElasticsearchConfig, spConfig *mgmtv3.SplunkConfig, kfConfig *mgmtv3.KafkaConfig, syslogConfig *mgmtv3.SyslogConfig, fluentForwarder *mgmtv3.FluentForwarderConfig) (string, string, string) {
+	var certificate, clientCert, clientKey string
+	if esConfig != nil {
+		certificate = esConfig.Certificate
+		clientCert = esConfig.ClientCert
+		clientKey = esConfig.ClientKey
+	} else if spConfig != nil {
+		certificate = spConfig.Certificate
+		clientCert = spConfig.ClientCert
+		clientKey = spConfig.ClientKey
+	} else if kfConfig != nil {
+		certificate = kfConfig.Certificate
+		clientCert = kfConfig.ClientCert
+		clientKey = kfConfig.ClientKey
+	} else if syslogConfig != nil {
+		certificate = syslogConfig.Certificate
+		clientCert = syslogConfig.ClientCert
+		clientKey = syslogConfig.ClientKey
+	} else if fluentForwarder != nil {
+		certificate = fluentForwarder.Certificate
+	}
+
+	return certificate, clientCert, clientKey
+}
