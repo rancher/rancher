@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 
 	monitoringv1 "github.com/coreos/prometheus-operator/pkg/client/monitoring/v1"
@@ -90,14 +91,23 @@ func (c *PromOperatorCRDManager) SyncPrometheusRule(promRule *monitoringv1.Prome
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("get prometheus rule %s:%s failed, %v", promRule.Namespace, promRule.Name, err)
 		}
-		if old, err = c.prometheusRules.Create(promRule); err != nil && !apierrors.IsAlreadyExists(err) {
+
+		if _, err = c.prometheusRules.Create(promRule); err != nil && !apierrors.IsAlreadyExists(err) {
 			return fmt.Errorf("create prometheus rule %s:%s failed, %v", promRule.Namespace, promRule.Name, err)
 		}
+		return nil
 	}
 
-	updated := old.DeepCopy()
-	updated.Spec = promRule.Spec
-	if !reflect.DeepEqual(old.Spec, updated.Spec) {
+	sortedNewGroups := promRule.Spec.Groups
+	sortedOldGroups := old.Spec.Groups
+	sortGroups(sortedNewGroups)
+	sortGroups(sortedOldGroups)
+
+	if !reflect.DeepEqual(sortedOldGroups, sortedNewGroups) {
+
+		updated := old.DeepCopy()
+		updated.Spec.Groups = sortedNewGroups
+
 		if _, err = c.prometheusRules.Update(updated); err != nil {
 			return fmt.Errorf("update prometheus rule %s:%s failed, %v", updated.Namespace, updated.Name, err)
 		}
@@ -165,4 +175,17 @@ func getExpr(expr, comparison string, thresholdValue float64) string {
 		return fmt.Sprintf("%s%s%v", expr, comparisonMap[comparison], thresholdValue)
 	}
 	return expr
+}
+
+func sortGroups(groups []monitoringv1.RuleGroup) {
+	for _, v := range groups {
+		sortedRules := v.Rules
+		sort.Slice(sortedRules, func(k, l int) bool {
+			return sortedRules[k].Labels["rule_id"] < sortedRules[l].Labels["rule_id"]
+		})
+	}
+
+	sort.Slice(groups, func(i, j int) bool {
+		return groups[i].Name < groups[j].Name
+	})
 }

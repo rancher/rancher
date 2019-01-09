@@ -96,12 +96,38 @@ func (d *ConfigSyncer) sync() error {
 		return errors.Wrapf(err, "List notifiers")
 	}
 
-	clusterAlertRules, err := d.clusterAlertRuleLister.List("", labels.NewSelector())
+	clusterAlertGroup, err := d.clusterAlertGroupLister.List(metav1.NamespaceAll, labels.NewSelector())
+	if err != nil {
+		return errors.Wrapf(err, "List cluster alert group")
+	}
+
+	cAlertGroupsMap := map[string]*v3.ClusterAlertGroup{}
+	for _, v := range clusterAlertGroup {
+		if len(v.Spec.Recipients) > 0 {
+			groupID := common.GetGroupID(v.Namespace, v.Name)
+			cAlertGroupsMap[groupID] = v
+		}
+	}
+
+	projectAlertGroup, err := d.projectAlertGroupLister.List(metav1.NamespaceAll, labels.NewSelector())
+	if err != nil {
+		return errors.Wrapf(err, "List project alert group")
+	}
+
+	pAlertGroupsMap := map[string]*v3.ProjectAlertGroup{}
+	for _, v := range projectAlertGroup {
+		if len(v.Spec.Recipients) > 0 && controller.ObjectInCluster(d.clusterName, v) {
+			groupID := common.GetGroupID(v.Namespace, v.Name)
+			pAlertGroupsMap[groupID] = v
+		}
+	}
+
+	clusterAlertRules, err := d.clusterAlertRuleLister.List(metav1.NamespaceAll, labels.NewSelector())
 	if err != nil {
 		return errors.Wrapf(err, "List cluster alert rules")
 	}
 
-	projectAlertRules, err := d.projectAlertRuleLister.List("", labels.NewSelector())
+	projectAlertRules, err := d.projectAlertRuleLister.List(metav1.NamespaceAll, labels.NewSelector())
 	if err != nil {
 		return errors.Wrapf(err, "List project alert rules")
 	}
@@ -109,7 +135,7 @@ func (d *ConfigSyncer) sync() error {
 	cAlertsMap := map[string][]*v3.ClusterAlertRule{}
 	cAlertsKey := []string{}
 	for _, alert := range clusterAlertRules {
-		if alert.Status.AlertState != "inactive" {
+		if _, ok := cAlertGroupsMap[alert.Spec.GroupName]; ok && alert.Status.AlertState != "inactive" {
 			cAlertsMap[alert.Spec.GroupName] = append(cAlertsMap[alert.Spec.GroupName], alert)
 		}
 	}
@@ -123,7 +149,7 @@ func (d *ConfigSyncer) sync() error {
 	pAlertsKey := []string{}
 	for _, alert := range projectAlertRules {
 		if controller.ObjectInCluster(d.clusterName, alert) {
-			if alert.Status.AlertState != "inactive" {
+			if _, ok := pAlertGroupsMap[alert.Spec.GroupName]; ok && alert.Status.AlertState != "inactive" {
 				_, projectName := ref.Parse(alert.Spec.ProjectName)
 				if _, ok := pAlertsMap[projectName]; !ok {
 					pAlertsMap[projectName] = make(map[string][]*v3.ProjectAlertRule)
