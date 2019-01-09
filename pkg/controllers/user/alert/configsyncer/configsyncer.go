@@ -29,10 +29,8 @@ import (
 )
 
 var (
-	defaultGroupInterval  = 10
-	eventGroupInterval    = 1
-	defaultGroupWait      = 10
-	defaultRepeatInterval = 10
+	eventGroupInterval = 1
+	eventGroupWait     = 1
 )
 
 func NewConfigSyncer(ctx context.Context, cluster *config.UserContext, alertManager *manager.AlertManager, operatorCRDManager *manager.PromOperatorCRDManager) *ConfigSyncer {
@@ -316,7 +314,7 @@ func (d *ConfigSyncer) addProjectAlert2Config(config *alertconfig.Config, projec
 
 			if exist {
 				config.Receivers = append(config.Receivers, receiver)
-				r1 := d.newRoute(map[string]string{"group_id": groupID}, defaultGroupWait, defaultRepeatInterval, defaultGroupInterval)
+				r1 := d.newRoute(map[string]string{"group_id": groupID}, group.Spec.GroupWaitSeconds, group.Spec.GroupIntervalSeconds, group.Spec.RepeatIntervalSeconds)
 
 				for _, alert := range rules {
 					if alert.Status.AlertState == "inactive" {
@@ -357,7 +355,7 @@ func (d *ConfigSyncer) addClusterAlert2Config(config *alertconfig.Config, alerts
 
 		if exist {
 			config.Receivers = append(config.Receivers, receiver)
-			r1 := d.newRoute(map[string]string{"group_id": groupID}, defaultGroupWait, defaultRepeatInterval, defaultGroupInterval)
+			r1 := d.newRoute(map[string]string{"group_id": groupID}, group.Spec.GroupWaitSeconds, group.Spec.GroupIntervalSeconds, group.Spec.RepeatIntervalSeconds)
 			for _, alert := range groupRules {
 				if alert.Status.AlertState == "inactive" {
 					continue
@@ -365,8 +363,8 @@ func (d *ConfigSyncer) addClusterAlert2Config(config *alertconfig.Config, alerts
 				ruleID := common.GetRuleID(groupID, alert.Name)
 
 				if alert.Spec.EventRule != nil {
-					r2 := d.newRoute(map[string]string{"alert_type": "event", "rule_id": ruleID}, defaultGroupWait, defaultRepeatInterval, eventGroupInterval)
-					d.appendRoute(r1, r2) //todo: better not overwrite interval for each, if the interval is same as above, should not add interval field
+					r2 := d.newRoute(map[string]string{"alert_type": "event", "rule_id": ruleID}, eventGroupWait, eventGroupInterval, alert.Spec.RepeatIntervalSeconds)
+					d.appendRoute(r1, r2)
 				}
 
 				if alert.Spec.MetricRule != nil || alert.Spec.SystemServiceRule != nil || alert.Spec.NodeRule != nil {
@@ -394,13 +392,12 @@ func (d *ConfigSyncer) newRoute(match map[string]string, groupWait, groupInterva
 
 	gw := model.Duration(time.Duration(groupWait) * time.Second)
 	route.GroupWait = &gw
+
 	ri := model.Duration(time.Duration(repeatInterval) * time.Second)
 	route.RepeatInterval = &ri
 
-	if groupInterval != defaultGroupInterval {
-		gi := model.Duration(time.Duration(groupInterval) * time.Second)
-		route.GroupInterval = &gi
-	}
+	gi := model.Duration(time.Duration(groupInterval) * time.Second)
+	route.GroupInterval = &gi
 	return route
 }
 
