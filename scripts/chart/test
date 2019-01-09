@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+cd $(dirname $0)/../..
+
+echo "-- chart/test --"
+
+# Check for helm
+hash helm >/dev/null 2>&1
+if [[ $? > 0 ]]; then
+    echo "helm not found. Helm is required to run tests."
+    exit 1
+fi
+
+# Check for unittest plugin
+helm unittest --help >/dev/null 2>&1
+if [[ $? > 0 ]]; then
+    echo "helm plugin unittest not found."
+    echo "Run to install plugin: helm plugin install https://github.com/lrills/helm-unittest"
+    exit 1
+fi
+
+helm unittest /tmp/chart/rancher

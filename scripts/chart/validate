@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+cd $(dirname $0)/../..
+
+echo "-- chart/validate --"
+
+# Check for helm
+hash helm >/dev/null 2>&1
+if [[ $? > 0 ]]; then
+    echo "helm not found. Helm is required to run tests."
+    exit 1
+fi
+
+helm lint /tmp/chart/rancher

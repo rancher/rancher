@@ -7,6 +7,8 @@ pipeline:
     - /var/run/docker.sock:/var/run/docker.sock
     commands:
     - dapper ci
+    when:
+      event: [ push, pull_request, tag ]
 
   stage-binaries:
     image: rancher/dapper:1.11.2
@@ -102,3 +104,26 @@ pipeline:
       event: tag
       ref:
         exclude: [ refs/tags/*rc* ]
+
+  chart-promote:
+    image: rancher/dapper:1.11.2
+    commands:
+      - dapper charts/copy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    when:
+      event: deployment
+      environment: promote-stable
+
+  chart-publish:
+    image: plugins/gcs
+    source: bin/chart
+    target: releases.rancher.com/server-charts
+    acl:
+      - allUsers:READER
+    cache_control: public,no-cache,proxy-revalidate
+    secrets:
+      - source: google_auth_key
+        target: GOOGLE_CREDENTIALS
+    when:
+      event: [ tag, deployment ]
