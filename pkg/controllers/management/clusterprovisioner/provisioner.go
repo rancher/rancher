@@ -246,10 +246,10 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 			logrus.Infof("Create done, Updating cluster [%s]", cluster.Name)
 			apiEndpoint, serviceAccountToken, caCert, err = p.driverUpdate(cluster, *spec)
 		}
-	} else if spec.RancherKubernetesEngineConfig.Restore.Restore {
+	} else if spec.RancherKubernetesEngineConfig != nil && spec.RancherKubernetesEngineConfig.Restore.Restore {
 		logrus.Infof("Restoring cluster [%s] from backup", cluster.Name)
 		apiEndpoint, serviceAccountToken, caCert, err = p.restoreClusterBackup(cluster, *spec)
-	} else if spec.RancherKubernetesEngineConfig.RotateCertificates != nil {
+	} else if spec.RancherKubernetesEngineConfig != nil && spec.RancherKubernetesEngineConfig.RotateCertificates != nil {
 		logrus.Infof("Rotating certificates for cluster [%s]", cluster.Name)
 		apiEndpoint, serviceAccountToken, caCert, err = p.driverUpdate(cluster, *spec)
 	} else {
