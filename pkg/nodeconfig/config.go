@@ -33,7 +33,7 @@ func NewStore(namespaceInterface v1.NamespaceInterface, secretsGetter v1.Secrets
 }
 
 func NewNodeConfig(store *encryptedstore.GenericEncryptedStore, node *v3.Node) (*NodeConfig, error) {
-	nodeDir, err := buildBaseHostDir(node.Spec.RequestedHostname)
+	nodeDir, err := buildBaseHostDir(node.Namespace + "-" + node.Spec.RequestedHostname)
 	if err != nil {
 		return nil, err
 	}
