@@ -34,6 +34,7 @@ def kubectl_available(request, dind_cc, client):
 
 
 # as an admin, we should have access
+@pytest.mark.skip(reason='cluster testing needs refactor')
 @pytest.mark.skipif(platform != 'linux', reason='requires linux for dind')
 @pytest.mark.nonparallel
 def test_admin_api_resources(request, dind_cc):
@@ -41,6 +42,7 @@ def test_admin_api_resources(request, dind_cc):
 
 
 # as a user which has not been given permission, we should fail
+@pytest.mark.skip(reason='cluster testing needs refactor')
 @pytest.mark.skipif(platform != 'linux', reason='requires linux for dind')
 @pytest.mark.nonparallel
 def test_user_no_template(request, dind_cc, user_mc):
@@ -51,6 +53,7 @@ def test_user_no_template(request, dind_cc, user_mc):
 
 
 # as a user that is a cluster member, we should have access
+@pytest.mark.skip(reason='cluster testing needs refactor')
 @pytest.mark.skipif(platform != 'linux', reason='requires linux for dind')
 @pytest.mark.nonparallel
 def test_user_with_template(request, dind_cc, user_mc):
@@ -65,6 +68,7 @@ def test_user_with_template(request, dind_cc, user_mc):
 
 
 # as a user that is part of a group that has access, we should have access
+@pytest.mark.skip(reason='cluster testing needs refactor')
 @pytest.mark.skipif(platform != 'linux', reason='requires linux for dind')
 @pytest.mark.nonparallel
 def test_user_group_with_template(request, dind_cc, user_mc):

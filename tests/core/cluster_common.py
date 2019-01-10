@@ -60,6 +60,7 @@ nodes:{% for node in random_nodes %}
 
 
 def create_cluster(cluster_config_file):
+    raise Exception('cluster creation needs refactor')
     # attempt to resolve unknown random rke up errors
     for _ in range(3):
         try:
