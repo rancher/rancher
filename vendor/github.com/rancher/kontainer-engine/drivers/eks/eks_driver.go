@@ -36,9 +36,16 @@ import (
 )
 
 var amiForRegion = map[string]string{
-	"us-west-2": "ami-0a54c984b9f908c81",
-	"us-east-1": "ami-0440e4f6b9713faf6",
-	"eu-west-1": "ami-0c7a4976cb6fafd3a",
+	"us-west-2": "ami-0a2abab4107669c1b",
+	"us-east-1": "ami-0c24db5df6badc35a",
+	"us-east-2": "ami-0c2e8d28b1f854c68",
+	"eu-west-1": "ami-01e08d22b9439c15a",
+	"eu-central-1": "ami-010caa98bae9a09e2",
+	"eu-north-1": "ami-06ee67302ab7cf838",
+	"ap-northeast-1": "ami-0f0e8066383e7a2cb",
+	"ap-northeast-2": "ami-0b7baa90de70f683f",
+	"ap-southeast-1": "ami-019966ed970c18502",
+	"ap-southeast-2": "ami-06ade0abbd8eca425",
 }
 
 type Driver struct {
