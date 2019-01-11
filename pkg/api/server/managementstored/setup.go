@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/kontainerdriver"
 	"github.com/rancher/rancher/pkg/api/customization/logging"
 	"github.com/rancher/rancher/pkg/api/customization/monitor"
+	"github.com/rancher/rancher/pkg/api/customization/multiclusterapp"
 	"github.com/rancher/rancher/pkg/api/customization/node"
 	"github.com/rancher/rancher/pkg/api/customization/nodetemplate"
 	"github.com/rancher/rancher/pkg/api/customization/pipeline"
@@ -78,6 +79,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.KontainerDriverType,
 		client.ListenConfigType,
 		client.MultiClusterAppType,
+		client.MultiClusterAppRevisionType,
 		client.MonitorMetricType,
 		client.NodeDriverType,
 		client.NodePoolType,
@@ -534,6 +536,19 @@ func MultiClusterApps(schemas *types.Schemas, management *config.ScaledContext) 
 		Store:              schema.Store,
 		NamespaceInterface: management.Core.Namespaces(""),
 	}
+	revisionSchema := schemas.Schema(&managementschema.Version, client.MultiClusterAppRevisionType)
+	revisionSchema.Store = &globalresource.GlobalNamespaceStore{
+		Store:              revisionSchema.Store,
+		NamespaceInterface: management.Core.Namespaces(""),
+	}
+	wrapper := multiclusterapp.Wrapper{
+		MultiClusterApps:              management.Management.MultiClusterApps(""),
+		MultiClusterAppLister:         management.Management.MultiClusterApps("").Controller().Lister(),
+		MultiClusterAppRevisionLister: management.Management.MultiClusterAppRevisions("").Controller().Lister(),
+	}
+	schema.Formatter = wrapper.Formatter
+	schema.ActionHandler = wrapper.ActionHandler
+	schema.LinkHandler = wrapper.LinkHandler
 }
 
 func GlobalDNSs(schemas *types.Schemas, management *config.ScaledContext) {

@@ -2,6 +2,7 @@ package workload
 
 import (
 	"context"
+	"github.com/rancher/norman/types/convert"
 	"strconv"
 	"strings"
 
@@ -73,6 +74,7 @@ type Workload struct {
 type Status struct {
 	Replicas          int32
 	AvailableReplicas int32
+	Conditions        []map[string]interface{}
 }
 
 type CommonController struct {
@@ -238,7 +240,8 @@ func (c CommonController) getByWorkloadIDFromCacheOrAPI(key string, retry bool) 
 		labelSelector := &metav1.LabelSelector{
 			MatchLabels: o.Spec.Selector,
 		}
-		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, labelSelector, o.Annotations, o.Spec.Template, o.OwnerReferences, o.Labels, o.Status.Replicas, o.Status.AvailableReplicas)
+		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, labelSelector, o.Annotations, o.Spec.Template,
+			o.OwnerReferences, o.Labels, o.Status.Replicas, o.Status.AvailableReplicas, convert.ToMapSlice(o.Status.Conditions))
 	case ReplicaSetType:
 		o, err := c.ReplicaSetLister.Get(namespace, name)
 		if err != nil && apierrors.IsNotFound(err) && retry {
@@ -248,7 +251,8 @@ func (c CommonController) getByWorkloadIDFromCacheOrAPI(key string, retry bool) 
 			return nil, err
 		}
 
-		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template, o.OwnerReferences, o.Labels, o.Status.Replicas, o.Status.AvailableReplicas)
+		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template,
+			o.OwnerReferences, o.Labels, o.Status.Replicas, o.Status.AvailableReplicas, convert.ToMapSlice(o.Status.Conditions))
 	case DaemonSetType:
 		o, err := c.DaemonSetLister.Get(namespace, name)
 		if err != nil && apierrors.IsNotFound(err) && retry {
@@ -258,7 +262,8 @@ func (c CommonController) getByWorkloadIDFromCacheOrAPI(key string, retry bool) 
 			return nil, err
 		}
 
-		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template, o.OwnerReferences, o.Labels, o.Status.DesiredNumberScheduled, o.Status.NumberAvailable)
+		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template,
+			o.OwnerReferences, o.Labels, o.Status.DesiredNumberScheduled, o.Status.NumberAvailable, convert.ToMapSlice(o.Status.Conditions))
 	case StatefulSetType:
 		o, err := c.StatefulSetLister.Get(namespace, name)
 		if err != nil && apierrors.IsNotFound(err) && retry {
@@ -268,7 +273,8 @@ func (c CommonController) getByWorkloadIDFromCacheOrAPI(key string, retry bool) 
 			return nil, err
 		}
 
-		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template, o.OwnerReferences, o.Labels, o.Status.Replicas, o.Status.ReadyReplicas)
+		workload = getWorkload(namespace, name, workloadType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template,
+			o.OwnerReferences, o.Labels, o.Status.Replicas, o.Status.ReadyReplicas, convert.ToMapSlice(o.Status.Conditions))
 	case JobType:
 		o, err := c.JobLister.Get(namespace, name)
 		if err != nil && apierrors.IsNotFound(err) && retry {
@@ -284,7 +290,8 @@ func (c CommonController) getByWorkloadIDFromCacheOrAPI(key string, retry bool) 
 			}
 		}
 
-		workload = getWorkload(namespace, name, workloadType, BatchVersion, o.UID, labelSelector, o.Annotations, &o.Spec.Template, o.OwnerReferences, o.Labels, 0, 0)
+		workload = getWorkload(namespace, name, workloadType, BatchVersion, o.UID, labelSelector, o.Annotations, &o.Spec.Template,
+			o.OwnerReferences, o.Labels, 0, 0, convert.ToMapSlice(o.Status.Conditions))
 	case CronJobType:
 		o, err := c.CronJobLister.Get(namespace, name)
 		if err != nil && apierrors.IsNotFound(err) && retry {
@@ -300,7 +307,8 @@ func (c CommonController) getByWorkloadIDFromCacheOrAPI(key string, retry bool) 
 			}
 		}
 
-		workload = getWorkload(namespace, name, workloadType, BatchBetaVersion, o.UID, labelSelector, o.Annotations, &o.Spec.JobTemplate.Spec.Template, o.OwnerReferences, o.Labels, 0, 0)
+		workload = getWorkload(namespace, name, workloadType, BatchBetaVersion, o.UID, labelSelector, o.Annotations, &o.Spec.JobTemplate.Spec.Template,
+			o.OwnerReferences, o.Labels, 0, 0, nil)
 	default:
 		o, err := c.DeploymentLister.Get(namespace, name)
 		if err != nil && apierrors.IsNotFound(err) && retry {
@@ -310,14 +318,15 @@ func (c CommonController) getByWorkloadIDFromCacheOrAPI(key string, retry bool) 
 			return nil, err
 		}
 
-		workload = getWorkload(namespace, name, DeploymentType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template, o.OwnerReferences, o.Labels, o.Status.Replicas, o.Status.AvailableReplicas)
+		workload = getWorkload(namespace, name, DeploymentType, AppVersion, o.UID, o.Spec.Selector, o.Annotations, &o.Spec.Template,
+			o.OwnerReferences, o.Labels, o.Status.Replicas, o.Status.AvailableReplicas, convert.ToMapSlice(o.Status.Conditions))
 	}
 	return workload, nil
 }
 
 func getWorkload(namespace string, name string, kind string, apiVersion string, UUID types.UID, selectorLabels *metav1.LabelSelector,
 	annotations map[string]string, podTemplateSpec *corev1.PodTemplateSpec, ownerRefs []metav1.OwnerReference, labels map[string]string,
-	replicas, availableReplicas int32) *Workload {
+	replicas, availableReplicas int32, conditions []map[string]interface{}) *Workload {
 	w := &Workload{
 		Name:            name,
 		Namespace:       namespace,
@@ -333,6 +342,7 @@ func getWorkload(namespace string, name string, kind string, apiVersion string, 
 		Status: &Status{
 			Replicas:          replicas,
 			AvailableReplicas: availableReplicas,
+			Conditions:        conditions,
 		},
 	}
 	return w
