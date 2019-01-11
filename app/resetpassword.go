@@ -92,7 +92,7 @@ func generatePassword(length int) []byte {
 
 	out := make([]byte, length)
 	for i := range out {
-		index := uint8(bytes[i]) % uint8(len(characters))
+		index := bytes[i] % uint8(len(characters))
 		out[i] = characters[index]
 	}
 

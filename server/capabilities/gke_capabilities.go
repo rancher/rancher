@@ -4,16 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/rancher/kontainer-engine/drivers/gke"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
-	"google.golang.org/api/container/v1"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/rancher/kontainer-engine/drivers/gke"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/container/v1"
 )
 
 type capabilitiesRequestBody struct {
@@ -92,5 +93,5 @@ func handleErr(writer http.ResponseWriter, originalErr error) {
 		return
 	}
 
-	writer.Write([]byte(asJSON))
+	writer.Write(asJSON)
 }

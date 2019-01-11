@@ -122,7 +122,7 @@ func newService(namespace, name string) *v1.Service {
 					Name:       "metrics",
 					Port:       24231,
 					TargetPort: intstr.Parse(strconv.FormatInt(24231, 10)),
-					Protocol:   v1.Protocol(v1.ProtocolTCP),
+					Protocol:   v1.ProtocolTCP,
 				},
 			},
 		},

@@ -97,7 +97,7 @@ func verifyGithubWebhookSignature(secret []byte, signature string, body []byte) 
 	computed := hmac.New(sha1.New, secret)
 	computed.Write(body)
 
-	return hmac.Equal([]byte(computed.Sum(nil)), actual)
+	return hmac.Equal(computed.Sum(nil), actual)
 }
 
 func parsePushPayload(raw []byte) (*model.BuildInfo, error) {

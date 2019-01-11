@@ -2,7 +2,6 @@ package networkpolicy
 
 import (
 	"fmt"
-
 	"sort"
 
 	"github.com/rancher/types/apis/core/v1"
@@ -105,7 +104,7 @@ func (npmgr *netpolMgr) hostPortsUpdateHandler(pod *corev1.Pod, clusterNamespace
 		for _, port := range c.Ports {
 			if port.HostPort != 0 {
 				hp := intstr.FromInt(int(port.ContainerPort))
-				proto := corev1.Protocol(port.Protocol)
+				proto := port.Protocol
 				p := knetworkingv1.NetworkPolicyPort{
 					Protocol: &proto,
 					Port:     &hp,

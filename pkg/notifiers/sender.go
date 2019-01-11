@@ -48,7 +48,7 @@ func SendMessage(notifier *v3.Notifier, recipient string, msg *Message) error {
 		if recipient == "" {
 			recipient = s.DefaultRecipient
 		}
-		return TestEmail(s.Host, s.Password, s.Username, int(s.Port), s.TLS, msg.Title, msg.Content, recipient, s.Sender)
+		return TestEmail(s.Host, s.Password, s.Username, s.Port, s.TLS, msg.Title, msg.Content, recipient, s.Sender)
 	}
 
 	if notifier.Spec.PagerdutyConfig != nil {

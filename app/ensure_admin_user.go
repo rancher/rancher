@@ -107,7 +107,7 @@ func createNewAdmin(client v3.Interface, length int) error {
 		},
 		DisplayName:        "Default Admin",
 		Username:           "admin",
-		Password:           string(hashedPass),
+		Password:           hashedPass,
 		MustChangePassword: false,
 	})
 

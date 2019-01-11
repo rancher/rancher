@@ -175,7 +175,7 @@ func (p *adProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult, 
 	isType := false
 	objectClass := entry.GetAttributeValues(ObjectClass)
 	for _, obj := range objectClass {
-		if strings.EqualFold(string(obj), config.UserObjectClass) {
+		if strings.EqualFold(obj, config.UserObjectClass) {
 			isType = true
 		}
 	}

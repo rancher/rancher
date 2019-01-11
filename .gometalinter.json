@@ -1,6 +1,7 @@
 {
     "Enable": [
         "golint",
+        "unconvert",
         "vet"
     ],
     "Exclude": [

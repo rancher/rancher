@@ -144,7 +144,7 @@ func parseJWTforField(tokenString string, fieldID string) (string, error) {
 
 	var dat map[string]interface{}
 
-	err = json.Unmarshal([]byte(decoded), &dat)
+	err = json.Unmarshal(decoded, &dat)
 	if err != nil {
 		return "", httperror.NewAPIError(httperror.InvalidFormat, "invalid token")
 	}

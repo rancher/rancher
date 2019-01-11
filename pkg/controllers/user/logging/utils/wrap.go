@@ -8,10 +8,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-
-	"github.com/rancher/types/apis/management.cattle.io/v3"
-
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 type WrapLogging struct {
@@ -262,7 +260,7 @@ func getDateFormat(dateformat string) string {
 }
 
 func testReachable(network string, url string) error {
-	timeout := time.Duration(10 * time.Second)
+	timeout := 10 * time.Second
 	conn, err := net.DialTimeout(network, url, timeout)
 	if err != nil {
 		return fmt.Errorf("url %s unreachable, error: %v", url, err)

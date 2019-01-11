@@ -2,7 +2,6 @@ package networkpolicy
 
 import (
 	"fmt"
-
 	"sort"
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -56,7 +55,7 @@ func (npmgr *netpolMgr) nodePortsUpdateHandler(service *corev1.Service, clusterN
 	for _, port := range service.Spec.Ports {
 		if port.NodePort != 0 {
 			tp := port.TargetPort
-			proto := corev1.Protocol(port.Protocol)
+			proto := port.Protocol
 			p := knetworkingv1.NetworkPolicyPort{
 				Protocol: &proto,
 				Port:     &tp,

@@ -2,14 +2,10 @@ package workload
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
-
-	"k8s.io/apimachinery/pkg/runtime"
-
-	"fmt"
-
-	"encoding/json"
 
 	"github.com/rancher/types/apis/apps/v1beta2"
 	batchv1 "github.com/rancher/types/apis/batch/v1"
@@ -23,6 +19,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -529,7 +526,7 @@ func generateClusterIPServiceFromContainers(workload *Workload) *Service {
 		servicePort := corev1.ServicePort{
 			Port:       42,
 			TargetPort: intstr.Parse(strconv.FormatInt(42, 10)),
-			Protocol:   corev1.Protocol(corev1.ProtocolTCP),
+			Protocol:   corev1.ProtocolTCP,
 			Name:       "default",
 		}
 		clusterIP = "None"
@@ -600,7 +597,7 @@ func generateServicesFromPortsAnnotation(workload *Workload) ([]Service, error) 
 			servicePort := corev1.ServicePort{
 				Port:       42,
 				TargetPort: intstr.Parse(strconv.FormatInt(42, 10)),
-				Protocol:   corev1.Protocol(corev1.ProtocolTCP),
+				Protocol:   corev1.ProtocolTCP,
 				Name:       "default",
 			}
 			servicePorts[workload.Name] = append(servicePorts[workload.Name], servicePort)

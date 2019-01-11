@@ -93,7 +93,7 @@ func hashPassword(data map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	data[client.UserFieldPassword] = string(hashed)
+	data[client.UserFieldPassword] = hashed
 
 	return nil
 }
