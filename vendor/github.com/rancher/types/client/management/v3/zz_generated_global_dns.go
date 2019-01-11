@@ -11,6 +11,7 @@ const (
 	GlobalDNSFieldCreatorID            = "creatorId"
 	GlobalDNSFieldFQDN                 = "fqdn"
 	GlobalDNSFieldLabels               = "labels"
+	GlobalDNSFieldMembers              = "members"
 	GlobalDNSFieldMultiClusterAppID    = "multiClusterAppId"
 	GlobalDNSFieldName                 = "name"
 	GlobalDNSFieldOwnerReferences      = "ownerReferences"
@@ -31,6 +32,7 @@ type GlobalDNS struct {
 	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	FQDN                 string            `json:"fqdn,omitempty" yaml:"fqdn,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Members              []Member          `json:"members,omitempty" yaml:"members,omitempty"`
 	MultiClusterAppID    string            `json:"multiClusterAppId,omitempty" yaml:"multiClusterAppId,omitempty"`
 	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`

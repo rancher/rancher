@@ -64,6 +64,7 @@ type Interface interface {
 	ProjectCatalogsGetter
 	ClusterCatalogsGetter
 	MultiClusterAppsGetter
+	MultiClusterAppRevisionsGetter
 	GlobalDNSsGetter
 	GlobalDNSProvidersGetter
 	KontainerDriversGetter
@@ -120,6 +121,7 @@ type Clients struct {
 	ProjectCatalog                          ProjectCatalogClient
 	ClusterCatalog                          ClusterCatalogClient
 	MultiClusterApp                         MultiClusterAppClient
+	MultiClusterAppRevision                 MultiClusterAppRevisionClient
 	GlobalDNS                               GlobalDNSClient
 	GlobalDNSProvider                       GlobalDNSProviderClient
 	KontainerDriver                         KontainerDriverClient
@@ -178,6 +180,7 @@ type Client struct {
 	projectCatalogControllers                          map[string]ProjectCatalogController
 	clusterCatalogControllers                          map[string]ClusterCatalogController
 	multiClusterAppControllers                         map[string]MultiClusterAppController
+	multiClusterAppRevisionControllers                 map[string]MultiClusterAppRevisionController
 	globalDnsControllers                               map[string]GlobalDNSController
 	globalDnsProviderControllers                       map[string]GlobalDNSProviderController
 	kontainerDriverControllers                         map[string]KontainerDriverController
@@ -352,6 +355,9 @@ func NewClientsFromInterface(iface Interface) *Clients {
 		MultiClusterApp: &multiClusterAppClient2{
 			iface: iface.MultiClusterApps(""),
 		},
+		MultiClusterAppRevision: &multiClusterAppRevisionClient2{
+			iface: iface.MultiClusterAppRevisions(""),
+		},
 		GlobalDNS: &globalDnsClient2{
 			iface: iface.GlobalDNSs(""),
 		},
@@ -433,6 +439,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		projectCatalogControllers:                          map[string]ProjectCatalogController{},
 		clusterCatalogControllers:                          map[string]ClusterCatalogController{},
 		multiClusterAppControllers:                         map[string]MultiClusterAppController{},
+		multiClusterAppRevisionControllers:                 map[string]MultiClusterAppRevisionController{},
 		globalDnsControllers:                               map[string]GlobalDNSController{},
 		globalDnsProviderControllers:                       map[string]GlobalDNSProviderController{},
 		kontainerDriverControllers:                         map[string]KontainerDriverController{},
@@ -1021,6 +1028,19 @@ type MultiClusterAppsGetter interface {
 func (c *Client) MultiClusterApps(namespace string) MultiClusterAppInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &MultiClusterAppResource, MultiClusterAppGroupVersionKind, multiClusterAppFactory{})
 	return &multiClusterAppClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type MultiClusterAppRevisionsGetter interface {
+	MultiClusterAppRevisions(namespace string) MultiClusterAppRevisionInterface
+}
+
+func (c *Client) MultiClusterAppRevisions(namespace string) MultiClusterAppRevisionInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &MultiClusterAppRevisionResource, MultiClusterAppRevisionGroupVersionKind, multiClusterAppRevisionFactory{})
+	return &multiClusterAppRevisionClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

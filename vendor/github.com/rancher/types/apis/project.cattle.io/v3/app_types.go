@@ -31,6 +31,7 @@ type AppSpec struct {
 var (
 	AppConditionInstalled condition.Cond = "Installed"
 	AppConditionMigrated  condition.Cond = "Migrated"
+	AppConditionDeployed  condition.Cond = "Deployed"
 )
 
 type AppStatus struct {
