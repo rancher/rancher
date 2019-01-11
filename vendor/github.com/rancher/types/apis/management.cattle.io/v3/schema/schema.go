@@ -337,11 +337,13 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 					Input:  "setPasswordInput",
 					Output: "user",
 				},
+				"refreshauthprovideraccess": {},
 			}
 			schema.CollectionActions = map[string]types.Action{
 				"changepassword": {
 					Input: "changePasswordInput",
 				},
+				"refreshauthprovideraccess": {},
 			}
 		}).
 		MustImportAndCustomize(&Version, v3.AuthConfig{}, func(schema *types.Schema) {

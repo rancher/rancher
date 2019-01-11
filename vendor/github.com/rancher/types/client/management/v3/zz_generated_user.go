@@ -68,9 +68,13 @@ type UserOperations interface {
 	ByID(id string) (*User, error)
 	Delete(container *User) error
 
+	ActionRefreshauthprovideraccess(resource *User) error
+
 	ActionSetpassword(resource *User, input *SetPasswordInput) (*User, error)
 
 	CollectionActionChangepassword(resource *UserCollection, input *ChangePasswordInput) error
+
+	CollectionActionRefreshauthprovideraccess(resource *UserCollection) error
 }
 
 func newUserClient(apiClient *Client) *UserClient {
@@ -124,6 +128,11 @@ func (c *UserClient) Delete(container *User) error {
 	return c.apiClient.Ops.DoResourceDelete(UserType, &container.Resource)
 }
 
+func (c *UserClient) ActionRefreshauthprovideraccess(resource *User) error {
+	err := c.apiClient.Ops.DoAction(UserType, "refreshauthprovideraccess", &resource.Resource, nil, nil)
+	return err
+}
+
 func (c *UserClient) ActionSetpassword(resource *User, input *SetPasswordInput) (*User, error) {
 	resp := &User{}
 	err := c.apiClient.Ops.DoAction(UserType, "setpassword", &resource.Resource, input, resp)
@@ -132,5 +141,10 @@ func (c *UserClient) ActionSetpassword(resource *User, input *SetPasswordInput) 
 
 func (c *UserClient) CollectionActionChangepassword(resource *UserCollection, input *ChangePasswordInput) error {
 	err := c.apiClient.Ops.DoCollectionAction(UserType, "changepassword", &resource.Collection, input, nil)
+	return err
+}
+
+func (c *UserClient) CollectionActionRefreshauthprovideraccess(resource *UserCollection) error {
+	err := c.apiClient.Ops.DoCollectionAction(UserType, "refreshauthprovideraccess", &resource.Collection, nil, nil)
 	return err
 }
