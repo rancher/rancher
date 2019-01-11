@@ -54,32 +54,52 @@ func (c *Client) request(method string, url string, body io.Reader) (*http.Reque
 	return req, nil
 }
 
-func (c *Client) do(req *http.Request) (model.Response, error) {
+func (c *Client) do(req *http.Request) (*model.Response, error) {
 	var data model.Response
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return data, err
+		return nil, err
 	}
 	// when err is nil, resp contains a non-nil resp.Body which must be closed
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return data, errors.Wrap(err, "Read response body error")
+		return nil, errors.Wrap(err, "Read response body error")
 	}
 
 	err = json.Unmarshal(body, &data)
 	if err != nil {
-		return data, errors.Wrapf(err, "Decode response error: %s", string(body))
+		return nil, errors.Wrapf(err, "Decode response error: %s", string(body))
 	}
 	logrus.Debugf("Got response entry: %+v", data)
 	if code := resp.StatusCode; code < 200 || code > 300 {
 		if data.Message != "" {
-			return data, errors.Errorf("Got request error: %s", data.Message)
+			return &data, errors.Errorf("Got request error: %s", data.Message)
 		}
 	}
 
-	return data, nil
+	return &data, nil
+}
+
+func (c *Client) get() (*model.Response, error) {
+	fqdn, token, err := c.getSecret()
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, errors.Wrap(err, "Failed to get stored secret")
+	}
+
+	url := buildURL(c.base, "/"+fqdn, "")
+	req, err := c.request(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to build a request")
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	return c.do(req)
 }
 
 func (c *Client) ApplyDomain(hosts []string) (bool, string, error) {
@@ -109,26 +129,49 @@ func (c *Client) ApplyDomain(hosts []string) (bool, string, error) {
 	return false, fqdn, nil
 }
 
-func (c *Client) GetDomain() (d *model.Domain, err error) {
-	fqdn, token, err := c.getSecret()
+func (c *Client) GetDomain() (*model.Domain, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	o, err := c.get()
 	if err != nil {
-		if k8serrors.IsNotFound(err) {
-			return nil, nil
+		// remove the secret token on a 403
+		if o != nil && o.Status == http.StatusForbidden {
+			if err = c.deleteSecret(); err != nil {
+				return nil, errors.Wrap(err, "GetDomain: failed to delete the token secret")
+			}
 		}
-		return nil, errors.Wrap(err, "GetDomain: failed to get stored secret")
+		return nil, errors.Wrap(err, "GetDomain: failed to execute a request")
+	}
+	if o == nil {
+		return nil, nil
 	}
 
-	url := buildURL(c.base, "/"+fqdn, "")
-	req, err := c.request(http.MethodGet, url, nil)
+	return &o.Data, nil
+}
+
+// EnforceGetDomain is different from GetDomain, it can:
+// return a domain if exists
+// return a new domain with empty hosts if not exists
+func (c *Client) EnforceGetDomain() (*model.Domain, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	o, err := c.get()
 	if err != nil {
-		return d, errors.Wrap(err, "GetDomain: failed to build a request")
+		// remove the secret token on a 403
+		if o != nil && o.Status == http.StatusForbidden {
+			if err = c.deleteSecret(); err != nil {
+				return nil, errors.Wrap(err, "EnforceGetDomain: failed to delete the token secret")
+			}
+			// create a new domain with empty hosts
+			if _, err = c.CreateDomain([]string{}); err != nil {
+				return nil, errors.Wrap(err, "EnforceGetDomain: failed to create a new domain")
+			}
+			return c.GetDomain()
+		}
+		return nil, errors.Wrap(err, "EnforceGetDomain: failed to execute a request")
 	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-
-	o, err := c.do(req)
-	if err != nil {
-		return d, errors.Wrap(err, "GetDomain: failed to execute a request")
+	if o == nil {
+		return nil, nil
 	}
 
 	return &o.Data, nil
@@ -159,7 +202,7 @@ func (c *Client) CreateDomain(hosts []string) (string, error) {
 			return "", err
 		}
 		//if token not found, create a new one
-		if err = c.setSecret(&resp); err != nil {
+		if err = c.setSecret(resp); err != nil {
 			return "", err
 		}
 	}
@@ -284,6 +327,10 @@ func (c *Client) getSecret() (string, string, error) {
 		return "", "", err
 	}
 	return string(sec.Data["fqdn"]), string(sec.Data["token"]), nil
+}
+
+func (c *Client) deleteSecret() error {
+	return c.secrets.DeleteNamespaced(c.clusterName, secretKey, &metav1.DeleteOptions{})
 }
 
 func NewClient(secrets v1.SecretInterface, secretLister v1.SecretLister, clusterName string) *Client {
