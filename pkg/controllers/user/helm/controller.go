@@ -53,6 +53,8 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 		NsClient:              user.Core.Namespaces(""),
 	}
 	appClient.AddClusterScopedLifecycle(ctx, "helm-controller", user.ClusterName, stackLifecycle)
+
+	StartStateCalculator(ctx, user)
 }
 
 type Lifecycle struct {
@@ -145,6 +147,15 @@ func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 }
 
 func (l *Lifecycle) DeployApp(obj *v3.App) (*v3.App, error) {
+	obj = obj.DeepCopy()
+	var err error
+	if !v3.AppConditionInstalled.IsUnknown(obj) {
+		v3.AppConditionInstalled.Unknown(obj)
+		obj, err = l.AppGetter.Apps("").Update(obj)
+		if err != nil {
+			return obj, err
+		}
+	}
 	newObj, err := v3.AppConditionInstalled.Do(obj, func() (runtime.Object, error) {
 		template, notes, tempDir, err := generateTemplates(obj, l.TemplateVersionClient, l.TemplateContentClient)
 		defer os.RemoveAll(tempDir)
