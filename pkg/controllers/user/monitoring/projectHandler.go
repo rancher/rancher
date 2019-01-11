@@ -191,7 +191,7 @@ func (ah *appHandler) grantProjectMonitoringPermissions(appName, appTargetNamesp
 			}
 			if appServiceAccount.Name == appServiceAccountName {
 				if appServiceAccount.DeletionTimestamp != nil {
-					return errors.New(fmt.Sprintf("stale %q ServiceAccount in %q Namespace is still on terminating", appServiceAccountName, appTargetNamespace))
+					return fmt.Errorf("stale %q ServiceAccount in %q Namespace is still on terminating", appServiceAccountName, appTargetNamespace)
 				}
 			} else {
 				appServiceAccount = &k8scorev1.ServiceAccount{
@@ -218,7 +218,7 @@ func (ah *appHandler) grantProjectMonitoringPermissions(appName, appTargetNamesp
 			}
 			if appClusterRoleBinding.Name == appClusterRoleBindingName {
 				if appClusterRoleBinding.DeletionTimestamp != nil {
-					return errors.New(fmt.Sprintf("stale %q ClusterRoleBinding is still on terminating", appClusterRoleBindingName))
+					return fmt.Errorf("stale %q ClusterRoleBinding is still on terminating", appClusterRoleBindingName)
 				}
 			} else {
 				appClusterRoleBinding = &k8srbacv1.ClusterRoleBinding{

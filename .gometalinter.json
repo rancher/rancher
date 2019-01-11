@@ -1,0 +1,11 @@
+{
+    "Enable": [
+        "golint",
+        "vet"
+    ],
+    "Exclude": [
+        "or be unexported",
+        "hyperkube"
+    ],
+    "Deadline": "60s"
+}
