@@ -105,11 +105,17 @@ func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 		}
 		if obj.Spec.ExternalID != "" {
 			if currentRevision.Status.ExternalID == obj.Spec.ExternalID && reflect.DeepEqual(currentRevision.Status.Answers, obj.Spec.Answers) {
+				if !v3.AppConditionForceUpgrade.IsTrue(obj) {
+					v3.AppConditionForceUpgrade.True(obj)
+				}
 				return obj, nil
 			}
 		}
 		if obj.Status.AppliedFiles != nil {
 			if reflect.DeepEqual(obj.Status.AppliedFiles, obj.Spec.Files) && reflect.DeepEqual(currentRevision.Status.Answers, obj.Spec.Answers) {
+				if !v3.AppConditionForceUpgrade.IsTrue(obj) {
+					v3.AppConditionForceUpgrade.True(obj)
+				}
 				return obj, nil
 			}
 		}
@@ -117,6 +123,9 @@ func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 	result, err := l.DeployApp(obj)
 	if err != nil {
 		return result, err
+	}
+	if !v3.AppConditionForceUpgrade.IsTrue(obj) {
+		v3.AppConditionForceUpgrade.True(obj)
 	}
 	ns, err := l.NsClient.Get(obj.Spec.TargetNamespace, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {

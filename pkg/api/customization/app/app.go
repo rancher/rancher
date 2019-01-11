@@ -90,6 +90,7 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 	case "upgrade":
 		externalID := actionInput["externalId"]
 		answers := actionInput["answers"]
+		forceUpgrade := actionInput["forceUpgrade"]
 		_, namespace := ref.Parse(app.ProjectID)
 		obj, err := w.AppGetter.Apps(namespace).Get(app.Name, metav1.GetOptions{})
 		if err != nil {
@@ -105,12 +106,16 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 			}
 		}
 		obj.Spec.ExternalID = convert.ToString(externalID)
+		if convert.ToBool(forceUpgrade) {
+			pv3.AppConditionForceUpgrade.Unknown(obj)
+		}
 		if _, err := w.AppGetter.Apps(namespace).Update(obj); err != nil {
 			return err
 		}
 		return nil
 	case "rollback":
 		revision := actionInput["revisionId"]
+		forceUpgrade := actionInput["forceUpgrade"]
 		if convert.ToString(revision) == "" {
 			return fmt.Errorf("revision is empty")
 		}
@@ -127,6 +132,9 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		}
 		obj.Spec.Answers = appRevision.Status.Answers
 		obj.Spec.ExternalID = appRevision.Status.ExternalID
+		if convert.ToBool(forceUpgrade) {
+			pv3.AppConditionForceUpgrade.Unknown(obj)
+		}
 		if _, err := w.AppGetter.Apps(namespace).Update(obj); err != nil {
 			return err
 		}
