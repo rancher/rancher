@@ -50,6 +50,7 @@ type Client struct {
 	ProjectCatalog                          ProjectCatalogOperations
 	ClusterCatalog                          ClusterCatalogOperations
 	MultiClusterApp                         MultiClusterAppOperations
+	MultiClusterAppRevision                 MultiClusterAppRevisionOperations
 	GlobalDNS                               GlobalDNSOperations
 	GlobalDNSProvider                       GlobalDNSProviderOperations
 	KontainerDriver                         KontainerDriverOperations
@@ -112,6 +113,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.ProjectCatalog = newProjectCatalogClient(client)
 	client.ClusterCatalog = newClusterCatalogClient(client)
 	client.MultiClusterApp = newMultiClusterAppClient(client)
+	client.MultiClusterAppRevision = newMultiClusterAppRevisionClient(client)
 	client.GlobalDNS = newGlobalDNSClient(client)
 	client.GlobalDNSProvider = newGlobalDNSProviderClient(client)
 	client.KontainerDriver = newKontainerDriverClient(client)

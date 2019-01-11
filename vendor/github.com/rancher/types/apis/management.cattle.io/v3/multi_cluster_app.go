@@ -1,8 +1,15 @@
 package v3
 
 import (
+	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/types/apis/project.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+var (
+	MultiClusterAppConditionInstalled condition.Cond = "Installed"
+	MultiClusterAppConditionDeployed  condition.Cond = "Deployed"
 )
 
 type MultiClusterApp struct {
@@ -19,13 +26,17 @@ type MultiClusterApp struct {
 }
 
 type MultiClusterAppSpec struct {
-	TemplateVersionName string   `json:"templateVersionName,omitempty" norman:"type=reference[templateVersion],required"`
-	Answers             []Answer `json:"answers,omitempty"`
-	Targets             []Target `json:"targets,omitempty" norman:"required"`
+	TemplateVersionName  string          `json:"templateVersionName,omitempty" norman:"type=reference[templateVersion],required"`
+	Answers              []Answer        `json:"answers,omitempty"`
+	Targets              []Target        `json:"targets,omitempty" norman:"required"`
+	Members              []Member        `json:"members,omitempty"`
+	RevisionHistoryLimit int             `json:"revisionHistoryLimit,omitempty" norman:"default=10"`
+	UpgradeStrategy      UpgradeStrategy `json:"upgradeStrategy,omitempty"`
 }
 
 type MultiClusterAppStatus struct {
-	Healthstate string `json:"healthState,omitempty"`
+	Conditions   []v3.AppCondition `json:"conditions,omitempty"`
+	RevisionName string            `json:"revisionName,omitempty" norman:"type=reference[multiClusterAppRevision],required"`
 }
 
 type Target struct {
@@ -38,4 +49,34 @@ type Answer struct {
 	ProjectName string            `json:"projectName,omitempty" norman:"type=reference[project]"`
 	ClusterName string            `json:"clusterName,omitempty" norman:"type=reference[cluster]"`
 	Values      map[string]string `json:"values,omitempty" norman:"required"`
+}
+
+type Member struct {
+	UserName           string `json:"userName,omitempty" norman:"type=reference[user]"`
+	UserPrincipalName  string `json:"userPrincipalName,omitempty" norman:"type=reference[principal]"`
+	DisplayName        string `json:"displayName,omitempty"`
+	GroupPrincipalName string `json:"groupPrincipalName,omitempty" norman:"type=reference[principal]"`
+	AccessType         string `json:"accessType,omitempty" norman:"type=enum,options=all|readonly|update"`
+}
+
+type UpgradeStrategy struct {
+	RollingUpdate *RollingUpdate `json:"rollingUpdate,omitempty"`
+}
+
+type RollingUpdate struct {
+	BatchSize int `json:"batchSize,omitempty"`
+	Interval  int `json:"interval,omitempty"`
+}
+
+type MultiClusterAppRevision struct {
+	types.Namespaced
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	TemplateVersionName string   `json:"templateVersionName,omitempty" norman:"type=reference[templateVersion]"`
+	Answers             []Answer `json:"answers,omitempty"`
+}
+
+type MultiClusterAppRollbackInput struct {
+	RevisionName string `json:"revisionName,omitempty" norman:"type=reference[multiClusterAppRevision]"`
 }
