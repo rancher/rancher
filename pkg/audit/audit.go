@@ -114,12 +114,11 @@ func (a *auditLog) write(userInfo *UserInfo, reqHeaders, resHeaders http.Header,
 	}
 
 	buffer.Write(bytes.TrimSuffix(alByte, []byte("}")))
-
-	if a.writer.Level >= levelRequest && a.reqBody != nil {
+	if a.writer.Level >= levelRequest && len(a.reqBody) > 0 {
 		buffer.WriteString(`,"requestBody":`)
 		buffer.Write(bytes.TrimSuffix(a.reqBody, []byte("\n")))
 	}
-	if a.writer.Level >= levelRequestResponse && resHeaders.Get("Content-Type") == contentTypeJSON && resBody != nil {
+	if a.writer.Level >= levelRequestResponse && resHeaders.Get("Content-Type") == contentTypeJSON && len(resBody) > 0 {
 		buffer.WriteString(`,"responseBody":`)
 		buffer.Write(bytes.TrimSuffix(resBody, []byte("\n")))
 	}
