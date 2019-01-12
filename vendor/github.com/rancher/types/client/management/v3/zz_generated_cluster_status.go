@@ -5,7 +5,6 @@ const (
 	ClusterStatusFieldAPIEndpoint                          = "apiEndpoint"
 	ClusterStatusFieldAgentImage                           = "agentImage"
 	ClusterStatusFieldAllocatable                          = "allocatable"
-	ClusterStatusFieldAppliedEnableClusterAuth             = "appliedEnableAuth"
 	ClusterStatusFieldAppliedEnableNetworkPolicy           = "appliedEnableNetworkPolicy"
 	ClusterStatusFieldAppliedPodSecurityPolicyTemplateName = "appliedPodSecurityPolicyTemplateId"
 	ClusterStatusFieldAppliedSpec                          = "appliedSpec"
@@ -27,7 +26,6 @@ type ClusterStatus struct {
 	APIEndpoint                          string                   `json:"apiEndpoint,omitempty" yaml:"apiEndpoint,omitempty"`
 	AgentImage                           string                   `json:"agentImage,omitempty" yaml:"agentImage,omitempty"`
 	Allocatable                          map[string]string        `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
-	AppliedEnableClusterAuth             bool                     `json:"appliedEnableAuth,omitempty" yaml:"appliedEnableAuth,omitempty"`
 	AppliedEnableNetworkPolicy           bool                     `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
 	AppliedPodSecurityPolicyTemplateName string                   `json:"appliedPodSecurityPolicyTemplateId,omitempty" yaml:"appliedPodSecurityPolicyTemplateId,omitempty"`
 	AppliedSpec                          *ClusterSpec             `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`

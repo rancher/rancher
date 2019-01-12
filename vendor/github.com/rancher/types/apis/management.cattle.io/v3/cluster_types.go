@@ -90,9 +90,7 @@ type ClusterSpec struct {
 	EnableNetworkPolicy                  *bool                          `json:"enableNetworkPolicy" norman:"default=false"`
 	EnableClusterAlerting                bool                           `json:"enableClusterAlerting" norman:"default=false"`
 	EnableClusterMonitoring              bool                           `json:"enableClusterMonitoring" norman:"default=false"`
-	EnableClusterAuth                    bool                           `json:"enableClusterAuth" norman:"default=false"`
-	ClusterEndpointFQDN                  string                         `json:"clusterEndpointFQDN,omitempty"`
-	ClusterEndpointFQDNCaCert            string                         `json:"clusterEndpointFQDNCaCert,omitempty"`
+	LocalClusterAuthEndpoint             LocalClusterAuthEndpoint       `json:"localClusterAuthEndpoint,omitempty"`
 }
 
 type ImportedConfig struct {
@@ -121,7 +119,6 @@ type ClusterStatus struct {
 	Version                              *version.Info            `json:"version,omitempty"`
 	AppliedPodSecurityPolicyTemplateName string                   `json:"appliedPodSecurityPolicyTemplateId"`
 	AppliedEnableNetworkPolicy           bool                     `json:"appliedEnableNetworkPolicy" norman:"nocreate,noupdate,default=false"`
-	AppliedEnableClusterAuth             bool                     `json:"appliedEnableAuth"`
 	Capabilities                         Capabilities             `json:"capabilities,omitempty"`
 	MonitoringStatus                     *MonitoringStatus        `json:"monitoringStatus,omitempty" norman:"nocreate,noupdate"`
 }
@@ -245,4 +242,10 @@ type RestoreFromEtcdBackupInput struct {
 type RotateCertificateInput struct {
 	CACertificates bool     `json:"caCertificates,omitempty"`
 	Services       []string `json:"services,omitempty" norman:"type=enum,options=etcd|kubelet|kube-apiserver|kube-proxy|kube-scheduler|kube-controller-manager"`
+}
+
+type LocalClusterAuthEndpoint struct {
+	Enabled bool   `json:"enabled"`
+	FQDN    string `json:"fqdn,omitempty"`
+	CACerts string `json:"caCerts,omitempty"`
 }
