@@ -10,7 +10,6 @@ const (
 	ClusterFieldAgentImage                           = "agentImage"
 	ClusterFieldAllocatable                          = "allocatable"
 	ClusterFieldAnnotations                          = "annotations"
-	ClusterFieldAppliedEnableClusterAuth             = "appliedEnableAuth"
 	ClusterFieldAppliedEnableNetworkPolicy           = "appliedEnableNetworkPolicy"
 	ClusterFieldAppliedPodSecurityPolicyTemplateName = "appliedPodSecurityPolicyTemplateId"
 	ClusterFieldAppliedSpec                          = "appliedSpec"
@@ -18,8 +17,6 @@ const (
 	ClusterFieldCACert                               = "caCert"
 	ClusterFieldCapabilities                         = "capabilities"
 	ClusterFieldCapacity                             = "capacity"
-	ClusterFieldClusterEndpointFQDN                  = "clusterEndpointFQDN"
-	ClusterFieldClusterEndpointFQDNCaCert            = "clusterEndpointFQDNCaCert"
 	ClusterFieldComponentStatuses                    = "componentStatuses"
 	ClusterFieldConditions                           = "conditions"
 	ClusterFieldCreated                              = "created"
@@ -32,7 +29,6 @@ const (
 	ClusterFieldDockerRootDir                        = "dockerRootDir"
 	ClusterFieldDriver                               = "driver"
 	ClusterFieldEnableClusterAlerting                = "enableClusterAlerting"
-	ClusterFieldEnableClusterAuth                    = "enableClusterAuth"
 	ClusterFieldEnableClusterMonitoring              = "enableClusterMonitoring"
 	ClusterFieldEnableNetworkPolicy                  = "enableNetworkPolicy"
 	ClusterFieldFailedSpec                           = "failedSpec"
@@ -40,6 +36,7 @@ const (
 	ClusterFieldInternal                             = "internal"
 	ClusterFieldLabels                               = "labels"
 	ClusterFieldLimits                               = "limits"
+	ClusterFieldLocalClusterAuthEndpoint             = "localClusterAuthEndpoint"
 	ClusterFieldMonitoringStatus                     = "monitoringStatus"
 	ClusterFieldName                                 = "name"
 	ClusterFieldOwnerReferences                      = "ownerReferences"
@@ -59,7 +56,6 @@ type Cluster struct {
 	AgentImage                           string                         `json:"agentImage,omitempty" yaml:"agentImage,omitempty"`
 	Allocatable                          map[string]string              `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
 	Annotations                          map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	AppliedEnableClusterAuth             bool                           `json:"appliedEnableAuth,omitempty" yaml:"appliedEnableAuth,omitempty"`
 	AppliedEnableNetworkPolicy           bool                           `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
 	AppliedPodSecurityPolicyTemplateName string                         `json:"appliedPodSecurityPolicyTemplateId,omitempty" yaml:"appliedPodSecurityPolicyTemplateId,omitempty"`
 	AppliedSpec                          *ClusterSpec                   `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
@@ -67,8 +63,6 @@ type Cluster struct {
 	CACert                               string                         `json:"caCert,omitempty" yaml:"caCert,omitempty"`
 	Capabilities                         *Capabilities                  `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
 	Capacity                             map[string]string              `json:"capacity,omitempty" yaml:"capacity,omitempty"`
-	ClusterEndpointFQDN                  string                         `json:"clusterEndpointFQDN,omitempty" yaml:"clusterEndpointFQDN,omitempty"`
-	ClusterEndpointFQDNCaCert            string                         `json:"clusterEndpointFQDNCaCert,omitempty" yaml:"clusterEndpointFQDNCaCert,omitempty"`
 	ComponentStatuses                    []ClusterComponentStatus       `json:"componentStatuses,omitempty" yaml:"componentStatuses,omitempty"`
 	Conditions                           []ClusterCondition             `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	Created                              string                         `json:"created,omitempty" yaml:"created,omitempty"`
@@ -81,7 +75,6 @@ type Cluster struct {
 	DockerRootDir                        string                         `json:"dockerRootDir,omitempty" yaml:"dockerRootDir,omitempty"`
 	Driver                               string                         `json:"driver,omitempty" yaml:"driver,omitempty"`
 	EnableClusterAlerting                bool                           `json:"enableClusterAlerting,omitempty" yaml:"enableClusterAlerting,omitempty"`
-	EnableClusterAuth                    bool                           `json:"enableClusterAuth,omitempty" yaml:"enableClusterAuth,omitempty"`
 	EnableClusterMonitoring              bool                           `json:"enableClusterMonitoring,omitempty" yaml:"enableClusterMonitoring,omitempty"`
 	EnableNetworkPolicy                  *bool                          `json:"enableNetworkPolicy,omitempty" yaml:"enableNetworkPolicy,omitempty"`
 	FailedSpec                           *ClusterSpec                   `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`
@@ -89,6 +82,7 @@ type Cluster struct {
 	Internal                             bool                           `json:"internal,omitempty" yaml:"internal,omitempty"`
 	Labels                               map[string]string              `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Limits                               map[string]string              `json:"limits,omitempty" yaml:"limits,omitempty"`
+	LocalClusterAuthEndpoint             *LocalClusterAuthEndpoint      `json:"localClusterAuthEndpoint,omitempty" yaml:"localClusterAuthEndpoint,omitempty"`
 	MonitoringStatus                     *MonitoringStatus              `json:"monitoringStatus,omitempty" yaml:"monitoringStatus,omitempty"`
 	Name                                 string                         `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences                      []OwnerReference               `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
