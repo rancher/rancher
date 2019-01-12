@@ -214,6 +214,12 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 	}
 	schema.Formatter = clusterFormatter.Formatter
 	schema.ActionHandler = handler.ClusterActionHandler
+
+	clusterValidator := ccluster.Validator{
+		ClusterLister: managementContext.Management.Clusters("").Controller().Lister(),
+	}
+	schema.Validator = clusterValidator.Validator
+
 	cluster.SetClusterStore(schema, managementContext, clusterManager, k8sProxy)
 }
 

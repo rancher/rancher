@@ -92,7 +92,10 @@ def import_cluster(admin_mc, kube_config_file, cluster_name):
     imported_cluster = client.create_cluster(
                             replace=True,
                             name=cluster_name,
-                            enableClusterAuth=True,
+                            localClusterAuthEndpoint={
+                                'enabled': True,
+                            },
+                            rancherKubernetesEngineConfig={},
                         )
     reg_token = client.create_cluster_registration_token(
                     clusterId=imported_cluster.id

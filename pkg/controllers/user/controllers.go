@@ -70,7 +70,7 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	alert.Register(ctx, cluster)
 	monitoring.Register(ctx, cluster)
 
-	if clusterRec.Spec.EnableClusterAuth {
+	if clusterRec.Spec.LocalClusterAuthEndpoint.Enabled {
 		err := clusterauthtoken.CRDSetup(ctx, cluster.UserOnlyContext())
 		if err != nil {
 			return err

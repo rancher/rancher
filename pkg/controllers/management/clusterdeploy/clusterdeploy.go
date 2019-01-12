@@ -56,15 +56,8 @@ func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, 
 	original := cluster
 	cluster = original.DeepCopy()
 
-	if cluster.Spec.EnableClusterAuth &&
-		cluster.Status.Driver != "" &&
-		cluster.Status.Driver != v3.ClusterDriverRKE &&
-		cluster.Status.Driver != v3.ClusterDriverImported {
-		err = fmt.Errorf("Cannot enable auth for cluster %s with driver [%s] (only RKE)", cluster.Name, cluster.Status.Driver)
-		return nil, err
-	}
 	if cluster.Status.Driver == v3.ClusterDriverRKE {
-		if cluster.Spec.EnableClusterAuth {
+		if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
 			cluster.Spec.RancherKubernetesEngineConfig.Authentication.Strategy = "x509|webhook"
 		} else {
 			cluster.Spec.RancherKubernetesEngineConfig.Authentication.Strategy = "x509"
@@ -116,7 +109,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	}
 
 	var desiredAuth string
-	if cluster.Spec.EnableClusterAuth {
+	if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
 		desiredAuth = cluster.Spec.DesiredAuthImage
 		if desiredAuth == "" || desiredAuth == "fixed" {
 			desiredAuth = image.Resolve(settings.AuthImage.Get())
@@ -151,7 +144,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 			return cluster, types.NewErrors(err, errors.New(string(output)))
 		}
 		v3.ClusterConditionAgentDeployed.Message(cluster, string(output))
-		if !cluster.Spec.EnableClusterAuth && cluster.Status.AppliedEnableClusterAuth && cluster.Status.AuthImage != "" {
+		if !cluster.Spec.LocalClusterAuthEndpoint.Enabled && cluster.Status.AppliedSpec.LocalClusterAuthEndpoint.Enabled && cluster.Status.AuthImage != "" {
 			output, err = kubectl.Delete([]byte(systemtemplate.AuthDaemonSet), kubeConfig)
 		}
 		if err != nil {
@@ -173,7 +166,6 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		if cluster.Spec.DesiredAuthImage == "fixed" {
 			cluster.Spec.DesiredAuthImage = desiredAuth
 		}
-		cluster.Status.AppliedEnableClusterAuth = cluster.Spec.EnableClusterAuth
 	}
 
 	return err

@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rke/services"
 	managementv3 "github.com/rancher/types/client/management/v3"
 )
 
@@ -115,11 +117,11 @@ func ForTokenBased(clusterName, clusterID, host, username, token string) (string
 func ForClusterTokenBased(cluster *managementv3.Cluster, clusterID, host, username, token string) (string, error) {
 	nodes := []node{getDefaultNode(cluster.Name, clusterID, host, username)}
 
-	if cluster.ClusterEndpointFQDN != "" {
+	if cluster.LocalClusterAuthEndpoint.FQDN != "" {
 		clusterNode := node{
 			ClusterName: cluster.Name + "-fqdn",
-			Server:      "https://" + cluster.ClusterEndpointFQDN + ":6443",
-			Cert:        formatCertString(cluster.ClusterEndpointFQDNCaCert),
+			Server:      "https://" + cluster.LocalClusterAuthEndpoint.FQDN,
+			Cert:        formatCertString(cluster.LocalClusterAuthEndpoint.CACerts),
 			User:        username,
 		}
 		nodes = append(nodes, clusterNode)
@@ -129,6 +131,9 @@ func ForClusterTokenBased(cluster *managementv3.Cluster, clusterID, host, userna
 			rkeNodes = cluster.AppliedSpec.RancherKubernetesEngineConfig.Nodes
 		}
 		for _, rkeNode := range rkeNodes {
+			if !slice.ContainsString(rkeNode.Role, services.ControlRole) {
+				continue
+			}
 			clusterNode := node{
 				ClusterName: cluster.Name + "-" + rkeNode.HostnameOverride,
 				Server:      "https://" + rkeNode.Address + ":6443",
