@@ -1,4 +1,4 @@
-package clusteregistrationtokens
+package cluster
 
 import (
 	"bytes"
@@ -103,7 +103,7 @@ func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action
 		err   error
 	)
 
-	if cluster.EnableClusterAuth {
+	if cluster.LocalClusterAuthEndpoint.Enabled {
 		token, err = a.getClusterToken(cluster.ID, apiContext)
 	} else {
 		token, err = a.getToken(apiContext)
@@ -114,7 +114,7 @@ func (a ActionHandler) GenerateKubeconfigActionHandler(actionName string, action
 
 	userName := a.UserMgr.GetUser(apiContext)
 
-	if cluster.EnableClusterAuth {
+	if cluster.LocalClusterAuthEndpoint.Enabled {
 		cfg, err = kubeconfig.ForClusterTokenBased(&cluster, apiContext.ID, apiContext.Request.Host, userName, token)
 	} else {
 		cfg, err = kubeconfig.ForTokenBased(cluster.Name, apiContext.ID, apiContext.Request.Host, userName, token)
