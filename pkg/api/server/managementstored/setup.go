@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/catalog"
 	ccluster "github.com/rancher/rancher/pkg/api/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
+	"github.com/rancher/rancher/pkg/api/customization/globaldns"
 	"github.com/rancher/rancher/pkg/api/customization/globalresource"
 	"github.com/rancher/rancher/pkg/api/customization/kontainerdriver"
 	"github.com/rancher/rancher/pkg/api/customization/logging"
@@ -162,6 +163,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	projectStore.SetProjectStore(schemas.Schema(&managementschema.Version, client.ProjectType), apiContext)
 	setupScopedTypes(schemas)
 	setupPasswordTypes(ctx, schemas, apiContext)
+	multiclusterapp.SetMemberStore(ctx, schemas.Schema(&managementschema.Version, client.MultiClusterAppType), apiContext)
 
 	return nil
 }
@@ -545,16 +547,26 @@ func MultiClusterApps(schemas *types.Schemas, management *config.ScaledContext) 
 		MultiClusterApps:              management.Management.MultiClusterApps(""),
 		MultiClusterAppLister:         management.Management.MultiClusterApps("").Controller().Lister(),
 		MultiClusterAppRevisionLister: management.Management.MultiClusterAppRevisions("").Controller().Lister(),
+		Users:                         management.Management.Users(""),
+		PrtbLister:                    management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		RoleTemplateLister:            management.Management.RoleTemplates("").Controller().Lister(),
 	}
 	schema.Formatter = wrapper.Formatter
 	schema.ActionHandler = wrapper.ActionHandler
 	schema.LinkHandler = wrapper.LinkHandler
+	schema.Validator = wrapper.Validator
 }
 
 func GlobalDNSs(schemas *types.Schemas, management *config.ScaledContext) {
+	gdns := globaldns.Wrapper{
+		GlobalDNSLister: management.Management.GlobalDNSs("").Controller().Lister(),
+		Users:           management.Management.Users(""),
+		PrtbLister:      management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+	}
 	schema := schemas.Schema(&managementschema.Version, client.GlobalDNSType)
 	schema.Store = &globalresource.GlobalNamespaceStore{
 		Store:              schema.Store,
 		NamespaceInterface: management.Core.Namespaces(""),
 	}
+	schema.Validator = gdns.Validator
 }
