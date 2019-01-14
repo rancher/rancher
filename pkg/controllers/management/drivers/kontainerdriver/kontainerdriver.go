@@ -70,6 +70,9 @@ func (l *Lifecycle) Create(obj *v3.KontainerDriver) (runtime.Object, error) {
 
 	if !obj.Spec.BuiltIn {
 		obj, err = l.download(obj)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		v3.KontainerDriverConditionDownloaded.True(obj)
 		v3.KontainerDriverConditionInstalled.True(obj)
