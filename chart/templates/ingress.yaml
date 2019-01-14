@@ -1,0 +1,34 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{ template "rancher.fullname" . }}
+  labels:
+    app: {{ template "rancher.fullname" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+  annotations:
+{{- if eq .Values.tls "external" }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "false" # turn off ssl redirect for external.
+{{- else }}
+  {{- if ne .Values.ingress.tls.source "secret" }}
+    certmanager.k8s.io/issuer: {{ template "rancher.fullname" . }}
+  {{- end }}
+{{- end }}
+{{- if .Values.ingress.extraAnnotations }}
+{{ toYaml .Values.ingress.extraAnnotations | indent 4 }}
+{{- end }}
+spec:
+  rules:
+  - host: {{ .Values.hostname }}  # hostname to access rancher server
+    http:
+      paths:
+      - backend:
+          serviceName: {{ template "rancher.fullname" . }}
+          servicePort: 80
+{{- if eq .Values.tls "ingress" }}
+  tls:
+  - hosts:
+    - {{ .Values.hostname }}
+    secretName: tls-rancher-ingress
+{{- end }}
