@@ -15,7 +15,7 @@ import (
 func StartMCAppStateController(ctx context.Context, cluster *config.UserContext) {
 	mcApps := cluster.Management.Management.MultiClusterApps("")
 	s := &MCAppStateController{
-		Apps:             cluster.Project.Apps("").Controller().Lister(),
+		Apps:             cluster.Management.Project.Apps("").Controller().Lister(),
 		MultiClusterApps: mcApps,
 	}
 	mcApps.AddHandler(ctx, "multi-cluster-app-state-controller", s.sync)
