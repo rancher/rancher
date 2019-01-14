@@ -1,0 +1,9 @@
+Rancher Server has been installed.
+
+NOTE: Rancher may take several minutes to fully initialize. Please standby while Certificates are being issued and Ingress comes up.
+
+Check out our docs at https://rancher.com/docs/rancher/v2.x/en/
+
+Browse to https://{{ .Values.hostname }}
+
+Happy Containering!

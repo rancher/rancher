@@ -1,11 +1,15 @@
 #!/bin/bash
+shopt -s extglob
 
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
     DIRTY="-dirty"
 fi
 
 COMMIT=$(git rev-parse --short HEAD)
+COMMIT_DATE=$(git --no-pager log -1 --format='%ct')
+COMMIT_BRANCH=$(git rev-parse --abbrev-ref HEAD | sed -E 's/\W+/-/g')
 GIT_TAG=${DRONE_TAG:-$(git tag -l --contains HEAD | head -n 1)}
+LAST_TAG=${GIT_TAG:-'v0.0.0'}
 
 if [[ -z "$DIRTY" && -n "$GIT_TAG" ]]; then
     VERSION=$GIT_TAG
@@ -13,6 +17,35 @@ else
     VERSION="${COMMIT}${DIRTY}"
 fi
 
+# Chart tag.
+if [[ -z "${DIRTY}" && -n "${GIT_TAG}" ]]; then
+    CHART_VERSION="${GIT_TAG}"
+elif [[ "$DIRTY" ]]; then
+    CHART_VERSION="${LAST_TAG}${DIRTY}.${COMMIT}"
+else
+    CHART_VERSION="${LAST_TAG}-${COMMIT_DATE}.${COMMIT_BRANCH}.${COMMIT}"
+fi
+
+# Drop the v prefix for Chart Version to follow existing pattern.
+CHART_VERSION="$(echo ${CHART_VERSION} | sed -E 's/^v//')"
+
+# Chart Repo - Target Repo for releases.
+case $CHART_VERSION in
+    *-alpha*) # All alpha tags
+        CHART_REPO="alpha" ;;
+    *-rc*) # All rc tags
+        CHART_REPO="latest" ;;
+    +([0-9]).+([0-9]).+([0-9])) # All release tags
+        CHART_REPO="latest" ;;
+    *) # Anything else - Future use
+        CHART_REPO="dev" ;;
+esac
+
 if [ -z "$ARCH" ]; then
     ARCH=amd64
 fi
+
+echo "ARCH: $ARCH"
+echo "CHART_REPO: $CHART_REPO"
+echo "CHART_VERSION: $CHART_VERSION"
+echo "VERSION: $VERSION"

@@ -1,0 +1,16 @@
+suite: Test Deployment
+templates:
+- deployment.yaml
+tests:
+- it: should set --add-local=false
+  set:
+    addLocal: "false"
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].args
+      content: "--add-local=false"
+- it: should default to --add-local=auto
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].args
+      content: "--add-local=auto"

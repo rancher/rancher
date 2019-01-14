@@ -1,0 +1,157 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: {{ template "rancher.fullname" . }}
+  labels:
+    app: {{ template "rancher.fullname" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: {{ template "rancher.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "rancher.fullname" . }}
+        release: {{ .Release.Name }}
+    spec:
+      serviceAccountName: {{ template "rancher.fullname" . }}
+{{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+{{ toYaml .Values.imagePullSecrets | indent 6 }}
+{{- end }}
+      affinity:
+        podAntiAffinity:
+{{- if eq .Values.antiAffinity "required" }}
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - {{ template "rancher.fullname" . }}
+            topologyKey: kubernetes.io/hostname
+{{- else }}
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - {{ template "rancher.fullname" . }}
+              topologyKey: kubernetes.io/hostname
+{{- end }}
+      containers:
+      - image: {{ .Values.rancherImage }}:{{ default .Chart.AppVersion .Values.rancherImageTag }}
+        name: {{ template "rancher.name" . }}
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        args:
+{{- if .Values.debug }}
+        - "--debug"
+{{- end }}
+{{- if .Values.privateCA }}
+        # Private CA - don't clear ca certs
+{{- else if eq .Values.ingress.tls.source "rancher" }}
+        # Rancher self-signed - don't clear ca certs
+{{- else }}
+        # Public trusted CA - clear ca certs
+        - "--no-cacerts"
+{{- end }}
+        - "--http-listen-port=80"
+        - "--https-listen-port=443"
+        - "--add-local={{ .Values.addLocal }}"
+        env:
+        - name: CATTLE_NAMESPACE
+          value: {{ .Release.Namespace }}
+        - name: CATTLE_PEER_SERVICE
+          value: {{ template "rancher.fullname" . }}
+{{- if gt .Values.auditLog.level 0.0 }}
+        - name: AUDIT_LEVEL
+          value: {{ .Values.auditLog.level | quote }}
+        - name: AUDIT_LOG_MAXAGE
+          value: {{ .Values.auditLog.maxAge | quote }}
+        - name: AUDIT_LOG_MAXBACKUP
+          value: {{ .Values.auditLog.maxBackup | quote }}
+        - name: AUDIT_LOG_MAXSIZE
+          value: {{ .Values.auditLog.maxSize | quote }}
+{{- end }}
+{{- if .Values.proxy }}
+        - name: HTTP_PROXY
+          value: {{ .Values.proxy }}
+        - name: HTTPS_PROXY
+          value: {{ .Values.proxy }}
+        - name: NO_PROXY
+          value: {{ .Values.noProxy }}
+{{- end }}
+        livenessProbe:
+          tcpSocket:
+            port: 80
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          tcpSocket:
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 30
+        resources:
+{{ toYaml .Values.resources | indent 10 }}
+        volumeMounts:
+{{- if .Values.additionalTrustedCAs }}
+        - mountPath: /etc/rancher/ssl/ca-additional.pem
+          name: tls-ca-additional-volume
+          subPath: ca-additional.pem
+          readOnly: true
+{{- end }}
+{{- if .Values.privateCA }}
+        # Pass CA cert into rancher for private CA
+        - mountPath: /etc/rancher/ssl
+          name: tls-ca-volume
+          subPath: cacerts.pem
+          readOnly: true
+{{- end }}
+{{- if gt .Values.auditLog.level 0.0 }}
+        - mountPath: /var/log/auditlog
+          name: audit-log
+{{- end }}
+{{- if gt .Values.auditLog.level 0.0 }}
+      # Make audit logs avalible for Rancher log collecter tools.
+      - image: busybox
+        name: {{ template "rancher.name" . }}-audit-log
+        command: ["tail"]
+        args: ["-F", "/var/log/auditlog/rancher-api-audit.log"]
+        volumeMounts:
+        - mountPath: /var/log/auditlog
+          name: audit-log
+{{- end }}
+      volumes:
+{{- if .Values.additionalTrustedCAs }}
+      - name: tls-ca-additional-volume
+        secret:
+          defaultMode: 0400
+          secretName: tls-ca-additional
+{{- end }}
+{{- if .Values.privateCA }}
+      - name: tls-ca-volume
+        secret:
+          defaultMode: 0400
+          secretName: tls-ca
+{{- end }}
+{{- if gt .Values.auditLog.level 0.0 }}
+  {{- if eq .Values.auditLog.destination "hostPath" }}
+      - name: audit-log
+        hostPath:
+          path: {{ .Values.auditLog.hostPath }}
+          type: DirectoryOrCreate
+  {{- else }}
+      - name: audit-log
+        emptyDir: {}
+  {{- end }}
+{{- end }}
+
