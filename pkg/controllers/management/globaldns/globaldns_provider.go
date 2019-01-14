@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"text/template"
 
+	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -15,6 +16,7 @@ import (
 	"k8s.io/api/extensions/v1beta1"
 	k8srbacV1 "k8s.io/api/rbac/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -34,6 +36,7 @@ type ProviderLauncher struct {
 	ServiceAccounts         corev1.ServiceAccountInterface
 	ClusterRoles            rbacv1.ClusterRoleInterface
 	ClusterRoleBindings     rbacv1.ClusterRoleBindingInterface
+	managementContext       *config.ManagementContext
 }
 
 func newGlobalDNSProviderLauncher(ctx context.Context, mgmt *config.ManagementContext) *ProviderLauncher {
@@ -44,6 +47,7 @@ func newGlobalDNSProviderLauncher(ctx context.Context, mgmt *config.ManagementCo
 		ServiceAccounts:         mgmt.K8sClient.CoreV1().ServiceAccounts(namespace.GlobalNamespace),
 		ClusterRoles:            mgmt.K8sClient.RbacV1beta1().ClusterRoles(),
 		ClusterRoleBindings:     mgmt.K8sClient.RbacV1beta1().ClusterRoleBindings(),
+		managementContext:       mgmt,
 	}
 	return n
 }
@@ -53,6 +57,14 @@ func (n *ProviderLauncher) sync(key string, obj *v3.GlobalDNSProvider) (runtime.
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
+	metaAccessor, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+	creatorID, ok := metaAccessor.GetAnnotations()[globalnamespacerbac.CreatorIDAnn]
+	if !ok {
+		return nil, fmt.Errorf("GlobalDNS %v has no creatorId annotation", metaAccessor.GetName())
+	}
 	//check if provider already running for this GlobalDNSProvider.
 	if n.isProviderAlreadyRunning(obj) {
 		logrus.Infof("GlobaldnsProviderLauncher: Found a running external-dns deployment for this provider %v , skip creating a new one", obj.Name)
@@ -60,7 +72,7 @@ func (n *ProviderLauncher) sync(key string, obj *v3.GlobalDNSProvider) (runtime.
 	}
 
 	//create svcAcct and rbac entities if not created already
-	err := n.createExternalDNSServiceAccount()
+	err = n.createExternalDNSServiceAccount()
 	if err != nil {
 		return nil, err
 	}
@@ -80,6 +92,9 @@ func (n *ProviderLauncher) sync(key string, obj *v3.GlobalDNSProvider) (runtime.
 		return n.handleRoute53Provider(obj)
 	}
 
+	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.GlobalDNSProviderResource, obj.Name, obj.Spec.Members, creatorID, n.managementContext); err != nil {
+		return nil, err
+	}
 	return nil, nil
 }
 

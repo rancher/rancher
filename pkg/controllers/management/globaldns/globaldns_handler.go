@@ -4,16 +4,21 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"reflect"
 	"strings"
 
+	access "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
+	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 
+	"github.com/rancher/types/client/management/v3"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -26,16 +31,22 @@ const (
 )
 
 type GDController struct {
-	globalDNSs      v3.GlobalDNSInterface
-	globalDNSLister v3.GlobalDNSLister
-	ingresses       clientv1beta1.IngressInterface //need to use client-go IngressInterface to update Ingress.Status field
+	globalDNSs        v3.GlobalDNSInterface
+	globalDNSLister   v3.GlobalDNSLister
+	ingresses         clientv1beta1.IngressInterface //need to use client-go IngressInterface to update Ingress.Status field
+	managementContext *config.ManagementContext
+	prtbLister        v3.ProjectRoleTemplateBindingLister
+	rtLister          v3.RoleTemplateLister
 }
 
 func newGlobalDNSController(ctx context.Context, mgmt *config.ManagementContext) *GDController {
 	n := &GDController{
-		globalDNSs:      mgmt.Management.GlobalDNSs(namespace.GlobalNamespace),
-		globalDNSLister: mgmt.Management.GlobalDNSs(namespace.GlobalNamespace).Controller().Lister(),
-		ingresses:       mgmt.K8sClient.Extensions().Ingresses(namespace.GlobalNamespace),
+		globalDNSs:        mgmt.Management.GlobalDNSs(namespace.GlobalNamespace),
+		globalDNSLister:   mgmt.Management.GlobalDNSs(namespace.GlobalNamespace).Controller().Lister(),
+		ingresses:         mgmt.K8sClient.Extensions().Ingresses(namespace.GlobalNamespace),
+		managementContext: mgmt,
+		prtbLister:        mgmt.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		rtLister:          mgmt.Management.RoleTemplates("").Controller().Lister(),
 	}
 	return n
 }
@@ -44,6 +55,15 @@ func newGlobalDNSController(ctx context.Context, mgmt *config.ManagementContext)
 func (n *GDController) sync(key string, obj *v3.GlobalDNS) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
+	}
+
+	metaAccessor, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+	creatorID, ok := metaAccessor.GetAnnotations()[globalnamespacerbac.CreatorIDAnn]
+	if !ok {
+		return nil, fmt.Errorf("GlobalDNS %v has no creatorId annotation", metaAccessor.GetName())
 	}
 
 	//check if status.endpoints is set, if yes create a dummy ingress if not already present
@@ -78,6 +98,25 @@ func (n *GDController) sync(key string, obj *v3.GlobalDNS) (runtime.Object, erro
 		return nil, fmt.Errorf("GlobalDNSController: Error updating ingress for the GlobalDNS %v", err)
 	}
 
+	groups := globalnamespacerbac.GetMemberGroups(obj.Spec.Members)
+	if err := access.CheckGroupAccess(groups, obj.Spec.ProjectNames, n.prtbLister, n.rtLister, "", client.GlobalDNSType); err != nil {
+		return nil, err
+	}
+
+	currentMembers := globalnamespacerbac.GetCurrentMembers(obj.Spec.Members)
+	updatedMembers, err := globalnamespacerbac.GetUpdatedMembers(obj.Spec.ProjectNames, obj.Spec.Members, n.prtbLister)
+	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.GlobalDNSResource, obj.Name, updatedMembers, creatorID, n.managementContext); err != nil {
+		return nil, err
+	}
+
+	if !reflect.DeepEqual(updatedMembers, currentMembers) {
+		toUpdate := obj.DeepCopy()
+		toUpdate.Spec.Members = updatedMembers
+		_, err := n.globalDNSs.Update(toUpdate)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return nil, nil
 }
 
