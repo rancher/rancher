@@ -41,6 +41,7 @@ type GlobalDNSProvider struct {
 
 type GlobalDNSProviderSpec struct {
 	Route53ProviderConfig *Route53ProviderConfig `json:"route53ProviderConfig,omitempty"`
+	Members               []Member               `json:"members,omitempty"`
 }
 
 type Route53ProviderConfig struct {
