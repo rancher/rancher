@@ -2583,6 +2583,11 @@ func (in *GlobalDNSProviderSpec) DeepCopyInto(out *GlobalDNSProviderSpec) {
 		*out = new(Route53ProviderConfig)
 		**out = **in
 	}
+	if in.Members != nil {
+		in, out := &in.Members, &out.Members
+		*out = make([]Member, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
