@@ -130,14 +130,13 @@ func validateServicesOptions(c *Cluster) error {
 
 func validateEtcdBackupOptions(c *Cluster) error {
 	if c.Services.Etcd.BackupConfig != nil {
-		if c.Services.Etcd.BackupConfig.S3BackupConfig == nil {
-			return fmt.Errorf("etcd backup is enabled but no s3 backend is specified")
-		}
-		if len(c.Services.Etcd.BackupConfig.S3BackupConfig.Endpoint) == 0 {
-			return fmt.Errorf("etcd s3 backup backend endpoint can't be empty")
-		}
-		if len(c.Services.Etcd.BackupConfig.S3BackupConfig.BucketName) == 0 {
-			return fmt.Errorf("etcd s3 backup backend bucketName can't be empty")
+		if c.Services.Etcd.BackupConfig.S3BackupConfig != nil {
+			if len(c.Services.Etcd.BackupConfig.S3BackupConfig.Endpoint) == 0 {
+				return fmt.Errorf("etcd s3 backup backend endpoint can't be empty")
+			}
+			if len(c.Services.Etcd.BackupConfig.S3BackupConfig.BucketName) == 0 {
+				return fmt.Errorf("etcd s3 backup backend bucketName can't be empty")
+			}
 		}
 	}
 	return nil

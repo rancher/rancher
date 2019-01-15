@@ -47,6 +47,23 @@ func CertificateCommand() cli.Command {
 					},
 				},
 			},
+			cli.Command{
+				Name:   "generate-csr",
+				Usage:  "Generate certificate sign requests for k8s components",
+				Action: generateCSRFromCli,
+				Flags: []cli.Flag{
+					cli.StringFlag{
+						Name:   "config",
+						Usage:  "Specify an alternate cluster YAML file",
+						Value:  pki.ClusterConfig,
+						EnvVar: "RKE_CONFIG",
+					},
+					cli.StringFlag{
+						Name:  "cert-dir",
+						Usage: "Specify a certificate dir path",
+					},
+				},
+			},
 		},
 	}
 }
@@ -79,6 +96,28 @@ func rotateRKECertificatesFromCli(ctx *cli.Context) error {
 	}
 	_, _, _, _, _, err = ClusterUp(context.Background(), hosts.DialersOptions{}, externalFlags)
 	return err
+}
+
+func generateCSRFromCli(ctx *cli.Context) error {
+	clusterFile, filePath, err := resolveClusterFile(ctx)
+	if err != nil {
+		return fmt.Errorf("Failed to resolve cluster file: %v", err)
+	}
+
+	rkeConfig, err := cluster.ParseConfig(clusterFile)
+	if err != nil {
+		return fmt.Errorf("Failed to parse cluster file: %v", err)
+	}
+	rkeConfig, err = setOptionsFromCLI(ctx, rkeConfig)
+	if err != nil {
+		return err
+	}
+	// setting up the flags
+	externalFlags := cluster.GetExternalFlags(false, false, false, "", filePath)
+	externalFlags.CertificateDir = ctx.String("cert-dir")
+	externalFlags.CustomCerts = ctx.Bool("custom-certs")
+
+	return GenerateRKECSRs(context.Background(), rkeConfig, externalFlags)
 }
 
 func showRKECertificatesFromCli(ctx *cli.Context) error {
@@ -115,7 +154,7 @@ func rebuildClusterWithRotatedCertificates(ctx context.Context,
 	clientKey = string(cert.EncodePrivateKeyPEM(kubeCluster.Certificates[pki.KubeAdminCertName].Key))
 	caCrt = string(cert.EncodeCertPEM(kubeCluster.Certificates[pki.CACertName].Certificate))
 
-	if err := kubeCluster.SetUpHosts(ctx, true); err != nil {
+	if err := kubeCluster.SetUpHosts(ctx, flags); err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
 	// Save new State
@@ -166,4 +205,28 @@ func rotateRKECertificates(ctx context.Context, kubeCluster *cluster.Cluster, fl
 		return nil, err
 	}
 	return rkeFullState, nil
+}
+
+func GenerateRKECSRs(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, flags cluster.ExternalFlags) error {
+	log.Infof(ctx, "Generating Kubernetes cluster CSR certificates")
+	if len(flags.CertificateDir) == 0 {
+		flags.CertificateDir = cluster.GetCertificateDirPath(flags.ClusterFilePath, flags.ConfigDir)
+	}
+
+	certBundle, err := pki.ReadCSRsAndKeysFromDir(flags.CertificateDir)
+	if err != nil {
+		return err
+	}
+
+	// initialze the cluster object from the config file
+	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags)
+	if err != nil {
+		return err
+	}
+
+	// Generating csrs for kubernetes components
+	if err := pki.GenerateRKEServicesCSRs(ctx, certBundle, kubeCluster.RancherKubernetesEngineConfig); err != nil {
+		return err
+	}
+	return pki.WriteCertificates(kubeCluster.CertificateDir, certBundle)
 }

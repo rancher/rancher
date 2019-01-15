@@ -34,6 +34,7 @@ type Cluster struct {
 	CloudConfigFile                  string
 	ControlPlaneHosts                []*hosts.Host
 	Certificates                     map[string]pki.CertificatePKI
+	CertificateDir                   string
 	ClusterDomain                    string
 	ClusterCIDR                      string
 	ClusterDNSServer                 string
@@ -49,8 +50,8 @@ type Cluster struct {
 	LocalConnDialerFactory           hosts.DialerFactory
 	PrivateRegistriesMap             map[string]v3.PrivateRegistry
 	StateFilePath                    string
-	UseKubectlDeploy                 bool
 	UpdateWorkersOnly                bool
+	UseKubectlDeploy                 bool
 	v3.RancherKubernetesEngineConfig `yaml:",inline"`
 	WorkerHosts                      []*hosts.Host
 }
@@ -152,16 +153,19 @@ func InitClusterObject(ctx context.Context, rkeConfig *v3.RancherKubernetesEngin
 		ConfigPath:                    flags.ClusterFilePath,
 		ConfigDir:                     flags.ConfigDir,
 		DinD:                          flags.DinD,
+		CertificateDir:                flags.CertificateDir,
 		StateFilePath:                 GetStateFilePath(flags.ClusterFilePath, flags.ConfigDir),
 		PrivateRegistriesMap:          make(map[string]v3.PrivateRegistry),
 	}
 	if len(c.ConfigPath) == 0 {
 		c.ConfigPath = pki.ClusterConfig
 	}
-
-	// set kube_config and state file
+	// set kube_config, state file, and certificate dir
 	c.LocalKubeConfigPath = pki.GetLocalKubeConfig(c.ConfigPath, c.ConfigDir)
 	c.StateFilePath = GetStateFilePath(c.ConfigPath, c.ConfigDir)
+	if len(c.CertificateDir) == 0 {
+		c.CertificateDir = GetCertificateDirPath(c.ConfigPath, c.ConfigDir)
+	}
 
 	// Setting cluster Defaults
 	c.setClusterDefaults(ctx)

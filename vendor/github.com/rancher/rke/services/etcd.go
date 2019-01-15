@@ -275,7 +275,7 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 		imageCfg.Cmd = append(imageCfg.Cmd, "--creation="+es.Creation)
 	}
 
-	if es.BackupConfig != nil && es.BackupConfig.S3BackupConfig != nil {
+	if es.BackupConfig != nil {
 		imageCfg = configS3BackupImgCmd(ctx, imageCfg, es.BackupConfig)
 	}
 	hostCfg := &container.HostConfig{
@@ -447,16 +447,20 @@ func GetEtcdSnapshotChecksum(ctx context.Context, etcdHost *hosts.Host, prsMap m
 }
 
 func configS3BackupImgCmd(ctx context.Context, imageCfg *container.Config, bc *v3.BackupConfig) *container.Config {
-	log.Infof(ctx, "Invoking s3 backup server cmd config, bucketName:%s, endpoint:%s", bc.S3BackupConfig.BucketName, bc.S3BackupConfig.Endpoint)
 	cmd := []string{
-		"--s3-backup=true",
-		"--s3-endpoint=" + bc.S3BackupConfig.Endpoint,
-		"--s3-accessKey=" + bc.S3BackupConfig.AccessKey,
-		"--s3-secretKey=" + bc.S3BackupConfig.SecretKey,
-		"--s3-bucketName=" + bc.S3BackupConfig.BucketName,
-		"--s3-region=" + bc.S3BackupConfig.Region,
 		"--creation=" + fmt.Sprintf("%dh", bc.IntervalHours),
 		"--retention=" + fmt.Sprintf("%dh", bc.Retention*bc.IntervalHours),
+	}
+
+	if bc.S3BackupConfig != nil {
+		cmd = append(cmd, []string{
+			"--s3-backup=true",
+			"--s3-endpoint=" + bc.S3BackupConfig.Endpoint,
+			"--s3-accessKey=" + bc.S3BackupConfig.AccessKey,
+			"--s3-secretKey=" + bc.S3BackupConfig.SecretKey,
+			"--s3-bucketName=" + bc.S3BackupConfig.BucketName,
+			"--s3-region=" + bc.S3BackupConfig.Region,
+		}...)
 	}
 	imageCfg.Cmd = append(imageCfg.Cmd, cmd...)
 	return imageCfg

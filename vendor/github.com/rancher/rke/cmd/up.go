@@ -52,6 +52,14 @@ func UpCommand() cli.Command {
 			Name:  "init",
 			Usage: "Initiate RKE cluster",
 		},
+		cli.StringFlag{
+			Name:  "cert-dir",
+			Usage: "Specify a certificate dir path",
+		},
+		cli.BoolFlag{
+			Name:  "custom-certs",
+			Usage: "Use custom certificates from a cert dir",
+		},
 	}
 
 	upFlags = append(upFlags, commonFlags...)
@@ -153,7 +161,7 @@ func ClusterUp(ctx context.Context, dialersOptions hosts.DialersOptions, flags c
 	caCrt = string(cert.EncodeCertPEM(kubeCluster.Certificates[pki.CACertName].Certificate))
 
 	// moved deploying certs before reconcile to remove all unneeded certs generation from reconcile
-	err = kubeCluster.SetUpHosts(ctx, false)
+	err = kubeCluster.SetUpHosts(ctx, flags)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
@@ -257,7 +265,9 @@ func clusterUpFromCli(ctx *cli.Context) error {
 	disablePortCheck := ctx.Bool("disable-port-check")
 	// setting up the flags
 	flags := cluster.GetExternalFlags(false, updateOnly, disablePortCheck, "", filePath)
-
+	// Custom certificates and certificate dir flags
+	flags.CertificateDir = ctx.String("cert-dir")
+	flags.CustomCerts = ctx.Bool("custom-certs")
 	if ctx.Bool("init") {
 		return ClusterInit(context.Background(), rkeConfig, hosts.DialersOptions{}, flags)
 	}
