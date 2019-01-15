@@ -105,6 +105,9 @@ func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
 
 func (c *Controller) Remove(b *v3.EtcdBackup) (runtime.Object, error) {
 	logrus.Infof("[etcd-backup] Deleteing backup %s ", b.Name)
+	if b.BackupConfig.S3BackupConfig == nil {
+		return b, nil
+	}
 	return b, c.deleteS3Snapshot(b)
 }
 
