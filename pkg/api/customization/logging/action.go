@@ -44,7 +44,7 @@ type Handler struct {
 	projectLoggingLister mgmtv3.ProjectLoggingLister
 }
 
-func NewHandler(dialer dialer.Factory, appsGetter projectv3.AppsGetter, projectLister mgmtv3.ProjectLister, pods v1.PodInterface, projectLoggingLister mgmtv3.ProjectLoggingLister, namespaces v1.NamespaceInterface, templateLister mgmtv3.TemplateLister, clusterManager *clustermanager.Manager, k8sProxy http.Handler) *Handler {
+func NewHandler(dialer dialer.Factory, appsGetter projectv3.AppsGetter, projectLister mgmtv3.ProjectLister, pods v1.PodInterface, projectLoggingLister mgmtv3.ProjectLoggingLister, namespaces v1.NamespaceInterface, templateLister mgmtv3.CatalogTemplateLister, clusterManager *clustermanager.Manager, k8sProxy http.Handler) *Handler {
 	testerDeployer := deployer.NewTesterDeployer(appsGetter, projectLister, pods, projectLoggingLister, namespaces, templateLister)
 	configGenerator := configsyncer.NewConfigGenerator(metav1.NamespaceAll, nil, projectLoggingLister, namespaces.Controller().Lister())
 

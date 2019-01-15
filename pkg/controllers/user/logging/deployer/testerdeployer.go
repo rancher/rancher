@@ -10,19 +10,20 @@ import (
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/namespace"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
 type TesterDeployer struct {
 	projectLister        mgmtv3.ProjectLister
-	templateLister       mgmtv3.TemplateLister
+	templateLister       mgmtv3.CatalogTemplateLister
 	projectLoggingLister mgmtv3.ProjectLoggingLister
 	namespacesLister     v1.NamespaceLister
 	appDeployer          *AppDeployer
 }
 
-func NewTesterDeployer(appsGetter projectv3.AppsGetter, projectLister mgmtv3.ProjectLister, pods v1.PodInterface, projectLoggingLister mgmtv3.ProjectLoggingLister, namespaces v1.NamespaceInterface, templateLister mgmtv3.TemplateLister) *TesterDeployer {
+func NewTesterDeployer(appsGetter projectv3.AppsGetter, projectLister mgmtv3.ProjectLister, pods v1.PodInterface, projectLoggingLister mgmtv3.ProjectLoggingLister, namespaces v1.NamespaceInterface, templateLister mgmtv3.CatalogTemplateLister) *TesterDeployer {
 	appDeployer := &AppDeployer{
 		AppsGetter: appsGetter,
 		Namespaces: namespaces,
@@ -56,7 +57,7 @@ func (d *TesterDeployer) Deploy(level, clusterName, projectID string, loggingTar
 
 func (d *TesterDeployer) deployLoggingTester(systemProjectID, systemProjectCreator, level, clusterName, projectID string, loggingTarget mgmtv3.LoggingTargets) error {
 	templateVersionID := loggingconfig.RancherLoggingTemplateID()
-	template, err := d.templateLister.Get(metav1.NamespaceAll, templateVersionID)
+	template, err := d.templateLister.Get(namespace.GlobalNamespace, templateVersionID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to find template by ID %s", templateVersionID)
 	}
