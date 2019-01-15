@@ -23,7 +23,7 @@ type Deployer struct {
 	clusterLoggingLister mgmtv3.ClusterLoggingLister
 	projectLoggingLister mgmtv3.ProjectLoggingLister
 	projectLister        mgmtv3.ProjectLister
-	templateLister       mgmtv3.TemplateLister
+	templateLister       mgmtv3.CatalogTemplateLister
 	appDeployer          *AppDeployer
 }
 
@@ -43,7 +43,7 @@ func NewDeployer(cluster *config.UserContext, secretSyncer *configsyncer.SecretM
 		clusterLoggingLister: cluster.Management.Management.ClusterLoggings(clusterName).Controller().Lister(),
 		projectLoggingLister: cluster.Management.Management.ProjectLoggings(metav1.NamespaceAll).Controller().Lister(),
 		projectLister:        cluster.Management.Management.Projects(metav1.NamespaceAll).Controller().Lister(),
-		templateLister:       cluster.Management.Management.Templates(metav1.NamespaceAll).Controller().Lister(),
+		templateLister:       cluster.Management.Management.CatalogTemplates(metav1.NamespaceAll).Controller().Lister(),
 		appDeployer:          appDeployer,
 	}
 }

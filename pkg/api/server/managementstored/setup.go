@@ -421,7 +421,7 @@ func LoggingTypes(schemas *types.Schemas, management *config.ScaledContext, clus
 		management.Core.Pods(""),
 		management.Management.ProjectLoggings("").Controller().Lister(),
 		management.Core.Namespaces(""),
-		management.Management.Templates("").Controller().Lister(),
+		management.Management.CatalogTemplates("").Controller().Lister(),
 		clusterManager,
 		k8sProxy,
 	)

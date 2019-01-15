@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/types/config"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/namespace"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -25,7 +26,7 @@ var (
 type loggingService struct {
 	clusterName    string
 	projectLister  v3.ProjectLister
-	templateLister v3.TemplateLister
+	templateLister v3.CatalogTemplateLister
 	daemonsets     appsv1beta2.DaemonSetInterface
 	appDeployer    *AppDeployer
 }
@@ -42,7 +43,7 @@ func (l *loggingService) Init(ctx context.Context, cluster *config.UserContext) 
 
 	l.clusterName = cluster.ClusterName
 	l.projectLister = cluster.Management.Management.Projects(metav1.NamespaceAll).Controller().Lister()
-	l.templateLister = cluster.Management.Management.Templates(metav1.NamespaceAll).Controller().Lister()
+	l.templateLister = cluster.Management.Management.CatalogTemplates(metav1.NamespaceAll).Controller().Lister()
 	l.daemonsets = cluster.Apps.DaemonSets(metav1.NamespaceAll)
 	l.appDeployer = ad
 }
@@ -54,7 +55,7 @@ func (l *loggingService) Version() (string, error) {
 func (l *loggingService) Upgrade(currentVersion string) (string, error) {
 	appName := loggingconfig.AppName
 	templateID := loggingconfig.RancherLoggingTemplateID()
-	template, err := l.templateLister.Get(metav1.NamespaceAll, templateID)
+	template, err := l.templateLister.Get(namespace.GlobalNamespace, templateID)
 	if err != nil {
 		return "", errors.Wrapf(err, "get template %s failed", templateID)
 	}
