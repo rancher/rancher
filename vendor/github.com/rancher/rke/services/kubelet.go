@@ -24,6 +24,6 @@ func removeKubelet(ctx context.Context, host *hosts.Host) error {
 	return docker.DoRemoveContainer(ctx, host.DClient, KubeletContainerName, host.Address)
 }
 
-func restartKubelet(ctx context.Context, host *hosts.Host) error {
+func RestartKubelet(ctx context.Context, host *hosts.Host) error {
 	return docker.DoRestartContainer(ctx, host.DClient, KubeletContainerName, host.Address)
 }

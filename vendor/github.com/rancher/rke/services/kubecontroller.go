@@ -23,6 +23,6 @@ func removeKubeController(ctx context.Context, host *hosts.Host) error {
 	return docker.DoRemoveContainer(ctx, host.DClient, KubeControllerContainerName, host.Address)
 }
 
-func restartKubeController(ctx context.Context, host *hosts.Host) error {
+func RestartKubeController(ctx context.Context, host *hosts.Host) error {
 	return docker.DoRestartContainer(ctx, host.DClient, KubeControllerContainerName, host.Address)
 }

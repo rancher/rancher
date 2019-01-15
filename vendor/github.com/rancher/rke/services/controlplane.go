@@ -93,17 +93,17 @@ func RestartControlPlane(ctx context.Context, controlHosts []*hosts.Host) error 
 			for host := range hostsQueue {
 				runHost := host.(*hosts.Host)
 				// restart KubeAPI
-				if err := restartKubeAPI(ctx, runHost); err != nil {
+				if err := RestartKubeAPI(ctx, runHost); err != nil {
 					errList = append(errList, err)
 				}
 
 				// restart KubeController
-				if err := restartKubeController(ctx, runHost); err != nil {
+				if err := RestartKubeController(ctx, runHost); err != nil {
 					errList = append(errList, err)
 				}
 
 				// restart scheduler
-				err := restartScheduler(ctx, runHost)
+				err := RestartScheduler(ctx, runHost)
 				if err != nil {
 					errList = append(errList, err)
 				}

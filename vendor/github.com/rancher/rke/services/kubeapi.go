@@ -25,6 +25,6 @@ func removeKubeAPI(ctx context.Context, host *hosts.Host) error {
 	return docker.DoRemoveContainer(ctx, host.DClient, KubeAPIContainerName, host.Address)
 }
 
-func restartKubeAPI(ctx context.Context, host *hosts.Host) error {
+func RestartKubeAPI(ctx context.Context, host *hosts.Host) error {
 	return docker.DoRestartContainer(ctx, host.DClient, KubeAPIContainerName, host.Address)
 }

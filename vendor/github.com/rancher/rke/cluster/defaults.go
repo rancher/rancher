@@ -52,10 +52,13 @@ const (
 )
 
 type ExternalFlags struct {
-	ConfigDir        string
+	CertificateDir   string
 	ClusterFilePath  string
 	DinD             bool
+	ConfigDir        string
+	CustomCerts      bool
 	DisablePortCheck bool
+	GenerateCSR      bool
 	Local            bool
 	UpdateOnly       bool
 }

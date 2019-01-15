@@ -33,7 +33,7 @@ func regenerateAPICertificate(c *Cluster, certificates map[string]pki.Certificat
 	if err != nil {
 		return nil, err
 	}
-	certificates[pki.KubeAPICertName] = pki.ToCertObject(pki.KubeAPICertName, "", "", kubeAPICert, kubeAPIKey)
+	certificates[pki.KubeAPICertName] = pki.ToCertObject(pki.KubeAPICertName, "", "", kubeAPICert, kubeAPIKey, nil)
 	return certificates, nil
 }
 
@@ -114,7 +114,7 @@ func GetClusterCertsFromKubernetes(ctx context.Context, kubeCluster *Cluster) (m
 	kubeAPICert := certMap[pki.KubeAPICertName]
 	if certMap[pki.ServiceAccountTokenKeyName].Key == nil {
 		log.Infof(ctx, "[certificates] Creating service account token key")
-		certMap[pki.ServiceAccountTokenKeyName] = pki.ToCertObject(pki.ServiceAccountTokenKeyName, pki.ServiceAccountTokenKeyName, "", kubeAPICert.Certificate, kubeAPICert.Key)
+		certMap[pki.ServiceAccountTokenKeyName] = pki.ToCertObject(pki.ServiceAccountTokenKeyName, pki.ServiceAccountTokenKeyName, "", kubeAPICert.Certificate, kubeAPICert.Key, nil)
 	}
 	log.Infof(ctx, "[certificates] Successfully fetched Cluster certificates from Kubernetes")
 	return certMap, nil
@@ -137,7 +137,7 @@ func regenerateAPIAggregationCerts(c *Cluster, certificates map[string]pki.Certi
 	if err != nil {
 		return nil, err
 	}
-	certificates[pki.RequestHeaderCACertName] = pki.ToCertObject(pki.RequestHeaderCACertName, "", "", requestHeaderCACrt, requestHeaderCAKey)
+	certificates[pki.RequestHeaderCACertName] = pki.ToCertObject(pki.RequestHeaderCACertName, "", "", requestHeaderCACrt, requestHeaderCAKey, nil)
 
 	//generate API server proxy client key and certs
 	logrus.Debugf("[certificates] Regenerating Kubernetes API server proxy client certificates")
@@ -145,7 +145,7 @@ func regenerateAPIAggregationCerts(c *Cluster, certificates map[string]pki.Certi
 	if err != nil {
 		return nil, err
 	}
-	certificates[pki.APIProxyClientCertName] = pki.ToCertObject(pki.APIProxyClientCertName, "", "", apiserverProxyClientCrt, apiserverProxyClientKey)
+	certificates[pki.APIProxyClientCertName] = pki.ToCertObject(pki.APIProxyClientCertName, "", "", apiserverProxyClientCrt, apiserverProxyClientKey, nil)
 	return certificates, nil
 }
 
@@ -196,7 +196,7 @@ func RotateRKECertificates(ctx context.Context, c *Cluster, flags ExternalFlags,
 				pki.ServiceAccountTokenKeyName,
 				"",
 				c.Certificates[pki.ServiceAccountTokenKeyName].Certificate,
-				privateKey.(*rsa.PrivateKey))
+				privateKey.(*rsa.PrivateKey), nil)
 		}
 	}
 	clusterState.DesiredState.CertificatesBundle = c.Certificates

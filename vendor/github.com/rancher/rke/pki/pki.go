@@ -18,23 +18,26 @@ import (
 )
 
 type CertificatePKI struct {
-	Certificate    *x509.Certificate `json:"-"`
-	Key            *rsa.PrivateKey   `json:"-"`
-	CertificatePEM string            `json:"certificatePEM"`
-	KeyPEM         string            `json:"keyPEM"`
-	Config         string            `json:"config"`
-	Name           string            `json:"name"`
-	CommonName     string            `json:"commonName"`
-	OUName         string            `json:"ouName"`
-	EnvName        string            `json:"envName"`
-	Path           string            `json:"path"`
-	KeyEnvName     string            `json:"keyEnvName"`
-	KeyPath        string            `json:"keyPath"`
-	ConfigEnvName  string            `json:"configEnvName"`
-	ConfigPath     string            `json:"configPath"`
+	Certificate    *x509.Certificate        `json:"-"`
+	Key            *rsa.PrivateKey          `json:"-"`
+	CSR            *x509.CertificateRequest `json:"-"`
+	CertificatePEM string                   `json:"certificatePEM"`
+	KeyPEM         string                   `json:"keyPEM"`
+	CSRPEM         string                   `json:"-"`
+	Config         string                   `json:"config"`
+	Name           string                   `json:"name"`
+	CommonName     string                   `json:"commonName"`
+	OUName         string                   `json:"ouName"`
+	EnvName        string                   `json:"envName"`
+	Path           string                   `json:"path"`
+	KeyEnvName     string                   `json:"keyEnvName"`
+	KeyPath        string                   `json:"keyPath"`
+	ConfigEnvName  string                   `json:"configEnvName"`
+	ConfigPath     string                   `json:"configPath"`
 }
 
 type GenFunc func(context.Context, map[string]CertificatePKI, v3.RancherKubernetesEngineConfig, string, string, bool) error
+type CSRFunc func(context.Context, map[string]CertificatePKI, v3.RancherKubernetesEngineConfig) error
 
 const (
 	etcdRole            = "etcd"
@@ -110,7 +113,7 @@ func RegenerateEtcdCertificate(
 		return nil, err
 	}
 	etcdName := GetEtcdCrtName(etcdHost.InternalAddress)
-	crtMap[etcdName] = ToCertObject(etcdName, "", "", etcdCrt, etcdKey)
+	crtMap[etcdName] = ToCertObject(etcdName, "", "", etcdCrt, etcdKey, nil)
 	log.Infof(ctx, "[certificates] Successfully generated new etcd-%s certificate and key", etcdHost.InternalAddress)
 	return crtMap, nil
 }

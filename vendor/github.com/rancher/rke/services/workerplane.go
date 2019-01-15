@@ -109,13 +109,13 @@ func RestartWorkerPlane(ctx context.Context, workerHosts []*hosts.Host) error {
 			var errList []error
 			for host := range hostsQueue {
 				runHost := host.(*hosts.Host)
-				if err := restartKubelet(ctx, runHost); err != nil {
+				if err := RestartKubelet(ctx, runHost); err != nil {
 					errList = append(errList, err)
 				}
-				if err := restartKubeproxy(ctx, runHost); err != nil {
+				if err := RestartKubeproxy(ctx, runHost); err != nil {
 					errList = append(errList, err)
 				}
-				if err := restartNginxProxy(ctx, runHost); err != nil {
+				if err := RestartNginxProxy(ctx, runHost); err != nil {
 					errList = append(errList, err)
 				}
 			}
