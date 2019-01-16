@@ -12,6 +12,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/namespace"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -97,7 +98,7 @@ func (d *Deployer) deployRancherLogging(systemProjectID, systemProjectCreator st
 	driverDir := getDriverDir(cluster.Status.Driver)
 
 	templateVersionID := loggingconfig.RancherLoggingTemplateID()
-	template, err := d.templateLister.Get(metav1.NamespaceAll, templateVersionID)
+	template, err := d.templateLister.Get(namespace.GlobalNamespace, templateVersionID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to find template by ID %s", templateVersionID)
 	}
