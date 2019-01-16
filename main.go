@@ -13,6 +13,7 @@ import (
 
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/ehazlett/simplelog"
+	_ "github.com/rancher/norman/controller"
 	"github.com/rancher/norman/pkg/dump"
 	"github.com/rancher/norman/pkg/kwrapper/k8s"
 	"github.com/rancher/norman/signal"
