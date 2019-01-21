@@ -109,7 +109,7 @@ func doRunDeployer(ctx context.Context, host *hosts.Host, containerEnv []string,
 			time.Sleep(5 * time.Second)
 			continue
 		}
-		if err := host.DClient.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{}); err != nil {
+		if err := host.DClient.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{RemoveVolumes: true}); err != nil {
 			return fmt.Errorf("Failed to delete Certificates deployer container on host [%s]: %v", host.Address, err)
 		}
 		return nil
