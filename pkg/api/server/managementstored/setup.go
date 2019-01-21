@@ -37,6 +37,7 @@ import (
 	passwordStore "github.com/rancher/rancher/pkg/api/store/password"
 	"github.com/rancher/rancher/pkg/api/store/preference"
 	"github.com/rancher/rancher/pkg/api/store/scoped"
+	settingstore "github.com/rancher/rancher/pkg/api/store/setting"
 	"github.com/rancher/rancher/pkg/api/store/userscope"
 	"github.com/rancher/rancher/pkg/auth/principals"
 	"github.com/rancher/rancher/pkg/auth/providers"
@@ -412,6 +413,7 @@ func Setting(schemas *types.Schemas) {
 	schema := schemas.Schema(&managementschema.Version, client.SettingType)
 	schema.Formatter = setting.Formatter
 	schema.Validator = setting.Validator
+	schema.Store = settingstore.New(schema.Store)
 }
 
 func LoggingTypes(schemas *types.Schemas, management *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler) {
@@ -506,7 +508,7 @@ func Pipeline(schemas *types.Schemas, management *config.ScaledContext, clusterM
 	schema.ActionHandler = pipelineExecutionHandler.ActionHandler
 
 	schema = schemas.Schema(&projectschema.Version, projectclient.PipelineSettingType)
-	schema.Formatter = setting.Formatter
+	schema.Formatter = setting.PipelineFormatter
 
 	sourceCodeCredentialHandler := &pipeline.SourceCodeCredentialHandler{
 		SourceCodeCredentials:      management.Project.SourceCodeCredentials(""),
