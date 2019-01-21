@@ -691,6 +691,7 @@ func (c *Cluster) BuildSidecarProcess() v3.Process {
 		Labels: map[string]string{
 			ContainerNameLabel: services.SidekickContainerName,
 		},
+		Command: []string{"/bin/bash"},
 	}
 }
 

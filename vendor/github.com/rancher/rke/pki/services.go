@@ -30,7 +30,11 @@ func GenerateKubeAPICertificate(ctx context.Context, certs map[string]Certificat
 		return nil
 	}
 	log.Infof(ctx, "[certificates] Generating Kubernetes API server certificates")
-	kubeAPICrt, kubeAPIKey, err := GenerateSignedCertAndKey(caCrt, caKey, true, KubeAPICertName, kubeAPIAltNames, certs[KubeAPICertName].Key, nil)
+	var serviceKey *rsa.PrivateKey
+	if !rotate {
+		serviceKey = certs[KubeAPICertName].Key
+	}
+	kubeAPICrt, kubeAPIKey, err := GenerateSignedCertAndKey(caCrt, caKey, true, KubeAPICertName, kubeAPIAltNames, serviceKey, nil)
 	if err != nil {
 		return err
 	}
@@ -73,11 +77,15 @@ func GenerateKubeControllerCertificate(ctx context.Context, certs map[string]Cer
 	// generate Kube controller-manager certificate and key
 	caCrt := certs[CACertName].Certificate
 	caKey := certs[CACertName].Key
-	if certs[KubeControllerCertName].Certificate != nil {
+	if certs[KubeControllerCertName].Certificate != nil && !rotate {
 		return nil
 	}
 	log.Infof(ctx, "[certificates] Generating Kube Controller certificates")
-	kubeControllerCrt, kubeControllerKey, err := GenerateSignedCertAndKey(caCrt, caKey, false, getDefaultCN(KubeControllerCertName), nil, certs[KubeControllerCertName].Key, nil)
+	var serviceKey *rsa.PrivateKey
+	if !rotate {
+		serviceKey = certs[KubeControllerCertName].Key
+	}
+	kubeControllerCrt, kubeControllerKey, err := GenerateSignedCertAndKey(caCrt, caKey, false, getDefaultCN(KubeControllerCertName), nil, serviceKey, nil)
 	if err != nil {
 		return err
 	}
@@ -105,11 +113,15 @@ func GenerateKubeSchedulerCertificate(ctx context.Context, certs map[string]Cert
 	// generate Kube scheduler certificate and key
 	caCrt := certs[CACertName].Certificate
 	caKey := certs[CACertName].Key
-	if certs[KubeSchedulerCertName].Certificate != nil {
+	if certs[KubeSchedulerCertName].Certificate != nil && !rotate {
 		return nil
 	}
 	log.Infof(ctx, "[certificates] Generating Kube Scheduler certificates")
-	kubeSchedulerCrt, kubeSchedulerKey, err := GenerateSignedCertAndKey(caCrt, caKey, false, getDefaultCN(KubeSchedulerCertName), nil, certs[KubeSchedulerCertName].Key, nil)
+	var serviceKey *rsa.PrivateKey
+	if !rotate {
+		serviceKey = certs[KubeSchedulerCertName].Key
+	}
+	kubeSchedulerCrt, kubeSchedulerKey, err := GenerateSignedCertAndKey(caCrt, caKey, false, getDefaultCN(KubeSchedulerCertName), nil, serviceKey, nil)
 	if err != nil {
 		return err
 	}
@@ -137,11 +149,15 @@ func GenerateKubeProxyCertificate(ctx context.Context, certs map[string]Certific
 	// generate Kube Proxy certificate and key
 	caCrt := certs[CACertName].Certificate
 	caKey := certs[CACertName].Key
-	if certs[KubeProxyCertName].Certificate != nil {
+	if certs[KubeProxyCertName].Certificate != nil && !rotate {
 		return nil
 	}
 	log.Infof(ctx, "[certificates] Generating Kube Proxy certificates")
-	kubeProxyCrt, kubeProxyKey, err := GenerateSignedCertAndKey(caCrt, caKey, false, getDefaultCN(KubeProxyCertName), nil, certs[KubeProxyCertName].Key, nil)
+	var serviceKey *rsa.PrivateKey
+	if !rotate {
+		serviceKey = certs[KubeProxyCertName].Key
+	}
+	kubeProxyCrt, kubeProxyKey, err := GenerateSignedCertAndKey(caCrt, caKey, false, getDefaultCN(KubeProxyCertName), nil, serviceKey, nil)
 	if err != nil {
 		return err
 	}
@@ -169,11 +185,15 @@ func GenerateKubeNodeCertificate(ctx context.Context, certs map[string]Certifica
 	// generate kubelet certificate
 	caCrt := certs[CACertName].Certificate
 	caKey := certs[CACertName].Key
-	if certs[KubeNodeCertName].Certificate != nil {
+	if certs[KubeNodeCertName].Certificate != nil && !rotate {
 		return nil
 	}
 	log.Infof(ctx, "[certificates] Generating Node certificate")
-	nodeCrt, nodeKey, err := GenerateSignedCertAndKey(caCrt, caKey, false, KubeNodeCommonName, nil, certs[KubeNodeCertName].Key, []string{KubeNodeOrganizationName})
+	var serviceKey *rsa.PrivateKey
+	if !rotate {
+		serviceKey = certs[KubeProxyCertName].Key
+	}
+	nodeCrt, nodeKey, err := GenerateSignedCertAndKey(caCrt, caKey, false, KubeNodeCommonName, nil, serviceKey, []string{KubeNodeOrganizationName})
 	if err != nil {
 		return err
 	}
@@ -207,7 +227,11 @@ func GenerateKubeAdminCertificate(ctx context.Context, certs map[string]Certific
 		configPath = ClusterConfig
 	}
 	localKubeConfigPath := GetLocalKubeConfig(configPath, configDir)
-	kubeAdminCrt, kubeAdminKey, err := GenerateSignedCertAndKey(caCrt, caKey, false, KubeAdminCertName, nil, certs[KubeAdminCertName].Key, []string{KubeAdminOrganizationName})
+	var serviceKey *rsa.PrivateKey
+	if !rotate {
+		serviceKey = certs[KubeAdminCertName].Key
+	}
+	kubeAdminCrt, kubeAdminKey, err := GenerateSignedCertAndKey(caCrt, caKey, false, KubeAdminCertName, nil, serviceKey, []string{KubeAdminOrganizationName})
 	if err != nil {
 		return err
 	}
@@ -250,11 +274,15 @@ func GenerateAPIProxyClientCertificate(ctx context.Context, certs map[string]Cer
 	//generate API server proxy client key and certs
 	caCrt := certs[RequestHeaderCACertName].Certificate
 	caKey := certs[RequestHeaderCACertName].Key
-	if certs[APIProxyClientCertName].Certificate != nil {
+	if certs[APIProxyClientCertName].Certificate != nil && !rotate {
 		return nil
 	}
 	log.Infof(ctx, "[certificates] Generating Kubernetes API server proxy client certificates")
-	apiserverProxyClientCrt, apiserverProxyClientKey, err := GenerateSignedCertAndKey(caCrt, caKey, true, APIProxyClientCertName, nil, certs[APIProxyClientCertName].Key, nil)
+	var serviceKey *rsa.PrivateKey
+	if !rotate {
+		serviceKey = certs[APIProxyClientCertName].Key
+	}
+	apiserverProxyClientCrt, apiserverProxyClientKey, err := GenerateSignedCertAndKey(caCrt, caKey, true, APIProxyClientCertName, nil, serviceKey, nil)
 	if err != nil {
 		return err
 	}
@@ -312,8 +340,12 @@ func GenerateEtcdCertificates(ctx context.Context, certs map[string]CertificateP
 		if _, ok := certs[etcdName]; ok && !rotate {
 			continue
 		}
+		var serviceKey *rsa.PrivateKey
+		if !rotate {
+			serviceKey = certs[etcdName].Key
+		}
 		log.Infof(ctx, "[certificates] Generating etcd-%s certificate and key", host.InternalAddress)
-		etcdCrt, etcdKey, err := GenerateSignedCertAndKey(caCrt, caKey, true, EtcdCertName, etcdAltNames, certs[etcdName].Key, nil)
+		etcdCrt, etcdKey, err := GenerateSignedCertAndKey(caCrt, caKey, true, EtcdCertName, etcdAltNames, serviceKey, nil)
 		if err != nil {
 			return err
 		}
@@ -370,7 +402,8 @@ func GenerateServiceTokenKey(ctx context.Context, certs map[string]CertificatePK
 func GenerateRKECACerts(ctx context.Context, certs map[string]CertificatePKI, configPath, configDir string) error {
 	// generate kubernetes CA certificate and key
 	log.Infof(ctx, "[certificates] Generating CA kubernetes certificates")
-	caCrt, caKey, err := GenerateCACertAndKey(CACertName, certs[CACertName].Key)
+
+	caCrt, caKey, err := GenerateCACertAndKey(CACertName, nil)
 	if err != nil {
 		return err
 	}
