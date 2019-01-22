@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/rancher/rke/docker"
+	"github.com/rancher/rke/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -19,7 +20,7 @@ const (
 	DINDSubnet          = "172.18.0.0/16"
 )
 
-func StartUpDindContainer(ctx context.Context, dindAddress, dindNetwork, dindStorageDriver string) (string, error) {
+func StartUpDindContainer(ctx context.Context, dindAddress, dindNetwork, dindStorageDriver, dindDNS string) (string, error) {
 	cli, err := client.NewEnvClient()
 	if err != nil {
 		return "", err
@@ -46,7 +47,15 @@ func StartUpDindContainer(ctx context.Context, dindAddress, dindNetwork, dindSto
 		}
 		binds := []string{
 			fmt.Sprintf("/var/lib/kubelet-%s:/var/lib/kubelet:shared", containerName),
-			"/etc/resolv.conf:/etc/resolv.conf",
+		}
+		isLink, err := util.IsSymlink("/etc/resolv.conf")
+		if err != nil {
+			return "", err
+		}
+		if isLink {
+			logrus.Infof("[%s] symlinked [/etc/resolv.conf] file detected. Using [%s] as DNS server.", DINDPlane, dindDNS)
+		} else {
+			binds = append(binds, "/etc/resolv.conf:/etc/resolv.conf")
 		}
 		imageCfg := &container.Config{
 			Image: DINDImage,
@@ -62,6 +71,12 @@ func StartUpDindContainer(ctx context.Context, dindAddress, dindNetwork, dindSto
 		hostCfg := &container.HostConfig{
 			Privileged: true,
 			Binds:      binds,
+			// this gets ignored if resolv.conf is bind mounted. So it's ok to have it anyway.
+			DNS: []string{dindDNS},
+			// Calico needs this
+			Sysctls: map[string]string{
+				"net.ipv4.conf.all.rp_filter": "1",
+			},
 		}
 		resp, err := cli.ContainerCreate(ctx, imageCfg, hostCfg, nil, containerName)
 		if err != nil {
