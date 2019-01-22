@@ -52,7 +52,7 @@ func (h *ProjectGraphHandler) QuerySeriesAction(actionName string, action *types
 		return fmt.Errorf("get usercontext failed, %v", err)
 	}
 
-	check := newAuthChecker(apiContext.Request.Context(), userContext, inputParser.Input, inputParser.ProjectName)
+	check := newAuthChecker(apiContext.Request.Context(), userContext, inputParser.Input, inputParser.ProjectID)
 	if err = check.check(); err != nil {
 		return err
 	}
@@ -66,7 +66,8 @@ func (h *ProjectGraphHandler) QuerySeriesAction(actionName string, action *types
 	reqContext, cancel := context.WithTimeout(context.Background(), prometheusReqTimeout)
 	defer cancel()
 
-	prometheusQuery, err := NewPrometheusQuery(reqContext, userContext, clusterName, token, h.clustermanager, h.dialerFactory)
+	svcName, svcNamespace, _ := monitorutil.ProjectPrometheusEndpoint(inputParser.ProjectName)
+	prometheusQuery, err := NewPrometheusQuery(reqContext, userContext, clusterName, token, svcNamespace, svcName, h.clustermanager, h.dialerFactory)
 	if err != nil {
 		return err
 	}

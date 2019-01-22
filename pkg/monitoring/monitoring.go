@@ -124,16 +124,16 @@ func ProjectMonitoringInfo(projectName string) (appName, appTargetNamespace stri
 	return projectLevelAppName, fmt.Sprintf("%s-%s", cattleNamespaceName, projectName)
 }
 
+func ProjectPrometheusServiceInfo(projectName string) (headlessServiceName, namespace string) {
+	return prometheusHeadlessServiceName, fmt.Sprintf("%s-%s", cattleNamespaceName, projectName)
+}
+
 func ClusterAlertManagerEndpoint() (headlessServiceName, namespace, port string) {
 	return alertManagerHeadlessServiceName, cattleNamespaceName, "9093"
 }
 
 func ClusterPrometheusEndpoint() (headlessServiceName, namespace, port string) {
 	return prometheusHeadlessServiceName, cattleNamespaceName, "9090"
-}
-
-func ProjectPrometheusEndpoint(projectName string) (headlessServiceName, namespace, port string) {
-	return prometheusHeadlessServiceName, fmt.Sprintf("%s-%s", cattleNamespaceName, projectName), "9090"
 }
 
 /*OverwriteAppAnswers Usage

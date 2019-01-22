@@ -28,13 +28,13 @@ type Queries struct {
 	eg  *errgroup.Group
 }
 
-func NewPrometheusQuery(ctx context.Context, userContext *config.UserContext, clusterName, authToken string, clustermanager *clustermanager.Manager, dialerFactory dialer.Factory) (*Queries, error) {
+func NewPrometheusQuery(ctx context.Context, userContext *config.UserContext, clusterName, authToken, svcNamespace, svcName string, clustermanager *clustermanager.Manager, dialerFactory dialer.Factory) (*Queries, error) {
 	dial, err := dialerFactory.ClusterDialer(clusterName)
 	if err != nil {
 		return nil, fmt.Errorf("get dail from usercontext failed, %v", err)
 	}
 
-	endpoint, err := getPrometheusEndpoint(userContext)
+	endpoint, err := getPrometheusEndpoint(userContext, svcNamespace, svcName)
 	if err != nil {
 		return nil, err
 	}
