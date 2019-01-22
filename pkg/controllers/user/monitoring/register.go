@@ -15,48 +15,50 @@ func Register(ctx context.Context, agentContext *config.UserContext) {
 	logrus.Infof("Registering monitoring for cluster %q", clusterName)
 
 	cattleContext := agentContext.Management
-	clustersClient := cattleContext.Management.Clusters(metav1.NamespaceAll)
-	projectsClient := cattleContext.Management.Projects(clusterName)
+	mgmtContext := cattleContext.Management
+	cattleClustersClient := mgmtContext.Clusters(metav1.NamespaceAll)
+	cattleProjectsClient := mgmtContext.Projects(clusterName)
 
 	// app handler
 	ah := &appHandler{
-		cattleTemplateVersionsGetter: cattleContext.Management,
-		cattleProjectsGetter:         cattleContext.Management,
-		cattleAppsGetter:             cattleContext.Project,
-		cattleCoreClient:             cattleContext.Core,
-		agentCoreClient:              agentContext.Core,
-		agentRBACClient:              agentContext.RBAC,
-		agentWorkloadsClient:         agentContext.Apps,
+		cattleAppClient:             cattleContext.Project.Apps(metav1.NamespaceAll),
+		cattleProjectClient:         cattleProjectsClient,
+		cattleSecretClient:          cattleContext.Core.Secrets(metav1.NamespaceAll),
+		cattleTemplateVersionClient: mgmtContext.CatalogTemplateVersions(metav1.NamespaceAll),
+		cattleClusterGraphClient:    mgmtContext.ClusterMonitorGraphs(metav1.NamespaceAll),
+		cattleProjectGraphClient:    mgmtContext.ProjectMonitorGraphs(metav1.NamespaceAll),
+		cattleMonitorMetricClient:   mgmtContext.MonitorMetrics(metav1.NamespaceAll),
+		agentDeploymentClient:       agentContext.Apps.Deployments(metav1.NamespaceAll),
+		agentDaemonSetClient:        agentContext.Apps.DaemonSets(metav1.NamespaceAll),
+		agentStatefulSetClient:      agentContext.Apps.StatefulSets(metav1.NamespaceAll),
+		agentServiceAccountClient:   agentContext.Core.ServiceAccounts(metav1.NamespaceAll),
+		agentSecretClient:           agentContext.Core.Secrets(metav1.NamespaceAll),
+		agentNodeClient:             agentContext.Core.Nodes(metav1.NamespaceAll),
+		agentNamespaceClient:        agentContext.Core.Namespaces(metav1.NamespaceAll),
 	}
 
 	// operator handler
 	oh := &operatorHandler{
-		app:           ah,
-		clusterName:   clusterName,
-		clusterClient: clustersClient,
+		clusterName:         clusterName,
+		cattleClusterClient: cattleClustersClient,
+		app:                 ah,
 	}
-	clustersClient.AddHandler(ctx, "prometheus-operator-handler", oh.sync)
+	cattleClustersClient.AddHandler(ctx, "prometheus-operator-handler", oh.sync)
 
 	// cluster handler
-
 	ch := &clusterHandler{
-		ctx:                  ctx,
 		clusterName:          clusterName,
-		cattleClustersClient: clustersClient,
+		cattleClustersClient: cattleClustersClient,
 		app:                  ah,
-		clusterGraph:         cattleContext.Management.ClusterMonitorGraphs(""),
-		monitorMetrics:       cattleContext.Management.MonitorMetrics(""),
 	}
-	clustersClient.AddHandler(ctx, "cluster-monitoring-handler", ch.sync)
+	cattleClustersClient.AddHandler(ctx, "cluster-monitoring-handler", ch.sync)
 
 	// project handler
 	ph := &projectHandler{
-		ctx:                  ctx,
-		clusterName:          clusterName,
-		cattleClustersClient: clustersClient,
-		cattleProjectsClient: projectsClient,
-		app:                  ah,
-		projectGraph:         cattleContext.Management.ProjectMonitorGraphs(""),
+		clusterName:         clusterName,
+		cattleClusterClient: cattleClustersClient,
+		cattleProjectClient: cattleProjectsClient,
+		app:                 ah,
 	}
-	projectsClient.Controller().AddClusterScopedHandler(ctx, "project-monitoring-handler", clusterName, ph.sync)
+	cattleProjectsClient.Controller().AddClusterScopedHandler(ctx, "project-monitoring-handler", clusterName, ph.sync)
 }

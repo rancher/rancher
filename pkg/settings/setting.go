@@ -48,7 +48,7 @@ var (
 	UIKubernetesSupportedVersions   = NewSetting("ui-k8s-supported-versions-range", ">= 1.11.0 <=1.13.x")
 	UIKubernetesDefaultVersion      = NewSetting("ui-k8s-default-version-range", "<=1.13.x")
 	WhitelistDomain                 = NewSetting("whitelist-domain", "forums.rancher.com")
-	SystemMonitoringCatalogID       = NewSetting("system-monitoring-catalog-id", "catalog://?catalog=system-library&template=rancher-monitoring&version=0.0.1")
+	SystemMonitoringCatalogID       = NewSetting("system-monitoring-catalog-id", "catalog://?catalog=system-library&template=rancher-monitoring&version=0.0.2")
 	AuthUserInfoResyncCron          = NewSetting("auth-user-info-resync-cron", "0 0 * * *")
 	AuthUserInfoMaxAgeSeconds       = NewSetting("auth-user-info-max-age-seconds", "3600") // 1 hour
 	APIUIVersion                    = NewSetting("api-ui-version", "1.1.6")                // Please update the CATTLE_API_UI_VERSION in package/Dockerfile when updating the version here.

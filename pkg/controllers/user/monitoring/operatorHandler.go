@@ -14,9 +14,9 @@ import (
 )
 
 type operatorHandler struct {
-	clusterName   string
-	clusterClient mgmtv3.ClusterInterface
-	app           *appHandler
+	clusterName         string
+	cattleClusterClient mgmtv3.ClusterInterface
+	app                 *appHandler
 }
 
 func (h *operatorHandler) sync(key string, obj *mgmtv3.Cluster) (runtime.Object, error) {
@@ -53,7 +53,7 @@ func (h *operatorHandler) sync(key string, obj *mgmtv3.Cluster) (runtime.Object,
 	}
 
 	if newCluster != nil && !reflect.DeepEqual(newCluster, obj) {
-		if newCluster, err = h.clusterClient.Update(newCluster); err != nil {
+		if newCluster, err = h.cattleClusterClient.Update(newCluster); err != nil {
 			return nil, err
 		}
 		return newCluster, nil
@@ -62,24 +62,20 @@ func (h *operatorHandler) sync(key string, obj *mgmtv3.Cluster) (runtime.Object,
 }
 
 func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr error) {
-	agentCoreClient := app.agentCoreClient
-	cattleAppsGetter := app.cattleAppsGetter
-	cattleProjectsGetter := app.cattleProjectsGetter
-	cattleTemplateVersionsClient := app.cattleTemplateVersionsGetter.CatalogTemplateVersions(metav1.NamespaceAll)
 	appName, appTargetNamespace := monitoring.SystemMonitoringInfo()
 
 	appCatalogID := settings.SystemMonitoringCatalogID.Get()
-	err := monitoring.DetectAppCatalogExistence(appCatalogID, cattleTemplateVersionsClient)
+	err := monitoring.DetectAppCatalogExistence(appCatalogID, app.cattleTemplateVersionClient)
 	if err != nil {
 		return errors.Wrapf(err, "failed to ensure catalog %q", appCatalogID)
 	}
 
-	appDeployProjectID, err := monitoring.GetSystemProjectID(cattleProjectsGetter.Projects(cluster.Name))
+	appDeployProjectID, err := monitoring.GetSystemProjectID(app.cattleProjectClient)
 	if err != nil {
 		return errors.Wrap(err, "failed to get System Project ID")
 	}
 
-	appProjectName, err := monitoring.EnsureAppProjectName(agentCoreClient.Namespaces(metav1.NamespaceAll), appDeployProjectID, cluster.Name, appTargetNamespace)
+	appProjectName, err := monitoring.EnsureAppProjectName(app.agentNamespaceClient, appDeployProjectID, cluster.Name, appTargetNamespace)
 	if err != nil {
 		return errors.Wrap(err, "failed to ensure monitoring project name")
 	}
@@ -90,12 +86,13 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 		"nameOverride": "prometheus-operator",
 	}
 	annotations := monitoring.CopyCreatorID(nil, cluster.Annotations)
-	annotations["cluster.cattle.io/addon"] = "system-monitoring"
+	annotations["cluster.cattle.io/addon"] = appName
 	targetApp := &projectv3.App{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: annotations,
-			Labels:      monitoring.OwnedLabels(appName, appTargetNamespace, monitoring.SystemLevel),
+			Labels:      monitoring.OwnedLabels(appName, appTargetNamespace, appProjectName, monitoring.SystemLevel),
 			Name:        appName,
+			Namespace:   appDeployProjectID,
 		},
 		Spec: projectv3.AppSpec{
 			Answers:         appAnswers,
@@ -106,7 +103,7 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 		},
 	}
 
-	err = monitoring.DeployApp(cattleAppsGetter, appDeployProjectID, targetApp)
+	err = monitoring.DeployApp(app.cattleAppClient, appDeployProjectID, targetApp)
 	if err != nil {
 		return errors.Wrap(err, "failed to ensure prometheus operator app")
 	}
@@ -115,10 +112,9 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 }
 
 func withdrawSystemMonitor(app *appHandler) error {
-	cattleAppsGetter := app.cattleAppsGetter
 	appName, appTargetNamespace := monitoring.SystemMonitoringInfo()
 
-	if err := monitoring.WithdrawApp(cattleAppsGetter, monitoring.OwnedAppListOptions(appName, appTargetNamespace)); err != nil {
+	if err := monitoring.WithdrawApp(app.cattleAppClient, monitoring.OwnedAppListOptions(appName, appTargetNamespace)); err != nil {
 		return errors.Wrap(err, "failed to withdraw prometheus operator app")
 	}
 

@@ -1,10 +1,7 @@
 package monitoring
 
 import (
-	"bytes"
 	"fmt"
-	"io"
-	"strings"
 
 	"github.com/pkg/errors"
 	appsv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
@@ -24,9 +21,9 @@ var (
 
 // All component names base on rancher-monitoring chart
 
-func isGrafanaDeployed(workloadsClient appsv1beta2.Interface, appNamespace, appNameSuffix string, monitoringStatus *mgmtv3.MonitoringStatus, clusterName string) error {
+func isGrafanaDeployed(agentDeploymentClient appsv1beta2.DeploymentInterface, appNamespace, appNameSuffix string, monitoringStatus *mgmtv3.MonitoringStatus, clusterName string) error {
 	_, err := ConditionGrafanaDeployed.DoUntilTrue(monitoringStatus, func() (*mgmtv3.MonitoringStatus, error) {
-		obj, err := workloadsClient.Deployments(appNamespace).Get("grafana-"+appNameSuffix, metav1.GetOptions{})
+		obj, err := agentDeploymentClient.GetNamespaced(appNamespace, "grafana-"+appNameSuffix, metav1.GetOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
 				return nil, errors.New("Grafana Deployment isn't deployed")
@@ -48,9 +45,9 @@ func isGrafanaDeployed(workloadsClient appsv1beta2.Interface, appNamespace, appN
 	return err
 }
 
-func isGrafanaWithdrew(workloadsClient appsv1beta2.Interface, appNamespace, appNameSuffix string, monitoringStatus *mgmtv3.MonitoringStatus) error {
+func isGrafanaWithdrew(agentDeploymentClient appsv1beta2.DeploymentInterface, appNamespace, appNameSuffix string, monitoringStatus *mgmtv3.MonitoringStatus) error {
 	_, err := ConditionGrafanaDeployed.DoUntilFalse(monitoringStatus, func() (*mgmtv3.MonitoringStatus, error) {
-		_, err := workloadsClient.Deployments(appNamespace).Get("grafana-"+appNameSuffix, metav1.GetOptions{})
+		_, err := agentDeploymentClient.GetNamespaced(appNamespace, "grafana-"+appNameSuffix, metav1.GetOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
 				monitoringStatus.GrafanaEndpoint = ""
@@ -66,9 +63,9 @@ func isGrafanaWithdrew(workloadsClient appsv1beta2.Interface, appNamespace, appN
 	return err
 }
 
-func isNodeExporterDeployed(workloadsClient appsv1beta2.Interface, appNamespace, appNameSuffix string, monitoringStatus *mgmtv3.MonitoringStatus) error {
+func isNodeExporterDeployed(agentDaemonSetClient appsv1beta2.DaemonSetInterface, appNamespace, appNameSuffix string, monitoringStatus *mgmtv3.MonitoringStatus) error {
 	_, err := ConditionNodeExporterDeployed.DoUntilTrue(monitoringStatus, func() (*mgmtv3.MonitoringStatus, error) {
-		obj, err := workloadsClient.DaemonSets(appNamespace).Get("exporter-node-"+appNameSuffix, metav1.GetOptions{})
+		obj, err := agentDaemonSetClient.GetNamespaced(appNamespace, "exporter-node-"+appNameSuffix, metav1.GetOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
 				return nil, errors.New("Node Exporter DaemonSet isn't deployed")
@@ -87,9 +84,9 @@ func isNodeExporterDeployed(workloadsClient appsv1beta2.Interface, appNamespace,
 	return err
 }
 
-func isNodeExporterWithdrew(workloadsClient appsv1beta2.Interface, appNamespace, appNameSuffix string, monitoringStatus *mgmtv3.MonitoringStatus) error {
+func isNodeExporterWithdrew(agentDaemonSetClient appsv1beta2.DaemonSetInterface, appNamespace, appNameSuffix string, monitoringStatus *mgmtv3.MonitoringStatus) error {
 	_, err := ConditionNodeExporterDeployed.DoUntilFalse(monitoringStatus, func() (*mgmtv3.MonitoringStatus, error) {
-		_, err := workloadsClient.DaemonSets(appNamespace).Get("exporter-node-"+appNameSuffix, metav1.GetOptions{})
+		_, err := agentDaemonSetClient.GetNamespaced(appNamespace, "exporter-node-"+appNameSuffix, metav1.GetOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
 				return monitoringStatus, nil
@@ -104,9 +101,9 @@ func isNodeExporterWithdrew(workloadsClient appsv1beta2.Interface, appNamespace,
 	return err
 }
 
-func isKubeStateExporterDeployed(workloadsClient appsv1beta2.Interface, appNamespace, appNameSuffix string, monitoringStatus *mgmtv3.MonitoringStatus) error {
+func isKubeStateExporterDeployed(agentDeploymentClient appsv1beta2.DeploymentInterface, appNamespace, appNameSuffix string, monitoringStatus *mgmtv3.MonitoringStatus) error {
 	_, err := ConditionKubeStateExporterDeployed.DoUntilTrue(monitoringStatus, func() (*mgmtv3.MonitoringStatus, error) {
-		obj, err := workloadsClient.Deployments(appNamespace).Get("exporter-kube-state-"+appNameSuffix, metav1.GetOptions{})
+		obj, err := agentDeploymentClient.GetNamespaced(appNamespace, "exporter-kube-state-"+appNameSuffix, metav1.GetOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
 				return nil, errors.New("Kube State Exporter Deployment isn't deployed")
@@ -126,9 +123,9 @@ func isKubeStateExporterDeployed(workloadsClient appsv1beta2.Interface, appNames
 	return err
 }
 
-func isKubeStateExporterWithdrew(workloadsClient appsv1beta2.Interface, appNamespace, appNameSuffix string, monitoringStatus *mgmtv3.MonitoringStatus) error {
+func isKubeStateExporterWithdrew(agentDeploymentClient appsv1beta2.DeploymentInterface, appNamespace, appNameSuffix string, monitoringStatus *mgmtv3.MonitoringStatus) error {
 	_, err := ConditionKubeStateExporterDeployed.DoUntilFalse(monitoringStatus, func() (*mgmtv3.MonitoringStatus, error) {
-		_, err := workloadsClient.Deployments(appNamespace).Get("exporter-kube-state-"+appNameSuffix, metav1.GetOptions{})
+		_, err := agentDeploymentClient.GetNamespaced(appNamespace, "exporter-kube-state-"+appNameSuffix, metav1.GetOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
 				return monitoringStatus, nil
@@ -143,9 +140,9 @@ func isKubeStateExporterWithdrew(workloadsClient appsv1beta2.Interface, appNames
 	return err
 }
 
-func isPrometheusDeployed(workloadsClient appsv1beta2.Interface, appNamespace, appNameSuffix string, monitoringStatus *mgmtv3.MonitoringStatus) error {
+func isPrometheusDeployed(agentStatefulSetClient appsv1beta2.StatefulSetInterface, appNamespace, appNameSuffix string, monitoringStatus *mgmtv3.MonitoringStatus) error {
 	_, err := ConditionPrometheusDeployed.DoUntilTrue(monitoringStatus, func() (*mgmtv3.MonitoringStatus, error) {
-		obj, err := workloadsClient.StatefulSets(appNamespace).Get("prometheus-"+appNameSuffix, metav1.GetOptions{})
+		obj, err := agentStatefulSetClient.GetNamespaced(appNamespace, "prometheus-"+appNameSuffix, metav1.GetOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
 				return nil, errors.New("Prometheus StatefulSet isn't deployed")
@@ -164,9 +161,9 @@ func isPrometheusDeployed(workloadsClient appsv1beta2.Interface, appNamespace, a
 	return err
 }
 
-func isPrometheusWithdrew(workloadsClient appsv1beta2.Interface, appNamespace, appNameSuffix string, monitoringStatus *mgmtv3.MonitoringStatus) error {
+func isPrometheusWithdrew(agentStatefulSetClient appsv1beta2.StatefulSetInterface, appNamespace, appNameSuffix string, monitoringStatus *mgmtv3.MonitoringStatus) error {
 	_, err := ConditionPrometheusDeployed.DoUntilFalse(monitoringStatus, func() (*mgmtv3.MonitoringStatus, error) {
-		_, err := workloadsClient.StatefulSets(appNamespace).Get("prometheus-"+appNameSuffix, metav1.GetOptions{})
+		_, err := agentStatefulSetClient.GetNamespaced(appNamespace, "prometheus-"+appNameSuffix, metav1.GetOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
 				return monitoringStatus, nil
@@ -225,29 +222,4 @@ func isMetricExpressionWithdrew(clusterName string, clusterGraphClient mgmtv3.Cl
 		return errors.Wrapf(err, "failed to deploy metric expression into Cluster %s", clusterName)
 	}
 	return nil
-}
-
-func filterError(except string, buf *bytes.Buffer) string {
-	var line string
-	var err error
-	newBuf := &bytes.Buffer{}
-	for {
-		line, err = buf.ReadString('\n')
-		if err != nil {
-			break
-		}
-
-		if !strings.Contains(line, except) {
-			newBuf.WriteString(line)
-			newBuf.WriteString("\n")
-		}
-	}
-
-	if err != io.EOF {
-		newBuf.WriteString(err.Error())
-		newBuf.WriteString("\n")
-		return newBuf.String()
-	}
-
-	return newBuf.String()
 }

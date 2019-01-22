@@ -297,7 +297,7 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID, syste
 			Annotations: map[string]string{
 				creatorIDAnn: systemProjectCreator,
 			},
-			Labels:    monitorutil.OwnedLabels(appName, appTargetNamespace, monitorutil.SystemLevel),
+			Labels:    monitorutil.OwnedLabels(appName, appTargetNamespace, systemProjectID, monitorutil.SystemLevel),
 			Name:      appName,
 			Namespace: systemProjectName,
 		},

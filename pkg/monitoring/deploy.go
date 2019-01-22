@@ -10,11 +10,9 @@ import (
 	corev1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
-	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	k8scorev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 func EnsureAppProjectName(agentNamespacesClient corev1.NamespaceInterface, ownedProjectID, clusterName, appTargetNamespace string) (string, error) {
@@ -51,9 +49,6 @@ func EnsureAppProjectName(agentNamespacesClient corev1.NamespaceInterface, owned
 		appProjectName = expectedAppProjectName
 		if deployNamespace.Annotations == nil {
 			deployNamespace.Annotations = make(map[string]string, 2)
-		}
-		if deployNamespace.Labels == nil {
-			deployNamespace.Labels = make(map[string]string, 2)
 		}
 
 		deployNamespace.Annotations[nslabels.ProjectIDFieldLabel] = appProjectName
@@ -103,9 +98,9 @@ func GetSystemProjectID(cattleProjectsClient mgmtv3.ProjectInterface) (string, e
 	return systemProject.Name, nil
 }
 
-func DeployApp(cattleAppsGetter projectv3.AppsGetter, projectID string, createApp *projectv3.App) error {
+func DeployApp(cattleAppClient projectv3.AppInterface, projectID string, createApp *projectv3.App) error {
 	appName := createApp.Name
-	app, err := cattleAppsGetter.Apps(projectID).Get(appName, metav1.GetOptions{})
+	app, err := cattleAppClient.GetNamespaced(projectID, appName, metav1.GetOptions{})
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return errors.Wrapf(err, "failed to query %q App in %s Project", appName, projectID)
 	}
@@ -117,15 +112,15 @@ func DeployApp(cattleAppsGetter projectv3.AppsGetter, projectID string, createAp
 		return nil
 	}
 
-	if _, err := cattleAppsGetter.Apps(projectID).Create(createApp); err != nil && !k8serrors.IsAlreadyExists(err) {
+	if _, err := cattleAppClient.Create(createApp); err != nil && !k8serrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "failed to create %q App", appName)
 	}
 
 	return nil
 }
 
-func WithdrawApp(cattleAppsGetter projectv3.AppsGetter, appLabels metav1.ListOptions) error {
-	monitoringApps, err := cattleAppsGetter.Apps(metav1.NamespaceAll).List(appLabels)
+func WithdrawApp(cattleAppClient projectv3.AppInterface, appLabels metav1.ListOptions) error {
+	monitoringApps, err := cattleAppClient.List(appLabels)
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
 			return nil
@@ -137,40 +132,11 @@ func WithdrawApp(cattleAppsGetter projectv3.AppsGetter, appLabels metav1.ListOpt
 	monitoringApps = monitoringApps.DeepCopy()
 	for _, app := range monitoringApps.Items {
 		if app.DeletionTimestamp == nil {
-			if err := cattleAppsGetter.Apps(app.Namespace).Delete(app.Name, &metav1.DeleteOptions{}); err != nil {
+			if err := cattleAppClient.DeleteNamespaced(app.Namespace, app.Name, &metav1.DeleteOptions{}); err != nil {
 				return errors.Wrapf(err, "failed to remove App with %s", appLabels.String())
 			}
 		}
 	}
 
 	return nil
-}
-
-func RevokePermissions(agentRBACClient rbacv1.Interface, agentCoreClient corev1.Interface, appServiceAccountName, appClusterRoleName, appClusterRoleBindingName, appTargetNamespace string) error {
-	return utilerrors.AggregateGoroutines(
-		func() error {
-			err := agentRBACClient.ClusterRoleBindings(metav1.NamespaceAll).Delete(appClusterRoleBindingName, &metav1.DeleteOptions{})
-			if err != nil && !k8serrors.IsNotFound(err) {
-				return err
-			}
-
-			return nil
-		},
-		func() error {
-			err := agentRBACClient.ClusterRoles(metav1.NamespaceAll).Delete(appClusterRoleName, &metav1.DeleteOptions{})
-			if err != nil && !k8serrors.IsNotFound(err) {
-				return err
-			}
-
-			return nil
-		},
-		func() error {
-			err := agentCoreClient.ServiceAccounts(appTargetNamespace).Delete(appServiceAccountName, &metav1.DeleteOptions{})
-			if err != nil && !k8serrors.IsNotFound(err) {
-				return err
-			}
-
-			return nil
-		},
-	)
 }
