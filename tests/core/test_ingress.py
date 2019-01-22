@@ -23,7 +23,12 @@ def test_ingress_fields(admin_pc_client):
         'paths': 'cru',
     })
 
-    assert 'httpIngressPath' not in admin_pc_client.schema.types
+    auth_check(admin_pc_client.schema, 'httpIngressPath', '', {
+        'path': 'cru',
+        'serviceId': 'cru',
+        'targetPort': 'cru',
+        'workloadIds': 'cru',
+    })
 
 
 def test_ingress(admin_pc, admin_cc_client):
@@ -47,18 +52,20 @@ def test_ingress(admin_pc, admin_cc_client):
                                     namespaceId=ns.id,
                                     rules=[{
                                         'host': "foo.com",
-                                        'paths': {
-                                            '/': {
+                                        'paths': [
+                                            {
+                                                'path': '/',
                                                 'targetPort': 80,
                                                 'workloadIds':
                                                 [workload.id],
-                                            }
-                                        }},
+                                            },
+                                        ]},
                                     ])
 
     assert len(ingress.rules) == 1
     assert ingress.rules[0].host == "foo.com"
-    path = ingress.rules[0].paths['/']
+    path = ingress.rules[0].paths[0]
+    assert path.path == '/'
     assert path.targetPort == 80
     assert path.workloadIds == [workload.id]
     assert path.serviceId is None
@@ -97,27 +104,30 @@ def test_ingress_rules_same_hostPortPath(admin_pc, admin_cc_client):
                                     namespaceId=ns.id,
                                     rules=[{
                                         'host': "foo.com",
-                                        'paths': {
-                                            '/': {
+                                        'paths': [
+                                            {
+                                                'path': '/',
                                                 'targetPort': 80,
                                                 'workloadIds':
                                                 [workload1.id],
-                                            }
-                                        }},
+                                            },
+                                        ]},
                                         {
                                         'host': "foo.com",
-                                        'paths': {
-                                            '/': {
+                                        'paths': [
+                                            {
+                                                'path': '/',
                                                 'targetPort': 80,
                                                 'workloadIds':
                                                 [workload2.id],
                                             }
-                                        }},
+                                        ]},
                                     ])
 
     assert len(ingress.rules) == 1
     assert ingress.rules[0].host == "foo.com"
-    path = ingress.rules[0].paths['/']
+    path = ingress.rules[0].paths[0]
+    assert path.path == '/'
     assert path.targetPort == 80
     assert len(path.workloadIds) == 2
     assert set(path.workloadIds) == set([workload1.id, workload2.id])
