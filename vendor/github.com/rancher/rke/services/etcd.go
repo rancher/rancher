@@ -329,10 +329,14 @@ func DownloadEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[
 			"etcd-backup",
 			"download",
 			"--name", name,
+			"--s3-endpoint=" + s3Backend.Endpoint,
+			"--s3-accessKey=" + s3Backend.AccessKey,
+			"--s3-secretKey=" + s3Backend.SecretKey,
+			"--s3-bucketName=" + s3Backend.BucketName,
+			"--s3-region=" + s3Backend.Region,
 		},
 		Image: etcdSnapshotImage,
 	}
-	imageCfg = configS3BackupImgCmd(ctx, imageCfg, es.BackupConfig)
 
 	hostCfg := &container.HostConfig{
 		Binds: []string{
@@ -347,11 +351,10 @@ func DownloadEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[
 	}
 	status, err := docker.WaitForContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdDownloadBackupContainerName)
 	if status != 0 || err != nil {
-		err := docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdDownloadBackupContainerName)
-		if err != nil {
-			return fmt.Errorf("Failed to get etcd snapshot from s3 exit code [%d], failed to exit container [%s]: %v ", status, EtcdDownloadBackupContainerName, err)
+		if err2 := docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdDownloadBackupContainerName); err2 != nil {
+			log.Warnf(ctx, "Failed to delete backup download container [%s]: %v", EtcdDownloadBackupContainerName, err2)
 		}
-		return fmt.Errorf("Failed to get etcd snapshot from s3 exit code [%d]: %v", status, err)
+		return fmt.Errorf("Failed to download etcd snapshot from s3, exit code [%d]: %v", status, err)
 	}
 	return docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdDownloadBackupContainerName)
 }

@@ -40,6 +40,11 @@ func UpCommand() cli.Command {
 			Name:  "dind-storage-driver",
 			Usage: "Storage driver for the docker in docker containers (experimental)",
 		},
+		cli.StringFlag{
+			Name:  "dind-dns-server",
+			Usage: "DNS resolver to be used by docker in docker container. Useful if host is running systemd-resovld",
+			Value: "8.8.8.8",
+		},
 		cli.BoolFlag{
 			Name:  "update-only",
 			Usage: "Skip idempotent deployment of control and etcd plane",
@@ -312,12 +317,12 @@ func clusterUpLocal(ctx *cli.Context) error {
 
 func clusterUpDind(ctx *cli.Context) error {
 	// get dind config
-	rkeConfig, disablePortCheck, dindStorageDriver, filePath, err := getDindConfig(ctx)
+	rkeConfig, disablePortCheck, dindStorageDriver, filePath, dindDNS, err := getDindConfig(ctx)
 	if err != nil {
 		return err
 	}
 	// setup dind environment
-	if err = createDINDEnv(context.Background(), rkeConfig, dindStorageDriver); err != nil {
+	if err = createDINDEnv(context.Background(), rkeConfig, dindStorageDriver, dindDNS); err != nil {
 		return err
 	}
 
@@ -338,23 +343,24 @@ func clusterUpDind(ctx *cli.Context) error {
 	return err
 }
 
-func getDindConfig(ctx *cli.Context) (*v3.RancherKubernetesEngineConfig, bool, string, string, error) {
+func getDindConfig(ctx *cli.Context) (*v3.RancherKubernetesEngineConfig, bool, string, string, string, error) {
 	disablePortCheck := ctx.Bool("disable-port-check")
 	dindStorageDriver := ctx.String("dind-storage-driver")
+	dindDNS := ctx.String("dind-dns-server")
 
 	clusterFile, filePath, err := resolveClusterFile(ctx)
 	if err != nil {
-		return nil, disablePortCheck, "", "", fmt.Errorf("Failed to resolve cluster file: %v", err)
+		return nil, disablePortCheck, "", "", "", fmt.Errorf("Failed to resolve cluster file: %v", err)
 	}
 
 	rkeConfig, err := cluster.ParseConfig(clusterFile)
 	if err != nil {
-		return nil, disablePortCheck, "", "", fmt.Errorf("Failed to parse cluster file: %v", err)
+		return nil, disablePortCheck, "", "", "", fmt.Errorf("Failed to parse cluster file: %v", err)
 	}
 
 	rkeConfig, err = setOptionsFromCLI(ctx, rkeConfig)
 	if err != nil {
-		return nil, disablePortCheck, "", "", err
+		return nil, disablePortCheck, "", "", "", err
 	}
 	// Setting conntrack max for kubeproxy to 0
 	if rkeConfig.Services.Kubeproxy.ExtraArgs == nil {
@@ -362,12 +368,12 @@ func getDindConfig(ctx *cli.Context) (*v3.RancherKubernetesEngineConfig, bool, s
 	}
 	rkeConfig.Services.Kubeproxy.ExtraArgs["conntrack-max-per-core"] = "0"
 
-	return rkeConfig, disablePortCheck, dindStorageDriver, filePath, nil
+	return rkeConfig, disablePortCheck, dindStorageDriver, filePath, dindDNS, nil
 }
 
-func createDINDEnv(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, dindStorageDriver string) error {
+func createDINDEnv(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, dindStorageDriver, dindDNS string) error {
 	for i := range rkeConfig.Nodes {
-		address, err := dind.StartUpDindContainer(ctx, rkeConfig.Nodes[i].Address, dind.DINDNetwork, dindStorageDriver)
+		address, err := dind.StartUpDindContainer(ctx, rkeConfig.Nodes[i].Address, dind.DINDNetwork, dindStorageDriver, dindDNS)
 		if err != nil {
 			return err
 		}
