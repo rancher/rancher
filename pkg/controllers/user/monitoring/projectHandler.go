@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/controller"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/settings"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -34,9 +35,15 @@ func (ph *projectHandler) sync(key string, project *mgmtv3.Project) (runtime.Obj
 		return project, nil
 	}
 
-	_, err := ph.cattleClustersClient.Get(project.Spec.ClusterName, metav1.GetOptions{})
+	clusterID := project.Spec.ClusterName
+	cluster, err := ph.cattleClustersClient.Get(clusterID, metav1.GetOptions{})
 	if err != nil {
-		return project, errors.Wrapf(err, "failed to find Cluster %s", project.Spec.ClusterName)
+		return project, errors.Wrapf(err, "failed to find Cluster %s", clusterID)
+	}
+	if !cluster.Spec.EnableClusterMonitoring && project.Spec.EnableProjectMonitoring {
+		return project, &controller.ForgetError{
+			Err: errors.New("unable to operate Project Monitoring without enabling Cluster Monitoring"),
+		}
 	}
 
 	projectTag := getProjectTag(project)
