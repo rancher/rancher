@@ -84,15 +84,16 @@ func updateDataRules(data map[string]interface{}) {
 		converted := convert.ToMapInterface(rule)
 		paths, ok := converted["paths"]
 		if ok {
-			pathMap := convert.ToMapInterface(paths)
-			for path, target := range pathMap {
+			pathSlice := convert.ToInterfaceSlice(paths)
+			for index, target := range pathSlice {
 				targetMap := convert.ToMapInterface(target)
 				serviceID := convert.ToString(values.GetValueN(targetMap, "serviceId"))
 				if serviceID == "" {
-					delete(pathMap, path)
+					pathSlice = append(pathSlice[:index], pathSlice[index+1:]...)
 				}
 			}
-			if len(pathMap) != 0 {
+			converted["paths"] = pathSlice
+			if len(pathSlice) != 0 {
 				updated = append(updated, rule)
 			}
 		}
@@ -167,9 +168,10 @@ func getPaths(data map[string]interface{}) (map[hostPath]map[string]interface{},
 		converted := convert.ToMapInterface(rule)
 		paths, ok := converted["paths"]
 		if ok {
-			for path, target := range convert.ToMapInterface(paths) {
-				key := hostPath{host: convert.ToString(converted["host"]), path: path}
+			for _, target := range convert.ToMapSlice(paths) {
 				targetMap := convert.ToMapInterface(target)
+				path := convert.ToString(targetMap["path"])
+				key := hostPath{host: convert.ToString(converted["host"]), path: path}
 				if existing, ok := result[key]; ok {
 					flag = true
 					targetWorkloadIds := convert.ToStringSlice(values.GetValueN(targetMap, "workloadIds"))
