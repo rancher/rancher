@@ -669,9 +669,6 @@ func addServiceOrDNSRecord(dns bool) types.SchemasInitFunc {
 
 func ingressTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
-		AddMapperForType(&Version, v1beta1.HTTPIngressRuleValue{},
-			&m.SliceToMap{Field: "paths", Key: "path"},
-		).
 		AddMapperForType(&Version, v1beta1.HTTPIngressPath{},
 			&m.Embed{Field: "backend"},
 		).
@@ -693,12 +690,7 @@ func ingressTypes(schemas *types.Schemas) *types.Schemas {
 			WorkloadIDs string `json:"workloadIds" norman:"type=array[reference[workload]]"`
 			ServiceName string `norman:"type=reference[service]"`
 		}{}).
-		MustImportAndCustomize(&Version, v1beta1.IngressRule{}, func(schema *types.Schema) {
-			schema.MustCustomizeField("paths", func(f types.Field) types.Field {
-				f.Type = "map[ingressBackend]"
-				return f
-			})
-		}).
+		MustImport(&Version, v1beta1.IngressRule{}).
 		MustImport(&Version, v1beta1.IngressTLS{}, struct {
 			SecretName string `norman:"type=reference[certificate]"`
 		}{}).
