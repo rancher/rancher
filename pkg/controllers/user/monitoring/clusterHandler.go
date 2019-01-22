@@ -12,7 +12,6 @@ import (
 	kcluster "github.com/rancher/kontainer-engine/cluster"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/monitoring"
-	"github.com/rancher/rancher/pkg/namespace"
 	nodeutil "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
@@ -74,11 +73,7 @@ func (ch *clusterHandler) sync(key string, cluster *mgmtv3.Cluster) (runtime.Obj
 	src := cluster
 	cpy := src.DeepCopy()
 
-	err := ch.syncSystemMonitor(cpy)
-	if err == nil {
-		err = ch.syncClusterMonitoring(cpy)
-	}
-
+	err := ch.syncClusterMonitoring(cpy)
 	if !reflect.DeepEqual(cpy, src) {
 		updated, updateErr := ch.cattleClustersClient.Update(cpy)
 		if updateErr != nil {
@@ -93,10 +88,6 @@ func (ch *clusterHandler) sync(key string, cluster *mgmtv3.Cluster) (runtime.Obj
 	}
 
 	return cpy, err
-}
-
-func (ch *clusterHandler) syncSystemMonitor(cluster *mgmtv3.Cluster) (err error) {
-	return monitoring.SyncServiceMonitor(cluster, ch.app.agentCoreClient, ch.app.agentRBACClient, ch.app.cattleAppsGetter, ch.app.cattleProjectsGetter, ch.app.cattleTemplateVersionsGetter.CatalogTemplateVersions(namespace.GlobalNamespace))
 }
 
 func (ch *clusterHandler) syncClusterMonitoring(cluster *mgmtv3.Cluster) error {

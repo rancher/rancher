@@ -8,7 +8,6 @@ import (
 	alertutil "github.com/rancher/rancher/pkg/controllers/user/alert/common"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
-	"github.com/rancher/rancher/pkg/monitoring"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/namespace"
 	projectutil "github.com/rancher/rancher/pkg/project"
@@ -134,10 +133,6 @@ func (d *Deployer) sync() error {
 	}
 	newCluster := cluster.DeepCopy()
 	newCluster.Spec.EnableClusterAlerting = needDeploy
-
-	if err = d.operaterDeployer.sync(newCluster); err != nil {
-		return err
-	}
 
 	if needDeploy {
 		if d.alertManager.IsDeploy, err = d.appDeployer.deploy(appName, appTargetNamespace, systemProjectID, systemProjectCreator); err != nil {
@@ -325,8 +320,4 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID, syste
 	}
 
 	return true, nil
-}
-
-func (od *operaterDeployer) sync(cluster *mgmtv3.Cluster) error {
-	return monitoring.SyncServiceMonitor(cluster, od.cores, od.rbacs, od.appsGetter, od.projectsGetter, od.templateVersions)
 }

@@ -29,6 +29,14 @@ func Register(ctx context.Context, agentContext *config.UserContext) {
 		agentWorkloadsClient:         agentContext.Apps,
 	}
 
+	// operator handler
+	oh := &operatorHandler{
+		app:           ah,
+		clusterName:   clusterName,
+		clusterClient: clustersClient,
+	}
+	clustersClient.AddHandler(ctx, "prometheus-operator-handler", oh.sync)
+
 	// cluster handler
 
 	ch := &clusterHandler{
@@ -39,7 +47,7 @@ func Register(ctx context.Context, agentContext *config.UserContext) {
 		clusterGraph:         cattleContext.Management.ClusterMonitorGraphs(""),
 		monitorMetrics:       cattleContext.Management.MonitorMetrics(""),
 	}
-	clustersClient.AddHandler(ctx, "user-cluster-monitoring", ch.sync)
+	clustersClient.AddHandler(ctx, "cluster-monitoring-handler", ch.sync)
 
 	// project handler
 	ph := &projectHandler{
@@ -50,5 +58,5 @@ func Register(ctx context.Context, agentContext *config.UserContext) {
 		app:                  ah,
 		projectGraph:         cattleContext.Management.ProjectMonitorGraphs(""),
 	}
-	projectsClient.Controller().AddClusterScopedHandler(ctx, "user-project-monitoring", clusterName, ph.sync)
+	projectsClient.Controller().AddClusterScopedHandler(ctx, "project-monitoring-handler", clusterName, ph.sync)
 }
