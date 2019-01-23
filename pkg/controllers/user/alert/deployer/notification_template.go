@@ -1,229 +1,174 @@
 package deployer
 
 const (
-	NotificationTmpl = `{{ define "rancher.title" }}
-{{ if eq (index .Alerts 0).Labels.alert_type "event"}}
-{{ (index .Alerts 0).Labels.event_type}} event of {{(index .Alerts 0).Labels.resource_kind}} occurred
+	NotificationTmpl = `
+{{- define "rancher.title" -}}
+{{- if eq .CommonLabels.alert_type "event" }}
+{{ .CommonLabels.event_type}} event of {{.GroupLabels.resource_kind}} occurred
 
-{{ else if eq (index .Alerts 0).Labels.alert_type "nodeHealthy"}}
-The kubelet on the node {{ (index .Alerts 0).Labels.node_name}} is not healthy
+{{- else if eq .CommonLabels.alert_type "systemService" }}
+The system component {{ .GroupLabels.component_name}} is not running
 
-{{ else if eq (index .Alerts 0).Labels.alert_type "systemService"}}
-The system component {{ (index .Alerts 0).Labels.component_name}} is not running
+{{- else if eq .CommonLabels.alert_type "nodeHealthy" }}
+The kubelet on the node {{ .GroupLabels.node_name}} is not healthy
 
-{{ else if eq (index .Alerts 0).Labels.alert_type "nodeCPU"}}
-The CPU usage on the node {{ (index .Alerts 0).Labels.node_name}} is over {{ (index .Alerts 0).Labels.cpu_threshold}}%
+{{- else if eq .CommonLabels.alert_type "nodeCPU" }}
+The CPU usage on the node {{ .GroupLabels.node_name}} is over {{ .CommonLabels.cpu_threshold}}%
 
-{{ else if eq (index .Alerts 0).Labels.alert_type "nodeMemory"}}
-The memory usage on the node {{ (index .Alerts 0).Labels.node_name}} is over {{ (index .Alerts 0).Labels.mem_threshold}}%
+{{- else if eq .CommonLabels.alert_type "nodeMemory" }}
+The memory usage on the node {{ .GroupLabels.node_name}} is over {{ .CommonLabels.mem_threshold}}%
 
-{{ else if eq (index .Alerts 0).Labels.alert_type "podNotScheduled"}}
-The Pod {{ if (index .Alerts 0).Labels.namespace}}{{(index .Alerts 0).Labels.namespace}}:{{end}}{{(index .Alerts 0).Labels.pod_name}} is not scheduled
+{{- else if eq .CommonLabels.alert_type "podNotScheduled" }}
+The Pod {{ if .GroupLabels.namespace}}{{.GroupLabels.namespace}}:{{end}}{{.GroupLabels.pod_name}} is not scheduled
 
-{{ else if eq (index .Alerts 0).Labels.alert_type "podNotRunning"}}
-The Pod {{ if (index .Alerts 0).Labels.namespace}}{{(index .Alerts 0).Labels.namespace}}:{{end}}{{(index .Alerts 0).Labels.pod_name}} is not running
+{{- else if eq .CommonLabels.alert_type "podNotRunning" }}
+The Pod {{ if .GroupLabels.namespace}}{{.GroupLabels.namespace}}:{{end}}{{.GroupLabels.pod_name}} is not running
 
-{{ else if eq (index .Alerts 0).Labels.alert_type "podRestarts"}}
-The Pod {{ if (index .Alerts 0).Labels.namespace}}{{(index .Alerts 0).Labels.namespace}}:{{end}}{{(index .Alerts 0).Labels.pod_name}} restarts {{ (index .Alerts 0).Labels.restart_times}} times in {{ (index .Alerts 0).Labels.restart_interval}} sec
+{{- else if eq .CommonLabels.alert_type "podRestarts" }}
+The Pod {{ if .GroupLabels.namespace}}{{.GroupLabels.namespace}}:{{end}}{{.GroupLabels.pod_name}} restarts {{ .GroupLabels.restart_times}} times in {{ .GroupLabels.restart_interval}} sec
 
-{{ else if eq (index .Alerts 0).Labels.alert_type "systemService"}}
-The system component {{ (index .Alerts 0).Labels.component_name}} is not running
+{{- else if eq .CommonLabels.alert_type "workload" }}
+The workload {{ if .GroupLabels.workload_namespace}}{{.GroupLabels.workload_namespace}}:{{end}}{{.GroupLabels.workload_name}} has available replicas less than {{ .GroupLabels.available_percentage}}%
 
-{{ else if eq (index .Alerts 0).Labels.alert_type "workload"}}
-The workload {{ if (index .Alerts 0).Labels.workload_namespace}}{{(index .Alerts 0).Labels.workload_namespace}}:{{end}}{{(index .Alerts 0).Labels.workload_name}} has available replicas less than {{ (index .Alerts 0).Labels.available_percentage}}%
+{{- else if eq .CommonLabels.alert_type "metric" }}
+The metric {{ .CommonLabels.alert_name}} crossed the threshold 
+{{ end -}}
+{{ end -}}
 
-{{ else if eq (index .Alerts 0).Labels.alert_type "metric"}}
-The metric {{ (index .Alerts 0).Labels.alert_name}} crossed the threshold 
-{{ end}}
-{{ end}}
+{{- define "wechat.text" -}}
+{{ template "__wechat_text_list" . }}
+{{ end -}}
 
-{{ define "wechat.default.message" }}Alert Name: {{ (index .Alerts 0).Labels.alert_name}}
-Severity: {{ (index .Alerts 0).Labels.severity}}
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
-{{ if eq (index .Alerts 0).Labels.alert_type "event"}}
-Target: {{ if (index .Alerts 0).Labels.target_namespace}}{{(index .Alerts 0).Labels.target_namespace}}:{{end}}{{(index .Alerts 0).Labels.target_name}}
-Count: {{ (index .Alerts 0).Labels.event_count}}
-Event Message: {{ (index .Alerts 0).Labels.event_message}}
-First Seen: {{ (index .Alerts 0).Labels.event_firstseen}}
-Last Seen: {{ (index .Alerts 0).Labels.event_lastseen}}
-{{ else if eq (index .Alerts 0).Labels.alert_type "nodeCPU"}}
-Used CPU: {{ (index .Alerts 0).Labels.used_cpu}} m
-Total CPU: {{ (index .Alerts 0).Labels.total_cpu}} m
-{{ else if eq (index .Alerts 0).Labels.alert_type "nodeMemory"}}
-Used Memory: {{ (index .Alerts 0).Labels.used_mem}}
-Total Memory: {{ (index .Alerts 0).Labels.total_mem}}
-{{ else if eq (index .Alerts 0).Labels.alert_type "podRestarts"}}
-Project Name: {{(index .Alerts 0).Labels.project_name}}
-Namespace: {{ (index .Alerts 0).Labels.namespace}}
-Container Name: {{(index .Alerts 0).Labels.container_name}}
-{{ else if eq (index .Alerts 0).Labels.alert_type "podNotRunning"}}
-Project Name: {{(index .Alerts 0).Labels.project_name}}
-Namespace: {{ (index .Alerts 0).Labels.namespace}}
-Container Name: {{ (index .Alerts 0).Labels.container_name}}
-{{ else if eq (index .Alerts 0).Labels.alert_type "podNotScheduled"}}
-Project Name: {{(index .Alerts 0).Labels.project_name}}
-Namespace: {{ (index .Alerts 0).Labels.namespace}}
-Pod Name: {{ (index .Alerts 0).Labels.pod_name}}
-{{ else if eq (index .Alerts 0).Labels.alert_type "workload"}}
-Project Name: {{(index .Alerts 0).Labels.project_name}}
-Available Replicas: {{ (index .Alerts 0).Labels.available_replicas}}
-Desired Replicas: {{ (index .Alerts 0).Labels.desired_replicas}}
-{{ else if eq (index .Alerts 0).Labels.alert_type "metric"}}
-{{ if (index .Alerts 0).Labels.project_name}}Project Name: {{(index .Alerts 0).Labels.project_name}}{{end}}
-Expression: {{(index .Alerts 0).Labels.expression}}
-{{ if (index .Alerts 0).Labels.pod_name}}Pod Name: {{(index .Alerts 0).Labels.pod_name}}{{ else if (index .Alerts 0).Labels.pod}}Pod Name: {{(index .Alerts 0).Labels.pod}}{{ end}}
-{{ if (index .Alerts 0).Labels.namespace}}Namespace: {{(index .Alerts 0).Labels.namespace}}{{ end}}
-Description: Threshold Crossed: datapoint value {{ (index .Alerts 0).Labels.current_value}} was {{ (index .Alerts 0).Labels.comparison}} to the threshold ({{ (index .Alerts 0).Labels.threshold_value}}) for ({{ (index .Alerts 0).Labels.duration}})
-{{ end}}
-{{ if (index .Alerts 0).Labels.logs}}
-Logs: {{ (index .Alerts 0).Labels.logs}}
-{{ end}}
-{{ end}}
+{{- define "__wechat_text_list" -}}
+{{ template "rancher.title" . }}
+{{ template "__text_list" . }}
+{{ end -}}
 
-{{ define "slack.text" }}
-{{ if eq (index .Alerts 0).Labels.alert_type "event"}}
-Alert Name: {{ (index .Alerts 0).Labels.alert_name}}
-Severity: {{ (index .Alerts 0).Labels.severity}}
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
-Target: {{ if (index .Alerts 0).Labels.target_namespace}}{{(index .Alerts 0).Labels.target_namespace}}:{{end}}{{(index .Alerts 0).Labels.target_name}}
-Count: {{ (index .Alerts 0).Labels.event_count}}
-Event Message: {{ (index .Alerts 0).Labels.event_message}}
-First Seen: {{ (index .Alerts 0).Labels.event_firstseen}}
-Last Seen: {{ (index .Alerts 0).Labels.event_lastseen}}
-{{ else if eq (index .Alerts 0).Labels.alert_type "nodeHealthy"}}
-Alert Name: {{ (index .Alerts 0).Labels.alert_name}}
-Severity: {{ (index .Alerts 0).Labels.severity}}
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
-{{ else if eq (index .Alerts 0).Labels.alert_type "nodeCPU"}}
-Alert Name: {{ (index .Alerts 0).Labels.alert_name}}
-Severity: {{ (index .Alerts 0).Labels.severity}}
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
-Used CPU: {{ (index .Alerts 0).Labels.used_cpu}} m
-Total CPU: {{ (index .Alerts 0).Labels.total_cpu}} m
-{{ else if eq (index .Alerts 0).Labels.alert_type "nodeMemory"}}
-Alert Name: {{ (index .Alerts 0).Labels.alert_name}}
-Severity: {{ (index .Alerts 0).Labels.severity}}
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
-Used Memory: {{ (index .Alerts 0).Labels.used_mem}}
-Total Memory: {{ (index .Alerts 0).Labels.total_mem}}
-{{ else if eq (index .Alerts 0).Labels.alert_type "podRestarts"}}
-Alert Name: {{ (index .Alerts 0).Labels.alert_name}}
-Severity: {{ (index .Alerts 0).Labels.severity}}
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
-Project Name: {{(index .Alerts 0).Labels.project_name}}
-Namespace: {{ (index .Alerts 0).Labels.namespace}}
-Container Name: {{(index .Alerts 0).Labels.container_name}}
-{{ else if eq (index .Alerts 0).Labels.alert_type "podNotRunning"}}
-Alert Name: {{ (index .Alerts 0).Labels.alert_name}}
-Severity: {{ (index .Alerts 0).Labels.severity}}
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
-Project Name: {{(index .Alerts 0).Labels.project_name}}
-Namespace: {{ (index .Alerts 0).Labels.namespace}}
-Container Name: {{ (index .Alerts 0).Labels.container_name}}
-{{ else if eq (index .Alerts 0).Labels.alert_type "podNotScheduled"}}
-Alert Name: {{ (index .Alerts 0).Labels.alert_name}}
-Severity: {{ (index .Alerts 0).Labels.severity}}
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
-Project Name: {{(index .Alerts 0).Labels.project_name}}
-Namespace: {{ (index .Alerts 0).Labels.namespace}}
-Pod Name: {{ (index .Alerts 0).Labels.pod_name}}
-{{ else if eq (index .Alerts 0).Labels.alert_type "systemService"}}
-Alert Name: {{ (index .Alerts 0).Labels.alert_name}}
-Severity: {{ (index .Alerts 0).Labels.severity}}
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
-{{ else if eq (index .Alerts 0).Labels.alert_type "workload"}}
-Alert Name: {{ (index .Alerts 0).Labels.alert_name}}
-Severity: {{ (index .Alerts 0).Labels.severity}}
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
-Project Name: {{(index .Alerts 0).Labels.project_name}}
-Available Replicas: {{ (index .Alerts 0).Labels.available_replicas}}
-Desired Replicas: {{ (index .Alerts 0).Labels.desired_replicas}}
-{{ else if eq (index .Alerts 0).Labels.alert_type "metric"}}
-Alert Name: {{ (index .Alerts 0).Labels.alert_name}}
-Severity: {{ (index .Alerts 0).Labels.severity}}
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}
-{{ if (index .Alerts 0).Labels.project_name}}Project Name: {{(index .Alerts 0).Labels.project_name}}{{end}}
-Expression: {{(index .Alerts 0).Labels.expression}}
-{{ if (index .Alerts 0).Labels.pod_name}}Pod Name: {{(index .Alerts 0).Labels.pod_name}}{{ else if (index .Alerts 0).Labels.pod}}Pod Name: {{(index .Alerts 0).Labels.pod}}{{ end}}
-{{ if (index .Alerts 0).Labels.namespace}}Namespace: {{(index .Alerts 0).Labels.namespace}}{{ end}}
-Description: Threshold Crossed: datapoint value {{ (index .Alerts 0).Labels.current_value}} was {{ (index .Alerts 0).Labels.comparison}} to the threshold ({{ (index .Alerts 0).Labels.threshold_value}}) for ({{ (index .Alerts 0).Labels.duration}})
-{{ end}}
-{{ if (index .Alerts 0).Labels.logs}}
-Logs: {{ (index .Alerts 0).Labels.logs}}
-{{ end}}
-{{ end}}
+{{- define "slack.text" -}}
+{{ template "__text_list" . }}
+{{ end -}}
 
-{{ define "email.text" }}
-{{ if eq (index .Alerts 0).Labels.alert_type "event"}}
-Alert Name: {{ (index .Alerts 0).Labels.alert_name}}<br>
-Severity: {{ (index .Alerts 0).Labels.severity}}<br>
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}<br>
-Target: {{ if (index .Alerts 0).Labels.target_namespace}}{{(index .Alerts 0).Labels.target_namespace}}:{{end}}{{ (index .Alerts 0).Labels.target_name}}<br>
-Count: {{ (index .Alerts 0).Labels.event_count}}<br>
-Event Message: {{ (index .Alerts 0).Labels.event_message}}<br>
-First Seen: {{ (index .Alerts 0).Labels.event_firstseen}}<br>
-Last Seen: {{ (index .Alerts 0).Labels.event_lastseen}}<br>
-{{ else if eq (index .Alerts 0).Labels.alert_type "nodeHealthy"}}
-Alert Name: {{ (index .Alerts 0).Labels.alert_name}}<br>
-Severity: {{ (index .Alerts 0).Labels.severity}}<br>
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}<br>
-{{ else if eq (index .Alerts 0).Labels.alert_type "nodeCPU"}}
-Alert Name: {{ (index .Alerts 0).Labels.alert_name}}<br>
-Severity: {{ (index .Alerts 0).Labels.severity}}<br>
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}<br>
-Used CPU: {{ (index .Alerts 0).Labels.used_cpu}} m<br>
-Total CPU: {{ (index .Alerts 0).Labels.total_cpu}} m<br>
-{{ else if eq (index .Alerts 0).Labels.alert_type "nodeMemory"}}
-Alert Name: {{ (index .Alerts 0).Labels.alert_name}}<br>
-Severity: {{ (index .Alerts 0).Labels.severity}}<br>
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}<br>
-Used Memory: {{ (index .Alerts 0).Labels.used_mem}}<br>
-Total Memory: {{ (index .Alerts 0).Labels.total_mem}}<br>
-{{ else if eq (index .Alerts 0).Labels.alert_type "podRestarts"}}
-Alert Name: {{ (index .Alerts 0).Labels.alert_name}}<br>
-Severity: {{ (index .Alerts 0).Labels.severity}}<br>
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}<br>
-Project Name: {{(index .Alerts 0).Labels.project_name}}<br>
-Namespace: {{ (index .Alerts 0).Labels.namespace}}<br>
-Container Name: {{(index .Alerts 0).Labels.container_name}}<br>
-{{ else if eq (index .Alerts 0).Labels.alert_type "podNotRunning"}}
-Alert Name: {{ (index .Alerts 0).Labels.alert_name}}<br>
-Severity: {{ (index .Alerts 0).Labels.severity}}<br>
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}<br>
-Project Name: {{(index .Alerts 0).Labels.project_name}}<br>
-Namespace: {{ (index .Alerts 0).Labels.namespace}}<br>
-Container Name: {{ (index .Alerts 0).Labels.container_name}}<br>
-{{ else if eq (index .Alerts 0).Labels.alert_type "podNotScheduled"}}
-Alert Name: {{ (index .Alerts 0).Labels.alert_name}}<br>
-Severity: {{ (index .Alerts 0).Labels.severity}}<br>
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}<br>
-Project Name: {{(index .Alerts 0).Labels.project_name}}<br>
-Namespace: {{ (index .Alerts 0).Labels.namespace}}<br>
-Pod Name: {{ (index .Alerts 0).Labels.pod_name}}<br>
-{{ else if eq (index .Alerts 0).Labels.alert_type "systemService"}}
-Alert Name: {{ (index .Alerts 0).Labels.alert_name}}<br>
-Severity: {{ (index .Alerts 0).Labels.severity}}<br>
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}<br>
-{{ else if eq (index .Alerts 0).Labels.alert_type "workload"}}
-Alert Name: {{ (index .Alerts 0).Labels.alert_name}}<br>
-Severity: {{ (index .Alerts 0).Labels.severity}}<br>
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}<br>
-Project Name: {{(index .Alerts 0).Labels.project_name}}<br>
-Available Replicas: {{ (index .Alerts 0).Labels.available_replicas}}<br>
-Desired Replicas: {{ (index .Alerts 0).Labels.desired_replicas}}<br>
-{{ else if eq (index .Alerts 0).Labels.alert_type "metric"}}
-Alert Name: {{ (index .Alerts 0).Labels.alert_name}}<br>
-Severity: {{ (index .Alerts 0).Labels.severity}}<br>
-Cluster Name: {{(index .Alerts 0).Labels.cluster_name}}<br>
-{{ if (index .Alerts 0).Labels.project_name}}Project Name: {{(index .Alerts 0).Labels.project_name}}{{end}}<br>
-{{ if (index .Alerts 0).Labels.pod_name}}Pod Name: {{(index .Alerts 0).Labels.pod_name}}{{ else if (index .Alerts 0).Labels.pod}}Pod Name: {{(index .Alerts 0).Labels.pod}}{{ end}}<br>
-{{ if (index .Alerts 0).Labels.namespace}}Namespace: {{(index .Alerts 0).Labels.namespace}}{{ end}}
-Expression: {{(index .Alerts 0).Labels.expression}}<br>
-Description: Threshold Crossed: datapoint value {{ (index .Alerts 0).Labels.current_value}} was {{ (index .Alerts 0).Labels.comparison}} to the threshold ({{ (index .Alerts 0).Labels.threshold_value}}) for ({{ (index .Alerts 0).Labels.duration}})<br>
-{{ end}}
-{{ if (index .Alerts 0).Labels.logs}}
-Logs: {{ (index .Alerts 0).Labels.logs}}
-{{ end}}
-{{ end}}
+{{- define "__text_list" -}}
+{{ range .Alerts.Firing }}
+{{ template "__text_single" . }}
+{{ end -}}
+{{ end -}}
+
+{{- define "__text_single" -}}
+Alert Name: {{ .Labels.alert_name}}
+Severity: {{ .Labels.severity}}
+Cluster Name: {{.Labels.cluster_name}}
+{{- if eq .Labels.alert_type "event" }}
+{{- if .Labels.workload_name }}
+Workload Name: {{.Labels.workload_name}}
+{{end -}}
+Target: {{ if .Labels.target_namespace -}}{{.Labels.target_namespace}}:{{ end -}}{{.Labels.target_name}}
+Count: {{ .Labels.event_count}}
+Event Message: {{ .Labels.event_message}}
+First Seen: {{ .Labels.event_firstseen}}
+Last Seen: {{ .Labels.event_lastseen}}
+{{- else if eq .Labels.alert_type "nodeCPU" }}
+Used CPU: {{ .Labels.used_cpu}} m
+Total CPU: {{ .Labels.total_cpu}} m
+{{- else if eq .Labels.alert_type "nodeMemory" }}
+Used Memory: {{ .Labels.used_mem}}
+Total Memory: {{ .Labels.total_mem}}
+{{- else if eq .Labels.alert_type "podRestarts" }}
+Project Name: {{ .Labels.project_name}}
+Namespace: {{ .Labels.namespace}}
+Container Name: {{ .Labels.container_name}}
+{{- else if eq .Labels.alert_type "podNotRunning" }}
+Project Name: {{ .Labels.project_name}}
+Namespace: {{ .Labels.namespace}}
+Container Name: {{ .Labels.container_name}}
+{{- else if eq .Labels.alert_type "podNotScheduled" }}
+Project Name: {{ .Labels.project_name}}
+Namespace: {{ .Labels.namespace}}
+Pod Name: {{ .Labels.pod_name}}
+{{- else if eq .Labels.alert_type "workload" }}
+Project Name: {{ .Labels.project_name}}
+Available Replicas: {{ .Labels.available_replicas}}
+Desired Replicas: {{ .Labels.desired_replicas}}
+{{- else if eq .Labels.alert_type "metric" }}
+{{- if .Labels.project_name }}
+Project Name: {{ .Labels.project_name}}
+{{ end -}}
+Expression: {{ .Labels.expression}}
+{{- if .Labels.pod_name }}
+Pod Name: {{ .Labels.pod_name}}{{ else if .Labels.pod -}}Pod Name: {{ .Labels.pod}}
+{{ end -}}
+{{- if .Labels.namespace }}
+Namespace: {{ .Labels.namespace}}
+{{ end -}}
+Description: Threshold Crossed: datapoint value {{ .Labels.current_value}} was {{ .Labels.comparison}} to the threshold ({{ .Labels.threshold_value}}) for ({{ .Labels.duration}})
+{{ end -}}
+{{- if .Labels.logs }}
+Logs: {{ .Labels.logs}}
+{{ end -}}
+{{ end -}}
+
+{{- define "email.text" -}}
+{{ template "__email_text_list" . }}
+{{ end -}}
+
+{{- define "__email_text_list" -}}
+{{ range .Alerts.Firing }}
+{{ template "__email_text_single" . }}
+{{ end -}}
+{{ end -}}
+
+{{- define "__email_text_single" -}}
+Alert Name: {{ .Labels.alert_name}}<br>
+Severity: {{ .Labels.severity}}<br>
+Cluster Name: {{.Labels.cluster_name}}<br>
+{{- if eq .Labels.alert_type "event" }}
+{{- if .Labels.workload_name }}
+Workload Name: {{.Labels.workload_name}}<br>
+{{ end -}}
+Target: {{ if .Labels.target_namespace -}}{{.Labels.target_namespace}}:{{end -}}{{ .Labels.target_name}}<br>
+Count: {{ .Labels.event_count}}<br>
+Event Message: {{ .Labels.event_message}}<br>
+First Seen: {{ .Labels.event_firstseen}}<br>
+Last Seen: {{ .Labels.event_lastseen}}<br>
+{{- else if eq .Labels.alert_type "nodeCPU" }}
+Used CPU: {{ .Labels.used_cpu}} m<br>
+Total CPU: {{ .Labels.total_cpu}} m<br>
+{{- else if eq .Labels.alert_type "nodeMemory" }}
+Used Memory: {{ .Labels.used_mem}}<br>
+Total Memory: {{ .Labels.total_mem}}<br>
+{{- else if eq .Labels.alert_type "podRestarts" }}
+Project Name: {{.Labels.project_name}}<br>
+Namespace: {{ .Labels.namespace}}<br>
+Container Name: {{.Labels.container_name}}<br>
+{{- else if eq .Labels.alert_type "podNotRunning" }}
+Project Name: {{.Labels.project_name}}<br>
+Namespace: {{ .Labels.namespace}}<br>
+Container Name: {{ .Labels.container_name}}<br>
+{{- else if eq .Labels.alert_type "podNotScheduled" }}
+Project Name: {{.Labels.project_name}}<br>
+Namespace: {{ .Labels.namespace}}<br>
+Pod Name: {{ .Labels.pod_name}}<br>
+{{- else if eq .Labels.alert_type "workload"}}
+Project Name: {{.Labels.project_name}}<br>
+Available Replicas: {{ .Labels.available_replicas}}<br>
+Desired Replicas: {{ .Labels.desired_replicas}}<br>
+{{- else if eq .Labels.alert_type "metric" }}
+{{- if .Labels.project_name }}
+Project Name: {{.Labels.project_name}}
+{{ end -}}
+{{- if .Labels.pod_name }}
+Pod Name: {{.Labels.pod_name}}{{ else if .Labels.pod -}}Pod Name: {{.Labels.pod}}
+{{ end -}}
+{{- if .Labels.namespace }}
+Namespace: {{.Labels.namespace}}
+{{ end -}}
+Expression: {{.Labels.expression}}<br>
+Description: Threshold Crossed: datapoint value {{ .Labels.current_value}} was {{ .Labels.comparison}} to the threshold ({{ .Labels.threshold_value}}) for ({{ .Labels.duration}})<br>
+{{ end -}}
+{{- if .Labels.logs }}
+Logs: {{ .Labels.logs}}
+{{ end -}}
+<br>
+{{ end -}}
 `
 )

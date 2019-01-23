@@ -188,6 +188,7 @@ func (w *NodeWatcher) checkNodeCPUUsage(alert *v3.ClusterAlertRule, machine *v3.
 			data := map[string]string{}
 			data["rule_id"] = ruleID
 			data["group_id"] = alert.Spec.GroupName
+			data["alert_name"] = alert.Spec.DisplayName
 			data["alert_type"] = "nodeCPU"
 			data["severity"] = alert.Spec.Severity
 			data["cluster_name"] = clusterDisplayName
@@ -220,6 +221,7 @@ func (w *NodeWatcher) checkNodeReady(alert *v3.ClusterAlertRule, machine *v3.Nod
 				data := map[string]string{}
 				data["rule_id"] = ruleID
 				data["group_id"] = alert.Spec.GroupName
+				data["alert_name"] = alert.Spec.DisplayName
 				data["alert_type"] = "nodeHealthy"
 				data["severity"] = alert.Spec.Severity
 				data["cluster_name"] = clusterDisplayName

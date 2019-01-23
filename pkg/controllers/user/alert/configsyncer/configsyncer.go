@@ -193,7 +193,7 @@ func (d *ConfigSyncer) sync() error {
 		return errors.Wrapf(err, "Get secrets")
 	}
 
-	if string(configSecret.Data["alertmanager.yaml"]) != string(data) {
+	if string(configSecret.Data["alertmanager.yaml"]) != string(data) || string(configSecret.Data["notification.tmpl"]) != deployer.NotificationTmpl {
 		newConfigSecret := configSecret.DeepCopy()
 		newConfigSecret.Data["alertmanager.yaml"] = data
 		newConfigSecret.Data["notification.tmpl"] = []byte(deployer.NotificationTmpl)
@@ -314,16 +314,18 @@ func (d *ConfigSyncer) addProjectAlert2Config(config *alertconfig.Config, projec
 
 			if exist {
 				config.Receivers = append(config.Receivers, receiver)
-				r1 := d.newRoute(map[string]string{"group_id": groupID}, group.Spec.GroupWaitSeconds, group.Spec.GroupIntervalSeconds, group.Spec.RepeatIntervalSeconds)
+				r1 := d.newRoute(map[string]string{"group_id": groupID}, group.Spec.GroupWaitSeconds, group.Spec.GroupIntervalSeconds, group.Spec.RepeatIntervalSeconds, []model.LabelName{"group_id"})
 
 				for _, alert := range rules {
 					if alert.Status.AlertState == "inactive" {
 						continue
 					}
 
+					groupBy := getProjectAlertGroupBy(alert.Spec)
+
 					if alert.Spec.PodRule != nil || alert.Spec.WorkloadRule != nil || alert.Spec.MetricRule != nil {
 						ruleID := common.GetRuleID(groupID, alert.Name)
-						d.addRule(ruleID, r1, alert.Spec.CommonRuleField)
+						d.addRule(ruleID, r1, alert.Spec.CommonRuleField, groupBy)
 					}
 
 				}
@@ -355,20 +357,21 @@ func (d *ConfigSyncer) addClusterAlert2Config(config *alertconfig.Config, alerts
 
 		if exist {
 			config.Receivers = append(config.Receivers, receiver)
-			r1 := d.newRoute(map[string]string{"group_id": groupID}, group.Spec.GroupWaitSeconds, group.Spec.GroupIntervalSeconds, group.Spec.RepeatIntervalSeconds)
+			r1 := d.newRoute(map[string]string{"group_id": groupID}, group.Spec.GroupWaitSeconds, group.Spec.GroupIntervalSeconds, group.Spec.RepeatIntervalSeconds, []model.LabelName{"group_id"})
 			for _, alert := range groupRules {
 				if alert.Status.AlertState == "inactive" {
 					continue
 				}
 				ruleID := common.GetRuleID(groupID, alert.Name)
+				groupBy := getClusterAlertGroupBy(alert.Spec)
 
 				if alert.Spec.EventRule != nil {
-					r2 := d.newRoute(map[string]string{"alert_type": "event", "rule_id": ruleID}, eventGroupWait, eventGroupInterval, alert.Spec.RepeatIntervalSeconds)
+					r2 := d.newRoute(map[string]string{"rule_id": ruleID}, eventGroupWait, eventGroupInterval, alert.Spec.RepeatIntervalSeconds, groupBy)
 					d.appendRoute(r1, r2)
 				}
 
 				if alert.Spec.MetricRule != nil || alert.Spec.SystemServiceRule != nil || alert.Spec.NodeRule != nil {
-					d.addRule(ruleID, r1, alert.Spec.CommonRuleField)
+					d.addRule(ruleID, r1, alert.Spec.CommonRuleField, groupBy)
 				}
 
 			}
@@ -379,15 +382,17 @@ func (d *ConfigSyncer) addClusterAlert2Config(config *alertconfig.Config, alerts
 	return nil
 }
 
-func (d *ConfigSyncer) addRule(ruleID string, route *alertconfig.Route, comm v3.CommonRuleField) {
-	r2 := d.newRoute(map[string]string{"rule_id": ruleID}, comm.GroupWaitSeconds, comm.GroupIntervalSeconds, comm.RepeatIntervalSeconds)
+func (d *ConfigSyncer) addRule(ruleID string, route *alertconfig.Route, comm v3.CommonRuleField, groupBy []model.LabelName) {
+	r2 := d.newRoute(map[string]string{"rule_id": ruleID}, comm.GroupWaitSeconds, comm.GroupIntervalSeconds, comm.RepeatIntervalSeconds, groupBy)
 	d.appendRoute(route, r2)
 }
 
-func (d *ConfigSyncer) newRoute(match map[string]string, groupWait, groupInterval, repeatInterval int) *alertconfig.Route {
+func (d *ConfigSyncer) newRoute(match map[string]string, groupWait, groupInterval, repeatInterval int, groupBy []model.LabelName) *alertconfig.Route {
 	route := &alertconfig.Route{
+		Continue: true,
 		Receiver: match["group_id"],
 		Match:    match,
+		GroupBy:  groupBy,
 	}
 
 	gw := model.Duration(time.Duration(groupWait) * time.Second)
@@ -434,6 +439,7 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 					APISecret: alertconfig.Secret(notifier.Spec.WechatConfig.Secret),
 					AgentID:   notifier.Spec.WechatConfig.Agent,
 					CorpID:    notifier.Spec.WechatConfig.Corp,
+					Message:   `{{ template "wechat.text" . }}`,
 				}
 
 				recipient := notifier.Spec.WechatConfig.DefaultRecipient
@@ -511,4 +517,30 @@ func includeProjectMetrics(projectAlerts []*v3.ProjectAlertRule) bool {
 		}
 	}
 	return false
+}
+
+func getClusterAlertGroupBy(spec v3.ClusterAlertRuleSpec) []model.LabelName {
+	if spec.EventRule != nil {
+		return []model.LabelName{"rule_id", "resource_kind", "target_namespace", "target_name"}
+	} else if spec.SystemServiceRule != nil {
+		return []model.LabelName{"rule_id", "component_name"}
+	} else if spec.NodeRule != nil {
+		return []model.LabelName{"rule_id", "node_name", "alert_type"}
+	} else if spec.MetricRule != nil {
+		return []model.LabelName{"rule_id"}
+	}
+
+	return nil
+}
+
+func getProjectAlertGroupBy(spec v3.ProjectAlertRuleSpec) []model.LabelName {
+	if spec.PodRule != nil {
+		return []model.LabelName{"rule_id", "namespace", "pod_name"}
+	} else if spec.WorkloadRule != nil {
+		return []model.LabelName{"rule_id", "workload_namespace", "workload_name", "workload_kind"}
+	} else if spec.MetricRule != nil {
+		return []model.LabelName{"rule_id"}
+	}
+
+	return nil
 }
