@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/randomtoken"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	clientv3 "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	apicorev1 "k8s.io/api/core/v1"
@@ -86,8 +87,7 @@ func tokenKeyIndexer(obj interface{}) ([]string, error) {
 }
 
 // createDerivedToken will create a jwt token for the authenticated user
-func (m *Manager) createDerivedToken(jsonInput v3.Token, tokenAuthValue string) (v3.Token, int, error) {
-
+func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue string) (v3.Token, int, error) {
 	logrus.Debug("Create Derived Token Invoked")
 
 	token, _, err := m.getToken(tokenAuthValue)
@@ -103,6 +103,7 @@ func (m *Manager) createDerivedToken(jsonInput v3.Token, tokenAuthValue string) 
 		AuthProvider:  token.AuthProvider,
 		ProviderInfo:  token.ProviderInfo,
 		Description:   jsonInput.Description,
+		ClusterName:   jsonInput.ClusterID,
 	}
 	derivedToken, err = m.createToken(&derivedToken)
 
@@ -271,7 +272,7 @@ func (m *Manager) deriveToken(request *types.APIContext) error {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("%s", err))
 	}
 
-	jsonInput := v3.Token{}
+	jsonInput := clientv3.Token{}
 	err = json.Unmarshal(bytes, &jsonInput)
 	if err != nil {
 		return httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("%s", err))
