@@ -95,9 +95,11 @@ func (s *Server) updateIPs(savedIPs map[string]bool) map[string]bool {
 	}
 
 	certs := map[string]string{}
+	s.Lock()
 	for key, cert := range s.certs {
 		certs[key] = certToString(cert)
 	}
+	s.Unlock()
 
 	if !reflect.DeepEqual(certs, cfg.GeneratedCerts) {
 		cfg = cfg.DeepCopy()
