@@ -179,6 +179,7 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     output_data_type  "json"
     output_include_tag true
     output_include_time true
+    max_send_retries  3
 
     {{- if .clusterTarget.KafkaConfig.Certificate }}        
     ssl_ca_cert /fluentd/etc/config/ssl/cluster_{{.clusterName}}_ca.pem
@@ -188,7 +189,19 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     ssl_client_cert /fluentd/etc/config/ssl/cluster_{{.clusterName}}_client-cert.pem
     ssl_client_cert_key /fluentd/etc/config/ssl/cluster_{{.clusterName}}_client-key.pem
     {{end }}
-    max_send_retries  3
+    
+    {{- if and .clusterTarget.KafkaConfig.SaslUsername .clusterTarget.KafkaConfig.SaslPassword}}        
+    username {{.clusterTarget.KafkaConfig.SaslUsername}}
+    password {{.clusterTarget.KafkaConfig.SaslPassword}}
+    {{end }}
+
+    {{- if and (eq .clusterTarget.KafkaConfig.SaslType "scram") .clusterTarget.KafkaConfig.SaslScramMechanism}}        
+    scram_mechanism {{.clusterTarget.KafkaConfig.SaslScramMechanism}}
+    {{- if eq .clusterTarget.KafkaTemplateWrap.IsSSL false}}
+    sasl_over_ssl false
+    {{end}}
+    {{end }}
+
     {{end }}
 
     {{- if eq .clusterTarget.CurrentTarget "syslog"}}

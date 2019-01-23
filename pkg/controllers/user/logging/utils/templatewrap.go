@@ -94,6 +94,7 @@ type KafkaTemplateWrap struct {
 	v3.KafkaConfig
 	Brokers   string
 	Zookeeper string
+	IsSSL     bool
 }
 
 type SyslogTemplateWrap struct {
@@ -234,13 +235,16 @@ func newKafkaTemplateWrap(kafkaConfig *v3.KafkaConfig) (*KafkaTemplateWrap, erro
 	}
 	if len(kafkaConfig.BrokerEndpoints) != 0 {
 		var bs []string
+		var h, s string
+		var err error
 		for _, v := range kafkaConfig.BrokerEndpoints {
-			h, _, err := parseEndpoint(v)
+			h, s, err = parseEndpoint(v)
 			if err != nil {
 				return nil, err
 			}
 			bs = append(bs, h)
 		}
+		wrap.IsSSL = s == "https"
 		wrap.Brokers = strings.Join(bs, ",")
 	} else {
 		if kafkaConfig.ZookeeperEndpoint != "" {
