@@ -174,7 +174,6 @@ var ProjectTemplate = `
       output_data_type  "json"
       output_include_tag  true
       output_include_time  true
-      # get_kafka_client_log  true
       max_send_retries 3
 
       {{- if $store.KafkaConfig.Certificate }}        
@@ -184,6 +183,18 @@ var ProjectTemplate = `
       {{- if and $store.KafkaConfig.ClientCert $store.KafkaConfig.ClientKey}}        
       ssl_client_cert /fluentd/etc/config/ssl/project_{{$store.WrapProjectName}}_client-cert.pem
       ssl_client_cert_key /fluentd/etc/config/ssl/project_{{$store.WrapProjectName}}_client-key.pem
+      {{end }}
+
+      {{- if and $store.KafkaConfig.SaslUsername $store.KafkaConfig.SaslPassword}}        
+      username {{$store.KafkaConfig.SaslUsername}}
+      password {{$store.KafkaConfig.SaslPassword}}
+      {{end }}
+  
+      {{- if and (eq $store.KafkaConfig.SaslType "scram") $store.KafkaConfig.SaslScramMechanism}}        
+      scram_mechanism {{$store.KafkaConfig.SaslScramMechanism}}
+      {{- if eq $store.KafkaTemplateWrap.IsSSL false}}
+      sasl_over_ssl false
+      {{end}}
       {{end }}
       {{end }}
 
