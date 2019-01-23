@@ -668,6 +668,8 @@ var (
 			Ingress:                   m("rancher/nginx-ingress-controller:0.16.2-rancher1"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
 			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.3.1"),
+			CoreDNS:                   m("coredns/coredns:1.2.2"),
+			CoreDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.0.0"),
 		},
 		"v1.12.1-rancher1-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.2.24"),
@@ -694,6 +696,8 @@ var (
 			Ingress:                   m("rancher/nginx-ingress-controller:0.16.2-rancher1"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
 			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.3.1"),
+			CoreDNS:                   m("coredns/coredns:1.2.2"),
+			CoreDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.0.0"),
 		},
 		"v1.12.3-rancher1-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.2.24"),
@@ -720,6 +724,8 @@ var (
 			Ingress:                   m("rancher/nginx-ingress-controller:0.16.2-rancher1"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
 			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.3.1"),
+			CoreDNS:                   m("coredns/coredns:1.2.2"),
+			CoreDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.0.0"),
 		},
 		"v1.12.4-rancher1-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.2.24"),
@@ -746,6 +752,8 @@ var (
 			Ingress:                   m("rancher/nginx-ingress-controller:0.16.2-rancher1"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
 			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.3.1"),
+			CoreDNS:                   m("coredns/coredns:1.2.2"),
+			CoreDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.0.0"),
 		},
 		"v1.12.5-rancher1-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.2.24"),
@@ -772,6 +780,8 @@ var (
 			Ingress:                   m("rancher/nginx-ingress-controller:0.16.2-rancher1"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
 			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.3.1"),
+			CoreDNS:                   m("coredns/coredns:1.2.2"),
+			CoreDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.0.0"),
 		},
 		"v1.13.1-rancher1-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.2.24"),
@@ -798,6 +808,8 @@ var (
 			Ingress:                   m("rancher/nginx-ingress-controller:0.21.0-rancher1"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
 			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.3.1"),
+			CoreDNS:                   m("coredns/coredns:1.2.6"),
+			CoreDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.0.0"),
 		},
 	}
 )

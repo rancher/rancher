@@ -5,31 +5,33 @@ import (
 )
 
 const (
-	GlobalDNSProviderType                       = "globalDnsProvider"
-	GlobalDNSProviderFieldAnnotations           = "annotations"
-	GlobalDNSProviderFieldCreated               = "created"
-	GlobalDNSProviderFieldCreatorID             = "creatorId"
-	GlobalDNSProviderFieldLabels                = "labels"
-	GlobalDNSProviderFieldMembers               = "members"
-	GlobalDNSProviderFieldName                  = "name"
-	GlobalDNSProviderFieldOwnerReferences       = "ownerReferences"
-	GlobalDNSProviderFieldRemoved               = "removed"
-	GlobalDNSProviderFieldRoute53ProviderConfig = "route53ProviderConfig"
-	GlobalDNSProviderFieldUUID                  = "uuid"
+	GlobalDNSProviderType                          = "globalDnsProvider"
+	GlobalDNSProviderFieldAnnotations              = "annotations"
+	GlobalDNSProviderFieldCloudflareProviderConfig = "cloudflareProviderConfig"
+	GlobalDNSProviderFieldCreated                  = "created"
+	GlobalDNSProviderFieldCreatorID                = "creatorId"
+	GlobalDNSProviderFieldLabels                   = "labels"
+	GlobalDNSProviderFieldMembers                  = "members"
+	GlobalDNSProviderFieldName                     = "name"
+	GlobalDNSProviderFieldOwnerReferences          = "ownerReferences"
+	GlobalDNSProviderFieldRemoved                  = "removed"
+	GlobalDNSProviderFieldRoute53ProviderConfig    = "route53ProviderConfig"
+	GlobalDNSProviderFieldUUID                     = "uuid"
 )
 
 type GlobalDNSProvider struct {
 	types.Resource
-	Annotations           map[string]string      `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	Created               string                 `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID             string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	Labels                map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Members               []Member               `json:"members,omitempty" yaml:"members,omitempty"`
-	Name                  string                 `json:"name,omitempty" yaml:"name,omitempty"`
-	OwnerReferences       []OwnerReference       `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	Removed               string                 `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Route53ProviderConfig *Route53ProviderConfig `json:"route53ProviderConfig,omitempty" yaml:"route53ProviderConfig,omitempty"`
-	UUID                  string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Annotations              map[string]string         `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	CloudflareProviderConfig *CloudflareProviderConfig `json:"cloudflareProviderConfig,omitempty" yaml:"cloudflareProviderConfig,omitempty"`
+	Created                  string                    `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID                string                    `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Labels                   map[string]string         `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Members                  []Member                  `json:"members,omitempty" yaml:"members,omitempty"`
+	Name                     string                    `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences          []OwnerReference          `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Removed                  string                    `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Route53ProviderConfig    *Route53ProviderConfig    `json:"route53ProviderConfig,omitempty" yaml:"route53ProviderConfig,omitempty"`
+	UUID                     string                    `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 
 type GlobalDNSProviderCollection struct {

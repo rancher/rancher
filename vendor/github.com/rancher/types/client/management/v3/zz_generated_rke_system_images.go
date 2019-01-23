@@ -11,6 +11,8 @@ const (
 	RKESystemImagesFieldCanalFlannel              = "canalFlannel"
 	RKESystemImagesFieldCanalNode                 = "canalNode"
 	RKESystemImagesFieldCertDownloader            = "certDownloader"
+	RKESystemImagesFieldCoreDNS                   = "coredns"
+	RKESystemImagesFieldCoreDNSAutoscaler         = "corednsAutoscaler"
 	RKESystemImagesFieldDNSmasq                   = "dnsmasq"
 	RKESystemImagesFieldEtcd                      = "etcd"
 	RKESystemImagesFieldFlannel                   = "flannel"
@@ -39,6 +41,8 @@ type RKESystemImages struct {
 	CanalFlannel              string `json:"canalFlannel,omitempty" yaml:"canalFlannel,omitempty"`
 	CanalNode                 string `json:"canalNode,omitempty" yaml:"canalNode,omitempty"`
 	CertDownloader            string `json:"certDownloader,omitempty" yaml:"certDownloader,omitempty"`
+	CoreDNS                   string `json:"coredns,omitempty" yaml:"coredns,omitempty"`
+	CoreDNSAutoscaler         string `json:"corednsAutoscaler,omitempty" yaml:"corednsAutoscaler,omitempty"`
 	DNSmasq                   string `json:"dnsmasq,omitempty" yaml:"dnsmasq,omitempty"`
 	Etcd                      string `json:"etcd,omitempty" yaml:"etcd,omitempty"`
 	Flannel                   string `json:"flannel,omitempty" yaml:"flannel,omitempty"`
