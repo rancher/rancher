@@ -123,12 +123,16 @@ type SplunkConfig struct {
 }
 
 type KafkaConfig struct {
-	ZookeeperEndpoint string   `json:"zookeeperEndpoint,omitempty"`
-	BrokerEndpoints   []string `json:"brokerEndpoints,omitempty"`
-	Topic             string   `json:"topic,omitempty" norman:"required"`
-	Certificate       string   `json:"certificate,omitempty"`
-	ClientCert        string   `json:"clientCert,omitempty"`
-	ClientKey         string   `json:"clientKey,omitempty"`
+	ZookeeperEndpoint  string   `json:"zookeeperEndpoint,omitempty"`
+	BrokerEndpoints    []string `json:"brokerEndpoints,omitempty"`
+	Topic              string   `json:"topic,omitempty" norman:"required"`
+	Certificate        string   `json:"certificate,omitempty"`
+	ClientCert         string   `json:"clientCert,omitempty"`
+	ClientKey          string   `json:"clientKey,omitempty"`
+	SaslUsername       string   `json:"saslUsername,omitempty"`
+	SaslPassword       string   `json:"saslPassword,omitempty" norman:"type=password"`
+	SaslScramMechanism string   `json:"saslScramMechanism,omitempty" norman:"type=enum,options=sha256|sha512"`
+	SaslType           string   `json:"saslType,omitempty" norman:"type=enum,options=plain|scram"`
 }
 
 type SyslogConfig struct {

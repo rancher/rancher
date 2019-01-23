@@ -45,6 +45,8 @@ type RancherKubernetesEngineConfig struct {
 	Restore RestoreConfig `yaml:"restore" json:"restore,omitempty"`
 	// Rotating Certificates Option
 	RotateCertificates *RotateCertificates `yaml:"rotate_certificates,omitempty" json:"rotateCertificates,omitempty"`
+	// DNS Config
+	DNS DNSConfig `yaml:"dns" json:"dns,omitempty"`
 }
 
 type BastionHost struct {
@@ -92,6 +94,10 @@ type RKESystemImages struct {
 	KubeDNSSidecar string `yaml:"kubedns_sidecar" json:"kubednsSidecar,omitempty"`
 	// KubeDNS autoscaler image
 	KubeDNSAutoscaler string `yaml:"kubedns_autoscaler" json:"kubednsAutoscaler,omitempty"`
+	// CoreDNS image
+	CoreDNS string `yaml:"coredns" json:"coredns,omitempty"`
+	// CoreDNS autoscaler image
+	CoreDNSAutoscaler string `yaml:"coredns_autoscaler" json:"corednsAutoscaler,omitempty"`
 	// Kubernetes image
 	Kubernetes string `yaml:"kubernetes" json:"kubernetes,omitempty"`
 	// Flannel image
@@ -598,4 +604,15 @@ type RotateCertificates struct {
 	CACertificates bool `json:"caCertificates,omitempty"`
 	// Services to rotate their certs
 	Services []string `json:"services,omitempty" norman:"type=enum,options=etcd|kubelet|kube-apiserver|kube-proxy|kube-scheduler|kube-controller-manager"`
+}
+
+type DNSConfig struct {
+	// DNS provider
+	Provider string `yaml:"provider" json:"provider,omitempty" norman:"default=kube-dns"`
+	// Upstream nameservers
+	UpstreamNameservers []string `yaml:"upstreamnameservers" json:"upstreamnameservers,omitempty"`
+	// ReverseCIDRs
+	ReverseCIDRs []string `yaml:"reversecidrs" json:"reversecidrs,omitempty"`
+	// NodeSelector key pair
+	NodeSelector map[string]string `yaml:"node_selector" json:"nodeSelector,omitempty"`
 }
