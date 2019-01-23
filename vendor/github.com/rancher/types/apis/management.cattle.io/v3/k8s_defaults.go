@@ -781,7 +781,7 @@ var (
 			WeaveNode:                 m("weaveworks/weave-kube:2.5.0"),
 			WeaveCNI:                  m("weaveworks/weave-npc:2.5.0"),
 			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.1"),
-			Ingress:                   m("rancher/nginx-ingress-controller:0.16.2-rancher1"),
+			Ingress:                   m("rancher/nginx-ingress-controller:0.21.0-rancher1"),
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
 			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.3.1"),
 			CoreDNS:                   m("coredns/coredns:1.2.2"),
