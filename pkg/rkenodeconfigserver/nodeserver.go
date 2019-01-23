@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 
-	"reflect"
-
+	"github.com/blang/semver"
 	docketypes "github.com/docker/docker/api/types"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/slice"
@@ -502,6 +502,12 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 		"root-dir":                     "c:/var/lib/kubelet",
 		"authentication-token-webhook": "true",
 	}, serviceOptions.Kubelet)
+
+	// since 1.12, cadvisor API surface has been removed https://github.com/kubernetes/kubernetes/issues/56523
+	if compareTag(rkeConfig.Version, "v1.12.0") {
+		delete(extendingKubeletOptions, "cadvisor-port")
+	}
+
 	extendingKubeproxyOptions := extendMap(map[string]string{
 		"v":                 "2",
 		"proxy-mode":        "kernelspace",
@@ -540,6 +546,21 @@ func getTagMajorVersion(tag string) string {
 		return ""
 	}
 	return strings.Join(splitTag[:2], ".")
+}
+
+// checking tag is greater than or equal to targetTag or not
+func compareTag(tag string, targetTag string) (isGreaterThanOrEqualTo bool) {
+	getTagVersionPart := func(tag string) string {
+		splitTag := strings.SplitN(tag, "-", 2)
+		tag = splitTag[0]
+
+		return strings.TrimPrefix(tag, "v")
+	}
+
+	tagSemver := semver.MustParse(getTagVersionPart(tag))
+	targetTagSemver := semver.MustParse(getTagVersionPart(targetTag))
+
+	return tagSemver.GTE(targetTagSemver)
 }
 
 func extendMap(sourceMap, targetMap map[string]string) map[string]string {
