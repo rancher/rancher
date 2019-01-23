@@ -124,6 +124,12 @@ func (w *splunkTestWrap) TestReachable(dial dialer.Dialer) error {
 }
 
 func (w *kafkaTestWrap) TestReachable(dial dialer.Dialer) error {
+	if w.SaslUsername != "" && w.SaslPassword != "" {
+		//TODO: Now we don't have a out of the box Kafka go client fit our request which both support sasl and could pass conn to it.
+		//kafka-go has a PR to support sasl, but not merge yet due to the mantainer want support Negotiation and Kerberos as well, we will add test func to sasl after the sasl in kafka-go is stable
+		return nil
+	}
+
 	partition := 0
 	if w.ZookeeperEndpoint != "" {
 		url, err := url.Parse(w.ZookeeperEndpoint)

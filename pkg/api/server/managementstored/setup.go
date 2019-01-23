@@ -431,10 +431,12 @@ func LoggingTypes(schemas *types.Schemas, management *config.ScaledContext, clus
 	schema := schemas.Schema(&managementschema.Version, client.ClusterLoggingType)
 	schema.CollectionFormatter = logging.CollectionFormatter
 	schema.ActionHandler = handler.ActionHandler
+	schema.Validator = logging.ClusterLoggingValidator
 
 	schema = schemas.Schema(&managementschema.Version, client.ProjectLoggingType)
 	schema.CollectionFormatter = logging.CollectionFormatter
 	schema.ActionHandler = handler.ActionHandler
+	schema.Validator = logging.ProjectLoggingValidator
 }
 
 func Alert(schemas *types.Schemas, management *config.ScaledContext) {
