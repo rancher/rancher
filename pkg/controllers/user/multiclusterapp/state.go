@@ -30,9 +30,6 @@ func (m *MCAppStateController) sync(key string, mcapp *v3.MultiClusterApp) (runt
 	if mcapp == nil || mcapp.DeletionTimestamp != nil {
 		return mcapp, nil
 	}
-	if v3.MultiClusterAppConditionInstalled.IsUnknown(mcapp) {
-		return mcapp, nil
-	}
 	var apps []*pv3.App
 	for _, t := range mcapp.Spec.Targets {
 		split := strings.SplitN(t.ProjectName, ":", 2)
