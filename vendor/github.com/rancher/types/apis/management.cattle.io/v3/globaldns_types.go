@@ -40,12 +40,19 @@ type GlobalDNSProvider struct {
 }
 
 type GlobalDNSProviderSpec struct {
-	Route53ProviderConfig *Route53ProviderConfig `json:"route53ProviderConfig,omitempty"`
-	Members               []Member               `json:"members,omitempty"`
+	Route53ProviderConfig    *Route53ProviderConfig    `json:"route53ProviderConfig,omitempty"`
+	CloudflareProviderConfig *CloudflareProviderConfig `json:"cloudflareProviderConfig,omitempty"`
+	Members                  []Member                  `json:"members,omitempty"`
 }
 
 type Route53ProviderConfig struct {
 	RootDomain string `json:"rootDomain" norman:"required"`
 	AccessKey  string `json:"accessKey"`
 	SecretKey  string `json:"secretKey" norman:"type=password"`
+}
+
+type CloudflareProviderConfig struct {
+	RootDomain string `json:"rootDomain" norman:"required"`
+	APIKey     string `json:"apiKey" norman:"required,type=password"`
+	APIEmail   string `json:"apiEmail" norman:"required"`
 }
