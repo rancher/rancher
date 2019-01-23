@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"reflect"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
@@ -77,7 +78,12 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		if err = json.Unmarshal(data, &input); err != nil {
 			return errors.Wrap(err, "unmarshal input error")
 		}
-		revision, err := w.MultiClusterAppRevisionLister.Get(namespace.GlobalNamespace, input.RevisionID)
+		id := input.RevisionID
+		splitID := strings.Split(input.RevisionID, ":")
+		if len(splitID) == 2 {
+			id = splitID[1]
+		}
+		revision, err := w.MultiClusterAppRevisionLister.Get(namespace.GlobalNamespace, id)
 		if err != nil {
 			return err
 		}
