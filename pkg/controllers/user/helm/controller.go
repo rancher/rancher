@@ -269,6 +269,8 @@ func (l *Lifecycle) createAppRevision(obj *v3.App, template, notes string, faile
 	release.Status.ProjectName = projectName
 	release.Status.ExternalID = obj.Spec.ExternalID
 	release.Status.ValuesYaml = obj.Spec.ValuesYaml
+	release.Status.Files = obj.Spec.Files
+
 	digest := sha256.New()
 	digest.Write([]byte(template))
 	tag := hex.EncodeToString(digest.Sum(nil))
