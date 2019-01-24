@@ -54,7 +54,7 @@ func (l *lifecycle) Remove(obj *v3.PodSecurityPolicyTemplate) (runtime.Object, e
 
 	for _, rawPSPTPB := range psptpbs {
 		psptpb := rawPSPTPB.(*v3.PodSecurityPolicyTemplateProjectBinding)
-		err := l.psptpbs.Delete(psptpb.Name, &v1.DeleteOptions{})
+		err := l.psptpbs.DeleteNamespaced(psptpb.Namespace,psptpb.Name, &v1.DeleteOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("error deleting psptpb: %v", err)
 		}
