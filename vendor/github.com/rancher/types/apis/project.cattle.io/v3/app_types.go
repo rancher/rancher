@@ -29,9 +29,10 @@ type AppSpec struct {
 }
 
 var (
-	AppConditionInstalled condition.Cond = "Installed"
-	AppConditionMigrated  condition.Cond = "Migrated"
-	AppConditionDeployed  condition.Cond = "Deployed"
+	AppConditionInstalled    condition.Cond = "Installed"
+	AppConditionMigrated     condition.Cond = "Migrated"
+	AppConditionDeployed     condition.Cond = "Deployed"
+	AppConditionForceUpgrade condition.Cond = "ForceUpgrade"
 )
 
 type AppStatus struct {
@@ -75,10 +76,12 @@ type AppRevisionStatus struct {
 }
 
 type AppUpgradeConfig struct {
-	ExternalID string            `json:"externalId,omitempty"`
-	Answers    map[string]string `json:"answers,omitempty"`
+	ExternalID   string            `json:"externalId,omitempty"`
+	Answers      map[string]string `json:"answers,omitempty"`
+	ForceUpgrade bool              `json:"forceUpgrade,omitempty"`
 }
 
 type RollbackRevision struct {
 	RevisionName string `json:"revisionName,omitempty" norman:"type=reference[/v3/project/schemas/apprevision]"`
+	ForceUpgrade bool   `json:"forceUpgrade,omitempty"`
 }
