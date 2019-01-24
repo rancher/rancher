@@ -26,6 +26,7 @@ type AppSpec struct {
 	AppRevisionName     string            `json:"appRevisionName,omitempty" norman:"type=reference[/v3/project/schemas/apprevision]"`
 	Prune               bool              `json:"prune,omitempty"`
 	MultiClusterAppName string            `json:"multiClusterAppName,omitempty" norman:"type=reference[/v3/schemas/multiclusterapp]"`
+	ValuesYaml          string            `json:"valuesYaml,omitempty"`
 }
 
 var (
@@ -73,6 +74,7 @@ type AppRevisionStatus struct {
 	ExternalID  string            `json:"externalId"`
 	Answers     map[string]string `json:"answers"`
 	Digest      string            `json:"digest"`
+	ValuesYaml  string            `json:"valuesYaml,omitempty"`
 }
 
 type AppUpgradeConfig struct {

@@ -31,6 +31,7 @@ const (
 	AppFieldTransitioning        = "transitioning"
 	AppFieldTransitioningMessage = "transitioningMessage"
 	AppFieldUUID                 = "uuid"
+	AppFieldValuesYaml           = "valuesYaml"
 )
 
 type App struct {
@@ -60,6 +61,7 @@ type App struct {
 	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	ValuesYaml           string            `json:"valuesYaml,omitempty" yaml:"valuesYaml,omitempty"`
 }
 
 type AppCollection struct {
