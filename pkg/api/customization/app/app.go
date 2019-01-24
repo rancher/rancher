@@ -2,6 +2,9 @@ package app
 
 import (
 	"fmt"
+	"net/http"
+	"reflect"
+
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse"
@@ -20,8 +23,6 @@ import (
 	"github.com/rancher/types/user"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"net/http"
-	"reflect"
 )
 
 type Wrapper struct {
@@ -113,6 +114,7 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		externalID := actionInput["externalId"]
 		answers := actionInput["answers"]
 		forceUpgrade := actionInput["forceUpgrade"]
+		files := actionInput["files"]
 		_, namespace := ref.Parse(app.ProjectID)
 		obj, err := w.AppGetter.Apps(namespace).Get(app.Name, metav1.GetOptions{})
 		if err != nil {
@@ -134,6 +136,19 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		if creatorNotFound {
 			obj.Annotations[creatorIDAnno] = w.UserManager.GetUser(apiContext)
 		}
+		if files != nil {
+			inputFiles := convert.ToMapInterface(files)
+			if len(inputFiles) != 0 {
+				targetFiles := make(map[string]string)
+				for k, v := range inputFiles {
+					targetFiles[k] = convert.ToString(v)
+				}
+
+				obj.Spec.Files = targetFiles
+				obj.Spec.ExternalID = "" // ignore externalID
+			}
+		}
+
 		if _, err := w.AppGetter.Apps(namespace).Update(obj); err != nil {
 			return err
 		}
