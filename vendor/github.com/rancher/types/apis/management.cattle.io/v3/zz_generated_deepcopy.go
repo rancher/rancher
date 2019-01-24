@@ -8103,6 +8103,11 @@ func (in *TemplateVersionSpec) DeepCopyInto(out *TemplateVersionSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.VersionURLs != nil {
+		in, out := &in.VersionURLs, &out.VersionURLs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

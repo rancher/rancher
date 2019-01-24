@@ -13,6 +13,9 @@ const (
 	TemplateVersionSpecFieldRequiredNamespace   = "requiredNamespace"
 	TemplateVersionSpecFieldUpgradeVersionLinks = "upgradeVersionLinks"
 	TemplateVersionSpecFieldVersion             = "version"
+	TemplateVersionSpecFieldVersionDir          = "versionDir"
+	TemplateVersionSpecFieldVersionName         = "versionName"
+	TemplateVersionSpecFieldVersionURLs         = "versionUrls"
 )
 
 type TemplateVersionSpec struct {
@@ -27,4 +30,7 @@ type TemplateVersionSpec struct {
 	RequiredNamespace   string            `json:"requiredNamespace,omitempty" yaml:"requiredNamespace,omitempty"`
 	UpgradeVersionLinks map[string]string `json:"upgradeVersionLinks,omitempty" yaml:"upgradeVersionLinks,omitempty"`
 	Version             string            `json:"version,omitempty" yaml:"version,omitempty"`
+	VersionDir          string            `json:"versionDir,omitempty" yaml:"versionDir,omitempty"`
+	VersionName         string            `json:"versionName,omitempty" yaml:"versionName,omitempty"`
+	VersionURLs         []string          `json:"versionUrls,omitempty" yaml:"versionUrls,omitempty"`
 }
