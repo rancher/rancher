@@ -29,6 +29,9 @@ const (
 	TemplateVersionFieldUUID                 = "uuid"
 	TemplateVersionFieldUpgradeVersionLinks  = "upgradeVersionLinks"
 	TemplateVersionFieldVersion              = "version"
+	TemplateVersionFieldVersionDir           = "versionDir"
+	TemplateVersionFieldVersionName          = "versionName"
+	TemplateVersionFieldVersionURLs          = "versionUrls"
 )
 
 type TemplateVersion struct {
@@ -56,6 +59,9 @@ type TemplateVersion struct {
 	UUID                 string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	UpgradeVersionLinks  map[string]string      `json:"upgradeVersionLinks,omitempty" yaml:"upgradeVersionLinks,omitempty"`
 	Version              string                 `json:"version,omitempty" yaml:"version,omitempty"`
+	VersionDir           string                 `json:"versionDir,omitempty" yaml:"versionDir,omitempty"`
+	VersionName          string                 `json:"versionName,omitempty" yaml:"versionName,omitempty"`
+	VersionURLs          []string               `json:"versionUrls,omitempty" yaml:"versionUrls,omitempty"`
 }
 
 type TemplateVersionCollection struct {
