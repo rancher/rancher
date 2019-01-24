@@ -94,11 +94,28 @@ const (
 	EnvImageRepo         = "CICD_IMAGE_REPO"
 	EnvLocalRegistry     = "CICD_LOCAL_REGISTRY"
 
-	SettingExecutorQuota          = "executor-quota"
-	SettingExecutorQuotaDefault   = "2"
-	SettingSigningDuration        = "registry-signing-duration"
-	SettingSigningDurationDefault = "2160h"
-	SettingGitCaCerts             = "git-cacerts"
+	SettingExecutorQuota                = "executor-quota"
+	SettingExecutorQuotaDefault         = "2"
+	SettingSigningDuration              = "registry-signing-duration"
+	SettingSigningDurationDefault       = "2160h"
+	SettingGitCaCerts                   = "git-cacerts"
+	SettingExecutorMemoryRequest        = "executor-memory-request"
+	SettingExecutorMemoryRequestDefault = "10Mi"
+	SettingExecutorMemoryLimit          = "executor-memory-limit"
+	SettingExecutorMemoryLimitDefault   = "1Gi"
+	SettingExecutorCPURequest           = "executor-cpu-request"
+	SettingExecutorCPURequestDefault    = "10m"
+	SettingExecutorCPULimit             = "executor-cpu-limit"
+	SettingExecutorCPULimitDefault      = "1"
+
+	PipelineToolsMemoryRequestDefault = "10Mi"
+	PipelineToolsMemoryLimitDefault   = "100Mi"
+	PipelineToolsCPURequestDefault    = "10m"
+	PipelineToolsCPULimitDefault      = "300m"
+	StepMemoryRequestDefault          = "10Mi"
+	StepMemoryLimitDefault            = "1Gi"
+	StepCPURequestDefault             = "10m"
+	StepCPULimitDefault               = "1"
 
 	DefaultTimeout = 60
 )

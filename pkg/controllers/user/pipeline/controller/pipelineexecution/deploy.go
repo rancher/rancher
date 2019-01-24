@@ -23,6 +23,7 @@ import (
 	"k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -459,6 +460,16 @@ func GetJenkinsDeployment(ns string) *appsv1beta2.Deployment {
 									},
 								},
 							},
+							Resources: corev1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    *resource.NewQuantity(1, resource.DecimalSI),
+									corev1.ResourceMemory: *resource.NewQuantity(1024E6, resource.BinarySI),
+								},
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+									corev1.ResourceMemory: *resource.NewQuantity(300E6, resource.BinarySI),
+								},
+							},
 						},
 					},
 				},
@@ -561,6 +572,16 @@ func GetRegistryDeployment(ns string) *appsv1beta2.Deployment {
 								{
 									Name:  "REGISTRY_AUTH_HTPASSWD_PATH",
 									Value: utils.RegistryAuthPath + utils.PipelineSecretRegistryTokenKey,
+								},
+							},
+							Resources: corev1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+									corev1.ResourceMemory: *resource.NewQuantity(200E6, resource.BinarySI),
+								},
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+									corev1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{
@@ -828,6 +849,16 @@ func GetMinioDeployment(ns string) *appsv1beta2.Deployment {
 								{
 									Name:          utils.MinioName,
 									ContainerPort: utils.MinioPort,
+								},
+							},
+							Resources: corev1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+									corev1.ResourceMemory: *resource.NewQuantity(200E6, resource.BinarySI),
+								},
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+									corev1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
 								},
 							},
 						},

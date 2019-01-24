@@ -23,9 +23,13 @@ import (
 // provider configs & pipeline settings for projects.
 
 var settings = map[string]string{
-	utils.SettingExecutorQuota:   utils.SettingExecutorQuotaDefault,
-	utils.SettingSigningDuration: utils.SettingSigningDurationDefault,
-	utils.SettingGitCaCerts:      "",
+	utils.SettingExecutorQuota:         utils.SettingExecutorQuotaDefault,
+	utils.SettingSigningDuration:       utils.SettingSigningDurationDefault,
+	utils.SettingGitCaCerts:            "",
+	utils.SettingExecutorMemoryRequest: utils.SettingExecutorMemoryRequestDefault,
+	utils.SettingExecutorMemoryLimit:   utils.SettingExecutorMemoryLimitDefault,
+	utils.SettingExecutorCPURequest:    utils.SettingExecutorCPURequestDefault,
+	utils.SettingExecutorCPULimit:      utils.SettingExecutorCPULimitDefault,
 }
 
 func Register(ctx context.Context, cluster *config.UserContext) {

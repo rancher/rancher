@@ -26,9 +26,9 @@ func (c *jenkinsPipelineConverter) getStepContainer(stageOrdinal int, stepOrdina
 		Env:     []v1.EnvVar{},
 	}
 	if step.SourceCodeConfig != nil {
-		container.Image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.AlpineGit)
+		c.configCloneStepContainer(&container, step)
 	} else if step.RunScriptConfig != nil {
-		container.Image = step.RunScriptConfig.Image
+		c.configRunScriptStepContainer(&container, step)
 	} else if step.PublishImageConfig != nil {
 		c.configPublishStepContainer(&container, step)
 	} else if step.ApplyYamlConfig != nil {
@@ -66,6 +66,7 @@ func (c *jenkinsPipelineConverter) getStepContainer(stageOrdinal int, stepOrdina
 	if step.Privileged {
 		container.SecurityContext = &v1.SecurityContext{Privileged: &step.Privileged}
 	}
+	injectSetpContainerResources(&container, step)
 	return container
 }
 
@@ -103,7 +104,18 @@ func (c *jenkinsPipelineConverter) getAgentContainer() v1.Container {
 	cloneContainer := c.getStepContainer(0, 0)
 	container.Env = append(container.Env, cloneContainer.Env...)
 	container.EnvFrom = append(container.EnvFrom, cloneContainer.EnvFrom...)
+	c.injectAgentResources(&container)
 	return container
+}
+
+func (c *jenkinsPipelineConverter) configCloneStepContainer(container *v1.Container, step *v3.Step) {
+	container.Image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.AlpineGit)
+	injectResources(container, utils.PipelineToolsCPULimitDefault, utils.PipelineToolsCPURequestDefault, utils.PipelineToolsMemoryLimitDefault, utils.PipelineToolsMemoryRequestDefault)
+}
+
+func (c *jenkinsPipelineConverter) configRunScriptStepContainer(container *v1.Container, step *v3.Step) {
+	container.Image = step.RunScriptConfig.Image
+	injectResources(container, utils.StepCPULimitDefault, utils.StepCPURequestDefault, utils.StepMemoryLimitDefault, utils.StepMemoryRequestDefault)
 }
 
 func (c *jenkinsPipelineConverter) configPublishStepContainer(container *v1.Container, step *v3.Step) {
@@ -174,6 +186,7 @@ func (c *jenkinsPipelineConverter) configPublishStepContainer(container *v1.Cont
 			ReadOnly:  true,
 		},
 	}
+	injectResources(container, utils.StepCPULimitDefault, utils.StepCPURequestDefault, utils.StepMemoryLimitDefault, utils.StepMemoryRequestDefault)
 }
 
 func (c *jenkinsPipelineConverter) configApplyYamlStepContainer(container *v1.Container, step *v3.Step, stageOrdinal int) {
@@ -210,6 +223,7 @@ StageLoop:
 	for k, v := range applyEnv {
 		container.Env = append(container.Env, v1.EnvVar{Name: k, Value: v})
 	}
+	injectResources(container, utils.PipelineToolsCPULimitDefault, utils.PipelineToolsCPURequestDefault, utils.PipelineToolsMemoryLimitDefault, utils.PipelineToolsMemoryRequestDefault)
 }
 
 func (c *jenkinsPipelineConverter) configPublishCatalogContainer(container *v1.Container, step *v3.Step) {
@@ -227,6 +241,7 @@ func (c *jenkinsPipelineConverter) configPublishCatalogContainer(container *v1.C
 	for k, v := range envs {
 		container.Env = append(container.Env, v1.EnvVar{Name: k, Value: v})
 	}
+	injectResources(container, utils.PipelineToolsCPULimitDefault, utils.PipelineToolsCPURequestDefault, utils.PipelineToolsMemoryLimitDefault, utils.PipelineToolsMemoryRequestDefault)
 }
 
 func (c *jenkinsPipelineConverter) configApplyAppContainer(container *v1.Container, step *v3.Step) {
@@ -252,4 +267,5 @@ func (c *jenkinsPipelineConverter) configApplyAppContainer(container *v1.Contain
 			},
 			Key: utils.PipelineSecretAPITokenKey,
 		}}})
+	injectResources(container, utils.PipelineToolsCPULimitDefault, utils.PipelineToolsCPURequestDefault, utils.PipelineToolsMemoryLimitDefault, utils.PipelineToolsMemoryRequestDefault)
 }
