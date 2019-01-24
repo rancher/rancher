@@ -25,7 +25,7 @@ Parameters:
   Subnet03Block:
     Type: String
     Default: 192.168.192.0/18
-    Description: CidrBlock for subnet 03 within the VPC
+    Description: CidrBlock for subnet 03 within the VPC. This is used only if the region has more than 2 AZs.
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -38,6 +38,26 @@ Metadata:
           - Subnet01Block
           - Subnet02Block
           - Subnet03Block
+
+Conditions:
+  Has2Azs:
+    Fn::Or:
+      - Fn::Equals:
+        - {Ref: 'AWS::Region'}
+        - ap-south-1
+      - Fn::Equals:
+        - {Ref: 'AWS::Region'}
+        - ap-northeast-2
+      - Fn::Equals:
+        - {Ref: 'AWS::Region'}
+        - ca-central-1
+      - Fn::Equals:
+        - {Ref: 'AWS::Region'}
+        - cn-north-1
+
+  HasMoreThan2Azs:
+    Fn::Not:
+      - Condition: Has2Azs
 
 Resources:
   VPC:
@@ -114,6 +134,7 @@ Resources:
         Value: !Sub "${AWS::StackName}-Subnet02"
 
   Subnet03:
+    Condition: HasMoreThan2Azs
     Type: AWS::EC2::Subnet
     Metadata:
       Comment: Subnet 03
@@ -144,6 +165,7 @@ Resources:
       RouteTableId: !Ref RouteTable
 
   Subnet03RouteTableAssociation:
+    Condition: HasMoreThan2Azs
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref Subnet03
@@ -159,7 +181,11 @@ Outputs:
 
   SubnetIds:
     Description: All subnets in the VPC
-    Value: !Join [ ",", [ !Ref Subnet01, !Ref Subnet02, !Ref Subnet03 ] ]
+    Value:
+      Fn::If:
+      - HasMoreThan2Azs
+      - !Join [ ",", [ !Ref Subnet01, !Ref Subnet02, !Ref Subnet03 ] ]
+      - !Join [ ",", [ !Ref Subnet01, !Ref Subnet02 ] ]
 
   SecurityGroups:
     Description: Security group for the cluster control plane communication with worker nodes
@@ -171,7 +197,7 @@ Outputs:
 `
 	workerNodesTemplate = `---
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Amazon EKS - Node Group - Released 2018-08-30'
+Description: 'Amazon EKS - Node Group'
 
 Parameters:
 
@@ -186,7 +212,7 @@ Parameters:
   NodeInstanceType:
     Description: EC2 instance type for the node instances
     Type: String
-    Default: t2.medium
+    Default: t3.medium
     AllowedValues:
     - t2.small
     - t2.medium
@@ -277,7 +303,12 @@ Parameters:
 
   NodeAutoScalingGroupMaxSize:
     Type: Number
-    Description: Maximum size of Node Group ASG.
+    Description: Maximum size of Node Group ASG. Set to at least 1 greater than NodeAutoScalingGroupDesiredCapacity.
+    Default: 4
+
+  NodeAutoScalingGroupDesiredCapacity:
+    Type: Number
+    Description: Desired capacity of Node Group ASG.
     Default: 3
 
   NodeVolumeSize:
@@ -330,6 +361,7 @@ Metadata:
         Parameters:
           - NodeGroupName
           - NodeAutoScalingGroupMinSize
+          - NodeAutoScalingGroupDesiredCapacity
           - NodeAutoScalingGroupMaxSize
           - NodeInstanceType
           - NodeImageId
@@ -449,7 +481,7 @@ Resources:
   NodeGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
-      DesiredCapacity: !Ref NodeAutoScalingGroupMaxSize
+      DesiredCapacity: !Ref NodeAutoScalingGroupDesiredCapacity
       LaunchConfigurationName: !Ref NodeLaunchConfig
       MinSize: !Ref NodeAutoScalingGroupMinSize
       MaxSize: !Ref NodeAutoScalingGroupMaxSize
@@ -464,13 +496,14 @@ Resources:
         PropagateAtLaunch: 'true'
     UpdatePolicy:
       AutoScalingRollingUpdate:
-        MinInstancesInService: '1'
         MaxBatchSize: '1'
+        MinInstancesInService: !Ref NodeAutoScalingGroupDesiredCapacity
+        PauseTime: 'PT5M'
 
   NodeLaunchConfig:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
-      AssociatePublicIpAddress: !Ref PublicIp
+      AssociatePublicIpAddress: !Ref PublicIps
       IamInstanceProfile: !Ref NodeInstanceProfile
       ImageId: !Ref NodeImageId
       InstanceType: !Ref NodeInstanceType

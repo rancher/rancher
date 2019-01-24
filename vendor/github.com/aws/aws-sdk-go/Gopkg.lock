@@ -2,19 +2,15 @@
 
 
 [[projects]]
-  name = "github.com/go-ini/ini"
-  packages = ["."]
-  revision = "300e940a926eb277d3901b20bdfcc54928ad3642"
-  version = "v1.25.4"
-
-[[projects]]
+  digest = "1:13fe471d0ed891e8544eddfeeb0471fd3c9f2015609a1c000aefdedf52a19d40"
   name = "github.com/jmespath/go-jmespath"
   packages = ["."]
-  revision = "0b12d6b5"
+  pruneopts = ""
+  revision = "c2b33e84"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "51a86a867df617990082dec6b868e4efe2fdb2ed0e02a3daa93cd30f962b5085"
+  input-imports = ["github.com/jmespath/go-jmespath"]
   solver-name = "gps-cdcl"
   solver-version = 1
