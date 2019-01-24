@@ -233,8 +233,11 @@ def dind_cc(request, admin_mc):
     admin_mc.client.update_by_id_cluster(
         id=cluster.id,
         name=cluster.name,
-        clusterEndpointFQDN=node_ip,
-        clusterEndpointFQDNCaCert=cluster.caCert,
+        localClusterAuthEndpoint={
+            'enabled': True,
+            'fqdn': node_ip + ':6443',
+            'caCerts': cluster.caCert,
+        },
     )
     return DINDContext(
         name, admin_mc, cluster, client, cluster_file, kube_file

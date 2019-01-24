@@ -76,6 +76,17 @@ func catalogTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.Template{}, struct {
 			VersionLinks map[string]string
 		}{}).
+		AddMapperForType(&Version, v3.CatalogTemplate{},
+			m.DisplayName{},
+			m.Drop{Field: "namespaceId"},
+		).
+		MustImport(&Version, v3.CatalogTemplate{}, struct {
+			VersionLinks map[string]string
+		}{}).
+		AddMapperForType(&Version, v3.CatalogTemplateVersion{},
+			m.Drop{Field: "namespaceId"},
+		).
+		MustImport(&Version, v3.CatalogTemplateVersion{}).
 		MustImport(&Version, v3.TemplateVersion{}).
 		MustImport(&Version, v3.TemplateContent{})
 }
@@ -508,8 +519,28 @@ func logTypes(schema *types.Schemas) *types.Schemas {
 			m.DisplayName{}).
 		AddMapperForType(&Version, v3.ProjectLogging{},
 			m.DisplayName{}).
-		MustImport(&Version, v3.ClusterLogging{}).
-		MustImport(&Version, v3.ProjectLogging{})
+		MustImport(&Version, v3.ClusterTestInput{}).
+		MustImport(&Version, v3.ProjectTestInput{}).
+		MustImportAndCustomize(&Version, v3.ClusterLogging{}, func(schema *types.Schema) {
+			schema.CollectionActions = map[string]types.Action{
+				"test": {
+					Input: "clusterTestInput",
+				},
+				"dryRun": {
+					Input: "clusterTestInput",
+				},
+			}
+		}).
+		MustImportAndCustomize(&Version, v3.ProjectLogging{}, func(schema *types.Schema) {
+			schema.CollectionActions = map[string]types.Action{
+				"test": {
+					Input: "projectTestInput",
+				},
+				"dryRun": {
+					Input: "projectTestInput",
+				},
+			}
+		})
 }
 
 func globalTypes(schema *types.Schemas) *types.Schemas {

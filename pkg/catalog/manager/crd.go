@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -21,10 +22,9 @@ import (
 const (
 	CatalogNameLabel  = "catalog.cattle.io/name"
 	TemplateNameLabel = "catalog.cattle.io/template_name"
-	CatalogTypeLabel  = "catalog.cattle.io/catalog_type"
 )
 
-func (m *Manager) createTemplate(template v3.Template, catalog *v3.Catalog, tagMap map[string]struct{}) error {
+func (m *Manager) createTemplate(template v3.CatalogTemplate, catalog *v3.Catalog, tagMap map[string]struct{}) error {
 	template.Labels = labels.Merge(template.Labels, map[string]string{
 		CatalogNameLabel: catalog.Name,
 	})
@@ -46,20 +46,20 @@ func (m *Manager) createTemplate(template v3.Template, catalog *v3.Catalog, tagM
 	return m.createTemplateVersions(versionFiles, createdTemplate, tagMap)
 }
 
-func (m *Manager) getTemplateMap(catalogName string) (map[string]*v3.Template, error) {
+func (m *Manager) getTemplateMap(catalogName string, namespace string) (map[string]*v3.CatalogTemplate, error) {
 	r, _ := labels.NewRequirement(CatalogNameLabel, selection.Equals, []string{catalogName})
-	templateList, err := m.templateLister.List("", labels.NewSelector().Add(*r))
+	templateList, err := m.templateLister.List(namespace, labels.NewSelector().Add(*r))
 	if err != nil {
 		return nil, err
 	}
-	templateMap := map[string]*v3.Template{}
+	templateMap := map[string]*v3.CatalogTemplate{}
 	for _, t := range templateList {
 		templateMap[t.Name] = t
 	}
 	return templateMap, nil
 }
 
-func (m *Manager) convertTemplateIcon(template *v3.Template, tagMap map[string]struct{}) error {
+func (m *Manager) convertTemplateIcon(template *v3.CatalogTemplate, tagMap map[string]struct{}) error {
 	tag, content, err := zipAndHash(template.Spec.Icon)
 	if err != nil {
 		return err
@@ -77,13 +77,13 @@ func (m *Manager) convertTemplateIcon(template *v3.Template, tagMap map[string]s
 	return nil
 }
 
-func (m *Manager) updateTemplate(template *v3.Template, toUpdate v3.Template, tagMap map[string]struct{}) error {
+func (m *Manager) updateTemplate(template *v3.CatalogTemplate, toUpdate v3.CatalogTemplate, tagMap map[string]struct{}) error {
 	r, _ := labels.NewRequirement(TemplateNameLabel, selection.Equals, []string{template.Name})
-	templateVersions, err := m.templateVersionLister.List("", labels.NewSelector().Add(*r))
+	templateVersions, err := m.templateVersionLister.List(template.Namespace, labels.NewSelector().Add(*r))
 	if err != nil {
 		return errors.Wrapf(err, "failed to list templateVersions")
 	}
-	tvByVersion := map[string]*v3.TemplateVersion{}
+	tvByVersion := map[string]*v3.CatalogTemplateVersion{}
 	for _, ver := range templateVersions {
 		tvByVersion[ver.Spec.Version] = ver
 	}
@@ -93,7 +93,7 @@ func (m *Manager) updateTemplate(template *v3.Template, toUpdate v3.Template, ta
 	*/
 	for _, toUpdateVer := range toUpdate.Spec.Versions {
 		// gzip each file to store the hash value into etcd. Next time if it already exists in etcd then use the existing tag
-		templateVersion := &v3.TemplateVersion{}
+		templateVersion := &v3.CatalogTemplateVersion{}
 		templateVersion.Spec = toUpdateVer
 		if err := m.convertFile(templateVersion, toUpdateVer, tagMap); err != nil {
 			return err
@@ -108,8 +108,9 @@ func (m *Manager) updateTemplate(template *v3.Template, toUpdate v3.Template, ta
 				}
 			}
 		} else {
-			toCreate := &v3.TemplateVersion{}
+			toCreate := &v3.CatalogTemplateVersion{}
 			toCreate.Name = fmt.Sprintf("%s-%v", template.Name, toUpdateVer.Version)
+			toCreate.Namespace = template.Namespace
 			toCreate.Labels = map[string]string{
 				TemplateNameLabel: template.Name,
 			}
@@ -129,7 +130,7 @@ func (m *Manager) updateTemplate(template *v3.Template, toUpdate v3.Template, ta
 	for v, tv := range tvByVersion {
 		if _, ok := toUpdateTvs[v]; !ok {
 			logrus.Infof("Deleting templateVersion %s", tv.Name)
-			if err := m.templateVersionClient.Delete(tv.Name, &metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
+			if err := m.templateVersionClient.DeleteNamespaced(template.Namespace, tv.Name, &metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
 				return err
 			}
 		}
@@ -175,10 +176,10 @@ func mergeLabels(set1, set2 map[string]string) map[string]string {
 	return set1
 }
 
-func (m *Manager) getTemplateVersion(templateName string) (map[string]struct{}, error) {
+func (m *Manager) getTemplateVersion(templateName string, namespace string) (map[string]struct{}, error) {
 	//because templates is a cluster resource now so we set namespace to "" when listing it.
 	r, _ := labels.NewRequirement(TemplateNameLabel, selection.Equals, []string{templateName})
-	templateVersions, err := m.templateVersionLister.List("", labels.NewSelector().Add(*r))
+	templateVersions, err := m.templateVersionLister.List(namespace, labels.NewSelector().Add(*r))
 	if err != nil {
 		return nil, err
 	}
@@ -189,11 +190,12 @@ func (m *Manager) getTemplateVersion(templateName string) (map[string]struct{}, 
 	return tVersion, nil
 }
 
-func (m *Manager) createTemplateVersions(versionsSpec []v3.TemplateVersionSpec, template *v3.Template, tagMap map[string]struct{}) error {
+func (m *Manager) createTemplateVersions(versionsSpec []v3.TemplateVersionSpec, template *v3.CatalogTemplate, tagMap map[string]struct{}) error {
 	for _, spec := range versionsSpec {
-		templateVersion := &v3.TemplateVersion{}
+		templateVersion := &v3.CatalogTemplateVersion{}
 		templateVersion.Spec = spec
 		templateVersion.Name = fmt.Sprintf("%s-%v", template.Name, spec.Version)
+		templateVersion.Namespace = template.Namespace
 		templateVersion.Labels = map[string]string{
 			TemplateNameLabel: template.Name,
 		}
@@ -210,7 +212,7 @@ func (m *Manager) createTemplateVersions(versionsSpec []v3.TemplateVersionSpec, 
 	return nil
 }
 
-func (m *Manager) convertFile(templateVersion *v3.TemplateVersion, spec v3.TemplateVersionSpec, tagMap map[string]struct{}) error {
+func (m *Manager) convertFile(templateVersion *v3.CatalogTemplateVersion, spec v3.TemplateVersionSpec, tagMap map[string]struct{}) error {
 	for name, file := range spec.Files {
 		tag, content, err := zipAndHash(file)
 		if err != nil {

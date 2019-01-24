@@ -15,6 +15,7 @@ const (
 	SettingFieldName            = "name"
 	SettingFieldOwnerReferences = "ownerReferences"
 	SettingFieldRemoved         = "removed"
+	SettingFieldSource          = "source"
 	SettingFieldUUID            = "uuid"
 	SettingFieldValue           = "value"
 )
@@ -30,6 +31,7 @@ type Setting struct {
 	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Source          string            `json:"source,omitempty" yaml:"source,omitempty"`
 	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Value           string            `json:"value,omitempty" yaml:"value,omitempty"`
 }

@@ -11,10 +11,10 @@ RUN mkdir /root/.kube && \
 WORKDIR /var/lib/rancher
 
 ENV CATTLE_HELM_VERSION v2.10.0-rancher5
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher1-1
-ENV LOGLEVEL_VERSION v0.1
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher4-1
+ENV LOGLEVEL_VERSION v0.1.1
 ENV TINI_VERSION v0.18.0
-ENV TELEMETRY_VERSION v0.5.1
+ENV TELEMETRY_VERSION v0.5.2
 
 RUN curl -sLf https://github.com/rancher/machine-package/releases/download/${CATTLE_MACHINE_VERSION}/docker-machine.tar.gz | tar xvzf - -C /usr/bin && \
     curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-amd64-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin
@@ -27,7 +27,10 @@ RUN curl -sLf https://github.com/krallin/tini/releases/download/${TINI_VERSION}/
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
 ENV CATTLE_UI_VERSION 2.0.77
-ENV CATTLE_CLI_VERSION v2.0.7-rc2
+ENV CATTLE_CLI_VERSION v2.2.0-rc2
+
+# Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
+ENV CATTLE_API_UI_VERSION 1.1.6
 
 RUN mkdir -p /var/log/auditlog
 ENV AUDIT_LOG_PATH /var/log/auditlog/rancher-api-audit.log
@@ -40,6 +43,9 @@ VOLUME /var/log/auditlog
 RUN mkdir -p /usr/share/rancher/ui && \
     cd /usr/share/rancher/ui && \
     curl -sL https://releases.rancher.com/ui/${CATTLE_UI_VERSION}.tar.gz | tar xvzf - --strip-components=1 && \
+    mkdir -p /usr/share/rancher/ui/api-ui && \
+    cd /usr/share/rancher/ui/api-ui && \
+    curl -sL https://releases.rancher.com/api-ui/${CATTLE_API_UI_VERSION}.tar.gz | tar xvzf - --strip-components=1 && \
     cd /var/lib/rancher
 
 ENV CATTLE_CLI_URL_DARWIN  https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_CLI_VERSION}.tar.gz

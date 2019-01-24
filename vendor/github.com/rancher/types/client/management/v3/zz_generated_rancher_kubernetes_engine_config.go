@@ -10,6 +10,7 @@ const (
 	RancherKubernetesEngineConfigFieldBastionHost         = "bastionHost"
 	RancherKubernetesEngineConfigFieldCloudProvider       = "cloudProvider"
 	RancherKubernetesEngineConfigFieldClusterName         = "clusterName"
+	RancherKubernetesEngineConfigFieldDNS                 = "dns"
 	RancherKubernetesEngineConfigFieldIgnoreDockerVersion = "ignoreDockerVersion"
 	RancherKubernetesEngineConfigFieldIngress             = "ingress"
 	RancherKubernetesEngineConfigFieldMonitoring          = "monitoring"
@@ -34,6 +35,7 @@ type RancherKubernetesEngineConfig struct {
 	BastionHost         *BastionHost        `json:"bastionHost,omitempty" yaml:"bastionHost,omitempty"`
 	CloudProvider       *CloudProvider      `json:"cloudProvider,omitempty" yaml:"cloudProvider,omitempty"`
 	ClusterName         string              `json:"clusterName,omitempty" yaml:"clusterName,omitempty"`
+	DNS                 *DNSConfig          `json:"dns,omitempty" yaml:"dns,omitempty"`
 	IgnoreDockerVersion bool                `json:"ignoreDockerVersion,omitempty" yaml:"ignoreDockerVersion,omitempty"`
 	Ingress             *IngressConfig      `json:"ingress,omitempty" yaml:"ingress,omitempty"`
 	Monitoring          *MonitoringConfig   `json:"monitoring,omitempty" yaml:"monitoring,omitempty"`

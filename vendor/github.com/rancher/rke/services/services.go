@@ -47,6 +47,8 @@ const (
 	WorkerThreads = util.WorkerThreads
 )
 
+type RestartFunc func(context.Context, *hosts.Host) error
+
 func runSidekick(ctx context.Context, host *hosts.Host, prsMap map[string]v3.PrivateRegistry, sidecarProcess v3.Process) error {
 	isRunning, err := docker.IsContainerRunning(ctx, host.DClient, host.Address, SidekickContainerName, true)
 	if err != nil {

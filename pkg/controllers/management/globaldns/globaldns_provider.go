@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"text/template"
 
+	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -15,6 +16,7 @@ import (
 	"k8s.io/api/extensions/v1beta1"
 	k8srbacV1 "k8s.io/api/rbac/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -24,6 +26,8 @@ import (
 )
 
 const (
+	Route53DNSProvider        = "route53"
+	CloudflareDNSProvider     = "cloudflare"
 	GlobaldnsProviderLauncher = "mgmt-global-dns-provider-launcher"
 )
 
@@ -34,6 +38,7 @@ type ProviderLauncher struct {
 	ServiceAccounts         corev1.ServiceAccountInterface
 	ClusterRoles            rbacv1.ClusterRoleInterface
 	ClusterRoleBindings     rbacv1.ClusterRoleBindingInterface
+	managementContext       *config.ManagementContext
 }
 
 func newGlobalDNSProviderLauncher(ctx context.Context, mgmt *config.ManagementContext) *ProviderLauncher {
@@ -44,6 +49,7 @@ func newGlobalDNSProviderLauncher(ctx context.Context, mgmt *config.ManagementCo
 		ServiceAccounts:         mgmt.K8sClient.CoreV1().ServiceAccounts(namespace.GlobalNamespace),
 		ClusterRoles:            mgmt.K8sClient.RbacV1beta1().ClusterRoles(),
 		ClusterRoleBindings:     mgmt.K8sClient.RbacV1beta1().ClusterRoleBindings(),
+		managementContext:       mgmt,
 	}
 	return n
 }
@@ -53,6 +59,14 @@ func (n *ProviderLauncher) sync(key string, obj *v3.GlobalDNSProvider) (runtime.
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
+	metaAccessor, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+	creatorID, ok := metaAccessor.GetAnnotations()[globalnamespacerbac.CreatorIDAnn]
+	if !ok {
+		return nil, fmt.Errorf("GlobalDNS %v has no creatorId annotation", metaAccessor.GetName())
+	}
 	//check if provider already running for this GlobalDNSProvider.
 	if n.isProviderAlreadyRunning(obj) {
 		logrus.Infof("GlobaldnsProviderLauncher: Found a running external-dns deployment for this provider %v , skip creating a new one", obj.Name)
@@ -60,7 +74,7 @@ func (n *ProviderLauncher) sync(key string, obj *v3.GlobalDNSProvider) (runtime.
 	}
 
 	//create svcAcct and rbac entities if not created already
-	err := n.createExternalDNSServiceAccount()
+	err = n.createExternalDNSServiceAccount()
 	if err != nil {
 		return nil, err
 	}
@@ -80,6 +94,13 @@ func (n *ProviderLauncher) sync(key string, obj *v3.GlobalDNSProvider) (runtime.
 		return n.handleRoute53Provider(obj)
 	}
 
+	if obj.Spec.CloudflareProviderConfig != nil {
+		return n.handleCloudflareProvider(obj)
+	}
+
+	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.GlobalDNSProviderResource, obj.Name, obj.Spec.Members, creatorID, n.managementContext); err != nil {
+		return nil, err
+	}
 	return nil, nil
 }
 
@@ -91,41 +112,30 @@ func (n *ProviderLauncher) handleRoute53Provider(obj *v3.GlobalDNSProvider) (run
 		"route53Domain":  obj.Spec.Route53ProviderConfig.RootDomain,
 		"deploymentName": obj.Name,
 	}
-	route53Template := template.Must(template.New("route53_template").Parse(Route53DeploymentTemplate))
-	var output bytes.Buffer
-	if err := route53Template.Execute(&output, data); err != nil {
-		return nil, fmt.Errorf("GlobaldnsProviderLauncher: Error parsing the external-dns/route53 deployment template: %v", err)
+	if err := n.createExternalDNSDeployment(obj, data, Route53DeploymentTemplate, Route53DNSProvider); err != nil {
+		return nil, err
 	}
 
-	decode := scheme.Codecs.UniversalDeserializer().Decode
-	deployObj, _, err := decode(output.Bytes(), nil, nil)
-	if err != nil {
-		return nil, fmt.Errorf("GlobaldnsProviderLauncher: Error decoding  external-dns/route53 deployment template to Kubernetes Object: %v", err)
-	}
+	return nil, nil
+}
 
-	deployment := deployObj.(*v1beta1.Deployment)
-	//set ownerRef to the dnsProvider CR
-	controller := true
-	ownerRef := []metav1.OwnerReference{{
-		Name:       obj.Name,
-		APIVersion: "v3",
-		UID:        obj.UID,
-		Kind:       obj.Kind,
-		Controller: &controller,
-	}}
-	deployment.ObjectMeta.OwnerReferences = ownerRef
-
-	deploymentCreated, err := n.Deployments.Create(deployment)
-	if err != nil {
-		return nil, fmt.Errorf("GlobaldnsProviderLauncher: Error creating external-dns deployment for Route53 provider: %v ", err)
+func (n *ProviderLauncher) handleCloudflareProvider(obj *v3.GlobalDNSProvider) (runtime.Object, error) {
+	//create external-dns cloudflare provider
+	data := map[string]interface{}{
+		"apiKey":           obj.Spec.CloudflareProviderConfig.APIKey,
+		"apiEmail":         obj.Spec.CloudflareProviderConfig.APIEmail,
+		"cloudflareDomain": obj.Spec.CloudflareProviderConfig.RootDomain,
+		"deploymentName":   obj.Name,
 	}
-	logrus.Infof("GlobaldnsProviderLauncher: Created Route53 external-dns provider deployment %v", deploymentCreated.Name)
+	if err := n.createExternalDNSDeployment(obj, data, CloudflareDeploymentTemplate, CloudflareDNSProvider); err != nil {
+		return nil, err
+	}
 
 	return nil, nil
 }
 
 func (n *ProviderLauncher) isProviderAlreadyRunning(obj *v3.GlobalDNSProvider) bool {
-	existingDep, err := n.Deployments.Get("route53", metav1.GetOptions{})
+	existingDep, err := n.Deployments.Get(obj.Name, metav1.GetOptions{})
 
 	if (err != nil && k8serrors.IsNotFound(err)) || existingDep == nil {
 		return false
@@ -199,5 +209,40 @@ func (n *ProviderLauncher) createExternalDNSClusterRoleBinding() error {
 		}
 	}
 
+	return nil
+}
+
+func (n *ProviderLauncher) createExternalDNSDeployment(obj *v3.GlobalDNSProvider, data map[string]interface{}, globalDNSTemplate, globalDNSName string) error {
+	//create external-dns provider
+	externalDNSTemplate := template.Must(template.New(globalDNSName).Parse(globalDNSTemplate))
+	var output bytes.Buffer
+	//create external-dns cloudflare provider
+	if err := externalDNSTemplate.Execute(&output, data); err != nil {
+		return fmt.Errorf("GlobaldnsProviderLauncher: Error parsing the external-dns/%s deployment template: %v", globalDNSName, err)
+	}
+
+	decode := scheme.Codecs.UniversalDeserializer().Decode
+	deployObj, _, err := decode(output.Bytes(), nil, nil)
+	if err != nil {
+		return fmt.Errorf("GlobaldnsProviderLauncher: Error decoding  external-dns/%s deployment template to Kubernetes Object: %v", globalDNSName, err)
+	}
+
+	deployment := deployObj.(*v1beta1.Deployment)
+	//set ownerRef to the dnsProvider CR
+	controller := true
+	ownerRef := []metav1.OwnerReference{{
+		Name:       obj.Name,
+		APIVersion: "v3",
+		UID:        obj.UID,
+		Kind:       obj.Kind,
+		Controller: &controller,
+	}}
+	deployment.ObjectMeta.OwnerReferences = ownerRef
+
+	deploymentCreated, err := n.Deployments.Create(deployment)
+	if err != nil {
+		return fmt.Errorf("GlobaldnsProviderLauncher: Error creating external-dns deployment for %s provider: %v ", globalDNSName, err)
+	}
+	logrus.Infof("GlobaldnsProviderLauncher: Created %s external-dns provider deployment %v", globalDNSName, deploymentCreated.Name)
 	return nil
 }

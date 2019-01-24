@@ -156,7 +156,7 @@ func (m *Manager) changed(r *record, cluster *v3.Cluster, controllers, clusterOw
 	if existing.Status.APIEndpoint != cluster.Status.APIEndpoint ||
 		existing.Status.ServiceAccountToken != cluster.Status.ServiceAccountToken ||
 		existing.Status.CACert != cluster.Status.CACert ||
-		existing.Status.AppliedEnableClusterAuth != cluster.Status.AppliedEnableClusterAuth {
+		existing.Status.AppliedSpec.LocalClusterAuthEndpoint.Enabled != cluster.Status.AppliedSpec.LocalClusterAuthEndpoint.Enabled {
 		return true
 	}
 

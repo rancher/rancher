@@ -25,6 +25,6 @@ func removeNginxProxy(ctx context.Context, host *hosts.Host) error {
 	return docker.DoRemoveContainer(ctx, host.DClient, NginxProxyContainerName, host.Address)
 }
 
-func restartNginxProxy(ctx context.Context, host *hosts.Host) error {
+func RestartNginxProxy(ctx context.Context, host *hosts.Host) error {
 	return docker.DoRestartContainer(ctx, host.DClient, NginxProxyContainerName, host.Address)
 }

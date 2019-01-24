@@ -2,24 +2,32 @@ package multiclusterapp
 
 import (
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"reflect"
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/norman/types/values"
+	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
 	"github.com/rancher/rancher/pkg/namespace"
-	"io/ioutil"
-
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
+	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
-	"net/http"
-	"reflect"
 )
 
 type Wrapper struct {
 	MultiClusterApps              v3.MultiClusterAppInterface
 	MultiClusterAppLister         v3.MultiClusterAppLister
 	MultiClusterAppRevisionLister v3.MultiClusterAppRevisionLister
+	Users                         v3.UserInterface
+	PrtbLister                    v3.ProjectRoleTemplateBindingLister
+	RoleTemplateLister            v3.RoleTemplateLister
 }
 
 const (
@@ -70,7 +78,12 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		if err = json.Unmarshal(data, &input); err != nil {
 			return errors.Wrap(err, "unmarshal input error")
 		}
-		revision, err := w.MultiClusterAppRevisionLister.Get(namespace.GlobalNamespace, input.RevisionID)
+		id := input.RevisionID
+		splitID := strings.Split(input.RevisionID, ":")
+		if len(splitID) == 2 {
+			id = splitID[1]
+		}
+		revision, err := w.MultiClusterAppRevisionLister.Get(namespace.GlobalNamespace, id)
 		if err != nil {
 			return err
 		}
@@ -88,4 +101,31 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		return err
 	}
 	return nil
+}
+
+func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
+	if request.Method != http.MethodPut && request.Method != http.MethodPost {
+		return nil
+	}
+
+	var targetProjects []string
+	// check if the creator of multiclusterapp and all members can access all target projects
+	targetMapSlice, found := values.GetSlice(data, client.MultiClusterAppFieldTargets)
+	if !found {
+		return fmt.Errorf("no target projects provided")
+	}
+	for _, t := range targetMapSlice {
+		projectID, ok := t[client.TargetFieldProjectID].(string)
+		if !ok {
+			continue
+		}
+		targetProjects = append(targetProjects, projectID)
+	}
+
+	ma := gaccess.MemberAccess{
+		Users:              w.Users,
+		PrtbLister:         w.PrtbLister,
+		RoleTemplateLister: w.RoleTemplateLister,
+	}
+	return ma.CheckCreatorAndMembersAccessToTargets(request, targetProjects, data, client.MultiClusterAppType, pv3.AppGroupVersionKind.Group, pv3.AppResource.Name)
 }

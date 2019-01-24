@@ -7,41 +7,37 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/sirupsen/logrus"
-
-	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
 )
 
 func ClusterLoggingValidator(resquest *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
-	var clusterLogging v3.ClusterLoggingSpec
-	if err := convert.ToObj(data, &clusterLogging); err != nil {
+	var spec v3.ClusterLoggingSpec
+	if err := convert.ToObj(data, &spec); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("%v", err))
 	}
 
-	wp := utils.WrapClusterLogging{
-		ClusterLoggingSpec: clusterLogging,
+	if spec.KafkaConfig != nil {
+		return validateKafka(spec.KafkaConfig)
 	}
 
-	if err := wp.Validate(); err != nil {
-		logrus.Warnf("clusterlogging %s input validate failed, %v", resquest.ID, err)
-		return httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("%v", err))
-	}
 	return nil
 }
 
 func ProjectLoggingValidator(resquest *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
-	var projectLogging v3.ProjectLoggingSpec
-	if err := convert.ToObj(data, &projectLogging); err != nil {
+	var spec v3.ProjectLoggingSpec
+	if err := convert.ToObj(data, &spec); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("%v", err))
 	}
 
-	wp := utils.WrapProjectLogging{
-		ProjectLoggingSpec: projectLogging,
+	if spec.KafkaConfig != nil {
+		return validateKafka(spec.KafkaConfig)
 	}
 
-	if err := wp.Validate(); err != nil {
-		logrus.Warnf("projectlogging %s input validate failed, %v", resquest.ID, err)
-		return httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("%v", err))
+	return nil
+}
+
+func validateKafka(kafkaConfig *v3.KafkaConfig) error {
+	if kafkaConfig.SaslType == "plain" && kafkaConfig.ClientCert == "" && kafkaConfig.ClientKey == "" {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "Plain SASL authentication requires SSL is configured")
 	}
 	return nil
 }

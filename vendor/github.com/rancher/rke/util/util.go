@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 
@@ -50,4 +51,15 @@ func UniqueStringSlice(elements []string) []string {
 		}
 	}
 	return result
+}
+
+func IsSymlink(file string) (bool, error) {
+	f, err := os.Lstat(file)
+	if err != nil {
+		return false, err
+	}
+	if f.Mode()&os.ModeSymlink != 0 {
+		return true, nil
+	}
+	return false, nil
 }

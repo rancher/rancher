@@ -26,15 +26,15 @@ func TemplateFormatter(apiContext *types.APIContext, resource *types.RawResource
 	resource.Links["icon"] = apiContext.URLBuilder.Link("icon", resource)
 
 	val := resource.Values
-	if val[client.TemplateFieldCatalogID] != nil {
+	if val[client.CatalogTemplateFieldCatalogID] != nil {
 		//catalog link
 		catalogSchema := apiContext.Schemas.Schema(&managementschema.Version, client.CatalogType)
 		catalogName := strings.Split(resource.ID, "-")[0]
 		resource.Links["catalog"] = apiContext.URLBuilder.ResourceLinkByID(catalogSchema, catalogName)
 	}
 
-	if val[client.TemplateFieldProjectCatalogID] != nil {
-		prjCatID, ok := val[client.TemplateFieldProjectCatalogID].(string)
+	if val[client.CatalogTemplateFieldProjectCatalogID] != nil {
+		prjCatID, ok := val[client.CatalogTemplateFieldProjectCatalogID].(string)
 		if ok {
 			prjCatalogName = prjCatID
 		}
@@ -43,8 +43,8 @@ func TemplateFormatter(apiContext *types.APIContext, resource *types.RawResource
 		resource.Links["projectCatalog"] = apiContext.URLBuilder.ResourceLinkByID(prjCatalogSchema, prjCatalogName)
 	}
 
-	if val[client.TemplateFieldClusterCatalogID] != nil {
-		clusterCatID, ok := val[client.TemplateFieldClusterCatalogID].(string)
+	if val[client.CatalogTemplateFieldClusterCatalogID] != nil {
+		clusterCatID, ok := val[client.CatalogTemplateFieldClusterCatalogID].(string)
 		if ok {
 			clusterCatalogName = clusterCatID
 		}

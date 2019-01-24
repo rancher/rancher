@@ -1,10 +1,13 @@
 package roletemplate
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/client/management/v3"
 )
 
 type Wrapper struct {
@@ -12,8 +15,18 @@ type Wrapper struct {
 }
 
 func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
-	if request.Method != http.MethodPut {
+	if request.Method != http.MethodPut && request.Method != http.MethodPost {
 		return nil
+	}
+
+	// Only cluster roles can be administrative for now. So this validation will prevent users from creating any "project" context
+	// roleTemplates with administrative bit set to true
+	if request.Method == http.MethodPost || request.Method == http.MethodPut {
+		administrative := convert.ToBool(data[client.RoleTemplateFieldAdministrative])
+		context := convert.ToString(data[client.RoleTemplateFieldContext])
+		if administrative && context != "cluster" {
+			return fmt.Errorf("Only cluster roles can be administrative")
+		}
 	}
 
 	rt, err := w.RoleTemplateLister.Get("", request.ID)

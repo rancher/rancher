@@ -3,8 +3,6 @@ package pipeline
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/rancher/rancher/pkg/pipeline/providers"
 	"github.com/rancher/rancher/pkg/pipeline/remote"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
@@ -12,6 +10,8 @@ import (
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/satori/go.uuid"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // This controller is responsible for watching pipelines and handling
@@ -48,7 +48,7 @@ func (l *Lifecycle) Updated(obj *v3.Pipeline) (runtime.Object, error) {
 
 func (l *Lifecycle) Remove(obj *v3.Pipeline) (runtime.Object, error) {
 	if obj.Status.WebHookID != "" {
-		if err := l.deleteHook(obj); err != nil {
+		if err := l.deleteHook(obj); err != nil && !errors.IsNotFound(err) {
 			return obj, err
 		}
 	}

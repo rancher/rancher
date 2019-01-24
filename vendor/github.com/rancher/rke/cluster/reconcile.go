@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
@@ -47,6 +48,12 @@ func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster,
 	if err := reconcileControl(ctx, currentCluster, kubeCluster, kubeClient); err != nil {
 		return err
 	}
+	if flags.CustomCerts {
+		if err := restartComponentsWhenCertChanges(ctx, currentCluster, kubeCluster); err != nil {
+			return err
+		}
+	}
+
 	log.Infof(ctx, "[reconcile] Reconciled cluster state successfully")
 	return nil
 }
@@ -242,4 +249,76 @@ func cleanControlNode(ctx context.Context, kubeCluster, currentCluster *Cluster,
 		log.Warnf(ctx, "[reconcile] Couldn't clean up controlplane node [%s]: %v", toDeleteHost.Address, err)
 	}
 	return nil
+}
+
+func restartComponentsWhenCertChanges(ctx context.Context, currentCluster, kubeCluster *Cluster) error {
+	AllCertsMap := map[string]bool{
+		pki.KubeAPICertName:            false,
+		pki.RequestHeaderCACertName:    false,
+		pki.CACertName:                 false,
+		pki.ServiceAccountTokenKeyName: false,
+		pki.APIProxyClientCertName:     false,
+		pki.KubeControllerCertName:     false,
+		pki.KubeSchedulerCertName:      false,
+		pki.KubeProxyCertName:          false,
+		pki.KubeNodeCertName:           false,
+	}
+	checkCertificateChanges(ctx, currentCluster, kubeCluster, AllCertsMap)
+	// check Restart Function
+	allHosts := hosts.GetUniqueHostList(kubeCluster.EtcdHosts, kubeCluster.ControlPlaneHosts, kubeCluster.WorkerHosts)
+	AllCertsFuncMap := map[string][]services.RestartFunc{
+		pki.CACertName:                 []services.RestartFunc{services.RestartKubeAPI, services.RestartKubeController, services.RestartKubelet},
+		pki.KubeAPICertName:            []services.RestartFunc{services.RestartKubeAPI, services.RestartKubeController},
+		pki.RequestHeaderCACertName:    []services.RestartFunc{services.RestartKubeAPI},
+		pki.ServiceAccountTokenKeyName: []services.RestartFunc{services.RestartKubeAPI, services.RestartKubeController},
+		pki.APIProxyClientCertName:     []services.RestartFunc{services.RestartKubeAPI},
+		pki.KubeControllerCertName:     []services.RestartFunc{services.RestartKubeController},
+		pki.KubeSchedulerCertName:      []services.RestartFunc{services.RestartScheduler},
+		pki.KubeProxyCertName:          []services.RestartFunc{services.RestartKubeproxy},
+		pki.KubeNodeCertName:           []services.RestartFunc{services.RestartKubelet},
+	}
+	for certName, changed := range AllCertsMap {
+		if changed {
+			for _, host := range allHosts {
+				runRestartFuncs(ctx, AllCertsFuncMap, certName, host)
+			}
+		}
+	}
+
+	for _, host := range kubeCluster.EtcdHosts {
+		etcdCertName := pki.GetEtcdCrtName(host.Address)
+		certMap := map[string]bool{
+			etcdCertName: false,
+		}
+		checkCertificateChanges(ctx, currentCluster, kubeCluster, certMap)
+		if certMap[etcdCertName] || AllCertsMap[pki.CACertName] {
+			if err := docker.DoRestartContainer(ctx, host.DClient, services.EtcdContainerName, host.HostnameOverride); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func runRestartFuncs(ctx context.Context, certFuncMap map[string][]services.RestartFunc, certName string, host *hosts.Host) error {
+	for _, restartFunc := range certFuncMap[certName] {
+		if err := restartFunc(ctx, host); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func checkCertificateChanges(ctx context.Context, currentCluster, kubeCluster *Cluster, certMap map[string]bool) {
+	for certName := range certMap {
+		if currentCluster.Certificates[certName].CertificatePEM != kubeCluster.Certificates[certName].CertificatePEM {
+			certMap[certName] = true
+			continue
+		}
+		if !(certName == pki.RequestHeaderCACertName || certName == pki.CACertName) {
+			if currentCluster.Certificates[certName].KeyPEM != kubeCluster.Certificates[certName].KeyPEM {
+				certMap[certName] = true
+			}
+		}
+	}
 }

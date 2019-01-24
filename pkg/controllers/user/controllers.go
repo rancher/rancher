@@ -41,7 +41,8 @@ import (
 	"github.com/rancher/types/factory"
 
 	// init upgrade implement
-	_ "github.com/rancher/rancher/pkg/controllers/user/logging/upgrade"
+	_ "github.com/rancher/rancher/pkg/controllers/user/alert/deployer"
+	_ "github.com/rancher/rancher/pkg/controllers/user/logging/deployer"
 	_ "github.com/rancher/rancher/pkg/controllers/user/pipeline/upgrade"
 )
 
@@ -69,7 +70,7 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	alert.Register(ctx, cluster)
 	monitoring.Register(ctx, cluster)
 
-	if clusterRec.Spec.EnableClusterAuth {
+	if clusterRec.Spec.LocalClusterAuthEndpoint.Enabled {
 		err := clusterauthtoken.CRDSetup(ctx, cluster.UserOnlyContext())
 		if err != nil {
 			return err

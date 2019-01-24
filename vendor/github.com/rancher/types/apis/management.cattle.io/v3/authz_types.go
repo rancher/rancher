@@ -91,6 +91,7 @@ type RoleTemplate struct {
 	ProjectCreatorDefault bool                `json:"projectCreatorDefault,omitempty" norman:"required"`
 	Context               string              `json:"context" norman:"type=string,options=project|cluster"`
 	RoleTemplateNames     []string            `json:"roleTemplateNames,omitempty" norman:"type=array[reference[roleTemplate]]"`
+	Administrative        bool                `json:"administrative,omitempty"`
 }
 
 type PodSecurityPolicyTemplate struct {

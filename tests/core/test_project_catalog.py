@@ -1,7 +1,6 @@
 from .conftest import wait_until, wait_until_available
 from rancher import ApiError
-from .common import wait_to_ensure_user_in_crb_subject, random_str
-import kubernetes
+from .common import random_str
 import time
 
 
@@ -23,8 +22,6 @@ def test_project_catalog_creation(admin_mc, remove_resource,
     name = random_str()
     project_name = str.lstrip(admin_pc.project.id, "local:")
     catalog_name = project_name + ":" + name
-    template_name = "local-"+project_name+"-"+name+"-etcd-operator"
-    template_version_name = template_name + "-0.7.6"
     url = "https://github.com/mrajashree/charts.git"
 
     project = admin_pc.project
@@ -44,23 +41,9 @@ def test_project_catalog_creation(admin_mc, remove_resource,
     templates = \
         project_owner_client.list_template(projectCatalogId=catalog_name)
     assert len(templates) == 1
-
-    # Find the expected k8s clusterRole for the templates and
-    # templateversions of this cluster catalog
-    api_instance = kubernetes.client.RbacAuthorizationV1Api(
-        admin_mc.k8s_client)
-    cr_name = "project-local-"+project_name+"-use-templates-templateversions"
-    cr = api_instance.read_cluster_role(cr_name)
-    # Ensure that the newly created template name is added to resourenames
-    # of the cluster role
-    cr_rules = cr.rules
-    wait_until(cr_rule_template(api_instance, cr_name, cr, "templates"))
-    wait_until(cr_rule_template(api_instance, cr_name, cr, "templateversions"))
-    for i in range(0, len(cr_rules)):
-        if cr_rules[i].resources[0] == "templates":
-            assert template_name in cr_rules[i].resource_names
-        if cr_rules[i].resources[0] == "templateversions":
-            assert template_version_name in cr_rules[i].resource_names
+    templateversions = \
+        project_owner_client.list_template(projectCatalogId=catalog_name)
+    assert len(templateversions) == 1
 
     # Now add a user as project-member to this project
     prtb_member = client.create_project_role_template_binding(
@@ -72,12 +55,6 @@ def test_project_catalog_creation(admin_mc, remove_resource,
     wait_until_available(user_mc.client, admin_cc.cluster)
     wait_until(prtb_cb(client, prtb_member))
 
-    # Get cluster role binding for project's cluster role
-    # Ensure that project-member user_mc is added in subjects
-    crb_name = "local-" + project_name + "-templates-templateversions-crb"
-    wait_to_ensure_user_in_crb_subject(api_instance, crb_name,
-                                       user_mc.user.id)
-
     project_member_client = user_mc.client
     # The project-member should now be able to access the project level
     # catalog and its templates
@@ -86,6 +63,9 @@ def test_project_catalog_creation(admin_mc, remove_resource,
     templates = \
         project_member_client.list_template(projectCatalogId=catalog_name)
     assert len(templates) == 1
+    templateversions = \
+        project_member_client.list_template(projectCatalogId=catalog_name)
+    assert len(templateversions) == 1
 
     # But project-member should not be able to create a project catalog
     try:
@@ -132,8 +112,8 @@ def test_create_project_catalog_after_user_addition(admin_mc,
     name = random_str()
     project_name = str.lstrip(admin_pc.project.id, "local:")
     catalog_name = project_name + ":" + name
-    template_name = "local-" + project_name + "-" + name + "-etcd-operator"
-    template_version_name = template_name + "-0.7.6"
+    # template_name = "local-" + project_name + "-" + name + "-etcd-operator"
+    # template_version_name = template_name + "-0.7.6"
     url = "https://github.com/mrajashree/charts.git"
 
     project = admin_pc.project
@@ -147,24 +127,6 @@ def test_create_project_catalog_after_user_addition(admin_mc,
     wait_for_projectcatalog_template_to_be_created(project_owner_client,
                                                    catalog_name)
 
-    # Find the expected k8s clusterRole for the templates and
-    # templateversions of this cluster catalog
-    api_instance = kubernetes.client.RbacAuthorizationV1Api(
-        admin_mc.k8s_client)
-    cr_name = "project-local-" + project_name + \
-              "-use-templates-templateversions"
-    cr = api_instance.read_cluster_role(cr_name)
-    # Ensure that the newly created template name is added to resourenames
-    # of the cluster role
-    cr_rules = cr.rules
-    wait_until(cr_rule_template(api_instance, cr_name, cr, "templates"))
-    wait_until(cr_rule_template(api_instance, cr_name, cr, "templateversions"))
-    for i in range(0, len(cr_rules)):
-        if cr_rules[i].resources[0] == "templates":
-            assert template_name in cr_rules[i].resource_names
-        if cr_rules[i].resources[0] == "templateversions":
-            assert template_version_name in cr_rules[i].resource_names
-
     # The project-owner should now be able to access the project level
     # catalog and its templates
     cc = project_owner_client.list_project_catalog(name=name)
@@ -172,12 +134,9 @@ def test_create_project_catalog_after_user_addition(admin_mc,
     templates = \
         project_owner_client.list_template(projectCatalogId=catalog_name)
     assert len(templates) == 1
-    # Get cluster role binding for project's cluster role
-    # Ensure that project-member user1 is added in subjects
-    # crb_name = project_name + "-" + name
-    crb_name = "local-" + project_name + "-templates-templateversions-crb"
-    wait_to_ensure_user_in_crb_subject(api_instance, crb_name,
-                                       user1.user.id)
+    templateversions = \
+        project_owner_client.list_template(projectCatalogId=catalog_name)
+    assert len(templateversions) == 1
 
     project_member_client = user1.client
     # The project-member should now be able to access the project level
@@ -201,8 +160,6 @@ def test_user_addition_after_creating_project_catalog(admin_mc,
     name = random_str()
     project_name = str.lstrip(admin_pc.project.id, "local:")
     catalog_name = project_name + ":" + name
-    template_name = "local-" + project_name + "-" + name + "-etcd-operator"
-    template_version_name = template_name + "-0.7.6"
     url = "https://github.com/mrajashree/charts.git"
 
     project = admin_pc.project
@@ -216,24 +173,6 @@ def test_user_addition_after_creating_project_catalog(admin_mc,
     wait_for_projectcatalog_template_to_be_created(project_owner_client,
                                                    catalog_name)
 
-    # Find the expected k8s clusterRole for the templates and
-    # templateversions of this cluster catalog
-    api_instance = kubernetes.client.RbacAuthorizationV1Api(
-        admin_mc.k8s_client)
-    cr_name = "project-local-" + project_name + \
-              "-use-templates-templateversions"
-    cr = api_instance.read_cluster_role(cr_name)
-    # Ensure that the newly created template name is added to resourenames
-    # of the cluster role
-    cr_rules = cr.rules
-    wait_until(cr_rule_template(api_instance, cr_name, cr, "templates"))
-    wait_until(cr_rule_template(api_instance, cr_name, cr, "templateversions"))
-    for i in range(0, len(cr_rules)):
-        if cr_rules[i].resources[0] == "templates":
-            assert template_name in cr_rules[i].resource_names
-        if cr_rules[i].resources[0] == "templateversions":
-            assert template_version_name in cr_rules[i].resource_names
-
     # The project-owner should now be able to access the project level
     # catalog and its templates
     cc = project_owner_client.list_project_catalog(name=name)
@@ -241,6 +180,9 @@ def test_user_addition_after_creating_project_catalog(admin_mc,
     templates = \
         project_owner_client.list_template(projectCatalogId=catalog_name)
     assert len(templates) == 1
+    templateverions = \
+        project_owner_client.list_template(projectCatalogId=catalog_name)
+    assert len(templateverions) == 1
 
     # Create a new user
     user1 = user_factory()
@@ -255,13 +197,6 @@ def test_user_addition_after_creating_project_catalog(admin_mc,
 
     wait_until(prtb_cb(client, prtb_member))
 
-    # Get cluster role binding for project's cluster role
-    # Ensure that project-member user1 is added in subjects
-    # crb_name = project_name + "-" + name
-    crb_name = "local-" + project_name + "-templates-templateversions-crb"
-    wait_to_ensure_user_in_crb_subject(api_instance, crb_name,
-                                       user1.user.id)
-
     project_member_client = user1.client
     # The project-member should now be able to access the project level
     # catalog and its templates
@@ -270,6 +205,9 @@ def test_user_addition_after_creating_project_catalog(admin_mc,
     templates = \
         project_member_client.list_template(projectCatalogId=catalog_name)
     assert len(templates) == 1
+    templateversions = \
+        project_member_client.list_template(projectCatalogId=catalog_name)
+    assert len(templateversions) == 1
 
     client.delete(project_catalog)
     wait_for_projectcatalog_template_to_be_deleted(client, catalog_name)

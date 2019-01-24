@@ -199,6 +199,11 @@ func (c *Cluster) BuildKubeAPIProcess(prefixPath string) v3.Process {
 		baseEnabledAdmissionPlugins = append(baseEnabledAdmissionPlugins, "PodSecurityPolicy")
 	}
 
+	// AlwaysPullImages
+	if c.Services.KubeAPI.AlwaysPullImages {
+		baseEnabledAdmissionPlugins = append(baseEnabledAdmissionPlugins, "AlwaysPullImages")
+	}
+
 	// Admission control plugins
 	// Resolution order:
 	//   k8s_defaults.go K8sVersionServiceOptions
@@ -686,6 +691,7 @@ func (c *Cluster) BuildSidecarProcess() v3.Process {
 		Labels: map[string]string{
 			ContainerNameLabel: services.SidekickContainerName,
 		},
+		Command: []string{"/bin/bash"},
 	}
 }
 

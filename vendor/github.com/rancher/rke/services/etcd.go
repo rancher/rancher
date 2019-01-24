@@ -275,7 +275,7 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 		imageCfg.Cmd = append(imageCfg.Cmd, "--creation="+es.Creation)
 	}
 
-	if es.BackupConfig != nil && es.BackupConfig.S3BackupConfig != nil {
+	if es.BackupConfig != nil {
 		imageCfg = configS3BackupImgCmd(ctx, imageCfg, es.BackupConfig)
 	}
 	hostCfg := &container.HostConfig{
@@ -329,10 +329,14 @@ func DownloadEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[
 			"etcd-backup",
 			"download",
 			"--name", name,
+			"--s3-endpoint=" + s3Backend.Endpoint,
+			"--s3-accessKey=" + s3Backend.AccessKey,
+			"--s3-secretKey=" + s3Backend.SecretKey,
+			"--s3-bucketName=" + s3Backend.BucketName,
+			"--s3-region=" + s3Backend.Region,
 		},
 		Image: etcdSnapshotImage,
 	}
-	imageCfg = configS3BackupImgCmd(ctx, imageCfg, es.BackupConfig)
 
 	hostCfg := &container.HostConfig{
 		Binds: []string{
@@ -347,11 +351,10 @@ func DownloadEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[
 	}
 	status, err := docker.WaitForContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdDownloadBackupContainerName)
 	if status != 0 || err != nil {
-		err := docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdDownloadBackupContainerName)
-		if err != nil {
-			return fmt.Errorf("Failed to get etcd snapshot from s3 exit code [%d], failed to exit container [%s]: %v ", status, EtcdDownloadBackupContainerName, err)
+		if err2 := docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdDownloadBackupContainerName); err2 != nil {
+			log.Warnf(ctx, "Failed to delete backup download container [%s]: %v", EtcdDownloadBackupContainerName, err2)
 		}
-		return fmt.Errorf("Failed to get etcd snapshot from s3 exit code [%d]: %v", status, err)
+		return fmt.Errorf("Failed to download etcd snapshot from s3, exit code [%d]: %v", status, err)
 	}
 	return docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdDownloadBackupContainerName)
 }
@@ -447,16 +450,20 @@ func GetEtcdSnapshotChecksum(ctx context.Context, etcdHost *hosts.Host, prsMap m
 }
 
 func configS3BackupImgCmd(ctx context.Context, imageCfg *container.Config, bc *v3.BackupConfig) *container.Config {
-	log.Infof(ctx, "Invoking s3 backup server cmd config, bucketName:%s, endpoint:%s", bc.S3BackupConfig.BucketName, bc.S3BackupConfig.Endpoint)
 	cmd := []string{
-		"--s3-backup=true",
-		"--s3-endpoint=" + bc.S3BackupConfig.Endpoint,
-		"--s3-accessKey=" + bc.S3BackupConfig.AccessKey,
-		"--s3-secretKey=" + bc.S3BackupConfig.SecretKey,
-		"--s3-bucketName=" + bc.S3BackupConfig.BucketName,
-		"--s3-region=" + bc.S3BackupConfig.Region,
 		"--creation=" + fmt.Sprintf("%dh", bc.IntervalHours),
 		"--retention=" + fmt.Sprintf("%dh", bc.Retention*bc.IntervalHours),
+	}
+
+	if bc.S3BackupConfig != nil {
+		cmd = append(cmd, []string{
+			"--s3-backup=true",
+			"--s3-endpoint=" + bc.S3BackupConfig.Endpoint,
+			"--s3-accessKey=" + bc.S3BackupConfig.AccessKey,
+			"--s3-secretKey=" + bc.S3BackupConfig.SecretKey,
+			"--s3-bucketName=" + bc.S3BackupConfig.BucketName,
+			"--s3-region=" + bc.S3BackupConfig.Region,
+		}...)
 	}
 	imageCfg.Cmd = append(imageCfg.Cmd, cmd...)
 	return imageCfg

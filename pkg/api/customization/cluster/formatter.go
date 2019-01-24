@@ -1,4 +1,4 @@
-package clusteregistrationtokens
+package cluster
 
 import (
 	"strings"
