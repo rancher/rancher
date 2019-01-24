@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -25,8 +26,12 @@ type jenkinsPipelineConverter struct {
 }
 
 type executeOptions struct {
-	gitCaCerts           string
-	imagePullSecretNames []string
+	gitCaCerts            string
+	imagePullSecretNames  []string
+	executorMemoryRequest string
+	executorMemoryLimit   string
+	executorCPURequest    string
+	executorCPULimit      string
 }
 
 func initJenkinsPipelineConverter(execution *v3.PipelineExecution, pipelineSettingLister v3.PipelineSettingLister, secretLister apiv1.SecretLister) (*jenkinsPipelineConverter, error) {
@@ -39,14 +44,54 @@ func initJenkinsPipelineConverter(execution *v3.PipelineExecution, pipelineSetti
 	if err != nil {
 		return nil, err
 	}
+	memoryRequestSetting, err := pipelineSettingLister.Get(projectID, utils.SettingExecutorMemoryRequest)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateQuantity(memoryRequestSetting.Value); err != nil {
+		return nil, errors.Wrap(err, "invalid executor memory request config")
+	}
+	memoryLimitSetting, err := pipelineSettingLister.Get(projectID, utils.SettingExecutorMemoryLimit)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateQuantity(memoryLimitSetting.Value); err != nil {
+		return nil, errors.Wrap(err, "invalid executor memory limit config")
+	}
+	cpuRequestSetting, err := pipelineSettingLister.Get(projectID, utils.SettingExecutorCPURequest)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateQuantity(cpuRequestSetting.Value); err != nil {
+		return nil, errors.Wrap(err, "invalid executor cpu request config")
+	}
+	cpuLimitSetting, err := pipelineSettingLister.Get(projectID, utils.SettingExecutorCPULimit)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateQuantity(cpuLimitSetting.Value); err != nil {
+		return nil, errors.Wrap(err, "invalid executor cpu limit config")
+	}
 	opts := &executeOptions{
-		gitCaCerts:           cacertSetting.Value,
-		imagePullSecretNames: secretNames,
+		gitCaCerts:            cacertSetting.Value,
+		imagePullSecretNames:  secretNames,
+		executorMemoryRequest: getPipelineSettingValue(memoryRequestSetting),
+		executorMemoryLimit:   getPipelineSettingValue(memoryLimitSetting),
+		executorCPURequest:    getPipelineSettingValue(cpuRequestSetting),
+		executorCPULimit:      getPipelineSettingValue(cpuLimitSetting),
 	}
 	return &jenkinsPipelineConverter{
 		execution: execution.DeepCopy(),
 		opts:      opts,
 	}, nil
+}
+
+func validateQuantity(value string) error {
+	if value == "" {
+		return nil
+	}
+	_, err := resource.ParseQuantity(value)
+	return err
 }
 
 func (c *jenkinsPipelineConverter) convertPipelineExecutionToJenkinsPipeline() (*PipelineJob, error) {
@@ -235,6 +280,41 @@ func (c *jenkinsPipelineConverter) injectGitCaCert(pod *v1.Pod) {
 	})
 }
 
+func (c *jenkinsPipelineConverter) injectAgentResources(container *v1.Container) {
+	injectResources(container, c.opts.executorCPULimit, c.opts.executorCPURequest, c.opts.executorMemoryLimit, c.opts.executorMemoryRequest)
+}
+
+func injectSetpContainerResources(container *v1.Container, step *v3.Step) {
+	injectResources(container, step.CPULimit, step.CPURequest, step.MemoryLimit, step.MemoryRequest)
+}
+
+func injectResources(container *v1.Container, cpuLimit string, cpuRequest string, memoryLimit string, memoryRequest string) {
+	if cpuLimit != "" {
+		if container.Resources.Limits == nil {
+			container.Resources.Limits = v1.ResourceList{}
+		}
+		container.Resources.Limits[v1.ResourceCPU] = resource.MustParse(cpuLimit)
+	}
+	if cpuRequest != "" {
+		if container.Resources.Requests == nil {
+			container.Resources.Requests = v1.ResourceList{}
+		}
+		container.Resources.Requests[v1.ResourceCPU] = resource.MustParse(cpuRequest)
+	}
+	if memoryLimit != "" {
+		if container.Resources.Limits == nil {
+			container.Resources.Limits = v1.ResourceList{}
+		}
+		container.Resources.Limits[v1.ResourceMemory] = resource.MustParse(memoryLimit)
+	}
+	if memoryRequest != "" {
+		if container.Resources.Requests == nil {
+			container.Resources.Requests = v1.ResourceList{}
+		}
+		container.Resources.Requests[v1.ResourceMemory] = resource.MustParse(memoryRequest)
+	}
+}
+
 func getImagePullSecretNames(secretLister apiv1.SecretLister, execution *v3.PipelineExecution) ([]string, error) {
 	result := []string{}
 	ns := utils.GetPipelineCommonName(execution.Spec.ProjectName)
@@ -249,6 +329,13 @@ func getImagePullSecretNames(secretLister apiv1.SecretLister, execution *v3.Pipe
 	}
 	logrus.Debugf("using imagepullsecrets %v for the build", result)
 	return result, nil
+}
+
+func getPipelineSettingValue(setting *v3.PipelineSetting) string {
+	if setting.Value != "" {
+		return setting.Value
+	}
+	return setting.Default
 }
 
 func parsePreservedEnvVar(execution *v3.PipelineExecution) {
