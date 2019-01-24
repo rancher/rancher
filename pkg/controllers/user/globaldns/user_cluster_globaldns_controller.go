@@ -5,13 +5,19 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/namespace"
+	v1coreRancher "github.com/rancher/types/apis/core/v1"
 	v1beta1Rancher "github.com/rancher/types/apis/extensions/v1beta1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
-
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+)
+
+const (
+	projectIDLabel = "field.cattle.io/projectId"
 )
 
 type UserGlobalDNSController struct {
@@ -20,6 +26,7 @@ type UserGlobalDNSController struct {
 	globalDNSs            v3.GlobalDNSInterface
 	globalDNSLister       v3.GlobalDNSLister
 	multiclusterappLister v3.MultiClusterAppLister
+	namespaceLister       v1coreRancher.NamespaceLister
 	clusterName           string
 }
 
@@ -30,6 +37,7 @@ func newUserGlobalDNSController(clusterContext *config.UserContext) *UserGlobalD
 		globalDNSs:            clusterContext.Management.Management.GlobalDNSs(""),
 		globalDNSLister:       clusterContext.Management.Management.GlobalDNSs("").Controller().Lister(),
 		multiclusterappLister: clusterContext.Management.Management.MultiClusterApps("").Controller().Lister(),
+		namespaceLister:       clusterContext.Core.Namespaces("").Controller().Lister(),
 		clusterName:           clusterContext.ClusterName,
 	}
 	return &g
@@ -40,11 +48,24 @@ func (g *UserGlobalDNSController) sync(key string, obj *v3.GlobalDNS) (runtime.O
 		return nil, nil
 	}
 
-	// This controller only deals with GlobalDNS created with MultiClusterAppID set
-	if obj.Spec.MultiClusterAppName == "" {
-		return nil, nil
+	var targetEndpoints []string
+	var err error
+
+	if obj.Spec.MultiClusterAppName != "" {
+		targetEndpoints, err = g.reconcileMultiClusterApp(obj)
+	} else if len(obj.Spec.ProjectNames) > 0 {
+		targetEndpoints, err = g.reconcileProjects(obj)
 	}
 
+	if err != nil {
+		return nil, err
+	}
+
+	//compare with the clusterEndpoints and find endpoints to update and remove.
+	return g.refreshGlobalDNSEndpoints(obj, targetEndpoints)
+}
+
+func (g *UserGlobalDNSController) reconcileMultiClusterApp(obj *v3.GlobalDNS) ([]string, error) {
 	// If multiclusterappID is set, look for ingresses in the projects of multiclusterapp's targets
 	// Get multiclusterapp by name set on GlobalDNS spec
 	mcappName, err := getMultiClusterAppName(obj.Spec.MultiClusterAppName)
@@ -56,11 +77,13 @@ func (g *UserGlobalDNSController) sync(key string, obj *v3.GlobalDNS) (runtime.O
 		return nil, err
 	}
 
-	// go through target projects which are part of the current cluster
+	// go through target projects which are part of the current cluster and find all ingresses
+	var allIngresses []*v1beta1.Ingress
+
 	for _, t := range mcapp.Spec.Targets {
 		split := strings.SplitN(t.ProjectName, ":", 2)
 		if len(split) != 2 {
-			return mcapp, fmt.Errorf("error in splitting project ID %v", t.ProjectName)
+			return nil, fmt.Errorf("error in splitting project ID %v", t.ProjectName)
 		}
 		// check if the target project in this iteration is same as the cluster in current context
 		if split[0] != g.clusterName {
@@ -68,55 +91,116 @@ func (g *UserGlobalDNSController) sync(key string, obj *v3.GlobalDNS) (runtime.O
 			continue
 		}
 
-		updated, err := g.updateGlobalDNSEndpointsForTarget(&t, obj)
+		// each target will have appName, this appName is also the namespace in which all workloads for this app are created
+		ingresses, err := g.ingressLister.List(t.AppName, labels.NewSelector())
 		if err != nil {
-			return updated, err
+			return nil, err
 		}
+		allIngresses = append(allIngresses, ingresses...)
 	}
-	return nil, err
+
+	//gather endpoints
+	return g.fetchGlobalDNSEndpointsForIngresses(allIngresses, obj)
 }
 
-func (g *UserGlobalDNSController) updateGlobalDNSEndpointsForTarget(t *v3.Target, obj *v3.GlobalDNS) (*v3.GlobalDNS, error) {
-	// each target will have appName, this appName is also the namespace in which all workloads for this app are created
-	ingresses, err := g.ingressLister.List(t.AppName, labels.NewSelector())
-	if err != nil {
-		return nil, err
+func (g *UserGlobalDNSController) reconcileProjects(obj *v3.GlobalDNS) ([]string, error) {
+	// go through target projects which are part of the current cluster and find all ingresses
+	var allIngresses []*v1beta1.Ingress
+
+	for _, projectNameSet := range obj.Spec.ProjectNames {
+		split := strings.SplitN(projectNameSet, ":", 2)
+		if len(split) != 2 {
+			return nil, fmt.Errorf("UserGlobalDNSController: Error in splitting project Name %v", projectNameSet)
+		}
+		// check if the project in this iteration belongs to the same cluster in current context
+		if split[0] != g.clusterName {
+			logrus.Debugf("UserGlobalDNSController: Continuing since project %v doesn't belong in cluster %v", split[1], g.clusterName)
+			continue
+		}
+		projectID := split[1]
+		//list all namespaces in this project and list all ingresses within each namespace
+		namespaces, err := g.namespaceLister.List("", labels.NewSelector())
+		if err != nil {
+			return nil, fmt.Errorf("UserGlobalDNSController: Error listing cluster namespaces")
+		}
+		var namespacesInProject []*corev1.Namespace
+		for _, namespace := range namespaces {
+			nameSpaceProject := namespace.ObjectMeta.Labels[projectSelectorLabel]
+			if strings.EqualFold(projectID, nameSpaceProject) {
+				namespacesInProject = append(namespacesInProject, namespace)
+			}
+		}
+		for _, namespace := range namespacesInProject {
+			ingresses, err := g.ingressLister.List(namespace.Name, labels.NewSelector())
+			if err != nil {
+				return nil, err
+			}
+			allIngresses = append(allIngresses, ingresses...)
+		}
 	}
+	//gather endpoints
+	return g.fetchGlobalDNSEndpointsForIngresses(allIngresses, obj)
+}
+
+func (g *UserGlobalDNSController) fetchGlobalDNSEndpointsForIngresses(ingresses []*v1beta1.Ingress, obj *v3.GlobalDNS) ([]string, error) {
 	if len(ingresses) == 0 {
 		return nil, nil
 	}
 
+	var allEndpoints []string
+	//gather endpoints from all ingresses
 	for _, ing := range ingresses {
 		if gdns, ok := ing.Annotations[annotationGlobalDNS]; ok {
 			// check if the globalDNS in annotation is same as the FQDN set on the GlobalDNS
 			if gdns != obj.Spec.FQDN {
 				continue
 			}
-			//update endpoints on GlobalDNS status field
+			//gather endpoints from the ingress
 			ingressEndpoints := gatherIngressEndpoints(ing.Status.LoadBalancer.Ingress)
-			updatedGDNS, err := g.updateGlobalDNSEndpoints(obj, ingressEndpoints)
-			if err != nil {
-				return updatedGDNS, err
-			}
+			allEndpoints = append(allEndpoints, ingressEndpoints...)
 		}
 	}
-	return nil, nil
+
+	return allEndpoints, nil
 }
 
-func (g *UserGlobalDNSController) updateGlobalDNSEndpoints(globalDNS *v3.GlobalDNS, ingressEndpoints []string) (*v3.GlobalDNS, error) {
-	globalDNS = prepareGlobalDNSForUpdate(globalDNS, ingressEndpoints)
+func (g *UserGlobalDNSController) refreshGlobalDNSEndpoints(globalDNS *v3.GlobalDNS, ingressEndpointsForCluster []string) (*v3.GlobalDNS, error) {
+
+	mapIngressEndpoints := make(map[string]bool)
+	for _, ep := range ingressEndpointsForCluster {
+		mapIngressEndpoints[ep] = true
+	}
+	//find endpoints removed by looking at clusterEndpoints of current cluster
+	endpointsToRemove := []string{}
+
+	if len(globalDNS.Status.ClusterEndpoints) == 0 {
+		globalDNS.Status.ClusterEndpoints = make(map[string][]string)
+	}
+
+	for _, ep := range globalDNS.Status.ClusterEndpoints[g.clusterName] {
+		if !mapIngressEndpoints[ep] {
+			endpointsToRemove = append(endpointsToRemove, ep)
+		}
+	}
+
+	globalDNSToUpdate := globalDNS.DeepCopy()
+	globalDNSToUpdate.Status.ClusterEndpoints[g.clusterName] = ingressEndpointsForCluster
+	//update endpoints on GlobalDNS status field
+	updatedGDNS, err := g.updateGlobalDNSEndpoints(globalDNSToUpdate, ingressEndpointsForCluster, endpointsToRemove)
+	if err != nil {
+		return updatedGDNS, err
+	}
+
+	return updatedGDNS, nil
+}
+
+func (g *UserGlobalDNSController) updateGlobalDNSEndpoints(globalDNS *v3.GlobalDNS, ingressEndpoints []string, endpointsToRemove []string) (*v3.GlobalDNS, error) {
+	prepareGlobalDNSForUpdate(globalDNS, ingressEndpoints, g.clusterName)
+	prepareGlobalDNSForEndpointsRemoval(globalDNS, endpointsToRemove)
+
 	updated, err := g.globalDNSs.Update(globalDNS)
 	if err != nil {
 		return updated, fmt.Errorf("UserGlobalDNSController: Failed to update GlobalDNS endpoints with error %v", err)
 	}
-	return nil, nil
-}
-
-func getMultiClusterAppName(multiClusterAppName string) (string, error) {
-	split := strings.SplitN(multiClusterAppName, ":", 2)
-	if len(split) != 2 {
-		return "", fmt.Errorf("error in splitting multiclusterapp ID %v", multiClusterAppName)
-	}
-	mcappName := split[1]
-	return mcappName, nil
+	return updated, nil
 }

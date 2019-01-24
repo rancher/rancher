@@ -13,7 +13,6 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,6 +34,7 @@ type UserIngressController struct {
 	appLister             projectv3.AppLister
 	namespaceLister       v1Rancher.NamespaceLister
 	multiclusterappLister v3.MultiClusterAppLister
+	clusterName           string
 }
 
 func newUserIngressController(ctx context.Context, clusterContext *config.UserContext) *UserIngressController {
@@ -46,6 +46,7 @@ func newUserIngressController(ctx context.Context, clusterContext *config.UserCo
 		appLister:             clusterContext.Management.Project.Apps("").Controller().Lister(),
 		namespaceLister:       clusterContext.Core.Namespaces("").Controller().Lister(),
 		multiclusterappLister: clusterContext.Management.Management.MultiClusterApps("").Controller().Lister(),
+		clusterName:           clusterContext.ClusterName,
 	}
 	return n
 }
@@ -59,7 +60,7 @@ func Register(ctx context.Context, clusterContext *config.UserContext) {
 
 func (ic *UserIngressController) sync(key string, obj *v1beta1.Ingress) (runtime.Object, error) {
 	if obj == nil {
-		return nil, nil
+		return ic.reconcileAllGlobalDNSs()
 	}
 	//if there are no globaldns cr, skip this run
 
@@ -116,20 +117,65 @@ func (ic *UserIngressController) noGlobalDNS() bool {
 	return len(gd) == 0
 }
 
-func gatherIngressEndpoints(ingressEps []v1.LoadBalancerIngress) []string {
-	endpoints := []string{}
-	for _, ep := range ingressEps {
-		if ep.IP != "" {
-			endpoints = append(endpoints, ep.IP)
-		} else if ep.Hostname != "" {
-			endpoints = append(endpoints, ep.Hostname)
+func (ic *UserIngressController) reconcileAllGlobalDNSs() (runtime.Object, error) {
+	globalDNSList, err := ic.globalDNSLister.List("", labels.NewSelector())
+	if err != nil {
+		return nil, err
+	}
+
+	for _, globalDNSObj := range globalDNSList {
+		//call update on each GlobalDNS obj that refers to this current cluster
+		targetsCluster, err := ic.doesGlobalDNSTargetCurrentCluster(globalDNSObj)
+		if err != nil {
+			return nil, err
+		}
+		if targetsCluster {
+			//enqueue it to the globalDNS controller
+			ic.globalDNSs.Controller().Enqueue(namespace.GlobalNamespace, globalDNSObj.Name)
 		}
 	}
-	return endpoints
+	return nil, nil
+}
+
+func (ic *UserIngressController) doesGlobalDNSTargetCurrentCluster(globalDNS *v3.GlobalDNS) (bool, error) {
+	if globalDNS.Spec.MultiClusterAppName != "" {
+		mcappName, err := getMultiClusterAppName(globalDNS.Spec.MultiClusterAppName)
+		if err != nil {
+			return false, err
+		}
+		mcapp, err := ic.multiclusterappLister.Get(namespace.GlobalNamespace, mcappName)
+		if err != nil {
+			return false, err
+		}
+		// go through target projects and check if its part of the current cluster
+		for _, t := range mcapp.Spec.Targets {
+			split := strings.SplitN(t.ProjectName, ":", 2)
+			if len(split) != 2 {
+				return false, fmt.Errorf("UserIngressController: error in splitting project ID %v", t.ProjectName)
+			}
+			// check if the target project in this iteration is same as the cluster in current context
+			if split[0] == ic.clusterName {
+				return true, nil
+			}
+		}
+	} else if len(globalDNS.Spec.ProjectNames) > 0 {
+		for _, projectNameSet := range globalDNS.Spec.ProjectNames {
+			split := strings.SplitN(projectNameSet, ":", 2)
+			if len(split) != 2 {
+				return false, fmt.Errorf("UserIngressController: Error in splitting project Name %v", projectNameSet)
+			}
+			// check if the project in this iteration belongs to the same cluster in current context
+			if split[0] == ic.clusterName {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
 }
 
 func (ic *UserIngressController) updateGlobalDNSEndpoints(globalDNS *v3.GlobalDNS, ingressEndpoints []string) error {
-	globalDNS = prepareGlobalDNSForUpdate(globalDNS, ingressEndpoints)
+	prepareGlobalDNSForUpdate(globalDNS, ingressEndpoints, ic.clusterName)
 	_, err := ic.globalDNSs.Update(globalDNS)
 	if err != nil {
 		return fmt.Errorf("UserIngressController: Failed to update GlobalDNS endpoints with error %v", err)
@@ -137,38 +183,8 @@ func (ic *UserIngressController) updateGlobalDNSEndpoints(globalDNS *v3.GlobalDN
 	return nil
 }
 
-func prepareGlobalDNSForUpdate(globalDNS *v3.GlobalDNS, ingressEndpoints []string) *v3.GlobalDNS {
-	originalLen := len(globalDNS.Status.Endpoints)
-	globalDNS.Status.Endpoints = append(globalDNS.Status.Endpoints, ingressEndpoints...)
-
-	if originalLen > 0 {
-		//dedup the endpoints
-		mapEndpoints := make(map[string]bool)
-		res := []string{}
-		for _, ep := range globalDNS.Status.Endpoints {
-			if !mapEndpoints[ep] {
-				mapEndpoints[ep] = true
-				res = append(res, ep)
-			}
-		}
-		globalDNS.Status.Endpoints = res
-	}
-	return globalDNS
-}
-
 func (ic *UserIngressController) removeGlobalDNSEndpoints(globalDNS *v3.GlobalDNS, ingressEndpoints []string) error {
-	mapRemovedEndpoints := make(map[string]bool)
-	for _, ep := range ingressEndpoints {
-		mapRemovedEndpoints[ep] = true
-	}
-
-	res := []string{}
-	for _, ep := range globalDNS.Status.Endpoints {
-		if !mapRemovedEndpoints[ep] {
-			res = append(res, ep)
-		}
-	}
-	globalDNS.Status.Endpoints = res
+	prepareGlobalDNSForEndpointsRemoval(globalDNS, ingressEndpoints)
 	_, err := ic.globalDNSs.Update(globalDNS)
 	if err != nil {
 		return fmt.Errorf("UserIngressController: Failed to update GlobalDNS endpoints on ingress deletion, with error %v", err)
