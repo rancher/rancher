@@ -154,14 +154,14 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		}
 		return nil
 	case "rollback":
-		revision := actionInput["revisionId"]
 		forceUpgrade := actionInput["forceUpgrade"]
-		if convert.ToString(revision) == "" {
+		revisionName := convert.ToString(actionInput["revisionId"])
+		if revisionName == "" {
 			return fmt.Errorf("revision is empty")
 		}
-		var appRevision projectv3.AppRevision
 		_, projectID := ref.Parse(app.ProjectID)
-		revisionID := fmt.Sprintf("%s:%s", projectID, convert.ToString(revision))
+		revisionID := fmt.Sprintf("%s:%s", projectID, revisionName)
+		var appRevision projectv3.AppRevision
 		if err := access.ByID(apiContext, &projectschema.Version, projectv3.AppRevisionType, revisionID, &appRevision); err != nil {
 			return err
 		}
@@ -178,6 +178,8 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		if creatorNotFound {
 			obj.Annotations[creatorIDAnno] = w.UserManager.GetUser(apiContext)
 		}
+		obj.Spec.Files = appRevision.Status.Files
+
 		if _, err := w.AppGetter.Apps(namespace).Update(obj); err != nil {
 			return err
 		}
