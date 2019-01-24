@@ -1,7 +1,6 @@
 import kubernetes
 
 from .conftest import kubernetes_api_client, wait_for
-from rancher import ApiError
 
 
 def cleanup_pspt(client, request, cluster):
@@ -19,13 +18,11 @@ def cleanup_pspt(client, request, cluster):
 
 def setup_cluster_with_pspt(client, request, template="pspt1"):
     """
+    WARNING: This function is not safe for parallel exec, only used by
+    test_service_accounts!!
     Sets the 'local' cluster to have the pspt given by template, if it exists,
     returns the pspt and cleans up. If it does, creates a copy and applies it.
-    If it does not, it creates a generic one.
-    :param client:
-    :param request:
-    :param template:
-    :return pspt:
+    If it does not, it creates a generic one. Also adds a finalizer for cleanup
     """
     pspt = client.by_id_pod_security_policy_template(template)
 
@@ -81,39 +78,32 @@ def test_pod_security_policy_template_del(admin_mc, request, remove_resource):
     """ Test for pod security policy template binding correctly
     ref https://github.com/rancher/rancher/issues/15728
     ref https://localhost:8443/v3/podsecuritypolicytemplates
-    :param admin_mc:
-    :param request:
-    :return:
     """
     api_client = admin_mc.client
+    # these create a mock pspts... not valid for real psp's
 
-    setup_cluster_with_pspt(api_client, request)
     pspt_proj = api_client.create_pod_security_policy_template("pspt2")
+    # add a finalizer to delete the pspt
+    remove_resource(pspt_proj)
 
     #  create a project in order to establish bindings
-    #  shameless copy from test_rbac.py
     def create_project():
-        try:
-            p = api_client.create_project(name="test-unrestrict-proj",
-                                          clusterId="local")
-            api_client.wait_success(p)
-            p.setpodsecuritypolicytemplate(
-                podSecurityPolicyTemplateId=pspt_proj.id)
+        p = api_client.create_project(name="test-unrestrict-proj",
+                                      clusterId="local")
+        p = api_client.wait_success(p)
+        # In case something goes badly, add a finalizer to
+        # delete the project as the admin
+        remove_resource(p)
 
-            # In case something goes badly, add a finalizer to
-            # delete the project as the admin
-            remove_resource(p)
-            # Also delete try to delete pspt if we crash out
-            remove_resource(pspt_proj)
-            return p
-        except ApiError as e:
-            assert e.error.status == 403
-            return False
+        p.setpodsecuritypolicytemplate(
+            podSecurityPolicyTemplateId=pspt_proj.id)
 
-    proj = wait_for(create_project, timeout=30)
+        return p
 
+    proj = create_project()
+    # wait to use proj object until done transitioning
     proj = api_client.wait_success(proj)
-    # Create a proj in the local cluster
+    # Check that project was created successfully with pspt
     assert proj.state == 'active'
     assert proj.podSecurityPolicyTemplateId == pspt_proj.id
 
@@ -127,14 +117,14 @@ def test_pod_security_policy_template_del(admin_mc, request, remove_resource):
     # delete the PSPT that was associated with the deleted project
     api_client.delete(pspt_proj)
 
-    def pspt_exists(client, p):
-        if client.by_id_pod_security_policy_template(p.id) is not None:
-            return False
-        else:  # no longer exists, delete succeeded
+    def pspt_del_check(client, p):
+        if client.by_id_pod_security_policy_template(p.id) is None:
             return True
+        else:  # keep checking to see delete occurred
+            return False
 
     # will timeout if pspt is not deleted
-    # this validates original bug
-    wait_for(lambda: pspt_exists(api_client, pspt_proj))
+    # this validates bug
+    wait_for(lambda: pspt_del_check(api_client, pspt_proj))
 
     assert api_client.by_id_pod_security_policy_template(pspt_proj.id) is None
