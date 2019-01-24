@@ -48,10 +48,11 @@ func (m *MCAppStateController) sync(key string, mcapp *v3.MultiClusterApp) (runt
 			apps = append(apps, app)
 		}
 	}
+	toUpdate := mcapp.DeepCopy()
 	if len(apps) != len(mcapp.Spec.Targets) {
-		v3.MultiClusterAppConditionInstalled.Unknown(mcapp)
-		v3.MultiClusterAppConditionInstalled.Message(mcapp, "creating apps")
-		return m.MultiClusterApps.Update(mcapp.DeepCopy())
+		v3.MultiClusterAppConditionInstalled.Unknown(toUpdate)
+		v3.MultiClusterAppConditionInstalled.Message(toUpdate, "creating apps")
+		return m.MultiClusterApps.Update(toUpdate)
 	}
 	updating := map[string]bool{}
 	installing := map[string]bool{}
@@ -62,12 +63,12 @@ func (m *MCAppStateController) sync(key string, mcapp *v3.MultiClusterApp) (runt
 			updating[app.Name] = true
 		}
 	}
-	if checkForUpdate(installing, mcapp, v3.MultiClusterAppConditionInstalled, "creating") {
-		return m.MultiClusterApps.Update(mcapp.DeepCopy())
+	if checkForUpdate(installing, toUpdate, v3.MultiClusterAppConditionInstalled, "creating") {
+		return m.MultiClusterApps.Update(toUpdate)
 	}
 
-	if checkForUpdate(updating, mcapp, v3.MultiClusterAppConditionDeployed, "updating") {
-		return m.MultiClusterApps.Update(mcapp.DeepCopy())
+	if checkForUpdate(updating, toUpdate, v3.MultiClusterAppConditionDeployed, "updating") {
+		return m.MultiClusterApps.Update(toUpdate)
 	}
 
 	return mcapp, nil
