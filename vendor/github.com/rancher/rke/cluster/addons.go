@@ -26,7 +26,7 @@ const (
 	UserAddonsIncludeResourceName = "rke-user-includes-addons"
 
 	IngressAddonJobName            = "rke-ingress-controller-deploy-job"
-	IngressAddonDeleteJobName      = "rke-ingress-controller-delete-job"
+	MetricsServerAddonJobName      = "rke-metrics-addon-deploy-job"
 	MetricsServerAddonResourceName = "rke-metrics-addon"
 	NginxIngressAddonAppName       = "ingress-nginx"
 	KubeDNSAddonAppName            = "kube-dns"
@@ -66,13 +66,11 @@ func (c *Cluster) deployK8sAddOns(ctx context.Context) error {
 		}
 		log.Warnf(ctx, "Failed to deploy addon execute job [%s]: %v", KubeDNSAddonResourceName, err)
 	}
-	if c.Monitoring.Provider == DefaultMonitoringProvider {
-		if err := c.deployMetricServer(ctx); err != nil {
-			if err, ok := err.(*addonError); ok && err.isCritical {
-				return err
-			}
-			log.Warnf(ctx, "Failed to deploy addon execute job [%s]: %v", MetricsServerAddonResourceName, err)
+	if err := c.deployMetricServer(ctx); err != nil {
+		if err, ok := err.(*addonError); ok && err.isCritical {
+			return err
 		}
+		log.Warnf(ctx, "Failed to deploy addon execute job [%s]: %v", MetricsServerAddonResourceName, err)
 	}
 	if err := c.deployIngress(ctx); err != nil {
 		if err, ok := err.(*addonError); ok && err.isCritical {
@@ -207,6 +205,23 @@ func (c *Cluster) deployKubeDNS(ctx context.Context) error {
 }
 
 func (c *Cluster) deployMetricServer(ctx context.Context) error {
+	if c.Monitoring.Provider == "none" {
+		addonJobExists, err := addons.AddonJobExists(MetricsServerAddonJobName, c.LocalKubeConfigPath, c.K8sWrapTransport)
+		if err != nil {
+			return nil
+		}
+		if addonJobExists {
+			log.Infof(ctx, "[ingress] Removing installed metrics server")
+			if err := c.doAddonDelete(ctx, MetricsServerAddonResourceName, false); err != nil {
+				return err
+			}
+
+			log.Infof(ctx, "[ingress] Metrics server removed successfully")
+		} else {
+			log.Infof(ctx, "[ingress] Metrics Server is disabled, skipping Metrics server installation")
+		}
+		return nil
+	}
 	log.Infof(ctx, "[addons] Setting up Metrics Server")
 	s := strings.Split(c.SystemImages.MetricsServer, ":")
 	versionTag := s[len(s)-1]

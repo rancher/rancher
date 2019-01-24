@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/rke/templates"
+	"github.com/rancher/rke/util"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
@@ -75,7 +76,7 @@ func setDefaultIfEmpty(varName *string, defaultValue string) {
 	}
 }
 
-func (c *Cluster) setClusterDefaults(ctx context.Context) {
+func (c *Cluster) setClusterDefaults(ctx context.Context) error {
 	if len(c.SSHKeyPath) == 0 {
 		c.SSHKeyPath = DefaultClusterSSHKeyPath
 	}
@@ -144,10 +145,15 @@ func (c *Cluster) setClusterDefaults(ctx context.Context) {
 		}
 		c.PrivateRegistriesMap[pr.URL] = pr
 	}
-	c.setClusterImageDefaults()
+	err := c.setClusterImageDefaults()
+	if err != nil {
+		return err
+	}
 	c.setClusterServicesDefaults()
 	c.setClusterNetworkDefaults()
 	c.setClusterAuthnDefaults()
+
+	return nil
 }
 
 func (c *Cluster) setClusterServicesDefaults() {
@@ -200,12 +206,16 @@ func (c *Cluster) setClusterServicesDefaults() {
 	}
 }
 
-func (c *Cluster) setClusterImageDefaults() {
+func (c *Cluster) setClusterImageDefaults() error {
 	var privRegURL string
-	imageDefaults, ok := v3.K8sVersionToRKESystemImages[c.Version]
-	if !ok {
-		imageDefaults = v3.K8sVersionToRKESystemImages[DefaultK8sVersion]
+
+	// Version Check
+	err := util.ValidateVersion(c.Version)
+	if err != nil {
+		return err
 	}
+
+	imageDefaults := v3.AllK8sVersions[c.Version]
 
 	for _, privReg := range c.PrivateRegistries {
 		if privReg.IsDefault {
@@ -243,6 +253,8 @@ func (c *Cluster) setClusterImageDefaults() {
 	for k, v := range systemImagesDefaultsMap {
 		setDefaultIfEmpty(k, v)
 	}
+
+	return nil
 }
 
 func (c *Cluster) setClusterNetworkDefaults() {

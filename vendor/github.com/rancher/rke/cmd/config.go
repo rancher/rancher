@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
+	"github.com/rancher/rke/util"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -402,11 +403,22 @@ func getAddonManifests(reader *bufio.Reader) ([]string, error) {
 
 func generateSystemImagesList(version string, all bool) error {
 	allVersions := []string{}
+	currentVersionImages := make(map[string]v3.RKESystemImages)
 	for version := range v3.AllK8sVersions {
+		err := util.ValidateVersion(version)
+		if err != nil {
+			continue
+		}
 		allVersions = append(allVersions, version)
+		currentVersionImages[version] = v3.AllK8sVersions[version]
 	}
 	if all {
-		for version, rkeSystemImages := range v3.AllK8sVersions {
+		for version, rkeSystemImages := range currentVersionImages {
+			err := util.ValidateVersion(version)
+			if err != nil {
+				continue
+			}
+
 			logrus.Infof("Generating images list for version [%s]:", version)
 			uniqueImages := getUniqueSystemImageList(rkeSystemImages)
 			for _, image := range uniqueImages {

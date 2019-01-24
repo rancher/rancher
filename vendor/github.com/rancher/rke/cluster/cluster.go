@@ -168,7 +168,10 @@ func InitClusterObject(ctx context.Context, rkeConfig *v3.RancherKubernetesEngin
 	}
 
 	// Setting cluster Defaults
-	c.setClusterDefaults(ctx)
+	err := c.setClusterDefaults(ctx)
+	if err != nil {
+		return nil, err
+	}
 	// extract cluster network configuration
 	c.setNetworkOptions()
 

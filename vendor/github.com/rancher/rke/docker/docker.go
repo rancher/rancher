@@ -485,3 +485,17 @@ func DoRestartContainer(ctx context.Context, dClient *client.Client, containerNa
 	log.Infof(ctx, "[restart/%s] Successfully restarted container on host [%s]", containerName, hostname)
 	return nil
 }
+
+func GetContainerOutput(ctx context.Context, dClient *client.Client, containerName, hostname string) (int64, string, string, error) {
+	status, err := WaitForContainer(ctx, dClient, hostname, containerName)
+	if err != nil {
+		return 1, "", "", err
+	}
+
+	stderr, stdout, err := GetContainerLogsStdoutStderr(ctx, dClient, containerName, "1", false)
+	if err != nil {
+		return 1, "", "", err
+	}
+
+	return status, stdout, stderr, nil
+}
