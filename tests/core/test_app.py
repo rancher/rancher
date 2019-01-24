@@ -156,6 +156,34 @@ def test_app_namespace_annotation(admin_pc, admin_mc):
     assert 'cattle.io/appIds' not in ns.annotations
 
 
+def test_app_custom_values_file(admin_pc, admin_mc):
+    client = admin_pc.client
+    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                  projectId=admin_pc.
+                                                  project.id)
+    wait_for_template_to_be_created(admin_mc.client, "library")
+    values_yaml = "replicaCount: 2\r\nimage:\r\n  " \
+                  "repository: registry\r\n  tag: 2.7"
+    answers = {
+        "image.tag": "2.6"
+    }
+    app = client.create_app(
+        name=random_str(),
+        externalId="catalog://?catalog=library&template=docker-registry"
+                   "&version=1.6.1&namespace=cattle-global-data",
+        targetNamespace=ns.name,
+        projectId=admin_pc.project.id,
+        valuesYaml=values_yaml,
+        answers=answers
+    )
+    workloads = wait_for_workload(client, ns.name, count=1)
+    print(workloads)
+    assert workloads.data[0].deploymentStatus.unavailableReplicas == 2
+    assert workloads.data[0].containers[0].image == "registry:2.6"
+    client.delete(app)
+    wait_for_app_to_be_deleted(client, app)
+
+
 def wait_for_workload(client, ns, timeout=60, count=0):
     start = time.time()
     interval = 0.5

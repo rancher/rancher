@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -105,17 +107,11 @@ func GenerateRandomPort() string {
 }
 
 func InstallCharts(rootDir, port string, obj *v3.App) error {
-	setValues := []string{}
 	InjectDefaultRegistry(obj)
-	if obj.Spec.Answers != nil {
-		answers := obj.Spec.Answers
-		result := []string{}
-		for k, v := range answers {
-			result = append(result, fmt.Sprintf("%s=%s", k, v))
-		}
-		setValues = append([]string{"--set"}, strings.Join(result, ","))
+	setValues, err := GenerateAnswerSetValues(obj, rootDir)
+	if err != nil {
+		return err
 	}
-
 	commands := make([]string, 0)
 	commands = append([]string{"upgrade", "--install", "--namespace", obj.Spec.TargetNamespace, obj.Name}, setValues...)
 	commands = append(commands, rootDir)
@@ -141,6 +137,28 @@ func InstallCharts(rootDir, port string, obj *v3.App) error {
 		return errors.Errorf("failed to install app %s. %s", obj.Name, stderrBuf.String())
 	}
 	return nil
+}
+
+func GenerateAnswerSetValues(app *v3.App, tempDir string) ([]string, error) {
+	setValues := []string{}
+	// a user-supplied values file will overridden default values.yaml
+	if app.Spec.ValuesYaml != "" {
+		valuesYaml := filepath.Join(tempDir, "answers.yaml")
+		if err := ioutil.WriteFile(valuesYaml, []byte(app.Spec.ValuesYaml), 0755); err != nil {
+			return setValues, err
+		}
+		setValues = append(setValues, "--values", valuesYaml)
+	}
+	// `--set` values will overridden the user-supplied values.yaml file
+	if app.Spec.Answers != nil {
+		answers := app.Spec.Answers
+		var values = []string{}
+		for k, v := range answers {
+			values = append(values, fmt.Sprintf("%s=%s", k, v))
+		}
+		setValues = append(setValues, "--set", strings.Join(values, ","))
+	}
+	return setValues, nil
 }
 
 func DeleteCharts(port string, obj *v3.App) error {
