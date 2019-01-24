@@ -7,9 +7,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/common"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
+	"github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/rancher/pkg/ticker"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -30,6 +32,7 @@ type PodWatcher struct {
 	clusterName             string
 	podRestartTrack         sync.Map
 	clusterLister           v3.ClusterLister
+	workloadFetcher         workloadFetcher
 }
 
 type restartTrack struct {
@@ -39,6 +42,9 @@ type restartTrack struct {
 
 func StartPodWatcher(ctx context.Context, cluster *config.UserContext, manager *manager.AlertManager) {
 	projectAlertPolicies := cluster.Management.Management.ProjectAlertRules("")
+	workloadFetcher := workloadFetcher{
+		workloadController: workload.NewWorkloadController(ctx, cluster.UserOnlyContext(), nil),
+	}
 
 	podWatcher := &PodWatcher{
 		podLister:               cluster.Core.Pods("").Controller().Lister(),
@@ -48,6 +54,7 @@ func StartPodWatcher(ctx context.Context, cluster *config.UserContext, manager *
 		clusterName:             cluster.ClusterName,
 		podRestartTrack:         sync.Map{},
 		clusterLister:           cluster.Management.Management.Clusters("").Controller().Lister(),
+		workloadFetcher:         workloadFetcher,
 	}
 
 	projectAlertLifecycle := &ProjectAlertLifecycle{
@@ -186,6 +193,14 @@ func (w *PodWatcher) checkPodRestarts(pod *corev1.Pod, alert *v3.ProjectAlertRul
 					data["logs"] = details
 				}
 
+				workloadName, err := w.getWorkloadInfo(pod)
+				if err != nil {
+					logrus.Warnf("Failed to get workload info for %s:%s %v", pod.Namespace, pod.Name, err)
+				}
+				if workloadName != "" {
+					data["workload_name"] = workloadName
+				}
+
 				if err := w.alertManager.SendAlert(data); err != nil {
 					logrus.Debugf("Error occurred while getting pod %s: %v", alert.Spec.PodRule.PodName, err)
 				}
@@ -270,6 +285,14 @@ func (w *PodWatcher) checkPodRunning(pod *corev1.Pod, alert *v3.ProjectAlertRule
 				data["logs"] = details
 			}
 
+			workloadName, err := w.getWorkloadInfo(pod)
+			if err != nil {
+				logrus.Warnf("Failed to get workload info for %s:%s %v", pod.Namespace, pod.Name, err)
+			}
+			if workloadName != "" {
+				data["workload_name"] = workloadName
+			}
+
 			if err := w.alertManager.SendAlert(data); err != nil {
 				logrus.Debugf("Error occurred while send alert %s: %v", alert.Spec.PodRule.PodName, err)
 			}
@@ -308,6 +331,14 @@ func (w *PodWatcher) checkPodScheduled(pod *corev1.Pod, alert *v3.ProjectAlertRu
 				data["logs"] = details
 			}
 
+			workloadName, err := w.getWorkloadInfo(pod)
+			if err != nil {
+				logrus.Warnf("Failed to get workload info for %s:%s %v", pod.Namespace, pod.Name, err)
+			}
+			if workloadName != "" {
+				data["workload_name"] = workloadName
+			}
+
 			if err := w.alertManager.SendAlert(data); err != nil {
 				logrus.Debugf("Error occurred while getting pod %s: %v", alert.Spec.PodRule.PodName, err)
 			}
@@ -317,4 +348,16 @@ func (w *PodWatcher) checkPodScheduled(pod *corev1.Pod, alert *v3.ProjectAlertRu
 
 	return true
 
+}
+
+func (w *PodWatcher) getWorkloadInfo(pod *corev1.Pod) (string, error) {
+	if len(pod.OwnerReferences) == 0 {
+		return pod.Name, nil
+	}
+	ownerRef := pod.OwnerReferences[0]
+	workloadName, err := w.workloadFetcher.getWorkloadName(pod.Namespace, ownerRef.Name, ownerRef.Kind)
+	if err != nil {
+		return "", errors.Wrap(err, "Failed to get workload info for alert")
+	}
+	return workloadName, nil
 }

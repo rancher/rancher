@@ -76,15 +76,24 @@ Total Memory: {{ .Labels.total_mem}}
 {{- else if eq .Labels.alert_type "podRestarts" }}
 Project Name: {{ .Labels.project_name}}
 Namespace: {{ .Labels.namespace}}
+{{- if .Labels.workload_name }}
+Workload Name: {{.Labels.workload_name}}
+{{ end -}}
 Container Name: {{ .Labels.container_name}}
 {{- else if eq .Labels.alert_type "podNotRunning" }}
 Project Name: {{ .Labels.project_name}}
 Namespace: {{ .Labels.namespace}}
+{{- if .Labels.workload_name }}
+Workload Name: {{.Labels.workload_name}}
+{{ end -}}
 Container Name: {{ .Labels.container_name}}
 {{- else if eq .Labels.alert_type "podNotScheduled" }}
 Project Name: {{ .Labels.project_name}}
 Namespace: {{ .Labels.namespace}}
 Pod Name: {{ .Labels.pod_name}}
+{{- if .Labels.workload_name }}
+Workload Name: {{.Labels.workload_name}}
+{{ end -}}
 {{- else if eq .Labels.alert_type "workload" }}
 Project Name: {{ .Labels.project_name}}
 Available Replicas: {{ .Labels.available_replicas}}
@@ -139,14 +148,23 @@ Total Memory: {{ .Labels.total_mem}}<br>
 {{- else if eq .Labels.alert_type "podRestarts" }}
 Project Name: {{.Labels.project_name}}<br>
 Namespace: {{ .Labels.namespace}}<br>
+{{- if .Labels.workload_name }}
+Workload Name: {{.Labels.workload_name}}<br>
+{{ end -}}
 Container Name: {{.Labels.container_name}}<br>
 {{- else if eq .Labels.alert_type "podNotRunning" }}
 Project Name: {{.Labels.project_name}}<br>
 Namespace: {{ .Labels.namespace}}<br>
+{{- if .Labels.workload_name }}
+Workload Name: {{.Labels.workload_name}}<br>
+{{ end -}}
 Container Name: {{ .Labels.container_name}}<br>
 {{- else if eq .Labels.alert_type "podNotScheduled" }}
 Project Name: {{.Labels.project_name}}<br>
 Namespace: {{ .Labels.namespace}}<br>
+{{- if .Labels.workload_name }}
+Workload Name: {{.Labels.workload_name}}<br>
+{{ end -}}
 Pod Name: {{ .Labels.pod_name}}<br>
 {{- else if eq .Labels.alert_type "workload"}}
 Project Name: {{.Labels.project_name}}<br>
