@@ -40,7 +40,7 @@ func CreateRoleAndRoleBinding(resource string, name string, UID types.UID, membe
 	if len(apiGroup) > 0 {
 		api = apiGroup
 	}
-	if _, err := createRole(resource, allAccess, name, managementContext, api); err != nil {
+	if _, err := createRole(resource, allAccess, name, UID, managementContext, api); err != nil {
 		return err
 	}
 
@@ -71,7 +71,7 @@ func CreateRoleAndRoleBinding(resource string, name string, UID types.UID, membe
 
 	// Check if there are members with readonly or update access; if found then create rolebindings for those
 	if len(readOnlyAccessSubjects) > 0 {
-		if _, err := createRole(resource, readOnlyAccess, name, managementContext, api); err != nil {
+		if _, err := createRole(resource, readOnlyAccess, name, UID, managementContext, api); err != nil {
 			return err
 		}
 		if _, err := createRoleBinding(readOnlyAccess, name, UID, readOnlyAccessSubjects, managementContext, resource, api); err != nil {
@@ -79,7 +79,7 @@ func CreateRoleAndRoleBinding(resource string, name string, UID types.UID, membe
 		}
 	}
 	if len(updateAccessSubjects) > 0 {
-		if _, err := createRole(resource, updateAccess, name, managementContext, api); err != nil {
+		if _, err := createRole(resource, updateAccess, name, UID, managementContext, api); err != nil {
 			return err
 		}
 		if _, err := createRoleBinding(updateAccess, name, UID, updateAccessSubjects, managementContext, resource, api); err != nil {
@@ -89,13 +89,24 @@ func CreateRoleAndRoleBinding(resource string, name string, UID types.UID, membe
 	return nil
 }
 
-func createRole(resource string, roleAccess string, resourceName string,
+func createRole(resource string, roleAccess string, resourceName string, UID types.UID,
 	managementContext *config.ManagementContext, apiGroups []string) (*k8srbacv1.Role, error) {
 	roleName, verbs := getRoleNameAndVerbs(roleAccess, resourceName, resource)
+	apiVersion := "management.cattle.io/v3"
+	if apiGroups[0] != "management.cattle.io" {
+		apiVersion = "v1"
+	}
+	ownerReference := metav1.OwnerReference{
+		APIVersion: apiVersion,
+		Kind:       resource,
+		Name:       resourceName,
+		UID:        UID,
+	}
 	newRole := &k8srbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      roleName,
-			Namespace: namespace.GlobalNamespace,
+			Name:            roleName,
+			Namespace:       namespace.GlobalNamespace,
+			OwnerReferences: []metav1.OwnerReference{ownerReference},
 		},
 		Rules: []k8srbacv1.PolicyRule{
 			{
