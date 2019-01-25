@@ -233,10 +233,14 @@ type Step struct {
 	PublishCatalogConfig *PublishCatalogConfig `json:"publishCatalogConfig,omitempty" yaml:"publishCatalogConfig,omitempty"`
 	ApplyAppConfig       *ApplyAppConfig       `json:"applyAppConfig,omitempty" yaml:"applyAppConfig,omitempty"`
 
-	Env        map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
-	EnvFrom    []EnvFrom         `json:"envFrom,omitempty" yaml:"envFrom,omitempty"`
-	Privileged bool              `json:"privileged,omitempty" yaml:"privileged,omitempty"`
-	When       *Constraints      `json:"when,omitempty" yaml:"when,omitempty"`
+	Env           map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
+	EnvFrom       []EnvFrom         `json:"envFrom,omitempty" yaml:"envFrom,omitempty"`
+	Privileged    bool              `json:"privileged,omitempty" yaml:"privileged,omitempty"`
+	CPURequest    string            `json:"cpuRequest,omitempty" yaml:"cpuRequest,omitempty"`
+	CPULimit      string            `json:"cpuLimit,omitempty" yaml:"cpuLimit,omitempty"`
+	MemoryRequest string            `json:"memoryRequest,omitempty" yaml:"memoryRequest,omitempty"`
+	MemoryLimit   string            `json:"memoryLimit,omitempty" yaml:"memoryLimit,omitempty"`
+	When          *Constraints      `json:"when,omitempty" yaml:"when,omitempty"`
 }
 
 type Constraints struct {
