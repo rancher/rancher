@@ -347,7 +347,7 @@ func (h *Handler) updateProjectPSPTID(request *types.APIContext,
 	if err != nil {
 		return nil, fmt.Errorf("error getting project: %v", err)
 	}
-
+	project = project.DeepCopy()
 	project.Status.PodSecurityPolicyTemplateName = podSecurityPolicyTemplateName
 
 	return h.Projects.Update(project)

@@ -325,7 +325,7 @@ def test_impersonation_passthrough(admin_mc, admin_cc, user_mc, user_factory,
 def test_permissions_can_be_removed(admin_cc, admin_mc, user_mc,
                                     request, remove_resource):
     def create_project_and_add_user():
-        admin_pc_instance = admin_pc(request, admin_cc)
+        admin_pc_instance = admin_pc(admin_cc, remove_resource)
 
         prtb = admin_mc.client.create_project_role_template_binding(
             userId=user_mc.user.id,
