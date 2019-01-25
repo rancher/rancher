@@ -15,7 +15,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -24,6 +26,9 @@ const (
 	tillerName      = "tiller"
 	helmName        = "helm"
 	forceUpgradeStr = "--force"
+
+	systemCatalogName     = "system-library"
+	systemDefaultRegistry = "global.systemDefaultRegistry"
 )
 
 func ParseExternalID(externalID string) (string, string, error) {
@@ -47,6 +52,26 @@ func ParseExternalID(externalID string) (string, string, error) {
 		catalog = catalogWithNamespace
 	}
 	return strings.Join([]string{catalog, template, version}, "-"), templateVersionNamespace, nil
+}
+
+func InjectDefaultRegistry(obj *v3.App) {
+	if obj.Spec.Answers == nil || obj.Spec.Answers[systemDefaultRegistry] != "" {
+		return
+	}
+
+	values, err := url.Parse(obj.Spec.ExternalID)
+	if err != nil {
+		logrus.Errorf("check catalog type failed: %s", err.Error())
+	}
+
+	catalogWithNamespace := values.Query().Get("catalog")
+	split := strings.SplitN(catalogWithNamespace, "/", 2)
+	catalog := split[len(split)-1]
+
+	reg := settings.SystemDefaultRegistry.Get()
+	if catalog == systemCatalogName && reg != "" {
+		obj.Spec.Answers[systemDefaultRegistry] = reg
+	}
 }
 
 // StartTiller start tiller server and return the listening address of the grpc address
@@ -81,6 +106,7 @@ func GenerateRandomPort() string {
 
 func InstallCharts(rootDir, port string, obj *v3.App) error {
 	setValues := []string{}
+	InjectDefaultRegistry(obj)
 	if obj.Spec.Answers != nil {
 		answers := obj.Spec.Answers
 		result := []string{}
@@ -89,6 +115,7 @@ func InstallCharts(rootDir, port string, obj *v3.App) error {
 		}
 		setValues = append([]string{"--set"}, strings.Join(result, ","))
 	}
+
 	commands := make([]string, 0)
 	commands = append([]string{"upgrade", "--install", "--namespace", obj.Spec.TargetNamespace, obj.Name}, setValues...)
 	commands = append(commands, rootDir)
