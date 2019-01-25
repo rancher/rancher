@@ -107,6 +107,7 @@ func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.CatalogTemplate
 		return "", "", "", err
 	}
 
+	common.InjectDefaultRegistry(obj)
 	setValues := []string{}
 	if obj.Spec.Answers != nil {
 		answers := obj.Spec.Answers
@@ -116,6 +117,7 @@ func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.CatalogTemplate
 		}
 		setValues = append([]string{"--set"}, strings.Join(result, ","))
 	}
+
 	commands := append([]string{"template", dir, "--name", obj.Name, "--namespace", obj.Spec.TargetNamespace}, setValues...)
 
 	cmd := exec.Command(helmName, commands...)
