@@ -103,6 +103,7 @@ func (w *elasticsearchTestWrap) TestReachable(dial dialer.Dialer) error {
 	if err != nil {
 		return errors.Wrap(err, "create request failed")
 	}
+	req.Header.Set("Content-Type", "application/json")
 
 	return testReachableHTTP(dial, req, w.Certificate, w.ClientCert, w.ClientKey, w.ClientKeyPass, "", w.SSLVerify)
 }
@@ -119,6 +120,7 @@ func (w *splunkTestWrap) TestReachable(dial dialer.Dialer) error {
 	if err != nil {
 		return errors.Wrap(err, "create request failed")
 	}
+	req.Header.Set("Authorization", fmt.Sprintf("Splunk %s", w.Token))
 
 	return testReachableHTTP(dial, req, w.Certificate, w.ClientCert, w.ClientKey, w.ClientKeyPass, "", w.SSLVerify)
 }
@@ -425,11 +427,11 @@ func getIndex(dateFormat, prefix string) string {
 	today := time.Now()
 	switch dateFormat {
 	case "YYYY":
-		index = fmt.Sprintf("%s-%d", prefix, today.Year())
+		index = fmt.Sprintf("%s-%04d", prefix, today.Year())
 	case "YYYY-MM":
-		index = fmt.Sprintf("%s-%d-%d", prefix, today.Year(), today.Month())
+		index = fmt.Sprintf("%s-%04d-%02d", prefix, today.Year(), today.Month())
 	case "YYYY-MM-DD":
-		index = fmt.Sprintf("%s-%d-%d-%d", prefix, today.Year(), today.Month(), today.Day())
+		index = fmt.Sprintf("%s-%04d-%02d-%02d", prefix, today.Year(), today.Month(), today.Day())
 	}
 	return index
 }
