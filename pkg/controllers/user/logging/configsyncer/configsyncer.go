@@ -33,7 +33,7 @@ func NewConfigSyncer(cluster *config.UserContext, SecretManager *SecretManager) 
 	configGenerator := NewConfigGenerator(clusterName, clusterLoggingLister, projectLoggingLister, namespaceLister)
 
 	return &ConfigSyncer{
-		apps:                 cluster.Project.Apps(metav1.NamespaceAll),
+		apps:                 cluster.Management.Project.Apps(metav1.NamespaceAll),
 		clusterName:          clusterName,
 		clusterLoggingLister: clusterLoggingLister,
 		projectLoggingLister: projectLoggingLister,
