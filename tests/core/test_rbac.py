@@ -125,6 +125,22 @@ def test_project_owner(admin_cc, admin_mc, user_mc, remove_resource):
     response = auth.create_self_subject_access_review(access_review)
     assert response.status.allowed is True
 
+    # List_namespaced_pod just list the pods of default core groups.
+    # If you want to list the metrics of pods,
+    # users should have the permissions of metrics.k8s.io group.
+    # As a proof, we use this particular k8s api, check that the user can list
+    # pods.metrics.k8s.io using the subject access review api
+    access_review = kubernetes.client.V1LocalSubjectAccessReview(spec={
+        "resourceAttributes": {
+            'namespace': ns.name,
+            'verb': 'list',
+            'resource': 'pods',
+            'group': 'metrics.k8s.io',
+        },
+    })
+    response = auth.create_self_subject_access_review(access_review)
+    assert response.status.allowed is True
+
 
 def test_removing_user_from_cluster(admin_pc, admin_mc, user_mc, admin_cc,
                                     remove_resource):
