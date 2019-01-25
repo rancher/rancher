@@ -137,7 +137,12 @@ func (s *ConfigSyncer) syncClusterConfig(clusterLoggings []*mgmtv3.ClusterLoggin
 	secretName := loggingconfig.RancherLoggingConfigSecretName()
 	namespace := loggingconfig.LoggingNamespace
 
-	buf, err := s.configGenerator.GenerateClusterLoggingConfig(clusterLoggings[0], systemProjectID)
+	var clusterLogging *mgmtv3.ClusterLogging
+	if len(clusterLoggings) != 0 {
+		clusterLogging = clusterLoggings[0]
+	}
+
+	buf, err := s.configGenerator.GenerateClusterLoggingConfig(clusterLogging, systemProjectID)
 	if err != nil {
 		return err
 	}
