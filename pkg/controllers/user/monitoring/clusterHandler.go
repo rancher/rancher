@@ -244,46 +244,60 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 	_, appDeployProjectID := ref.Parse(appProjectName)
 	clusterAlertManagerSvcName, clusterAlertManagerSvcNamespaces, clusterAlertManagerPort := monitoring.ClusterAlertManagerEndpoint()
 
-	appAnswers := map[string]string{
-		"exporter-coredns.enabled":  "true",
+	optionalAppAnswers := map[string]string{
+		"exporter-coredns.enabled": "true",
+
+		"exporter-kube-controller-manager.enabled": "true",
+
+		"exporter-kube-dns.enabled": "true",
+
+		"exporter-kube-scheduler.enabled": "true",
+
+		"exporter-kube-state.enabled": "true",
+
+		"exporter-kubelets.enabled": "true",
+
+		"exporter-kubernetes.enabled": "true",
+
+		"exporter-node.enabled": "true",
+
+		"exporter-fluentd.enabled": "true",
+
+		"grafana.persistence.enabled": "false",
+
+		"prometheus.persistence.enabled": "false",
+	}
+
+	mustAppAnswers := map[string]string{
+		"enabled": "false",
+
 		"exporter-coredns.apiGroup": monitoring.APIVersion.Group,
 
-		"exporter-kube-controller-manager.enabled":  "true",
 		"exporter-kube-controller-manager.apiGroup": monitoring.APIVersion.Group,
 
-		"exporter-kube-dns.enabled":  "true",
 		"exporter-kube-dns.apiGroup": monitoring.APIVersion.Group,
 
-		"exporter-kube-etcd.enabled":  "false",
 		"exporter-kube-etcd.apiGroup": monitoring.APIVersion.Group,
 
-		"exporter-kube-scheduler.enabled":  "true",
 		"exporter-kube-scheduler.apiGroup": monitoring.APIVersion.Group,
 
-		"exporter-kube-state.enabled":  "true",
 		"exporter-kube-state.apiGroup": monitoring.APIVersion.Group,
 
-		"exporter-kubelets.enabled":  "true",
 		"exporter-kubelets.apiGroup": monitoring.APIVersion.Group,
 
-		"exporter-kubernetes.enabled":  "true",
 		"exporter-kubernetes.apiGroup": monitoring.APIVersion.Group,
 
-		"exporter-node.enabled":  "true",
 		"exporter-node.apiGroup": monitoring.APIVersion.Group,
 
-		"exporter-fluentd.enabled":  "true",
 		"exporter-fluentd.apiGroup": monitoring.APIVersion.Group,
 
-		"grafana.enabled":             "true",
-		"grafana.apiGroup":            monitoring.APIVersion.Group,
-		"grafana.persistence.enabled": "false",
-		"grafana.serviceAccountName":  appName,
+		"grafana.enabled":            "true",
+		"grafana.apiGroup":           monitoring.APIVersion.Group,
+		"grafana.serviceAccountName": appName,
 
 		"prometheus.enabled":                        "true",
-		"prometheus.externalLabels.prometheus_from": cluster.Spec.DisplayName,
 		"prometheus.apiGroup":                       monitoring.APIVersion.Group,
-		"prometheus.persistence.enabled":            "false",
+		"prometheus.externalLabels.prometheus_from": cluster.Spec.DisplayName,
 		"prometheus.serviceAccountNameOverride":     appName,
 		"prometheus.additionalAlertManagerConfigs[0].static_configs[0].targets[0]":          fmt.Sprintf("%s.%s:%s", clusterAlertManagerSvcName, clusterAlertManagerSvcNamespaces, clusterAlertManagerPort),
 		"prometheus.additionalAlertManagerConfigs[0].static_configs[0].labels.level":        "cluster",
@@ -300,7 +314,13 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 		"prometheus.ruleSelector.matchExpressions[0].values[0]":                             monitoring.CattleAlertingPrometheusRuleLabelValue,
 		"prometheus.ruleSelector.matchExpressions[0].values[1]":                             monitoring.CattleMonitoringPrometheusRuleLabelValue,
 	}
-	appAnswers = monitoring.OverwriteAppAnswers(appAnswers, cluster.Annotations)
+
+	appAnswers := monitoring.OverwriteAppAnswers(optionalAppAnswers, cluster.Annotations)
+
+	// cannot overwrite mustAppAnswers
+	for mustKey, mustVal := range mustAppAnswers {
+		appAnswers[mustKey] = mustVal
+	}
 
 	if systemComponentMap != nil {
 		if etcdEndpoints, ok := systemComponentMap[etcd]; ok {

@@ -144,18 +144,42 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 	clusterPrometheusSvcName, clusterPrometheusSvcNamespaces, clusterPrometheusPort := monitoring.ClusterPrometheusEndpoint()
 	clusterAlertManagerSvcName, clusterAlertManagerSvcNamespaces, clusterAlertManagerPort := monitoring.ClusterAlertManagerEndpoint()
 
-	appAnswers := map[string]string{
-		"grafana.enabled":             "true",
-		"grafana.level":               "project",
-		"grafana.apiGroup":            monitoring.APIVersion.Group,
+	optionalAppAnswers := map[string]string{
 		"grafana.persistence.enabled": "false",
-		"grafana.serviceAccountName":  appName,
+
+		"prometheus.persistence.enabled": "false",
+	}
+
+	mustAppAnswers := map[string]string{
+		"enabled": "false",
+
+		"exporter-coredns.enabled": "false",
+
+		"exporter-kube-controller-manager.enabled": "false",
+
+		"exporter-kube-dns.enabled": "false",
+
+		"exporter-kube-scheduler.enabled": "false",
+
+		"exporter-kube-state.enabled": "false",
+
+		"exporter-kubelets.enabled": "false",
+
+		"exporter-kubernetes.enabled": "false",
+
+		"exporter-node.enabled": "false",
+
+		"exporter-fluentd.enabled": "false",
+
+		"grafana.enabled":            "true",
+		"grafana.level":              "project",
+		"grafana.apiGroup":           monitoring.APIVersion.Group,
+		"grafana.serviceAccountName": appName,
 
 		"prometheus.enabled":                                                                "true",
 		"prometheus.externalLabels.prometheus_from":                                         clusterName,
 		"prometheus.level":                                                                  "project",
 		"prometheus.apiGroup":                                                               monitoring.APIVersion.Group,
-		"prometheus.persistence.enabled":                                                    "false",
 		"prometheus.serviceAccountNameOverride":                                             appName,
 		"prometheus.additionalBindingClusterRoles[0]":                                       fmt.Sprintf("%s-namespaces-readonly", appDeployProjectID),
 		"prometheus.remoteRead[0].url":                                                      fmt.Sprintf("http://%s.%s:%s/api/v1/read", clusterPrometheusSvcName, clusterPrometheusSvcNamespaces, clusterPrometheusPort),
@@ -176,7 +200,13 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 		"prometheus.ruleSelector.matchExpressions[0].operator":                              "In",
 		"prometheus.ruleSelector.matchExpressions[0].values[0]":                             monitoring.CattleAlertingPrometheusRuleLabelValue,
 	}
-	appAnswers = monitoring.OverwriteAppAnswers(appAnswers, project.Annotations)
+
+	appAnswers := monitoring.OverwriteAppAnswers(optionalAppAnswers, project.Annotations)
+
+	// cannot overwrite mustAppAnswers
+	for mustKey, mustVal := range mustAppAnswers {
+		appAnswers[mustKey] = mustVal
+	}
 
 	appCatalogID := settings.SystemMonitoringCatalogID.Get()
 	app := &v3.App{
