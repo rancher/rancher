@@ -33,15 +33,7 @@ type ConfigGenerator struct {
 
 func (s *ConfigGenerator) GenerateClusterLoggingConfig(clusterLogging *mgmtv3.ClusterLogging, systemProjectID string) ([]byte, error) {
 	if clusterLogging == nil {
-		clusterLoggings, err := s.clusterLoggingLister.List("", labels.NewSelector())
-		if err != nil {
-			return nil, errors.Wrapf(err, "List cluster loggings failed")
-		}
-		if len(clusterLoggings) == 0 {
-			return []byte{}, nil
-		}
-
-		clusterLogging = clusterLoggings[0]
+		return []byte{}, nil
 	}
 
 	var excludeNamespaces string
