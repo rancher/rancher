@@ -166,9 +166,9 @@ var ProjectTemplate = `
       {{- if eq $store.CurrentTarget "kafka"}}
       @type kafka_buffered
       {{- if $store.KafkaConfig.ZookeeperEndpoint }}
-      zookeeper {{$store.WrapKafka.Zookeeper}}
+      zookeeper {{$store.KafkaTemplateWrap.Zookeeper}}
       {{else}}
-      brokers {{$store.WrapKafka.Brokers}}
+      brokers {{$store.KafkaTemplateWrap.Brokers}}
       {{end }}
       default_topic {{$store.KafkaConfig.Topic}}
       output_data_type  "json"
