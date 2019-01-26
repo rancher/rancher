@@ -503,7 +503,7 @@ Resources:
   NodeLaunchConfig:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
-      AssociatePublicIpAddress: !Ref PublicIps
+      AssociatePublicIpAddress: !Ref PublicIp
       IamInstanceProfile: !Ref NodeInstanceProfile
       ImageId: !Ref NodeImageId
       InstanceType: !Ref NodeInstanceType
