@@ -19,14 +19,15 @@ import (
 )
 
 const (
-	allAccess                 = "all"
-	updateAccess              = "update"
-	readOnlyAccess            = "readonly"
-	MultiClusterAppResource   = "multiclusterapps"
-	GlobalDNSResource         = "globaldnses"
-	GlobalDNSProviderResource = "globaldnsproviders"
-	CloudCredentialResource   = "secrets"
-	CreatorIDAnn              = "field.cattle.io/creatorId"
+	allAccess                       = "all"
+	updateAccess                    = "update"
+	readOnlyAccess                  = "readonly"
+	MultiClusterAppResource         = "multiclusterapps"
+	MultiClusterAppRevisionResource = "multiclusterapprevisions"
+	GlobalDNSResource               = "globaldnses"
+	GlobalDNSProviderResource       = "globaldnsproviders"
+	CloudCredentialResource         = "secrets"
+	CreatorIDAnn                    = "field.cattle.io/creatorId"
 )
 
 func CreateRoleAndRoleBinding(resource string, name string, UID types.UID, members []v3.Member, creatorID string,
@@ -89,18 +90,18 @@ func CreateRoleAndRoleBinding(resource string, name string, UID types.UID, membe
 	return nil
 }
 
-func createRole(resource string, roleAccess string, resourceName string, UID types.UID,
+func createRole(resource string, roleAccess string, resourceName string, resourceUID types.UID,
 	managementContext *config.ManagementContext, apiGroups []string) (*k8srbacv1.Role, error) {
 	roleName, verbs := getRoleNameAndVerbs(roleAccess, resourceName, resource)
 	apiVersion := "management.cattle.io/v3"
 	if apiGroups[0] != "management.cattle.io" {
-		apiVersion = "v1"
+		apiVersion = "v1" // for cloud credential
 	}
 	ownerReference := metav1.OwnerReference{
 		APIVersion: apiVersion,
 		Kind:       resource,
 		Name:       resourceName,
-		UID:        UID,
+		UID:        resourceUID,
 	}
 	newRole := &k8srbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
@@ -148,7 +149,7 @@ func createRoleBinding(roleAccess string, name string, UID types.UID,
 
 	apiVersion := "management.cattle.io/v3"
 	if apiGroups[0] != "management.cattle.io" {
-		apiVersion = "v1"
+		apiVersion = "v1" // for cloud credential
 	}
 	ownerReference := metav1.OwnerReference{
 		APIVersion: apiVersion,

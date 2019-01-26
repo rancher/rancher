@@ -27,6 +27,10 @@ type MCAppController struct {
 	gDNSs             v3.GlobalDNSInterface
 }
 
+type MCAppRevisionController struct {
+	managementContext *config.ManagementContext
+}
+
 func Register(ctx context.Context, management *config.ManagementContext) {
 	m := MCAppController{
 		multiClusterApps:  management.Management.MultiClusterApps(""),
@@ -36,7 +40,11 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		rtLister:          management.Management.RoleTemplates("").Controller().Lister(),
 		gDNSs:             management.Management.GlobalDNSs(""),
 	}
+	r := MCAppRevisionController{
+		managementContext: management,
+	}
 	m.multiClusterApps.AddHandler(ctx, "management-multiclusterapp-controller", m.sync)
+	management.Management.MultiClusterAppRevisions("").AddHandler(ctx, "management-multiclusterapp-revisions-rbac", r.sync)
 	m.prtbs.AddHandler(ctx, "management-prtb-controller-global-resource", m.prtbSync)
 }
 
@@ -101,4 +109,24 @@ func (mc *MCAppController) prtbSync(key string, prtb *v3.ProjectRoleTemplateBind
 	}
 
 	return nil, nil
+}
+
+func (r *MCAppRevisionController) sync(key string, mcappRevision *v3.MultiClusterAppRevision) (runtime.Object, error) {
+	if mcappRevision == nil || mcappRevision.DeletionTimestamp != nil {
+		return mcappRevision, nil
+	}
+	metaAccessor, err := meta.Accessor(mcappRevision)
+	if err != nil {
+		return mcappRevision, err
+	}
+	creatorID, ok := metaAccessor.GetAnnotations()[globalnamespacerbac.CreatorIDAnn]
+	if !ok {
+		return mcappRevision, fmt.Errorf("mcapp revision %v has no creatorId annotation", mcappRevision.Name)
+	}
+	if err := globalnamespacerbac.CreateRoleAndRoleBinding(
+		globalnamespacerbac.MultiClusterAppRevisionResource, mcappRevision.Name, mcappRevision.UID, []v3.Member{}, creatorID,
+		r.managementContext); err != nil {
+		return nil, err
+	}
+	return mcappRevision, nil
 }
