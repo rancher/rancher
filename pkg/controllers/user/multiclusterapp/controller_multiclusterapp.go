@@ -3,6 +3,7 @@ package multiclusterapp
 import (
 	"context"
 	"fmt"
+	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
 	"github.com/rancher/rancher/pkg/ref"
 	"reflect"
 	"strings"
@@ -110,7 +111,7 @@ func (m *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.O
 	if !toUpgrade {
 		if mcapp.Status.RevisionName == "" {
 			v3.MultiClusterAppConditionInstalled.True(mcapp)
-			return m.setRevisionAndUpdate(mcapp)
+			return m.setRevisionAndUpdate(mcapp, creatorID)
 		}
 		return mcapp, nil
 	}
@@ -121,7 +122,7 @@ func (m *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.O
 
 	if len(resp.updateApps) == 0 && v3.MultiClusterAppConditionDeployed.IsUnknown(mcapp) {
 		v3.MultiClusterAppConditionDeployed.True(mcapp)
-		return m.setRevisionAndUpdate(mcapp)
+		return m.setRevisionAndUpdate(mcapp, creatorID)
 	}
 
 	if resp.remaining == 0 || len(resp.updateApps) == 0 {
@@ -266,8 +267,21 @@ func (m *MCAppController) updateApp(app *pv3.App, answerMap map[string]map[strin
 	return updatedObj, err
 }
 
-func (m *MCAppController) createRevision(mcapp *v3.MultiClusterApp) (*v3.MultiClusterAppRevision, error) {
-	revision := &v3.MultiClusterAppRevision{}
+func (m *MCAppController) createRevision(mcapp *v3.MultiClusterApp, creatorID string) (*v3.MultiClusterAppRevision, error) {
+	ownerReference := metav1.OwnerReference{
+		APIVersion: "management.cattle.io/v3",
+		Kind:       globalnamespacerbac.MultiClusterAppResource,
+		Name:       mcapp.Name,
+		UID:        mcapp.UID,
+	}
+	revision := &v3.MultiClusterAppRevision{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				creatorIDAnn: creatorID,
+			},
+			OwnerReferences: []metav1.OwnerReference{ownerReference},
+		},
+	}
 	revision.GenerateName = "mcapprevision-"
 	revision.Labels = map[string]string{
 		mcAppLabel: mcapp.Name,
@@ -278,8 +292,8 @@ func (m *MCAppController) createRevision(mcapp *v3.MultiClusterApp) (*v3.MultiCl
 	return m.multiClusterAppRevisions.Create(revision)
 }
 
-func (m *MCAppController) setRevisionAndUpdate(mcapp *v3.MultiClusterApp) (*v3.MultiClusterApp, error) {
-	rev, err := m.createRevision(mcapp)
+func (m *MCAppController) setRevisionAndUpdate(mcapp *v3.MultiClusterApp, creatorID string) (*v3.MultiClusterApp, error) {
+	rev, err := m.createRevision(mcapp, creatorID)
 	if err != nil {
 		return mcapp, err
 	}
