@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	kcluster "github.com/rancher/kontainer-engine/cluster"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/node"
@@ -98,13 +99,14 @@ func (ch *clusterHandler) doSync(cluster *mgmtv3.Cluster) error {
 			}
 		}
 
-		if err := ch.deployApp(appName, appTargetNamespace, appProjectName, cluster, etcdTLSConfigs, systemComponentMap); err != nil {
+		appAnswers, err := ch.deployApp(appName, appTargetNamespace, appProjectName, cluster, etcdTLSConfigs, systemComponentMap)
+		if err != nil {
 			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
 			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
 			return errors.Wrap(err, "failed to deploy monitoring")
 		}
 
-		if err := ch.detectAppComponentsWhileInstall(appName, appTargetNamespace, cluster); err != nil {
+		if err := ch.detectAppComponentsWhileInstall(appName, appTargetNamespace, cluster, appAnswers); err != nil {
 			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
 			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
 			return errors.Wrap(err, "failed to detect the installation status of monitoring components")
@@ -240,7 +242,7 @@ func (ch *clusterHandler) getExporterEndpoint() (map[string][]string, error) {
 	return endpointMap, nil
 }
 
-func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProjectName string, cluster *mgmtv3.Cluster, etcdTLSConfig []*etcdTLSConfig, systemComponentMap map[string][]string) error {
+func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProjectName string, cluster *mgmtv3.Cluster, etcdTLSConfig []*etcdTLSConfig, systemComponentMap map[string][]string) (map[string]string, error) {
 	_, appDeployProjectID := ref.Parse(appProjectName)
 	clusterAlertManagerSvcName, clusterAlertManagerSvcNamespaces, clusterAlertManagerPort := monitoring.ClusterAlertManagerEndpoint()
 
@@ -369,13 +371,13 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 
 	err := monitoring.DeployApp(ch.app.cattleAppClient, appDeployProjectID, app)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return appAnswers, nil
 }
 
-func (ch *clusterHandler) detectAppComponentsWhileInstall(appName, appTargetNamespace string, cluster *mgmtv3.Cluster) error {
+func (ch *clusterHandler) detectAppComponentsWhileInstall(appName, appTargetNamespace string, cluster *mgmtv3.Cluster, appAnswers map[string]string) error {
 	if cluster.Status.MonitoringStatus == nil {
 		cluster.Status.MonitoringStatus = &mgmtv3.MonitoringStatus{
 			Conditions: []mgmtv3.MonitoringCondition{
@@ -389,18 +391,32 @@ func (ch *clusterHandler) detectAppComponentsWhileInstall(appName, appTargetName
 	}
 	monitoringStatus := cluster.Status.MonitoringStatus
 
+	enabledExporterNode := convert.ToBool(appAnswers["exporter-node.enabled"])
+	if enabledExporterNode {
+		ConditionNodeExporterDeployed.Add(monitoringStatus)
+	} else {
+		ConditionNodeExporterDeployed.Del(monitoringStatus)
+	}
+
+	enabledExporterKubeState := convert.ToBool(appAnswers["exporter-kube-state.enabled"])
+	if enabledExporterKubeState {
+		ConditionKubeStateExporterDeployed.Add(monitoringStatus)
+	} else {
+		ConditionKubeStateExporterDeployed.Del(monitoringStatus)
+	}
+
 	checkers := make([]func() error, 0, len(monitoringStatus.Conditions))
 	if !ConditionGrafanaDeployed.IsTrue(monitoringStatus) {
 		checkers = append(checkers, func() error {
 			return isGrafanaDeployed(ch.app.agentDeploymentClient, appTargetNamespace, appName, monitoringStatus, cluster.Name)
 		})
 	}
-	if !ConditionNodeExporterDeployed.IsTrue(monitoringStatus) {
+	if enabledExporterNode && !ConditionNodeExporterDeployed.IsTrue(monitoringStatus) {
 		checkers = append(checkers, func() error {
 			return isNodeExporterDeployed(ch.app.agentDaemonSetClient, appTargetNamespace, appName, monitoringStatus)
 		})
 	}
-	if !ConditionKubeStateExporterDeployed.IsTrue(monitoringStatus) {
+	if enabledExporterKubeState && !ConditionKubeStateExporterDeployed.IsTrue(monitoringStatus) {
 		checkers = append(checkers, func() error {
 			return isKubeStateExporterDeployed(ch.app.agentDeploymentClient, appTargetNamespace, appName, monitoringStatus)
 		})
