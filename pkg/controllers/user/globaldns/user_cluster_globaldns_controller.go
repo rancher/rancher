@@ -9,7 +9,6 @@ import (
 	v1beta1Rancher "github.com/rancher/types/apis/extensions/v1beta1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
-	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -87,7 +86,6 @@ func (g *UserGlobalDNSController) reconcileMultiClusterApp(obj *v3.GlobalDNS) ([
 		}
 		// check if the target project in this iteration is same as the cluster in current context
 		if split[0] != g.clusterName {
-			logrus.Debugf("Continuing since target is not for current cluster since project %v doesn't belong in cluster %v", split[1], g.clusterName)
 			continue
 		}
 
@@ -107,6 +105,11 @@ func (g *UserGlobalDNSController) reconcileProjects(obj *v3.GlobalDNS) ([]string
 	// go through target projects which are part of the current cluster and find all ingresses
 	var allIngresses []*v1beta1.Ingress
 
+	allNamespaces, err := g.namespaceLister.List("", labels.NewSelector())
+	if err != nil {
+		return nil, fmt.Errorf("UserGlobalDNSController: Error listing cluster namespaces")
+	}
+
 	for _, projectNameSet := range obj.Spec.ProjectNames {
 		split := strings.SplitN(projectNameSet, ":", 2)
 		if len(split) != 2 {
@@ -114,17 +117,12 @@ func (g *UserGlobalDNSController) reconcileProjects(obj *v3.GlobalDNS) ([]string
 		}
 		// check if the project in this iteration belongs to the same cluster in current context
 		if split[0] != g.clusterName {
-			logrus.Debugf("UserGlobalDNSController: Continuing since project %v doesn't belong in cluster %v", split[1], g.clusterName)
 			continue
 		}
 		projectID := split[1]
 		//list all namespaces in this project and list all ingresses within each namespace
-		namespaces, err := g.namespaceLister.List("", labels.NewSelector())
-		if err != nil {
-			return nil, fmt.Errorf("UserGlobalDNSController: Error listing cluster namespaces")
-		}
 		var namespacesInProject []*corev1.Namespace
-		for _, namespace := range namespaces {
+		for _, namespace := range allNamespaces {
 			nameSpaceProject := namespace.ObjectMeta.Labels[projectSelectorLabel]
 			if strings.EqualFold(projectID, nameSpaceProject) {
 				namespacesInProject = append(namespacesInProject, namespace)
@@ -166,41 +164,22 @@ func (g *UserGlobalDNSController) fetchGlobalDNSEndpointsForIngresses(ingresses 
 
 func (g *UserGlobalDNSController) refreshGlobalDNSEndpoints(globalDNS *v3.GlobalDNS, ingressEndpointsForCluster []string) (*v3.GlobalDNS, error) {
 
-	mapIngressEndpoints := make(map[string]bool)
-	for _, ep := range ingressEndpointsForCluster {
-		mapIngressEndpoints[ep] = true
-	}
-	//find endpoints removed by looking at clusterEndpoints of current cluster
-	endpointsToRemove := []string{}
-
-	if len(globalDNS.Status.ClusterEndpoints) == 0 {
-		globalDNS.Status.ClusterEndpoints = make(map[string][]string)
-	}
-
-	for _, ep := range globalDNS.Status.ClusterEndpoints[g.clusterName] {
-		if !mapIngressEndpoints[ep] {
-			endpointsToRemove = append(endpointsToRemove, ep)
-		}
-	}
-
 	globalDNSToUpdate := globalDNS.DeepCopy()
-	globalDNSToUpdate.Status.ClusterEndpoints[g.clusterName] = ingressEndpointsForCluster
-	//update endpoints on GlobalDNS status field
-	updatedGDNS, err := g.updateGlobalDNSEndpoints(globalDNSToUpdate, ingressEndpointsForCluster, endpointsToRemove)
-	if err != nil {
-		return updatedGDNS, err
+
+	if len(globalDNSToUpdate.Status.ClusterEndpoints) == 0 {
+		globalDNSToUpdate.Status.ClusterEndpoints = make(map[string][]string)
 	}
 
-	return updatedGDNS, nil
-}
+	clusterEps := globalDNSToUpdate.Status.ClusterEndpoints[g.clusterName]
 
-func (g *UserGlobalDNSController) updateGlobalDNSEndpoints(globalDNS *v3.GlobalDNS, ingressEndpoints []string, endpointsToRemove []string) (*v3.GlobalDNS, error) {
-	prepareGlobalDNSForUpdate(globalDNS, ingressEndpoints, g.clusterName)
-	prepareGlobalDNSForEndpointsRemoval(globalDNS, endpointsToRemove)
-
-	updated, err := g.globalDNSs.Update(globalDNS)
-	if err != nil {
-		return updated, fmt.Errorf("UserGlobalDNSController: Failed to update GlobalDNS endpoints with error %v", err)
+	if ifEndpointsDiffer(clusterEps, ingressEndpointsForCluster) {
+		globalDNSToUpdate.Status.ClusterEndpoints[g.clusterName] = ingressEndpointsForCluster
+		reconcileGlobalDNSEndpoints(globalDNSToUpdate)
+		updated, err := g.globalDNSs.Update(globalDNSToUpdate)
+		if err != nil {
+			return updated, fmt.Errorf("UserGlobalDNSController: Failed to update GlobalDNS endpoints with error %v", err)
+		}
+		return updated, nil
 	}
-	return updated, nil
+	return nil, nil
 }
