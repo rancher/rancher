@@ -32,6 +32,7 @@ const (
 	EtcdSnapshotOnceContainerName   = "etcd-snapshot-once"
 	EtcdRestoreContainerName        = "etcd-restore"
 	EtcdDownloadBackupContainerName = "etcd-download-backup"
+	EtcdServeBackupContainerName    = "etcd-Serve-backup"
 	EtcdChecksumContainerName       = "etcd-checksum-checker"
 	NginxProxyContainerName         = "nginx-proxy"
 	SidekickContainerName           = "service-sidekick"

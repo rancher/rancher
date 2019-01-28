@@ -130,7 +130,10 @@ func RestoreEtcdSnapshot(
 	if err := kubeCluster.TunnelHosts(ctx, flags); err != nil {
 		return err
 	}
-
+	// first download and check
+	if err := kubeCluster.PrepareBackup(ctx, snapshotName); err != nil {
+		return err
+	}
 	log.Infof(ctx, "Cleaning old kubernetes cluster")
 	if err := kubeCluster.CleanupNodes(ctx); err != nil {
 		return err
