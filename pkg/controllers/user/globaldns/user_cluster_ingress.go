@@ -62,15 +62,19 @@ func (ic *UserIngressController) sync(key string, obj *v1beta1.Ingress) (runtime
 	if obj == nil {
 		return ic.reconcileAllGlobalDNSs()
 	}
-	//if there are no globaldns cr, skip this run
+	//if there are no globaldns cr, skip this run. If error, return error
 
-	if ic.noGlobalDNS() {
+	noGlobalDNS, err := ic.noGlobalDNS()
+	if err != nil {
+		return nil, err
+	}
+
+	if noGlobalDNS {
 		logrus.Debug("UserIngressController: Skipping run, no Global DNS registered")
 		return nil, nil
 	}
 
 	annotations := obj.Annotations
-	logrus.Debugf("Ingress annotations %v", annotations)
 
 	//look for globalDNS annotation, if found load the GlobalDNS if there are Ingress endpoints
 	if annotations[annotationGlobalDNS] != "" && len(obj.Status.LoadBalancer.Ingress) > 0 {
@@ -96,29 +100,25 @@ func (ic *UserIngressController) sync(key string, obj *v1beta1.Ingress) (runtime
 			return nil, err
 		}
 
-		//update endpoints on GlobalDNS status field
-		ingressEndpoints := gatherIngressEndpoints(obj.Status.LoadBalancer.Ingress)
-		if obj.DeletionTimestamp != nil {
-			err = ic.removeGlobalDNSEndpoints(globalDNS, ingressEndpoints)
-		} else {
-			err = ic.updateGlobalDNSEndpoints(globalDNS, ingressEndpoints)
-		}
+		//update endpoints on GlobalDNS status field by enqueueing update on GlobalDNS
+		ic.globalDNSs.Controller().Enqueue(namespace.GlobalNamespace, globalDNS.Name)
+
 		return nil, err
 	}
 	return nil, nil
 }
 
-func (ic *UserIngressController) noGlobalDNS() bool {
-	gd, err := ic.globalDNSLister.List("", labels.NewSelector())
+func (ic *UserIngressController) noGlobalDNS() (bool, error) {
+	gd, err := ic.globalDNSLister.List(namespace.GlobalNamespace, labels.NewSelector())
 	if err != nil {
-		return true
+		return true, err
 	}
 
-	return len(gd) == 0
+	return len(gd) == 0, nil
 }
 
 func (ic *UserIngressController) reconcileAllGlobalDNSs() (runtime.Object, error) {
-	globalDNSList, err := ic.globalDNSLister.List("", labels.NewSelector())
+	globalDNSList, err := ic.globalDNSLister.List(namespace.GlobalNamespace, labels.NewSelector())
 	if err != nil {
 		return nil, err
 	}
@@ -138,6 +138,9 @@ func (ic *UserIngressController) reconcileAllGlobalDNSs() (runtime.Object, error
 }
 
 func (ic *UserIngressController) doesGlobalDNSTargetCurrentCluster(globalDNS *v3.GlobalDNS) (bool, error) {
+
+	var targetProjectNames []string
+
 	if globalDNS.Spec.MultiClusterAppName != "" {
 		mcappName, err := getMultiClusterAppName(globalDNS.Spec.MultiClusterAppName)
 		if err != nil {
@@ -147,55 +150,31 @@ func (ic *UserIngressController) doesGlobalDNSTargetCurrentCluster(globalDNS *v3
 		if err != nil {
 			return false, err
 		}
-		// go through target projects and check if its part of the current cluster
 		for _, t := range mcapp.Spec.Targets {
-			split := strings.SplitN(t.ProjectName, ":", 2)
-			if len(split) != 2 {
-				return false, fmt.Errorf("UserIngressController: error in splitting project ID %v", t.ProjectName)
-			}
-			// check if the target project in this iteration is same as the cluster in current context
-			if split[0] == ic.clusterName {
-				return true, nil
-			}
+			targetProjectNames = append(targetProjectNames, t.ProjectName)
 		}
 	} else if len(globalDNS.Spec.ProjectNames) > 0 {
-		for _, projectNameSet := range globalDNS.Spec.ProjectNames {
-			split := strings.SplitN(projectNameSet, ":", 2)
-			if len(split) != 2 {
-				return false, fmt.Errorf("UserIngressController: Error in splitting project Name %v", projectNameSet)
-			}
-			// check if the project in this iteration belongs to the same cluster in current context
-			if split[0] == ic.clusterName {
-				return true, nil
-			}
+		targetProjectNames = append(targetProjectNames, globalDNS.Spec.ProjectNames...)
+	}
+
+	// go through target projects and check if its part of the current cluster
+	for _, projectNameSet := range targetProjectNames {
+		split := strings.SplitN(projectNameSet, ":", 2)
+		if len(split) != 2 {
+			return false, fmt.Errorf("UserIngressController: Error in splitting project Name %v", projectNameSet)
+		}
+		// check if the project in this iteration belongs to the same cluster in current context
+		if split[0] == ic.clusterName {
+			return true, nil
 		}
 	}
 
 	return false, nil
 }
 
-func (ic *UserIngressController) updateGlobalDNSEndpoints(globalDNS *v3.GlobalDNS, ingressEndpoints []string) error {
-	prepareGlobalDNSForUpdate(globalDNS, ingressEndpoints, ic.clusterName)
-	_, err := ic.globalDNSs.Update(globalDNS)
-	if err != nil {
-		return fmt.Errorf("UserIngressController: Failed to update GlobalDNS endpoints with error %v", err)
-	}
-	return nil
-}
-
-func (ic *UserIngressController) removeGlobalDNSEndpoints(globalDNS *v3.GlobalDNS, ingressEndpoints []string) error {
-	prepareGlobalDNSForEndpointsRemoval(globalDNS, ingressEndpoints)
-	_, err := ic.globalDNSs.Update(globalDNS)
-	if err != nil {
-		return fmt.Errorf("UserIngressController: Failed to update GlobalDNS endpoints on ingress deletion, with error %v", err)
-	}
-
-	return nil
-}
-
 func (ic *UserIngressController) findGlobalDNS(fqdnRequested string) (*v3.GlobalDNS, error) {
 
-	allGlobalDNSs, err := ic.globalDNSLister.List("", labels.NewSelector())
+	allGlobalDNSs, err := ic.globalDNSLister.List(namespace.GlobalNamespace, labels.NewSelector())
 	if err != nil {
 		return nil, fmt.Errorf("UserIngressController: Error listing GlobalDNSs %v", err)
 	}
