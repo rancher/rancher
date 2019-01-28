@@ -14,7 +14,6 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
 	"k8s.io/api/core/v1"
@@ -102,6 +101,7 @@ func (m *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.O
 	if toUpgrade && mcapp.Spec.UpgradeStrategy.RollingUpdate != nil {
 		batchSize = mcapp.Spec.UpgradeStrategy.RollingUpdate.BatchSize
 	}
+
 	// todo: need to make this generic so works for other upgrade strategies
 	resp, err := m.createApps(mcapp, externalID, answerMap, creatorID, batchSize, toUpgrade)
 	if err != nil {
@@ -110,7 +110,7 @@ func (m *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.O
 
 	if !toUpgrade {
 		if mcapp.Status.RevisionName == "" {
-			v3.MultiClusterAppConditionInstalled.True(mcapp)
+			setInstalledDone(mcapp)
 			return m.setRevisionAndUpdate(mcapp, creatorID)
 		}
 		return mcapp, nil
@@ -120,8 +120,9 @@ func (m *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.O
 		return mcapp, nil
 	}
 
-	if len(resp.updateApps) == 0 && v3.MultiClusterAppConditionDeployed.IsUnknown(mcapp) {
-		v3.MultiClusterAppConditionDeployed.True(mcapp)
+	if len(resp.updateApps) == 0 && v3.MultiClusterAppConditionInstalled.IsUnknown(mcapp) {
+		v3.MultiClusterAppConditionInstalled.True(mcapp)
+		v3.MultiClusterAppConditionInstalled.Message(mcapp, "")
 		return m.setRevisionAndUpdate(mcapp, creatorID)
 	}
 
@@ -138,9 +139,8 @@ func (m *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.O
 		}
 	}
 
-	v3.MultiClusterAppConditionDeployed.Unknown(mcapp)
-	v3.MultiClusterAppConditionDeployed.LastUpdated(mcapp, time.Now().Format(time.RFC3339))
-	return m.update(mcapp)
+	setInstalledUnknown(mcapp)
+	return m.updateCondition(mcapp, setInstalledUnknown)
 }
 
 type Response struct {
@@ -177,7 +177,6 @@ func (m *MCAppController) createApps(mcapp *v3.MultiClusterApp, externalID strin
 		// check if the target project in this iteration is same as the cluster in current context, if not then don't create namespace and app else it
 		// will be in the wrong cluster
 		if split[0] != m.clusterName {
-			logrus.Debugf("Not for the current cluster since project %v doesn't belong in cluster %v", split[1], m.clusterName)
 			continue
 		}
 		// check if this app already exists
@@ -197,7 +196,7 @@ func (m *MCAppController) createApps(mcapp *v3.MultiClusterApp, externalID strin
 					}
 				}
 				if appUpdated {
-					if !pv3.AppConditionInstalled.IsTrue(app) || !pv3.AppConditionInstalled.IsTrue(app) {
+					if !pv3.AppConditionInstalled.IsTrue(app) || !pv3.AppConditionDeployed.IsTrue(app) {
 						toUpdate = false
 						updateApps = []*pv3.App{}
 					}
@@ -225,7 +224,7 @@ func (m *MCAppController) createApps(mcapp *v3.MultiClusterApp, externalID strin
 	}
 
 	if mcappToUpdate != nil && !reflect.DeepEqual(mcapp, mcappToUpdate) {
-		upd, err := m.update(mcappToUpdate)
+		upd, err := m.multiClusterApps.Update(mcappToUpdate)
 		if err != nil {
 			resp.object = mcappToUpdate
 			return resp, err
@@ -298,7 +297,7 @@ func (m *MCAppController) setRevisionAndUpdate(mcapp *v3.MultiClusterApp, creato
 		return mcapp, err
 	}
 	mcapp.Status.RevisionName = rev.Name
-	return m.update(mcapp)
+	return m.updateCondition(mcapp, setInstalledDone)
 }
 
 func (m *MCAppController) toUpgrade(mcapp *v3.MultiClusterApp) (bool, error) {
@@ -309,8 +308,8 @@ func (m *MCAppController) toUpgrade(mcapp *v3.MultiClusterApp) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if v3.MultiClusterAppConditionDeployed.IsUnknown(mcapp) {
-		lastUpdated, err := time.Parse(time.RFC3339, v3.MultiClusterAppConditionDeployed.GetLastUpdated(mcapp))
+	if v3.MultiClusterAppConditionInstalled.IsUnknown(mcapp) && v3.MultiClusterAppConditionInstalled.GetMessage(mcapp) == "upgrading" {
+		lastUpdated, err := time.Parse(time.RFC3339, v3.MultiClusterAppConditionInstalled.GetLastUpdated(mcapp))
 		if err != nil {
 			return false, err
 		}
@@ -422,7 +421,8 @@ func (m *MCAppController) deleteApps(mcAppName string, mcapp *v3.MultiClusterApp
 	}
 
 	var g errgroup.Group
-	for _, app := range appsToDelete {
+	for ind := range appsToDelete {
+		app := appsToDelete[ind]
 		g.Go(func() error {
 			var appWorkloadNamespace string
 			if app != nil {
@@ -468,7 +468,7 @@ func (m *MCAppController) getAllAppsToDelete(mcAppName string) ([]*pv3.App, *v3.
 	return appsToDelete, nil, err
 }
 
-func (m *MCAppController) update(mcappToUpdate *v3.MultiClusterApp) (*v3.MultiClusterApp, error) {
+func (m *MCAppController) updateCondition(mcappToUpdate *v3.MultiClusterApp, setCondition func(mcapp *v3.MultiClusterApp)) (*v3.MultiClusterApp, error) {
 	updatedObj, err := m.multiClusterApps.Update(mcappToUpdate)
 	if err != nil && apierrors.IsConflict(err) {
 		// retry 5 times
@@ -484,6 +484,7 @@ func (m *MCAppController) update(mcappToUpdate *v3.MultiClusterApp) (*v3.MultiCl
 				}
 			}
 			latestToUpdate.Status.RevisionName = mcappToUpdate.Status.RevisionName
+			setCondition(latestToUpdate)
 			updatedMcApp, err := m.multiClusterApps.Update(latestToUpdate)
 			if err != nil && apierrors.IsConflict(err) {
 				time.Sleep(5 * time.Millisecond)
@@ -494,6 +495,17 @@ func (m *MCAppController) update(mcappToUpdate *v3.MultiClusterApp) (*v3.MultiCl
 		return mcappToUpdate, err
 	}
 	return updatedObj, err
+}
+
+func setInstalledUnknown(mcapp *v3.MultiClusterApp) {
+	v3.MultiClusterAppConditionInstalled.Unknown(mcapp)
+	v3.MultiClusterAppConditionInstalled.Message(mcapp, "upgrading")
+	v3.MultiClusterAppConditionInstalled.LastUpdated(mcapp, time.Now().Format(time.RFC3339))
+}
+
+func setInstalledDone(mcapp *v3.MultiClusterApp) {
+	v3.MultiClusterAppConditionInstalled.True(mcapp)
+	v3.MultiClusterAppConditionInstalled.Message(mcapp, "")
 }
 
 func (m *MCAppController) createAnswerMap(answers []v3.Answer) (map[string]map[string]string, error) {
@@ -557,7 +569,7 @@ func (m *MCAppController) getExternalID(mcapp *v3.MultiClusterApp) (string, *v3.
 		return "", mcapp, err
 	}
 	if tv == nil {
-		return "", mcapp, fmt.Errorf("Invalid templateVersion provided: %v", mcapp.Spec.TemplateVersionName)
+		return "", mcapp, fmt.Errorf("invalid templateVersion provided: %v", mcapp.Spec.TemplateVersionName)
 	}
 
 	externalID := tv.Spec.ExternalID

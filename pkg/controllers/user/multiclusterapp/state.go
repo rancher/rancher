@@ -30,6 +30,9 @@ func (m *MCAppStateController) sync(key string, mcapp *v3.MultiClusterApp) (runt
 	if mcapp == nil || mcapp.DeletionTimestamp != nil {
 		return mcapp, nil
 	}
+	if v3.MultiClusterAppConditionInstalled.IsUnknown(mcapp) && v3.MultiClusterAppConditionInstalled.GetMessage(mcapp) == "upgrading" {
+		return mcapp, nil
+	}
 	var apps []*pv3.App
 	for _, t := range mcapp.Spec.Targets {
 		split := strings.SplitN(t.ProjectName, ":", 2)
@@ -50,36 +53,37 @@ func (m *MCAppStateController) sync(key string, mcapp *v3.MultiClusterApp) (runt
 	}
 	toUpdate := mcapp.DeepCopy()
 	if len(apps) != len(mcapp.Spec.Targets) {
-		v3.MultiClusterAppConditionInstalled.Unknown(toUpdate)
-		v3.MultiClusterAppConditionInstalled.Message(toUpdate, "creating apps")
-		return m.MultiClusterApps.Update(toUpdate)
+		if !v3.MultiClusterAppConditionInstalled.IsUnknown(toUpdate) {
+			v3.MultiClusterAppConditionInstalled.Unknown(toUpdate)
+			return m.MultiClusterApps.Update(toUpdate)
+		}
+		return mcapp, nil
 	}
 	updating := map[string]bool{}
 	installing := map[string]bool{}
 	for _, app := range apps {
 		if !pv3.AppConditionInstalled.IsTrue(app) {
 			installing[app.Name] = true
-		} else if !pv3.AppConditionDeployed.IsTrue(app) && pv3.AppConditionDeployed.GetStatus(app) != "" {
+		} else if !pv3.AppConditionDeployed.IsTrue(app) {
 			updating[app.Name] = true
 		}
 	}
-	if checkForUpdate(installing, toUpdate, v3.MultiClusterAppConditionInstalled, "creating") {
+	if checkForUpdate(installing, toUpdate, v3.MultiClusterAppConditionInstalled) {
 		return m.MultiClusterApps.Update(toUpdate)
 	}
 
-	if checkForUpdate(updating, toUpdate, v3.MultiClusterAppConditionDeployed, "updating") {
+	if checkForUpdate(updating, toUpdate, v3.MultiClusterAppConditionDeployed) {
 		return m.MultiClusterApps.Update(toUpdate)
 	}
 
 	return mcapp, nil
 }
 
-func checkForUpdate(transitioning map[string]bool, mcapp *v3.MultiClusterApp, cond condition.Cond, reason string) bool {
+func checkForUpdate(transitioning map[string]bool, mcapp *v3.MultiClusterApp, cond condition.Cond) bool {
 	if len(transitioning) > 0 {
 		existing := strings.Split(cond.GetMessage(mcapp), ",")
 		if !Equal(existing, transitioning) {
 			cond.Unknown(mcapp)
-			cond.Reason(mcapp, fmt.Sprintf("%s apps", reason))
 			cond.Message(mcapp, GetMsg(transitioning))
 			return true
 		}
@@ -97,7 +101,7 @@ func GetMsg(data map[string]bool) string {
 	for key := range data {
 		keys = append(keys, key)
 	}
-	return fmt.Sprintf("%s %s", "Updating", strings.Join(keys, ","))
+	return fmt.Sprintf("%s", strings.Join(keys, ","))
 }
 
 func Equal(existing []string, toUpdate map[string]bool) bool {

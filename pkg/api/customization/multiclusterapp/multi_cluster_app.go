@@ -3,10 +3,13 @@ package multiclusterapp
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"reflect"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
@@ -51,6 +54,17 @@ func (w Wrapper) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 				filtered = append(filtered, revision)
 			}
 		}
+		sort.SliceStable(filtered, func(i, j int) bool {
+			val1, err := time.Parse(time.RFC3339, convert.ToString(values.GetValueN(filtered[i], "created")))
+			if err != nil {
+				logrus.Infof("error parsing time %v", err)
+			}
+			val2, err := time.Parse(time.RFC3339, convert.ToString(values.GetValueN(filtered[j], "created")))
+			if err != nil {
+				logrus.Infof("error parsing time %v", err)
+			}
+			return val1.After(val2)
+		})
 		apiContext.Type = client.MultiClusterAppRevisionType
 		apiContext.WriteResponse(http.StatusOK, filtered)
 		return nil

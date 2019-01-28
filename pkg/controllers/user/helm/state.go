@@ -11,7 +11,6 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
-	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 	"strings"
 )
@@ -76,6 +75,9 @@ func (s *AppStateCalculator) syncAppState(key string, app *pv3.App) (runtime.Obj
 	if err != nil {
 		return app, fmt.Errorf("error getting workloads %v", err)
 	}
+	if mcappName, ok := app.Labels[MultiClusterAppIDSelector]; ok {
+		s.MultiClusterApps.Controller().Enqueue(namespace.GlobalNamespace, mcappName)
+	}
 	updatingWorkloads := getUpdating(workloads)
 	toUpdate := app.DeepCopy()
 	if len(updatingWorkloads) == 0 {
@@ -95,14 +97,7 @@ func (s *AppStateCalculator) syncAppState(key string, app *pv3.App) (runtime.Obj
 		pv3.AppConditionDeployed.Message(toUpdate, mcapp.GetMsg(updatingWorkloads))
 		pv3.AppConditionDeployed.Reason(toUpdate, "workloads are updating")
 	}
-	updated, err := s.Apps.Update(toUpdate)
-	if err != nil {
-		logrus.Errorf("error updating app %s", toUpdate.Name)
-	}
-	if mcappName, ok := app.Labels[MultiClusterAppIDSelector]; ok {
-		s.MultiClusterApps.Controller().Enqueue(namespace.GlobalNamespace, mcappName)
-	}
-	return updated, nil
+	return s.Apps.Update(toUpdate)
 }
 
 func (s *AppStateCalculator) getWorkloadsByApp(name string) ([]*util.Workload, error) {
