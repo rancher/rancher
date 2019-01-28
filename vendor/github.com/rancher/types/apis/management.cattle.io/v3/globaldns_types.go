@@ -26,7 +26,8 @@ type GlobalDNSSpec struct {
 }
 
 type GlobalDNSStatus struct {
-	Endpoints []string `json:"endpoints,omitempty"`
+	Endpoints        []string            `json:"endpoints,omitempty"`
+	ClusterEndpoints map[string][]string `json:"clusterEndpoints,omitempty"`
 }
 
 type GlobalDNSProvider struct {

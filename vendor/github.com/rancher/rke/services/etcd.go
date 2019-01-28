@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	"k8s.io/client-go/util/cert"
 )
 
 const (
@@ -37,7 +38,8 @@ func RunEtcdPlane(
 	prsMap map[string]v3.PrivateRegistry,
 	updateWorkersOnly bool,
 	alpineImage string,
-	es v3.ETCDService) error {
+	es v3.ETCDService,
+	certMap map[string]pki.CertificatePKI) error {
 	log.Infof(ctx, "[%s] Building up etcd plane..", ETCDRole)
 	for _, host := range etcdHosts {
 		if updateWorkersOnly {
@@ -64,7 +66,19 @@ func RunEtcdPlane(
 			return err
 		}
 	}
-	log.Infof(ctx, "[%s] Successfully started etcd plane..", ETCDRole)
+	log.Infof(ctx, "[%s] Successfully started etcd plane.. Checking etcd cluster health", ETCDRole)
+	clientCert := cert.EncodeCertPEM(certMap[pki.KubeNodeCertName].Certificate)
+	clientkey := cert.EncodePrivateKeyPEM(certMap[pki.KubeNodeCertName].Key)
+	var healthy bool
+	for _, host := range etcdHosts {
+		_, _, healthCheckURL := GetProcessConfig(etcdNodePlanMap[host.Address].Processes[EtcdContainerName])
+		if healthy = isEtcdHealthy(ctx, localConnDialerFactory, host, clientCert, clientkey, healthCheckURL); healthy {
+			break
+		}
+	}
+	if !healthy {
+		return fmt.Errorf("[etcd] Etcd Cluster is not healthy")
+	}
 	return nil
 }
 

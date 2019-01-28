@@ -42,7 +42,7 @@ metadata:
   labels:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
-{{- if eq .RBAC "rbac"}}
+{{- if eq .RBACConfig "rbac"}}
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
@@ -205,8 +205,14 @@ spec:
         - --cache-size=1000
         - --log-facility=-
         - --server=/{{.ClusterDomain}}/127.0.0.1#10053
+	{{- if .ReverseCIDRs }}
+	{{- range .ReverseCIDRs }}
+        - --server=/{{.}}/127.0.0.1#10053
+	{{- end }}
+	{{- else }}
         - --server=/in-addr.arpa/127.0.0.1#10053
         - --server=/ip6.arpa/127.0.0.1#10053
+	{{- end }}
         ports:
         - containerPort: 53
           name: dns
@@ -223,7 +229,7 @@ spec:
         - name: kube-dns-config
           mountPath: /etc/k8s/dns/dnsmasq-nanny
       - name: sidecar
-        image: {{.KubednsSidecarImage}}
+        image: {{.KubeDNSSidecarImage}}
         livenessProbe:
           httpGet:
             path: /metrics
@@ -269,4 +275,15 @@ spec:
     protocol: UDP
   - name: dns-tcp
     port: 53
-    protocol: TCP`
+    protocol: TCP
+{{- if .UpstreamNameservers }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kube-dns
+  namespace: kube-system
+data:
+  upstreamNameservers: |
+    [{{range $i, $v := .UpstreamNameservers}}{{if $i}}, {{end}}{{printf "%q" .}}{{end}}]
+{{- end }}`

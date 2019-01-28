@@ -1,10 +1,12 @@
 package client
 
 const (
-	GlobalDNSStatusType           = "globalDnsStatus"
-	GlobalDNSStatusFieldEndpoints = "endpoints"
+	GlobalDNSStatusType                  = "globalDnsStatus"
+	GlobalDNSStatusFieldClusterEndpoints = "clusterEndpoints"
+	GlobalDNSStatusFieldEndpoints        = "endpoints"
 )
 
 type GlobalDNSStatus struct {
-	Endpoints []string `json:"endpoints,omitempty" yaml:"endpoints,omitempty"`
+	ClusterEndpoints map[string][]string `json:"clusterEndpoints,omitempty" yaml:"clusterEndpoints,omitempty"`
+	Endpoints        []string            `json:"endpoints,omitempty" yaml:"endpoints,omitempty"`
 }

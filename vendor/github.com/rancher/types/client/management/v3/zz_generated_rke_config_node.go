@@ -11,6 +11,8 @@ const (
 	RKEConfigNodeFieldPort             = "port"
 	RKEConfigNodeFieldRole             = "role"
 	RKEConfigNodeFieldSSHAgentAuth     = "sshAgentAuth"
+	RKEConfigNodeFieldSSHCert          = "sshCert"
+	RKEConfigNodeFieldSSHCertPath      = "sshCertPath"
 	RKEConfigNodeFieldSSHKey           = "sshKey"
 	RKEConfigNodeFieldSSHKeyPath       = "sshKeyPath"
 	RKEConfigNodeFieldUser             = "user"
@@ -26,6 +28,8 @@ type RKEConfigNode struct {
 	Port             string            `json:"port,omitempty" yaml:"port,omitempty"`
 	Role             []string          `json:"role,omitempty" yaml:"role,omitempty"`
 	SSHAgentAuth     bool              `json:"sshAgentAuth,omitempty" yaml:"sshAgentAuth,omitempty"`
+	SSHCert          string            `json:"sshCert,omitempty" yaml:"sshCert,omitempty"`
+	SSHCertPath      string            `json:"sshCertPath,omitempty" yaml:"sshCertPath,omitempty"`
 	SSHKey           string            `json:"sshKey,omitempty" yaml:"sshKey,omitempty"`
 	SSHKeyPath       string            `json:"sshKeyPath,omitempty" yaml:"sshKeyPath,omitempty"`
 	User             string            `json:"user,omitempty" yaml:"user,omitempty"`
