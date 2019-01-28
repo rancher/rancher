@@ -416,6 +416,8 @@ func App(schemas *types.Schemas, management *config.ScaledContext, kubeConfigGet
 		KubeConfigGetter:      kubeConfigGetter,
 		TemplateContentClient: management.Management.TemplateContents(""),
 		AppGetter:             management.Project,
+		UserLister:            management.Management.Users("").Controller().Lister(),
+		UserManager:           management.UserManager,
 	}
 	schema.Formatter = app.Formatter
 	schema.ActionHandler = wrapper.ActionHandler

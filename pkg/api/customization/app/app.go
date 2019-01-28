@@ -16,6 +16,8 @@ import (
 	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	clusterv3 "github.com/rancher/types/client/cluster/v3"
 	projectv3 "github.com/rancher/types/client/project/v3"
+	"github.com/rancher/types/user"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
 	"reflect"
@@ -27,10 +29,13 @@ type Wrapper struct {
 	KubeConfigGetter      common.KubeConfigGetter
 	TemplateContentClient v3.TemplateContentInterface
 	AppGetter             pv3.AppsGetter
+	UserLister            v3.UserLister
+	UserManager           user.Manager
 }
 
 const (
-	appLabel = "io.cattle.field/appId"
+	appLabel      = "io.cattle.field/appId"
+	creatorIDAnno = "field.cattle.io/creatorId"
 )
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -81,6 +86,17 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 	if err := access.ByID(apiContext, &projectschema.Version, projectv3.AppType, apiContext.ID, &app); err != nil {
 		return err
 	}
+
+	creatorNotFound := false
+	if _, err := w.UserLister.Get("", app.CreatorID); err != nil && apierrors.IsNotFound(err) {
+		creatorNotFound = true
+	}
+	userCanCreateApp := apiContext.AccessControl.CanCreate(apiContext, apiContext.Schema) == nil
+
+	if creatorNotFound && !userCanCreateApp {
+		return httperror.NewAPIError(httperror.PermissionDenied, "can not upgrade/rollback app")
+	}
+
 	actionInput, err := parse.ReadBody(apiContext.Request)
 	if err != nil {
 		return err
@@ -108,6 +124,9 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		if convert.ToBool(forceUpgrade) {
 			pv3.AppConditionForceUpgrade.Unknown(obj)
 		}
+		if creatorNotFound {
+			obj.Annotations[creatorIDAnno] = w.UserManager.GetUser(apiContext)
+		}
 		if _, err := w.AppGetter.Apps(namespace).Update(obj); err != nil {
 			return err
 		}
@@ -133,6 +152,9 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		obj.Spec.ExternalID = appRevision.Status.ExternalID
 		if convert.ToBool(forceUpgrade) {
 			pv3.AppConditionForceUpgrade.Unknown(obj)
+		}
+		if creatorNotFound {
+			obj.Annotations[creatorIDAnno] = w.UserManager.GetUser(apiContext)
 		}
 		if _, err := w.AppGetter.Apps(namespace).Update(obj); err != nil {
 			return err
