@@ -49,6 +49,9 @@ type dockerConfig struct {
 type authConfig types.AuthConfig
 
 func DoRunContainer(ctx context.Context, dClient *client.Client, imageCfg *container.Config, hostCfg *container.HostConfig, containerName string, hostname string, plane string, prsMap map[string]v3.PrivateRegistry) error {
+	if dClient == nil {
+		return fmt.Errorf("[%s] Failed to run container: docker client is nil for container [%s] on host [%s]", plane, containerName, hostname)
+	}
 	container, err := dClient.ContainerInspect(ctx, containerName)
 	if err != nil {
 		if !client.IsErrNotFound(err) {
@@ -98,6 +101,9 @@ func DoRunContainer(ctx context.Context, dClient *client.Client, imageCfg *conta
 }
 
 func DoRollingUpdateContainer(ctx context.Context, dClient *client.Client, imageCfg *container.Config, hostCfg *container.HostConfig, containerName, hostname, plane string, prsMap map[string]v3.PrivateRegistry) error {
+	if dClient == nil {
+		return fmt.Errorf("[%s] Failed rolling update of container: docker client is nil for container [%s] on host [%s]", plane, containerName, hostname)
+	}
 	logrus.Debugf("[%s] Checking for deployed [%s]", plane, containerName)
 	isRunning, err := IsContainerRunning(ctx, dClient, hostname, containerName, false)
 	if err != nil {
@@ -131,6 +137,9 @@ func DoRollingUpdateContainer(ctx context.Context, dClient *client.Client, image
 }
 
 func DoRemoveContainer(ctx context.Context, dClient *client.Client, containerName, hostname string) error {
+	if dClient == nil {
+		return fmt.Errorf("Failed to remove container: docker client is nil for container [%s] on host [%s]", containerName, hostname)
+	}
 	logrus.Debugf("[remove/%s] Checking if container is running on host [%s]", containerName, hostname)
 	// not using the wrapper to check if the error is a NotFound error
 	_, err := dClient.ContainerInspect(ctx, containerName)
@@ -151,6 +160,9 @@ func DoRemoveContainer(ctx context.Context, dClient *client.Client, containerNam
 }
 
 func IsContainerRunning(ctx context.Context, dClient *client.Client, hostname string, containerName string, all bool) (bool, error) {
+	if dClient == nil {
+		return false, fmt.Errorf("Failed to check if container is running: docker client is nil for container [%s] on host [%s]", containerName, hostname)
+	}
 	logrus.Debugf("Checking if container [%s] is running on host [%s]", containerName, hostname)
 	containers, err := dClient.ContainerList(ctx, types.ContainerListOptions{All: all})
 	if err != nil {
@@ -206,6 +218,9 @@ func pullImage(ctx context.Context, dClient *client.Client, hostname string, con
 }
 
 func UseLocalOrPull(ctx context.Context, dClient *client.Client, hostname string, containerImage string, plane string, prsMap map[string]v3.PrivateRegistry) error {
+	if dClient == nil {
+		return fmt.Errorf("[%s] Failed to use local image or pull: docker client is nil for container [%s] on host [%s]", plane, containerImage, hostname)
+	}
 	logrus.Debugf("[%s] Checking image [%s] on host [%s]", plane, containerImage, hostname)
 	imageExists, err := localImageExists(ctx, dClient, hostname, containerImage)
 	if err != nil {
@@ -224,6 +239,9 @@ func UseLocalOrPull(ctx context.Context, dClient *client.Client, hostname string
 }
 
 func RemoveContainer(ctx context.Context, dClient *client.Client, hostname string, containerName string) error {
+	if dClient == nil {
+		return fmt.Errorf("Failed to remove container: docker client is nil for container [%s] on host [%s]", containerName, hostname)
+	}
 	err := dClient.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
 	if err != nil {
 		return fmt.Errorf("Can't remove Docker container [%s] for host [%s]: %v", containerName, hostname, err)
@@ -232,6 +250,9 @@ func RemoveContainer(ctx context.Context, dClient *client.Client, hostname strin
 }
 
 func RestartContainer(ctx context.Context, dClient *client.Client, hostname, containerName string) error {
+	if dClient == nil {
+		return fmt.Errorf("Failed to restart container: docker client is nil for container [%s] on host [%s]", containerName, hostname)
+	}
 	restartTimeout := RestartTimeout * time.Second
 	err := dClient.ContainerRestart(ctx, containerName, &restartTimeout)
 	if err != nil {
@@ -240,6 +261,9 @@ func RestartContainer(ctx context.Context, dClient *client.Client, hostname, con
 	return nil
 }
 func StopContainer(ctx context.Context, dClient *client.Client, hostname string, containerName string) error {
+	if dClient == nil {
+		return fmt.Errorf("Failed to stop container: docker client is nil for container [%s] on host [%s]", containerName, hostname)
+	}
 	// define the stop timeout
 	stopTimeoutDuration := StopTimeout * time.Second
 	err := dClient.ContainerStop(ctx, containerName, &stopTimeoutDuration)
@@ -250,6 +274,9 @@ func StopContainer(ctx context.Context, dClient *client.Client, hostname string,
 }
 
 func RenameContainer(ctx context.Context, dClient *client.Client, hostname string, oldContainerName string, newContainerName string) error {
+	if dClient == nil {
+		return fmt.Errorf("Failed to rename container: docker client is nil for container [%s] on host [%s]", oldContainerName, hostname)
+	}
 	err := dClient.ContainerRename(ctx, oldContainerName, newContainerName)
 	if err != nil {
 		return fmt.Errorf("Can't rename Docker container [%s] for host [%s]: %v", oldContainerName, hostname, err)
@@ -258,6 +285,9 @@ func RenameContainer(ctx context.Context, dClient *client.Client, hostname strin
 }
 
 func StartContainer(ctx context.Context, dClient *client.Client, hostname string, containerName string) error {
+	if dClient == nil {
+		return fmt.Errorf("Failed to start container: docker client is nil for container [%s] on host [%s]", containerName, hostname)
+	}
 	if err := dClient.ContainerStart(ctx, containerName, types.ContainerStartOptions{}); err != nil {
 		return fmt.Errorf("Failed to start [%s] container on host [%s]: %v", containerName, hostname, err)
 	}
@@ -265,6 +295,9 @@ func StartContainer(ctx context.Context, dClient *client.Client, hostname string
 }
 
 func CreateContainer(ctx context.Context, dClient *client.Client, hostname string, containerName string, imageCfg *container.Config, hostCfg *container.HostConfig) (container.ContainerCreateCreatedBody, error) {
+	if dClient == nil {
+		return container.ContainerCreateCreatedBody{}, fmt.Errorf("Failed to create container: docker client is nil for container [%s] on host [%s]", containerName, hostname)
+	}
 	created, err := dClient.ContainerCreate(ctx, imageCfg, hostCfg, nil, containerName)
 	if err != nil {
 		return container.ContainerCreateCreatedBody{}, fmt.Errorf("Failed to create [%s] container on host [%s]: %v", containerName, hostname, err)
@@ -273,6 +306,9 @@ func CreateContainer(ctx context.Context, dClient *client.Client, hostname strin
 }
 
 func InspectContainer(ctx context.Context, dClient *client.Client, hostname string, containerName string) (types.ContainerJSON, error) {
+	if dClient == nil {
+		return types.ContainerJSON{}, fmt.Errorf("Failed to inspect container: docker client is nil for container [%s] on host [%s]", containerName, hostname)
+	}
 	inspection, err := dClient.ContainerInspect(ctx, containerName)
 	if err != nil {
 		return types.ContainerJSON{}, fmt.Errorf("Failed to inspect [%s] container on host [%s]: %v", containerName, hostname, err)
@@ -281,6 +317,9 @@ func InspectContainer(ctx context.Context, dClient *client.Client, hostname stri
 }
 
 func StopRenameContainer(ctx context.Context, dClient *client.Client, hostname string, oldContainerName string, newContainerName string) error {
+	if dClient == nil {
+		return fmt.Errorf("Failed to stop and rename container: docker client is nil for container [%s] on host [%s]", oldContainerName, hostname)
+	}
 	// make sure we don't have an old old-container from a previous broken update
 	exists, err := IsContainerRunning(ctx, dClient, hostname, newContainerName, true)
 	if err != nil {
@@ -302,6 +341,9 @@ func StopRenameContainer(ctx context.Context, dClient *client.Client, hostname s
 }
 
 func WaitForContainer(ctx context.Context, dClient *client.Client, hostname string, containerName string) (int64, error) {
+	if dClient == nil {
+		return 1, fmt.Errorf("Failed waiting for container: docker client is nil for container [%s] on host [%s]", containerName, hostname)
+	}
 	// We capture the status exit code of the container
 	statusCh, errCh := dClient.ContainerWait(ctx, containerName, container.WaitConditionNotRunning)
 	select {
@@ -318,6 +360,9 @@ func WaitForContainer(ctx context.Context, dClient *client.Client, hostname stri
 }
 
 func IsContainerUpgradable(ctx context.Context, dClient *client.Client, imageCfg *container.Config, hostCfg *container.HostConfig, containerName string, hostname string, plane string) (bool, error) {
+	if dClient == nil {
+		return false, fmt.Errorf("[%s] Failed checking if container is upgradable: docker client is nil for container [%s] on host [%s]", plane, containerName, hostname)
+	}
 	logrus.Debugf("[%s] Checking if container [%s] is eligible for upgrade on host [%s]", plane, containerName, hostname)
 	// this should be moved to a higher layer.
 
@@ -369,6 +414,9 @@ func IsSupportedDockerVersion(info types.Info, K8sVersion string) (bool, error) 
 }
 
 func ReadFileFromContainer(ctx context.Context, dClient *client.Client, hostname, container, filePath string) (string, error) {
+	if dClient == nil {
+		return "", fmt.Errorf("Failed reading file from container: docker client is nil for container [%s] on host [%s]", container, hostname)
+	}
 	reader, _, err := dClient.CopyFromContainer(ctx, container, filePath)
 	if err != nil {
 		return "", fmt.Errorf("Failed to copy file [%s] from container [%s] on host [%s]: %v", filePath, container, hostname, err)
@@ -386,10 +434,16 @@ func ReadFileFromContainer(ctx context.Context, dClient *client.Client, hostname
 }
 
 func ReadContainerLogs(ctx context.Context, dClient *client.Client, containerName string, follow bool, tail string) (io.ReadCloser, error) {
+	if dClient == nil {
+		return nil, fmt.Errorf("Failed reading container logs: docker client is nil for container [%s]", containerName)
+	}
 	return dClient.ContainerLogs(ctx, containerName, types.ContainerLogsOptions{Follow: follow, ShowStdout: true, ShowStderr: true, Timestamps: false, Tail: tail})
 }
 
 func GetContainerLogsStdoutStderr(ctx context.Context, dClient *client.Client, containerName, tail string, follow bool) (string, string, error) {
+	if dClient == nil {
+		return "", "", fmt.Errorf("Failed to get container logs stdout and stderr: docker client is nil for container [%s]", containerName)
+	}
 	var containerStderr bytes.Buffer
 	var containerStdout bytes.Buffer
 	var containerErrLog, containerStdLog string
@@ -467,6 +521,9 @@ func GetKubeletDockerConfig(prsMap map[string]v3.PrivateRegistry) (string, error
 }
 
 func DoRestartContainer(ctx context.Context, dClient *client.Client, containerName, hostname string) error {
+	if dClient == nil {
+		return fmt.Errorf("Failed to restart container: docker client is nil for container [%s] on host [%s]", containerName, hostname)
+	}
 	logrus.Debugf("[restart/%s] Checking if container is running on host [%s]", containerName, hostname)
 	// not using the wrapper to check if the error is a NotFound error
 	_, err := dClient.ContainerInspect(ctx, containerName)
@@ -487,6 +544,9 @@ func DoRestartContainer(ctx context.Context, dClient *client.Client, containerNa
 }
 
 func GetContainerOutput(ctx context.Context, dClient *client.Client, containerName, hostname string) (int64, string, string, error) {
+	if dClient == nil {
+		return 1, "", "", fmt.Errorf("Failed to get container output: docker client is nil for container [%s] on host [%s]", containerName, hostname)
+	}
 	status, err := WaitForContainer(ctx, dClient, hostname, containerName)
 	if err != nil {
 		return 1, "", "", err

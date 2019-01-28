@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5"
 	"fmt"
+	"net"
 	"path"
 	"strconv"
 	"strings"
@@ -69,7 +70,7 @@ func BuildRKEConfigNodePlan(ctx context.Context, myCluster *Cluster, host *hosts
 		processes[services.NginxProxyContainerName] = myCluster.BuildProxyProcess()
 	}
 	if host.IsControl {
-		processes[services.KubeAPIContainerName] = myCluster.BuildKubeAPIProcess(prefixPath)
+		processes[services.KubeAPIContainerName] = myCluster.BuildKubeAPIProcess(host, prefixPath)
 		processes[services.KubeControllerContainerName] = myCluster.BuildKubeControllerProcess(prefixPath)
 		processes[services.SchedulerContainerName] = myCluster.BuildSchedulerProcess(prefixPath)
 
@@ -97,7 +98,7 @@ func BuildRKEConfigNodePlan(ctx context.Context, myCluster *Cluster, host *hosts
 	}
 }
 
-func (c *Cluster) BuildKubeAPIProcess(prefixPath string) v3.Process {
+func (c *Cluster) BuildKubeAPIProcess(host *hosts.Host, prefixPath string) v3.Process {
 	// check if external etcd is used
 	etcdConnectionString := services.GetEtcdConnString(c.EtcdHosts)
 	etcdPathPrefix := EtcdPathPrefix
@@ -191,6 +192,10 @@ func (c *Cluster) BuildKubeAPIProcess(prefixPath string) v3.Process {
 
 	if c.Authorization.Mode == services.RBACAuthorizationMode {
 		CommandArgs["authorization-mode"] = "Node,RBAC"
+	}
+
+	if len(host.InternalAddress) > 0 && net.ParseIP(host.InternalAddress) != nil {
+		CommandArgs["advertise-address"] = host.InternalAddress
 	}
 
 	// PodSecurityPolicy

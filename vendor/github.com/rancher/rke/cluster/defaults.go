@@ -45,6 +45,7 @@ const (
 	DefaultMonitoringProvider            = "metrics-server"
 	DefaultEtcdBackupConfigIntervalHours = 12
 	DefaultEtcdBackupConfigRetention     = 6
+	DefaultDNSProvider                   = "kubedns"
 
 	DefaultEtcdHeartbeatIntervalName  = "heartbeat-interval"
 	DefaultEtcdHeartbeatIntervalValue = "500"
@@ -137,7 +138,6 @@ func (c *Cluster) setClusterDefaults(ctx context.Context) error {
 	if len(c.Monitoring.Provider) == 0 {
 		c.Monitoring.Provider = DefaultMonitoringProvider
 	}
-
 	//set docker private registry URL
 	for _, pr := range c.PrivateRegistries {
 		if pr.URL == "" {
@@ -145,10 +145,16 @@ func (c *Cluster) setClusterDefaults(ctx context.Context) error {
 		}
 		c.PrivateRegistriesMap[pr.URL] = pr
 	}
+
 	err := c.setClusterImageDefaults()
 	if err != nil {
 		return err
 	}
+
+	if len(c.DNS.Provider) == 0 {
+		c.DNS.Provider = DefaultDNSProvider
+	}
+
 	c.setClusterServicesDefaults()
 	c.setClusterNetworkDefaults()
 	c.setClusterAuthnDefaults()
@@ -231,6 +237,8 @@ func (c *Cluster) setClusterImageDefaults() error {
 		&c.SystemImages.KubeDNSSidecar:            d(imageDefaults.KubeDNSSidecar, privRegURL),
 		&c.SystemImages.DNSmasq:                   d(imageDefaults.DNSmasq, privRegURL),
 		&c.SystemImages.KubeDNSAutoscaler:         d(imageDefaults.KubeDNSAutoscaler, privRegURL),
+		&c.SystemImages.CoreDNS:                   d(imageDefaults.CoreDNS, privRegURL),
+		&c.SystemImages.CoreDNSAutoscaler:         d(imageDefaults.CoreDNSAutoscaler, privRegURL),
 		&c.SystemImages.KubernetesServicesSidecar: d(imageDefaults.KubernetesServicesSidecar, privRegURL),
 		&c.SystemImages.Etcd:                      d(imageDefaults.Etcd, privRegURL),
 		&c.SystemImages.Kubernetes:                d(imageDefaults.Kubernetes, privRegURL),

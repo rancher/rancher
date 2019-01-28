@@ -21,6 +21,7 @@ const (
 	RancherKubernetesEngineConfigFieldRestore             = "restore"
 	RancherKubernetesEngineConfigFieldRotateCertificates  = "rotateCertificates"
 	RancherKubernetesEngineConfigFieldSSHAgentAuth        = "sshAgentAuth"
+	RancherKubernetesEngineConfigFieldSSHCertPath         = "sshCertPath"
 	RancherKubernetesEngineConfigFieldSSHKeyPath          = "sshKeyPath"
 	RancherKubernetesEngineConfigFieldServices            = "services"
 	RancherKubernetesEngineConfigFieldVersion             = "kubernetesVersion"
@@ -46,6 +47,7 @@ type RancherKubernetesEngineConfig struct {
 	Restore             *RestoreConfig      `json:"restore,omitempty" yaml:"restore,omitempty"`
 	RotateCertificates  *RotateCertificates `json:"rotateCertificates,omitempty" yaml:"rotateCertificates,omitempty"`
 	SSHAgentAuth        bool                `json:"sshAgentAuth,omitempty" yaml:"sshAgentAuth,omitempty"`
+	SSHCertPath         string              `json:"sshCertPath,omitempty" yaml:"sshCertPath,omitempty"`
 	SSHKeyPath          string              `json:"sshKeyPath,omitempty" yaml:"sshKeyPath,omitempty"`
 	Services            *RKEConfigServices  `json:"services,omitempty" yaml:"services,omitempty"`
 	Version             string              `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
