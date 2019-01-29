@@ -726,6 +726,22 @@ func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, options *t
 func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types.ClusterInfo, error) {
 	logrus.Infof("Starting post-check")
 
+	clientset, err := d.createClientset(info)
+	if err != nil {
+		return nil, err
+	}
+
+	logrus.Infof("Generating service account token")
+
+	info.ServiceAccountToken, err = util.GenerateServiceAccountToken(clientset)
+	if err != nil {
+		return nil, fmt.Errorf("error generating service account token: %v", err)
+	}
+
+	return info, nil
+}
+
+func (d *Driver) createClientset(info *types.ClusterInfo) (kubernetes.Interface, error) {
 	state, err := getState(info)
 	if err != nil {
 		return nil, err
@@ -752,19 +768,16 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 	info.Endpoint = *cluster.Cluster.MasterEndpoint
 	info.RootCaCertificate = *cluster.Cluster.CertificateAuthority.Data
 
-	clientset, err := getClientset(state, *cluster.Cluster.MasterEndpoint, capem)
+	return getClientset(state, *cluster.Cluster.MasterEndpoint, capem)
+}
+
+func (d *Driver) RemoveLegacyServiceAccount(ctx context.Context, info *types.ClusterInfo) error {
+	clientset, err := d.createClientset(info)
 	if err != nil {
-		return nil, fmt.Errorf("error creating clientset: %v", err)
+		return err
 	}
 
-	logrus.Infof("Generating service account token")
-
-	info.ServiceAccountToken, err = util.GenerateServiceAccountToken(clientset)
-	if err != nil {
-		return nil, fmt.Errorf("error generating service account token: %v", err)
-	}
-
-	return info, nil
+	return util.DeleteLegacyServiceAccountAndRoleBinding(clientset)
 }
 
 func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {

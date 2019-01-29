@@ -38,6 +38,7 @@ const (
 	ClusterConditionAgentDeployed            condition.Cond = "AgentDeployed"
 	ClusterConditionGlobalAdminsSynced       condition.Cond = "GlobalAdminsSynced"
 	ClusterConditionInitialRolesPopulated    condition.Cond = "InitialRolesPopulated"
+	ClusterConditionServiceAccountMigrated   condition.Cond = "ServiceAccountMigrated"
 
 	ClusterDriverImported = "imported"
 	ClusterDriverLocal    = "local"

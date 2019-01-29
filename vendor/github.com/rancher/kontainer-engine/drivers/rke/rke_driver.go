@@ -371,6 +371,15 @@ func (d *Driver) Remove(ctx context.Context, clusterInfo *types.ClusterInfo) err
 	return cmd.ClusterRemove(ctx, &rkeConfig, d.DockerDialer, d.wrapTransport(&rkeConfig), false, stateDir)
 }
 
+func (d *Driver) RemoveLegacyServiceAccount(ctx context.Context, info *types.ClusterInfo) error {
+	clientset, err := d.getClientset(info)
+	if err != nil {
+		return err
+	}
+
+	return util.DeleteLegacyServiceAccountAndRoleBinding(clientset)
+}
+
 func (d *Driver) restore(info *types.ClusterInfo) (string, error) {
 	os.MkdirAll(rancherPath, 0700)
 	dir, err := ioutil.TempDir(rancherPath, "rke-")
