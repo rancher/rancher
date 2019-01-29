@@ -575,10 +575,10 @@ func (d *Driver) getServiceClient(ctx context.Context, state state) (*raw.Servic
 	return service, nil
 }
 
-func generateServiceAccountTokenForGke(cluster *raw.Cluster) (string, error) {
+func getClientset(cluster *raw.Cluster) (kubernetes.Interface, error) {
 	capem, err := base64.StdEncoding.DecodeString(cluster.MasterAuth.ClusterCaCertificate)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	host := cluster.Endpoint
 	if !strings.HasPrefix(host, "https://") {
@@ -594,6 +594,15 @@ func generateServiceAccountTokenForGke(cluster *raw.Cluster) (string, error) {
 		Password: cluster.MasterAuth.Password,
 	}
 	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	return clientset, nil
+}
+
+func generateServiceAccountTokenForGke(cluster *raw.Cluster) (string, error) {
+	clientset, err := getClientset(cluster)
 	if err != nil {
 		return "", err
 	}
@@ -785,4 +794,33 @@ func (d *Driver) updateAndWait(ctx context.Context, info *types.ClusterInfo, upd
 
 func (d *Driver) GetCapabilities(ctx context.Context) (*types.Capabilities, error) {
 	return &d.driverCapabilities, nil
+}
+
+func (d *Driver) RemoveLegacyServiceAccount(ctx context.Context, info *types.ClusterInfo) error {
+	state, err := getState(info)
+	if err != nil {
+		return err
+	}
+
+	svc, err := d.getServiceClient(ctx, state)
+	if err != nil {
+		return err
+	}
+
+	cluster, err := svc.Projects.Zones.Clusters.Get(state.ProjectID, state.Zone, state.Name).Context(ctx).Do()
+	if err != nil {
+		return err
+	}
+
+	clientset, err := getClientset(cluster)
+	if err != nil {
+		return err
+	}
+
+	err = util.DeleteLegacyServiceAccountAndRoleBinding(clientset)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

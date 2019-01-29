@@ -535,7 +535,7 @@ func getVPCStackName(state state) string {
 }
 
 func (d *Driver) createConfigMap(state state, endpoint string, capem []byte, nodeInstanceRole string) error {
-	clientset, err := getClientset(state, endpoint, capem)
+	clientset, err := createClientset(state, endpoint, capem)
 	if err != nil {
 		return fmt.Errorf("error creating clientset: %v", err)
 	}
@@ -577,7 +577,7 @@ func (d *Driver) createConfigMap(state state, endpoint string, capem []byte, nod
 	return nil
 }
 
-func getClientset(state state, endpoint string, capem []byte) (*kubernetes.Clientset, error) {
+func createClientset(state state, endpoint string, capem []byte) (*kubernetes.Clientset, error) {
 	token, err := getEKSToken(state)
 	if err != nil {
 		return nil, fmt.Errorf("error generating token: %v", err)
@@ -732,6 +732,22 @@ func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, options *t
 func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types.ClusterInfo, error) {
 	logrus.Infof("Starting post-check")
 
+	clientset, err := getClientset(info)
+	if err != nil {
+		return nil, err
+	}
+
+	logrus.Infof("Generating service account token")
+
+	info.ServiceAccountToken, err = util.GenerateServiceAccountToken(clientset)
+	if err != nil {
+		return nil, fmt.Errorf("error generating service account token: %v", err)
+	}
+
+	return info, nil
+}
+
+func getClientset(info *types.ClusterInfo) (*kubernetes.Clientset, error) {
 	state, err := getState(info)
 	if err != nil {
 		return nil, err
@@ -765,19 +781,12 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 	info.Endpoint = *cluster.Cluster.Endpoint
 	info.RootCaCertificate = *cluster.Cluster.CertificateAuthority.Data
 
-	clientset, err := getClientset(state, *cluster.Cluster.Endpoint, capem)
+	clientset, err := createClientset(state, *cluster.Cluster.Endpoint, capem)
 	if err != nil {
 		return nil, fmt.Errorf("error creating clientset: %v", err)
 	}
 
-	logrus.Infof("Generating service account token")
-
-	info.ServiceAccountToken, err = util.GenerateServiceAccountToken(clientset)
-	if err != nil {
-		return nil, fmt.Errorf("error generating service account token: %v", err)
-	}
-
-	return info, nil
+	return clientset, nil
 }
 
 func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {
@@ -829,6 +838,15 @@ func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {
 	}
 
 	return nil
+}
+
+func (d *Driver) RemoveLegacyServiceAccount(ctx context.Context, info *types.ClusterInfo) error {
+	clientset, err := getClientset(info)
+	if err != nil {
+		return nil
+	}
+
+	return util.DeleteLegacyServiceAccountAndRoleBinding(clientset)
 }
 
 func noClusterFound(err error) bool {
