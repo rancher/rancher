@@ -20,7 +20,7 @@ type RemoteService struct {
 	cluster   *v3.Cluster
 	transport http.RoundTripper
 	url       urlGetter
-	auth      string
+	auth      authGetter
 }
 
 var (
@@ -28,6 +28,8 @@ var (
 )
 
 type urlGetter func() (url.URL, error)
+
+type authGetter func() (string, error)
 
 type errorResponder struct {
 }
@@ -68,7 +70,7 @@ func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, er
 		transport: transport,
 	}
 	if localConfig.BearerToken != "" {
-		rs.auth = "Bearer " + localConfig.BearerToken
+		rs.auth = func() (string, error) { return "Bearer " + localConfig.BearerToken, nil }
 	}
 
 	return rs, nil
@@ -114,11 +116,20 @@ func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dial
 		return *u, nil
 	}
 
+	authGetter := func() (string, error) {
+		newCluster, err := clusterLister.Get("", cluster.Name)
+		if err != nil {
+			return "", err
+		}
+
+		return "Bearer " + newCluster.Status.ServiceAccountToken, nil
+	}
+
 	return &RemoteService{
 		cluster:   cluster,
 		transport: transport,
 		url:       urlGetter,
-		auth:      "Bearer " + cluster.Status.ServiceAccountToken,
+		auth:      authGetter,
 	}, nil
 }
 
@@ -149,8 +160,14 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	req.URL.Host = req.Host
-	if r.auth != "" {
-		req.Header.Set("Authorization", r.auth)
+	if r.auth != nil {
+		token, err := r.auth()
+		if err != nil {
+			er.Error(rw, req, err)
+			return
+		}
+
+		req.Header.Set("Authorization", token)
 	}
 
 	httpProxy := proxy.NewUpgradeAwareHandler(&u, r.transport, true, false, er)
