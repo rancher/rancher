@@ -47,6 +47,7 @@ const (
 	ClusterConditionAgentDeployed              condition.Cond = "AgentDeployed"
 	ClusterConditionGlobalAdminsSynced         condition.Cond = "GlobalAdminsSynced"
 	ClusterConditionInitialRolesPopulated      condition.Cond = "InitialRolesPopulated"
+	ClusterConditionServiceAccountMigrated     condition.Cond = "ServiceAccountMigrated"
 	ClusterConditionPrometheusOperatorDeployed condition.Cond = "PrometheusOperatorDeployed"
 	ClusterConditionMonitoringEnabled          condition.Cond = "MonitoringEnabled"
 	ClusterConditionAlertingEnabled            condition.Cond = "AlertingEnabled"
