@@ -602,12 +602,18 @@ func (a ActionHandler) BackupEtcdHandler(actionName string, action *types.Action
 
 	newBackup := etcdbackup.NewBackupObject(cluster)
 
-	if _, err = a.BackupClient.Create(newBackup); err != nil {
+	backup, err := a.BackupClient.Create(newBackup)
+	if err != nil {
 		response["message"] = "failed to create etcdbackup object"
 		apiContext.WriteResponse(http.StatusInternalServerError, response)
 		return errors.Wrapf(err, "failed to cteate etcdbackup object")
 	}
-	apiContext.WriteResponse(http.StatusCreated, response)
+	backupJSON, err := json.Marshal(backup)
+	if err != nil {
+		return err
+	}
+	apiContext.Response.Header().Set("Content-Type", "application/json")
+	http.ServeContent(apiContext.Response, apiContext.Request, "backupEtcd", time.Now(), bytes.NewReader(backupJSON))
 	return nil
 }
 
