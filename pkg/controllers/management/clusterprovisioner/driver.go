@@ -58,6 +58,24 @@ func (p *Provisioner) driverRemove(cluster *v3.Cluster) error {
 	return err
 }
 
+func (p *Provisioner) generateServiceAccount(cluster *v3.Cluster, spec v3.ClusterSpec) (string, error) {
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.EventLogger, cluster, v3.ClusterConditionUpdated)
+	defer logger.Close()
+
+	spec = cleanRKE(spec)
+
+	return p.Driver.GenerateServiceAccount(ctx, cluster.Name, spec)
+}
+
+func (p *Provisioner) removeLegacyServiceAccount(cluster *v3.Cluster, spec v3.ClusterSpec) error {
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, p.EventLogger, cluster, v3.ClusterConditionUpdated)
+	defer logger.Close()
+
+	spec = cleanRKE(spec)
+
+	return p.Driver.RemoveLegacyServiceAccount(ctx, cluster.Name, spec)
+}
+
 func cleanRKE(spec v3.ClusterSpec) v3.ClusterSpec {
 	if spec.RancherKubernetesEngineConfig == nil {
 		return spec
