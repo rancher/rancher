@@ -19,6 +19,7 @@ service Driver {
     rpc ETCDSave (SaveETCDSnapshotRequest) returns (Empty) {}
     rpc ETCDRestore (RestoreETCDSnapshotRequest) returns (Empty) {}
     rpc GetK8sCapabilities (DriverOptions) returns (K8sCapabilities) {}
+    rpc RemoveLegacyServiceAccount(ClusterInfo) returns (Empty) {}
 }
 
 message Empty {

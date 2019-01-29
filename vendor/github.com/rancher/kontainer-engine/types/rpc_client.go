@@ -119,6 +119,11 @@ func (rpc *grpcClient) ETCDRestore(ctx context.Context, clusterInfo *ClusterInfo
 	return handlErr(err)
 }
 
+func (rpc *grpcClient) RemoveLegacyServiceAccount(ctx context.Context, info *ClusterInfo) error {
+	_, err := rpc.client.RemoveLegacyServiceAccount(ctx, info)
+	return handlErr(err)
+}
+
 func handlErr(err error) error {
 	if st, ok := status.FromError(err); ok {
 		if st.Code() == codes.Unknown && st.Message() != "" {
