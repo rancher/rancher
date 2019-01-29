@@ -100,7 +100,7 @@ pipeline:
   chart-promote:
     image: rancher/dapper:1.11.2
     commands:
-      - dapper charts/copy
+      - dapper chart/copy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     when:
