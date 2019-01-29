@@ -48,8 +48,8 @@ type GlobalDNSProviderSpec struct {
 
 type Route53ProviderConfig struct {
 	RootDomain string `json:"rootDomain" norman:"required"`
-	AccessKey  string `json:"accessKey"`
-	SecretKey  string `json:"secretKey" norman:"type=password"`
+	AccessKey  string `json:"accessKey" norman:"required"`
+	SecretKey  string `json:"secretKey" norman:"required,type=password"`
 }
 
 type CloudflareProviderConfig struct {
