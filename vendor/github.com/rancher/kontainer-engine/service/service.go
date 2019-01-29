@@ -166,6 +166,8 @@ type EngineService interface {
 	Create(ctx context.Context, name string, clusterSpec v3.ClusterSpec) (string, string, string, error)
 	Update(ctx context.Context, name string, clusterSpec v3.ClusterSpec) (string, string, string, error)
 	Remove(ctx context.Context, name string, clusterSpec v3.ClusterSpec) error
+	GenerateServiceAccount(ctx context.Context, name string, clusterSpec v3.ClusterSpec) (string, error)
+	RemoveLegacyServiceAccount(ctx context.Context, name string, clusterSpec v3.ClusterSpec) error
 }
 
 type engineService struct {
@@ -247,4 +249,32 @@ func (e *engineService) Remove(ctx context.Context, name string, clusterSpec v3.
 		return err
 	}
 	return cls.Remove(ctx)
+}
+
+func (e *engineService) GenerateServiceAccount(ctx context.Context, name string, clusterSpec v3.ClusterSpec) (string, error) {
+	cls, err := e.convertCluster(name, clusterSpec)
+	if err != nil {
+		return "", err
+	}
+
+	err = cls.GenerateServiceAccount(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return cls.ServiceAccountToken, nil
+}
+
+func (e *engineService) RemoveLegacyServiceAccount(ctx context.Context, name string, clusterSpec v3.ClusterSpec) error {
+	cls, err := e.convertCluster(name, clusterSpec)
+	if err != nil {
+		return err
+	}
+
+	err = cls.RemoveLegacyServiceAccount(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

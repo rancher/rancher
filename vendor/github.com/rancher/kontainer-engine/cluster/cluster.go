@@ -126,7 +126,7 @@ func (c *Cluster) create(ctx context.Context, clusterInfo *types.ClusterInfo) er
 	return err
 }
 
-func (c *Cluster) postCheck(ctx context.Context) error {
+func (c *Cluster) PostCheck(ctx context.Context) error {
 	if err := c.PersistStore.PersistStatus(*c, PostCheck); err != nil {
 		return err
 	}
@@ -141,6 +141,35 @@ func (c *Cluster) postCheck(ctx context.Context) error {
 
 	// persist cluster info
 	return c.Store()
+}
+
+func (c *Cluster) GenerateServiceAccount(ctx context.Context) error {
+	if err := c.restore(); err != nil {
+		return err
+	}
+
+	if err := c.PersistStore.PersistStatus(*c, Updating); err != nil {
+		return err
+	}
+
+	// receive cluster info back
+	info, err := c.Driver.PostCheck(ctx, toInfo(c))
+	if err != nil {
+		return err
+	}
+
+	transformClusterInfo(c, info)
+
+	// persist cluster info
+	return c.Store()
+}
+
+func (c *Cluster) RemoveLegacyServiceAccount(ctx context.Context) error {
+	if err := c.restore(); err != nil {
+		return err
+	}
+
+	return c.Driver.RemoveLegacyServiceAccount(ctx, toInfo(c))
 }
 
 func (c *Cluster) createInner(ctx context.Context) error {
@@ -162,7 +191,7 @@ func (c *Cluster) createInner(ctx context.Context) error {
 		return err
 	}
 
-	return c.postCheck(ctx)
+	return c.PostCheck(ctx)
 }
 
 // Update updates a cluster
@@ -202,7 +231,7 @@ func (c *Cluster) Update(ctx context.Context) error {
 
 	transformClusterInfo(c, info)
 
-	return c.postCheck(ctx)
+	return c.PostCheck(ctx)
 }
 
 func (c *Cluster) GetVersion(ctx context.Context) (*types.KubernetesVersion, error) {

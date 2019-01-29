@@ -98,6 +98,11 @@ func (rpc *grpcClient) GetCapabilities(ctx context.Context) (*Capabilities, erro
 	return rpc.client.GetCapabilities(ctx, &Empty{})
 }
 
+func (rpc *grpcClient) RemoveLegacyServiceAccount(ctx context.Context, info *ClusterInfo) error {
+	_, err := rpc.client.RemoveLegacyServiceAccount(ctx, info)
+	return handlErr(err)
+}
+
 func handlErr(err error) error {
 	if st, ok := status.FromError(err); ok {
 		if st.Code() == codes.Unknown && st.Message() != "" {

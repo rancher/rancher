@@ -100,6 +100,10 @@ func (s *GrpcServer) GetCapabilities(ctx context.Context, in *Empty) (*Capabilit
 	return s.driver.GetCapabilities(ctx)
 }
 
+func (s *GrpcServer) RemoveLegacyServiceAccount(ctx context.Context, clusterInfo *ClusterInfo) (*Empty, error) {
+	return &Empty{}, s.driver.RemoveLegacyServiceAccount(ctx, clusterInfo)
+}
+
 // Serve serves a grpc server
 func (s *GrpcServer) Serve() {
 	listen, err := net.Listen("tcp", listenAddr)

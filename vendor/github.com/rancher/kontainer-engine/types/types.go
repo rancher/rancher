@@ -44,6 +44,9 @@ type Driver interface {
 
 	// Get driver capabilities
 	GetCapabilities(ctx context.Context) (*Capabilities, error)
+
+	// Remove legacy service account token
+	RemoveLegacyServiceAccount(ctx context.Context, clusterInfo *ClusterInfo) error
 }
 
 type UnimplementedVersionAccess struct {
