@@ -1,8 +1,10 @@
 import kubernetes
 from rancher import ApiError
+
 from .common import random_str
-from .conftest import wait_until_available,\
-    cluster_and_client, kubernetes_api_client, wait_for
+from .conftest import wait_until_available, \
+    cluster_and_client, kubernetes_api_client, wait_for, ClusterContext, \
+    admin_pc
 
 
 def test_multi_user(admin_mc, user_mc):
@@ -150,7 +152,7 @@ def test_removing_user_from_cluster(admin_pc, admin_mc, user_mc, admin_cc,
 
     # Find the expected k8s clusterRoleBinding
     crbs = api_instance.list_cluster_role_binding(
-        label_selector=prtb.uuid+"="+mbo)
+        label_selector=prtb.uuid + "=" + mbo)
 
     assert len(crbs.items) == 1
 
@@ -160,7 +162,7 @@ def test_removing_user_from_cluster(admin_pc, admin_mc, user_mc, admin_cc,
 
     def crb_callback():
         crbs = api_instance.list_cluster_role_binding(
-            label_selector=prtb.uuid+"="+mbo)
+            label_selector=prtb.uuid + "=" + mbo)
         return len(crbs.items) == 0
 
     def fail_handler():
@@ -205,3 +207,56 @@ def test_user_role_permissions(admin_mc, user_factory, remove_resource):
     role_templates = user2.client.list_role_template()
     assert len(role_templates.data) == 0, ("user2 does not have permission " +
                                            "to view roleTemplates")
+
+
+def test_permissions_can_be_removed(admin_cc, admin_mc, user_mc,
+                                    request, remove_resource):
+    def create_project_and_add_user():
+        admin_pc_instance = admin_pc(request, admin_cc)
+
+        prtb = admin_mc.client.create_project_role_template_binding(
+            userId=user_mc.user.id,
+            roleTemplateId="project-member",
+            projectId=admin_pc_instance.project.id,
+        )
+        remove_resource(prtb)
+        return admin_pc_instance, prtb
+
+    admin_pc1, _ = create_project_and_add_user()
+    admin_pc2, prtb2 = create_project_and_add_user()
+
+    def add_namespace_to_project(admin_pc):
+        def safe_remove(client, resource):
+            try:
+                client.delete(resource)
+            except ApiError:
+                pass
+
+        ns = admin_cc.client.create_namespace(name=random_str(),
+                                              projectId=admin_pc.project.id)
+        request.addfinalizer(lambda: safe_remove(admin_cc.client, ns))
+
+        def ns_active():
+            new_ns = admin_cc.client.reload(ns)
+            return new_ns.state == 'active'
+
+        wait_for(ns_active)
+
+    add_namespace_to_project(admin_pc1)
+
+    def new_user_cc(user_mc):
+        cluster, client = cluster_and_client('local', user_mc.client)
+        return ClusterContext(user_mc, cluster, client)
+
+    user_cc = new_user_cc(user_mc)
+    assert len(user_cc.client.list_namespace()) == 1
+
+    add_namespace_to_project(admin_pc2)
+
+    user_cc = new_user_cc(user_mc)
+    assert len(user_cc.client.list_namespace()) == 2
+
+    admin_mc.client.delete(prtb2)
+
+    user_cc = new_user_cc(user_mc)
+    assert len(user_cc.client.list_namespace()) == 1
