@@ -122,6 +122,34 @@ func (p *Provisioner) driverRestore(cluster *v3.Cluster, spec v3.ClusterSpec) (s
 
 }
 
+func (p *Provisioner) generateServiceAccount(cluster *v3.Cluster, spec v3.ClusterSpec) (string, error) {
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, cluster, v3.ClusterConditionUpdated)
+	defer logger.Close()
+
+	spec = cleanRKE(spec)
+
+	kontainerDriver, err := p.getKontainerDriver(spec)
+	if err != nil {
+		return "", err
+	}
+
+	return p.Driver.GenerateServiceAccount(ctx, cluster.Name, kontainerDriver, spec)
+}
+
+func (p *Provisioner) removeLegacyServiceAccount(cluster *v3.Cluster, spec v3.ClusterSpec) error {
+	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, cluster, v3.ClusterConditionUpdated)
+	defer logger.Close()
+
+	spec = cleanRKE(spec)
+
+	kontainerDriver, err := p.getKontainerDriver(spec)
+	if err != nil {
+		return err
+	}
+
+	return p.Driver.RemoveLegacyServiceAccount(ctx, cluster.Name, kontainerDriver, spec)
+}
+
 func cleanRKE(spec v3.ClusterSpec) v3.ClusterSpec {
 	if spec.RancherKubernetesEngineConfig == nil {
 		return spec
