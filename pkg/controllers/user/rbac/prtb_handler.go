@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -229,19 +230,6 @@ func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.Proj
 }
 
 func (p *prtbLifecycle) reconcileProjectAccessToGlobalResourcesForDelete(binding *v3.ProjectRoleTemplateBinding) error {
-	prtbs, err := p.m.prtbIndexer.ByIndex(prtbByProjecSubjectIndex, getPRTBProjectAndSubjectKey(binding))
-	if err != nil {
-		return err
-	}
-	if len(prtbs) != 0 {
-		for _, p := range prtbs {
-			pr := p.(*v3.ProjectRoleTemplateBinding)
-			if pr.DeletionTimestamp == nil {
-				return nil
-			}
-		}
-	}
-
 	bindingCli := p.m.workload.K8sClient.RbacV1().ClusterRoleBindings()
 	rtbUID := string(binding.UID)
 	set := labels.Set(map[string]string{rtbUID: owner})
@@ -258,7 +246,12 @@ func (p *prtbLifecycle) reconcileProjectAccessToGlobalResourcesForDelete(binding
 			}
 		}
 
-		if len(crb.Labels) == 0 {
+		delete, err := p.m.noRemainingOwnerLabels(crb)
+		if err != nil {
+			return err
+		}
+
+		if delete {
 			if err := bindingCli.Delete(crb.Name, &metav1.DeleteOptions{}); err != nil {
 				if apierrors.IsNotFound(err) {
 					continue
@@ -273,6 +266,29 @@ func (p *prtbLifecycle) reconcileProjectAccessToGlobalResourcesForDelete(binding
 	}
 
 	return nil
+}
+
+func (m *manager) noRemainingOwnerLabels(crb *rbacv1.ClusterRoleBinding) (bool, error) {
+	for k, v := range crb.Labels {
+		if v == owner {
+			if exists, err := m.ownerExists(k); exists || err != nil {
+				return false, err
+			}
+		}
+
+		if k == rtbOwnerLabel {
+			if exists, err := m.ownerExists(v); exists || err != nil {
+				return false, err
+			}
+		}
+	}
+
+	return true, nil
+}
+
+func (m *manager) ownerExists(uid interface{}) (bool, error) {
+	prtbs, err := m.prtbIndexer.ByIndex(prtbByUIDIndex, convert.ToString(uid))
+	return len(prtbs) > 0, err
 }
 
 // If the roleTemplate has rules granting access to non-namespaced (global) resource, return the verbs for those rules
