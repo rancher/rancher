@@ -169,6 +169,8 @@ type EngineService interface {
 	GetK8sCapabilities(ctx context.Context, name string, kontainerDriver *v3.KontainerDriver, clusterSpec v3.ClusterSpec) (*types.K8SCapabilities, error)
 	ETCDSave(ctx context.Context, name string, kontainerDriver *v3.KontainerDriver, clusterSpec v3.ClusterSpec, backup string) error
 	ETCDRestore(ctx context.Context, name string, kontainerDriver *v3.KontainerDriver, clusterSpec v3.ClusterSpec, backup string) (string, string, string, error)
+	GenerateServiceAccount(ctx context.Context, name string, kontainerDriver *v3.KontainerDriver, clusterSpec v3.ClusterSpec) (string, error)
+	RemoveLegacyServiceAccount(ctx context.Context, name string, kontainerDriver *v3.KontainerDriver, clusterSpec v3.ClusterSpec) error
 }
 
 type engineService struct {
@@ -514,4 +516,51 @@ func (e *engineService) ETCDRestore(ctx context.Context, name string, kontainerD
 	}
 	return endpoint, cls.ServiceAccountToken, cls.RootCACert, nil
 
+}
+
+func (e *engineService) GenerateServiceAccount(ctx context.Context, name string, kontainerDriver *v3.KontainerDriver, clusterSpec v3.ClusterSpec) (string, error) {
+	runningDriver, err := e.getRunningDriver(kontainerDriver, clusterSpec)
+	if err != nil {
+		return "", err
+	}
+
+	listenAddr, err := runningDriver.Start()
+	if err != nil {
+		return "", fmt.Errorf("error starting driver: %v", err)
+	}
+	defer runningDriver.Stop()
+
+	cls, err := e.convertCluster(name, listenAddr, clusterSpec)
+	if err != nil {
+		return "", err
+	}
+	defer cls.Driver.Close()
+
+	err = cls.GenerateServiceAccount(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return cls.ServiceAccountToken, nil
+}
+
+func (e *engineService) RemoveLegacyServiceAccount(ctx context.Context, name string, kontainerDriver *v3.KontainerDriver, clusterSpec v3.ClusterSpec) error {
+	runningDriver, err := e.getRunningDriver(kontainerDriver, clusterSpec)
+	if err != nil {
+		return err
+	}
+
+	listenAddr, err := runningDriver.Start()
+	if err != nil {
+		return fmt.Errorf("error starting driver: %v", err)
+	}
+	defer runningDriver.Stop()
+
+	cls, err := e.convertCluster(name, listenAddr, clusterSpec)
+	if err != nil {
+		return err
+	}
+	defer cls.Driver.Close()
+
+	return cls.RemoveLegacyServiceAccount(ctx)
 }

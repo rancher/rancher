@@ -109,6 +109,10 @@ func (s *GrpcServer) GetK8SCapabilities(ctx context.Context, opts *DriverOptions
 	return s.driver.GetK8SCapabilities(ctx, opts)
 }
 
+func (s *GrpcServer) RemoveLegacyServiceAccount(ctx context.Context, clusterInfo *ClusterInfo) (*Empty, error) {
+	return &Empty{}, s.driver.RemoveLegacyServiceAccount(ctx, clusterInfo)
+}
+
 // Serve serves a grpc server.  Sends errors to the error channel if they occur
 func (s *GrpcServer) Serve(listenAddr string, errChan chan error) {
 	listen, err := net.Listen("tcp", listenAddr)
