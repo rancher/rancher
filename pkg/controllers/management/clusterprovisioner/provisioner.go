@@ -225,6 +225,38 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 		err                                      error
 	)
 
+	if cluster.Name != "local" && !v3.ClusterConditionServiceAccountMigrated.IsTrue(cluster) &&
+		v3.ClusterConditionProvisioned.IsTrue(cluster) {
+		driverName, err := p.validateDriver(cluster)
+		if err != nil {
+			return nil, err
+		}
+
+		spec, _, err := p.getConfig(true, cluster.Spec, driverName, cluster.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		serviceAccountToken, err = p.generateServiceAccount(cluster, *spec)
+		if err != nil {
+			return nil, err
+		}
+
+		cluster.Status.ServiceAccountToken = serviceAccountToken
+		v3.ClusterConditionServiceAccountMigrated.True(cluster)
+
+		// Update the cluster in k8s
+		cluster, err = p.Clusters.Update(cluster)
+		if err != nil {
+			return nil, err
+		}
+
+		err = p.removeLegacyServiceAccount(cluster, *spec)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	spec, err := p.getSpec(cluster)
 	if err != nil || spec == nil {
 		return cluster, err
@@ -263,6 +295,13 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 	if err != nil {
 		return cluster, err
 	}
+
+	err = p.removeLegacyServiceAccount(cluster, *spec)
+	if err != nil {
+		return nil, err
+	}
+
+	v3.ClusterConditionServiceAccountMigrated.True(cluster)
 
 	saved := false
 	for i := 0; i < 20; i++ {
