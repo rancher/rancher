@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
 	"github.com/rancher/rancher/pkg/ref"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -93,6 +94,11 @@ func (m *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.O
 		return mcapp, err
 	}
 
+	mcapp = mcapp.DeepCopy()
+	if err := m.reconcileTargetsForDelete(mcapp); err != nil {
+		return mcapp, err
+	}
+
 	toUpgrade, err := m.toUpgrade(mcapp)
 	if err != nil {
 		return mcapp, err
@@ -121,8 +127,7 @@ func (m *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.O
 	}
 
 	if len(resp.updateApps) == 0 && v3.MultiClusterAppConditionInstalled.IsUnknown(mcapp) {
-		v3.MultiClusterAppConditionInstalled.True(mcapp)
-		v3.MultiClusterAppConditionInstalled.Message(mcapp, "")
+		setInstalledDone(mcapp)
 		return m.setRevisionAndUpdate(mcapp, creatorID)
 	}
 
@@ -401,7 +406,7 @@ func (m *MCAppController) deleteApps(mcAppName string, mcapp *v3.MultiClusterApp
 	var err error
 
 	if mcapp == nil {
-		appsToDelete, _, err = m.getAllAppsToDelete(mcAppName)
+		appsToDelete, err = m.getAllApps(mcAppName)
 		if err != nil {
 			return nil, err
 		}
@@ -420,6 +425,70 @@ func (m *MCAppController) deleteApps(mcAppName string, mcapp *v3.MultiClusterApp
 		}
 	}
 
+	if err := m.delete(appsToDelete); err != nil {
+		return nil, err
+	}
+	return nil, nil
+}
+
+func (m *MCAppController) getAllApps(mcAppName string) ([]*pv3.App, error) {
+	// to get all apps, get all clusters first, then get all apps in all projects of all clusters
+	appsToDelete := []*pv3.App{}
+	set := labels.Set(map[string]string{multiClusterAppIDSelector: mcAppName})
+	clusters, err := m.clusterLister.List("", labels.NewSelector())
+	if err != nil {
+		return appsToDelete, err
+	}
+	for _, c := range clusters {
+		projects, err := m.projectLister.List(c.Name, labels.NewSelector())
+		if err != nil {
+			return appsToDelete, err
+		}
+		for _, p := range projects {
+			apps, err := m.appLister.List(p.Name, set.AsSelector())
+			if err != nil {
+				return appsToDelete, err
+			}
+			appsToDelete = append(appsToDelete, apps...)
+		}
+	}
+	return appsToDelete, err
+}
+
+func (m *MCAppController) reconcileTargetsForDelete(mcapp *v3.MultiClusterApp) error {
+	existingApps := map[string][]string{}
+	for ind, t := range mcapp.Spec.Targets {
+		if t.AppName == "" {
+			continue
+		}
+		split := strings.SplitN(t.ProjectName, ":", 2)
+		if len(split) != 2 {
+			return fmt.Errorf("invalid project name %s", t.ProjectName)
+		}
+		existingApps[t.AppName] = []string{split[1], strconv.Itoa(ind)}
+	}
+	allApps, err := m.getAllApps(mcapp.Name)
+	if err != nil {
+		return err
+	}
+	toDelete := []*pv3.App{}
+	for _, app := range allApps {
+		val, ok := existingApps[app.Name]
+		if !ok {
+			toDelete = append(toDelete, app)
+		} else if val[0] != app.Namespace {
+			toDelete = append(toDelete, app)
+			ind, err := strconv.Atoi(val[1])
+			if err != nil {
+				return err
+			}
+			mcapp.Spec.Targets[ind].AppName = ""
+		}
+	}
+	return m.delete(toDelete)
+}
+
+func (m *MCAppController) delete(appsToDelete []*pv3.App) error {
 	var g errgroup.Group
 	for ind := range appsToDelete {
 		app := appsToDelete[ind]
@@ -439,33 +508,9 @@ func (m *MCAppController) deleteApps(mcAppName string, mcapp *v3.MultiClusterApp
 	}
 
 	if err := g.Wait(); err != nil {
-		return nil, err
+		return err
 	}
-	return nil, nil
-}
-
-func (m *MCAppController) getAllAppsToDelete(mcAppName string) ([]*pv3.App, *v3.MultiClusterApp, error) {
-	// to get all apps, get all clusters first, then get all apps in all projects of all clusters
-	appsToDelete := []*pv3.App{}
-	set := labels.Set(map[string]string{multiClusterAppIDSelector: mcAppName})
-	clusters, err := m.clusterLister.List("", labels.NewSelector())
-	if err != nil {
-		return appsToDelete, nil, err
-	}
-	for _, c := range clusters {
-		projects, err := m.projectLister.List(c.Name, labels.NewSelector())
-		if err != nil {
-			return appsToDelete, nil, err
-		}
-		for _, p := range projects {
-			apps, err := m.appLister.List(p.Name, set.AsSelector())
-			if err != nil {
-				return appsToDelete, nil, err
-			}
-			appsToDelete = append(appsToDelete, apps...)
-		}
-	}
-	return appsToDelete, nil, err
+	return nil
 }
 
 func (m *MCAppController) updateCondition(mcappToUpdate *v3.MultiClusterApp, setCondition func(mcapp *v3.MultiClusterApp)) (*v3.MultiClusterApp, error) {
