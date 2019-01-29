@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/rancher/kontainer-engine/service"
@@ -279,7 +278,7 @@ func toResourceField(name string, flag *types.Flag) (string, v3.Field, error) {
 		field.Type = "int"
 
 		if flag.Default != nil {
-			field.Default.StringValue = strconv.Itoa(int(flag.Default.DefaultInt))
+			field.Default.IntValue = int(flag.Default.DefaultInt)
 		}
 	} else if flag.Type == types.BoolType || flag.Type == types.BoolPointerType {
 		field.Type = "boolean"
