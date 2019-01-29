@@ -21,7 +21,7 @@ type RemoteService struct {
 	cluster   *v3.Cluster
 	transport http.RoundTripper
 	url       urlGetter
-	auth      string
+	auth      authGetter
 }
 
 var (
@@ -29,6 +29,8 @@ var (
 )
 
 type urlGetter func() (url.URL, error)
+
+type authGetter func() (string, error)
 
 type errorResponder struct {
 }
@@ -69,9 +71,11 @@ func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, er
 		transport: transport,
 	}
 	if localConfig.BearerToken != "" {
-		rs.auth = "Bearer " + localConfig.BearerToken
+		rs.auth = func() (string, error) { return "Bearer " + localConfig.BearerToken, nil }
 	} else if localConfig.Password != "" {
-		rs.auth = "Basic " + base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", localConfig.Username, localConfig.Password)))
+		rs.auth = func() (string, error) {
+			return "Basic " + base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", localConfig.Username, localConfig.Password))), nil
+		}
 	}
 
 	return rs, nil
@@ -117,11 +121,20 @@ func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dial
 		return *u, nil
 	}
 
+	authGetter := func() (string, error) {
+		newCluster, err := clusterLister.Get("", cluster.Name)
+		if err != nil {
+			return "", err
+		}
+
+		return "Bearer " + newCluster.Status.ServiceAccountToken, nil
+	}
+
 	return &RemoteService{
 		cluster:   cluster,
 		transport: transport,
 		url:       urlGetter,
-		auth:      "Bearer " + cluster.Status.ServiceAccountToken,
+		auth:      authGetter,
 	}, nil
 }
 
@@ -152,10 +165,15 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	req.URL.Host = req.Host
-	if r.auth == "" {
+	if r.auth == nil {
 		req.Header.Del("Authorization")
 	} else {
-		req.Header.Set("Authorization", r.auth)
+		token, err := r.auth()
+		if err != nil {
+			er.Error(rw, req, err)
+			return
+		}
+		req.Header.Set("Authorization", token)
 	}
 
 	httpProxy := proxy.NewUpgradeAwareHandler(&u, r.transport, true, false, er)
@@ -205,4 +223,5 @@ func (s *SimpleProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 	httpProxy := proxy.NewUpgradeAwareHandler(&u, s.transport, true, false, er)
 	httpProxy.ServeHTTP(rw, req)
+
 }
