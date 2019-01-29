@@ -15,6 +15,7 @@ service Driver {
     rpc SetNodeCount (SetNodeCountRequest) returns (Empty) {}
 
     rpc GetCapabilities(Empty) returns (Capabilities) {}
+    rpc RemoveLegacyServiceAccount(ClusterInfo) returns (Empty) {}
 }
 
 message Empty {

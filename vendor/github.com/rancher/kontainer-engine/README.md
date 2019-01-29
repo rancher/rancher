@@ -55,6 +55,10 @@ You must have Go and [Bats](https://github.com/sstephenson/bats) installed for t
 
 If you are adding new tests, note that they must have a `.bats` extension to be recognized by the runner.
 
+## Generated Code
+
+To generate the protobuf files install protoc binary in your PATH from [v3.6.1](https://github.com/protocolbuffers/protobuf/releases/tag/v3.6.1) and then build protoc-gen-go from commit 1643683e1b54a9e88ad26d98f81400c8c9d9f4f9 and install to your PATH.  Do not update the protobuf version in the vendor.conf.  The run `./scripts/generate-protoc.sh`.
+
 ## License
 Copyright (c) 2014-2016 [Rancher Labs, Inc.](http://rancher.com)
 

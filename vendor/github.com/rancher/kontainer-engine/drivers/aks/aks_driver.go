@@ -681,6 +681,38 @@ const retries = 5
 func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types.ClusterInfo, error) {
 	logrus.Info("starting post-check")
 
+	clientset, err := getClientset(info)
+	if err != nil {
+		return nil, err
+	}
+
+	failureCount := 0
+
+	for {
+		info.ServiceAccountToken, err = util.GenerateServiceAccountToken(clientset)
+
+		if err == nil {
+			logrus.Info("service account token generated successfully")
+			break
+		} else {
+			if failureCount < retries {
+				logrus.Infof("service account token generation failed, retries left: %v", retries-failureCount)
+				failureCount = failureCount + 1
+
+				time.Sleep(pollInterval * time.Second)
+			} else {
+				logrus.Error("retries exceeded, failing post-check")
+				return nil, err
+			}
+		}
+	}
+
+	logrus.Info("post-check completed successfully")
+
+	return info, nil
+}
+
+func getClientset(info *types.ClusterInfo) (kubernetes.Interface, error) {
 	state, err := getState(info)
 
 	if err != nil {
@@ -745,35 +777,7 @@ func (d *Driver) PostCheck(ctx context.Context, info *types.ClusterInfo) (*types
 		},
 	}
 
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating clientset: %v", err)
-	}
-
-	failureCount := 0
-
-	for {
-		info.ServiceAccountToken, err = util.GenerateServiceAccountToken(clientset)
-
-		if err == nil {
-			logrus.Info("service account token generated successfully")
-			break
-		} else {
-			if failureCount < retries {
-				logrus.Infof("service account token generation failed, retries left: %v", retries-failureCount)
-				failureCount = failureCount + 1
-
-				time.Sleep(pollInterval * time.Second)
-			} else {
-				logrus.Error("retries exceeded, failing post-check")
-				return nil, err
-			}
-		}
-	}
-
-	logrus.Info("post-check completed successfully")
-
-	return info, nil
+	return kubernetes.NewForConfig(config)
 }
 
 func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {
@@ -802,4 +806,13 @@ func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {
 
 func (d *Driver) GetCapabilities(ctx context.Context) (*types.Capabilities, error) {
 	return &d.driverCapabilities, nil
+}
+
+func (d *Driver) RemoveLegacyServiceAccount(ctx context.Context, info *types.ClusterInfo) error {
+	clientset, err := getClientset(info)
+	if err != nil {
+		return err
+	}
+
+	return util.DeleteLegacyServiceAccountAndRoleBinding(clientset)
 }

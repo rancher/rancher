@@ -175,3 +175,7 @@ func (d *Driver) Remove(ctx context.Context, clusterInfo *types.ClusterInfo) err
 	// Nothing to do
 	return nil
 }
+
+func (d *Driver) RemoveLegacyServiceAccount(ctx context.Context, info *types.ClusterInfo) error {
+	return fmt.Errorf("not implemented")
+}
