@@ -50,7 +50,11 @@ type ActionHandler struct {
 
 func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	canUpdateCluster := func() bool {
-		return apiContext.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", apiContext, nil, apiContext.Schema) == nil
+		cluster := map[string]interface{}{
+			"id": apiContext.ID,
+		}
+
+		return apiContext.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", apiContext, cluster, apiContext.Schema) == nil
 	}
 
 	switch actionName {
