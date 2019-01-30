@@ -72,7 +72,7 @@ func getServiceMonitorFromWorkload(w *util.Workload) (*monitoringv1.ServiceMonit
 			Annotations: map[string]string{
 				util.WorkloadAnnotation: workloadTargetAnnotation,
 			},
-			GenerateName: "sm-",
+			Name: w.Name,
 		},
 		Spec: monitoringv1.ServiceMonitorSpec{},
 	}
@@ -110,9 +110,6 @@ func getWorkloadFromOwners(namespace string, owners []metav1.OwnerReference, lis
 func areServiceMonitorEqual(a, b *monitoringv1.ServiceMonitor) bool {
 	sort.Sort(EndpointSorter(a.Spec.Endpoints))
 	sort.Sort(EndpointSorter(b.Spec.Endpoints))
-	// if !reflect.DeepEqual(a.Spec.Endpoints, b.Spec.Endpoints) {
-	// 	return false
-	// }
 	if len(a.Spec.Endpoints) != len(b.Spec.Endpoints) {
 		return false
 	}
