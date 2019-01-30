@@ -11,6 +11,8 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"strings"
 )
@@ -47,7 +49,11 @@ func (s *AppStateCalculator) sync(key string, obj *util.Workload) error {
 	if label, ok := obj.Labels[appLabel]; ok {
 		ns, err := s.NamespaceLister.Get("", obj.Namespace)
 		if err != nil {
-			return err
+			if !errors.IsNotFound(err) {
+				return err
+			}
+			logrus.Errorf("error getting namespace %s for app %s: %v", obj.Namespace, obj.Name, err)
+			return nil
 		}
 		projectNS := ns.Labels[projectLabel]
 		if projectNS == "" {
@@ -55,7 +61,11 @@ func (s *AppStateCalculator) sync(key string, obj *util.Workload) error {
 		}
 		app, err := s.AppLister.Get(projectNS, label)
 		if err != nil {
-			return fmt.Errorf("error getting app %s %v", label, err)
+			if !errors.IsNotFound(err) {
+				return err
+			}
+			logrus.Errorf("error getting app %s %v", label, err)
+			return nil
 		}
 		if app != nil && app.DeletionTimestamp == nil {
 			s.Apps.Controller().Enqueue(app.Namespace, app.Name)
