@@ -1,6 +1,7 @@
 from .common import random_str
 from .test_catalog import wait_for_template_to_be_created
 import time
+import base64
 
 
 def test_app_mysql(admin_pc, admin_mc):
@@ -182,6 +183,32 @@ def test_app_custom_values_file(admin_pc, admin_mc):
     assert workloads.data[0].containers[0].image == "registry:2.6"
     client.delete(app)
     wait_for_app_to_be_deleted(client, app)
+
+
+def test_app_rancher_typed_values(admin_pc, admin_mc):
+    client = admin_pc.client
+    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                  projectId=admin_pc.
+                                                  project.id)
+    wait_for_template_to_be_created(admin_mc.client, "library")
+    answers = {
+        "secrets.htpasswd": "string:11111"
+    }
+    client.create_app(
+        name=random_str(),
+        externalId="catalog://?catalog=library&template=docker-registry"
+                   "&version=1.6.1&namespace=cattle-global-data",
+        targetNamespace=ns.name,
+        projectId=admin_pc.project.id,
+        answers=answers
+    )
+    workloads = wait_for_workload(client, ns.name, count=1)
+    secrets = client.list_namespaced_secret(
+        kind="Opaque",
+        namespaceId=workloads.data[0].namespaceId)
+
+    htpasswd = base64.b64decode(secrets.data[0].data.htpasswd.encode())
+    assert htpasswd.decode() == "11111"
 
 
 def wait_for_workload(client, ns, timeout=60, count=0):

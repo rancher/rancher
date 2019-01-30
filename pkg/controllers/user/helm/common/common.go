@@ -149,16 +149,40 @@ func GenerateAnswerSetValues(app *v3.App, tempDir string) ([]string, error) {
 		}
 		setValues = append(setValues, "--values", valuesYaml)
 	}
+
 	// `--set` values will overridden the user-supplied values.yaml file
 	if app.Spec.Answers != nil {
 		answers := app.Spec.Answers
-		var values = []string{}
+		var values, strValues []string
 		for k, v := range answers {
-			values = append(values, fmt.Sprintf("%s=%s", k, v))
+			strValue := rancherTypedVal(k, v)
+			if len(strValue) > 0 {
+				strValues = append(strValues, fmt.Sprintf("%s=%s", k, strValue))
+			} else {
+				values = append(values, fmt.Sprintf("%s=%s", k, v))
+			}
 		}
 		setValues = append(setValues, "--set", strings.Join(values, ","))
+		setValues = append(setValues, "--set-string", strings.Join(strValues, ","))
 	}
 	return setValues, nil
+}
+
+// rancherTypedVal parse value based on rancher type prefix
+func rancherTypedVal(key, value string) string {
+	parts := strings.SplitN(value, ":", 2)
+	if len(parts) == 2 {
+		t := parts[0]
+		switch t {
+		// we only need to deal the string: prefix for now(e.g string:11111 will be converted to string `11111`),
+		// for the other types like bool, int will be passed by default `--set`
+		case "string":
+			return parts[1]
+		default:
+			return ""
+		}
+	}
+	return ""
 }
 
 func DeleteCharts(port string, obj *v3.App) error {
