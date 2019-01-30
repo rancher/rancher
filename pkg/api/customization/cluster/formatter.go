@@ -59,11 +59,18 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 		}
 
 		setTrueIfNil(configMap, "associateWorkerNodePublicIp")
+		setIntIfNil(configMap, "nodeVolumeSize", 20)
 	}
 }
 
 func setTrueIfNil(configMap map[string]interface{}, fieldName string) {
 	if configMap[fieldName] == nil {
 		configMap[fieldName] = true
+	}
+}
+
+func setIntIfNil(configMap map[string]interface{}, fieldName string, replaceVal int) {
+	if configMap[fieldName] == nil {
+		configMap[fieldName] = replaceVal
 	}
 }

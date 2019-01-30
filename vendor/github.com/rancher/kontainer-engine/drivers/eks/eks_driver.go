@@ -408,6 +408,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 	if err != nil {
 		return nil, fmt.Errorf("error parsing state: %v", err)
 	}
+
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String(state.Region),
 		Credentials: credentials.NewStaticCredentials(
