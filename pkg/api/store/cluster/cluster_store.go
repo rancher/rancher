@@ -3,6 +3,7 @@ package cluster
 import (
 	"fmt"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -166,7 +167,44 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		values.PutValue(data, m, managementv3.ClusterFieldAnnotations)
 	}
 
+	if err = setInitialConditions(data); err != nil {
+		return nil, err
+	}
+
 	return r.Store.Create(apiContext, schema, data)
+}
+
+func setInitialConditions(data map[string]interface{}) error {
+	if data[managementv3.ClusterStatusFieldConditions] == nil {
+		data[managementv3.ClusterStatusFieldConditions] = []map[string]interface{}{}
+	}
+
+	conditions, ok := data[managementv3.ClusterStatusFieldConditions].([]map[string]interface{})
+	if !ok {
+		return fmt.Errorf("unable to parse field \"%v\" type \"%v\" as \"[]map[string]interface{}\"",
+			managementv3.ClusterStatusFieldConditions, reflect.TypeOf(data[managementv3.ClusterStatusFieldConditions]))
+	}
+
+	data[managementv3.ClusterStatusFieldConditions] =
+		append(
+			conditions,
+			[]map[string]interface{}{
+				{
+					"status": "True",
+					"type":   string(v3.ClusterConditionPending),
+				},
+				{
+					"status": "Unknown",
+					"type":   string(v3.ClusterConditionProvisioned),
+				},
+				{
+					"status": "Unknown",
+					"type":   string(v3.ClusterConditionWaiting),
+				},
+			}...,
+		)
+
+	return nil
 }
 
 func toMap(rawMap interface{}) map[string]interface{} {
