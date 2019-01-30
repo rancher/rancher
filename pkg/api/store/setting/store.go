@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/settings"
 )
 
@@ -13,13 +14,12 @@ func New(store types.Store) types.Store {
 		Store: store,
 		Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
 			v, ok := data["value"]
-			value := os.Getenv(settings.GetENVKey(apiContext.ID))
+			value := os.Getenv(settings.GetENVKey(convert.ToString(data["id"])))
 			switch {
 			case value != "":
 				data["value"] = value
 				data["customized"] = false
 				data["source"] = "env"
-
 			case !ok || v == "":
 				data["value"] = data["default"]
 				data["customized"] = false
