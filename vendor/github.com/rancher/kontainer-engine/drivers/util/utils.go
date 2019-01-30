@@ -22,6 +22,8 @@ const (
 	kontainerEngine           = "kontainer-engine"
 	oldClusterRoleBindingName = "netes-default-clusterRoleBinding"
 	newClusterRoleBindingName = "system-netes-default-clusterRoleBinding"
+
+	cattleNodeAgentLableSelector = "app=cattle-agent"
 )
 
 // GenerateServiceAccountToken generate a serviceAccountToken for clusterAdmin given a rest clientset
@@ -141,4 +143,8 @@ func ConvertToRkeConfig(config string) (v3.RancherKubernetesEngineConfig, error)
 		return rkeConfig, err
 	}
 	return rkeConfig, nil
+}
+
+func RestartCattleNodeAgent(clientset kubernetes.Interface) error {
+	return clientset.CoreV1().Pods(cattleNamespace).DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: cattleNodeAgentLableSelector})
 }
