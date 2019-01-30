@@ -439,6 +439,16 @@ func (c *Cluster) deployIngress(ctx context.Context) error {
 		IngressImage:   c.SystemImages.Ingress,
 		IngressBackend: c.SystemImages.IngressBackend,
 	}
+	// since nginx ingress controller 0.16.0, it can be run as non-root and doesn't require privileged anymore.
+	// So we can use securityContext instead of setting privileges via initContainer.
+	ingressSplits := strings.SplitN(c.SystemImages.Ingress, ":", 2)
+	if len(ingressSplits) == 2 {
+		version := strings.Split(ingressSplits[1], "-")[0]
+		if version < "0.16.0" {
+			ingressConfig.AlpineImage = c.SystemImages.Alpine
+		}
+	}
+
 	// Currently only deploying nginx ingress controller
 	ingressYaml, err := addons.GetNginxIngressManifest(ingressConfig)
 	if err != nil {

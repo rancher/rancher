@@ -21,6 +21,9 @@ items:
     spec:
       template:
         metadata:
+          annotations:
+            scheduler.alpha.kubernetes.io/tolerations: >-
+              [{"key":"dedicated","operator":"Equal","value":"master","effect":"NoSchedule"}]
           labels:
             name: weave-net
         spec:
@@ -50,7 +53,7 @@ items:
                   value: "{{.WeavePassword}}"
                 {{- end}}
               image: {{.Image}}
-              livenessProbe:
+              readinessProbe:
                 httpGet:
                   host: 127.0.0.1
                   path: /status
@@ -77,7 +80,6 @@ items:
                 - name: xtables-lock
                   mountPath: /run/xtables.lock
             - name: weave-npc
-              args: []
               env:
                 - name: HOSTNAME
                   valueFrom:
@@ -93,9 +95,9 @@ items:
               volumeMounts:
                 - name: xtables-lock
                   mountPath: /run/xtables.lock
-            - name: weave-loopback
+            - name: weave-plugins
               command:
-                - /opt/rke-tools/weave-loopback-cni.sh
+                - /opt/rke-tools/weave-plugins-cni.sh
               image: {{.WeaveLoopbackImage}}
               securityContext:
                 privileged: true
@@ -109,14 +111,10 @@ items:
             seLinuxOptions: {}
           serviceAccountName: weave-net
           tolerations:
-            - key: "node-role.kubernetes.io/controlplane"
-              operator: "Exists"
-              effect: "NoSchedule"
-            - key: "node-role.kubernetes.io/etcd"
-              operator: "Exists"
-              effect: "NoExecute"
-            - effect: NoExecute
-              operator: Exists
+          - operator: Exists
+            effect: NoSchedule
+          - operator: Exists
+            effect: NoExecute
           volumes:
             - name: weavedb
               hostPath:
