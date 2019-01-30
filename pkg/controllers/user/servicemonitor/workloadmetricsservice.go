@@ -23,10 +23,6 @@ func (c *MetricsServiceController) createService(key string, w *util.Workload) e
 		}
 	}
 
-	if _, ok := w.Annotations[creatorIDAnnotation]; !ok {
-		return nil
-	}
-
 	if errs := validation.IsDNS1123Subdomain(w.Name); len(errs) != 0 {
 		logrus.Debugf("Not creating service for workload [%s]: dns name is invalid", w.Name)
 		return nil
@@ -66,7 +62,7 @@ func (c *MetricsServiceController) ReconcileServiceMonitor(w *util.Workload) err
 			return err
 		}
 	case expectedServiceMonitor != nil: //Create scenario
-		if _, err := c.smClient.Create(expectedServiceMonitor); err != nil {
+		if _, err := c.smClient.Create(expectedServiceMonitor); err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 	case sm != nil: //Delete scenario
