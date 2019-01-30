@@ -108,6 +108,8 @@ func (c *controller) RKECapabilities(capabilities v3.Capabilities, rkeConfig v3.
 		capabilities.LoadBalancerCapabilities = c.L4Capability(true, ElasticLoadBalancer, []string{"TCP"}, true)
 	case azure.AzureCloudProviderName:
 		capabilities.LoadBalancerCapabilities = c.L4Capability(true, AzureL4LB, []string{"TCP", "UDP"}, true)
+	default:
+		capabilities.LoadBalancerCapabilities = c.L4Capability(false, "", []string{}, false)
 	}
 	// only if not custom, non custom clusters have nodepools set
 	nodes, err := c.nodeLister.List(clusterName, labels.Everything())
@@ -132,7 +134,7 @@ func (c *controller) RKECapabilities(capabilities v3.Capabilities, rkeConfig v3.
 
 func (c *controller) L4Capability(enabled bool, providerName string, protocols []string, healthCheck bool) v3.LoadBalancerCapabilities {
 	l4lb := v3.LoadBalancerCapabilities{
-		Enabled:              enabled,
+		Enabled:              &enabled,
 		Provider:             providerName,
 		ProtocolsSupported:   protocols,
 		HealthCheckSupported: healthCheck,
@@ -161,7 +163,7 @@ func toCapabilities(k8sCapabilities *types.K8SCapabilities) v3.Capabilities {
 	return v3.Capabilities{
 		IngressCapabilities: controllers,
 		LoadBalancerCapabilities: v3.LoadBalancerCapabilities{
-			Enabled:              k8sCapabilities.L4LoadBalancer.Enabled,
+			Enabled:              &k8sCapabilities.L4LoadBalancer.Enabled,
 			HealthCheckSupported: k8sCapabilities.L4LoadBalancer.HealthCheckSupported,
 			ProtocolsSupported:   k8sCapabilities.L4LoadBalancer.ProtocolsSupported,
 			Provider:             k8sCapabilities.L4LoadBalancer.Provider,
