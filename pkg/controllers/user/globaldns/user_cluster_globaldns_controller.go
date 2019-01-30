@@ -15,15 +15,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-const (
-	projectIDLabel = "field.cattle.io/projectId"
-)
-
 type UserGlobalDNSController struct {
 	ingresses             v1beta1Rancher.IngressInterface
 	ingressLister         v1beta1Rancher.IngressLister
 	globalDNSs            v3.GlobalDNSInterface
-	globalDNSLister       v3.GlobalDNSLister
 	multiclusterappLister v3.MultiClusterAppLister
 	namespaceLister       v1coreRancher.NamespaceLister
 	clusterName           string
@@ -34,7 +29,6 @@ func newUserGlobalDNSController(clusterContext *config.UserContext) *UserGlobalD
 		ingresses:             clusterContext.Extensions.Ingresses(""),
 		ingressLister:         clusterContext.Extensions.Ingresses("").Controller().Lister(),
 		globalDNSs:            clusterContext.Management.Management.GlobalDNSs(""),
-		globalDNSLister:       clusterContext.Management.Management.GlobalDNSs("").Controller().Lister(),
 		multiclusterappLister: clusterContext.Management.Management.MultiClusterApps("").Controller().Lister(),
 		namespaceLister:       clusterContext.Core.Namespaces("").Controller().Lister(),
 		clusterName:           clusterContext.ClusterName,

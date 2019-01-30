@@ -3,12 +3,13 @@ package multiclusterapp
 import (
 	"context"
 	"fmt"
-	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
-	"github.com/rancher/rancher/pkg/ref"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
+	"github.com/rancher/rancher/pkg/ref"
 
 	"github.com/rancher/rancher/pkg/namespace"
 	corev1 "github.com/rancher/types/apis/core/v1"
@@ -38,7 +39,6 @@ type MCAppController struct {
 	apps                          pv3.AppInterface
 	appLister                     pv3.AppLister
 	multiClusterApps              v3.MultiClusterAppInterface
-	multiClusterAppLister         v3.MultiClusterAppLister
 	multiClusterAppRevisions      v3.MultiClusterAppRevisionInterface
 	multiClusterAppRevisionLister v3.MultiClusterAppRevisionLister
 	namespaces                    corev1.NamespaceInterface
@@ -55,7 +55,6 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		appLister:                     cluster.Management.Project.Apps("").Controller().Lister(),
 		namespaces:                    cluster.Core.Namespaces(""),
 		multiClusterApps:              mcApps,
-		multiClusterAppLister:         mcApps.Controller().Lister(),
 		multiClusterAppRevisions:      cluster.Management.Management.MultiClusterAppRevisions(""),
 		multiClusterAppRevisionLister: cluster.Management.Management.MultiClusterAppRevisions("").Controller().Lister(),
 		clusterLister:                 cluster.Management.Management.Clusters("").Controller().Lister(),

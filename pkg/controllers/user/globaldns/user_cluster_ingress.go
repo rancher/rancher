@@ -27,7 +27,6 @@ const (
 )
 
 type UserIngressController struct {
-	ingresses             v1beta1Rancher.IngressInterface
 	ingressLister         v1beta1Rancher.IngressLister
 	globalDNSs            v3.GlobalDNSInterface
 	globalDNSLister       v3.GlobalDNSLister
@@ -39,7 +38,6 @@ type UserIngressController struct {
 
 func newUserIngressController(ctx context.Context, clusterContext *config.UserContext) *UserIngressController {
 	n := &UserIngressController{
-		ingresses:             clusterContext.Extensions.Ingresses(""),
 		ingressLister:         clusterContext.Extensions.Ingresses("").Controller().Lister(),
 		globalDNSs:            clusterContext.Management.Management.GlobalDNSs(""),
 		globalDNSLister:       clusterContext.Management.Management.GlobalDNSs("").Controller().Lister(),
