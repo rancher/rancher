@@ -221,7 +221,7 @@ type Capabilities struct {
 }
 
 type LoadBalancerCapabilities struct {
-	Enabled              bool     `json:"enabled,omitempty"`
+	Enabled              *bool    `json:"enabled,omitempty"`
 	Provider             string   `json:"provider,omitempty"`
 	ProtocolsSupported   []string `json:"protocolsSupported,omitempty"`
 	HealthCheckSupported bool     `json:"healthCheckSupported,omitempty"`
