@@ -47,7 +47,11 @@ type Handler struct {
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	canUpdateProject := func() bool {
-		return apiContext.AccessControl.CanDo(v3.ProjectGroupVersionKind.Group, v3.ProjectResource.Name, "update", apiContext, nil, apiContext.Schema) == nil
+		project := map[string]interface{}{
+			"id": apiContext.ID,
+		}
+
+		return apiContext.AccessControl.CanDo(v3.ProjectGroupVersionKind.Group, v3.ProjectResource.Name, "update", apiContext, project, apiContext.Schema) == nil
 	}
 
 	switch actionName {
