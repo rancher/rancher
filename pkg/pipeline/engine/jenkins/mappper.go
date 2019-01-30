@@ -102,12 +102,12 @@ func (c *jenkinsPipelineConverter) convertPipelineExecutionToJenkinsPipeline() (
 	if err := utils.ValidPipelineConfig(c.execution.Spec.PipelineConfig); err != nil {
 		return nil, err
 	}
+	parsePreservedEnvVar(c.execution)
 	script, err := c.convertPipelineExecutionToPipelineScript()
 	if err != nil {
 		return nil, err
 	}
 
-	parsePreservedEnvVar(c.execution)
 	pipelineJob := &PipelineJob{
 		Plugin: WorkflowJobPlugin,
 		Definition: Definition{
