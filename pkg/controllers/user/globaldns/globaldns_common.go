@@ -9,7 +9,7 @@ import (
 )
 
 func gatherIngressEndpoints(ingressEps []v1.LoadBalancerIngress) []string {
-	endpoints := []string{}
+	var endpoints []string
 	for _, ep := range ingressEps {
 		if ep.IP != "" {
 			endpoints = append(endpoints, ep.IP)

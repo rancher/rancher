@@ -136,7 +136,6 @@ func (ic *UserIngressController) reconcileAllGlobalDNSs() (runtime.Object, error
 }
 
 func (ic *UserIngressController) doesGlobalDNSTargetCurrentCluster(globalDNS *v3.GlobalDNS) (bool, error) {
-
 	var targetProjectNames []string
 
 	if globalDNS.Spec.MultiClusterAppName != "" {
@@ -171,7 +170,6 @@ func (ic *UserIngressController) doesGlobalDNSTargetCurrentCluster(globalDNS *v3
 }
 
 func (ic *UserIngressController) findGlobalDNS(fqdnRequested string) (*v3.GlobalDNS, error) {
-
 	allGlobalDNSs, err := ic.globalDNSLister.List(namespace.GlobalNamespace, labels.NewSelector())
 	if err != nil {
 		return nil, fmt.Errorf("UserIngressController: Error listing GlobalDNSs %v", err)

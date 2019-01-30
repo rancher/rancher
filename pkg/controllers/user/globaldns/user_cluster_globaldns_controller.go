@@ -9,14 +9,12 @@ import (
 	v1beta1Rancher "github.com/rancher/types/apis/extensions/v1beta1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type UserGlobalDNSController struct {
-	ingresses             v1beta1Rancher.IngressInterface
 	ingressLister         v1beta1Rancher.IngressLister
 	globalDNSs            v3.GlobalDNSInterface
 	multiclusterappLister v3.MultiClusterAppLister
@@ -26,7 +24,6 @@ type UserGlobalDNSController struct {
 
 func newUserGlobalDNSController(clusterContext *config.UserContext) *UserGlobalDNSController {
 	g := UserGlobalDNSController{
-		ingresses:             clusterContext.Extensions.Ingresses(""),
 		ingressLister:         clusterContext.Extensions.Ingresses("").Controller().Lister(),
 		globalDNSs:            clusterContext.Management.Management.GlobalDNSs(""),
 		multiclusterappLister: clusterContext.Management.Management.MultiClusterApps("").Controller().Lister(),
@@ -115,15 +112,15 @@ func (g *UserGlobalDNSController) reconcileProjects(obj *v3.GlobalDNS) ([]string
 		}
 		projectID := split[1]
 		//list all namespaces in this project and list all ingresses within each namespace
-		var namespacesInProject []*corev1.Namespace
+		var namespacesInProject []string
 		for _, namespace := range allNamespaces {
 			nameSpaceProject := namespace.ObjectMeta.Labels[projectSelectorLabel]
 			if strings.EqualFold(projectID, nameSpaceProject) {
-				namespacesInProject = append(namespacesInProject, namespace)
+				namespacesInProject = append(namespacesInProject, namespace.Name)
 			}
 		}
 		for _, namespace := range namespacesInProject {
-			ingresses, err := g.ingressLister.List(namespace.Name, labels.NewSelector())
+			ingresses, err := g.ingressLister.List(namespace, labels.NewSelector())
 			if err != nil {
 				return nil, err
 			}
