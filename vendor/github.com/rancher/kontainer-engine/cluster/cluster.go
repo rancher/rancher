@@ -2,8 +2,10 @@ package cluster
 
 import (
 	"context"
+	"encoding/json"
 	errors2 "errors"
 	"fmt"
+	"reflect"
 
 	"github.com/rancher/kontainer-engine/logstream"
 	"github.com/rancher/kontainer-engine/types"
@@ -190,7 +192,17 @@ func (c *Cluster) Update(ctx context.Context) error {
 		return err
 	}
 	driverOpts.StringOptions["name"] = c.Name
+
 	for k, v := range c.Metadata {
+		if k == "state" {
+			state := make(map[string]interface{})
+			if err := json.Unmarshal([]byte(v), &state); err == nil {
+				flattenIfNotExist(state, &driverOpts)
+			}
+
+			continue
+		}
+
 		driverOpts.StringOptions[k] = v
 	}
 
@@ -331,4 +343,61 @@ func FromCluster(cluster *Cluster, addr string, configGetter ConfigGetter, persi
 	cluster.ConfigGetter = configGetter
 	cluster.PersistStore = persistStore
 	return cluster, nil
+}
+
+// flattenIfNotExist take a map into driverOptions, if the key not exist
+func flattenIfNotExist(data map[string]interface{}, driverOptions *types.DriverOptions) {
+	for k, v := range data {
+		switch v.(type) {
+		case float64:
+			if _, exist := driverOptions.IntOptions[k]; !exist {
+				driverOptions.IntOptions[k] = int64(v.(float64))
+			}
+		case string:
+			if _, exist := driverOptions.StringOptions[k]; !exist {
+				driverOptions.StringOptions[k] = v.(string)
+			}
+		case bool:
+			if _, exist := driverOptions.BoolOptions[k]; !exist {
+				driverOptions.BoolOptions[k] = v.(bool)
+			}
+		case []interface{}:
+			// lists of strings come across as lists of interfaces, have to convert them manually
+			var stringArray []string
+
+			for _, stringInterface := range v.([]interface{}) {
+				switch stringInterface.(type) {
+				case string:
+					stringArray = append(stringArray, stringInterface.(string))
+				}
+			}
+
+			// if the length is 0 then it must not have been an array of strings
+			if len(stringArray) != 0 {
+				if _, exist := driverOptions.StringSliceOptions[k]; !exist {
+					driverOptions.StringSliceOptions[k] = &types.StringSlice{Value: stringArray}
+				}
+			}
+		case []string:
+			if _, exist := driverOptions.StringSliceOptions[k]; !exist {
+				driverOptions.StringSliceOptions[k] = &types.StringSlice{Value: v.([]string)}
+			}
+		case map[string]interface{}:
+			// hack for labels
+			if k == "tags" {
+				r := make([]string, 0, 4)
+				for key1, value1 := range v.(map[string]interface{}) {
+					r = append(r, fmt.Sprintf("%v=%v", key1, value1))
+				}
+
+				if _, exist := driverOptions.StringSliceOptions[k]; !exist {
+					driverOptions.StringSliceOptions[k] = &types.StringSlice{Value: r}
+				}
+			} else {
+				flattenIfNotExist(v.(map[string]interface{}), driverOptions)
+			}
+		default:
+			logrus.Warnf("could not convert %v %v=%v", reflect.TypeOf(v), k, v)
+		}
+	}
 }
