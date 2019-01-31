@@ -99,17 +99,17 @@ Project Name: {{ .Labels.project_name}}
 Available Replicas: {{ .Labels.available_replicas}}
 Desired Replicas: {{ .Labels.desired_replicas}}
 {{- else if eq .Labels.alert_type "metric" }}
-{{- if .Labels.project_name }}
+{{ if .Labels.project_name }}
 Project Name: {{ .Labels.project_name}}
 {{ end -}}
-Expression: {{ .Labels.expression}}
-{{- if .Labels.pod_name }}
+{{ if .Labels.pod_name }}
 Pod Name: {{ .Labels.pod_name}}{{ else if .Labels.pod -}}Pod Name: {{ .Labels.pod}}
 {{ end -}}
-{{- if .Labels.namespace }}
+{{ if .Labels.namespace }}
 Namespace: {{ .Labels.namespace}}
 {{ end -}}
-Description: Threshold Crossed: datapoint value {{ .Labels.current_value}} was {{ .Labels.comparison}} to the threshold ({{ .Labels.threshold_value}}) for ({{ .Labels.duration}})
+Expression: {{ .Labels.expression}}
+Description: Threshold Crossed: datapoint value {{ .Annotations.current_value}} was {{ .Labels.comparison}} to the threshold ({{ .Labels.threshold_value}}) for ({{ .Labels.duration}})
 {{ end -}}
 {{- if .Labels.logs }}
 Logs: {{ .Labels.logs}}
@@ -172,16 +172,16 @@ Available Replicas: {{ .Labels.available_replicas}}<br>
 Desired Replicas: {{ .Labels.desired_replicas}}<br>
 {{- else if eq .Labels.alert_type "metric" }}
 {{- if .Labels.project_name }}
-Project Name: {{.Labels.project_name}}
+Project Name: {{.Labels.project_name}}<br>
 {{ end -}}
 {{- if .Labels.pod_name }}
-Pod Name: {{.Labels.pod_name}}{{ else if .Labels.pod -}}Pod Name: {{.Labels.pod}}
+Pod Name: {{.Labels.pod_name}}{{ else if .Labels.pod -}}Pod Name: {{.Labels.pod}}<br>
 {{ end -}}
 {{- if .Labels.namespace }}
-Namespace: {{.Labels.namespace}}
+Namespace: {{.Labels.namespace}}<br>
 {{ end -}}
 Expression: {{.Labels.expression}}<br>
-Description: Threshold Crossed: datapoint value {{ .Labels.current_value}} was {{ .Labels.comparison}} to the threshold ({{ .Labels.threshold_value}}) for ({{ .Labels.duration}})<br>
+Description: Threshold Crossed: datapoint value {{ .Annotations.current_value}} was {{ .Labels.comparison}} to the threshold ({{ .Labels.threshold_value}}) for ({{ .Labels.duration}})<br>
 {{ end -}}
 {{- if .Labels.logs }}
 Logs: {{ .Labels.logs}}
