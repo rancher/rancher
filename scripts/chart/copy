@@ -4,8 +4,8 @@ set -e
 
 echo "-- chart/copy --"
 
-cd $(dirname $0)/../..
-. ./scripts/version
+cd $(dirname $0)/..
+. ./version
 
 # A Promotion is from Latest to Stable.
 if [[ -z "${DRONE_TAG}" ]]; then
@@ -19,10 +19,10 @@ if [[ "${CHART_REPO}" != "latest" ]]; then
 fi
 
 # Remove any existing charts.
-rm -rf ./bin/chart
+rm -rf ../bin/chart
 
-mkdir -p ./bin/chart/stable
+mkdir -p ../bin/chart/stable
 
-curl -f -H 'Cache-Control: max-age=0,no-cache' -H 'Host: releases.rancher.com' "https://c.storage.googleapis.com/server-charts/latest/rancher-${CHART_VERSION}.tgz?$(date +%s%N)" -o ./bin/chart/stable/rancher-${CHART_VERSION}.tgz
+curl -f -H 'Cache-Control: max-age=0,no-cache' -H 'Host: releases.rancher.com' "https://c.storage.googleapis.com/server-charts/latest/rancher-${CHART_VERSION}.tgz?$(date +%s%N)" -o ../bin/chart/stable/rancher-${CHART_VERSION}.tgz
 
-./scripts/chart/index stable
+./chart/index stable

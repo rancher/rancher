@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-cd $(dirname $0)/../..
-
 echo "-- chart/test --"
 
 # Check for helm
