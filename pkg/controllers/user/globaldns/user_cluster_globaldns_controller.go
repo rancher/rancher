@@ -9,7 +9,9 @@ import (
 	v1beta1Rancher "github.com/rancher/types/apis/extensions/v1beta1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/sirupsen/logrus"
 	"k8s.io/api/extensions/v1beta1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -34,6 +36,7 @@ func newUserGlobalDNSController(clusterContext *config.UserContext) *UserGlobalD
 }
 
 func (g *UserGlobalDNSController) sync(key string, obj *v3.GlobalDNS) (runtime.Object, error) {
+
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -62,9 +65,14 @@ func (g *UserGlobalDNSController) reconcileMultiClusterApp(obj *v3.GlobalDNS) ([
 	if err != nil {
 		return nil, err
 	}
+
 	mcapp, err := g.multiclusterappLister.Get(namespace.GlobalNamespace, mcappName)
+	if err != nil && k8serrors.IsNotFound(err) {
+		logrus.Debugf("UserGlobalDNSController: Object Not found Error %v, while listing MulticlusterApp by name %v", err, mcappName)
+		return nil, nil
+	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("UserGlobalDNSController: Error %v Listing MulticlusterApp by name %v", err, mcappName)
 	}
 
 	// go through target projects which are part of the current cluster and find all ingresses
@@ -98,7 +106,7 @@ func (g *UserGlobalDNSController) reconcileProjects(obj *v3.GlobalDNS) ([]string
 
 	allNamespaces, err := g.namespaceLister.List("", labels.NewSelector())
 	if err != nil {
-		return nil, fmt.Errorf("UserGlobalDNSController: Error listing cluster namespaces")
+		return nil, fmt.Errorf("UserGlobalDNSController: Error listing cluster namespaces %v", err)
 	}
 
 	for _, projectNameSet := range obj.Spec.ProjectNames {
@@ -149,23 +157,23 @@ func (g *UserGlobalDNSController) fetchGlobalDNSEndpointsForIngresses(ingresses 
 			allEndpoints = append(allEndpoints, ingressEndpoints...)
 		}
 	}
-
 	return allEndpoints, nil
 }
 
 func (g *UserGlobalDNSController) refreshGlobalDNSEndpoints(globalDNS *v3.GlobalDNS, ingressEndpointsForCluster []string) (*v3.GlobalDNS, error) {
 
 	globalDNSToUpdate := globalDNS.DeepCopy()
+	uniqueEndpointsForCluster := dedupEndpoints(ingressEndpointsForCluster)
 
 	if len(globalDNSToUpdate.Status.ClusterEndpoints) == 0 {
 		globalDNSToUpdate.Status.ClusterEndpoints = make(map[string][]string)
 	}
 
 	clusterEps := globalDNSToUpdate.Status.ClusterEndpoints[g.clusterName]
-
-	if ifEndpointsDiffer(clusterEps, ingressEndpointsForCluster) {
-		globalDNSToUpdate.Status.ClusterEndpoints[g.clusterName] = ingressEndpointsForCluster
+	if ifEndpointsDiffer(clusterEps, uniqueEndpointsForCluster) {
+		globalDNSToUpdate.Status.ClusterEndpoints[g.clusterName] = uniqueEndpointsForCluster
 		reconcileGlobalDNSEndpoints(globalDNSToUpdate)
+
 		updated, err := g.globalDNSs.Update(globalDNSToUpdate)
 		if err != nil {
 			return updated, fmt.Errorf("UserGlobalDNSController: Failed to update GlobalDNS endpoints with error %v", err)
