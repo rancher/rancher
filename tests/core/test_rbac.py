@@ -267,9 +267,9 @@ def test_impersonation_passthrough(admin_mc, admin_cc, user_mc, user_factory,
         metadata={'name': 'limited-impersonator'},
         rules=[{
             'resources': ['users'],
-            'apiGroups':[''],
-            'verbs':['impersonate'],
-            'resourceNames':[user2.user.id]
+            'apiGroups': [''],
+            'verbs': ['impersonate'],
+            'resourceNames': [user2.user.id]
         }]
     )
     impersonate_role = admin_rbac.create_cluster_role(body)
@@ -357,3 +357,18 @@ def test_permissions_can_be_removed(admin_cc, admin_mc, user_mc,
 
     user_cc = new_user_cc(user_mc)
     assert len(user_cc.client.list_namespace()) == 1
+
+
+def test_appropriate_users_can_see_kontainer_drivers(user_factory):
+    kds = user_factory().client.list_kontainer_driver()
+    assert len(kds) == 8
+
+    kds = user_factory('clusters-create').client.list_kontainer_driver()
+    assert len(kds) == 8
+
+    kds = user_factory('kontainerdrivers-manage').client. \
+        list_kontainer_driver()
+    assert len(kds) == 8
+
+    kds = user_factory('settings-manage').client.list_kontainer_driver()
+    assert len(kds) == 0
