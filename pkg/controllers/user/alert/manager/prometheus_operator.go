@@ -154,7 +154,10 @@ func Metric2Rule(groupID, ruleID, serverity, displayName, clusterName, projectNa
 		"expression":      expr,
 		"threshold_value": fmt.Sprintf("%v", metric.ThresholdValue),
 		"comparison":      comp,
-		"current_value":   "{{ .Value }}",
+	}
+
+	annotation := map[string]string{
+		"current_value": "{{ .Value }}",
 	}
 
 	if projectName != "" {
@@ -163,10 +166,11 @@ func Metric2Rule(groupID, ruleID, serverity, displayName, clusterName, projectNa
 	}
 
 	return monitoringv1.Rule{
-		Alert:  displayName,
-		Expr:   intstr.FromString(expr),
-		For:    metric.Duration,
-		Labels: labels,
+		Alert:       displayName,
+		Expr:        intstr.FromString(expr),
+		For:         metric.Duration,
+		Labels:      labels,
+		Annotations: annotation,
 	}
 }
 
