@@ -274,7 +274,7 @@ func toResourceField(name string, flag *types.Flag) (string, v3.Field, error) {
 		if flag.Default != nil {
 			field.Default.StringValue = flag.Default.DefaultString
 		}
-	} else if flag.Type == types.IntType {
+	} else if flag.Type == types.IntType || flag.Type == types.IntPointerType {
 		field.Type = "int"
 
 		if flag.Default != nil {
