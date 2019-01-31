@@ -47,6 +47,18 @@ func ifEndpointsDiffer(endpointsOne []string, endpointsTwo []string) bool {
 	return false
 }
 
+func dedupEndpoints(endpoints []string) []string {
+	mapEndpoints := make(map[string]bool)
+	res := []string{}
+	for _, ep := range endpoints {
+		if !mapEndpoints[ep] {
+			mapEndpoints[ep] = true
+			res = append(res, ep)
+		}
+	}
+	return res
+}
+
 func reconcileGlobalDNSEndpoints(globalDNS *v3.GlobalDNS) {
 	//aggregate all clusterEndpoints and form the final DNS endpoints[]
 	var reconciledEps []string
