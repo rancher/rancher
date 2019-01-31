@@ -91,6 +91,7 @@ type state struct {
 
 	MinimumASGSize int64
 	MaximumASGSize int64
+	NodeVolumeSize *int64
 
 	InstanceType string
 	Region       string
@@ -166,6 +167,13 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 			DefaultInt: 3,
 		},
 	}
+	driverFlag.Options["node-volume-size"] = &types.Flag{
+		Type:  types.IntPointerType,
+		Usage: "The volume size for each node",
+		Default: &types.Default{
+			DefaultInt: 20,
+		},
+	}
 
 	driverFlag.Options["virtual-network"] = &types.Flag{
 		Type:  types.StringType,
@@ -231,6 +239,7 @@ func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state.InstanceType = options.GetValueFromDriverOptions(driverOptions, types.StringType, "instance-type", "instanceType").(string)
 	state.MinimumASGSize = options.GetValueFromDriverOptions(driverOptions, types.IntType, "minimum-nodes", "minimumNodes").(int64)
 	state.MaximumASGSize = options.GetValueFromDriverOptions(driverOptions, types.IntType, "maximum-nodes", "maximumNodes").(int64)
+	state.NodeVolumeSize, _ = options.GetValueFromDriverOptions(driverOptions, types.IntPointerType, "node-volume-size", "nodeVolumeSize").(*int64)
 	state.VirtualNetwork = options.GetValueFromDriverOptions(driverOptions, types.StringType, "virtual-network", "virtualNetwork").(string)
 	state.Subnets = options.GetValueFromDriverOptions(driverOptions, types.StringSliceType, "subnets").(*types.StringSlice).Value
 	state.ServiceRole = options.GetValueFromDriverOptions(driverOptions, types.StringType, "service-role", "serviceRole").(string)
@@ -275,6 +284,10 @@ func (state *state) validate() error {
 
 	if state.MaximumASGSize < state.MinimumASGSize {
 		return fmt.Errorf("maximum nodes cannot be less than minimum nodes")
+	}
+
+	if state.NodeVolumeSize != nil && *state.NodeVolumeSize < 1 {
+		return fmt.Errorf("node volume size must be greater than 0")
 	}
 
 	networkEmpty := state.VirtualNetwork == ""
@@ -536,6 +549,13 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		publicIP = *state.AssociateWorkerNodePublicIP
 	}
 
+	var volumeSize int64
+	if state.NodeVolumeSize == nil {
+		volumeSize = 20
+	} else {
+		volumeSize = *state.NodeVolumeSize
+	}
+
 	stack, err := d.createStack(svc, getWorkNodeName(state.DisplayName), displayName, workerNodesTemplate,
 		[]string{cloudformation.CapabilityCapabilityIam},
 		[]*cloudformation.Parameter{
@@ -548,6 +568,8 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 				int(state.MinimumASGSize)))},
 			{ParameterKey: aws.String("NodeAutoScalingGroupMaxSize"), ParameterValue: aws.String(strconv.Itoa(
 				int(state.MaximumASGSize)))},
+			{ParameterKey: aws.String("NodeVolumeSize"), ParameterValue: aws.String(strconv.Itoa(
+				int(volumeSize)))},
 			{ParameterKey: aws.String("NodeInstanceType"), ParameterValue: aws.String(state.InstanceType)},
 			{ParameterKey: aws.String("NodeImageId"), ParameterValue: aws.String(amiID)},
 			{ParameterKey: aws.String("KeyName"), ParameterValue: aws.String(keyPairName)}, // TODO let the user specify this

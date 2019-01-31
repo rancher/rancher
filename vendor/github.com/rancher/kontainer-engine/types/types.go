@@ -13,6 +13,8 @@ const (
 	BoolPointerType = "boolPtr"
 	// IntType is the type for int flag
 	IntType = "int"
+	// IntPointerType flag should be used if the int value can be nil
+	IntPointerType = "intPtr"
 	// StringSliceType is the type for stringSlice flag
 	StringSliceType = "stringSlice"
 )
