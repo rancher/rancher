@@ -68,6 +68,21 @@ def test_min_nodes_cannot_be_zero(admin_mc, remove_resource):
                              "greater than 0")
 
 
+def test_node_volume_size_cannot_be_zero(admin_mc, remove_resource):
+    eks = {
+        "accessKey": "not a real access key",
+        "secretKey": "not a real secret key",
+        "region": "us-west-2",
+        "kubernetesVersion": "1.11",
+        "minimumNodes": 1,
+        "maximumNodes": 3,
+        "nodeVolumeSize": 0
+    }
+    assert_has_error_message(admin_mc, remove_resource, eks,
+                             "error parsing state: node volume size must "
+                             "be greater than 0")
+
+
 def test_private_cluster_requires_vpc_subnets(admin_mc, remove_resource):
     eks = {
         "accessKey": "not a real access key",
