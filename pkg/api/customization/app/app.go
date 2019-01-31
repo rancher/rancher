@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	hcommon "github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/rancher/pkg/ref"
@@ -35,12 +36,18 @@ type Wrapper struct {
 
 const (
 	appLabel      = "io.cattle.field/appId"
+	MCappLabel    = "mcapp"
 	creatorIDAnno = "field.cattle.io/creatorId"
 )
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
-	resource.AddAction(apiContext, "upgrade")
-	resource.AddAction(apiContext, "rollback")
+	mcappLabel := convert.ToString(values.GetValueN(resource.Values, "labels", MCappLabel))
+	if mcappLabel == "" {
+		resource.AddAction(apiContext, "upgrade")
+		resource.AddAction(apiContext, "rollback")
+	} else {
+		delete(resource.Links, "remove")
+	}
 	resource.Links["revision"] = apiContext.URLBuilder.Link("revision", resource)
 	if _, ok := resource.Values["status"]; ok {
 		if status, ok := resource.Values["status"].(map[string]interface{}); ok {

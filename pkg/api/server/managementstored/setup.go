@@ -30,6 +30,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/roletemplate"
 	"github.com/rancher/rancher/pkg/api/customization/roletemplatebinding"
 	"github.com/rancher/rancher/pkg/api/customization/setting"
+	appStore "github.com/rancher/rancher/pkg/api/store/app"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/cluster"
 	nodeStore "github.com/rancher/rancher/pkg/api/store/node"
@@ -410,6 +411,11 @@ func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
 
 func App(schemas *types.Schemas, management *config.ScaledContext, kubeConfigGetter common.KubeConfigGetter) {
 	schema := schemas.Schema(&projectschema.Version, projectclient.AppType)
+	store := &appStore.Store{
+		Store: schema.Store,
+		Apps:  management.Project.Apps("").Controller().Lister(),
+	}
+	schema.Store = store
 	wrapper := app.Wrapper{
 		Clusters:              management.Management.Clusters(""),
 		TemplateVersionClient: management.Management.CatalogTemplateVersions(""),
