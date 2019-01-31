@@ -90,6 +90,9 @@ spec:
         - name: NO_PROXY
           value: {{ .Values.noProxy }}
 {{- end }}
+{{- if .Values.extraEnv }}
+{{ toYaml .Values.extraEnv | indent 8}}
+{{- end }}
         livenessProbe:
           tcpSocket:
             port: 80
@@ -121,7 +124,7 @@ spec:
           name: audit-log
 {{- end }}
 {{- if gt .Values.auditLog.level 0.0 }}
-      # Make audit logs avalible for Rancher log collecter tools.
+      # Make audit logs available for Rancher log collector tools.
       - image: busybox
         name: {{ template "rancher.name" . }}-audit-log
         command: ["tail"]

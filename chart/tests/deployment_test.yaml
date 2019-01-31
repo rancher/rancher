@@ -14,3 +14,33 @@ tests:
   - contains:
       path: spec.template.spec.containers[0].args
       content: "--add-local=auto"
+- it: should add CATTLE_SYSTEM_DEFAULT_REGISTRY to env and maintain default vars
+  set:
+    extraEnv:
+    - name: CATTLE_SYSTEM_DEFAULT_REGISTRY
+      value: registry.example.com
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: CATTLE_SYSTEM_DEFAULT_REGISTRY
+        value: registry.example.com
+  - contains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: CATTLE_PEER_SERVICE
+        value: RELEASE-NAME-rancher
+  - contains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: CATTLE_NAMESPACE
+        value: NAMESPACE
+- it: should Just have default env vars
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[0].env
+      value:
+      - name: CATTLE_NAMESPACE
+        value: NAMESPACE
+      - name: CATTLE_PEER_SERVICE
+        value: RELEASE-NAME-rancher

@@ -25,6 +25,11 @@ addLocal: "auto"
 # Add debug flag to Rancher server
 debug: false
 
+# Extra environment variables passed to the rancher pods.
+# extraEnv:
+# - name: CATTLE_SYSTEM_DEFAULT_REGISTRY
+#   value: "registry.example.com"
+
 # Fully qualified name to reach your Rancher server
 # hostname: rancher.my.org
 
