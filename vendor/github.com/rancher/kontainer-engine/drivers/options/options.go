@@ -11,6 +11,13 @@ func GetValueFromDriverOptions(driverOptions *types.DriverOptions, optionType st
 			}
 		}
 		return int64(0)
+	case types.IntPointerType:
+		for _, key := range keys {
+			if value, ok := driverOptions.IntOptions[key]; ok {
+				return &value
+			}
+		}
+		return nil
 	case types.StringType:
 		for _, key := range keys {
 			if value, ok := driverOptions.StringOptions[key]; ok {
