@@ -32,7 +32,7 @@ If the reported issue is regarding a created cluster, please provide requested i
 (paste the output here)
 ```
 
-- Docker (use `docker info`):
+- Docker version (use `docker version`):
 
 ```
 (paste the output here)
