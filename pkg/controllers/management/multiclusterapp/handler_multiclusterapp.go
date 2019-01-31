@@ -3,14 +3,14 @@ package multiclusterapp
 import (
 	"context"
 	"fmt"
-	"reflect"
-
 	access "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
 	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"reflect"
+	"strings"
 
 	"github.com/rancher/types/client/management/v3"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -31,6 +31,12 @@ type MCAppRevisionController struct {
 	managementContext *config.ManagementContext
 }
 
+type ProjectController struct {
+	mcAppsLister  v3.MultiClusterAppLister
+	mcApps        v3.MultiClusterAppInterface
+	projectLister v3.ProjectLister
+}
+
 func Register(ctx context.Context, management *config.ManagementContext) {
 	m := MCAppController{
 		multiClusterApps:  management.Management.MultiClusterApps(""),
@@ -43,9 +49,16 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	r := MCAppRevisionController{
 		managementContext: management,
 	}
+	projects := management.Management.Projects("")
+	p := ProjectController{
+		mcAppsLister:  management.Management.MultiClusterApps("").Controller().Lister(),
+		mcApps:        management.Management.MultiClusterApps(""),
+		projectLister: projects.Controller().Lister(),
+	}
 	m.multiClusterApps.AddHandler(ctx, "management-multiclusterapp-controller", m.sync)
 	management.Management.MultiClusterAppRevisions("").AddHandler(ctx, "management-multiclusterapp-revisions-rbac", r.sync)
 	m.prtbs.AddHandler(ctx, "management-prtb-controller-global-resource", m.prtbSync)
+	projects.AddHandler(ctx, "management-mcapp-project-controller", p.sync)
 }
 
 func (mc *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Object, error) {
@@ -129,4 +142,38 @@ func (r *MCAppRevisionController) sync(key string, mcappRevision *v3.MultiCluste
 		return nil, err
 	}
 	return mcappRevision, nil
+}
+
+func (p *ProjectController) sync(key string, project *v3.Project) (runtime.Object, error) {
+	if project != nil && project.DeletionTimestamp == nil {
+		return project, nil
+	}
+	splitKey := strings.SplitN(key, "/", 2)
+	if len(splitKey) != 2 || splitKey[0] == "" || splitKey[1] == "" {
+		return project, fmt.Errorf("invalid project id %s", key)
+	}
+	key = fmt.Sprintf("%s:%s", splitKey[0], splitKey[1])
+	mcApps, err := p.mcAppsLister.List(namespace.GlobalNamespace, labels.NewSelector())
+	if err != nil {
+		return project, err
+	}
+	for _, mcApp := range mcApps {
+		if mcApp.DeletionTimestamp != nil {
+			continue
+		}
+		var toUpdate *v3.MultiClusterApp
+		for i, target := range mcApp.Spec.Targets {
+			if target.ProjectName == key {
+				toUpdate = mcApp.DeepCopy()
+				toUpdate.Spec.Targets = append(toUpdate.Spec.Targets[:i], toUpdate.Spec.Targets[i+1:]...)
+				break
+			}
+		}
+		if toUpdate != nil {
+			if _, err := p.mcApps.Update(toUpdate); err != nil {
+				return project, fmt.Errorf("error updating mcapp %s for project %s", mcApp.Name, key)
+			}
+		}
+	}
+	return project, nil
 }
