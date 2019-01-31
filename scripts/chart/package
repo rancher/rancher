@@ -4,16 +4,16 @@ set -e
 
 echo "-- chart/package --"
 
-cd $(dirname $0)/../..
-. ./scripts/version
+cd $(dirname $0)/..
+. ./version
 
-mkdir -p ./bin/chart/${CHART_REPO}
+mkdir -p ../bin/chart/${CHART_REPO}
 
-helm package -d ./bin/chart/${CHART_REPO} /tmp/chart/rancher
+helm package -d ../bin/chart/${CHART_REPO} /tmp/chart/rancher
 
 if [[ "${CHART_REPO}" == "dev" ]]; then
     echo "dev repo - skipping index"
 else
     echo "updating index ... "
-    ./scripts/chart/index ${CHART_REPO}
+    ./chart/index ${CHART_REPO}
 fi
