@@ -123,7 +123,7 @@ func (c *Controller) clusterBackupSync(ctx context.Context, interval time.Durati
 			return err
 		}
 		for _, cluster := range clusters {
-			logrus.Infof("[etcd-backup] Checking backups for cluster: %s", cluster.Name)
+			logrus.Debugf("[etcd-backup] Checking backups for cluster: %s", cluster.Name)
 			if err := c.doClusterBackupSync(cluster); err != nil && !apierrors.IsConflict(err) {
 				logrus.Error(fmt.Errorf("[etcd-backup] clusterBackupSync faild: %v", err))
 			}
