@@ -197,13 +197,13 @@ type ETCDService struct {
 	Key string `yaml:"key" json:"key,omitempty"`
 	// External etcd prefix
 	Path string `yaml:"path" json:"path,omitempty"`
-	// Etcd Recurring snapshot Service
-	Snapshot *bool `yaml:"snapshot" json:"snapshot,omitempty" norman:"default=true"`
+	// Etcd Recurring snapshot Service, used by rke only
+	Snapshot *bool `yaml:"snapshot" json:"snapshot,omitempty" norman:"default=false"`
 	// Etcd snapshot Retention period
 	Retention string `yaml:"retention" json:"retention,omitempty" norman:"default=72h"`
 	// Etcd snapshot Creation period
 	Creation string `yaml:"creation" json:"creation,omitempty" norman:"default=12h"`
-	// Backup backend for etcd snapshots, used by rke only
+	// Backup backend for etcd snapshots
 	BackupConfig *BackupConfig `yaml:"backup_config" json:"backupConfig,omitempty"`
 }
 
