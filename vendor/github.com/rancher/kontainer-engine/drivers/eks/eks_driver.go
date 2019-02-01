@@ -93,6 +93,8 @@ type state struct {
 	MaximumASGSize int64
 	NodeVolumeSize *int64
 
+	UserData string
+
 	InstanceType string
 	Region       string
 
@@ -177,11 +179,14 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 
 	driverFlag.Options["virtual-network"] = &types.Flag{
 		Type:  types.StringType,
-		Usage: "The name of hte virtual network to use",
+		Usage: "The name of the virtual network to use",
 	}
 	driverFlag.Options["subnets"] = &types.Flag{
 		Type:  types.StringSliceType,
 		Usage: "Comma-separated list of subnets in the virtual network to use",
+		Default: &types.Default{
+			DefaultStringSlice: &types.StringSlice{Value: []string{}}, //avoid nil value for init
+		},
 	}
 	driverFlag.Options["service-role"] = &types.Flag{
 		Type:  types.StringType,
@@ -200,6 +205,18 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Usage: "A custom AMI ID to use for the worker nodes instead of the default",
 		Default: &types.Default{
 			DefaultBool: true,
+		},
+	}
+	// Newlines are expected to always be passed as "\n"
+	driverFlag.Options["user-data"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "Pass user-data to the nodes to perform automated configuration tasks",
+		Default: &types.Default{
+			DefaultString: "#!/bin/bash\nset -o xtrace\n" +
+				"/etc/eks/bootstrap.sh EKS-api-cluster\n" +
+				"/opt/aws/bin/cfn-signal --exit-code $? " +
+				"--stack  ${AWS::StackName} " +
+				"--resource NodeGroup --region ${AWS::Region}\n",
 		},
 	}
 
@@ -246,6 +263,7 @@ func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state.SecurityGroups = options.GetValueFromDriverOptions(driverOptions, types.StringSliceType, "security-groups", "securityGroups").(*types.StringSlice).Value
 	state.AMI = options.GetValueFromDriverOptions(driverOptions, types.StringType, "ami").(string)
 	state.AssociateWorkerNodePublicIP, _ = options.GetValueFromDriverOptions(driverOptions, types.BoolPointerType, "associate-worker-node-public-ip", "associateWorkerNodePublicIp").(*bool)
+	state.UserData = options.GetValueFromDriverOptions(driverOptions, types.StringType, "user-data", "userData").(string)
 
 	return state, state.validate()
 }
@@ -537,7 +555,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 	if state.AMI != "" {
 		amiID = state.AMI
 	} else {
-		//should be always accessable after validate()
+		//should be always accessible after validate()
 		amiID = getAMIs(ctx, ec2svc, state)
 
 	}
@@ -548,6 +566,9 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 	} else {
 		publicIP = *state.AssociateWorkerNodePublicIP
 	}
+	// amend UserData values into template.
+	// must use %q to safely pass the string
+	workerNodesFinalTemplate := fmt.Sprintf(workerNodesTemplate, state.UserData)
 
 	var volumeSize int64
 	if state.NodeVolumeSize == nil {
@@ -556,7 +577,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		volumeSize = *state.NodeVolumeSize
 	}
 
-	stack, err := d.createStack(svc, getWorkNodeName(state.DisplayName), displayName, workerNodesTemplate,
+	stack, err := d.createStack(svc, getWorkNodeName(state.DisplayName), displayName, workerNodesFinalTemplate,
 		[]string{cloudformation.CapabilityCapabilityIam},
 		[]*cloudformation.Parameter{
 			{ParameterKey: aws.String("ClusterName"), ParameterValue: aws.String(state.DisplayName)},
