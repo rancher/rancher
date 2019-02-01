@@ -336,7 +336,7 @@ Parameters:
   VpcId:
     Description: The VPC of the worker instances
     Type: AWS::EC2::VPC::Id
-
+    
   Subnets:
     Description: The subnets where workers can be created.
     Type: List<AWS::EC2::Subnet::Id>
@@ -345,6 +345,15 @@ Parameters:
     Description: Associate the public IP addresses of the worker nodes
     Type: String
     Default: "true"
+
+  CustomUserData:
+    Description: Pass user-data to the nodes to perform automated configuration tasks, overwrites default configuration
+    Type: String
+    Default: "" 
+
+Conditions:          # Equals: compares if two values are equal
+  UseCustomUserData: !Not [!Equals [ !Ref CustomUserData, "" ]] # Recheck: I want to say "If custom data is passed in, lets use that otherwise lets use the default"
+  UseDefaultUserData: !Not [!Condition UseCustomUserData]
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -482,7 +491,8 @@ Resources:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
       DesiredCapacity: !Ref NodeAutoScalingGroupDesiredCapacity
-      LaunchConfigurationName: !Ref NodeLaunchConfig
+      LaunchConfigurationName: 
+        !If [ UseCustomUserData, !Ref NodeLaunchConfigCustomUserData, !Ref NodeLaunchConfigDefaultUserData]   #!If [condition_name, value_if_true, value_if_false]
       MinSize: !Ref NodeAutoScalingGroupMinSize
       MaxSize: !Ref NodeAutoScalingGroupMaxSize
       VPCZoneIdentifier:
@@ -500,7 +510,8 @@ Resources:
         MinInstancesInService: !Ref NodeAutoScalingGroupDesiredCapacity
         PauseTime: 'PT5M'
 
-  NodeLaunchConfig:
+  NodeLaunchConfigDefaultUserData:
+    Condition: UseDefaultUserData
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
       AssociatePublicIpAddress: !Ref PublicIp
@@ -523,10 +534,31 @@ Resources:
             set -o xtrace
             /etc/eks/bootstrap.sh ${ClusterName} ${BootstrapArguments}
             /opt/aws/bin/cfn-signal --exit-code $? \
-                     --stack  ${AWS::StackName} \
-                     --resource NodeGroup  \
-                     --region ${AWS::Region}
+                    --stack  ${AWS::StackName} \
+                    --resource NodeGroup  \
+                    --region ${AWS::Region} 
 
+  NodeLaunchConfigCustomUserData:
+    Condition: UseCustomUserData
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      AssociatePublicIpAddress: !Ref PublicIp
+      IamInstanceProfile: !Ref NodeInstanceProfile
+      ImageId: !Ref NodeImageId
+      InstanceType: !Ref NodeInstanceType
+      KeyName: !Ref KeyName
+      SecurityGroups:
+      - !Ref NodeSecurityGroup
+      BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeSize: !Ref NodeVolumeSize
+              VolumeType: gp2
+              DeleteOnTermination: true
+      UserData:
+        Fn::Base64:
+          !Sub | 
+            ${CustomUserData}
 Outputs:
   NodeInstanceRole:
     Description: The node instance role
