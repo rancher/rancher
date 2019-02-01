@@ -10,8 +10,6 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 	"strings"
 
@@ -37,14 +35,19 @@ type MCAppRevisionController struct {
 type ProjectController struct {
 	mcAppsLister  v3.MultiClusterAppLister
 	mcApps        v3.MultiClusterAppInterface
-	clusters      v3.ClusterInterface
-	clusterLister v3.ClusterLister
 	projectLister v3.ProjectLister
 }
 
+type ClusterController struct {
+	mcAppsLister  v3.MultiClusterAppLister
+	mcApps        v3.MultiClusterAppInterface
+	clusterLister v3.ClusterLister
+}
+
 func Register(ctx context.Context, management *config.ManagementContext) {
+	mcApps := management.Management.MultiClusterApps("")
 	m := MCAppController{
-		multiClusterApps:  management.Management.MultiClusterApps(""),
+		multiClusterApps:  mcApps,
 		managementContext: management,
 		prtbs:             management.Management.ProjectRoleTemplateBindings(""),
 		prtbLister:        management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
@@ -56,16 +59,21 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	}
 	projects := management.Management.Projects("")
 	p := ProjectController{
-		mcAppsLister:  management.Management.MultiClusterApps("").Controller().Lister(),
-		mcApps:        management.Management.MultiClusterApps(""),
-		clusters:      management.Management.Clusters(""),
-		clusterLister: management.Management.Clusters("").Controller().Lister(),
+		mcAppsLister:  mcApps.Controller().Lister(),
+		mcApps:        mcApps,
 		projectLister: projects.Controller().Lister(),
+	}
+	clusters := management.Management.Clusters("")
+	c := ClusterController{
+		mcAppsLister:  mcApps.Controller().Lister(),
+		mcApps:        mcApps,
+		clusterLister: clusters.Controller().Lister(),
 	}
 	m.multiClusterApps.AddHandler(ctx, "management-multiclusterapp-controller", m.sync)
 	management.Management.MultiClusterAppRevisions("").AddHandler(ctx, "management-multiclusterapp-revisions-rbac", r.sync)
 	m.prtbs.AddHandler(ctx, "management-prtb-controller-global-resource", m.prtbSync)
 	projects.AddHandler(ctx, "management-mcapp-project-controller", p.sync)
+	clusters.AddHandler(ctx, "management-mcapp-cluster-controller", c.sync)
 }
 
 func (mc *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Object, error) {
@@ -174,9 +182,7 @@ func (p *ProjectController) sync(key string, project *v3.Project) (runtime.Objec
 			if target.ProjectName == key {
 				toUpdate = mcApp.DeepCopy()
 				toUpdate.Spec.Targets = append(toUpdate.Spec.Targets[:i], toUpdate.Spec.Targets[i+1:]...)
-				if err := p.updateAnswers(clusterName, key, toUpdate); err != nil {
-					return project, err
-				}
+				p.updateAnswersForProject(key, toUpdate)
 				break
 			}
 		}
@@ -189,58 +195,52 @@ func (p *ProjectController) sync(key string, project *v3.Project) (runtime.Objec
 	return project, nil
 }
 
-func (p *ProjectController) updateAnswers(clusterName string, projectName string, mcapp *v3.MultiClusterApp) error {
-	deleted, err := p.clusterDeleted(clusterName, mcapp)
-	if err != nil {
-		return err
-	}
-	if deleted {
-		for i := len(mcapp.Spec.Answers) - 1; i >= 0; i-- {
-			projClusterName, _ := ref.Parse(mcapp.Spec.Answers[i].ProjectName)
-			if mcapp.Spec.Answers[i].ClusterName == clusterName || projClusterName == clusterName {
-				mcapp.Spec.Answers = append(mcapp.Spec.Answers[:i], mcapp.Spec.Answers[i+1:]...)
-			}
-		}
-		return nil
-	}
+func (p *ProjectController) updateAnswersForProject(projectName string, mcapp *v3.MultiClusterApp) {
 	for i := len(mcapp.Spec.Answers) - 1; i >= 0; i-- {
 		if mcapp.Spec.Answers[i].ProjectName == projectName {
 			mcapp.Spec.Answers = append(mcapp.Spec.Answers[:i], mcapp.Spec.Answers[i+1:]...)
 			break
 		}
 	}
-	return nil
 }
 
-func (p *ProjectController) clusterDeleted(clusterName string, mcapp *v3.MultiClusterApp) (bool, error) {
-	cluster, err := p.clusterLister.Get("", clusterName)
+func (c *ClusterController) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
+	if cluster != nil && cluster.DeletionTimestamp == nil {
+		return cluster, nil
+	}
+	mcApps, err := c.mcAppsLister.List(namespace.GlobalNamespace, labels.NewSelector())
 	if err != nil {
-		if !errors.IsNotFound(err) {
-			return false, err
+		return cluster, err
+	}
+	for _, mcApp := range mcApps {
+		if mcApp.DeletionTimestamp != nil {
+			continue
 		}
-		//  check if cluster override is there in targets, if yes then make sure it is deleted
-		if clusterOverrideExists(clusterName, mcapp) {
-			cluster, err = p.clusters.Get(clusterName, metav1.GetOptions{})
-			if err != nil {
-				if !errors.IsNotFound(err) {
-					return false, err
+		var toUpdate *v3.MultiClusterApp
+		for i := len(mcApp.Spec.Targets) - 1; i >= 0; i-- {
+			clusterName, _ := ref.Parse(mcApp.Spec.Targets[i].ProjectName)
+			if clusterName == key {
+				if toUpdate == nil {
+					toUpdate = mcApp.DeepCopy()
 				}
-				return true, nil
+				toUpdate.Spec.Targets = append(toUpdate.Spec.Targets[:i], toUpdate.Spec.Targets[i+1:]...)
 			}
 		}
-
-	}
-	if cluster == nil || cluster.DeletionTimestamp != nil {
-		return true, nil
-	}
-	return false, nil
-}
-
-func clusterOverrideExists(clusterName string, mcapp *v3.MultiClusterApp) bool {
-	for _, ans := range mcapp.Spec.Answers {
-		if ans.ClusterName == clusterName && ans.ProjectName == "" {
-			return true
+		if toUpdate != nil {
+			c.updateAnswersForCluster(key, toUpdate)
+			if _, err := c.mcApps.Update(toUpdate); err != nil {
+				return cluster, fmt.Errorf("error updating mcapp %s for cluster %s", mcApp.Name, key)
+			}
 		}
 	}
-	return false
+	return cluster, nil
+}
+
+func (c *ClusterController) updateAnswersForCluster(clusterName string, mcapp *v3.MultiClusterApp) {
+	for i := len(mcapp.Spec.Answers) - 1; i >= 0; i-- {
+		projClusterName, _ := ref.Parse(mcapp.Spec.Answers[i].ProjectName)
+		if mcapp.Spec.Answers[i].ClusterName == clusterName || projClusterName == clusterName {
+			mcapp.Spec.Answers = append(mcapp.Spec.Answers[:i], mcapp.Spec.Answers[i+1:]...)
+		}
+	}
 }
