@@ -180,7 +180,10 @@ func (p *Provisioner) pending(cluster *v3.Cluster) (*v3.Cluster, error) {
 		}
 
 		if driver == "" {
-			return cluster, &controller.ForgetError{Err: fmt.Errorf("waiting for full cluster configuration")}
+			return cluster, &controller.ForgetError{
+				Err:    fmt.Errorf("waiting for full cluster configuration"),
+				Reason: "Pending",
+			}
 		}
 
 		if driver != cluster.Status.Driver {
