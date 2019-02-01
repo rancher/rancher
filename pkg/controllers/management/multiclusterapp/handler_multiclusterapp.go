@@ -6,9 +6,12 @@ import (
 	access "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
 	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 	"strings"
 
@@ -34,6 +37,8 @@ type MCAppRevisionController struct {
 type ProjectController struct {
 	mcAppsLister  v3.MultiClusterAppLister
 	mcApps        v3.MultiClusterAppInterface
+	clusters      v3.ClusterInterface
+	clusterLister v3.ClusterLister
 	projectLister v3.ProjectLister
 }
 
@@ -53,6 +58,8 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	p := ProjectController{
 		mcAppsLister:  management.Management.MultiClusterApps("").Controller().Lister(),
 		mcApps:        management.Management.MultiClusterApps(""),
+		clusters:      management.Management.Clusters(""),
+		clusterLister: management.Management.Clusters("").Controller().Lister(),
 		projectLister: projects.Controller().Lister(),
 	}
 	m.multiClusterApps.AddHandler(ctx, "management-multiclusterapp-controller", m.sync)
@@ -152,7 +159,8 @@ func (p *ProjectController) sync(key string, project *v3.Project) (runtime.Objec
 	if len(splitKey) != 2 || splitKey[0] == "" || splitKey[1] == "" {
 		return project, fmt.Errorf("invalid project id %s", key)
 	}
-	key = fmt.Sprintf("%s:%s", splitKey[0], splitKey[1])
+	clusterName, projectName := splitKey[0], splitKey[1]
+	key = fmt.Sprintf("%s:%s", clusterName, projectName)
 	mcApps, err := p.mcAppsLister.List(namespace.GlobalNamespace, labels.NewSelector())
 	if err != nil {
 		return project, err
@@ -166,6 +174,9 @@ func (p *ProjectController) sync(key string, project *v3.Project) (runtime.Objec
 			if target.ProjectName == key {
 				toUpdate = mcApp.DeepCopy()
 				toUpdate.Spec.Targets = append(toUpdate.Spec.Targets[:i], toUpdate.Spec.Targets[i+1:]...)
+				if err := p.updateAnswers(clusterName, key, toUpdate); err != nil {
+					return project, err
+				}
 				break
 			}
 		}
@@ -176,4 +187,60 @@ func (p *ProjectController) sync(key string, project *v3.Project) (runtime.Objec
 		}
 	}
 	return project, nil
+}
+
+func (p *ProjectController) updateAnswers(clusterName string, projectName string, mcapp *v3.MultiClusterApp) error {
+	deleted, err := p.clusterDeleted(clusterName, mcapp)
+	if err != nil {
+		return err
+	}
+	if deleted {
+		for i := len(mcapp.Spec.Answers) - 1; i >= 0; i-- {
+			projClusterName, _ := ref.Parse(mcapp.Spec.Answers[i].ProjectName)
+			if mcapp.Spec.Answers[i].ClusterName == clusterName || projClusterName == clusterName {
+				mcapp.Spec.Answers = append(mcapp.Spec.Answers[:i], mcapp.Spec.Answers[i+1:]...)
+			}
+		}
+		return nil
+	}
+	for i := len(mcapp.Spec.Answers) - 1; i >= 0; i-- {
+		if mcapp.Spec.Answers[i].ProjectName == projectName {
+			mcapp.Spec.Answers = append(mcapp.Spec.Answers[:i], mcapp.Spec.Answers[i+1:]...)
+			break
+		}
+	}
+	return nil
+}
+
+func (p *ProjectController) clusterDeleted(clusterName string, mcapp *v3.MultiClusterApp) (bool, error) {
+	cluster, err := p.clusterLister.Get("", clusterName)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return false, err
+		}
+		//  check if cluster override is there in targets, if yes then make sure it is deleted
+		if clusterOverrideExists(clusterName, mcapp) {
+			cluster, err = p.clusters.Get(clusterName, metav1.GetOptions{})
+			if err != nil {
+				if !errors.IsNotFound(err) {
+					return false, err
+				}
+				return true, nil
+			}
+		}
+
+	}
+	if cluster == nil || cluster.DeletionTimestamp != nil {
+		return true, nil
+	}
+	return false, nil
+}
+
+func clusterOverrideExists(clusterName string, mcapp *v3.MultiClusterApp) bool {
+	for _, ans := range mcapp.Spec.Answers {
+		if ans.ClusterName == clusterName && ans.ProjectName == "" {
+			return true
+		}
+	}
+	return false
 }
