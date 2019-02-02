@@ -504,12 +504,6 @@ func (d *Driver) ETCDRestore(ctx context.Context, clusterInfo *types.ClusterInfo
 	defer d.cleanup(stateDir)
 
 	dialers, externalFlags := d.getFlags(rkeConfig, stateDir)
-	if err := cmd.RestoreEtcdSnapshot(ctx, &rkeConfig, dialers, externalFlags, snapshotName); err != nil {
-		return err
-	}
-	clientset, err := d.getClientset(clusterInfo)
-	if err != nil {
-		return fmt.Errorf("failed to create clientset: %v", err)
-	}
-	return util.RestartCattleNodeAgent(clientset)
+
+	return cmd.RestoreEtcdSnapshot(ctx, &rkeConfig, dialers, externalFlags, snapshotName)
 }
