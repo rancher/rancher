@@ -141,6 +141,7 @@ type SyslogConfig struct {
 	Program     string `json:"program,omitempty"`
 	Protocol    string `json:"protocol,omitempty" norman:"default=udp,type=enum,options=udp|tcp"`
 	Token       string `json:"token,omitempty" norman:"type=password"`
+	EnableTLS   bool   `json:"enableTls,omitempty" norman:"default=false"`
 	Certificate string `json:"certificate,omitempty"`
 	ClientCert  string `json:"clientCert,omitempty"`
 	ClientKey   string `json:"clientKey,omitempty"`
