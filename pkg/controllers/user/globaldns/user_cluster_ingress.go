@@ -150,6 +150,11 @@ func (ic *UserIngressController) doesGlobalDNSTargetCurrentCluster(globalDNS *v3
 			return false, err
 		}
 		mcapp, err := ic.multiclusterappLister.Get(namespace.GlobalNamespace, mcappName)
+		if err != nil && k8serrors.IsNotFound(err) {
+			logrus.Debugf("UserIngressController: reconcileallgdns, multiclusterapp not found by name %v, might be marked for deletion", mcappName)
+			//pass the check and let the controller continue in this case, it will enqueue update to globaldns and the other controller will figure out the endpoint updates
+			return true, nil
+		}
 		if err != nil {
 			return false, err
 		}
