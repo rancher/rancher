@@ -3,8 +3,8 @@ package multiclusterapp
 import (
 	"context"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 
@@ -42,6 +42,7 @@ type MCAppController struct {
 	multiClusterAppRevisions      v3.MultiClusterAppRevisionInterface
 	multiClusterAppRevisionLister v3.MultiClusterAppRevisionLister
 	namespaces                    corev1.NamespaceInterface
+	nsLister                      corev1.NamespaceLister
 	templateVersionLister         v3.CatalogTemplateVersionLister
 	clusterLister                 v3.ClusterLister
 	projectLister                 v3.ProjectLister
@@ -57,6 +58,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		multiClusterApps:              mcApps,
 		multiClusterAppRevisions:      cluster.Management.Management.MultiClusterAppRevisions(""),
 		multiClusterAppRevisionLister: cluster.Management.Management.MultiClusterAppRevisions("").Controller().Lister(),
+		nsLister:                      cluster.Core.Namespaces("").Controller().Lister(),
 		clusterLister:                 cluster.Management.Management.Clusters("").Controller().Lister(),
 		projectLister:                 cluster.Management.Management.Projects("").Controller().Lister(),
 		clusterName:                   cluster.ClusterName,
@@ -339,41 +341,54 @@ func (m *MCAppController) createNamespaceAndApp(t *v3.Target, mcapp *v3.MultiClu
 	set map[string]string, projectNS string, creatorID string, externalID string) (*v3.Target, *v3.MultiClusterApp, error) {
 	// Create the target namespace first
 	// Adding the projectId as an annotation is necessary, else the API/UI and UI won't list any of the resources from this namespace
-	n := v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: mcapp.Name + "-",
-			Labels:       map[string]string{projectIDFieldLabel: projectNS},
-			Annotations:  map[string]string{projectIDFieldLabel: t.ProjectName, creatorIDAnn: creatorID},
-		},
-	}
-	ns, err := m.namespaces.Create(&n)
+	nsName := getAppNamespaceName(mcapp.Name, projectNS)
+	ns, err := m.nsLister.Get("", nsName)
 	if err != nil {
-		return nil, mcapp, err
+		if !apierrors.IsNotFound(err) {
+			return nil, nil, err
+		}
 	}
-
-	app := pv3.App{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        ns.Name,
-			Namespace:   projectNS,
-			Annotations: ann,
-			Labels:      set,
-		},
-		Spec: pv3.AppSpec{
-			ProjectName:         t.ProjectName,
-			TargetNamespace:     ns.Name,
-			ExternalID:          externalID,
-			MultiClusterAppName: mcapp.Name,
-		},
+	if ns == nil {
+		n := v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        nsName,
+				Labels:      map[string]string{projectIDFieldLabel: projectNS, multiClusterAppIDSelector: mcapp.Name},
+				Annotations: map[string]string{projectIDFieldLabel: t.ProjectName, creatorIDAnn: creatorID},
+			},
+		}
+		ns, err = m.namespaces.Create(&n)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return nil, mcapp, err
+		}
 	}
-
-	app.Spec.Answers = getAnswerMap(answerMap, t.ProjectName)
-	// Now create the App instance
-	createdApp, err := m.apps.Create(&app)
-	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return nil, mcapp, err
+	app, err := m.appLister.Get(projectNS, ns.Name)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, mcapp, err
+		}
+		toCreate := pv3.App{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        ns.Name,
+				Namespace:   projectNS,
+				Annotations: ann,
+				Labels:      set,
+			},
+			Spec: pv3.AppSpec{
+				ProjectName:         t.ProjectName,
+				TargetNamespace:     ns.Name,
+				ExternalID:          externalID,
+				MultiClusterAppName: mcapp.Name,
+				Answers:             getAnswerMap(answerMap, t.ProjectName),
+			},
+		}
+		// Now create the App instance
+		app, err = m.apps.Create(&toCreate)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return nil, mcapp, err
+		}
 	}
 	// App creation is successful, so set Target.AppID = createdApp.Name
-	t.AppName = createdApp.Name
+	t.AppName = app.Name
 	return t, mcapp, nil
 }
 
@@ -405,7 +420,7 @@ func (m *MCAppController) deleteApps(mcAppName string, mcapp *v3.MultiClusterApp
 	var err error
 
 	if mcapp == nil {
-		appsToDelete, err = m.getAllApps(mcAppName)
+		appsToDelete, err = m.getAllApps(mcAppName, true)
 		if err != nil {
 			return nil, err
 		}
@@ -430,7 +445,7 @@ func (m *MCAppController) deleteApps(mcAppName string, mcapp *v3.MultiClusterApp
 	return nil, nil
 }
 
-func (m *MCAppController) getAllApps(mcAppName string) ([]*pv3.App, error) {
+func (m *MCAppController) getAllApps(mcAppName string, all bool) ([]*pv3.App, error) {
 	// to get all apps, get all clusters first, then get all apps in all projects of all clusters
 	appsToDelete := []*pv3.App{}
 	set := labels.Set(map[string]string{multiClusterAppIDSelector: mcAppName})
@@ -439,6 +454,9 @@ func (m *MCAppController) getAllApps(mcAppName string) ([]*pv3.App, error) {
 		return appsToDelete, err
 	}
 	for _, c := range clusters {
+		if !all && m.clusterName != c.Name {
+			continue
+		}
 		projects, err := m.projectLister.List(c.Name, labels.NewSelector())
 		if err != nil {
 			return appsToDelete, err
@@ -455,34 +473,41 @@ func (m *MCAppController) getAllApps(mcAppName string) ([]*pv3.App, error) {
 }
 
 func (m *MCAppController) reconcileTargetsForDelete(mcapp *v3.MultiClusterApp) error {
-	existingApps := map[string][]string{}
+	existingNS := map[string]bool{}
 	for ind, t := range mcapp.Spec.Targets {
-		if t.AppName == "" {
-			continue
-		}
 		split := strings.SplitN(t.ProjectName, ":", 2)
 		if len(split) != 2 {
-			return fmt.Errorf("invalid project name %s", t.ProjectName)
+			return fmt.Errorf("error in splitting project ID %v", t.ProjectName)
 		}
-		existingApps[t.AppName] = []string{split[1], strconv.Itoa(ind)}
+		if split[0] != m.clusterName {
+			continue
+		}
+		projectNS := split[1]
+		nsName := getAppNamespaceName(mcapp.Name, projectNS)
+		ns, err := m.nsLister.Get("", nsName)
+		if err != nil {
+			if !apierrors.IsNotFound(err) {
+				return err
+			}
+		}
+		if ns == nil {
+			mcapp.Spec.Targets[ind].AppName = ""
+		} else {
+			existingNS[ns.Name] = true
+		}
 	}
-	allApps, err := m.getAllApps(mcapp.Name)
+	allApps, err := m.getAllApps(mcapp.Name, false)
 	if err != nil {
 		return err
 	}
 	toDelete := []*pv3.App{}
 	for _, app := range allApps {
-		val, ok := existingApps[app.Name]
-		if !ok {
+		if _, ok := existingNS[app.Spec.TargetNamespace]; !ok {
 			toDelete = append(toDelete, app)
-		} else if val[0] != app.Namespace {
-			toDelete = append(toDelete, app)
-			ind, err := strconv.Atoi(val[1])
-			if err != nil {
-				return err
-			}
-			mcapp.Spec.Targets[ind].AppName = ""
 		}
+	}
+	if len(toDelete) > 0 {
+		logrus.Debugf("deleting apps for mcapp %s toDelete %v", mcapp.Name, toDelete)
 	}
 	return m.delete(toDelete)
 }
@@ -618,4 +643,8 @@ func (m *MCAppController) getExternalID(mcapp *v3.MultiClusterApp) (string, *v3.
 
 	externalID := tv.Spec.ExternalID
 	return externalID, mcapp, nil
+}
+
+func getAppNamespaceName(mcappName, projectNS string) string {
+	return fmt.Sprintf("%s-%s", mcappName, projectNS)
 }
