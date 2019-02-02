@@ -7,6 +7,8 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"strings"
 )
@@ -43,6 +45,10 @@ func (m *MCAppStateController) sync(key string, mcapp *v3.MultiClusterApp) (runt
 		if t.AppName != "" {
 			app, err := m.Apps.Get(projectNS, t.AppName)
 			if err != nil {
+				if errors.IsNotFound(err) {
+					logrus.Infof("app %s not found for mcapp %s in projectNS %s", t.AppName, mcapp.Name, projectNS)
+					continue
+				}
 				return mcapp, err
 			}
 			if value, ok := app.Labels[multiClusterAppIDSelector]; !ok || value != mcapp.Name {
