@@ -118,11 +118,12 @@ func (n *ProviderLauncher) handleRoute53Provider(obj *v3.GlobalDNSProvider) (run
 
 	//create external-dns route53 provider
 	data := map[string]interface{}{
-		"awsAccessKey":   obj.Spec.Route53ProviderConfig.AccessKey,
-		"awsSecretKey":   obj.Spec.Route53ProviderConfig.SecretKey,
-		"route53Domain":  obj.Spec.Route53ProviderConfig.RootDomain,
-		"deploymentName": obj.Name,
-		"identifier":     rancherInstallUUID + "_" + obj.Name,
+		"awsAccessKey":     obj.Spec.Route53ProviderConfig.AccessKey,
+		"awsSecretKey":     obj.Spec.Route53ProviderConfig.SecretKey,
+		"route53Domain":    obj.Spec.Route53ProviderConfig.RootDomain,
+		"deploymentName":   obj.Name,
+		"identifier":       rancherInstallUUID + "_" + obj.Name,
+		"externalDnsImage": v3.ToolsSystemImages.GlobalDNSSystemImages.ExternalDNS,
 	}
 	if err := n.createExternalDNSDeployment(obj, data, Route53DeploymentTemplate, Route53DNSProvider); err != nil {
 		return nil, err
@@ -140,6 +141,7 @@ func (n *ProviderLauncher) handleCloudflareProvider(obj *v3.GlobalDNSProvider) (
 		"cloudflareDomain": obj.Spec.CloudflareProviderConfig.RootDomain,
 		"deploymentName":   obj.Name,
 		"identifier":       rancherInstallUUID + "_" + obj.Name,
+		"externalDnsImage": v3.ToolsSystemImages.GlobalDNSSystemImages.ExternalDNS,
 	}
 	if err := n.createExternalDNSDeployment(obj, data, CloudflareDeploymentTemplate, CloudflareDNSProvider); err != nil {
 		return nil, err
@@ -151,10 +153,11 @@ func (n *ProviderLauncher) handleCloudflareProvider(obj *v3.GlobalDNSProvider) (
 func (n *ProviderLauncher) handleAlidnsProvider(obj *v3.GlobalDNSProvider) (runtime.Object, error) {
 	//create external-dns alidns provider
 	data := map[string]interface{}{
-		"accessKey":    obj.Spec.AlidnsProviderConfig.AccessKey,
-		"secretKey":    obj.Spec.AlidnsProviderConfig.SecretKey,
-		"rootDomain":   obj.Spec.AlidnsProviderConfig.RootDomain,
-		"providerName": obj.Name,
+		"accessKey":        obj.Spec.AlidnsProviderConfig.AccessKey,
+		"secretKey":        obj.Spec.AlidnsProviderConfig.SecretKey,
+		"rootDomain":       obj.Spec.AlidnsProviderConfig.RootDomain,
+		"providerName":     obj.Name,
+		"externalDnsImage": v3.ToolsSystemImages.GlobalDNSSystemImages.ExternalDNS,
 	}
 	if err := n.createExternalDNSSecret(obj, data, AlidnsSecretTemplate, AliDNSProvider); err != nil {
 		return nil, err
@@ -286,11 +289,9 @@ func (n *ProviderLauncher) createExternalDNSSecret(obj *v3.GlobalDNSProvider, da
 	}}
 	secret.ObjectMeta.OwnerReferences = ownerRef
 
-	secretCreated, err := n.Secrets.Create(secret)
-	if err != nil {
+	if _, err := n.Secrets.Create(secret); err != nil && !k8serrors.IsAlreadyExists(err) {
 		return fmt.Errorf("GlobaldnsProviderLauncher: Error creating external-dns secret for %s provider: %v ", globalDNSName, err)
 	}
-	logrus.Infof("GlobaldnsProviderLauncher: Created %s external-dns provider secret %v", globalDNSName, secretCreated.Name)
 	return nil
 }
 

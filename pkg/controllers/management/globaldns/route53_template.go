@@ -16,7 +16,7 @@ spec:
       serviceAccountName: external-dns
       containers:
       - name: {{.deploymentName}}
-        image: registry.opensource.zalan.do/teapot/external-dns:latest
+        image: {{.externalDnsImage}}
         env:
         - name: AWS_SECRET_ACCESS_KEY
           value: {{.awsSecretKey}}
