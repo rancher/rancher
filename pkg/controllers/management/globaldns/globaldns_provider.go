@@ -29,6 +29,7 @@ import (
 const (
 	Route53DNSProvider        = "route53"
 	CloudflareDNSProvider     = "cloudflare"
+	AliDNSProvider            = "alidns"
 	GlobaldnsProviderLauncher = "mgmt-global-dns-provider-launcher"
 )
 
@@ -36,6 +37,7 @@ type ProviderLauncher struct {
 	GlobalDNSproviders      v3.GlobalDNSProviderInterface
 	GlobalDNSproviderLister v3.GlobalDNSProviderLister
 	Deployments             extv1beta1.DeploymentInterface
+	Secrets                 corev1.SecretInterface
 	ServiceAccounts         corev1.ServiceAccountInterface
 	ClusterRoles            rbacv1.ClusterRoleInterface
 	ClusterRoleBindings     rbacv1.ClusterRoleBindingInterface
@@ -47,6 +49,7 @@ func newGlobalDNSProviderLauncher(ctx context.Context, mgmt *config.ManagementCo
 		GlobalDNSproviders:      mgmt.Management.GlobalDNSProviders(namespace.GlobalNamespace),
 		GlobalDNSproviderLister: mgmt.Management.GlobalDNSProviders(namespace.GlobalNamespace).Controller().Lister(),
 		Deployments:             mgmt.K8sClient.ExtensionsV1beta1().Deployments(namespace.GlobalNamespace),
+		Secrets:                 mgmt.K8sClient.CoreV1().Secrets(namespace.GlobalNamespace),
 		ServiceAccounts:         mgmt.K8sClient.CoreV1().ServiceAccounts(namespace.GlobalNamespace),
 		ClusterRoles:            mgmt.K8sClient.RbacV1beta1().ClusterRoles(),
 		ClusterRoleBindings:     mgmt.K8sClient.RbacV1beta1().ClusterRoleBindings(),
@@ -99,6 +102,10 @@ func (n *ProviderLauncher) sync(key string, obj *v3.GlobalDNSProvider) (runtime.
 		return n.handleCloudflareProvider(obj)
 	}
 
+	if obj.Spec.AlidnsProviderConfig != nil {
+		return n.handleAlidnsProvider(obj)
+	}
+
 	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.GlobalDNSProviderResource, obj.Name,
 		obj.UID, obj.Spec.Members, creatorID, n.managementContext); err != nil {
 		return nil, err
@@ -135,6 +142,24 @@ func (n *ProviderLauncher) handleCloudflareProvider(obj *v3.GlobalDNSProvider) (
 		"identifier":       rancherInstallUUID + "_" + obj.Name,
 	}
 	if err := n.createExternalDNSDeployment(obj, data, CloudflareDeploymentTemplate, CloudflareDNSProvider); err != nil {
+		return nil, err
+	}
+
+	return nil, nil
+}
+
+func (n *ProviderLauncher) handleAlidnsProvider(obj *v3.GlobalDNSProvider) (runtime.Object, error) {
+	//create external-dns alidns provider
+	data := map[string]interface{}{
+		"accessKey":    obj.Spec.AlidnsProviderConfig.AccessKey,
+		"secretKey":    obj.Spec.AlidnsProviderConfig.SecretKey,
+		"rootDomain":   obj.Spec.AlidnsProviderConfig.RootDomain,
+		"providerName": obj.Name,
+	}
+	if err := n.createExternalDNSSecret(obj, data, AlidnsSecretTemplate, AliDNSProvider); err != nil {
+		return nil, err
+	}
+	if err := n.createExternalDNSDeployment(obj, data, AlidnsDeploymentTemplate, AliDNSProvider); err != nil {
 		return nil, err
 	}
 
@@ -220,20 +245,10 @@ func (n *ProviderLauncher) createExternalDNSClusterRoleBinding() error {
 }
 
 func (n *ProviderLauncher) createExternalDNSDeployment(obj *v3.GlobalDNSProvider, data map[string]interface{}, globalDNSTemplate, globalDNSName string) error {
-	//create external-dns provider
-	externalDNSTemplate := template.Must(template.New(globalDNSName).Parse(globalDNSTemplate))
-	var output bytes.Buffer
-	//create external-dns cloudflare provider
-	if err := externalDNSTemplate.Execute(&output, data); err != nil {
-		return fmt.Errorf("GlobaldnsProviderLauncher: Error parsing the external-dns/%s deployment template: %v", globalDNSName, err)
-	}
-
-	decode := scheme.Codecs.UniversalDeserializer().Decode
-	deployObj, _, err := decode(output.Bytes(), nil, nil)
+	deployObj, err := n.parseExternalDNSTemplate(data, globalDNSTemplate, globalDNSName)
 	if err != nil {
-		return fmt.Errorf("GlobaldnsProviderLauncher: Error decoding  external-dns/%s deployment template to Kubernetes Object: %v", globalDNSName, err)
+		return err
 	}
-
 	deployment := deployObj.(*v1beta1.Deployment)
 	//set ownerRef to the dnsProvider CR
 	controller := true
@@ -252,4 +267,44 @@ func (n *ProviderLauncher) createExternalDNSDeployment(obj *v3.GlobalDNSProvider
 	}
 	logrus.Infof("GlobaldnsProviderLauncher: Created %s external-dns provider deployment %v", globalDNSName, deploymentCreated.Name)
 	return nil
+}
+
+func (n *ProviderLauncher) createExternalDNSSecret(obj *v3.GlobalDNSProvider, data map[string]interface{}, globalDNSTemplate, globalDNSName string) error {
+	secretObj, err := n.parseExternalDNSTemplate(data, globalDNSTemplate, globalDNSName)
+	if err != nil {
+		return err
+	}
+	secret := secretObj.(*v1.Secret)
+	//set ownerRef to the dnsProvider CR
+	controller := true
+	ownerRef := []metav1.OwnerReference{{
+		Name:       obj.Name,
+		APIVersion: "v3",
+		UID:        obj.UID,
+		Kind:       obj.Kind,
+		Controller: &controller,
+	}}
+	secret.ObjectMeta.OwnerReferences = ownerRef
+
+	secretCreated, err := n.Secrets.Create(secret)
+	if err != nil {
+		return fmt.Errorf("GlobaldnsProviderLauncher: Error creating external-dns secret for %s provider: %v ", globalDNSName, err)
+	}
+	logrus.Infof("GlobaldnsProviderLauncher: Created %s external-dns provider secret %v", globalDNSName, secretCreated.Name)
+	return nil
+}
+
+func (n *ProviderLauncher) parseExternalDNSTemplate(data map[string]interface{}, globalDNSTemplate, globalDNSName string) (runtime.Object, error) {
+	externalDNSTemplate := template.Must(template.New(globalDNSName).Parse(globalDNSTemplate))
+	var output bytes.Buffer
+	if err := externalDNSTemplate.Execute(&output, data); err != nil {
+		return nil, fmt.Errorf("GlobaldnsProviderLauncher: Error parsing the external-dns/%s template: %v", globalDNSName, err)
+	}
+
+	decode := scheme.Codecs.UniversalDeserializer().Decode
+	resourceObj, _, err := decode(output.Bytes(), nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("GlobaldnsProviderLauncher: Error decoding  external-dns/%s template to Kubernetes Object: %v", globalDNSName, err)
+	}
+	return resourceObj, nil
 }
