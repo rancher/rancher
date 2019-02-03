@@ -83,7 +83,7 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
 <filter cluster.**>
   @type grep
   <exclude>
-    key namespace
+    key $.kubernetes.namespace_name
     pattern {{.clusterTarget.ExcludeNamespace}}
   </exclude>
 </filter>
