@@ -49,6 +49,7 @@ const (
 
 //ssl
 const (
+	DefaultCertDir = "/fluentd/etc/config/ssl"
 	CaFileName     = "ca.pem"
 	ClientCertName = "client-cert.pem"
 	ClientKeyName  = "client-key.pem"

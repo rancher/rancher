@@ -118,12 +118,12 @@ var ProjectTemplate = `
       ssl_version {{ $store.ElasticsearchConfig.SSLVersion }}
 
       {{- if $store.ElasticsearchConfig.Certificate }}
-      ca_file /fluentd/etc/config/ssl/project_{{$store.WrapProjectName}}_ca.pem
+      ca_file {{ $.certDir}}/project_{{$store.WrapProjectName}}_ca.pem
       {{end }}
 
       {{- if and $store.ElasticsearchConfig.ClientCert $store.ElasticsearchConfig.ClientKey}}
-      client_cert /fluentd/etc/config/ssl/project_{{$store.WrapProjectName}}_client-cert.pem
-      client_key /fluentd/etc/config/ssl/project_{{$store.WrapProjectName}}_client-key.pem
+      client_cert {{ $.certDir}}/project_{{$store.WrapProjectName}}_client-cert.pem
+      client_key {{ $.certDir}}/project_{{$store.WrapProjectName}}_client-key.pem
       {{end }}
 
       {{- if $store.ElasticsearchConfig.ClientKeyPass}}
@@ -149,12 +149,12 @@ var ProjectTemplate = `
       ssl_verify {{$store.SplunkConfig.SSLVerify}}    
 
       {{- if $store.SplunkConfig.Certificate }}    
-      ca_file /fluentd/etc/config/ssl/project_{{$store.WrapProjectName}}_ca.pem
+      ca_file {{ $.certDir}}/project_{{$store.WrapProjectName}}_ca.pem
       {{end }}
 
       {{- if and $store.SplunkConfig.ClientCert $store.SplunkConfig.ClientKey}}    
-      client_cert /fluentd/etc/config/ssl/project_{{$store.WrapProjectName}}_client-cert.pem
-      client_key /fluentd/etc/config/ssl/project_{{$store.WrapProjectName}}_client-key.pem
+      client_cert {{ $.certDir}}/project_{{$store.WrapProjectName}}_client-cert.pem
+      client_key {{ $.certDir}}/project_{{$store.WrapProjectName}}_client-key.pem
       {{end }}
 
       {{- if $store.SplunkConfig.ClientKeyPass}}    
@@ -177,12 +177,12 @@ var ProjectTemplate = `
       max_send_retries 3
 
       {{- if $store.KafkaConfig.Certificate }}        
-      ssl_ca_cert /fluentd/etc/config/ssl/project_{{$store.WrapProjectName}}_ca.pem
+      ssl_ca_cert {{ $.certDir}}/project_{{$store.WrapProjectName}}_ca.pem
       {{end }}
 
       {{- if and $store.KafkaConfig.ClientCert $store.KafkaConfig.ClientKey}}        
-      ssl_client_cert /fluentd/etc/config/ssl/project_{{$store.WrapProjectName}}_client-cert.pem
-      ssl_client_cert_key /fluentd/etc/config/ssl/project_{{$store.WrapProjectName}}_client-key.pem
+      ssl_client_cert {{ $.certDir}}/project_{{$store.WrapProjectName}}_client-cert.pem
+      ssl_client_cert_key {{ $.certDir}}/project_{{$store.WrapProjectName}}_client-key.pem
       {{end }}
 
       {{- if and $store.KafkaConfig.SaslUsername $store.KafkaConfig.SaslPassword}}        
@@ -216,16 +216,15 @@ var ProjectTemplate = `
       {{end }}
 
       {{- if $store.SyslogConfig.EnableTLS }}
-      tls true        
-      {{end}}
-
+      tls true
       {{- if $store.SyslogConfig.Certificate }}
-      ca_file /fluentd/etc/config/ssl/project_{{$store.WrapProjectName}}_ca.pem
+      ca_file {{ $.certDir}}/project_{{$store.WrapProjectName}}_ca.pem
+      {{end }}
       {{end }}
 
       {{- if and $store.SyslogConfig.ClientCert $store.SyslogConfig.ClientKey}}        
-      client_cert /fluentd/etc/config/ssl/project_{{$store.WrapProjectName}}_client-cert.pem
-      client_cert_key /fluentd/etc/config/ssl/project_{{$store.WrapProjectName}}_client-key.pem
+      client_cert {{ $.certDir}}/project_{{$store.WrapProjectName}}_client-cert.pem
+      client_cert_key {{ $.certDir}}/project_{{$store.WrapProjectName}}_client-key.pem
       {{end }}
       {{end }}
 
@@ -237,7 +236,7 @@ var ProjectTemplate = `
       tls_verify_hostname true
       {{end }}
       {{- if $store.FluentForwarderConfig.Certificate }}
-      tls_cert_path /fluentd/etc/config/ssl/project_{{$store.WrapProjectName}}_ca.pem
+      tls_cert_path {{ $.certDir}}/project_{{$store.WrapProjectName}}_ca.pem
       {{end }}  
 
       {{- if $store.FluentForwarderConfig.Compress }}
