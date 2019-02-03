@@ -283,10 +283,10 @@ var ProjectTemplate = `
         {{- if eq $store.CurrentTarget "splunk"}}
         chunk_limit_size 8m
         {{end }}
+        queued_chunks_limit_size 200
       </buffer> 
 
       slow_flush_log_threshold 40.0
-      queued_chunks_limit_size 200
       {{end }}
 
       {{- if eq $store.CurrentTarget "customtarget"}}
