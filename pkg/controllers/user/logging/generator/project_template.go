@@ -215,8 +215,11 @@ var ProjectTemplate = `
       verify_mode 0
       {{end }}
 
-      {{- if $store.SyslogConfig.Certificate }}
+      {{- if $store.SyslogConfig.EnableTLS }}
       tls true        
+      {{end}}
+
+      {{- if $store.SyslogConfig.Certificate }}
       ca_file /fluentd/etc/config/ssl/project_{{$store.WrapProjectName}}_ca.pem
       {{end }}
 

@@ -65,7 +65,7 @@ func (e *endpointWatcher) checkClusterTarget() error {
 	if wl == nil {
 		err = nil
 	} else {
-		err = wl.TestReachable(clusterDialer)
+		err = wl.TestReachable(clusterDialer, false)
 	}
 
 	updatedObj := setClusterLoggingErrMsg(obj, err)
@@ -96,7 +96,7 @@ func (e *endpointWatcher) checkProjectTarget() error {
 		if wp == nil {
 			err = nil
 		} else {
-			err = wp.TestReachable(clusterDialer)
+			err = wp.TestReachable(clusterDialer, false)
 		}
 
 		updatedObj := setProjectLoggingErrMsg(v, err)
