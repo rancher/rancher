@@ -31,7 +31,7 @@ type ConfigGenerator struct {
 	namespaceLister      v1.NamespaceLister
 }
 
-func (s *ConfigGenerator) GenerateClusterLoggingConfig(clusterLogging *mgmtv3.ClusterLogging, systemProjectID string) ([]byte, error) {
+func (s *ConfigGenerator) GenerateClusterLoggingConfig(clusterLogging *mgmtv3.ClusterLogging, systemProjectID, certDir string) ([]byte, error) {
 	if clusterLogging == nil {
 		return []byte{}, nil
 	}
@@ -44,7 +44,7 @@ func (s *ConfigGenerator) GenerateClusterLoggingConfig(clusterLogging *mgmtv3.Cl
 		}
 	}
 
-	buf, err := generator.GenerateClusterConfig(clusterLogging.Spec, excludeNamespaces)
+	buf, err := generator.GenerateClusterConfig(clusterLogging.Spec, excludeNamespaces, certDir)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func (s *ConfigGenerator) GenerateClusterLoggingConfig(clusterLogging *mgmtv3.Cl
 	return buf, nil
 }
 
-func (s *ConfigGenerator) GenerateProjectLoggingConfig(projectLoggings []*mgmtv3.ProjectLogging, systemProjectID string) ([]byte, error) {
+func (s *ConfigGenerator) GenerateProjectLoggingConfig(projectLoggings []*mgmtv3.ProjectLogging, systemProjectID, certDir string) ([]byte, error) {
 	if len(projectLoggings) == 0 {
 		allProjectLoggings, err := s.projectLoggingLister.List("", labels.NewSelector())
 		if err != nil {
@@ -79,7 +79,7 @@ func (s *ConfigGenerator) GenerateProjectLoggingConfig(projectLoggings []*mgmtv3
 		return nil, errors.Wrap(err, "list namespace failed")
 	}
 
-	buf, err := generator.GenerateProjectConfig(projectLoggings, namespaces, systemProjectID)
+	buf, err := generator.GenerateProjectConfig(projectLoggings, namespaces, systemProjectID, certDir)
 	if err != nil {
 		return nil, err
 	}

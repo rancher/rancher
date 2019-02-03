@@ -142,7 +142,7 @@ func (s *ConfigSyncer) syncClusterConfig(clusterLoggings []*mgmtv3.ClusterLoggin
 		clusterLogging = clusterLoggings[0]
 	}
 
-	buf, err := s.configGenerator.GenerateClusterLoggingConfig(clusterLogging, systemProjectID)
+	buf, err := s.configGenerator.GenerateClusterLoggingConfig(clusterLogging, systemProjectID, loggingconfig.DefaultCertDir)
 	if err != nil {
 		return err
 	}
@@ -158,7 +158,7 @@ func (s *ConfigSyncer) syncProjectConfig(projectLoggings []*mgmtv3.ProjectLoggin
 	secretName := loggingconfig.RancherLoggingConfigSecretName()
 	namespace := loggingconfig.LoggingNamespace
 
-	buf, err := s.configGenerator.GenerateProjectLoggingConfig(projectLoggings, systemProjectID)
+	buf, err := s.configGenerator.GenerateProjectLoggingConfig(projectLoggings, systemProjectID, loggingconfig.DefaultCertDir)
 	if err != nil {
 		return err
 	}
@@ -176,16 +176,18 @@ func (s *ConfigSyncer) syncSSLCert(clusterLoggings []*mgmtv3.ClusterLogging, pro
 
 	sslConfig := make(map[string][]byte)
 	for _, v := range clusterLoggings {
-		ca, cert, key := getSSLConfig(v.Spec.ElasticsearchConfig, v.Spec.SplunkConfig, v.Spec.KafkaConfig, v.Spec.SyslogConfig, v.Spec.FluentForwarderConfig)
+		ca, cert, key := GetSSLConfig(v.Spec.LoggingTargets)
 		sslConfig[loggingconfig.SecretDataKeyCa(loggingconfig.ClusterLevel, v.Namespace)] = []byte(ca)
 		sslConfig[loggingconfig.SecretDataKeyCert(loggingconfig.ClusterLevel, v.Namespace)] = []byte(cert)
 		sslConfig[loggingconfig.SecretDataKeyCertKey(loggingconfig.ClusterLevel, v.Namespace)] = []byte(key)
 	}
 
 	for _, v := range projectLoggings {
-		ca, cert, key := getSSLConfig(v.Spec.ElasticsearchConfig, v.Spec.SplunkConfig, v.Spec.KafkaConfig, v.Spec.SyslogConfig, v.Spec.FluentForwarderConfig)
+		target := v.Spec.LoggingTargets
+		ca, cert, key := GetSSLConfig(target)
 		projectKey := strings.Replace(v.Spec.ProjectName, ":", "_", -1)
-		sslConfig[loggingconfig.SecretDataKeyCa(loggingconfig.ProjectLevel, projectKey)] = []byte(ca)
+		caByte := []byte(ca)
+		sslConfig[loggingconfig.SecretDataKeyCa(loggingconfig.ProjectLevel, projectKey)] = caByte
 		sslConfig[loggingconfig.SecretDataKeyCert(loggingconfig.ProjectLevel, projectKey)] = []byte(cert)
 		sslConfig[loggingconfig.SecretDataKeyCertKey(loggingconfig.ProjectLevel, projectKey)] = []byte(key)
 	}
@@ -193,26 +195,30 @@ func (s *ConfigSyncer) syncSSLCert(clusterLoggings []*mgmtv3.ClusterLogging, pro
 	return s.secretManager.updateSecret(secretname, namespace, sslConfig)
 }
 
-func getSSLConfig(esConfig *mgmtv3.ElasticsearchConfig, spConfig *mgmtv3.SplunkConfig, kfConfig *mgmtv3.KafkaConfig, syslogConfig *mgmtv3.SyslogConfig, fluentForwarder *mgmtv3.FluentForwarderConfig) (string, string, string) {
+func GetSSLConfig(target mgmtv3.LoggingTargets) (string, string, string) {
 	var certificate, clientCert, clientKey string
-	if esConfig != nil {
-		certificate = esConfig.Certificate
-		clientCert = esConfig.ClientCert
-		clientKey = esConfig.ClientKey
-	} else if spConfig != nil {
-		certificate = spConfig.Certificate
-		clientCert = spConfig.ClientCert
-		clientKey = spConfig.ClientKey
-	} else if kfConfig != nil {
-		certificate = kfConfig.Certificate
-		clientCert = kfConfig.ClientCert
-		clientKey = kfConfig.ClientKey
-	} else if syslogConfig != nil {
-		certificate = syslogConfig.Certificate
-		clientCert = syslogConfig.ClientCert
-		clientKey = syslogConfig.ClientKey
-	} else if fluentForwarder != nil {
-		certificate = fluentForwarder.Certificate
+	if target.ElasticsearchConfig != nil {
+		certificate = target.ElasticsearchConfig.Certificate
+		clientCert = target.ElasticsearchConfig.ClientCert
+		clientKey = target.ElasticsearchConfig.ClientKey
+	} else if target.SplunkConfig != nil {
+		certificate = target.SplunkConfig.Certificate
+		clientCert = target.SplunkConfig.ClientCert
+		clientKey = target.SplunkConfig.ClientKey
+	} else if target.KafkaConfig != nil {
+		certificate = target.KafkaConfig.Certificate
+		clientCert = target.KafkaConfig.ClientCert
+		clientKey = target.KafkaConfig.ClientKey
+	} else if target.SyslogConfig != nil {
+		certificate = target.SyslogConfig.Certificate
+		clientCert = target.SyslogConfig.ClientCert
+		clientKey = target.SyslogConfig.ClientKey
+	} else if target.FluentForwarderConfig != nil {
+		certificate = target.FluentForwarderConfig.Certificate
+	} else if target.CustomTargetConfig != nil {
+		certificate = target.CustomTargetConfig.Certificate
+		clientCert = target.CustomTargetConfig.ClientCert
+		clientKey = target.CustomTargetConfig.ClientKey
 	}
 
 	return certificate, clientCert, clientKey

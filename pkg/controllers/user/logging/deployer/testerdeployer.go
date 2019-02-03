@@ -70,7 +70,7 @@ func (d *TesterDeployer) deployLoggingTester(systemProjectID, systemProjectCreat
 			LoggingTargets: loggingTarget,
 			ClusterName:    clusterName,
 		}
-		buf, err := generator.GenerateClusterConfig(spec, "")
+		buf, err := generator.GenerateClusterConfig(spec, "", loggingconfig.DefaultCertDir)
 		if err != nil {
 			return err
 		}
@@ -98,7 +98,7 @@ func (d *TesterDeployer) deployLoggingTester(systemProjectID, systemProjectCreat
 
 		loggings := append(cur, new)
 
-		buf, err := generator.GenerateProjectConfig(loggings, namespaces, systemProjectID)
+		buf, err := generator.GenerateProjectConfig(loggings, namespaces, systemProjectID, loggingconfig.DefaultCertDir)
 		if err != nil {
 			return err
 		}

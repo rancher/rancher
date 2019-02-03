@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"path"
 	"strings"
 
 	"github.com/rancher/norman/condition"
@@ -17,13 +18,13 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/logging/deployer"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	mgmtv3client "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config/dialer"
 
 	"github.com/pkg/errors"
+	"github.com/satori/go.uuid"
 	k8scorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,28 +33,27 @@ import (
 )
 
 var (
-	fluentdCommand = "fluentd -q --dry-run -i "
+	fluentdCommand      = "fluentd -q --dry-run -i "
+	cleanCertDirCommand = "rm -rf "
+	tmpCertDirPrefix    = "/fluentd/etc/config/tmpCert"
 )
 
 type Handler struct {
 	clusterManager       *clustermanager.Manager
 	dialerFactory        dialer.Factory
-	k8sProxy             http.Handler
-	testerDeployer       *deployer.TesterDeployer
-	configGenerator      *configsyncer.ConfigGenerator
+	appsGetter           projectv3.AppsGetter
+	projectLister        mgmtv3.ProjectLister
+	templateLister       mgmtv3.CatalogTemplateLister
 	projectLoggingLister mgmtv3.ProjectLoggingLister
 }
 
-func NewHandler(dialer dialer.Factory, appsGetter projectv3.AppsGetter, projectLister mgmtv3.ProjectLister, pods v1.PodInterface, projectLoggingLister mgmtv3.ProjectLoggingLister, namespaces v1.NamespaceInterface, templateLister mgmtv3.CatalogTemplateLister, clusterManager *clustermanager.Manager, k8sProxy http.Handler) *Handler {
-	testerDeployer := deployer.NewTesterDeployer(appsGetter, projectLister, pods, projectLoggingLister, namespaces, templateLister)
-	configGenerator := configsyncer.NewConfigGenerator(metav1.NamespaceAll, nil, projectLoggingLister, namespaces.Controller().Lister())
-
+func NewHandler(dialer dialer.Factory, clusterManager *clustermanager.Manager, appsGetter projectv3.AppsGetter, projectLister mgmtv3.ProjectLister, projectLoggingLister mgmtv3.ProjectLoggingLister, templateLister mgmtv3.CatalogTemplateLister) *Handler {
 	return &Handler{
 		clusterManager:       clusterManager,
 		dialerFactory:        dialer,
-		k8sProxy:             k8sProxy,
-		testerDeployer:       testerDeployer,
-		configGenerator:      configGenerator,
+		appsGetter:           appsGetter,
+		projectLister:        projectLister,
+		templateLister:       templateLister,
 		projectLoggingLister: projectLoggingLister,
 	}
 }
@@ -138,9 +138,20 @@ func (h *Handler) testLoggingTarget(clusterName string, target mgmtv3.LoggingTar
 }
 
 func (h *Handler) dryRunLoggingTarget(apiContext *types.APIContext, level, clusterName, projectID string, target mgmtv3.LoggingTargets) error {
-	var err error
-	var dryRunConfigBuf []byte
+	context, err := h.clusterManager.UserContext(clusterName)
+	if err != nil {
+		return err
+	}
 
+	pods := context.Core.Pods(loggingconfig.LoggingNamespace)
+	namespaces := context.Core.Namespaces(metav1.NamespaceAll)
+	testerDeployer := deployer.NewTesterDeployer(h.appsGetter, h.projectLister, pods, h.projectLoggingLister, namespaces, h.templateLister)
+	configGenerator := configsyncer.NewConfigGenerator(metav1.NamespaceAll, nil, h.projectLoggingLister, namespaces.Controller().Lister())
+
+	var dryRunConfigBuf []byte
+	var certificate, clientCert, clientKey, certificatePath, clientCertPath, clientKeyPath, certScretKeyName string
+
+	tmpCertDir := fmt.Sprintf("%s/%s", tmpCertDirPrefix, uuid.NewV4().String())
 	if level == loggingconfig.ClusterLevel {
 		clusterLogging := &mgmtv3.ClusterLogging{
 			Spec: mgmtv3.ClusterLoggingSpec{
@@ -148,16 +159,14 @@ func (h *Handler) dryRunLoggingTarget(apiContext *types.APIContext, level, clust
 				ClusterName:    clusterName,
 			},
 		}
-		dryRunConfigBuf, err = h.configGenerator.GenerateClusterLoggingConfig(clusterLogging, "testSystemProjectID")
+		dryRunConfigBuf, err = configGenerator.GenerateClusterLoggingConfig(clusterLogging, "testSystemProjectID", tmpCertDir)
 		if err != nil {
 			return err
 		}
-	} else {
-		curProjectLoggings, err := h.projectLoggingLister.List(metav1.NamespaceAll, labels.NewSelector())
-		if err != nil {
-			return errors.Wrap(err, "list project logging failed")
-		}
 
+		certificate, clientCert, clientKey = configsyncer.GetSSLConfig(clusterLogging.Spec.LoggingTargets)
+		certScretKeyName = clusterName
+	} else {
 		new := &mgmtv3.ProjectLogging{
 			Spec: mgmtv3.ProjectLoggingSpec{
 				LoggingTargets: target,
@@ -165,42 +174,43 @@ func (h *Handler) dryRunLoggingTarget(apiContext *types.APIContext, level, clust
 			},
 		}
 
-		newProjectLoggings := append(curProjectLoggings, new)
-		dryRunConfigBuf, err = h.configGenerator.GenerateProjectLoggingConfig(newProjectLoggings, "testSystemProjectID")
+		dryRunConfigBuf, err = configGenerator.GenerateProjectLoggingConfig([]*mgmtv3.ProjectLogging{new}, "testSystemProjectID", tmpCertDir)
 		if err != nil {
 			return err
 		}
+
+		certificate, clientCert, clientKey = configsyncer.GetSSLConfig(new.Spec.LoggingTargets)
+		certScretKeyName = strings.Replace(projectID, ":", "_", -1)
 	}
 
-	if err := h.testerDeployer.Deploy(level, clusterName, projectID, target); err != nil {
+	certificatePath = addCertPrefixPath(tmpCertDir, loggingconfig.SecretDataKeyCa(level, certScretKeyName))
+	clientCertPath = addCertPrefixPath(tmpCertDir, loggingconfig.SecretDataKeyCert(level, certScretKeyName))
+	clientKeyPath = addCertPrefixPath(tmpCertDir, loggingconfig.SecretDataKeyCertKey(level, certScretKeyName))
+
+	if err := testerDeployer.Deploy(level, clusterName, projectID, target); err != nil {
 		return err
 	}
 
-	context, err := h.clusterManager.UserContext(clusterName)
-	if err != nil {
-		return err
-	}
-
-	pods, err := context.K8sClient.CoreV1().Pods(loggingconfig.LoggingNamespace).List(metav1.ListOptions{
+	testerPods, err := context.K8sClient.CoreV1().Pods(loggingconfig.LoggingNamespace).List(metav1.ListOptions{
 		LabelSelector: labels.Set(loggingconfig.FluentdTesterSelector).String(),
 	})
 	if err != nil {
 		return err
 	}
 
-	if len(pods.Items) == 0 {
+	if len(testerPods.Items) == 0 {
 		return errors.New("could not find fluentd tester pod")
 	}
 
-	pod := pods.Items[0]
-	if !condition.Cond(k8scorev1.PodReady).IsTrue(&pod) {
+	testerPod := testerPods.Items[0]
+	if !condition.Cond(k8scorev1.PodReady).IsTrue(&testerPod) {
 		return errors.New("pod fluentd tester not ready")
 	}
 
 	req := context.K8sClient.CoreV1().RESTClient().Post().
 		Resource("pods").
-		Name(pod.Name).
-		Namespace(pod.Namespace).
+		Name(testerPod.Name).
+		Namespace(testerPod.Namespace).
 		SubResource("exec").
 		VersionedParams(&k8scorev1.PodExecOptions{
 			Container: loggingconfig.FluentdTesterContainerName,
@@ -215,14 +225,34 @@ func (h *Handler) dryRunLoggingTarget(apiContext *types.APIContext, level, clust
 	if err != nil {
 		return errors.Wrap(err, "create executor failed")
 	}
-	var stdout, stderr, stdin bytes.Buffer
 
-	dryRunConfig := strings.Replace(string(dryRunConfigBuf), `$`, `\$`, -1)
-	stdin.WriteString(fluentdCommand)
-	stdin.WriteString(fmt.Sprintf(`"%s"`, dryRunConfig))
+	var testCmd bytes.Buffer
+	testCmd.WriteString("mkdir -p " + tmpCertDir)
 
+	if certificate != "" {
+		testCmd.WriteString(` && echo "` + certificate + `" >> ` + certificatePath)
+	}
+	if clientCert != "" {
+		testCmd.WriteString(` && echo "` + clientCert + `" >> ` + clientCertPath)
+	}
+	if clientKey != "" {
+		testCmd.WriteString(` && echo "` + clientKey + `" >> ` + clientKeyPath)
+	}
+
+	replacer := strings.NewReplacer(loggingconfig.DefaultCertDir, tmpCertDir, `$`, `\$`)
+	dryRunConfig := replacer.Replace(string(dryRunConfigBuf))
+	testCmd.WriteString(` && ` + fluentdCommand)
+	testCmd.WriteString(fmt.Sprintf(`"%s"`, dryRunConfig))
+
+	testCmd.WriteString(` && ` + cleanCertDirCommand + tmpCertDir)
+	return remoteExcuteCommand(executor, testCmd)
+}
+
+func remoteExcuteCommand(executor remotecommand.Executor, stdin bytes.Buffer) error {
+	var stdout, stderr bytes.Buffer
 	handler := &streamHandler{resizeEvent: make(chan remotecommand.TerminalSize)}
-	if err = executor.Stream(remotecommand.StreamOptions{
+
+	if err := executor.Stream(remotecommand.StreamOptions{
 		Stdin:             &stdin,
 		Stdout:            &stdout,
 		Stderr:            &stderr,
@@ -259,4 +289,8 @@ func (handler *streamHandler) Next() (size *remotecommand.TerminalSize) {
 
 type streamHandler struct {
 	resizeEvent chan remotecommand.TerminalSize
+}
+
+func addCertPrefixPath(certDir, file string) string {
+	return path.Join(certDir, file)
 }

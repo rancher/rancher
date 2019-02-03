@@ -440,14 +440,12 @@ func Setting(schemas *types.Schemas) {
 
 func LoggingTypes(schemas *types.Schemas, management *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler) {
 	handler := logging.NewHandler(
-		management.Dialer, management.Project,
-		management.Management.Projects("").Controller().Lister(),
-		management.Core.Pods(""),
-		management.Management.ProjectLoggings("").Controller().Lister(),
-		management.Core.Namespaces(""),
-		management.Management.CatalogTemplates("").Controller().Lister(),
+		management.Dialer,
 		clusterManager,
-		k8sProxy,
+		management.Project,
+		management.Management.Projects("").Controller().Lister(),
+		management.Management.ProjectLoggings("").Controller().Lister(),
+		management.Management.CatalogTemplates("").Controller().Lister(),
 	)
 
 	schema := schemas.Schema(&managementschema.Version, client.ClusterLoggingType)

@@ -28,7 +28,7 @@ func generateConfig(templateM, tempalteName string, conf map[string]interface{})
 	return buf.Bytes(), nil
 }
 
-func GenerateClusterConfig(logging mgmtv3.ClusterLoggingSpec, excludeNamespaces string) ([]byte, error) {
+func GenerateClusterConfig(logging mgmtv3.ClusterLoggingSpec, excludeNamespaces, certDir string) ([]byte, error) {
 	wl, err := utils.NewWrapClusterLogging(logging, excludeNamespaces)
 	if err != nil {
 		return nil, errors.Wrap(err, "to wraper cluster logging failed")
@@ -41,6 +41,7 @@ func GenerateClusterConfig(logging mgmtv3.ClusterLoggingSpec, excludeNamespaces 
 	conf := map[string]interface{}{
 		"clusterTarget": wl,
 		"clusterName":   logging.ClusterName,
+		"certDir":       certDir,
 	}
 
 	buf, err := generateConfig(ClusterTemplate, loggingconfig.ClusterLevel, conf)
@@ -51,10 +52,9 @@ func GenerateClusterConfig(logging mgmtv3.ClusterLoggingSpec, excludeNamespaces 
 	return buf, nil
 }
 
-func GenerateProjectConfig(projectLoggings []*mgmtv3.ProjectLogging, namespaces []*k8scorev1.Namespace, systemProjectID string) ([]byte, error) {
+func GenerateProjectConfig(projectLoggings []*mgmtv3.ProjectLogging, namespaces []*k8scorev1.Namespace, systemProjectID, certDir string) ([]byte, error) {
 	var wl []utils.ProjectLoggingTemplateWrap
 	for _, v := range projectLoggings {
-
 		var grepNamespace []string
 		for _, v2 := range namespaces {
 			if nsProjectName, ok := v2.Annotations[project.ProjectIDAnn]; ok && nsProjectName == v.Spec.ProjectName {
@@ -82,6 +82,7 @@ func GenerateProjectConfig(projectLoggings []*mgmtv3.ProjectLogging, namespaces 
 
 	conf := map[string]interface{}{
 		"projectTargets": wl,
+		"certDir":        certDir,
 	}
 
 	buf, err := generateConfig(ProjectTemplate, loggingconfig.ProjectLevel, conf)

@@ -122,12 +122,12 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     ssl_verify {{ .clusterTarget.ElasticsearchConfig.SSLVerify }}
     ssl_version {{ .clusterTarget.ElasticsearchConfig.SSLVersion }}
     {{- if .clusterTarget.ElasticsearchConfig.Certificate }}
-    ca_file /fluentd/etc/config/ssl/cluster_{{.clusterName}}_ca.pem
+    ca_file {{ .certDir}}/cluster_{{.clusterName}}_ca.pem
     {{end }}
 
     {{- if and .clusterTarget.ElasticsearchConfig.ClientCert .clusterTarget.ElasticsearchConfig.ClientKey}}
-    client_cert /fluentd/etc/config/ssl/cluster_{{.clusterName}}_client-cert.pem
-    client_key /fluentd/etc/config/ssl/cluster_{{.clusterName}}_client-key.pem
+    client_cert {{ .certDir}}/cluster_{{.clusterName}}_client-cert.pem
+    client_key {{ .certDir}}/cluster_{{.clusterName}}_client-key.pem
     {{end }}
 
     {{- if .clusterTarget.ElasticsearchConfig.ClientKeyPass}}
@@ -154,12 +154,12 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     ssl_verify {{ .clusterTarget.SplunkConfig.SSLVerify }}
 
     {{- if .clusterTarget.SplunkConfig.Certificate }}    
-    ca_file /fluentd/etc/config/ssl/cluster_{{.clusterName}}_ca.pem
+    ca_file {{ .certDir}}/cluster_{{.clusterName}}_ca.pem
     {{end }}
 
     {{- if and .clusterTarget.SplunkConfig.ClientCert .clusterTarget.SplunkConfig.ClientKey}}    
-    client_cert /fluentd/etc/config/ssl/cluster_{{.clusterName}}_client-cert.pem
-    client_key /fluentd/etc/config/ssl/cluster_{{.clusterName}}_client-key.pem
+    client_cert {{ .certDir}}/cluster_{{.clusterName}}_client-cert.pem
+    client_key {{ .certDir}}/cluster_{{.clusterName}}_client-key.pem
     {{end }}
 
     {{- if .clusterTarget.SplunkConfig.ClientKeyPass}}    
@@ -182,12 +182,12 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     max_send_retries  3
 
     {{- if .clusterTarget.KafkaConfig.Certificate }}        
-    ssl_ca_cert /fluentd/etc/config/ssl/cluster_{{.clusterName}}_ca.pem
+    ssl_ca_cert {{ .certDir}}/cluster_{{.clusterName}}_ca.pem
     {{end }}
 
     {{- if and .clusterTarget.KafkaConfig.ClientCert .clusterTarget.KafkaConfig.ClientKey}}        
-    ssl_client_cert /fluentd/etc/config/ssl/cluster_{{.clusterName}}_client-cert.pem
-    ssl_client_cert_key /fluentd/etc/config/ssl/cluster_{{.clusterName}}_client-key.pem
+    ssl_client_cert {{ .certDir}}/cluster_{{.clusterName}}_client-cert.pem
+    ssl_client_cert_key {{ .certDir}}/cluster_{{.clusterName}}_client-key.pem
     {{end }}
     
     {{- if and .clusterTarget.KafkaConfig.SaslUsername .clusterTarget.KafkaConfig.SaslPassword}}        
@@ -222,15 +222,15 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     {{end }}
 
     {{- if .clusterTarget.SyslogConfig.EnableTLS }}
-    tls true        
-    {{end}}
-    {{- if .clusterTarget.SyslogConfig.Certificate }}
-    ca_file /fluentd/etc/config/ssl/cluster_{{.clusterName}}_ca.pem
-    {{end}}
+    tls true    
+    {{- if .clusterTarget.SyslogConfig.Certificate }}    
+    ca_file {{ .certDir}}/cluster_{{.clusterName}}_ca.pem
+    {{end }}
+    {{end }}
 
     {{- if and .clusterTarget.SyslogConfig.ClientCert .clusterTarget.SyslogConfig.ClientKey}}        
-    client_cert /fluentd/etc/config/ssl/cluster_{{.clusterName}}_client-cert.pem
-    client_cert_key /fluentd/etc/config/ssl/cluster_{{.clusterName}}_client-key.pem
+    client_cert {{ .certDir}}/cluster_{{.clusterName}}_client-cert.pem
+    client_cert_key {{ .certDir}}/cluster_{{.clusterName}}_client-key.pem
     {{end }}
     {{end }}
 
@@ -242,7 +242,7 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     tls_allow_self_signed_cert true
     {{end }}    
     {{ if .clusterTarget.FluentForwarderConfig.Certificate }}
-    tls_cert_path /fluentd/etc/config/ssl/cluster_{{.clusterName}}_ca.pem
+    tls_cert_path {{ .certDir}}/cluster_{{.clusterName}}_ca.pem
     {{end }}  
     
     {{- if .clusterTarget.FluentForwarderConfig.Compress }}
