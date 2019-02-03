@@ -31,7 +31,7 @@ func StartEndpointWatcher(ctx context.Context, cluster *config.UserContext) {
 		clusterLoggings: cluster.Management.Management.ClusterLoggings(cluster.ClusterName),
 		projectLoggings: cluster.Management.Management.ProjectLoggings(metav1.NamespaceAll),
 	}
-	go s.watch(ctx, 10*time.Second)
+	go s.watch(ctx, 120*time.Second)
 }
 
 func (e *endpointWatcher) watch(ctx context.Context, interval time.Duration) {
