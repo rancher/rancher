@@ -134,7 +134,7 @@ func (h *Handler) testLoggingTarget(clusterName string, target mgmtv3.LoggingTar
 		return nil
 	}
 
-	return wp.TestReachable(clusterDialer)
+	return wp.TestReachable(clusterDialer, true)
 }
 
 func (h *Handler) dryRunLoggingTarget(apiContext *types.APIContext, level, clusterName, projectID string, target mgmtv3.LoggingTargets) error {

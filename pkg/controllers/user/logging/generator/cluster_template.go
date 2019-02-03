@@ -221,8 +221,10 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     verify_mode 0
     {{end }}
 
-    {{- if .clusterTarget.SyslogConfig.Certificate }}
+    {{- if .clusterTarget.SyslogConfig.EnableTLS }}
     tls true        
+    {{end}}
+    {{- if .clusterTarget.SyslogConfig.Certificate }}
     ca_file /fluentd/etc/config/ssl/cluster_{{.clusterName}}_ca.pem
     {{end}}
 
