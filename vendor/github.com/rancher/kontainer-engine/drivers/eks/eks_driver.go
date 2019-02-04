@@ -396,6 +396,9 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		return nil, fmt.Errorf("error parsing state: %v", err)
 	}
 
+	info := &types.ClusterInfo{}
+	storeState(info, state)
+
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String(state.Region),
 		Credentials: credentials.NewStaticCredentials(
@@ -405,7 +408,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error getting new aws session: %v", err)
+		return info, fmt.Errorf("error getting new aws session: %v", err)
 	}
 
 	svc := cloudformation.New(sess)
@@ -421,14 +424,14 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		stack, err := d.createStack(svc, getVPCStackName(state.DisplayName), displayName, vpcTemplate, []string{},
 			[]*cloudformation.Parameter{})
 		if err != nil {
-			return nil, fmt.Errorf("error creating stack: %v", err)
+			return info, fmt.Errorf("error creating stack: %v", err)
 		}
 
 		securityGroupsString := getParameterValueFromOutput("SecurityGroups", stack.Stacks[0].Outputs)
 		subnetIdsString := getParameterValueFromOutput("SubnetIds", stack.Stacks[0].Outputs)
 
 		if securityGroupsString == "" || subnetIdsString == "" {
-			return nil, fmt.Errorf("no security groups or subnet ids were returned")
+			return info, fmt.Errorf("no security groups or subnet ids were returned")
 		}
 
 		securityGroups = toStringPointerSlice(strings.Split(securityGroupsString, ","))
@@ -438,7 +441,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 			StackName: aws.String(state.DisplayName + "-eks-vpc"),
 		})
 		if err != nil {
-			return nil, fmt.Errorf("error getting stack resoures")
+			return info, fmt.Errorf("error getting stack resoures")
 		}
 
 		for _, resource := range resources.StackResources {
@@ -461,12 +464,12 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		stack, err := d.createStack(svc, getServiceRoleName(state.DisplayName), displayName, serviceRoleTemplate,
 			[]string{cloudformation.CapabilityCapabilityIam}, nil)
 		if err != nil {
-			return nil, fmt.Errorf("error creating stack: %v", err)
+			return info, fmt.Errorf("error creating stack: %v", err)
 		}
 
 		roleARN = getParameterValueFromOutput("RoleArn", stack.Stacks[0].Outputs)
 		if roleARN == "" {
-			return nil, fmt.Errorf("no RoleARN was returned")
+			return info, fmt.Errorf("no RoleARN was returned")
 		}
 	} else {
 		logrus.Infof("Retrieving existing service role")
@@ -475,7 +478,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 			RoleName: aws.String(state.ServiceRole),
 		})
 		if err != nil {
-			return nil, fmt.Errorf("error getting role: %v", err)
+			return info, fmt.Errorf("error getting role: %v", err)
 		}
 
 		roleARN = *role.Role.Arn
@@ -494,19 +497,19 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		Version: aws.String(state.KubernetesVersion),
 	})
 	if err != nil && !isClusterConflict(err) {
-		return nil, fmt.Errorf("error creating cluster: %v", err)
+		return info, fmt.Errorf("error creating cluster: %v", err)
 	}
 
 	cluster, err := d.waitForClusterReady(eksService, state)
 	if err != nil {
-		return nil, err
+		return info, err
 	}
 
 	logrus.Infof("Cluster provisioned successfully")
 
 	capem, err := base64.StdEncoding.DecodeString(*cluster.Cluster.CertificateAuthority.Data)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing CA data: %v", err)
+		return info, fmt.Errorf("error parsing CA data: %v", err)
 	}
 
 	ec2svc := ec2.New(sess)
@@ -515,7 +518,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		KeyName: aws.String(keyPairName),
 	})
 	if err != nil && !isDuplicateKeyError(err) {
-		return nil, fmt.Errorf("error creating key pair %v", err)
+		return info, fmt.Errorf("error creating key pair %v", err)
 	}
 
 	logrus.Infof("Creating worker nodes")
@@ -557,21 +560,19 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 			{ParameterKey: aws.String("PublicIp"), ParameterValue: aws.String(strconv.FormatBool(publicIP))},
 		})
 	if err != nil {
-		return nil, fmt.Errorf("error creating stack: %v", err)
+		return info, fmt.Errorf("error creating stack: %v", err)
 	}
 
 	nodeInstanceRole := getParameterValueFromOutput("NodeInstanceRole", stack.Stacks[0].Outputs)
 	if nodeInstanceRole == "" {
-		return nil, fmt.Errorf("no node instance role returned in output: %v", err)
+		return info, fmt.Errorf("no node instance role returned in output: %v", err)
 	}
 
 	err = d.createConfigMap(state, *cluster.Cluster.Endpoint, capem, nodeInstanceRole)
 	if err != nil {
-		return nil, err
+		return info, err
 	}
 
-	info := &types.ClusterInfo{}
-	storeState(info, state)
 	return info, nil
 }
 

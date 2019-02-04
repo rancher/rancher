@@ -631,24 +631,30 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 		return nil, err
 	}
 
+	info := &types.ClusterInfo{}
+	err = storeState(info, driverState)
+	if err != nil {
+		return info, err
+	}
+
 	azureAuthorizer, err := newClientAuthorizer(driverState)
 	if err != nil {
-		return nil, err
+		return info, err
 	}
 
 	clustersClient, err := newClustersClient(azureAuthorizer, driverState)
 	if err != nil {
-		return nil, err
+		return info, err
 	}
 
 	resourceGroupsClient, err := newResourceGroupsClient(azureAuthorizer, driverState)
 	if err != nil {
-		return nil, err
+		return info, err
 	}
 
 	operationInsightsWorkspaceClient, err := newOperationInsightsWorkspaceClient(azureAuthorizer, driverState)
 	if err != nil {
-		return nil, err
+		return info, err
 	}
 
 	masterDNSPrefix := driverState.DNSPrefix
@@ -670,14 +676,14 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 
 	exists, err := d.resourceGroupExists(ctx, resourceGroupsClient, driverState.ResourceGroup)
 	if err != nil {
-		return nil, err
+		return info, err
 	}
 
 	if !exists {
 		logrus.Infof("resource group %v does not exist, creating", driverState.ResourceGroup)
 		err = d.createResourceGroup(ctx, resourceGroupsClient, driverState)
 		if err != nil {
-			return nil, err
+			return info, err
 		}
 	}
 
@@ -708,7 +714,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 	if driverState.AddonEnableMonitoring {
 		logAnalyticsWorkspaceResourceID, err := d.ensureLogAnalyticsWorkspaceForMonitoring(ctx, operationInsightsWorkspaceClient, driverState)
 		if err != nil {
-			return nil, err
+			return info, err
 		}
 
 		if !strings.HasPrefix(logAnalyticsWorkspaceResourceID, "/") {
@@ -818,7 +824,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 		if driverState.LinuxSSHPublicKeyContents == "" {
 			publicKey, err = ioutil.ReadFile(driverState.LinuxSSHPublicKeyPath)
 			if err != nil {
-				return nil, err
+				return info, err
 			}
 		} else {
 			publicKey = []byte(driverState.LinuxSSHPublicKeyContents)
@@ -862,7 +868,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 	logClusterConfig(managedCluster)
 	_, err = clustersClient.CreateOrUpdate(ctx, driverState.ResourceGroup, driverState.Name, managedCluster)
 	if err != nil {
-		return nil, err
+		return info, err
 	}
 
 	logrus.Info("Request submitted, waiting for cluster to finish creating")
@@ -872,7 +878,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 	for {
 		result, err := clustersClient.Get(ctx, driverState.ResourceGroup, driverState.Name)
 		if err != nil {
-			return nil, err
+			return info, err
 		}
 
 		state := *result.ProvisioningState
@@ -880,7 +886,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 		if state == failedStatus {
 			if failedCount > 3 {
 				logrus.Errorf("cluster recovery failed, retries depleted")
-				return nil, fmt.Errorf("cluster create has completed with status of 'Failed'")
+				return info, fmt.Errorf("cluster create has completed with status of 'Failed'")
 			}
 
 			failedCount = failedCount + 1
@@ -898,7 +904,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 
 		if state != creatingStatus && state != updatingStatus {
 			logrus.Errorf("Azure failed to provision cluster with state: %v", state)
-			return nil, fmt.Errorf("failed to provision Azure cluster")
+			return info, fmt.Errorf("failed to provision Azure cluster")
 		}
 
 		logrus.Infof("Cluster has not yet completed provisioning, waiting another %v seconds", pollInterval)
