@@ -3,18 +3,18 @@ package multiclusterapp
 import (
 	"context"
 	"fmt"
-	access "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
+	"strings"
+
 	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
-	"reflect"
-	"strings"
+	"github.com/rancher/types/user"
 
-	"github.com/rancher/types/client/management/v3"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -24,8 +24,11 @@ type MCAppController struct {
 	managementContext *config.ManagementContext
 	prtbs             v3.ProjectRoleTemplateBindingInterface
 	prtbLister        v3.ProjectRoleTemplateBindingLister
+	crtbs             v3.ClusterRoleTemplateBindingInterface
+	crtbLister        v3.ClusterRoleTemplateBindingLister
 	rtLister          v3.RoleTemplateLister
 	gDNSs             v3.GlobalDNSInterface
+	userManager       user.Manager
 }
 
 type MCAppRevisionController struct {
@@ -51,8 +54,11 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		managementContext: management,
 		prtbs:             management.Management.ProjectRoleTemplateBindings(""),
 		prtbLister:        management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		crtbs:             management.Management.ClusterRoleTemplateBindings(""),
+		crtbLister:        management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
 		rtLister:          management.Management.RoleTemplates("").Controller().Lister(),
 		gDNSs:             management.Management.GlobalDNSs(""),
+		userManager:       management.UserManager,
 	}
 	r := MCAppRevisionController{
 		managementContext: management,
@@ -71,7 +77,6 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	}
 	m.multiClusterApps.AddHandler(ctx, "management-multiclusterapp-controller", m.sync)
 	management.Management.MultiClusterAppRevisions("").AddHandler(ctx, "management-multiclusterapp-revisions-rbac", r.sync)
-	m.prtbs.AddHandler(ctx, "management-prtb-controller-global-resource", m.prtbSync)
 	projects.AddHandler(ctx, "management-mcapp-project-controller", p.sync)
 	clusters.AddHandler(ctx, "management-mcapp-cluster-controller", c.sync)
 }
@@ -89,53 +94,111 @@ func (mc *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.
 		return mcapp, fmt.Errorf("MultiClusterApp %v has no creatorId annotation. Cannot create apps for %v", metaAccessor.GetName(), mcapp.Name)
 	}
 
-	// check if all member groups have access to target projects
-	groups := globalnamespacerbac.GetMemberGroups(mcapp.Spec.Members)
-	var targets []string
-	for _, t := range mcapp.Spec.Targets {
-		targets = append(targets, t.ProjectName)
-	}
-	currentMembers := globalnamespacerbac.GetCurrentMembers(mcapp.Spec.Members)
-	updatedMembers, err := globalnamespacerbac.GetUpdatedMembers(targets, mcapp.Spec.Members, mc.prtbLister)
-	if err := access.CheckGroupAccess(groups, targets, mc.prtbLister, mc.rtLister, pv3.AppGroupVersionKind.Group, client.MultiClusterAppType); err != nil {
+	systemUser, err := mc.userManager.EnsureUser(fmt.Sprintf("system://%s", mcapp.Name), "System account for Multiclusterapp "+mcapp.Name)
+	if err != nil {
 		return nil, err
 	}
-	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.MultiClusterAppResource, mcapp.Name, mcapp.UID,
-		updatedMembers, creatorID, mc.managementContext); err != nil {
-		return nil, err
-	}
-	if !reflect.DeepEqual(updatedMembers, currentMembers) {
-		toUpdate := mcapp.DeepCopy()
-		toUpdate.Spec.Members = updatedMembers
-		_, err := mc.multiClusterApps.Update(toUpdate)
+	var prtbName, crtbName string
+	// create PRTBs with this service account for all roles of multiclusterapp
+	for _, r := range mcapp.Spec.Roles {
+		rt, err := mc.rtLister.Get("", r)
 		if err != nil {
 			return nil, err
 		}
-	}
-	return nil, nil
-}
 
-func (mc *MCAppController) prtbSync(key string, prtb *v3.ProjectRoleTemplateBinding) (runtime.Object, error) {
-	if prtb == nil || prtb.DeletionTimestamp != nil {
-		mcapps, err := mc.multiClusterApps.Controller().Lister().List(namespace.GlobalNamespace, labels.NewSelector())
-		if err != nil {
-			return nil, err
-		}
-		for _, mcapp := range mcapps {
-			mc.multiClusterApps.Controller().Enqueue(namespace.GlobalNamespace, mcapp.Name)
-		}
-		gdnses, err := mc.gDNSs.Controller().Lister().List(namespace.GlobalNamespace, labels.NewSelector())
-		if err != nil {
-			return nil, err
-		}
-		for _, gdns := range gdnses {
-			if len(gdns.Spec.ProjectNames) == 0 {
+		for _, p := range mcapp.Spec.Targets {
+			if p.ProjectName == "" {
 				continue
 			}
-			mc.gDNSs.Controller().Enqueue(namespace.GlobalNamespace, gdns.Name)
+			split := strings.SplitN(p.ProjectName, ":", 2)
+			if len(split) != 2 {
+				return nil, fmt.Errorf("invalid project name")
+			}
+			clusterName := split[0]
+			projectName := split[1]
+
+			if rt.Context == "project" {
+				prtbName = mcapp.Name + "-" + r
+				// check if these prtbs already exist
+				_, err := mc.prtbLister.Get(projectName, prtbName)
+				if err != nil {
+					if apierrors.IsNotFound(err) {
+						_, err := mc.prtbs.Create(&v3.ProjectRoleTemplateBinding{
+							ObjectMeta: v1.ObjectMeta{
+								Name:      prtbName,
+								Namespace: projectName,
+							},
+							UserName:         systemUser.Name,
+							RoleTemplateName: r,
+							ProjectName:      p.ProjectName,
+						})
+						if err != nil && !apierrors.IsAlreadyExists(err) {
+							return nil, err
+						}
+					} else {
+						return nil, err
+					}
+				}
+			} else if rt.Context == "cluster" {
+				crtbName = mcapp.Name + "-" + r
+				// check if these crtbs already exist
+				_, err := mc.crtbLister.Get(clusterName, crtbName)
+				if err != nil {
+					if apierrors.IsNotFound(err) {
+						_, err := mc.crtbs.Create(&v3.ClusterRoleTemplateBinding{
+							ObjectMeta: v1.ObjectMeta{
+								Name:      crtbName,
+								Namespace: clusterName,
+							},
+							UserName:         systemUser.Name,
+							RoleTemplateName: r,
+							ClusterName:      clusterName,
+						})
+						if err != nil && !apierrors.IsAlreadyExists(err) {
+							return nil, err
+						}
+					} else {
+						return nil, err
+					}
+				}
+			}
+		}
+
+		for _, p := range mcapp.Spec.Targets {
+			if p.ProjectName == "" {
+				continue
+			}
+			split := strings.SplitN(p.ProjectName, ":", 2)
+			if len(split) != 2 {
+				return nil, fmt.Errorf("invalid project name")
+			}
+			projectName := split[1]
+			// check if these prtbs already exist
+			_, err := mc.prtbLister.Get(projectName, prtbName)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					_, err := mc.prtbs.Create(&v3.ProjectRoleTemplateBinding{
+						ObjectMeta: v1.ObjectMeta{
+							Name:      prtbName,
+							Namespace: projectName,
+						},
+						UserName:         systemUser.Name,
+						RoleTemplateName: r,
+						ProjectName:      p.ProjectName,
+					})
+					if err != nil && !apierrors.IsAlreadyExists(err) {
+						return nil, err
+					}
+				} else {
+					return nil, err
+				}
+			}
 		}
 	}
-
+	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.MultiClusterAppResource, mcapp.Name, mcapp.UID,
+		mcapp.Spec.Members, creatorID, mc.managementContext); err != nil {
+		return nil, err
+	}
 	return nil, nil
 }
 

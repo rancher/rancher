@@ -636,7 +636,7 @@ func (m *manager) reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs m
 	for _, rb := range desiredRBs {
 		logrus.Infof("[%v] Creating roleBinding for subject %v with role %v in namespace %v", m.controller, rb.Subjects[0].Name, rb.RoleRef.Name, rb.Namespace)
 		_, err := roleBindings.Create(rb)
-		if err != nil {
+		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 	}

@@ -16,8 +16,10 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/user"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/docker/machine/libmachine/log"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -47,6 +49,7 @@ type MCAppController struct {
 	clusterLister                 v3.ClusterLister
 	projectLister                 v3.ProjectLister
 	clusterName                   string
+	userManager                   user.Manager
 }
 
 func Register(ctx context.Context, cluster *config.UserContext) {
@@ -63,6 +66,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		projectLister:                 cluster.Management.Management.Projects("").Controller().Lister(),
 		clusterName:                   cluster.ClusterName,
 		templateVersionLister:         cluster.Management.Management.CatalogTemplateVersions("").Controller().Lister(),
+		userManager:                   cluster.Management.UserManager,
 	}
 	m.multiClusterApps.AddHandler(ctx, "multi-cluster-app-controller", m.sync)
 
@@ -77,14 +81,29 @@ func (m *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.O
 		}
 		return m.deleteApps(mcappName, mcapp)
 	}
-	metaAccessor, err := meta.Accessor(mcapp)
-	if err != nil {
-		return mcapp, err
+	var creatorID string
+
+	// This is temporary
+	if len(mcapp.Spec.Roles) == 0 {
+		metaAccessor, err := meta.Accessor(mcapp)
+		if err != nil {
+			return mcapp, err
+		}
+		var ok bool
+		creatorID, ok = metaAccessor.GetAnnotations()[creatorIDAnn]
+		if !ok {
+			return mcapp, fmt.Errorf("MultiClusterApp %v has no creatorId annotation. Cannot create apps for %v", metaAccessor.GetName(), mcapp.Name)
+		}
+	} else {
+		// creatorID is the username of the service account created for this multiclusterapp
+		systemUser, err := m.userManager.EnsureUser(fmt.Sprintf("system://%s", mcapp.Name), "System account for Multiclusterapp "+mcapp.Name)
+		if err != nil {
+			return nil, err
+		}
+		creatorID = systemUser.Name
 	}
-	creatorID, ok := metaAccessor.GetAnnotations()[creatorIDAnn]
-	if !ok {
-		return mcapp, fmt.Errorf("MultiClusterApp %v has no creatorId annotation. Cannot create apps for %v", metaAccessor.GetName(), mcapp.Name)
-	}
+
+	log.Debugf("creator ID of apps and multiclusterapprevision for mcapp %v is: %v", mcapp.Name, creatorID)
 	answerMap, err := m.createAnswerMap(mcapp.Spec.Answers)
 	if err != nil {
 		return mcapp, err
@@ -612,7 +631,7 @@ func (m *MCAppController) createAnswerMap(answers []v3.Answer) (map[string]map[s
 			clusterName := split[0]
 			// Using k8s labels.Merge, since by definition:
 			// Merge combines given maps, and does not check for any conflicts between the maps. In case of conflicts, second map (labels2) wins
-			// And we want project level keys to override keys from global level for that project
+			// And we want project level keys to override keys from global/cluster level for that project
 			projectLabels := make(map[string]string)
 			if val, ok := answerMap[clusterName]; ok {
 				projectLabels = labels.Merge(val, a.Values)

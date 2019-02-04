@@ -618,9 +618,9 @@ func MultiClusterApps(schemas *types.Schemas, management *config.ScaledContext) 
 		MultiClusterApps:              management.Management.MultiClusterApps(""),
 		MultiClusterAppLister:         management.Management.MultiClusterApps("").Controller().Lister(),
 		MultiClusterAppRevisionLister: management.Management.MultiClusterAppRevisions("").Controller().Lister(),
-		Users:                         management.Management.Users(""),
 		PrtbLister:                    management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
 		RoleTemplateLister:            management.Management.RoleTemplates("").Controller().Lister(),
+		Users:                         management.Management.Users(""),
 	}
 	schema.Formatter = wrapper.Formatter
 	schema.ActionHandler = wrapper.ActionHandler
@@ -630,14 +630,18 @@ func MultiClusterApps(schemas *types.Schemas, management *config.ScaledContext) 
 
 func GlobalDNSs(schemas *types.Schemas, management *config.ScaledContext) {
 	gdns := globaldns.Wrapper{
-		GlobalDNSLister: management.Management.GlobalDNSs("").Controller().Lister(),
-		Users:           management.Management.Users(""),
-		PrtbLister:      management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		GlobalDNSes:           management.Management.GlobalDNSs(""),
+		GlobalDNSLister:       management.Management.GlobalDNSs("").Controller().Lister(),
+		PrtbLister:            management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		MultiClusterAppLister: management.Management.MultiClusterApps("").Controller().Lister(),
+		Users:                 management.Management.Users(""),
 	}
 	schema := schemas.Schema(&managementschema.Version, client.GlobalDNSType)
 	schema.Store = &globalresource.GlobalNamespaceStore{
 		Store:              schema.Store,
 		NamespaceInterface: management.Core.Namespaces(""),
 	}
+	schema.Formatter = gdns.Formatter
+	schema.ActionHandler = gdns.ActionHandler
 	schema.Validator = gdns.Validator
 }

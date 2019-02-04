@@ -5,7 +5,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"reflect"
 	"sort"
-	"strings"
 
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -15,13 +14,12 @@ import (
 	k8srbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 )
 
 const (
-	allAccess                       = "all"
-	updateAccess                    = "update"
-	readOnlyAccess                  = "readonly"
+	ownerAccess                     = "owner"
+	memberAccess                    = "member"
+	readOnlyAccess                  = "read-only"
 	MultiClusterAppResource         = "multiclusterapps"
 	MultiClusterAppRevisionResource = "multiclusterapprevisions"
 	GlobalDNSResource               = "globaldnses"
@@ -33,32 +31,32 @@ const (
 func CreateRoleAndRoleBinding(resource string, name string, UID types.UID, members []v3.Member, creatorID string,
 	managementContext *config.ManagementContext, apiGroup ...string) error {
 	/* Create 3 Roles containing the resource (multiclusterapp or globalDNS), and the current multiclusterapp/globalDNS in resourceNames list
-	1. Role with all verbs (everything access, includes creator); name multiclusterapp.Name + "-ma" / (globalDNS.Name + "-ga")
+	1. Role with owner verbs (Owner access, includes creator); name multiclusterapp.Name + "-ma" / (globalDNS.Name + "-ga")
 	2. Role with "get", "list" "watch" verbs (ReadOnly access); name multiclusterapp.Name + "-mr" / (globalDNS.Name + "-gr")
-	3. Role with "update" verb (Upgrade access); name multiclusterapp.Name + "-mu" / (globalDNS.Name + "-gu")
+	3. Role with "update" verb (Member access); name multiclusterapp.Name + "-mu" / (globalDNS.Name + "-gu")
 	*/
 	api := []string{"management.cattle.io"}
 	if len(apiGroup) > 0 {
 		api = apiGroup
 	}
-	if _, err := createRole(resource, allAccess, name, UID, managementContext, api); err != nil {
+	if _, err := createRole(resource, ownerAccess, name, UID, managementContext, api); err != nil {
 		return err
 	}
 
 	// Create a roleBinding referring the role with everything access, and containing creator of the multiclusterapp, along with
 	// any members that have everything access
-	var allAccessSubjects, readOnlyAccessSubjects, updateAccessSubjects []k8srbacv1.Subject
-	allAccessSubjects = append(allAccessSubjects, k8srbacv1.Subject{Kind: "User", Name: creatorID, APIGroup: rbacv1.GroupName})
+	var ownerAccessSubjects, readOnlyAccessSubjects, memberAccessSubjects []k8srbacv1.Subject
+	ownerAccessSubjects = append(ownerAccessSubjects, k8srbacv1.Subject{Kind: "User", Name: creatorID, APIGroup: rbacv1.GroupName})
 	for _, m := range members {
 		s, err := buildSubjectForMember(m, managementContext)
 		if err != nil {
 			return err
 		}
 		switch m.AccessType {
-		case allAccess:
-			allAccessSubjects = append(allAccessSubjects, s)
-		case updateAccess:
-			updateAccessSubjects = append(updateAccessSubjects, s)
+		case ownerAccess:
+			ownerAccessSubjects = append(ownerAccessSubjects, s)
+		case memberAccess:
+			memberAccessSubjects = append(memberAccessSubjects, s)
 		case readOnlyAccess:
 			readOnlyAccessSubjects = append(readOnlyAccessSubjects, s)
 		default:
@@ -66,11 +64,11 @@ func CreateRoleAndRoleBinding(resource string, name string, UID types.UID, membe
 		}
 	}
 
-	if _, err := createRoleBinding(allAccess, name, UID, allAccessSubjects, managementContext, resource, api); err != nil {
+	if _, err := createRoleBinding(ownerAccess, name, UID, ownerAccessSubjects, managementContext, resource, api); err != nil {
 		return err
 	}
 
-	// Check if there are members with readonly or update access; if found then create rolebindings for those
+	// Check if there are members with readonly or member(update) access; if found then create rolebindings for those
 	if len(readOnlyAccessSubjects) > 0 {
 		if _, err := createRole(resource, readOnlyAccess, name, UID, managementContext, api); err != nil {
 			return err
@@ -79,11 +77,11 @@ func CreateRoleAndRoleBinding(resource string, name string, UID types.UID, membe
 			return err
 		}
 	}
-	if len(updateAccessSubjects) > 0 {
-		if _, err := createRole(resource, updateAccess, name, UID, managementContext, api); err != nil {
+	if len(memberAccessSubjects) > 0 {
+		if _, err := createRole(resource, memberAccess, name, UID, managementContext, api); err != nil {
 			return err
 		}
-		if _, err := createRoleBinding(updateAccess, name, UID, updateAccessSubjects, managementContext, resource, api); err != nil {
+		if _, err := createRoleBinding(memberAccess, name, UID, memberAccessSubjects, managementContext, resource, api); err != nil {
 			return err
 		}
 	}
@@ -170,6 +168,7 @@ func createRoleBinding(roleAccess string, name string, UID types.UID,
 		},
 		Subjects: subjects,
 	}
+
 	roleBinding, err := managementContext.RBAC.RoleBindings("").GetNamespaced(namespace.GlobalNamespace, roleName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -197,15 +196,17 @@ func getRoleNameAndVerbs(roleAccess string, resourceName string, resource string
 	var verbs []string
 	switch resource {
 	case MultiClusterAppResource:
-		resourceName += "-m"
+		resourceName += "-m-"
 	case GlobalDNSResource:
-		resourceName += "-g"
+		resourceName += "-g-"
+	case GlobalDNSProviderResource:
+		resourceName += "-gp-"
 	}
 	switch roleAccess {
-	case allAccess:
+	case ownerAccess:
 		roleName = resourceName + "a"
 		verbs = []string{"*"}
-	case updateAccess:
+	case memberAccess:
 		roleName = resourceName + "u"
 		verbs = []string{"update", "get", "list", "watch"}
 	case readOnlyAccess:
@@ -261,70 +262,4 @@ func checkAndSetUserFields(m v3.Member, managementContext *config.ManagementCont
 		return m, nil
 	}
 	return m, nil
-}
-
-func GetMemberGroups(members []v3.Member) map[string]string {
-	groups := make(map[string]string)
-	for _, m := range members {
-		if m.GroupPrincipalName != "" {
-			groups[m.GroupPrincipalName] = m.AccessType
-		}
-	}
-	return groups
-}
-
-func GetUpdatedMembers(projects []string, members []v3.Member, prtbLister v3.ProjectRoleTemplateBindingLister) ([]v3.Member, error) {
-	var updatedUsers, updatedGroups, updatedMembers []v3.Member
-	users := make(map[string]bool)
-	groups := make(map[string]bool)
-	for _, p := range projects {
-		split := strings.SplitN(p, ":", 2)
-		if len(split) != 2 {
-			return updatedMembers, fmt.Errorf("Target project name %s is invalid", p)
-		}
-		projectNS := split[1]
-		prtbs, err := prtbLister.List(projectNS, labels.NewSelector())
-		if err != nil {
-			return updatedMembers, err
-		}
-		prtbMap := make(map[string]bool)
-		// get all PRTBs for this project
-		for _, prtb := range prtbs {
-			if prtb.UserPrincipalName != "" && prtb.DeletionTimestamp == nil {
-				prtbMap[prtb.UserPrincipalName] = true
-			} else if prtb.GroupPrincipalName != "" && prtb.DeletionTimestamp == nil {
-				prtbMap[prtb.GroupPrincipalName] = true
-			}
-		}
-
-		// all members should have PRTBs in this project, if not, remove them
-		for _, mem := range members {
-			if mem.UserPrincipalName != "" && prtbMap[mem.UserPrincipalName] && !users[mem.UserPrincipalName] {
-				users[mem.UserPrincipalName] = true
-				updatedUsers = append(updatedUsers, mem)
-			} else if mem.GroupPrincipalName != "" && prtbMap[mem.GroupPrincipalName] && !groups[mem.GroupPrincipalName] {
-				groups[mem.GroupPrincipalName] = true
-				updatedGroups = append(updatedGroups, mem)
-			}
-		}
-	}
-	sort.Slice(updatedUsers, func(i, j int) bool { return updatedUsers[i].UserPrincipalName < updatedUsers[j].UserPrincipalName })
-	sort.Slice(updatedGroups, func(i, j int) bool { return updatedGroups[i].GroupPrincipalName < updatedGroups[j].GroupPrincipalName })
-	updatedMembers = append(updatedUsers, updatedGroups...)
-	return updatedMembers, nil
-}
-
-func GetCurrentMembers(members []v3.Member) []v3.Member {
-	var memberUsers, memberGroups []v3.Member
-	for _, m := range members {
-		if m.UserPrincipalName != "" {
-			memberUsers = append(memberUsers, m)
-		} else if m.GroupPrincipalName != "" {
-			memberGroups = append(memberGroups, m)
-		}
-	}
-	sort.Slice(memberUsers, func(i, j int) bool { return memberUsers[i].UserPrincipalName < memberUsers[j].UserPrincipalName })
-	sort.Slice(memberGroups, func(i, j int) bool { return memberGroups[i].GroupPrincipalName < memberGroups[j].GroupPrincipalName })
-	memberUsers = append(memberUsers, memberGroups...)
-	return memberUsers
 }

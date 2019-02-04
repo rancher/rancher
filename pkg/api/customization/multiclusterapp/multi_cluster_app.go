@@ -3,77 +3,33 @@ package multiclusterapp
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
-	"reflect"
-	"sort"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
+	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/norman/types/values"
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
-)
 
-type Wrapper struct {
-	MultiClusterApps              v3.MultiClusterAppInterface
-	MultiClusterAppLister         v3.MultiClusterAppLister
-	MultiClusterAppRevisionLister v3.MultiClusterAppRevisionLister
-	Users                         v3.UserInterface
-	PrtbLister                    v3.ProjectRoleTemplateBindingLister
-	RoleTemplateLister            v3.RoleTemplateLister
-}
+	"k8s.io/apimachinery/pkg/api/meta"
+)
 
 const (
-	mcAppLabel = "io.cattle.field/multiClusterAppId"
+	addProjectsAction    = "addProjects"
+	removeProjectsAction = "removeProjects"
 )
-
-func (w Wrapper) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) error {
-	switch apiContext.Link {
-	case "revisions":
-		var app client.MultiClusterApp
-		if err := access.ByID(apiContext, &managementschema.Version, client.MultiClusterAppType, apiContext.ID, &app); err != nil {
-			return err
-		}
-		var appRevisions, filtered []map[string]interface{}
-		if err := access.List(apiContext, &managementschema.Version, client.MultiClusterAppRevisionType, &types.QueryOptions{}, &appRevisions); err != nil {
-			return err
-		}
-		for _, revision := range appRevisions {
-			labels := convert.ToMapInterface(revision["labels"])
-			if reflect.DeepEqual(labels[mcAppLabel], app.Name) {
-				filtered = append(filtered, revision)
-			}
-		}
-		sort.SliceStable(filtered, func(i, j int) bool {
-			val1, err := time.Parse(time.RFC3339, convert.ToString(values.GetValueN(filtered[i], "created")))
-			if err != nil {
-				logrus.Infof("error parsing time %v", err)
-			}
-			val2, err := time.Parse(time.RFC3339, convert.ToString(values.GetValueN(filtered[j], "created")))
-			if err != nil {
-				logrus.Infof("error parsing time %v", err)
-			}
-			return val1.After(val2)
-		})
-		apiContext.Type = client.MultiClusterAppRevisionType
-		apiContext.WriteResponse(http.StatusOK, filtered)
-		return nil
-	}
-	return nil
-}
 
 func (w Wrapper) Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "rollback")
+	resource.AddAction(apiContext, addProjectsAction)
+	resource.AddAction(apiContext, removeProjectsAction)
 	resource.Links["revisions"] = apiContext.URLBuilder.Link("revisions", resource)
 }
 
@@ -82,12 +38,12 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 	if err := access.ByID(apiContext, &managementschema.Version, client.MultiClusterAppType, apiContext.ID, &mcApp); err != nil {
 		return err
 	}
-	data, err := ioutil.ReadAll(apiContext.Request.Body)
-	if err != nil {
-		return errors.Wrap(err, "reading request body error")
-	}
 	switch actionName {
 	case "rollback":
+		data, err := ioutil.ReadAll(apiContext.Request.Body)
+		if err != nil {
+			return errors.Wrap(err, "reading request body error")
+		}
 		input := client.MultiClusterAppRollbackInput{}
 		if err = json.Unmarshal(data, &input); err != nil {
 			return errors.Wrap(err, "unmarshal input error")
@@ -113,33 +69,136 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		toUpdate.Spec.Answers = revision.Answers
 		_, err = w.MultiClusterApps.Update(toUpdate)
 		return err
+	case addProjectsAction:
+		return w.addProjects(apiContext)
+	case removeProjectsAction:
+		return w.removeProjects(apiContext)
+	default:
+		return fmt.Errorf("bad action for multiclusterapp %v", actionName)
 	}
-	return nil
 }
 
-func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
-	if request.Method != http.MethodPut && request.Method != http.MethodPost {
-		return nil
+func (w Wrapper) addProjects(request *types.APIContext) error {
+	mcapp, existingProjects, inputProjects, inputAnswers, err := w.modifyProjects(request, addProjectsAction)
+	if err != nil {
+		return err
 	}
-
-	var targetProjects []string
-	// check if the creator of multiclusterapp and all members can access all target projects
-	targetMapSlice, found := values.GetSlice(data, client.MultiClusterAppFieldTargets)
-	if !found {
-		return fmt.Errorf("no target projects provided")
-	}
-	for _, t := range targetMapSlice {
-		projectID, ok := t[client.TargetFieldProjectID].(string)
-		if !ok {
-			continue
+	updatedMcApp := mcapp
+	if len(inputAnswers) > 0 {
+		mcappToUpdate := mcapp.DeepCopy()
+		mcappToUpdate.Spec.Answers = append(mcappToUpdate.Spec.Answers, inputAnswers...)
+		if updatedMcApp, err = w.MultiClusterApps.Update(mcappToUpdate); err != nil {
+			return err
 		}
-		targetProjects = append(targetProjects, projectID)
+	}
+	mcappToUpdate := updatedMcApp.DeepCopy()
+	for _, p := range inputProjects {
+		if !existingProjects[p] {
+			mcappToUpdate.Spec.Targets = append(mcappToUpdate.Spec.Targets, v3.Target{ProjectName: p})
+		}
+	}
+	return w.updateMcApp(mcappToUpdate, request, "addedProjects")
+}
+
+func (w Wrapper) removeProjects(request *types.APIContext) error {
+	mcapp, _, inputProjects, _, err := w.modifyProjects(request, removeProjectsAction)
+	if err != nil {
+		return err
+	}
+	mcappToUpdate := mcapp.DeepCopy()
+	toRemoveProjects := make(map[string]bool)
+	var finalTargets []v3.Target
+	for _, p := range inputProjects {
+		toRemoveProjects[p] = true
+	}
+	for _, t := range mcapp.Spec.Targets {
+		if !toRemoveProjects[t.ProjectName] {
+			finalTargets = append(finalTargets, t)
+		}
+	}
+	mcappToUpdate.Spec.Targets = finalTargets
+	return w.updateMcApp(mcappToUpdate, request, "removedProjects")
+}
+
+func (w Wrapper) modifyProjects(request *types.APIContext, actionName string) (*v3.MultiClusterApp, map[string]bool, []string, []v3.Answer, error) {
+	split := strings.SplitN(request.ID, ":", 2)
+	if len(split) != 2 {
+		return nil, map[string]bool{}, []string{}, []v3.Answer{}, fmt.Errorf("incorrect multi cluster app ID %v", request.ID)
+	}
+	var inputProjects []string
+	var inputAnswers []v3.Answer
+	existingProjects := make(map[string]bool)
+	mcapp, err := w.MultiClusterAppLister.Get(split[0], split[1])
+	if err != nil {
+		return nil, existingProjects, inputProjects, inputAnswers, err
+	}
+	// ensure that caller is not a readonly member of multiclusterapp, else abort
+	callerID := request.Request.Header.Get(gaccess.ImpersonateUserHeader)
+	metaAccessor, err := meta.Accessor(mcapp)
+	if err != nil {
+		return nil, existingProjects, inputProjects, inputAnswers, err
+	}
+	creatorID, ok := metaAccessor.GetAnnotations()[creatorIDAnn]
+	if !ok {
+		return nil, existingProjects, inputProjects, inputAnswers, fmt.Errorf("multiclusterapp %v has no creatorId annotation", metaAccessor.GetName())
+	}
+	ma := gaccess.MemberAccess{
+		Users:      w.Users,
+		PrtbLister: w.PrtbLister,
+	}
+	accessType, err := ma.GetAccessTypeOfCaller(callerID, creatorID, mcapp.Name, mcapp.Spec.Members)
+	if err != nil {
+		return nil, existingProjects, inputProjects, inputAnswers, err
+	}
+	if accessType != gaccess.OwnerAccess {
+		return nil, existingProjects, inputProjects, inputAnswers, fmt.Errorf("only owners can modify projects of multiclusterapp")
+	}
+	var updateMultiClusterAppTargetsInput v3.UpdateMultiClusterAppTargetsInput
+	actionInput, err := parse.ReadBody(request.Request)
+	if err != nil {
+		return nil, existingProjects, inputProjects, inputAnswers, err
+	}
+	if err = convert.ToObj(actionInput, &updateMultiClusterAppTargetsInput); err != nil {
+		return nil, existingProjects, inputProjects, inputAnswers, err
+	}
+	inputProjects = updateMultiClusterAppTargetsInput.Projects
+	for _, p := range mcapp.Spec.Targets {
+		existingProjects[p.ProjectName] = true
+	}
+	if actionName == addProjectsAction {
+		if err = ma.EnsureRoleInTargets(inputProjects, mcapp.Spec.Roles, callerID); err != nil {
+			return nil, existingProjects, inputProjects, inputAnswers, err
+		}
+	}
+	inputAnswers = updateMultiClusterAppTargetsInput.Answers
+	// check if the input includes answers, and if they are only for the input projects
+	if len(inputAnswers) > 0 {
+		inputProjectsMap := make(map[string]bool)
+		for _, p := range inputProjects {
+			if !inputProjectsMap[p] {
+				inputProjectsMap[p] = true
+			}
+		}
+		for _, a := range inputAnswers {
+			if a.ProjectName == "" {
+				return nil, existingProjects, inputProjects, inputAnswers, fmt.Errorf("can only provide project-scoped answers for new projects through add/remove projects action")
+			}
+			if !inputProjectsMap[a.ProjectName] {
+				return nil, existingProjects, inputProjects, inputAnswers, fmt.Errorf("the project %v is not among the ones provided in input", a.ProjectName)
+			}
+		}
+	}
+	return mcapp, existingProjects, inputProjects, inputAnswers, nil
+}
+
+func (w Wrapper) updateMcApp(mcappToUpdate *v3.MultiClusterApp, request *types.APIContext, message string) error {
+	if _, err := w.MultiClusterApps.Update(mcappToUpdate); err != nil {
+		return err
 	}
 
-	ma := gaccess.MemberAccess{
-		Users:              w.Users,
-		PrtbLister:         w.PrtbLister,
-		RoleTemplateLister: w.RoleTemplateLister,
+	op := map[string]interface{}{
+		"message": message,
 	}
-	return ma.CheckCreatorAndMembersAccessToTargets(request, targetProjects, data, client.MultiClusterAppType, pv3.AppGroupVersionKind.Group, pv3.AppResource.Name)
+	request.WriteResponse(http.StatusOK, op)
+	return nil
 }
