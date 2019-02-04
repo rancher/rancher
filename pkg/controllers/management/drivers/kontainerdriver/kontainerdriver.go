@@ -3,6 +3,7 @@ package kontainerdriver
 import (
 	"context"
 	"fmt"
+	errorsutil "github.com/pkg/errors"
 	"reflect"
 	"regexp"
 	"strings"
@@ -132,36 +133,9 @@ func (l *Lifecycle) download(obj *v3.KontainerDriver) (*v3.KontainerDriver, erro
 }
 
 func (l *Lifecycle) createDynamicSchema(obj *v3.KontainerDriver) error {
-	driver := service.NewEngineService(
-		clusterprovisioner.NewPersistentStore(l.namespaces, l.coreV1),
-	)
-	flags, err := driver.GetDriverCreateOptions(context.Background(), obj.Name, obj, v3.ClusterSpec{
-		GenericEngineConfig: &v3.MapStringInterface{
-			clusterprovisioner.DriverNameField: obj.Status.DisplayName,
-		},
-	})
+	resourceFields, err := l.getResourceFields(obj)
 	if err != nil {
-		return fmt.Errorf("error getting driver create options: %v", err)
-	}
-
-	resourceFields := map[string]v3.Field{}
-	for key, flag := range flags.Options {
-		formattedName, field, err := toResourceField(key, flag)
-		if err != nil {
-			return fmt.Errorf("error formatting field name: %v", err)
-		}
-
-		resourceFields[formattedName] = field
-	}
-
-	// all drivers need a driverName field so kontainer-engine knows what type they are
-	resourceFields[clusterprovisioner.DriverNameField] = v3.Field{
-		Create: true,
-		Update: true,
-		Type:   "string",
-		Default: v3.Values{
-			StringValue: obj.Name,
-		},
+		return err
 	}
 
 	dynamicSchema := &v3.DynamicSchema{
@@ -181,14 +155,70 @@ func (l *Lifecycle) createDynamicSchema(obj *v3.KontainerDriver) error {
 	}
 	dynamicSchema.Labels = map[string]string{}
 	dynamicSchema.Labels[obj.Name] = obj.Status.DisplayName
-	dynamicSchema.Labels = map[string]string{}
 	dynamicSchema.Labels[driverNameLabel] = obj.Status.DisplayName
 	_, err = l.dynamicSchemas.Create(dynamicSchema)
 	if err != nil && !errors.IsAlreadyExists(err) {
-		return fmt.Errorf("error creating dynamic schema: %v", err)
+		return errorsutil.WithMessage(err, "error creating dynamic schema")
 	}
 
 	return l.createOrUpdateKontainerDriverTypes(obj)
+}
+
+func (l *Lifecycle) updateDynamicSchema(obj *v3.KontainerDriver) error {
+	dynamicSchema, err := l.dynamicSchemasLister.Get("", strings.ToLower(getDynamicTypeName(obj)))
+	if err != nil {
+		return err
+	}
+
+	dynamicSchema = dynamicSchema.DeepCopy()
+
+	fields, err := l.getResourceFields(obj)
+	if err != nil {
+		return err
+	}
+
+	dynamicSchema.Spec.ResourceFields = fields
+
+	logrus.Infof("dynamic schema for kontainerdriver %v updating", obj.Name)
+
+	_, err = l.dynamicSchemas.Update(dynamicSchema)
+	return err
+}
+
+func (l *Lifecycle) getResourceFields(obj *v3.KontainerDriver) (map[string]v3.Field, error) {
+	driver := service.NewEngineService(
+		clusterprovisioner.NewPersistentStore(l.namespaces, l.coreV1),
+	)
+	flags, err := driver.GetDriverCreateOptions(context.Background(), obj.Name, obj, v3.ClusterSpec{
+		GenericEngineConfig: &v3.MapStringInterface{
+			clusterprovisioner.DriverNameField: obj.Status.DisplayName,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	resourceFields := map[string]v3.Field{}
+	for key, flag := range flags.Options {
+		formattedName, field, err := toResourceField(key, flag)
+		if err != nil {
+			return nil, errorsutil.WithMessage(err, "error formatting field name")
+		}
+
+		resourceFields[formattedName] = field
+	}
+
+	// all drivers need a driverName field so kontainer-engine knows what type they are
+	resourceFields[clusterprovisioner.DriverNameField] = v3.Field{
+		Create: true,
+		Update: true,
+		Type:   "string",
+		Default: v3.Values{
+			StringValue: obj.Name,
+		},
+	}
+
+	return resourceFields, nil
 }
 
 func (l *Lifecycle) createOrUpdateKontainerDriverTypes(obj *v3.KontainerDriver) error {
@@ -221,6 +251,8 @@ func (l *Lifecycle) createOrUpdateKontainerDriverTypes(obj *v3.KontainerDriver) 
 		}
 		return nil
 	}
+
+	clusterSchema = clusterSchema.DeepCopy()
 
 	shouldUpdate := false
 
@@ -310,12 +342,13 @@ func toLowerCamelCase(nodeFlagName string) (string, error) {
 
 func (l *Lifecycle) Updated(obj *v3.KontainerDriver) (runtime.Object, error) {
 	logrus.Infof("update kontainerdriver %v", obj.Name)
-	if obj.Spec.BuiltIn {
+	if hasStaticSchema(obj) {
 		return obj, nil
 	}
 
-	if hasStaticSchema(obj) {
-		return obj, nil
+	if obj.Spec.BuiltIn {
+		// Builtin drivers can still have their schema change during Rancher upgrades so we need to try
+		return obj, l.updateDynamicSchema(obj)
 	}
 
 	// redownload file if url changed or not downloaded
@@ -401,6 +434,8 @@ func (l *Lifecycle) removeFieldFromCluster(obj *v3.KontainerDriver) error {
 	if err != nil {
 		return fmt.Errorf("error getting schema: %v", err)
 	}
+
+	nodeSchema = nodeSchema.DeepCopy()
 
 	delete(nodeSchema.Spec.ResourceFields, fieldName)
 
