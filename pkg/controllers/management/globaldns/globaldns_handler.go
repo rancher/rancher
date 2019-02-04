@@ -4,17 +4,14 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"reflect"
 	"strings"
 
-	access "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
 	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 
-	"github.com/rancher/types/client/management/v3"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -98,25 +95,9 @@ func (n *GDController) sync(key string, obj *v3.GlobalDNS) (runtime.Object, erro
 		return nil, fmt.Errorf("GlobalDNSController: Error updating ingress for the GlobalDNS %v", err)
 	}
 
-	groups := globalnamespacerbac.GetMemberGroups(obj.Spec.Members)
-	if err := access.CheckGroupAccess(groups, obj.Spec.ProjectNames, n.prtbLister, n.rtLister, "", client.GlobalDNSType); err != nil {
-		return nil, err
-	}
-
-	currentMembers := globalnamespacerbac.GetCurrentMembers(obj.Spec.Members)
-	updatedMembers, err := globalnamespacerbac.GetUpdatedMembers(obj.Spec.ProjectNames, obj.Spec.Members, n.prtbLister)
 	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.GlobalDNSResource, obj.Name,
-		obj.UID, updatedMembers, creatorID, n.managementContext); err != nil {
+		obj.UID, obj.Spec.Members, creatorID, n.managementContext); err != nil {
 		return nil, err
-	}
-
-	if !reflect.DeepEqual(updatedMembers, currentMembers) {
-		toUpdate := obj.DeepCopy()
-		toUpdate.Spec.Members = updatedMembers
-		_, err := n.globalDNSs.Update(toUpdate)
-		if err != nil {
-			return nil, err
-		}
 	}
 	return nil, nil
 }

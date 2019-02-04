@@ -6,166 +6,156 @@ import (
 	"strings"
 
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
-	"github.com/rancher/norman/types/values"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
 
+	"github.com/rancher/norman/api/access"
+	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
 type MemberAccess struct {
 	Users              v3.UserInterface
-	PrtbLister         v3.ProjectRoleTemplateBindingLister
 	RoleTemplateLister v3.RoleTemplateLister
+	PrtbLister         v3.ProjectRoleTemplateBindingLister
 }
 
 const (
 	ImpersonateUserHeader  = "Impersonate-User"
 	ImpersonateGroupHeader = "Impersonate-Group"
-	AllAccess              = "all"
-	UpdateAccess           = "update"
-	ReadonlyAccess         = "readonly"
+	OwnerAccess            = "owner"
+	ReadonlyAccess         = "read-only"
 	localPrincipalPrefix   = "local://"
 )
 
-var accessVerbs = map[string][]string{
-	AllAccess:      {"create", "update", "delete", "list"},
-	UpdateAccess:   {"update", "get", "list"},
-	ReadonlyAccess: {"get", "list"},
-}
-
-func (ma *MemberAccess) CheckCreatorAndMembersAccessToTargets(request *types.APIContext, targets []string, data map[string]interface{}, resourceType, apiGroup, resource string) error {
-	creatorID := request.Request.Header.Get(ImpersonateUserHeader)
-	if err := ma.getGroupsAndCheckAccess(data, targets, resource, resourceType); err != nil {
-		return err
-	}
-	memberIDAccessType, err := ma.getMemberAccessTypeMap(creatorID, data)
-	if err != nil {
-		return err
-	}
-	defer request.Request.Header.Set(ImpersonateUserHeader, creatorID)
-	for userID, accessType := range memberIDAccessType {
-		userAPIContext := *request
-		userRequest := *(request.Request)
-		userAPIContext.Request = &userRequest
-		userAPIContext.Request.Header.Set(ImpersonateUserHeader, userID)
-		for _, targetID := range targets {
-			switch resourceType {
-			case client.GlobalDNSType:
-				newObj := make(map[string]interface{})
-				newObj["id"] = targetID
-				if _, err := checkAccess(&userAPIContext, accessVerbs[ReadonlyAccess], newObj, apiGroup, resource); err != nil {
-					return fmt.Errorf("user %v cannot access %v %v", userAPIContext.Request.Header.Get(ImpersonateUserHeader), resource, targetID)
-				}
-			case client.MultiClusterAppType:
-				split := strings.SplitN(targetID, ":", 2)
-				if len(split) != 2 {
-					return fmt.Errorf("project Id is incorrect")
-				}
-				projectNamespace := split[1]
-				newObj := make(map[string]interface{})
-				newObj["namespaceId"] = projectNamespace
-				if verb, err := checkAccess(&userAPIContext, accessVerbs[accessType], newObj, apiGroup, resource); err != nil {
-					return fmt.Errorf("user %v cannot %v apps in project %v", userAPIContext.Request.Header.Get(ImpersonateUserHeader), verb, targetID)
-				}
-			}
+func (ma *MemberAccess) CheckCallerAccessToTargets(request *types.APIContext, targets []string, resourceType string, into interface{}) error {
+	for _, targetID := range targets {
+		if err := access.ByID(request, &managementschema.Version, resourceType, targetID, into); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func (ma *MemberAccess) getMemberAccessTypeMap(creatorID string, data map[string]interface{}) (map[string]string, error) {
-	memberIDAccessType := make(map[string]string)
-	memberIDAccessType[creatorID] = AllAccess
-	membersMapSlice, _ := values.GetSlice(data, client.MultiClusterAppFieldMembers)
-	// find user and pass ID
-	for _, m := range membersMapSlice {
-		if userPrincipalID, ok := m[client.MemberFieldUserPrincipalID].(string); ok {
-			if _, ok := m[client.MemberFieldGroupPrincipalID].(string); ok {
-				return memberIDAccessType, fmt.Errorf("member cannot have both userPrincipalID and groupPrincipalID set")
-			}
-			user, err := ma.getUserFromUserPrincipalID(userPrincipalID)
-			if err != nil {
-				return memberIDAccessType, err
-			}
-			if user == nil {
-				return memberIDAccessType, fmt.Errorf("no user found for principal %v", userPrincipalID)
-			}
-			if accessType, exists := m[client.MemberFieldAccessType].(string); exists {
-				memberIDAccessType[user.Name] = accessType
-			} else {
-				memberIDAccessType[user.Name] = ReadonlyAccess
-			}
+func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []string, callerID string) error {
+	newRoleTemplateMap := make(map[string]bool)
+	for _, r := range roleTemplates {
+		if !newRoleTemplateMap[r] {
+			newRoleTemplateMap[r] = true
 		}
 	}
-	return memberIDAccessType, nil
-}
-
-func (ma *MemberAccess) getGroupsAndCheckAccess(data map[string]interface{}, targets []string, resource, resourceType string) error {
-	membersMapSlice, _ := values.GetSlice(data, client.MultiClusterAppFieldMembers)
-	groupAccessType := make(map[string]string)
-	var groups []string
-	for _, m := range membersMapSlice {
-		if groupPrincipalID, ok := m[client.MemberFieldGroupPrincipalID].(string); ok && groupPrincipalID != "" {
-			groups = append(groups, groupPrincipalID)
-			if accessType, exists := m[client.MemberFieldAccessType].(string); exists {
-				groupAccessType[groupPrincipalID] = accessType
-			} else {
-				groupAccessType[groupPrincipalID] = ReadonlyAccess
-			}
-		}
-	}
-	return CheckGroupAccess(groupAccessType, targets, ma.PrtbLister, ma.RoleTemplateLister, resource, resourceType)
-}
-
-func CheckGroupAccess(groups map[string]string, targets []string, prtbLister v3.ProjectRoleTemplateBindingLister, rtLister v3.RoleTemplateLister, resource, resourceType string) error {
-	for _, t := range targets {
+	for _, t := range targetProjects {
+		roleTemplateFoundCount := 0
 		split := strings.SplitN(t, ":", 2)
 		if len(split) != 2 {
-			return fmt.Errorf("Target project name %s is invalid", t)
+			return fmt.Errorf("invalid project ID %v", t)
 		}
-		projectNS := split[1]
-		prtbs, err := prtbLister.List(projectNS, labels.NewSelector())
+		prtbs, err := ma.PrtbLister.List(split[1], labels.NewSelector())
 		if err != nil {
 			return err
 		}
-		prtbMap := make(map[string]string)
 		for _, prtb := range prtbs {
-			if prtb.GroupPrincipalName != "" {
-				prtbMap[prtb.GroupPrincipalName] = prtb.RoleTemplateName
+			if prtb.UserName == callerID && newRoleTemplateMap[prtb.RoleTemplateName] {
+				roleTemplateFoundCount++
 			}
 		}
-		// see if all groups are in prtbMap
-		for g, accessType := range groups {
-			if rtName, ok := prtbMap[g]; ok {
-				if resourceType == client.MultiClusterAppType {
-					rt, err := rtLister.Get("", rtName)
-					if err != nil {
-						return err
-					}
-					for _, r := range rt.Rules {
-						if !slice.ContainsString(r.Resources, resource) {
-							continue
-						}
-						if slice.ContainsString(r.Verbs, "*") {
-							continue
-						}
-						for _, v := range accessVerbs[accessType] {
-							if !slice.ContainsString(r.Verbs, v) {
-								return fmt.Errorf("member (group) %v cannot %v %v in project %v", g, v, resource, t)
-							}
-						}
-
-					}
-				}
-			} else {
-				return fmt.Errorf("member (group) %v does not have access to project %v", g, t)
-			}
+		if roleTemplateFoundCount != len(newRoleTemplateMap) {
+			return fmt.Errorf("user %v does not have all roles provided in project %v", callerID, t)
 		}
 	}
 	return nil
+}
+
+// CheckAccessToUpdateMembers checks if the request is updating members list, and if the caller has permission to do so
+func CheckAccessToUpdateMembers(members []v3.Member, data map[string]interface{}, ownerAccess bool) error {
+	var requestUpdatesMembers bool
+	// Check if members are being updated, if yes, make sure only member with owner permission is making this update request
+	newMembers := convert.ToMapSlice(data[client.GlobalDNSFieldMembers])
+	originalMembers := members
+	if len(newMembers) != len(originalMembers) && !ownerAccess {
+		return fmt.Errorf("only members with owner access can update members")
+	}
+
+	newMemberAccessType := make(map[string]string)
+	for _, m := range newMembers {
+		if _, ok := m[client.MemberFieldUserPrincipalID]; ok {
+			newMemberAccessType[convert.ToString(m[client.MemberFieldUserPrincipalID])] = convert.ToString(m[client.MemberFieldAccessType])
+		}
+		if _, ok := m[client.MemberFieldGroupPrincipalID]; ok {
+			newMemberAccessType[convert.ToString(m[client.MemberFieldGroupPrincipalID])] = convert.ToString(m[client.MemberFieldAccessType])
+		}
+	}
+
+	originalMemberAccessType := make(map[string]string)
+	originalMembersFoundInRequest := make(map[string]bool) // map to check whether all existing members are present in the current request, if not then this request is trying to update members list
+	for _, m := range originalMembers {
+		if m.UserPrincipalName != "" {
+			originalMemberAccessType[m.UserPrincipalName] = m.AccessType
+		}
+		if m.GroupPrincipalName != "" {
+			originalMemberAccessType[m.GroupPrincipalName] = m.AccessType
+		}
+	}
+
+	// go through all members in the current request, check if each exists in the original global DNS
+	// if it exists, check that the access type hasn't changed, if it has changed, this means the req is updating members
+	// if the member from req doesn't exist in original global DNS, this means the new request is adding a new member, hence updating members list
+	for key, accessType := range newMemberAccessType {
+		if val, ok := originalMemberAccessType[key]; ok {
+			if val != accessType {
+				requestUpdatesMembers = true
+				break
+			}
+			// mark this original member as present in the current request
+			originalMembersFoundInRequest[key] = true
+		} else {
+			requestUpdatesMembers = true
+			break
+		}
+	}
+	if requestUpdatesMembers && !ownerAccess {
+		return fmt.Errorf("only members with owner access can add new members")
+	}
+
+	// at this point, all members in the new request have been found in the original global DNS with the same access type
+	// but we need to check if all members from the original global DNS are also present in the current request
+	for member := range originalMemberAccessType {
+		// if any member is not found, this means the current request is updating members list by deleting this member
+		if !originalMembersFoundInRequest[member] && !ownerAccess {
+			return fmt.Errorf("only members with owner access can delete existing members")
+		}
+	}
+	return nil
+}
+
+func (ma *MemberAccess) GetAccessTypeOfCaller(callerID, creatorID, name string, members []v3.Member) (string, error) {
+	var username string
+	if callerID == creatorID {
+		return OwnerAccess, nil
+	}
+	for _, m := range members {
+		if m.UserName == "" && m.UserPrincipalName != "" {
+			user, err := ma.getUserFromUserPrincipalID(m.UserPrincipalName)
+			if err != nil {
+				return "", err
+			}
+			if user == nil {
+				return "", fmt.Errorf("no user found for principal %v", m.UserPrincipalName)
+			}
+			if user.Name == callerID {
+				username = user.Name
+			}
+		} else if m.UserName == callerID {
+			username = m.UserName
+		}
+		if username != "" { // found the caller
+			return m.AccessType, nil
+		}
+	}
+	return "", fmt.Errorf("user %v is not in members list", callerID)
 }
 
 func (ma *MemberAccess) getUserFromUserPrincipalID(userPrincipalID string) (*v3.User, error) {
@@ -200,13 +190,4 @@ func (ma *MemberAccess) getUserFromUserPrincipalID(userPrincipalID string) (*v3.
 		}
 	}
 	return match, nil
-}
-
-func checkAccess(apiContext *types.APIContext, verbs []string, newObj map[string]interface{}, apiGroup, resource string) (string, error) {
-	for _, verb := range verbs {
-		if err := apiContext.AccessControl.CanDo(apiGroup, resource, verb, apiContext, newObj, apiContext.Schema); err != nil {
-			return verb, err
-		}
-	}
-	return "", nil
 }
