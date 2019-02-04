@@ -84,7 +84,13 @@ func (c *Controller) add(dynamicSchema *v3.DynamicSchema) error {
 		schema.ID = dynamicSchema.Name
 	}
 	schema.Version = managementSchema.Version
-	c.Schemas.AddSchema(schema)
+	schema.DynamicSchemaVersion = dynamicSchema.ResourceVersion
+
+	if schema.Embed {
+		c.Schemas.AddSchema(schema)
+	} else {
+		c.Schemas.ForceAddSchema(schema)
+	}
 
 	return nil
 }
