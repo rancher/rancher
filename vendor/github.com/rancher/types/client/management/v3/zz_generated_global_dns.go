@@ -63,6 +63,10 @@ type GlobalDNSOperations interface {
 	Replace(existing *GlobalDNS) (*GlobalDNS, error)
 	ByID(id string) (*GlobalDNS, error)
 	Delete(container *GlobalDNS) error
+
+	ActionAddProjects(resource *GlobalDNS, input *UpdateGlobalDNSTargetsInput) error
+
+	ActionRemoveProjects(resource *GlobalDNS, input *UpdateGlobalDNSTargetsInput) error
 }
 
 func newGlobalDNSClient(apiClient *Client) *GlobalDNSClient {
@@ -114,4 +118,14 @@ func (c *GlobalDNSClient) ByID(id string) (*GlobalDNS, error) {
 
 func (c *GlobalDNSClient) Delete(container *GlobalDNS) error {
 	return c.apiClient.Ops.DoResourceDelete(GlobalDNSType, &container.Resource)
+}
+
+func (c *GlobalDNSClient) ActionAddProjects(resource *GlobalDNS, input *UpdateGlobalDNSTargetsInput) error {
+	err := c.apiClient.Ops.DoAction(GlobalDNSType, "addProjects", &resource.Resource, input, nil)
+	return err
+}
+
+func (c *GlobalDNSClient) ActionRemoveProjects(resource *GlobalDNS, input *UpdateGlobalDNSTargetsInput) error {
+	err := c.apiClient.Ops.DoAction(GlobalDNSType, "removeProjects", &resource.Resource, input, nil)
+	return err
 }

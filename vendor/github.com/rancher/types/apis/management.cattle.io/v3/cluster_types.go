@@ -245,6 +245,10 @@ type RotateCertificateInput struct {
 	Services       []string `json:"services,omitempty" norman:"type=enum,options=etcd|kubelet|kube-apiserver|kube-proxy|kube-scheduler|kube-controller-manager"`
 }
 
+type RotateCertificateOutput struct {
+	Message string `json:"message,omitempty"`
+}
+
 type LocalClusterAuthEndpoint struct {
 	Enabled bool   `json:"enabled"`
 	FQDN    string `json:"fqdn,omitempty"`

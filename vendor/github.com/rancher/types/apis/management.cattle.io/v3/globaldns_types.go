@@ -19,7 +19,7 @@ type GlobalDNS struct {
 
 type GlobalDNSSpec struct {
 	FQDN                string   `json:"fqdn,omitempty" norman:"required"`
-	ProjectNames        []string `json:"projectNames" norman:"type=array[reference[project]]"`
+	ProjectNames        []string `json:"projectNames" norman:"type=array[reference[project]],noupdate"`
 	MultiClusterAppName string   `json:"multiClusterAppName,omitempty" norman:"type=reference[multiClusterApp]"`
 	ProviderName        string   `json:"providerName,omitempty" norman:"type=reference[globalDnsProvider],required"`
 	Members             []Member `json:"members,omitempty"`
@@ -56,4 +56,8 @@ type CloudflareProviderConfig struct {
 	RootDomain string `json:"rootDomain" norman:"required"`
 	APIKey     string `json:"apiKey" norman:"notnullable,required,minLength=1,type=password"`
 	APIEmail   string `json:"apiEmail" norman:"notnullable,required,minLength=1"`
+}
+
+type UpdateGlobalDNSTargetsInput struct {
+	ProjectNames []string `json:"projectNames" norman:"type=array[reference[project]]"`
 }

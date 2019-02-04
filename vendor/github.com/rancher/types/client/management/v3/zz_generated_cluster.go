@@ -128,7 +128,7 @@ type ClusterOperations interface {
 
 	ActionRestoreFromEtcdBackup(resource *Cluster, input *RestoreFromEtcdBackupInput) error
 
-	ActionRotateCertificates(resource *Cluster, input *RotateCertificateInput) error
+	ActionRotateCertificates(resource *Cluster, input *RotateCertificateInput) (*RotateCertificateOutput, error)
 }
 
 func newClusterClient(apiClient *Client) *ClusterClient {
@@ -220,7 +220,8 @@ func (c *ClusterClient) ActionRestoreFromEtcdBackup(resource *Cluster, input *Re
 	return err
 }
 
-func (c *ClusterClient) ActionRotateCertificates(resource *Cluster, input *RotateCertificateInput) error {
-	err := c.apiClient.Ops.DoAction(ClusterType, "rotateCertificates", &resource.Resource, input, nil)
-	return err
+func (c *ClusterClient) ActionRotateCertificates(resource *Cluster, input *RotateCertificateInput) (*RotateCertificateOutput, error) {
+	resp := &RotateCertificateOutput{}
+	err := c.apiClient.Ops.DoAction(ClusterType, "rotateCertificates", &resource.Resource, input, resp)
+	return resp, err
 }
