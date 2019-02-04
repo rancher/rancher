@@ -5,23 +5,28 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config/dialer"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/transport"
 )
 
 type RemoteService struct {
-	cluster   *v3.Cluster
-	transport http.RoundTripper
-	url       urlGetter
-	auth      authGetter
+	cluster          *v3.Cluster
+	transport        http.RoundTripper
+	url              urlGetter
+	auth             authGetter
+	upgradeTransport proxy.UpgradeRequestRoundTripper
 }
 
 var (
@@ -63,12 +68,18 @@ func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, er
 		return nil, err
 	}
 
+	upgradeTransport, err := makeUpgradeTransport(localConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	rs := &RemoteService{
 		cluster: cluster,
 		url: func() (url.URL, error) {
 			return *hostURL, nil
 		},
-		transport: transport,
+		transport:        transport,
+		upgradeTransport: upgradeTransport,
 	}
 	if localConfig.BearerToken != "" {
 		rs.auth = func() (string, error) { return "Bearer " + localConfig.BearerToken, nil }
@@ -86,7 +97,12 @@ func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dial
 		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, "cluster not provisioned")
 	}
 
-	transport := &http.Transport{}
+	transport := &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+	}
 
 	if factory != nil {
 		d, err := factory.ClusterDialer(cluster.Name)
@@ -177,11 +193,38 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	httpProxy := proxy.NewUpgradeAwareHandler(&u, r.transport, true, false, er)
+	if r.upgradeTransport != nil {
+		httpProxy.UpgradeTransport = r.upgradeTransport
+	}
 	httpProxy.ServeHTTP(rw, req)
 }
 
 func (r *RemoteService) Cluster() *v3.Cluster {
 	return r.cluster
+}
+
+func makeUpgradeTransport(config *rest.Config) (proxy.UpgradeRequestRoundTripper, error) {
+	transportConfig, err := config.TransportConfig()
+	if err != nil {
+		return nil, err
+	}
+	tlsConfig, err := transport.TLSConfigFor(transportConfig)
+	if err != nil {
+		return nil, err
+	}
+	rt := utilnet.SetOldTransportDefaults(&http.Transport{
+		TLSClientConfig: tlsConfig,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+	})
+
+	upgrader, err := transport.HTTPWrappersForConfig(transportConfig, proxy.MirrorRequest)
+	if err != nil {
+		return nil, err
+	}
+	return proxy.NewUpgradeRequestRoundTripper(rt, upgrader), nil
 }
 
 type SimpleProxy struct {

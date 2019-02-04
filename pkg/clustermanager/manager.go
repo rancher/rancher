@@ -253,7 +253,10 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 		Timeout: 30 * time.Second,
 		WrapTransport: func(rt http.RoundTripper) http.RoundTripper {
 			if ht, ok := rt.(*http.Transport); ok {
-				ht.DialContext = nil
+				ht.DialContext = (&net.Dialer{
+					Timeout:   30 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).DialContext
 				ht.DialTLS = tlsDialer
 				ht.Dial = clusterDialer
 			}
