@@ -47,6 +47,11 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver("exoscale", "local://", "", "", []string{"api.exoscale.ch"}, false, true, management); err != nil {
 		return err
 	}
+	if err := addMachineDriver("linode", "https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.6/docker-machine-driver-linode_linux-amd64.zip",
+		"https://linode.github.io/rancher-ui-driver-linode/releases/v0.2.0/component.js", "4d53a20a6ee3090a713c48c2d3f5ed45",
+		[]string{"linode.github.io"}, false, false, management); err != nil {
+		return err
+	}
 	if err := addMachineDriver("openstack", "local://", "", "", nil, false, true, management); err != nil {
 		return err
 	}
