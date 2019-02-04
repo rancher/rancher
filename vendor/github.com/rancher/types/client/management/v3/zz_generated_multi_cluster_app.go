@@ -16,6 +16,7 @@ const (
 	MultiClusterAppFieldOwnerReferences      = "ownerReferences"
 	MultiClusterAppFieldRemoved              = "removed"
 	MultiClusterAppFieldRevisionHistoryLimit = "revisionHistoryLimit"
+	MultiClusterAppFieldRoles                = "roles"
 	MultiClusterAppFieldState                = "state"
 	MultiClusterAppFieldStatus               = "status"
 	MultiClusterAppFieldTargets              = "targets"
@@ -38,6 +39,7 @@ type MultiClusterApp struct {
 	OwnerReferences      []OwnerReference       `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed              string                 `json:"removed,omitempty" yaml:"removed,omitempty"`
 	RevisionHistoryLimit int64                  `json:"revisionHistoryLimit,omitempty" yaml:"revisionHistoryLimit,omitempty"`
+	Roles                []string               `json:"roles,omitempty" yaml:"roles,omitempty"`
 	State                string                 `json:"state,omitempty" yaml:"state,omitempty"`
 	Status               *MultiClusterAppStatus `json:"status,omitempty" yaml:"status,omitempty"`
 	Targets              []Target               `json:"targets,omitempty" yaml:"targets,omitempty"`
@@ -65,6 +67,10 @@ type MultiClusterAppOperations interface {
 	Replace(existing *MultiClusterApp) (*MultiClusterApp, error)
 	ByID(id string) (*MultiClusterApp, error)
 	Delete(container *MultiClusterApp) error
+
+	ActionAddProjects(resource *MultiClusterApp, input *UpdateMultiClusterAppTargetsInput) error
+
+	ActionRemoveProjects(resource *MultiClusterApp, input *UpdateMultiClusterAppTargetsInput) error
 
 	ActionRollback(resource *MultiClusterApp, input *MultiClusterAppRollbackInput) error
 }
@@ -118,6 +124,16 @@ func (c *MultiClusterAppClient) ByID(id string) (*MultiClusterApp, error) {
 
 func (c *MultiClusterAppClient) Delete(container *MultiClusterApp) error {
 	return c.apiClient.Ops.DoResourceDelete(MultiClusterAppType, &container.Resource)
+}
+
+func (c *MultiClusterAppClient) ActionAddProjects(resource *MultiClusterApp, input *UpdateMultiClusterAppTargetsInput) error {
+	err := c.apiClient.Ops.DoAction(MultiClusterAppType, "addProjects", &resource.Resource, input, nil)
+	return err
+}
+
+func (c *MultiClusterAppClient) ActionRemoveProjects(resource *MultiClusterApp, input *UpdateMultiClusterAppTargetsInput) error {
+	err := c.apiClient.Ops.DoAction(MultiClusterAppType, "removeProjects", &resource.Resource, input, nil)
+	return err
 }
 
 func (c *MultiClusterAppClient) ActionRollback(resource *MultiClusterApp, input *MultiClusterAppRollbackInput) error {

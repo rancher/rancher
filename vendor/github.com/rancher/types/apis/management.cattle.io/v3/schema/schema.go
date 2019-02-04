@@ -177,6 +177,7 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.GenerateKubeConfigOutput{}).
 		MustImport(&Version, v3.ImportClusterYamlInput{}).
 		MustImport(&Version, v3.RotateCertificateInput{}).
+		MustImport(&Version, v3.RotateCertificateOutput{}).
 		MustImport(&Version, v3.ImportYamlOutput{}).
 		MustImport(&Version, v3.ExportOutput{}).
 		MustImport(&Version, v3.MonitoringInput{}).
@@ -215,7 +216,8 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 				Input: "restoreFromEtcdBackupInput",
 			}
 			schema.ResourceActions["rotateCertificates"] = types.Action{
-				Input: "rotateCertificateInput",
+				Input:  "rotateCertificateInput",
+				Output: "rotateCertificateOutput",
 			}
 		})
 }
@@ -679,10 +681,17 @@ func multiClusterAppTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.UpgradeStrategy{}).
 		MustImport(&Version, v3.MultiClusterAppRollbackInput{}).
 		MustImport(&Version, v3.MultiClusterAppRevision{}).
+		MustImport(&Version, v3.UpdateMultiClusterAppTargetsInput{}).
 		MustImportAndCustomize(&Version, v3.MultiClusterApp{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
 				"rollback": {
 					Input: "multiClusterAppRollbackInput",
+				},
+				"addProjects": {
+					Input: "updateMultiClusterAppTargetsInput",
+				},
+				"removeProjects": {
+					Input: "updateMultiClusterAppTargetsInput",
 				},
 			}
 		})
@@ -695,8 +704,17 @@ func globalDNSTypes(schemas *types.Schemas) *types.Schemas {
 		TypeName("globalDnsSpec", v3.GlobalDNSSpec{}).
 		TypeName("globalDnsStatus", v3.GlobalDNSStatus{}).
 		TypeName("globalDnsProviderSpec", v3.GlobalDNSProviderSpec{}).
+		MustImport(&Version, v3.UpdateGlobalDNSTargetsInput{}).
 		AddMapperForType(&Version, v3.GlobalDNS{}, m.Drop{Field: "namespaceId"}).
 		MustImportAndCustomize(&Version, v3.GlobalDNS{}, func(schema *types.Schema) {
+			schema.ResourceActions = map[string]types.Action{
+				"addProjects": {
+					Input: "updateGlobalDNSTargetsInput",
+				},
+				"removeProjects": {
+					Input: "updateGlobalDNSTargetsInput",
+				},
+			}
 		}).
 		MustImportAndCustomize(&Version, v3.GlobalDNSProvider{}, func(schema *types.Schema) {
 		})
