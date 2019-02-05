@@ -75,8 +75,14 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 		}
 		return a.disableMonitoring(actionName, action, apiContext)
 	case "backupEtcd":
+		if !canUpdateCluster() {
+			return httperror.NewAPIError(httperror.Unauthorized, "can not backup etcd")
+		}
 		return a.BackupEtcdHandler(actionName, action, apiContext)
 	case "restoreFromEtcdBackup":
+		if !canUpdateCluster() {
+			return httperror.NewAPIError(httperror.Unauthorized, "can not restore etcd backup")
+		}
 		return a.RestoreFromEtcdBackupHandler(actionName, action, apiContext)
 	case "rotateCertificates":
 		if !canUpdateCluster() {
