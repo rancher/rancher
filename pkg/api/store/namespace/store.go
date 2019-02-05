@@ -17,6 +17,7 @@ import (
 )
 
 const quotaField = "resourceQuota"
+const containerRecsourceLimitField = "containerDefaultResourceLimit"
 
 func New(store types.Store) types.Store {
 	t := &transform.Store{
@@ -151,6 +152,12 @@ func (p *Store) validateResourceQuota(apiContext *types.APIContext, schema *type
 			return err
 		}
 		nsLimits = append(nsLimits, nsLimit)
+	}
+
+	// set default resource limit
+	limit := data[containerRecsourceLimitField]
+	if limit == nil {
+		data[containerRecsourceLimitField] = project.ContainerDefaultResourceLimit
 	}
 
 	isFit, msg, err := resourcequota.IsQuotaFit(nsQuotaLimit, nsLimits, projectQuotaLimit)
