@@ -13,6 +13,7 @@ const (
 	DynamicSchemaFieldCollectionMethods    = "collectionMethods"
 	DynamicSchemaFieldCreated              = "created"
 	DynamicSchemaFieldCreatorID            = "creatorId"
+	DynamicSchemaFieldDynamicSchemaVersion = "dynamicSchemaVersion"
 	DynamicSchemaFieldEmbed                = "embed"
 	DynamicSchemaFieldEmbedType            = "embedType"
 	DynamicSchemaFieldIncludeableLinks     = "includeableLinks"
@@ -41,6 +42,7 @@ type DynamicSchema struct {
 	CollectionMethods    []string             `json:"collectionMethods,omitempty" yaml:"collectionMethods,omitempty"`
 	Created              string               `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string               `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DynamicSchemaVersion string               `json:"dynamicSchemaVersion,omitempty" yaml:"dynamicSchemaVersion,omitempty"`
 	Embed                bool                 `json:"embed,omitempty" yaml:"embed,omitempty"`
 	EmbedType            string               `json:"embedType,omitempty" yaml:"embedType,omitempty"`
 	IncludeableLinks     []string             `json:"includeableLinks,omitempty" yaml:"includeableLinks,omitempty"`

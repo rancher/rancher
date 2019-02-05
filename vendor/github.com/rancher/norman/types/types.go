@@ -94,25 +94,26 @@ var NamespaceScope TypeScope = "namespace"
 type TypeScope string
 
 type Schema struct {
-	ID                string            `json:"id,omitempty"`
-	Embed             bool              `json:"embed,omitempty"`
-	EmbedType         string            `json:"embedType,omitempty"`
-	CodeName          string            `json:"-"`
-	CodeNamePlural    string            `json:"-"`
-	PkgName           string            `json:"-"`
-	Type              string            `json:"type,omitempty"`
-	BaseType          string            `json:"baseType,omitempty"`
-	Links             map[string]string `json:"links"`
-	Version           APIVersion        `json:"version"`
-	PluralName        string            `json:"pluralName,omitempty"`
-	ResourceMethods   []string          `json:"resourceMethods,omitempty"`
-	ResourceFields    map[string]Field  `json:"resourceFields"`
-	ResourceActions   map[string]Action `json:"resourceActions,omitempty"`
-	CollectionMethods []string          `json:"collectionMethods,omitempty"`
-	CollectionFields  map[string]Field  `json:"collectionFields,omitempty"`
-	CollectionActions map[string]Action `json:"collectionActions,omitempty"`
-	CollectionFilters map[string]Filter `json:"collectionFilters,omitempty"`
-	Scope             TypeScope         `json:"-"`
+	ID                   string            `json:"id,omitempty"`
+	Embed                bool              `json:"embed,omitempty"`
+	EmbedType            string            `json:"embedType,omitempty"`
+	CodeName             string            `json:"-"`
+	CodeNamePlural       string            `json:"-"`
+	PkgName              string            `json:"-"`
+	Type                 string            `json:"type,omitempty"`
+	BaseType             string            `json:"baseType,omitempty"`
+	Links                map[string]string `json:"links"`
+	Version              APIVersion        `json:"version"`
+	PluralName           string            `json:"pluralName,omitempty"`
+	ResourceMethods      []string          `json:"resourceMethods,omitempty"`
+	ResourceFields       map[string]Field  `json:"resourceFields"`
+	ResourceActions      map[string]Action `json:"resourceActions,omitempty"`
+	CollectionMethods    []string          `json:"collectionMethods,omitempty"`
+	CollectionFields     map[string]Field  `json:"collectionFields,omitempty"`
+	CollectionActions    map[string]Action `json:"collectionActions,omitempty"`
+	CollectionFilters    map[string]Filter `json:"collectionFilters,omitempty"`
+	DynamicSchemaVersion string            `json:"dynamicSchemaVersion,omitempty"`
+	Scope                TypeScope         `json:"-"`
 
 	InternalSchema      *Schema             `json:"-"`
 	Mapper              Mapper              `json:"-"`

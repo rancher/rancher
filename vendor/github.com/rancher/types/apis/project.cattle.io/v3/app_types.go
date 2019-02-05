@@ -75,12 +75,14 @@ type AppRevisionStatus struct {
 	Answers     map[string]string `json:"answers"`
 	Digest      string            `json:"digest"`
 	ValuesYaml  string            `json:"valuesYaml,omitempty"`
+	Files       map[string]string `json:"files,omitempty"`
 }
 
 type AppUpgradeConfig struct {
 	ExternalID   string            `json:"externalId,omitempty"`
 	Answers      map[string]string `json:"answers,omitempty"`
 	ForceUpgrade bool              `json:"forceUpgrade,omitempty"`
+	Files        map[string]string `json:"files,omitempty"`
 }
 
 type RollbackRevision struct {
