@@ -49,14 +49,3 @@ echo "ARCH: $ARCH"
 echo "CHART_REPO: $CHART_REPO"
 echo "CHART_VERSION: $CHART_VERSION"
 echo "VERSION: $VERSION"
-
-if echo "$TAG" | grep -q -e '^v.*' ; then 
-    UI_INDEX="local"
-fi
-
-pushd $(dirname $0)/.. > /dev/null
-# Settings default value
-CATTLE_UI_INDEX_DEFAULT=${UI_INDEX:-"https://releases.rancher.com/ui/latest2/index.html"}
-CATTLE_RKE_VERSION_DEFAULT="$(grep -m1 '^github.com/rancher/rke' vendor.conf | awk '{print $2}')"
-
-popd > /dev/null
