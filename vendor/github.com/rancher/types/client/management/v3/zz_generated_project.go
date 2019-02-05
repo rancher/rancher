@@ -9,6 +9,7 @@ const (
 	ProjectFieldAnnotations                   = "annotations"
 	ProjectFieldClusterID                     = "clusterId"
 	ProjectFieldConditions                    = "conditions"
+	ProjectFieldContainerDefaultResourceLimit = "containerDefaultResourceLimit"
 	ProjectFieldCreated                       = "created"
 	ProjectFieldCreatorID                     = "creatorId"
 	ProjectFieldDescription                   = "description"
@@ -33,6 +34,7 @@ type Project struct {
 	Annotations                   map[string]string       `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	ClusterID                     string                  `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Conditions                    []ProjectCondition      `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	ContainerDefaultResourceLimit *ContainerResourceLimit `json:"containerDefaultResourceLimit,omitempty" yaml:"containerDefaultResourceLimit,omitempty"`
 	Created                       string                  `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                     string                  `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Description                   string                  `json:"description,omitempty" yaml:"description,omitempty"`

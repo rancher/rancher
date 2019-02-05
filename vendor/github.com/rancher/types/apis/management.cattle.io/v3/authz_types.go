@@ -55,6 +55,7 @@ type ProjectSpec struct {
 	ClusterName                   string                  `json:"clusterName,omitempty" norman:"required,type=reference[cluster]"`
 	ResourceQuota                 *ProjectResourceQuota   `json:"resourceQuota,omitempty"`
 	NamespaceDefaultResourceQuota *NamespaceResourceQuota `json:"namespaceDefaultResourceQuota,omitempty"`
+	ContainerDefaultResourceLimit *ContainerResourceLimit `json:"containerDefaultResourceLimit,omitempty"`
 	EnableProjectMonitoring       bool                    `json:"enableProjectMonitoring" norman:"default=false"`
 }
 
