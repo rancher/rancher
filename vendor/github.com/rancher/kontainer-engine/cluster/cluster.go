@@ -298,14 +298,16 @@ func toInfo(c *Cluster) *types.ClusterInfo {
 
 // Remove removes a cluster
 func (c *Cluster) Remove(ctx context.Context) error {
-	defer c.PersistStore.Remove(c.Name)
 	if err := c.restore(); errors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
 		return err
 	}
 
-	return c.Driver.Remove(ctx, toInfo(c))
+	if err := c.Driver.Remove(ctx, toInfo(c)); err != nil {
+		return err
+	}
+	return c.PersistStore.Remove(c.Name)
 }
 
 func (c *Cluster) GetCapabilities(ctx context.Context) (*types.Capabilities, error) {
