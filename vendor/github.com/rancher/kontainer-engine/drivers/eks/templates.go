@@ -346,15 +346,6 @@ Parameters:
     Type: String
     Default: "true"
 
-  CustomUserData:
-    Description: Pass user-data to the nodes to perform automated configuration tasks, overwrites default configuration
-    Type: String
-    Default: "" 
-
-Conditions:          # Equals: compares if two values are equal
-  UseCustomUserData: !Not [!Equals [ !Ref CustomUserData, "" ]] # Recheck: I want to say "If custom data is passed in, lets use that otherwise lets use the default"
-  UseDefaultUserData: !Not [!Condition UseCustomUserData]
-
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
@@ -491,8 +482,7 @@ Resources:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
       DesiredCapacity: !Ref NodeAutoScalingGroupDesiredCapacity
-      LaunchConfigurationName: 
-        !If [ UseCustomUserData, !Ref NodeLaunchConfigCustomUserData, !Ref NodeLaunchConfigDefaultUserData]   #!If [condition_name, value_if_true, value_if_false]
+      LaunchConfigurationName: !Ref NodeLaunchConfig
       MinSize: !Ref NodeAutoScalingGroupMinSize
       MaxSize: !Ref NodeAutoScalingGroupMaxSize
       VPCZoneIdentifier:
@@ -510,8 +500,7 @@ Resources:
         MinInstancesInService: !Ref NodeAutoScalingGroupDesiredCapacity
         PauseTime: 'PT5M'
 
-  NodeLaunchConfigDefaultUserData:
-    Condition: UseDefaultUserData
+  NodeLaunchConfig:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
       AssociatePublicIpAddress: !Ref PublicIp
@@ -527,42 +516,14 @@ Resources:
             VolumeSize: !Ref NodeVolumeSize
             VolumeType: gp2
             DeleteOnTermination: true
-      UserData:
-        Fn::Base64:
-          !Sub |
-            #!/bin/bash
-            set -o xtrace
-            /etc/eks/bootstrap.sh ${ClusterName} ${BootstrapArguments}
-            /opt/aws/bin/cfn-signal --exit-code $? \
-                    --stack  ${AWS::StackName} \
-                    --resource NodeGroup  \
-                    --region ${AWS::Region} 
-
-  NodeLaunchConfigCustomUserData:
-    Condition: UseCustomUserData
-    Type: AWS::AutoScaling::LaunchConfiguration
-    Properties:
-      AssociatePublicIpAddress: !Ref PublicIp
-      IamInstanceProfile: !Ref NodeInstanceProfile
-      ImageId: !Ref NodeImageId
-      InstanceType: !Ref NodeInstanceType
-      KeyName: !Ref KeyName
-      SecurityGroups:
-      - !Ref NodeSecurityGroup
-      BlockDeviceMappings:
-          - DeviceName: /dev/xvda
-            Ebs:
-              VolumeSize: !Ref NodeVolumeSize
-              VolumeType: gp2
-              DeleteOnTermination: true
-      UserData:
-        Fn::Base64:
-          !Sub | 
-            ${CustomUserData}
+      UserData: !Base64
+        'Fn::Sub': %q
 Outputs:
   NodeInstanceRole:
     Description: The node instance role
-    Value: !GetAtt NodeInstanceRole.Arn
+    Value: !GetAtt
+      - NodeInstanceRole
+      - Arn
 `
 	serviceRoleTemplate = `---
 AWSTemplateFormatVersion: '2010-09-09'
