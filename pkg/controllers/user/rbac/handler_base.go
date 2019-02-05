@@ -104,6 +104,8 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		NsIndexer:           nsInformer.GetIndexer(),
 		ResourceQuotas:      workload.Core.ResourceQuotas(""),
 		ResourceQuotaLister: workload.Core.ResourceQuotas("").Controller().Lister(),
+		LimitRange:          workload.Core.LimitRanges(""),
+		LimitRangeLister:    workload.Core.LimitRanges("").Controller().Lister(),
 		ProjectLister:       workload.Management.Management.Projects(workload.ClusterName).Controller().Lister(),
 	}
 	workload.Core.Namespaces("").AddLifecycle(ctx, "namespace-auth", newNamespaceLifecycle(r, sync))

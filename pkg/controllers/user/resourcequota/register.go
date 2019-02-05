@@ -25,6 +25,8 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		NsIndexer:           nsInformer.GetIndexer(),
 		ResourceQuotas:      cluster.Core.ResourceQuotas(""),
 		ResourceQuotaLister: cluster.Core.ResourceQuotas("").Controller().Lister(),
+		LimitRange:          cluster.Core.LimitRanges(""),
+		LimitRangeLister:    cluster.Core.LimitRanges("").Controller().Lister(),
 		ProjectLister:       cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
 	}
 	cluster.Core.Namespaces("").AddHandler(ctx, "resourceQuotaSyncController", sync.syncResourceQuota)

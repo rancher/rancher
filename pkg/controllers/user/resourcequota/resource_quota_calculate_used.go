@@ -70,7 +70,7 @@ func (c *calculateLimitController) calculateProjectResourceQuota(projectID strin
 		if !set {
 			continue
 		}
-		nsLimit, err := getNamespaceLimit(ns)
+		nsLimit, err := getNamespaceResourceQuotaLimit(ns)
 		if err != nil {
 			return err
 		}

@@ -24,6 +24,13 @@ def default_project_quota():
     return {"limit": {"pods": "100"}}
 
 
+def ns_default_limit():
+    return {"requestsCpu": "1",
+            "requestsMemory": "1Gi",
+            "limitsCpu": "2",
+            "limitsMemory": "2Gi"}
+
+
 def wait_for_applied_quota_set(admin_cc_client, ns, timeout=30):
     start = time.time()
     ns = admin_cc_client.reload(ns)
@@ -55,6 +62,7 @@ def test_namespace_resource_quota(admin_cc, admin_pc):
 
     p = admin_cc.management.client.wait_success(p)
     assert p.resourceQuota is not None
+
     client = admin_pc.cluster.client
     ns = client.create_namespace(name=random_str(),
                                  projectId=p.id,
@@ -439,3 +447,37 @@ def test_update_quota(admin_cc, admin_pc):
                                           resourceQuota=pq,
                                           namespaceDefaultResourceQuota=dq)
     assert e.value.error.status == 422
+
+
+def test_container_resource_limit(admin_cc, admin_pc):
+    q = default_project_quota()
+    lmt = ns_default_limit()
+    client = admin_cc.management.client
+    p = client.create_project(name='test-' + random_str(),
+                              clusterId=admin_cc.cluster.id,
+                              resourceQuota=q,
+                              namespaceDefaultResourceQuota=q,
+                              containerDefaultResourceLimit=lmt)
+
+    p = admin_cc.management.client.wait_success(p)
+    assert p.resourceQuota is not None
+    assert p.containerDefaultResourceLimit is not None
+
+    client = admin_pc.cluster.client
+    ns = client.create_namespace(name=random_str(),
+                                 projectId=p.id,
+                                 resourceQuota=ns_quota())
+    assert ns is not None
+    assert ns.resourceQuota is not None
+    assert ns.containerDefaultResourceLimit is not None
+    wait_for_applied_quota_set(admin_pc.cluster.client,
+                               ns)
+
+    # reset the container limit
+    p = admin_cc.management.client.update(p,
+                                          containerDefaultResourceLimit=None)
+    assert p.containerDefaultResourceLimit is None
+
+    ns = admin_cc.management.client.update(ns,
+                                           containerDefaultResourceLimit=None)
+    assert len(ns.containerDefaultResourceLimit) == 0
