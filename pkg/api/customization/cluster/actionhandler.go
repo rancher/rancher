@@ -79,6 +79,9 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 	case "restoreFromEtcdBackup":
 		return a.RestoreFromEtcdBackupHandler(actionName, action, apiContext)
 	case "rotateCertificates":
+		if !canUpdateCluster() {
+			return httperror.NewAPIError(httperror.Unauthorized, "can not rotate certificates")
+		}
 		return a.RotateCertificates(actionName, action, apiContext)
 	}
 
