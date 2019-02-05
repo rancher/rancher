@@ -18,18 +18,19 @@ type DynamicSchema struct {
 }
 
 type DynamicSchemaSpec struct {
-	SchemaName        string            `json:"schemaName,omitempty"`
-	Embed             bool              `json:"embed,omitempty"`
-	EmbedType         string            `json:"embedType,omitempty"`
-	PluralName        string            `json:"pluralName,omitempty"`
-	ResourceMethods   []string          `json:"resourceMethods,omitempty"`
-	ResourceFields    map[string]Field  `json:"resourceFields,omitempty"`
-	ResourceActions   map[string]Action `json:"resourceActions,omitempty"`
-	CollectionMethods []string          `json:"collectionMethods,omitempty"`
-	CollectionFields  map[string]Field  `json:"collectionFields,omitempty"`
-	CollectionActions map[string]Action `json:"collectionActions,omitempty"`
-	CollectionFilters map[string]Filter `json:"collectionFilters,omitempty"`
-	IncludeableLinks  []string          `json:"includeableLinks,omitempty"`
+	SchemaName           string            `json:"schemaName,omitempty"`
+	Embed                bool              `json:"embed,omitempty"`
+	EmbedType            string            `json:"embedType,omitempty"`
+	PluralName           string            `json:"pluralName,omitempty"`
+	ResourceMethods      []string          `json:"resourceMethods,omitempty"`
+	ResourceFields       map[string]Field  `json:"resourceFields,omitempty"`
+	ResourceActions      map[string]Action `json:"resourceActions,omitempty"`
+	CollectionMethods    []string          `json:"collectionMethods,omitempty"`
+	CollectionFields     map[string]Field  `json:"collectionFields,omitempty"`
+	CollectionActions    map[string]Action `json:"collectionActions,omitempty"`
+	CollectionFilters    map[string]Filter `json:"collectionFilters,omitempty"`
+	IncludeableLinks     []string          `json:"includeableLinks,omitempty"`
+	DynamicSchemaVersion string            `json:"dynamicSchemaVersion,omitempty"`
 }
 
 type DynamicSchemaStatus struct {

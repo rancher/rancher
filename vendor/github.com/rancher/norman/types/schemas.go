@@ -108,10 +108,16 @@ func (s *Schemas) removeReferences(schema *Schema) {
 func (s *Schemas) AddSchema(schema Schema) *Schemas {
 	s.Lock()
 	defer s.Unlock()
-	return s.doAddSchema(schema)
+	return s.doAddSchema(schema, false)
 }
 
-func (s *Schemas) doAddSchema(schema Schema) *Schemas {
+func (s *Schemas) ForceAddSchema(schema Schema) *Schemas {
+	s.Lock()
+	defer s.Unlock()
+	return s.doAddSchema(schema, true)
+}
+
+func (s *Schemas) doAddSchema(schema Schema, replace bool) *Schemas {
 	s.setupDefaults(&schema)
 
 	if s.AddHook != nil {
@@ -125,9 +131,20 @@ func (s *Schemas) doAddSchema(schema Schema) *Schemas {
 		s.versions = append(s.versions, schema.Version)
 	}
 
-	if _, ok := schemas[schema.ID]; !ok {
+	if _, ok := schemas[schema.ID]; !ok ||
+		(replace && schema.DynamicSchemaVersion != schemas[schema.ID].DynamicSchemaVersion) {
 		schemas[schema.ID] = &schema
-		s.schemas = append(s.schemas, &schema)
+
+		if replace {
+			for i, candidate := range s.schemas {
+				if candidate.ID == schema.ID {
+					s.schemas[i] = &schema
+					break
+				}
+			}
+		} else {
+			s.schemas = append(s.schemas, &schema)
+		}
 
 		if !schema.Embed {
 			s.addReferences(&schema)
@@ -159,7 +176,7 @@ func (s *Schemas) removeEmbed(schema *Schema) {
 	}
 
 	s.doRemoveSchema(*target)
-	s.doAddSchema(newSchema)
+	s.doAddSchema(newSchema, false)
 }
 
 func (s *Schemas) embed(schema *Schema) {
@@ -184,7 +201,7 @@ func (s *Schemas) embed(schema *Schema) {
 	}
 
 	s.doRemoveSchema(*target)
-	s.doAddSchema(newSchema)
+	s.doAddSchema(newSchema, false)
 }
 
 func (s *Schemas) addReferences(schema *Schema) {
