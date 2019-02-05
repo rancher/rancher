@@ -1,8 +1,8 @@
 package settings
 
 import (
-	"fmt"
 	"os"
+	"strings"
 
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -31,10 +31,6 @@ type settingsProvider struct {
 }
 
 func (s *settingsProvider) Get(name string) string {
-	value := os.Getenv(settings.GetENVKey(name))
-	if value != "" {
-		return value
-	}
 	obj, err := s.settingsLister.Get("", name)
 	if err != nil {
 		return s.fallback[name]
@@ -46,10 +42,6 @@ func (s *settingsProvider) Get(name string) string {
 }
 
 func (s *settingsProvider) Set(name, value string) error {
-	envValue := os.Getenv(settings.GetENVKey(name))
-	if envValue != "" {
-		return fmt.Errorf("setting %s can not be set because it is from environment variable", name)
-	}
 	obj, err := s.settings.Get(name, v1.GetOptions{})
 	if err != nil {
 		return err
@@ -75,11 +67,11 @@ func (s *settingsProvider) SetIfUnset(name, value string) error {
 	return err
 }
 
-func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error {
+func (s *settingsProvider) SetAll(settings map[string]settings.Setting) error {
 	fallback := map[string]string{}
 
-	for name, setting := range settingsMap {
-		key := settings.GetENVKey(name)
+	for name, setting := range settings {
+		key := "CATTLE_" + strings.ToUpper(strings.Replace(name, "-", "_", -1))
 		value := os.Getenv(key)
 
 		obj, err := s.settings.Get(setting.Name, v1.GetOptions{})
