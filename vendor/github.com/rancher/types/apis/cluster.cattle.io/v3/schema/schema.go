@@ -34,13 +34,16 @@ func namespaceTypes(schemas *types.Schemas) *types.Schemas {
 			&m.AnnotationField{Field: "description"},
 			&m.AnnotationField{Field: "projectId"},
 			&m.AnnotationField{Field: "resourceQuota", Object: true},
+			&m.AnnotationField{Field: "containerDefaultResourceLimit", Object: true},
 			&m.Drop{Field: "status"},
 		).
 		MustImport(&Version, NamespaceResourceQuota{}).
+		MustImport(&Version, ContainerResourceLimit{}).
 		MustImport(&Version, v1.Namespace{}, struct {
-			Description   string `json:"description"`
-			ProjectID     string `norman:"type=reference[/v3/schemas/project],noupdate"`
-			ResourceQuota string `json:"resourceQuota,omitempty" norman:"type=namespaceResourceQuota"`
+			Description                   string `json:"description"`
+			ProjectID                     string `norman:"type=reference[/v3/schemas/project],noupdate"`
+			ResourceQuota                 string `json:"resourceQuota,omitempty" norman:"type=namespaceResourceQuota"`
+			ContainerDefaultResourceLimit string `json:"containerDefaultResourceLimit,omitempty" norman:"type=containerResourceLimit"`
 		}{}).
 		MustImport(&Version, NamespaceMove{}).
 		MustImportAndCustomize(&Version, v1.Namespace{}, func(schema *types.Schema) {

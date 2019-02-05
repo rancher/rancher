@@ -33,6 +33,7 @@ type Interface interface {
 	ServiceAccountsGetter
 	ReplicationControllersGetter
 	ResourceQuotasGetter
+	LimitRangesGetter
 }
 
 type Clients struct {
@@ -51,6 +52,7 @@ type Clients struct {
 	ServiceAccount        ServiceAccountClient
 	ReplicationController ReplicationControllerClient
 	ResourceQuota         ResourceQuotaClient
+	LimitRange            LimitRangeClient
 }
 
 type Client struct {
@@ -71,6 +73,7 @@ type Client struct {
 	serviceAccountControllers        map[string]ServiceAccountController
 	replicationControllerControllers map[string]ReplicationControllerController
 	resourceQuotaControllers         map[string]ResourceQuotaController
+	limitRangeControllers            map[string]LimitRangeController
 }
 
 func Factory(ctx context.Context, config rest.Config) (context.Context, controller.Starter, error) {
@@ -145,6 +148,9 @@ func NewClientsFromInterface(iface Interface) *Clients {
 		ResourceQuota: &resourceQuotaClient2{
 			iface: iface.ResourceQuotas(""),
 		},
+		LimitRange: &limitRangeClient2{
+			iface: iface.LimitRanges(""),
+		},
 	}
 }
 
@@ -174,6 +180,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		serviceAccountControllers:        map[string]ServiceAccountController{},
 		replicationControllerControllers: map[string]ReplicationControllerController{},
 		resourceQuotaControllers:         map[string]ResourceQuotaController{},
+		limitRangeControllers:            map[string]LimitRangeController{},
 	}, nil
 }
 
@@ -352,6 +359,19 @@ type ResourceQuotasGetter interface {
 func (c *Client) ResourceQuotas(namespace string) ResourceQuotaInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ResourceQuotaResource, ResourceQuotaGroupVersionKind, resourceQuotaFactory{})
 	return &resourceQuotaClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type LimitRangesGetter interface {
+	LimitRanges(namespace string) LimitRangeInterface
+}
+
+func (c *Client) LimitRanges(namespace string) LimitRangeInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &LimitRangeResource, LimitRangeGroupVersionKind, limitRangeFactory{})
+	return &limitRangeClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,
