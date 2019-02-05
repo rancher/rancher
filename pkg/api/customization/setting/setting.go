@@ -7,14 +7,9 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	v3client "github.com/rancher/types/client/management/v3"
 )
-
-var readOnlySettings = []string{
-	"cacerts",
-}
 
 func PipelineFormatter(apiContext *types.APIContext, resource *types.RawResource) {
 	v, ok := resource.Values["value"]
@@ -29,8 +24,6 @@ func PipelineFormatter(apiContext *types.APIContext, resource *types.RawResource
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	if convert.ToString(resource.Values["source"]) == "env" {
 		delete(resource.Links, "update")
-	} else if slice.ContainsString(readOnlySettings, resource.ID) {
-		delete(resource.Links, "update")
 	}
 }
 
@@ -41,8 +34,6 @@ func Validator(request *types.APIContext, schema *types.Schema, data map[string]
 	}
 	if setting.Source == "env" {
 		return httperror.NewAPIError(httperror.MethodNotAllowed, fmt.Sprintf("%s is readOnly because its value is from environment variable", request.ID))
-	} else if slice.ContainsString(readOnlySettings, setting.ID) {
-		return httperror.NewAPIError(httperror.MethodNotAllowed, fmt.Sprintf("%s is readOnly", request.ID))
 	}
 
 	newValue, ok := data["value"]
