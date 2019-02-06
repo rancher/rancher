@@ -161,12 +161,12 @@ def wait_for_workload(client, ns, timeout=60, count=0):
     interval = 0.5
     workloads = client.list_workload(namespaceId=ns)
     while len(workloads.data) != count:
-        workloads = client.list_workload(namespaceId=ns)
-        time.sleep(interval)
         if time.time() - start > timeout:
             print(workloads)
             raise Exception('Timeout waiting for workload service')
+        time.sleep(interval)
         interval *= 2
+        workloads = client.list_workload(namespaceId=ns)
     return workloads
 
 
