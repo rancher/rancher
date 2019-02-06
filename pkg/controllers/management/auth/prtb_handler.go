@@ -36,6 +36,7 @@ var projectManagmentPlaneResources = []string{
 }
 var prtbClusterManagmentPlaneResources = []string{
 	"notifiers",
+	"clustercatalogs",
 	"catalogtemplates",
 	"catalogtemplateversions",
 }

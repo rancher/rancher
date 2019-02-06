@@ -112,8 +112,6 @@ def test_create_project_catalog_after_user_addition(admin_mc,
     name = random_str()
     project_name = str.lstrip(admin_pc.project.id, "local:")
     catalog_name = project_name + ":" + name
-    # template_name = "local-" + project_name + "-" + name + "-etcd-operator"
-    # template_version_name = template_name + "-0.7.6"
     url = "https://github.com/mrajashree/charts.git"
 
     project = admin_pc.project

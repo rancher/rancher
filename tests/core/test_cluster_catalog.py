@@ -98,6 +98,11 @@ def test_cluster_catalog_templates_access(admin_mc, user_factory,
 
     wait_until(crtb_cb(admin_client, crtb_member))
 
+    # cluster roles should be able to list global catalog
+    # so that it shows up in dropdown on the app launch page
+    c = user1.client.list_catalog(name="library")
+    assert len(c) == 1
+
     # Now create a cluster catalog
     name = random_str()
     catalog_name = "local:" + name
@@ -129,6 +134,35 @@ def test_cluster_catalog_templates_access(admin_mc, user_factory,
     templateversions = \
         project_owner_client.list_template(clusterCatalogId=catalog_name)
     assert len(templateversions) == 1
+
+    # project roles should be able to list global and cluster catalogs
+    # so that they show up in dropdown on the app launch page
+    c = project_owner_client.list_catalog(name="library")
+    assert len(c) == 1
+    cluster_cat = project_owner_client.list_cluster_catalog(name=name)
+    assert len(cluster_cat) == 1
+    # but project-owners should't have cud permissions for cluster catalog
+    # create must fail
+    try:
+        project_owner_client.create_cluster_catalog(name=random_str(),
+                                                    branch="onlyOne",
+                                                    url=url,
+                                                    clusterId="local",
+                                                    )
+    except ApiError as e:
+        assert e.error.status == 403
+
+    # delete must fail
+    try:
+        project_owner_client.delete(cc)
+    except ApiError as e:
+        assert e.error.status == 403
+
+    # update must fail
+    try:
+        project_owner_client.update(cc, branch="master")
+    except ApiError as e:
+        assert e.error.status == 403
 
     cluster_member_client = user1.client
     templates = \
