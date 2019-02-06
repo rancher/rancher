@@ -86,3 +86,11 @@ def test_global_catalog_template_access(admin_mc, user_factory,
 
     client.delete(catalog)
     wait_for_template_to_be_deleted(client, name)
+
+
+def test_user_can_list_global_catalog(user_factory, remove_resource):
+    user1 = user_factory()
+    remove_resource(user1)
+    user_client = user1.client
+    c = user_client.list_catalog(name="library")
+    assert len(c) == 1
