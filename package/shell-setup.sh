@@ -12,12 +12,18 @@ mkdir -p .kube/certs
 
 SERVER="${CATTLE_SERVER}/k8s/clusters/${cluster}"
 
-if [ -f /etc/kubernetes/ssl/certs/serverca ]; then
-    cp /etc/kubernetes/ssl/certs/serverca .kube/certs/ca.crt
-    chmod 666 .kube/certs/ca.crt
-    if ! curl -s $SERVER > /dev/null; then
-        CERT="    certificate-authority: /nonexistent/.kube/certs/ca.crt"
-    fi
+if [ ! -f /etc/kubernetes/ssl/certs/serverca ]; then
+    temp=$(mktemp)
+    curl --insecure -s -fL $CATTLE_SERVER/v3/settings/cacerts | jq -r .value > $temp
+    mkdir -p /etc/kubernetes/ssl/certs
+    mv $temp /etc/kubernetes/ssl/certs/serverca
+fi
+
+cp /etc/kubernetes/ssl/certs/serverca .kube/certs/ca.crt
+chmod 666 .kube/certs/ca.crt
+
+if ! curl -s $SERVER > /dev/null; then
+  CERT="    certificate-authority: /nonexistent/.kube/certs/ca.crt"
 fi
 
 for i in /run /var/run /etc/kubernetes; do
