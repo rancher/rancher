@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -9,6 +10,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/transport"
@@ -24,7 +26,6 @@ func (s *ShellLinkHandler) LinkHandler(apiContext *types.APIContext, next types.
 	if err != nil {
 		return err
 	}
-
 	userManager := context.Management.UserManager
 
 	userID := userManager.GetUser(apiContext)
@@ -32,6 +33,7 @@ func (s *ShellLinkHandler) LinkHandler(apiContext *types.APIContext, next types.
 	if err != nil {
 		return err
 	}
+	cacerts := base64.StdEncoding.EncodeToString([]byte(settings.CACerts.Get()))
 
 	pods, err := context.K8sClient.CoreV1().Pods("cattle-system").List(v1.ListOptions{
 		LabelSelector: "app=cattle-agent",
@@ -51,6 +53,7 @@ func (s *ShellLinkHandler) LinkHandler(apiContext *types.APIContext, next types.
 			vars.Add("command", "kubectl-shell.sh")
 			vars.Add("command", token)
 			vars.Add("command", context.ClusterName)
+			vars.Add("command", cacerts)
 
 			path := fmt.Sprintf("/k8s/clusters/%s/api/v1/namespaces/%s/pods/%s/exec", context.ClusterName, "cattle-system", pod.Name)
 
