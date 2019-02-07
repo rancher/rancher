@@ -171,32 +171,29 @@ func (p *Provisioner) provision(cluster *v3.Cluster) (*v3.Cluster, error) {
 }
 
 func (p *Provisioner) pending(cluster *v3.Cluster) (*v3.Cluster, error) {
-	obj, err := v3.ClusterConditionPending.DoUntilTrue(cluster, func() (runtime.Object, error) {
-		if skipProvisioning(cluster) {
-			return cluster, nil
-		}
-
-		driver, err := p.validateDriver(cluster)
-		if err != nil {
-			return cluster, err
-		}
-
-		if driver == "" {
-			return cluster, &controller.ForgetError{Err: fmt.Errorf("waiting for full cluster configuration")}
-		}
-
-		if driver != cluster.Status.Driver {
-			cluster.Status.Driver = driver
-			if driver == v3.ClusterDriverRKE && cluster.Spec.RancherKubernetesEngineConfig == nil {
-				cluster.Spec.RancherKubernetesEngineConfig = &v3.RancherKubernetesEngineConfig{}
-			}
-			return p.Clusters.Update(cluster)
-		}
-
+	if skipProvisioning(cluster) {
 		return cluster, nil
-	})
+	}
 
-	return obj.(*v3.Cluster), err
+	driver, err := p.validateDriver(cluster)
+	if err != nil {
+		return cluster, err
+	}
+
+	if driver == "" {
+		return cluster, &controller.ForgetError{Err: fmt.Errorf("waiting for full cluster configuration")}
+	}
+
+	if driver != cluster.Status.Driver {
+		cluster.Status.Driver = driver
+		if driver == v3.ClusterDriverRKE && cluster.Spec.RancherKubernetesEngineConfig == nil {
+			cluster.Spec.RancherKubernetesEngineConfig = &v3.RancherKubernetesEngineConfig{}
+		}
+		return p.Clusters.Update(cluster)
+	}
+
+	return cluster, nil
+
 }
 
 func (p *Provisioner) backoffFailure(cluster *v3.Cluster, spec *v3.ClusterSpec) (bool, time.Duration) {
@@ -485,12 +482,11 @@ func (p *Provisioner) getDriver(cluster *v3.Cluster) (string, error) {
 		}
 	}
 
-	if driver == nil {
-		nodes, err := p.reconcileRKENodes(cluster.Name)
-		if err == nil && len(nodes) > 0 {
-			return v3.ClusterDriverRKE, nil
-		}
+	if cluster.Spec.RancherKubernetesEngineConfig != nil {
+		return v3.ClusterDriverRKE, nil
+	}
 
+	if driver == nil {
 		return "", nil
 	}
 
@@ -651,6 +647,7 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) ([]v3.RKEConfigNode,
 		return nil, &controller.ForgetError{
 			Err:    fmt.Errorf("waiting for etcd and controlplane nodes to be registered"),
 			Reason: "Provisioning",
+
 		}
 	}
 
