@@ -93,7 +93,7 @@ func (n *GDController) sync(key string, obj *v3.GlobalDNS) (runtime.Object, erro
 		}
 	}
 
-	err = n.updateIngressEndpoints(ingress, obj.Status.Endpoints)
+	err = n.updateIngressEndpointsFQDN(ingress, obj)
 	if err != nil {
 		return nil, fmt.Errorf("GlobalDNSController: Error updating ingress for the GlobalDNS %v", err)
 	}
@@ -196,20 +196,28 @@ func (n *GDController) generateNewIngressSpec(globaldns *v3.GlobalDNS) *v1beta1.
 	}
 }
 
-func (n *GDController) updateIngressEndpoints(ingress *v1beta1.Ingress, endpoints []string) error {
+func (n *GDController) updateIngressEndpointsFQDN(ingress *v1beta1.Ingress, obj *v3.GlobalDNS) error {
+	var err error
 
-	if !n.ifEndpointsDiffer(ingress.Status.LoadBalancer.Ingress, endpoints) {
-		return nil
+	if n.ifEndpointsDiffer(ingress.Status.LoadBalancer.Ingress, obj.Status.Endpoints) {
+		ingress.Status.LoadBalancer.Ingress = n.sliceToStatus(obj.Status.Endpoints)
+		ingress, err = n.ingresses.UpdateStatus(ingress)
+
+		if err != nil {
+			return fmt.Errorf("GlobalDNSController: Error updating Ingress %v", err)
+		}
 	}
 
-	ingress.Status.LoadBalancer.Ingress = n.sliceToStatus(endpoints)
-	updatedObj, err := n.ingresses.UpdateStatus(ingress)
-
-	if err != nil {
-		return fmt.Errorf("GlobalDNSController: Error updating Ingress %v", err)
+	if len(ingress.Spec.Rules) > 0 {
+		if !strings.EqualFold(ingress.Spec.Rules[0].Host, obj.Spec.FQDN) {
+			ingress.Spec.Rules[0].Host = obj.Spec.FQDN
+			_, err = n.ingresses.Update(ingress)
+			if err != nil {
+				return fmt.Errorf("GlobalDNSController: Error updating Ingress %v", err)
+			}
+		}
 	}
 
-	logrus.Debugf("GlobalDNSController: Updated Ingress: %v", updatedObj)
 	return nil
 }
 
