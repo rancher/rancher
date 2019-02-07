@@ -29,6 +29,6 @@ spec:
         - --provider=aws
         - --aws-zone-type=public # only look at public hosted zones (valid values are public, private or no value for both)
         - --registry=txt
-        - --txt-owner-id=my-identifier
+        - --txt-owner-id={{.identifier}}
         - --log-level=debug
         - --publish-internal-services`
