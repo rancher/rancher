@@ -141,8 +141,8 @@ def test_app_namespace_annotation(admin_pc, admin_mc):
     )
     wait_for_workload(client, ns.name, count=3)
     ns = admin_pc.cluster.client.reload(ns)
-    assert app1.name in ns.annotations['cattle.io/appIds']
-    assert app2.name in ns.annotations['cattle.io/appIds']
+    ns = wait_for_app_annotation(admin_pc, ns, app1.name)
+    ns = wait_for_app_annotation(admin_pc, ns, app2.name)
     client.delete(app1)
     wait_for_app_to_be_deleted(client, app1)
 
@@ -154,6 +154,20 @@ def test_app_namespace_annotation(admin_pc, admin_mc):
     wait_for_app_to_be_deleted(client, app2)
     ns = admin_pc.cluster.client.reload(ns)
     assert 'cattle.io/appIds' not in ns.annotations
+
+
+def wait_for_app_annotation(admin_pc, ns, app_name, timeout=60):
+    start = time.time()
+    interval = 0.5
+    ns = admin_pc.cluster.client.reload(ns)
+    while app_name not in ns.annotations['cattle.io/appIds']:
+        if time.time() - start > timeout:
+            print(ns.annotations)
+            raise Exception('Timeout waiting for app annotation')
+        time.sleep(interval)
+        interval *= 2
+        ns = admin_pc.cluster.client.reload(ns)
+    return ns
 
 
 def wait_for_workload(client, ns, timeout=60, count=0):
