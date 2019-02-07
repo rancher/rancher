@@ -26,10 +26,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-const PingName = "ping"
-const ADFSName = "adfs"
-const KeyCloakName = "keycloak"
-const OKTAName = "okta"
+const (
+	PingName            = "ping"
+	ADFSName            = "adfs"
+	KeyCloakName        = "keycloak"
+	OKTAName            = "okta"
+	loginAction         = "login"
+	testAndEnableAction = "testAndEnable"
+)
 
 type Provider struct {
 	ctx             context.Context
@@ -99,7 +103,7 @@ func PerformSamlLogin(name string, apiContext *types.APIContext, input interface
 
 	if provider, ok := SamlProviders[name]; ok {
 		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_FinalRedirectURL", finalRedirectURL)
-		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_Action", "login")
+		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_Action", loginAction)
 		idpRedirectURL, err := provider.HandleSamlLogin(apiContext.Response, apiContext.Request)
 		if err != nil {
 			return err

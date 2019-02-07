@@ -56,7 +56,7 @@ func (s *Provider) testAndEnable(actionName string, action *types.Action, reques
 	finalRedirectURL := samlLogin.FinalRedirectURL
 	provider.clientState.SetState(request.Response, request.Request, "Rancher_UserID", provider.userMGR.GetUser(request))
 	provider.clientState.SetState(request.Response, request.Request, "Rancher_FinalRedirectURL", finalRedirectURL)
-	provider.clientState.SetState(request.Response, request.Request, "Rancher_Action", "testAndEnable")
+	provider.clientState.SetState(request.Response, request.Request, "Rancher_Action", testAndEnableAction)
 	idpRedirectURL, err := provider.HandleSamlLogin(request.Response, request.Request)
 	if err != nil {
 		return err

@@ -244,6 +244,13 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	}
 
 	redirectURL := s.clientState.GetState(r, "Rancher_FinalRedirectURL")
+	rancherAction := s.clientState.GetState(r, "Rancher_Action")
+	if rancherAction == loginAction {
+		redirectURL += "/login?"
+	} else if rancherAction == testAndEnableAction {
+		// the first query param is config=saml_provider_name set by UI
+		redirectURL += "&"
+	}
 
 	samlData := make(map[string][]string)
 
@@ -262,14 +269,14 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	config, err := s.getSamlConfig()
 	if err != nil {
 		log.Errorf("SAML: Error getting saml config %v", err)
-		http.Redirect(w, r, redirectURL+"/login?errorCode=500", http.StatusFound)
+		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 		return
 	}
 
 	userPrincipal, groupPrincipals, err = s.getSamlPrincipals(config, samlData)
 	if err != nil {
 		log.Error(err)
-		http.Redirect(w, r, redirectURL+"/login?errorCode=500", http.StatusFound)
+		http.Redirect(w, r, redirectURL+"errorCode=422&errorMsg=Invalid saml attributes", http.StatusFound)
 		return
 	}
 	allowedPrincipals := config.AllowedPrincipalIDs
@@ -277,22 +284,21 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	allowed, err := s.userMGR.CheckAccess(config.AccessMode, allowedPrincipals, userPrincipal.Name, groupPrincipals)
 	if err != nil {
 		log.Errorf("SAML: Error during login while checking access %v", err)
-		http.Redirect(w, r, redirectURL+"/login?errorCode=500", http.StatusFound)
+		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 		return
 	}
 	if !allowed {
 		log.Errorf("SAML: User does not have access %v", err)
-		http.Redirect(w, r, redirectURL+"/login?errorCode=403", http.StatusFound)
+		http.Redirect(w, r, redirectURL+"errorCode=403", http.StatusFound)
 		return
 	}
 
 	userID := s.clientState.GetState(r, "Rancher_UserID")
-	rancherAction := s.clientState.GetState(r, "Rancher_Action")
-	if userID != "" && rancherAction == "testAndEnable" {
+	if userID != "" && rancherAction == testAndEnableAction {
 		user, err := s.userMGR.SetPrincipalOnCurrentUserByUserID(userID, userPrincipal)
 		if err != nil {
 			log.Errorf("SAML: Error setting principal on current user %v", err)
-			http.Redirect(w, r, redirectURL+"/login?errorCode=500", http.StatusFound)
+			http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 			return
 		}
 
@@ -300,7 +306,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		err = s.saveSamlConfig(config)
 		if err != nil {
 			log.Errorf("SAML: Error saving saml config %v", err)
-			http.Redirect(w, r, redirectURL+"/login?errorCode=500", http.StatusFound)
+			http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 			return
 		}
 
@@ -311,7 +317,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		err = setRancherToken(w, r, s.tokenMGR, user.Name, userPrincipal, groupPrincipals, isSecure)
 		if err != nil {
 			log.Errorf("SAML: Failed creating token with error: %v", err)
-			http.Redirect(w, r, redirectURL+"/login?errorCode=500", http.StatusFound)
+			http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 		}
 		// delete the cookies
 		s.clientState.DeleteState(w, r, "Rancher_UserID")
@@ -333,20 +339,20 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	user, err := s.userMGR.EnsureUser(userPrincipal.Name, displayName)
 	if err != nil {
 		log.Errorf("SAML: Failed getting user with error: %v", err)
-		http.Redirect(w, r, redirectURL+"/login?errorCode=500", http.StatusFound)
+		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 		return
 	}
 
 	if user.Enabled != nil && !*user.Enabled {
 		log.Errorf("SAML: User %v permission denied", user.Name)
-		http.Redirect(w, r, redirectURL+"/login?errorCode=403", http.StatusFound)
+		http.Redirect(w, r, redirectURL+"errorCode=403", http.StatusFound)
 		return
 	}
 
 	err = setRancherToken(w, r, s.tokenMGR, user.Name, userPrincipal, groupPrincipals, true)
 	if err != nil {
 		log.Errorf("SAML: Failed creating token with error: %v", err)
-		http.Redirect(w, r, redirectURL+"/login?errorCode=500", http.StatusFound)
+		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
 	}
 	redirectURL = s.clientState.GetState(r, "Rancher_FinalRedirectURL")
 	if redirectURL != "" {
