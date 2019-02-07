@@ -302,4 +302,10 @@ type CloudCredential struct {
 	metav1.TypeMeta `json:",inline"`
 
 	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec CloudCredentialSpec `json:"spec"`
+}
+
+type CloudCredentialSpec struct {
+	Description string `json:"description,omitempty"`
 }

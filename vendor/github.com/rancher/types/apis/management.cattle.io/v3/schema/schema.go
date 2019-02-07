@@ -61,7 +61,6 @@ func credTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		AddMapperForType(&Version, v3.CloudCredential{},
 			&mapper.CredentialMapper{},
-			&m.Move{From: "name", To: "id"},
 			&m.Drop{Field: "namespaceId"}).
 		MustImport(&Version, v3.CloudCredential{})
 }
