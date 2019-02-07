@@ -91,7 +91,29 @@ spec:
                   operator: NotIn
                   values:
                     - windows
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-role.kubernetes.io/controlplane
+                operator: In
+                values:
+                - "true"
+          - weight: 1
+            preference:
+              matchExpressions:
+              - key: node-role.kubernetes.io/etcd
+                operator: In
+                values:
+                - "true"
       serviceAccountName: cattle
+      tolerations:
+      - effect: NoExecute
+        key: "node-role.kubernetes.io/etcd"
+        value: "true"
+      - effect: NoSchedule
+        key: "node-role.kubernetes.io/controlplane"
+        value: "true"
       containers:
         - name: cluster-register
           imagePullPolicy: IfNotPresent
@@ -142,12 +164,7 @@ spec:
       hostNetwork: true
       serviceAccountName: cattle
       tolerations:
-      - effect: NoExecute
-        key: "node-role.kubernetes.io/etcd"
-        value: "true"
-      - effect: NoSchedule
-        key: "node-role.kubernetes.io/controlplane"
-        value: "true"
+      - operator: Exists
       containers:
       - name: agent
         image: {{.AgentImage}}
@@ -225,6 +242,21 @@ spec:
                   operator: NotIn
                   values:
                     - windows
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-role.kubernetes.io/controlplane
+                operator: In
+                values:
+                - "true"
+          - weight: 1
+            preference:
+              matchExpressions:
+              - key: node-role.kubernetes.io/etcd
+                operator: In
+                values:
+                - "true"
       hostNetwork: true
       serviceAccountName: cattle
       tolerations:
