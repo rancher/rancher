@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 
+	"github.com/rancher/rancher/pkg/settings"
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	k8srbacV1 "k8s.io/api/rbac/v1beta1"
@@ -106,12 +107,15 @@ func (n *ProviderLauncher) sync(key string, obj *v3.GlobalDNSProvider) (runtime.
 }
 
 func (n *ProviderLauncher) handleRoute53Provider(obj *v3.GlobalDNSProvider) (runtime.Object, error) {
+	rancherInstallUUID := settings.InstallUUID.Get()
+
 	//create external-dns route53 provider
 	data := map[string]interface{}{
 		"awsAccessKey":   obj.Spec.Route53ProviderConfig.AccessKey,
 		"awsSecretKey":   obj.Spec.Route53ProviderConfig.SecretKey,
 		"route53Domain":  obj.Spec.Route53ProviderConfig.RootDomain,
 		"deploymentName": obj.Name,
+		"identifier":     rancherInstallUUID + "_" + obj.Name,
 	}
 	if err := n.createExternalDNSDeployment(obj, data, Route53DeploymentTemplate, Route53DNSProvider); err != nil {
 		return nil, err
@@ -121,12 +125,14 @@ func (n *ProviderLauncher) handleRoute53Provider(obj *v3.GlobalDNSProvider) (run
 }
 
 func (n *ProviderLauncher) handleCloudflareProvider(obj *v3.GlobalDNSProvider) (runtime.Object, error) {
+	rancherInstallUUID := settings.InstallUUID.Get()
 	//create external-dns cloudflare provider
 	data := map[string]interface{}{
 		"apiKey":           obj.Spec.CloudflareProviderConfig.APIKey,
 		"apiEmail":         obj.Spec.CloudflareProviderConfig.APIEmail,
 		"cloudflareDomain": obj.Spec.CloudflareProviderConfig.RootDomain,
 		"deploymentName":   obj.Name,
+		"identifier":       rancherInstallUUID + "_" + obj.Name,
 	}
 	if err := n.createExternalDNSDeployment(obj, data, CloudflareDeploymentTemplate, CloudflareDNSProvider); err != nil {
 		return nil, err

@@ -24,6 +24,7 @@ spec:
         - --provider=cloudflare
         - --cloudflare-proxied # (optional) enable the proxy feature of Cloudflare (DDOS protection, CDN...)
         - --log-level=debug
+        - --txt-owner-id={{.identifier}}
         - --publish-internal-services
         env:
         - name: CF_API_KEY
