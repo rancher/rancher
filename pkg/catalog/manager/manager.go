@@ -211,11 +211,11 @@ func (m *Manager) deleteChart(toDelete string, namespace string) error {
 		return err
 	}
 	for tv := range toDeleteTvs {
-		if err := m.templateVersionClient.Delete(tv, &metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
+		if err := m.templateVersionClient.DeleteNamespaced(namespace, tv, &metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
 			return err
 		}
 	}
-	if err := m.templateClient.Delete(toDelete, &metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
+	if err := m.templateClient.DeleteNamespaced(namespace, toDelete, &metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
 		return err
 	}
 	return nil

@@ -249,7 +249,9 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogInfo, t
 	cmt.projectCatalog = projectCatalog
 	cmt.clusterCatalog = clusterCatalog
 	if len(terrors) > 0 {
-		m.updateCatalogInfo(cmt, catalogType, "", false, true)
+		if _, err := m.updateCatalogInfo(cmt, catalogType, "", false, true); err != nil {
+			return err
+		}
 		return errors.Errorf("failed to update templates. Multiple error occurred: %v", terrors)
 	}
 	var finalError error
@@ -268,7 +270,9 @@ func (m *Manager) traverseAndUpdate(repoPath, commit string, cmt *CatalogInfo, t
 	cmt.catalog = catalog
 	cmt.projectCatalog = projectCatalog
 	cmt.clusterCatalog = clusterCatalog
-	m.updateCatalogInfo(cmt, catalogType, "", true, true)
+	if _, err := m.updateCatalogInfo(cmt, catalogType, "", true, true); err != nil {
+		return err
+	}
 
 	return finalError
 }
