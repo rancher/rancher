@@ -20,7 +20,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/ingresshostgen"
 	"github.com/rancher/rancher/pkg/controllers/user/logging"
 	"github.com/rancher/rancher/pkg/controllers/user/monitoring"
-	"github.com/rancher/rancher/pkg/controllers/user/multiclusterapp"
 	"github.com/rancher/rancher/pkg/controllers/user/networkpolicy"
 	"github.com/rancher/rancher/pkg/controllers/user/noderemove"
 	"github.com/rancher/rancher/pkg/controllers/user/nodesyncer"
@@ -51,7 +50,6 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	healthsyncer.Register(ctx, cluster, clusterManager)
 	helm.Register(ctx, cluster, kubeConfigGetter)
 	logging.Register(ctx, cluster)
-	multiclusterapp.Register(ctx, cluster)
 	networkpolicy.Register(ctx, cluster)
 	noderemove.Register(ctx, cluster)
 	nodesyncer.Register(ctx, cluster, kubeConfigGetter)

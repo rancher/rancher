@@ -14,10 +14,10 @@ import (
 )
 
 //StartMCAppStateController gets all corresponding apps and update condition on multi cluster app sync
-func StartMCAppStateController(ctx context.Context, cluster *config.UserContext) {
-	mcApps := cluster.Management.Management.MultiClusterApps("")
+func StartMCAppStateController(ctx context.Context, management *config.ManagementContext) {
+	mcApps := management.Management.MultiClusterApps("")
 	s := &MCAppStateController{
-		Apps:             cluster.Management.Project.Apps("").Controller().Lister(),
+		Apps:             management.Project.Apps("").Controller().Lister(),
 		MultiClusterApps: mcApps,
 	}
 	mcApps.AddHandler(ctx, "multi-cluster-app-state-controller", s.sync)
@@ -51,7 +51,7 @@ func (m *MCAppStateController) sync(key string, mcapp *v3.MultiClusterApp) (runt
 				}
 				return mcapp, err
 			}
-			if value, ok := app.Labels[multiClusterAppIDSelector]; !ok || value != mcapp.Name {
+			if value, ok := app.Labels[MultiClusterAppIDSelector]; !ok || value != mcapp.Name {
 				return mcapp, fmt.Errorf("app %s missing label selector for %s", t.AppName, mcapp.Name)
 			}
 			apps = append(apps, app)
