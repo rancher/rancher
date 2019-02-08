@@ -84,7 +84,9 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 				field.Type = "password"
 			}
 			if field.Type == "password" || userCredFields[name] {
-				credFields[name] = field
+				credField := field
+				credField.Required = true
+				credFields[name] = credField
 			}
 		}
 		return m.createCredSchema(obj, credFields)
@@ -144,7 +146,9 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 			field.Type = "password"
 		}
 		if field.Type == "password" || userCredFields[name] {
-			credFields[name] = field
+			credField := field
+			credField.Required = true
+			credFields[name] = credField
 		}
 		resourceFields[name] = field
 	}
