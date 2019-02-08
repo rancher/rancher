@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
@@ -49,7 +50,7 @@ type ClusterController struct {
 	clusterLister v3.ClusterLister
 }
 
-func Register(ctx context.Context, management *config.ManagementContext) {
+func Register(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	mcApps := management.Management.MultiClusterApps("")
 	m := MCAppController{
 		multiClusterApps:  mcApps,
@@ -78,10 +79,14 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		mcApps:        mcApps,
 		clusterLister: clusters.Controller().Lister(),
 	}
-	m.multiClusterApps.AddHandler(ctx, "management-multiclusterapp-controller", m.sync)
+	m.multiClusterApps.AddHandler(ctx, "management-multiclusterapp-rbac-controller", m.sync)
 	management.Management.MultiClusterAppRevisions("").AddHandler(ctx, "management-multiclusterapp-revisions-rbac", r.sync)
 	projects.AddHandler(ctx, "management-mcapp-project-controller", p.sync)
 	clusters.AddHandler(ctx, "management-mcapp-cluster-controller", c.sync)
+
+	StartMCAppStateController(ctx, management)
+	StartMCAppManagementController(ctx, management, clusterManager)
+	StartMCAppEnqueueController(ctx, management)
 }
 
 func (mc *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Object, error) {

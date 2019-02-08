@@ -49,7 +49,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	podsecuritypolicy.Register(ctx, management)
 	etcdbackup.Register(ctx, management)
 	globaldns.Register(ctx, management)
-	multiclusterapp.Register(ctx, management)
+	multiclusterapp.Register(ctx, management, manager)
 
 	// Register last
 	auth.RegisterLate(ctx, management)

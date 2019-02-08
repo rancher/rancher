@@ -3,23 +3,23 @@ package multiclusterapp
 import (
 	"context"
 	"fmt"
-	"github.com/sirupsen/logrus"
+	"github.com/rancher/types/user"
 	"reflect"
 	"strings"
 	"time"
 
+	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
+
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/sirupsen/logrus"
 
 	"github.com/rancher/rancher/pkg/namespace"
-	corev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
-	"github.com/rancher/types/user"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/docker/machine/libmachine/log"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,53 +31,52 @@ import (
 const (
 	globalScopeAnswersKey     = "global"
 	creatorIDAnn              = "field.cattle.io/creatorId"
-	multiClusterAppIDSelector = "mcapp"
+	MultiClusterAppIDSelector = "mcapp"
 	projectIDFieldLabel       = "field.cattle.io/projectId"
 	mcAppLabel                = "io.cattle.field/multiClusterAppId"
 )
 
-type MCAppController struct {
+type MCAppManager struct {
 	apps                          pv3.AppInterface
 	appLister                     pv3.AppLister
 	multiClusterApps              v3.MultiClusterAppInterface
 	multiClusterAppRevisions      v3.MultiClusterAppRevisionInterface
 	multiClusterAppRevisionLister v3.MultiClusterAppRevisionLister
-	namespaces                    corev1.NamespaceInterface
-	nsLister                      corev1.NamespaceLister
 	templateVersionLister         v3.CatalogTemplateVersionLister
+	clusterManager                *clustermanager.Manager
 	clusterLister                 v3.ClusterLister
 	projectLister                 v3.ProjectLister
-	clusterName                   string
 	userManager                   user.Manager
+	ctx                           context.Context
 }
 
-func Register(ctx context.Context, cluster *config.UserContext) {
-	mcApps := cluster.Management.Management.MultiClusterApps("")
-	m := &MCAppController{
-		apps:                          cluster.Management.Project.Apps(""),
-		appLister:                     cluster.Management.Project.Apps("").Controller().Lister(),
-		namespaces:                    cluster.Core.Namespaces(""),
+func StartMCAppManagementController(ctx context.Context, mgmt *config.ManagementContext, clusterManager *clustermanager.Manager) {
+	management := mgmt.Management
+	mcApps := management.MultiClusterApps("")
+	m := &MCAppManager{
+		ctx:                           ctx,
+		apps:                          mgmt.Project.Apps(""),
+		appLister:                     mgmt.Project.Apps("").Controller().Lister(),
 		multiClusterApps:              mcApps,
-		multiClusterAppRevisions:      cluster.Management.Management.MultiClusterAppRevisions(""),
-		multiClusterAppRevisionLister: cluster.Management.Management.MultiClusterAppRevisions("").Controller().Lister(),
-		nsLister:                      cluster.Core.Namespaces("").Controller().Lister(),
-		clusterLister:                 cluster.Management.Management.Clusters("").Controller().Lister(),
-		projectLister:                 cluster.Management.Management.Projects("").Controller().Lister(),
-		clusterName:                   cluster.ClusterName,
-		templateVersionLister:         cluster.Management.Management.CatalogTemplateVersions("").Controller().Lister(),
-		userManager:                   cluster.Management.UserManager,
+		multiClusterAppRevisions:      management.MultiClusterAppRevisions(""),
+		multiClusterAppRevisionLister: management.MultiClusterAppRevisions("").Controller().Lister(),
+		clusterManager:                clusterManager,
+		clusterLister:                 management.Clusters("").Controller().Lister(),
+		projectLister:                 management.Projects("").Controller().Lister(),
+		templateVersionLister:         management.CatalogTemplateVersions("").Controller().Lister(),
+		userManager:                   mgmt.UserManager,
 	}
+	mcAppTickerData = map[string]*IntervalData{}
 	m.multiClusterApps.AddHandler(ctx, "multi-cluster-app-controller", m.sync)
-
-	StartMCAppStateController(ctx, cluster)
 }
 
-func (m *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Object, error) {
+func (m *MCAppManager) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Object, error) {
 	if mcapp == nil || mcapp.DeletionTimestamp != nil {
 		_, mcappName, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
 			return mcapp, err
 		}
+		deleteContext(mcappName)
 		return m.deleteApps(mcappName, mcapp)
 	}
 	var creatorID string
@@ -89,7 +88,6 @@ func (m *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.O
 	}
 	creatorID = systemUser.Name
 
-	log.Debugf("creator ID of apps and multiclusterapprevision for mcapp %v is: %v", mcapp.Name, creatorID)
 	answerMap, err := m.createAnswerMap(mcapp.Spec.Answers)
 	if err != nil {
 		return mcapp, err
@@ -100,70 +98,102 @@ func (m *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.O
 		return mcapp, err
 	}
 
-	mcapp = mcapp.DeepCopy()
-	if err := m.reconcileTargetsForDelete(mcapp); err != nil {
-		return mcapp, err
-	}
-
-	toUpgrade, err := m.toUpgrade(mcapp)
+	clusterContexts, err := m.getClusterContexts(mcapp)
 	if err != nil {
 		return mcapp, err
 	}
-	batchSize := len(mcapp.Spec.Targets)
-	if toUpgrade && mcapp.Spec.UpgradeStrategy.RollingUpdate != nil {
-		batchSize = mcapp.Spec.UpgradeStrategy.RollingUpdate.BatchSize
+
+	mcapp = mcapp.DeepCopy()
+	if err := m.reconcileTargetsForDelete(mcapp, clusterContexts); err != nil {
+		return mcapp, err
 	}
 
-	// todo: need to make this generic so works for other upgrade strategies
-	resp, err := m.createApps(mcapp, externalID, answerMap, creatorID, batchSize, toUpgrade)
+	changed, err := m.isChanged(mcapp)
+	if err != nil {
+		return mcapp, err
+	}
+
+	toUpdate := false
+	if changed {
+		toUpdate, err = m.toUpdate(mcapp)
+		if err != nil {
+			return mcapp, err
+		}
+	}
+
+	batchSize := len(mcapp.Spec.Targets)
+	if toUpdate && mcapp.Spec.UpgradeStrategy.RollingUpdate != nil {
+		if mcapp.Spec.UpgradeStrategy.RollingUpdate.Interval != 0 {
+			batchSize = mcapp.Spec.UpgradeStrategy.RollingUpdate.BatchSize
+		}
+	}
+
+	resp, err := m.createApps(mcapp, externalID, answerMap, creatorID, batchSize, toUpdate, clusterContexts)
 	if err != nil {
 		return resp.object, err
 	}
 
-	if !toUpgrade {
+	if !changed {
 		if mcapp.Status.RevisionName == "" {
-			setInstalledDone(mcapp)
 			return m.setRevisionAndUpdate(mcapp, creatorID)
 		}
 		return mcapp, nil
 	}
 
-	if !resp.canProceed {
-		return mcapp, nil
-	}
-
-	if len(resp.updateApps) == 0 && v3.MultiClusterAppConditionInstalled.IsUnknown(mcapp) {
-		setInstalledDone(mcapp)
+	if resp.count == len(mcapp.Spec.Targets) && v3.MultiClusterAppConditionInstalled.IsUnknown(mcapp) &&
+		v3.MultiClusterAppConditionInstalled.GetMessage(mcapp) == "upgrading" {
+		deleteContext(mcapp.Name)
 		return m.setRevisionAndUpdate(mcapp, creatorID)
 	}
 
-	if resp.remaining == 0 || len(resp.updateApps) == 0 {
+	if !toUpdate || resp.remaining <= 0 {
 		return mcapp, nil
 	}
 
 	for i, app := range resp.updateApps {
-		if resp.remaining > 0 {
-			if _, err := m.updateApp(app, answerMap, externalID, resp.projects[i]); err != nil {
-				return mcapp, err
-			}
-			resp.remaining--
+		if _, err := m.updateApp(app, answerMap, externalID, resp.projects[i]); err != nil {
+			return mcapp, err
+		}
+		resp.remaining--
+		if resp.remaining == 0 {
+			break
 		}
 	}
 
 	setInstalledUnknown(mcapp)
-	return m.updateCondition(mcapp, setInstalledUnknown)
+	upd, err := m.updateCondition(mcapp, setInstalledUnknown)
+	if err != nil {
+		return mcapp, err
+	}
+	storeContext(m.ctx, mcapp, m.multiClusterApps)
+	return upd, err
 }
 
 type Response struct {
 	object     *v3.MultiClusterApp
-	updateApps []*pv3.App
 	projects   []string
+	updateApps []*pv3.App
 	remaining  int
-	canProceed bool
+	count      int
 }
 
-func (m *MCAppController) createApps(mcapp *v3.MultiClusterApp, externalID string, answerMap map[string]map[string]string,
-	creatorID string, batchSize int, toUpdate bool) (*Response, error) {
+func (m *MCAppManager) getClusterContexts(mcapp *v3.MultiClusterApp) (map[string]*config.UserContext, error) {
+	clusterToContext := map[string]*config.UserContext{}
+	for _, t := range mcapp.Spec.Targets {
+		clusterName, _ := ref.Parse(t.ProjectName)
+		if _, ok := clusterToContext[clusterName]; !ok {
+			userContext, err := m.clusterManager.UserContext(clusterName)
+			if err != nil {
+				return nil, err
+			}
+			clusterToContext[clusterName] = userContext
+		}
+	}
+	return clusterToContext, nil
+}
+
+func (m *MCAppManager) createApps(mcapp *v3.MultiClusterApp, externalID string, answerMap map[string]map[string]string,
+	creatorID string, batchSize int, toUpdate bool, clusterContexts map[string]*config.UserContext) (*Response, error) {
 
 	var mcappToUpdate *v3.MultiClusterApp
 	var updateApps []*pv3.App
@@ -172,10 +202,12 @@ func (m *MCAppController) createApps(mcapp *v3.MultiClusterApp, externalID strin
 	ann := map[string]string{
 		creatorIDAnn: creatorID,
 	}
-	set := labels.Set(map[string]string{multiClusterAppIDSelector: mcapp.Name})
+	set := labels.Set(map[string]string{MultiClusterAppIDSelector: mcapp.Name})
 
 	resp := &Response{object: mcapp}
+
 	updateBatchSize := batchSize
+	count := 0
 
 	// for all targets, create the App{} instance, so that helm controller App lifecycle can pick it up
 	// only one app per project named mcapp-{{mcapp.Name}}
@@ -184,35 +216,31 @@ func (m *MCAppController) createApps(mcapp *v3.MultiClusterApp, externalID strin
 		if len(split) != 2 {
 			return resp, fmt.Errorf("error in splitting project ID %v", t.ProjectName)
 		}
-		projectNS := split[1]
-		// check if the target project in this iteration is same as the cluster in current context, if not then don't create namespace and app else it
-		// will be in the wrong cluster
-		if split[0] != m.clusterName {
-			continue
-		}
+		clusterName, projectNS := split[0], split[1]
 		// check if this app already exists
 		if t.AppName != "" {
 			app, err := m.appLister.Get(projectNS, t.AppName)
 			if err != nil || app == nil {
 				return resp, fmt.Errorf("error %v getting app %s in %s", err, t.AppName, projectNS)
 			}
-			if val, ok := app.Labels[multiClusterAppIDSelector]; !ok || val != mcapp.Name {
+			if val, ok := app.Labels[MultiClusterAppIDSelector]; !ok || val != mcapp.Name {
 				return resp, fmt.Errorf("app %s in %s missing multi cluster app label", t.AppName, projectNS)
 			}
+			appUpdated := false
+			if app.Spec.ExternalID == externalID {
+				if reflect.DeepEqual(app.Spec.Answers, getAnswerMap(answerMap, t.ProjectName)) {
+					appUpdated = true
+				}
+			}
+			if appUpdated {
+				count++
+				if !pv3.AppConditionInstalled.IsTrue(app) || !pv3.AppConditionDeployed.IsTrue(app) {
+					toUpdate = false
+					updateApps = []*pv3.App{}
+				}
+				continue
+			}
 			if toUpdate && updateBatchSize > 0 {
-				appUpdated := false
-				if app.Spec.ExternalID == externalID {
-					if reflect.DeepEqual(app.Spec.Answers, getAnswerMap(answerMap, t.ProjectName)) {
-						appUpdated = true
-					}
-				}
-				if appUpdated {
-					if !pv3.AppConditionInstalled.IsTrue(app) || !pv3.AppConditionDeployed.IsTrue(app) {
-						toUpdate = false
-						updateApps = []*pv3.App{}
-					}
-					continue
-				}
 				updateApps = append(updateApps, app)
 				projects = append(projects, t.ProjectName)
 				updateBatchSize--
@@ -220,7 +248,7 @@ func (m *MCAppController) createApps(mcapp *v3.MultiClusterApp, externalID strin
 			continue
 		}
 		if batchSize > 0 {
-			newTarget, mcapp, err := m.createNamespaceAndApp(&t, mcapp, answerMap, ann, set, projectNS, creatorID, externalID)
+			newTarget, mcapp, err := m.createNamespaceAndApp(&t, mcapp, answerMap, ann, set, projectNS, creatorID, externalID, clusterContexts[clusterName])
 			if err != nil {
 				return resp, fmt.Errorf("error %v in creating multiclusterapp: %v", err, mcapp)
 			}
@@ -229,8 +257,9 @@ func (m *MCAppController) createApps(mcapp *v3.MultiClusterApp, externalID strin
 					mcappToUpdate = mcapp.DeepCopy()
 				}
 				mcappToUpdate.Spec.Targets[ind].AppName = newTarget.AppName
+				batchSize--
+				count++
 			}
-			batchSize--
 		}
 	}
 
@@ -244,14 +273,15 @@ func (m *MCAppController) createApps(mcapp *v3.MultiClusterApp, externalID strin
 	}
 
 	resp.updateApps = updateApps
-	resp.canProceed = toUpdate
 	resp.projects = projects
+	resp.count = count
 	resp.remaining = batchSize
 
 	return resp, nil
 }
 
-func (m *MCAppController) updateApp(app *pv3.App, answerMap map[string]map[string]string, externalID string, projectName string) (*pv3.App, error) {
+func (m *MCAppManager) updateApp(app *pv3.App, answerMap map[string]map[string]string, externalID string, projectName string) (*pv3.App, error) {
+	app = app.DeepCopy()
 	app.Spec.Answers = getAnswerMap(answerMap, projectName)
 	app.Spec.ExternalID = externalID
 	updatedObj, err := m.apps.Update(app)
@@ -277,7 +307,7 @@ func (m *MCAppController) updateApp(app *pv3.App, answerMap map[string]map[strin
 	return updatedObj, err
 }
 
-func (m *MCAppController) createRevision(mcapp *v3.MultiClusterApp, creatorID string) (*v3.MultiClusterAppRevision, error) {
+func (m *MCAppManager) createRevision(mcapp *v3.MultiClusterApp, creatorID string) (*v3.MultiClusterAppRevision, error) {
 	ownerReference := metav1.OwnerReference{
 		APIVersion: "management.cattle.io/v3",
 		Kind:       globalnamespacerbac.MultiClusterAppResource,
@@ -302,7 +332,23 @@ func (m *MCAppController) createRevision(mcapp *v3.MultiClusterApp, creatorID st
 	return m.multiClusterAppRevisions.Create(revision)
 }
 
-func (m *MCAppController) setRevisionAndUpdate(mcapp *v3.MultiClusterApp, creatorID string) (*v3.MultiClusterApp, error) {
+func (m *MCAppManager) setRevisionAndUpdate(mcapp *v3.MultiClusterApp, creatorID string) (*v3.MultiClusterApp, error) {
+	latestMcApp, err := m.multiClusterApps.GetNamespaced(namespace.GlobalNamespace, mcapp.Name, metav1.GetOptions{})
+	if err != nil {
+		return mcapp, err
+	}
+	if latestMcApp.Status.RevisionName != "" {
+		currRevision, err := m.multiClusterAppRevisionLister.Get(namespace.GlobalNamespace, latestMcApp.Status.RevisionName)
+		if err != nil {
+			return mcapp, err
+		}
+		if currRevision.TemplateVersionName == mcapp.Spec.TemplateVersionName &&
+			reflect.DeepEqual(currRevision.Answers, mcapp.Spec.Answers) {
+			return mcapp, nil
+		}
+		mcapp = latestMcApp
+	}
+	setInstalledDone(mcapp)
 	rev, err := m.createRevision(mcapp, creatorID)
 	if err != nil {
 		return mcapp, err
@@ -311,7 +357,7 @@ func (m *MCAppController) setRevisionAndUpdate(mcapp *v3.MultiClusterApp, creato
 	return m.updateCondition(mcapp, setInstalledDone)
 }
 
-func (m *MCAppController) toUpgrade(mcapp *v3.MultiClusterApp) (bool, error) {
+func (m *MCAppManager) isChanged(mcapp *v3.MultiClusterApp) (bool, error) {
 	if mcapp.Status.RevisionName == "" {
 		return false, nil
 	}
@@ -319,6 +365,16 @@ func (m *MCAppController) toUpgrade(mcapp *v3.MultiClusterApp) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	if mcapp.Spec.TemplateVersionName != mcappRevision.TemplateVersionName {
+		return true, nil
+	}
+	if !reflect.DeepEqual(mcapp.Spec.Answers, mcappRevision.Answers) {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (m *MCAppManager) toUpdate(mcapp *v3.MultiClusterApp) (bool, error) {
 	if v3.MultiClusterAppConditionInstalled.IsUnknown(mcapp) && v3.MultiClusterAppConditionInstalled.GetMessage(mcapp) == "upgrading" {
 		lastUpdated, err := time.Parse(time.RFC3339, v3.MultiClusterAppConditionInstalled.GetLastUpdated(mcapp))
 		if err != nil {
@@ -332,22 +388,16 @@ func (m *MCAppController) toUpgrade(mcapp *v3.MultiClusterApp) (bool, error) {
 			return false, nil
 		}
 	}
-	if mcapp.Spec.TemplateVersionName != mcappRevision.TemplateVersionName {
-		return true, nil
-	}
-	if !reflect.DeepEqual(mcapp.Spec.Answers, mcappRevision.Answers) {
-		return true, nil
-	}
-	return false, nil
+	return true, nil
 }
 
 // createNamespaceAndApp creates the namespace for all workloads of the app, and then the app itself
-func (m *MCAppController) createNamespaceAndApp(t *v3.Target, mcapp *v3.MultiClusterApp, answerMap map[string]map[string]string, ann map[string]string,
-	set map[string]string, projectNS string, creatorID string, externalID string) (*v3.Target, *v3.MultiClusterApp, error) {
+func (m *MCAppManager) createNamespaceAndApp(t *v3.Target, mcapp *v3.MultiClusterApp, answerMap map[string]map[string]string, ann map[string]string,
+	set map[string]string, projectNS string, creatorID string, externalID string, clusterContext *config.UserContext) (*v3.Target, *v3.MultiClusterApp, error) {
 	// Create the target namespace first
 	// Adding the projectId as an annotation is necessary, else the API/UI and UI won't list any of the resources from this namespace
 	nsName := getAppNamespaceName(mcapp.Name, projectNS)
-	ns, err := m.nsLister.Get("", nsName)
+	ns, err := clusterContext.Core.Namespaces("").Controller().Lister().Get("", nsName)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, nil, err
@@ -357,11 +407,11 @@ func (m *MCAppController) createNamespaceAndApp(t *v3.Target, mcapp *v3.MultiClu
 		n := v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        nsName,
-				Labels:      map[string]string{projectIDFieldLabel: projectNS, multiClusterAppIDSelector: mcapp.Name},
+				Labels:      map[string]string{projectIDFieldLabel: projectNS, MultiClusterAppIDSelector: mcapp.Name},
 				Annotations: map[string]string{projectIDFieldLabel: t.ProjectName, creatorIDAnn: creatorID},
 			},
 		}
-		ns, err = m.namespaces.Create(&n)
+		ns, err = clusterContext.Core.Namespaces("").Create(&n)
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return nil, mcapp, err
 		}
@@ -418,18 +468,24 @@ func getAnswerMap(answerMap map[string]map[string]string, projectName string) ma
 }
 
 // deleteApps finds all apps created by this multiclusterapp and deletes them
-func (m *MCAppController) deleteApps(mcAppName string, mcapp *v3.MultiClusterApp) (runtime.Object, error) {
+func (m *MCAppManager) deleteApps(mcAppName string, mcapp *v3.MultiClusterApp) (runtime.Object, error) {
 	// get all apps with label "multiClusterAppId" = name of this app
 	appsToDelete := []*pv3.App{}
-	set := labels.Set(map[string]string{multiClusterAppIDSelector: mcAppName})
+	projectToCluster := map[string]string{}
+	clusterContexts := map[string]*config.UserContext{}
+	set := labels.Set(map[string]string{MultiClusterAppIDSelector: mcAppName})
 	var err error
 
 	if mcapp == nil {
-		appsToDelete, err = m.getAllApps(mcAppName, true)
+		appsToDelete, projectToCluster, clusterContexts, err = m.getAllApps(mcAppName, true)
 		if err != nil {
 			return nil, err
 		}
 	} else {
+		clusterContexts, err = m.getClusterContexts(mcapp)
+		if err != nil {
+			return nil, err
+		}
 		for _, t := range mcapp.Spec.Targets {
 			split := strings.SplitN(t.ProjectName, ":", 2)
 			if len(split) != 2 {
@@ -441,55 +497,59 @@ func (m *MCAppController) deleteApps(mcAppName string, mcapp *v3.MultiClusterApp
 				return nil, err
 			}
 			appsToDelete = append(appsToDelete, apps...)
+			projectToCluster[projectNS] = split[0]
 		}
 	}
-
-	if err := m.delete(appsToDelete); err != nil {
+	if err := m.delete(appsToDelete, clusterContexts, projectToCluster); err != nil {
 		return nil, err
 	}
 	return nil, nil
 }
 
-func (m *MCAppController) getAllApps(mcAppName string, all bool) ([]*pv3.App, error) {
+func (m *MCAppManager) getAllApps(mcAppName string, withContext bool) ([]*pv3.App, map[string]string, map[string]*config.UserContext, error) {
 	// to get all apps, get all clusters first, then get all apps in all projects of all clusters
-	appsToDelete := []*pv3.App{}
-	set := labels.Set(map[string]string{multiClusterAppIDSelector: mcAppName})
+	allApps := []*pv3.App{}
+	projectToCluster := map[string]string{}
+	clusterContexts := map[string]*config.UserContext{}
+	set := labels.Set(map[string]string{MultiClusterAppIDSelector: mcAppName})
 	clusters, err := m.clusterLister.List("", labels.NewSelector())
 	if err != nil {
-		return appsToDelete, err
+		return allApps, projectToCluster, clusterContexts, err
 	}
 	for _, c := range clusters {
-		if !all && m.clusterName != c.Name {
-			continue
-		}
 		projects, err := m.projectLister.List(c.Name, labels.NewSelector())
 		if err != nil {
-			return appsToDelete, err
+			return allApps, projectToCluster, clusterContexts, err
 		}
 		for _, p := range projects {
 			apps, err := m.appLister.List(p.Name, set.AsSelector())
 			if err != nil {
-				return appsToDelete, err
+				return allApps, projectToCluster, clusterContexts, err
 			}
-			appsToDelete = append(appsToDelete, apps...)
+			allApps = append(allApps, apps...)
+			projectToCluster[p.Name] = c.Name
+		}
+		if withContext {
+			userContext, err := m.clusterManager.UserContext(c.Name)
+			if err != nil {
+				return allApps, projectToCluster, clusterContexts, err
+			}
+			clusterContexts[c.Name] = userContext
 		}
 	}
-	return appsToDelete, err
+	return allApps, projectToCluster, clusterContexts, err
 }
 
-func (m *MCAppController) reconcileTargetsForDelete(mcapp *v3.MultiClusterApp) error {
+func (m *MCAppManager) reconcileTargetsForDelete(mcapp *v3.MultiClusterApp, clusterContexts map[string]*config.UserContext) error {
 	existingNS := map[string]bool{}
 	for ind, t := range mcapp.Spec.Targets {
 		split := strings.SplitN(t.ProjectName, ":", 2)
 		if len(split) != 2 {
 			return fmt.Errorf("error in splitting project ID %v", t.ProjectName)
 		}
-		if split[0] != m.clusterName {
-			continue
-		}
 		projectNS := split[1]
 		nsName := getAppNamespaceName(mcapp.Name, projectNS)
-		ns, err := m.nsLister.Get("", nsName)
+		ns, err := clusterContexts[split[0]].Core.Namespaces("").Controller().Lister().Get("", nsName)
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
 				return err
@@ -501,7 +561,7 @@ func (m *MCAppController) reconcileTargetsForDelete(mcapp *v3.MultiClusterApp) e
 			existingNS[ns.Name] = true
 		}
 	}
-	allApps, err := m.getAllApps(mcapp.Name, false)
+	allApps, projectToCluster, _, err := m.getAllApps(mcapp.Name, false)
 	if err != nil {
 		return err
 	}
@@ -514,10 +574,10 @@ func (m *MCAppController) reconcileTargetsForDelete(mcapp *v3.MultiClusterApp) e
 	if len(toDelete) > 0 {
 		logrus.Debugf("deleting apps for mcapp %s toDelete %v", mcapp.Name, toDelete)
 	}
-	return m.delete(toDelete)
+	return m.delete(toDelete, clusterContexts, projectToCluster)
 }
 
-func (m *MCAppController) delete(appsToDelete []*pv3.App) error {
+func (m *MCAppManager) delete(appsToDelete []*pv3.App, clusterContexts map[string]*config.UserContext, projectToCluster map[string]string) error {
 	var g errgroup.Group
 	for ind := range appsToDelete {
 		app := appsToDelete[ind]
@@ -529,7 +589,11 @@ func (m *MCAppController) delete(appsToDelete []*pv3.App) error {
 			if err := m.apps.DeleteNamespaced(app.Namespace, app.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
-			if err := m.namespaces.Delete(appWorkloadNamespace, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			clusterName := projectToCluster[app.Namespace]
+			if clusterName == "" {
+				return fmt.Errorf("error getting correct cluster name %s", app.Namespace)
+			}
+			if err := clusterContexts[clusterName].Core.Namespaces("").Delete(appWorkloadNamespace, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
 			return nil
@@ -542,7 +606,7 @@ func (m *MCAppController) delete(appsToDelete []*pv3.App) error {
 	return nil
 }
 
-func (m *MCAppController) updateCondition(mcappToUpdate *v3.MultiClusterApp, setCondition func(mcapp *v3.MultiClusterApp)) (*v3.MultiClusterApp, error) {
+func (m *MCAppManager) updateCondition(mcappToUpdate *v3.MultiClusterApp, setCondition func(mcapp *v3.MultiClusterApp)) (*v3.MultiClusterApp, error) {
 	updatedObj, err := m.multiClusterApps.Update(mcappToUpdate)
 	if err != nil && apierrors.IsConflict(err) {
 		// retry 5 times
@@ -582,7 +646,7 @@ func setInstalledDone(mcapp *v3.MultiClusterApp) {
 	v3.MultiClusterAppConditionInstalled.Message(mcapp, "")
 }
 
-func (m *MCAppController) createAnswerMap(answers []v3.Answer) (map[string]map[string]string, error) {
+func (m *MCAppManager) createAnswerMap(answers []v3.Answer) (map[string]map[string]string, error) {
 	// create a map, where key is the projectID or clusterID, or "global" if neither is provided, and value is the actual answer values
 	// Global scoped answers will have all questions. Project/cluster scoped will only have override keys. So we'll first create a global map,
 	// and then merge with project/cluster map
@@ -600,7 +664,7 @@ func (m *MCAppController) createAnswerMap(answers []v3.Answer) (map[string]map[s
 		if a.ClusterName != "" {
 			// Using k8s labels.Merge, since by definition:
 			// Merge combines given maps, and does not check for any conflicts between the maps. In case of conflicts, second map (labels2) wins
-			// And we want cluster level keys to override keys from global level for that cluster
+			// And we want cluster level keys to override keys from global/cluster for that cluster
 			clusterLabels := labels.Merge(globalAnswersMap, a.Values)
 			answerMap[a.ClusterName] = make(map[string]string)
 			answerMap[a.ClusterName] = clusterLabels
@@ -617,7 +681,7 @@ func (m *MCAppController) createAnswerMap(answers []v3.Answer) (map[string]map[s
 			clusterName := split[0]
 			// Using k8s labels.Merge, since by definition:
 			// Merge combines given maps, and does not check for any conflicts between the maps. In case of conflicts, second map (labels2) wins
-			// And we want project level keys to override keys from global/cluster level for that project
+			// And we want project level keys to override keys from global level for that project
 			projectLabels := make(map[string]string)
 			if val, ok := answerMap[clusterName]; ok {
 				projectLabels = labels.Merge(val, a.Values)
@@ -633,7 +697,7 @@ func (m *MCAppController) createAnswerMap(answers []v3.Answer) (map[string]map[s
 }
 
 // getExternalID gets the TemplateVersion.Spec.ExternalID field
-func (m *MCAppController) getExternalID(mcapp *v3.MultiClusterApp) (string, *v3.MultiClusterApp, error) {
+func (m *MCAppManager) getExternalID(mcapp *v3.MultiClusterApp) (string, *v3.MultiClusterApp, error) {
 	// create the externalID field, it's also present on the templateVersion. So get the templateVersion and read its externalID field
 	split := strings.SplitN(mcapp.Spec.TemplateVersionName, ":", 2)
 	templateVersionNamespace := split[0]

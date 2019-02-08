@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/rancher/norman/types/convert"
-	mcapp "github.com/rancher/rancher/pkg/controllers/user/multiclusterapp"
 	util "github.com/rancher/rancher/pkg/controllers/user/workload"
-	"github.com/rancher/rancher/pkg/namespace"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
@@ -18,8 +16,7 @@ import (
 )
 
 const (
-	MultiClusterAppIDSelector = "mcapp"
-	projectLabel              = "field.cattle.io/projectId"
+	projectLabel = "field.cattle.io/projectId"
 )
 
 func StartStateCalculator(ctx context.Context, cluster *config.UserContext) {
@@ -85,9 +82,6 @@ func (s *AppStateCalculator) syncAppState(key string, app *pv3.App) (runtime.Obj
 	if err != nil {
 		return app, fmt.Errorf("error getting workloads %v", err)
 	}
-	if mcappName, ok := app.Labels[MultiClusterAppIDSelector]; ok {
-		s.MultiClusterApps.Controller().Enqueue(namespace.GlobalNamespace, mcappName)
-	}
 	updatingWorkloads := getUpdating(workloads)
 	toUpdate := app.DeepCopy()
 	if len(updatingWorkloads) == 0 {
@@ -100,11 +94,11 @@ func (s *AppStateCalculator) syncAppState(key string, app *pv3.App) (runtime.Obj
 	} else {
 		existing := strings.Split(strings.TrimPrefix(
 			pv3.AppConditionDeployed.GetMessage(toUpdate), "Updating "), ",")
-		if mcapp.Equal(existing, updatingWorkloads) {
+		if Equal(existing, updatingWorkloads) {
 			return app, nil
 		}
 		pv3.AppConditionDeployed.Unknown(toUpdate)
-		pv3.AppConditionDeployed.Message(toUpdate, mcapp.GetMsg(updatingWorkloads))
+		pv3.AppConditionDeployed.Message(toUpdate, GetMsg(updatingWorkloads))
 		pv3.AppConditionDeployed.Reason(toUpdate, "workloads are updating")
 	}
 	return s.Apps.Update(toUpdate)
@@ -144,4 +138,24 @@ func hasUpdatingCondition(conditions []map[string]interface{}) bool {
 		}
 	}
 	return false
+}
+
+func GetMsg(data map[string]bool) string {
+	var keys []string
+	for key := range data {
+		keys = append(keys, key)
+	}
+	return fmt.Sprintf("%s", strings.Join(keys, ","))
+}
+
+func Equal(existing []string, toUpdate map[string]bool) bool {
+	if len(existing) != len(toUpdate) {
+		return false
+	}
+	for _, name := range existing {
+		if _, ok := toUpdate[name]; !ok {
+			return false
+		}
+	}
+	return true
 }
