@@ -22,16 +22,18 @@ func NewAuthenticationFilter(ctx context.Context, managementContext *config.Scal
 	}
 	auth := NewAuthenticator(ctx, managementContext)
 	return &authHeaderHandler{
-		auth: auth,
-		next: next,
-		sar:  sar,
+		auth:              auth,
+		next:              next,
+		sar:               sar,
+		userAuthRefresher: providerrefresh.NewUserAuthRefresher(ctx, managementContext),
 	}, nil
 }
 
 type authHeaderHandler struct {
-	auth Authenticator
-	next http.Handler
-	sar  sar.SubjectAccessReview
+	auth              Authenticator
+	next              http.Handler
+	sar               sar.SubjectAccessReview
+	userAuthRefresher providerrefresh.UserAuthRefresher
 }
 
 func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -104,7 +106,7 @@ func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 		auditUser.RequestGroups = reqGroup
 	}
 
-	go providerrefresh.TriggerUserRefresh(user, false)
+	go h.userAuthRefresher.TriggerUserRefresh(user, false)
 	h.next.ServeHTTP(rw, req)
 }
 

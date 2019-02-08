@@ -33,6 +33,7 @@ func (h *Handler) CollectionFormatter(apiContext *types.APIContext, collection *
 type Handler struct {
 	UserClient               v3.UserInterface
 	GlobalRoleBindingsClient v3.GlobalRoleBindingInterface
+	UserAuthRefresher        providerrefresh.UserAuthRefresher
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -156,9 +157,9 @@ func (h *Handler) refreshAttributes(actionName string, action *types.Action, req
 	}
 
 	if request.ID != "" {
-		providerrefresh.TriggerUserRefresh(request.ID, true)
+		h.UserAuthRefresher.TriggerUserRefresh(request.ID, true)
 	} else {
-		providerrefresh.TriggerAllUserRefresh()
+		h.UserAuthRefresher.TriggerAllUserRefresh()
 	}
 
 	request.WriteResponse(http.StatusOK, nil)

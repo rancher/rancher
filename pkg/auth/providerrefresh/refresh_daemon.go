@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/rancher/pkg/settings"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -19,13 +21,28 @@ import (
 )
 
 var (
-	ref            *refresher
-	primaryContext context.Context
-	mgmt           *config.ManagementContext
-	specialFalse   = false
-	falsePointer   = &specialFalse
-	c              = cron.New()
+	ref          *refresher
+	specialFalse = false
+	falsePointer = &specialFalse
+	c            = cron.New()
 )
+
+type UserAuthRefresher interface {
+	TriggerAllUserRefresh()
+	TriggerUserRefresh(string, bool)
+}
+
+func NewUserAuthRefresher(ctx context.Context, scaledContext *config.ScaledContext) UserAuthRefresher {
+	return &refresher{
+		tokenLister:         scaledContext.Management.Tokens("").Controller().Lister(),
+		tokens:              scaledContext.Management.Tokens(""),
+		userLister:          scaledContext.Management.Users("").Controller().Lister(),
+		tokenMGR:            tokens.NewManager(ctx, scaledContext),
+		userAttributes:      scaledContext.Management.UserAttributes(""),
+		userAttributeLister: scaledContext.Management.UserAttributes("").Controller().Lister(),
+		settingLister:       scaledContext.Management.Settings("").Controller().Lister(),
+	}
+}
 
 type refresher struct {
 	tokenLister         v3.TokenLister
@@ -35,21 +52,20 @@ type refresher struct {
 	userAttributes      v3.UserAttributeInterface
 	userAttributeLister v3.UserAttributeLister
 	intervalInSeconds   int64
+	unparsedMaxAge      string
 	maxAge              time.Duration
 	settingLister       v3.SettingLister
 }
 
 func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext, mgmtContext *config.ManagementContext, refreshCronTime string, maxAge string) {
-	primaryContext = ctx
-	mgmt = mgmtContext
 	ref = &refresher{
-		tokenLister:         mgmt.Management.Tokens("").Controller().Lister(),
-		tokens:              mgmt.Management.Tokens(""),
-		userLister:          mgmt.Management.Users("").Controller().Lister(),
+		tokenLister:         mgmtContext.Management.Tokens("").Controller().Lister(),
+		tokens:              mgmtContext.Management.Tokens(""),
+		userLister:          mgmtContext.Management.Users("").Controller().Lister(),
 		tokenMGR:            tokens.NewManager(ctx, scaledContext),
-		userAttributes:      mgmt.Management.UserAttributes(""),
-		userAttributeLister: mgmt.Management.UserAttributes("").Controller().Lister(),
-		settingLister:       mgmt.Management.Settings("").Controller().Lister(),
+		userAttributes:      mgmtContext.Management.UserAttributes(""),
+		userAttributeLister: mgmtContext.Management.UserAttributes("").Controller().Lister(),
+		settingLister:       mgmtContext.Management.Settings("").Controller().Lister(),
 	}
 
 	UpdateRefreshMaxAge(maxAge)
@@ -83,31 +99,37 @@ func UpdateRefreshMaxAge(maxAge string) {
 		return
 	}
 
-	parsed, err := ParseMaxAge(maxAge)
-	if err != nil {
-		logrus.Errorf("%v", err)
-		return
-	}
-	ref.maxAge = parsed
+	ref.ensureMaxAgeUpToDate(maxAge)
 }
 
-func TriggerUserRefresh(userName string, force bool) {
-	if ref == nil {
+func (r *refresher) ensureMaxAgeUpToDate(maxAge string) {
+	if r.unparsedMaxAge == maxAge {
 		return
 	}
 
+	parsed, err := ParseMaxAge(maxAge)
+	if err != nil {
+		logrus.Errorf("Error parsing max age %v", err)
+		return
+	}
+	r.unparsedMaxAge = maxAge
+	r.maxAge = parsed
+}
+
+func (r *refresher) TriggerUserRefresh(userName string, force bool) {
 	if force {
 		logrus.Debugf("Triggering auth refresh manually on %v", userName)
 	} else {
 		logrus.Debugf("Triggering auth refresh on %v", userName)
 	}
 
-	if !force && (ref.maxAge <= 0) {
+	r.ensureMaxAgeUpToDate(settings.AuthUserInfoMaxAgeSeconds.Get())
+	if !force && (r.maxAge <= 0) {
 		logrus.Debugf("Skipping refresh trigger on user %v because max age setting is <= 0", userName)
 		return
 	}
 
-	ref.triggerUserRefresh(userName, force)
+	r.triggerUserRefresh(userName, force)
 }
 
 func RefreshAllForCron() {
@@ -119,9 +141,9 @@ func RefreshAllForCron() {
 	ref.refreshAll(false)
 }
 
-func TriggerAllUserRefresh() {
+func (r *refresher) TriggerAllUserRefresh() {
 	logrus.Debug("Triggering auth refresh manually on all users")
-	ref.refreshAll(true)
+	r.refreshAll(true)
 }
 
 func RefreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttribute, error) {
@@ -187,7 +209,12 @@ func (r *refresher) triggerUserRefresh(userName string, force bool) {
 	} else {
 		_, err = r.userAttributes.Update(attribs)
 		if err != nil {
-			logrus.Errorf("Error updating user attribute to trigger refresh: %v", err)
+			if apierrors.IsConflict(err) {
+				// User attribute has just been updated, triggering the refresh.
+				logrus.Debugf("Error updating user attribute to trigger refresh: %v", err)
+			} else {
+				logrus.Errorf("Error updating user attribute to trigger refresh: %v", err)
+			}
 		}
 	}
 }
