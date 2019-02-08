@@ -41,6 +41,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/store/scoped"
 	"github.com/rancher/rancher/pkg/api/store/userscope"
 	"github.com/rancher/rancher/pkg/auth/principals"
+	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
@@ -131,7 +132,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	ClusterRoleTemplateBinding(schemas, apiContext)
 	Templates(ctx, schemas, apiContext)
 	TemplateVersion(ctx, schemas, apiContext)
-	User(schemas, apiContext)
+	User(ctx, schemas, apiContext)
 	Catalog(schemas, apiContext)
 	ProjectCatalog(schemas, apiContext)
 	ClusterCatalog(schemas, apiContext)
@@ -365,11 +366,12 @@ func SecretTypes(ctx context.Context, schemas *types.Schemas, management *config
 	credSchema.Validator = cred.Validator
 }
 
-func User(schemas *types.Schemas, management *config.ScaledContext) {
+func User(ctx context.Context, schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.UserType)
 	handler := &authn.Handler{
 		UserClient:               management.Management.Users(""),
 		GlobalRoleBindingsClient: management.Management.GlobalRoleBindings(""),
+		UserAuthRefresher:        providerrefresh.NewUserAuthRefresher(ctx, management),
 	}
 
 	schema.Formatter = handler.UserFormatter
