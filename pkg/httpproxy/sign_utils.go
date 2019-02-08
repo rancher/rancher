@@ -44,7 +44,11 @@ func requiredFieldsExist(data map[string]string, fields []string) bool {
 }
 
 func getCredential(credentialID string, credentials v1.SecretInterface) (map[string]string, error) {
-	cred, err := credentials.Controller().Lister().Get(namespace.GlobalNamespace, credentialID)
+	split := strings.SplitN(credentialID, ":", 2)
+	if len(split) != 2 || split[0] == "" || split[1] == "" {
+		return nil, fmt.Errorf("invalid credential id %s", credentialID)
+	}
+	cred, err := credentials.Controller().Lister().Get(namespace.GlobalNamespace, split[1])
 	if err != nil {
 		return nil, err
 	}
