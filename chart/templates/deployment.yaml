@@ -127,7 +127,7 @@ spec:
 {{- end }}
 {{- if gt .Values.auditLog.level 0.0 }}
       # Make audit logs available for Rancher log collector tools.
-      - image: busybox
+      - image: {{ .Values.busyboxImage }}
         name: {{ template "rancher.name" . }}-audit-log
         command: ["tail"]
         args: ["-F", "/var/log/auditlog/rancher-api-audit.log"]

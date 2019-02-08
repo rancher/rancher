@@ -44,3 +44,20 @@ tests:
         value: NAMESPACE
       - name: CATTLE_PEER_SERVICE
         value: RELEASE-NAME-rancher
+- it: should set busybox image as busybox
+  set:
+    auditLog:
+      level: 1
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[1].image
+      value: busybox
+- it: should override busybox image
+  set:
+    auditLog:
+      level: 1
+    busyboxImage: my.private.repo:5000/rancher/busybox:1.0.1
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[1].image
+      value: my.private.repo:5000/rancher/busybox:1.0.1

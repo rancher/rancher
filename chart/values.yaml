@@ -22,6 +22,10 @@ auditLog:
 # Adding the "local" cluster available in the GUI can be convenient, but any user with access to this cluster has "root" on any of the clusters that Rancher manages.
 # options; "auto", "false". (auto pretty much means true)
 addLocal: "auto"
+
+# Image for collecting rancher audit logs.
+busyboxImage: busybox
+
 # Add debug flag to Rancher server
 debug: false
 
