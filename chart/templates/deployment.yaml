@@ -94,12 +94,14 @@ spec:
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}
         livenessProbe:
-          tcpSocket:
+          httpGet:
+            path: /healthz
             port: 80
           initialDelaySeconds: 60
           periodSeconds: 30
         readinessProbe:
-          tcpSocket:
+          httpGet:
+            path: /healthz
             port: 80
           initialDelaySeconds: 5
           periodSeconds: 30
