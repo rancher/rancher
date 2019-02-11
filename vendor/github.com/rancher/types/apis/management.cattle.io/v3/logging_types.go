@@ -166,7 +166,10 @@ type FluentServer struct {
 }
 
 type CustomTargetConfig struct {
-	Content string `json:"content,omitempty"`
+	Content     string `json:"content,omitempty"`
+	Certificate string `json:"certificate,omitempty"`
+	ClientCert  string `json:"clientCert,omitempty"`
+	ClientKey   string `json:"clientKey,omitempty"`
 }
 
 type LoggingSystemImages struct {
