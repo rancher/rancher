@@ -596,6 +596,65 @@ type AzureCloudProvider struct {
 
 // AWSCloudProvider options
 type AWSCloudProvider struct {
+	Global          GlobalAwsOpts              `json:"global" yaml:"global" ini:"Global,omitempty"`
+	ServiceOverride map[string]ServiceOverride `json:"serviceOverride,omitempty" yaml:"service_override,omitempty" ini:"ServiceOverride,omitempty"`
+}
+
+type ServiceOverride struct {
+	Service       string `json:"service" yaml:"service" ini:"Service,omitempty"`
+	Region        string `json:"region" yaml:"region" ini:"Region,omitempty"`
+	URL           string `json:"url" yaml:"url" ini:"URL,omitempty"`
+	SigningRegion string `json:"signing-region" yaml:"signing-region" ini:"SigningRegion,omitempty"`
+	SigningMethod string `json:"signing-method" yaml:"signing-method" ini:"SigningMethod,omitempty"`
+	SigningName   string `json:"signing-name" yaml:"signing-name" ini:"SigningName,omitempty"`
+}
+
+type GlobalAwsOpts struct {
+	// TODO: Is there any use for this?  We can get it from the instance metadata service
+	// Maybe if we're not running on AWS, e.g. bootstrap; for now it is not very useful
+	Zone string `json:"zone" yaml:"zone" ini:"Zone,omitempty"`
+
+	// The AWS VPC flag enables the possibility to run the master components
+	// on a different aws account, on a different cloud provider or on-premises.
+	// If the flag is set also the KubernetesClusterTag must be provided
+	VPC string `json:"vpc" yaml:"vpc" ini:"VPC,omitempty"`
+	// SubnetID enables using a specific subnet to use for ELB's
+	SubnetID string `json:"subnet-id" yaml:"subnet-id" ini:"SubnetID,omitempty"`
+	// RouteTableID enables using a specific RouteTable
+	RouteTableID string `json:"routetable-id" yaml:"routetable-id" ini:"RouteTableID,omitempty"`
+
+	// RoleARN is the IAM role to assume when interaction with AWS APIs.
+	RoleARN string `json:"role-arn" yaml:"role-arn" ini:"RoleARN,omitempty"`
+
+	// KubernetesClusterTag is the legacy cluster id we'll use to identify our cluster resources
+	KubernetesClusterTag string `json:"kubernetes-cluster-tag" yaml:"kubernetes-cluster-tag" ini:"KubernetesClusterTag,omitempty"`
+	// KubernetesClusterID is the cluster id we'll use to identify our cluster resources
+	KubernetesClusterID string `json:"kubernetes-cluster-id" yaml:"kubernetes-cluster-id" ini:"KubernetesClusterID,omitempty"`
+
+	//The aws provider creates an inbound rule per load balancer on the node security
+	//group. However, this can run into the AWS security group rule limit of 50 if
+	//many LoadBalancers are created.
+	//
+	//This flag disables the automatic ingress creation. It requires that the user
+	//has setup a rule that allows inbound traffic on kubelet ports from the
+	//local VPC subnet (so load balancers can access it). E.g. 10.82.0.0/16 30000-32000.
+	DisableSecurityGroupIngress bool `json:"disable-security-group-ingress" yaml:"disable-security-group-ingress" ini:"DisableSecurityGroupIngress,omitempty"`
+
+	//AWS has a hard limit of 500 security groups. For large clusters creating a security group for each ELB
+	//can cause the max number of security groups to be reached. If this is set instead of creating a new
+	//Security group for each ELB this security group will be used instead.
+	ElbSecurityGroup string `json:"elb-security-group" yaml:"elb-security-group" ini:"ElbSecurityGroup,omitempty"`
+
+	//During the instantiation of an new AWS cloud provider, the detected region
+	//is validated against a known set of regions.
+	//
+	//In a non-standard, AWS like environment (e.g. Eucalyptus), this check may
+	//be undesirable.  Setting this to true will disable the check and provide
+	//a warning that the check was skipped.  Please note that this is an
+	//experimental feature and work-in-progress for the moment.  If you find
+	//yourself in an non-AWS cloud and open an issue, please indicate that in the
+	//issue body.
+	DisableStrictZoneCheck bool `json:"disable-strict-zone-check" yaml:"disable-strict-zone-check" ini:"DisableStrictZoneCheck,omitempty"`
 }
 
 type MonitoringConfig struct {
