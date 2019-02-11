@@ -24,6 +24,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+const (
+	DefaultBackupIntervalHours = 12
+	DefaultBackupRetention     = 6
+)
+
 type Store struct {
 	types.Store
 	ShellHandler          types.RequestHandler
@@ -148,6 +153,8 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	}
 
 	setKubernetesVersion(data)
+	// enable local backups for rke clusters by default
+	enableLocalBackup(data)
 
 	data, err := r.transposeDynamicFieldToGenericConfig(data)
 	if err != nil {
@@ -312,4 +319,24 @@ func validateNetworkFlag(data map[string]interface{}, create bool) error {
 	}
 
 	return nil
+}
+
+func enableLocalBackup(data map[string]interface{}) {
+	rkeConfig, ok := values.GetValue(data, "rancherKubernetesEngineConfig")
+
+	if ok && rkeConfig != nil {
+		legacyConfig := values.GetValueN(data, "rancherKubernetesEngineConfig", "services", "etcd", "snapshot")
+		if legacyConfig != nil && legacyConfig.(bool) { //  don't enable rancher backup if legacy is enabled.
+			return
+		}
+		backupConfig := values.GetValueN(data, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig")
+		if backupConfig == nil {
+			backupConfig = &v3.BackupConfig{
+				IntervalHours: DefaultBackupIntervalHours,
+				Retention:     DefaultBackupRetention,
+			}
+			// enable rancher etcd backup
+			values.PutValue(data, backupConfig, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig")
+		}
+	}
 }
