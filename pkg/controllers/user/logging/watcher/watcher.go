@@ -31,7 +31,7 @@ func StartEndpointWatcher(ctx context.Context, cluster *config.UserContext) {
 		clusterLoggings: cluster.Management.Management.ClusterLoggings(cluster.ClusterName),
 		projectLoggings: cluster.Management.Management.ProjectLoggings(metav1.NamespaceAll),
 	}
-	go s.watch(ctx, 10*time.Second)
+	go s.watch(ctx, 120*time.Second)
 }
 
 func (e *endpointWatcher) watch(ctx context.Context, interval time.Duration) {
@@ -65,7 +65,7 @@ func (e *endpointWatcher) checkClusterTarget() error {
 	if wl == nil {
 		err = nil
 	} else {
-		err = wl.TestReachable(clusterDialer)
+		err = wl.TestReachable(clusterDialer, false)
 	}
 
 	updatedObj := setClusterLoggingErrMsg(obj, err)
@@ -96,7 +96,7 @@ func (e *endpointWatcher) checkProjectTarget() error {
 		if wp == nil {
 			err = nil
 		} else {
-			err = wp.TestReachable(clusterDialer)
+			err = wp.TestReachable(clusterDialer, false)
 		}
 
 		updatedObj := setProjectLoggingErrMsg(v, err)
