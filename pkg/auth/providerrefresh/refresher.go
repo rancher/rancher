@@ -2,18 +2,14 @@ package providerrefresh
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
-	"github.com/rancher/rancher/pkg/settings"
-
-	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
-	"github.com/robfig/cron"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,10 +17,8 @@ import (
 )
 
 var (
-	ref          *refresher
 	specialFalse = false
 	falsePointer = &specialFalse
-	c            = cron.New()
 )
 
 type UserAuthRefresher interface {
@@ -57,51 +51,6 @@ type refresher struct {
 	settingLister       v3.SettingLister
 }
 
-func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext, mgmtContext *config.ManagementContext, refreshCronTime string, maxAge string) {
-	ref = &refresher{
-		tokenLister:         mgmtContext.Management.Tokens("").Controller().Lister(),
-		tokens:              mgmtContext.Management.Tokens(""),
-		userLister:          mgmtContext.Management.Users("").Controller().Lister(),
-		tokenMGR:            tokens.NewManager(ctx, scaledContext),
-		userAttributes:      mgmtContext.Management.UserAttributes(""),
-		userAttributeLister: mgmtContext.Management.UserAttributes("").Controller().Lister(),
-		settingLister:       mgmtContext.Management.Settings("").Controller().Lister(),
-	}
-
-	UpdateRefreshMaxAge(maxAge)
-	UpdateRefreshCronTime(refreshCronTime)
-
-}
-
-func UpdateRefreshCronTime(refreshCronTime string) {
-	if ref == nil {
-		return
-	}
-
-	parsed, err := ParseCron(refreshCronTime)
-	if err != nil {
-		logrus.Errorf("%v", err)
-		return
-	}
-
-	c.Stop()
-	c = cron.New()
-
-	if parsed != nil {
-		job := cron.FuncJob(RefreshAllForCron)
-		c.Schedule(parsed, job)
-		c.Start()
-	}
-}
-
-func UpdateRefreshMaxAge(maxAge string) {
-	if ref == nil {
-		return
-	}
-
-	ref.ensureMaxAgeUpToDate(maxAge)
-}
-
 func (r *refresher) ensureMaxAgeUpToDate(maxAge string) {
 	if r.unparsedMaxAge == maxAge {
 		return
@@ -132,34 +81,9 @@ func (r *refresher) TriggerUserRefresh(userName string, force bool) {
 	r.triggerUserRefresh(userName, force)
 }
 
-func RefreshAllForCron() {
-	if ref == nil {
-		return
-	}
-
-	logrus.Debug("Triggering auth refresh cron")
-	ref.refreshAll(false)
-}
-
 func (r *refresher) TriggerAllUserRefresh() {
 	logrus.Debug("Triggering auth refresh manually on all users")
 	r.refreshAll(true)
-}
-
-func RefreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttribute, error) {
-	if ref == nil {
-		return nil, errors.Errorf("refresh daemon not yet initialized")
-	}
-
-	logrus.Debugf("Starting refresh process for %v", attribs.Name)
-	modified, err := ref.refreshAttributes(attribs)
-	if err != nil {
-		return nil, err
-	}
-	logrus.Debugf("Finished refresh process for %v", attribs.Name)
-	modified.LastRefresh = time.Now().UTC().Format(time.RFC3339)
-	modified.NeedsRefresh = false
-	return modified, nil
 }
 
 func (r *refresher) refreshAll(force bool) {
@@ -187,7 +111,7 @@ func (r *refresher) triggerUserRefresh(userName string, force bool) {
 		return
 	}
 
-	user, err := ref.userLister.Get("", userName)
+	user, err := r.userLister.Get("", userName)
 	if err != nil {
 		logrus.Errorf("Error finding user before triggering refresh %v", err)
 		return
@@ -363,24 +287,4 @@ func (r *refresher) refreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttrib
 	}
 
 	return attribs, nil
-}
-
-func ParseMaxAge(setting string) (time.Duration, error) {
-	durString := fmt.Sprintf("%vs", setting)
-	dur, err := time.ParseDuration(durString)
-	if err != nil {
-		return 0, fmt.Errorf("Error parsing auth refresh max age: %v", err)
-	}
-	return dur, nil
-}
-
-func ParseCron(setting string) (cron.Schedule, error) {
-	if setting == "" {
-		return nil, nil
-	}
-	schedule, err := cron.ParseStandard(setting)
-	if err != nil {
-		return nil, fmt.Errorf("Error parsing auth refresh cron: %v", err)
-	}
-	return schedule, nil
 }
