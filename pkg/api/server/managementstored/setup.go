@@ -33,6 +33,7 @@ import (
 	appStore "github.com/rancher/rancher/pkg/api/store/app"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/cluster"
+	globaldnsAPIStore "github.com/rancher/rancher/pkg/api/store/globaldns"
 	nodeStore "github.com/rancher/rancher/pkg/api/store/node"
 	nodeTemplateStore "github.com/rancher/rancher/pkg/api/store/nodetemplate"
 	"github.com/rancher/rancher/pkg/api/store/noopwatching"
@@ -644,4 +645,5 @@ func GlobalDNSs(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.Formatter = gdns.Formatter
 	schema.ActionHandler = gdns.ActionHandler
 	schema.Validator = gdns.Validator
+	schema.Store = globaldnsAPIStore.Wrap(schema.Store)
 }
