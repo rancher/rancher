@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"runtime/debug"
 	"sync"
 
 	"github.com/rancher/norman/api/access"
@@ -14,6 +15,7 @@ import (
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/store/wrapper"
 	"github.com/rancher/norman/types"
+	"github.com/sirupsen/logrus"
 )
 
 type StoreWrapper func(types.Store) types.Store
@@ -168,6 +170,13 @@ func (s *Server) setupDefaults(schema *types.Schema) {
 }
 
 func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	defer func() {
+		if err := recover(); err != nil && err != http.ErrAbortHandler {
+			logrus.Error("Panic serving api request: \n" + string(debug.Stack()))
+			rw.WriteHeader(http.StatusInternalServerError)
+		}
+	}()
+
 	if apiResponse, err := s.handle(rw, req); err != nil {
 		s.handleError(apiResponse, err)
 	}
