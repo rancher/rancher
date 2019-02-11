@@ -23,6 +23,8 @@ type Signer interface {
 	sign(*http.Request, v1.SecretInterface, string) error
 }
 
+const ForwardForHeader = "X-Forwarded-For"
+
 func newSigner(auth string) Signer {
 	splitAuth := strings.Split(auth, " ")
 	switch strings.ToLower(splitAuth[0]) {
@@ -75,9 +77,16 @@ func (a awsv4) sign(req *http.Request, secrets v1.SecretInterface, auth string) 
 			return fmt.Errorf("error reading request body %v", err)
 		}
 	}
+	val := req.Header.Get(ForwardForHeader)
+	if val != "" {
+		req.Header.Del(ForwardForHeader)
+	}
 	_, err = awsSigner.Sign(req, bytes.NewReader(body), service, region, time.Now())
 	if err != nil {
 		return err
+	}
+	if val != "" {
+		req.Header.Add(ForwardForHeader, val)
 	}
 	return nil
 }
