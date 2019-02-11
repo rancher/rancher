@@ -3,14 +3,15 @@ package settings
 import (
 	"encoding/json"
 	"os"
+	"strings"
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 var (
-	settings   = map[string]Setting{}
-	provider   Provider
-	RKEVersion string
+	settings       = map[string]Setting{}
+	provider       Provider
+	InjectDefaults string
 
 	AgentImage                      = NewSetting("agent-image", "rancher/rancher-agent:master")
 	AuthImage                       = NewSetting("auth-image", "erikwilson/kube-api-auth:latest") // FIXME: Update to Rancher image when released
@@ -33,7 +34,7 @@ var (
 	Namespace                       = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PeerServices                    = NewSetting("peer-service", os.Getenv("CATTLE_PEER_SERVICE"))
 	RDNSServerBaseURL               = NewSetting("rdns-base-url", "https://api.lb.rancher.cloud/v1")
-	RkeVersion                      = NewSetting("rke-version", RKEVersion)
+	RkeVersion                      = NewSetting("rke-version", "")
 	ServerImage                     = NewSetting("server-image", "rancher/rancher")
 	ServerURL                       = NewSetting("server-url", "")
 	ServerVersion                   = NewSetting("server-version", "dev")
@@ -52,6 +53,24 @@ var (
 	AuthUserInfoMaxAgeSeconds       = NewSetting("auth-user-info-max-age-seconds", "3600") // 1 hour
 	APIUIVersion                    = NewSetting("api-ui-version", "1.1.6")                // Please update the CATTLE_API_UI_VERSION in package/Dockerfile when updating the version here.
 )
+
+func init() {
+	if InjectDefaults == "" {
+		return
+	}
+	defaults := map[string]string{}
+	if err := json.Unmarshal([]byte(InjectDefaults), &defaults); err != nil {
+		return
+	}
+	for name, defaultValue := range defaults {
+		value, ok := settings[name]
+		if !ok {
+			continue
+		}
+		value.Default = defaultValue
+		settings[name] = value
+	}
+}
 
 type Provider interface {
 	Get(name string) string
@@ -122,4 +141,8 @@ func getSystemImages() string {
 		return ""
 	}
 	return string(data)
+}
+
+func GetEnvKey(key string) string {
+	return "CATTLE_" + strings.ToUpper(strings.Replace(key, "-", "_", -1))
 }
