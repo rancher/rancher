@@ -5,7 +5,7 @@ from .common import random_str
 
 
 @pytest.mark.skip(reason="cluster-defaults disabled")
-def test_initial_defaults(admin_mc):
+def test_generic_initial_defaults(admin_mc):
     cclient = admin_mc.client
     schema_defaults = {}
     setting_defaults = {}
@@ -35,8 +35,10 @@ def test_initial_defaults(admin_mc):
     assert schema_defaults == setting_defaults
 
 
-def test_initial_conditions(admin_mc, remove_resource):
-    cluster = admin_mc.client.create_cluster(name=random_str())
+def test_generic_initial_conditions(admin_mc, remove_resource):
+    cluster = admin_mc.client.create_cluster(
+            name=random_str(), amazonElasticContainerServiceConfig={
+                "accessKey": "asdfsd"})
     remove_resource(cluster)
 
     assert len(cluster.conditions) == 3
@@ -48,3 +50,27 @@ def test_initial_conditions(admin_mc, remove_resource):
 
     assert cluster.conditions[2].type == 'Waiting'
     assert cluster.conditions[2].status == 'Unknown'
+
+
+def test_rke_initial_conditions(admin_mc, remove_resource):
+    cluster = admin_mc.client.create_cluster(
+            name=random_str(), rancherKubernetesEngineConfig={
+                "accessKey": "asdfsd"})
+    remove_resource(cluster)
+
+    assert len(cluster.conditions) == 3
+    assert cluster.conditions[0].type == 'Pending'
+    assert cluster.conditions[0].status == 'True'
+
+    assert cluster.conditions[1].type == 'Provisioned'
+    assert cluster.conditions[1].status == 'Unknown'
+
+    assert cluster.conditions[2].type == 'Waiting'
+    assert cluster.conditions[2].status == 'Unknown'
+
+
+def test_import_initial_conditions(admin_mc, remove_resource):
+    cluster = admin_mc.client.create_cluster(name=random_str())
+    remove_resource(cluster)
+
+    assert cluster.conditions is None
