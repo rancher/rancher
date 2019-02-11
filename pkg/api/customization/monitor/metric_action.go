@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config/dialer"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func NewMetricHandler(dialerFactory dialer.Factory, clustermanager *clustermanager.Manager) *MetricHandler {
@@ -222,10 +223,13 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 			return fmt.Errorf("get cluster metric list failed, %v", err)
 		}
 
-		names := append(projectNames, clusterNames...)
+		names := sets.String{}
+		names.Insert(projectNames...)
+		names.Insert(clusterNames...)
+
 		data := map[string]interface{}{
 			"type":  "metricNamesOutput",
-			"names": names,
+			"names": names.List(),
 		}
 		apiContext.WriteResponse(http.StatusOK, data)
 	}
