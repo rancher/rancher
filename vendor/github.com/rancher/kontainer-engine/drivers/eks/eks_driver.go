@@ -216,7 +216,8 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 				"/etc/eks/bootstrap.sh ${ClusterName} ${BootstrapArguments}" +
 				"/opt/aws/bin/cfn-signal --exit-code $? " +
 				"--stack  ${AWS::StackName} " +
-				"--resource NodeGroup --region ${AWS::Region}\n",
+				"--resource NodeGroup --region ${AWS::Region}\n" +
+				"#### APPEND BELOW IF USING AWS AMI ###########",
 		},
 	}
 
