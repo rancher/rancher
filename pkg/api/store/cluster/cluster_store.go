@@ -167,7 +167,6 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		values.PutValue(data, m, managementv3.ClusterFieldAnnotations)
 	}
 
-
 	if err = setInitialConditions(data); err != nil {
 		return nil, err
 	}
