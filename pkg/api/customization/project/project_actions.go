@@ -110,43 +110,27 @@ func (h *Handler) ExportYamlHandler(actionName string, action *types.Action, api
 }
 
 func (h *Handler) enableMonitoring(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	rtn := map[string]interface{}{
-		"message": "enabled",
-	}
-
 	namespace, id := ref.Parse(apiContext.ID)
 	project, err := h.ProjectLister.Get(namespace, id)
 	if err != nil {
-		rtn["message"] = "none existent Project"
-		apiContext.WriteResponse(http.StatusBadRequest, rtn)
-
-		return errors.Wrapf(err, "failed to get Project by ID %s", apiContext.ID)
+		return httperror.WrapAPIError(err, httperror.NotFound, "none existent Project")
 	}
 	if project.DeletionTimestamp != nil {
-		rtn["message"] = "deleting Project"
-		apiContext.WriteResponse(http.StatusBadRequest, rtn)
-
-		return fmt.Errorf("unable to operate deleting %s Project", apiContext.ID)
+		return httperror.NewAPIError(httperror.InvalidType, "deleting Project")
 	}
 
 	if project.Spec.EnableProjectMonitoring {
-		apiContext.WriteResponse(http.StatusOK, rtn)
+		apiContext.WriteResponse(http.StatusNoContent, map[string]interface{}{})
 		return nil
 	}
 
 	data, err := ioutil.ReadAll(apiContext.Request.Body)
 	if err != nil {
-		rtn["message"] = "unable to read request content"
-		apiContext.WriteResponse(http.StatusBadRequest, rtn)
-
-		return errors.Wrap(err, "reading request body error")
+		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "unable to read request content")
 	}
 	var input v3.MonitoringInput
 	if err = json.Unmarshal(data, &input); err != nil {
-		rtn["message"] = "failed to parse request content"
-		apiContext.WriteResponse(http.StatusBadRequest, rtn)
-
-		return errors.Wrap(err, "unmarshaling input error")
+		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "failed to parse request content")
 	}
 
 	project = project.DeepCopy()
@@ -155,39 +139,25 @@ func (h *Handler) enableMonitoring(actionName string, action *types.Action, apiC
 
 	_, err = h.Projects.Update(project)
 	if err != nil {
-		rtn["message"] = "failed to enable monitoring"
-		apiContext.WriteResponse(http.StatusInternalServerError, rtn)
-
-		return errors.Wrapf(err, "unable to update Project %s", project.Name)
+		return httperror.WrapAPIError(err, httperror.ServerError, "failed to enable monitoring")
 	}
 
-	apiContext.WriteResponse(http.StatusOK, rtn)
-
+	apiContext.WriteResponse(http.StatusNoContent, map[string]interface{}{})
 	return nil
 }
 
 func (h *Handler) disableMonitoring(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	rtn := map[string]interface{}{
-		"message": "disabled",
-	}
-
 	namespace, id := ref.Parse(apiContext.ID)
 	project, err := h.ProjectLister.Get(namespace, id)
 	if err != nil {
-		rtn["message"] = "none existent Project"
-		apiContext.WriteResponse(http.StatusBadRequest, rtn)
-
-		return errors.Wrapf(err, "failed to get Project by ID %s", apiContext.ID)
+		return httperror.WrapAPIError(err, httperror.NotFound, "none existent Project")
 	}
 	if project.DeletionTimestamp != nil {
-		rtn["message"] = "deleting Project"
-		apiContext.WriteResponse(http.StatusBadRequest, rtn)
-
-		return fmt.Errorf("unable to operate deleting %s Project", apiContext.ID)
+		return httperror.NewAPIError(httperror.InvalidType, "deleting Project")
 	}
 
 	if !project.Spec.EnableProjectMonitoring {
-		apiContext.WriteResponse(http.StatusOK, rtn)
+		apiContext.WriteResponse(http.StatusNoContent, map[string]interface{}{})
 		return nil
 	}
 
@@ -196,14 +166,10 @@ func (h *Handler) disableMonitoring(actionName string, action *types.Action, api
 
 	_, err = h.Projects.Update(project)
 	if err != nil {
-		rtn["message"] = "failed to disable monitoring"
-		apiContext.WriteResponse(http.StatusInternalServerError, rtn)
-
-		return errors.Wrapf(err, "unable to update Project %s", project.Name)
+		return httperror.WrapAPIError(err, httperror.ServerError, "failed to disable monitoring")
 	}
 
-	apiContext.WriteResponse(http.StatusOK, rtn)
-
+	apiContext.WriteResponse(http.StatusNoContent, map[string]interface{}{})
 	return nil
 }
 
