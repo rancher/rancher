@@ -13,7 +13,6 @@ import (
 
 	ref "github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
-	"github.com/rancher/rke/cloudprovider/aws"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/k8s"
@@ -161,7 +160,7 @@ func (c *Cluster) BuildKubeAPIProcess(host *hosts.Host, prefixPath string) v3.Pr
 		"tls-cert-file":                      pki.GetCertPath(pki.KubeAPICertName),
 		"tls-private-key-file":               pki.GetKeyPath(pki.KubeAPICertName),
 	}
-	if len(c.CloudProvider.Name) > 0 && c.CloudProvider.Name != aws.AWSCloudProviderName {
+	if len(c.CloudProvider.Name) > 0 {
 		CommandArgs["cloud-config"] = cloudConfigFileName
 	}
 	if c.Authentication.Webhook != nil {
@@ -306,7 +305,7 @@ func (c *Cluster) BuildKubeControllerProcess(prefixPath string) v3.Process {
 	if c.DinD {
 		CommandArgs["address"] = "0.0.0.0"
 	}
-	if len(c.CloudProvider.Name) > 0 && c.CloudProvider.Name != aws.AWSCloudProviderName {
+	if len(c.CloudProvider.Name) > 0 {
 		CommandArgs["cloud-config"] = cloudConfigFileName
 	}
 	if len(c.CloudProvider.Name) > 0 {
@@ -414,7 +413,7 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 	if host.Address != host.InternalAddress {
 		CommandArgs["node-ip"] = host.InternalAddress
 	}
-	if len(c.CloudProvider.Name) > 0 && c.CloudProvider.Name != aws.AWSCloudProviderName {
+	if len(c.CloudProvider.Name) > 0 {
 		CommandArgs["cloud-config"] = cloudConfigFileName
 	}
 	if len(c.CloudProvider.Name) > 0 {
