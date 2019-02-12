@@ -4,21 +4,26 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/rancher/kontainer-engine/drivers/gke"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
-	"google.golang.org/api/container/v1"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/rancher/kontainer-engine/drivers/gke"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	computev1 "google.golang.org/api/compute/v1"
+	containerv1 "google.golang.org/api/container/v1"
+	iamv1 "google.golang.org/api/iam/v1"
 )
 
 type capabilitiesRequestBody struct {
-	Credentials string `json:"credentials"`
-	ProjectID   string `json:"projectId"`
+	Credentials string `json:"credentials,omitempty"`
+	ProjectID   string `json:"projectId,omitempty"`
+	Zone        string `json:"zone,omitempty"`
+	Region      string `json:"region,omitempty"`
 }
 
 func validateCapabilitiesRequestBody(writer http.ResponseWriter, body *capabilitiesRequestBody) error {
@@ -70,7 +75,7 @@ func getOAuthClient(ctx context.Context, credentialContent string) (*http.Client
 	setEnv = true
 	os.Setenv(defaultCredentialEnv, file.Name())
 
-	ts, err := google.DefaultTokenSource(ctx, container.CloudPlatformScope)
+	ts, err := google.DefaultTokenSource(ctx, containerv1.CloudPlatformScope)
 	if err != nil {
 		return nil, err
 	}
@@ -93,4 +98,92 @@ func handleErr(writer http.ResponseWriter, originalErr error) {
 	}
 
 	writer.Write([]byte(asJSON))
+}
+
+func preCheck(writer http.ResponseWriter, req *http.Request) *capabilitiesRequestBody {
+	if req.Method != http.MethodPost {
+		writer.WriteHeader(http.StatusMethodNotAllowed)
+		return nil
+	}
+
+	writer.Header().Set("Content-Type", "application/json")
+
+	var body capabilitiesRequestBody
+	err := extractRequestBody(writer, req, &body)
+
+	if err != nil {
+		handleErr(writer, err)
+		return nil
+	}
+
+	err = validateCapabilitiesRequestBody(writer, &body)
+
+	if err != nil {
+		handleErr(writer, err)
+		return nil
+	}
+	return &body
+}
+
+func postCheck(writer http.ResponseWriter, result interface{}, err error) {
+	if err != nil {
+		writer.WriteHeader(http.StatusInternalServerError)
+		handleErr(writer, err)
+		return
+	}
+
+	serialized, err := json.Marshal(&result)
+
+	if err != nil {
+		writer.WriteHeader(http.StatusInternalServerError)
+		handleErr(writer, err)
+		return
+	}
+
+	writer.Write(serialized)
+}
+
+func getComputeServiceClient(ctx context.Context, credentialContent string) (*computev1.Service, error) {
+	client, err := getOAuthClient(ctx, credentialContent)
+
+	if err != nil {
+		return nil, err
+	}
+
+	service, err := computev1.New(client)
+
+	if err != nil {
+		return nil, err
+	}
+	return service, nil
+}
+
+func getIamServiceClient(ctx context.Context, credentialContent string) (*iamv1.Service, error) {
+	client, err := getOAuthClient(ctx, credentialContent)
+
+	if err != nil {
+		return nil, err
+	}
+
+	service, err := iamv1.New(client)
+
+	if err != nil {
+		return nil, err
+	}
+	return service, nil
+}
+
+func getContainerServiceClient(ctx context.Context, credentialContent string) (*containerv1.Service, error) {
+	client, err := getOAuthClient(ctx, credentialContent)
+
+	if err != nil {
+		return nil, err
+	}
+
+	service, err := containerv1.New(client)
+
+	if err != nil {
+		return nil, err
+	}
+	return service, nil
 }

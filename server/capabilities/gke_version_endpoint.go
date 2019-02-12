@@ -2,9 +2,7 @@ package capabilities
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"google.golang.org/api/container/v1"
 	"net/http"
 )
 
@@ -26,25 +24,8 @@ type errorResponse struct {
 }
 
 func (g *GKEVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodPost {
-		writer.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
-	writer.Header().Set("Content-Type", "application/json")
-
-	var body zoneCapabilitiesRequestBody
-	err := extractRequestBody(writer, req, &body)
-
-	if err != nil {
-		handleErr(writer, err)
-		return
-	}
-
-	err = validateCapabilitiesRequestBody(writer, &body.capabilitiesRequestBody)
-
-	if err != nil {
-		handleErr(writer, err)
+	body := preCheck(writer, req)
+	if body == nil {
 		return
 	}
 
@@ -55,7 +36,7 @@ func (g *GKEVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	client, err := g.getServiceClient(context.Background(), body.Credentials)
+	client, err := getContainerServiceClient(context.Background(), body.Credentials)
 
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
@@ -65,34 +46,5 @@ func (g *GKEVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 
 	result, err := client.Projects.Zones.GetServerconfig(body.ProjectID, zone).Do()
 
-	if err != nil {
-		writer.WriteHeader(http.StatusInternalServerError)
-		handleErr(writer, err)
-		return
-	}
-
-	serialized, err := json.Marshal(result)
-
-	if err != nil {
-		writer.WriteHeader(http.StatusInternalServerError)
-		handleErr(writer, err)
-		return
-	}
-
-	writer.Write(serialized)
-}
-
-func (g *GKEVersionHandler) getServiceClient(ctx context.Context, credentialContent string) (*container.Service, error) {
-	client, err := getOAuthClient(ctx, credentialContent)
-
-	if err != nil {
-		return nil, err
-	}
-
-	service, err := container.New(client)
-
-	if err != nil {
-		return nil, err
-	}
-	return service, nil
+	postCheck(writer, result, err)
 }
