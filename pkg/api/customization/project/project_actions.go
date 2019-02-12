@@ -36,6 +36,10 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 			resource.AddAction(apiContext, "enableMonitoring")
 		}
 	}
+
+	if convert.ToBool(resource.Values["enableProjectMonitoring"]) {
+		resource.AddAction(apiContext, "viewMonitoring")
+	}
 }
 
 type Handler struct {
@@ -59,6 +63,8 @@ func (h *Handler) Actions(actionName string, action *types.Action, apiContext *t
 		return h.setPodSecurityPolicyTemplate(actionName, action, apiContext)
 	case "exportYaml":
 		return h.ExportYamlHandler(actionName, action, apiContext)
+	case "viewMonitoring":
+		return h.viewMonitoring(actionName, action, apiContext)
 	case "enableMonitoring":
 		if !canUpdateProject() {
 			return httperror.NewAPIError(httperror.Unauthorized, "can not access")
@@ -106,6 +112,32 @@ func (h *Handler) ExportYamlHandler(actionName string, action *types.Action, api
 	reader := bytes.NewReader(buf)
 	apiContext.Response.Header().Set("Content-Type", "text/yaml")
 	http.ServeContent(apiContext.Response, apiContext.Request, "exportYaml", time.Now(), reader)
+	return nil
+}
+
+func (h *Handler) viewMonitoring(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	namespace, id := ref.Parse(apiContext.ID)
+	project, err := h.ProjectLister.Get(namespace, id)
+	if err != nil {
+		return httperror.WrapAPIError(err, httperror.NotFound, "none existent Project")
+	}
+	if project.DeletionTimestamp != nil {
+		return httperror.NewAPIError(httperror.InvalidType, "deleting Project")
+	}
+
+	if !project.Spec.EnableProjectMonitoring {
+		return httperror.NewAPIError(httperror.InvalidState, "disabling Monitoring")
+	}
+
+	// need to support `map[string]string` as entry value type in norman Builder.convertMap
+	answers, err := convert.EncodeToMap(monitoring.GetOverwroteAppAnswers(project.Annotations))
+	if err != nil {
+		return httperror.WrapAPIError(err, httperror.ServerError, "failed to parse response")
+	}
+	apiContext.WriteResponse(http.StatusOK, map[string]interface{}{
+		"answers": answers,
+		"type":    "monitoringOutput",
+	})
 	return nil
 }
 
