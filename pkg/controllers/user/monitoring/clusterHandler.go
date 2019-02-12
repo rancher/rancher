@@ -1,7 +1,6 @@
 package monitoring
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -10,20 +9,16 @@ import (
 
 	"github.com/pkg/errors"
 	kcluster "github.com/rancher/kontainer-engine/cluster"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/monitoring"
-	"github.com/rancher/rancher/pkg/namespace"
-	nodeutil "github.com/rancher/rancher/pkg/node"
+	"github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/pki"
-	appsv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
-	corev1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
-	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
+	"github.com/rancher/types/apis/project.cattle.io/v3"
 	k8scorev1 "k8s.io/api/core/v1"
-	k8srbacv1 "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -42,22 +37,9 @@ type etcdTLSConfig struct {
 	internalAddress string
 }
 
-type appHandler struct {
-	cattleTemplateVersionsGetter mgmtv3.CatalogTemplateVersionsGetter
-	cattleProjectsGetter         mgmtv3.ProjectsGetter
-	cattleAppsGetter             projectv3.AppsGetter
-	cattleCoreClient             corev1.Interface
-	agentRBACClient              rbacv1.Interface
-	agentCoreClient              corev1.Interface
-	agentWorkloadsClient         appsv1beta2.Interface
-}
-
 type clusterHandler struct {
-	ctx                  context.Context
 	clusterName          string
 	cattleClustersClient mgmtv3.ClusterInterface
-	clusterGraph         mgmtv3.ClusterMonitorGraphInterface
-	monitorMetrics       mgmtv3.MonitorMetricInterface
 	app                  *appHandler
 }
 
@@ -74,11 +56,7 @@ func (ch *clusterHandler) sync(key string, cluster *mgmtv3.Cluster) (runtime.Obj
 	src := cluster
 	cpy := src.DeepCopy()
 
-	err := ch.syncSystemMonitor(cpy)
-	if err == nil {
-		err = ch.syncClusterMonitoring(cpy)
-	}
-
+	err := ch.doSync(cpy)
 	if !reflect.DeepEqual(cpy, src) {
 		updated, updateErr := ch.cattleClustersClient.Update(cpy)
 		if updateErr != nil {
@@ -95,15 +73,11 @@ func (ch *clusterHandler) sync(key string, cluster *mgmtv3.Cluster) (runtime.Obj
 	return cpy, err
 }
 
-func (ch *clusterHandler) syncSystemMonitor(cluster *mgmtv3.Cluster) (err error) {
-	return monitoring.SyncServiceMonitor(cluster, ch.app.agentCoreClient, ch.app.agentRBACClient, ch.app.cattleAppsGetter, ch.app.cattleProjectsGetter, ch.app.cattleTemplateVersionsGetter.CatalogTemplateVersions(namespace.GlobalNamespace))
-}
-
-func (ch *clusterHandler) syncClusterMonitoring(cluster *mgmtv3.Cluster) error {
+func (ch *clusterHandler) doSync(cluster *mgmtv3.Cluster) error {
 	appName, appTargetNamespace := monitoring.ClusterMonitoringInfo()
 
 	if cluster.Spec.EnableClusterMonitoring {
-		appProjectName, err := ch.app.ensureClusterMonitoringProjectName(cluster.Name, appTargetNamespace)
+		appProjectName, err := ch.ensureAppProjectName(cluster.Name, appTargetNamespace)
 		if err != nil {
 			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
 			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
@@ -113,32 +87,26 @@ func (ch *clusterHandler) syncClusterMonitoring(cluster *mgmtv3.Cluster) error {
 		var etcdTLSConfigs []*etcdTLSConfig
 		var systemComponentMap map[string][]string
 		if isRkeCluster(cluster) {
-			if etcdTLSConfigs, err = ch.app.deployEtcdCert(cluster.Name, appTargetNamespace); err != nil {
+			if etcdTLSConfigs, err = ch.deployEtcdCert(cluster.Name, appTargetNamespace); err != nil {
 				mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
 				mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
 				return errors.Wrap(err, "failed to deploy etcd cert")
 			}
-			if systemComponentMap, err = ch.app.getExporterEndpoint(); err != nil {
+			if systemComponentMap, err = ch.getExporterEndpoint(); err != nil {
 				mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
 				mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
 				return errors.Wrap(err, "failed to get exporter endpoint")
 			}
 		}
 
-		appServiceAccountName, err := ch.app.grantClusterMonitoringPermissions(appName, appTargetNamespace)
+		appAnswers, err := ch.deployApp(appName, appTargetNamespace, appProjectName, cluster, etcdTLSConfigs, systemComponentMap)
 		if err != nil {
-			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
-			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
-			return errors.Wrap(err, "failed to grant monitoring permissions")
-		}
-
-		if err := ch.app.deployClusterMonitoringApp(appName, appTargetNamespace, appServiceAccountName, appProjectName, cluster, etcdTLSConfigs, systemComponentMap); err != nil {
 			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
 			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
 			return errors.Wrap(err, "failed to deploy monitoring")
 		}
 
-		if err := ch.detectMonitoringComponentsWhileInstall(appName, appTargetNamespace, cluster); err != nil {
+		if err := ch.detectAppComponentsWhileInstall(appName, appTargetNamespace, cluster, appAnswers); err != nil {
 			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
 			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
 			return errors.Wrap(err, "failed to detect the installation status of monitoring components")
@@ -147,25 +115,22 @@ func (ch *clusterHandler) syncClusterMonitoring(cluster *mgmtv3.Cluster) error {
 		mgmtv3.ClusterConditionMonitoringEnabled.True(cluster)
 		mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, "")
 	} else if cluster.Status.MonitoringStatus != nil {
+		if err := ch.disableAllOwnedProjectsMonitoring(cluster.Name); err != nil {
+			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
+			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
+			return errors.Wrap(err, "failed to disable all owned projects monitoring")
+		}
+
 		if err := ch.app.withdrawApp(appName, appTargetNamespace); err != nil {
 			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
 			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
 			return errors.Wrap(err, "failed to withdraw monitoring")
 		}
 
-		if err := ch.detectMonitoringComponentsWhileUninstall(appName, appTargetNamespace, cluster); err != nil {
+		if err := ch.detectAppComponentsWhileUninstall(appName, appTargetNamespace, cluster); err != nil {
 			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
 			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
 			return errors.Wrap(err, "failed to detect the uninstallation status of monitoring components")
-		}
-
-		appServiceAccountName := appName
-		appClusterRoleName := appName
-		appClusterRoleBindingName := appClusterRoleName + "-binding"
-		if err := ch.app.revokePermissions(appServiceAccountName, appClusterRoleName, appClusterRoleBindingName, appTargetNamespace); err != nil {
-			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
-			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
-			return errors.Wrap(err, "failed to revoke monitoring permissions")
 		}
 
 		mgmtv3.ClusterConditionMonitoringEnabled.False(cluster)
@@ -175,76 +140,26 @@ func (ch *clusterHandler) syncClusterMonitoring(cluster *mgmtv3.Cluster) error {
 	return nil
 }
 
-func (ch *clusterHandler) detectMonitoringComponentsWhileInstall(appName, appTargetNamespace string, cluster *mgmtv3.Cluster) error {
-	time.Sleep(5 * time.Second)
-
-	if cluster.Status.MonitoringStatus == nil {
-		cluster.Status.MonitoringStatus = &mgmtv3.MonitoringStatus{
-			Conditions: []mgmtv3.MonitoringCondition{
-				{Type: mgmtv3.ClusterConditionType(ConditionGrafanaDeployed), Status: k8scorev1.ConditionFalse},
-				{Type: mgmtv3.ClusterConditionType(ConditionNodeExporterDeployed), Status: k8scorev1.ConditionFalse},
-				{Type: mgmtv3.ClusterConditionType(ConditionKubeStateExporterDeployed), Status: k8scorev1.ConditionFalse},
-				{Type: mgmtv3.ClusterConditionType(ConditionPrometheusDeployed), Status: k8scorev1.ConditionFalse},
-				{Type: mgmtv3.ClusterConditionType(ConditionMetricExpressionDeployed), Status: k8scorev1.ConditionFalse},
-			},
-		}
+func (ch *clusterHandler) ensureAppProjectName(clusterID, appTargetNamespace string) (string, error) {
+	appDeployProjectID, err := monitoring.GetSystemProjectID(ch.app.cattleProjectClient)
+	if err != nil {
+		return "", err
 	}
 
-	monitoringStatus := cluster.Status.MonitoringStatus
-
-	return stream(
-		func() error {
-			return isGrafanaDeployed(ch.app.agentWorkloadsClient, appTargetNamespace, appName, monitoringStatus, cluster.Name)
-		},
-		func() error {
-			return isNodeExporterDeployed(ch.app.agentWorkloadsClient, appTargetNamespace, appName, monitoringStatus)
-		},
-		func() error {
-			return isKubeStateExporterDeployed(ch.app.agentWorkloadsClient, appTargetNamespace, appName, monitoringStatus)
-		},
-		func() error {
-			return isPrometheusDeployed(ch.app.agentWorkloadsClient, appTargetNamespace, appName, monitoringStatus)
-		},
-		func() error {
-			return isMetricExpressionDeployed(cluster.Name, ch.clusterGraph, ch.monitorMetrics, monitoringStatus)
-		},
-	)
-}
-
-func (ch *clusterHandler) detectMonitoringComponentsWhileUninstall(appName, appTargetNamespace string, cluster *mgmtv3.Cluster) error {
-	if cluster.Status.MonitoringStatus == nil {
-		return nil
+	appProjectName, err := monitoring.EnsureAppProjectName(ch.app.agentNamespaceClient, appDeployProjectID, clusterID, appTargetNamespace)
+	if err != nil {
+		return "", err
 	}
 
-	time.Sleep(5 * time.Second)
-
-	monitoringStatus := cluster.Status.MonitoringStatus
-
-	return stream(
-		func() error {
-			return isMetricExpressionWithdrew(cluster.Name, ch.clusterGraph, ch.monitorMetrics, monitoringStatus)
-		},
-		func() error {
-			return isPrometheusWithdrew(ch.app.agentWorkloadsClient, appTargetNamespace, appName, monitoringStatus)
-		},
-		func() error {
-			return isKubeStateExporterWithdrew(ch.app.agentWorkloadsClient, appTargetNamespace, appName, monitoringStatus)
-		},
-		func() error {
-			return isNodeExporterWithdrew(ch.app.agentWorkloadsClient, appTargetNamespace, appName, monitoringStatus)
-		},
-		func() error {
-			return isGrafanaWithdrew(ch.app.agentWorkloadsClient, appTargetNamespace, appName, monitoringStatus)
-		},
-	)
+	return appProjectName, nil
 }
 
-func (ah *appHandler) deployEtcdCert(clusterName, appTargetNamespace string) ([]*etcdTLSConfig, error) {
+func (ch *clusterHandler) deployEtcdCert(clusterName, appTargetNamespace string) ([]*etcdTLSConfig, error) {
 	var etcdTLSConfigs []*etcdTLSConfig
 
 	rkeCertSecretName := "c-" + clusterName
 	systemNamespace := "cattle-system"
-	sec, err := ah.cattleCoreClient.Secrets(systemNamespace).Get(rkeCertSecretName, metav1.GetOptions{})
+	sec, err := ch.app.cattleSecretClient.GetNamespaced(systemNamespace, rkeCertSecretName, metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get %s:%s in deploy etcd cert to prometheus", systemNamespace, rkeCertSecretName)
 	}
@@ -276,11 +191,17 @@ func (ah *appHandler) deployEtcdCert(clusterName, appTargetNamespace string) ([]
 		}
 	}
 
-	agentUserSecretsClient := ah.agentCoreClient.Secrets(appTargetNamespace)
-	oldSec, err := agentUserSecretsClient.Get(exporterEtcdCertName, metav1.GetOptions{})
+	agentSecretClient := ch.app.agentSecretClient
+	oldSec, err := agentSecretClient.GetNamespaced(appTargetNamespace, exporterEtcdCertName, metav1.GetOptions{})
 	if err != nil && k8serrors.IsNotFound(err) {
-		secret := newSecret(exporterEtcdCertName, appTargetNamespace, secretData)
-		if _, err = agentUserSecretsClient.Create(secret); err != nil && !k8serrors.IsAlreadyExists(err) {
+		secret := &k8scorev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      exporterEtcdCertName,
+				Namespace: appTargetNamespace,
+			},
+			Data: secretData,
+		}
+		if _, err = agentSecretClient.Create(secret); err != nil && !k8serrors.IsAlreadyExists(err) {
 			return nil, err
 		}
 		return etcdTLSConfigs, nil
@@ -288,21 +209,11 @@ func (ah *appHandler) deployEtcdCert(clusterName, appTargetNamespace string) ([]
 
 	newSec := oldSec.DeepCopy()
 	newSec.Data = secretData
-	_, err = agentUserSecretsClient.Update(newSec)
+	_, err = agentSecretClient.Update(newSec)
 	return etcdTLSConfigs, err
 }
 
-func newSecret(name, namespace string, data map[string][]byte) *k8scorev1.Secret {
-	return &k8scorev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Data: data,
-	}
-}
-
-func (ah *appHandler) getExporterEndpoint() (map[string][]string, error) {
+func (ch *clusterHandler) getExporterEndpoint() (map[string][]string, error) {
 	endpointMap := make(map[string][]string)
 	etcdLablels := labels.Set{
 		"node-role.kubernetes.io/etcd": "true",
@@ -311,13 +222,13 @@ func (ah *appHandler) getExporterEndpoint() (map[string][]string, error) {
 		"node-role.kubernetes.io/controlplane": "true",
 	}
 
-	agentNodeLister := ah.agentCoreClient.Nodes(metav1.NamespaceAll).Controller().Lister()
+	agentNodeLister := ch.app.agentNodeClient.Controller().Lister()
 	etcdNodes, err := agentNodeLister.List(metav1.NamespaceAll, etcdLablels.AsSelector())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get etcd nodes")
 	}
 	for _, v := range etcdNodes {
-		endpointMap[etcd] = append(endpointMap[etcd], nodeutil.GetNodeInternalAddress(v))
+		endpointMap[etcd] = append(endpointMap[etcd], node.GetNodeInternalAddress(v))
 	}
 
 	controlplaneNodes, err := agentNodeLister.List(metav1.NamespaceAll, controlplaneLabels.AsSelector())
@@ -325,266 +236,93 @@ func (ah *appHandler) getExporterEndpoint() (map[string][]string, error) {
 		return nil, errors.Wrap(err, "failed to get controlplane nodes")
 	}
 	for _, v := range controlplaneNodes {
-		endpointMap[controlplane] = append(endpointMap[controlplane], nodeutil.GetNodeInternalAddress(v))
+		endpointMap[controlplane] = append(endpointMap[controlplane], node.GetNodeInternalAddress(v))
 	}
 
 	return endpointMap, nil
 }
 
-func (ah *appHandler) ensureClusterMonitoringProjectName(clusterID, appTargetNamespace string) (string, error) {
-	appDeployProjectID, err := monitoring.GetSystemProjectID(ah.cattleProjectsGetter.Projects(clusterID))
-	if err != nil {
-		return "", err
-	}
+func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProjectName string, cluster *mgmtv3.Cluster, etcdTLSConfig []*etcdTLSConfig, systemComponentMap map[string][]string) (map[string]string, error) {
+	_, appDeployProjectID := ref.Parse(appProjectName)
+	clusterAlertManagerSvcName, clusterAlertManagerSvcNamespaces, clusterAlertManagerPort := monitoring.ClusterAlertManagerEndpoint()
 
-	agentNamespacesClient := ah.agentCoreClient.Namespaces(metav1.NamespaceAll)
-	appProjectName, err := monitoring.EnsureAppProjectName(agentNamespacesClient, appDeployProjectID, clusterID, appTargetNamespace)
-	if err != nil {
-		return "", err
-	}
+	optionalAppAnswers := map[string]string{
+		"exporter-coredns.enabled": "true",
 
-	return appProjectName, nil
-}
+		"exporter-kube-controller-manager.enabled": "true",
 
-func (ah *appHandler) grantClusterMonitoringPermissions(appName, appTargetNamespace string) (string, error) {
-	appServiceAccountName := appName
-	appClusterRoleName := appServiceAccountName
-	appClusterRoleBindingName := appServiceAccountName + "-binding"
+		"exporter-kube-dns.enabled": "true",
 
-	err := stream(
-		// detect ServiceAccount (the name as same as App)
-		func() error {
-			appServiceAccount, err := ah.agentCoreClient.ServiceAccounts(appTargetNamespace).Get(appServiceAccountName, metav1.GetOptions{})
-			if err != nil && !k8serrors.IsNotFound(err) {
-				return errors.Wrapf(err, "failed to query %q ServiceAccount in %q Namespace", appServiceAccountName, appTargetNamespace)
-			}
-			if appServiceAccount.Name == appServiceAccountName {
-				if appServiceAccount.DeletionTimestamp != nil {
-					return fmt.Errorf("stale %q ServiceAccount in %q Namespace is still on terminating", appServiceAccountName, appTargetNamespace)
-				}
-			} else {
-				appServiceAccount = &k8scorev1.ServiceAccount{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      appServiceAccountName,
-						Namespace: appTargetNamespace,
-						Labels:    monitoring.OwnedLabels(appName, appTargetNamespace, monitoring.ClusterLevel),
-					},
-				}
+		"exporter-kube-scheduler.enabled": "true",
 
-				if _, err := ah.agentCoreClient.ServiceAccounts(appTargetNamespace).Create(appServiceAccount); err != nil && !k8serrors.IsAlreadyExists(err) {
-					return errors.Wrapf(err, "failed to create %q ServiceAccount in %q Namespace", appServiceAccountName, appTargetNamespace)
-				}
-			}
+		"exporter-kube-state.enabled": "true",
 
-			return nil
-		},
+		"exporter-kubelets.enabled": "true",
 
-		// detect ClusterRole (the name as same as App)
-		func() error {
-			appClusterRole, err := ah.agentRBACClient.ClusterRoles(metav1.NamespaceAll).Get(appClusterRoleName, metav1.GetOptions{})
-			if err != nil && !k8serrors.IsNotFound(err) {
-				return errors.Wrapf(err, "failed to query %q ClusterRole", appClusterRoleName)
-			}
+		"exporter-kubernetes.enabled": "true",
 
-			rules := []k8srbacv1.PolicyRule{
-				{
-					NonResourceURLs: []string{"/metrics"},
-					Verbs:           []string{"get"},
-				},
-				{
-					APIGroups: []string{""},
-					Resources: []string{"services", "endpoints", "pods", "nodes"},
-					Verbs:     []string{"list", "watch"},
-				},
-				{
-					APIGroups: []string{""},
-					Resources: []string{"nodes/metrics"}, // kubelet
-					Verbs:     []string{"get"},
-				},
-				// for Node Exporter
-				{
-					APIGroups: []string{"authentication.k8s.io"},
-					Resources: []string{"tokenreviews"},
-					Verbs:     []string{"create"},
-				},
-				{
-					APIGroups: []string{"authorization.k8s.io"},
-					Resources: []string{"subjectaccessreviews"},
-					Verbs:     []string{"create"},
-				},
-				// for Kube-state Exporter
-				{
-					APIGroups: []string{""},
-					Resources: []string{"namespaces", "nodes", "pods", "services", "resourcequotas", "replicationcontrollers", "limitranges", "persistentvolumeclaims", "persistentvolumes", "endpoints", "configmaps", "secrets"},
-					Verbs:     []string{"list", "watch"},
-				},
-				{
-					APIGroups: []string{"extensions"},
-					Resources: []string{"daemonsets", "deployments", "replicasets", "ingresses"},
-					Verbs:     []string{"list", "watch"},
-				},
-				{
-					APIGroups: []string{"apps"},
-					Resources: []string{"statefulsets", "deployments"},
-					Verbs:     []string{"list", "watch"},
-				},
-				{
-					APIGroups: []string{"batch"},
-					Resources: []string{"cronjobs", "jobs"},
-					Verbs:     []string{"list", "watch"},
-				},
-				{
-					APIGroups: []string{"autoscaling"},
-					Resources: []string{"horizontalpodautoscalers"},
-					Verbs:     []string{"list", "watch"},
-				},
-				// for Prometheus-Auth Agent
-				{
-					APIGroups: []string{""},
-					Resources: []string{"namespaces", "serviceaccounts", "secrets"},
-					Verbs:     []string{"list", "watch", "get"},
-				},
-				{
-					APIGroups: []string{"rbac.authorization.k8s.io"},
-					Resources: []string{"roles", "clusterroles", "rolebindings", "clusterrolebindings"},
-					Verbs:     []string{"list", "watch", "get"},
-				},
-			}
+		"exporter-node.enabled": "true",
 
-			if appClusterRole.Name == appClusterRoleName {
-				if appClusterRole.DeletionTimestamp != nil {
-					return fmt.Errorf("stale %q ClusterRole is still on terminating", appClusterRoleName)
-				}
+		"exporter-fluentd.enabled": "true",
 
-				// ensure
-				appClusterRole = appClusterRole.DeepCopy()
-				appClusterRole.Rules = rules
-				if _, err := ah.agentRBACClient.ClusterRoles(metav1.NamespaceAll).Update(appClusterRole); err != nil {
-					return errors.Wrapf(err, "failed to update %q ClusterRole", appClusterRoleName)
-				}
-			} else {
-				appClusterRole = &k8srbacv1.ClusterRole{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:   appClusterRoleName,
-						Labels: monitoring.OwnedLabels(appName, appTargetNamespace, monitoring.ClusterLevel),
-					},
-					Rules: rules,
-				}
-
-				if _, err := ah.agentRBACClient.ClusterRoles(metav1.NamespaceAll).Create(appClusterRole); err != nil && !k8serrors.IsAlreadyExists(err) {
-					return errors.Wrapf(err, "failed to create %q ClusterRole", appClusterRoleName)
-				}
-			}
-
-			return nil
-		},
-
-		// detect ClusterRoleBinding (the name is ${ServiceAccountName}-binding)
-		func() error {
-			appClusterRoleBinding, err := ah.agentRBACClient.ClusterRoleBindings(metav1.NamespaceAll).Get(appClusterRoleBindingName, metav1.GetOptions{})
-			if err != nil && !k8serrors.IsNotFound(err) {
-				return errors.Wrapf(err, "failed to query %q ClusterRoleBinding", appClusterRoleBindingName)
-			}
-			if appClusterRoleBinding.Name == appClusterRoleBindingName {
-				if appClusterRoleBinding.DeletionTimestamp != nil {
-					return fmt.Errorf("stale %q ClusterRoleBinding is still on terminating", appClusterRoleBindingName)
-				}
-			} else {
-				appClusterRoleBinding = &k8srbacv1.ClusterRoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:   appClusterRoleBindingName,
-						Labels: monitoring.OwnedLabels(appName, appTargetNamespace, monitoring.ClusterLevel),
-					},
-					Subjects: []k8srbacv1.Subject{
-						{
-							Kind:      k8srbacv1.ServiceAccountKind,
-							Namespace: appTargetNamespace,
-							Name:      appServiceAccountName,
-						},
-					},
-					RoleRef: k8srbacv1.RoleRef{
-						APIGroup: k8srbacv1.GroupName,
-						Kind:     "ClusterRole",
-						Name:     appClusterRoleName,
-					},
-				}
-
-				if _, err := ah.agentRBACClient.ClusterRoleBindings(metav1.NamespaceAll).Create(appClusterRoleBinding); err != nil && !k8serrors.IsAlreadyExists(err) {
-					return errors.Wrapf(err, "failed to create %q ClusterRoleBinding", appClusterRoleBindingName)
-				}
-			}
-
-			return nil
-		},
-	)
-	if err != nil {
-		return "", err
-	}
-
-	return appServiceAccountName, nil
-}
-
-func (ah *appHandler) deployClusterMonitoringApp(appName, appTargetNamespace string, appServiceAccountName, appProjectName string, cluster *mgmtv3.Cluster, etcdTLSConfig []*etcdTLSConfig, systemComponentMap map[string][]string) error {
-	alertSvcName, _, alertPort := monitoring.ClusterAlertManagerEndpoint()
-
-	appAnswers := map[string]string{
-		"exporter-coredns.enabled":  "true",
-		"exporter-coredns.apiGroup": monitoring.APIVersion.Group,
-
-		"exporter-kube-controller-manager.enabled":  "true",
-		"exporter-kube-controller-manager.apiGroup": monitoring.APIVersion.Group,
-
-		"exporter-kube-dns.enabled":  "true",
-		"exporter-kube-dns.apiGroup": monitoring.APIVersion.Group,
-
-		"exporter-kube-etcd.enabled":  "false",
-		"exporter-kube-etcd.apiGroup": monitoring.APIVersion.Group,
-
-		"exporter-kube-scheduler.enabled":  "true",
-		"exporter-kube-scheduler.apiGroup": monitoring.APIVersion.Group,
-
-		"exporter-kube-state.enabled":            "true",
-		"exporter-kube-state.apiGroup":           monitoring.APIVersion.Group,
-		"exporter-kube-state.serviceAccountName": appServiceAccountName,
-
-		"exporter-kubelets.enabled":  "true",
-		"exporter-kubelets.apiGroup": monitoring.APIVersion.Group,
-
-		"exporter-kubernetes.enabled":  "true",
-		"exporter-kubernetes.apiGroup": monitoring.APIVersion.Group,
-
-		"exporter-node.enabled":            "true",
-		"exporter-node.apiGroup":           monitoring.APIVersion.Group,
-		"exporter-node.serviceAccountName": appServiceAccountName,
-
-		"exporter-fluentd.enabled":  "true",
-		"exporter-fluentd.apiGroup": monitoring.APIVersion.Group,
-
-		"grafana.enabled":             "true",
-		"grafana.apiGroup":            monitoring.APIVersion.Group,
-		"grafana.serviceAccountName":  appServiceAccountName,
 		"grafana.persistence.enabled": "false",
 
-		"prometheus.enabled":                                                      "true",
-		"prometheus.apiGroup":                                                     monitoring.APIVersion.Group,
-		"prometheus.serviceAccountName":                                           appServiceAccountName,
-		"prometheus.persistence.enabled":                                          "false",
-		"prometheus.alertingEndpoints[0].name":                                    alertSvcName,
-		"prometheus.alertingEndpoints[0].namespace":                               appTargetNamespace,
-		"prometheus.alertingEndpoints[0].port":                                    alertPort,
-		"prometheus.serviceMonitorNamespaceSelector.matchExpressions[0].key":      nslabels.ProjectIDFieldLabel,
-		"prometheus.serviceMonitorNamespaceSelector.matchExpressions[0].operator": "Exists",
-		"prometheus.serviceMonitorSelector.matchExpressions[0].key":               monitoring.CattlePrometheusRuleLabelKey,
-		"prometheus.serviceMonitorSelector.matchExpressions[0].operator":          "In",
-		"prometheus.serviceMonitorSelector.matchExpressions[0].values[1]":         "rancher-monitoring",
-		"prometheus.ruleNamespaceSelector.matchExpressions[0].key":                nslabels.ProjectIDFieldLabel,
-		"prometheus.ruleNamespaceSelector.matchExpressions[0].operator":           "Exists",
-		"prometheus.rulesSelector.matchExpressions[0].key":                        monitoring.CattlePrometheusRuleLabelKey,
-		"prometheus.rulesSelector.matchExpressions[0].operator":                   "In",
-		"prometheus.rulesSelector.matchExpressions[0].values[0]":                  monitoring.CattleAlertingPrometheusRuleLabelValue,
-		"prometheus.rulesSelector.matchExpressions[0].values[1]":                  "rancher-monitoring",
+		"prometheus.persistence.enabled": "false",
 	}
-	appAnswers = monitoring.OverwriteAppAnswers(appAnswers, cluster.Annotations)
+
+	mustAppAnswers := map[string]string{
+		"enabled": "false",
+
+		"exporter-coredns.apiGroup": monitoring.APIVersion.Group,
+
+		"exporter-kube-controller-manager.apiGroup": monitoring.APIVersion.Group,
+
+		"exporter-kube-dns.apiGroup": monitoring.APIVersion.Group,
+
+		"exporter-kube-etcd.apiGroup": monitoring.APIVersion.Group,
+
+		"exporter-kube-scheduler.apiGroup": monitoring.APIVersion.Group,
+
+		"exporter-kube-state.apiGroup": monitoring.APIVersion.Group,
+
+		"exporter-kubelets.apiGroup": monitoring.APIVersion.Group,
+
+		"exporter-kubernetes.apiGroup": monitoring.APIVersion.Group,
+
+		"exporter-node.apiGroup": monitoring.APIVersion.Group,
+
+		"exporter-fluentd.apiGroup": monitoring.APIVersion.Group,
+
+		"grafana.enabled":            "true",
+		"grafana.apiGroup":           monitoring.APIVersion.Group,
+		"grafana.serviceAccountName": appName,
+
+		"prometheus.enabled":                        "true",
+		"prometheus.apiGroup":                       monitoring.APIVersion.Group,
+		"prometheus.externalLabels.prometheus_from": cluster.Spec.DisplayName,
+		"prometheus.serviceAccountNameOverride":     appName,
+		"prometheus.additionalAlertManagerConfigs[0].static_configs[0].targets[0]":          fmt.Sprintf("%s.%s:%s", clusterAlertManagerSvcName, clusterAlertManagerSvcNamespaces, clusterAlertManagerPort),
+		"prometheus.additionalAlertManagerConfigs[0].static_configs[0].labels.level":        "cluster",
+		"prometheus.additionalAlertManagerConfigs[0].static_configs[0].labels.cluster_id":   cluster.Name,
+		"prometheus.additionalAlertManagerConfigs[0].static_configs[0].labels.cluster_name": cluster.Spec.DisplayName,
+		"prometheus.serviceMonitorNamespaceSelector.matchExpressions[0].key":                nslabels.ProjectIDFieldLabel,
+		"prometheus.serviceMonitorNamespaceSelector.matchExpressions[0].operator":           "In",
+		"prometheus.serviceMonitorNamespaceSelector.matchExpressions[0].values[0]":          appDeployProjectID,
+		"prometheus.ruleNamespaceSelector.matchExpressions[0].key":                          nslabels.ProjectIDFieldLabel,
+		"prometheus.ruleNamespaceSelector.matchExpressions[0].operator":                     "In",
+		"prometheus.ruleNamespaceSelector.matchExpressions[0].values[0]":                    appDeployProjectID,
+		"prometheus.ruleSelector.matchExpressions[0].key":                                   monitoring.CattlePrometheusRuleLabelKey,
+		"prometheus.ruleSelector.matchExpressions[0].operator":                              "In",
+		"prometheus.ruleSelector.matchExpressions[0].values[0]":                             monitoring.CattleAlertingPrometheusRuleLabelValue,
+		"prometheus.ruleSelector.matchExpressions[0].values[1]":                             monitoring.CattleMonitoringPrometheusRuleLabelValue,
+	}
+
+	appAnswers := monitoring.OverwriteAppAnswers(optionalAppAnswers, cluster.Annotations)
+
+	// cannot overwrite mustAppAnswers
+	for mustKey, mustVal := range mustAppAnswers {
+		appAnswers[mustKey] = mustVal
+	}
 
 	if systemComponentMap != nil {
 		if etcdEndpoints, ok := systemComponentMap[etcd]; ok {
@@ -615,15 +353,14 @@ func (ah *appHandler) deployClusterMonitoringApp(appName, appTargetNamespace str
 	}
 
 	appCatalogID := settings.SystemMonitoringCatalogID.Get()
-	_, appDeployProjectID := ref.Parse(appProjectName)
-	app := &projectv3.App{
+	app := &v3.App{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: monitoring.CopyCreatorID(nil, cluster.Annotations),
-			Labels:      monitoring.OwnedLabels(appName, appTargetNamespace, monitoring.ClusterLevel),
+			Labels:      monitoring.OwnedLabels(appName, appTargetNamespace, appProjectName, monitoring.ClusterLevel),
 			Name:        appName,
 			Namespace:   appDeployProjectID,
 		},
-		Spec: projectv3.AppSpec{
+		Spec: v3.AppSpec{
 			Answers:         appAnswers,
 			Description:     "Rancher Cluster Monitoring",
 			ExternalID:      appCatalogID,
@@ -632,24 +369,154 @@ func (ah *appHandler) deployClusterMonitoringApp(appName, appTargetNamespace str
 		},
 	}
 
-	err := monitoring.DeployApp(ah.cattleAppsGetter, appDeployProjectID, app)
+	err := monitoring.DeployApp(ch.app.cattleAppClient, appDeployProjectID, app)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return appAnswers, nil
 }
 
-func (ah *appHandler) revokePermissions(appServiceAccountName, appClusterRoleName, appClusterRoleBindingName, appTargetNamespace string) error {
-	return monitoring.RevokePermissions(ah.agentRBACClient, ah.agentCoreClient, appServiceAccountName, appClusterRoleName, appClusterRoleBindingName, appTargetNamespace)
+func (ch *clusterHandler) detectAppComponentsWhileInstall(appName, appTargetNamespace string, cluster *mgmtv3.Cluster, appAnswers map[string]string) error {
+	if cluster.Status.MonitoringStatus == nil {
+		cluster.Status.MonitoringStatus = &mgmtv3.MonitoringStatus{
+			Conditions: []mgmtv3.MonitoringCondition{
+				{Type: mgmtv3.ClusterConditionType(ConditionGrafanaDeployed), Status: k8scorev1.ConditionFalse},
+				{Type: mgmtv3.ClusterConditionType(ConditionNodeExporterDeployed), Status: k8scorev1.ConditionFalse},
+				{Type: mgmtv3.ClusterConditionType(ConditionKubeStateExporterDeployed), Status: k8scorev1.ConditionFalse},
+				{Type: mgmtv3.ClusterConditionType(ConditionPrometheusDeployed), Status: k8scorev1.ConditionFalse},
+				{Type: mgmtv3.ClusterConditionType(ConditionMetricExpressionDeployed), Status: k8scorev1.ConditionFalse},
+			},
+		}
+	}
+	monitoringStatus := cluster.Status.MonitoringStatus
+
+	enabledExporterNode := convert.ToBool(appAnswers["exporter-node.enabled"])
+	if enabledExporterNode {
+		ConditionNodeExporterDeployed.Add(monitoringStatus)
+	} else {
+		ConditionNodeExporterDeployed.Del(monitoringStatus)
+	}
+
+	enabledExporterKubeState := convert.ToBool(appAnswers["exporter-kube-state.enabled"])
+	if enabledExporterKubeState {
+		ConditionKubeStateExporterDeployed.Add(monitoringStatus)
+	} else {
+		ConditionKubeStateExporterDeployed.Del(monitoringStatus)
+	}
+
+	checkers := make([]func() error, 0, len(monitoringStatus.Conditions))
+	if !ConditionGrafanaDeployed.IsTrue(monitoringStatus) {
+		checkers = append(checkers, func() error {
+			return isGrafanaDeployed(ch.app.agentDeploymentClient, appTargetNamespace, appName, monitoringStatus, cluster.Name)
+		})
+	}
+	if enabledExporterNode && !ConditionNodeExporterDeployed.IsTrue(monitoringStatus) {
+		checkers = append(checkers, func() error {
+			return isNodeExporterDeployed(ch.app.agentDaemonSetClient, appTargetNamespace, appName, monitoringStatus)
+		})
+	}
+	if enabledExporterKubeState && !ConditionKubeStateExporterDeployed.IsTrue(monitoringStatus) {
+		checkers = append(checkers, func() error {
+			return isKubeStateExporterDeployed(ch.app.agentDeploymentClient, appTargetNamespace, appName, monitoringStatus)
+		})
+	}
+	if !ConditionPrometheusDeployed.IsTrue(monitoringStatus) {
+		checkers = append(checkers, func() error {
+			return isPrometheusDeployed(ch.app.agentStatefulSetClient, appTargetNamespace, appName, monitoringStatus)
+		})
+	}
+	if !ConditionMetricExpressionDeployed.IsTrue(monitoringStatus) {
+		checkers = append(checkers, func() error {
+			return isMetricExpressionDeployed(cluster.Name, ch.app.cattleClusterGraphClient, ch.app.cattleMonitorMetricClient, monitoringStatus)
+		})
+	}
+
+	if len(checkers) == 0 {
+		return nil
+	}
+
+	err := stream(checkers...)
+	if err != nil {
+		time.Sleep(5 * time.Second)
+	}
+
+	return err
 }
 
-func (ah *appHandler) withdrawApp(appName, appTargetNamespace string) error {
-	return monitoring.WithdrawApp(ah.cattleAppsGetter, monitoring.OwnedAppListOptions(appName, appTargetNamespace))
+func (ch *clusterHandler) detectAppComponentsWhileUninstall(appName, appTargetNamespace string, cluster *mgmtv3.Cluster) error {
+	if cluster.Status.MonitoringStatus == nil {
+		return nil
+	}
+	monitoringStatus := cluster.Status.MonitoringStatus
+
+	checkers := make([]func() error, 0, len(monitoringStatus.Conditions))
+	if !ConditionGrafanaDeployed.IsFalse(monitoringStatus) {
+		checkers = append(checkers, func() error {
+			return isGrafanaWithdrew(ch.app.agentDeploymentClient, appTargetNamespace, appName, monitoringStatus)
+		})
+	}
+	if !ConditionNodeExporterDeployed.IsFalse(monitoringStatus) {
+		checkers = append(checkers, func() error {
+			return isNodeExporterWithdrew(ch.app.agentDaemonSetClient, appTargetNamespace, appName, monitoringStatus)
+		})
+	}
+	if !ConditionKubeStateExporterDeployed.IsFalse(monitoringStatus) {
+		checkers = append(checkers, func() error {
+			return isKubeStateExporterWithdrew(ch.app.agentDeploymentClient, appTargetNamespace, appName, monitoringStatus)
+		})
+	}
+	if !ConditionPrometheusDeployed.IsFalse(monitoringStatus) {
+		checkers = append(checkers, func() error {
+			return isPrometheusWithdrew(ch.app.agentStatefulSetClient, appTargetNamespace, appName, monitoringStatus)
+		})
+	}
+	if !ConditionMetricExpressionDeployed.IsFalse(monitoringStatus) {
+		checkers = append(checkers, func() error {
+			return isMetricExpressionWithdrew(cluster.Name, ch.app.cattleClusterGraphClient, ch.app.cattleMonitorMetricClient, monitoringStatus)
+		})
+	}
+
+	if len(checkers) == 0 {
+		return nil
+	}
+
+	err := stream(checkers...)
+	if err != nil {
+		time.Sleep(5 * time.Second)
+	}
+
+	return err
+}
+
+func (ch *clusterHandler) disableAllOwnedProjectsMonitoring(clusterID string) error {
+	projectClient := ch.app.cattleProjectClient
+
+	ownedProjectList, err := projectClient.List(metav1.ListOptions{})
+	if err != nil {
+		return errors.Wrap(err, "failed to list all projects")
+	}
+
+	ownedProjectItems := ownedProjectList.Items
+	disableFns := make([]func() error, 0, len(ownedProjectItems))
+	for _, ownedProject := range ownedProjectItems {
+		copyOwnedProject := ownedProject.DeepCopy()
+		if copyOwnedProject.DeletionTimestamp != nil || !copyOwnedProject.Spec.EnableProjectMonitoring {
+			continue
+		}
+		copyOwnedProject.Spec.EnableProjectMonitoring = false
+
+		disableFns = append(disableFns, func() error {
+			_, err := projectClient.Update(copyOwnedProject)
+			return err
+		})
+	}
+
+	return stream(disableFns...)
 }
 
 func getClusterTag(cluster *mgmtv3.Cluster) string {
-	return fmt.Sprintf("%s(%s)", cluster.Spec.DisplayName, cluster.Name)
+	return fmt.Sprintf("%s(%s)", cluster.Name, cluster.Spec.DisplayName)
 }
 
 func isRkeCluster(cluster *mgmtv3.Cluster) bool {

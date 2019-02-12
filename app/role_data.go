@@ -169,6 +169,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("projectmonitorgraphs").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("catalogtemplates").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("catalogtemplateversions").verbs("*").
+		addRule().apiGroups("monitoring.cattle.io").resources("prometheus").verbs("view").
 		setRoleTemplateNames("admin")
 
 	rb.addRoleTemplate("Project Member", "project-member", "project", true, false, false, false).
@@ -191,6 +192,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("projectmonitorgraphs").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("catalogtemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("catalogtemplateversions").verbs("get", "list", "watch").
+		addRule().apiGroups("monitoring.cattle.io").resources("prometheus").verbs("view").
 		setRoleTemplateNames("edit")
 
 	rb.addRoleTemplate("Read-only", "read-only", "project", true, false, false, false).

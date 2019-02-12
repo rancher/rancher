@@ -34,6 +34,7 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 		var clusterName, projectName, appName, saNamespace string
 		var comm v3.CommonQueryMetricInput
 		var err error
+		var svcNamespace, svcName string
 
 		if actionName == querycluster {
 			var queryMetricInput v3.QueryClusterMetricInput
@@ -53,6 +54,7 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 
 			comm = queryMetricInput.CommonQueryMetricInput
 			appName, saNamespace = monitorutil.ClusterMonitoringInfo()
+			svcName, svcNamespace, _ = monitorutil.ClusterPrometheusEndpoint()
 		} else {
 			var queryMetricInput v3.QueryProjectMetricInput
 			actionInput, err := parse.ReadBody(apiContext.Request)
@@ -72,6 +74,7 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 
 			comm = queryMetricInput.CommonQueryMetricInput
 			appName, saNamespace = monitorutil.ProjectMonitoringInfo(projectName)
+			svcName, svcNamespace = monitorutil.ProjectPrometheusServiceInfo(projectName)
 		}
 
 		start, end, step, err := parseTimeParams(comm.From, comm.To, comm.Interval)
@@ -92,7 +95,7 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 		reqContext, cancel := context.WithTimeout(context.Background(), prometheusReqTimeout)
 		defer cancel()
 
-		prometheusQuery, err := NewPrometheusQuery(reqContext, userContext, clusterName, token, h.clustermanager, h.dialerFactory)
+		prometheusQuery, err := NewPrometheusQuery(reqContext, userContext, clusterName, token, svcNamespace, svcName, h.clustermanager, h.dialerFactory)
 		if err != nil {
 			return err
 		}
@@ -119,46 +122,19 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 		}
 		apiContext.Response.Write(res)
 
-	case listclustermetricname, listprojectmetricname:
+	case listclustermetricname:
+		var input v3.ClusterMetricNamesInput
+		actionInput, err := parse.ReadBody(apiContext.Request)
+		if err != nil {
+			return err
+		}
+		if err = convert.ToObj(actionInput, &input); err != nil {
+			return err
+		}
 
-		var clusterName, projectName, appName, saNamespace string
-		var err error
-
-		if actionName == listclustermetricname {
-			var input v3.ClusterMetricNamesInput
-			actionInput, err := parse.ReadBody(apiContext.Request)
-			if err != nil {
-				return err
-			}
-			if err = convert.ToObj(actionInput, &input); err != nil {
-				return err
-			}
-
-			clusterName = input.ClusterName
-			if clusterName == "" {
-				return fmt.Errorf("clusterName is empty")
-			}
-
-			appName, saNamespace = monitorutil.ClusterMonitoringInfo()
-		} else {
-
-			var input v3.ProjectMetricNamesInput
-			actionInput, err := parse.ReadBody(apiContext.Request)
-			if err != nil {
-				return err
-			}
-			if err = convert.ToObj(actionInput, &input); err != nil {
-				return err
-			}
-
-			projectID := input.ProjectName
-			clusterName, projectName = ref.Parse(projectID)
-
-			if clusterName == "" {
-				return fmt.Errorf("clusterName is empty")
-			}
-
-			appName, saNamespace = monitorutil.ProjectMonitoringInfo(projectName)
+		clusterName := input.ClusterName
+		if clusterName == "" {
+			return fmt.Errorf("clusterName is empty")
 		}
 
 		userContext, err := h.clustermanager.UserContext(clusterName)
@@ -166,6 +142,7 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 			return fmt.Errorf("get usercontext failed, %v", err)
 		}
 
+		appName, saNamespace := monitorutil.ClusterMonitoringInfo()
 		token, err := getAuthToken(userContext, appName, saNamespace)
 		if err != nil {
 			return err
@@ -174,15 +151,78 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 		reqContext, cancel := context.WithTimeout(context.Background(), prometheusReqTimeout)
 		defer cancel()
 
-		prometheusQuery, err := NewPrometheusQuery(reqContext, userContext, clusterName, token, h.clustermanager, h.dialerFactory)
+		svcName, svcNamespace, _ := monitorutil.ClusterPrometheusEndpoint()
+		prometheusQuery, err := NewPrometheusQuery(reqContext, userContext, clusterName, token, svcNamespace, svcName, h.clustermanager, h.dialerFactory)
 		if err != nil {
 			return err
 		}
 
 		names, err := prometheusQuery.GetLabelValues("__name__")
 		if err != nil {
-			return fmt.Errorf("get metric list failed, %v", err)
+			return err
 		}
+		data := map[string]interface{}{
+			"type":  "metricNamesOutput",
+			"names": names,
+		}
+
+		apiContext.WriteResponse(http.StatusOK, data)
+	case listprojectmetricname:
+		// project metric names need to merge cluster level and project level prometheus labels name list
+		var input v3.ProjectMetricNamesInput
+		actionInput, err := parse.ReadBody(apiContext.Request)
+		if err != nil {
+			return err
+		}
+		if err = convert.ToObj(actionInput, &input); err != nil {
+			return err
+		}
+
+		projectID := input.ProjectName
+		clusterName, projectName := ref.Parse(projectID)
+
+		if clusterName == "" {
+			return fmt.Errorf("clusterName is empty")
+		}
+
+		userContext, err := h.clustermanager.UserContext(clusterName)
+		if err != nil {
+			return fmt.Errorf("get usercontext failed, %v", err)
+		}
+
+		appName, saNamespace := monitorutil.ProjectMonitoringInfo(projectName)
+		token, err := getAuthToken(userContext, appName, saNamespace)
+		if err != nil {
+			return err
+		}
+
+		reqContext, cancel := context.WithTimeout(context.Background(), prometheusReqTimeout)
+		defer cancel()
+
+		// get name list for user definded metric from project prometheus
+		projectSvcName, projectSvcNamespace := monitorutil.ProjectPrometheusServiceInfo(projectName)
+		projectPrometheusQuery, err := NewPrometheusQuery(reqContext, userContext, clusterName, token, projectSvcNamespace, projectSvcName, h.clustermanager, h.dialerFactory)
+		if err != nil {
+			return err
+		}
+		projectNames, err := projectPrometheusQuery.GetLabelValues("__name__")
+		if err != nil {
+			return fmt.Errorf("get project metric list failed, %v", err)
+		}
+
+		// get name list for pod/container metric from cluster prometheus
+		clusterSvcName, clusterSvcNamespace, _ := monitorutil.ClusterPrometheusEndpoint()
+		clusterPrometheusQuery, err := NewPrometheusQuery(reqContext, userContext, clusterName, token, clusterSvcNamespace, clusterSvcName, h.clustermanager, h.dialerFactory)
+		if err != nil {
+			return err
+		}
+
+		clusterNames, err := clusterPrometheusQuery.GetLabelValues("__name__")
+		if err != nil {
+			return fmt.Errorf("get cluster metric list failed, %v", err)
+		}
+
+		names := append(projectNames, clusterNames...)
 		data := map[string]interface{}{
 			"type":  "metricNamesOutput",
 			"names": names,

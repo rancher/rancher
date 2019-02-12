@@ -1,31 +1,28 @@
 package monitoring
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/controller"
+	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/settings"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
+	"github.com/rancher/types/apis/project.cattle.io/v3"
 	k8scorev1 "k8s.io/api/core/v1"
-	k8srbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type projectHandler struct {
-	ctx                  context.Context
-	clusterName          string
-	cattleClustersClient mgmtv3.ClusterInterface
-	cattleProjectsClient mgmtv3.ProjectInterface
-	projectGraph         mgmtv3.ProjectMonitorGraphInterface
-	app                  *appHandler
+	clusterName         string
+	cattleClusterClient mgmtv3.ClusterInterface
+	cattleProjectClient mgmtv3.ProjectInterface
+	app                 *appHandler
 }
 
 func (ph *projectHandler) sync(key string, project *mgmtv3.Project) (runtime.Object, error) {
@@ -34,34 +31,40 @@ func (ph *projectHandler) sync(key string, project *mgmtv3.Project) (runtime.Obj
 		return project, nil
 	}
 
-	_, err := ph.cattleClustersClient.Get(project.Spec.ClusterName, metav1.GetOptions{})
+	clusterID := project.Spec.ClusterName
+	cluster, err := ph.cattleClusterClient.Get(clusterID, metav1.GetOptions{})
 	if err != nil {
-		return project, errors.Wrapf(err, "failed to find Cluster %s", project.Spec.ClusterName)
+		return project, errors.Wrapf(err, "failed to find Cluster %s", clusterID)
+	}
+	if !cluster.Spec.EnableClusterMonitoring && project.Spec.EnableProjectMonitoring {
+		return project, &controller.ForgetError{
+			Err: errors.New("unable to operate Project Monitoring without enabling Cluster Monitoring"),
+		}
 	}
 
 	projectTag := getProjectTag(project)
 	src := project
 	cpy := src.DeepCopy()
 
-	err = ph.syncProjectMonitoring(cpy, ph.projectGraph)
+	err = ph.doSync(cpy, cluster.Spec.DisplayName)
 
 	if !reflect.DeepEqual(cpy, src) {
-		updated, updateErr := ph.cattleProjectsClient.Update(cpy)
+		updated, updateErr := ph.cattleProjectClient.Update(cpy)
 		if updateErr != nil {
-			return project, errors.Wrapf(updateErr, "failed to update Project %s in Cluster %s", projectTag, project.Spec.ClusterName)
+			return project, errors.Wrapf(updateErr, "failed to update Project %s", projectTag)
 		}
 
 		cpy = updated
 	}
 
 	if err != nil {
-		err = errors.Wrapf(err, "unable to sync Project %s in Cluster %s", projectTag, project.Spec.ClusterName)
+		err = errors.Wrapf(err, "unable to sync Project %s", projectTag)
 	}
 
 	return cpy, err
 }
 
-func (ph *projectHandler) syncProjectMonitoring(project *mgmtv3.Project, projectGraphClient mgmtv3.ProjectMonitorGraphInterface) error {
+func (ph *projectHandler) doSync(project *mgmtv3.Project, clusterName string) error {
 	if !mgmtv3.NamespaceBackedResource.IsTrue(project) && !mgmtv3.ProjectConditionInitialRolesPopulated.IsTrue(project) {
 		return nil
 	}
@@ -72,7 +75,7 @@ func (ph *projectHandler) syncProjectMonitoring(project *mgmtv3.Project, project
 			newObj := graph.DeepCopy()
 			newObj.Namespace = project.Name
 			newObj.Spec.ProjectName = projectName
-			if _, err := projectGraphClient.Create(newObj); err != nil && !apierrors.IsAlreadyExists(err) {
+			if _, err := ph.app.cattleProjectGraphClient.Create(newObj); err != nil && !apierrors.IsAlreadyExists(err) {
 				return project, err
 			}
 		}
@@ -86,27 +89,20 @@ func (ph *projectHandler) syncProjectMonitoring(project *mgmtv3.Project, project
 	appName, appTargetNamespace := monitoring.ProjectMonitoringInfo(project.Name)
 
 	if project.Spec.EnableProjectMonitoring {
-		appProjectName, err := ph.app.ensureProjectMonitoringProjectName(appTargetNamespace, project)
+		appProjectName, err := ph.ensureAppProjectName(appTargetNamespace, project)
 		if err != nil {
 			mgmtv3.ProjectConditionMonitoringEnabled.Unknown(project)
 			mgmtv3.ProjectConditionMonitoringEnabled.Message(project, err.Error())
 			return errors.Wrap(err, "failed to ensure monitoring project name")
 		}
 
-		deployServiceAccountName, err := ph.app.grantProjectMonitoringPermissions(appName, appTargetNamespace, project)
-		if err != nil {
-			mgmtv3.ProjectConditionMonitoringEnabled.Unknown(project)
-			mgmtv3.ProjectConditionMonitoringEnabled.Message(project, err.Error())
-			return errors.Wrap(err, "failed to grant monitoring permissions")
-		}
-
-		if err := ph.app.deployProjectMonitoringApp(appName, appTargetNamespace, deployServiceAccountName, appProjectName, project); err != nil {
+		if err := ph.deployApp(appName, appTargetNamespace, appProjectName, project, clusterName); err != nil {
 			mgmtv3.ProjectConditionMonitoringEnabled.Unknown(project)
 			mgmtv3.ProjectConditionMonitoringEnabled.Message(project, err.Error())
 			return errors.Wrap(err, "failed to deploy monitoring")
 		}
 
-		if err := ph.detectMonitoringComponentsWhileInstall(appName, appTargetNamespace, project); err != nil {
+		if err := ph.detectAppComponentsWhileInstall(appName, appTargetNamespace, project); err != nil {
 			mgmtv3.ProjectConditionMonitoringEnabled.Unknown(project)
 			mgmtv3.ProjectConditionMonitoringEnabled.Message(project, err.Error())
 			return errors.Wrap(err, "failed to detect the installation status of monitoring components")
@@ -121,19 +117,10 @@ func (ph *projectHandler) syncProjectMonitoring(project *mgmtv3.Project, project
 			return errors.Wrap(err, "failed to withdraw monitoring")
 		}
 
-		if err := ph.detectMonitoringComponentsWhileUninstall(appName, appTargetNamespace, project); err != nil {
+		if err := ph.detectAppComponentsWhileUninstall(appName, appTargetNamespace, project); err != nil {
 			mgmtv3.ProjectConditionMonitoringEnabled.Unknown(project)
 			mgmtv3.ProjectConditionMonitoringEnabled.Message(project, err.Error())
 			return errors.Wrap(err, "failed to detect the uninstallation status of monitoring components")
-		}
-
-		appServiceAccountName := appName
-		appClusterRoleName := fmt.Sprintf("%s-%s", appName, project.Name)
-		appClusterRoleBindingName := appClusterRoleName + "-binding"
-		if err := ph.app.revokePermissions(appServiceAccountName, appClusterRoleName, appClusterRoleBindingName, appTargetNamespace); err != nil {
-			mgmtv3.ProjectConditionMonitoringEnabled.Unknown(project)
-			mgmtv3.ProjectConditionMonitoringEnabled.Message(project, err.Error())
-			return errors.Wrap(err, "failed to revoke monitoring permissions")
 		}
 
 		mgmtv3.ProjectConditionMonitoringEnabled.False(project)
@@ -143,33 +130,8 @@ func (ph *projectHandler) syncProjectMonitoring(project *mgmtv3.Project, project
 	return nil
 }
 
-func (ph *projectHandler) detectMonitoringComponentsWhileInstall(appName, appTargetNamespace string, project *mgmtv3.Project) error {
-	time.Sleep(5 * time.Second)
-
-	if project.Status.MonitoringStatus == nil {
-		project.Status.MonitoringStatus = &mgmtv3.MonitoringStatus{
-			Conditions: []mgmtv3.MonitoringCondition{
-				{Type: mgmtv3.ClusterConditionType(ConditionGrafanaDeployed), Status: k8scorev1.ConditionFalse},
-			},
-		}
-	}
-
-	return isGrafanaDeployed(ph.app.agentWorkloadsClient, appTargetNamespace, appName, project.Status.MonitoringStatus, project.Spec.ClusterName)
-}
-
-func (ph *projectHandler) detectMonitoringComponentsWhileUninstall(appName, appTargetNamespace string, project *mgmtv3.Project) error {
-	if project.Status.MonitoringStatus == nil {
-		return nil
-	}
-
-	time.Sleep(5 * time.Second)
-
-	return isGrafanaWithdrew(ph.app.agentWorkloadsClient, appTargetNamespace, appName, project.Status.MonitoringStatus)
-}
-
-func (ah *appHandler) ensureProjectMonitoringProjectName(appTargetNamespace string, project *mgmtv3.Project) (string, error) {
-	agentNamespacesClient := ah.agentCoreClient.Namespaces(metav1.NamespaceAll)
-	appProjectName, err := monitoring.EnsureAppProjectName(agentNamespacesClient, project.Name, project.Spec.ClusterName, appTargetNamespace)
+func (ph *projectHandler) ensureAppProjectName(appTargetNamespace string, project *mgmtv3.Project) (string, error) {
+	appProjectName, err := monitoring.EnsureAppProjectName(ph.app.agentNamespaceClient, project.Name, project.Spec.ClusterName, appTargetNamespace)
 	if err != nil {
 		return "", err
 	}
@@ -177,106 +139,84 @@ func (ah *appHandler) ensureProjectMonitoringProjectName(appTargetNamespace stri
 	return appProjectName, nil
 }
 
-func (ah *appHandler) grantProjectMonitoringPermissions(appName, appTargetNamespace string, project *mgmtv3.Project) (string, error) {
-	appServiceAccountName := appName
-	appClusterRoleName := fmt.Sprintf("%s-%s", appName, project.Name)
-	appClusterRoleBindingName := appClusterRoleName + "-binding"
+func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProjectName string, project *mgmtv3.Project, clusterName string) error {
+	appDeployProjectID := project.Name
+	clusterPrometheusSvcName, clusterPrometheusSvcNamespaces, clusterPrometheusPort := monitoring.ClusterPrometheusEndpoint()
+	clusterAlertManagerSvcName, clusterAlertManagerSvcNamespaces, clusterAlertManagerPort := monitoring.ClusterAlertManagerEndpoint()
 
-	err := stream(
-		// detect ServiceAccount (the name as same as App)
-		func() error {
-			appServiceAccount, err := ah.agentCoreClient.ServiceAccounts(appTargetNamespace).Get(appServiceAccountName, metav1.GetOptions{})
-			if err != nil && !k8serrors.IsNotFound(err) {
-				return errors.Wrapf(err, "failed to query %q ServiceAccount in %q Namespace", appServiceAccountName, appTargetNamespace)
-			}
-			if appServiceAccount.Name == appServiceAccountName {
-				if appServiceAccount.DeletionTimestamp != nil {
-					return fmt.Errorf("stale %q ServiceAccount in %q Namespace is still on terminating", appServiceAccountName, appTargetNamespace)
-				}
-			} else {
-				appServiceAccount = &k8scorev1.ServiceAccount{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      appServiceAccountName,
-						Namespace: appTargetNamespace,
-						Labels:    monitoring.OwnedLabels(appName, appTargetNamespace, monitoring.ProjectLevel),
-					},
-				}
+	optionalAppAnswers := map[string]string{
+		"grafana.persistence.enabled": "false",
 
-				if _, err := ah.agentCoreClient.ServiceAccounts(appTargetNamespace).Create(appServiceAccount); err != nil && !k8serrors.IsAlreadyExists(err) {
-					return errors.Wrapf(err, "failed to create %q ServiceAccount in %q Namespace", appServiceAccountName, appTargetNamespace)
-				}
-			}
-
-			return nil
-		},
-
-		// detect ClusterRoleBinding (the name is ${ServiceAccountName}-binding)
-		func() error {
-			appClusterRoleBinding, err := ah.agentRBACClient.ClusterRoleBindings(metav1.NamespaceAll).Get(appClusterRoleBindingName, metav1.GetOptions{})
-			if err != nil && !k8serrors.IsNotFound(err) {
-				return errors.Wrapf(err, "failed to query %q ClusterRoleBinding", appClusterRoleBindingName)
-			}
-			if appClusterRoleBinding.Name == appClusterRoleBindingName {
-				if appClusterRoleBinding.DeletionTimestamp != nil {
-					return fmt.Errorf("stale %q ClusterRoleBinding is still on terminating", appClusterRoleBindingName)
-				}
-			} else {
-				appClusterRoleBinding = &k8srbacv1.ClusterRoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:   appClusterRoleBindingName,
-						Labels: monitoring.OwnedLabels(appName, appTargetNamespace, monitoring.ProjectLevel),
-					},
-					Subjects: []k8srbacv1.Subject{
-						{
-							Kind:      k8srbacv1.ServiceAccountKind,
-							Namespace: appTargetNamespace,
-							Name:      appServiceAccountName,
-						},
-					},
-					RoleRef: k8srbacv1.RoleRef{
-						APIGroup: k8srbacv1.GroupName,
-						Kind:     "ClusterRole",
-						Name:     project.Name + "-namespaces-edit",
-					},
-				}
-
-				if _, err := ah.agentRBACClient.ClusterRoleBindings(metav1.NamespaceAll).Create(appClusterRoleBinding); err != nil && !k8serrors.IsAlreadyExists(err) {
-					return errors.Wrapf(err, "failed to create %q ClusterRoleBinding", appClusterRoleBindingName)
-				}
-			}
-
-			return nil
-		},
-	)
-	if err != nil {
-		return "", err
+		"prometheus.persistence.enabled": "false",
 	}
 
-	return appServiceAccountName, nil
-}
+	mustAppAnswers := map[string]string{
+		"enabled": "false",
 
-func (ah *appHandler) deployProjectMonitoringApp(appName, appTargetNamespace string, appServiceAccountName, appProjectName string, project *mgmtv3.Project) error {
-	clusterPrometheusSvcName, clusterPrometheusSvcNamespace, clusterPrometheusPort := monitoring.ClusterPrometheusEndpoint()
-	appAnswers := map[string]string{
-		"grafana.enabled":                 "true",
-		"grafana.apiGroup":                monitoring.APIVersion.Group,
-		"grafana.serviceAccountName":      appServiceAccountName,
-		"grafana.persistence.enabled":     "false",
-		"grafana.level":                   "project",
-		"grafana.prometheusDatasourceURL": fmt.Sprintf("http://%s.%s:%s", clusterPrometheusSvcName, clusterPrometheusSvcNamespace, clusterPrometheusPort),
+		"exporter-coredns.enabled": "false",
+
+		"exporter-kube-controller-manager.enabled": "false",
+
+		"exporter-kube-dns.enabled": "false",
+
+		"exporter-kube-scheduler.enabled": "false",
+
+		"exporter-kube-state.enabled": "false",
+
+		"exporter-kubelets.enabled": "false",
+
+		"exporter-kubernetes.enabled": "false",
+
+		"exporter-node.enabled": "false",
+
+		"exporter-fluentd.enabled": "false",
+
+		"grafana.enabled":            "true",
+		"grafana.level":              "project",
+		"grafana.apiGroup":           monitoring.APIVersion.Group,
+		"grafana.serviceAccountName": appName,
+
+		"prometheus.enabled":                                                                "true",
+		"prometheus.externalLabels.prometheus_from":                                         clusterName,
+		"prometheus.level":                                                                  "project",
+		"prometheus.apiGroup":                                                               monitoring.APIVersion.Group,
+		"prometheus.serviceAccountNameOverride":                                             appName,
+		"prometheus.additionalBindingClusterRoles[0]":                                       fmt.Sprintf("%s-namespaces-readonly", appDeployProjectID),
+		"prometheus.remoteRead[0].url":                                                      fmt.Sprintf("http://%s.%s:%s/api/v1/read", clusterPrometheusSvcName, clusterPrometheusSvcNamespaces, clusterPrometheusPort),
+		"prometheus.remoteRead[0].bearerTokenFile":                                          "/var/run/secrets/kubernetes.io/serviceaccount/token",
+		"prometheus.additionalAlertManagerConfigs[0].static_configs[0].targets[0]":          fmt.Sprintf("%s.%s:%s", clusterAlertManagerSvcName, clusterAlertManagerSvcNamespaces, clusterAlertManagerPort),
+		"prometheus.additionalAlertManagerConfigs[0].static_configs[0].labels.level":        "project",
+		"prometheus.additionalAlertManagerConfigs[0].static_configs[0].labels.project_id":   project.Name,
+		"prometheus.additionalAlertManagerConfigs[0].static_configs[0].labels.project_name": project.Spec.DisplayName,
+		"prometheus.additionalAlertManagerConfigs[0].static_configs[0].labels.cluster_id":   project.Spec.ClusterName,
+		"prometheus.additionalAlertManagerConfigs[0].static_configs[0].labels.cluster_name": clusterName,
+		"prometheus.serviceMonitorNamespaceSelector.matchExpressions[0].key":                nslabels.ProjectIDFieldLabel,
+		"prometheus.serviceMonitorNamespaceSelector.matchExpressions[0].operator":           "In",
+		"prometheus.serviceMonitorNamespaceSelector.matchExpressions[0].values[0]":          appDeployProjectID,
+		"prometheus.ruleNamespaceSelector.matchExpressions[0].key":                          nslabels.ProjectIDFieldLabel,
+		"prometheus.ruleNamespaceSelector.matchExpressions[0].operator":                     "In",
+		"prometheus.ruleNamespaceSelector.matchExpressions[0].values[0]":                    appDeployProjectID,
+		"prometheus.ruleSelector.matchExpressions[0].key":                                   monitoring.CattlePrometheusRuleLabelKey,
+		"prometheus.ruleSelector.matchExpressions[0].operator":                              "In",
+		"prometheus.ruleSelector.matchExpressions[0].values[0]":                             monitoring.CattleAlertingPrometheusRuleLabelValue,
 	}
-	appAnswers = monitoring.OverwriteAppAnswers(appAnswers, project.Annotations)
+
+	appAnswers := monitoring.OverwriteAppAnswers(optionalAppAnswers, project.Annotations)
+
+	// cannot overwrite mustAppAnswers
+	for mustKey, mustVal := range mustAppAnswers {
+		appAnswers[mustKey] = mustVal
+	}
 
 	appCatalogID := settings.SystemMonitoringCatalogID.Get()
-	appDeployProjectID := project.Name
-	app := &projectv3.App{
+	app := &v3.App{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: monitoring.CopyCreatorID(nil, project.Annotations),
-			Labels:      monitoring.OwnedLabels(appName, appTargetNamespace, monitoring.ProjectLevel),
+			Labels:      monitoring.OwnedLabels(appName, appTargetNamespace, appProjectName, monitoring.ProjectLevel),
 			Name:        appName,
 			Namespace:   appDeployProjectID,
 		},
-		Spec: projectv3.AppSpec{
+		Spec: v3.AppSpec{
 			Answers:         appAnswers,
 			Description:     "Rancher Project Monitoring",
 			ExternalID:      appCatalogID,
@@ -285,7 +225,7 @@ func (ah *appHandler) deployProjectMonitoringApp(appName, appTargetNamespace str
 		},
 	}
 
-	err := monitoring.DeployApp(ah.cattleAppsGetter, appDeployProjectID, app)
+	err := monitoring.DeployApp(ph.app.cattleAppClient, appDeployProjectID, app)
 	if err != nil {
 		return err
 	}
@@ -293,6 +233,71 @@ func (ah *appHandler) deployProjectMonitoringApp(appName, appTargetNamespace str
 	return nil
 }
 
+func (ph *projectHandler) detectAppComponentsWhileInstall(appName, appTargetNamespace string, project *mgmtv3.Project) error {
+	if project.Status.MonitoringStatus == nil {
+		project.Status.MonitoringStatus = &mgmtv3.MonitoringStatus{
+			Conditions: []mgmtv3.MonitoringCondition{
+				{Type: mgmtv3.ClusterConditionType(ConditionPrometheusDeployed), Status: k8scorev1.ConditionFalse},
+				{Type: mgmtv3.ClusterConditionType(ConditionGrafanaDeployed), Status: k8scorev1.ConditionFalse},
+			},
+		}
+	}
+	monitoringStatus := project.Status.MonitoringStatus
+
+	checkers := make([]func() error, 0, len(monitoringStatus.Conditions))
+	if !ConditionGrafanaDeployed.IsTrue(monitoringStatus) {
+		checkers = append(checkers, func() error {
+			return isGrafanaDeployed(ph.app.agentDeploymentClient, appTargetNamespace, appName, monitoringStatus, project.Spec.ClusterName)
+		})
+	}
+	if !ConditionPrometheusDeployed.IsTrue(monitoringStatus) {
+		checkers = append(checkers, func() error {
+			return isPrometheusDeployed(ph.app.agentStatefulSetClient, appTargetNamespace, appName, monitoringStatus)
+		})
+	}
+
+	if len(checkers) == 0 {
+		return nil
+	}
+
+	err := stream(checkers...)
+	if err != nil {
+		time.Sleep(5 * time.Second)
+	}
+
+	return err
+}
+
+func (ph *projectHandler) detectAppComponentsWhileUninstall(appName, appTargetNamespace string, project *mgmtv3.Project) error {
+	if project.Status.MonitoringStatus == nil {
+		return nil
+	}
+	monitoringStatus := project.Status.MonitoringStatus
+
+	checkers := make([]func() error, 0, len(monitoringStatus.Conditions))
+	if !ConditionGrafanaDeployed.IsFalse(monitoringStatus) {
+		checkers = append(checkers, func() error {
+			return isGrafanaWithdrew(ph.app.agentDeploymentClient, appTargetNamespace, appName, monitoringStatus)
+		})
+	}
+	if !ConditionPrometheusDeployed.IsFalse(monitoringStatus) {
+		checkers = append(checkers, func() error {
+			return isPrometheusWithdrew(ph.app.agentStatefulSetClient, appTargetNamespace, appName, monitoringStatus)
+		})
+	}
+
+	if len(checkers) == 0 {
+		return nil
+	}
+
+	err := stream(checkers...)
+	if err != nil {
+		time.Sleep(5 * time.Second)
+	}
+
+	return err
+}
+
 func getProjectTag(project *mgmtv3.Project) string {
-	return fmt.Sprintf("%s(%s)", project.Spec.DisplayName, project.Name)
+	return fmt.Sprintf("%s(%s)_%s", project.Name, project.Spec.DisplayName, project.Spec.ClusterName)
 }

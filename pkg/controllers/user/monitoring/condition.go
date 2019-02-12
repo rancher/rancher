@@ -16,6 +16,27 @@ var temfileRegexp = regexp.MustCompile("/tmp/[-_a-zA-Z0-9]+")
 
 type condition ncondition.Cond
 
+func (c condition) Del(obj *mgmtv3.MonitoringStatus) {
+	condIdx := findCond(obj, mgmtv3.ClusterConditionType(c))
+	if condIdx == nil {
+		return
+	}
+
+	obj.Conditions = append(obj.Conditions[:*condIdx], obj.Conditions[*condIdx+1:]...)
+}
+
+func (c condition) Add(obj *mgmtv3.MonitoringStatus) {
+	condIdx := findCond(obj, mgmtv3.ClusterConditionType(c))
+	if condIdx != nil {
+		return
+	}
+
+	obj.Conditions = append(obj.Conditions, mgmtv3.MonitoringCondition{
+		Type:   mgmtv3.ClusterConditionType(c),
+		Status: corev1.ConditionFalse,
+	})
+}
+
 func (c condition) True(obj *mgmtv3.MonitoringStatus) {
 	setStatus(obj, mgmtv3.ClusterConditionType(c), corev1.ConditionTrue)
 }

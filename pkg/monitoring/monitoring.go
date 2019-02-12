@@ -7,25 +7,24 @@ import (
 	"strings"
 
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/ref"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type Level string
+type AppLevel string
 
 const (
-	SystemLevel  Level = "system"
-	ClusterLevel Level = "cluster"
-	ProjectLevel Level = "project"
+	SystemLevel  AppLevel = "system"
+	ClusterLevel AppLevel = "cluster"
+	ProjectLevel AppLevel = "project"
 )
 
 const (
-	cattleNamespaceName                              = "cattle-prometheus"
-	cattleCreatorIDAnnotationKey                     = "field.cattle.io/creatorId"
-	cattleOverwriteMonitoringAppAnswersAnnotationKey = "field.cattle.io/overwriteMonitoringAppAnswers"
-	clusterAppName                                   = "cluster-monitoring"
-	projectAppName                                   = "project-monitoring"
+	cattleNamespaceName                    = "cattle-prometheus"
+	cattleCreatorIDAnnotationKey           = "field.cattle.io/creatorId"
+	cattleOverwriteAppAnswersAnnotationKey = "field.cattle.io/overwriteAppAnswers"
 )
 
 const (
@@ -35,19 +34,24 @@ const (
 	// The label info of App, RoleBinding
 	appNameLabelKey            = cattleMonitoringLabelKey + "/appName"
 	appTargetNamespaceLabelKey = cattleMonitoringLabelKey + "/appTargetNamespace"
-	levelLabelKey              = cattleMonitoringLabelKey + "/level"
+	appProjectIDLabelKey       = cattleMonitoringLabelKey + "/projectID"
+	appClusterIDLabelKey       = cattleMonitoringLabelKey + "/clusterID"
+	appLevelLabelKey           = cattleMonitoringLabelKey + "/level"
 
 	// The names of App
-	systemAppName       = "system-monitor"
-	alertManagerAppName = "cluster-alerting"
+	systemLevelAppName              = "monitoring-operator"
+	clusterLevelAppName             = "cluster-monitoring"
+	projectLevelAppName             = "project-monitoring"
+	clusterLevelAlertManagerAppName = "cluster-alerting"
 
 	// The headless service name of Prometheus
-	alertmanagerHeadlessServiceName = "alertmanager-operated"
+	alertManagerHeadlessServiceName = "alertmanager-operated"
 	prometheusHeadlessServiceName   = "prometheus-operated"
 
 	//CattlePrometheusRuleLabelKey The label info of PrometheusRule
-	CattlePrometheusRuleLabelKey           = "source"
-	CattleAlertingPrometheusRuleLabelValue = "rancher-alert"
+	CattlePrometheusRuleLabelKey             = "source"
+	CattleAlertingPrometheusRuleLabelValue   = "rancher-alert"
+	CattleMonitoringPrometheusRuleLabelValue = "rancher-monitoring"
 )
 
 var (
@@ -86,38 +90,46 @@ func AppendAppOverwritingAnswers(toAnnotations map[string]string, appOverwriteAn
 			toAnnotations = make(map[string]string, 2)
 		}
 
-		toAnnotations[cattleOverwriteMonitoringAppAnswersAnnotationKey] = appOverwriteAnswers
+		toAnnotations[cattleOverwriteAppAnswersAnnotationKey] = appOverwriteAnswers
 	}
 
 	return toAnnotations
 }
 
-func OwnedLabels(appName, appTargetNamespace string, level Level) map[string]string {
+func OwnedLabels(appName, appTargetNamespace, appProjectName string, level AppLevel) map[string]string {
+	clusterID, projectID := ref.Parse(appProjectName)
+
 	return map[string]string{
 		appNameLabelKey:            appName,
 		appTargetNamespaceLabelKey: appTargetNamespace,
-		levelLabelKey:              string(level),
+		appProjectIDLabelKey:       projectID,
+		appClusterIDLabelKey:       clusterID,
+		appLevelLabelKey:           string(level),
 	}
 }
 
 func SystemMonitoringInfo() (appName, appTargetNamespace string) {
-	return systemAppName, cattleNamespaceName
+	return systemLevelAppName, cattleNamespaceName
 }
 
 func ClusterMonitoringInfo() (appName, appTargetNamespace string) {
-	return clusterAppName, cattleNamespaceName
+	return clusterLevelAppName, cattleNamespaceName
 }
 
 func ClusterAlertManagerInfo() (appName, appTargetNamespace string) {
-	return alertManagerAppName, cattleNamespaceName
+	return clusterLevelAlertManagerAppName, cattleNamespaceName
 }
 
 func ProjectMonitoringInfo(projectName string) (appName, appTargetNamespace string) {
-	return projectAppName, fmt.Sprintf("%s-%s", cattleNamespaceName, projectName)
+	return projectLevelAppName, fmt.Sprintf("%s-%s", cattleNamespaceName, projectName)
+}
+
+func ProjectPrometheusServiceInfo(projectName string) (headlessServiceName, namespace string) {
+	return prometheusHeadlessServiceName, fmt.Sprintf("%s-%s", cattleNamespaceName, projectName)
 }
 
 func ClusterAlertManagerEndpoint() (headlessServiceName, namespace, port string) {
-	return alertmanagerHeadlessServiceName, cattleNamespaceName, "9093"
+	return alertManagerHeadlessServiceName, cattleNamespaceName, "9093"
 }
 
 func ClusterPrometheusEndpoint() (headlessServiceName, namespace, port string) {
@@ -169,7 +181,7 @@ grafana.persistence.size             	| 50Gi
 */
 func OverwriteAppAnswers(rawAnswers map[string]string, annotations map[string]string) map[string]string {
 	overwriteAnswers := func() map[string]string {
-		overwritingAppAnswers := annotations[cattleOverwriteMonitoringAppAnswersAnnotationKey]
+		overwritingAppAnswers := annotations[cattleOverwriteAppAnswersAnnotationKey]
 		if len(overwritingAppAnswers) != 0 {
 			var appOverwriteInput mgmtv3.MonitoringInput
 			err := json.Unmarshal([]byte(overwritingAppAnswers), &appOverwriteInput)

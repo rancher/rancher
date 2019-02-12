@@ -9,7 +9,6 @@ import (
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
-	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -27,9 +26,8 @@ var (
 	defaultFrom        = "now-" + defaultQueryDuring
 )
 
-func getPrometheusEndpoint(userContext *config.UserContext) (string, error) {
-	appName, appNamespace, _ := monitoring.ClusterPrometheusEndpoint()
-	svc, err := userContext.Core.Services("").Controller().Lister().Get(appNamespace, appName)
+func getPrometheusEndpoint(userContext *config.UserContext, namespace, name string) (string, error) {
+	svc, err := userContext.Core.Services("").Controller().Lister().Get(namespace, name)
 	if err != nil {
 		return "", fmt.Errorf("Failed to get service for prometheus-server %v", err)
 	}
@@ -92,7 +90,7 @@ func newProjectGraphInputParser(input v3.QueryGraphInput) *projectGraphInputPars
 
 type projectGraphInputParser struct {
 	Input       *v3.QueryGraphInput
-	ProjectName string
+	ProjectID   string
 	ClusterName string
 	Start       time.Time
 	End         time.Time
@@ -118,12 +116,12 @@ func (p *projectGraphInputParser) parseFilter() error {
 		return fmt.Errorf("must have projectId filter")
 	}
 
-	p.ProjectName = p.Input.Filters["projectId"]
-	if p.ProjectName == "" {
-		return fmt.Errorf("projectName is empty")
+	p.ProjectID = p.Input.Filters["projectId"]
+	if p.ProjectID == "" {
+		return fmt.Errorf("projectId is empty")
 	}
 
-	if p.ClusterName, _ = ref.Parse(p.ProjectName); p.ClusterName == "" {
+	if p.ClusterName, _ = ref.Parse(p.ProjectID); p.ClusterName == "" {
 		return fmt.Errorf("clusterName is empty")
 	}
 
@@ -135,15 +133,15 @@ func (p *projectGraphInputParser) parseFilter() error {
 }
 
 type authChecker struct {
-	ProjectName        string
+	ProjectID          string
 	Input              *v3.QueryGraphInput
 	UserContext        *config.UserContext
 	WorkloadController workload.CommonController
 }
 
-func newAuthChecker(ctx context.Context, userContext *config.UserContext, input *v3.QueryGraphInput, projectName string) *authChecker {
+func newAuthChecker(ctx context.Context, userContext *config.UserContext, input *v3.QueryGraphInput, projectID string) *authChecker {
 	return &authChecker{
-		ProjectName:        projectName,
+		ProjectID:          projectID,
 		Input:              input,
 		UserContext:        userContext,
 		WorkloadController: workload.NewWorkloadController(ctx, userContext.UserOnlyContext(), nil),
@@ -176,7 +174,7 @@ func (a *authChecker) isAuthorizeNamespace() bool {
 		logrus.Errorf("get namespace %s info failed, %v", a.Input.MetricParams["namespace"], err)
 		return false
 	}
-	return ns.Annotations[projectIDAnn] == a.ProjectName
+	return ns.Annotations[projectIDAnn] == a.ProjectID
 }
 
 func (a *authChecker) getAuthroizeNamespace() (string, error) {
@@ -186,7 +184,7 @@ func (a *authChecker) getAuthroizeNamespace() (string, error) {
 	}
 	var authNs []string
 	for _, v := range nss.Items {
-		if v.Annotations[projectIDAnn] == a.ProjectName {
+		if v.Annotations[projectIDAnn] == a.ProjectID {
 			authNs = append(authNs, v.Name)
 		}
 	}
