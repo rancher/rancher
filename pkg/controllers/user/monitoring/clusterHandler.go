@@ -247,14 +247,6 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 	clusterAlertManagerSvcName, clusterAlertManagerSvcNamespaces, clusterAlertManagerPort := monitoring.ClusterAlertManagerEndpoint()
 
 	optionalAppAnswers := map[string]string{
-		"exporter-coredns.enabled": "true",
-
-		"exporter-kube-controller-manager.enabled": "true",
-
-		"exporter-kube-dns.enabled": "true",
-
-		"exporter-kube-scheduler.enabled": "true",
-
 		"exporter-kube-state.enabled": "true",
 
 		"exporter-kubelets.enabled": "true",
@@ -273,14 +265,19 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 	mustAppAnswers := map[string]string{
 		"enabled": "false",
 
+		"exporter-coredns.enabled":  "false",
 		"exporter-coredns.apiGroup": monitoring.APIVersion.Group,
 
+		"exporter-kube-controller-manager.enabled":  "false",
 		"exporter-kube-controller-manager.apiGroup": monitoring.APIVersion.Group,
 
+		"exporter-kube-dns.enabled":  "false",
 		"exporter-kube-dns.apiGroup": monitoring.APIVersion.Group,
 
+		"exporter-kube-etcd.enabled":  "false",
 		"exporter-kube-etcd.apiGroup": monitoring.APIVersion.Group,
 
+		"exporter-kube-scheduler.enabled":  "false",
 		"exporter-kube-scheduler.apiGroup": monitoring.APIVersion.Group,
 
 		"exporter-kube-state.apiGroup": monitoring.APIVersion.Group,
