@@ -688,5 +688,13 @@ func (p *Provisioner) restoreClusterBackup(cluster *v3.Cluster, spec v3.ClusterS
 	if backup.ClusterID != cluster.Name {
 		return "", "", "", fmt.Errorf("snapshot [%s] is not a backup of cluster [%s]", backup.Name, cluster.Name)
 	}
-	return p.driverRestore(cluster, spec)
+	api, token, cert, restoreErr := p.driverRestore(cluster, spec)
+	// rmeove the restore flag, to avoid getting stuck in this state
+	if restoreErr != nil {
+		cluster.Spec.RancherKubernetesEngineConfig.Restore.Restore = false
+		if _, err := p.Clusters.Update(cluster); err != nil {
+			logrus.Warnf("failed to update cluster object: %v", err)
+		}
+	}
+	return api, token, cert, restoreErr
 }
