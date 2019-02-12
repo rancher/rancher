@@ -153,6 +153,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	RoleTemplate(schemas, apiContext)
 	MultiClusterApps(schemas, apiContext)
 	GlobalDNSs(schemas, apiContext)
+	GlobalDNSProviders(schemas, apiContext)
 	Monitor(schemas, apiContext, clusterManager)
 	KontainerDriver(schemas, apiContext)
 
@@ -644,4 +645,13 @@ func GlobalDNSs(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.ActionHandler = gdns.ActionHandler
 	schema.Validator = gdns.Validator
 	schema.Store = globaldnsAPIStore.Wrap(schema.Store)
+}
+
+func GlobalDNSProviders(schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.GlobalDNSProviderType)
+	schema.Store = &globalresource.GlobalNamespaceStore{
+		Store:              schema.Store,
+		NamespaceInterface: management.Core.Namespaces(""),
+	}
+	schema.Store = globaldnsAPIStore.ProviderWrap(schema.Store)
 }
