@@ -2,7 +2,7 @@ package generator
 
 var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
 
-{{- if eq .clusterTarget.ExcludeSystemComponent false }}
+{{- if eq .clusterTarget.IncludeSystemComponent true }}
 <source>
   @type  tail
   path  /var/lib/rancher/rke/log/*.log
@@ -79,7 +79,7 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
   </metric>
 </filter>
 
-{{- if eq .clusterTarget.ExcludeSystemComponent true }}
+{{- if eq .clusterTarget.IncludeSystemComponent false }}
 <filter cluster.**>
   @type grep
   <exclude>
@@ -91,7 +91,7 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
 
 {{- if eq .clusterTarget.CurrentTarget "syslog"}}
 {{- if .clusterTarget.SyslogConfig.Token}}
-<filter  cluster.** cluster-custom.** {{ if eq .clusterTarget.ExcludeSystemComponent false }}rke.**{{end }} >
+<filter  cluster.** cluster-custom.** {{ if eq .clusterTarget.IncludeSystemComponent true }}rke.**{{end }} >
   @type record_transformer
   <record>
     tag ${tag} {{.clusterTarget.SyslogConfig.Token}}
@@ -100,7 +100,7 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
 {{end }}
 {{end }}
 
-<match  cluster.** cluster-custom.** {{ if eq .clusterTarget.ExcludeSystemComponent false }}rke.**{{end }} > 
+<match  cluster.** cluster-custom.** {{ if eq .clusterTarget.IncludeSystemComponent true }}rke.**{{end }} > 
   @type copy
   <store>
     {{- if or (eq .clusterTarget.CurrentTarget "elasticsearch") (eq .clusterTarget.CurrentTarget "splunk") (eq .clusterTarget.CurrentTarget "syslog") (eq .clusterTarget.CurrentTarget "kafka") (eq .clusterTarget.CurrentTarget "fluentforwarder")}}

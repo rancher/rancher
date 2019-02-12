@@ -25,7 +25,7 @@ type ClusterLoggingTemplateWrap struct {
 	v3.LoggingCommonField
 	LoggingTargetTemplateWrap
 	ExcludeNamespace       string
-	ExcludeSystemComponent bool
+	IncludeSystemComponent bool
 }
 
 type ProjectLoggingTemplateWrap struct {
@@ -51,7 +51,7 @@ func NewWrapClusterLogging(logging v3.ClusterLoggingSpec, excludeNamespace strin
 		LoggingCommonField:        logging.LoggingCommonField,
 		LoggingTargetTemplateWrap: *wrap,
 		ExcludeNamespace:          excludeNamespace,
-		ExcludeSystemComponent:    logging.ExcludeSystemComponent,
+		IncludeSystemComponent:    *logging.IncludeSystemComponent,
 	}, nil
 }
 
