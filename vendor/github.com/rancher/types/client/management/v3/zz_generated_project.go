@@ -74,11 +74,15 @@ type ProjectOperations interface {
 
 	ActionDisableMonitoring(resource *Project) error
 
+	ActionEditMonitoring(resource *Project, input *MonitoringInput) error
+
 	ActionEnableMonitoring(resource *Project, input *MonitoringInput) error
 
 	ActionExportYaml(resource *Project) error
 
 	ActionSetpodsecuritypolicytemplate(resource *Project, input *SetPodSecurityPolicyTemplateInput) (*Project, error)
+
+	ActionViewMonitoring(resource *Project) (*MonitoringOutput, error)
 }
 
 func newProjectClient(apiClient *Client) *ProjectClient {
@@ -137,6 +141,11 @@ func (c *ProjectClient) ActionDisableMonitoring(resource *Project) error {
 	return err
 }
 
+func (c *ProjectClient) ActionEditMonitoring(resource *Project, input *MonitoringInput) error {
+	err := c.apiClient.Ops.DoAction(ProjectType, "editMonitoring", &resource.Resource, input, nil)
+	return err
+}
+
 func (c *ProjectClient) ActionEnableMonitoring(resource *Project, input *MonitoringInput) error {
 	err := c.apiClient.Ops.DoAction(ProjectType, "enableMonitoring", &resource.Resource, input, nil)
 	return err
@@ -150,5 +159,11 @@ func (c *ProjectClient) ActionExportYaml(resource *Project) error {
 func (c *ProjectClient) ActionSetpodsecuritypolicytemplate(resource *Project, input *SetPodSecurityPolicyTemplateInput) (*Project, error) {
 	resp := &Project{}
 	err := c.apiClient.Ops.DoAction(ProjectType, "setpodsecuritypolicytemplate", &resource.Resource, input, resp)
+	return resp, err
+}
+
+func (c *ProjectClient) ActionViewMonitoring(resource *Project) (*MonitoringOutput, error) {
+	resp := &MonitoringOutput{}
+	err := c.apiClient.Ops.DoAction(ProjectType, "viewMonitoring", &resource.Resource, nil, resp)
 	return resp, err
 }
