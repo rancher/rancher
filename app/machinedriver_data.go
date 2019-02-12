@@ -11,8 +11,9 @@ import (
 )
 
 var driverData = map[string]map[string][]string{
-	"amazonec2": {"cred": []string{"accessKey"}},
-	"azure":     {"cred": []string{"clientId"}},
+	"amazonec2":     {"cred": []string{"accessKey"}},
+	"azure":         {"cred": []string{"clientId", "subscriptionId"}},
+	"vmwarevsphere": {"cred": []string{"username", "vcenter", "vcenterPort"}},
 }
 
 type machineDriverCompare struct {
