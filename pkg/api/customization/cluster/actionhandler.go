@@ -66,6 +66,11 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 		return a.ExportYamlHandler(actionName, action, apiContext)
 	case "viewMonitoring":
 		return a.viewMonitoring(actionName, action, apiContext)
+	case "editMonitoring":
+		if !canUpdateCluster() {
+			return httperror.NewAPIError(httperror.Unauthorized, "can not access")
+		}
+		return a.editMonitoring(actionName, action, apiContext)
 	case "enableMonitoring":
 		if !canUpdateCluster() {
 			return httperror.NewAPIError(httperror.Unauthorized, "can not access")
@@ -297,6 +302,40 @@ func (a ActionHandler) viewMonitoring(actionName string, action *types.Action, a
 		"answers": answers,
 		"type":    "monitoringOutput",
 	})
+	return nil
+}
+
+func (a ActionHandler) editMonitoring(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	cluster, err := a.ClusterClient.Get(apiContext.ID, metav1.GetOptions{})
+	if err != nil {
+		return httperror.WrapAPIError(err, httperror.NotFound, "none existent Cluster")
+	}
+	if cluster.DeletionTimestamp != nil {
+		return httperror.NewAPIError(httperror.InvalidType, "deleting Cluster")
+	}
+
+	if !cluster.Spec.EnableClusterMonitoring {
+		return httperror.NewAPIError(httperror.InvalidState, "disabling Monitoring")
+	}
+
+	data, err := ioutil.ReadAll(apiContext.Request.Body)
+	if err != nil {
+		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "unable to read request content")
+	}
+	var input v3.MonitoringInput
+	if err = json.Unmarshal(data, &input); err != nil {
+		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "failed to parse request content")
+	}
+
+	cluster = cluster.DeepCopy()
+	cluster.Annotations = monitoring.AppendAppOverwritingAnswers(cluster.Annotations, string(data))
+
+	_, err = a.ClusterClient.Update(cluster)
+	if err != nil {
+		return httperror.WrapAPIError(err, httperror.ServerError, "failed to upgrade monitoring")
+	}
+
+	apiContext.WriteResponse(http.StatusNoContent, map[string]interface{}{})
 	return nil
 }
 
