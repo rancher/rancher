@@ -236,6 +236,10 @@ type MonitoringInput struct {
 	Answers map[string]string `json:"answers,omitempty"`
 }
 
+type MonitoringOutput struct {
+	Answers map[string]string `json:"answers,omitempty"`
+}
+
 type RestoreFromEtcdBackupInput struct {
 	EtcdBackupName string `json:"etcdBackupName,omitempty" norman:"type=reference[etcdBackup]"`
 }

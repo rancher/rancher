@@ -181,6 +181,7 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.ImportYamlOutput{}).
 		MustImport(&Version, v3.ExportOutput{}).
 		MustImport(&Version, v3.MonitoringInput{}).
+		MustImport(&Version, v3.MonitoringOutput{}).
 		MustImport(&Version, v3.RestoreFromEtcdBackupInput{}).
 		MustImportAndCustomize(&Version, v3.ETCDService{}, func(schema *types.Schema) {
 			schema.MustCustomizeField("extraArgs", func(field types.Field) types.Field {
@@ -211,6 +212,12 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 				Input: "monitoringInput",
 			}
 			schema.ResourceActions["disableMonitoring"] = types.Action{}
+			schema.ResourceActions["viewMonitoring"] = types.Action{
+				Output: "monitoringOutput",
+			}
+			schema.ResourceActions["editMonitoring"] = types.Action{
+				Input: "monitoringInput",
+			}
 			schema.ResourceActions["backupEtcd"] = types.Action{}
 			schema.ResourceActions["restoreFromEtcdBackup"] = types.Action{
 				Input: "restoreFromEtcdBackupInput",
@@ -239,6 +246,8 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 		).
 		MustImport(&Version, v3.SetPodSecurityPolicyTemplateInput{}).
 		MustImport(&Version, v3.ImportYamlOutput{}).
+		MustImport(&Version, v3.MonitoringInput{}).
+		MustImport(&Version, v3.MonitoringOutput{}).
 		MustImportAndCustomize(&Version, v3.Project{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
 				"setpodsecuritypolicytemplate": {
@@ -250,6 +259,12 @@ func authzTypes(schemas *types.Schemas) *types.Schemas {
 					Input: "monitoringInput",
 				},
 				"disableMonitoring": {},
+				"viewMonitoring": {
+					Output: "monitoringOutput",
+				},
+				"editMonitoring": {
+					Input: "monitoringInput",
+				},
 			}
 		}).
 		MustImportAndCustomize(&Version, v3.GlobalRole{}, func(schema *types.Schema) {
