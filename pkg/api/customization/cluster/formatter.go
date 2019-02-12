@@ -33,10 +33,16 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 	if err := request.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", request, resource.Values, request.Schema); err == nil {
 		if convert.ToBool(resource.Values["enableClusterMonitoring"]) {
 			resource.AddAction(request, "disableMonitoring")
+			resource.AddAction(request, "editMonitoring")
 		} else {
 			resource.AddAction(request, "enableMonitoring")
 		}
 	}
+
+	if convert.ToBool(resource.Values["enableClusterMonitoring"]) {
+		resource.AddAction(request, "viewMonitoring")
+	}
+
 	if gkeConfig, ok := resource.Values["googleKubernetesEngineConfig"]; ok {
 		configMap, ok := gkeConfig.(map[string]interface{})
 		if !ok {
