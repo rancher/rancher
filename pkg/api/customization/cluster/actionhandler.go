@@ -274,42 +274,26 @@ func (a ActionHandler) ExportYamlHandler(actionName string, action *types.Action
 }
 
 func (a ActionHandler) enableMonitoring(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	rtn := map[string]interface{}{
-		"message": "enabled",
-	}
-
 	cluster, err := a.ClusterClient.Get(apiContext.ID, metav1.GetOptions{})
 	if err != nil {
-		rtn["message"] = "none existent Cluster"
-		apiContext.WriteResponse(http.StatusBadRequest, rtn)
-
-		return errors.Wrapf(err, "failed to get Cluster by ID %s", apiContext.ID)
+		return httperror.WrapAPIError(err, httperror.NotFound, "none existent Cluster")
 	}
 	if cluster.DeletionTimestamp != nil {
-		rtn["message"] = "deleting Cluster"
-		apiContext.WriteResponse(http.StatusBadRequest, rtn)
-
-		return fmt.Errorf("unable to operate deleting %s Cluster", apiContext.ID)
+		return httperror.NewAPIError(httperror.InvalidType, "deleting Cluster")
 	}
 
 	if cluster.Spec.EnableClusterMonitoring {
-		apiContext.WriteResponse(http.StatusOK, rtn)
+		apiContext.WriteResponse(http.StatusNoContent, map[string]interface{}{})
 		return nil
 	}
 
 	data, err := ioutil.ReadAll(apiContext.Request.Body)
 	if err != nil {
-		rtn["message"] = "unable to read request content"
-		apiContext.WriteResponse(http.StatusBadRequest, rtn)
-
-		return errors.Wrap(err, "reading request body error")
+		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "unable to read request content")
 	}
 	var input v3.MonitoringInput
 	if err = json.Unmarshal(data, &input); err != nil {
-		rtn["message"] = "failed to parse request content"
-		apiContext.WriteResponse(http.StatusBadRequest, rtn)
-
-		return errors.Wrap(err, "unmarshaling input error")
+		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "failed to parse request content")
 	}
 
 	cluster = cluster.DeepCopy()
@@ -318,38 +302,24 @@ func (a ActionHandler) enableMonitoring(actionName string, action *types.Action,
 
 	_, err = a.ClusterClient.Update(cluster)
 	if err != nil {
-		rtn["message"] = "failed to enable monitoring"
-		apiContext.WriteResponse(http.StatusInternalServerError, rtn)
-
-		return errors.Wrapf(err, "unable to update Cluster %s", cluster.Name)
+		return httperror.WrapAPIError(err, httperror.ServerError, "failed to enable monitoring")
 	}
 
-	apiContext.WriteResponse(http.StatusOK, rtn)
-
+	apiContext.WriteResponse(http.StatusNoContent, map[string]interface{}{})
 	return nil
 }
 
 func (a ActionHandler) disableMonitoring(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	rtn := map[string]interface{}{
-		"message": "disabled",
-	}
-
 	cluster, err := a.ClusterClient.Get(apiContext.ID, metav1.GetOptions{})
 	if err != nil {
-		rtn["message"] = "none existent Cluster"
-		apiContext.WriteResponse(http.StatusBadRequest, rtn)
-
-		return errors.Wrapf(err, "failed to get Cluster by ID %s", apiContext.ID)
+		return httperror.WrapAPIError(err, httperror.NotFound, "none existent Cluster")
 	}
 	if cluster.DeletionTimestamp != nil {
-		rtn["message"] = "deleting Cluster"
-		apiContext.WriteResponse(http.StatusBadRequest, rtn)
-
-		return fmt.Errorf("unable to operate deleting %s Cluster", apiContext.ID)
+		return httperror.NewAPIError(httperror.InvalidType, "deleting Cluster")
 	}
 
 	if !cluster.Spec.EnableClusterMonitoring {
-		apiContext.WriteResponse(http.StatusOK, rtn)
+		apiContext.WriteResponse(http.StatusNoContent, map[string]interface{}{})
 		return nil
 	}
 
@@ -358,14 +328,10 @@ func (a ActionHandler) disableMonitoring(actionName string, action *types.Action
 
 	_, err = a.ClusterClient.Update(cluster)
 	if err != nil {
-		rtn["message"] = "failed to enable monitoring"
-		apiContext.WriteResponse(http.StatusInternalServerError, rtn)
-
-		return errors.Wrapf(err, "unable to update Cluster %s", cluster.Name)
+		return httperror.WrapAPIError(err, httperror.ServerError, "failed to disable monitoring")
 	}
 
-	apiContext.WriteResponse(http.StatusOK, rtn)
-
+	apiContext.WriteResponse(http.StatusNoContent, map[string]interface{}{})
 	return nil
 }
 
