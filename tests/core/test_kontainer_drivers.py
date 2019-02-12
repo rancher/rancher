@@ -64,6 +64,8 @@ def test_kontainer_driver_lifecycle(admin_mc, remove_resource):
 
 @pytest.mark.nonparallel
 def test_enabling_driver_exposes_schema(admin_mc, remove_resource):
+    """ Test if enabling driver exposes its dynamic schema, drivers are
+     downloaded / installed once they are active """
     kd = admin_mc.client.create_kontainerDriver(
         createDynamicSchema=True,
         active=False,
@@ -71,7 +73,7 @@ def test_enabling_driver_exposes_schema(admin_mc, remove_resource):
     )
     remove_resource(kd)
 
-    kd = wait_for_condition('Installed', 'True', admin_mc.client, kd,
+    kd = wait_for_condition('Inactive', 'True', admin_mc.client, kd,
                             timeout=90)
 
     # verify the kontainer driver has no activate and a deactivate link
@@ -81,7 +83,7 @@ def test_enabling_driver_exposes_schema(admin_mc, remove_resource):
 
     verify_driver_not_in_types(admin_mc.client, kd)
 
-    kd.active = True
+    kd.active = True  # driver should begin downloading / installing
     admin_mc.client.update_by_id_kontainerDriver(kd.id, kd)
 
     kd = wait_for_condition('Active', 'True', admin_mc.client, kd,
