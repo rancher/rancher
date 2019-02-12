@@ -30,7 +30,7 @@ func EtcdCommand() cli.Command {
 		},
 		cli.BoolFlag{
 			Name:  "s3",
-			Usage: "Enabled backup to s3, set true or false",
+			Usage: "Enabled backup to s3",
 		},
 		cli.StringFlag{
 			Name:  "s3-endpoint",

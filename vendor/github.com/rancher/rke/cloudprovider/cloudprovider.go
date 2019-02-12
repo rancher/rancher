@@ -17,7 +17,7 @@ type CloudProvider interface {
 
 func InitCloudProvider(cloudProviderConfig v3.CloudProvider) (CloudProvider, error) {
 	var p CloudProvider
-	if cloudProviderConfig.Name == aws.AWSCloudProviderName {
+	if cloudProviderConfig.AWSCloudProvider != nil || cloudProviderConfig.Name == aws.AWSCloudProviderName {
 		p = aws.GetInstance()
 	}
 	if cloudProviderConfig.AzureCloudProvider != nil || cloudProviderConfig.Name == azure.AzureCloudProviderName {
