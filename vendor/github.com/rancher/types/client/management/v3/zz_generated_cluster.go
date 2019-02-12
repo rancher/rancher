@@ -118,6 +118,8 @@ type ClusterOperations interface {
 
 	ActionDisableMonitoring(resource *Cluster) error
 
+	ActionEditMonitoring(resource *Cluster, input *MonitoringInput) error
+
 	ActionEnableMonitoring(resource *Cluster, input *MonitoringInput) error
 
 	ActionExportYaml(resource *Cluster) (*ExportOutput, error)
@@ -129,6 +131,8 @@ type ClusterOperations interface {
 	ActionRestoreFromEtcdBackup(resource *Cluster, input *RestoreFromEtcdBackupInput) error
 
 	ActionRotateCertificates(resource *Cluster, input *RotateCertificateInput) (*RotateCertificateOutput, error)
+
+	ActionViewMonitoring(resource *Cluster) (*MonitoringOutput, error)
 }
 
 func newClusterClient(apiClient *Client) *ClusterClient {
@@ -192,6 +196,11 @@ func (c *ClusterClient) ActionDisableMonitoring(resource *Cluster) error {
 	return err
 }
 
+func (c *ClusterClient) ActionEditMonitoring(resource *Cluster, input *MonitoringInput) error {
+	err := c.apiClient.Ops.DoAction(ClusterType, "editMonitoring", &resource.Resource, input, nil)
+	return err
+}
+
 func (c *ClusterClient) ActionEnableMonitoring(resource *Cluster, input *MonitoringInput) error {
 	err := c.apiClient.Ops.DoAction(ClusterType, "enableMonitoring", &resource.Resource, input, nil)
 	return err
@@ -223,5 +232,11 @@ func (c *ClusterClient) ActionRestoreFromEtcdBackup(resource *Cluster, input *Re
 func (c *ClusterClient) ActionRotateCertificates(resource *Cluster, input *RotateCertificateInput) (*RotateCertificateOutput, error) {
 	resp := &RotateCertificateOutput{}
 	err := c.apiClient.Ops.DoAction(ClusterType, "rotateCertificates", &resource.Resource, input, resp)
+	return resp, err
+}
+
+func (c *ClusterClient) ActionViewMonitoring(resource *Cluster) (*MonitoringOutput, error) {
+	resp := &MonitoringOutput{}
+	err := c.apiClient.Ops.DoAction(ClusterType, "viewMonitoring", &resource.Resource, nil, resp)
 	return resp, err
 }
