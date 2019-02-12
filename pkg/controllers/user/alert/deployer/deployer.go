@@ -135,21 +135,25 @@ func (d *Deployer) sync() error {
 	newCluster.Spec.EnableClusterAlerting = needDeploy
 
 	if needDeploy {
+		if !reflect.DeepEqual(cluster, newCluster) {
+			_, err = d.clusters.Update(newCluster)
+			if err != nil {
+				return fmt.Errorf("update cluster %v failed, %v", d.clusterName, err)
+			}
+		}
+
 		if d.alertManager.IsDeploy, err = d.appDeployer.deploy(appName, appTargetNamespace, systemProjectID, systemProjectCreator); err != nil {
 			return fmt.Errorf("deploy alertmanager failed, %v", err)
 		}
 
-		if err = d.appDeployer.isDeploySuccess(newCluster, alertutil.GetAlertManagerDaemonsetName(appName), appTargetNamespace); err != nil {
-			return err
-		}
+		return d.appDeployer.isDeploySuccess(newCluster, alertutil.GetAlertManagerDaemonsetName(appName), appTargetNamespace)
+	}
 
-	} else {
-		if d.alertManager.IsDeploy, err = d.appDeployer.cleanup(appName, appTargetNamespace, systemProjectID); err != nil {
-			return fmt.Errorf("clean up alertmanager failed, %v", err)
-		}
-		if mgmtv3.ClusterConditionAlertingEnabled.IsTrue(newCluster) {
-			mgmtv3.ClusterConditionAlertingEnabled.False(newCluster)
-		}
+	if d.alertManager.IsDeploy, err = d.appDeployer.cleanup(appName, appTargetNamespace, systemProjectID); err != nil {
+		return fmt.Errorf("clean up alertmanager failed, %v", err)
+	}
+	if mgmtv3.ClusterConditionAlertingEnabled.IsTrue(newCluster) {
+		mgmtv3.ClusterConditionAlertingEnabled.False(newCluster)
 	}
 
 	if !reflect.DeepEqual(cluster, newCluster) {
