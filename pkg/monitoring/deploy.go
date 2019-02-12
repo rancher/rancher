@@ -98,22 +98,31 @@ func GetSystemProjectID(cattleProjectsClient mgmtv3.ProjectInterface) (string, e
 	return systemProject.Name, nil
 }
 
-func DeployApp(cattleAppClient projectv3.AppInterface, projectID string, createApp *projectv3.App) error {
-	appName := createApp.Name
+func DeployApp(cattleAppClient projectv3.AppInterface, projectID string, createOrUpdateApp *projectv3.App) error {
+	if createOrUpdateApp == nil {
+		return errors.New("cannot deploy a nil App")
+	}
+
+	appName := createOrUpdateApp.Name
 	app, err := cattleAppClient.GetNamespaced(projectID, appName, metav1.GetOptions{})
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return errors.Wrapf(err, "failed to query %q App in %s Project", appName, projectID)
 	}
-	if app.Name == appName {
-		if app.DeletionTimestamp != nil {
-			return fmt.Errorf("stale %q App in %s Project is still on terminating", appName, projectID)
-		}
 
-		return nil
+	if app.DeletionTimestamp != nil {
+		return fmt.Errorf("stale %q App in %s Project is still on terminating", appName, projectID)
 	}
 
-	if _, err := cattleAppClient.Create(createApp); err != nil && !k8serrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "failed to create %q App", appName)
+	if app.Name == "" {
+		if _, err = cattleAppClient.Create(createOrUpdateApp); err != nil {
+			return errors.Wrapf(err, "failed to create %q App", appName)
+		}
+	} else {
+		app = app.DeepCopy()
+		app.Spec.Answers = createOrUpdateApp.Spec.Answers
+		if _, err = cattleAppClient.Update(app); err != nil {
+			return errors.Wrapf(err, "failed to update %q App", appName)
+		}
 	}
 
 	return nil

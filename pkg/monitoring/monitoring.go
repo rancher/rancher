@@ -180,20 +180,7 @@ grafana.persistence.size             	| 50Gi
 
 */
 func OverwriteAppAnswers(rawAnswers map[string]string, annotations map[string]string) map[string]string {
-	overwriteAnswers := func() map[string]string {
-		overwritingAppAnswers := annotations[cattleOverwriteAppAnswersAnnotationKey]
-		if len(overwritingAppAnswers) != 0 {
-			var appOverwriteInput mgmtv3.MonitoringInput
-			err := json.Unmarshal([]byte(overwritingAppAnswers), &appOverwriteInput)
-			if err == nil {
-				return appOverwriteInput.Answers
-			}
-
-			logrus.Errorf("failed to parse app overwrite input from %q, %v", overwritingAppAnswers, err)
-		}
-
-		return nil
-	}()
+	overwriteAnswers := GetOverwroteAppAnswers(annotations)
 
 	for specialKey, value := range overwriteAnswers {
 		if strings.HasPrefix(specialKey, "_tpl-") {
@@ -254,4 +241,19 @@ func (tr *templateRegexp) translate(value string) *templateRegexpResult {
 	}
 
 	return captures
+}
+
+func GetOverwroteAppAnswers(annotations map[string]string) map[string]string {
+	overwritingAppAnswers := annotations[cattleOverwriteAppAnswersAnnotationKey]
+	if len(overwritingAppAnswers) != 0 {
+		var appOverwriteInput mgmtv3.MonitoringInput
+		err := json.Unmarshal([]byte(overwritingAppAnswers), &appOverwriteInput)
+		if err == nil {
+			return appOverwriteInput.Answers
+		}
+
+		logrus.Errorf("failed to parse app overwrite input from %q, %v", overwritingAppAnswers, err)
+	}
+
+	return map[string]string{}
 }
