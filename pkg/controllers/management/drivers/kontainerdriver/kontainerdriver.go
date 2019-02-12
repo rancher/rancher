@@ -55,12 +55,15 @@ type Lifecycle struct {
 func (l *Lifecycle) Create(obj *v3.KontainerDriver) (runtime.Object, error) {
 	logrus.Infof("create kontainerdriver %v", obj.Name)
 
-	v3.KontainerDriverConditionDownloaded.Unknown(obj)
-	v3.KontainerDriverConditionInstalled.Unknown(obj)
-
+	// return early if driver is not active
+	// set driver to a non-transitioning state
 	if !obj.Spec.Active {
+		v3.KontainerDriverConditionInactive.True(obj)
 		return obj, nil
 	}
+
+	v3.KontainerDriverConditionDownloaded.Unknown(obj)
+	v3.KontainerDriverConditionInstalled.Unknown(obj)
 
 	// Update status
 	obj, err := l.kontainerDrivers.Update(obj)
@@ -351,15 +354,17 @@ func (l *Lifecycle) Updated(obj *v3.KontainerDriver) (runtime.Object, error) {
 		return obj, l.updateDynamicSchema(obj)
 	}
 
-	// redownload file if url changed or not downloaded
+	// redownload file if active AND url changed or not downloaded
+	// prevents downloading on air-gapped installations
 	var err error
-	if obj.Spec.URL != obj.Status.ActualURL || v3.KontainerDriverConditionDownloaded.IsFalse(obj) || !l.driverExists(obj) {
+	if obj.Spec.Active && (obj.Spec.URL != obj.Status.ActualURL || v3.KontainerDriverConditionDownloaded.IsFalse(obj) || !l.driverExists(obj)) {
 		obj, err = l.download(obj)
 		if err != nil {
 			return nil, err
 		}
 	}
-
+	// Create schema if obj is active
+	// Delete schema if obj is inactive
 	if obj.Spec.Active {
 		err = l.createDynamicSchema(obj)
 
@@ -368,7 +373,6 @@ func (l *Lifecycle) Updated(obj *v3.KontainerDriver) (runtime.Object, error) {
 		if err = l.dynamicSchemas.Delete(getDynamicTypeName(obj), &v13.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 			return nil, fmt.Errorf("error deleting schema: %v", err)
 		}
-
 		if err = l.removeFieldFromCluster(obj); err != nil {
 			return nil, err
 		}
@@ -424,6 +428,7 @@ func (l *Lifecycle) Remove(obj *v3.KontainerDriver) (runtime.Object, error) {
 	return obj, nil
 }
 
+// Removes the v3/dynamicschema "cluster"'s resourceField associated with the KontainerDriver obj
 func (l *Lifecycle) removeFieldFromCluster(obj *v3.KontainerDriver) error {
 	nodedriver.SchemaLock.Lock()
 	defer nodedriver.SchemaLock.Unlock()
@@ -432,7 +437,7 @@ func (l *Lifecycle) removeFieldFromCluster(obj *v3.KontainerDriver) error {
 
 	nodeSchema, err := l.dynamicSchemasLister.Get("", "cluster")
 	if err != nil {
-		return fmt.Errorf("error getting schema: %v", err)
+		return fmt.Errorf("error getting schema: %v", err) // this error may fire during Rancher startup
 	}
 
 	nodeSchema = nodeSchema.DeepCopy()
