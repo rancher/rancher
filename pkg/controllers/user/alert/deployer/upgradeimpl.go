@@ -6,21 +6,20 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/types/apis/core/v1"
-
 	"github.com/rancher/norman/controller"
 	alertutil "github.com/rancher/rancher/pkg/controllers/user/alert/common"
+	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/rancher/pkg/controllers/user/systemimage"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
-	"github.com/rancher/types/apis/apps/v1beta2"
+	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
-
-	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
-	"github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/config"
+
+	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -61,7 +60,6 @@ func (l *alertService) Init(ctx context.Context, cluster *config.UserContext) {
 	}
 
 	l.clusterName = cluster.ClusterName
-	l.deployments = cluster.Apps.Deployments("")
 	l.oldClusterAlerts = cluster.Management.Management.ClusterAlerts(cluster.ClusterName)
 	l.oldProjectAlerts = cluster.Management.Management.ProjectAlerts(metav1.NamespaceAll)
 	l.clusterAlertGroups = cluster.Management.Management.ClusterAlertGroups(cluster.ClusterName)
@@ -70,6 +68,7 @@ func (l *alertService) Init(ctx context.Context, cluster *config.UserContext) {
 	l.projectAlertRules = cluster.Management.Management.ProjectAlertRules(metav1.NamespaceAll)
 	l.projectLister = cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister()
 	l.apps = cluster.Management.Project.Apps(metav1.NamespaceAll)
+	l.namespaces = cluster.Core.Namespaces(metav1.NamespaceAll)
 	l.appDeployer = ad
 
 }
@@ -99,6 +98,10 @@ func (l *alertService) Upgrade(currentVersion string) (string, error) {
 		}
 
 		if err := l.migrateLegacyProjectAlert(); err != nil {
+			return "", err
+		}
+
+		if err := l.removeLegacyAlerting(); err != nil {
 			return "", err
 		}
 	}
@@ -332,6 +335,15 @@ func (l *alertService) migrateLegacyProjectAlert() error {
 				return fmt.Errorf("create migrate alert group %s:%s failed, %v", legacyGroup.Namespace, legacyGroup.Name, err)
 			}
 		}
+	}
+	return nil
+}
+
+func (l *alertService) removeLegacyAlerting() error {
+	legacyAlertmanagerNamespace := "cattle-alerting"
+
+	if err := l.namespaces.Delete(legacyAlertmanagerNamespace, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to remove legacy alerting namespace when upgrade")
 	}
 	return nil
 }
