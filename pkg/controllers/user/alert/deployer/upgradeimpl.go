@@ -30,10 +30,13 @@ var (
 	serviceName = "alerting"
 )
 
+const (
+	defaultGroupIntervalSeconds = 180
+)
+
 type alertService struct {
 	clusterName        string
 	apps               projectv3.AppInterface
-	deployments        v1beta2.DeploymentInterface
 	oldClusterAlerts   v3.ClusterAlertInterface
 	oldProjectAlerts   v3.ProjectAlertInterface
 	clusterAlertGroups v3.ClusterAlertGroupInterface
@@ -154,7 +157,8 @@ func (l *alertService) migrateLegacyClusterAlert() error {
 					DisplayName: v.Spec.DisplayName,
 					Severity:    v.Spec.Severity,
 					TimingField: v3.TimingField{
-						GroupIntervalSeconds:  v.Spec.InitialWaitSeconds,
+						GroupWaitSeconds:      v.Spec.InitialWaitSeconds,
+						GroupIntervalSeconds:  defaultGroupIntervalSeconds,
 						RepeatIntervalSeconds: v.Spec.RepeatIntervalSeconds,
 					},
 				},
@@ -210,6 +214,11 @@ func (l *alertService) migrateLegacyClusterAlert() error {
 				CommonGroupField: v3.CommonGroupField{
 					DisplayName: "Migrate group",
 					Description: "Migrate alert from last version",
+					TimingField: v3.TimingField{
+						GroupWaitSeconds:      v.Spec.InitialWaitSeconds,
+						GroupIntervalSeconds:  defaultGroupIntervalSeconds,
+						RepeatIntervalSeconds: v.Spec.RepeatIntervalSeconds,
+					},
 				},
 				Recipients: v.Spec.Recipients,
 			},
@@ -229,10 +238,10 @@ func (l *alertService) migrateLegacyProjectAlert() error {
 		return fmt.Errorf("get old project alert failed, %s", err)
 	}
 
-	oldProjectAlertGroup := make(map[string][]*v3.ProjectAlert)
+	oldProjectAlertGroup := make(map[string][]v3.ProjectAlert)
 	for _, v := range oldProjectAlert.Items {
 		if controller.ObjectInCluster(l.clusterName, v) {
-			oldProjectAlertGroup[v.Spec.ProjectName] = append(oldProjectAlertGroup[v.Spec.ProjectName], &v)
+			oldProjectAlertGroup[v.Spec.ProjectName] = append(oldProjectAlertGroup[v.Spec.ProjectName], v)
 		}
 	}
 
@@ -250,13 +259,14 @@ func (l *alertService) migrateLegacyProjectAlert() error {
 					Namespace: projectName,
 				},
 				Spec: v3.ProjectAlertRuleSpec{
-					ProjectName: projectName,
+					ProjectName: projectID,
 					GroupName:   groupID,
 					CommonRuleField: v3.CommonRuleField{
 						DisplayName: v.Spec.DisplayName,
 						Severity:    v.Spec.Severity,
 						TimingField: v3.TimingField{
-							GroupIntervalSeconds:  v.Spec.InitialWaitSeconds,
+							GroupWaitSeconds:      v.Spec.InitialWaitSeconds,
+							GroupIntervalSeconds:  defaultGroupIntervalSeconds,
 							RepeatIntervalSeconds: v.Spec.RepeatIntervalSeconds,
 						},
 					},
@@ -307,6 +317,11 @@ func (l *alertService) migrateLegacyProjectAlert() error {
 					CommonGroupField: v3.CommonGroupField{
 						DisplayName: "Migrate group",
 						Description: "Migrate alert from last version",
+						TimingField: v3.TimingField{
+							GroupWaitSeconds:      v.Spec.InitialWaitSeconds,
+							GroupIntervalSeconds:  defaultGroupIntervalSeconds,
+							RepeatIntervalSeconds: v.Spec.RepeatIntervalSeconds,
+						},
 					},
 					Recipients: v.Spec.Recipients,
 				},
