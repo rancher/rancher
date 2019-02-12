@@ -14,9 +14,9 @@ const (
 	ClusterLoggingFieldCreatorID              = "creatorId"
 	ClusterLoggingFieldCustomTargetConfig     = "customTargetConfig"
 	ClusterLoggingFieldElasticsearchConfig    = "elasticsearchConfig"
-	ClusterLoggingFieldExcludeSystemComponent = "excludeSystemComponent"
 	ClusterLoggingFieldFailedSpec             = "failedSpec"
 	ClusterLoggingFieldFluentForwarderConfig  = "fluentForwarderConfig"
+	ClusterLoggingFieldIncludeSystemComponent = "includeSystemComponent"
 	ClusterLoggingFieldKafkaConfig            = "kafkaConfig"
 	ClusterLoggingFieldLabels                 = "labels"
 	ClusterLoggingFieldName                   = "name"
@@ -43,9 +43,9 @@ type ClusterLogging struct {
 	CreatorID              string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	CustomTargetConfig     *CustomTargetConfig    `json:"customTargetConfig,omitempty" yaml:"customTargetConfig,omitempty"`
 	ElasticsearchConfig    *ElasticsearchConfig   `json:"elasticsearchConfig,omitempty" yaml:"elasticsearchConfig,omitempty"`
-	ExcludeSystemComponent bool                   `json:"excludeSystemComponent,omitempty" yaml:"excludeSystemComponent,omitempty"`
 	FailedSpec             *ClusterLoggingSpec    `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`
 	FluentForwarderConfig  *FluentForwarderConfig `json:"fluentForwarderConfig,omitempty" yaml:"fluentForwarderConfig,omitempty"`
+	IncludeSystemComponent *bool                  `json:"includeSystemComponent,omitempty" yaml:"includeSystemComponent,omitempty"`
 	KafkaConfig            *KafkaConfig           `json:"kafkaConfig,omitempty" yaml:"kafkaConfig,omitempty"`
 	Labels                 map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                   string                 `json:"name,omitempty" yaml:"name,omitempty"`

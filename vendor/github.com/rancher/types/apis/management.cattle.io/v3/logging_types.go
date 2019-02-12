@@ -56,7 +56,7 @@ type ClusterLoggingSpec struct {
 	LoggingTargets
 	LoggingCommonField
 	ClusterName            string `json:"clusterName" norman:"type=reference[cluster]"`
-	ExcludeSystemComponent bool   `json:"excludeSystemComponent,omitempty"`
+	IncludeSystemComponent *bool  `json:"includeSystemComponent,omitempty" norman:"default=true"`
 }
 
 type ProjectLoggingSpec struct {

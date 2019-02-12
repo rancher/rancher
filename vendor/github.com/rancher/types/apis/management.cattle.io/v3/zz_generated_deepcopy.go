@@ -1438,6 +1438,11 @@ func (in *ClusterLoggingSpec) DeepCopyInto(out *ClusterLoggingSpec) {
 	*out = *in
 	in.LoggingTargets.DeepCopyInto(&out.LoggingTargets)
 	in.LoggingCommonField.DeepCopyInto(&out.LoggingCommonField)
+	if in.IncludeSystemComponent != nil {
+		in, out := &in.IncludeSystemComponent, &out.IncludeSystemComponent
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
