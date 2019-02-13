@@ -37,7 +37,7 @@ func (s *ConfigGenerator) GenerateClusterLoggingConfig(clusterLogging *mgmtv3.Cl
 	}
 
 	var excludeNamespaces string
-	if !*clusterLogging.Spec.IncludeSystemComponent {
+	if clusterLogging.Spec.IncludeSystemComponent != nil && !*clusterLogging.Spec.IncludeSystemComponent {
 		var err error
 		if excludeNamespaces, err = s.addExcludeNamespaces(systemProjectID); err != nil {
 			return nil, err

@@ -47,11 +47,16 @@ func NewWrapClusterLogging(logging v3.ClusterLoggingSpec, excludeNamespace strin
 		return nil, nil
 	}
 
+	includeSystemComponent := true
+	if logging.IncludeSystemComponent != nil {
+		includeSystemComponent = *logging.IncludeSystemComponent
+	}
+
 	return &ClusterLoggingTemplateWrap{
 		LoggingCommonField:        logging.LoggingCommonField,
 		LoggingTargetTemplateWrap: *wrap,
 		ExcludeNamespace:          excludeNamespace,
-		IncludeSystemComponent:    *logging.IncludeSystemComponent,
+		IncludeSystemComponent:    includeSystemComponent,
 	}, nil
 }
 
