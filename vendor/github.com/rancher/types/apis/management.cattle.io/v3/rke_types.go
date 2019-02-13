@@ -217,7 +217,7 @@ type KubeAPIService struct {
 	// Enabled/Disable PodSecurityPolicy
 	PodSecurityPolicy bool `yaml:"pod_security_policy" json:"podSecurityPolicy,omitempty"`
 	// Enable/Disable AlwaysPullImages admissions plugin
-	AlwaysPullImages bool `yaml:"always_pull_images" json:"always_pull_images,omitempty"`
+	AlwaysPullImages bool `yaml:"always_pull_images" json:"alwaysPullImages,omitempty"`
 }
 
 type KubeControllerService struct {
