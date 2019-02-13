@@ -12,6 +12,8 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 
+	"strconv"
+
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -25,6 +27,7 @@ import (
 const (
 	GlobaldnsController    = "mgmt-global-dns-controller"
 	annotationIngressClass = "kubernetes.io/ingress.class"
+	annotationDNSTTL       = "external-dns.alpha.kubernetes.io/ttl"
 )
 
 type GDController struct {
@@ -90,7 +93,7 @@ func (n *GDController) sync(key string, obj *v3.GlobalDNS) (runtime.Object, erro
 		}
 	}
 
-	err = n.updateIngressEndpointsFQDN(ingress, obj)
+	err = n.updateIngressForDNS(ingress, obj)
 	if err != nil {
 		return nil, fmt.Errorf("GlobalDNSController: Error updating ingress for the GlobalDNS %v", err)
 	}
@@ -125,6 +128,9 @@ func (n *GDController) isIngressOwnedByGlobalDNS(ingress *v1beta1.Ingress, globa
 
 func (n *GDController) createIngressForGlobalDNS(globaldns *v3.GlobalDNS) (*v1beta1.Ingress, error) {
 	ingressSpec := n.generateNewIngressSpec(globaldns)
+	if globaldns.Spec.TTL != 0 {
+		ingressSpec.ObjectMeta.Annotations[annotationDNSTTL] = strconv.FormatInt(globaldns.Spec.TTL, 10)
+	}
 	ingressObj, err := n.ingresses.Create(ingressSpec)
 	if err != nil {
 		return nil, err
@@ -177,7 +183,7 @@ func (n *GDController) generateNewIngressSpec(globaldns *v3.GlobalDNS) *v1beta1.
 	}
 }
 
-func (n *GDController) updateIngressEndpointsFQDN(ingress *v1beta1.Ingress, obj *v3.GlobalDNS) error {
+func (n *GDController) updateIngressForDNS(ingress *v1beta1.Ingress, obj *v3.GlobalDNS) error {
 	var err error
 
 	if n.ifEndpointsDiffer(ingress.Status.LoadBalancer.Ingress, obj.Status.Endpoints) {
@@ -189,13 +195,24 @@ func (n *GDController) updateIngressEndpointsFQDN(ingress *v1beta1.Ingress, obj 
 		}
 	}
 
+	var updateIngress bool
 	if len(ingress.Spec.Rules) > 0 {
 		if !strings.EqualFold(ingress.Spec.Rules[0].Host, obj.Spec.FQDN) {
 			ingress.Spec.Rules[0].Host = obj.Spec.FQDN
-			_, err = n.ingresses.Update(ingress)
-			if err != nil {
-				return fmt.Errorf("GlobalDNSController: Error updating Ingress %v", err)
-			}
+			updateIngress = true
+		}
+	}
+
+	ttlvalue := strconv.FormatInt(obj.Spec.TTL, 10)
+	if !strings.EqualFold(ingress.ObjectMeta.Annotations[annotationDNSTTL], ttlvalue) {
+		ingress.ObjectMeta.Annotations[annotationDNSTTL] = ttlvalue
+		updateIngress = true
+	}
+
+	if updateIngress {
+		_, err = n.ingresses.Update(ingress)
+		if err != nil {
+			return fmt.Errorf("GlobalDNSController: Error updating Ingress %v", err)
 		}
 	}
 
