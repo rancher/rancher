@@ -6,6 +6,7 @@ import (
 
 const (
 	GlobalDNSProviderType                          = "globalDnsProvider"
+	GlobalDNSProviderFieldAlidnsProviderConfig     = "alidnsProviderConfig"
 	GlobalDNSProviderFieldAnnotations              = "annotations"
 	GlobalDNSProviderFieldCloudflareProviderConfig = "cloudflareProviderConfig"
 	GlobalDNSProviderFieldCreated                  = "created"
@@ -21,6 +22,7 @@ const (
 
 type GlobalDNSProvider struct {
 	types.Resource
+	AlidnsProviderConfig     *AlidnsProviderConfig     `json:"alidnsProviderConfig,omitempty" yaml:"alidnsProviderConfig,omitempty"`
 	Annotations              map[string]string         `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	CloudflareProviderConfig *CloudflareProviderConfig `json:"cloudflareProviderConfig,omitempty" yaml:"cloudflareProviderConfig,omitempty"`
 	Created                  string                    `json:"created,omitempty" yaml:"created,omitempty"`

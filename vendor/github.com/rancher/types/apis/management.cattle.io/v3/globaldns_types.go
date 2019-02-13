@@ -43,6 +43,7 @@ type GlobalDNSProvider struct {
 type GlobalDNSProviderSpec struct {
 	Route53ProviderConfig    *Route53ProviderConfig    `json:"route53ProviderConfig,omitempty"`
 	CloudflareProviderConfig *CloudflareProviderConfig `json:"cloudflareProviderConfig,omitempty"`
+	AlidnsProviderConfig     *AlidnsProviderConfig     `json:"alidnsProviderConfig,omitempty"`
 	Members                  []Member                  `json:"members,omitempty"`
 }
 
@@ -60,4 +61,14 @@ type CloudflareProviderConfig struct {
 
 type UpdateGlobalDNSTargetsInput struct {
 	ProjectNames []string `json:"projectNames" norman:"type=array[reference[project]]"`
+}
+
+type AlidnsProviderConfig struct {
+	RootDomain string `json:"rootDomain" norman:"required"`
+	AccessKey  string `json:"accessKey" norman:"notnullable,required,minLength=1"`
+	SecretKey  string `json:"secretKey" norman:"notnullable,required,minLength=1,type=password"`
+}
+
+type GlobalDNSSystemImages struct {
+	ExternalDNS string `yaml:"ExternalDns" json:"ExternalDns,omitempty"`
 }
