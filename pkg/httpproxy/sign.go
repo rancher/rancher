@@ -19,11 +19,14 @@ import (
 	"github.com/rancher/types/apis/core/v1"
 )
 
+var requiredHeadersForAws = map[string]bool{"host": true,
+	"x-amz-content-sha256": true,
+	"x-amz-date":           true,
+	"x-amz-user-agent":     true}
+
 type Signer interface {
 	sign(*http.Request, v1.SecretInterface, string) error
 }
-
-const ForwardForHeader = "X-Forwarded-For"
 
 func newSigner(auth string) Signer {
 	splitAuth := strings.Split(auth, " ")
@@ -77,16 +80,21 @@ func (a awsv4) sign(req *http.Request, secrets v1.SecretInterface, auth string) 
 			return fmt.Errorf("error reading request body %v", err)
 		}
 	}
-	val := req.Header.Get(ForwardForHeader)
-	if val != "" {
-		req.Header.Del(ForwardForHeader)
+	oldHeader, newHeader := http.Header{}, http.Header{}
+	for header, value := range req.Header {
+		if _, ok := requiredHeadersForAws[strings.ToLower(header)]; ok {
+			newHeader[header] = value
+		} else {
+			oldHeader[header] = value
+		}
 	}
+	req.Header = newHeader
 	_, err = awsSigner.Sign(req, bytes.NewReader(body), service, region, time.Now())
 	if err != nil {
 		return err
 	}
-	if val != "" {
-		req.Header.Add(ForwardForHeader, val)
+	for key, val := range oldHeader {
+		req.Header.Add(key, strings.Join(val, ""))
 	}
 	return nil
 }
