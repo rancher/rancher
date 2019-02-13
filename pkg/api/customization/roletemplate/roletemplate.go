@@ -29,6 +29,9 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 		}
 	}
 
+	if request.Method != http.MethodPut {
+		return nil
+	}
 	rt, err := w.RoleTemplateLister.Get("", request.ID)
 	if err != nil {
 		return err
