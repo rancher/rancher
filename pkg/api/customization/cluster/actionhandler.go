@@ -538,6 +538,7 @@ func (a ActionHandler) getKubeConfig(apiContext *types.APIContext, cluster *mgmt
 
 func (a ActionHandler) RotateCertificates(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	rtn := map[string]interface{}{
+		"type":    "rotateCertificateOutput",
 		"message": "rotating certificates for all components",
 	}
 	var mgmtCluster mgmtclient.Cluster
