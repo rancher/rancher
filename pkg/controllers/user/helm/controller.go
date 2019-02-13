@@ -104,7 +104,7 @@ func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 			return nil, err
 		}
 		if obj.Spec.ExternalID != "" {
-			if currentRevision.Status.ExternalID == obj.Spec.ExternalID && reflect.DeepEqual(currentRevision.Status.Answers, obj.Spec.Answers) {
+			if currentRevision.Status.ExternalID == obj.Spec.ExternalID && reflect.DeepEqual(currentRevision.Status.Answers, obj.Spec.Answers) && reflect.DeepEqual(currentRevision.Status.ValuesYaml, obj.Spec.ValuesYaml) {
 				if !v3.AppConditionForceUpgrade.IsTrue(obj) {
 					v3.AppConditionForceUpgrade.True(obj)
 				}
@@ -112,7 +112,7 @@ func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 			}
 		}
 		if obj.Status.AppliedFiles != nil {
-			if reflect.DeepEqual(obj.Status.AppliedFiles, obj.Spec.Files) && reflect.DeepEqual(currentRevision.Status.Answers, obj.Spec.Answers) {
+			if reflect.DeepEqual(obj.Status.AppliedFiles, obj.Spec.Files) && reflect.DeepEqual(currentRevision.Status.Answers, obj.Spec.Answers) && reflect.DeepEqual(currentRevision.Status.ValuesYaml, obj.Spec.ValuesYaml) {
 				if !v3.AppConditionForceUpgrade.IsTrue(obj) {
 					v3.AppConditionForceUpgrade.True(obj)
 				}
@@ -268,6 +268,7 @@ func (l *Lifecycle) createAppRevision(obj *v3.App, template, notes string, faile
 	release.Status.Answers = obj.Spec.Answers
 	release.Status.ProjectName = projectName
 	release.Status.ExternalID = obj.Spec.ExternalID
+	release.Status.ValuesYaml = obj.Spec.ValuesYaml
 	digest := sha256.New()
 	digest.Write([]byte(template))
 	tag := hex.EncodeToString(digest.Sum(nil))
