@@ -5,7 +5,7 @@ import pytest
 from .conftest import wait_for_condition, wait_until
 
 DRIVER_URL = "https://github.com/rancher/kontainer-engine-driver-example/" \
-             "releases/download/v0.2.0/kontainer-engine-driver-example-" \
+             "releases/download/v0.2.1/kontainer-engine-driver-example-" \
              + sys.platform
 
 
