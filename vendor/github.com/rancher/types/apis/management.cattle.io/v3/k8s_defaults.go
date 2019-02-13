@@ -84,11 +84,12 @@ var (
 		},
 	}
 
-	// ToolsSystemImages default images for alert, pipeline, logging
+	// ToolsSystemImages default images for alert, pipeline, logging, globaldns
 	ToolsSystemImages = struct {
-		AlertSystemImages    AlertSystemImages
-		PipelineSystemImages projectv3.PipelineSystemImages
-		LoggingSystemImages  LoggingSystemImages
+		AlertSystemImages     AlertSystemImages
+		PipelineSystemImages  projectv3.PipelineSystemImages
+		LoggingSystemImages   LoggingSystemImages
+		GlobalDNSSystemImages GlobalDNSSystemImages
 	}{
 		AlertSystemImages: AlertSystemImages{
 			AlertManager:       m("prom/alertmanager:v0.15.2"),
@@ -108,6 +109,9 @@ var (
 			Fluentd:                       m("rancher/fluentd:v0.1.11"),
 			FluentdHelper:                 m("rancher/fluentd-helper:v0.1.2"),
 			LogAggregatorFlexVolumeDriver: m("rancher/log-aggregator:v0.1.4"),
+		},
+		GlobalDNSSystemImages: GlobalDNSSystemImages{
+			ExternalDNS: m("registry.opensource.zalan.do/teapot/external-dns:v0.5.10"),
 		},
 	}
 
