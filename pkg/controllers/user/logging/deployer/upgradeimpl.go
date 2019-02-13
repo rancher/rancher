@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/controllers/user/systemimage"
 	"github.com/rancher/rancher/pkg/project"
 	appsv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
+	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 
@@ -28,6 +30,7 @@ type loggingService struct {
 	projectLister  v3.ProjectLister
 	templateLister v3.CatalogTemplateLister
 	daemonsets     appsv1beta2.DaemonSetInterface
+	secrets        v1.SecretInterface
 	appDeployer    *AppDeployer
 }
 
@@ -44,7 +47,8 @@ func (l *loggingService) Init(ctx context.Context, cluster *config.UserContext) 
 	l.clusterName = cluster.ClusterName
 	l.projectLister = cluster.Management.Management.Projects(metav1.NamespaceAll).Controller().Lister()
 	l.templateLister = cluster.Management.Management.CatalogTemplates(metav1.NamespaceAll).Controller().Lister()
-	l.daemonsets = cluster.Apps.DaemonSets(metav1.NamespaceAll)
+	l.daemonsets = cluster.Apps.DaemonSets(loggingconfig.LoggingNamespace)
+	l.secrets = cluster.Core.Secrets(loggingconfig.LoggingNamespace)
 	l.appDeployer = ad
 }
 
@@ -65,18 +69,15 @@ func (l *loggingService) Upgrade(currentVersion string) (string, error) {
 		return currentVersion, nil
 	}
 
-	newVersion := template.Spec.DefaultVersion
-
 	//clean old version
-	if err = l.daemonsets.Delete(loggingconfig.FluentdName, &metav1.DeleteOptions{}); !apierrors.IsNotFound(err) {
-		return "", nil
-	}
-
-	if err = l.daemonsets.Delete(loggingconfig.LogAggregatorName, &metav1.DeleteOptions{}); !apierrors.IsNotFound(err) {
-		return "", nil
+	if !strings.Contains(currentVersion, templateID) {
+		if err = l.removeLegacy(); err != nil {
+			return "", err
+		}
 	}
 
 	//upgrade old app
+	newVersion := template.Spec.DefaultVersion
 	newCatalogID := loggingconfig.RancherLoggingCatalogID(newVersion)
 	defaultSystemProjects, err := l.projectLister.List(metav1.NamespaceAll, labels.Set(project.SystemProjectLabel).AsSelector())
 	if err != nil {
@@ -95,7 +96,7 @@ func (l *loggingService) Upgrade(currentVersion string) (string, error) {
 	app, err := l.appDeployer.AppsGetter.Apps(metav1.NamespaceAll).GetNamespaced(systemProject.Name, appName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return newVersion, nil
+			return newFullVersion, nil
 		}
 		return "", errors.Wrapf(err, "get app %s:%s failed", systemProject.Name, appName)
 	}
@@ -107,5 +108,35 @@ func (l *loggingService) Upgrade(currentVersion string) (string, error) {
 			return "", errors.Wrapf(err, "update app %s:%s failed", app.Namespace, app.Name)
 		}
 	}
-	return newVersion, nil
+	return newFullVersion, nil
+}
+
+func (l *loggingService) removeLegacy() error {
+	op := metav1.DeletePropagationBackground
+	errMsg := "failed to remove legacy logging %s %s:%s when upgrade"
+
+	if err := l.daemonsets.Delete(loggingconfig.FluentdName, &metav1.DeleteOptions{PropagationPolicy: &op}); err != nil && !apierrors.IsNotFound(err) {
+		return errors.Wrapf(err, errMsg, loggingconfig.LoggingNamespace, "daemonset", loggingconfig.FluentdName)
+	}
+
+	if err := l.daemonsets.Delete(loggingconfig.LogAggregatorName, &metav1.DeleteOptions{PropagationPolicy: &op}); err != nil && !apierrors.IsNotFound(err) {
+		return errors.Wrapf(err, errMsg, loggingconfig.LoggingNamespace, "daemonset", loggingconfig.LogAggregatorName)
+	}
+
+	legacySSlConfigName := "sslconfig"
+	legacyClusterConfigName := "cluster-logging"
+	legacyProjectConfigName := "project-logging"
+
+	if err := l.secrets.Delete(legacySSlConfigName, &metav1.DeleteOptions{PropagationPolicy: &op}); err != nil && !apierrors.IsNotFound(err) {
+		return errors.Wrapf(err, errMsg, "serect", loggingconfig.LoggingNamespace, legacySSlConfigName)
+	}
+
+	if err := l.secrets.Delete(legacyClusterConfigName, &metav1.DeleteOptions{PropagationPolicy: &op}); err != nil && !apierrors.IsNotFound(err) {
+		return errors.Wrapf(err, errMsg, "serect", loggingconfig.LoggingNamespace, legacyClusterConfigName)
+	}
+
+	if err := l.secrets.Delete(legacyProjectConfigName, &metav1.DeleteOptions{PropagationPolicy: &op}); err != nil && !apierrors.IsNotFound(err) {
+		return errors.Wrapf(err, errMsg, "serect", loggingconfig.LoggingNamespace, legacyProjectConfigName)
+	}
+	return nil
 }
