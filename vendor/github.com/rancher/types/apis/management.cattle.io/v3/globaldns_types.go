@@ -19,6 +19,7 @@ type GlobalDNS struct {
 
 type GlobalDNSSpec struct {
 	FQDN                string   `json:"fqdn,omitempty" norman:"required"`
+	TTL                 int64    `json:"ttl,omitempty"`
 	ProjectNames        []string `json:"projectNames" norman:"type=array[reference[project]],noupdate"`
 	MultiClusterAppName string   `json:"multiClusterAppName,omitempty" norman:"type=reference[multiClusterApp]"`
 	ProviderName        string   `json:"providerName,omitempty" norman:"type=reference[globalDnsProvider],required"`

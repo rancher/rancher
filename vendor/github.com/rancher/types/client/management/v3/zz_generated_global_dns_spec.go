@@ -7,6 +7,7 @@ const (
 	GlobalDNSSpecFieldMultiClusterAppID = "multiClusterAppId"
 	GlobalDNSSpecFieldProjectIDs        = "projectIds"
 	GlobalDNSSpecFieldProviderID        = "providerId"
+	GlobalDNSSpecFieldTTL               = "ttl"
 )
 
 type GlobalDNSSpec struct {
@@ -15,4 +16,5 @@ type GlobalDNSSpec struct {
 	MultiClusterAppID string   `json:"multiClusterAppId,omitempty" yaml:"multiClusterAppId,omitempty"`
 	ProjectIDs        []string `json:"projectIds,omitempty" yaml:"projectIds,omitempty"`
 	ProviderID        string   `json:"providerId,omitempty" yaml:"providerId,omitempty"`
+	TTL               int64    `json:"ttl,omitempty" yaml:"ttl,omitempty"`
 }
