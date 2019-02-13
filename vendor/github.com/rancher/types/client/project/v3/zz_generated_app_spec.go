@@ -11,6 +11,7 @@ const (
 	AppSpecFieldProjectID         = "projectId"
 	AppSpecFieldPrune             = "prune"
 	AppSpecFieldTargetNamespace   = "targetNamespace"
+	AppSpecFieldValuesYaml        = "valuesYaml"
 )
 
 type AppSpec struct {
@@ -23,4 +24,5 @@ type AppSpec struct {
 	ProjectID         string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Prune             bool              `json:"prune,omitempty" yaml:"prune,omitempty"`
 	TargetNamespace   string            `json:"targetNamespace,omitempty" yaml:"targetNamespace,omitempty"`
+	ValuesYaml        string            `json:"valuesYaml,omitempty" yaml:"valuesYaml,omitempty"`
 }
