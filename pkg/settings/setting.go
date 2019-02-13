@@ -39,7 +39,7 @@ var (
 	ServerURL                       = NewSetting("server-url", "")
 	ServerVersion                   = NewSetting("server-version", "dev")
 	SystemDefaultRegistry           = NewSetting("system-default-registry", "")
-	SystemNamespaces                = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,cattle-prometheus,ingress-nginx")
+	SystemNamespaces                = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,cattle-prometheus,ingress-nginx,cattle-global-data")
 	TelemetryOpt                    = NewSetting("telemetry-opt", "prompt")
 	UIFeedBackForm                  = NewSetting("ui-feedback-form", "")
 	UIIndex                         = NewSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
