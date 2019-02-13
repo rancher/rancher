@@ -170,6 +170,9 @@ spec:
         operator: Exists
         effect: NoExecute
       {{- end }}
+      - key: node.kubernetes.io/not-ready
+        effect: NoSchedule
+        operator: Exists
       volumes:
         - name: run
           hostPath:
