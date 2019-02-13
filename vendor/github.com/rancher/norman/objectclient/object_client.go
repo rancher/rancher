@@ -102,6 +102,13 @@ func (p *ObjectClient) Create(o runtime.Object) (runtime.Object, error) {
 		labels := obj.GetLabels()
 		if labels == nil {
 			labels = make(map[string]string)
+		} else {
+			ls := make(map[string]string)
+			for k, v := range labels {
+				ls[k] = v
+			}
+			labels = ls
+
 		}
 		labels["cattle.io/creator"] = "norman"
 		obj.SetLabels(labels)
