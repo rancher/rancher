@@ -22,7 +22,6 @@ import (
 	"github.com/docker/machine/libmachine/log"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -83,25 +82,12 @@ func (m *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.O
 	}
 	var creatorID string
 
-	// This is temporary
-	if len(mcapp.Spec.Roles) == 0 {
-		metaAccessor, err := meta.Accessor(mcapp)
-		if err != nil {
-			return mcapp, err
-		}
-		var ok bool
-		creatorID, ok = metaAccessor.GetAnnotations()[creatorIDAnn]
-		if !ok {
-			return mcapp, fmt.Errorf("MultiClusterApp %v has no creatorId annotation. Cannot create apps for %v", metaAccessor.GetName(), mcapp.Name)
-		}
-	} else {
-		// creatorID is the username of the service account created for this multiclusterapp
-		systemUser, err := m.userManager.EnsureUser(fmt.Sprintf("system://%s", mcapp.Name), "System account for Multiclusterapp "+mcapp.Name)
-		if err != nil {
-			return nil, err
-		}
-		creatorID = systemUser.Name
+	// creatorID is the username of the service account created for this multiclusterapp
+	systemUser, err := m.userManager.EnsureUser(fmt.Sprintf("system://%s", mcapp.Name), "System account for Multiclusterapp "+mcapp.Name)
+	if err != nil {
+		return nil, err
 	}
+	creatorID = systemUser.Name
 
 	log.Debugf("creator ID of apps and multiclusterapprevision for mcapp %v is: %v", mcapp.Name, creatorID)
 	answerMap, err := m.createAnswerMap(mcapp.Spec.Answers)

@@ -497,6 +497,21 @@ func (m *userManager) createUsersRoleAnnotation() (map[string]string, error) {
 	return annotations, nil
 }
 
+func (m *userManager) GetUserByPrincipalID(principalName string) (*v3.User, error) {
+	user, err := m.checkCache(principalName)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		// Not in cache, query API by label
+		user, _, err = m.checkLabels(principalName)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return user, nil
+}
+
 func (m *userManager) checkCache(principalName string) (*v3.User, error) {
 	users, err := m.userIndexer.ByIndex(userByPrincipalIndex, principalName)
 	if err != nil {
