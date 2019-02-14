@@ -72,7 +72,13 @@ func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
 		return b, err
 	}
 	if cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig == nil {
-		return b, fmt.Errorf("[etcd-backup] cluster doesn't have a backup config")
+		v3.BackupConditionCreated.False(b)
+		v3.BackupConditionCreated.Message(b, "cluster doesn't have a backup config")
+		b, err = c.backupClient.Update(b)
+		if err != nil {
+			return b, err
+		}
+		return b, fmt.Errorf("cluster doesn't have a backup config")
 	}
 
 	if !v3.BackupConditionCreated.IsTrue(b) {
