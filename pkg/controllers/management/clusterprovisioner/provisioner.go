@@ -21,9 +21,11 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/flowcontrol"
 )
 
@@ -287,6 +289,8 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 		apiEndpoint, serviceAccountToken, caCert, err = p.driverUpdate(cluster, *spec)
 	} else {
 		logrus.Infof("Updating cluster [%s]", cluster.Name)
+
+		p.setClusterStatusUpdating(cluster)
 		apiEndpoint, serviceAccountToken, caCert, err = p.driverUpdate(cluster, *spec)
 	}
 	// at this point we know the cluster has been modified in driverCreate/Update so reload
@@ -345,6 +349,41 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 
 	logrus.Infof("Provisioned cluster [%s]", cluster.Name)
 	return cluster, nil
+}
+
+func (p *Provisioner) setClusterStatusUpdating(cluster *v3.Cluster) {
+	v3.ClusterConditionUpdated.Unknown(cluster)
+	_, err := p.Clusters.Update(cluster)
+	if err != nil {
+		if !apierrors.IsConflict(err) {
+			logrus.Warnf("Failed to update cluster status [%s]: %v", cluster.Name, err)
+		} else {
+			backoff := wait.Backoff{
+				Duration: 100 * time.Millisecond,
+				Factor:   2,
+				Jitter:   0,
+				Steps:    4,
+			}
+
+			err = wait.ExponentialBackoff(backoff, func() (bool, error) {
+				newCluster, err := p.Clusters.Get(cluster.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, nil
+				}
+				v3.ClusterConditionUpdated.Unknown(newCluster)
+				if _, err = p.Clusters.Update(newCluster); err != nil {
+					if apierrors.IsConflict(err) {
+						return false, nil
+					}
+					return false, fmt.Errorf("%v", err)
+				}
+				return true, nil
+			})
+			if err != nil {
+				logrus.Warnf("Failed to update cluster [%s]: %v", cluster.Name, err)
+			}
+		}
+	}
 }
 
 func resetRkeConfigFlags(cluster *v3.Cluster) {
