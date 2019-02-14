@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/controller"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/settings"
@@ -36,18 +35,13 @@ func (ph *projectHandler) sync(key string, project *mgmtv3.Project) (runtime.Obj
 	if err != nil {
 		return project, errors.Wrapf(err, "failed to find Cluster %s", clusterID)
 	}
-	if !cluster.Spec.EnableClusterMonitoring && project.Spec.EnableProjectMonitoring {
-		return project, &controller.ForgetError{
-			Err: errors.New("unable to operate Project Monitoring without enabling Cluster Monitoring"),
-		}
-	}
 
-	projectTag := getProjectTag(project)
+	clusterName := cluster.Spec.DisplayName
+	projectTag := getProjectTag(project, clusterName)
 	src := project
 	cpy := src.DeepCopy()
 
-	err = ph.doSync(cpy, cluster.Spec.DisplayName)
-
+	err = ph.doSync(cpy, clusterName)
 	if !reflect.DeepEqual(cpy, src) {
 		updated, updateErr := ph.cattleProjectClient.Update(cpy)
 		if updateErr != nil {
@@ -149,7 +143,7 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 
 		"prometheus.persistence.enabled": "false",
 
-		"prometheus.sync.mode": "remote",
+		"prometheus.sync.mode": "federate",
 	}
 
 	mustAppAnswers := map[string]string{
@@ -307,6 +301,6 @@ func (ph *projectHandler) detectAppComponentsWhileUninstall(appName, appTargetNa
 	return err
 }
 
-func getProjectTag(project *mgmtv3.Project) string {
-	return fmt.Sprintf("%s(%s)_%s", project.Name, project.Spec.DisplayName, project.Spec.ClusterName)
+func getProjectTag(project *mgmtv3.Project, clusterName string) string {
+	return fmt.Sprintf("%s(%s) of Cluster %s(%s)", project.Name, project.Spec.DisplayName, project.Spec.ClusterName, clusterName)
 }
