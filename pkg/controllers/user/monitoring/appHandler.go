@@ -25,6 +25,6 @@ type appHandler struct {
 	agentNamespaceClient        corev1.NamespaceInterface
 }
 
-func (ah *appHandler) withdrawApp(appName, appTargetNamespace string) error {
-	return monitoring.WithdrawApp(ah.cattleAppClient, monitoring.OwnedAppListOptions(appName, appTargetNamespace))
+func (ah *appHandler) withdrawApp(clusterID, appName, appTargetNamespace string) error {
+	return monitoring.WithdrawApp(ah.cattleAppClient, monitoring.OwnedAppListOptions(clusterID, appName, appTargetNamespace))
 }

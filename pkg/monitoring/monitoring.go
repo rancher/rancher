@@ -66,9 +66,9 @@ var (
 	}
 )
 
-func OwnedAppListOptions(appName, appTargetNamespace string) metav1.ListOptions {
+func OwnedAppListOptions(clusterID, appName, appTargetNamespace string) metav1.ListOptions {
 	return metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s, %s=%s", appNameLabelKey, appName, appTargetNamespaceLabelKey, appTargetNamespace),
+		LabelSelector: fmt.Sprintf("%s=%s, %s=%s, %s=%s", appClusterIDLabelKey, clusterID, appNameLabelKey, appName, appTargetNamespaceLabelKey, appTargetNamespace),
 	}
 }
 

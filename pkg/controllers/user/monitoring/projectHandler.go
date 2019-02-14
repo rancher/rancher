@@ -111,7 +111,7 @@ func (ph *projectHandler) doSync(project *mgmtv3.Project, clusterName string) er
 		mgmtv3.ProjectConditionMonitoringEnabled.True(project)
 		mgmtv3.ProjectConditionMonitoringEnabled.Message(project, "")
 	} else if project.Status.MonitoringStatus != nil {
-		if err := ph.app.withdrawApp(appName, appTargetNamespace); err != nil {
+		if err := ph.app.withdrawApp(project.Spec.ClusterName, appName, appTargetNamespace); err != nil {
 			mgmtv3.ProjectConditionMonitoringEnabled.Unknown(project)
 			mgmtv3.ProjectConditionMonitoringEnabled.Message(project, err.Error())
 			return errors.Wrap(err, "failed to withdraw monitoring")

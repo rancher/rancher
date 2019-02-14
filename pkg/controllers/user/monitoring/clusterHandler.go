@@ -121,7 +121,7 @@ func (ch *clusterHandler) doSync(cluster *mgmtv3.Cluster) error {
 			return errors.Wrap(err, "failed to disable all owned projects monitoring")
 		}
 
-		if err := ch.app.withdrawApp(appName, appTargetNamespace); err != nil {
+		if err := ch.app.withdrawApp(cluster.Name, appName, appTargetNamespace); err != nil {
 			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
 			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
 			return errors.Wrap(err, "failed to withdraw monitoring")
