@@ -378,7 +378,7 @@ func (l *Lifecycle) Updated(obj *v3.KontainerDriver) (runtime.Object, error) {
 }
 
 func hasStaticSchema(obj *v3.KontainerDriver) bool {
-	return obj.Name == "rancherKubernetesEngine" || obj.Name == "import"
+	return obj.Name == service.RancherKubernetesEngineDriverName || obj.Name == service.ImportDriverName
 }
 
 func getDynamicTypeName(obj *v3.KontainerDriver) string {
