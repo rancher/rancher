@@ -938,7 +938,7 @@ func (d *Driver) waitClusterRemoveExp(ctx context.Context, svc *raw.Service, sta
 
 	for i := 1; i < 12; i++ {
 		time.Sleep(time.Duration(i*i) * time.Second)
-		operation, err := svc.Projects.Zones.Clusters.Delete(state.ProjectID, state.Zone, state.Name).Context(ctx).Do()
+		operation, err = svc.Projects.Zones.Clusters.Delete(state.ProjectID, state.Zone, state.Name).Context(ctx).Do()
 		if err == nil {
 			return operation, nil
 		} else if !strings.Contains(err.Error(), "Please wait and try again once it is done") {
