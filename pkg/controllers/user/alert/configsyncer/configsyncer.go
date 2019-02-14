@@ -322,7 +322,7 @@ func (d *ConfigSyncer) addProjectAlert2Config(config *alertconfig.Config, projec
 
 			if exist {
 				config.Receivers = append(config.Receivers, receiver)
-				r1 := d.newRoute(map[string]string{"group_id": groupID}, group.Spec.GroupWaitSeconds, group.Spec.GroupIntervalSeconds, group.Spec.RepeatIntervalSeconds, []model.LabelName{"group_id"})
+				r1 := d.newRoute(map[string]string{"group_id": groupID}, false, group.Spec.TimingField, []model.LabelName{"group_id"})
 
 				for _, alert := range rules {
 					if alert.Status.AlertState == "inactive" {
@@ -365,7 +365,7 @@ func (d *ConfigSyncer) addClusterAlert2Config(config *alertconfig.Config, alerts
 
 		if exist {
 			config.Receivers = append(config.Receivers, receiver)
-			r1 := d.newRoute(map[string]string{"group_id": groupID}, group.Spec.GroupWaitSeconds, group.Spec.GroupIntervalSeconds, group.Spec.RepeatIntervalSeconds, []model.LabelName{"group_id"})
+			r1 := d.newRoute(map[string]string{"group_id": groupID}, false, group.Spec.TimingField, []model.LabelName{"group_id"})
 			for _, alert := range groupRules {
 				if alert.Status.AlertState == "inactive" {
 					continue
@@ -374,7 +374,16 @@ func (d *ConfigSyncer) addClusterAlert2Config(config *alertconfig.Config, alerts
 				groupBy := getClusterAlertGroupBy(alert.Spec)
 
 				if alert.Spec.EventRule != nil {
-					r2 := d.newRoute(map[string]string{"rule_id": ruleID}, eventGroupWait, eventGroupInterval, alert.Spec.RepeatIntervalSeconds, groupBy)
+					timeFields := v3.TimingField{
+						GroupWaitSeconds:     eventGroupWait,
+						GroupIntervalSeconds: eventGroupInterval,
+					}
+
+					if alert.Spec.Inherited != nil && !*alert.Spec.Inherited {
+						timeFields.RepeatIntervalSeconds = alert.Spec.RepeatIntervalSeconds
+					}
+
+					r2 := d.newRoute(map[string]string{"rule_id": ruleID}, false, timeFields, groupBy)
 					d.appendRoute(r1, r2)
 				}
 
@@ -391,11 +400,16 @@ func (d *ConfigSyncer) addClusterAlert2Config(config *alertconfig.Config, alerts
 }
 
 func (d *ConfigSyncer) addRule(ruleID string, route *alertconfig.Route, comm v3.CommonRuleField, groupBy []model.LabelName) {
-	r2 := d.newRoute(map[string]string{"rule_id": ruleID}, comm.GroupWaitSeconds, comm.GroupIntervalSeconds, comm.RepeatIntervalSeconds, groupBy)
+	inherited := true
+	if comm.Inherited != nil {
+		inherited = *comm.Inherited
+	}
+
+	r2 := d.newRoute(map[string]string{"rule_id": ruleID}, inherited, comm.TimingField, groupBy)
 	d.appendRoute(route, r2)
 }
 
-func (d *ConfigSyncer) newRoute(match map[string]string, groupWait, groupInterval, repeatInterval int, groupBy []model.LabelName) *alertconfig.Route {
+func (d *ConfigSyncer) newRoute(match map[string]string, inherited bool, timeFields v3.TimingField, groupBy []model.LabelName) *alertconfig.Route {
 	route := &alertconfig.Route{
 		Continue: true,
 		Receiver: match["group_id"],
@@ -403,14 +417,23 @@ func (d *ConfigSyncer) newRoute(match map[string]string, groupWait, groupInterva
 		GroupBy:  groupBy,
 	}
 
-	gw := model.Duration(time.Duration(groupWait) * time.Second)
-	route.GroupWait = &gw
+	if !inherited {
+		if timeFields.GroupWaitSeconds > 0 {
+			gw := model.Duration(time.Duration(timeFields.GroupWaitSeconds) * time.Second)
+			route.GroupWait = &gw
+		}
 
-	ri := model.Duration(time.Duration(repeatInterval) * time.Second)
-	route.RepeatInterval = &ri
+		if timeFields.RepeatIntervalSeconds > 0 {
+			ri := model.Duration(time.Duration(timeFields.RepeatIntervalSeconds) * time.Second)
+			route.RepeatInterval = &ri
+		}
 
-	gi := model.Duration(time.Duration(groupInterval) * time.Second)
-	route.GroupInterval = &gi
+		if timeFields.GroupIntervalSeconds > 0 {
+			gi := model.Duration(time.Duration(timeFields.GroupIntervalSeconds) * time.Second)
+			route.GroupInterval = &gi
+		}
+	}
+
 	return route
 }
 
