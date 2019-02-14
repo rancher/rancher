@@ -43,7 +43,8 @@ func Register(ctx context.Context, agentContext *config.UserContext) {
 		cattleClusterClient: cattleClustersClient,
 		app:                 ah,
 	}
-	cattleClustersClient.AddHandler(ctx, "prometheus-operator-handler", oh.sync)
+	cattleClustersClient.AddHandler(ctx, "prometheus-operator-handler", oh.syncCluster)
+	cattleProjectsClient.Controller().AddClusterScopedHandler(ctx, "prometheus-operator-handler", clusterName, oh.syncProject)
 
 	// cluster handler
 	ch := &clusterHandler{
