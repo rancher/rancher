@@ -13,6 +13,7 @@ const (
 	ProjectAlertRuleFieldGroupID               = "groupId"
 	ProjectAlertRuleFieldGroupIntervalSeconds  = "groupIntervalSeconds"
 	ProjectAlertRuleFieldGroupWaitSeconds      = "groupWaitSeconds"
+	ProjectAlertRuleFieldInherited             = "inherited"
 	ProjectAlertRuleFieldLabels                = "labels"
 	ProjectAlertRuleFieldMetricRule            = "metricRule"
 	ProjectAlertRuleFieldName                  = "name"
@@ -39,6 +40,7 @@ type ProjectAlertRule struct {
 	GroupID               string            `json:"groupId,omitempty" yaml:"groupId,omitempty"`
 	GroupIntervalSeconds  int64             `json:"groupIntervalSeconds,omitempty" yaml:"groupIntervalSeconds,omitempty"`
 	GroupWaitSeconds      int64             `json:"groupWaitSeconds,omitempty" yaml:"groupWaitSeconds,omitempty"`
+	Inherited             *bool             `json:"inherited,omitempty" yaml:"inherited,omitempty"`
 	Labels                map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	MetricRule            *MetricRule       `json:"metricRule,omitempty" yaml:"metricRule,omitempty"`
 	Name                  string            `json:"name,omitempty" yaml:"name,omitempty"`

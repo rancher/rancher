@@ -8,6 +8,7 @@ const (
 	ClusterAlertRuleSpecFieldGroupID               = "groupId"
 	ClusterAlertRuleSpecFieldGroupIntervalSeconds  = "groupIntervalSeconds"
 	ClusterAlertRuleSpecFieldGroupWaitSeconds      = "groupWaitSeconds"
+	ClusterAlertRuleSpecFieldInherited             = "inherited"
 	ClusterAlertRuleSpecFieldMetricRule            = "metricRule"
 	ClusterAlertRuleSpecFieldNodeRule              = "nodeRule"
 	ClusterAlertRuleSpecFieldRepeatIntervalSeconds = "repeatIntervalSeconds"
@@ -22,6 +23,7 @@ type ClusterAlertRuleSpec struct {
 	GroupID               string             `json:"groupId,omitempty" yaml:"groupId,omitempty"`
 	GroupIntervalSeconds  int64              `json:"groupIntervalSeconds,omitempty" yaml:"groupIntervalSeconds,omitempty"`
 	GroupWaitSeconds      int64              `json:"groupWaitSeconds,omitempty" yaml:"groupWaitSeconds,omitempty"`
+	Inherited             *bool              `json:"inherited,omitempty" yaml:"inherited,omitempty"`
 	MetricRule            *MetricRule        `json:"metricRule,omitempty" yaml:"metricRule,omitempty"`
 	NodeRule              *NodeRule          `json:"nodeRule,omitempty" yaml:"nodeRule,omitempty"`
 	RepeatIntervalSeconds int64              `json:"repeatIntervalSeconds,omitempty" yaml:"repeatIntervalSeconds,omitempty"`
