@@ -195,6 +195,7 @@ type CommonGroupField struct {
 type CommonRuleField struct {
 	DisplayName string `json:"displayName,omitempty"`
 	Severity    string `json:"severity,omitempty" norman:"required,options=info|critical|warning,default=critical"`
+	Inherited   *bool  `json:"inherited,omitempty" norman:"default=true"`
 	TimingField
 }
 
@@ -207,9 +208,9 @@ type MetricRule struct {
 }
 
 type TimingField struct {
-	GroupWaitSeconds      int `json:"groupWaitSeconds,omitempty" norman:"required,default=30,min=0"`
-	GroupIntervalSeconds  int `json:"groupIntervalSeconds,omitempty" norman:"required,default=180,min=0"`
-	RepeatIntervalSeconds int `json:"repeatIntervalSeconds,omitempty"  norman:"required,default=3600,min=0"`
+	GroupWaitSeconds      int `json:"groupWaitSeconds,omitempty" norman:"required,default=30,min=1"`
+	GroupIntervalSeconds  int `json:"groupIntervalSeconds,omitempty" norman:"required,default=180,min=1"`
+	RepeatIntervalSeconds int `json:"repeatIntervalSeconds,omitempty"  norman:"required,default=3600,min=1"`
 }
 
 type NodeRule struct {
