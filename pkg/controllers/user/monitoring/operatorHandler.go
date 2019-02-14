@@ -43,7 +43,7 @@ func (h *operatorHandler) sync(key string, obj *mgmtv3.Cluster) (runtime.Object,
 				mgmtv3.ClusterConditionMonitoringEnabled.GetStatus(obj) == "") &&
 			!mgmtv3.ClusterConditionPrometheusOperatorDeployed.IsFalse(obj) {
 			newCluster = obj.DeepCopy()
-			if err = withdrawSystemMonitor(h.app); err != nil {
+			if err = withdrawSystemMonitor(h.app, newCluster.Name); err != nil {
 				mgmtv3.ClusterConditionPrometheusOperatorDeployed.Unknown(newCluster)
 				mgmtv3.ClusterConditionPrometheusOperatorDeployed.ReasonAndMessageFromError(newCluster, err)
 			} else {
@@ -111,10 +111,10 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 	return nil
 }
 
-func withdrawSystemMonitor(app *appHandler) error {
+func withdrawSystemMonitor(app *appHandler, clusterID string) error {
 	appName, appTargetNamespace := monitoring.SystemMonitoringInfo()
 
-	if err := monitoring.WithdrawApp(app.cattleAppClient, monitoring.OwnedAppListOptions(appName, appTargetNamespace)); err != nil {
+	if err := monitoring.WithdrawApp(app.cattleAppClient, monitoring.OwnedAppListOptions(clusterID, appName, appTargetNamespace)); err != nil {
 		return errors.Wrap(err, "failed to withdraw prometheus operator app")
 	}
 
