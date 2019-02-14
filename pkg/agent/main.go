@@ -204,7 +204,10 @@ func run() error {
 		if !isConnect() {
 			wsURL += "/register"
 		}
-		logrus.Infof("Connecting to %s with token %s", wsURL, token)
+		// Don't show whole token value, show first/last 4 characters instead
+		logrus.Infof("Connecting to %s with token %s", wsURL,
+			token[0:4]+strings.Repeat("*", len(token)-4*2)+token[len(token)-4:],
+		)
 		remotedialer.ClientConnect(wsURL, http.Header(headers), nil, func(proto, address string) bool {
 			switch proto {
 			case "tcp":
