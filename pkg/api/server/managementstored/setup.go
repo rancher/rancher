@@ -621,6 +621,7 @@ func MultiClusterApps(schemas *types.Schemas, management *config.ScaledContext) 
 		MultiClusterAppLister:         management.Management.MultiClusterApps("").Controller().Lister(),
 		MultiClusterAppRevisionLister: management.Management.MultiClusterAppRevisions("").Controller().Lister(),
 		PrtbLister:                    management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		CrtbLister:                    management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
 		RoleTemplateLister:            management.Management.RoleTemplates("").Controller().Lister(),
 		Users:                         management.Management.Users(""),
 	}

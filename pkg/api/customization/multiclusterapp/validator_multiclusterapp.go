@@ -28,6 +28,7 @@ type Wrapper struct {
 	MultiClusterAppLister         v3.MultiClusterAppLister
 	MultiClusterAppRevisionLister v3.MultiClusterAppRevisionLister
 	PrtbLister                    v3.ProjectRoleTemplateBindingLister
+	CrtbLister                    v3.ClusterRoleTemplateBindingLister
 	RoleTemplateLister            v3.RoleTemplateLister
 	Users                         v3.UserInterface
 }
@@ -78,19 +79,21 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 		return nil
 	}
 	ma := gaccess.MemberAccess{
-		Users:      w.Users,
-		PrtbLister: w.PrtbLister,
+		Users:              w.Users,
+		PrtbLister:         w.PrtbLister,
+		CrtbLister:         w.CrtbLister,
+		RoleTemplateLister: w.RoleTemplateLister,
 	}
-	targets, _ := values.GetSlice(data, client.MultiClusterAppFieldTargets)
 	var targetProjects []string
-	for _, t := range targets {
-		targetProjects = append(targetProjects, convert.ToString(t[client.TargetFieldProjectID]))
-	}
 	callerID := request.Request.Header.Get(gaccess.ImpersonateUserHeader)
 	if request.Method == http.MethodPost {
 		// create request, caller is owner/creator
 		// Request is POST, hence multiclusterapp is being created.
 		// check if creator has the given roles in all target projects
+		targets, _ := values.GetSlice(data, client.MultiClusterAppFieldTargets)
+		for _, t := range targets {
+			targetProjects = append(targetProjects, convert.ToString(t[client.TargetFieldProjectID]))
+		}
 		roleTemplates := convert.ToStringSlice(data[client.MultiClusterAppFieldRoles])
 		return ma.EnsureRoleInTargets(targetProjects, roleTemplates, callerID)
 	}
@@ -141,5 +144,8 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 		return fmt.Errorf("user %v is not an owner of multiclusterapp %v, cannot edit roles", callerID, mcapp.Name)
 	}
 	// check if modifier has all roles listed in toAdd in all projects
+	for _, t := range mcapp.Spec.Targets {
+		targetProjects = append(targetProjects, t.ProjectName)
+	}
 	return ma.EnsureRoleInTargets(targetProjects, rolesToAdd, callerID)
 }
