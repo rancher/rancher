@@ -21,6 +21,7 @@ type MemberAccess struct {
 	Users              v3.UserInterface
 	RoleTemplateLister v3.RoleTemplateLister
 	PrtbLister         v3.ProjectRoleTemplateBindingLister
+	CrtbLister         v3.ClusterRoleTemplateBindingLister
 }
 
 const (
@@ -41,29 +42,70 @@ func (ma *MemberAccess) CheckCallerAccessToTargets(request *types.APIContext, ta
 }
 
 func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []string, callerID string) error {
-	newRoleTemplateMap := make(map[string]bool)
+	newProjectRoleTemplateMap := make(map[string]bool)
+	newClusterRoleTemplateMap := make(map[string]bool)
+	projects := make(map[string]bool)
+	clusters := make(map[string]bool)
 	for _, r := range roleTemplates {
-		if !newRoleTemplateMap[r] {
-			newRoleTemplateMap[r] = true
+		rt, err := ma.RoleTemplateLister.Get("", r)
+		if err != nil {
+			return err
+		}
+		switch rt.Context {
+		case "project":
+			if !newProjectRoleTemplateMap[r] {
+				newProjectRoleTemplateMap[r] = true
+			}
+		case "cluster":
+			if !newClusterRoleTemplateMap[r] {
+				newClusterRoleTemplateMap[r] = true
+			}
 		}
 	}
 	for _, t := range targetProjects {
-		roleTemplateFoundCount := 0
 		split := strings.SplitN(t, ":", 2)
 		if len(split) != 2 {
 			return fmt.Errorf("invalid project ID %v", t)
 		}
-		prtbs, err := ma.PrtbLister.List(split[1], labels.NewSelector())
+		clusterName := split[0]
+		projectName := split[1]
+
+		if !projects[projectName] {
+			projects[projectName] = true
+		}
+		if !clusters[clusterName] {
+			clusters[clusterName] = true
+		}
+	}
+
+	for pname := range projects {
+		projectRoleTemplateFoundCount := 0
+		prtbs, err := ma.PrtbLister.List(pname, labels.NewSelector())
 		if err != nil {
 			return err
 		}
 		for _, prtb := range prtbs {
-			if prtb.UserName == callerID && newRoleTemplateMap[prtb.RoleTemplateName] {
-				roleTemplateFoundCount++
+			if prtb.UserName == callerID && newProjectRoleTemplateMap[prtb.RoleTemplateName] {
+				projectRoleTemplateFoundCount++
 			}
 		}
-		if roleTemplateFoundCount != len(newRoleTemplateMap) {
-			return fmt.Errorf("user %v does not have all roles provided in project %v", callerID, t)
+		if projectRoleTemplateFoundCount != len(newProjectRoleTemplateMap) {
+			return fmt.Errorf("user %v does not have all project roles provided in project %v", callerID, pname)
+		}
+	}
+	for cname := range clusters {
+		clusterRoleTemplateFoundCount := 0
+		crtbs, err := ma.CrtbLister.List(cname, labels.NewSelector())
+		if err != nil {
+			return err
+		}
+		for _, crtb := range crtbs {
+			if crtb.UserName == callerID && newClusterRoleTemplateMap[crtb.RoleTemplateName] {
+				clusterRoleTemplateFoundCount++
+			}
+		}
+		if clusterRoleTemplateFoundCount != len(newClusterRoleTemplateMap) {
+			return fmt.Errorf("user %v does not have all cluster roles provided in cluster %v", callerID, cname)
 		}
 	}
 	return nil
