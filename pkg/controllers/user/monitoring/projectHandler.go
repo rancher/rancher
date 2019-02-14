@@ -148,6 +148,8 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 		"grafana.persistence.enabled": "false",
 
 		"prometheus.persistence.enabled": "false",
+
+		"prometheus.sync.mode": "remote",
 	}
 
 	mustAppAnswers := map[string]string{
@@ -176,14 +178,12 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 		"grafana.apiGroup":           monitoring.APIVersion.Group,
 		"grafana.serviceAccountName": appName,
 
-		"prometheus.enabled":                                                                "true",
-		"prometheus.externalLabels.prometheus_from":                                         clusterName,
-		"prometheus.level":                                                                  "project",
-		"prometheus.apiGroup":                                                               monitoring.APIVersion.Group,
-		"prometheus.serviceAccountNameOverride":                                             appName,
-		"prometheus.additionalBindingClusterRoles[0]":                                       fmt.Sprintf("%s-namespaces-readonly", appDeployProjectID),
-		"prometheus.remoteRead[0].url":                                                      fmt.Sprintf("http://%s.%s:%s/api/v1/read", clusterPrometheusSvcName, clusterPrometheusSvcNamespaces, clusterPrometheusPort),
-		"prometheus.remoteRead[0].bearerTokenFile":                                          "/var/run/secrets/kubernetes.io/serviceaccount/token",
+		"prometheus.enabled":                          "true",
+		"prometheus.externalLabels.prometheus_from":   clusterName,
+		"prometheus.level":                            "project",
+		"prometheus.apiGroup":                         monitoring.APIVersion.Group,
+		"prometheus.serviceAccountNameOverride":       appName,
+		"prometheus.additionalBindingClusterRoles[0]": fmt.Sprintf("%s-namespaces-readonly", appDeployProjectID),
 		"prometheus.additionalAlertManagerConfigs[0].static_configs[0].targets[0]":          fmt.Sprintf("%s.%s:%s", clusterAlertManagerSvcName, clusterAlertManagerSvcNamespaces, clusterAlertManagerPort),
 		"prometheus.additionalAlertManagerConfigs[0].static_configs[0].labels.level":        "project",
 		"prometheus.additionalAlertManagerConfigs[0].static_configs[0].labels.project_id":   project.Name,
@@ -206,6 +206,15 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 	// cannot overwrite mustAppAnswers
 	for mustKey, mustVal := range mustAppAnswers {
 		appAnswers[mustKey] = mustVal
+	}
+
+	// complete sync target & path
+	if appAnswers["prometheus.sync.mode"] == "federate" {
+		appAnswers["prometheus.sync.target"] = fmt.Sprintf("%s.%s:%s", clusterPrometheusSvcName, clusterPrometheusSvcNamespaces, clusterPrometheusPort)
+		appAnswers["prometheus.sync.path"] = "/federate"
+	} else {
+		appAnswers["prometheus.sync.target"] = fmt.Sprintf("http://%s.%s:%s", clusterPrometheusSvcName, clusterPrometheusSvcNamespaces, clusterPrometheusPort)
+		appAnswers["prometheus.sync.path"] = "/api/v1/read"
 	}
 
 	appCatalogID := settings.SystemMonitoringCatalogID.Get()
