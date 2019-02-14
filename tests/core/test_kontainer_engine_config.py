@@ -33,22 +33,22 @@ def test_eks_config_appears_correctly(admin_mc, remove_resource):
     """ Simple test to ensure that cluster returned from POST is correct"""
     cluster = admin_mc.client.create_cluster(
         name=random_str(), amazonElasticContainerServiceConfig={
-             "accessKey": "MyAccessKey",
-             "ami": "",
-             "associateWorkerNodePublicIp": True,
-             "displayName": "EKS-api-cluster",
-             "driverName": "amazonelasticcontainerservice",
-             "instanceType": "t3.small",
-             "kubernetesVersion": "1.11",
-             "maximumNodes": 3,
-             "minimumNodes": 1,
-             "region": "us-east-2",
-             "secretKey": "secret-key",
-             "serviceRole": "",
-             "sessionToken": "",
-             "userData": "!#/bin/bash\ntouch /tmp/testfile.txt",
-             "virtualNetwork": "",
-            })
+            "accessKey": "MyAccessKey",
+            "ami": "",
+            "associateWorkerNodePublicIp": True,
+            "displayName": "EKS-api-cluster",
+            "driverName": "amazonelasticcontainerservice",
+            "instanceType": "t3.small",
+            "kubernetesVersion": "1.11",
+            "maximumNodes": 3,
+            "minimumNodes": 1,
+            "region": "us-east-2",
+            "secretKey": "secret-key",
+            "serviceRole": "",
+            "sessionToken": "",
+            "userData": "!#/bin/bash\ntouch /tmp/testfile.txt",
+            "virtualNetwork": "",
+        })
     remove_resource(cluster)
 
     # test cluster returned from POST has correct config
@@ -73,3 +73,16 @@ def test_eks_config_appears_correctly(admin_mc, remove_resource):
 
     # test that cluster returned from PUT has correct config
     assert cluster.amazonElasticContainerServiceConfig.maximumNodes == 5
+
+
+def test_rke_config_appears_correctly(admin_mc, remove_resource):
+    """ Testing a single field from the RKE config to ensure that the
+    schema is properly populated"""
+    cluster = admin_mc.client.create_cluster(
+        name=random_str(), rancherKubernetesEngineConfig={
+            "kubernetesVersion": "some-fake-version",
+        })
+    remove_resource(cluster)
+
+    k8s_version = cluster.rancherKubernetesEngineConfig.kubernetesVersion
+    assert k8s_version == "some-fake-version"
