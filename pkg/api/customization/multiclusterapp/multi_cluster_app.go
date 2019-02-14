@@ -143,8 +143,10 @@ func (w Wrapper) modifyProjects(request *types.APIContext, actionName string) (*
 		return nil, existingProjects, inputProjects, inputAnswers, fmt.Errorf("multiclusterapp %v has no creatorId annotation", metaAccessor.GetName())
 	}
 	ma := gaccess.MemberAccess{
-		Users:      w.Users,
-		PrtbLister: w.PrtbLister,
+		Users:              w.Users,
+		PrtbLister:         w.PrtbLister,
+		CrtbLister:         w.CrtbLister,
+		RoleTemplateLister: w.RoleTemplateLister,
 	}
 	accessType, err := ma.GetAccessTypeOfCaller(callerID, creatorID, mcapp.Name, mcapp.Spec.Members)
 	if err != nil {
