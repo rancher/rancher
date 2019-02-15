@@ -12,6 +12,8 @@ import (
 
 const (
 	WorkerThreads = 50
+
+	SupportedSyncToolsVersion = "0.1.22"
 )
 
 func StrToSemVer(version string) (*semver.Version, error) {
@@ -107,4 +109,27 @@ func ValidateVersion(version string) error {
 	}
 
 	return nil
+}
+
+func GetDefaultRKETools() string {
+	return v3.AllK8sVersions[v3.DefaultK8s].Alpine
+}
+
+func IsRancherBackupSupported(image string) bool {
+	v := strings.Split(image, ":")
+	last := v[len(v)-1]
+
+	sv, err := StrToSemVer(last)
+	if err != nil {
+		return false
+	}
+
+	supported, err := StrToSemVer(SupportedSyncToolsVersion)
+	if err != nil {
+		return false
+	}
+	if sv.LessThan(*supported) {
+		return false
+	}
+	return true
 }
