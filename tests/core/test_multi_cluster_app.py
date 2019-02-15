@@ -2,6 +2,7 @@ from .common import random_str
 from rancher import ApiError
 from .conftest import wait_until
 import time
+import pytest
 
 
 def test_multiclusterapp_create(admin_mc, admin_pc, remove_resource):
@@ -62,6 +63,7 @@ def test_multiclusterapp_create_with_members(admin_mc, admin_pc,
         assert e.error.status == 403
 
 
+@pytest.mark.skip()
 def test_multiclusterapp_create_with_roles(admin_mc, admin_pc,
                                            remove_resource, user_factory):
     client = admin_mc.client
