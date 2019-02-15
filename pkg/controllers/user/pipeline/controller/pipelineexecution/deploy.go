@@ -11,7 +11,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
+	"github.com/rancher/rancher/pkg/controllers/user/resourcequota"
 	images "github.com/rancher/rancher/pkg/image"
+	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/randomtoken"
 	"github.com/rancher/rancher/pkg/ref"
@@ -47,6 +49,9 @@ func (l *Lifecycle) deploy(projectName string) error {
 	logrus.Debug("deploy pipeline workloads and services")
 	if _, err := l.namespaces.Create(ns); err != nil && !apierrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "Error create ns")
+	}
+	if err := l.waitResourceQuotaInitCondition(ns.Name); err != nil {
+		return err
 	}
 	token, err := randomtoken.Generate()
 	if err != nil {
@@ -126,6 +131,26 @@ func (l *Lifecycle) deploy(projectName string) error {
 	}
 
 	return l.reconcileRb(projectName)
+}
+
+func (l *Lifecycle) waitResourceQuotaInitCondition(namespace string) error {
+	tries := 0
+	for tries <= 3 {
+		ns, err := l.namespaces.Get(namespace, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		set, err := namespaceutil.IsNamespaceConditionSet(ns, resourcequota.ResourceQuotaInitCondition, true)
+		if err != nil {
+			return err
+		}
+		if set {
+			break
+		}
+		time.Sleep(2 * time.Second)
+		tries++
+	}
+	return nil
 }
 
 func getCommonPipelineNamespace() *corev1.Namespace {
