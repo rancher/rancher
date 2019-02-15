@@ -269,10 +269,14 @@ func IsEtcdMember(ctx context.Context, etcdHost *hosts.Host, etcdHosts []*hosts.
 
 func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdSnapshotImage string, name string, once bool, es v3.ETCDService) error {
 	log.Infof(ctx, "[etcd] Saving snapshot [%s] on host [%s]", name, etcdHost.Address)
+	backupCmd := "etcd-backup"
+	if !util.IsRancherBackupSupported(etcdSnapshotImage) {
+		backupCmd = "rolling-backup"
+	}
 	imageCfg := &container.Config{
 		Cmd: []string{
 			"/opt/rke-tools/rke-etcd-backup",
-			"etcd-backup",
+			backupCmd,
 			"save",
 			"--cacert", pki.GetCertPath(pki.CACertName),
 			"--cert", pki.GetCertPath(pki.KubeNodeCertName),
@@ -330,7 +334,6 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 	if snapshotCont.State.Status == "exited" || snapshotCont.State.Restarting {
 		log.Warnf(ctx, "Etcd rolling snapshot container failed to start correctly")
 		return docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdSnapshotContainerName)
-
 	}
 	return nil
 }
