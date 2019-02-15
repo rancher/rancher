@@ -14,7 +14,7 @@ var (
 	InjectDefaults string
 
 	AgentImage                      = NewSetting("agent-image", "rancher/rancher-agent:master")
-	AuthImage                       = NewSetting("auth-image", "erikwilson/kube-api-auth:latest") // FIXME: Update to Rancher image when released
+	AuthImage                       = NewSetting("auth-image", "rancher/kube-api-auth:v0.1.1")
 	WindowsAgentImage               = NewSetting("windows-agent-image", "rancher/rancher-agent:master-nanoserver-1803")
 	CACerts                         = NewSetting("cacerts", "")
 	CLIURLDarwin                    = NewSetting("cli-url-darwin", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-darwin-amd64-v1.0.0-alpha8.tar.gz")
