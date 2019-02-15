@@ -42,6 +42,7 @@ type HTMLResponseWriter struct {
 func (h *HTMLResponseWriter) start(apiContext *types.APIContext, code int, obj interface{}) {
 	AddCommonResponseHeader(apiContext)
 	apiContext.Response.Header().Set("content-type", "text/html")
+	apiContext.Response.Header().Set("X-Frame-Options", "deny")
 	apiContext.Response.WriteHeader(code)
 }
 
