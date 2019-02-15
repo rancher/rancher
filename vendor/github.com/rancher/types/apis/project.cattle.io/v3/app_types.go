@@ -83,6 +83,7 @@ type AppUpgradeConfig struct {
 	Answers      map[string]string `json:"answers,omitempty"`
 	ForceUpgrade bool              `json:"forceUpgrade,omitempty"`
 	Files        map[string]string `json:"files,omitempty"`
+	ValuesYaml   string            `json:"valuesYaml,omitempty"`
 }
 
 type RollbackRevision struct {
