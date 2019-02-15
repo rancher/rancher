@@ -66,7 +66,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 	connectHandler, connectConfigHandler := connectHandlers(scaledContext)
 
 	samlRoot := saml.AuthHandler()
-	chain := responsewriter.NewMiddlewareChain(responsewriter.Gzip, responsewriter.NoCache, responsewriter.ContentType, ui.UI)
+	chain := responsewriter.NewMiddlewareChain(responsewriter.Gzip, responsewriter.NoCache, responsewriter.DenyFrameOptions, responsewriter.ContentType, ui.UI)
 	root.Handle("/", chain.Handler(managementAPI))
 	root.PathPrefix("/v3-public").Handler(publicAPI)
 	root.Handle("/v3/import/{token}.yaml", http.HandlerFunc(clusterregistrationtokens.ClusterImportHandler))
@@ -85,7 +85,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 	root.PathPrefix("/v1-saml").Handler(samlRoot)
 
 	// UI
-	uiContent := responsewriter.NewMiddlewareChain(responsewriter.Gzip, responsewriter.CacheMiddleware("json", "js", "css")).Handler(ui.Content())
+	uiContent := responsewriter.NewMiddlewareChain(responsewriter.Gzip, responsewriter.DenyFrameOptions, responsewriter.CacheMiddleware("json", "js", "css")).Handler(ui.Content())
 	root.PathPrefix("/assets").Handler(uiContent)
 	root.PathPrefix("/translations").Handler(uiContent)
 	root.PathPrefix("/ember-fetch").Handler(uiContent)
