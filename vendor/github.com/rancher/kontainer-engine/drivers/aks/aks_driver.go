@@ -808,7 +808,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 				DNSPrefix:      to.StringPtr(agentDNSPrefix),
 				Count:          countPointer,
 				MaxPods:        maxPodsPointer,
-				Name:           to.StringPtr(safeSlice(driverState.AgentName, 12)),
+				Name:           to.StringPtr(driverState.AgentName),
 				OsDiskSizeGB:   osDiskSizeGBPointer,
 				OsType:         containerservice.Linux,
 				StorageProfile: agentStorageProfile,
