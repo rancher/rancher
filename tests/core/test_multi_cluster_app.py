@@ -100,6 +100,7 @@ def test_multiclusterapp_create_with_roles(admin_mc, admin_pc,
         assert "does not have all cluster roles" in e.error.message
 
 
+@pytest.mark.skip()
 def test_multiclusterapp_update_roles(admin_mc, admin_pc, remove_resource):
     client = admin_mc.client
     mcapp_name = random_str()
