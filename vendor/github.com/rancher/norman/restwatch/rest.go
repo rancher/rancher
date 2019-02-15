@@ -21,7 +21,7 @@ func UnversionedRESTClientFor(config *rest.Config) (rest.Interface, error) {
 	}
 
 	newConfig := *config
-	newConfig.Timeout = time.Hour
+	newConfig.Timeout = 30 * time.Minute
 	watchClient, err := rest.UnversionedRESTClientFor(&newConfig)
 	if err != nil {
 		return nil, err
