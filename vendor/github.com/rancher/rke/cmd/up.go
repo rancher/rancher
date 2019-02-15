@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"k8s.io/client-go/util/cert"
 )
@@ -75,44 +73,6 @@ func UpCommand() cli.Command {
 		Action: clusterUpFromCli,
 		Flags:  upFlags,
 	}
-}
-
-func doUpgradeLegacyCluster(ctx context.Context, kubeCluster *cluster.Cluster, fullState *cluster.FullState) error {
-	if _, err := os.Stat(kubeCluster.LocalKubeConfigPath); os.IsNotExist(err) {
-		// there is no kubeconfig. This is a new cluster
-		logrus.Debug("[state] local kubeconfig not found, this is a new cluster")
-		return nil
-	}
-	if _, err := os.Stat(kubeCluster.StateFilePath); err == nil {
-		// this cluster has a previous state, I don't need to upgrade!
-		logrus.Debug("[state] previous state found, this is not a legacy cluster")
-		return nil
-	}
-	// We have a kubeconfig and no current state. This is a legacy cluster or a new cluster with old kubeconfig
-	// let's try to upgrade
-	log.Infof(ctx, "[state] Possible legacy cluster detected, trying to upgrade")
-	if err := cluster.RebuildKubeconfig(ctx, kubeCluster); err != nil {
-		return err
-	}
-	recoveredCluster, err := cluster.GetStateFromKubernetes(ctx, kubeCluster)
-	if err != nil {
-		return err
-	}
-	// if we found a recovered cluster, we will need override the current state
-	if recoveredCluster != nil {
-		recoveredCerts, err := cluster.GetClusterCertsFromKubernetes(ctx, kubeCluster)
-		if err != nil {
-			return err
-		}
-		fullState.CurrentState.RancherKubernetesEngineConfig = recoveredCluster.RancherKubernetesEngineConfig.DeepCopy()
-		fullState.CurrentState.CertificatesBundle = recoveredCerts
-
-		// we don't want to regenerate certificates
-		fullState.DesiredState.CertificatesBundle = recoveredCerts
-		return fullState.WriteStateFile(ctx, kubeCluster.StateFilePath)
-	}
-
-	return nil
 }
 
 func ClusterUp(ctx context.Context, dialersOptions hosts.DialersOptions, flags cluster.ExternalFlags) (string, string, string, string, map[string]pki.CertificatePKI, error) {

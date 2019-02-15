@@ -30,7 +30,7 @@ func EtcdCommand() cli.Command {
 		},
 		cli.BoolFlag{
 			Name:  "s3",
-			Usage: "Enabled backup to s3",
+			Usage: "Enabled backup to s3, set true or false",
 		},
 		cli.StringFlag{
 			Name:  "s3-endpoint",
@@ -110,18 +110,18 @@ func RestoreEtcdSnapshot(
 	flags cluster.ExternalFlags, snapshotName string) error {
 
 	log.Infof(ctx, "Restoring etcd snapshot %s", snapshotName)
-	stateFilePath := cluster.GetStateFilePath(flags.ClusterFilePath, flags.ConfigDir)
-	rkeFullState, err := cluster.ReadStateFile(ctx, stateFilePath)
+	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags)
 	if err != nil {
+		return err
+	}
+	stateFilePath := cluster.GetStateFilePath(flags.ClusterFilePath, flags.ConfigDir)
+	rkeFullState, _ := cluster.ReadStateFile(ctx, stateFilePath)
+	if err := doUpgradeLegacyCluster(ctx, kubeCluster, rkeFullState); err != nil {
 		return err
 	}
 
 	rkeFullState.CurrentState = cluster.State{}
 	if err := rkeFullState.WriteStateFile(ctx, stateFilePath); err != nil {
-		return err
-	}
-	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags)
-	if err != nil {
 		return err
 	}
 	if err := kubeCluster.SetupDialers(ctx, dialersOptions); err != nil {
