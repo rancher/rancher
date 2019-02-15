@@ -24,10 +24,10 @@ import (
 const (
 	projectIDAnnotation             = "field.cattle.io/projectId"
 	resourceQuotaLabel              = "resourcequota.management.cattle.io/default-resource-quota"
-	resourceQuotaInitCondition      = "ResourceQuotaInit"
 	resourceQuotaAnnotation         = "field.cattle.io/resourceQuota"
 	limitRangeAnnotation            = "field.cattle.io/containerDefaultResourceLimit"
 	resourceQuotaValidatedCondition = "ResourceQuotaValidated"
+	ResourceQuotaInitCondition      = "ResourceQuotaInit"
 )
 
 /*
@@ -182,12 +182,12 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (runtime.Obje
 		return updated, err
 	}
 
-	set, err := namespaceutil.IsNamespaceConditionSet(ns, resourceQuotaInitCondition, true)
+	set, err := namespaceutil.IsNamespaceConditionSet(ns, ResourceQuotaInitCondition, true)
 	if err != nil || set {
 		return updated, err
 	}
 	toUpdate := updated.DeepCopy()
-	namespaceutil.SetNamespaceCondition(toUpdate, time.Second*1, resourceQuotaInitCondition, true, "")
+	namespaceutil.SetNamespaceCondition(toUpdate, time.Second*1, ResourceQuotaInitCondition, true, "")
 	return c.Namespaces.Update(toUpdate)
 
 }
