@@ -86,6 +86,9 @@ func (l *alertService) Upgrade(currentVersion string) (string, error) {
 	newCatalogID := settings.SystemMonitoringCatalogID.Get()
 
 	NewVersion, _, err := common.ParseExternalID(newCatalogID)
+	if err != nil {
+		return "", err
+	}
 	if currentVersion == NewVersion {
 		return currentVersion, nil
 	}

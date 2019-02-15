@@ -102,7 +102,6 @@ func (l *Lifecycle) createHook(obj *v3.Pipeline) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	accessToken := credential.Spec.AccessToken
 	_, projID := ref.Parse(obj.Spec.ProjectName)
 	scpConfig, err := providers.GetSourceCodeProviderConfig(credential.Spec.SourceCodeType, projID)
 	if err != nil {
@@ -112,7 +111,7 @@ func (l *Lifecycle) createHook(obj *v3.Pipeline) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	accessToken, err = utils.EnsureAccessToken(l.sourceCodeCredentials, remote, credential)
+	accessToken, err := utils.EnsureAccessToken(l.sourceCodeCredentials, remote, credential)
 	if err != nil {
 		return "", err
 	}
@@ -131,7 +130,6 @@ func (l *Lifecycle) deleteHook(obj *v3.Pipeline) error {
 	if err != nil {
 		return err
 	}
-	accessToken := credential.Spec.AccessToken
 	_, projID := ref.Parse(obj.Spec.ProjectName)
 	scpConfig, err := providers.GetSourceCodeProviderConfig(credential.Spec.SourceCodeType, projID)
 	if err != nil {
@@ -141,7 +139,7 @@ func (l *Lifecycle) deleteHook(obj *v3.Pipeline) error {
 	if err != nil {
 		return err
 	}
-	accessToken, err = utils.EnsureAccessToken(l.sourceCodeCredentials, remote, credential)
+	accessToken, err := utils.EnsureAccessToken(l.sourceCodeCredentials, remote, credential)
 	if err != nil {
 		return err
 	}

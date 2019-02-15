@@ -198,9 +198,7 @@ func (m *userManager) EnsureClusterToken(clusterName, tokenName, description, us
 	}
 
 	token, err := m.tokenLister.Get("", tokenName)
-	if apierrors.IsNotFound(err) {
-		token, err = nil, nil
-	} else if err != nil {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return "", err
 	}
 

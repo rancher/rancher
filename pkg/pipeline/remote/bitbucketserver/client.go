@@ -333,6 +333,7 @@ func (c *client) SetPipelineFileInRepo(repoURL string, branch string, accessToke
 			return err
 		}
 		values["sourceCommitId"] = commitID
+		values["message"] = message
 	}
 
 	for key, v := range values {
