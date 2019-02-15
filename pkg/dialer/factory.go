@@ -171,9 +171,11 @@ func hostPort(cluster *v3.Cluster) string {
 }
 
 func native() (dialer.Dialer, error) {
-	return func(network, address string) (net.Conn, error) {
-		return net.DialTimeout(network, address, 30*time.Second)
-	}, nil
+	netDialer := net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+	return netDialer.Dial, nil
 }
 
 func (f *Factory) DockerDialer(clusterName, machineName string) (dialer.Dialer, error) {
