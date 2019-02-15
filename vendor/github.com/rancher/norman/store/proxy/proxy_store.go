@@ -256,7 +256,7 @@ func (s *Store) realWatch(apiContext *types.APIContext, schema *types.Schema, op
 		k8sClient = watchClient.WatchClient()
 	}
 
-	timeout := int64(60 * 60)
+	timeout := int64(60 * 30)
 	req := s.common(namespace, k8sClient.Get())
 	req.VersionedParams(&metav1.ListOptions{
 		Watch:           true,
