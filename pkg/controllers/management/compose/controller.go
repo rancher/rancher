@@ -154,6 +154,9 @@ func up(token string, port int, config *compose.Config) error {
 		TokenKey: token,
 		Insecure: true,
 	})
+	if err != nil {
+		return err
+	}
 	baseProjectClient, err := clientbase.NewAPIClient(&clientbase.ClientOpts{
 		URL:      fmt.Sprintf(url, port) + "/project",
 		TokenKey: token,

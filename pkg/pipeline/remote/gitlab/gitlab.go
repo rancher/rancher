@@ -283,7 +283,7 @@ func (c *client) SetPipelineFileInRepo(repoURL string, branch string, accessToke
 	resp, err := doRequestToGitlab(method, url, accessToken, option)
 	defer resp.Body.Close()
 
-	return nil
+	return err
 }
 
 func (c *client) GetBranches(repoURL string, accessToken string) ([]string, error) {

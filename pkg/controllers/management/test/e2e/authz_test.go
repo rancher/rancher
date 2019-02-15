@@ -50,7 +50,7 @@ func (s *AuthzSuite) TestClusterRoleTemplateBindingCreate(c *check.C) {
 	// create RoleTemplate that will reference the first one
 	rtName := "testcrt1"
 	s.clusterClient.RbacV1().ClusterRoles().Delete(rtName, &metav1.DeleteOptions{})
-	rt, err := s.createRoleTemplate(rtName,
+	rt, _ := s.createRoleTemplate(rtName,
 		[]rbacv1.PolicyRule{
 			{
 				Verbs:           []string{"get", "list", "watch"},
@@ -147,7 +147,7 @@ func (s *AuthzSuite) TestRoleTemplateBindingCreate(c *check.C) {
 	// create RoleTemplate that will reference the first one
 	rtName := "testrt1"
 	s.clusterClient.RbacV1().ClusterRoles().Delete(rtName, &metav1.DeleteOptions{})
-	rt, err := s.createRoleTemplate(rtName,
+	rt, _ := s.createRoleTemplate(rtName,
 		[]rbacv1.PolicyRule{
 			{
 				Verbs:           []string{"get", "list", "watch"},
@@ -230,7 +230,7 @@ func (s *AuthzSuite) TestBuiltinRoleTemplateBindingCreate(c *check.C) {
 
 	// create RoleTemplate that user will be bound to
 	rtName := "testrt2"
-	_, err := s.createRoleTemplate(rtName,
+	s.createRoleTemplate(rtName,
 		[]rbacv1.PolicyRule{}, []string{}, true, c)
 
 	// create namespace and watchers for resources in that namespace

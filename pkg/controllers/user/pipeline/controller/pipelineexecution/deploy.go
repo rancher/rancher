@@ -666,7 +666,7 @@ func (l *Lifecycle) reconcileProxyConfigMap(projectID string) error {
 			return err
 		}
 		toUpdate := cm.DeepCopy()
-		portMap, err := utils.GetRegistryPortMapping(toUpdate)
+		portMap, err = utils.GetRegistryPortMapping(toUpdate)
 		if err != nil {
 			return err
 		}

@@ -2,7 +2,6 @@ package providers
 
 import (
 	"github.com/rancher/rancher/pkg/pipeline/remote"
-	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
@@ -14,9 +13,7 @@ import (
 func GetPipelineConfigByBranch(sourceCodeCredentials v3.SourceCodeCredentialInterface, sourceCodeCredentialLister v3.SourceCodeCredentialLister, pipeline *v3.Pipeline, branch string) (*v3.PipelineConfig, error) {
 	credentialName := pipeline.Spec.SourceCodeCredentialName
 	repoURL := pipeline.Spec.RepositoryURL
-	accessToken := ""
 	_, projID := ref.Parse(pipeline.Spec.ProjectName)
-	sourceCodeType := model.GithubType
 	var scpConfig interface{}
 	var credential *v3.SourceCodeCredential
 	var err error
@@ -26,9 +23,7 @@ func GetPipelineConfigByBranch(sourceCodeCredentials v3.SourceCodeCredentialInte
 		if err != nil {
 			return nil, err
 		}
-		accessToken = credential.Spec.AccessToken
-		sourceCodeType = credential.Spec.SourceCodeType
-
+		sourceCodeType := credential.Spec.SourceCodeType
 		scpConfig, err = GetSourceCodeProviderConfig(sourceCodeType, projID)
 		if err != nil {
 			return nil, err
@@ -38,7 +33,7 @@ func GetPipelineConfigByBranch(sourceCodeCredentials v3.SourceCodeCredentialInte
 	if err != nil {
 		return nil, err
 	}
-	accessToken, err = utils.EnsureAccessToken(sourceCodeCredentials, remote, credential)
+	accessToken, err := utils.EnsureAccessToken(sourceCodeCredentials, remote, credential)
 	if err != nil {
 		return nil, err
 	}

@@ -359,7 +359,7 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 		}
 	}
 
-	// get private registeries
+	// get private registries
 	privateRegistriesMap := make(map[string]v3.PrivateRegistry)
 	for _, pr := range rkeConfig.PrivateRegistries {
 		if pr.URL == "" {
