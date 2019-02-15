@@ -115,6 +115,7 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		answers := actionInput["answers"]
 		forceUpgrade := actionInput["forceUpgrade"]
 		files := actionInput["files"]
+		valuesYaml := actionInput["valuesYaml"]
 		_, namespace := ref.Parse(app.ProjectID)
 		obj, err := w.AppGetter.Apps(namespace).Get(app.Name, metav1.GetOptions{})
 		if err != nil {
@@ -148,10 +149,14 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 				obj.Spec.ExternalID = "" // ignore externalID
 			}
 		}
+		if valuesYaml != nil {
+			obj.Spec.ValuesYaml = convert.ToString(valuesYaml)
+		}
 
 		if _, err := w.AppGetter.Apps(namespace).Update(obj); err != nil {
 			return err
 		}
+		apiContext.WriteResponse(http.StatusNoContent, map[string]interface{}{})
 		return nil
 	case "rollback":
 		forceUpgrade := actionInput["forceUpgrade"]
@@ -183,6 +188,7 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		if _, err := w.AppGetter.Apps(namespace).Update(obj); err != nil {
 			return err
 		}
+		apiContext.WriteResponse(http.StatusNoContent, map[string]interface{}{})
 		return nil
 	}
 	return nil
