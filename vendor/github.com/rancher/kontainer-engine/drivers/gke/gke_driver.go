@@ -180,10 +180,6 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Type:  types.BoolType,
 		Usage: "To enable kubernetes alpha feature",
 	}
-	driverFlag.Options["legacy-authorization"] = &types.Flag{
-		Type:  types.BoolType,
-		Usage: "Enable legacy authorization",
-	}
 	driverFlag.Options["enable-stackdriver-logging"] = &types.Flag{
 		Type:  types.BoolPointerType,
 		Usage: "Disable stackdriver logging",
@@ -345,7 +341,7 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Usage: "The sub-network to use for the cluster",
 	}
 	driverFlag.Options["enable-legacy-abac"] = &types.Flag{
-		Type:  types.StringType,
+		Type:  types.BoolType,
 		Usage: "Whether to enable legacy abac on the cluster",
 	}
 	driverFlag.Options["locations"] = &types.Flag{
@@ -450,7 +446,7 @@ func getStateFromOpts(driverOptions *types.DriverOptions) (state, error) {
 	d.NodePool.Config.ImageType = options.GetValueFromDriverOptions(driverOptions, types.StringType, "imageType").(string)
 	d.Network = options.GetValueFromDriverOptions(driverOptions, types.StringType, "network").(string)
 	d.SubNetwork = options.GetValueFromDriverOptions(driverOptions, types.StringType, "subNetwork").(string)
-	d.LegacyAbac = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "legacy-authorization", "enableLegacyAbac").(bool)
+	d.LegacyAbac = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "enable-legacy-abac", "enableLegacyAbac").(bool)
 	d.Locations = []string{}
 	locations := options.GetValueFromDriverOptions(driverOptions, types.StringSliceType, "locations").(*types.StringSlice)
 	for _, location := range locations.Value {
@@ -631,7 +627,11 @@ func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, opts *type
 		state.NodePoolID = cluster.NodePools[0].Name
 	}
 
-	logrus.Debugf("Updating config. MasterVersion: %s, NodeVersion: %s, NodeCount: %v", state.MasterVersion, state.NodeVersion, state.NodePool.InitialNodeCount)
+	if state.NodePool != nil {
+		logrus.Debugf("Updating config. MasterVersion: %s, NodeVersion: %s, NodeCount: %v", state.MasterVersion, state.NodeVersion, state.NodePool.InitialNodeCount)
+	} else {
+		logrus.Debugf("Updating config. MasterVersion: %s, NodeVersion: %s", state.MasterVersion, state.NodeVersion)
+	}
 
 	if newState.MasterVersion != "" {
 		log.Infof(ctx, "Updating master to %v", newState.MasterVersion)
@@ -665,7 +665,7 @@ func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, opts *type
 		state.NodeVersion = newState.NodeVersion
 	}
 
-	if newState.NodePool.InitialNodeCount != 0 {
+	if newState.NodePool != nil && newState.NodePool.InitialNodeCount != 0 {
 		log.Infof(ctx, "Updating node number to %v", newState.NodePool.InitialNodeCount)
 		operation, err := svc.Projects.Zones.Clusters.NodePools.SetSize(state.ProjectID, state.Zone, state.Name, state.NodePoolID, &raw.SetNodePoolSizeRequest{
 			NodeCount: newState.NodePool.InitialNodeCount,
@@ -679,7 +679,7 @@ func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, opts *type
 		}
 	}
 
-	if newState.NodePool.Autoscaling.Enabled {
+	if newState.NodePool != nil && newState.NodePool.Autoscaling != nil && newState.NodePool.Autoscaling.Enabled {
 		log.Infof(ctx, "Updating the autoscaling settings for node pool %s", state.NodePoolID)
 		operation, err := svc.Projects.Zones.Clusters.NodePools.Autoscaling(state.ProjectID, state.Zone, state.Name, state.NodePoolID, &raw.SetNodePoolAutoscalingRequest{
 			Autoscaling: newState.NodePool.Autoscaling,
