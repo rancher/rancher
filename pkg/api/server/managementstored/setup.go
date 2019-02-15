@@ -172,8 +172,19 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	setupScopedTypes(schemas)
 	setupPasswordTypes(ctx, schemas, apiContext)
 	multiclusterapp.SetMemberStore(ctx, schemas.Schema(&managementschema.Version, client.MultiClusterAppType), apiContext)
-
+	resetHASchemas(schemas, apiContext)
 	return nil
+}
+
+func resetHASchemas(schemas *types.Schemas, apiContext *config.ScaledContext) {
+	if apiContext.PeerManager == nil {
+		globalDNS := schemas.Schema(&managementschema.Version, client.GlobalDNSType)
+		globalDNS.CollectionMethods = []string{}
+		globalDNS.ResourceMethods = []string{}
+		globalDNSProvider := schemas.Schema(&managementschema.Version, client.GlobalDNSProviderType)
+		globalDNSProvider.CollectionMethods = []string{}
+		globalDNSProvider.ResourceMethods = []string{}
+	}
 }
 
 func setupPasswordTypes(ctx context.Context, schemas *types.Schemas, management *config.ScaledContext) {

@@ -3,6 +3,7 @@ from rancher import ApiError
 import pytest
 
 
+@pytest.mark.skip(reason='drone needs to change to run rancher in HA mode')
 def test_dns_fqdn_unique(admin_mc):
     client = admin_mc.client
     provider_name = random_str()
@@ -28,6 +29,7 @@ def test_dns_fqdn_unique(admin_mc):
     client.delete(globaldns_provider)
 
 
+@pytest.mark.skip(reason='drone needs to change to run rancher in HA mode')
 def test_dns_provider_deletion(admin_mc):
     client = admin_mc.client
     provider_name = random_str()
