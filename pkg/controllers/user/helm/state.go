@@ -22,21 +22,25 @@ const (
 func StartStateCalculator(ctx context.Context, cluster *config.UserContext) {
 	apps := cluster.Management.Project.Apps("")
 	w := &AppStateCalculator{
-		AppLister:        apps.Controller().Lister(),
-		Apps:             apps,
-		MultiClusterApps: cluster.Management.Management.MultiClusterApps(""),
-		NamespaceLister:  cluster.Core.Namespaces("").Controller().Lister(),
+		appLister:        apps.Controller().Lister(),
+		apps:             apps,
+		multiClusterApps: cluster.Management.Management.MultiClusterApps(""),
+		namespaceLister:  cluster.Core.Namespaces("").Controller().Lister(),
+		projectLister:    cluster.Management.Management.Projects("").Controller().Lister(),
+		clusterName:      cluster.ClusterName,
 	}
 	w.workloadLister = util.NewWorkloadController(ctx, cluster.UserOnlyContext(), w.sync)
 	apps.Controller().AddHandler(ctx, "app-state-controller", w.syncAppState)
 }
 
 type AppStateCalculator struct {
-	Apps             pv3.AppInterface
-	AppLister        pv3.AppLister
-	NamespaceLister  corev1.NamespaceLister
-	MultiClusterApps v3.MultiClusterAppInterface
+	apps             pv3.AppInterface
+	appLister        pv3.AppLister
+	namespaceLister  corev1.NamespaceLister
+	multiClusterApps v3.MultiClusterAppInterface
 	workloadLister   util.CommonController
+	projectLister    v3.ProjectLister
+	clusterName      string
 }
 
 func (s *AppStateCalculator) sync(key string, obj *util.Workload) error {
@@ -44,7 +48,7 @@ func (s *AppStateCalculator) sync(key string, obj *util.Workload) error {
 		return nil
 	}
 	if label, ok := obj.Labels[appLabel]; ok {
-		ns, err := s.NamespaceLister.Get("", obj.Namespace)
+		ns, err := s.namespaceLister.Get("", obj.Namespace)
 		if err != nil {
 			if !errors.IsNotFound(err) {
 				return err
@@ -56,7 +60,7 @@ func (s *AppStateCalculator) sync(key string, obj *util.Workload) error {
 		if projectNS == "" {
 			return fmt.Errorf("cannot find app namespace in labels of %s", obj.Namespace)
 		}
-		app, err := s.AppLister.Get(projectNS, label)
+		app, err := s.appLister.Get(projectNS, label)
 		if err != nil {
 			if !errors.IsNotFound(err) {
 				return err
@@ -65,7 +69,7 @@ func (s *AppStateCalculator) sync(key string, obj *util.Workload) error {
 			return nil
 		}
 		if app != nil && app.DeletionTimestamp == nil {
-			s.Apps.Controller().Enqueue(app.Namespace, app.Name)
+			s.apps.Controller().Enqueue(app.Namespace, app.Name)
 		}
 	}
 	return nil
@@ -76,6 +80,13 @@ func (s *AppStateCalculator) syncAppState(key string, app *pv3.App) (runtime.Obj
 		return nil, nil
 	}
 	if !pv3.AppConditionInstalled.IsTrue(app) {
+		return app, nil
+	}
+	project, err := s.projectLister.Get(s.clusterName, app.Namespace)
+	if err != nil && !errors.IsNotFound(err) {
+		return app, err
+	}
+	if err != nil || project == nil || project.DeletionTimestamp != nil {
 		return app, nil
 	}
 	workloads, err := s.getWorkloadsByApp(app.Name)
@@ -92,8 +103,7 @@ func (s *AppStateCalculator) syncAppState(key string, app *pv3.App) (runtime.Obj
 		pv3.AppConditionDeployed.Reason(toUpdate, "")
 		pv3.AppConditionDeployed.Message(toUpdate, "")
 	} else {
-		existing := strings.Split(strings.TrimPrefix(
-			pv3.AppConditionDeployed.GetMessage(toUpdate), "Updating "), ",")
+		existing := strings.Split(v3.MultiClusterAppConditionDeployed.GetMessage(toUpdate), ",")
 		if Equal(existing, updatingWorkloads) {
 			return app, nil
 		}
@@ -101,7 +111,7 @@ func (s *AppStateCalculator) syncAppState(key string, app *pv3.App) (runtime.Obj
 		pv3.AppConditionDeployed.Message(toUpdate, GetMsg(updatingWorkloads))
 		pv3.AppConditionDeployed.Reason(toUpdate, "workloads are updating")
 	}
-	return s.Apps.Update(toUpdate)
+	return s.apps.Update(toUpdate)
 }
 
 func (s *AppStateCalculator) getWorkloadsByApp(name string) ([]*util.Workload, error) {
