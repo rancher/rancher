@@ -47,8 +47,8 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 
 	if err := creator.addCustomDriver(
 		"aliyunkubernetescontainerservice",
-		"https://github.com/rancher/kontainer-engine-driver-aliyun/releases/download/v0.2.1/kontainer-engine-driver-aliyun-linux",
-		"",
+		"https://github.com/rancher/kontainer-engine-driver-aliyun/releases/download/v0.2.3/kontainer-engine-driver-aliyun-linux",
+		"15c994fa48b5e0b924e4ead33a161e17785720ad7732425a151ad79c8746358d",
 		"",
 		false,
 		"*.aliyuncs.com",
@@ -58,8 +58,8 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 
 	if err := creator.addCustomDriver(
 		"tencentkubernetesengine",
-		"https://github.com/rancher/kontainer-engine-driver-tencent/releases/download/v0.2.0/kontainer-engine-driver-tencent-linux",
-		"",
+		"https://github.com/rancher/kontainer-engine-driver-tencent/releases/download/v0.2.2/kontainer-engine-driver-tencent-linux",
+		"923bde3bcc2201e236b0e6ebcf83ca540dd12d23b5aa4804f12dd37f9beca6c6",
 		"",
 		false,
 		"*.tencentcloudapi.com", "*.qcloud.com",
@@ -69,8 +69,8 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 
 	if err := creator.addCustomDriver(
 		"huaweicontainercloudengine",
-		"https://github.com/rancher/kontainer-engine-driver-huawei/releases/download/v0.1.0/kontainer-engine-driver-huawei-linux",
-		"",
+		"https://github.com/rancher/kontainer-engine-driver-huawei/releases/download/v0.1.1/kontainer-engine-driver-huawei-linux",
+		"8114c33cf166fa8447d3289db5330d38fbe87e09d4130d3d9eb6ba4dd8904a98",
 		"",
 		false,
 		"*.myhuaweicloud.com",
