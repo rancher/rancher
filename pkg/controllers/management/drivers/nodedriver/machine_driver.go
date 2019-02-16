@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers"
+	"reflect"
 	"strings"
 	"sync"
 
@@ -178,7 +179,7 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 
 func (m *Lifecycle) createCredSchema(obj *v3.NodeDriver, credFields map[string]v3.Field) (*v3.NodeDriver, error) {
 	name := credentialConfigSchemaName(obj.Spec.DisplayName)
-	_, err := m.schemaLister.Get("", name)
+	credSchema, err := m.schemaLister.Get("", name)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			credentialSchema := &v3.DynamicSchema{
@@ -199,6 +200,13 @@ func (m *Lifecycle) createCredSchema(obj *v3.NodeDriver, credFields map[string]v
 			return obj, err
 		}
 		return obj, err
+	} else if !reflect.DeepEqual(credSchema.Spec.ResourceFields, credFields) {
+		toUpdate := credSchema.DeepCopy()
+		toUpdate.Spec.ResourceFields = credFields
+		_, err := m.schemaClient.Update(toUpdate)
+		if err != nil {
+			return obj, err
+		}
 	}
 	return obj, nil
 }
@@ -297,7 +305,7 @@ func (m *Lifecycle) createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, f
 		}
 		if _, ok := nodeSchema.Spec.ResourceFields[fieldName]; !ok {
 			// if embedded we add the type to schema
-			logrus.Infof("uploading %s to node schema", fieldName)
+			logrus.Infof("uploading %s to %s schema", fieldName, schemaID)
 			nodeSchema.Spec.ResourceFields[fieldName] = v3.Field{
 				Create:   true,
 				Nullable: true,
@@ -309,7 +317,7 @@ func (m *Lifecycle) createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, f
 	} else {
 		// if not we delete it from schema
 		if _, ok := nodeSchema.Spec.ResourceFields[fieldName]; ok {
-			logrus.Infof("deleting %s from node schema", fieldName)
+			logrus.Infof("deleting %s from %s schema", fieldName, schemaID)
 			delete(nodeSchema.Spec.ResourceFields, fieldName)
 			shouldUpdate = true
 		}
