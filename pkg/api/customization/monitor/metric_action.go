@@ -14,7 +14,6 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config/dialer"
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func NewMetricHandler(dialerFactory dialer.Factory, clustermanager *clustermanager.Manager) *MetricHandler {
@@ -211,25 +210,9 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 			return fmt.Errorf("get project metric list failed, %v", err)
 		}
 
-		// get name list for pod/container metric from cluster prometheus
-		clusterSvcName, clusterSvcNamespace, _ := monitorutil.ClusterPrometheusEndpoint()
-		clusterPrometheusQuery, err := NewPrometheusQuery(reqContext, userContext, clusterName, token, clusterSvcNamespace, clusterSvcName, h.clustermanager, h.dialerFactory)
-		if err != nil {
-			return err
-		}
-
-		clusterNames, err := clusterPrometheusQuery.GetLabelValues("__name__")
-		if err != nil {
-			return fmt.Errorf("get cluster metric list failed, %v", err)
-		}
-
-		names := sets.String{}
-		names.Insert(projectNames...)
-		names.Insert(clusterNames...)
-
 		data := map[string]interface{}{
 			"type":  "metricNamesOutput",
-			"names": names.List(),
+			"names": projectNames,
 		}
 		apiContext.WriteResponse(http.StatusOK, data)
 	}
