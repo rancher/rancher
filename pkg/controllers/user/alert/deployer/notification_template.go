@@ -25,10 +25,10 @@ The Pod {{ if .GroupLabels.namespace}}{{.GroupLabels.namespace}}:{{end}}{{.Group
 The Pod {{ if .GroupLabels.namespace}}{{.GroupLabels.namespace}}:{{end}}{{.GroupLabels.pod_name}} is not running
 
 {{- else if eq .CommonLabels.alert_type "podRestarts" }}
-The Pod {{ if .GroupLabels.namespace}}{{.GroupLabels.namespace}}:{{end}}{{.GroupLabels.pod_name}} restarts {{ .GroupLabels.restart_times}} times in {{ .GroupLabels.restart_interval}} sec
+The Pod {{ if .GroupLabels.namespace}}{{.GroupLabels.namespace}}:{{end}}{{.GroupLabels.pod_name}} restarts {{ .CommonLabels.restart_times}} times in {{ .CommonLabels.restart_interval}} sec
 
 {{- else if eq .CommonLabels.alert_type "workload" }}
-The workload {{ if .GroupLabels.workload_namespace}}{{.GroupLabels.workload_namespace}}:{{end}}{{.GroupLabels.workload_name}} has available replicas less than {{ .GroupLabels.available_percentage}}%
+The workload {{ if .GroupLabels.workload_namespace}}{{.GroupLabels.workload_namespace}}:{{end}}{{.GroupLabels.workload_name}} has available replicas less than {{ .CommonLabels.available_percentage}}%
 
 {{- else if eq .CommonLabels.alert_type "metric" }}
 The metric {{ .CommonLabels.alert_name}} crossed the threshold 
@@ -99,15 +99,12 @@ Project Name: {{ .Labels.project_name}}
 Available Replicas: {{ .Labels.available_replicas}}
 Desired Replicas: {{ .Labels.desired_replicas}}
 {{- else if eq .Labels.alert_type "metric" }}
-{{ if .Labels.project_name }}
-Project Name: {{ .Labels.project_name}}
-{{ end -}}
-{{ if .Labels.pod_name }}
-Pod Name: {{ .Labels.pod_name}}{{ else if .Labels.pod -}}Pod Name: {{ .Labels.pod}}
-{{ end -}}
-{{ if .Labels.namespace }}
-Namespace: {{ .Labels.namespace}}
-{{ end -}}
+{{- if .Labels.namespace }}
+Namespace: {{ .Labels.namespace}}{{ end }}
+{{- if .Labels.project_name }}
+Project Name: {{ .Labels.project_name}}{{ end }}
+{{- if .Labels.pod_name }}
+Pod Name: {{ .Labels.pod_name}}{{ else if .Labels.pod -}}Pod Name: {{ .Labels.pod}}{{ end }}
 Expression: {{ .Labels.expression}}
 Description: Threshold Crossed: datapoint value {{ .Annotations.current_value}} was {{ .Labels.comparison}} to the threshold ({{ .Labels.threshold_value}}) for ({{ .Labels.duration}})
 {{ end -}}

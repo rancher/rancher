@@ -34,6 +34,7 @@ type WorkloadWatcher struct {
 	projectAlertRuleLister v3.ProjectAlertRuleLister
 	clusterName            string
 	clusterLister          v3.ClusterLister
+	projectLister          v3.ProjectLister
 	namespaceIndexer       cache.Indexer
 }
 
@@ -51,6 +52,7 @@ func StartWorkloadWatcher(ctx context.Context, cluster *config.UserContext, mana
 		alertManager:           manager,
 		clusterName:            cluster.ClusterName,
 		clusterLister:          cluster.Management.Management.Clusters("").Controller().Lister(),
+		projectLister:          cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
 		namespaceIndexer:       nsInformer.GetIndexer(),
 	}
 
@@ -143,15 +145,9 @@ func (w *WorkloadWatcher) checkWorkloadCondition(wl *workload.Workload, alert *v
 
 	if wl.Status.AvailableReplicas < availableThreshold {
 		ruleID := common.GetRuleID(alert.Spec.GroupName, alert.Name)
-		projectName := alert.Namespace
 
-		clusterDisplayName := w.clusterName
-		cluster, err := w.clusterLister.Get("", w.clusterName)
-		if err != nil {
-			logrus.Warnf("Failed to get cluster for %s: %v", w.clusterName, err)
-		} else {
-			clusterDisplayName = cluster.Spec.DisplayName
-		}
+		clusterDisplayName := common.GetClusterDisplayName(w.clusterName, w.clusterLister)
+		projectDisplayName := common.GetProjectDisplayName(alert.Spec.ProjectName, w.projectLister)
 
 		data := map[string]string{}
 		data["rule_id"] = ruleID
@@ -160,7 +156,7 @@ func (w *WorkloadWatcher) checkWorkloadCondition(wl *workload.Workload, alert *v
 		data["alert_name"] = alert.Spec.DisplayName
 		data["severity"] = alert.Spec.Severity
 		data["cluster_name"] = clusterDisplayName
-		data["project_name"] = projectName
+		data["project_name"] = projectDisplayName
 		data["workload_name"] = wl.Name
 		data["workload_namespace"] = wl.Namespace
 		data["workload_kind"] = wl.Kind

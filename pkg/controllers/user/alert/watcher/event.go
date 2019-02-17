@@ -70,13 +70,7 @@ func (l *EventWatcher) Sync(key string, obj *corev1.Event) (runtime.Object, erro
 		if alert.Spec.EventRule.EventType == obj.Type && alert.Spec.EventRule.ResourceKind == obj.InvolvedObject.Kind {
 			ruleID := common.GetRuleID(alert.Spec.GroupName, alert.Name)
 
-			clusterDisplayName := l.clusterName
-			cluster, err := l.clusterLister.Get("", l.clusterName)
-			if err != nil {
-				logrus.Warnf("Failed to get cluster for %s: %v", l.clusterName, err)
-			} else {
-				clusterDisplayName = cluster.Spec.DisplayName
-			}
+			clusterDisplayName := common.GetClusterDisplayName(l.clusterName, l.clusterLister)
 
 			data := map[string]string{}
 			data["rule_id"] = ruleID

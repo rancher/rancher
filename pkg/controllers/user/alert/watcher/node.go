@@ -143,13 +143,7 @@ func (w *NodeWatcher) checkNodeMemUsage(alert *v3.ClusterAlertRule, machine *v3.
 		if used.Value()*100.0/total.Value() > int64(alert.Spec.NodeRule.MemThreshold) {
 			ruleID := common.GetRuleID(alert.Spec.GroupName, alert.Name)
 
-			clusterDisplayName := w.clusterName
-			cluster, err := w.clusterLister.Get("", w.clusterName)
-			if err != nil {
-				logrus.Warnf("Failed to get cluster for %s: %v", w.clusterName, err)
-			} else {
-				clusterDisplayName = cluster.Spec.DisplayName
-			}
+			clusterDisplayName := common.GetClusterDisplayName(w.clusterName, w.clusterLister)
 
 			data := map[string]string{}
 			data["rule_id"] = ruleID
@@ -177,13 +171,7 @@ func (w *NodeWatcher) checkNodeCPUUsage(alert *v3.ClusterAlertRule, machine *v3.
 		if used.MilliValue()*100.0/total.MilliValue() > int64(alert.Spec.NodeRule.CPUThreshold) {
 			ruleID := common.GetRuleID(alert.Spec.GroupName, alert.Name)
 
-			clusterDisplayName := w.clusterName
-			cluster, err := w.clusterLister.Get("", w.clusterName)
-			if err != nil {
-				logrus.Warnf("Failed to get cluster for %s: %v", w.clusterName, err)
-			} else {
-				clusterDisplayName = cluster.Spec.DisplayName
-			}
+			clusterDisplayName := common.GetClusterDisplayName(w.clusterName, w.clusterLister)
 
 			data := map[string]string{}
 			data["rule_id"] = ruleID
@@ -210,13 +198,7 @@ func (w *NodeWatcher) checkNodeReady(alert *v3.ClusterAlertRule, machine *v3.Nod
 			if cond.Status != corev1.ConditionTrue {
 				ruleID := common.GetRuleID(alert.Spec.GroupName, alert.Name)
 
-				clusterDisplayName := w.clusterName
-				cluster, err := w.clusterLister.Get("", w.clusterName)
-				if err != nil {
-					logrus.Warnf("Failed to get cluster for %s: %v", w.clusterName, err)
-				} else {
-					clusterDisplayName = cluster.Spec.DisplayName
-				}
+				clusterDisplayName := common.GetClusterDisplayName(w.clusterName, w.clusterLister)
 
 				data := map[string]string{}
 				data["rule_id"] = ruleID
