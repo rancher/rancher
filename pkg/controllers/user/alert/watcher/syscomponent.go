@@ -80,13 +80,7 @@ func (w *SysComponentWatcher) checkComponentHealthy(statuses *v1.ComponentStatus
 					if cond.Status == corev1.ConditionFalse {
 						ruleID := common.GetRuleID(alert.Spec.GroupName, alert.Name)
 
-						clusterDisplayName := w.clusterName
-						cluster, err := w.clusterLister.Get("", w.clusterName)
-						if err != nil {
-							logrus.Warnf("Failed to get cluster for %s: %v", w.clusterName, err)
-						} else {
-							clusterDisplayName = cluster.Spec.DisplayName
-						}
+						clusterDisplayName := common.GetClusterDisplayName(w.clusterName, w.clusterLister)
 
 						data := map[string]string{}
 						data["rule_id"] = ruleID

@@ -32,6 +32,7 @@ type PodWatcher struct {
 	clusterName             string
 	podRestartTrack         sync.Map
 	clusterLister           v3.ClusterLister
+	projectLister           v3.ProjectLister
 	workloadFetcher         workloadFetcher
 }
 
@@ -54,6 +55,7 @@ func StartPodWatcher(ctx context.Context, cluster *config.UserContext, manager *
 		clusterName:             cluster.ClusterName,
 		podRestartTrack:         sync.Map{},
 		clusterLister:           cluster.Management.Management.Clusters("").Controller().Lister(),
+		projectLister:           cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
 		workloadFetcher:         workloadFetcher,
 	}
 
@@ -160,20 +162,14 @@ func (w *PodWatcher) checkPodRestarts(pod *corev1.Pod, alert *v3.ProjectAlertRul
 
 			if curCount-preCount >= int32(alert.Spec.PodRule.RestartTimes) {
 				ruleID := common.GetRuleID(alert.Spec.GroupName, alert.Name)
-				projectName := alert.Namespace
 
 				details := ""
 				if containerStatus.State.Waiting != nil {
 					details = containerStatus.State.Waiting.Message
 				}
 
-				clusterDisplayName := w.clusterName
-				cluster, err := w.clusterLister.Get("", w.clusterName)
-				if err != nil {
-					logrus.Warnf("Failed to get cluster for %s: %v", w.clusterName, err)
-				} else {
-					clusterDisplayName = cluster.Spec.DisplayName
-				}
+				clusterDisplayName := common.GetClusterDisplayName(w.clusterName, w.clusterLister)
+				projectDisplayName := common.GetProjectDisplayName(alert.Spec.ProjectName, w.projectLister)
 
 				data := map[string]string{}
 				data["rule_id"] = ruleID
@@ -182,7 +178,7 @@ func (w *PodWatcher) checkPodRestarts(pod *corev1.Pod, alert *v3.ProjectAlertRul
 				data["alert_type"] = "podRestarts"
 				data["severity"] = alert.Spec.Severity
 				data["cluster_name"] = clusterDisplayName
-				data["project_name"] = projectName
+				data["project_name"] = projectDisplayName
 				data["namespace"] = pod.Namespace
 				data["pod_name"] = pod.Name
 				data["container_name"] = containerStatus.Name
@@ -262,13 +258,8 @@ func (w *PodWatcher) checkPodRunning(pod *corev1.Pod, alert *v3.ProjectAlertRule
 				details = containerStatus.State.Terminated.Message
 			}
 
-			clusterDisplayName := w.clusterName
-			cluster, err := w.clusterLister.Get("", w.clusterName)
-			if err != nil {
-				logrus.Warnf("Failed to get cluster for %s: %v", w.clusterName, err)
-			} else {
-				clusterDisplayName = cluster.Spec.DisplayName
-			}
+			clusterDisplayName := common.GetClusterDisplayName(w.clusterName, w.clusterLister)
+			projectDisplayName := common.GetProjectDisplayName(alert.Spec.ProjectName, w.projectLister)
 
 			data := map[string]string{}
 			data["rule_id"] = ruleID
@@ -278,6 +269,7 @@ func (w *PodWatcher) checkPodRunning(pod *corev1.Pod, alert *v3.ProjectAlertRule
 			data["severity"] = alert.Spec.Severity
 			data["cluster_name"] = clusterDisplayName
 			data["namespace"] = pod.Namespace
+			data["project_name"] = projectDisplayName
 			data["pod_name"] = pod.Name
 			data["container_name"] = containerStatus.Name
 
@@ -306,16 +298,10 @@ func (w *PodWatcher) checkPodScheduled(pod *corev1.Pod, alert *v3.ProjectAlertRu
 	for _, condition := range pod.Status.Conditions {
 		if condition.Type == corev1.PodScheduled && condition.Status == corev1.ConditionFalse {
 			ruleID := common.GetRuleID(alert.Spec.GroupName, alert.Name)
-
 			details := condition.Message
 
-			clusterDisplayName := w.clusterName
-			cluster, err := w.clusterLister.Get("", w.clusterName)
-			if err != nil {
-				logrus.Warnf("Failed to get cluster for %s: %v", w.clusterName, err)
-			} else {
-				clusterDisplayName = cluster.Spec.DisplayName
-			}
+			clusterDisplayName := common.GetClusterDisplayName(w.clusterName, w.clusterLister)
+			projectDisplayName := common.GetProjectDisplayName(alert.Spec.ProjectName, w.projectLister)
 
 			data := map[string]string{}
 			data["rule_id"] = ruleID
@@ -325,6 +311,7 @@ func (w *PodWatcher) checkPodScheduled(pod *corev1.Pod, alert *v3.ProjectAlertRu
 			data["severity"] = alert.Spec.Severity
 			data["cluster_name"] = clusterDisplayName
 			data["namespace"] = pod.Namespace
+			data["project_name"] = projectDisplayName
 			data["pod_name"] = pod.Name
 
 			if details != "" {

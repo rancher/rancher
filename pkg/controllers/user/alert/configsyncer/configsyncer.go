@@ -41,6 +41,8 @@ func NewConfigSyncer(ctx context.Context, cluster *config.UserContext, alertMana
 		clusterAlertRuleLister:  cluster.Management.Management.ClusterAlertRules(cluster.ClusterName).Controller().Lister(),
 		projectAlertRuleLister:  cluster.Management.Management.ProjectAlertRules("").Controller().Lister(),
 		notifierLister:          cluster.Management.Management.Notifiers(cluster.ClusterName).Controller().Lister(),
+		clusterLister:           cluster.Management.Management.Clusters(metav1.NamespaceAll).Controller().Lister(),
+		projectLister:           cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
 		clusterName:             cluster.ClusterName,
 		alertManager:            alertManager,
 		operatorCRDManager:      operatorCRDManager,
@@ -54,6 +56,8 @@ type ConfigSyncer struct {
 	projectAlertRuleLister  v3.ProjectAlertRuleLister
 	clusterAlertRuleLister  v3.ClusterAlertRuleLister
 	notifierLister          v3.NotifierLister
+	clusterLister           v3.ClusterLister
+	projectLister           v3.ProjectLister
 	clusterName             string
 	alertManager            *manager.AlertManager
 	operatorCRDManager      *manager.PromOperatorCRDManager
@@ -85,6 +89,8 @@ func (d *ConfigSyncer) sync() error {
 	if d.alertManager.IsDeploy == false {
 		return nil
 	}
+
+	clusterDisplayName := common.GetClusterDisplayName(d.clusterName, d.clusterLister)
 
 	if _, err := d.alertManager.GetAlertManagerEndpoint(); err != nil {
 		return err
@@ -161,11 +167,11 @@ func (d *ConfigSyncer) sync() error {
 	}
 	sort.Strings(pAlertsKey)
 
-	if err := d.addClusterAlert2Operator(cAlertsMap, cAlertsKey); err != nil {
+	if err := d.addClusterAlert2Operator(clusterDisplayName, cAlertsMap, cAlertsKey); err != nil {
 		return err
 	}
 
-	if err := d.addProjectAlert2Operator(pAlertsMap, pAlertsKey); err != nil {
+	if err := d.addProjectAlert2Operator(clusterDisplayName, pAlertsMap, pAlertsKey); err != nil {
 		return err
 	}
 
@@ -221,12 +227,14 @@ func (d *ConfigSyncer) getNotifier(id string, notifiers []*v3.Notifier) *v3.Noti
 	return nil
 }
 
-func (d *ConfigSyncer) addProjectAlert2Operator(projectGroups map[string]map[string][]*v3.ProjectAlertRule, keys []string) error {
-	for _, projectID := range keys {
-		groupRules := projectGroups[projectID]
-		_, projectName := ref.Parse(projectID)
+func (d *ConfigSyncer) addProjectAlert2Operator(clusterDisplayName string, projectGroups map[string]map[string][]*v3.ProjectAlertRule, keys []string) error {
+	for _, projectName := range keys {
+		groupRules := projectGroups[projectName]
 		_, namespace := monitorutil.ProjectMonitoringInfo(projectName)
 		promRule := d.operatorCRDManager.GetDefaultPrometheusRule(namespace, projectName)
+
+		projectID := fmt.Sprintf("%s:%s", d.clusterName, projectName)
+		projectDisplayName := common.GetProjectDisplayName(projectID, d.projectLister)
 
 		var groupIDs []string
 		for k := range groupRules {
@@ -242,7 +250,7 @@ func (d *ConfigSyncer) addProjectAlert2Operator(projectGroups map[string]map[str
 			for _, alertRule := range alertRules {
 				if alertRule.Spec.MetricRule != nil {
 					ruleID := common.GetRuleID(alertRule.Spec.GroupName, alertRule.Name)
-					promRule := manager.Metric2Rule(groupID, ruleID, alertRule.Spec.Severity, alertRule.Spec.DisplayName, d.clusterName, projectName, alertRule.Spec.MetricRule)
+					promRule := manager.Metric2Rule(groupID, ruleID, alertRule.Spec.Severity, alertRule.Spec.DisplayName, clusterDisplayName, projectDisplayName, alertRule.Spec.MetricRule)
 					d.operatorCRDManager.AddRule(ruleGroup, promRule)
 				}
 			}
@@ -261,7 +269,7 @@ func (d *ConfigSyncer) addProjectAlert2Operator(projectGroups map[string]map[str
 	return nil
 }
 
-func (d *ConfigSyncer) addClusterAlert2Operator(groupRules map[string][]*v3.ClusterAlertRule, keys []string) error {
+func (d *ConfigSyncer) addClusterAlert2Operator(clusterDisplayName string, groupRules map[string][]*v3.ClusterAlertRule, keys []string) error {
 	var enabled bool
 	_, namespace := monitorutil.ClusterMonitoringInfo()
 	promRule := d.operatorCRDManager.GetDefaultPrometheusRule(namespace, d.clusterName)
@@ -273,7 +281,7 @@ func (d *ConfigSyncer) addClusterAlert2Operator(groupRules map[string][]*v3.Clus
 		for _, alertRule := range alertRules {
 			if alertRule.Spec.MetricRule != nil {
 				ruleID := common.GetRuleID(alertRule.Spec.GroupName, alertRule.Name)
-				promRule := manager.Metric2Rule(groupID, ruleID, alertRule.Spec.Severity, alertRule.Spec.DisplayName, d.clusterName, "", alertRule.Spec.MetricRule)
+				promRule := manager.Metric2Rule(groupID, ruleID, alertRule.Spec.Severity, alertRule.Spec.DisplayName, clusterDisplayName, "", alertRule.Spec.MetricRule)
 				d.operatorCRDManager.AddRule(ruleGroup, promRule)
 			}
 		}
@@ -535,7 +543,7 @@ func getClusterAlertGroupBy(spec v3.ClusterAlertRuleSpec) []model.LabelName {
 
 func getProjectAlertGroupBy(spec v3.ProjectAlertRuleSpec) []model.LabelName {
 	if spec.PodRule != nil {
-		return []model.LabelName{"rule_id", "namespace", "pod_name"}
+		return []model.LabelName{"rule_id", "namespace", "pod_name", "alert_type"}
 	} else if spec.WorkloadRule != nil {
 		return []model.LabelName{"rule_id", "workload_namespace", "workload_name", "workload_kind"}
 	} else if spec.MetricRule != nil {
