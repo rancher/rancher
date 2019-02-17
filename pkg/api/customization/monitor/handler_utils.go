@@ -3,7 +3,6 @@ package monitor
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -25,17 +24,6 @@ var (
 	defaultTo          = "now"
 	defaultFrom        = "now-" + defaultQueryDuring
 )
-
-func getPrometheusEndpoint(userContext *config.UserContext, namespace, name string) (string, error) {
-	svc, err := userContext.Core.Services("").Controller().Lister().Get(namespace, name)
-	if err != nil {
-		return "", fmt.Errorf("Failed to get service for prometheus-server %v", err)
-	}
-
-	port := svc.Spec.Ports[0].Port
-	url := "http://" + svc.Name + "." + svc.Namespace + ".svc.cluster.local:" + strconv.Itoa(int(port))
-	return url, nil
-}
 
 func newClusterGraphInputParser(input v3.QueryGraphInput) *clusterGraphInputParser {
 	return &clusterGraphInputParser{
