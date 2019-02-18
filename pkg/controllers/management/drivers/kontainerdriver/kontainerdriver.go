@@ -3,11 +3,11 @@ package kontainerdriver
 import (
 	"context"
 	"fmt"
-	errorsutil "github.com/pkg/errors"
 	"reflect"
 	"regexp"
 	"strings"
 
+	errorsutil "github.com/pkg/errors"
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
@@ -107,30 +107,47 @@ func (l *Lifecycle) driverExists(obj *v3.KontainerDriver) bool {
 
 func (l *Lifecycle) download(obj *v3.KontainerDriver) (*v3.KontainerDriver, error) {
 	driver := drivers.NewKontainerDriver(obj.Spec.BuiltIn, obj.Name, obj.Spec.URL, obj.Spec.Checksum)
-	err := driver.Stage()
+
+	newObj, err := v3.KontainerDriverConditionDownloaded.Once(obj, func() (runtime.Object, error) {
+		// update status
+		obj, err := l.kontainerDrivers.Update(obj)
+		if err != nil {
+			return nil, err
+		}
+
+		err = driver.Stage()
+		if err != nil {
+			return nil, err
+		}
+		return obj, nil
+	})
 	if err != nil {
-		return nil, err
+		return obj, err
 	}
 
-	v3.KontainerDriverConditionDownloaded.True(obj)
+	obj = newObj.(*v3.KontainerDriver)
+	newObj, err = v3.KontainerDriverConditionInstalled.Once(obj, func() (runtime.Object, error) {
+		path, err := driver.Install()
+		if err != nil {
+			return nil, err
+		}
+		obj.Status.ExecutablePath = path
+		matches := kontainerDriverName.FindStringSubmatch(path)
+		if len(matches) < 2 {
+			return nil, fmt.Errorf("could not parse name of kontainer driver from path: %v", path)
+		}
 
-	path, err := driver.Install()
+		obj.Status.DisplayName = matches[1]
+		obj.Status.ActualURL = obj.Spec.URL
+
+		return obj, nil
+	})
 	if err != nil {
-		return nil, err
+		return obj, err
 	}
 
-	v3.KontainerDriverConditionInstalled.True(obj)
-
-	obj.Status.ExecutablePath = path
-	matches := kontainerDriverName.FindStringSubmatch(path)
-	if len(matches) < 2 {
-		return nil, fmt.Errorf("could not parse name of kontainer driver from path: %v", path)
-	}
-
-	obj.Status.DisplayName = matches[1]
-	obj.Status.ActualURL = obj.Spec.URL
-
-	logrus.Infof("kontainerdriver %v downloaded and registered at %v", obj.Name, path)
+	obj = newObj.(*v3.KontainerDriver)
+	logrus.Infof("kontainerdriver %v downloaded and registered at %v", obj.Name, obj.Status.ExecutablePath)
 
 	return obj, nil
 }
@@ -363,6 +380,13 @@ func (l *Lifecycle) Updated(obj *v3.KontainerDriver) (runtime.Object, error) {
 			return nil, err
 		}
 	}
+
+	// Update status
+	obj, err = l.kontainerDrivers.Update(obj)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create schema if obj is active
 	// Delete schema if obj is inactive
 	if obj.Spec.Active {
