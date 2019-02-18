@@ -43,6 +43,7 @@ type MultiClusterAppStatus struct {
 type Target struct {
 	ProjectName string `json:"projectName,omitempty" norman:"type=reference[project],required"`
 	AppName     string `json:"appName,omitempty" norman:"type=reference[v3/projects/schemas/app]"`
+	State       string `json:"state,omitempty"`
 	Healthstate string `json:"healthState,omitempty"`
 }
 

@@ -32,6 +32,8 @@ type GlobalDNSStatus struct {
 }
 
 type GlobalDNSProvider struct {
+	types.Namespaced
+
 	metav1.TypeMeta `json:",inline"`
 	// Standard object’s metadata. More info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata

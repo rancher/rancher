@@ -24,8 +24,9 @@ var (
 	GlobalDNSProviderResource = metav1.APIResource{
 		Name:         "globaldnsproviders",
 		SingularName: "globaldnsprovider",
-		Namespaced:   false,
-		Kind:         GlobalDNSProviderGroupVersionKind.Kind,
+		Namespaced:   true,
+
+		Kind: GlobalDNSProviderGroupVersionKind.Kind,
 	}
 )
 
