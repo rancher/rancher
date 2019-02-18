@@ -85,5 +85,5 @@ type MultiClusterAppRollbackInput struct {
 
 type UpdateMultiClusterAppTargetsInput struct {
 	Projects []string `json:"projects" norman:"type=array[reference[project]],required"`
-	Answers  []Answer `json:"answers" norman:"type=array[reference[answer]]"`
+	Answers  []Answer `json:"answers"`
 }
