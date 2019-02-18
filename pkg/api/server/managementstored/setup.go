@@ -2,6 +2,7 @@ package managementstored
 
 import (
 	"context"
+	"github.com/rancher/rancher/pkg/namespace"
 	"net/http"
 
 	"github.com/rancher/norman/store/crd"
@@ -331,8 +332,9 @@ func NodeTemplates(schemas *types.Schemas, management *config.ScaledContext) {
 	}
 	schema.Formatter = f.Formatter
 	s := &nodeTemplateStore.Store{
-		Store:          userscope.NewStore(management.Core.Namespaces(""), schema.Store),
-		NodePoolLister: npl,
+		Store:                 userscope.NewStore(management.Core.Namespaces(""), schema.Store),
+		NodePoolLister:        npl,
+		CloudCredentialLister: management.Core.Secrets(namespace.GlobalNamespace).Controller().Lister(),
 	}
 	schema.Store = s
 	schema.Validator = nodetemplate.Validator
@@ -369,7 +371,8 @@ func SecretTypes(ctx context.Context, schemas *types.Schemas, management *config
 		"secrets")
 
 	credSchema := schemas.Schema(&managementschema.Version, client.CloudCredentialType)
-	credSchema.Store = cred.Wrap(mgmtSecretSchema.Store, management.Core.Namespaces(""))
+	credSchema.Store = cred.Wrap(mgmtSecretSchema.Store,
+		management.Core.Namespaces(""))
 	credSchema.Validator = cred.Validator
 }
 
