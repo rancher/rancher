@@ -69,7 +69,12 @@ func (n *ProviderLauncher) sync(key string, obj *v3.GlobalDNSProvider) (runtime.
 	}
 	creatorID, ok := metaAccessor.GetAnnotations()[globalnamespacerbac.CreatorIDAnn]
 	if !ok {
-		return nil, fmt.Errorf("GlobalDNS %v has no creatorId annotation", metaAccessor.GetName())
+		return nil, fmt.Errorf("GlobalDNS provider %v has no creatorId annotation", metaAccessor.GetName())
+	}
+
+	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.GlobalDNSProviderResource, obj.Name,
+		obj.UID, obj.Spec.Members, creatorID, n.managementContext); err != nil {
+		return nil, err
 	}
 	//check if provider already running for this GlobalDNSProvider.
 	if n.isProviderAlreadyRunning(obj) {
@@ -106,10 +111,6 @@ func (n *ProviderLauncher) sync(key string, obj *v3.GlobalDNSProvider) (runtime.
 		return n.handleAlidnsProvider(obj)
 	}
 
-	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.GlobalDNSProviderResource, obj.Name,
-		obj.UID, obj.Spec.Members, creatorID, n.managementContext); err != nil {
-		return nil, err
-	}
 	return nil, nil
 }
 

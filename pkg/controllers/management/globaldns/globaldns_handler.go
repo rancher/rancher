@@ -66,6 +66,10 @@ func (n *GDController) sync(key string, obj *v3.GlobalDNS) (runtime.Object, erro
 		return nil, fmt.Errorf("GlobalDNS %v has no creatorId annotation", metaAccessor.GetName())
 	}
 
+	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.GlobalDNSResource, obj.Name,
+		obj.UID, obj.Spec.Members, creatorID, n.managementContext); err != nil {
+		return nil, err
+	}
 	//check if status.endpoints is set, if yes create a dummy ingress if not already present
 	//if ingress exists, update endpoints if different
 
@@ -98,10 +102,6 @@ func (n *GDController) sync(key string, obj *v3.GlobalDNS) (runtime.Object, erro
 		return nil, fmt.Errorf("GlobalDNSController: Error updating ingress for the GlobalDNS %v", err)
 	}
 
-	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.GlobalDNSResource, obj.Name,
-		obj.UID, obj.Spec.Members, creatorID, n.managementContext); err != nil {
-		return nil, err
-	}
 	return nil, nil
 }
 

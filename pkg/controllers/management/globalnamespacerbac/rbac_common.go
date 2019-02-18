@@ -60,7 +60,11 @@ func CreateRoleAndRoleBinding(resource string, name string, UID types.UID, membe
 		case readOnlyAccess:
 			readOnlyAccessSubjects = append(readOnlyAccessSubjects, s)
 		default:
-			readOnlyAccessSubjects = append(readOnlyAccessSubjects, s)
+			if resource == GlobalDNSProviderResource || resource == GlobalDNSResource {
+				ownerAccessSubjects = append(ownerAccessSubjects, s)
+			} else {
+				readOnlyAccessSubjects = append(readOnlyAccessSubjects, s)
+			}
 		}
 	}
 
