@@ -69,8 +69,18 @@ func (d *AppDeployer) deploy(app *projectv3.App) error {
 		return err
 	}
 
-	if _, err := d.AppsGetter.Apps(app.Namespace).Create(app); err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "failed to create %q App", app.Name)
+	current, err := d.AppsGetter.Apps(app.Namespace).Get(app.Name, metav1.GetOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return errors.Wrapf(err, "failed to query app %s:%s", app.Namespace, app.Name)
+		}
+		if _, err := d.AppsGetter.Apps(app.Namespace).Create(app); err != nil && !apierrors.IsAlreadyExists(err) {
+			return errors.Wrapf(err, "failed to create app %s:%s", app.Namespace, app.Name)
+		}
+	}
+
+	if current.DeletionTimestamp != nil {
+		return errors.New("stale app " + app.Namespace + ":" + app.Name + " still on terminating")
 	}
 
 	return nil
