@@ -721,6 +721,7 @@ func globalDNSTypes(schemas *types.Schemas) *types.Schemas {
 		TypeName("globalDnsProviderSpec", v3.GlobalDNSProviderSpec{}).
 		MustImport(&Version, v3.UpdateGlobalDNSTargetsInput{}).
 		AddMapperForType(&Version, v3.GlobalDNS{}, m.Drop{Field: "namespaceId"}).
+		AddMapperForType(&Version, v3.GlobalDNSProvider{}, m.Drop{Field: "namespaceId"}).
 		MustImportAndCustomize(&Version, v3.GlobalDNS{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
 				"addProjects": {
