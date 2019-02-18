@@ -155,7 +155,7 @@ func (w Wrapper) modifyProjects(request *types.APIContext, actionName string) (*
 	if accessType != gaccess.OwnerAccess {
 		return nil, existingProjects, inputProjects, inputAnswers, fmt.Errorf("only owners can modify projects of multiclusterapp")
 	}
-	var updateMultiClusterAppTargetsInput v3.UpdateMultiClusterAppTargetsInput
+	var updateMultiClusterAppTargetsInput client.UpdateMultiClusterAppTargetsInput
 	actionInput, err := parse.ReadBody(request.Request)
 	if err != nil {
 		return nil, existingProjects, inputProjects, inputAnswers, err
@@ -172,7 +172,13 @@ func (w Wrapper) modifyProjects(request *types.APIContext, actionName string) (*
 			return nil, existingProjects, inputProjects, inputAnswers, err
 		}
 	}
-	inputAnswers = updateMultiClusterAppTargetsInput.Answers
+	for _, a := range updateMultiClusterAppTargetsInput.Answers {
+		inputAnswers = append(inputAnswers, v3.Answer{
+			ProjectName: a.ProjectID,
+			ClusterName: a.ClusterID,
+			Values:      a.Values,
+		})
+	}
 	// check if the input includes answers, and if they are only for the input projects
 	if len(inputAnswers) > 0 {
 		inputProjectsMap := make(map[string]bool)
