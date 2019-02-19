@@ -84,7 +84,7 @@ func (s *Store) replaceCloudCredFields(data map[string]interface{}) error {
 	for key := range cred.Data {
 		splitKey := strings.SplitN(key, "-", 2)
 		if len(splitKey) == 2 && splitKey[0] == credConfigName {
-			toReplace[splitKey[1]] = ""
+			delete(toReplace, splitKey[1])
 			fields = append(fields, splitKey[1])
 		}
 	}
