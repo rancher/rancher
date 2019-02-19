@@ -593,6 +593,13 @@ func (m *MCAppManager) delete(appsToDelete []*pv3.App, clusterContexts map[strin
 			if clusterName == "" {
 				return fmt.Errorf("error getting correct cluster name %s", app.Namespace)
 			}
+			if _, ok := clusterContexts[clusterName]; !ok {
+				userContext, err := m.clusterManager.UserContext(clusterName)
+				if err != nil {
+					return err
+				}
+				clusterContexts[clusterName] = userContext
+			}
 			if err := clusterContexts[clusterName].Core.Namespaces("").Delete(appWorkloadNamespace, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
