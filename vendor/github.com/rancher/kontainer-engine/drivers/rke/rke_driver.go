@@ -484,6 +484,9 @@ func clusterUp(
 
 func (d *Driver) ETCDSave(ctx context.Context, clusterInfo *types.ClusterInfo, opts *types.DriverOptions, snapshotName string) error {
 	rkeConfig, err := util.ConvertToRkeConfig(clusterInfo.Metadata["Config"])
+	if err != nil {
+		return err
+	}
 	stateDir, err := d.restore(clusterInfo)
 	if err != nil {
 		return err
@@ -496,7 +499,15 @@ func (d *Driver) ETCDSave(ctx context.Context, clusterInfo *types.ClusterInfo, o
 }
 
 func (d *Driver) ETCDRestore(ctx context.Context, clusterInfo *types.ClusterInfo, opts *types.DriverOptions, snapshotName string) error {
-	rkeConfig, err := util.ConvertToRkeConfig(clusterInfo.Metadata["Config"])
+	yaml, err := getYAML(opts)
+	if err != nil {
+		return err
+	}
+
+	rkeConfig, err := util.ConvertToRkeConfig(yaml)
+	if err != nil {
+		return err
+	}
 	stateDir, err := d.restore(clusterInfo)
 	if err != nil {
 		return err
