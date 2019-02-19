@@ -683,7 +683,7 @@ func (p *Provisioner) restoreClusterBackup(cluster *v3.Cluster, spec v3.ClusterS
 	if err != nil {
 		return "", "", "", err
 	}
-	if backup.ClusterID != cluster.Name {
+	if backup.Spec.ClusterID != cluster.Name {
 		return "", "", "", fmt.Errorf("snapshot [%s] is not a backup of cluster [%s]", backup.Name, cluster.Name)
 	}
 	return p.driverRestore(cluster, spec)
