@@ -45,7 +45,7 @@ const (
 	DefaultMonitoringProvider            = "metrics-server"
 	DefaultEtcdBackupConfigIntervalHours = 12
 	DefaultEtcdBackupConfigRetention     = 6
-	DefaultDNSProvider                   = "kubedns"
+	DefaultDNSProvider                   = "kube-dns"
 
 	DefaultEtcdHeartbeatIntervalName  = "heartbeat-interval"
 	DefaultEtcdHeartbeatIntervalValue = "500"

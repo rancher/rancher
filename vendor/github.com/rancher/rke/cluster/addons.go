@@ -33,9 +33,10 @@ const (
 	CoreDNSAutoscalerAppName       = "coredns-autoscaler"
 
 	CoreDNSProvider = "coredns"
+	KubeDNSProvider = "kube-dns"
 )
 
-var DNSProviders = []string{"kubedns", "coredns"}
+var DNSProviders = []string{KubeDNSProvider, CoreDNSProvider}
 
 type ingressOptions struct {
 	RBACConfig     string
