@@ -1,6 +1,8 @@
 import kubernetes
 from .conftest import kubernetes_api_client, wait_for
 from .common import random_str
+from rancher import ApiError
+import pytest
 
 
 def cleanup_pspt(client, request, cluster):
@@ -116,7 +118,7 @@ def test_pod_security_policy_template_del(admin_mc, admin_pc, remove_resource):
         proj_obj = proj.podSecurityPolicyTemplateProjectBindings()
         for data in proj_obj.data:
             if (data.targetProjectId == proj.id and
-               data.podSecurityPolicyTemplateId == pspt_proj.id):
+                    data.podSecurityPolicyTemplateId == pspt_proj.id):
                 return True
 
         return False
@@ -141,3 +143,28 @@ def test_pod_security_policy_template_del(admin_mc, admin_pc, remove_resource):
     # will timeout if pspt is not deleted
     wait_for(pspt_del_check)
     assert api_client.by_id_pod_security_policy_template(pspt_proj.id) is None
+
+
+def test_incorrect_pspt(admin_mc, remove_resource):
+    """ Test that incorrect pod security policy templates cannot be created"""
+    api_client = admin_mc.client
+
+    name = "pspt" + random_str()
+    with pytest.raises(ApiError) as e:
+        api_client.create_podSecurityPolicyTemplate(name=name)
+    assert e.value.error.status == 422
+
+    name = "pspt" + random_str()
+    with pytest.raises(ApiError) as e:
+        args = {'name': name,
+                'description': 'Test PSPT',
+                'fsGroup': {"rule": "RunAsAny"},
+                'runAsUser': {"rule": "RunAsAny"},
+                'seLinux': {"rule": "RunAsAny"},
+                'supplementalGroups': {"rule": "RunAsAny"},
+                'allowPrivilegeEscalation': False,
+                'defaultAllowPrivilegeEscalation': True}
+        # Should not set the default True if allowPrivilegedEscalation is false
+        api_client.create_podSecurityPolicyTemplate(**args)
+    assert e.value.error.status == 422
+    assert e.value.error.code == 'InvalidBodyContent'
