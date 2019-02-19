@@ -582,6 +582,7 @@ func PodSecurityPolicyTemplate(schemas *types.Schemas, management *config.Scaled
 	schema.Store = &podsecuritypolicytemplate.Store{
 		Store: schema.Store,
 	}
+	schema.Validator = podsecuritypolicytemplate.Validator
 }
 
 func ClusterRoleTemplateBinding(schemas *types.Schemas, management *config.ScaledContext) {
