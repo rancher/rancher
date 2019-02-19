@@ -1,129 +1,221 @@
 ---
-pipeline:
-  build:
-    privileged: true
-    image: rancher/dapper:1.11.2
-    volumes:
-    - /var/run/docker.sock:/var/run/docker.sock
-    commands:
-    - dapper ci
-    when:
-      event: [ push, pull_request, tag ]
+kind: pipeline
+name: default
 
-  stage-binaries:
-    image: rancher/dapper:1.11.2
-    commands:
-    - cp -r ./bin/* ./package/
-    when:
-      branch: [master, release/*, alpha]
-      event: [push,tag]
+platform:
+  os: linux
+  arch: amd64
 
-  docker-publish-master:
-    image: plugins/docker
-    dockerfile: package/Dockerfile
-    repo: rancher/rancher
-    context: package/
-    tag: master
-    secrets: [docker_username, docker_password]
-    environment:
-    -  PLUGIN_CUSTOM_DNS=1.1.1.1
+steps:
+- name: build
+  pull: default
+  image: rancher/dapper:v0.4.1
+  commands:
+  - dapper ci
+  privileged: true
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    event:
+    - push
+    - pull_request
+    - tag
+
+- name: stage-binaries
+  pull: default
+  image: rancher/dapper:v0.4.1
+  commands:
+  - "cp -r ./bin/* ./package/"
+  when:
+    event:
+    - push
+    - tag
+
+- name: docker-publish-master
+  pull: default
+  image: plugins/docker
+  settings:
     build_args:
     - VERSION=master
-    when:
-      branch: master
-      event: push
-
-  docker-publish-master-agent:
-    image: plugins/docker
-    dockerfile: package/Dockerfile.agent
-    repo: rancher/rancher-agent
     context: package/
+    custom_dns: 1.1.1.1
+    dockerfile: package/Dockerfile
+    password:
+      from_secret: docker_password
+    repo: rancher/rancher
     tag: master
-    secrets: [docker_username, docker_password]
-    environment:
-    -  PLUGIN_CUSTOM_DNS=1.1.1.1
+    username:
+      from_secret: docker_username
+  when:
+    branch:
+    - master
+    event:
+    - push
+
+- name: docker-publish-master-agent
+  pull: default
+  image: plugins/docker
+  settings:
     build_args:
     - VERSION=master
-    when:
-      branch: master
-      event: push
-
-  docker-publish:
-    image: plugins/docker
-    dockerfile: package/Dockerfile
-    repo: rancher/rancher
     context: package/
-    tag: ${DRONE_TAG}
-    secrets: [docker_username, docker_password]
-    environment:
-    -  PLUGIN_CUSTOM_DNS=1.1.1.1
-    build_args:
-    - VERSION=${DRONE_TAG}
-    when:
-      branch: [master, release/*, alpha]
-      event: tag
-
-  docker-publish-agent:
-    image: plugins/docker
+    custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.agent
+    password:
+      from_secret: docker_password
     repo: rancher/rancher-agent
-    context: package/
-    tag: ${DRONE_TAG}
-    secrets: [docker_username, docker_password]
-    environment:
-    -  PLUGIN_CUSTOM_DNS=1.1.1.1
-    build_args:
-    - VERSION=${DRONE_TAG}
-    when:
-      branch: [master, release/*, alpha]
-      event: tag
+    tag: master
+    username:
+      from_secret: docker_username
+  when:
+    branch:
+    - master
+    event:
+    - push
 
-  github_binary_prerelease:
-    image: plugins/github-release
+- name: docker-publish
+  pull: default
+  image: plugins/docker
+  settings:
+    build_args:
+    - "VERSION=${DRONE_TAG}"
+    context: package/
+    custom_dns: 1.1.1.1
+    dockerfile: package/Dockerfile
+    password:
+      from_secret: docker_password
+    repo: rancher/rancher
+    tag: "${DRONE_TAG}"
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+
+- name: docker-publish-agent
+  pull: default
+  image: plugins/docker
+  settings:
+    build_args:
+    - "VERSION=${DRONE_TAG}"
+    context: package/
+    custom_dns: 1.1.1.1
+    dockerfile: package/Dockerfile.agent
+    password:
+      from_secret: docker_password
+    repo: rancher/rancher-agent
+    tag: "${DRONE_TAG}"
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+
+- name: github_binary_prerelease
+  pull: default
+  image: plugins/github-release
+  settings:
+    api_key:
+      from_secret: github_token
+    checksum:
+    - sha256
+    files:
+    - "bin/rancher-*"
     prerelease: true
-    files:
-     - bin/rancher-*
+  when:
+    event:
+    - tag
+    ref:
+      include:
+      - "refs/tags/*rc*"
+      - "refs/tags/*alpha*"
+
+- name: github_binary_release
+  pull: default
+  image: plugins/github-release
+  settings:
+    api_key:
+      from_secret: github_token
     checksum:
-     - sha256
-    secrets: [github_token]
-    when:
-      branch: [master, release/*, alpha]
-      event: tag
-      ref:
-        include: [ refs/tags/*rc*, refs/tags/*alpha* ]
-
-  github_binary_release:
-    image: plugins/github-release
+    - sha256
     files:
-     - bin/rancher-*
-    checksum:
-     - sha256
-    secrets: [github_token]
-    when:
-      branch: [master, release/*]
-      event: tag
-      ref:
-        exclude: [ refs/tags/*rc*, refs/tags/*alpha* ]
+    - "bin/rancher-*"
+  when:
+    event:
+    - tag
+    ref:
+      include:
+      - "refs/tags/v2*"
+      exclude:
+      - "refs/tags/*rc*"
+      - "refs/tags/*alpha*"
 
-  chart-promote:
-    image: rancher/dapper:1.11.2
-    commands:
-      - dapper chart/copy
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    when:
-      event: deployment
-      environment: promote-stable
-
-  chart-publish:
-    image: plugins/gcs
+- name: chart-publish
+  pull: default
+  image: plugins/gcs
+  settings:
+    acl:
+    - allUsers:READER
+    cache_control: "public,no-cache,proxy-revalidate"
     source: bin/chart
     target: releases.rancher.com/server-charts
+    token:
+      from_secret: google_auth_key
+  when:
+    event:
+    - tag
+
+volumes:
+- name: docker
+  host:
+    path: /var/run/docker.sock
+
+trigger:
+  event:
+    exclude:
+    - promote
+---
+kind: pipeline
+name: publish
+
+platform:
+  os: linux
+  arch: amd64 
+
+steps:
+- name: chart-promote
+  pull: default
+  image: rancher/dapper:v0.4.1
+  commands:
+  - dapper chart/copy
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    event:
+    - promote
+    target:
+    - promote-stable
+
+- name: chart-publish
+  pull: default
+  image: plugins/gcs
+  settings:
     acl:
-      - allUsers:READER
-    cache_control: public,no-cache,proxy-revalidate
-    secrets:
-      - source: google_auth_key
-        target: GOOGLE_CREDENTIALS
-    when:
-      event: [ tag, deployment ]
+    - allUsers:READER
+    cache_control: "public,no-cache,proxy-revalidate"
+    source: bin/chart
+    target: releases.rancher.com/server-charts
+    token:
+      from_secret: google_auth_key
+
+volumes:
+- name: docker
+  host:
+    path: /var/run/docker.sock
+
+trigger:
+  event:
+  - promote
+...
