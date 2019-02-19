@@ -67,7 +67,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 }
 
 func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
-	cluster, err := c.clusterClient.Get(b.ClusterID, metav1.GetOptions{})
+	cluster, err := c.clusterClient.Get(b.Spec.ClusterID, metav1.GetOptions{})
 	if err != nil {
 		return b, err
 	}
@@ -76,8 +76,8 @@ func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
 	}
 
 	if !v3.BackupConditionCreated.IsTrue(b) {
-		b.Filename = getBackupFilename(b.Name, cluster)
-		b.BackupConfig = *cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig
+		b.Spec.Filename = getBackupFilename(b.Name, cluster)
+		b.Spec.BackupConfig = *cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig
 		v3.BackupConditionCreated.True(b)
 		b, err = c.backupClient.Update(b)
 		if err != nil {
@@ -105,7 +105,7 @@ func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
 
 func (c *Controller) Remove(b *v3.EtcdBackup) (runtime.Object, error) {
 	logrus.Infof("[etcd-backup] Deleteing backup %s ", b.Name)
-	if b.BackupConfig.S3BackupConfig == nil {
+	if b.Spec.BackupConfig.S3BackupConfig == nil {
 		return b, nil
 	}
 	return b, c.deleteS3Snapshot(b)
@@ -216,7 +216,9 @@ func NewBackupObject(cluster *v3.Cluster) *v3.EtcdBackup {
 				},
 			},
 		},
-		ClusterID: cluster.Name,
+		Spec: v3.EtcdBackupSpec{
+			ClusterID: cluster.Name,
+		},
 	}
 }
 
@@ -230,21 +232,21 @@ func getBackupFilename(snapshotName string, cluster *v3.Cluster) string {
 }
 
 func (c *Controller) deleteS3Snapshot(b *v3.EtcdBackup) error {
-	if b.BackupConfig.S3BackupConfig == nil {
+	if b.Spec.BackupConfig.S3BackupConfig == nil {
 		return fmt.Errorf("can't find S3 backup target configuration")
 	}
 	var err error
 	s3Client := &minio.Client{}
-	endpoint := b.BackupConfig.S3BackupConfig.Endpoint
-	bucket := b.BackupConfig.S3BackupConfig.BucketName
+	endpoint := b.Spec.BackupConfig.S3BackupConfig.Endpoint
+	bucket := b.Spec.BackupConfig.S3BackupConfig.BucketName
 	// no access credentials, we assume IAM roles
-	if b.BackupConfig.S3BackupConfig.AccessKey == "" ||
-		b.BackupConfig.S3BackupConfig.SecretKey == "" {
+	if b.Spec.BackupConfig.S3BackupConfig.AccessKey == "" ||
+		b.Spec.BackupConfig.S3BackupConfig.SecretKey == "" {
 		creds := credentials.NewIAM("")
 		s3Client, err = minio.NewWithCredentials(endpoint, creds, true, "")
 	} else {
-		accessKey := b.BackupConfig.S3BackupConfig.AccessKey
-		secretKey := b.BackupConfig.S3BackupConfig.SecretKey
+		accessKey := b.Spec.BackupConfig.S3BackupConfig.AccessKey
+		secretKey := b.Spec.BackupConfig.S3BackupConfig.SecretKey
 
 		s3Client, err = minio.New(endpoint, accessKey, secretKey, true)
 	}
