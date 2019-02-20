@@ -47,8 +47,8 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 
 	if err := creator.addCustomDriver(
 		"aliyunkubernetescontainerservice",
-		"https://github.com/rancher/kontainer-engine-driver-aliyun/releases/download/v0.2.3/kontainer-engine-driver-aliyun-linux",
-		"15c994fa48b5e0b924e4ead33a161e17785720ad7732425a151ad79c8746358d",
+		"https://github.com/rancher/kontainer-engine-driver-aliyun/releases/download/v0.2.4/kontainer-engine-driver-aliyun-linux",
+		"61e8d1a69dae4c9bee7a1618399422300b95436ca747e520329cfc1a724c4180",
 		"",
 		false,
 		"*.aliyuncs.com",
