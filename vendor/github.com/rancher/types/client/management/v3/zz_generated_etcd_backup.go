@@ -5,37 +5,43 @@ import (
 )
 
 const (
-	EtcdBackupType                 = "etcdBackup"
-	EtcdBackupFieldAnnotations     = "annotations"
-	EtcdBackupFieldBackupConfig    = "backupConfig"
-	EtcdBackupFieldClusterID       = "clusterId"
-	EtcdBackupFieldCreated         = "created"
-	EtcdBackupFieldCreatorID       = "creatorId"
-	EtcdBackupFieldFilename        = "filename"
-	EtcdBackupFieldLabels          = "labels"
-	EtcdBackupFieldName            = "name"
-	EtcdBackupFieldNamespaceId     = "namespaceId"
-	EtcdBackupFieldOwnerReferences = "ownerReferences"
-	EtcdBackupFieldRemoved         = "removed"
-	EtcdBackupFieldStatus          = "status"
-	EtcdBackupFieldUUID            = "uuid"
+	EtcdBackupType                      = "etcdBackup"
+	EtcdBackupFieldAnnotations          = "annotations"
+	EtcdBackupFieldBackupConfig         = "backupConfig"
+	EtcdBackupFieldClusterID            = "clusterId"
+	EtcdBackupFieldCreated              = "created"
+	EtcdBackupFieldCreatorID            = "creatorId"
+	EtcdBackupFieldFilename             = "filename"
+	EtcdBackupFieldLabels               = "labels"
+	EtcdBackupFieldName                 = "name"
+	EtcdBackupFieldNamespaceId          = "namespaceId"
+	EtcdBackupFieldOwnerReferences      = "ownerReferences"
+	EtcdBackupFieldRemoved              = "removed"
+	EtcdBackupFieldState                = "state"
+	EtcdBackupFieldStatus               = "status"
+	EtcdBackupFieldTransitioning        = "transitioning"
+	EtcdBackupFieldTransitioningMessage = "transitioningMessage"
+	EtcdBackupFieldUUID                 = "uuid"
 )
 
 type EtcdBackup struct {
 	types.Resource
-	Annotations     map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	BackupConfig    *BackupConfig     `json:"backupConfig,omitempty" yaml:"backupConfig,omitempty"`
-	ClusterID       string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
-	Created         string            `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	Filename        string            `json:"filename,omitempty" yaml:"filename,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
-	NamespaceId     string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Status          *EtcdBackupStatus `json:"status,omitempty" yaml:"status,omitempty"`
-	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	BackupConfig         *BackupConfig     `json:"backupConfig,omitempty" yaml:"backupConfig,omitempty"`
+	ClusterID            string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Filename             string            `json:"filename,omitempty" yaml:"filename,omitempty"`
+	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId          string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	State                string            `json:"state,omitempty" yaml:"state,omitempty"`
+	Status               *EtcdBackupStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
 
 type EtcdBackupCollection struct {
