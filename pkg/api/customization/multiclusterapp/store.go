@@ -99,12 +99,17 @@ func (s *Store) setDisplayName(apiContext *types.APIContext, schema *types.Schem
 	if !found {
 		return data, nil
 	}
+	token, err := s.auth.TokenFromRequest(apiContext.Request)
+	if err != nil {
+		return nil, err
+	}
+	if token.AuthProvider == providers.LocalProvider {
+		// getPrincipal if called, will be called on local auth provider, and will not find a user with external auth principal ID
+		// hence returning, since the only thing this method does is setting display name by getting it from the external auth provider.
+		return data, nil
+	}
 	for _, m := range membersMapSlice {
 		if principalID, ok := m[client.MemberFieldUserPrincipalID].(string); ok && principalID != "" && !strings.HasPrefix(principalID, "local://") {
-			token, err := s.auth.TokenFromRequest(apiContext.Request)
-			if err != nil {
-				return nil, err
-			}
 			princ, err := providers.GetPrincipal(principalID, *token)
 			if err != nil {
 				return nil, err
