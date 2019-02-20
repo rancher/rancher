@@ -76,6 +76,10 @@ func (n *ProviderCatalogLauncher) sync(key string, obj *v3.GlobalDNSProvider) (r
 		return n.handleAlidnsProvider(obj)
 	}
 
+	if obj.Spec.LinodeProviderConfig != nil {
+		return n.handleLinodeProvider(obj)
+	}
+
 	return nil, nil
 }
 
@@ -128,6 +132,24 @@ func (n *ProviderCatalogLauncher) handleAlidnsProvider(obj *v3.GlobalDNSProvider
 		"txtOwnerId":             rancherInstallUUID + "_" + obj.Name,
 		"rbac.create":            "true",
 		"policy":                 "sync",
+	}
+
+	if obj.Spec.RootDomain != "" {
+		answers["domainFilters[0]"] = obj.Spec.RootDomain
+	}
+
+	return n.createUpdateExternalDNSApp(obj, answers)
+}
+
+func (n *ProviderCatalogLauncher) handleLinodeProvider(obj *v3.GlobalDNSProvider) (runtime.Object, error) {
+	rancherInstallUUID := settings.InstallUUID.Get()
+	//create external-dns linode provider
+	answers := map[string]string{
+		"provider":        "linode",
+		"linode.apiToken": obj.Spec.LinodeProviderConfig.APIToken,
+		"txtOwnerId":      rancherInstallUUID + "_" + obj.Name,
+		"rbac.create":     "true",
+		"policy":          "sync",
 	}
 
 	if obj.Spec.RootDomain != "" {
