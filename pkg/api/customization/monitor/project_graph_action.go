@@ -66,8 +66,8 @@ func (h *ProjectGraphHandler) QuerySeriesAction(actionName string, action *types
 	reqContext, cancel := context.WithTimeout(context.Background(), prometheusReqTimeout)
 	defer cancel()
 
-	svcName, svcNamespace, _ := monitorutil.ClusterPrometheusEndpoint()
-	prometheusQuery, err := NewPrometheusQuery(reqContext, userContext, clusterName, token, svcNamespace, svcName, h.clustermanager, h.dialerFactory)
+	svcName, svcNamespace, svcPort := monitorutil.ClusterPrometheusEndpoint()
+	prometheusQuery, err := NewPrometheusQuery(reqContext, clusterName, token, svcNamespace, svcName, svcPort, h.dialerFactory)
 	if err != nil {
 		return err
 	}

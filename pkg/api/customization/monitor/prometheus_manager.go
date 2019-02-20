@@ -12,8 +12,6 @@ import (
 	promapi "github.com/prometheus/client_golang/api"
 	promapiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
-	"github.com/rancher/rancher/pkg/clustermanager"
-	"github.com/rancher/types/config"
 	"github.com/rancher/types/config/dialer"
 	"golang.org/x/sync/errgroup"
 )
@@ -28,16 +26,13 @@ type Queries struct {
 	eg  *errgroup.Group
 }
 
-func NewPrometheusQuery(ctx context.Context, userContext *config.UserContext, clusterName, authToken, svcNamespace, svcName string, clustermanager *clustermanager.Manager, dialerFactory dialer.Factory) (*Queries, error) {
+func NewPrometheusQuery(ctx context.Context, clusterName, authToken, svcNamespace, svcName, svcPort string, dialerFactory dialer.Factory) (*Queries, error) {
 	dial, err := dialerFactory.ClusterDialer(clusterName)
 	if err != nil {
 		return nil, fmt.Errorf("get dail from usercontext failed, %v", err)
 	}
 
-	endpoint, err := getPrometheusEndpoint(userContext, svcNamespace, svcName)
-	if err != nil {
-		return nil, err
-	}
+	endpoint := fmt.Sprintf("http://%s.%s:%s", svcName, svcNamespace, svcPort)
 
 	api, err := newPrometheusAPI(dial, endpoint, authToken)
 	if err != nil {

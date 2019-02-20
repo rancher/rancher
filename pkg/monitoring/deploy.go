@@ -138,7 +138,6 @@ func WithdrawApp(cattleAppClient projectv3.AppInterface, appLabels metav1.ListOp
 		return errors.Wrapf(err, "failed to find App with %s", appLabels.String())
 	}
 
-	monitoringApps = monitoringApps.DeepCopy()
 	for _, app := range monitoringApps.Items {
 		if app.DeletionTimestamp == nil {
 			if err := cattleAppClient.DeleteNamespaced(app.Namespace, app.Name, &metav1.DeleteOptions{}); err != nil {
