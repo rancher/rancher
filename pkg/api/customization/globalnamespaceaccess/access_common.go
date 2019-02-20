@@ -5,14 +5,16 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
 
-	"github.com/rancher/norman/api/access"
-	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
+	"github.com/rancher/norman/httperror"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -49,6 +51,9 @@ func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []stri
 	for _, r := range roleTemplates {
 		rt, err := ma.RoleTemplateLister.Get("", r)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "Role "+r+" does not exist")
+			}
 			return err
 		}
 		switch rt.Context {
