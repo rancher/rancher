@@ -36,7 +36,7 @@ func (cd *clusterAnnotations) sync(key string, cluster *v3.Cluster) (runtime.Obj
 			return nil, nil
 		}
 
-		newValue := strconv.FormatBool(eksConfig["sessionToken"] != "")
+		newValue := strconv.FormatBool(eksConfig["sessionToken"] != "" && eksConfig["sessionToken"] != nil)
 		original := cluster
 		cluster = original.DeepCopy()
 

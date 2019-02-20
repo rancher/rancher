@@ -166,11 +166,12 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, httperror.NewFieldAPIError(httperror.InvalidOption, "enableNetworkPolicy", err.Error())
 	}
 
-	if eksConfig := data["amazonElasticContainerServiceConfig"]; eksConfig != nil {
-		sessionToken, _ := values.GetValue(data, "amazonElasticContainerServiceConfig", "sessionToken")
+	if driverName, _ := values.GetValue(data, "genericEngineConfig", "driverName"); driverName == "amazonelasticcontainerservice" {
+		sessionToken, _ := values.GetValue(data, "genericEngineConfig", "sessionToken")
 		annotation, _ := values.GetValue(data, managementv3.ClusterFieldAnnotations)
 		m := toMap(annotation)
-		m[clusterstatus.TemporaryCredentialsAnnotationKey] = strconv.FormatBool(sessionToken != nil)
+		m[clusterstatus.TemporaryCredentialsAnnotationKey] = strconv.FormatBool(
+			sessionToken != "" && sessionToken != nil)
 		values.PutValue(data, m, managementv3.ClusterFieldAnnotations)
 	}
 
