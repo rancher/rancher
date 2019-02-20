@@ -16,6 +16,10 @@ def test_builtin_drivers_are_present(admin_mc):
     for name in ['azureKubernetesService',
                  'googleKubernetesEngine',
                  'amazonElasticContainerService']:
+        kd = admin_mc.client.list_kontainerDriver(
+            name=name,
+        ).data[0]
+        wait_for_condition('Active', "True", admin_mc.client, kd, timeout=90)
         # check in schema
         assert name + "Config" in types
 
