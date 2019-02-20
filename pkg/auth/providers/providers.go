@@ -24,7 +24,7 @@ var (
 	ProvidersWithSecrets   = make(map[string]bool)
 	UnrefreshableProviders = make(map[string]bool)
 	providers              = make(map[string]common.AuthProvider)
-	localProvider          = "local"
+	LocalProvider          = "local"
 	providersByType        = make(map[string]common.AuthProvider)
 	confMu                 sync.Mutex
 )
@@ -123,8 +123,8 @@ func AuthenticateUser(input interface{}, providerName string) (v3.Principal, []v
 func GetPrincipal(principalID string, myToken v3.Token) (v3.Principal, error) {
 	principal, err := providers[myToken.AuthProvider].GetPrincipal(principalID, myToken)
 
-	if err != nil && myToken.AuthProvider != localProvider {
-		p2, e2 := providers[localProvider].GetPrincipal(principalID, myToken)
+	if err != nil && myToken.AuthProvider != LocalProvider {
+		p2, e2 := providers[LocalProvider].GetPrincipal(principalID, myToken)
 		if e2 == nil {
 			return p2, nil
 		}
@@ -138,8 +138,8 @@ func SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Princi
 	if err != nil {
 		return principals, err
 	}
-	if myToken.AuthProvider != localProvider {
-		lp := providers[localProvider]
+	if myToken.AuthProvider != LocalProvider {
+		lp := providers[LocalProvider]
 		if lpDedupe, _ := lp.(*local.Provider); lpDedupe != nil {
 			localPrincipals, err := lpDedupe.SearchPrincipalsDedupe(name, principalType, myToken, principals)
 			if err != nil {
