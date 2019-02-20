@@ -330,7 +330,6 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 	CommandArgs := map[string]string{
 		"v":                            "2",
 		"address":                      "0.0.0.0",
-		"cadvisor-port":                "0", //depricated in 1.12
 		"read-only-port":               "0",
 		"cluster-domain":               c.ClusterDomain,
 		"pod-infra-container-image":    c.Services.Kubelet.InfraContainerImage,
