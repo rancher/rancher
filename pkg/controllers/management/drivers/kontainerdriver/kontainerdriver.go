@@ -3,11 +3,11 @@ package kontainerdriver
 import (
 	"context"
 	"fmt"
-	errorsutil "github.com/pkg/errors"
 	"reflect"
 	"regexp"
 	"strings"
 
+	errorsutil "github.com/pkg/errors"
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
@@ -62,51 +62,29 @@ func (l *Lifecycle) Create(obj *v3.KontainerDriver) (runtime.Object, error) {
 		return obj, nil
 	}
 
-	v3.KontainerDriverConditionDownloaded.Unknown(obj)
-	v3.KontainerDriverConditionInstalled.Unknown(obj)
-
-	// Update status
-	obj, err := l.kontainerDrivers.Update(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	if !obj.Spec.BuiltIn {
-		obj, err = l.download(obj)
-		if err != nil {
-			return nil, err
-		}
-	} else {
+	if obj.Spec.BuiltIn {
 		v3.KontainerDriverConditionDownloaded.True(obj)
 		v3.KontainerDriverConditionInstalled.True(obj)
-	}
-
-	// Update status
-	obj, err = l.kontainerDrivers.Update(obj)
-	if err != nil {
-		return nil, err
+	} else {
+		v3.KontainerDriverConditionDownloaded.Unknown(obj)
+		v3.KontainerDriverConditionInstalled.Unknown(obj)
 	}
 
 	if hasStaticSchema(obj) {
-		return obj, nil
+		v3.KontainerDriverConditionActive.True(obj)
+	} else {
+		v3.KontainerDriverConditionActive.Unknown(obj)
 	}
-
-	err = l.createDynamicSchema(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	v3.KontainerDriverConditionActive.True(obj)
 
 	return obj, nil
 }
 
 func (l *Lifecycle) driverExists(obj *v3.KontainerDriver) bool {
-	return drivers.NewKontainerDriver(obj.Spec.BuiltIn, obj.Name, obj.Spec.URL, obj.Spec.Checksum).Exists()
+	return drivers.NewKontainerDriver(obj.Spec.BuiltIn, obj.Status.DisplayName, obj.Spec.URL, obj.Spec.Checksum).Exists()
 }
 
 func (l *Lifecycle) download(obj *v3.KontainerDriver) (*v3.KontainerDriver, error) {
-	driver := drivers.NewKontainerDriver(obj.Spec.BuiltIn, obj.Name, obj.Spec.URL, obj.Spec.Checksum)
+	driver := drivers.NewKontainerDriver(obj.Spec.BuiltIn, obj.Status.DisplayName, obj.Spec.URL, obj.Spec.Checksum)
 	err := driver.Stage()
 	if err != nil {
 		return nil, err
@@ -349,33 +327,59 @@ func (l *Lifecycle) Updated(obj *v3.KontainerDriver) (runtime.Object, error) {
 		return obj, nil
 	}
 
-	if obj.Spec.BuiltIn {
+	if obj.Spec.BuiltIn && v3.KontainerDriverConditionActive.IsTrue(obj) {
 		// Builtin drivers can still have their schema change during Rancher upgrades so we need to try
 		return obj, l.updateDynamicSchema(obj)
 	}
 
+	var err error
+	var tmpObj runtime.Object
+	switch { // dealing with deactivate action
+	case !obj.Spec.Active && l.DynamicSchemaExists(obj):
+		v3.KontainerDriverConditionInactive.Unknown(obj)
+		// we don't need to show the Inactivating state so we don't need to store the Inactivate condition
+		fallthrough
+	case !obj.Spec.Active:
+		tmpObj, err = v3.KontainerDriverConditionInactive.DoUntilTrue(obj, func() (runtime.Object, error) {
+			if err = l.dynamicSchemas.Delete(getDynamicTypeName(obj), &v13.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+				return nil, fmt.Errorf("error deleting schema: %v", err)
+			}
+			if err = l.removeFieldFromCluster(obj); err != nil {
+				return nil, err
+			}
+
+			return obj, nil
+		})
+		obj = tmpObj.(*v3.KontainerDriver)
+
 	// redownload file if active AND url changed or not downloaded
 	// prevents downloading on air-gapped installations
-	var err error
-	if obj.Spec.Active && (obj.Spec.URL != obj.Status.ActualURL || v3.KontainerDriverConditionDownloaded.IsFalse(obj) || !l.driverExists(obj)) {
-		obj, err = l.download(obj)
-		if err != nil {
-			return nil, err
-		}
-	}
-	// Create schema if obj is active
-	// Delete schema if obj is inactive
-	if obj.Spec.Active {
-		err = l.createDynamicSchema(obj)
+	// and update the Downloaded condition to Unknown to show the downloading state
+	case !v3.KontainerDriverConditionDownloaded.IsUnknown(obj) &&
+		(obj.Spec.URL != obj.Status.ActualURL ||
+			v3.KontainerDriverConditionDownloaded.IsFalse(obj) ||
+			!l.driverExists(obj)):
+		v3.KontainerDriverConditionDownloaded.Unknown(obj)
 
-		v3.KontainerDriverConditionActive.True(obj)
-	} else {
-		if err = l.dynamicSchemas.Delete(getDynamicTypeName(obj), &v13.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-			return nil, fmt.Errorf("error deleting schema: %v", err)
-		}
-		if err = l.removeFieldFromCluster(obj); err != nil {
-			return nil, err
-		}
+	// if it is a buildin driver, set true without downloading
+	case obj.Spec.BuiltIn && !v3.KontainerDriverConditionDownloaded.IsTrue(obj):
+		v3.KontainerDriverConditionDownloaded.True(obj)
+		v3.KontainerDriverConditionInstalled.True(obj)
+
+	// handling download process
+	case !obj.Spec.BuiltIn && !v3.KontainerDriverConditionDownloaded.IsTrue(obj):
+		obj, err = l.download(obj)
+
+	// set active status to unknown to show the activating state
+	case !l.DynamicSchemaExists(obj) && !v3.KontainerDriverConditionActive.IsUnknown(obj):
+		v3.KontainerDriverConditionActive.Unknown(obj)
+
+	// create schema and set active status to true
+	default:
+		tmpObj, err = v3.KontainerDriverConditionActive.DoUntilTrue(obj, func() (runtime.Object, error) {
+			return obj, l.createDynamicSchema(obj)
+		})
+		obj = tmpObj.(*v3.KontainerDriver)
 	}
 
 	return obj, err
@@ -449,4 +453,16 @@ func (l *Lifecycle) removeFieldFromCluster(obj *v3.KontainerDriver) error {
 	}
 
 	return nil
+}
+
+func (l *Lifecycle) DynamicSchemaExists(obj *v3.KontainerDriver) bool {
+	if obj == nil {
+		return false
+	}
+	if obj.Spec.BuiltIn {
+		return true
+	}
+
+	_, err := l.dynamicSchemasLister.Get("", strings.ToLower(getDynamicTypeName(obj)))
+	return err == nil
 }
