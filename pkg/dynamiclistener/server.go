@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/golang-lru"
 	"github.com/rancher/norman/types/set"
 	"github.com/rancher/norman/types/slice"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/acme/autocert"
@@ -32,6 +33,40 @@ import (
 const (
 	httpsMode = "https"
 	acmeMode  = "acme"
+)
+
+var (
+	tlsVersions = map[string]uint16{
+		"1.2": tls.VersionTLS12,
+		"1.1": tls.VersionTLS11,
+		"1.0": tls.VersionTLS10,
+	}
+
+	// https://golang.org/pkg/crypto/tls/#pkg-constants
+	tlsCipherSuites = map[string]uint16{
+		"TLS_RSA_WITH_RC4_128_SHA":                tls.TLS_RSA_WITH_RC4_128_SHA,
+		"TLS_RSA_WITH_3DES_EDE_CBC_SHA":           tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA,
+		"TLS_RSA_WITH_AES_128_CBC_SHA":            tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+		"TLS_RSA_WITH_AES_256_CBC_SHA":            tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+		"TLS_RSA_WITH_AES_128_CBC_SHA256":         tls.TLS_RSA_WITH_AES_128_CBC_SHA256,
+		"TLS_RSA_WITH_AES_128_GCM_SHA256":         tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
+		"TLS_RSA_WITH_AES_256_GCM_SHA384":         tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+		"TLS_ECDHE_ECDSA_WITH_RC4_128_SHA":        tls.TLS_ECDHE_ECDSA_WITH_RC4_128_SHA,
+		"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA":    tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
+		"TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA":    tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
+		"TLS_ECDHE_RSA_WITH_RC4_128_SHA":          tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA,
+		"TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA":     tls.TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA,
+		"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA":      tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+		"TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA":      tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+		"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256": tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
+		"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256":   tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
+		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256":   tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256": tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+		"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384":   tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+		"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384": tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+		"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305":    tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+		"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305":  tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+	}
 )
 
 type ListenConfigStorage interface {
@@ -384,9 +419,22 @@ func (s *Server) cacheIPHandler(handler http.Handler) http.Handler {
 }
 
 func (s *Server) serveHTTPS(config *v3.ListenConfig) error {
+	// Get configured minimal tls version
+	TLSMinVersion, err := lookupTLSVersion()
+	if err != nil {
+		return fmt.Errorf("Error while configuring minimal TLS version: %s", err)
+	}
+	// Get configured tls ciphers
+	TLSCiphers, err := lookupTLSCiphers()
+	if err != nil {
+		return fmt.Errorf("Error while configuring TLS ciphers: %s", err)
+	}
+
 	conf := &tls.Config{
 		GetCertificate:           s.getCertificate,
 		PreferServerCipherSuites: true,
+		MinVersion:               TLSMinVersion,
+		CipherSuites:             TLSCiphers,
 	}
 	listener, err := s.newListener(s.httpsPort, conf)
 	if err != nil {
@@ -489,6 +537,17 @@ func (s *Server) newListener(port int, config *tls.Config) (net.Listener, error)
 }
 
 func (s *Server) serveACME(config *v3.ListenConfig) error {
+	// Get configured minimal tls version
+	TLSMinVersion, err := lookupTLSVersion()
+	if err != nil {
+		return fmt.Errorf("Error while configuring minimal TLS version: %s", err)
+	}
+	// Get configured tls ciphers
+	TLSCiphers, err := lookupTLSCiphers()
+	if err != nil {
+		return fmt.Errorf("Error while configuring TLS ciphers: %s", err)
+	}
+
 	manager := autocert.Manager{
 		Cache:      autocert.DirCache("certs-cache"),
 		Prompt:     s.prompt,
@@ -503,7 +562,10 @@ func (s *Server) serveACME(config *v3.ListenConfig) error {
 			}
 			return manager.GetCertificate(hello)
 		},
-		NextProtos: []string{"h2", "http/1.1"},
+		NextProtos:               []string{"h2", "http/1.1"},
+		PreferServerCipherSuites: true,
+		MinVersion:               TLSMinVersion,
+		CipherSuites:             TLSCiphers,
 	}
 
 	httpsListener, err := s.newListener(s.httpsPort, conf)
@@ -587,4 +649,37 @@ func (ln tcpKeepAliveListener) Accept() (c net.Conn, err error) {
 	tc.SetKeepAlive(true)
 	tc.SetKeepAlivePeriod(3 * time.Minute)
 	return tc, nil
+}
+
+func lookupTLSVersion() (uint16, error) {
+	tlsVersionKeys := getKeysFromMap(tlsVersions)
+	settingsTLSMinVersion := settings.TLSMinVersion.Get()
+	if val, ok := tlsVersions[settingsTLSMinVersion]; ok {
+		return val, nil
+	}
+	return 0, fmt.Errorf("Invalid minimal TLS version [%s], must be one of: %s", settingsTLSMinVersion, strings.Join(tlsVersionKeys, " "))
+}
+
+func lookupTLSCiphers() ([]uint16, error) {
+	tlsCipherSuitesKeys := getKeysFromMap(tlsCipherSuites)
+	settingsTLSCiphers := settings.TLSCiphers.Get()
+	sliceTLSCiphers := strings.Split(settingsTLSCiphers, ",")
+
+	var TLSCiphers []uint16
+	for _, TLSCipher := range sliceTLSCiphers {
+		val, ok := tlsCipherSuites[strings.TrimSpace(TLSCipher)]
+		if !ok {
+			return []uint16{}, fmt.Errorf("Unsupported cipher [%s], must be one or more from: %s", TLSCipher, strings.Join(tlsCipherSuitesKeys, " "))
+		}
+		TLSCiphers = append(TLSCiphers, val)
+	}
+	return TLSCiphers, nil
+}
+
+func getKeysFromMap(input map[string]uint16) []string {
+	var keys []string
+	for key := range input {
+		keys = append(keys, key)
+	}
+	return keys
 }
