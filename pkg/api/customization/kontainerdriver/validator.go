@@ -20,11 +20,7 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "Kontainer driver spec conversion error")
 	}
 
-	if err := v.validateKontainerDriverURL(request, spec); err != nil {
-		return err
-	}
-
-	return nil
+	return v.validateKontainerDriverURL(request, spec)
 }
 
 func (v *Validator) validateKontainerDriverURL(request *types.APIContext, spec v3.KontainerDriverSpec) error {
@@ -34,7 +30,7 @@ func (v *Validator) validateKontainerDriverURL(request *types.APIContext, spec v
 	}
 
 	for _, driver := range kontainerDrivers {
-		if driver.Spec.URL == spec.URL && driver.Name == request.ID {
+		if driver.Spec.URL == spec.URL && driver.Name != request.ID {
 			return httperror.NewAPIError(httperror.Conflict, fmt.Sprintf("Driver URL already in use: %s", spec.URL))
 		}
 	}

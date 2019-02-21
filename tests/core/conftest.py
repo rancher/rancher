@@ -305,7 +305,20 @@ def remove_resource(admin_mc, request):
                 if e.error.status != 404:
                     raise e
         request.addfinalizer(clean)
+    return _cleanup
 
+
+@pytest.fixture()
+def wait_remove_resource(admin_mc, request, timeout=DEFAULT_TIMEOUT):
+    """Remove a resource after a test finishes even if the test fails and
+    wait until deletion is confirmed."""
+    client = admin_mc.client
+
+    def _cleanup(resource):
+        def clean():
+            client.delete(resource)
+            wait_until(lambda: client.reload(resource) is None)
+        request.addfinalizer(clean)
     return _cleanup
 
 
