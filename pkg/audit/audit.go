@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/pborman/uuid"
-
+	"github.com/pkg/errors"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -122,8 +122,16 @@ func (a *auditLog) write(userInfo *UserInfo, reqHeaders, resHeaders http.Header,
 		buffer.WriteString(`,"responseBody":`)
 		buffer.Write(bytes.TrimSuffix(resBody, []byte("\n")))
 	}
-	buffer.WriteString("}\n")
-	_, err = a.writer.Output.Write(buffer.Bytes())
+	buffer.WriteString("}")
+
+	var compactBuffer bytes.Buffer
+	err = json.Compact(&compactBuffer, buffer.Bytes())
+	if err != nil {
+		return errors.Wrap(err, "compact audit log json failed")
+	}
+
+	compactBuffer.WriteString("\n")
+	_, err = a.writer.Output.Write(compactBuffer.Bytes())
 	return err
 }
 
