@@ -20,7 +20,6 @@ import (
 	"github.com/rancher/types/config"
 	"golang.org/x/sync/errgroup"
 
-	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,7 +31,6 @@ const (
 	globalScopeAnswersKey     = "global"
 	creatorIDAnn              = "field.cattle.io/creatorId"
 	MultiClusterAppIDSelector = "mcapp"
-	projectIDFieldLabel       = "field.cattle.io/projectId"
 	mcAppLabel                = "io.cattle.field/multiClusterAppId"
 )
 
@@ -43,9 +41,8 @@ type MCAppManager struct {
 	multiClusterAppRevisions      v3.MultiClusterAppRevisionInterface
 	multiClusterAppRevisionLister v3.MultiClusterAppRevisionLister
 	templateVersionLister         v3.CatalogTemplateVersionLister
-	clusterManager                *clustermanager.Manager
-	clusterLister                 v3.ClusterLister
 	projectLister                 v3.ProjectLister
+	clusterLister                 v3.ClusterLister
 	userManager                   user.Manager
 	ctx                           context.Context
 }
@@ -60,9 +57,8 @@ func StartMCAppManagementController(ctx context.Context, mgmt *config.Management
 		multiClusterApps:              mcApps,
 		multiClusterAppRevisions:      management.MultiClusterAppRevisions(""),
 		multiClusterAppRevisionLister: management.MultiClusterAppRevisions("").Controller().Lister(),
-		clusterManager:                clusterManager,
-		clusterLister:                 management.Clusters("").Controller().Lister(),
 		projectLister:                 management.Projects("").Controller().Lister(),
+		clusterLister:                 management.Clusters("").Controller().Lister(),
 		templateVersionLister:         management.CatalogTemplateVersions("").Controller().Lister(),
 		userManager:                   mgmt.UserManager,
 	}
@@ -98,13 +94,8 @@ func (m *MCAppManager) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Obje
 		return mcapp, err
 	}
 
-	clusterContexts, err := m.getClusterContexts(mcapp)
-	if err != nil {
-		return mcapp, err
-	}
-
 	mcapp = mcapp.DeepCopy()
-	if err := m.reconcileTargetsForDelete(mcapp, clusterContexts); err != nil {
+	if err := m.reconcileTargetsForDelete(mcapp); err != nil {
 		return mcapp, err
 	}
 
@@ -128,7 +119,7 @@ func (m *MCAppManager) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Obje
 		}
 	}
 
-	resp, err := m.createApps(mcapp, externalID, answerMap, creatorID, batchSize, toUpdate, clusterContexts)
+	resp, err := m.createApps(mcapp, externalID, answerMap, creatorID, batchSize, toUpdate)
 	if err != nil {
 		return resp.object, err
 	}
@@ -177,23 +168,8 @@ type Response struct {
 	count      int
 }
 
-func (m *MCAppManager) getClusterContexts(mcapp *v3.MultiClusterApp) (map[string]*config.UserContext, error) {
-	clusterToContext := map[string]*config.UserContext{}
-	for _, t := range mcapp.Spec.Targets {
-		clusterName, _ := ref.Parse(t.ProjectName)
-		if _, ok := clusterToContext[clusterName]; !ok {
-			userContext, err := m.clusterManager.UserContext(clusterName)
-			if err != nil {
-				return nil, err
-			}
-			clusterToContext[clusterName] = userContext
-		}
-	}
-	return clusterToContext, nil
-}
-
 func (m *MCAppManager) createApps(mcapp *v3.MultiClusterApp, externalID string, answerMap map[string]map[string]string,
-	creatorID string, batchSize int, toUpdate bool, clusterContexts map[string]*config.UserContext) (*Response, error) {
+	creatorID string, batchSize int, toUpdate bool) (*Response, error) {
 
 	var mcappToUpdate *v3.MultiClusterApp
 	var updateApps []*pv3.App
@@ -216,7 +192,7 @@ func (m *MCAppManager) createApps(mcapp *v3.MultiClusterApp, externalID string, 
 		if len(split) != 2 {
 			return resp, fmt.Errorf("error in splitting project ID %v", t.ProjectName)
 		}
-		clusterName, projectNS := split[0], split[1]
+		projectNS := split[1]
 		// check if this app already exists
 		if t.AppName != "" {
 			app, err := m.appLister.Get(projectNS, t.AppName)
@@ -248,15 +224,15 @@ func (m *MCAppManager) createApps(mcapp *v3.MultiClusterApp, externalID string, 
 			continue
 		}
 		if batchSize > 0 {
-			newTarget, mcapp, err := m.createNamespaceAndApp(&t, mcapp, answerMap, ann, set, projectNS, creatorID, externalID, clusterContexts[clusterName])
+			appName, mcapp, err := m.createApp(mcapp, answerMap, ann, set, projectNS, creatorID, externalID, t.ProjectName)
 			if err != nil {
 				return resp, fmt.Errorf("error %v in creating multiclusterapp: %v", err, mcapp)
 			}
-			if newTarget != nil {
+			if appName != "" {
 				if mcappToUpdate == nil {
 					mcappToUpdate = mcapp.DeepCopy()
 				}
-				mcappToUpdate.Spec.Targets[ind].AppName = newTarget.AppName
+				mcappToUpdate.Spec.Targets[ind].AppName = appName
 				batchSize--
 				count++
 			}
@@ -391,60 +367,36 @@ func (m *MCAppManager) toUpdate(mcapp *v3.MultiClusterApp) (bool, error) {
 	return true, nil
 }
 
-// createNamespaceAndApp creates the namespace for all workloads of the app, and then the app itself
-func (m *MCAppManager) createNamespaceAndApp(t *v3.Target, mcapp *v3.MultiClusterApp, answerMap map[string]map[string]string, ann map[string]string,
-	set map[string]string, projectNS string, creatorID string, externalID string, clusterContext *config.UserContext) (*v3.Target, *v3.MultiClusterApp, error) {
-	// Create the target namespace first
-	// Adding the projectId as an annotation is necessary, else the API/UI and UI won't list any of the resources from this namespace
+func (m *MCAppManager) createApp(mcapp *v3.MultiClusterApp, answerMap map[string]map[string]string, ann map[string]string,
+	set map[string]string, projectNS string, creatorID string, externalID string, projectName string) (string, *v3.MultiClusterApp, error) {
 	nsName := getAppNamespaceName(mcapp.Name, projectNS)
-	ns, err := clusterContext.Core.Namespaces("").Controller().Lister().Get("", nsName)
+	app, err := m.appLister.Get(projectNS, nsName)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, nil, err
-		}
-	}
-	if ns == nil {
-		n := v1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        nsName,
-				Labels:      map[string]string{projectIDFieldLabel: projectNS, MultiClusterAppIDSelector: mcapp.Name},
-				Annotations: map[string]string{projectIDFieldLabel: t.ProjectName, creatorIDAnn: creatorID},
-			},
-		}
-		ns, err = clusterContext.Core.Namespaces("").Create(&n)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return nil, mcapp, err
-		}
-	}
-	app, err := m.appLister.Get(projectNS, ns.Name)
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, mcapp, err
+			return "", mcapp, err
 		}
 		toCreate := pv3.App{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:        ns.Name,
+				Name:        nsName,
 				Namespace:   projectNS,
 				Annotations: ann,
 				Labels:      set,
 			},
 			Spec: pv3.AppSpec{
-				ProjectName:         t.ProjectName,
-				TargetNamespace:     ns.Name,
+				ProjectName:         projectName,
+				TargetNamespace:     nsName,
 				ExternalID:          externalID,
 				MultiClusterAppName: mcapp.Name,
-				Answers:             getAnswerMap(answerMap, t.ProjectName),
+				Answers:             getAnswerMap(answerMap, projectName),
 			},
 		}
 		// Now create the App instance
 		app, err = m.apps.Create(&toCreate)
 		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return nil, mcapp, err
+			return "", mcapp, err
 		}
 	}
-	// App creation is successful, so set Target.AppID = createdApp.Name
-	t.AppName = app.Name
-	return t, mcapp, nil
+	return app.Name, mcapp, nil
 }
 
 func getAnswerMap(answerMap map[string]map[string]string, projectName string) map[string]string {
@@ -471,21 +423,15 @@ func getAnswerMap(answerMap map[string]map[string]string, projectName string) ma
 func (m *MCAppManager) deleteApps(mcAppName string, mcapp *v3.MultiClusterApp) (runtime.Object, error) {
 	// get all apps with label "multiClusterAppId" = name of this app
 	appsToDelete := []*pv3.App{}
-	projectToCluster := map[string]string{}
-	clusterContexts := map[string]*config.UserContext{}
 	set := labels.Set(map[string]string{MultiClusterAppIDSelector: mcAppName})
 	var err error
 
 	if mcapp == nil {
-		appsToDelete, projectToCluster, clusterContexts, err = m.getAllApps(mcAppName, true)
+		appsToDelete, err = m.getAllApps(mcAppName)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		clusterContexts, err = m.getClusterContexts(mcapp)
-		if err != nil {
-			return nil, err
-		}
 		for _, t := range mcapp.Spec.Targets {
 			split := strings.SplitN(t.ProjectName, ":", 2)
 			if len(split) != 2 {
@@ -497,116 +443,82 @@ func (m *MCAppManager) deleteApps(mcAppName string, mcapp *v3.MultiClusterApp) (
 				return nil, err
 			}
 			appsToDelete = append(appsToDelete, apps...)
-			projectToCluster[projectNS] = split[0]
 		}
 	}
-	if err := m.delete(appsToDelete, clusterContexts, projectToCluster); err != nil {
+	if err := m.delete(appsToDelete); err != nil {
 		return nil, err
 	}
 	return nil, nil
 }
 
-func (m *MCAppManager) getAllApps(mcAppName string, withContext bool) ([]*pv3.App, map[string]string, map[string]*config.UserContext, error) {
+func (m *MCAppManager) getAllApps(mcAppName string) ([]*pv3.App, error) {
 	// to get all apps, get all clusters first, then get all apps in all projects of all clusters
 	allApps := []*pv3.App{}
-	projectToCluster := map[string]string{}
-	clusterContexts := map[string]*config.UserContext{}
 	set := labels.Set(map[string]string{MultiClusterAppIDSelector: mcAppName})
 	clusters, err := m.clusterLister.List("", labels.NewSelector())
 	if err != nil {
-		return allApps, projectToCluster, clusterContexts, err
+		return allApps, err
 	}
 	for _, c := range clusters {
 		projects, err := m.projectLister.List(c.Name, labels.NewSelector())
 		if err != nil {
-			return allApps, projectToCluster, clusterContexts, err
+			return allApps, err
 		}
 		for _, p := range projects {
 			apps, err := m.appLister.List(p.Name, set.AsSelector())
 			if err != nil {
-				return allApps, projectToCluster, clusterContexts, err
+				return allApps, err
 			}
 			allApps = append(allApps, apps...)
-			projectToCluster[p.Name] = c.Name
-		}
-		if withContext {
-			userContext, err := m.clusterManager.UserContext(c.Name)
-			if err != nil {
-				return allApps, projectToCluster, clusterContexts, err
-			}
-			clusterContexts[c.Name] = userContext
 		}
 	}
-	return allApps, projectToCluster, clusterContexts, err
+	return allApps, err
 }
 
-func (m *MCAppManager) reconcileTargetsForDelete(mcapp *v3.MultiClusterApp, clusterContexts map[string]*config.UserContext) error {
-	existingNS := map[string]bool{}
-	for ind, t := range mcapp.Spec.Targets {
+func (m *MCAppManager) reconcileTargetsForDelete(mcapp *v3.MultiClusterApp) error {
+	existingApps := map[string]bool{}
+	set := labels.Set(map[string]string{MultiClusterAppIDSelector: mcapp.Name})
+	for _, t := range mcapp.Spec.Targets {
 		split := strings.SplitN(t.ProjectName, ":", 2)
 		if len(split) != 2 {
 			return fmt.Errorf("error in splitting project ID %v", t.ProjectName)
 		}
 		projectNS := split[1]
-		nsName := getAppNamespaceName(mcapp.Name, projectNS)
-		ns, err := clusterContexts[split[0]].Core.Namespaces("").Controller().Lister().Get("", nsName)
+		apps, err := m.appLister.List(projectNS, set.AsSelector())
 		if err != nil {
-			if !apierrors.IsNotFound(err) {
-				return err
-			}
+			return err
 		}
-		if ns == nil {
-			mcapp.Spec.Targets[ind].AppName = ""
-		} else {
-			existingNS[ns.Name] = true
+		for _, app := range apps {
+			existingApps[app.Namespace] = true
 		}
 	}
-	allApps, projectToCluster, _, err := m.getAllApps(mcapp.Name, false)
+	allApps, err := m.getAllApps(mcapp.Name)
 	if err != nil {
 		return err
 	}
 	toDelete := []*pv3.App{}
 	for _, app := range allApps {
-		if _, ok := existingNS[app.Spec.TargetNamespace]; !ok {
+		if _, ok := existingApps[app.Namespace]; !ok {
 			toDelete = append(toDelete, app)
 		}
 	}
 	if len(toDelete) > 0 {
 		logrus.Debugf("deleting apps for mcapp %s toDelete %v", mcapp.Name, toDelete)
 	}
-	return m.delete(toDelete, clusterContexts, projectToCluster)
+	return m.delete(toDelete)
 }
 
-func (m *MCAppManager) delete(appsToDelete []*pv3.App, clusterContexts map[string]*config.UserContext, projectToCluster map[string]string) error {
+func (m *MCAppManager) delete(appsToDelete []*pv3.App) error {
 	var g errgroup.Group
 	for ind := range appsToDelete {
 		app := appsToDelete[ind]
 		g.Go(func() error {
-			var appWorkloadNamespace string
-			if app != nil {
-				appWorkloadNamespace = app.Spec.TargetNamespace
-			}
 			if err := m.apps.DeleteNamespaced(app.Namespace, app.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-				return err
-			}
-			clusterName := projectToCluster[app.Namespace]
-			if clusterName == "" {
-				return fmt.Errorf("error getting correct cluster name %s", app.Namespace)
-			}
-			if _, ok := clusterContexts[clusterName]; !ok {
-				userContext, err := m.clusterManager.UserContext(clusterName)
-				if err != nil {
-					return err
-				}
-				clusterContexts[clusterName] = userContext
-			}
-			if err := clusterContexts[clusterName].Core.Namespaces("").Delete(appWorkloadNamespace, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
 			return nil
 		})
 	}
-
 	if err := g.Wait(); err != nil {
 		return err
 	}
