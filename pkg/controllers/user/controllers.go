@@ -107,8 +107,6 @@ func RegisterUserOnly(ctx context.Context, cluster *config.UserOnlyContext) erro
 	targetworkloadservice.Register(ctx, cluster)
 	workload.Register(ctx, cluster)
 	servicemonitor.Register(ctx, cluster)
-	monitoring.RegisterAgent(ctx, cluster)
-
 	return nil
 }
 

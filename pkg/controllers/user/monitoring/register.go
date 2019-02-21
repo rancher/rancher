@@ -62,17 +62,4 @@ func Register(ctx context.Context, agentContext *config.UserContext) {
 		app:                 ah,
 	}
 	cattleProjectsClient.Controller().AddClusterScopedHandler(ctx, "project-monitoring-handler", clusterName, ph.sync)
-
-}
-
-func RegisterAgent(ctx context.Context, agentContext *config.UserOnlyContext) {
-	cp := &ControlPlaneEndpointController{
-		Endpoints:           agentContext.Core.Endpoints("cattle-prometheus"),
-		EndpointLister:      agentContext.Core.Endpoints("cattle-prometheus").Controller().Lister(),
-		EndpointsController: agentContext.Core.Endpoints("cattle-prometheus").Controller(),
-		NodeLister:          agentContext.Core.Nodes("").Controller().Lister(),
-		ServiceLister:       agentContext.Core.Services("cattle-prometheus").Controller().Lister(),
-	}
-	agentContext.Core.Nodes("").AddHandler(ctx, "control-plane-endpoint", cp.sync)
-	agentContext.Core.Endpoints("cattle-prometheus").AddHandler(ctx, "control-plane-endpoint", cp.syncEndpoints)
 }
