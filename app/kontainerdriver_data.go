@@ -25,7 +25,7 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 		drivers:       management.Management.KontainerDrivers(""),
 	}
 
-	if err := creator.add("import"); err != nil {
+	if err := cleanupImportDriver(creator); err != nil {
 		return err
 	}
 
@@ -75,6 +75,19 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 		false,
 		"*.myhuaweicloud.com",
 	); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func cleanupImportDriver(creator driverCreator) error {
+	var err error
+	if _, err = creator.driversLister.Get("", "import"); err == nil {
+		err = creator.drivers.Delete("import", &v1.DeleteOptions{})
+	}
+
+	if !errors.IsNotFound(err) {
 		return err
 	}
 
