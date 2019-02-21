@@ -47,6 +47,7 @@ type GlobalDNSProviderSpec struct {
 	Route53ProviderConfig    *Route53ProviderConfig    `json:"route53ProviderConfig,omitempty"`
 	CloudflareProviderConfig *CloudflareProviderConfig `json:"cloudflareProviderConfig,omitempty"`
 	AlidnsProviderConfig     *AlidnsProviderConfig     `json:"alidnsProviderConfig,omitempty"`
+	LinodeProviderConfig     *LinodeProviderConfig     `json:"linodeProviderConfig,omitempty"`
 	Members                  []Member                  `json:"members,omitempty"`
 	RootDomain               string                    `json:"rootDomain"`
 }
@@ -68,4 +69,8 @@ type UpdateGlobalDNSTargetsInput struct {
 type AlidnsProviderConfig struct {
 	AccessKey string `json:"accessKey" norman:"notnullable,required,minLength=1"`
 	SecretKey string `json:"secretKey" norman:"notnullable,required,minLength=1,type=password"`
+}
+
+type LinodeProviderConfig struct {
+	APIToken string `json:"secretKey" norman:"notnullable,required,minLength=1,type=password"`
 }

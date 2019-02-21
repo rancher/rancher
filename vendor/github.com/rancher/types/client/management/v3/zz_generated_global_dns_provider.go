@@ -12,6 +12,7 @@ const (
 	GlobalDNSProviderFieldCreated                  = "created"
 	GlobalDNSProviderFieldCreatorID                = "creatorId"
 	GlobalDNSProviderFieldLabels                   = "labels"
+	GlobalDNSProviderFieldLinodeProviderConfig     = "linodeProviderConfig"
 	GlobalDNSProviderFieldMembers                  = "members"
 	GlobalDNSProviderFieldName                     = "name"
 	GlobalDNSProviderFieldOwnerReferences          = "ownerReferences"
@@ -29,6 +30,7 @@ type GlobalDNSProvider struct {
 	Created                  string                    `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                string                    `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Labels                   map[string]string         `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LinodeProviderConfig     *LinodeProviderConfig     `json:"linodeProviderConfig,omitempty" yaml:"linodeProviderConfig,omitempty"`
 	Members                  []Member                  `json:"members,omitempty" yaml:"members,omitempty"`
 	Name                     string                    `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences          []OwnerReference          `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
