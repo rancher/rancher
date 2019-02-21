@@ -229,6 +229,7 @@ func (c *Cluster) deployKubeDNS(ctx context.Context) error {
 		ClusterDNSServer:       c.ClusterDNSServer,
 		UpstreamNameservers:    c.DNS.UpstreamNameservers,
 		ReverseCIDRs:           c.DNS.ReverseCIDRs,
+		NodeSelector:           c.DNS.NodeSelector,
 	}
 	kubeDNSYaml, err := addons.GetKubeDNSManifest(KubeDNSConfig)
 	if err != nil {
@@ -251,6 +252,7 @@ func (c *Cluster) deployCoreDNS(ctx context.Context) error {
 		ClusterDNSServer:       c.ClusterDNSServer,
 		UpstreamNameservers:    c.DNS.UpstreamNameservers,
 		ReverseCIDRs:           c.DNS.ReverseCIDRs,
+		NodeSelector:           c.DNS.NodeSelector,
 	}
 	coreDNSYaml, err := addons.GetCoreDNSManifest(CoreDNSConfig)
 	if err != nil {
