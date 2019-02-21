@@ -113,6 +113,10 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      nodeSelector:
+      {{ range $k, $v := .NodeSelector }}
+        {{ $k }}: {{ $v }}
+      {{ end }}
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
