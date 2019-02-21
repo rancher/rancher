@@ -610,6 +610,11 @@ func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 	}
 	schema.ActionHandler = handler.ActionHandler
 	schema.Formatter = kontainerdriver.Formatter
+
+	kontainerDriverValidator := kontainerdriver.Validator{
+		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
+	}
+	schema.Validator = kontainerDriverValidator.Validator
 }
 
 func MultiClusterApps(schemas *types.Schemas, management *config.ScaledContext) {
