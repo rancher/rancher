@@ -4,6 +4,7 @@ import (
 	"reflect"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
@@ -70,7 +71,6 @@ func (grb *globalRoleBindingLifecycle) Remove(obj *v3.GlobalRoleBinding) (runtim
 }
 
 func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBinding *v3.GlobalRoleBinding) error {
-	var catalogTemplateRule, catalogTemplateVersionRule *v1.PolicyRule
 	crbName, ok := globalRoleBinding.Annotations[crbNameAnnotation]
 	if !ok {
 		crbName = crbNamePrefix + globalRoleBinding.Name
@@ -109,7 +109,7 @@ func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBind
 				return errors.Wrapf(err, "couldn't update ClusterRoleBinding %v", crb.Name)
 			}
 		}
-		return nil
+		return grb.addRulesForTemplateAndTemplateVersions(globalRoleBinding, subject)
 	}
 
 	logrus.Infof("Creating new GlobalRoleBinding for GlobalRoleBinding %v", globalRoleBinding.Name)
@@ -149,22 +149,46 @@ func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBind
 	}
 	globalRoleBinding.Annotations[crbNameAnnotation] = crbName
 
+	return grb.addRulesForTemplateAndTemplateVersions(globalRoleBinding, subject)
+}
+
+func (grb *globalRoleBindingLifecycle) addRulesForTemplateAndTemplateVersions(globalRoleBinding *v3.GlobalRoleBinding, subject v1.Subject) error {
+	var catalogTemplateRule, catalogTemplateVersionRule *v1.PolicyRule
 	// Check if the current globalRole has rules for templates and templateversions
-	gr, _ = grb.grLister.Get("", globalRoleBinding.GlobalRoleName)
+	gr, err := grb.grLister.Get("", globalRoleBinding.GlobalRoleName)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
 	if gr != nil {
 		for _, rule := range gr.Rules {
 			for _, resource := range rule.Resources {
 				if resource == templateResourceRule {
-					catalogTemplateRule = &v1.PolicyRule{
-						APIGroups: rule.APIGroups,
-						Resources: []string{catalogTemplateResourceRule},
-						Verbs:     rule.Verbs,
+					if catalogTemplateRule == nil {
+						catalogTemplateRule = &v1.PolicyRule{
+							APIGroups: rule.APIGroups,
+							Resources: []string{catalogTemplateResourceRule},
+							Verbs:     rule.Verbs,
+						}
+					} else {
+						for _, v := range rule.Verbs {
+							if !slice.ContainsString(catalogTemplateRule.Verbs, v) {
+								catalogTemplateRule.Verbs = append(catalogTemplateRule.Verbs, v)
+							}
+						}
 					}
 				} else if resource == templateVersionResourceRule {
-					catalogTemplateVersionRule = &v1.PolicyRule{
-						APIGroups: rule.APIGroups,
-						Resources: []string{catalogTemplateVersionResourceRule},
-						Verbs:     rule.Verbs,
+					if catalogTemplateVersionRule == nil {
+						catalogTemplateVersionRule = &v1.PolicyRule{
+							APIGroups: rule.APIGroups,
+							Resources: []string{catalogTemplateVersionResourceRule},
+							Verbs:     rule.Verbs,
+						}
+					} else {
+						for _, v := range rule.Verbs {
+							if !slice.ContainsString(catalogTemplateVersionRule.Verbs, v) {
+								catalogTemplateVersionRule.Verbs = append(catalogTemplateVersionRule.Verbs, v)
+							}
+						}
 					}
 				}
 			}
@@ -180,7 +204,7 @@ func (grb *globalRoleBindingLifecycle) reconcileGlobalRoleBinding(globalRoleBind
 		rules = append(rules, *catalogTemplateVersionRule)
 	}
 	if len(rules) > 0 {
-		_, err = grb.roles.GetNamespaced(namespace.GlobalNamespace, globalCatalogRole, metav1.GetOptions{})
+		_, err := grb.roles.GetNamespaced(namespace.GlobalNamespace, globalCatalogRole, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				role := &v1.Role{
