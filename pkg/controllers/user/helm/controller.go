@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
+	"k8s.io/api/core/v1"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -30,9 +31,12 @@ import (
 )
 
 const (
-	helmTokenPrefix = "helm-token-"
-	description     = "token for helm chart deployment"
-	AppIDsLabel     = "cattle.io/appIds"
+	helmTokenPrefix           = "helm-token-"
+	description               = "token for helm chart deployment"
+	AppIDsLabel               = "cattle.io/appIds"
+	creatorIDAnn              = "field.cattle.io/creatorId"
+	MultiClusterAppIDSelector = "mcapp"
+	projectIDFieldLabel       = "field.cattle.io/projectId"
 )
 
 func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
@@ -53,6 +57,7 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 		ClusterName:           user.ClusterName,
 		AppRevisionGetter:     user.Management.Project,
 		AppGetter:             user.Management.Project,
+		NsLister:              user.Core.Namespaces("").Controller().Lister(),
 		NsClient:              user.Core.Namespaces(""),
 	}
 	appClient.AddClusterScopedLifecycle(ctx, "helm-controller", user.ClusterName, stackLifecycle)
@@ -76,6 +81,7 @@ type Lifecycle struct {
 	ClusterName           string
 	AppRevisionGetter     v3.AppRevisionsGetter
 	AppGetter             v3.AppsGetter
+	NsLister              corev1.NamespaceLister
 	NsClient              corev1.NamespaceInterface
 }
 
@@ -126,6 +132,31 @@ func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 			}
 		}
 	}
+	created := false
+	if obj.Spec.MultiClusterAppName != "" {
+		if _, err := l.NsLister.Get("", obj.Spec.TargetNamespace); err != nil && !errors.IsNotFound(err) {
+			return obj, err
+		} else if err != nil && errors.IsNotFound(err) {
+			n := v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: obj.Spec.TargetNamespace,
+					Labels: map[string]string{
+						projectIDFieldLabel:       obj.Namespace,
+						MultiClusterAppIDSelector: obj.Spec.MultiClusterAppName},
+					Annotations: map[string]string{
+						projectIDFieldLabel: fmt.Sprintf("%s:%s", l.ClusterName, obj.Namespace),
+						creatorIDAnn:        obj.Annotations[creatorIDAnn],
+						AppIDsLabel:         obj.Name},
+				},
+			}
+			_, err := l.NsClient.Create(&n)
+			if err != nil && !errors.IsAlreadyExists(err) {
+				return obj, err
+			} else if err == nil {
+				created = true
+			}
+		}
+	}
 	result, err := l.DeployApp(obj)
 	if err != nil {
 		return result, err
@@ -134,9 +165,16 @@ func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 		v3.AppConditionForceUpgrade.True(obj)
 	}
 	ns, err := l.NsClient.Get(obj.Spec.TargetNamespace, metav1.GetOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return result, err
-	} else if errors.IsNotFound(err) {
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return result, err
+		}
+		if obj.Spec.MultiClusterAppName != "" {
+			return obj, fmt.Errorf("namespace not found after app creation %s", obj.Name)
+		}
+		return result, nil
+	}
+	if created {
 		return result, nil
 	}
 	if ns.Annotations[AppIDsLabel] == "" {
@@ -223,6 +261,13 @@ func (l *Lifecycle) Remove(obj *v3.App) (runtime.Object, error) {
 		return obj, err
 	} else if errors.IsNotFound(err) {
 		return obj, nil
+	}
+	if val, ok := ns.Labels[MultiClusterAppIDSelector]; ok && val == obj.Spec.MultiClusterAppName {
+		err := l.NsClient.Delete(ns.Name, &metav1.DeleteOptions{})
+		if errors.IsNotFound(err) {
+			return obj, nil
+		}
+		return obj, err
 	}
 	appIds := strings.Split(ns.Annotations[AppIDsLabel], ",")
 	appAnno := ""
