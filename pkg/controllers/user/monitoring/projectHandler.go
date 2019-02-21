@@ -149,13 +149,11 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 	mustAppAnswers := map[string]string{
 		"enabled": "false",
 
+		"exporter-rke.enabled": "false",
+
 		"exporter-coredns.enabled": "false",
 
-		"exporter-kube-controller-manager.enabled": "false",
-
 		"exporter-kube-dns.enabled": "false",
-
-		"exporter-kube-scheduler.enabled": "false",
 
 		"exporter-kube-state.enabled": "false",
 
