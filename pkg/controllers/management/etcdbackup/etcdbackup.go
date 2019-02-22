@@ -3,6 +3,7 @@ package etcdbackup
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	minio "github.com/minio/minio-go"
@@ -24,6 +25,7 @@ import (
 
 const (
 	clusterBackupCheckInterval = 5 * time.Minute
+	s3Endpoint                 = "s3.amazonaws.com"
 )
 
 type Controller struct {
@@ -71,7 +73,9 @@ func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
 	if err != nil {
 		return b, err
 	}
-	if cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig == nil {
+
+	if cluster.Spec.RancherKubernetesEngineConfig == nil ||
+		cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig == nil {
 		return b, fmt.Errorf("[etcd-backup] cluster doesn't have a backup config")
 	}
 
@@ -236,20 +240,29 @@ func (c *Controller) deleteS3Snapshot(b *v3.EtcdBackup) error {
 		return fmt.Errorf("can't find S3 backup target configuration")
 	}
 	var err error
-	s3Client := &minio.Client{}
+	var s3Client = &minio.Client{}
+	var creds = &credentials.Credentials{}
 	endpoint := b.Spec.BackupConfig.S3BackupConfig.Endpoint
+	bucketLookup := getBucketLookupType(endpoint)
 	bucket := b.Spec.BackupConfig.S3BackupConfig.BucketName
 	// no access credentials, we assume IAM roles
 	if b.Spec.BackupConfig.S3BackupConfig.AccessKey == "" ||
 		b.Spec.BackupConfig.S3BackupConfig.SecretKey == "" {
-		creds := credentials.NewIAM("")
-		s3Client, err = minio.NewWithCredentials(endpoint, creds, true, "")
+		creds = credentials.NewIAM("")
+		if b.Spec.BackupConfig.S3BackupConfig.Endpoint == "" {
+			endpoint = s3Endpoint
+		}
 	} else {
 		accessKey := b.Spec.BackupConfig.S3BackupConfig.AccessKey
 		secretKey := b.Spec.BackupConfig.S3BackupConfig.SecretKey
-
-		s3Client, err = minio.New(endpoint, accessKey, secretKey, true)
+		creds = credentials.NewStatic(accessKey, secretKey, "", credentials.SignatureDefault)
 	}
+	s3Client, err = minio.NewWithOptions(endpoint, &minio.Options{
+		Creds:        creds,
+		Region:       b.Spec.BackupConfig.S3BackupConfig.Region,
+		Secure:       true,
+		BucketLookup: bucketLookup,
+	})
 	if err != nil {
 		return err
 	}
@@ -264,6 +277,16 @@ func (c *Controller) deleteS3Snapshot(b *v3.EtcdBackup) error {
 	}
 
 	return s3Client.RemoveObject(bucket, b.Name)
+}
+
+func getBucketLookupType(endpoint string) minio.BucketLookupType {
+	if endpoint == "" {
+		return minio.BucketLookupAuto
+	}
+	if strings.Contains(endpoint, "aliyun") {
+		return minio.BucketLookupDNS
+	}
+	return minio.BucketLookupAuto
 }
 
 func getBackupCompletedTime(o runtime.Object) time.Time {
