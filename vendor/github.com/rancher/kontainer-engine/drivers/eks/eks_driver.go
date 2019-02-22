@@ -283,15 +283,19 @@ func (state *state) validate() error {
 		return fmt.Errorf("client secret is required")
 	}
 
-	amiForRegion, ok := amiForRegionAndVersion[state.KubernetesVersion]
-	if !ok && state.AMI == "" {
-		return fmt.Errorf("default ami of region %s for kubernetes version %s is not set", state.Region, state.KubernetesVersion)
-	}
+	// If no k8s version is set then this is a legacy cluster and we can't choose the correct ami anyway, so skip those
+	// validations
+	if state.KubernetesVersion != "" {
+		amiForRegion, ok := amiForRegionAndVersion[state.KubernetesVersion]
+		if !ok && state.AMI == "" {
+			return fmt.Errorf("default ami of region %s for kubernetes version %s is not set", state.Region, state.KubernetesVersion)
+		}
 
-	// If the custom AMI ID is set, then assume they are trying to spin up in a region we don't have knowledge of
-	// and try to create anyway
-	if amiForRegion[state.Region] == "" && state.AMI == "" {
-		return fmt.Errorf("rancher does not support region %v, no entry for ami lookup", state.Region)
+		// If the custom AMI ID is set, then assume they are trying to spin up in a region we don't have knowledge of
+		// and try to create anyway
+		if amiForRegion[state.Region] == "" && state.AMI == "" {
+			return fmt.Errorf("rancher does not support region %v, no entry for ami lookup", state.Region)
+		}
 	}
 
 	if state.MinimumASGSize < 1 {
@@ -650,7 +654,7 @@ func getWorkNodeName(name string) string {
 }
 
 func (d *Driver) createConfigMap(state state, endpoint string, capem []byte, nodeInstanceRole string) error {
-	clientset, err := createClientset(state, endpoint, capem)
+	clientset, err := createClientset(state.DisplayName, state, endpoint, capem)
 	if err != nil {
 		return fmt.Errorf("error creating clientset: %v", err)
 	}
@@ -692,8 +696,8 @@ func (d *Driver) createConfigMap(state state, endpoint string, capem []byte, nod
 	return nil
 }
 
-func createClientset(state state, endpoint string, capem []byte) (*kubernetes.Clientset, error) {
-	token, err := getEKSToken(state)
+func createClientset(name string, state state, endpoint string, capem []byte) (*kubernetes.Clientset, error) {
+	token, err := getEKSToken(name, state)
 	if err != nil {
 		return nil, fmt.Errorf("error generating token: %v", err)
 	}
@@ -720,7 +724,7 @@ const awsSharedCredentialsFile = "AWS_SHARED_CREDENTIALS_FILE"
 
 var awsCredentialsLocker = &sync.Mutex{}
 
-func getEKSToken(state state) (string, error) {
+func getEKSToken(name string, state state) (string, error) {
 	generator, err := heptio.NewGenerator()
 	if err != nil {
 		return "", fmt.Errorf("error creating generator: %v", err)
@@ -764,7 +768,7 @@ aws_session_token=%v`,
 		return "", fmt.Errorf("error writing credentials file: %v", err)
 	}
 
-	return generator.Get(state.DisplayName)
+	return generator.Get(name)
 }
 
 func (d *Driver) waitForClusterReady(svc *eks.EKS, state state) (*eks.DescribeClusterOutput, error) {
@@ -844,10 +848,6 @@ func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, options *t
 	}
 	*oldstate = state
 
-	if state.KubernetesVersion == "" {
-		state.KubernetesVersion = "1.10"
-	}
-
 	newState, err := getStateFromOptions(options)
 	if err != nil {
 		return nil, err
@@ -860,7 +860,7 @@ func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, options *t
 
 	if !reflect.DeepEqual(state, *oldstate) {
 		if err := d.updateClusterAndWait(ctx, state); err != nil {
-			logrus.WithError(err).Debug("updating cluster error")
+			logrus.Errorf("error updating cluster: %v", err)
 			return info, err
 		}
 	}
@@ -910,7 +910,15 @@ func getClientset(info *types.ClusterInfo) (*kubernetes.Clientset, error) {
 		Name: aws.String(state.DisplayName),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error getting cluster: %v", err)
+		if notFound(err) {
+			cluster, err = svc.DescribeCluster(&eks.DescribeClusterInput{
+				Name: aws.String(state.ClusterName),
+			})
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("error getting cluster: %v", err)
+		}
 	}
 
 	capem, err := base64.StdEncoding.DecodeString(*cluster.Cluster.CertificateAuthority.Data)
@@ -922,9 +930,25 @@ func getClientset(info *types.ClusterInfo) (*kubernetes.Clientset, error) {
 	info.Version = *cluster.Cluster.Version
 	info.RootCaCertificate = *cluster.Cluster.CertificateAuthority.Data
 
-	clientset, err := createClientset(state, *cluster.Cluster.Endpoint, capem)
+	clientset, err := createClientset(state.DisplayName, state, *cluster.Cluster.Endpoint, capem)
 	if err != nil {
 		return nil, fmt.Errorf("error creating clientset: %v", err)
+	}
+
+	_, err = clientset.ServerVersion()
+	if err != nil {
+		if errors.IsUnauthorized(err) {
+			clientset, err = createClientset(state.ClusterName, state, *cluster.Cluster.Endpoint, capem)
+			if err != nil {
+				return nil, err
+			}
+
+			_, err = clientset.ServerVersion()
+		}
+
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return clientset, nil
@@ -1131,13 +1155,25 @@ func (d *Driver) updateClusterAndWait(ctx context.Context, state state) error {
 	if err != nil {
 		return err
 	}
+
 	svc := eks.New(sess)
-	output, err := svc.UpdateClusterVersionWithContext(ctx, &eks.UpdateClusterVersionInput{
-		Name:    aws.String(state.DisplayName),
-		Version: aws.String(state.KubernetesVersion),
-	})
+	input := &eks.UpdateClusterVersionInput{
+		Name: aws.String(state.DisplayName),
+	}
+	if state.KubernetesVersion != "" {
+		input.Version = aws.String(state.KubernetesVersion)
+	}
+
+	output, err := svc.UpdateClusterVersionWithContext(ctx, input)
 	if err != nil {
-		return err
+		if notFound(err) {
+			input.Name = aws.String(state.ClusterName)
+			output, err = svc.UpdateClusterVersionWithContext(ctx, input)
+		}
+
+		if err != nil {
+			return err
+		}
 	}
 
 	return d.waitForClusterUpdateReady(ctx, svc, state, *output.Update.Id)
@@ -1159,7 +1195,16 @@ func (d *Driver) waitForClusterUpdateReady(ctx context.Context, svc *eks.EKS, st
 			UpdateId: aws.String(updateID),
 		})
 		if err != nil {
-			return fmt.Errorf("error polling cluster update state: %v", err)
+			if notFound(err) {
+				update, err = svc.DescribeUpdateWithContext(ctx, &eks.DescribeUpdateInput{
+					Name:     aws.String(state.ClusterName),
+					UpdateId: aws.String(updateID),
+				})
+			}
+
+			if err != nil {
+				return fmt.Errorf("error polling cluster update state: %v", err)
+			}
 		}
 
 		if update.Update == nil {
