@@ -372,7 +372,8 @@ func SecretTypes(ctx context.Context, schemas *types.Schemas, management *config
 
 	credSchema := schemas.Schema(&managementschema.Version, client.CloudCredentialType)
 	credSchema.Store = cred.Wrap(mgmtSecretSchema.Store,
-		management.Core.Namespaces(""))
+		management.Core.Namespaces(""),
+		management.Management.NodeTemplates("").Controller().Lister())
 	credSchema.Validator = cred.Validator
 }
 
