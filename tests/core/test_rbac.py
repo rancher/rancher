@@ -372,7 +372,11 @@ def test_permissions_can_be_removed(admin_cc, admin_mc, user_mc,
     admin_mc.client.delete(prtb2)
 
     user_cc = new_user_cc(user_mc)
-    assert len(user_cc.client.list_namespace()) == 1
+    wait_for(lambda: ns_count(user_cc.client, 1), timeout=30)
+
+
+def ns_count(client, count):
+    return len(client.list_namespace()) == count
 
 
 def test_appropriate_users_can_see_kontainer_drivers(user_factory):
