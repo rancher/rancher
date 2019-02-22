@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/labels"
 )
 
 func SetMemberStore(ctx context.Context, schema *types.Schema, mgmt *config.ScaledContext) {
@@ -58,6 +57,10 @@ func SetMemberStore(ctx context.Context, schema *types.Schema, mgmt *config.Scal
 		auth:       requests.NewAuthenticator(ctx, mgmt),
 		crtbLister: mgmt.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
 		prtbLister: mgmt.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		grbLister:  mgmt.Management.GlobalRoleBindings("").Controller().Lister(),
+		grLister:   mgmt.Management.GlobalRoles("").Controller().Lister(),
+		users:      mgmt.Management.Users(""),
+		rtLister:   mgmt.Management.RoleTemplates("").Controller().Lister(),
 	}
 
 	schema.Store = s
@@ -68,6 +71,10 @@ type Store struct {
 	auth       requests.Authenticator
 	crtbLister v3.ClusterRoleTemplateBindingLister
 	prtbLister v3.ProjectRoleTemplateBindingLister
+	grbLister  v3.GlobalRoleBindingLister
+	grLister   v3.GlobalRoleLister
+	users      v3.UserInterface
+	rtLister   v3.RoleTemplateLister
 }
 
 func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
@@ -129,53 +136,27 @@ func (s *Store) checkAndSetRoles(apiContext *types.APIContext, data map[string]i
 	// if no roles are provided, default to roles that the creator of mcapp has in all of its target projects/clusters
 	roles := convert.ToStringSlice(data[client.MultiClusterAppFieldRoles])
 	if len(roles) == 0 {
-		callerID := apiContext.Request.Header.Get(gaccess.ImpersonateUserHeader)
-		targetProjects := make(map[string]bool)
-		clustersOfTargetProjects := make(map[string]bool)
-		rolesToAddMap := make(map[string]bool)
-		targInterface := convert.ToMapSlice(data[client.MultiClusterAppFieldTargets])
-		for _, t := range targInterface {
-			target := convert.ToString(t[client.TargetFieldProjectID])
-			split := strings.SplitN(target, ":", 2)
-			if len(split) != 2 {
-				return nil, fmt.Errorf("invalid project name: %v", target)
-			}
-			clusterName := split[0]
-			projectName := split[1]
-			if !clustersOfTargetProjects[clusterName] {
-				// get roles from this cluster for this creator
-				crtbs, err := s.crtbLister.List(clusterName, labels.NewSelector())
-				if err != nil {
-					return nil, err
-				}
-				for _, crtb := range crtbs {
-					if crtb.UserName == callerID && !rolesToAddMap[crtb.RoleTemplateName] {
-						rolesToAddMap[crtb.RoleTemplateName] = true
-					}
-				}
-				clustersOfTargetProjects[clusterName] = true
-			}
-			if !targetProjects[projectName] {
-				// get roles from this project for this creator
-				prtbs, err := s.prtbLister.List(projectName, labels.NewSelector())
-				if err != nil {
-					return nil, err
-				}
-				for _, prtb := range prtbs {
-					if prtb.UserName == callerID && !rolesToAddMap[prtb.RoleTemplateName] {
-						rolesToAddMap[prtb.RoleTemplateName] = true
-					}
-				}
-				targetProjects[projectName] = true
-			}
+		ma := gaccess.MemberAccess{
+			Users:              s.users,
+			GrbLister:          s.grbLister,
+			GrLister:           s.grLister,
+			PrtbLister:         s.prtbLister,
+			CrtbLister:         s.crtbLister,
+			RoleTemplateLister: s.rtLister,
 		}
-		rolesToAdd := make([]string, len(rolesToAddMap))
+		targInterface := convert.ToMapSlice(data[client.MultiClusterAppFieldTargets])
+		targets := make([]string, len(targInterface))
 		i := 0
-		for role := range rolesToAddMap {
-			rolesToAdd[i] = role
+		for _, t := range targInterface {
+			targets[i] = convert.ToString(t[client.TargetFieldProjectID])
 			i++
 		}
-		values.PutValue(data, rolesToAdd, client.MultiClusterAppFieldRoles)
+		callerID := apiContext.Request.Header.Get(gaccess.ImpersonateUserHeader)
+		targetToRoles, err := ma.DeriveRolesInTargets(callerID, targets)
+		if err != nil {
+			return nil, err
+		}
+		values.PutValue(data, targetToRoles, client.MultiClusterAppSpecFieldTargetToRole)
 	}
 	return data, nil
 }
