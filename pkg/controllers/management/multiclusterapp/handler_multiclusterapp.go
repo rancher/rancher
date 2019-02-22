@@ -118,7 +118,8 @@ func (mc *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.
 		return mcapp, fmt.Errorf("MultiClusterApp %v has no creatorId annotation. Cannot create apps for %v", metaAccessor.GetName(), mcapp.Name)
 	}
 
-	systemUser, err := mc.userManager.EnsureUser(fmt.Sprintf("system://%s", mcapp.Name), "System account for Multiclusterapp "+mcapp.Name)
+	systemUserPrincipalID := fmt.Sprintf("system://%s", mcapp.Name)
+	systemUser, err := mc.userManager.EnsureUser(systemUserPrincipalID, "System account for Multiclusterapp "+mcapp.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -144,47 +145,30 @@ func (mc *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.
 			if rt.Context == "project" {
 				prtbName = mcapp.Name + "-" + r
 				// check if these prtbs already exist
-				_, err := mc.prtbLister.Get(projectName, prtbName)
-				if err != nil {
-					if apierrors.IsNotFound(err) {
-						_, err := mc.prtbs.Create(&v3.ProjectRoleTemplateBinding{
-							ObjectMeta: v1.ObjectMeta{
-								Name:      prtbName,
-								Namespace: projectName,
-							},
-							UserName:         systemUser.Name,
-							RoleTemplateName: r,
-							ProjectName:      p.ProjectName,
-						})
-						if err != nil && !apierrors.IsAlreadyExists(err) {
-							return nil, err
-						}
-					} else {
-						return nil, err
-					}
+				if err = mc.createPrtb(projectName, p.ProjectName, prtbName, r, systemUser.Name, systemUserPrincipalID); err != nil {
+					return nil, err
 				}
 			} else if rt.Context == "cluster" {
 				crtbName = mcapp.Name + "-" + r
-				// check if these crtbs already exist
-				_, err := mc.crtbLister.Get(clusterName, crtbName)
-				if err != nil {
-					if apierrors.IsNotFound(err) {
-						_, err := mc.crtbs.Create(&v3.ClusterRoleTemplateBinding{
-							ObjectMeta: v1.ObjectMeta{
-								Name:      crtbName,
-								Namespace: clusterName,
-							},
-							UserName:         systemUser.Name,
-							RoleTemplateName: r,
-							ClusterName:      clusterName,
-						})
-						if err != nil && !apierrors.IsAlreadyExists(err) {
-							return nil, err
-						}
-					} else {
-						return nil, err
-					}
-				}
+				mc.createCrtb(clusterName, crtbName, r, systemUser.Name, systemUserPrincipalID)
+			}
+		}
+	}
+
+	for target, roles := range mcapp.Spec.TargetToRole {
+		split := strings.SplitN(target, ":", 2)
+		if len(split) == 2 {
+			// create prtbs with these roles
+			projectName := split[1]
+			for _, r := range roles {
+				prtbName = mcapp.Name + "-" + r
+				mc.createPrtb(projectName, target, prtbName, r, systemUser.Name, systemUserPrincipalID)
+			}
+		} else {
+			// create crtbs with the roles
+			for _, r := range roles {
+				crtbName = mcapp.Name + "-" + r
+				mc.createCrtb(target, crtbName, r, systemUser.Name, systemUserPrincipalID)
 			}
 		}
 	}
@@ -299,4 +283,52 @@ func (c *ClusterController) updateAnswersForCluster(clusterName string, mcapp *v
 			mcapp.Spec.Answers = append(mcapp.Spec.Answers[:i], mcapp.Spec.Answers[i+1:]...)
 		}
 	}
+}
+
+func (mc *MCAppController) createPrtb(projectName, projectID, prtbName, roleTemplateName, systemUserName, systemUserPrincipalID string) error {
+	_, err := mc.prtbLister.Get(projectName, prtbName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			_, err := mc.prtbs.Create(&v3.ProjectRoleTemplateBinding{
+				ObjectMeta: v1.ObjectMeta{
+					Name:      prtbName,
+					Namespace: projectName,
+				},
+				UserName:          systemUserName,
+				UserPrincipalName: systemUserPrincipalID,
+				RoleTemplateName:  roleTemplateName,
+				ProjectName:       projectID,
+			})
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	return nil
+}
+
+func (mc *MCAppController) createCrtb(clusterName, crtbName, roleTemplateName, systemUserName, systemUserPrincipalID string) error {
+	_, err := mc.crtbLister.Get(clusterName, crtbName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			_, err := mc.crtbs.Create(&v3.ClusterRoleTemplateBinding{
+				ObjectMeta: v1.ObjectMeta{
+					Name:      crtbName,
+					Namespace: clusterName,
+				},
+				UserName:          systemUserName,
+				UserPrincipalName: systemUserPrincipalID,
+				RoleTemplateName:  roleTemplateName,
+				ClusterName:       clusterName,
+			})
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	return nil
 }

@@ -31,6 +31,8 @@ type Wrapper struct {
 	CrtbLister                    v3.ClusterRoleTemplateBindingLister
 	RoleTemplateLister            v3.RoleTemplateLister
 	Users                         v3.UserInterface
+	GrbLister                     v3.GlobalRoleBindingLister
+	GrLister                      v3.GlobalRoleLister
 }
 
 const (
@@ -83,6 +85,8 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 		PrtbLister:         w.PrtbLister,
 		CrtbLister:         w.CrtbLister,
 		RoleTemplateLister: w.RoleTemplateLister,
+		GrbLister:          w.GrbLister,
+		GrLister:           w.GrLister,
 	}
 	var targetProjects []string
 	callerID := request.Request.Header.Get(gaccess.ImpersonateUserHeader)
@@ -140,6 +144,12 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 	}
 	// get difference between new and original roles
 	rolesToAdd, rolesToRemove, _ := set.Diff(newRoles, originalRoles)
+	if len(rolesToAdd) == 0 && len(rolesToRemove) == 0 {
+		// this UPDATE request is not modifying the multiclusterapp roles.
+		// So return without calling EnsureRoleInTargets, because this UPDATE could be called by a mcapp member with access type member,
+		// just to update the templateversion or answers; this member is allowed to not have all roles in all targets
+		return nil
+	}
 	if (len(rolesToAdd) != 0 || len(rolesToRemove) != 0) && !ownerAccess {
 		return fmt.Errorf("user %v is not an owner of multiclusterapp %v, cannot edit roles", callerID, mcapp.Name)
 	}
