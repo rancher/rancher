@@ -1,9 +1,12 @@
-import sys
-
 import pytest
-
+import sys
 from rancher import ApiError
+
 from .conftest import wait_for_condition, wait_until
+
+NEW_DRIVER_URL = "https://github.com/rancher/kontainer-engine-driver-" \
+                 "example/releases/download/v0.2.2/kontainer-engine-" \
+                 "driver-example-" + sys.platform + "-amd64"
 
 DRIVER_URL = "https://github.com/rancher/kontainer-engine-driver-example/" \
              "releases/download/v0.2.1/kontainer-engine-driver-example-" \
@@ -100,6 +103,37 @@ def test_enabling_driver_exposes_schema(admin_mc, wait_remove_resource):
     admin_mc.client.update_by_id_kontainerDriver(kd.id, kd)
 
     verify_driver_not_in_types(admin_mc.client, kd)
+
+
+@pytest.mark.nonparallel
+def test_upgrade_changes_schema(admin_mc, wait_remove_resource):
+    client = admin_mc.client
+    kd = client.create_kontainerDriver(
+        createDynamicSchema=True,
+        active=True,
+        url=DRIVER_URL
+    )
+    wait_remove_resource(kd)
+
+    kd = wait_for_condition('Active', 'True', admin_mc.client, kd,
+                            timeout=90)
+
+    verify_driver_in_types(client, kd)
+    kdSchema = client.schema.types[kd.name + 'EngineConfig']
+    assert 'specialTestingField' not in kdSchema.resourceFields
+
+    kd.url = NEW_DRIVER_URL
+    kd = client.update_by_id_kontainerDriver(kd.id, kd)
+
+    def schema_updated():
+        client.reload_schema()
+        kdSchema = client.schema.types[kd.name + 'EngineConfig']
+        return 'specialTestingField' in kdSchema.resourceFields
+
+    wait_until(schema_updated)
+
+    kdSchema = client.schema.types[kd.name + 'EngineConfig']
+    assert 'specialTestingField' in kdSchema.resourceFields
 
 
 @pytest.mark.nonparallel

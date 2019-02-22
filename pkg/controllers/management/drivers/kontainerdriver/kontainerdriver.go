@@ -145,12 +145,20 @@ func (l *Lifecycle) createDynamicSchema(obj *v3.KontainerDriver) error {
 	return l.createOrUpdateKontainerDriverTypes(obj)
 }
 
-func (l *Lifecycle) updateDynamicSchema(obj *v3.KontainerDriver) error {
+func (l *Lifecycle) createOrUpdateDynamicSchema(obj *v3.KontainerDriver) error {
 	dynamicSchema, err := l.dynamicSchemasLister.Get("", strings.ToLower(getDynamicTypeName(obj)))
+	if errors.IsNotFound(err) {
+		return l.createDynamicSchema(obj)
+	}
 	if err != nil {
 		return err
+
 	}
 
+	return l.updateDynamicSchema(dynamicSchema, obj)
+}
+
+func (l *Lifecycle) updateDynamicSchema(dynamicSchema *v3.DynamicSchema, obj *v3.KontainerDriver) error {
 	dynamicSchema = dynamicSchema.DeepCopy()
 
 	fields, err := l.getResourceFields(obj)
@@ -162,8 +170,11 @@ func (l *Lifecycle) updateDynamicSchema(obj *v3.KontainerDriver) error {
 
 	logrus.Infof("dynamic schema for kontainerdriver %v updating", obj.Name)
 
-	_, err = l.dynamicSchemas.Update(dynamicSchema)
-	return err
+	if _, err = l.dynamicSchemas.Update(dynamicSchema); err != nil {
+		return err
+	}
+
+	return l.createOrUpdateKontainerDriverTypes(obj)
 }
 
 func (l *Lifecycle) getResourceFields(obj *v3.KontainerDriver) (map[string]v3.Field, error) {
@@ -329,7 +340,7 @@ func (l *Lifecycle) Updated(obj *v3.KontainerDriver) (runtime.Object, error) {
 
 	if obj.Spec.BuiltIn && v3.KontainerDriverConditionActive.IsTrue(obj) {
 		// Builtin drivers can still have their schema change during Rancher upgrades so we need to try
-		return obj, l.updateDynamicSchema(obj)
+		return obj, l.createOrUpdateDynamicSchema(obj)
 	}
 
 	var err error
@@ -369,6 +380,12 @@ func (l *Lifecycle) Updated(obj *v3.KontainerDriver) (runtime.Object, error) {
 	// handling download process
 	case !obj.Spec.BuiltIn && !v3.KontainerDriverConditionDownloaded.IsTrue(obj):
 		obj, err = l.download(obj)
+		if err != nil {
+			return obj, err
+		}
+
+		// Force create/update of schemas
+		v3.KontainerDriverConditionActive.Unknown(obj)
 
 	// set active status to unknown to show the activating state
 	case !l.DynamicSchemaExists(obj) && !v3.KontainerDriverConditionActive.IsUnknown(obj):
@@ -377,7 +394,7 @@ func (l *Lifecycle) Updated(obj *v3.KontainerDriver) (runtime.Object, error) {
 	// create schema and set active status to true
 	default:
 		tmpObj, err = v3.KontainerDriverConditionActive.DoUntilTrue(obj, func() (runtime.Object, error) {
-			return obj, l.createDynamicSchema(obj)
+			return obj, l.createOrUpdateDynamicSchema(obj)
 		})
 		obj = tmpObj.(*v3.KontainerDriver)
 	}
