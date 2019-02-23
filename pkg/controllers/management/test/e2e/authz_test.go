@@ -50,7 +50,7 @@ func (s *AuthzSuite) TestClusterRoleTemplateBindingCreate(c *check.C) {
 	// create RoleTemplate that will reference the first one
 	rtName := "testcrt1"
 	s.clusterClient.RbacV1().ClusterRoles().Delete(rtName, &metav1.DeleteOptions{})
-	rt, _ := s.createRoleTemplate(rtName,
+	rt, err := s.createRoleTemplate(rtName,
 		[]rbacv1.PolicyRule{
 			{
 				Verbs:           []string{"get", "list", "watch"},
@@ -60,6 +60,7 @@ func (s *AuthzSuite) TestClusterRoleTemplateBindingCreate(c *check.C) {
 				NonResourceURLs: []string{},
 			},
 		}, []string{podRORoleTemplateName}, false, c)
+	c.Assert(err, check.IsNil)
 
 	// create namespace and watchers for resources in that namespace
 	bindingWatcher := s.clusterBindingWatcher(c)
@@ -147,7 +148,7 @@ func (s *AuthzSuite) TestRoleTemplateBindingCreate(c *check.C) {
 	// create RoleTemplate that will reference the first one
 	rtName := "testrt1"
 	s.clusterClient.RbacV1().ClusterRoles().Delete(rtName, &metav1.DeleteOptions{})
-	rt, _ := s.createRoleTemplate(rtName,
+	rt, err := s.createRoleTemplate(rtName,
 		[]rbacv1.PolicyRule{
 			{
 				Verbs:           []string{"get", "list", "watch"},
@@ -157,6 +158,7 @@ func (s *AuthzSuite) TestRoleTemplateBindingCreate(c *check.C) {
 				NonResourceURLs: []string{},
 			},
 		}, []string{podRORoleTemplateName}, false, c)
+	c.Assert(err, check.IsNil)
 
 	// create namespace and watchers for resources in that namespace
 	ns := setupNS("testauthzns1", projectName, s.clusterClient.CoreV1().Namespaces(), c)
@@ -230,8 +232,9 @@ func (s *AuthzSuite) TestBuiltinRoleTemplateBindingCreate(c *check.C) {
 
 	// create RoleTemplate that user will be bound to
 	rtName := "testrt2"
-	s.createRoleTemplate(rtName,
+	_, err := s.createRoleTemplate(rtName,
 		[]rbacv1.PolicyRule{}, []string{}, true, c)
+	c.Assert(err, check.IsNil)
 
 	// create namespace and watchers for resources in that namespace
 	ns := setupNS("testauthzbuiltinns1", projectName, s.clusterClient.CoreV1().Namespaces(), c)
