@@ -13,10 +13,10 @@ def test_dns_fqdn_unique(admin_mc):
     globaldns_provider = \
         client.create_global_dns_provider(
                                          name=provider_name,
+                                         rootDomain="example.com",
                                          route53ProviderConfig={
                                              'accessKey': access,
-                                             'secretKey': secret,
-                                             'rootDomain': "example.com"})
+                                             'secretKey': secret})
 
     fqdn = random_str() + ".example.com"
     globaldns_entry = \
@@ -38,10 +38,10 @@ def test_dns_provider_deletion(admin_mc):
     globaldns_provider = \
         client.create_global_dns_provider(
                                          name=provider_name,
+                                         rootDomain="example.com",
                                          route53ProviderConfig={
                                              'accessKey': access,
-                                             'secretKey': secret,
-                                             'rootDomain': "example.com"})
+                                             'secretKey': secret})
 
     fqdn = random_str() + ".example.com"
     provider_id = "cattle-global-data:"+provider_name
@@ -71,10 +71,10 @@ def test_share_globaldns_provider_entry(admin_mc, user_factory,
     globaldns_provider = \
         client.create_global_dns_provider(
             name=provider_name,
+            rootDomain="example.com",
             route53ProviderConfig={
                 'accessKey': access,
-                'secretKey': secret,
-                'rootDomain': "example.com"},
+                'secretKey': secret},
             members=members)
 
     remove_resource(globaldns_provider)
@@ -118,10 +118,10 @@ def test_user_access_global_dns(admin_mc, user_factory, remove_resource):
     globaldns_provider = \
         user_client.create_global_dns_provider(
             name=provider_name,
+            rootDomain="example.com",
             route53ProviderConfig={
                 'accessKey': access,
-                'secretKey': secret,
-                'rootDomain': "example.com"})
+                'secretKey': secret})
 
     remove_resource(globaldns_provider)
     fqdn = random_str() + ".example.com"
