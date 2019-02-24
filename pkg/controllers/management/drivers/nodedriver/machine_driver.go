@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -79,7 +80,7 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 		if err != nil {
 			logrus.Errorf("error getting schema %v", err)
 		}
-		userCredFields, pwdFields := getCredFields(obj.Annotations)
+		userCredFields, pwdFields, defaults := getCredFields(obj.Annotations)
 		for name, field := range existingSchema.Spec.ResourceFields {
 			if pwdFields[name] {
 				field.Type = "password"
@@ -87,6 +88,9 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 			if field.Type == "password" || userCredFields[name] {
 				credField := field
 				credField.Required = true
+				if val, ok := defaults[name]; ok {
+					credField = updateDefault(credField, val, field.Type)
+				}
 				credFields[name] = credField
 			}
 		}
@@ -137,7 +141,7 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	}
 	credFields := map[string]v3.Field{}
 	resourceFields := map[string]v3.Field{}
-	userCredFields, pwdFields := getCredFields(obj.Annotations)
+	userCredFields, pwdFields, defaults := getCredFields(obj.Annotations)
 	for _, flag := range flags {
 		name, field, err := FlagToField(flag)
 		if err != nil {
@@ -149,6 +153,9 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 		if field.Type == "password" || userCredFields[name] {
 			credField := field
 			credField.Required = true
+			if val, ok := defaults[name]; ok {
+				credField = updateDefault(credField, val, field.Type)
+			}
 			credFields[name] = credField
 		}
 		resourceFields[name] = field
@@ -333,7 +340,7 @@ func (m *Lifecycle) createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, f
 	return nil
 }
 
-func getCredFields(annotations map[string]string) (map[string]bool, map[string]bool) {
+func getCredFields(annotations map[string]string) (map[string]bool, map[string]bool, map[string]string) {
 	getMap := func(fields string) map[string]bool {
 		data := map[string]bool{}
 		for _, field := range strings.Split(fields, ",") {
@@ -341,9 +348,30 @@ func getCredFields(annotations map[string]string) (map[string]bool, map[string]b
 		}
 		return data
 	}
-	return getMap(annotations["cred"]), getMap(annotations["password"])
+	getDefaults := func(fields string) map[string]string {
+		data := map[string]string{}
+		for _, pattern := range strings.Split(fields, ",") {
+			split := strings.SplitN(pattern, ":", 2)
+			if len(split) == 2 {
+				data[split[0]] = split[1]
+			}
+		}
+		return data
+	}
+	return getMap(annotations["cred"]), getMap(annotations["password"]), getDefaults(annotations["defaults"])
 }
 
 func credentialConfigSchemaName(driverName string) string {
 	return fmt.Sprintf("%s%s", driverName, "credentialconfig")
+}
+
+func updateDefault(credField v3.Field, val, kind string) v3.Field {
+	switch kind {
+	case "int":
+		i, err := strconv.Atoi(val)
+		if err == nil {
+			credField.Default = v3.Values{IntValue: i}
+		}
+	}
+	return credField
 }

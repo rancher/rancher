@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -14,6 +15,9 @@ var driverData = map[string]map[string][]string{
 	"amazonec2":     {"cred": []string{"accessKey"}},
 	"azure":         {"cred": []string{"clientId", "subscriptionId"}},
 	"vmwarevsphere": {"cred": []string{"username", "vcenter", "vcenterPort"}},
+}
+var driverDefaults = map[string]map[string]string{
+	"vmwarevsphere": {"vcenterPort": "443"},
 }
 
 type machineDriverCompare struct {
@@ -86,6 +90,13 @@ func addMachineDriver(name, url, uiURL, checksum string, whitelist []string, act
 	}
 	for key, fields := range driverData[name] {
 		annotations[key] = strings.Join(fields, ",")
+	}
+	defaults := []string{}
+	for key, val := range driverDefaults[name] {
+		defaults = append(defaults, fmt.Sprintf("%s:%s", key, val))
+	}
+	if len(defaults) > 0 {
+		annotations["defaults"] = strings.Join(defaults, ",")
 	}
 	if m != nil {
 		old := machineDriverCompare{
