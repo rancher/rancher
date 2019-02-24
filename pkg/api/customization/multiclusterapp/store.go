@@ -71,6 +71,9 @@ type Store struct {
 }
 
 func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
+	if err := checkDuplicateTargets(data); err != nil {
+		return nil, err
+	}
 	data, err := s.setDisplayName(apiContext, schema, data)
 	if err != nil {
 		return nil, err
@@ -175,4 +178,19 @@ func (s *Store) checkAndSetRoles(apiContext *types.APIContext, data map[string]i
 		values.PutValue(data, rolesToAdd, client.MultiClusterAppFieldRoles)
 	}
 	return data, nil
+}
+
+func checkDuplicateTargets(data map[string]interface{}) error {
+	targets, _ := values.GetSlice(data, "targets")
+	projectIds := map[string]bool{}
+	for _, target := range targets {
+		id := convert.ToString(values.GetValueN(target, "projectId"))
+		if id != "" {
+			if _, ok := projectIds[id]; ok {
+				return fmt.Errorf("duplicate projects in targets %s", id)
+			}
+			projectIds[id] = true
+		}
+	}
+	return nil
 }
