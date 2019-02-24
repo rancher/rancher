@@ -48,18 +48,17 @@ type GlobalDNSProviderSpec struct {
 	CloudflareProviderConfig *CloudflareProviderConfig `json:"cloudflareProviderConfig,omitempty"`
 	AlidnsProviderConfig     *AlidnsProviderConfig     `json:"alidnsProviderConfig,omitempty"`
 	Members                  []Member                  `json:"members,omitempty"`
+	RootDomain               string                    `json:"rootDomain"`
 }
 
 type Route53ProviderConfig struct {
-	RootDomain string `json:"rootDomain" norman:"required"`
-	AccessKey  string `json:"accessKey" norman:"notnullable,required,minLength=1"`
-	SecretKey  string `json:"secretKey" norman:"notnullable,required,minLength=1,type=password"`
+	AccessKey string `json:"accessKey" norman:"notnullable,required,minLength=1"`
+	SecretKey string `json:"secretKey" norman:"notnullable,required,minLength=1,type=password"`
 }
 
 type CloudflareProviderConfig struct {
-	RootDomain string `json:"rootDomain" norman:"required"`
-	APIKey     string `json:"apiKey" norman:"notnullable,required,minLength=1,type=password"`
-	APIEmail   string `json:"apiEmail" norman:"notnullable,required,minLength=1"`
+	APIKey   string `json:"apiKey" norman:"notnullable,required,minLength=1,type=password"`
+	APIEmail string `json:"apiEmail" norman:"notnullable,required,minLength=1"`
 }
 
 type UpdateGlobalDNSTargetsInput struct {
@@ -68,9 +67,8 @@ type UpdateGlobalDNSTargetsInput struct {
 }
 
 type AlidnsProviderConfig struct {
-	RootDomain string `json:"rootDomain" norman:"required"`
-	AccessKey  string `json:"accessKey" norman:"notnullable,required,minLength=1"`
-	SecretKey  string `json:"secretKey" norman:"notnullable,required,minLength=1,type=password"`
+	AccessKey string `json:"accessKey" norman:"notnullable,required,minLength=1"`
+	SecretKey string `json:"secretKey" norman:"notnullable,required,minLength=1,type=password"`
 }
 
 type GlobalDNSSystemImages struct {

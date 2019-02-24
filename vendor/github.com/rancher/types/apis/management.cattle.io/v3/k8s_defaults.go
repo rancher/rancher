@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	DefaultK8s = "v1.13.1-rancher1-1"
+	DefaultK8s = "v1.13.1-rancher1-2"
 )
 
 var (
@@ -25,8 +25,11 @@ var (
 	// K8sVersionsCurrent are the latest versions available for installation
 	K8sVersionsCurrent = []string{
 		"v1.11.6-rancher1-1",
-		"v1.12.5-rancher1-1",
-		"v1.13.1-rancher1-1",
+		// When add a new k8s version to 2.2, make sure to add support for it to the 2.1.x branch.
+		// Account for the fact that rke-tools image is different cross branches, and it requires using
+		// different k8s version tag
+		"v1.12.5-rancher1-2",
+		"v1.13.1-rancher1-2",
 	}
 
 	// K8sVersionToRKESystemImages is dynamically populated on init() with the latest versions
@@ -763,7 +766,7 @@ var (
 			CoreDNS:                   m("coredns/coredns:1.2.2"),
 			CoreDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.0.0"),
 		},
-		"v1.12.5-rancher1-1": {
+		"v1.12.5-rancher1-2": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.2.24"),
 			Kubernetes:                m("rancher/hyperkube:v1.12.5-rancher1"),
 			Alpine:                    m("rancher/rke-tools:v0.1.24"),
@@ -791,7 +794,7 @@ var (
 			CoreDNS:                   m("coredns/coredns:1.2.2"),
 			CoreDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.0.0"),
 		},
-		"v1.13.1-rancher1-1": {
+		"v1.13.1-rancher1-2": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.2.24"),
 			Kubernetes:                m("rancher/hyperkube:v1.13.1-rancher1"),
 			Alpine:                    m("rancher/rke-tools:v0.1.24"),
@@ -820,7 +823,7 @@ var (
 			CoreDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.0.0"),
 		},
 		// Add a new version with old rke-tools to allow upgrade from 2.1.x clusters
-		"v1.12.5-rancher1-1-1": {
+		"v1.12.5-rancher1-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.2.24"),
 			Kubernetes:                m("rancher/hyperkube:v1.12.5-rancher1"),
 			Alpine:                    m("rancher/rke-tools:v0.1.16"),
@@ -847,7 +850,7 @@ var (
 			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.3.1"),
 		},
 		// Add a new version with old rke-tools to allow upgrade from 2.1.x clusters
-		"v1.13.1-rancher1-1-1": {
+		"v1.13.1-rancher1-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.2.24"),
 			Kubernetes:                m("rancher/hyperkube:v1.13.1-rancher1"),
 			Alpine:                    m("rancher/rke-tools:v0.1.16"),
