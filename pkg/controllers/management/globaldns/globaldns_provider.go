@@ -121,7 +121,7 @@ func (n *ProviderLauncher) handleRoute53Provider(obj *v3.GlobalDNSProvider) (run
 	data := map[string]interface{}{
 		"awsAccessKey":     obj.Spec.Route53ProviderConfig.AccessKey,
 		"awsSecretKey":     obj.Spec.Route53ProviderConfig.SecretKey,
-		"route53Domain":    obj.Spec.Route53ProviderConfig.RootDomain,
+		"route53Domain":    obj.Spec.RootDomain,
 		"deploymentName":   obj.Name,
 		"identifier":       rancherInstallUUID + "_" + obj.Name,
 		"externalDnsImage": v3.ToolsSystemImages.GlobalDNSSystemImages.ExternalDNS,
@@ -139,7 +139,7 @@ func (n *ProviderLauncher) handleCloudflareProvider(obj *v3.GlobalDNSProvider) (
 	data := map[string]interface{}{
 		"apiKey":           obj.Spec.CloudflareProviderConfig.APIKey,
 		"apiEmail":         obj.Spec.CloudflareProviderConfig.APIEmail,
-		"cloudflareDomain": obj.Spec.CloudflareProviderConfig.RootDomain,
+		"cloudflareDomain": obj.Spec.RootDomain,
 		"deploymentName":   obj.Name,
 		"identifier":       rancherInstallUUID + "_" + obj.Name,
 		"externalDnsImage": v3.ToolsSystemImages.GlobalDNSSystemImages.ExternalDNS,
@@ -156,7 +156,7 @@ func (n *ProviderLauncher) handleAlidnsProvider(obj *v3.GlobalDNSProvider) (runt
 	data := map[string]interface{}{
 		"accessKey":        obj.Spec.AlidnsProviderConfig.AccessKey,
 		"secretKey":        obj.Spec.AlidnsProviderConfig.SecretKey,
-		"rootDomain":       obj.Spec.AlidnsProviderConfig.RootDomain,
+		"rootDomain":       obj.Spec.RootDomain,
 		"providerName":     obj.Name,
 		"externalDnsImage": v3.ToolsSystemImages.GlobalDNSSystemImages.ExternalDNS,
 	}
