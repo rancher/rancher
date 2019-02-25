@@ -187,7 +187,7 @@ func checkDuplicateTargets(data map[string]interface{}) error {
 		id := convert.ToString(values.GetValueN(target, "projectId"))
 		if id != "" {
 			if _, ok := projectIds[id]; ok {
-				return fmt.Errorf("duplicate projects in targets %s", id)
+				return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("duplicate projects in targets %s", id))
 			}
 			projectIds[id] = true
 		}
