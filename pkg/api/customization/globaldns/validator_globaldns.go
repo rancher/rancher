@@ -95,7 +95,7 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 
 	originalMultiClusterApp := gDNS.Spec.MultiClusterAppName
 	newMultiClusterApp := convert.ToString(data[client.GlobalDNSFieldMultiClusterAppID])
-	if originalMultiClusterApp != newMultiClusterApp {
+	if newMultiClusterApp != "" && originalMultiClusterApp != newMultiClusterApp {
 		// check access to new multiclusterapp
 		return ma.CheckCallerAccessToTargets(request, []string{newMultiClusterApp}, client.MultiClusterAppType, &client.MultiClusterApp{})
 	}
