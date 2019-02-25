@@ -3,6 +3,7 @@ package multiclusterapp
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/rancher/norman/httperror"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -83,21 +84,30 @@ func (w Wrapper) addProjects(request *types.APIContext) error {
 	if err != nil {
 		return err
 	}
-	updatedMcApp := mcapp
+	var mcappToUpdate *v3.MultiClusterApp
+	if len(inputProjects) > 0 {
+		for _, p := range inputProjects {
+			if existingProjects[p] {
+				return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("duplicate projects in targets %s", p))
+			}
+			existingProjects[p] = true
+		}
+		mcappToUpdate = mcapp.DeepCopy()
+		for _, name := range inputProjects {
+			mcappToUpdate.Spec.Targets = append(mcappToUpdate.Spec.Targets, v3.Target{ProjectName: name})
+		}
+	}
 	if len(inputAnswers) > 0 {
-		mcappToUpdate := mcapp.DeepCopy()
+		if mcappToUpdate == nil {
+			mcappToUpdate = mcapp.DeepCopy()
+		}
 		mcappToUpdate.Spec.Answers = append(mcappToUpdate.Spec.Answers, inputAnswers...)
-		if updatedMcApp, err = w.MultiClusterApps.Update(mcappToUpdate); err != nil {
-			return err
-		}
 	}
-	mcappToUpdate := updatedMcApp.DeepCopy()
-	for _, p := range inputProjects {
-		if !existingProjects[p] {
-			mcappToUpdate.Spec.Targets = append(mcappToUpdate.Spec.Targets, v3.Target{ProjectName: p})
-		}
+	if mcappToUpdate != nil {
+		return w.updateMcApp(mcappToUpdate, request, "addedProjects")
 	}
-	return w.updateMcApp(mcappToUpdate, request, "addedProjects")
+	request.WriteResponse(http.StatusOK, nil)
+	return nil
 }
 
 func (w Wrapper) removeProjects(request *types.APIContext) error {
