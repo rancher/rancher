@@ -11,13 +11,19 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	amazonec2driver = "amazonec2"
+	azuredriver     = "azure"
+	vmwaredriver    = "vmwarevsphere"
+)
+
 var driverData = map[string]map[string][]string{
-	"amazonec2":     {"cred": []string{"accessKey"}},
-	"azure":         {"cred": []string{"clientId", "subscriptionId"}},
-	"vmwarevsphere": {"cred": []string{"username", "vcenter", "vcenterPort"}},
+	amazonec2driver: {"cred": []string{"accessKey"}},
+	azuredriver:     {"cred": []string{"clientId", "subscriptionId"}},
+	vmwaredriver:    {"cred": []string{"username", "vcenter", "vcenterPort"}},
 }
 var driverDefaults = map[string]map[string]string{
-	"vmwarevsphere": {"vcenterPort": "443"},
+	vmwaredriver: {"vcenterPort": "443"},
 }
 
 type machineDriverCompare struct {
@@ -35,10 +41,10 @@ func addMachineDrivers(management *config.ManagementContext) error {
 		"", "c31b9da2c977e70c2eeee5279123a95d", []string{"ecs.aliyuncs.com"}, false, false, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("amazonec2", "local://", "", "", []string{"*.amazonaws.com", "*.amazonaws.com.cn"}, true, true, management); err != nil {
+	if err := addMachineDriver(amazonec2driver, "local://", "", "", []string{"*.amazonaws.com", "*.amazonaws.com.cn"}, true, true, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("azure", "local://", "", "", nil, true, true, management); err != nil {
+	if err := addMachineDriver(azuredriver, "local://", "", "", nil, true, true, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver("cloudca", "https://github.com/cloud-ca/docker-machine-driver-cloudca/files/2446837/docker-machine-driver-cloudca_v2.0.0_linux-amd64.zip",
@@ -74,7 +80,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver("softlayer", "local://", "", "", nil, false, true, management); err != nil {
 		return err
 	}
-	return addMachineDriver("vmwarevsphere", "local://", "", "", nil, true, true, management)
+	return addMachineDriver(vmwaredriver, "local://", "", "", nil, true, true, management)
 }
 
 func addMachineDriver(name, url, uiURL, checksum string, whitelist []string, active, builtin bool, management *config.ManagementContext) error {

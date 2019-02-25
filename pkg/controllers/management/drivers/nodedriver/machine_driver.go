@@ -3,6 +3,7 @@ package nodedriver
 import (
 	"context"
 	"fmt"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers"
 	"reflect"
 	"strconv"
@@ -371,7 +372,17 @@ func updateDefault(credField v3.Field, val, kind string) v3.Field {
 		i, err := strconv.Atoi(val)
 		if err == nil {
 			credField.Default = v3.Values{IntValue: i}
+		} else {
+			logrus.Errorf("error converting %s to int %v", val, err)
 		}
+	case "boolean":
+		credField.Default = v3.Values{BoolValue: convert.ToBool(val)}
+	case "array[string]":
+		credField.Default = v3.Values{StringSliceValue: convert.ToStringSlice(val)}
+	case "password", "string":
+		credField.Default = v3.Values{StringValue: val}
+	default:
+		logrus.Errorf("unsupported kind for default val:%s kind:%s", val, kind)
 	}
 	return credField
 }
