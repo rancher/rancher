@@ -124,7 +124,7 @@ func GetAlertManagerDefaultConfig() *alertconfig.Config {
 
 	resolveTimeout, _ := model.ParseDuration("5m")
 	config.Global = &alertconfig.GlobalConfig{
-		SlackAPIURL:    "slack_api_url",
+		SlackAPIURL:    "https://api.slack.com",
 		ResolveTimeout: resolveTimeout,
 		SMTPRequireTLS: false,
 	}
