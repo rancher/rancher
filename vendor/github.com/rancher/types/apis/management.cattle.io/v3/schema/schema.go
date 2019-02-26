@@ -688,7 +688,7 @@ func clusterCatalogTypes(schemas *types.Schemas) *types.Schemas {
 
 func multiClusterAppTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
-		AddMapperForType(&Version, v3.MultiClusterApp{}, m.Drop{Field: "namespaceId"}).
+		AddMapperForType(&Version, v3.MultiClusterApp{}, m.Drop{Field: "namespaceId"}, m.Drop{Field: "targetToRole"}).
 		AddMapperForType(&Version, v3.MultiClusterAppRevision{}, m.Drop{Field: "namespaceId"}).
 		AddMapperForType(&Version, v3.Member{}, m.Drop{Field: "userName"}, m.Drop{Field: "displayName"}).
 		MustImport(&Version, v3.MultiClusterApp{}).
