@@ -149,9 +149,14 @@ func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 						AppIDsLabel:         obj.Name},
 				},
 			}
-			_, err := l.NsClient.Create(&n)
-			if err != nil && !errors.IsAlreadyExists(err) {
-				return obj, err
+			ns, err := l.NsClient.Create(&n)
+			if err != nil {
+				if !errors.IsAlreadyExists(err) {
+					return obj, err
+				}
+				if ns.DeletionTimestamp != nil {
+					return obj, fmt.Errorf("waiting for namespace %s to be terminated", obj.Namespace)
+				}
 			} else if err == nil {
 				created = true
 			}
