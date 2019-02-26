@@ -72,6 +72,10 @@ func (n *ProviderCatalogLauncher) sync(key string, obj *v3.GlobalDNSProvider) (r
 		return n.handleCloudflareProvider(obj)
 	}
 
+	if obj.Spec.AlidnsProviderConfig != nil {
+		return n.handleAlidnsProvider(obj)
+	}
+
 	return nil, nil
 }
 
@@ -106,6 +110,27 @@ func (n *ProviderCatalogLauncher) handleCloudflareProvider(obj *v3.GlobalDNSProv
 		"rbac.create":       "true",
 		"logLevel":          "debug",
 		"policy":            "sync",
+	}
+
+	if obj.Spec.RootDomain != "" {
+		answers["domainFilters[0]"] = obj.Spec.RootDomain
+	}
+
+	return n.createUpdateExternalDNSApp(obj, answers)
+}
+
+func (n *ProviderCatalogLauncher) handleAlidnsProvider(obj *v3.GlobalDNSProvider) (runtime.Object, error) {
+	rancherInstallUUID := settings.InstallUUID.Get()
+	//create external-dns alidns provider
+	answers := map[string]string{
+		"provider":               "alibabacloud",
+		"alibabacloud.zoneType":  "public",
+		"alibabacloud.accessKey": obj.Spec.AlidnsProviderConfig.AccessKey,
+		"alibabacloud.secretKey": obj.Spec.AlidnsProviderConfig.SecretKey,
+		"txtOwnerId":             rancherInstallUUID + "_" + obj.Name,
+		"rbac.create":            "true",
+		"logLevel":               "debug",
+		"policy":                 "sync",
 	}
 
 	if obj.Spec.RootDomain != "" {
