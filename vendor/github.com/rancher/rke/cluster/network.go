@@ -142,7 +142,7 @@ func (c *Cluster) doFlannelDeploy(ctx context.Context) error {
 			"Type": c.Network.Options[FlannelBackendType],
 		},
 		RBACConfig:     c.Authorization.Mode,
-		ClusterVersion: getTagMajorVersion(c.Version),
+		ClusterVersion: util.GetTagMajorVersion(c.Version),
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(flannelConfig)
 	if err != nil {
