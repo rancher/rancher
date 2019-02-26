@@ -141,6 +141,9 @@ func InstallCharts(rootDir, port string, obj *v3.App) error {
 		// if the first install failed, the second install would have error message like `has no deployed releases`, then the
 		// original error is masked. We need to filter out the message and always return the last one if error matches this pattern
 		if strings.Contains(stderrBuf.String(), "has no deployed releases") {
+			if !v3.AppConditionForceUpgrade.IsUnknown(obj) {
+				v3.AppConditionForceUpgrade.Unknown(obj)
+			}
 			return errors.New(v3.AppConditionInstalled.GetMessage(obj))
 		}
 		return errors.Errorf("failed to install app %s. %s", obj.Name, stderrBuf.String())
