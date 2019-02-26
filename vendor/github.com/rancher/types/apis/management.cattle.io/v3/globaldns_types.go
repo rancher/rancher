@@ -70,7 +70,3 @@ type AlidnsProviderConfig struct {
 	AccessKey string `json:"accessKey" norman:"notnullable,required,minLength=1"`
 	SecretKey string `json:"secretKey" norman:"notnullable,required,minLength=1,type=password"`
 }
-
-type GlobalDNSSystemImages struct {
-	ExternalDNS string `yaml:"ExternalDns" json:"ExternalDns,omitempty"`
-}
