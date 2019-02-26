@@ -955,7 +955,8 @@ func getClientset(info *types.ClusterInfo) (*kubernetes.Clientset, error) {
 }
 
 func (d *Driver) Remove(ctx context.Context, info *types.ClusterInfo) error {
-	logrus.Infof("Starting delete cluster")
+	ans, _ := json.Marshal(info.Metadata["state"])
+	logrus.Infof("Starting delete cluster %s", string(ans))
 
 	state, err := getState(info)
 	if err != nil {
