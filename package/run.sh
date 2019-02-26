@@ -223,9 +223,9 @@ fi
 
 if [ -n "$CATTLE_CA_CHECKSUM" ]; then
     temp=$(mktemp)
-    curl --insecure -s -fL $CATTLE_SERVER/v3/settings/cacerts | jq -r .value > $temp
+    curl --insecure -s -fL $CATTLE_SERVER/v3/settings/cacerts | jq -r '.value | select(length > 0)' > $temp
     if [ ! -s $temp ]; then
-      error "Failed to pull the cacert from the rancher server settings at $CATTLE_SERVER/v3/settings/cacerts"
+      error "The environment variable CATTLE_CA_CHECKSUM is set but there is no CA certificate configured at $CATTLE_SERVER/v3/settings/cacerts"
       exit 1
     fi
     err=$(check_x509_cert $temp)
