@@ -133,3 +133,11 @@ func IsRancherBackupSupported(image string) bool {
 	}
 	return true
 }
+
+func GetTagMajorVersion(tag string) string {
+	splitTag := strings.Split(tag, ".")
+	if len(splitTag) < 2 {
+		return ""
+	}
+	return strings.Join(splitTag[:2], ".")
+}
