@@ -2,17 +2,32 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/rancher/norman/types/convert"
+	libhelm "github.com/rancher/rancher/pkg/catalog/helm"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/image"
+	"gopkg.in/yaml.v2"
 )
 
 func main() {
-	if err := run(os.Args[1:]...); err != nil {
+	if len(os.Args) < 2 {
+		log.Fatal("system charts path is required, please set it as the first parameter")
+	}
+	images, err := getImagesFromCharts(os.Args[1])
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	images = append(images, os.Args[2:]...)
+
+	if err := run(images...); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -259,6 +274,101 @@ func findStrings(obj map[string]interface{}, found map[string]bool) {
 			found[t] = true
 		case map[string]interface{}:
 			findStrings(t, found)
+		}
+	}
+}
+
+func getImagesFromCharts(path string) ([]string, error) {
+	var images []string
+	imageMap := map[string]struct{}{}
+	chartVersion, err := getChartAndVersion(path)
+	if err != nil {
+		return nil, err
+	}
+	if err := filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
+		return walkFunc(imageMap, chartVersion, path, p, info, err)
+	}); err != nil {
+		return images, err
+	}
+	for value := range imageMap {
+		images = append(images, value)
+	}
+	return images, nil
+}
+
+func getChartAndVersion(path string) (map[string]string, error) {
+	rtn := map[string]string{}
+	helm := libhelm.Helm{
+		LocalPath: path,
+		IconPath:  path,
+		Hash:      "",
+	}
+	index, err := helm.LoadIndex()
+	if err != nil {
+		return nil, err
+	}
+	for k, versions := range index.IndexFile.Entries {
+		// because versions is sorted in reverse order, the first one will be the latest version
+		if len(versions) > 0 {
+			rtn[k] = versions[0].Dir
+		}
+	}
+
+	return rtn, nil
+}
+
+func walkFunc(images map[string]struct{}, versions map[string]string, basePath, path string, info os.FileInfo, err error) error {
+	relPath, err := filepath.Rel(basePath, path)
+	if err != nil {
+		return err
+	}
+	var found bool
+	for _, v := range versions {
+		if strings.HasPrefix(relPath, v) {
+			found = true
+			break
+		}
+	}
+	if !found || info.Name() != "values.yaml" {
+		return nil
+	}
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	dataInterface := map[interface{}]interface{}{}
+	if err := yaml.Unmarshal(data, &dataInterface); err != nil {
+		return err
+	}
+
+	walkthroughMap(dataInterface, func(inputMap map[interface{}]interface{}) {
+		generateImages(inputMap, images)
+	})
+	return nil
+}
+
+func generateImages(inputMap map[interface{}]interface{}, output map[string]struct{}) {
+	r, repoOk := inputMap["repository"]
+	t, tagOk := inputMap["tag"]
+	if !repoOk || !tagOk {
+		return
+	}
+	repo, repoOk := r.(string)
+	tag, tagOk := t.(string)
+	if !repoOk || !tagOk {
+		return
+	}
+
+	output[fmt.Sprintf("%s:%s", repo, tag)] = struct{}{}
+
+	return
+}
+
+func walkthroughMap(inputMap map[interface{}]interface{}, walkFunc func(map[interface{}]interface{})) {
+	walkFunc(inputMap)
+	for _, value := range inputMap {
+		if v, ok := value.(map[interface{}]interface{}); ok {
+			walkthroughMap(v, walkFunc)
 		}
 	}
 }
