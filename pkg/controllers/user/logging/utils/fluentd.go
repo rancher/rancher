@@ -46,7 +46,7 @@ func (w *fluentForwarderTestWrap) TestReachable(dial dialer.Dialer, includeSendT
 			if serverName == "" {
 				serverName = host
 			}
-			tlsConfig, err = buildTLSConfig(w.Certificate, "", "", "", "", serverName, true)
+			tlsConfig, err = buildTLSConfig(w.Certificate, w.ClientCert, w.ClientKey, w.ClientKeyPass, "", serverName, w.SSLVerify)
 			if err != nil {
 				return err
 			}
