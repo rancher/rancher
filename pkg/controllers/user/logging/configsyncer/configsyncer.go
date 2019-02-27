@@ -238,6 +238,8 @@ func GetSSLConfig(target mgmtv3.LoggingTargets) (string, string, string) {
 		clientKey = target.SyslogConfig.ClientKey
 	} else if target.FluentForwarderConfig != nil {
 		certificate = target.FluentForwarderConfig.Certificate
+		clientCert = target.FluentForwarderConfig.ClientCert
+		clientKey = target.FluentForwarderConfig.ClientKey
 	} else if target.CustomTargetConfig != nil {
 		certificate = target.CustomTargetConfig.Certificate
 		clientCert = target.CustomTargetConfig.ClientCert
