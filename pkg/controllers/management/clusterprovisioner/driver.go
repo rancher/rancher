@@ -78,7 +78,7 @@ func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 	return p.Driver.Update(ctx, cluster.Name, kontainerDriver, spec)
 }
 
-func (p *Provisioner) driverRemove(cluster *v3.Cluster) error {
+func (p *Provisioner) driverRemove(cluster *v3.Cluster, forceRemove bool) error {
 	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, cluster, v3.ClusterConditionProvisioned)
 	defer logger.Close()
 
@@ -94,7 +94,7 @@ func (p *Provisioner) driverRemove(cluster *v3.Cluster) error {
 			return nil, err
 		}
 
-		return cluster, p.Driver.Remove(ctx, cluster.Name, kontainerDriver, spec)
+		return cluster, p.Driver.Remove(ctx, cluster.Name, kontainerDriver, spec, forceRemove)
 	})
 
 	return err
