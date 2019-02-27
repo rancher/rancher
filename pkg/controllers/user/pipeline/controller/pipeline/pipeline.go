@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/satori/go.uuid"
-	"k8s.io/apimachinery/pkg/api/errors"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -48,8 +48,9 @@ func (l *Lifecycle) Updated(obj *v3.Pipeline) (runtime.Object, error) {
 
 func (l *Lifecycle) Remove(obj *v3.Pipeline) (runtime.Object, error) {
 	if obj.Status.WebHookID != "" {
-		if err := l.deleteHook(obj); err != nil && !errors.IsNotFound(err) {
-			return obj, err
+		if err := l.deleteHook(obj); err != nil {
+			logrus.WithError(err).Warnf("fail to delete webhook for pipeline %q", obj.Name)
+			return obj, nil
 		}
 	}
 	return obj, nil
