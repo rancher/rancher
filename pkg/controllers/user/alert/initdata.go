@@ -50,7 +50,7 @@ func initClusterPreCanAlerts(clusterAlertGroups v3.ClusterAlertGroupInterface, c
 			},
 			MetricRule: &v3.MetricRule{
 				Description:    "Etcd member has no leader",
-				Expression:     `etcd_server_has_leader{job="exporter-kube-etcd-cluster-monitoring"}`,
+				Expression:     `etcd_server_has_leader`,
 				Comparison:     manager.ComparisonNotEqual,
 				Duration:       "3m",
 				ThresholdValue: 1,
@@ -80,7 +80,7 @@ func initClusterPreCanAlerts(clusterAlertGroups v3.ClusterAlertGroupInterface, c
 			},
 			MetricRule: &v3.MetricRule{
 				Description:    "Etcd instance has seen high number of leader changes within the last hour",
-				Expression:     `increase(etcd_server_leader_changes_seen_total{job="exporter-kube-etcd-cluster-monitoring"}[1h])`,
+				Expression:     `increase(etcd_server_leader_changes_seen_total[1h])`,
 				Comparison:     manager.ComparisonGreaterThan,
 				Duration:       "3m",
 				ThresholdValue: 3,
