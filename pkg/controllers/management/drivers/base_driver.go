@@ -230,7 +230,7 @@ func (d *BaseDriver) copyBinary(cacheFile, input string) (string, error) {
 	}))
 
 	if file == "" {
-		return "", fmt.Errorf("failed to find machine driver in archive. There must be a file of form docker-machine-driver*")
+		return "", fmt.Errorf("failed to find driver in archive. There must be a file of form %s*", d.BinaryPrefix)
 	}
 
 	if driverName == "" {
