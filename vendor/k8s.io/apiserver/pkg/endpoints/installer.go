@@ -28,7 +28,6 @@ import (
 
 	restful "github.com/emicklei/go-restful"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,9 +37,12 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
+	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
+	openapibuilder "k8s.io/kube-openapi/pkg/builder"
+	openapiutil "k8s.io/kube-openapi/pkg/util"
+	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 )
 
 const (
@@ -160,38 +162,13 @@ func (a *APIInstaller) getResourceKind(path string, storage rest.Storage) (schem
 	if fqKindToRegister.Empty() {
 		return schema.GroupVersionKind{}, fmt.Errorf("unable to locate fully qualified kind for %v: found %v when registering for %v", reflect.TypeOf(object), fqKinds, a.group.GroupVersion)
 	}
-	return fqKindToRegister, nil
-}
 
-// restMapping returns rest mapper for the resource.
-// Example REST paths that this mapper maps.
-// 1. Resource only, no subresource:
-//      Resource Type:    batch/v1.Job (input args: resource = "jobs")
-//      REST path:        /apis/batch/v1/namespaces/{namespace}/job/{name}
-// 2. Subresource and its parent belong to different API groups and/or versions:
-//      Resource Type:    extensions/v1beta1.ReplicaSet (input args: resource = "replicasets")
-//      Subresource Type: autoscaling/v1.Scale
-//      REST path:        /apis/extensions/v1beta1/namespaces/{namespace}/replicaset/{name}/scale
-func (a *APIInstaller) restMapping(resource string) (*meta.RESTMapping, error) {
-	// subresources must have parent resources, and follow the namespacing rules of their parent.
-	// So get the storage of the resource (which is the parent resource in case of subresources)
-	storage, ok := a.group.Storage[resource]
-	if !ok {
-		return nil, fmt.Errorf("unable to locate the storage object for resource: %s", resource)
-	}
-	fqKindToRegister, err := a.getResourceKind(resource, storage)
-	if err != nil {
-		return nil, fmt.Errorf("unable to locate fully qualified kind for mapper resource %s: %v", resource, err)
-	}
-	return a.group.Mapper.RESTMapping(fqKindToRegister.GroupKind(), fqKindToRegister.Version)
+	// group is guaranteed to match based on the check above
+	return fqKindToRegister, nil
 }
 
 func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService) (*metav1.APIResource, error) {
 	admit := a.group.Admit
-	context := a.group.Context
-	if context == nil {
-		return nil, fmt.Errorf("%v missing Context", a.group.GroupVersion)
-	}
 
 	optionsExternalVersion := a.group.GroupVersion
 	if a.group.OptionsExternalVersion != nil {
@@ -199,11 +176,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	resource, subresource, err := splitSubresource(path)
-	if err != nil {
-		return nil, err
-	}
-
-	mapping, err := a.restMapping(resource)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +191,28 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 	defaultVersionedObject := indirectArbitraryPointer(versionedPtr)
 	kind := fqKindToRegister.Kind
-	hasSubresource := len(subresource) > 0
+	isSubresource := len(subresource) > 0
+
+	// If there is a subresource, namespace scoping is defined by the parent resource
+	namespaceScoped := true
+	if isSubresource {
+		parentStorage, ok := a.group.Storage[resource]
+		if !ok {
+			return nil, fmt.Errorf("missing parent storage: %q", resource)
+		}
+		scoper, ok := parentStorage.(rest.Scoper)
+		if !ok {
+			return nil, fmt.Errorf("%q must implement scoper", resource)
+		}
+		namespaceScoped = scoper.NamespaceScoped()
+
+	} else {
+		scoper, ok := storage.(rest.Scoper)
+		if !ok {
+			return nil, fmt.Errorf("%q must implement scoper", resource)
+		}
+		namespaceScoped = scoper.NamespaceScoped()
+	}
 
 	// what verbs are supported by the storage, used to know what verbs we support per path
 	creater, isCreater := storage.(rest.Creater)
@@ -266,6 +259,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	versionedListOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("ListOptions"))
+	if err != nil {
+		return nil, err
+	}
+	versionedCreateOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("CreateOptions"))
+	if err != nil {
+		return nil, err
+	}
+	versionedUpdateOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("UpdateOptions"))
 	if err != nil {
 		return nil, err
 	}
@@ -342,16 +343,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 	}
 
-	var ctxFn handlers.ContextFunc
-	ctxFn = func(req *http.Request) request.Context {
-		if ctx, ok := context.Get(req); ok {
-			return request.WithUserAgent(ctx, req.Header.Get("User-Agent"))
-		}
-		return request.WithUserAgent(request.NewContext(), req.Header.Get("User-Agent"))
-	}
-
 	allowWatchList := isWatcher && isLister // watching on lists is allowed only for kinds that support both watch and list.
-	scope := mapping.Scope
 	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
 	pathParam := ws.PathParameter("path", "path to the resource").DataType("string")
 
@@ -370,8 +362,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	var apiResource metav1.APIResource
 	// Get the list of actions for the given scope.
-	switch scope.Name() {
-	case meta.RESTScopeNameRoot:
+	switch {
+	case !namespaceScoped:
 		// Handle non-namespace scoped resources like nodes.
 		resourcePath := resource
 		resourceParams := params
@@ -379,7 +371,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		nameParams := append(params, nameParam)
 		proxyParams := append(nameParams, pathParam)
 		suffix := ""
-		if hasSubresource {
+		if isSubresource {
 			suffix = "/" + subresource
 			itemPath = itemPath + suffix
 			resourcePath = itemPath
@@ -389,7 +381,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Namespaced = false
 		apiResource.Kind = resourceKind
 		namer := handlers.ContextBasedNaming{
-			GetContext:         ctxFn,
 			SelfLinker:         a.group.Linker,
 			ClusterScoped:      true,
 			SelfLinkPathPrefix: gpath.Join(a.prefix, resource) + "/",
@@ -401,7 +392,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false}, isLister)
 		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false}, isCreater)
 		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false}, isCollectionDeleter)
-		// DEPRECATED
+		// DEPRECATED in 1.11
 		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false}, allowWatchList)
 
 		// Add actions at the item path: /api/apiVersion/resource/{name}
@@ -412,14 +403,16 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false}, isUpdater)
 		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false}, isPatcher)
 		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false}, isGracefulDeleter)
+		// DEPRECATED in 1.11
 		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false}, isWatcher)
 		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false}, isConnecter)
 		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)
 		break
-	case meta.RESTScopeNameNamespace:
+	default:
+		namespaceParamName := "namespaces"
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
-		namespaceParam := ws.PathParameter(scope.ArgumentName(), scope.ParamDescription()).DataType("string")
-		namespacedPath := scope.ParamName() + "/{" + scope.ArgumentName() + "}/" + resource
+		namespaceParam := ws.PathParameter("namespace", "object name and auth scope, such as for teams and projects").DataType("string")
+		namespacedPath := namespaceParamName + "/{" + "namespace" + "}/" + resource
 		namespaceParams := []*restful.Parameter{namespaceParam}
 
 		resourcePath := namespacedPath
@@ -428,7 +421,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		nameParams := append(namespaceParams, nameParam)
 		proxyParams := append(nameParams, pathParam)
 		itemPathSuffix := ""
-		if hasSubresource {
+		if isSubresource {
 			itemPathSuffix = "/" + subresource
 			itemPath = itemPath + itemPathSuffix
 			resourcePath = itemPath
@@ -438,17 +431,16 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Namespaced = true
 		apiResource.Kind = resourceKind
 		namer := handlers.ContextBasedNaming{
-			GetContext:         ctxFn,
 			SelfLinker:         a.group.Linker,
 			ClusterScoped:      false,
-			SelfLinkPathPrefix: gpath.Join(a.prefix, scope.ParamName()) + "/",
+			SelfLinkPathPrefix: gpath.Join(a.prefix, namespaceParamName) + "/",
 			SelfLinkPathSuffix: itemPathSuffix,
 		}
 
 		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false}, isLister)
 		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false}, isCreater)
 		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false}, isCollectionDeleter)
-		// DEPRECATED
+		// DEPRECATED in 1.11
 		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false}, allowWatchList)
 
 		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, false}, isGetter)
@@ -458,6 +450,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false}, isUpdater)
 		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false}, isPatcher)
 		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false}, isGracefulDeleter)
+		// DEPRECATED in 1.11
 		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false}, isWatcher)
 		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false}, isConnecter)
 		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)
@@ -465,13 +458,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		// list or post across namespace.
 		// For ex: LIST all pods in all namespaces by sending a LIST request at /api/apiVersion/pods.
 		// TODO: more strongly type whether a resource allows these actions on "all namespaces" (bulk delete)
-		if !hasSubresource {
+		if !isSubresource {
 			actions = appendIf(actions, action{"LIST", resource, params, namer, true}, isLister)
+			// DEPRECATED in 1.11
 			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer, true}, allowWatchList)
 		}
 		break
-	default:
-		return nil, fmt.Errorf("unsupported restscope: %s", scope.Name())
 	}
 
 	// Create Routes for the actions.
@@ -497,7 +489,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	kubeVerbs := map[string]struct{}{}
 	reqScope := handlers.RequestScope{
-		ContextFunc:     ctxFn,
 		Serializer:      a.group.Serializer,
 		ParameterCodec:  a.group.ParameterCodec,
 		Creater:         a.group.Creater,
@@ -505,6 +496,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		Defaulter:       a.group.Defaulter,
 		Typer:           a.group.Typer,
 		UnsafeConvertor: a.group.UnsafeConvertor,
+		Authorizer:      a.group.Authorizer,
 
 		// TODO: Check for the interface on storage
 		TableConvertor: tableProvider,
@@ -518,6 +510,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 	if a.group.MetaGroupVersion != nil {
 		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion
+	}
+	reqScope.OpenAPISchema, err = a.getOpenAPISchema(ws.RootPath(), resource, fqKindToRegister, defaultVersionedObject)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get openapi schema for %v: %v", fqKindToRegister, err)
 	}
 	for _, action := range actions {
 		producedObject := storageMeta.ProducesObject(action.Verb)
@@ -554,8 +550,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		routes := []*restful.RouteBuilder{}
 
 		// If there is a subresource, kind should be the parent's kind.
-		if hasSubresource {
-			fqParentKind, err := a.getResourceKind(resource, a.group.Storage[resource])
+		if isSubresource {
+			parentStorage, ok := a.group.Storage[resource]
+			if !ok {
+				return nil, fmt.Errorf("missing parent storage: %q", resource)
+			}
+
+			fqParentKind, err := a.getResourceKind(resource, parentStorage)
 			if err != nil {
 				return nil, err
 			}
@@ -568,7 +569,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "GET": // Get a resource.
 			var handler restful.RouteFunction
 			if isGetterWithOptions {
-				handler = restfulGetResourceWithOptions(getterWithOptions, reqScope, hasSubresource)
+				handler = restfulGetResourceWithOptions(getterWithOptions, reqScope, isSubresource)
 			} else {
 				handler = restfulGetResource(getter, exporter, reqScope)
 			}
@@ -581,10 +582,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 
 			if a.enableAPIResponseCompression {
-				handler = genericfilters.RestfulWithCompression(handler, a.group.Context)
+				handler = genericfilters.RestfulWithCompression(handler)
 			}
 			doc := "read the specified " + kind
-			if hasSubresource {
+			if isSubresource {
 				doc = "read " + subresource + " of the specified " + kind
 			}
 			route := ws.GET(action.Path).To(handler).
@@ -608,12 +609,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			routes = append(routes, route)
 		case "LIST": // List all resources of a kind.
 			doc := "list objects of kind " + kind
-			if hasSubresource {
+			if isSubresource {
 				doc = "list " + subresource + " of objects of kind " + kind
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, restfulListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
 			if a.enableAPIResponseCompression {
-				handler = genericfilters.RestfulWithCompression(handler, a.group.Context)
+				handler = genericfilters.RestfulWithCompression(handler)
 			}
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
@@ -628,13 +629,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			switch {
 			case isLister && isWatcher:
 				doc := "list or watch objects of kind " + kind
-				if hasSubresource {
+				if isSubresource {
 					doc = "list or watch " + subresource + " of objects of kind " + kind
 				}
 				route.Doc(doc)
 			case isWatcher:
 				doc := "watch objects of kind " + kind
-				if hasSubresource {
+				if isSubresource {
 					doc = "watch " + subresource + "of objects of kind " + kind
 				}
 				route.Doc(doc)
@@ -643,10 +644,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			routes = append(routes, route)
 		case "PUT": // Update a resource.
 			doc := "replace the specified " + kind
-			if hasSubresource {
+			if isSubresource {
 				doc = "replace " + subresource + " of the specified " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, restfulUpdateResource(updater, reqScope, a.group.Typer, admit))
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, restfulUpdateResource(updater, reqScope, admit))
 			route := ws.PUT(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -658,11 +659,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusCreated, "Created", producedObject).
 				Reads(defaultVersionedObject).
 				Writes(producedObject)
+			if err := addObjectParams(ws, route, versionedUpdateOptions); err != nil {
+				return nil, err
+			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
 		case "PATCH": // Partially update a resource
 			doc := "partially update the specified " + kind
-			if hasSubresource {
+			if isSubresource {
 				doc = "partially update " + subresource + " of the specified " + kind
 			}
 			supportedTypes := []string{
@@ -670,7 +674,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				string(types.MergePatchType),
 				string(types.StrategicMergePatchType),
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, restfulPatchResource(patcher, reqScope, admit, mapping.ObjectConvertor, supportedTypes))
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, restfulPatchResource(patcher, reqScope, admit, supportedTypes))
 			route := ws.PATCH(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -680,19 +684,22 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusOK, "OK", producedObject).
 				Reads(metav1.Patch{}).
 				Writes(producedObject)
+			if err := addObjectParams(ws, route, versionedUpdateOptions); err != nil {
+				return nil, err
+			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
 		case "POST": // Create a resource.
 			var handler restful.RouteFunction
 			if isNamedCreater {
-				handler = restfulCreateNamedResource(namedCreater, reqScope, a.group.Typer, admit)
+				handler = restfulCreateNamedResource(namedCreater, reqScope, admit)
 			} else {
-				handler = restfulCreateResource(creater, reqScope, a.group.Typer, admit)
+				handler = restfulCreateResource(creater, reqScope, admit)
 			}
 			handler = metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, handler)
 			article := getArticleForNoun(kind, " ")
 			doc := "create" + article + kind
-			if hasSubresource {
+			if isSubresource {
 				doc = "create " + subresource + " of" + article + kind
 			}
 			route := ws.POST(action.Path).To(handler).
@@ -707,12 +714,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusAccepted, "Accepted", producedObject).
 				Reads(defaultVersionedObject).
 				Writes(producedObject)
+			if err := addObjectParams(ws, route, versionedCreateOptions); err != nil {
+				return nil, err
+			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
 		case "DELETE": // Delete a resource.
 			article := getArticleForNoun(kind, " ")
 			doc := "delete" + article + kind
-			if hasSubresource {
+			if isSubresource {
 				doc = "delete " + subresource + " of" + article + kind
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, restfulDeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit))
@@ -722,7 +732,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Operation("delete"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Writes(versionedStatus).
-				Returns(http.StatusOK, "OK", versionedStatus)
+				Returns(http.StatusOK, "OK", versionedStatus).
+				Returns(http.StatusAccepted, "Accepted", versionedStatus)
 			if isGracefulDeleter {
 				route.Reads(versionedDeleterObject)
 				if err := addObjectParams(ws, route, versionedDeleteOptions); err != nil {
@@ -733,7 +744,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			routes = append(routes, route)
 		case "DELETECOLLECTION":
 			doc := "delete collection of " + kind
-			if hasSubresource {
+			if isSubresource {
 				doc = "delete collection of " + subresource + " of a " + kind
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, restfulDeleteCollection(collectionDeleter, isCollectionDeleter, reqScope, admit))
@@ -749,12 +760,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
-		// TODO: deprecated
+		// deprecated in 1.11
 		case "WATCH": // Watch a resource.
 			doc := "watch changes to an object of kind " + kind
-			if hasSubresource {
+			if isSubresource {
 				doc = "watch changes to " + subresource + " of an object of kind " + kind
 			}
+			doc += ". deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter."
 			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
@@ -768,12 +780,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
-		// TODO: deprecated
+		// deprecated in 1.11
 		case "WATCHLIST": // Watch all resources of a kind.
 			doc := "watch individual changes to a list of " + kind
-			if hasSubresource {
+			if isSubresource {
 				doc = "watch individual changes to a list of " + subresource + " of " + kind
 			}
+			doc += ". deprecated: use the 'watch' parameter with a list operation instead."
 			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
@@ -794,10 +807,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 					connectProducedObject = "string"
 				}
 				doc := "connect " + method + " requests to " + kind
-				if hasSubresource {
+				if isSubresource {
 					doc = "connect " + method + " requests to " + subresource + " of " + kind
 				}
-				handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, restfulConnectResource(connecter, reqScope, admit, path, hasSubresource))
+				handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, restfulConnectResource(connecter, reqScope, admit, path, isSubresource))
 				route := ws.Method(method).Path(action.Path).
 					To(handler).
 					Doc(doc).
@@ -812,6 +825,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				}
 				addParams(route, action.Params)
 				routes = append(routes, route)
+
+				// transform ConnectMethods to kube verbs
+				if kubeVerb, found := toDiscoveryKubeVerb[method]; found {
+					if len(kubeVerb) != 0 {
+						kubeVerbs[kubeVerb] = struct{}{}
+					}
+				}
 			}
 		default:
 			return nil, fmt.Errorf("unrecognized action verb: %s", action.Verb)
@@ -850,6 +870,24 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	return &apiResource, nil
 }
 
+// getOpenAPISchema builds the openapi schema for a single resource model to be given to each handler. It will
+// return nil if the apiserver doesn't have openapi enabled, or if the specific path should be ignored by openapi.
+func (a *APIInstaller) getOpenAPISchema(rootPath, resource string, kind schema.GroupVersionKind, sampleObject interface{}) (openapiproto.Schema, error) {
+	path := gpath.Join(rootPath, resource)
+	if a.group.OpenAPIConfig == nil {
+		return nil, nil
+	}
+	pathsToIgnore := openapiutil.NewTrie(a.group.OpenAPIConfig.IgnorePrefixes)
+	if pathsToIgnore.HasPrefix(path) {
+		return nil, nil
+	}
+	openAPIDefinitions, err := openapibuilder.BuildOpenAPIDefinitionsForResource(sampleObject, a.group.OpenAPIConfig)
+	if err != nil {
+		return nil, err
+	}
+	return utilopenapi.ToProtoSchema(openAPIDefinitions, kind)
+}
+
 // indirectArbitraryPointer returns *ptrToObject for an arbitrary pointer
 func indirectArbitraryPointer(ptrToObject interface{}) interface{} {
 	return reflect.Indirect(reflect.ValueOf(ptrToObject)).Interface()
@@ -860,13 +898,6 @@ func appendIf(actions []action, a action, shouldAppend bool) []action {
 		actions = append(actions, a)
 	}
 	return actions
-}
-
-// Wraps a http.Handler function inside a restful.RouteFunction
-func routeFunction(handler http.Handler) restful.RouteFunction {
-	return func(restReq *restful.Request, restResp *restful.Response) {
-		handler.ServeHTTP(restResp.ResponseWriter, restReq.Request)
-	}
 }
 
 func addParams(route *restful.RouteBuilder, params []*restful.Parameter) {
@@ -1016,15 +1047,15 @@ func restfulListResource(r rest.Lister, rw rest.Watcher, scope handlers.RequestS
 	}
 }
 
-func restfulCreateNamedResource(r rest.NamedCreater, scope handlers.RequestScope, typer runtime.ObjectTyper, admit admission.Interface) restful.RouteFunction {
+func restfulCreateNamedResource(r rest.NamedCreater, scope handlers.RequestScope, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
-		handlers.CreateNamedResource(r, scope, typer, admit)(res.ResponseWriter, req.Request)
+		handlers.CreateNamedResource(r, scope, admit)(res.ResponseWriter, req.Request)
 	}
 }
 
-func restfulCreateResource(r rest.Creater, scope handlers.RequestScope, typer runtime.ObjectTyper, admit admission.Interface) restful.RouteFunction {
+func restfulCreateResource(r rest.Creater, scope handlers.RequestScope, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
-		handlers.CreateResource(r, scope, typer, admit)(res.ResponseWriter, req.Request)
+		handlers.CreateResource(r, scope, admit)(res.ResponseWriter, req.Request)
 	}
 }
 
@@ -1040,15 +1071,15 @@ func restfulDeleteCollection(r rest.CollectionDeleter, checkBody bool, scope han
 	}
 }
 
-func restfulUpdateResource(r rest.Updater, scope handlers.RequestScope, typer runtime.ObjectTyper, admit admission.Interface) restful.RouteFunction {
+func restfulUpdateResource(r rest.Updater, scope handlers.RequestScope, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
-		handlers.UpdateResource(r, scope, typer, admit)(res.ResponseWriter, req.Request)
+		handlers.UpdateResource(r, scope, admit)(res.ResponseWriter, req.Request)
 	}
 }
 
-func restfulPatchResource(r rest.Patcher, scope handlers.RequestScope, admit admission.Interface, converter runtime.ObjectConvertor, supportedTypes []string) restful.RouteFunction {
+func restfulPatchResource(r rest.Patcher, scope handlers.RequestScope, admit admission.Interface, supportedTypes []string) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
-		handlers.PatchResource(r, scope, admit, converter, supportedTypes)(res.ResponseWriter, req.Request)
+		handlers.PatchResource(r, scope, admit, supportedTypes)(res.ResponseWriter, req.Request)
 	}
 }
 

@@ -39,7 +39,11 @@ type awsElasticBlockStoreAttacher struct {
 
 var _ volume.Attacher = &awsElasticBlockStoreAttacher{}
 
+var _ volume.DeviceMounter = &awsElasticBlockStoreAttacher{}
+
 var _ volume.AttachableVolumePlugin = &awsElasticBlockStorePlugin{}
+
+var _ volume.DeviceMountableVolumePlugin = &awsElasticBlockStorePlugin{}
 
 func (plugin *awsElasticBlockStorePlugin) NewAttacher() (volume.Attacher, error) {
 	awsCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
@@ -53,13 +57,17 @@ func (plugin *awsElasticBlockStorePlugin) NewAttacher() (volume.Attacher, error)
 	}, nil
 }
 
+func (plugin *awsElasticBlockStorePlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	return plugin.NewAttacher()
+}
+
 func (plugin *awsElasticBlockStorePlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
-	return mount.GetMountRefs(mounter, deviceMountPath)
+	return mounter.GetMountRefs(deviceMountPath)
 }
 
 func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
-	volumeSource, readOnly, err := getVolumeSource(spec)
+	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
 	}
@@ -68,7 +76,7 @@ func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, nodeName
 
 	// awsCloud.AttachDisk checks if disk is already attached to node and
 	// succeeds in that case, so no need to do that separately.
-	devicePath, err := attacher.awsVolumes.AttachDisk(volumeID, nodeName, readOnly)
+	devicePath, err := attacher.awsVolumes.AttachDisk(volumeID, nodeName)
 	if err != nil {
 		glog.Errorf("Error attaching volume %q to node %q: %+v", volumeID, nodeName, err)
 		return "", err
@@ -236,6 +244,8 @@ type awsElasticBlockStoreDetacher struct {
 
 var _ volume.Detacher = &awsElasticBlockStoreDetacher{}
 
+var _ volume.DeviceUnmounter = &awsElasticBlockStoreDetacher{}
+
 func (plugin *awsElasticBlockStorePlugin) NewDetacher() (volume.Detacher, error) {
 	awsCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
@@ -246,6 +256,10 @@ func (plugin *awsElasticBlockStorePlugin) NewDetacher() (volume.Detacher, error)
 		mounter:    plugin.host.GetMounter(plugin.GetPluginName()),
 		awsVolumes: awsCloud,
 	}, nil
+}
+
+func (plugin *awsElasticBlockStorePlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
+	return plugin.NewDetacher()
 }
 
 func (detacher *awsElasticBlockStoreDetacher) Detach(volumeName string, nodeName types.NodeName) error {

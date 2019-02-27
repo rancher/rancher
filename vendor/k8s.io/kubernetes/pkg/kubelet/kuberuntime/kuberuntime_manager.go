@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
+	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -98,6 +99,9 @@ type kubeGenericRuntimeManager struct {
 	// If true, enforce container cpu limits with CFS quota support
 	cpuCFSQuota bool
 
+	// CPUCFSQuotaPeriod sets the CPU CFS quota period value, cpu.cfs_period_us, defaults to 100ms
+	cpuCFSQuotaPeriod metav1.Duration
+
 	// wrapped image puller.
 	imagePuller images.ImageManager
 
@@ -116,11 +120,14 @@ type kubeGenericRuntimeManager struct {
 
 	// A shim to legacy functions for backward compatibility.
 	legacyLogProvider LegacyLogProvider
+
+	// Manage RuntimeClass resources.
+	runtimeClassManager *runtimeclass.Manager
 }
 
 type KubeGenericRuntime interface {
 	kubecontainer.Runtime
-	kubecontainer.IndirectStreamingRuntime
+	kubecontainer.StreamingRuntime
 	kubecontainer.ContainerCommandRunner
 }
 
@@ -146,14 +153,17 @@ func NewKubeGenericRuntimeManager(
 	imagePullQPS float32,
 	imagePullBurst int,
 	cpuCFSQuota bool,
+	cpuCFSQuotaPeriod metav1.Duration,
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
 	internalLifecycle cm.InternalContainerLifecycle,
 	legacyLogProvider LegacyLogProvider,
+	runtimeClassManager *runtimeclass.Manager,
 ) (KubeGenericRuntime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:            recorder,
 		cpuCFSQuota:         cpuCFSQuota,
+		cpuCFSQuotaPeriod:   cpuCFSQuotaPeriod,
 		seccompProfileRoot:  seccompProfileRoot,
 		livenessManager:     livenessManager,
 		containerRefManager: containerRefManager,
@@ -165,6 +175,7 @@ func NewKubeGenericRuntimeManager(
 		keyring:             credentialprovider.NewDockerKeyring(),
 		internalLifecycle:   internalLifecycle,
 		legacyLogProvider:   legacyLogProvider,
+		runtimeClassManager: runtimeClassManager,
 	}
 
 	typedVersion, err := kubeRuntimeManager.runtimeService.Version(kubeRuntimeAPIVersion)
@@ -510,7 +521,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
 			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
 				message := fmt.Sprintf("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
-				glog.Info(message)
+				glog.V(3).Infof(message)
 				changes.ContainersToStart = append(changes.ContainersToStart, idx)
 			}
 			continue
@@ -754,7 +765,7 @@ func (m *kubeGenericRuntimeManager) doBackOff(pod *v1.Pod, container *v1.Contain
 		return false, "", nil
 	}
 
-	glog.Infof("checking backoff for container %q in pod %q", container.Name, format.Pod(pod))
+	glog.V(3).Infof("checking backoff for container %q in pod %q", container.Name, format.Pod(pod))
 	// Use the finished time of the latest exited container as the start point to calculate whether to do back-off.
 	ts := cStatus.FinishedAt
 	// backOff requires a unique key to identify the container.
@@ -764,7 +775,7 @@ func (m *kubeGenericRuntimeManager) doBackOff(pod *v1.Pod, container *v1.Contain
 			m.recorder.Eventf(ref, v1.EventTypeWarning, events.BackOffStartContainer, "Back-off restarting failed container")
 		}
 		err := fmt.Errorf("Back-off %s restarting failed container=%s pod=%s", backOff.Get(key), container.Name, format.Pod(pod))
-		glog.Infof("%s", err.Error())
+		glog.V(3).Infof("%s", err.Error())
 		return true, err.Error(), kubecontainer.ErrCrashLoopBackOff
 	}
 
@@ -801,24 +812,6 @@ func (m *kubeGenericRuntimeManager) killPodWithSyncResult(pod *v1.Pod, runningPo
 	}
 
 	return
-}
-
-// isHostNetwork checks whether the pod is running in host-network mode.
-func (m *kubeGenericRuntimeManager) isHostNetwork(podSandBoxID string, pod *v1.Pod) (bool, error) {
-	if pod != nil {
-		return kubecontainer.IsHostNetworkPod(pod), nil
-	}
-
-	podStatus, err := m.runtimeService.PodSandboxStatus(podSandBoxID)
-	if err != nil {
-		return false, err
-	}
-
-	if podStatus.GetLinux().GetNamespaces().GetOptions().GetNetwork() == runtimeapi.NamespaceMode_NODE {
-		return true, nil
-	}
-
-	return false, nil
 }
 
 // GetPodStatus retrieves the status of the pod, including the

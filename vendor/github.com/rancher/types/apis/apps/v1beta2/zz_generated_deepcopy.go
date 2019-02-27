@@ -1,7 +1,7 @@
 package v1beta2
 
 import (
-	apps_v1beta2 "k8s.io/api/apps/v1beta2"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -12,7 +12,7 @@ func (in *DaemonSetList) DeepCopyInto(out *DaemonSetList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]apps_v1beta2.DaemonSet, len(*in))
+		*out = make([]appsv1beta2.DaemonSet, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -45,7 +45,7 @@ func (in *DeploymentList) DeepCopyInto(out *DeploymentList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]apps_v1beta2.Deployment, len(*in))
+		*out = make([]appsv1beta2.Deployment, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -78,7 +78,7 @@ func (in *ReplicaSetList) DeepCopyInto(out *ReplicaSetList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]apps_v1beta2.ReplicaSet, len(*in))
+		*out = make([]appsv1beta2.ReplicaSet, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -111,7 +111,7 @@ func (in *StatefulSetList) DeepCopyInto(out *StatefulSetList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]apps_v1beta2.StatefulSet, len(*in))
+		*out = make([]appsv1beta2.StatefulSet, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

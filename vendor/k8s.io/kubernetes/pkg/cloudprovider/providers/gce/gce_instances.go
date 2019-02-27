@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -92,10 +91,20 @@ func (gce *GCECloud) NodeAddresses(_ context.Context, _ types.NodeName) ([]v1.No
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get external IP: %v", err)
 	}
-	return []v1.NodeAddress{
+	addresses := []v1.NodeAddress{
 		{Type: v1.NodeInternalIP, Address: internalIP},
 		{Type: v1.NodeExternalIP, Address: externalIP},
-	}, nil
+	}
+
+	if internalDNSFull, err := metadata.Get("instance/hostname"); err != nil {
+		glog.Warningf("couldn't get full internal DNS name: %v", err)
+	} else {
+		addresses = append(addresses,
+			v1.NodeAddress{Type: v1.NodeInternalDNS, Address: internalDNSFull},
+			v1.NodeAddress{Type: v1.NodeHostName, Address: internalDNSFull},
+		)
+	}
+	return addresses, nil
 }
 
 // NodeAddressesByProviderID will not be called from the node that is requesting this ID.
@@ -146,6 +155,11 @@ func (gce *GCECloud) instanceByProviderID(providerID string) (*gceInstance, erro
 	return instance, nil
 }
 
+// InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
+func (gce *GCECloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	return false, cloudprovider.NotImplemented
+}
+
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node
 // with the specified unique providerID This method will not be called from the
 // node that is requesting this ID. i.e. metadata service and other local
@@ -157,27 +171,6 @@ func (gce *GCECloud) InstanceTypeByProviderID(ctx context.Context, providerID st
 	}
 
 	return instance.Type, nil
-}
-
-// ExternalID returns the cloud provider ID of the node with the specified NodeName (deprecated).
-func (gce *GCECloud) ExternalID(ctx context.Context, nodeName types.NodeName) (string, error) {
-	instanceName := mapNodeNameToInstanceName(nodeName)
-	if gce.useMetadataServer {
-		// Use metadata, if possible, to fetch ID. See issue #12000
-		if gce.isCurrentInstance(instanceName) {
-			externalInstanceID, err := getCurrentExternalIDViaMetadata()
-			if err == nil {
-				return externalInstanceID, nil
-			}
-		}
-	}
-
-	// Fallback to GCE API call if metadata server fails to retrieve ID
-	inst, err := gce.getInstanceByName(instanceName)
-	if err != nil {
-		return "", err
-	}
-	return strconv.FormatUint(inst.ID, 10), nil
 }
 
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
@@ -544,14 +537,6 @@ func getInstanceIDViaMetadata() (string, error) {
 		return "", fmt.Errorf("unexpected response: %s", result)
 	}
 	return parts[0], nil
-}
-
-func getCurrentExternalIDViaMetadata() (string, error) {
-	externalID, err := metadata.Get("instance/id")
-	if err != nil {
-		return "", fmt.Errorf("couldn't get external ID: %v", err)
-	}
-	return externalID, nil
 }
 
 func getCurrentMachineTypeViaMetadata() (string, error) {

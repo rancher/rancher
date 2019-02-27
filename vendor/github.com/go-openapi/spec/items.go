@@ -22,6 +22,11 @@ import (
 	"github.com/go-openapi/swag"
 )
 
+const (
+	jsonRef = "$ref"
+)
+
+// SimpleSchema describe swagger simple schemas for parameters and headers
 type SimpleSchema struct {
 	Type             string      `json:"type,omitempty"`
 	Format           string      `json:"format,omitempty"`
@@ -31,6 +36,7 @@ type SimpleSchema struct {
 	Example          interface{} `json:"example,omitempty"`
 }
 
+// TypeName return the type (or format) of a simple schema
 func (s *SimpleSchema) TypeName() string {
 	if s.Format != "" {
 		return s.Format
@@ -38,6 +44,7 @@ func (s *SimpleSchema) TypeName() string {
 	return s.Type
 }
 
+// ItemsTypeName yields the type of items in a simple schema array
 func (s *SimpleSchema) ItemsTypeName() string {
 	if s.Items == nil {
 		return ""
@@ -45,6 +52,7 @@ func (s *SimpleSchema) ItemsTypeName() string {
 	return s.Items.TypeName()
 }
 
+// CommonValidations describe common JSON-schema validations
 type CommonValidations struct {
 	Maximum          *float64      `json:"maximum,omitempty"`
 	ExclusiveMaximum bool          `json:"exclusiveMaximum,omitempty"`
@@ -85,7 +93,7 @@ func (i *Items) Typed(tpe, format string) *Items {
 
 // CollectionOf a fluent builder method for an array item
 func (i *Items) CollectionOf(items *Items, format string) *Items {
-	i.Type = "array"
+	i.Type = jsonArray
 	i.Items = items
 	i.CollectionFormat = format
 	return i
@@ -212,18 +220,18 @@ func (i Items) MarshalJSON() ([]byte, error) {
 }
 
 // JSONLookup look up a value by the json property name
-func (p Items) JSONLookup(token string) (interface{}, error) {
-	if token == "$ref" {
-		return &p.Ref, nil
+func (i Items) JSONLookup(token string) (interface{}, error) {
+	if token == jsonRef {
+		return &i.Ref, nil
 	}
 
-	r, _, err := jsonpointer.GetForToken(p.CommonValidations, token)
+	r, _, err := jsonpointer.GetForToken(i.CommonValidations, token)
 	if err != nil && !strings.HasPrefix(err.Error(), "object has no field") {
 		return nil, err
 	}
 	if r != nil {
 		return r, nil
 	}
-	r, _, err = jsonpointer.GetForToken(p.SimpleSchema, token)
+	r, _, err = jsonpointer.GetForToken(i.SimpleSchema, token)
 	return r, err
 }

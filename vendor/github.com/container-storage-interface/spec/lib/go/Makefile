@@ -46,7 +46,6 @@ $(PROTOC):
 	  unzip "$(PROTOC_TMP_DIR)/$(PROTOC_ZIP)" -d "$(PROTOC_TMP_DIR)" && \
 	  chmod 0755 "$(PROTOC_TMP_BIN)" && \
 	  cp -f "$(PROTOC_TMP_BIN)" "$@"
-	-rm -fr "$(PROTOC_TMP_DIR)"
 	stat "$@" > /dev/null 2>&1
 
 
@@ -58,8 +57,15 @@ $(PROTOC):
 # for protoc
 PROTOC_GEN_GO_PKG := github.com/golang/protobuf/protoc-gen-go
 PROTOC_GEN_GO := protoc-gen-go
+$(PROTOC_GEN_GO): PROTOBUF_PKG := $(dir $(PROTOC_GEN_GO_PKG))
+$(PROTOC_GEN_GO): PROTOBUF_VERSION := v1.1.0
 $(PROTOC_GEN_GO):
-	go get -d $(PROTOC_GEN_GO_PKG) && \
+	mkdir -p $(dir $(GOPATH)/src/$(PROTOBUF_PKG))
+	test -d $(GOPATH)/src/$(PROTOBUF_PKG)/.git || git clone https://$(PROTOBUF_PKG) $(GOPATH)/src/$(PROTOBUF_PKG)
+	(cd $(GOPATH)/src/$(PROTOBUF_PKG) && \
+		(test "$$(git describe --tags | head -1)" = "$(PROTOBUF_VERSION)" || \
+			(git fetch && git checkout tags/$(PROTOBUF_VERSION))))
+	(cd $(GOPATH)/src/$(PROTOBUF_PKG) && go get -v -d ./...) && \
 	go build -o "$@" $(PROTOC_GEN_GO_PKG)
 
 
@@ -83,9 +89,12 @@ CSI_A := csi.a
 CSI_GO_TMP := $(CSI_PKG)/.build/csi.pb.go
 
 # This recipe generates the go language bindings to a temp area.
+$(CSI_GO_TMP): GO_OUT := plugins=grpc
+$(CSI_GO_TMP): GO_OUT := $(GO_OUT),Mgoogle/protobuf/wrappers.proto=github.com/golang/protobuf/ptypes/wrappers
+$(CSI_GO_TMP): INCLUDE = -I$(PROTOC_TMP_DIR)/include
 $(CSI_GO_TMP): $(CSI_PROTO) | $(PROTOC) $(PROTOC_GEN_GO)
 	@mkdir -p "$(@D)"
-	$(PROTOC) -I "$(<D)" --go_out=plugins=grpc:"$(@D)" "$<"
+	$(PROTOC) -I "$(<D)" $(INCLUDE) --go_out=$(GO_OUT):"$(@D)" "$<"
 
 # The temp language bindings are compared to the ones that are
 # versioned. If they are different then it means the language
@@ -104,7 +113,7 @@ endif
 #   2. Cache the packages.
 #   3. Build the archive file.
 $(CSI_A): $(CSI_GO)
-	go get -d ./...
+	go get -v -d ./...
 	go install ./$(CSI_PKG)
 	go build -o "$@" ./$(CSI_PKG)
 
@@ -115,6 +124,6 @@ clean:
 	rm -f "$(CSI_A)"
 
 clobber: clean
-	rm -fr "$(PROTOC)" "$(PROTOC_GEN_GO)" "$(dir $(CSI_GO))"
+	rm -fr "$(PROTOC)" "$(PROTOC_GEN_GO)" "$(CSI_PKG)"
 
 .PHONY: clean clobber

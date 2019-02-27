@@ -33,9 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubeexternalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
@@ -77,6 +79,7 @@ func createAggregatorConfig(
 
 	// copy the etcd options so we don't mutate originals.
 	etcdOptions := *commandOptions.Etcd
+	etcdOptions.StorageConfig.Paging = utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	etcdOptions.StorageConfig.Codec = aggregatorscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion)
 	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
 
@@ -84,7 +87,7 @@ func createAggregatorConfig(
 	if err := commandOptions.APIEnablement.ApplyTo(
 		&genericConfig,
 		aggregatorapiserver.DefaultAPIResourceConfigSource(),
-		aggregatorscheme.Registry); err != nil {
+		aggregatorscheme.Scheme); err != nil {
 		return nil, err
 	}
 
@@ -139,7 +142,10 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 		go func() {
 			// let the CRD controller process the initial set of CRDs before starting the autoregistration controller.
 			// this prevents the autoregistration controller's initial sync from deleting APIServices for CRDs that still exist.
-			crdRegistrationController.WaitForInitialSync()
+			// we only need to do this if CRDs are enabled on this server.  We can't use discovery because we are the source for discovery.
+			if aggregatorConfig.GenericConfig.MergedResourceConfig.AnyVersionForGroupEnabled("apiextensions.k8s.io") {
+				crdRegistrationController.WaitForInitialSync()
+			}
 			autoRegistrationController.Run(5, context.StopCh)
 		}()
 		return nil
@@ -229,7 +235,7 @@ type priority struct {
 // That ripples out every bit as far as you'd expect, so for 1.7 we'll include the list here instead of being built up during storage.
 var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "", Version: "v1"}: {group: 18000, version: 1},
-	// extensions is above the rest for CLI compatibility, though the level of unqalified resource compatibility we
+	// extensions is above the rest for CLI compatibility, though the level of unqualified resource compatibility we
 	// can reasonably expect seems questionable.
 	{Group: "extensions", Version: "v1beta1"}: {group: 17900, version: 1},
 	// to my knowledge, nothing below here collides
@@ -243,6 +249,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "authorization.k8s.io", Version: "v1beta1"}:          {group: 17600, version: 9},
 	{Group: "autoscaling", Version: "v1"}:                        {group: 17500, version: 15},
 	{Group: "autoscaling", Version: "v2beta1"}:                   {group: 17500, version: 9},
+	{Group: "autoscaling", Version: "v2beta2"}:                   {group: 17500, version: 1},
 	{Group: "batch", Version: "v1"}:                              {group: 17400, version: 15},
 	{Group: "batch", Version: "v1beta1"}:                         {group: 17400, version: 9},
 	{Group: "batch", Version: "v2alpha1"}:                        {group: 17400, version: 9},
@@ -260,7 +267,9 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "admissionregistration.k8s.io", Version: "v1"}:       {group: 16700, version: 15},
 	{Group: "admissionregistration.k8s.io", Version: "v1beta1"}:  {group: 16700, version: 12},
 	{Group: "admissionregistration.k8s.io", Version: "v1alpha1"}: {group: 16700, version: 9},
+	{Group: "scheduling.k8s.io", Version: "v1beta1"}:             {group: 16600, version: 12},
 	{Group: "scheduling.k8s.io", Version: "v1alpha1"}:            {group: 16600, version: 9},
+	{Group: "coordination.k8s.io", Version: "v1beta1"}:           {group: 16500, version: 9},
 	// Append a new group to the end of the list if unsure.
 	// You can use min(existing group)-100 as the initial value for a group.
 	// Version can be set to 9 (to have space around) for a new group.

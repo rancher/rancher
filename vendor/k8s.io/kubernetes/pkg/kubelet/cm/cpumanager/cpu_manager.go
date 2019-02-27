@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"path"
 )
 
 // ActivePodsFunc is a function that returns a list of pods to reconcile.
@@ -45,8 +44,8 @@ type runtimeService interface {
 
 type policyName string
 
-// CPUManagerStateFileName is the name file name where cpu manager stores it's state
-const CPUManagerStateFileName = "cpu_manager_state"
+// cpuManagerStateFileName is the name file name where cpu manager stores it's state
+const cpuManagerStateFileName = "cpu_manager_state"
 
 // Manager interface provides methods for Kubelet to manage pod cpus.
 type Manager interface {
@@ -98,7 +97,7 @@ type manager struct {
 var _ Manager = &manager{}
 
 // NewManager creates new cpu manager based on provided policy
-func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, stateFileDirecory string) (Manager, error) {
+func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string) (Manager, error) {
 	var policy Policy
 
 	switch policyName(cpuPolicyName) {
@@ -137,9 +136,10 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 		policy = NewNonePolicy()
 	}
 
-	stateImpl := state.NewFileState(
-		path.Join(stateFileDirecory, CPUManagerStateFileName),
-		policy.Name())
+	stateImpl, err := state.NewCheckpointState(stateFileDirectory, cpuManagerStateFileName, policy.Name())
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize checkpoint manager: %v", err)
+	}
 
 	manager := &manager{
 		policy:                     policy,
@@ -181,12 +181,16 @@ func (m *manager) AddContainer(p *v1.Pod, c *v1.Container, containerID string) e
 		err = m.updateContainerCPUSet(containerID, cpus)
 		if err != nil {
 			glog.Errorf("[cpumanager] AddContainer error: %v", err)
-			return err
+			m.Lock()
+			err := m.policy.RemoveContainer(m.state, containerID)
+			if err != nil {
+				glog.Errorf("[cpumanager] AddContainer rollback state error: %v", err)
+			}
+			m.Unlock()
 		}
-	} else {
-		glog.V(5).Infof("[cpumanager] update container resources is skipped due to cpu set is empty")
+		return err
 	}
-
+	glog.V(5).Infof("[cpumanager] update container resources is skipped due to cpu set is empty")
 	return nil
 }
 
@@ -245,6 +249,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 					if err != nil {
 						glog.Errorf("[cpumanager] reconcileState: failed to add container (pod: %s, container: %s, container id: %s, error: %v)", pod.Name, container.Name, containerID, err)
 						failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
+						continue
 					}
 				} else {
 					// if DeletionTimestamp is set, pod has already been removed from state

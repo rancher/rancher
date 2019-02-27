@@ -23,10 +23,9 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"github.com/golang/glog"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -39,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/mount"
+	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 
 	"reflect"
@@ -50,6 +50,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
 const (
@@ -77,6 +78,16 @@ const (
 	// object created dynamically
 	VolumeDynamicallyCreatedByKey = "kubernetes.io/createdby"
 )
+
+// VolumeZoneConfig contains config information about zonal volume.
+type VolumeZoneConfig struct {
+	ZonePresent                bool
+	ZonesPresent               bool
+	ReplicaZoneFromNodePresent bool
+	Zone                       string
+	Zones                      string
+	ReplicaZoneFromNode        string
+}
 
 // IsReady checks for the existence of a regular file
 // called 'ready' in the given directory and returns
@@ -116,8 +127,9 @@ func SetReady(dir string) {
 
 // UnmountPath is a common unmount routine that unmounts the given path and
 // deletes the remaining directory if successful.
+// TODO: Remove this function and change callers to call mount pkg directly
 func UnmountPath(mountPath string, mounter mount.Interface) error {
-	return UnmountMountPoint(mountPath, mounter, false /* extensiveMountPointCheck */)
+	return mount.CleanupMountPoint(mountPath, mounter, false /* extensiveMountPointCheck */)
 }
 
 // UnmountMountPoint is a common unmount routine that unmounts the given path and
@@ -125,92 +137,21 @@ func UnmountPath(mountPath string, mounter mount.Interface) error {
 // if extensiveMountPointCheck is true
 // IsNotMountPoint will be called instead of IsLikelyNotMountPoint.
 // IsNotMountPoint is more expensive but properly handles bind mounts.
+// TODO: Change callers to call mount pkg directly
 func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool) error {
-	pathExists, pathErr := PathExists(mountPath)
-	if !pathExists {
-		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
-		return nil
-	}
-	corruptedMnt := isCorruptedMnt(pathErr)
-	if pathErr != nil && !corruptedMnt {
-		return fmt.Errorf("Error checking path: %v", pathErr)
-	}
-	return doUnmountMountPoint(mountPath, mounter, extensiveMountPointCheck, corruptedMnt)
-}
-
-// doUnmountMountPoint is a common unmount routine that unmounts the given path and
-// deletes the remaining directory if successful.
-// if extensiveMountPointCheck is true
-// IsNotMountPoint will be called instead of IsLikelyNotMountPoint.
-// IsNotMountPoint is more expensive but properly handles bind mounts.
-// if corruptedMnt is true, it means that the mountPath is a corrupted mountpoint, Take it as an argument for convenience of testing
-func doUnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool, corruptedMnt bool) error {
-	if !corruptedMnt {
-		var notMnt bool
-		var err error
-		if extensiveMountPointCheck {
-			notMnt, err = mount.IsNotMountPoint(mounter, mountPath)
-		} else {
-			notMnt, err = mounter.IsLikelyNotMountPoint(mountPath)
-		}
-
-		if err != nil {
-			return err
-		}
-
-		if notMnt {
-			glog.Warningf("Warning: %q is not a mountpoint, deleting", mountPath)
-			return os.Remove(mountPath)
-		}
-	}
-
-	// Unmount the mount path
-	glog.V(4).Infof("%q is a mountpoint, unmounting", mountPath)
-	if err := mounter.Unmount(mountPath); err != nil {
-		return err
-	}
-	notMnt, mntErr := mounter.IsLikelyNotMountPoint(mountPath)
-	if mntErr != nil {
-		return mntErr
-	}
-	if notMnt {
-		glog.V(4).Infof("%q is unmounted, deleting the directory", mountPath)
-		return os.Remove(mountPath)
-	}
-	return fmt.Errorf("Failed to unmount path %v", mountPath)
+	return mount.CleanupMountPoint(mountPath, mounter, extensiveMountPointCheck)
 }
 
 // PathExists returns true if the specified path exists.
+// TODO: Change callers to call mount pkg directly
 func PathExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	} else if os.IsNotExist(err) {
-		return false, nil
-	} else if isCorruptedMnt(err) {
-		return true, err
-	} else {
-		return false, err
-	}
+	return mount.PathExists(path)
 }
 
-// isCorruptedMnt return true if err is about corrupted mount point
-func isCorruptedMnt(err error) bool {
-	if err == nil {
-		return false
-	}
-	var underlyingError error
-	switch pe := err.(type) {
-	case nil:
-		return false
-	case *os.PathError:
-		underlyingError = pe.Err
-	case *os.LinkError:
-		underlyingError = pe.Err
-	case *os.SyscallError:
-		underlyingError = pe.Err
-	}
-	return underlyingError == syscall.ENOTCONN || underlyingError == syscall.ESTALE
+// IsCorruptedMnt return true if err is about corrupted mount point
+// TODO: Change callers to call mount pkg directly
+func IsCorruptedMnt(err error) bool {
+	return mount.IsCorruptedMnt(err)
 }
 
 // GetSecretForPod locates secret by name in the pod's namespace and returns secret map
@@ -267,37 +208,7 @@ func GetClassForVolume(kubeClient clientset.Interface, pv *v1.PersistentVolume) 
 // CheckNodeAffinity looks at the PV node affinity, and checks if the node has the same corresponding labels
 // This ensures that we don't mount a volume that doesn't belong to this node
 func CheckNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) error {
-	if err := checkAlphaNodeAffinity(pv, nodeLabels); err != nil {
-		return err
-	}
 	return checkVolumeNodeAffinity(pv, nodeLabels)
-}
-
-func checkAlphaNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) error {
-	affinity, err := v1helper.GetStorageNodeAffinityFromAnnotation(pv.Annotations)
-	if err != nil {
-		return fmt.Errorf("Error getting storage node affinity: %v", err)
-	}
-	if affinity == nil {
-		return nil
-	}
-
-	if affinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-		terms := affinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
-		glog.V(10).Infof("Match for RequiredDuringSchedulingIgnoredDuringExecution node selector terms %+v", terms)
-		for _, term := range terms {
-			selector, err := v1helper.NodeSelectorRequirementsAsSelector(term.MatchExpressions)
-			if err != nil {
-				return fmt.Errorf("Failed to parse MatchExpressions: %v", err)
-			}
-			if selector.Matches(labels.Set(nodeLabels)) {
-				// Terms are ORed, so only one needs to match
-				return nil
-			}
-		}
-		return fmt.Errorf("No matching NodeSelectorTerms")
-	}
-	return nil
 }
 
 func checkVolumeNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) error {
@@ -308,18 +219,11 @@ func checkVolumeNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]stri
 	if pv.Spec.NodeAffinity.Required != nil {
 		terms := pv.Spec.NodeAffinity.Required.NodeSelectorTerms
 		glog.V(10).Infof("Match for Required node selector terms %+v", terms)
-		for _, term := range terms {
-			selector, err := v1helper.NodeSelectorRequirementsAsSelector(term.MatchExpressions)
-			if err != nil {
-				return fmt.Errorf("Failed to parse MatchExpressions: %v", err)
-			}
-			if selector.Matches(labels.Set(nodeLabels)) {
-				// Terms are ORed, so only one needs to match
-				return nil
-			}
+		if !v1helper.MatchNodeSelectorTerms(terms, labels.Set(nodeLabels), nil) {
+			return fmt.Errorf("No matching NodeSelectorTerms")
 		}
-		return fmt.Errorf("No matching NodeSelectorTerms")
 	}
+
 	return nil
 }
 
@@ -344,13 +248,128 @@ func LoadPodFromFile(filePath string) (*v1.Pod, error) {
 	return pod, nil
 }
 
+// SelectZoneForVolume is a wrapper around SelectZonesForVolume
+// to select a single zone for a volume based on parameters
+func SelectZoneForVolume(zoneParameterPresent, zonesParameterPresent bool, zoneParameter string, zonesParameter, zonesWithNodes sets.String, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm, pvcName string) (string, error) {
+	zones, err := SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent, zoneParameter, zonesParameter, zonesWithNodes, node, allowedTopologies, pvcName, 1)
+	if err != nil {
+		return "", err
+	}
+	zone, ok := zones.PopAny()
+	if !ok {
+		return "", fmt.Errorf("could not determine a zone to provision volume in")
+	}
+	return zone, nil
+}
+
+// SelectZonesForVolume selects zones for a volume based on several factors:
+// node.zone, allowedTopologies, zone/zones parameters from storageclass,
+// zones with active nodes from the cluster. The number of zones = replicas.
+func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zoneParameter string, zonesParameter, zonesWithNodes sets.String, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm, pvcName string, numReplicas uint32) (sets.String, error) {
+	if zoneParameterPresent && zonesParameterPresent {
+		return nil, fmt.Errorf("both zone and zones StorageClass parameters must not be used at the same time")
+	}
+
+	var zoneFromNode string
+	// pick one zone from node if present
+	if node != nil {
+		// VolumeScheduling implicit since node is not nil
+		if zoneParameterPresent || zonesParameterPresent {
+			return nil, fmt.Errorf("zone[s] cannot be specified in StorageClass if VolumeBindingMode is set to WaitForFirstConsumer. Please specify allowedTopologies in StorageClass for constraining zones")
+		}
+
+		// pick node's zone for one of the replicas
+		var ok bool
+		zoneFromNode, ok = node.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
+		if !ok {
+			return nil, fmt.Errorf("%s Label for node missing", kubeletapis.LabelZoneFailureDomain)
+		}
+		// if single replica volume and node with zone found, return immediately
+		if numReplicas == 1 {
+			return sets.NewString(zoneFromNode), nil
+		}
+	}
+
+	// pick zone from allowedZones if specified
+	allowedZones, err := ZonesFromAllowedTopologies(allowedTopologies)
+	if err != nil {
+		return nil, err
+	}
+
+	if (len(allowedTopologies) > 0) && (allowedZones.Len() == 0) {
+		return nil, fmt.Errorf("no matchLabelExpressions with %s key found in allowedTopologies. Please specify matchLabelExpressions with %s key", kubeletapis.LabelZoneFailureDomain, kubeletapis.LabelZoneFailureDomain)
+	}
+
+	if allowedZones.Len() > 0 {
+		// VolumeScheduling implicit since allowedZones present
+		if zoneParameterPresent || zonesParameterPresent {
+			return nil, fmt.Errorf("zone[s] cannot be specified in StorageClass if allowedTopologies specified")
+		}
+		// scheduler will guarantee if node != null above, zoneFromNode is member of allowedZones.
+		// so if zoneFromNode != "", we can safely assume it is part of allowedZones.
+		if zones, err := chooseZonesForVolumeIncludingZone(allowedZones, pvcName, zoneFromNode, numReplicas); err != nil {
+			return nil, fmt.Errorf("cannot process zones in allowedTopologies: %v", err)
+		} else {
+			return zones, nil
+		}
+	}
+
+	// pick zone from parameters if present
+	if zoneParameterPresent {
+		if numReplicas > 1 {
+			return nil, fmt.Errorf("zone cannot be specified if desired number of replicas for pv is greather than 1. Please specify zones or allowedTopologies to specify desired zones")
+		}
+		return sets.NewString(zoneParameter), nil
+	}
+
+	if zonesParameterPresent {
+		if uint32(zonesParameter.Len()) < numReplicas {
+			return nil, fmt.Errorf("not enough zones found in zones parameter to provision a volume with %d replicas. Found %d zones, need %d zones", numReplicas, zonesParameter.Len(), numReplicas)
+		}
+		// directly choose from zones parameter; no zone from node need to be considered
+		return ChooseZonesForVolume(zonesParameter, pvcName, numReplicas), nil
+	}
+
+	// pick zone from zones with nodes
+	if zonesWithNodes.Len() > 0 {
+		// If node != null (and thus zoneFromNode != ""), zoneFromNode will be member of zonesWithNodes
+		if zones, err := chooseZonesForVolumeIncludingZone(zonesWithNodes, pvcName, zoneFromNode, numReplicas); err != nil {
+			return nil, fmt.Errorf("cannot process zones where nodes exist in the cluster: %v", err)
+		} else {
+			return zones, nil
+		}
+	}
+	return nil, fmt.Errorf("cannot determine zones to provision volume in")
+}
+
+// ZonesFromAllowedTopologies returns a list of zones specified in allowedTopologies
+func ZonesFromAllowedTopologies(allowedTopologies []v1.TopologySelectorTerm) (sets.String, error) {
+	zones := make(sets.String)
+	for _, term := range allowedTopologies {
+		for _, exp := range term.MatchLabelExpressions {
+			if exp.Key == kubeletapis.LabelZoneFailureDomain {
+				for _, value := range exp.Values {
+					zones.Insert(value)
+				}
+			} else {
+				return nil, fmt.Errorf("unsupported key found in matchLabelExpressions: %s", exp.Key)
+			}
+		}
+	}
+	return zones, nil
+}
+
 func ZonesSetToLabelValue(strSet sets.String) string {
 	return strings.Join(strSet.UnsortedList(), kubeletapis.LabelMultiZoneDelimiter)
 }
 
 // ZonesToSet converts a string containing a comma separated list of zones to set
 func ZonesToSet(zonesString string) (sets.String, error) {
-	return stringToSet(zonesString, ",")
+	zones, err := stringToSet(zonesString, ",")
+	if err != nil {
+		return nil, fmt.Errorf("error parsing zones %s, must be strings separated by commas: %v", zonesString, err)
+	}
+	return zones, nil
 }
 
 // LabelZonesToSet converts a PV label value from string containing a delimited list of zones to set
@@ -358,7 +377,7 @@ func LabelZonesToSet(labelZonesValue string) (sets.String, error) {
 	return stringToSet(labelZonesValue, kubeletapis.LabelMultiZoneDelimiter)
 }
 
-// StringToSet converts a string containing list separated by specified delimiter to to a set
+// StringToSet converts a string containing list separated by specified delimiter to a set
 func stringToSet(str, delimiter string) (sets.String, error) {
 	zonesSlice := strings.Split(str, delimiter)
 	zonesSet := make(sets.String)
@@ -373,6 +392,27 @@ func stringToSet(str, delimiter string) (sets.String, error) {
 		zonesSet.Insert(trimmedZone)
 	}
 	return zonesSet, nil
+}
+
+// LabelZonesToList converts a PV label value from string containing a delimited list of zones to list
+func LabelZonesToList(labelZonesValue string) ([]string, error) {
+	return stringToList(labelZonesValue, kubeletapis.LabelMultiZoneDelimiter)
+}
+
+// StringToList converts a string containing list separated by specified delimiter to a list
+func stringToList(str, delimiter string) ([]string, error) {
+	zonesSlice := make([]string, 0)
+	for _, zone := range strings.Split(str, delimiter) {
+		trimmedZone := strings.TrimSpace(zone)
+		if trimmedZone == "" {
+			return nil, fmt.Errorf(
+				"%q separated list (%q) must not contain an empty string",
+				delimiter,
+				str)
+		}
+		zonesSlice = append(zonesSlice, trimmedZone)
+	}
+	return zonesSlice, nil
 }
 
 // CalculateTimeoutForVolume calculates time for a Recycler pod to complete a
@@ -397,7 +437,11 @@ func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *v1.Pers
 // RoundUpSize(1500 * 1024*1024, 1024*1024*1024) returns '2'
 // (2 GiB is the smallest allocatable volume that can hold 1500MiB)
 func RoundUpSize(volumeSizeBytes int64, allocationUnitBytes int64) int64 {
-	return (volumeSizeBytes + allocationUnitBytes - 1) / allocationUnitBytes
+	roundedUp := volumeSizeBytes / allocationUnitBytes
+	if volumeSizeBytes%allocationUnitBytes > 0 {
+		roundedUp += 1
+	}
+	return roundedUp
 }
 
 // RoundUpToGB rounds up given quantity to chunks of GB
@@ -410,6 +454,32 @@ func RoundUpToGB(size resource.Quantity) int64 {
 func RoundUpToGiB(size resource.Quantity) int64 {
 	requestBytes := size.Value()
 	return RoundUpSize(requestBytes, GIB)
+}
+
+// RoundUpSizeInt calculates how many allocation units are needed to accommodate
+// a volume of given size. It returns an int instead of an int64 and an error if
+// there's overflow
+func RoundUpSizeInt(volumeSizeBytes int64, allocationUnitBytes int64) (int, error) {
+	roundedUp := RoundUpSize(volumeSizeBytes, allocationUnitBytes)
+	roundedUpInt := int(roundedUp)
+	if int64(roundedUpInt) != roundedUp {
+		return 0, fmt.Errorf("capacity %v is too great, casting results in integer overflow", roundedUp)
+	}
+	return roundedUpInt, nil
+}
+
+// RoundUpToGBInt rounds up given quantity to chunks of GB. It returns an
+// int instead of an int64 and an error if there's overflow
+func RoundUpToGBInt(size resource.Quantity) (int, error) {
+	requestBytes := size.Value()
+	return RoundUpSizeInt(requestBytes, GB)
+}
+
+// RoundUpToGiBInt rounds up given quantity upto chunks of GiB. It returns an
+// int instead of an int64 and an error if there's overflow
+func RoundUpToGiBInt(size resource.Quantity) (int, error) {
+	requestBytes := size.Value()
+	return RoundUpSizeInt(requestBytes, GIB)
 }
 
 // GenerateVolumeName returns a PV name with clusterName prefix. The function
@@ -443,6 +513,11 @@ func GetPath(mounter volume.Mounter) (string, error) {
 // This means that a StatefulSet's volumes (`claimname-statefulsetname-id`) will spread across available zones,
 // assuming the id values are consecutive.
 func ChooseZoneForVolume(zones sets.String, pvcName string) string {
+	// No zones available, return empty string.
+	if zones.Len() == 0 {
+		return ""
+	}
+
 	// We create the volume in a zone determined by the name
 	// Eventually the scheduler will coordinate placement into an available zone
 	hash, index := getPVCNameHashAndIndexOffset(pvcName)
@@ -462,8 +537,41 @@ func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 	return zone
 }
 
+// chooseZonesForVolumeIncludingZone is a wrapper around ChooseZonesForVolume that ensures zoneToInclude is chosen
+// zoneToInclude can either be empty in which case it is ignored. If non-empty, zoneToInclude is expected to be member of zones.
+// numReplicas is expected to be > 0 and <= zones.Len()
+func chooseZonesForVolumeIncludingZone(zones sets.String, pvcName, zoneToInclude string, numReplicas uint32) (sets.String, error) {
+	if numReplicas == 0 {
+		return nil, fmt.Errorf("invalid number of replicas passed")
+	}
+	if uint32(zones.Len()) < numReplicas {
+		return nil, fmt.Errorf("not enough zones found to provision a volume with %d replicas. Need at least %d distinct zones for a volume with %d replicas", numReplicas, numReplicas, numReplicas)
+	}
+	if zoneToInclude != "" && !zones.Has(zoneToInclude) {
+		return nil, fmt.Errorf("zone to be included: %s needs to be member of set: %v", zoneToInclude, zones)
+	}
+	if uint32(zones.Len()) == numReplicas {
+		return zones, nil
+	}
+	if zoneToInclude != "" {
+		zones.Delete(zoneToInclude)
+		numReplicas = numReplicas - 1
+	}
+	zonesChosen := ChooseZonesForVolume(zones, pvcName, numReplicas)
+	if zoneToInclude != "" {
+		zonesChosen.Insert(zoneToInclude)
+	}
+	return zonesChosen, nil
+}
+
 // ChooseZonesForVolume is identical to ChooseZoneForVolume, but selects a multiple zones, for multi-zone disks.
 func ChooseZonesForVolume(zones sets.String, pvcName string, numZones uint32) sets.String {
+	// No zones available, return empty set.
+	replicaZones := sets.NewString()
+	if zones.Len() == 0 {
+		return replicaZones
+	}
+
 	// We create the volume in a zone determined by the name
 	// Eventually the scheduler will coordinate placement into an available zone
 	hash, index := getPVCNameHashAndIndexOffset(pvcName)
@@ -477,7 +585,6 @@ func ChooseZonesForVolume(zones sets.String, pvcName string, numZones uint32) se
 	// PVC placement (which could also e.g. avoid putting volumes in overloaded or
 	// unhealthy zones)
 	zoneSlice := zones.List()
-	replicaZones := sets.NewString()
 
 	startingIndex := index * numZones
 	for index = startingIndex; index < startingIndex+numZones; index++ {
@@ -644,9 +751,10 @@ func GetUniqueVolumeName(pluginName, volumeName string) v1.UniqueVolumeName {
 	return v1.UniqueVolumeName(fmt.Sprintf("%s/%s", pluginName, volumeName))
 }
 
-// GetUniqueVolumeNameForNonAttachableVolume returns the unique volume name
-// for a non-attachable volume.
-func GetUniqueVolumeNameForNonAttachableVolume(
+// GetUniqueVolumeNameFromSpecWithPod returns a unique volume name with pod
+// name included. This is useful to generate different names for different pods
+// on same volume.
+func GetUniqueVolumeNameFromSpecWithPod(
 	podName types.UniquePodName, volumePlugin volume.VolumePlugin, volumeSpec *volume.Spec) v1.UniqueVolumeName {
 	return v1.UniqueVolumeName(
 		fmt.Sprintf("%s/%v-%s", volumePlugin.GetPluginName(), podName, volumeSpec.Name()))
@@ -697,7 +805,7 @@ func notRunning(statuses []v1.ContainerStatus) bool {
 }
 
 // SplitUniqueName splits the unique name to plugin name and volume name strings. It expects the uniqueName to follow
-// the fromat plugin_name/volume_name and the plugin name must be namespaced as described by the plugin interface,
+// the format plugin_name/volume_name and the plugin name must be namespaced as described by the plugin interface,
 // i.e. namespace/plugin containing exactly one '/'. This means the unique name will always be in the form of
 // plugin_namespace/plugin/volume_name, see k8s.io/kubernetes/pkg/volume/plugins.go VolumePlugin interface
 // description and pkg/volume/util/volumehelper/volumehelper.go GetUniqueVolumeNameFromSpec that constructs
@@ -740,6 +848,11 @@ func GetPersistentVolumeClaimVolumeMode(claim *v1.PersistentVolumeClaim) (v1.Per
 	return "", fmt.Errorf("cannot get volumeMode from pvc: %v", claim.Name)
 }
 
+// GetPersistentVolumeClaimQualifiedName returns a qualified name for pvc.
+func GetPersistentVolumeClaimQualifiedName(claim *v1.PersistentVolumeClaim) string {
+	return utilstrings.JoinQualifiedName(claim.GetNamespace(), claim.GetName())
+}
+
 // CheckVolumeModeFilesystem checks VolumeMode.
 // If the mode is Filesystem, return true otherwise return false.
 func CheckVolumeModeFilesystem(volumeSpec *volume.Spec) (bool, error) {
@@ -753,6 +866,12 @@ func CheckVolumeModeFilesystem(volumeSpec *volume.Spec) (bool, error) {
 		}
 	}
 	return true, nil
+}
+
+// CheckPersistentVolumeClaimModeBlock checks VolumeMode.
+// If the mode is Block, return true otherwise return false.
+func CheckPersistentVolumeClaimModeBlock(pvc *v1.PersistentVolumeClaim) bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == v1.PersistentVolumeBlock
 }
 
 // MakeAbsolutePath convert path to absolute path according to GOOS
@@ -771,4 +890,31 @@ func MakeAbsolutePath(goos, path string) string {
 	}
 	// Otherwise, add 'c:\'
 	return "c:\\" + path
+}
+
+// MapBlockVolume is a utility function to provide a common way of mounting
+// block device path for a specified volume and pod.  This function should be
+// called by volume plugins that implements volume.BlockVolumeMapper.Map() method.
+func MapBlockVolume(
+	devicePath,
+	globalMapPath,
+	podVolumeMapPath,
+	volumeMapName string,
+	podUID utypes.UID,
+) error {
+	blkUtil := volumepathhandler.NewBlockVolumePathHandler()
+
+	// map devicePath to global node path
+	mapErr := blkUtil.MapDevice(devicePath, globalMapPath, string(podUID))
+	if mapErr != nil {
+		return mapErr
+	}
+
+	// map devicePath to pod volume path
+	mapErr = blkUtil.MapDevice(devicePath, podVolumeMapPath, volumeMapName)
+	if mapErr != nil {
+		return mapErr
+	}
+
+	return nil
 }

@@ -339,10 +339,14 @@ func (c *sioClient) getGuid() (string, error) {
 func (c *sioClient) getSioDiskPaths() ([]os.FileInfo, error) {
 	files, err := ioutil.ReadDir(sioDiskIDPath)
 	if err != nil {
-		glog.Error(log("failed to ReadDir %s: %v", sioDiskIDPath, err))
-		return nil, err
+		if os.IsNotExist(err) {
+			// sioDiskIDPath may not exist yet which is fine
+			return []os.FileInfo{}, nil
+		} else {
+			glog.Error(log("failed to ReadDir %s: %v", sioDiskIDPath, err))
+			return nil, err
+		}
 	}
-
 	result := []os.FileInfo{}
 	for _, file := range files {
 		if c.diskRegex.MatchString(file.Name()) {
@@ -417,7 +421,7 @@ func (c *sioClient) WaitForAttachedDevice(token string) (string, error) {
 				return "", err
 			}
 			go func() {
-				glog.V(4).Infof(log("waiting for volume %s to be mapped/attached", token))
+				glog.V(4).Info(log("waiting for volume %s to be mapped/attached", token))
 			}()
 			if path, ok := devMap[token]; ok {
 				glog.V(4).Info(log("device %s mapped to vol %s", path, token))
@@ -451,7 +455,7 @@ func (c *sioClient) WaitForDetachedDevice(token string) error {
 				return err
 			}
 			go func() {
-				glog.V(4).Infof(log("waiting for volume %s to be unmapped/detached", token))
+				glog.V(4).Info(log("waiting for volume %s to be unmapped/detached", token))
 			}()
 			// cant find vol id, then ok.
 			if _, ok := devMap[token]; !ok {

@@ -26,7 +26,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -80,6 +79,8 @@ func toRuntimeProtocol(protocol v1.Protocol) runtimeapi.Protocol {
 		return runtimeapi.Protocol_TCP
 	case v1.ProtocolUDP:
 		return runtimeapi.Protocol_UDP
+	case v1.ProtocolSCTP:
+		return runtimeapi.Protocol_SCTP
 	}
 
 	glog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
@@ -189,24 +190,6 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus) *kubecontainer.Runtim
 		})
 	}
 	return &kubecontainer.RuntimeStatus{Conditions: conditions}
-}
-
-// getSysctlsFromAnnotations gets sysctls and unsafeSysctls from annotations.
-func getSysctlsFromAnnotations(annotations map[string]string) (map[string]string, error) {
-	apiSysctls, apiUnsafeSysctls, err := v1helper.SysctlsFromPodAnnotations(annotations)
-	if err != nil {
-		return nil, err
-	}
-
-	sysctls := make(map[string]string)
-	for _, c := range apiSysctls {
-		sysctls[c.Name] = c.Value
-	}
-	for _, c := range apiUnsafeSysctls {
-		sysctls[c.Name] = c.Value
-	}
-
-	return sysctls, nil
 }
 
 // getSeccompProfileFromAnnotations gets seccomp profile from annotations.

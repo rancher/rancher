@@ -5,6 +5,8 @@ aliases:
     - k82cn
     - timothysc
     - wojtek-t
+    - aveshagarwal
+    - ravisantoshgudimetla
   sig-scheduling:
     - bsalamat
     - davidopp
@@ -15,29 +17,36 @@ aliases:
     - wojtek-t
     - aveshagarwal
     - ravisantoshgudimetla
+    - misterikkit
   sig-cli-maintainers:
     - adohe
     - brendandburns
     - deads2k
     - janetkuo
     - liggitt
-    - pwittrock
+    - seans3
+    - monopole
+    - droot
+    - apelisse
+    - mengqiy
     - smarterclayton
+    - soltysh
   sig-cli:
     - adohe
     - deads2k
     - derekwaynecarr
+    - dixudx
     - dims
     - dshulyak
     - eparis
     - ericchiang
     - ghodss
+    - juanvallejo
     - mengqiy
     - rootfs
     - shiywang
     - smarterclayton
     - soltysh
-    - sttts
   sig-testing-reviewers:
     - fejta
     - ixdy
@@ -56,9 +65,9 @@ aliases:
     - dims
     - feiskyer
     - mtaufen
-    - ncdc
     - pmorie
     - resouer
+    - sjenning
     - sjpotter
     - tallclair
     - tmrts
@@ -85,6 +94,7 @@ aliases:
     - mrhohn
     - nicksardo
     - thockin
+    - rramkumar1
   sig-apps-reviewers:
     - enisoc
     - erictune
@@ -125,7 +135,6 @@ aliases:
     - slack
     - colemickens
     - foxish
-    - pwittrock
     - AdoHe
     - lukemarsden
     - jbeda
@@ -153,7 +162,6 @@ aliases:
     - apsinha
     - idvoretskyi
     - calebamiles
-    - pwittrock
     - calebamiles
     - wojtek-t
     - countspongebob
@@ -180,6 +188,9 @@ aliases:
     - cmluciano
     - bsalamat
     - m1093782566
+    - tallclair
+    - feiskyer
+    - mikedanese
   api-approvers:
     - erictune
     - lavalamp
@@ -228,3 +239,42 @@ aliases:
     - cblecker
     - thockin
     - sttts
+  feature-approvers:
+    - AdoHe           # CLI
+    - bgrant0607      # Architecture
+    - brancz          # Instrumentation
+    - bsalamat        # Scheduling
+    - calebamiles     # Release
+    - caseydavenport  # Network
+    - childsb         # Storage
+    - countspongebob  # Scalability
+    - csbell          # Multicluster
+    - dcbw            # Network
+    - dchen1107       # Node
+    - deads2k         # API Machinery
+    - derekwaynecarr  # Node
+    - dghubble        # On Premise
+    - directxman12    # Autoscaling
+    - ericchiang      # Auth
+    - jdumars         # Architecture, Cluster Ops, Release
+    - kow3ns          # Apps
+    - lavalamp        # API Machinery
+    - liggitt         # Auth
+    - lukemarsden     # Cluster Lifecycle
+    - luxas           # Cluster Lifecycle
+    - marcoceppi      # On Premise
+    - mattfarina      # Apps
+    - michmike        # Windows
+    - mwielgus        # Autoscaling
+    - piosz           # Instrumentation
+    - prydonius       # Apps
+    - pwittrock       # CLI
+    - quinton-hoole   # Multicluster
+    - roberthbailey   # Cluster Lifecycle
+    - saad-ali        # Storage
+    - soltysh         # CLI
+    - tallclair       # Auth
+    - thockin         # Network
+    - timothysc       # Cluster Lifecycle, Scheduling
+    - wojtek-t        # Scalability
+    - zehicle         # Cluster Ops

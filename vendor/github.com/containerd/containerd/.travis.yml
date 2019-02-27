@@ -20,7 +20,7 @@ addons:
       - libnl-3-dev
       - libnet-dev
       - protobuf-c-compiler
-      - protobuf-compiler
+      # - protobuf-compiler
       - python-minimal
       - libcap-dev
       - libaio-dev
@@ -35,10 +35,14 @@ before_install:
   - uname -r
 
 install:
-  - wget https://github.com/google/protobuf/releases/download/v3.3.0/protoc-3.3.0-linux-x86_64.zip -O /tmp/protoc-3.3.0-linux-x86_64.zip
-  - sudo unzip -o -d /usr/local /tmp/protoc-3.3.0-linux-x86_64.zip
+  - wget https://github.com/google/protobuf/releases/download/v3.5.0/protoc-3.5.0-linux-x86_64.zip -O /tmp/protoc-3.5.0-linux-x86_64.zip
+  - sudo unzip -o -d /usr/local /tmp/protoc-3.5.0-linux-x86_64.zip
+  - sudo chmod +x /usr/local/bin/protoc
+  - sudo chmod og+rx /usr/local/include/google /usr/local/include/google/protobuf /usr/local/include/google/protobuf/compiler
+  - sudo chmod -R og+r /usr/local/include/google/protobuf/
+  - protoc --version
   - go get -u github.com/vbatts/git-validation
-  - sudo wget https://github.com/crosbymichael/runc/releases/download/ctd-7/runc -O /bin/runc; sudo chmod +x /bin/runc
+  - sudo wget https://github.com/crosbymichael/runc/releases/download/ctd-9/runc -O /bin/runc; sudo chmod +x /bin/runc
   - wget https://github.com/xemul/criu/archive/v3.0.tar.gz -O /tmp/criu.tar.gz
   - tar -C /tmp/ -zxf /tmp/criu.tar.gz
   - cd /tmp/criu-3.0 && sudo make install-criu
@@ -48,7 +52,8 @@ script:
   - export GOOS=$TRAVIS_GOOS
   - export CGO_ENABLED=$TRAVIS_CGO_ENABLED
   - GIT_CHECK_EXCLUDE="./vendor" TRAVIS_COMMIT_RANGE="${TRAVIS_COMMIT_RANGE/.../..}" make dco
-  - GOOS=linux make setup
+  - GOOS=linux script/setup/install-dev-tools
+  - script/validate/vendor
   - go build -i .
   - make check
   - if [ "$GOOS" = "linux" ]; then make check-protos check-api-descriptors; fi
@@ -58,10 +63,11 @@ script:
   - if [ "$GOOS" = "linux" ]; then make coverage ; fi
   - if [ "$GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH make root-coverage ; fi
   - if [ "$GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH make integration ; fi
-  - if [ "$GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH make integration-parallel ; fi
+  # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
+  - if [ "$GOOS" = "linux" ]; then sudo PATH=$PATH GOPATH=$GOPATH TESTFLAGS_PARALLEL=1 make integration ; fi
 
 after_success:
-  - bash <(curl -s https://codecov.io/bash)
+  - bash <(curl -s https://codecov.io/bash) -F linux
 
 before_deploy:
   - make release

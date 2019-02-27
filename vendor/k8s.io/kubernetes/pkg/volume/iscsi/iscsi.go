@@ -27,6 +27,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -36,11 +37,12 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&iscsiPlugin{nil}}
+	return []volume.VolumePlugin{&iscsiPlugin{}}
 }
 
 type iscsiPlugin struct {
-	host volume.VolumeHost
+	host        volume.VolumeHost
+	targetLocks keymutex.KeyMutex
 }
 
 var _ volume.VolumePlugin = &iscsiPlugin{}
@@ -53,6 +55,7 @@ const (
 
 func (plugin *iscsiPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	plugin.targetLocks = keymutex.NewHashed(0)
 	return nil
 }
 
@@ -112,6 +115,12 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 	if err != nil {
 		return nil, err
 	}
+
+	if iscsiDisk != nil {
+
+		//Add volume metrics
+		iscsiDisk.MetricsProvider = volume.NewMetricsStatFS(iscsiDisk.GetPath())
+	}
 	return &iscsiDiskMounter{
 		iscsiDisk:    iscsiDisk,
 		fsType:       fsType,
@@ -164,13 +173,15 @@ func (plugin *iscsiPlugin) NewUnmounter(volName string, podUID types.UID) (volum
 func (plugin *iscsiPlugin) newUnmounterInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec) (volume.Unmounter, error) {
 	return &iscsiDiskUnmounter{
 		iscsiDisk: &iscsiDisk{
-			podUID:  podUID,
-			VolName: volName,
-			manager: manager,
-			plugin:  plugin,
+			podUID:          podUID,
+			VolName:         volName,
+			manager:         manager,
+			plugin:          plugin,
+			MetricsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(podUID, utilstrings.EscapeQualifiedNameForDisk(iscsiPluginName), volName)),
 		},
-		mounter: mounter,
-		exec:    exec,
+		mounter:    mounter,
+		exec:       exec,
+		deviceUtil: ioutil.NewDeviceHandler(ioutil.NewIOHandler()),
 	}, nil
 }
 
@@ -196,7 +207,7 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 	// Find globalPDPath from pod volume directory(mountPath)
 	var globalPDPath string
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
-	paths, err := mount.GetMountRefs(mounter, mountPath)
+	paths, err := mounter.GetMountRefs(mountPath)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +275,7 @@ type iscsiDisk struct {
 	plugin         *iscsiPlugin
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
-	volume.MetricsNil
+	volume.MetricsProvider
 }
 
 func (iscsi *iscsiDisk) GetPath() string {
@@ -274,7 +285,7 @@ func (iscsi *iscsiDisk) GetPath() string {
 }
 
 func (iscsi *iscsiDisk) iscsiGlobalMapPath(spec *volume.Spec) (string, error) {
-	mounter, err := volumeSpecToMounter(spec, iscsi.plugin.host, nil /* pod */)
+	mounter, err := volumeSpecToMounter(spec, iscsi.plugin.host, iscsi.plugin.targetLocks, nil /* pod */)
 	if err != nil {
 		glog.Warningf("failed to get iscsi mounter: %v", err)
 		return "", err
@@ -330,8 +341,9 @@ func (b *iscsiDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 type iscsiDiskUnmounter struct {
 	*iscsiDisk
-	mounter mount.Interface
-	exec    mount.Exec
+	mounter    mount.Interface
+	exec       mount.Exec
+	deviceUtil ioutil.DeviceUtil
 }
 
 var _ volume.Unmounter = &iscsiDiskUnmounter{}
@@ -358,6 +370,10 @@ var _ volume.BlockVolumeMapper = &iscsiDiskMapper{}
 
 func (b *iscsiDiskMapper) SetUpDevice() (string, error) {
 	return "", nil
+}
+
+func (b *iscsiDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
+	return ioutil.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
 }
 
 type iscsiDiskUnmapper struct {

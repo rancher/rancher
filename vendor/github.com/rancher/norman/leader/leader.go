@@ -3,6 +3,7 @@ package leader
 import (
 	"context"
 	"os"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
@@ -12,33 +13,35 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
+
+	// ensure that core is loaded into legacyschema
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
 type Callback func(cb context.Context)
 
-func RunOrDie(ctx context.Context, name string, client kubernetes.Interface, cb Callback) {
-	err := run(ctx, name, client, cb)
+func RunOrDie(ctx context.Context, namespace, name string, client kubernetes.Interface, cb Callback) {
+	if namespace == "" {
+		namespace = "kube-system"
+	}
+
+	err := run(ctx, namespace, name, client, cb)
 	if err != nil {
 		logrus.Fatalf("Failed to start leader election for %s", name)
 	}
 	panic("Failed to start leader election for " + name)
 }
 
-func run(ctx context.Context, name string, client kubernetes.Interface, cb Callback) error {
+func run(ctx context.Context, namespace, name string, client kubernetes.Interface, cb Callback) error {
 	id, err := os.Hostname()
 	if err != nil {
 		return err
 	}
 
-	le := leaderelectionconfig.DefaultLeaderElectionConfiguration()
-	le.LeaderElect = true
-	le.ResourceLock = resourcelock.ConfigMapsResourceLock
-
 	recorder := createRecorder(name, client)
 
-	rl, err := resourcelock.New(le.ResourceLock,
-		"kube-system",
+	rl, err := resourcelock.New(resourcelock.ConfigMapsResourceLock,
+		namespace,
 		name,
 		client.CoreV1(),
 		resourcelock.ResourceLockConfig{
@@ -49,17 +52,19 @@ func run(ctx context.Context, name string, client kubernetes.Interface, cb Callb
 		logrus.Fatalf("error creating leader lock for %s: %v", name, err)
 	}
 
-	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+	t := time.Second
+	if dl := os.Getenv("DEV_LEADERELECTION"); dl != "" {
+		t = time.Hour
+	}
+
+	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
 		Lock:          rl,
-		LeaseDuration: le.LeaseDuration.Duration,
-		RenewDeadline: le.RenewDeadline.Duration,
-		RetryPeriod:   le.RetryPeriod.Duration,
+		LeaseDuration: 45 * t,
+		RenewDeadline: 30 * t,
+		RetryPeriod:   2 * t,
 		Callbacks: leaderelection.LeaderCallbacks{
-			OnStartedLeading: func(stop <-chan struct{}) {
-				subCtx, cancel := context.WithCancel(ctx)
-				go cb(subCtx)
-				<-stop
-				cancel()
+			OnStartedLeading: func(ctx context.Context) {
+				go cb(ctx)
 			},
 			OnStoppedLeading: func() {
 				logrus.Fatalf("leaderelection lost for %s", name)

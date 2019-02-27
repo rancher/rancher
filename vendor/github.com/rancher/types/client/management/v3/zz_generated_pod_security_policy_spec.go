@@ -6,9 +6,12 @@ const (
 	PodSecurityPolicySpecFieldAllowedCapabilities             = "allowedCapabilities"
 	PodSecurityPolicySpecFieldAllowedFlexVolumes              = "allowedFlexVolumes"
 	PodSecurityPolicySpecFieldAllowedHostPaths                = "allowedHostPaths"
+	PodSecurityPolicySpecFieldAllowedProcMountTypes           = "allowedProcMountTypes"
+	PodSecurityPolicySpecFieldAllowedUnsafeSysctls            = "allowedUnsafeSysctls"
 	PodSecurityPolicySpecFieldDefaultAddCapabilities          = "defaultAddCapabilities"
 	PodSecurityPolicySpecFieldDefaultAllowPrivilegeEscalation = "defaultAllowPrivilegeEscalation"
 	PodSecurityPolicySpecFieldFSGroup                         = "fsGroup"
+	PodSecurityPolicySpecFieldForbiddenSysctls                = "forbiddenSysctls"
 	PodSecurityPolicySpecFieldHostIPC                         = "hostIPC"
 	PodSecurityPolicySpecFieldHostNetwork                     = "hostNetwork"
 	PodSecurityPolicySpecFieldHostPID                         = "hostPID"
@@ -27,9 +30,12 @@ type PodSecurityPolicySpec struct {
 	AllowedCapabilities             []string                           `json:"allowedCapabilities,omitempty" yaml:"allowedCapabilities,omitempty"`
 	AllowedFlexVolumes              []AllowedFlexVolume                `json:"allowedFlexVolumes,omitempty" yaml:"allowedFlexVolumes,omitempty"`
 	AllowedHostPaths                []AllowedHostPath                  `json:"allowedHostPaths,omitempty" yaml:"allowedHostPaths,omitempty"`
+	AllowedProcMountTypes           []string                           `json:"allowedProcMountTypes,omitempty" yaml:"allowedProcMountTypes,omitempty"`
+	AllowedUnsafeSysctls            []string                           `json:"allowedUnsafeSysctls,omitempty" yaml:"allowedUnsafeSysctls,omitempty"`
 	DefaultAddCapabilities          []string                           `json:"defaultAddCapabilities,omitempty" yaml:"defaultAddCapabilities,omitempty"`
 	DefaultAllowPrivilegeEscalation *bool                              `json:"defaultAllowPrivilegeEscalation,omitempty" yaml:"defaultAllowPrivilegeEscalation,omitempty"`
 	FSGroup                         *FSGroupStrategyOptions            `json:"fsGroup,omitempty" yaml:"fsGroup,omitempty"`
+	ForbiddenSysctls                []string                           `json:"forbiddenSysctls,omitempty" yaml:"forbiddenSysctls,omitempty"`
 	HostIPC                         bool                               `json:"hostIPC,omitempty" yaml:"hostIPC,omitempty"`
 	HostNetwork                     bool                               `json:"hostNetwork,omitempty" yaml:"hostNetwork,omitempty"`
 	HostPID                         bool                               `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`

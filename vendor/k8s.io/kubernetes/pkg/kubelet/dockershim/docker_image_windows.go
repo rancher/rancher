@@ -19,10 +19,10 @@ limitations under the License.
 package dockershim
 
 import (
+	"context"
 	"time"
 
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
@@ -45,9 +45,8 @@ func (ds *dockerService) ImageFsInfo(_ context.Context, _ *runtimeapi.ImageFsInf
 
 	filesystems := []*runtimeapi.FilesystemUsage{
 		{
-			Timestamp:  time.Now().UnixNano(),
-			UsedBytes:  &runtimeapi.UInt64Value{Value: fsinfo.Usage},
-			InodesUsed: &runtimeapi.UInt64Value{Value: 0},
+			Timestamp: time.Now().UnixNano(),
+			UsedBytes: &runtimeapi.UInt64Value{Value: fsinfo.Usage},
 			FsId: &runtimeapi.FilesystemIdentifier{
 				Mountpoint: info.DockerRootDir,
 			},

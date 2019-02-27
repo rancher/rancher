@@ -1,7 +1,7 @@
 package v1
 
 import (
-	rbac_v1 "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -12,7 +12,7 @@ func (in *ClusterRoleBindingList) DeepCopyInto(out *ClusterRoleBindingList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]rbac_v1.ClusterRoleBinding, len(*in))
+		*out = make([]rbacv1.ClusterRoleBinding, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -45,7 +45,7 @@ func (in *ClusterRoleList) DeepCopyInto(out *ClusterRoleList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]rbac_v1.ClusterRole, len(*in))
+		*out = make([]rbacv1.ClusterRole, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -78,7 +78,7 @@ func (in *RoleBindingList) DeepCopyInto(out *RoleBindingList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]rbac_v1.RoleBinding, len(*in))
+		*out = make([]rbacv1.RoleBinding, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -111,7 +111,7 @@ func (in *RoleList) DeepCopyInto(out *RoleList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]rbac_v1.Role, len(*in))
+		*out = make([]rbacv1.Role, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

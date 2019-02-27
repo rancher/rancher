@@ -42,7 +42,7 @@ type PersistentVolumeSpec struct {
 	CSI                           *CSIPersistentVolumeSource        `json:"csi,omitempty" yaml:"csi,omitempty"`
 	Capacity                      map[string]string                 `json:"capacity,omitempty" yaml:"capacity,omitempty"`
 	CephFS                        *CephFSPersistentVolumeSource     `json:"cephfs,omitempty" yaml:"cephfs,omitempty"`
-	Cinder                        *CinderVolumeSource               `json:"cinder,omitempty" yaml:"cinder,omitempty"`
+	Cinder                        *CinderPersistentVolumeSource     `json:"cinder,omitempty" yaml:"cinder,omitempty"`
 	ClaimRef                      *ObjectReference                  `json:"claimRef,omitempty" yaml:"claimRef,omitempty"`
 	FC                            *FCVolumeSource                   `json:"fc,omitempty" yaml:"fc,omitempty"`
 	FlexVolume                    *FlexPersistentVolumeSource       `json:"flexVolume,omitempty" yaml:"flexVolume,omitempty"`

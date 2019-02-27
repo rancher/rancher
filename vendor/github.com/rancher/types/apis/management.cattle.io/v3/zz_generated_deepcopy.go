@@ -2,7 +2,7 @@ package v3
 
 import (
 	v1 "k8s.io/api/core/v1"
-	rbac_v1 "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	version "k8s.io/apimachinery/pkg/version"
 )
@@ -77,12 +77,8 @@ func (in *ActiveDirectoryConfig) DeepCopyInto(out *ActiveDirectoryConfig) {
 	}
 	if in.NestedGroupMembershipEnabled != nil {
 		in, out := &in.NestedGroupMembershipEnabled, &out.NestedGroupMembershipEnabled
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }
@@ -190,12 +186,8 @@ func (in *AmazonElasticContainerServiceConfig) DeepCopyInto(out *AmazonElasticCo
 	}
 	if in.AssociateWorkerNodePublicIP != nil {
 		in, out := &in.AssociateWorkerNodePublicIP, &out.AssociateWorkerNodePublicIP
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }
@@ -664,39 +656,23 @@ func (in *CloudProvider) DeepCopyInto(out *CloudProvider) {
 	*out = *in
 	if in.AWSCloudProvider != nil {
 		in, out := &in.AWSCloudProvider, &out.AWSCloudProvider
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(AWSCloudProvider)
-			**out = **in
-		}
+		*out = new(AWSCloudProvider)
+		**out = **in
 	}
 	if in.AzureCloudProvider != nil {
 		in, out := &in.AzureCloudProvider, &out.AzureCloudProvider
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(AzureCloudProvider)
-			**out = **in
-		}
+		*out = new(AzureCloudProvider)
+		**out = **in
 	}
 	if in.OpenstackCloudProvider != nil {
 		in, out := &in.OpenstackCloudProvider, &out.OpenstackCloudProvider
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(OpenstackCloudProvider)
-			**out = **in
-		}
+		*out = new(OpenstackCloudProvider)
+		**out = **in
 	}
 	if in.VsphereCloudProvider != nil {
 		in, out := &in.VsphereCloudProvider, &out.VsphereCloudProvider
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(VsphereCloudProvider)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(VsphereCloudProvider)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -807,30 +783,18 @@ func (in *ClusterAlertSpec) DeepCopyInto(out *ClusterAlertSpec) {
 	in.AlertCommonSpec.DeepCopyInto(&out.AlertCommonSpec)
 	if in.TargetNode != nil {
 		in, out := &in.TargetNode, &out.TargetNode
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(TargetNode)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(TargetNode)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.TargetSystemService != nil {
 		in, out := &in.TargetSystemService, &out.TargetSystemService
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(TargetSystemService)
-			**out = **in
-		}
+		*out = new(TargetSystemService)
+		**out = **in
 	}
 	if in.TargetEvent != nil {
 		in, out := &in.TargetEvent, &out.TargetEvent
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(TargetEvent)
-			**out = **in
-		}
+		*out = new(TargetEvent)
+		**out = **in
 	}
 	return
 }
@@ -1064,12 +1028,8 @@ func (in *ClusterLoggingStatus) DeepCopyInto(out *ClusterLoggingStatus) {
 	in.AppliedSpec.DeepCopyInto(&out.AppliedSpec)
 	if in.FailedSpec != nil {
 		in, out := &in.FailedSpec, &out.FailedSpec
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ClusterLoggingSpec)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ClusterLoggingSpec)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -1243,57 +1203,33 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 	*out = *in
 	if in.ImportedConfig != nil {
 		in, out := &in.ImportedConfig, &out.ImportedConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ImportedConfig)
-			**out = **in
-		}
+		*out = new(ImportedConfig)
+		**out = **in
 	}
 	if in.GoogleKubernetesEngineConfig != nil {
 		in, out := &in.GoogleKubernetesEngineConfig, &out.GoogleKubernetesEngineConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(GoogleKubernetesEngineConfig)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(GoogleKubernetesEngineConfig)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.AzureKubernetesServiceConfig != nil {
 		in, out := &in.AzureKubernetesServiceConfig, &out.AzureKubernetesServiceConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(AzureKubernetesServiceConfig)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(AzureKubernetesServiceConfig)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.RancherKubernetesEngineConfig != nil {
 		in, out := &in.RancherKubernetesEngineConfig, &out.RancherKubernetesEngineConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(RancherKubernetesEngineConfig)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(RancherKubernetesEngineConfig)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.AmazonElasticContainerServiceConfig != nil {
 		in, out := &in.AmazonElasticContainerServiceConfig, &out.AmazonElasticContainerServiceConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(AmazonElasticContainerServiceConfig)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(AmazonElasticContainerServiceConfig)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.EnableNetworkPolicy != nil {
 		in, out := &in.EnableNetworkPolicy, &out.EnableNetworkPolicy
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }
@@ -1340,12 +1276,8 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 	in.AppliedSpec.DeepCopyInto(&out.AppliedSpec)
 	if in.FailedSpec != nil {
 		in, out := &in.FailedSpec, &out.FailedSpec
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ClusterSpec)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ClusterSpec)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Requested != nil {
 		in, out := &in.Requested, &out.Requested
@@ -1363,12 +1295,8 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 	}
 	if in.Version != nil {
 		in, out := &in.Version, &out.Version
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(version.Info)
-			**out = **in
-		}
+		*out = new(version.Info)
+		**out = **in
 	}
 	return
 }
@@ -1727,12 +1655,8 @@ func (in *ETCDService) DeepCopyInto(out *ETCDService) {
 	}
 	if in.Snapshot != nil {
 		in, out := &in.Snapshot, &out.Snapshot
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }
@@ -2040,7 +1964,7 @@ func (in *GlobalRole) DeepCopyInto(out *GlobalRole) {
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	if in.Rules != nil {
 		in, out := &in.Rules, &out.Rules
-		*out = make([]rbac_v1.PolicyRule, len(*in))
+		*out = make([]rbacv1.PolicyRule, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -2186,30 +2110,18 @@ func (in *GoogleKubernetesEngineConfig) DeepCopyInto(out *GoogleKubernetesEngine
 	}
 	if in.EnableHTTPLoadBalancing != nil {
 		in, out := &in.EnableHTTPLoadBalancing, &out.EnableHTTPLoadBalancing
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.EnableHorizontalPodAutoscaling != nil {
 		in, out := &in.EnableHorizontalPodAutoscaling, &out.EnableHorizontalPodAutoscaling
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.EnableNetworkPolicyConfig != nil {
 		in, out := &in.EnableNetworkPolicyConfig, &out.EnableNetworkPolicyConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.Locations != nil {
 		in, out := &in.Locations, &out.Locations
@@ -2218,21 +2130,13 @@ func (in *GoogleKubernetesEngineConfig) DeepCopyInto(out *GoogleKubernetesEngine
 	}
 	if in.EnableStackdriverLogging != nil {
 		in, out := &in.EnableStackdriverLogging, &out.EnableStackdriverLogging
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.EnableStackdriverMonitoring != nil {
 		in, out := &in.EnableStackdriverMonitoring, &out.EnableStackdriverMonitoring
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }
@@ -2885,48 +2789,28 @@ func (in *LoggingCommonSpec) DeepCopyInto(out *LoggingCommonSpec) {
 	}
 	if in.ElasticsearchConfig != nil {
 		in, out := &in.ElasticsearchConfig, &out.ElasticsearchConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ElasticsearchConfig)
-			**out = **in
-		}
+		*out = new(ElasticsearchConfig)
+		**out = **in
 	}
 	if in.SplunkConfig != nil {
 		in, out := &in.SplunkConfig, &out.SplunkConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SplunkConfig)
-			**out = **in
-		}
+		*out = new(SplunkConfig)
+		**out = **in
 	}
 	if in.KafkaConfig != nil {
 		in, out := &in.KafkaConfig, &out.KafkaConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(KafkaConfig)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(KafkaConfig)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.SyslogConfig != nil {
 		in, out := &in.SyslogConfig, &out.SyslogConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SyslogConfig)
-			**out = **in
-		}
+		*out = new(SyslogConfig)
+		**out = **in
 	}
 	if in.FluentForwarderConfig != nil {
 		in, out := &in.FluentForwarderConfig, &out.FluentForwarderConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(FluentForwarderConfig)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(FluentForwarderConfig)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -3041,30 +2925,18 @@ func (in *NetworkConfig) DeepCopyInto(out *NetworkConfig) {
 	}
 	if in.CalicoNetworkProvider != nil {
 		in, out := &in.CalicoNetworkProvider, &out.CalicoNetworkProvider
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(CalicoNetworkProvider)
-			**out = **in
-		}
+		*out = new(CalicoNetworkProvider)
+		**out = **in
 	}
 	if in.CanalNetworkProvider != nil {
 		in, out := &in.CanalNetworkProvider, &out.CanalNetworkProvider
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(CanalNetworkProvider)
-			**out = **in
-		}
+		*out = new(CanalNetworkProvider)
+		**out = **in
 	}
 	if in.FlannelNetworkProvider != nil {
 		in, out := &in.FlannelNetworkProvider, &out.FlannelNetworkProvider
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(FlannelNetworkProvider)
-			**out = **in
-		}
+		*out = new(FlannelNetworkProvider)
+		**out = **in
 	}
 	return
 }
@@ -3457,12 +3329,8 @@ func (in *NodeSpec) DeepCopyInto(out *NodeSpec) {
 	*out = *in
 	if in.CustomConfig != nil {
 		in, out := &in.CustomConfig, &out.CustomConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(CustomConfig)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(CustomConfig)
+		(*in).DeepCopyInto(*out)
 	}
 	in.InternalNodeSpec.DeepCopyInto(&out.InternalNodeSpec)
 	if in.DesiredNodeLabels != nil {
@@ -3495,12 +3363,8 @@ func (in *NodeSpec) DeepCopyInto(out *NodeSpec) {
 	}
 	if in.NodeDrainInput != nil {
 		in, out := &in.NodeDrainInput, &out.NodeDrainInput
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(NodeDrainInput)
-			**out = **in
-		}
+		*out = new(NodeDrainInput)
+		**out = **in
 	}
 	return
 }
@@ -3540,21 +3404,13 @@ func (in *NodeStatus) DeepCopyInto(out *NodeStatus) {
 	}
 	if in.NodeTemplateSpec != nil {
 		in, out := &in.NodeTemplateSpec, &out.NodeTemplateSpec
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(NodeTemplateSpec)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(NodeTemplateSpec)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.NodeConfig != nil {
 		in, out := &in.NodeConfig, &out.NodeConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(RKEConfigNode)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(RKEConfigNode)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.NodeAnnotations != nil {
 		in, out := &in.NodeAnnotations, &out.NodeAnnotations
@@ -3579,12 +3435,8 @@ func (in *NodeStatus) DeepCopyInto(out *NodeStatus) {
 	}
 	if in.DockerInfo != nil {
 		in, out := &in.DockerInfo, &out.DockerInfo
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(DockerInfo)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(DockerInfo)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -3720,39 +3572,23 @@ func (in *Notification) DeepCopyInto(out *Notification) {
 	*out = *in
 	if in.SMTPConfig != nil {
 		in, out := &in.SMTPConfig, &out.SMTPConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SMTPConfig)
-			**out = **in
-		}
+		*out = new(SMTPConfig)
+		**out = **in
 	}
 	if in.SlackConfig != nil {
 		in, out := &in.SlackConfig, &out.SlackConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SlackConfig)
-			**out = **in
-		}
+		*out = new(SlackConfig)
+		**out = **in
 	}
 	if in.PagerdutyConfig != nil {
 		in, out := &in.PagerdutyConfig, &out.PagerdutyConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(PagerdutyConfig)
-			**out = **in
-		}
+		*out = new(PagerdutyConfig)
+		**out = **in
 	}
 	if in.WebhookConfig != nil {
 		in, out := &in.WebhookConfig, &out.WebhookConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(WebhookConfig)
-			**out = **in
-		}
+		*out = new(WebhookConfig)
+		**out = **in
 	}
 	return
 }
@@ -3834,39 +3670,23 @@ func (in *NotifierSpec) DeepCopyInto(out *NotifierSpec) {
 	*out = *in
 	if in.SMTPConfig != nil {
 		in, out := &in.SMTPConfig, &out.SMTPConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SMTPConfig)
-			**out = **in
-		}
+		*out = new(SMTPConfig)
+		**out = **in
 	}
 	if in.SlackConfig != nil {
 		in, out := &in.SlackConfig, &out.SlackConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SlackConfig)
-			**out = **in
-		}
+		*out = new(SlackConfig)
+		**out = **in
 	}
 	if in.PagerdutyConfig != nil {
 		in, out := &in.PagerdutyConfig, &out.PagerdutyConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(PagerdutyConfig)
-			**out = **in
-		}
+		*out = new(PagerdutyConfig)
+		**out = **in
 	}
 	if in.WebhookConfig != nil {
 		in, out := &in.WebhookConfig, &out.WebhookConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(WebhookConfig)
-			**out = **in
-		}
+		*out = new(WebhookConfig)
+		**out = **in
 	}
 	return
 }
@@ -4461,21 +4281,13 @@ func (in *ProjectAlertSpec) DeepCopyInto(out *ProjectAlertSpec) {
 	in.AlertCommonSpec.DeepCopyInto(&out.AlertCommonSpec)
 	if in.TargetWorkload != nil {
 		in, out := &in.TargetWorkload, &out.TargetWorkload
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(TargetWorkload)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(TargetWorkload)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.TargetPod != nil {
 		in, out := &in.TargetPod, &out.TargetPod
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(TargetPod)
-			**out = **in
-		}
+		*out = new(TargetPod)
+		**out = **in
 	}
 	return
 }
@@ -4649,12 +4461,8 @@ func (in *ProjectNetworkPolicy) DeepCopyInto(out *ProjectNetworkPolicy) {
 	out.Spec = in.Spec
 	if in.Status != nil {
 		in, out := &in.Status, &out.Status
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ProjectNetworkPolicyStatus)
-			**out = **in
-		}
+		*out = new(ProjectNetworkPolicyStatus)
+		**out = **in
 	}
 	return
 }
@@ -4825,21 +4633,13 @@ func (in *ProjectSpec) DeepCopyInto(out *ProjectSpec) {
 	*out = *in
 	if in.ResourceQuota != nil {
 		in, out := &in.ResourceQuota, &out.ResourceQuota
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ProjectResourceQuota)
-			**out = **in
-		}
+		*out = new(ProjectResourceQuota)
+		**out = **in
 	}
 	if in.NamespaceDefaultResourceQuota != nil {
 		in, out := &in.NamespaceDefaultResourceQuota, &out.NamespaceDefaultResourceQuota
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(NamespaceResourceQuota)
-			**out = **in
-		}
+		*out = new(NamespaceResourceQuota)
+		**out = **in
 	}
 	return
 }
@@ -5141,7 +4941,7 @@ func (in *RoleTemplate) DeepCopyInto(out *RoleTemplate) {
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	if in.Rules != nil {
 		in, out := &in.Rules, &out.Rules
-		*out = make([]rbac_v1.PolicyRule, len(*in))
+		*out = make([]rbacv1.PolicyRule, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -5947,12 +5747,8 @@ func (in *User) DeepCopyInto(out *User) {
 	}
 	if in.Enabled != nil {
 		in, out := &in.Enabled, &out.Enabled
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	out.Spec = in.Spec
 	in.Status.DeepCopyInto(&out.Status)

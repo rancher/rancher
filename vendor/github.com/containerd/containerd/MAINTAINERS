@@ -50,10 +50,9 @@ maintainer candidates are selected and proposed on the maintainers mailing list.
 
 After a candidate has been announced on the maintainers mailing list, the
 existing maintainers are given five business days to discuss the candidate,
-raise objections and cast their vote. Candidates must be approved by the BDFL
-and at least 66% of the current maintainers by adding their vote on the mailing
+raise objections and cast their vote. Candidates must be approved by at least 66% of the current maintainers by adding their vote on the mailing
 list. Only maintainers of the repository that the candidate is proposed for are
-allowed to vote. The BDFL's vote is mandatory.
+allowed to vote.
 
 If a candidate is approved, a maintainer will contact the candidate to invite
 the candidate to open a pull request that adds the contributor to the
@@ -108,43 +107,12 @@ a maintainer. If the maintainer decides to step down as a maintainer, they
 open a pull request to be removed from the MAINTAINERS file.
 
 If the maintainer wants to remain a maintainer, but is unable to perform the
-required duties they can be removed with a vote by the BDFL and at least 66% of
-the current maintainers. The BDFL's vote is mandatory. An e-mail is sent to the
+required duties they can be removed with a vote of at least 66% of
+the current maintainers. An e-mail is sent to the
 mailing list, inviting maintainers of the project to vote. The voting period is
 five business days. Issues related to a maintainer's performance should be
 discussed with them among the other maintainers so that they are not surprised
 by a pull request removing them.
-"""
-
-	[Rules.bdfl]
-
-	title = "The Benevolent dictator for life (BDFL)"
-
-	text = """
-containerd follows the timeless, highly efficient and totally unfair system
-known as [Benevolent dictator for
-life](https://en.wikipedia.org/wiki/Benevolent_Dictator_for_Life), with yours
-truly, Solomon Hykes, in the role of BDFL. This means that all decisions are
-made, by default, by Solomon. Since making every decision himself would be
-highly un-scalable, in practice decisions are spread across multiple
-maintainers.
-
-Ideally, the BDFL role is like the Queen of England: awesome crown, but not an
-actual operational role day-to-day. The real job of a BDFL is to NEVER GO AWAY.
-Every other rule can change, perhaps drastically so, but the BDFL will always be
-there, preserving the philosophy and principles of the project, and keeping
-ultimate authority over its fate. This gives us great flexibility in
-experimenting with various governance models, knowing that we can always press
-the "reset" button without fear of fragmentation or deadlock. See the US
-congress for a counter-example.
-
-BDFL daily routine:
-
-* Is the project governance stuck in a deadlock or irreversibly fragmented?
-	* If yes: refactor the project governance
-* Are there issues or conflicts escalated by maintainers?
-	* If yes: resolve them
-* Go back to polishing that crown.
 """
 
 	[Rules.decisions]
@@ -205,58 +173,35 @@ Yes. Nobody should ever push to master directly. All changes should be
 made through a pull request.
 """
 
+	[Rules.tsc]
+
+	title = "Conflict Resolution and technical disputes"
+
+	text = """
+containerd defers to the [Technical Steering Committee](https://github.com/moby/tsc) for escalations and resolution on disputes for technical matters."
+	"""
+
 	[Rules.meta]
 
 	title = "How is this process changed?"
 
 	text = "Just like everything else: by making a pull request :)"
 
-# Current project roles
-[Roles]
-
-	[Roles.bdfl]
-
-	person = "shykes"
-
-	[Roles."Chief Architect"]
-
-	person = "crosbymichael"
-
-	text = """
-The chief architect is responsible for the overall integrity of the technical
-architecture across all subsystems, and the consistency of APIs and UI.
-
-Changes to UI, public APIs and overall architecture must be approved by the
-chief architect.
-"""
-
-	[Roles."Chief Maintainer"]
-
-	person = "crosbymichael"
-
-	text = """
-The chief maintainer is responsible for all aspects of quality for the project
-including code reviews, usability, stability, security, performance, etc.  The
-most important function of the chief maintainer is to lead by example. On the
-first day of a new maintainer, the best advice should be "follow the C.M.'s
-example and you'll be fine".
-"""
-
 # Current project organization
 [Org]
 
 	[Org.Maintainers]
-	people = [
-		"akihirosuda",
-		"crosbymichael",
-		"dqminh",
-		"dmcgowan",
-		"estesp",
-		"hqhq",
-		"jhowardmsft",
-		"mlaventure",
-		"stevvooe",
-	]
+		people = [
+			"akihirosuda",
+			"crosbymichael",
+			"dqminh",
+			"dmcgowan",
+			"estesp",
+			"hqhq",
+			"jhowardmsft",
+			"mlaventure",
+			"stevvooe",
+		]
 
 [People]
 

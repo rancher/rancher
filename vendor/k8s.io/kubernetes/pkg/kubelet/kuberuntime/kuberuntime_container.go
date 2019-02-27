@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -51,6 +52,7 @@ import (
 var (
 	ErrCreateContainerConfig = errors.New("CreateContainerConfigError")
 	ErrCreateContainer       = errors.New("CreateContainerError")
+	ErrPreStartHook          = errors.New("PreStartHookError")
 	ErrPostStartHook         = errors.New("PostStartHookError")
 )
 
@@ -122,8 +124,8 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 	}
 	err = m.internalLifecycle.PreStartContainer(pod, container, containerID)
 	if err != nil {
-		m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedToStartContainer, "Internal PreStartContainer hook failed: %v", err)
-		return "Internal PreStartContainer hook failed", err
+		m.recordContainerEvent(pod, container, containerID, v1.EventTypeWarning, events.FailedToStartContainer, "Internal PreStartContainer hook failed: %v", grpc.ErrorDesc(err))
+		return grpc.ErrorDesc(err), ErrPreStartHook
 	}
 	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, events.CreatedContainer, "Created container")
 
@@ -150,9 +152,15 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 	legacySymlink := legacyLogSymlink(containerID, containerMeta.Name, sandboxMeta.Name,
 		sandboxMeta.Namespace)
 	containerLog := filepath.Join(podSandboxConfig.LogDirectory, containerConfig.LogPath)
-	if err := m.osInterface.Symlink(containerLog, legacySymlink); err != nil {
-		glog.Errorf("Failed to create legacy symbolic link %q to container %q log %q: %v",
-			legacySymlink, containerID, containerLog, err)
+	// only create legacy symlink if containerLog path exists (or the error is not IsNotExist).
+	// Because if containerLog path does not exist, only dandling legacySymlink is created.
+	// This dangling legacySymlink is later removed by container gc, so it does not make sense
+	// to create it in the first place. it happens when journald logging driver is used with docker.
+	if _, err := m.osInterface.Stat(containerLog); !os.IsNotExist(err) {
+		if err := m.osInterface.Symlink(containerLog, legacySymlink); err != nil {
+			glog.Errorf("Failed to create legacy symbolic link %q to container %q log %q: %v",
+				legacySymlink, containerID, containerLog, err)
+		}
 	}
 
 	// Step 4: execute the post start hook.
@@ -360,7 +368,7 @@ func getTerminationMessage(status *runtimeapi.ContainerStatus, terminationMessag
 func (m *kubeGenericRuntimeManager) readLastStringFromContainerLogs(path string) string {
 	value := int64(kubecontainer.MaxContainerTerminationMessageLogLines)
 	buf, _ := circbuf.NewBuffer(kubecontainer.MaxContainerTerminationMessageLogLength)
-	if err := m.ReadLogs(path, "", &v1.PodLogOptions{TailLines: &value}, buf, buf); err != nil {
+	if err := m.ReadLogs(context.Background(), path, "", &v1.PodLogOptions{TailLines: &value}, buf, buf); err != nil {
 		return fmt.Sprintf("Error on reading termination message from logs: %v", err)
 	}
 	return buf.String()
@@ -724,16 +732,13 @@ func findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus)
 }
 
 // GetContainerLogs returns logs of a specific container.
-func (m *kubeGenericRuntimeManager) GetContainerLogs(pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error) {
+func (m *kubeGenericRuntimeManager) GetContainerLogs(ctx context.Context, pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error) {
 	status, err := m.runtimeService.ContainerStatus(containerID.ID)
 	if err != nil {
 		glog.V(4).Infof("failed to get container status for %v: %v", containerID.String(), err)
 		return fmt.Errorf("Unable to retrieve container logs for %v", containerID.String())
 	}
-	labeledInfo := getContainerInfoFromLabels(status.Labels)
-	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
-	path := buildFullContainerLogsPath(pod.UID, labeledInfo.ContainerName, annotatedInfo.RestartCount)
-	return m.ReadLogs(path, containerID.ID, logOptions, stdout, stderr)
+	return m.ReadLogs(ctx, status.GetLogPath(), containerID.ID, logOptions, stdout, stderr)
 }
 
 // GetExec gets the endpoint the runtime will serve the exec request from.

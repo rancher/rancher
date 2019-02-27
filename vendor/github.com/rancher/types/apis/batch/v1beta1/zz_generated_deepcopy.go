@@ -1,7 +1,7 @@
 package v1beta1
 
 import (
-	batch_v1beta1 "k8s.io/api/batch/v1beta1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -12,7 +12,7 @@ func (in *CronJobList) DeepCopyInto(out *CronJobList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]batch_v1beta1.CronJob, len(*in))
+		*out = make([]batchv1beta1.CronJob, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

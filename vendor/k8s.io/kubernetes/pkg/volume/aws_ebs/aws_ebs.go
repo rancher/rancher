@@ -17,10 +17,11 @@ limitations under the License.
 package aws_ebs
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -29,7 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -92,6 +95,47 @@ func (plugin *awsElasticBlockStorePlugin) SupportsMountOption() bool {
 
 func (plugin *awsElasticBlockStorePlugin) SupportsBulkVolumeVerification() bool {
 	return true
+}
+
+func (plugin *awsElasticBlockStorePlugin) GetVolumeLimits() (map[string]int64, error) {
+	volumeLimits := map[string]int64{
+		util.EBSVolumeLimitKey: util.DefaultMaxEBSVolumes,
+	}
+	cloud := plugin.host.GetCloudProvider()
+
+	// if we can't fetch cloudprovider we return an error
+	// hoping external CCM or admin can set it. Returning
+	// default values from here will mean, no one can
+	// override them.
+	if cloud == nil {
+		return nil, fmt.Errorf("No cloudprovider present")
+	}
+
+	if cloud.ProviderName() != aws.ProviderName {
+		return nil, fmt.Errorf("Expected aws cloud, found %s", cloud.ProviderName())
+	}
+
+	instances, ok := cloud.Instances()
+	if !ok {
+		glog.V(3).Infof("Failed to get instances from cloud provider")
+		return volumeLimits, nil
+	}
+
+	instanceType, err := instances.InstanceType(context.TODO(), plugin.host.GetNodeName())
+	if err != nil {
+		glog.Errorf("Failed to get instance type from AWS cloud provider")
+		return volumeLimits, nil
+	}
+
+	if ok, _ := regexp.MatchString(util.EBSNitroLimitRegex, instanceType); ok {
+		volumeLimits[util.EBSVolumeLimitKey] = util.DefaultMaxEBSNitroVolumeLimit
+	}
+
+	return volumeLimits, nil
+}
+
+func (plugin *awsElasticBlockStorePlugin) VolumeLimitKey(spec *volume.Spec) string {
+	return util.EBSVolumeLimitKey
 }
 
 func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
@@ -266,10 +310,11 @@ func (plugin *awsElasticBlockStorePlugin) ExpandVolumeDevice(
 }
 
 var _ volume.ExpandableVolumePlugin = &awsElasticBlockStorePlugin{}
+var _ volume.VolumePluginWithAttachLimits = &awsElasticBlockStorePlugin{}
 
 // Abstract interface to PD operations.
 type ebsManager interface {
-	CreateVolume(provisioner *awsElasticBlockStoreProvisioner) (volumeID aws.KubernetesVolumeID, volumeSizeGB int, labels map[string]string, fstype string, err error)
+	CreateVolume(provisioner *awsElasticBlockStoreProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID aws.KubernetesVolumeID, volumeSizeGB int, labels map[string]string, fstype string, err error)
 	// Deletes a volume
 	DeleteVolume(deleter *awsElasticBlockStoreDeleter) error
 }
@@ -387,12 +432,12 @@ func makeGlobalPDPath(host volume.VolumeHost, volumeID aws.KubernetesVolumeID) s
 	// Clean up the URI to be more fs-friendly
 	name := string(volumeID)
 	name = strings.Replace(name, "://", "/", -1)
-	return path.Join(host.GetPluginDir(awsElasticBlockStorePluginName), mount.MountsInGlobalPDPath, name)
+	return filepath.Join(host.GetPluginDir(awsElasticBlockStorePluginName), mount.MountsInGlobalPDPath, name)
 }
 
 // Reverses the mapping done in makeGlobalPDPath
 func getVolumeIDFromGlobalMount(host volume.VolumeHost, globalPath string) (string, error) {
-	basePath := path.Join(host.GetPluginDir(awsElasticBlockStorePluginName), mount.MountsInGlobalPDPath)
+	basePath := filepath.Join(host.GetPluginDir(awsElasticBlockStorePluginName), mount.MountsInGlobalPDPath)
 	rel, err := filepath.Rel(basePath, globalPath)
 	if err != nil {
 		glog.Errorf("Failed to get volume id from global mount %s - %v", globalPath, err)
@@ -454,12 +499,12 @@ type awsElasticBlockStoreProvisioner struct {
 
 var _ volume.Provisioner = &awsElasticBlockStoreProvisioner{}
 
-func (c *awsElasticBlockStoreProvisioner) Provision() (*v1.PersistentVolume, error) {
+func (c *awsElasticBlockStoreProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
 	if !util.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
 	}
 
-	volumeID, sizeGB, labels, fstype, err := c.manager.CreateVolume(c)
+	volumeID, sizeGB, labels, fstype, err := c.manager.CreateVolume(c, selectedNode, allowedTopologies)
 	if err != nil {
 		glog.Errorf("Provision failed: %v", err)
 		return nil, err
@@ -467,6 +512,15 @@ func (c *awsElasticBlockStoreProvisioner) Provision() (*v1.PersistentVolume, err
 
 	if fstype == "" {
 		fstype = "ext4"
+	}
+
+	var volumeMode *v1.PersistentVolumeMode
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		volumeMode = c.options.PVC.Spec.VolumeMode
+		if volumeMode != nil && *volumeMode == v1.PersistentVolumeBlock {
+			// Block volumes should not have any FSType
+			fstype = ""
+		}
 	}
 
 	pv := &v1.PersistentVolume{
@@ -483,6 +537,7 @@ func (c *awsElasticBlockStoreProvisioner) Provision() (*v1.PersistentVolume, err
 			Capacity: v1.ResourceList{
 				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 			},
+			VolumeMode: volumeMode,
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
 					VolumeID:  string(volumeID),
@@ -499,13 +554,22 @@ func (c *awsElasticBlockStoreProvisioner) Provision() (*v1.PersistentVolume, err
 		pv.Spec.AccessModes = c.plugin.GetAccessModes()
 	}
 
+	requirements := make([]v1.NodeSelectorRequirement, 0)
 	if len(labels) != 0 {
 		if pv.Labels == nil {
 			pv.Labels = make(map[string]string)
 		}
 		for k, v := range labels {
 			pv.Labels[k] = v
+			requirements = append(requirements, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
 		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		pv.Spec.NodeAffinity = new(v1.VolumeNodeAffinity)
+		pv.Spec.NodeAffinity.Required = new(v1.NodeSelector)
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 1)
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions = requirements
 	}
 
 	return pv, nil

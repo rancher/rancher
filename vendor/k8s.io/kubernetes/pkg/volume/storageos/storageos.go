@@ -560,9 +560,12 @@ type storageosProvisioner struct {
 
 var _ volume.Provisioner = &storageosProvisioner{}
 
-func (c *storageosProvisioner) Provision() (*v1.PersistentVolume, error) {
+func (c *storageosProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
 	if !util.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
+	}
+	if util.CheckPersistentVolumeClaimModeBlock(c.options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", c.plugin.GetPluginName())
 	}
 
 	var adminSecretName, adminSecretNamespace string
@@ -599,7 +602,11 @@ func (c *storageosProvisioner) Provision() (*v1.PersistentVolume, error) {
 		c.labels[k] = v
 	}
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	c.sizeGB = int(util.RoundUpSize(capacity.Value(), 1024*1024*1024))
+	var err error
+	c.sizeGB, err = util.RoundUpToGiBInt(capacity)
+	if err != nil {
+		return nil, err
+	}
 
 	apiCfg, err := parsePVSecret(adminSecretNamespace, adminSecretName, c.plugin.host.GetKubeClient())
 	if err != nil {

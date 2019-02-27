@@ -52,7 +52,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
@@ -123,7 +124,7 @@ type containerManagerImpl struct {
 	capacity v1.ResourceList
 	// Absolute cgroupfs path to a cgroup that Kubelet needs to place all pods under.
 	// This path include a top level container for enforcing Node Allocatable.
-	cgroupRoot string
+	cgroupRoot CgroupName
 	// Event recorder interface.
 	recorder record.EventRecorder
 	// Interface for QoS cgroup management
@@ -200,19 +201,22 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
 	}
 
-	// Check whether swap is enabled. The Kubelet does not support running with swap enabled.
-	swapData, err := ioutil.ReadFile("/proc/swaps")
-	if err != nil {
-		return nil, err
-	}
-	swapData = bytes.TrimSpace(swapData) // extra trailing \n
-	swapLines := strings.Split(string(swapData), "\n")
+	if failSwapOn {
+		// Check whether swap is enabled. The Kubelet does not support running with swap enabled.
+		swapData, err := ioutil.ReadFile("/proc/swaps")
+		if err != nil {
+			return nil, err
+		}
+		swapData = bytes.TrimSpace(swapData) // extra trailing \n
+		swapLines := strings.Split(string(swapData), "\n")
 
-	// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should
-	// error out unless --fail-swap-on is set to false.
-	if failSwapOn && len(swapLines) > 1 {
-		return nil, fmt.Errorf("Running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained: %v", swapLines)
+		// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should
+		// error out unless --fail-swap-on is set to false.
+		if len(swapLines) > 1 {
+			return nil, fmt.Errorf("Running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained: %v", swapLines)
+		}
 	}
+
 	var capacity = v1.ResourceList{}
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
 	// machine info is computed and cached once as part of cAdvisor object creation.
@@ -223,7 +227,8 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	}
 	capacity = cadvisor.CapacityFromMachineInfo(machineInfo)
 
-	cgroupRoot := nodeConfig.CgroupRoot
+	// Turn CgroupRoot from a string (in cgroupfs path format) to internal CgroupName
+	cgroupRoot := ParseCgroupfsToCgroupName(nodeConfig.CgroupRoot)
 	cgroupManager := NewCgroupManager(subsystems, nodeConfig.CgroupDriver)
 	// Check if Cgroup-root actually exists on the node
 	if nodeConfig.CgroupsPerQOS {
@@ -236,13 +241,13 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		// of note, we always use the cgroupfs driver when performing this check since
 		// the input is provided in that format.
 		// this is important because we do not want any name conversion to occur.
-		if !cgroupManager.Exists(CgroupName(cgroupRoot)) {
+		if !cgroupManager.Exists(cgroupRoot) {
 			return nil, fmt.Errorf("invalid configuration: cgroup-root %q doesn't exist: %v", cgroupRoot, err)
 		}
 		glog.Infof("container manager verified user specified cgroup-root exists: %v", cgroupRoot)
 		// Include the top level cgroup for enforcing node allocatable into cgroup-root.
 		// This way, all sub modules can avoid having to understand the concept of node allocatable.
-		cgroupRoot = path.Join(cgroupRoot, defaultNodeAllocatableCgroupName)
+		cgroupRoot = NewCgroupName(cgroupRoot, defaultNodeAllocatableCgroupName)
 	}
 	glog.Infof("Creating Container Manager object based on Node Config: %+v", nodeConfig)
 
@@ -302,10 +307,11 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 			cgroupManager:     cm.cgroupManager,
 			podPidsLimit:      cm.ExperimentalPodPidsLimit,
 			enforceCPULimits:  cm.EnforceCPULimits,
+			cpuCFSQuotaPeriod: uint64(cm.CPUCFSQuotaPeriod / time.Microsecond),
 		}
 	}
 	return &podContainerManagerNoop{
-		cgroupRoot: CgroupName(cm.cgroupRoot),
+		cgroupRoot: cm.cgroupRoot,
 	}
 }
 
@@ -503,7 +509,7 @@ func (cm *containerManagerImpl) GetNodeConfig() NodeConfig {
 
 // GetPodCgroupRoot returns the literal cgroupfs value for the cgroup containing all pods.
 func (cm *containerManagerImpl) GetPodCgroupRoot() string {
-	return cm.cgroupManager.Name(CgroupName(cm.cgroupRoot))
+	return cm.cgroupManager.Name(cm.cgroupRoot)
 }
 
 func (cm *containerManagerImpl) GetMountedSubsystems() *CgroupSubsystems {
@@ -539,12 +545,14 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	// allocatable of the node
 	cm.nodeInfo = node
 
-	rootfs, err := cm.cadvisorInterface.RootFsInfo()
-	if err != nil {
-		return fmt.Errorf("failed to get rootfs info: %v", err)
-	}
-	for rName, rCap := range cadvisor.EphemeralStorageCapacityFromFsInfo(rootfs) {
-		cm.capacity[rName] = rCap
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LocalStorageCapacityIsolation) {
+		rootfs, err := cm.cadvisorInterface.RootFsInfo()
+		if err != nil {
+			return fmt.Errorf("failed to get rootfs info: %v", err)
+		}
+		for rName, rCap := range cadvisor.EphemeralStorageCapacityFromFsInfo(rootfs) {
+			cm.capacity[rName] = rCap
+		}
 	}
 
 	// Ensure that node allocatable configuration is valid.
@@ -595,6 +603,10 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	}
 
 	return nil
+}
+
+func (cm *containerManagerImpl) GetPluginRegistrationHandler() pluginwatcher.PluginHandler {
+	return cm.deviceManager.GetWatcherHandler()
 }
 
 // TODO: move the GetResources logic to PodContainerManager.
@@ -857,21 +869,6 @@ func isKernelPid(pid int) bool {
 	// Kernel threads have no associated executable.
 	_, err := os.Readlink(fmt.Sprintf("/proc/%d/exe", pid))
 	return err != nil
-}
-
-// Helper for getting the docker API version.
-func getDockerAPIVersion(cadvisor cadvisor.Interface) *utilversion.Version {
-	versions, err := cadvisor.VersionInfo()
-	if err != nil {
-		glog.Errorf("Error requesting cAdvisor VersionInfo: %v", err)
-		return utilversion.MustParseSemantic("0.0")
-	}
-	dockerAPIVersion, err := utilversion.ParseGeneric(versions.DockerAPIVersion)
-	if err != nil {
-		glog.Errorf("Error parsing docker version %q: %v", versions.DockerVersion, err)
-		return utilversion.MustParseSemantic("0.0")
-	}
-	return dockerAPIVersion
 }
 
 func (cm *containerManagerImpl) GetCapacity() v1.ResourceList {

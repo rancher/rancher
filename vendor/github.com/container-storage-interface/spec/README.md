@@ -3,3 +3,11 @@
 ![CSI Logo](logo.png)
 
 This project contains the CSI [specification](spec.md) and [protobuf](csi.proto) files.
+
+## CSI Adoption
+
+### Container Orchestrators (CO)
+
+* [Cloud Foundry](https://github.com/cloudfoundry/csi-local-volume-release)
+* [Kubernetes](https://kubernetes-csi.github.io/docs/)
+* [Mesos](http://mesos.apache.org/documentation/latest/csi/)

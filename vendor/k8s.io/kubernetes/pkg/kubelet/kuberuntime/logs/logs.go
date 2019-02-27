@@ -19,6 +19,7 @@ package logs
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,7 +28,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/docker/docker/pkg/jsonlog"
+	"github.com/docker/docker/daemon/logger/jsonfilelog/jsonlog"
 	"github.com/fsnotify/fsnotify"
 	"github.com/golang/glog"
 
@@ -266,7 +267,7 @@ func (w *logWriter) write(msg *logMessage) error {
 // ReadLogs read the container log and redirect into stdout and stderr.
 // Note that containerID is only needed when following the log, or else
 // just pass in empty string "".
-func ReadLogs(path, containerID string, opts *LogOptions, runtimeService internalapi.RuntimeService, stdout, stderr io.Writer) error {
+func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, runtimeService internalapi.RuntimeService, stdout, stderr io.Writer) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("failed to open log file %q: %v", path, err)
@@ -317,7 +318,7 @@ func ReadLogs(path, containerID string, opts *LogOptions, runtimeService interna
 					}
 				}
 				// Wait until the next log change.
-				if found, err := waitLogs(containerID, watcher, runtimeService); !found {
+				if found, err := waitLogs(ctx, containerID, watcher, runtimeService); !found {
 					return err
 				}
 				continue
@@ -354,12 +355,33 @@ func ReadLogs(path, containerID string, opts *LogOptions, runtimeService interna
 	}
 }
 
+func isContainerRunning(id string, r internalapi.RuntimeService) (bool, error) {
+	s, err := r.ContainerStatus(id)
+	if err != nil {
+		return false, err
+	}
+	// Only keep following container log when it is running.
+	if s.State != runtimeapi.ContainerState_CONTAINER_RUNNING {
+		glog.V(5).Infof("Container %q is not running (state=%q)", id, s.State)
+		// Do not return error because it's normal that the container stops
+		// during waiting.
+		return false, nil
+	}
+	return true, nil
+}
+
 // waitLogs wait for the next log write. It returns a boolean and an error. The boolean
 // indicates whether a new log is found; the error is error happens during waiting new logs.
-func waitLogs(id string, w *fsnotify.Watcher, runtimeService internalapi.RuntimeService) (bool, error) {
+func waitLogs(ctx context.Context, id string, w *fsnotify.Watcher, runtimeService internalapi.RuntimeService) (bool, error) {
+	// no need to wait if the pod is not running
+	if running, err := isContainerRunning(id, runtimeService); !running {
+		return false, err
+	}
 	errRetry := 5
 	for {
 		select {
+		case <-ctx.Done():
+			return false, fmt.Errorf("context cancelled")
 		case e := <-w.Events:
 			switch e.Op {
 			case fsnotify.Write:
@@ -374,16 +396,8 @@ func waitLogs(id string, w *fsnotify.Watcher, runtimeService internalapi.Runtime
 			}
 			errRetry--
 		case <-time.After(stateCheckPeriod):
-			s, err := runtimeService.ContainerStatus(id)
-			if err != nil {
+			if running, err := isContainerRunning(id, runtimeService); !running {
 				return false, err
-			}
-			// Only keep following container log when it is running.
-			if s.State != runtimeapi.ContainerState_CONTAINER_RUNNING {
-				glog.Errorf("Container %q is not running (state=%q)", id, s.State)
-				// Do not return error because it's normal that the container stops
-				// during waiting.
-				return false, nil
 			}
 		}
 	}

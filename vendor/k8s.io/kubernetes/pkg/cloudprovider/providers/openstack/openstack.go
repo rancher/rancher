@@ -26,6 +26,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -52,7 +53,10 @@ import (
 
 const (
 	// ProviderName is the name of the openstack provider
-	ProviderName     = "openstack"
+	ProviderName = "openstack"
+
+	// TypeHostName is the name type of openstack instance
+	TypeHostName     = "hostname"
 	availabilityZone = "availability_zone"
 	defaultTimeOut   = 60 * time.Second
 )
@@ -415,12 +419,9 @@ func foreachServer(client *gophercloud.ServiceClient, opts servers.ListOptsBuild
 	return err
 }
 
-func getServerByName(client *gophercloud.ServiceClient, name types.NodeName, showOnlyActive bool) (*servers.Server, error) {
+func getServerByName(client *gophercloud.ServiceClient, name types.NodeName) (*servers.Server, error) {
 	opts := servers.ListOpts{
 		Name: fmt.Sprintf("^%s$", regexp.QuoteMeta(mapNodeNameToServerName(name))),
-	}
-	if showOnlyActive {
-		opts.Status = "ACTIVE"
 	}
 
 	pager := servers.List(client, opts)
@@ -500,11 +501,20 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 		)
 	}
 
+	if srv.Metadata[TypeHostName] != "" {
+		v1helper.AddToNodeAddresses(&addrs,
+			v1.NodeAddress{
+				Type:    v1.NodeHostName,
+				Address: srv.Metadata[TypeHostName],
+			},
+		)
+	}
+
 	return addrs, nil
 }
 
 func getAddressesByName(client *gophercloud.ServiceClient, name types.NodeName) ([]v1.NodeAddress, error) {
-	srv, err := getServerByName(client, name, true)
+	srv, err := getServerByName(client, name)
 	if err != nil {
 		return nil, err
 	}
@@ -575,6 +585,11 @@ func (os *OpenStack) HasClusterID() bool {
 // LoadBalancer initializes a LbaasV2 object
 func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	glog.V(4).Info("openstack.LoadBalancer() called")
+
+	if reflect.DeepEqual(os.lbOpts, LoadBalancerOpts{}) {
+		glog.V(4).Info("LoadBalancer section is empty/not defined in cloud-config")
+		return nil, false
+	}
 
 	network, err := os.NewNetworkV2()
 	if err != nil {
@@ -675,7 +690,7 @@ func (os *OpenStack) GetZoneByNodeName(ctx context.Context, nodeName types.NodeN
 		return cloudprovider.Zone{}, err
 	}
 
-	srv, err := getServerByName(compute, nodeName, true)
+	srv, err := getServerByName(compute, nodeName)
 	if err != nil {
 		if err == ErrNotFound {
 			return cloudprovider.Zone{}, cloudprovider.InstanceNotFound

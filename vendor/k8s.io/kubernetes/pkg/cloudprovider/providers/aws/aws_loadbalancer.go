@@ -564,12 +564,17 @@ func filterForIPRangeDescription(securityGroups []*ec2.SecurityGroup, lbName str
 	response := []*ec2.SecurityGroup{}
 	clientRule := fmt.Sprintf("%s=%s", NLBClientRuleDescription, lbName)
 	healthRule := fmt.Sprintf("%s=%s", NLBHealthCheckRuleDescription, lbName)
+	alreadyAdded := sets.NewString()
 	for i := range securityGroups {
 		for j := range securityGroups[i].IpPermissions {
 			for k := range securityGroups[i].IpPermissions[j].IpRanges {
 				description := aws.StringValue(securityGroups[i].IpPermissions[j].IpRanges[k].Description)
 				if description == clientRule || description == healthRule {
-					response = append(response, securityGroups[i])
+					sgIDString := aws.StringValue(securityGroups[i].GroupId)
+					if !alreadyAdded.Has(sgIDString) {
+						response = append(response, securityGroups[i])
+						alreadyAdded.Insert(sgIDString)
+					}
 				}
 			}
 		}
@@ -594,6 +599,7 @@ func (c *Cloud) getVpcCidrBlock() (*string, error) {
 // if clientTraffic is false, then only update HealthCheck rules
 func (c *Cloud) updateInstanceSecurityGroupsForNLBTraffic(actualGroups []*ec2.SecurityGroup, desiredSgIds []string, ports []int64, lbName string, clientCidrs []string, clientTraffic bool) error {
 
+	glog.V(8).Infof("updateInstanceSecurityGroupsForNLBTraffic: actualGroups=%v, desiredSgIds=%v, ports=%v, clientTraffic=%v", actualGroups, desiredSgIds, ports, clientTraffic)
 	// Map containing the groups we want to make changes on; the ports to make
 	// changes on; and whether to add or remove it. true to add, false to remove
 	portChanges := map[string]map[int64]bool{}
@@ -648,16 +654,16 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLBTraffic(actualGroups []*ec2.Se
 			if add {
 				if clientTraffic {
 					glog.V(2).Infof("Adding rule for client MTU discovery from the network load balancer (%s) to instances (%s)", clientCidrs, instanceSecurityGroupID)
-					glog.V(2).Infof("Adding rule for client traffic from the network load balancer (%s) to instances (%s)", clientCidrs, instanceSecurityGroupID)
+					glog.V(2).Infof("Adding rule for client traffic from the network load balancer (%s) to instances (%s), port (%v)", clientCidrs, instanceSecurityGroupID, port)
 				} else {
-					glog.V(2).Infof("Adding rule for health check traffic from the network load balancer (%s) to instances (%s)", clientCidrs, instanceSecurityGroupID)
+					glog.V(2).Infof("Adding rule for health check traffic from the network load balancer (%s) to instances (%s), port (%v)", clientCidrs, instanceSecurityGroupID, port)
 				}
 			} else {
 				if clientTraffic {
 					glog.V(2).Infof("Removing rule for client MTU discovery from the network load balancer (%s) to instances (%s)", clientCidrs, instanceSecurityGroupID)
-					glog.V(2).Infof("Removing rule for client traffic from the network load balancer (%s) to instance (%s)", clientCidrs, instanceSecurityGroupID)
+					glog.V(2).Infof("Removing rule for client traffic from the network load balancer (%s) to instance (%s), port (%v)", clientCidrs, instanceSecurityGroupID, port)
 				}
-				glog.V(2).Infof("Removing rule for health check traffic from the network load balancer (%s) to instance (%s)", clientCidrs, instanceSecurityGroupID)
+				glog.V(2).Infof("Removing rule for health check traffic from the network load balancer (%s) to instance (%s), port (%v)", clientCidrs, instanceSecurityGroupID, port)
 			}
 
 			if clientTraffic {
@@ -912,9 +918,17 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 
 		// We are supposed to specify one subnet per AZ.
 		// TODO: What happens if we have more than one subnet per AZ?
-		createRequest.Subnets = stringPointerArray(subnetIDs)
+		if subnetIDs == nil {
+			createRequest.Subnets = nil
+		} else {
+			createRequest.Subnets = aws.StringSlice(subnetIDs)
+		}
 
-		createRequest.SecurityGroups = stringPointerArray(securityGroupIDs)
+		if securityGroupIDs == nil {
+			createRequest.SecurityGroups = nil
+		} else {
+			createRequest.SecurityGroups = aws.StringSlice(securityGroupIDs)
+		}
 
 		// Get additional tags set by the user
 		tags := getLoadBalancerAdditionalTags(annotations)
@@ -996,7 +1010,11 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 				// This call just replaces the security groups, unlike e.g. subnets (!)
 				request := &elb.ApplySecurityGroupsToLoadBalancerInput{}
 				request.LoadBalancerName = aws.String(loadBalancerName)
-				request.SecurityGroups = stringPointerArray(securityGroupIDs)
+				if securityGroupIDs == nil {
+					request.SecurityGroups = nil
+				} else {
+					request.SecurityGroups = aws.StringSlice(securityGroupIDs)
+				}
 				glog.V(2).Info("Applying updated security groups to load balancer")
 				_, err := c.elb.ApplySecurityGroupsToLoadBalancer(request)
 				if err != nil {
@@ -1027,10 +1045,10 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 					if elbProtocolsAreEqual(actual.InstanceProtocol, expected.InstanceProtocol) {
 						continue
 					}
-					if orZero(actual.InstancePort) != orZero(expected.InstancePort) {
+					if aws.Int64Value(actual.InstancePort) != aws.Int64Value(expected.InstancePort) {
 						continue
 					}
-					if orZero(actual.LoadBalancerPort) != orZero(expected.LoadBalancerPort) {
+					if aws.Int64Value(actual.LoadBalancerPort) != aws.Int64Value(expected.LoadBalancerPort) {
 						continue
 					}
 					if awsArnEquals(actual.SSLCertificateId, expected.SSLCertificateId) {
@@ -1375,8 +1393,7 @@ func (c *Cloud) ensureSSLNegotiationPolicy(loadBalancer *elb.LoadBalancerDescrip
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
-			case "PolicyNotFound":
-				// TODO change from string to `elb.ErrCodePolicyNotFoundException` once the AWS SDK is updated
+			case elb.ErrCodePolicyNotFoundException:
 			default:
 				return fmt.Errorf("error describing security policies on load balancer: %q", err)
 			}

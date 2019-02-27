@@ -17,11 +17,11 @@ limitations under the License.
 package etcd
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"reflect"
 	"sync"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,7 +32,6 @@ import (
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 )
 
 // Etcd watch event actions
@@ -99,9 +98,6 @@ type etcdWatcher struct {
 
 	cache etcdCache
 }
-
-// watchWaitDuration is the amount of time to wait for an error from watch.
-const watchWaitDuration = 100 * time.Millisecond
 
 // newEtcdWatcher returns a new etcdWatcher; if list is true, watch sub-nodes.
 // The versioner must be able to handle the objects that transform creates.

@@ -24,9 +24,7 @@ go_library(
         "io.go",
         "pem.go",
     ],
-    data = [
-        "testdata/dontUseThisKey.pem",
-    ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/cert",
     importpath = "k8s.io/client-go/util/cert",
 )
 

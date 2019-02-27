@@ -254,6 +254,22 @@ func (rc *reconciler) reconcile() {
 					glog.V(5).Infof(volumeToMount.GenerateMsgDetailed("operationExecutor.MountVolume started", remountingLogStr))
 				}
 			}
+		} else if cache.IsFSResizeRequiredError(err) &&
+			utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes) {
+			glog.V(4).Infof(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.ExpandVolumeFSWithoutUnmounting", ""))
+			err := rc.operationExecutor.ExpandVolumeFSWithoutUnmounting(
+				volumeToMount.VolumeToMount,
+				rc.actualStateOfWorld)
+			if err != nil &&
+				!nestedpendingoperations.IsAlreadyExists(err) &&
+				!exponentialbackoff.IsExponentialBackoff(err) {
+				// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
+				// Log all other errors.
+				glog.Errorf(volumeToMount.GenerateErrorDetailed("operationExecutor.ExpandVolumeFSWithoutUnmounting failed", err).Error())
+			}
+			if err == nil {
+				glog.V(4).Infof(volumeToMount.GenerateMsgDetailed("operationExecutor.ExpandVolumeFSWithoutUnmounting started", ""))
+			}
 		}
 	}
 
@@ -439,6 +455,10 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	if err != nil {
 		return nil, err
 	}
+	deviceMountablePlugin, err := rc.volumePluginMgr.FindDeviceMountablePluginByName(volume.pluginName)
+	if err != nil {
+		return nil, err
+	}
 
 	// Create pod object
 	pod := &v1.Pod{
@@ -464,13 +484,13 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	}
 
 	var uniqueVolumeName v1.UniqueVolumeName
-	if attachablePlugin != nil {
+	if attachablePlugin != nil || deviceMountablePlugin != nil {
 		uniqueVolumeName, err = util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		uniqueVolumeName = util.GetUniqueVolumeNameForNonAttachableVolume(volume.podName, plugin, volumeSpec)
+		uniqueVolumeName = util.GetUniqueVolumeNameFromSpecWithPod(volume.podName, plugin, volumeSpec)
 	}
 	// Check existence of mount point for filesystem volume or symbolic link for block volume
 	isExist, checkErr := rc.operationExecutor.CheckVolumeExistenceOperation(volumeSpec, volume.mountPath, volumeSpec.Name(), rc.mounter, uniqueVolumeName, volume.podName, pod.UID, attachablePlugin)
@@ -593,7 +613,8 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 			volume.mounter,
 			volume.blockVolumeMapper,
 			volume.outerVolumeSpecName,
-			volume.volumeGidValue)
+			volume.volumeGidValue,
+			volume.volumeSpec)
 		if err != nil {
 			glog.Errorf("Could not add pod to volume information to actual state of world: %v", err)
 			continue

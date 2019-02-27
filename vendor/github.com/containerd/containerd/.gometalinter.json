@@ -10,6 +10,11 @@
   "WarnUnmatchedDirective": true,
 
   "Enable": [
+    "structcheck",
+    "unused",
+    "varcheck",
+    "staticcheck",
+
     "gofmt",
     "goimports",
     "golint",

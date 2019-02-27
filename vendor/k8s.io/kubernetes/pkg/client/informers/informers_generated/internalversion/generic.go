@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import (
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates"
+	coordination "k8s.io/kubernetes/pkg/apis/coordination"
 	core "k8s.io/kubernetes/pkg/apis/core"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	networking "k8s.io/kubernetes/pkg/apis/networking"
@@ -92,6 +93,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case certificates.SchemeGroupVersion.WithResource("certificatesigningrequests"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Certificates().InternalVersion().CertificateSigningRequests().Informer()}, nil
 
+		// Group=coordination.k8s.io, Version=internalVersion
+	case coordination.SchemeGroupVersion.WithResource("leases"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Coordination().InternalVersion().Leases().Informer()}, nil
+
 		// Group=core, Version=internalVersion
 	case core.SchemeGroupVersion.WithResource("componentstatuses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Core().InternalVersion().ComponentStatuses().Informer()}, nil
@@ -133,8 +138,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().InternalVersion().Deployments().Informer()}, nil
 	case extensions.SchemeGroupVersion.WithResource("ingresses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().InternalVersion().Ingresses().Informer()}, nil
-	case extensions.SchemeGroupVersion.WithResource("podsecuritypolicies"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().InternalVersion().PodSecurityPolicies().Informer()}, nil
 	case extensions.SchemeGroupVersion.WithResource("replicasets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().InternalVersion().ReplicaSets().Informer()}, nil
 
@@ -145,6 +148,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=policy, Version=internalVersion
 	case policy.SchemeGroupVersion.WithResource("poddisruptionbudgets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Policy().InternalVersion().PodDisruptionBudgets().Informer()}, nil
+	case policy.SchemeGroupVersion.WithResource("podsecuritypolicies"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Policy().InternalVersion().PodSecurityPolicies().Informer()}, nil
 
 		// Group=rbac.authorization.k8s.io, Version=internalVersion
 	case rbac.SchemeGroupVersion.WithResource("clusterroles"):

@@ -19,24 +19,23 @@ package vsphere
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/vmware/govmomi/vim25"
-
-	"fmt"
-
 	"github.com/vmware/govmomi/vim25/mo"
-	"io/ioutil"
+
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib/diskmanagers"
 	"k8s.io/kubernetes/pkg/util/version"
-	"path/filepath"
 )
 
 const (
@@ -298,11 +297,15 @@ func (vs *VSphere) cleanUpDummyVMs(dummyVMPrefix string) {
 			continue
 		}
 		// A write lock is acquired to make sure the cleanUp routine doesn't delete any VM's created by ongoing PVC requests.
-		defer cleanUpDummyVMLock.Lock()
-		err = diskmanagers.CleanUpDummyVMs(ctx, vmFolder, dc)
-		if err != nil {
-			glog.V(4).Infof("Unable to clean up dummy VM's in the kubernetes cluster: %q. err: %+v", vs.cfg.Workspace.Folder, err)
+		cleanUpDummyVMs := func() {
+			cleanUpDummyVMLock.Lock()
+			defer cleanUpDummyVMLock.Unlock()
+			err = diskmanagers.CleanUpDummyVMs(ctx, vmFolder, dc)
+			if err != nil {
+				glog.V(4).Infof("Unable to clean up dummy VM's in the kubernetes cluster: %q. err: %+v", vs.cfg.Workspace.Folder, err)
+			}
 		}
+		cleanUpDummyVMs()
 	}
 }
 
@@ -479,7 +482,7 @@ func (vs *VSphere) checkDiskAttached(ctx context.Context, nodes []k8stypes.NodeN
 			return nodesToRetry, err
 		}
 		nodeUUID = strings.ToLower(nodeUUID)
-		glog.V(9).Infof("Verifying volume for node %s with nodeuuid %q: %s", nodeName, nodeUUID, vmMoMap)
+		glog.V(9).Infof("Verifying volume for node %s with nodeuuid %q: %v", nodeName, nodeUUID, vmMoMap)
 		vclib.VerifyVolumePathsForVM(vmMoMap[nodeUUID], nodeVolumes[nodeName], convertToString(nodeName), attached)
 	}
 	return nodesToRetry, nil
@@ -520,6 +523,27 @@ func (vs *VSphere) IsDummyVMPresent(vmName string) (bool, error) {
 	}
 
 	return isDummyVMPresent, nil
+}
+
+func (vs *VSphere) GetNodeNameFromProviderID(providerID string) (string, error) {
+	var nodeName string
+	nodes, err := vs.nodeManager.GetNodeDetails()
+	if err != nil {
+		glog.Errorf("Error while obtaining Kubernetes node nodeVmDetail details. error : %+v", err)
+		return "", err
+	}
+	for _, node := range nodes {
+		// ProviderID is UUID for nodes v1.9.3+
+		if node.VMUUID == GetUUIDFromProviderID(providerID) || node.NodeName == providerID {
+			nodeName = node.NodeName
+			break
+		}
+	}
+	if nodeName == "" {
+		msg := fmt.Sprintf("Error while obtaining Kubernetes nodename for providerID %s.", providerID)
+		return "", errors.New(msg)
+	}
+	return nodeName, nil
 }
 
 func GetVMUUID() (string, error) {

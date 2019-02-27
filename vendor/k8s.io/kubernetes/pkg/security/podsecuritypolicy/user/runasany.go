@@ -19,7 +19,7 @@ package user
 import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
 // runAsAny implements the interface RunAsUserStrategy.
@@ -28,7 +28,7 @@ type runAsAny struct{}
 var _ RunAsUserStrategy = &runAsAny{}
 
 // NewRunAsAny provides a strategy that will return nil.
-func NewRunAsAny(options *extensions.RunAsUserStrategyOptions) (RunAsUserStrategy, error) {
+func NewRunAsAny(options *policy.RunAsUserStrategyOptions) (RunAsUserStrategy, error) {
 	return &runAsAny{}, nil
 }
 
@@ -38,6 +38,6 @@ func (s *runAsAny) Generate(pod *api.Pod, container *api.Container) (*int64, err
 }
 
 // Validate ensures that the specified values fall within the range of the strategy.
-func (s *runAsAny) Validate(fldPath *field.Path, _ *api.Pod, _ *api.Container, runAsNonRoot *bool, runAsUser *int64) field.ErrorList {
+func (s *runAsAny) Validate(_ *field.Path, _ *api.Pod, _ *api.Container, runAsNonRoot *bool, runAsUser *int64) field.ErrorList {
 	return field.ErrorList{}
 }

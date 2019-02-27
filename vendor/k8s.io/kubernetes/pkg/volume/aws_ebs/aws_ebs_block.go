@@ -18,7 +18,6 @@ package aws_ebs
 
 import (
 	"fmt"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -30,14 +29,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
-var _ volume.VolumePlugin = &awsElasticBlockStorePlugin{}
-var _ volume.PersistentVolumePlugin = &awsElasticBlockStorePlugin{}
 var _ volume.BlockVolumePlugin = &awsElasticBlockStorePlugin{}
-var _ volume.DeletableVolumePlugin = &awsElasticBlockStorePlugin{}
-var _ volume.ProvisionableVolumePlugin = &awsElasticBlockStorePlugin{}
 
 func (plugin *awsElasticBlockStorePlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, mapPath string) (*volume.Spec, error) {
 	pluginDir := plugin.host.GetVolumeDevicePluginDir(awsElasticBlockStorePluginName)
@@ -156,6 +152,10 @@ func (b *awsElasticBlockStoreMapper) SetUpDevice() (string, error) {
 	return "", nil
 }
 
+func (b *awsElasticBlockStoreMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
+	return util.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
+}
+
 // GetGlobalMapPath returns global map path and error
 // path: plugins/kubernetes.io/{PluginName}/volumeDevices/volumeID
 //       plugins/kubernetes.io/aws-ebs/volumeDevices/vol-XXXXXX
@@ -164,7 +164,7 @@ func (ebs *awsElasticBlockStore) GetGlobalMapPath(spec *volume.Spec) (string, er
 	if err != nil {
 		return "", err
 	}
-	return path.Join(ebs.plugin.host.GetVolumeDevicePluginDir(awsElasticBlockStorePluginName), string(volumeSource.VolumeID)), nil
+	return filepath.Join(ebs.plugin.host.GetVolumeDevicePluginDir(awsElasticBlockStorePluginName), string(volumeSource.VolumeID)), nil
 }
 
 // GetPodDeviceMapPath returns pod device map path and volume name

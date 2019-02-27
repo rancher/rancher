@@ -9,7 +9,7 @@ The requirements to build `CFSSL` are:
 
 To build, run:
 
-    $ script/build    
+    $ script/build-docker    
 
 This is will build by default all the cfssl command line utilities
 for darwin (OSX), linux, and windows for i386 and amd64 and output the
@@ -17,7 +17,7 @@ binaries in the current path.
 
 To build a specific platform and OS, run:
 
-    $ script/build -os="darwin" -arch="amd64"
+    $ script/build-docker -os="darwin" -arch="amd64"
 
 Note: for cross-compilation compatibility, the Docker build process will
 build programs without PKCS #11.
@@ -26,10 +26,12 @@ build programs without PKCS #11.
 
 The requirements to build without Docker are:
 
-1. Go version 1.5 is the minimum required version of Go.
+1. Go version 1.5 is the minimum required version of Go. However, only Go 1.6+
+   is supported due to the test system not supporting Go 1.5.
 2. A properly configured go environment
 3. A properly configured GOPATH
-4. With Go 1.5, you are required to set the environment variable `GO15VENDOREXPERIMENT=1`
+4. With Go 1.5, you are required to set the environment variable
+   `GO15VENDOREXPERIMENT=1`.
 
 Run:
 
