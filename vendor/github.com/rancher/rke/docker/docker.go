@@ -20,7 +20,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/rancher/rke/log"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -170,7 +170,7 @@ func IsContainerRunning(ctx context.Context, dClient *client.Client, hostname st
 
 	}
 	for _, container := range containers {
-		if container.Names[0] == "/"+containerName {
+		if len(container.Names) != 0 && container.Names[0] == "/"+containerName {
 			return true, nil
 		}
 	}
