@@ -178,7 +178,7 @@ func run() error {
 		}
 
 		if err := cleanup(context.Background()); err != nil {
-			return err
+			logrus.Warnf("Unable to perform docker cleanup: %v", err)
 		}
 
 		go func() {

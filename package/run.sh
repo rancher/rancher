@@ -147,9 +147,9 @@ fi
 
 if [ "$CATTLE_CLUSTER" != "true" ]; then
     if [ ! -w /var/run/docker.sock ] || [ ! -S /var/run/docker.sock ]; then
-        error Please bind mount in the docker socket to /var/run/docker.sock
-        error example:  docker run -v /var/run/docker.sock:/var/run/docker.sock ...
-        exit 1
+        warn "Docker socket is not available!"
+        warn "Please bind mount in the docker socket to /var/run/docker.sock if docker errors occur"
+        warn "example:  docker run -v /var/run/docker.sock:/var/run/docker.sock ..."
     fi
 fi
 
