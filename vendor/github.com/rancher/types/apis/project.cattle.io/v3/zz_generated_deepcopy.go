@@ -468,21 +468,13 @@ func (in *Constraints) DeepCopyInto(out *Constraints) {
 	*out = *in
 	if in.Branch != nil {
 		in, out := &in.Branch, &out.Branch
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(Constraint)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(Constraint)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Event != nil {
 		in, out := &in.Event, &out.Event
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(Constraint)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(Constraint)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -1162,12 +1154,8 @@ func (in *PipelineConfig) DeepCopyInto(out *PipelineConfig) {
 	}
 	if in.Branch != nil {
 		in, out := &in.Branch, &out.Branch
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(Constraint)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(Constraint)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -1403,12 +1391,8 @@ func (in *PipelineStatus) DeepCopyInto(out *PipelineStatus) {
 	*out = *in
 	if in.SourceCodeCredential != nil {
 		in, out := &in.SourceCodeCredential, &out.SourceCodeCredential
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SourceCodeCredential)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(SourceCodeCredential)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -2035,12 +2019,8 @@ func (in *Stage) DeepCopyInto(out *Stage) {
 	}
 	if in.When != nil {
 		in, out := &in.When, &out.When
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(Constraints)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(Constraints)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -2081,39 +2061,23 @@ func (in *Step) DeepCopyInto(out *Step) {
 	*out = *in
 	if in.SourceCodeConfig != nil {
 		in, out := &in.SourceCodeConfig, &out.SourceCodeConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SourceCodeConfig)
-			**out = **in
-		}
+		*out = new(SourceCodeConfig)
+		**out = **in
 	}
 	if in.RunScriptConfig != nil {
 		in, out := &in.RunScriptConfig, &out.RunScriptConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(RunScriptConfig)
-			**out = **in
-		}
+		*out = new(RunScriptConfig)
+		**out = **in
 	}
 	if in.PublishImageConfig != nil {
 		in, out := &in.PublishImageConfig, &out.PublishImageConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(PublishImageConfig)
-			**out = **in
-		}
+		*out = new(PublishImageConfig)
+		**out = **in
 	}
 	if in.ApplyYamlConfig != nil {
 		in, out := &in.ApplyYamlConfig, &out.ApplyYamlConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ApplyYamlConfig)
-			**out = **in
-		}
+		*out = new(ApplyYamlConfig)
+		**out = **in
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
@@ -2129,12 +2093,8 @@ func (in *Step) DeepCopyInto(out *Step) {
 	}
 	if in.When != nil {
 		in, out := &in.When, &out.When
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(Constraints)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(Constraints)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }

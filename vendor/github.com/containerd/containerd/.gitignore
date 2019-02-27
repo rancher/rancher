@@ -1,4 +1,4 @@
 /bin/
-**/coverage.txt
-**/coverage.out
+coverage.txt
+profile.out
 containerd.test

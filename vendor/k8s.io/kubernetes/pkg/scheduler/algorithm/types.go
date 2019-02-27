@@ -17,13 +17,18 @@ limitations under the License.
 package algorithm
 
 import (
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
+
+// NodeFieldSelectorKeys is a map that: the key are node field selector keys; the values are
+// the functions to get the value of the node field.
+var NodeFieldSelectorKeys = map[string]func(*v1.Node) string{
+	NodeFieldSelectorKeyNodeName: func(n *v1.Node) string { return n.Name },
+}
 
 // FitPredicate is a function that indicates if a pod fits into an existing node.
 // The failure information is given by the error.
@@ -78,9 +83,6 @@ type PredicateFailureReason interface {
 	GetReason() string
 }
 
-// GetEquivalencePodFunc is a function that gets a EquivalencePod from a pod.
-type GetEquivalencePodFunc func(pod *v1.Pod) interface{}
-
 // NodeLister interface represents anything that can list nodes for a scheduler.
 type NodeLister interface {
 	// We explicitly return []*v1.Node, instead of v1.NodeList, to avoid
@@ -117,7 +119,7 @@ type ControllerLister interface {
 // ReplicaSetLister interface represents anything that can produce a list of ReplicaSet; the list is consumed by a scheduler.
 type ReplicaSetLister interface {
 	// Gets the replicasets for the given pod
-	GetPodReplicaSets(*v1.Pod) ([]*extensions.ReplicaSet, error)
+	GetPodReplicaSets(*v1.Pod) ([]*apps.ReplicaSet, error)
 }
 
 var _ ControllerLister = &EmptyControllerLister{}
@@ -141,7 +143,7 @@ var _ ReplicaSetLister = &EmptyReplicaSetLister{}
 type EmptyReplicaSetLister struct{}
 
 // GetPodReplicaSets returns nil
-func (f EmptyReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*extensions.ReplicaSet, err error) {
+func (f EmptyReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*apps.ReplicaSet, err error) {
 	return nil, nil
 }
 

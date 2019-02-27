@@ -47,13 +47,13 @@ import (
 const (
 	imageWatcherStr = "watcher="
 	imageSizeStr    = "size "
-	sizeDivStr      = " MB in"
 	kubeLockMagic   = "kubelet_lock_magic_"
 	// The following three values are used for 30 seconds timeout
 	// while waiting for RBD Watcher to expire.
 	rbdImageWatcherInitDelay = 1 * time.Second
 	rbdImageWatcherFactor    = 1.4
 	rbdImageWatcherSteps     = 10
+	rbdImageSizeUnitMiB      = 1024 * 1024
 )
 
 func getDevFromImageAndPool(pool, image string) (string, bool) {
@@ -318,7 +318,11 @@ func (util *RBDUtil) rbdUnlock(b rbdMounter) error {
 	}
 
 	// Construct lock id using host name and a magic prefix.
-	lock_id := kubeLockMagic + node.GetHostname("")
+	hostName, err := node.GetHostname("")
+	if err != nil {
+		return err
+	}
+	lock_id := kubeLockMagic + hostName
 
 	mon := util.kernelRBDMonitorsOpt(b.Mon)
 
@@ -346,6 +350,8 @@ func (util *RBDUtil) rbdUnlock(b rbdMounter) error {
 		cmd, err = b.exec.Run("rbd", args...)
 		if err == nil {
 			glog.V(4).Infof("rbd: successfully remove lock (locker_id: %s) on image: %s/%s with id %s mon %s", lock_id, b.Pool, b.Image, b.Id, mon)
+		} else {
+			glog.Warningf("rbd: failed to remove lock (lock_id: %s) on image: %s/%s with id %s mon %s: %v", lock_id, b.Pool, b.Image, b.Id, mon, err)
 		}
 	}
 
@@ -388,12 +394,26 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 			Factor:   rbdImageWatcherFactor,
 			Steps:    rbdImageWatcherSteps,
 		}
+		needValidUsed := true
+		// If accessModes contain ReadOnlyMany, we don't need check rbd status of being used.
+		if b.accessModes != nil {
+			for _, v := range b.accessModes {
+				if v != v1.ReadWriteOnce {
+					needValidUsed = false
+					break
+				}
+			}
+		} else {
+			// ReadOnly rbd volume should not check rbd status of being used to
+			// support mounted as read-only by multiple consumers simultaneously.
+			needValidUsed = !b.rbd.ReadOnly
+		}
 		err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 			used, rbdOutput, err := util.rbdStatus(&b)
 			if err != nil {
 				return false, fmt.Errorf("fail to check rbd image status with: (%v), rbd output: (%s)", err, rbdOutput)
 			}
-			return !used, nil
+			return !needValidUsed || !used, nil
 		})
 		// Return error if rbd image has not become available for the specified timeout.
 		if err == wait.ErrWaitTimeout {
@@ -563,7 +583,10 @@ func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDPersistentVo
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	volSizeBytes := capacity.Value()
 	// Convert to MB that rbd defaults on.
-	sz := int(volutil.RoundUpSize(volSizeBytes, 1024*1024))
+	sz, err := volutil.RoundUpSizeInt(volSizeBytes, 1024*1024)
+	if err != nil {
+		return nil, 0, err
+	}
 	volSz := fmt.Sprintf("%d", sz)
 	mon := util.kernelRBDMonitorsOpt(p.Mon)
 	if p.rbdMounter.imageFormat == rbdImageFormat2 {
@@ -650,8 +673,7 @@ func (util *RBDUtil) ExpandImage(rbdExpander *rbdVolumeExpander, oldSize resourc
 // rbdInfo runs `rbd info` command to get the current image size in MB.
 func (util *RBDUtil) rbdInfo(b *rbdMounter) (int, error) {
 	var err error
-	var output string
-	var cmd []byte
+	var output []byte
 
 	// If we don't have admin id/secret (e.g. attaching), fallback to user id/secret.
 	id := b.adminId
@@ -680,9 +702,8 @@ func (util *RBDUtil) rbdInfo(b *rbdMounter) (int, error) {
 	// rbd: error opening image 1234: (2) No such file or directory
 	//
 	glog.V(4).Infof("rbd: info %s using mon %s, pool %s id %s key %s", b.Image, mon, b.Pool, id, secret)
-	cmd, err = b.exec.Run("rbd",
-		"info", b.Image, "--pool", b.Pool, "-m", mon, "--id", id, "--key="+secret)
-	output = string(cmd)
+	output, err = b.exec.Run("rbd",
+		"info", b.Image, "--pool", b.Pool, "-m", mon, "--id", id, "--key="+secret, "--format=json")
 
 	if err, ok := err.(*exec.Error); ok {
 		if err.Err == exec.ErrNotFound {
@@ -698,22 +719,20 @@ func (util *RBDUtil) rbdInfo(b *rbdMounter) (int, error) {
 	}
 
 	if len(output) == 0 {
-		return 0, fmt.Errorf("can not get image size info %s: %s", b.Image, output)
+		return 0, fmt.Errorf("can not get image size info %s: %s", b.Image, string(output))
 	}
 
-	// Get the size value string, just between `size ` and ` MB in`, such as `size 1024 MB in 256 objects`.
-	sizeIndex := strings.Index(output, imageSizeStr)
-	divIndex := strings.Index(output, sizeDivStr)
-	if sizeIndex == -1 || divIndex == -1 || divIndex <= sizeIndex+5 {
-		return 0, fmt.Errorf("can not get image size info %s: %s", b.Image, output)
-	}
-	rbdSizeStr := output[sizeIndex+5 : divIndex]
-	rbdSize, err := strconv.Atoi(rbdSizeStr)
-	if err != nil {
-		return 0, fmt.Errorf("can not convert size str: %s to int", rbdSizeStr)
-	}
+	return getRbdImageSize(output)
+}
 
-	return rbdSize, nil
+func getRbdImageSize(output []byte) (int, error) {
+	info := struct {
+		Size int64 `json:"size"`
+	}{}
+	if err := json.Unmarshal(output, &info); err != nil {
+		return 0, fmt.Errorf("parse rbd info output failed: %s, %v", string(output), err)
+	}
+	return int(info.Size / rbdImageSizeUnitMiB), nil
 }
 
 // rbdStatus runs `rbd status` command to check if there is watcher on the image.

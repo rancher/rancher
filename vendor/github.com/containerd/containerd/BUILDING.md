@@ -3,18 +3,38 @@
 This guide is useful if you intend to contribute on containerd. Thanks for your
 effort. Every contribution is very appreciated.
 
+This doc includes:
+* [Build requirements](#build-requirements)
+* [Build the development environment](#build-the-development-environment)
+* [Build containerd](#build-containerd)
+* [Via docker container](#via-docker-container)
+* [Testing](#testing-containerd)
+
+## Build requirements
+
+To build the `containerd` daemon, and the `ctr` simple test client, the following build system dependencies are required:
+
+* Go 1.9.x or above
+* Protoc 3.x compiler and headers (download at the [Google protobuf releases page](https://github.com/google/protobuf/releases))
+* Btrfs headers and libraries for your distribution. Note that building the btrfs driver can be disabled via the build tag `no_btrfs`, removing this dependency.
+
 ## Build the development environment
 
-In first you need to setup your Go development environment. You can follow this
+First you need to setup your Go development environment. You can follow this
 guideline [How to write go code](https://golang.org/doc/code.html) and at the
 end you need to have `GOPATH` and `GOROOT` set in your environment.
-
-Current containerd requires Go 1.9.x or above.
 
 At this point you can use `go` to checkout `containerd` in your `GOPATH`:
 
 ```sh
 go get github.com/containerd/containerd
+```
+
+For proper results, install the `protoc` release into `/usr/local` on your build system. For example, the following commands will download and install the 3.5.0 release for a 64-bit Linux host:
+
+```
+$ wget -c https://github.com/google/protobuf/releases/download/v3.5.0/protoc-3.5.0-linux-x86_64.zip
+$ sudo unzip protoc-3.5.0-linux-x86_64.zip -d /usr/local
 ```
 
 `containerd` uses [Btrfs](https://en.wikipedia.org/wiki/Btrfs) it means that you
@@ -23,9 +43,9 @@ need to satisfy this dependencies in your system:
 * CentOS/Fedora: `yum install btrfs-progs-devel`
 * Debian/Ubuntu: `apt-get install btrfs-tools`
 
-At this point you are ready to build `containerd` yourself.
+At this point you are ready to build `containerd` yourself!
 
-## In your local environment
+## Build containerd
 
 `containerd` uses `make` to create a repeatable build flow. It means that you
 can run:
@@ -34,21 +54,49 @@ can run:
 make
 ```
 
-This is going to build all the binaries provided by this project in the `./bin`
-directory.
+This is going to build all the project binaries in the `./bin/` directory.
 
-You can move them in your global path with:
+You can move them in your global path, `/usr/local/bin` with:
 
 ```sudo
 sudo make install
 ```
 
-## Via Docker Container
+When making any changes to the gRPC API, you can use the installed `protoc`
+compiler to regenerate the API generated code packages with:
 
-### Build containerd
+```sudo
+make generate
+```
 
-You can build `containerd` via Docker container. You can build an image from
-this `Dockerfile`:
+> *Note*: A build tag is currently available to disable building the btrfs snapshot driver.
+> Adding `BUILDTAGS=no_btrfs` to your environment before calling the **binaries**
+> Makefile target will disable the btrfs driver within the containerd Go build.
+
+Vendoring of external imports uses the [`vndr` tool](https://github.com/LK4D4/vndr) which uses a simple config file, `vendor.conf`, to provide the URL and version or hash details for each vendored import. After modifying `vendor.conf` run the `vndr` tool to update the `vendor/` directory contents. Combining the `vendor.conf` update with the changeset in `vendor/` after running `vndr` should become a single commit for a PR which relies on vendored updates.
+
+Please refer to [RUNC.md](/RUNC.md) for the currently supported version of `runc` that is used by containerd.
+
+### Static binaries
+
+You can build static binaries by providing a few variables to `make`:
+
+```sudo
+make EXTRA_FLAGS="-buildmode pie" \
+	EXTRA_LDFLAGS='-extldflags "-fno-PIC -static"' \
+	BUILDTAGS="static_build"
+```
+
+> *Note*:
+> - static build is discouraged
+> - static containerd binary does not support loading plugins
+
+# Via Docker container
+
+## Build containerd
+
+You can build `containerd` via a Linux-based Docker container.
+You can build an image from this `Dockerfile`:
 
 ```
 FROM golang
@@ -57,26 +105,26 @@ RUN apt-get update && \
     apt-get install btrfs-tools
 ```
 
-Let's suppose that you built an image called `containerd/build` and you are into
-the containerd root directory you can run the following command:
+Let's suppose that you built an image called `containerd/build`. From the
+containerd source root directory you can run the following command:
 
 ```sh
-docker run -it --rm \
+docker run -it \
     -v ${PWD}:/go/src/github.com/containerd/containerd \
     -e GOPATH=/go \
-    -w /go/src/github.com/containerd/containerd containerd/build make
+    -w /go/src/github.com/containerd/containerd containerd/build sh
 ```
 
-At this point you can find your binaries in the `./bin` directory in your host.
-You can move the binaries in your `$PATH` with the command:
+This mounts `containerd` repository
+
+You are now ready to [build](#build-containerd):
 
 ```sh
-sudo make install
+ make && make install
 ```
 
-### Build runc and containerd
-
-To have complete core container runtime, you will need both `containerd` and `runc`. It is possible to build both of these via Docker container.
+## Build containerd and runc
+To have complete core container runtime, you will both `containerd` and `runc`. It is possible to build both of these via Docker container.
 
 You can use `go` to checkout `runc` in your `GOPATH`:
 
@@ -84,7 +132,7 @@ You can use `go` to checkout `runc` in your `GOPATH`:
 go get github.com/opencontainers/runc
 ```
 
-We can build an image from this `Dockerfile`
+We can build an image from this `Dockerfile`:
 
 ```sh
 FROM golang
@@ -94,7 +142,7 @@ RUN apt-get update && \
 
 ```
 
-In our Docker container we will use a specific `runc` build which includes [seccomp](https://en.wikipedia.org/wiki/seccomp) and [apparmor](https://en.wikipedia.org/wiki/AppArmor) support. Hence why our Dockerfile includes these dependencies: `libapparmor-dev` `libseccomp-dev`.
+In our Docker container we will use a specific `runc` build which includes [seccomp](https://en.wikipedia.org/wiki/seccomp) and [apparmor](https://en.wikipedia.org/wiki/AppArmor) support. Hence why our Dockerfile includes these dependencies: `libapparmor-dev` `libseccomp-dev`. Please refer to [RUNC.md](/RUNC.md) for the currently supported version of `runc` that is used by containerd.
 
 Let's suppose you build an image called `containerd/build` from the above Dockerfile. You can run the following command:
 
@@ -103,13 +151,13 @@ docker run -it --privileged \
     -v /var/lib/containerd \
     -v ${GOPATH}/src/github.com/opencontainers/runc:/go/src/github.com/opencontainers/runc \
     -v ${GOPATH}/src/github.com/containerd/containerd:/go/src/github.com/containerd/containerd \
-    -e GOPATH=/go
+    -e GOPATH=/go \
     -w /go/src/github.com/containerd/containerd containerd/build sh
 ```
 
 This mounts both `runc` and `containerd` repositories in our Docker container.
 
-From within our Docker container let's build `containerd`
+From within our Docker container let's build `containerd`:
 
 ```sh
 cd /go/src/github.com/containerd/containerd
@@ -119,14 +167,14 @@ make && make install
 These binaries can be found in the `./bin` directory in your host.
 `make install` will move the binaries in your `$PATH`.
 
-Next, let's build `runc`
+Next, let's build `runc`:
 
 ```sh
 cd /go/src/github.com/opencontainers/runc
 make BUILDTAGS='seccomp apparmor' && make install
 ```
 
-When working with `ctr`, the containerd CLI we just built, don't forget to start `containerd`!
+When working with `ctr`, the simple test client we just built, don't forget to start the daemon!
 
 ```sh
 containerd --config config.toml

@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	ioutil "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -93,7 +92,6 @@ func (plugin *configMapPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts v
 			pod.UID,
 			plugin,
 			plugin.host.GetMounter(plugin.GetPluginName()),
-			plugin.host.GetWriter(),
 			volume.MetricsNil{},
 		},
 		source:       *spec.Volume.ConfigMap,
@@ -110,7 +108,6 @@ func (plugin *configMapPlugin) NewUnmounter(volName string, podUID types.UID) (v
 			podUID,
 			plugin,
 			plugin.host.GetMounter(plugin.GetPluginName()),
-			plugin.host.GetWriter(),
 			volume.MetricsNil{},
 		},
 	}, nil
@@ -131,7 +128,6 @@ type configMapVolume struct {
 	podUID  types.UID
 	plugin  *configMapPlugin
 	mounter mount.Interface
-	writer  ioutil.Writer
 	volume.MetricsNil
 }
 
@@ -207,13 +203,6 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		}
 	}
 
-	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
-		return err
-	}
-	if err := volumeutil.MakeNestedMountpoints(b.volName, dir, b.pod); err != nil {
-		return err
-	}
-
 	totalBytes := totalBytes(configMap)
 	glog.V(3).Infof("Received configMap %v/%v containing (%v) pieces of data, %v total bytes",
 		b.pod.Namespace,
@@ -225,6 +214,29 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err != nil {
 		return err
 	}
+
+	setupSuccess := false
+	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
+		return err
+	}
+	if err := volumeutil.MakeNestedMountpoints(b.volName, dir, b.pod); err != nil {
+		return err
+	}
+
+	defer func() {
+		// Clean up directories if setup fails
+		if !setupSuccess {
+			unmounter, unmountCreateErr := b.plugin.NewUnmounter(b.volName, b.podUID)
+			if unmountCreateErr != nil {
+				glog.Errorf("error cleaning up mount %s after failure. Create unmounter failed with %v", b.volName, unmountCreateErr)
+				return
+			}
+			tearDownErr := unmounter.TearDown()
+			if tearDownErr != nil {
+				glog.Errorf("Error tearing down volume %s with : %v", b.volName, tearDownErr)
+			}
+		}
+	}()
 
 	writerContext := fmt.Sprintf("pod %v/%v volume %v", b.pod.Namespace, b.pod.Name, b.volName)
 	writer, err := volumeutil.NewAtomicWriter(dir, writerContext)
@@ -244,6 +256,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		glog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
 		return err
 	}
+	setupSuccess = true
 	return nil
 }
 

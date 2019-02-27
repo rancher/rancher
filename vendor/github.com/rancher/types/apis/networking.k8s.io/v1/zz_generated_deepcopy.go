@@ -1,7 +1,7 @@
 package v1
 
 import (
-	networking_v1 "k8s.io/api/networking/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -12,7 +12,7 @@ func (in *NetworkPolicyList) DeepCopyInto(out *NetworkPolicyList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]networking_v1.NetworkPolicy, len(*in))
+		*out = make([]networkingv1.NetworkPolicy, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

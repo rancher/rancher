@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion"
+	policylisters "k8s.io/kubernetes/pkg/client/listers/policy/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 	psp "k8s.io/kubernetes/pkg/security/podsecuritypolicy"
@@ -61,7 +61,7 @@ type PodSecurityPolicyPlugin struct {
 	strategyFactory  psp.StrategyFactory
 	failOnNoPolicies bool
 	authz            authorizer.Authorizer
-	lister           extensionslisters.PodSecurityPolicyLister
+	lister           policylisters.PodSecurityPolicyLister
 }
 
 // SetAuthorizer sets the authorizer.
@@ -84,6 +84,7 @@ var _ admission.MutationInterface = &PodSecurityPolicyPlugin{}
 var _ admission.ValidationInterface = &PodSecurityPolicyPlugin{}
 var _ genericadmissioninit.WantsAuthorizer = &PodSecurityPolicyPlugin{}
 var _ kubeapiserveradmission.WantsInternalKubeInformerFactory = &PodSecurityPolicyPlugin{}
+var auditKeyPrefix = strings.ToLower(PluginName) + "." + policy.GroupName + ".k8s.io"
 
 // newPlugin creates a new PSP admission plugin.
 func newPlugin(strategyFactory psp.StrategyFactory, failOnNoPolicies bool) *PodSecurityPolicyPlugin {
@@ -95,7 +96,7 @@ func newPlugin(strategyFactory psp.StrategyFactory, failOnNoPolicies bool) *PodS
 }
 
 func (a *PodSecurityPolicyPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	podSecurityPolicyInformer := f.Extensions().InternalVersion().PodSecurityPolicies()
+	podSecurityPolicyInformer := f.Policy().InternalVersion().PodSecurityPolicies()
 	a.lister = podSecurityPolicyInformer.Lister()
 	a.SetReadyFunc(podSecurityPolicyInformer.Informer().HasSynced)
 }
@@ -136,6 +137,10 @@ func (c *PodSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 			pod.ObjectMeta.Annotations = map[string]string{}
 		}
 		pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation] = pspName
+		key := auditKeyPrefix + "/" + "admit-policy"
+		if err := a.AddAnnotation(key, pspName); err != nil {
+			glog.Warningf("failed to set admission audit annotation %s to %s: %v", key, pspName, err)
+		}
 		return nil
 	}
 
@@ -154,11 +159,15 @@ func (c *PodSecurityPolicyPlugin) Validate(a admission.Attributes) error {
 	pod := a.GetObject().(*api.Pod)
 
 	// compute the context. Mutation is not allowed. ValidatedPSPAnnotation is used as a hint to gain same speed-up.
-	allowedPod, _, validationErrs, err := c.computeSecurityContext(a, pod, false, pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation])
+	allowedPod, pspName, validationErrs, err := c.computeSecurityContext(a, pod, false, pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation])
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
 	if apiequality.Semantic.DeepEqual(pod, allowedPod) {
+		key := auditKeyPrefix + "/" + "validate-policy"
+		if err := a.AddAnnotation(key, pspName); err != nil {
+			glog.Warningf("failed to set admission audit annotation %s to %s: %v", key, pspName, err)
+		}
 		return nil
 	}
 
@@ -249,7 +258,7 @@ func (c *PodSecurityPolicyPlugin) computeSecurityContext(a admission.Attributes,
 	for _, provider := range providers {
 		podCopy := pod.DeepCopy()
 
-		if errs := assignSecurityContext(provider, podCopy, field.NewPath(fmt.Sprintf("provider %s: ", provider.GetPSPName()))); len(errs) > 0 {
+		if errs := assignSecurityContext(provider, podCopy); len(errs) > 0 {
 			validationErrs[provider.GetPSPName()] = errs
 			continue
 		}
@@ -294,7 +303,7 @@ func (c *PodSecurityPolicyPlugin) computeSecurityContext(a admission.Attributes,
 // assignSecurityContext creates a security context for each container in the pod
 // and validates that the sc falls within the psp constraints.  All containers must validate against
 // the same psp or is not considered valid.
-func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.Path) field.ErrorList {
+func assignSecurityContext(provider psp.Provider, pod *api.Pod) field.ErrorList {
 	errs := field.ErrorList{}
 
 	err := provider.DefaultPodSecurityContext(pod)
@@ -302,7 +311,7 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 		errs = append(errs, field.Invalid(field.NewPath("spec", "securityContext"), pod.Spec.SecurityContext, err.Error()))
 	}
 
-	errs = append(errs, provider.ValidatePod(pod, field.NewPath("spec", "securityContext"))...)
+	errs = append(errs, provider.ValidatePod(pod)...)
 
 	for i := range pod.Spec.InitContainers {
 		err := provider.DefaultContainerSecurityContext(pod, &pod.Spec.InitContainers[i])
@@ -310,7 +319,7 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 			errs = append(errs, field.Invalid(field.NewPath("spec", "initContainers").Index(i).Child("securityContext"), "", err.Error()))
 			continue
 		}
-		errs = append(errs, provider.ValidateContainerSecurityContext(pod, &pod.Spec.InitContainers[i], field.NewPath("spec", "initContainers").Index(i).Child("securityContext"))...)
+		errs = append(errs, provider.ValidateContainer(pod, &pod.Spec.InitContainers[i], field.NewPath("spec", "initContainers").Index(i))...)
 	}
 
 	for i := range pod.Spec.Containers {
@@ -319,7 +328,7 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 			errs = append(errs, field.Invalid(field.NewPath("spec", "containers").Index(i).Child("securityContext"), "", err.Error()))
 			continue
 		}
-		errs = append(errs, provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[i], field.NewPath("spec", "containers").Index(i).Child("securityContext"))...)
+		errs = append(errs, provider.ValidateContainer(pod, &pod.Spec.Containers[i], field.NewPath("spec", "containers").Index(i))...)
 	}
 
 	if len(errs) > 0 {
@@ -329,7 +338,7 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 }
 
 // createProvidersFromPolicies creates providers from the constraints supplied.
-func (c *PodSecurityPolicyPlugin) createProvidersFromPolicies(psps []*extensions.PodSecurityPolicy, namespace string) ([]psp.Provider, []error) {
+func (c *PodSecurityPolicyPlugin) createProvidersFromPolicies(psps []*policy.PodSecurityPolicy, namespace string) ([]psp.Provider, []error) {
 	var (
 		// collected providers
 		providers []psp.Provider

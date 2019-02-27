@@ -34,7 +34,7 @@ Once you've installed a library, you import it like this:
 package main
 
 import (
-    "golang.org/x/net/context"
+    "context"
     "golang.org/x/oauth2"
     "golang.org/x/oauth2/google"
     "google.golang.org/api/urlshortener/v1"
@@ -128,3 +128,19 @@ For a more complete example, see
 [urlshortener.go](https://github.com/google/google-api-go-client/tree/master/examples/urlshortener.go)
 in the [examples directory](https://github.com/google/google-api-go-client/tree/master/examples/).
 (the examples use some functions in `main.go` in the same directory)
+
+## Error Handling
+
+Most errors returned by the `Do` methods of these clients will be of type
+[`googleapi.Error`](https://godoc.org/google.golang.org/api/googleapi#Error).
+Use a type assertion to obtain the HTTP status code and other properties of the
+error:
+
+```go
+    url, err := svc.Url.Get(shortURL).Do()
+    if err != nil {
+        if e, ok := err.(*googleapi.Error); ok && e.Code == http.StatusNotFound {
+            ...
+        }
+    }
+```

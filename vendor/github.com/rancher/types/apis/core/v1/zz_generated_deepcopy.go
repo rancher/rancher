@@ -1,7 +1,7 @@
 package v1
 
 import (
-	core_v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -12,7 +12,7 @@ func (in *ComponentStatusList) DeepCopyInto(out *ComponentStatusList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]core_v1.ComponentStatus, len(*in))
+		*out = make([]corev1.ComponentStatus, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -45,7 +45,7 @@ func (in *ConfigMapList) DeepCopyInto(out *ConfigMapList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]core_v1.ConfigMap, len(*in))
+		*out = make([]corev1.ConfigMap, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -78,7 +78,7 @@ func (in *EndpointsList) DeepCopyInto(out *EndpointsList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]core_v1.Endpoints, len(*in))
+		*out = make([]corev1.Endpoints, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -111,7 +111,7 @@ func (in *EventList) DeepCopyInto(out *EventList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]core_v1.Event, len(*in))
+		*out = make([]corev1.Event, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -144,7 +144,7 @@ func (in *NamespaceList) DeepCopyInto(out *NamespaceList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]core_v1.Namespace, len(*in))
+		*out = make([]corev1.Namespace, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -177,7 +177,7 @@ func (in *NodeList) DeepCopyInto(out *NodeList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]core_v1.Node, len(*in))
+		*out = make([]corev1.Node, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -210,7 +210,7 @@ func (in *PersistentVolumeClaimList) DeepCopyInto(out *PersistentVolumeClaimList
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]core_v1.PersistentVolumeClaim, len(*in))
+		*out = make([]corev1.PersistentVolumeClaim, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -243,7 +243,7 @@ func (in *PodList) DeepCopyInto(out *PodList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]core_v1.Pod, len(*in))
+		*out = make([]corev1.Pod, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -276,7 +276,7 @@ func (in *ReplicationControllerList) DeepCopyInto(out *ReplicationControllerList
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]core_v1.ReplicationController, len(*in))
+		*out = make([]corev1.ReplicationController, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -309,7 +309,7 @@ func (in *ResourceQuotaList) DeepCopyInto(out *ResourceQuotaList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]core_v1.ResourceQuota, len(*in))
+		*out = make([]corev1.ResourceQuota, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -342,7 +342,7 @@ func (in *SecretList) DeepCopyInto(out *SecretList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]core_v1.Secret, len(*in))
+		*out = make([]corev1.Secret, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -375,7 +375,7 @@ func (in *ServiceAccountList) DeepCopyInto(out *ServiceAccountList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]core_v1.ServiceAccount, len(*in))
+		*out = make([]corev1.ServiceAccount, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -408,7 +408,7 @@ func (in *ServiceList) DeepCopyInto(out *ServiceList) {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]core_v1.Service, len(*in))
+		*out = make([]corev1.Service, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

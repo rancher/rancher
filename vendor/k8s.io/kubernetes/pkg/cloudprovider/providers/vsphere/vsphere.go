@@ -17,10 +17,12 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -32,7 +34,9 @@ import (
 	"gopkg.in/gcfg.v1"
 
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
+	"github.com/vmware/govmomi/vapi/rest"
+	"github.com/vmware/govmomi/vapi/tags"
+	"github.com/vmware/govmomi/vim25/mo"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
@@ -61,6 +65,18 @@ var datastoreFolderIDMap = make(map[string]map[string]string)
 var cleanUpRoutineInitLock sync.Mutex
 var cleanUpDummyVMLock sync.RWMutex
 
+// Error Messages
+const (
+	MissingUsernameErrMsg = "Username is missing"
+	MissingPasswordErrMsg = "Password is missing"
+)
+
+// Error constants
+var (
+	ErrUsernameMissing = errors.New(MissingUsernameErrMsg)
+	ErrPasswordMissing = errors.New(MissingPasswordErrMsg)
+)
+
 // VSphere is an implementation of cloud provider Interface for VSphere.
 type VSphere struct {
 	cfg      *VSphereConfig
@@ -68,8 +84,9 @@ type VSphere struct {
 	// Maps the VSphere IP address to VSphereInstance
 	vsphereInstanceMap map[string]*VSphereInstance
 	// Responsible for managing discovery of k8s node, their location etc.
-	nodeManager *NodeManager
-	vmUUID      string
+	nodeManager          *NodeManager
+	vmUUID               string
+	isSecretInfoProvided bool
 }
 
 // Represents a vSphere instance where one or more kubernetes nodes are running.
@@ -90,6 +107,8 @@ type VirtualCenterConfig struct {
 	Datacenters string `gcfg:"datacenters"`
 	// Soap round tripper count (retries = RoundTripper - 1)
 	RoundTripperCount uint `gcfg:"soap-roundtrip-count"`
+	// Thumbprint of the VCenter's certificate thumbprint
+	Thumbprint string `gcfg:"thumbprint"`
 }
 
 // Structure that represents the content of vsphere.conf file.
@@ -108,6 +127,11 @@ type VSphereConfig struct {
 		VCenterPort string `gcfg:"port"`
 		// True if vCenter uses self-signed cert.
 		InsecureFlag bool `gcfg:"insecure-flag"`
+		// Specifies the path to a CA certificate in PEM format. Optional; if not
+		// configured, the system's CA certificates will be used.
+		CAFile string `gcfg:"ca-file"`
+		// Thumbprint of the VCenter's certificate thumbprint
+		Thumbprint string `gcfg:"thumbprint"`
 		// Datacenter in which VMs are located.
 		// Deprecated. Use "datacenters" instead.
 		Datacenter string `gcfg:"datacenter"`
@@ -121,7 +145,7 @@ type VSphereConfig struct {
 		WorkingDir string `gcfg:"working-dir"`
 		// Soap round tripper count (retries = RoundTripper - 1)
 		RoundTripperCount uint `gcfg:"soap-roundtrip-count"`
-		// Deprecated as the virtual machines will be automatically discovered.
+		// Is required on the controller-manager if it does not run on a VMware machine
 		// VMUUID is the VM Instance UUID of virtual machine which can be retrieved from instanceUuid
 		// property in VmConfigInfo, or also set as vc.uuid in VMX file.
 		// If not set, will be fetched from the machine via sysfs (requires root)
@@ -131,6 +155,10 @@ type VSphereConfig struct {
 		// Combining the WorkingDir and VMName can form a unique InstanceID.
 		// When vm-name is set, no username/password is required on worker nodes.
 		VMName string `gcfg:"vm-name"`
+		// Name of the secret were vCenter credentials are present.
+		SecretName string `gcfg:"secret-name"`
+		// Secret Namespace where secret will be present that has vCenter credentials.
+		SecretNamespace string `gcfg:"secret-namespace"`
 	}
 
 	VirtualCenter map[string]*VirtualCenterConfig
@@ -152,6 +180,12 @@ type VSphereConfig struct {
 		Folder           string `gcfg:"folder"`
 		DefaultDatastore string `gcfg:"default-datastore"`
 		ResourcePoolPath string `gcfg:"resourcepool-path"`
+	}
+
+	// Tag categories and tags which correspond to "built-in node labels: zones and region"
+	Labels struct {
+		Zone   string `gcfg:"zone"`
+		Region string `gcfg:"region"`
 	}
 }
 
@@ -217,6 +251,18 @@ func (vs *VSphere) SetInformers(informerFactory informers.SharedInformerFactory)
 		return
 	}
 
+	if vs.isSecretInfoProvided {
+		secretCredentialManager := &SecretCredentialManager{
+			SecretName:      vs.cfg.Global.SecretName,
+			SecretNamespace: vs.cfg.Global.SecretNamespace,
+			SecretLister:    informerFactory.Core().V1().Secrets().Lister(),
+			Cache: &SecretCache{
+				VirtualCenter: make(map[string]*Credential),
+			},
+		}
+		vs.nodeManager.UpdateCredentialManager(secretCredentialManager)
+	}
+
 	// Only on controller node it is required to register listeners.
 	// Register callbacks for node updates
 	glog.V(4).Infof("Setting up node informers for vSphere Cloud Provider")
@@ -226,6 +272,7 @@ func (vs *VSphere) SetInformers(informerFactory informers.SharedInformerFactory)
 		DeleteFunc: vs.NodeDeleted,
 	})
 	glog.V(4).Infof("Node informers in vSphere cloud provider initialized")
+
 }
 
 // Creates new worker node interface and returns
@@ -247,19 +294,40 @@ func newWorkerNode() (*VSphere, error) {
 
 func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance, error) {
 	vsphereInstanceMap := make(map[string]*VSphereInstance)
+	isSecretInfoProvided := true
+
+	if cfg.Global.SecretName == "" || cfg.Global.SecretNamespace == "" {
+		glog.Warningf("SecretName and/or SecretNamespace is not provided. " +
+			"VCP will use username and password from config file")
+		isSecretInfoProvided = false
+	}
+
+	if isSecretInfoProvided {
+		if cfg.Global.User != "" {
+			glog.Warning("Global.User and Secret info provided. VCP will use secret to get credentials")
+			cfg.Global.User = ""
+		}
+		if cfg.Global.Password != "" {
+			glog.Warning("Global.Password and Secret info provided. VCP will use secret to get credentials")
+			cfg.Global.Password = ""
+		}
+	}
 
 	// Check if the vsphere.conf is in old format. In this
 	// format the cfg.VirtualCenter will be nil or empty.
 	if cfg.VirtualCenter == nil || len(cfg.VirtualCenter) == 0 {
 		glog.V(4).Infof("Config is not per virtual center and is in old format.")
-		if cfg.Global.User == "" {
-			glog.Error("Global.User is empty!")
-			return nil, errors.New("Global.User is empty!")
+		if !isSecretInfoProvided {
+			if cfg.Global.User == "" {
+				glog.Error("Global.User is empty!")
+				return nil, ErrUsernameMissing
+			}
+			if cfg.Global.Password == "" {
+				glog.Error("Global.Password is empty!")
+				return nil, ErrPasswordMissing
+			}
 		}
-		if cfg.Global.Password == "" {
-			glog.Error("Global.Password is empty!")
-			return nil, errors.New("Global.Password is empty!")
-		}
+
 		if cfg.Global.WorkingDir == "" {
 			glog.Error("Global.WorkingDir is empty!")
 			return nil, errors.New("Global.WorkingDir is empty!")
@@ -283,8 +351,11 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 			VCenterPort:       cfg.Global.VCenterPort,
 			Datacenters:       cfg.Global.Datacenter,
 			RoundTripperCount: cfg.Global.RoundTripperCount,
+			Thumbprint:        cfg.Global.Thumbprint,
 		}
 
+		// Note: If secrets info is provided username and password will be populated
+		// once secret is created.
 		vSphereConn := vclib.VSphereConnection{
 			Username:          vcConfig.User,
 			Password:          vcConfig.Password,
@@ -292,7 +363,10 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 			Insecure:          cfg.Global.InsecureFlag,
 			RoundTripperCount: vcConfig.RoundTripperCount,
 			Port:              vcConfig.VCenterPort,
+			CACert:            cfg.Global.CAFile,
+			Thumbprint:        cfg.Global.Thumbprint,
 		}
+
 		vsphereIns := VSphereInstance{
 			conn: &vSphereConn,
 			cfg:  &vcConfig,
@@ -305,31 +379,44 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 			glog.Error(msg)
 			return nil, errors.New(msg)
 		}
+
 		for vcServer, vcConfig := range cfg.VirtualCenter {
 			glog.V(4).Infof("Initializing vc server %s", vcServer)
 			if vcServer == "" {
 				glog.Error("vsphere.conf does not have the VirtualCenter IP address specified")
 				return nil, errors.New("vsphere.conf does not have the VirtualCenter IP address specified")
 			}
-			if vcConfig.User == "" {
-				vcConfig.User = cfg.Global.User
+
+			if !isSecretInfoProvided {
+				if vcConfig.User == "" {
+					vcConfig.User = cfg.Global.User
+					if vcConfig.User == "" {
+						glog.Errorf("vcConfig.User is empty for vc %s!", vcServer)
+						return nil, ErrUsernameMissing
+					}
+				}
+				if vcConfig.Password == "" {
+					vcConfig.Password = cfg.Global.Password
+					if vcConfig.Password == "" {
+						glog.Errorf("vcConfig.Password is empty for vc %s!", vcServer)
+						return nil, ErrPasswordMissing
+					}
+				}
+			} else {
+				if vcConfig.User != "" {
+					glog.Warningf("vcConfig.User for server %s and Secret info provided. VCP will use secret to get credentials", vcServer)
+					vcConfig.User = ""
+				}
+				if vcConfig.Password != "" {
+					glog.Warningf("vcConfig.Password for server %s and Secret info provided. VCP will use secret to get credentials", vcServer)
+					vcConfig.Password = ""
+				}
 			}
-			if vcConfig.Password == "" {
-				vcConfig.Password = cfg.Global.Password
-			}
-			if vcConfig.User == "" {
-				msg := fmt.Sprintf("vcConfig.User is empty for vc %s!", vcServer)
-				glog.Error(msg)
-				return nil, errors.New(msg)
-			}
-			if vcConfig.Password == "" {
-				msg := fmt.Sprintf("vcConfig.Password is empty for vc %s!", vcServer)
-				glog.Error(msg)
-				return nil, errors.New(msg)
-			}
+
 			if vcConfig.VCenterPort == "" {
 				vcConfig.VCenterPort = cfg.Global.VCenterPort
 			}
+
 			if vcConfig.Datacenters == "" {
 				if cfg.Global.Datacenters != "" {
 					vcConfig.Datacenters = cfg.Global.Datacenters
@@ -342,6 +429,8 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 				vcConfig.RoundTripperCount = cfg.Global.RoundTripperCount
 			}
 
+			// Note: If secrets info is provided username and password will be populated
+			// once secret is created.
 			vSphereConn := vclib.VSphereConnection{
 				Username:          vcConfig.User,
 				Password:          vcConfig.Password,
@@ -349,6 +438,8 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 				Insecure:          cfg.Global.InsecureFlag,
 				RoundTripperCount: vcConfig.RoundTripperCount,
 				Port:              vcConfig.VCenterPort,
+				CACert:            cfg.Global.CAFile,
+				Thumbprint:        vcConfig.Thumbprint,
 			}
 			vsphereIns := VSphereInstance{
 				conn: &vSphereConn,
@@ -360,9 +451,39 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 	return vsphereInstanceMap, nil
 }
 
-// Creates new Contreoller node interface and returns
+// getVMUUID allows tests to override GetVMUUID
+var getVMUUID = GetVMUUID
+
+// Creates new Controller node interface and returns
 func newControllerNode(cfg VSphereConfig) (*VSphere, error) {
-	var err error
+	vs, err := buildVSphereFromConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	vs.hostName, err = os.Hostname()
+	if err != nil {
+		glog.Errorf("Failed to get hostname. err: %+v", err)
+		return nil, err
+	}
+	if cfg.Global.VMUUID != "" {
+		vs.vmUUID = cfg.Global.VMUUID
+	} else {
+		vs.vmUUID, err = getVMUUID()
+		if err != nil {
+			glog.Errorf("Failed to get uuid. err: %+v", err)
+			return nil, err
+		}
+	}
+	runtime.SetFinalizer(vs, logout)
+	return vs, nil
+}
+
+// Initializes vSphere from vSphere CloudProvider Configuration
+func buildVSphereFromConfig(cfg VSphereConfig) (*VSphere, error) {
+	isSecretInfoProvided := false
+	if cfg.Global.SecretName != "" && cfg.Global.SecretNamespace != "" {
+		isSecretInfoProvided = true
+	}
 
 	if cfg.Disk.SCSIControllerType == "" {
 		cfg.Disk.SCSIControllerType = vclib.PVSCSIControllerType
@@ -391,30 +512,16 @@ func newControllerNode(cfg VSphereConfig) (*VSphere, error) {
 			nodeInfoMap:        make(map[string]*NodeInfo),
 			registeredNodes:    make(map[string]*v1.Node),
 		},
-		cfg: &cfg,
+		isSecretInfoProvided: isSecretInfoProvided,
+		cfg:                  &cfg,
 	}
-
-	vs.hostName, err = os.Hostname()
-	if err != nil {
-		glog.Errorf("Failed to get hostname. err: %+v", err)
-		return nil, err
-	}
-	vs.vmUUID, err = GetVMUUID()
-	if err != nil {
-		glog.Errorf("Failed to get uuid. err: %+v", err)
-		return nil, err
-	}
-	runtime.SetFinalizer(&vs, logout)
 	return &vs, nil
 }
 
 func logout(vs *VSphere) {
 	for _, vsphereIns := range vs.vsphereInstanceMap {
-		if vsphereIns.conn.GoVmomiClient != nil {
-			vsphereIns.conn.GoVmomiClient.Logout(context.TODO())
-		}
+		vsphereIns.conn.Logout(context.TODO())
 	}
-
 }
 
 // Instances returns an implementation of Instances for vSphere.
@@ -477,7 +584,7 @@ func (vs *VSphere) getVSphereInstanceForServer(vcServer string, ctx context.Cont
 		return nil, errors.New(fmt.Sprintf("Cannot find node %q in vsphere configuration map", vcServer))
 	}
 	// Ensure client is logged in and session is valid
-	err := vsphereIns.conn.Connect(ctx)
+	err := vs.nodeManager.vcConnect(ctx, vsphereIns)
 	if err != nil {
 		glog.Errorf("failed connecting to vcServer %q with error %+v", vcServer, err)
 		return nil, err
@@ -499,7 +606,13 @@ func (vs *VSphere) getVMFromNodeName(ctx context.Context, nodeName k8stypes.Node
 func (vs *VSphere) NodeAddresses(ctx context.Context, nodeName k8stypes.NodeName) ([]v1.NodeAddress, error) {
 	// Get local IP addresses if node is local node
 	if vs.hostName == convertToString(nodeName) {
-		return getLocalIP()
+		addrs, err := getLocalIP()
+		if err != nil {
+			return nil, err
+		}
+		// add the hostname address
+		v1helper.AddToNodeAddresses(&addrs, v1.NodeAddress{Type: v1.NodeHostName, Address: vs.hostName})
+		return addrs, nil
 	}
 
 	if vs.cfg == nil {
@@ -516,7 +629,7 @@ func (vs *VSphere) NodeAddresses(ctx context.Context, nodeName k8stypes.NodeName
 		return nil, err
 	}
 	// Ensure client is logged in and session is valid
-	err = vsi.conn.Connect(ctx)
+	err = vs.nodeManager.vcConnect(ctx, vsi)
 	if err != nil {
 		return nil, err
 	}
@@ -577,30 +690,13 @@ func convertToK8sType(vmName string) k8stypes.NodeName {
 	return k8stypes.NodeName(vmName)
 }
 
-// ExternalID returns the cloud provider ID of the node with the specified Name (deprecated).
-func (vs *VSphere) ExternalID(ctx context.Context, nodeName k8stypes.NodeName) (string, error) {
-	return vs.InstanceID(ctx, nodeName)
-}
-
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (vs *VSphere) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
-	var nodeName string
-	nodes, err := vs.nodeManager.GetNodeDetails()
+	nodeName, err := vs.GetNodeNameFromProviderID(providerID)
 	if err != nil {
-		glog.Errorf("Error while obtaining Kubernetes node nodeVmDetail details. error : %+v", err)
+		glog.Errorf("Error while getting nodename for providerID %s", providerID)
 		return false, err
-	}
-	for _, node := range nodes {
-		// ProviderID is UUID for nodes v1.9.3+
-		if node.VMUUID == GetUUIDFromProviderID(providerID) || node.NodeName == providerID {
-			nodeName = node.NodeName
-			break
-		}
-	}
-	if nodeName == "" {
-		msg := fmt.Sprintf("Error while obtaining Kubernetes nodename for providerID %s.", providerID)
-		return false, errors.New(msg)
 	}
 	_, err = vs.InstanceID(ctx, convertToK8sType(nodeName))
 	if err == nil {
@@ -608,6 +704,35 @@ func (vs *VSphere) InstanceExistsByProviderID(ctx context.Context, providerID st
 	}
 
 	return false, err
+}
+
+// InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
+func (vs *VSphere) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	nodeName, err := vs.GetNodeNameFromProviderID(providerID)
+	if err != nil {
+		glog.Errorf("Error while getting nodename for providerID %s", providerID)
+		return false, err
+	}
+
+	vsi, err := vs.getVSphereInstance(convertToK8sType(nodeName))
+	if err != nil {
+		return false, err
+	}
+	// Ensure client is logged in and session is valid
+	if err := vs.nodeManager.vcConnect(ctx, vsi); err != nil {
+		return false, err
+	}
+	vm, err := vs.getVMFromNodeName(ctx, convertToK8sType(nodeName))
+	if err != nil {
+		glog.Errorf("Failed to get VM object for node: %q. err: +%v", nodeName, err)
+		return false, err
+	}
+	isActive, err := vm.IsActive(ctx)
+	if err != nil {
+		glog.Errorf("Failed to check whether node %q is active. err: %+v.", nodeName, err)
+		return false, err
+	}
+	return !isActive, nil
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified Name.
@@ -631,15 +756,12 @@ func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (
 			return "", err
 		}
 		// Ensure client is logged in and session is valid
-		err = vsi.conn.Connect(ctx)
+		err = vs.nodeManager.vcConnect(ctx, vsi)
 		if err != nil {
 			return "", err
 		}
 		vm, err := vs.getVMFromNodeName(ctx, nodeName)
 		if err != nil {
-			if err == vclib.ErrNoVMFound {
-				return "", cloudprovider.InstanceNotFound
-			}
 			glog.Errorf("Failed to get VM object for node: %q. err: +%v", convertToString(nodeName), err)
 			return "", err
 		}
@@ -657,9 +779,8 @@ func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (
 
 	instanceID, err := instanceIDInternal()
 	if err != nil {
-		var isManagedObjectNotFoundError bool
-		isManagedObjectNotFoundError, err = vs.retry(nodeName, err)
-		if isManagedObjectNotFoundError {
+		if vclib.IsManagedObjectNotFoundError(err) {
+			err = vs.nodeManager.RediscoverNode(nodeName)
 			if err == nil {
 				glog.V(4).Infof("InstanceID: Found node %q", convertToString(nodeName))
 				instanceID, err = instanceIDInternal()
@@ -697,10 +818,13 @@ func (vs *VSphere) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return nil, false
 }
 
-// Zones returns an implementation of Zones for Google vSphere.
+// Zones returns an implementation of Zones for vSphere.
 func (vs *VSphere) Zones() (cloudprovider.Zones, bool) {
-	glog.V(1).Info("The vSphere cloud provider does not support zones")
-	return nil, false
+	if vs.cfg == nil {
+		glog.V(1).Info("The vSphere cloud provider does not support zones")
+		return nil, false
+	}
+	return vs, true
 }
 
 // Routes returns a false since the interface is not supported for vSphere.
@@ -722,7 +846,7 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, storagePolicyName string, nodeN
 			return "", err
 		}
 		// Ensure client is logged in and session is valid
-		err = vsi.conn.Connect(ctx)
+		err = vs.nodeManager.vcConnect(ctx, vsi)
 		if err != nil {
 			return "", err
 		}
@@ -743,31 +867,18 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, storagePolicyName string, nodeN
 	requestTime := time.Now()
 	diskUUID, err = attachDiskInternal(vmDiskPath, storagePolicyName, nodeName)
 	if err != nil {
-		var isManagedObjectNotFoundError bool
-		isManagedObjectNotFoundError, err = vs.retry(nodeName, err)
-		if isManagedObjectNotFoundError {
+		if vclib.IsManagedObjectNotFoundError(err) {
+			err = vs.nodeManager.RediscoverNode(nodeName)
 			if err == nil {
 				glog.V(4).Infof("AttachDisk: Found node %q", convertToString(nodeName))
 				diskUUID, err = attachDiskInternal(vmDiskPath, storagePolicyName, nodeName)
-				glog.V(4).Infof("AttachDisk: Retry: diskUUID %s, err +%v", convertToString(nodeName), diskUUID, err)
+				glog.V(4).Infof("AttachDisk: Retry: diskUUID %s, err +%v", diskUUID, err)
 			}
 		}
 	}
 	glog.V(4).Infof("AttachDisk executed for node %s and volume %s with diskUUID %s. Err: %s", convertToString(nodeName), vmDiskPath, diskUUID, err)
 	vclib.RecordvSphereMetric(vclib.OperationAttachVolume, requestTime, err)
 	return diskUUID, err
-}
-
-func (vs *VSphere) retry(nodeName k8stypes.NodeName, err error) (bool, error) {
-	isManagedObjectNotFoundError := false
-	if err != nil {
-		if vclib.IsManagedObjectNotFoundError(err) {
-			isManagedObjectNotFoundError = true
-			glog.V(4).Infof("error %q ManagedObjectNotFound for node %q", err, convertToString(nodeName))
-			err = vs.nodeManager.RediscoverNode(nodeName)
-		}
-	}
-	return isManagedObjectNotFoundError, err
 }
 
 // DetachDisk detaches given virtual disk volume from the compute running kubelet.
@@ -789,7 +900,7 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error 
 			return err
 		}
 		// Ensure client is logged in and session is valid
-		err = vsi.conn.Connect(ctx)
+		err = vs.nodeManager.vcConnect(ctx, vsi)
 		if err != nil {
 			return err
 		}
@@ -814,9 +925,8 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error 
 	requestTime := time.Now()
 	err := detachDiskInternal(volPath, nodeName)
 	if err != nil {
-		var isManagedObjectNotFoundError bool
-		isManagedObjectNotFoundError, err = vs.retry(nodeName, err)
-		if isManagedObjectNotFoundError {
+		if vclib.IsManagedObjectNotFoundError(err) {
+			err = vs.nodeManager.RediscoverNode(nodeName)
 			if err == nil {
 				err = detachDiskInternal(volPath, nodeName)
 			}
@@ -844,7 +954,7 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 			return false, err
 		}
 		// Ensure client is logged in and session is valid
-		err = vsi.conn.Connect(ctx)
+		err = vs.nodeManager.vcConnect(ctx, vsi)
 		if err != nil {
 			return false, err
 		}
@@ -866,15 +976,14 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 				volPath,
 				vSphereInstance)
 		}
-		glog.V(4).Infof("DiskIsAttached result: %q and error: %q, for volume: %q", attached, err, volPath)
+		glog.V(4).Infof("DiskIsAttached result: %v and error: %q, for volume: %q", attached, err, volPath)
 		return attached, err
 	}
 	requestTime := time.Now()
 	isAttached, err := diskIsAttachedInternal(volPath, nodeName)
 	if err != nil {
-		var isManagedObjectNotFoundError bool
-		isManagedObjectNotFoundError, err = vs.retry(nodeName, err)
-		if isManagedObjectNotFoundError {
+		if vclib.IsManagedObjectNotFoundError(err) {
+			err = vs.nodeManager.RediscoverNode(nodeName)
 			if err == vclib.ErrNoVMFound {
 				isAttached, err = false, nil
 			} else if err == nil {
@@ -957,7 +1066,7 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 			return nodesToRetry, nil
 		}
 
-		glog.V(4).Info("Starting DisksAreAttached API for vSphere with nodeVolumes: %+v", nodeVolumes)
+		glog.V(4).Infof("Starting DisksAreAttached API for vSphere with nodeVolumes: %+v", nodeVolumes)
 		// Create context
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -1196,4 +1305,113 @@ func (vs *VSphere) NodeManager() (nodeManager *NodeManager) {
 		return nil
 	}
 	return vs.nodeManager
+}
+
+func withTagsClient(ctx context.Context, connection *vclib.VSphereConnection, f func(c *rest.Client) error) error {
+	c := rest.NewClient(connection.Client)
+	user := url.UserPassword(connection.Username, connection.Password)
+	if err := c.Login(ctx, user); err != nil {
+		return err
+	}
+	defer c.Logout(ctx)
+	return f(c)
+}
+
+// GetZone implements Zones.GetZone
+func (vs *VSphere) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
+	nodeName, err := vs.CurrentNodeName(ctx, vs.hostName)
+	if err != nil {
+		glog.Errorf("Cannot get node name.")
+		return cloudprovider.Zone{}, err
+	}
+	zone := cloudprovider.Zone{}
+	vsi, err := vs.getVSphereInstanceForServer(vs.cfg.Workspace.VCenterIP, ctx)
+	if err != nil {
+		glog.Errorf("Cannot connent to vsphere. Get zone for node %s error", nodeName)
+		return cloudprovider.Zone{}, err
+	}
+	dc, err := vclib.GetDatacenter(ctx, vsi.conn, vs.cfg.Workspace.Datacenter)
+	if err != nil {
+		glog.Errorf("Cannot connent to datacenter. Get zone for node %s error", nodeName)
+		return cloudprovider.Zone{}, err
+	}
+	vmHost, err := dc.GetHostByVMUUID(ctx, vs.vmUUID)
+	if err != nil {
+		glog.Errorf("Cannot find VM runtime host. Get zone for node %s error", nodeName)
+		return cloudprovider.Zone{}, err
+	}
+
+	pc := vsi.conn.Client.ServiceContent.PropertyCollector
+	err = withTagsClient(ctx, vsi.conn, func(c *rest.Client) error {
+		client := tags.NewManager(c)
+		// example result: ["Folder", "Datacenter", "Cluster", "Host"]
+		objects, err := mo.Ancestors(ctx, vsi.conn.Client, pc, *vmHost)
+		if err != nil {
+			return err
+		}
+
+		// search the hierarchy, example order: ["Host", "Cluster", "Datacenter", "Folder"]
+		for i := range objects {
+			obj := objects[len(objects)-1-i]
+			tags, err := client.ListAttachedTags(ctx, obj)
+			if err != nil {
+				glog.Errorf("Cannot list attached tags. Get zone for node %s: %s", nodeName, err)
+				return err
+			}
+			for _, value := range tags {
+				tag, err := client.GetTag(ctx, value)
+				if err != nil {
+					glog.Errorf("Get tag %s: %s", value, err)
+					return err
+				}
+				category, err := client.GetCategory(ctx, tag.CategoryID)
+				if err != nil {
+					glog.Errorf("Get category %s error", value)
+					return err
+				}
+
+				found := func() {
+					glog.Errorf("Found %q tag (%s) for %s attached to %s", category.Name, tag.Name, vs.vmUUID, obj.Reference())
+				}
+				switch {
+				case category.Name == vs.cfg.Labels.Zone:
+					zone.FailureDomain = tag.Name
+					found()
+				case category.Name == vs.cfg.Labels.Region:
+					zone.Region = tag.Name
+					found()
+				}
+
+				if zone.FailureDomain != "" && zone.Region != "" {
+					return nil
+				}
+			}
+		}
+
+		if zone.Region == "" {
+			if vs.cfg.Labels.Region != "" {
+				return fmt.Errorf("vSphere region category %q does not match any tags for node %s [%s]", vs.cfg.Labels.Region, nodeName, vs.vmUUID)
+			}
+		}
+		if zone.FailureDomain == "" {
+			if vs.cfg.Labels.Zone != "" {
+				return fmt.Errorf("vSphere zone category %q does not match any tags for node %s [%s]", vs.cfg.Labels.Zone, nodeName, vs.vmUUID)
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		glog.Errorf("Get zone for node %s: %s", nodeName, err)
+		return cloudprovider.Zone{}, err
+	}
+	return zone, nil
+}
+
+func (vs *VSphere) GetZoneByNodeName(ctx context.Context, nodeName k8stypes.NodeName) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, cloudprovider.NotImplemented
+}
+
+func (vs *VSphere) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, cloudprovider.NotImplemented
 }

@@ -34,10 +34,12 @@ const (
 	DeploymentFieldPriorityClassName             = "priorityClassName"
 	DeploymentFieldProjectID                     = "projectId"
 	DeploymentFieldPublicEndpoints               = "publicEndpoints"
+	DeploymentFieldReadinessGates                = "readinessGates"
 	DeploymentFieldRemoved                       = "removed"
 	DeploymentFieldRestartPolicy                 = "restartPolicy"
 	DeploymentFieldRunAsGroup                    = "runAsGroup"
 	DeploymentFieldRunAsNonRoot                  = "runAsNonRoot"
+	DeploymentFieldRuntimeClassName              = "runtimeClassName"
 	DeploymentFieldScale                         = "scale"
 	DeploymentFieldSchedulerName                 = "schedulerName"
 	DeploymentFieldScheduling                    = "scheduling"
@@ -46,6 +48,7 @@ const (
 	DeploymentFieldShareProcessNamespace         = "shareProcessNamespace"
 	DeploymentFieldState                         = "state"
 	DeploymentFieldSubdomain                     = "subdomain"
+	DeploymentFieldSysctls                       = "sysctls"
 	DeploymentFieldTerminationGracePeriodSeconds = "terminationGracePeriodSeconds"
 	DeploymentFieldTransitioning                 = "transitioning"
 	DeploymentFieldTransitioningMessage          = "transitioningMessage"
@@ -86,10 +89,12 @@ type Deployment struct {
 	PriorityClassName             string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
 	ProjectID                     string                 `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	PublicEndpoints               []PublicEndpoint       `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
+	ReadinessGates                []PodReadinessGate     `json:"readinessGates,omitempty" yaml:"readinessGates,omitempty"`
 	Removed                       string                 `json:"removed,omitempty" yaml:"removed,omitempty"`
 	RestartPolicy                 string                 `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
 	RunAsGroup                    *int64                 `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
+	RuntimeClassName              string                 `json:"runtimeClassName,omitempty" yaml:"runtimeClassName,omitempty"`
 	Scale                         *int64                 `json:"scale,omitempty" yaml:"scale,omitempty"`
 	SchedulerName                 string                 `json:"schedulerName,omitempty" yaml:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling            `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
@@ -98,6 +103,7 @@ type Deployment struct {
 	ShareProcessNamespace         *bool                  `json:"shareProcessNamespace,omitempty" yaml:"shareProcessNamespace,omitempty"`
 	State                         string                 `json:"state,omitempty" yaml:"state,omitempty"`
 	Subdomain                     string                 `json:"subdomain,omitempty" yaml:"subdomain,omitempty"`
+	Sysctls                       []Sysctl               `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 	TerminationGracePeriodSeconds *int64                 `json:"terminationGracePeriodSeconds,omitempty" yaml:"terminationGracePeriodSeconds,omitempty"`
 	Transitioning                 string                 `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage          string                 `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`

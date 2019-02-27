@@ -2,6 +2,7 @@ approvers:
 - mikedanese
 - dims
 - wlan0
+- andrewsykim
 reviewers:
 - thockin
 - lavalamp
@@ -41,3 +42,6 @@ reviewers:
 - jingxu97
 - wlan0
 - cheftako
+- andrewsykim
+labels:
+- sig/cloud-provider

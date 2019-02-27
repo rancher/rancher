@@ -19,3 +19,9 @@ reviewers:
 - nikhiljindal
 - ncdc
 - sttts
+- hzxuzhonghu
+- CaoShuFeng
+- yue9944882
+labels:
+- sig/api-machinery
+- area/apiserver

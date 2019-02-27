@@ -8,42 +8,9 @@ go_library(
         "helper.go",
         "log_metrics_provider.go",
         "stats_provider.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "stats_provider_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "stats_provider_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "stats_provider_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "stats_provider_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "stats_provider_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "stats_provider_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "stats_provider_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "stats_provider_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "stats_provider_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "stats_provider_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "stats_provider_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "stats_provider_linux.go",
+        "stats_provider_unsupported.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/stats",
     visibility = ["//visibility:public"],
     deps = [
@@ -55,18 +22,16 @@ go_library(
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/kuberuntime:go_default_library",
         "//pkg/kubelet/leaky:go_default_library",
-        "//pkg/kubelet/network:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
         "//pkg/kubelet/server/stats:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/volume:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/google/cadvisor/fs:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
 )
 
@@ -108,14 +73,14 @@ go_test(
         "//pkg/kubelet/server/stats:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/volume:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/github.com/google/cadvisor/fs:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
 )

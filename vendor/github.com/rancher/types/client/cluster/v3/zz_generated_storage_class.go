@@ -7,6 +7,7 @@ import (
 const (
 	StorageClassType                      = "storageClass"
 	StorageClassFieldAllowVolumeExpansion = "allowVolumeExpansion"
+	StorageClassFieldAllowedTopologies    = "allowedTopologies"
 	StorageClassFieldAnnotations          = "annotations"
 	StorageClassFieldCreated              = "created"
 	StorageClassFieldCreatorID            = "creatorId"
@@ -25,21 +26,22 @@ const (
 
 type StorageClass struct {
 	types.Resource
-	AllowVolumeExpansion *bool             `json:"allowVolumeExpansion,omitempty" yaml:"allowVolumeExpansion,omitempty"`
-	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	Description          string            `json:"description,omitempty" yaml:"description,omitempty"`
-	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	MountOptions         []string          `json:"mountOptions,omitempty" yaml:"mountOptions,omitempty"`
-	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
-	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	Parameters           map[string]string `json:"parameters,omitempty" yaml:"parameters,omitempty"`
-	Provisioner          string            `json:"provisioner,omitempty" yaml:"provisioner,omitempty"`
-	ReclaimPolicy        string            `json:"reclaimPolicy,omitempty" yaml:"reclaimPolicy,omitempty"`
-	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
-	VolumeBindingMode    string            `json:"volumeBindingMode,omitempty" yaml:"volumeBindingMode,omitempty"`
+	AllowVolumeExpansion *bool                  `json:"allowVolumeExpansion,omitempty" yaml:"allowVolumeExpansion,omitempty"`
+	AllowedTopologies    []TopologySelectorTerm `json:"allowedTopologies,omitempty" yaml:"allowedTopologies,omitempty"`
+	Annotations          map[string]string      `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Created              string                 `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID            string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description          string                 `json:"description,omitempty" yaml:"description,omitempty"`
+	Labels               map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
+	MountOptions         []string               `json:"mountOptions,omitempty" yaml:"mountOptions,omitempty"`
+	Name                 string                 `json:"name,omitempty" yaml:"name,omitempty"`
+	OwnerReferences      []OwnerReference       `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Parameters           map[string]string      `json:"parameters,omitempty" yaml:"parameters,omitempty"`
+	Provisioner          string                 `json:"provisioner,omitempty" yaml:"provisioner,omitempty"`
+	ReclaimPolicy        string                 `json:"reclaimPolicy,omitempty" yaml:"reclaimPolicy,omitempty"`
+	Removed              string                 `json:"removed,omitempty" yaml:"removed,omitempty"`
+	UUID                 string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	VolumeBindingMode    string                 `json:"volumeBindingMode,omitempty" yaml:"volumeBindingMode,omitempty"`
 }
 
 type StorageClassCollection struct {

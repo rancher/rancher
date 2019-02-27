@@ -145,7 +145,7 @@ func (t *templater) cmdGroupsString(c *cobra.Command) string {
 	for _, cmdGroup := range t.cmdGroups(c, c.Commands()) {
 		cmds := []string{cmdGroup.Message}
 		for _, cmd := range cmdGroup.Commands {
-			if cmd.Runnable() {
+			if cmd.IsAvailableCommand() {
 				cmds = append(cmds, "  "+rpad(cmd.Name(), cmd.NamePadding())+" "+cmd.Short)
 			}
 		}
@@ -232,15 +232,6 @@ func flagsUsages(f *flag.FlagSet) string {
 func rpad(s string, padding int) string {
 	template := fmt.Sprintf("%%-%ds", padding)
 	return fmt.Sprintf(template, s)
-}
-
-func indentLines(s string, indentation int) string {
-	r := []string{}
-	for _, line := range strings.Split(s, "\n") {
-		indented := strings.Repeat(" ", indentation) + line
-		r = append(r, indented)
-	}
-	return strings.Join(r, "\n")
 }
 
 func appendIfNotPresent(s, stringToAppend string) string {

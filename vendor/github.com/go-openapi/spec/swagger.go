@@ -24,7 +24,8 @@ import (
 )
 
 // Swagger this is the root document object for the API specification.
-// It combines what previously was the Resource Listing and API Declaration (version 1.2 and earlier) together into one document.
+// It combines what previously was the Resource Listing and API Declaration (version 1.2 and earlier)
+// together into one document.
 //
 // For more information: http://goo.gl/8us55a#swagger-object-
 type Swagger struct {
@@ -67,16 +68,22 @@ func (s *Swagger) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// SwaggerProps captures the top-level properties of an Api specification
+//
+// NOTE: validation rules
+// - the scheme, when present must be from [http, https, ws, wss]
+// - BasePath must start with a leading "/"
+// - Paths is required
 type SwaggerProps struct {
 	ID                  string                 `json:"id,omitempty"`
 	Consumes            []string               `json:"consumes,omitempty"`
 	Produces            []string               `json:"produces,omitempty"`
-	Schemes             []string               `json:"schemes,omitempty"` // the scheme, when present must be from [http, https, ws, wss]
+	Schemes             []string               `json:"schemes,omitempty"`
 	Swagger             string                 `json:"swagger,omitempty"`
 	Info                *Info                  `json:"info,omitempty"`
 	Host                string                 `json:"host,omitempty"`
-	BasePath            string                 `json:"basePath,omitempty"` // must start with a leading "/"
-	Paths               *Paths                 `json:"paths"`              // required
+	BasePath            string                 `json:"basePath,omitempty"`
+	Paths               *Paths                 `json:"paths"`
 	Definitions         Definitions            `json:"definitions,omitempty"`
 	Parameters          map[string]Parameter   `json:"parameters,omitempty"`
 	Responses           map[string]Response    `json:"responses,omitempty"`
@@ -243,9 +250,9 @@ func (s *StringOrArray) UnmarshalJSON(data []byte) error {
 	if single == nil {
 		return nil
 	}
-	switch single.(type) {
+	switch v := single.(type) {
 	case string:
-		*s = StringOrArray([]string{single.(string)})
+		*s = StringOrArray([]string{v})
 		return nil
 	default:
 		return fmt.Errorf("only string or array is allowed, not %T", single)

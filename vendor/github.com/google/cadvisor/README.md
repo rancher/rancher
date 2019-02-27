@@ -13,7 +13,7 @@ To quickly tryout cAdvisor on your machine with Docker, we have a Docker image t
 ```
 sudo docker run \
   --volume=/:/rootfs:ro \
-  --volume=/var/run:/var/run:rw \
+  --volume=/var/run:/var/run:ro \
   --volume=/sys:/sys:ro \
   --volume=/var/lib/docker/:/var/lib/docker:ro \
   --volume=/dev/disk/:/dev/disk:ro \
@@ -25,9 +25,11 @@ sudo docker run \
 
 cAdvisor is now running (in the background) on `http://localhost:8080`. The setup includes directories with Docker state cAdvisor needs to observe.
 
-**Note**: If you're running on CentOS, Fedora, RHEL, or are using LXC take a look at our [running instructions](docs/running.md).
+**Note**: If you're running on CentOS, Fedora, or RHEL (or are using LXC), take a look at our [running instructions](docs/running.md).
 
-We have detailed [instructions](docs/running.md#standalone) on running cAdvisor standalone outside of Docker. cAdvisor [running options](docs/runtime_options.md) may also be interesting for advanced usecases. If you want to build your own cAdvisor Docker image see our [deployment](docs/deploy.md) page.
+We have detailed [instructions](docs/running.md#standalone) on running cAdvisor standalone outside of Docker. cAdvisor [running options](docs/runtime_options.md) may also be interesting for advanced usecases. If you want to build your own cAdvisor Docker image, see our [deployment](docs/deploy.md) page.
+
+For [Kubernetes](https://github.com/kubernetes/kubernetes) users, cAdvisor can be run as a daemonset.  See the [instructions](deploy/kubernetes) for how to get started, and for how to [kustomize](https://github.com/kubernetes-sigs/kustomize#kustomize) it to fit your needs.
 
 ## Building and Testing
 
@@ -54,7 +56,7 @@ There is also an official Go client implementation in the [client](client/) dire
 ## Roadmap
 
 cAdvisor aims to improve the resource usage and performance characteristics of running containers. Today, we gather and expose this information to users. In our roadmap:
-- Advise on the performance of a container (e.g.: when it is being negatively affected by another, when it is not receiving the resources it requires, etc)
+- Advise on the performance of a container (e.g.: when it is being negatively affected by another, when it is not receiving the resources it requires, etc).
 - Auto-tune the performance of the container based on previous advise.
 - Provide usage prediction to cluster schedulers and orchestration layers.
 

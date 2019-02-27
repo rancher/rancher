@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/features"
@@ -47,6 +48,7 @@ func ValidateStorageClass(storageClass *storage.StorageClass) field.ErrorList {
 	allErrs = append(allErrs, validateReclaimPolicy(storageClass.ReclaimPolicy, field.NewPath("reclaimPolicy"))...)
 	allErrs = append(allErrs, validateAllowVolumeExpansion(storageClass.AllowVolumeExpansion, field.NewPath("allowVolumeExpansion"))...)
 	allErrs = append(allErrs, validateVolumeBindingMode(storageClass.VolumeBindingMode, field.NewPath("volumeBindingMode"))...)
+	allErrs = append(allErrs, validateAllowedTopologies(storageClass.AllowedTopologies, field.NewPath("allowedTopologies"))...)
 
 	return allErrs
 }
@@ -235,6 +237,37 @@ func validateVolumeBindingMode(mode *storage.VolumeBindingMode, fldPath *field.P
 		}
 	} else if mode != nil {
 		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate VolumeScheduling"))
+	}
+
+	return allErrs
+}
+
+// validateAllowedTopology tests that AllowedTopologies specifies valid values.
+func validateAllowedTopologies(topologies []api.TopologySelectorTerm, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if topologies == nil || len(topologies) == 0 {
+		return allErrs
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate VolumeScheduling"))
+	}
+
+	rawTopologies := make([]map[string]sets.String, len(topologies))
+	for i, term := range topologies {
+		idxPath := fldPath.Index(i)
+		exprMap, termErrs := apivalidation.ValidateTopologySelectorTerm(term, fldPath.Index(i))
+		allErrs = append(allErrs, termErrs...)
+
+		// TODO (verult) consider improving runtime
+		for _, t := range rawTopologies {
+			if helper.Semantic.DeepEqual(exprMap, t) {
+				allErrs = append(allErrs, field.Duplicate(idxPath.Child("matchLabelExpressions"), ""))
+			}
+		}
+
+		rawTopologies = append(rawTopologies, exprMap)
 	}
 
 	return allErrs

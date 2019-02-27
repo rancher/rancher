@@ -13,7 +13,37 @@ containerd is designed to be embedded into a larger system, rather than being us
 
 ## Getting Started
 
-If you are interested in trying out containerd please see our [Getting Started Guide](docs/getting-started.md).
+See our documentation on [containerd.io](containerd.io):
+* [for ops and admins](docs/ops.md)
+* [namespaces](docs/namespaces.md)
+* [client options](docs/client-opts.md)
+
+See how to build containerd from source at [BUILDING](BUILDING.md).
+
+If you are interested in trying out containerd see our example at [Getting Started](docs/getting-started.md).
+
+
+## Runtime Requirements
+
+Runtime requirements for containerd are very minimal. Most interactions with
+the Linux and Windows container feature sets are handled via [runc](https://github.com/opencontainers/runc) and/or
+OS-specific libraries (e.g. [hcsshim](https://github.com/Microsoft/hcsshim) for Microsoft). The current required version of `runc` is always listed in [RUNC.md](/RUNC.md).
+
+There are specific features
+used by containerd core code and snapshotters that will require a minimum kernel
+version on Linux. With the understood caveat of distro kernel versioning, a
+reasonable starting point for Linux is a minimum 4.x kernel version.
+
+The overlay filesystem snapshotter, used by default, uses features that were
+finalized in the 4.x kernel series. If you choose to use btrfs, there may
+be more flexibility in kernel version (minimum recommended is 3.18), but will
+require the btrfs kernel module and btrfs tools to be installed on your Linux
+distribution.
+
+To use Linux checkpoint and restore features, you will need `criu` installed on
+your system. See more details in [Checkpoint and Restore](#checkpoint-and-restore).
+
+Build requirements for developers are listed in [BUILDING](BUILDING.md).
 
 ## Features
 
@@ -23,7 +53,11 @@ containerd offers a full client package to help you integrate containerd into yo
 
 ```go
 
-import "github.com/containerd/containerd"
+import (
+  "github.com/containerd/containerd"
+  "github.com/containerd/containerd/cio"
+)
+
 
 func main() {
 	client, err := containerd.New("/run/containerd/containerd.sock")
@@ -39,7 +73,7 @@ Namespaces allow multiple consumers to use the same containerd without conflicti
 To set a namespace for requests to the API:
 
 ```go
-context    = context.Background()
+context = context.Background()
 // create a context for docker
 docker = namespaces.WithNamespace(context, "docker")
 
@@ -78,7 +112,7 @@ containerd fully supports the OCI runtime specification for running containers. 
 You can specify options when creating a container about how to modify the specification.
 
 ```go
-redis, err := client.NewContainer(context, "redis-master", containerd.WithNewSpec(containerd.WithImageConfig(image)))
+redis, err := client.NewContainer(context, "redis-master", containerd.WithNewSpec(oci.WithImageConfig(image)))
 ```
 
 ### Root Filesystems
@@ -92,8 +126,7 @@ image, err := client.Pull(context, "docker.io/library/redis:latest", containerd.
 // allocate a new RW root filesystem for a container based on the image
 redis, err := client.NewContainer(context, "redis-master",
 	containerd.WithNewSnapshot("redis-rootfs", image),
-	containerd.WithNewSpec(containerd.WithImageConfig(image)),
-
+	containerd.WithNewSpec(oci.WithImageConfig(image)),
 )
 
 // use a readonly filesystem with multiple containers
@@ -101,7 +134,7 @@ for i := 0; i < 10; i++ {
 	id := fmt.Sprintf("id-%s", i)
 	container, err := client.NewContainer(ctx, id,
 		containerd.WithNewSnapshotView(id, image),
-		containerd.WithNewSpec(containerd.WithImageConfig(image)),
+		containerd.WithNewSpec(oci.WithImageConfig(image)),
 	)
 }
 ```
@@ -112,7 +145,7 @@ Taking a container object and turning it into a runnable process on a system is 
 
 ```go
 // create a new task
-task, err := redis.NewTask(context, containerd.Stdio)
+task, err := redis.NewTask(context, cio.Stdio)
 defer task.Delete(context)
 
 // the task is now running and has a pid that can be use to setup networking
@@ -144,36 +177,11 @@ checkpoint := image.Target()
 redis, err = client.NewContainer(context, "redis-master", containerd.WithCheckpoint(checkpoint, "redis-rootfs"))
 defer container.Delete(context)
 
-task, err = redis.NewTask(context, containerd.Stdio, containerd.WithTaskCheckpoint(checkpoint))
+task, err = redis.NewTask(context, cio.Stdio, containerd.WithTaskCheckpoint(checkpoint))
 defer task.Delete(context)
 
 err := task.Start(context)
 ```
-
-## Developer Quick-Start
-
-To build the daemon and `ctr` simple test client, the following build system dependencies are required:
-
-* Go 1.9.x or above
-* Protoc 3.x compiler and headers (download at the [Google protobuf releases page](https://github.com/google/protobuf/releases))
-* Btrfs headers and libraries for your distribution. Note that building the btrfs driver can be disabled via build tag removing this dependency.
-
-For proper results, install the `protoc` release into `/usr/local` on your build system. For example, the following commands will download and install the 3.1.0 release for a 64-bit Linux host:
-
-```
-$ wget -c https://github.com/google/protobuf/releases/download/v3.1.0/protoc-3.1.0-linux-x86_64.zip
-$ sudo unzip protoc-3.1.0-linux-x86_64.zip -d /usr/local
-```
-
-With the required dependencies installed, the `Makefile` target named **binaries** will compile the `ctr` and `containerd` binaries and place them in the `bin/` directory. Using `sudo make install` will place the binaries in `/usr/local/bin`. When making any changes to the gRPC API, `make generate` will use the installed `protoc` compiler to regenerate the API generated code packages.
-
-> *Note*: A build tag is currently available to disable building the btrfs snapshot driver.
-> Adding `BUILDTAGS=no_btrfs` to your environment before calling the **binaries**
-> Makefile target will disable the btrfs driver within the containerd Go build.
-
-Vendoring of external imports uses the [`vndr` tool](https://github.com/LK4D4/vndr) which uses a simple config file, `vendor.conf`, to provide the URL and version or hash details for each vendored import. After modifying `vendor.conf` run the `vndr` tool to update the `vendor/` directory contents. Combining the `vendor.conf` update with the changeset in `vendor/` after running `vndr` should become a single commit for a PR which relies on vendored updates.
-
-Please refer to [RUNC.md](/RUNC.md) for the currently supported version of `runc` that is used by containerd.
 
 ### Releases and API Stability
 

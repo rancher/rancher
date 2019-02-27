@@ -32,8 +32,8 @@ import (
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
 )
 
 type EtcdOptions struct {
@@ -91,6 +91,21 @@ func (s *EtcdOptions) Validate() []error {
 		allErrors = append(allErrors, fmt.Errorf("--storage-backend invalid, must be 'etcd3' or 'etcd2'. If not specified, it will default to 'etcd3'"))
 	}
 
+	for _, override := range s.EtcdServersOverrides {
+		tokens := strings.Split(override, "#")
+		if len(tokens) != 2 {
+			allErrors = append(allErrors, fmt.Errorf("--etcd-servers-overrides invalid, must be of format: group/resource#servers, where servers are URLs, semicolon separated"))
+			continue
+		}
+
+		apiresource := strings.Split(tokens[0], "/")
+		if len(apiresource) != 2 {
+			allErrors = append(allErrors, fmt.Errorf("--etcd-servers-overrides invalid, must be of format: group/resource#servers, where servers are URLs, semicolon separated"))
+			continue
+		}
+
+	}
+
 	return allErrors
 }
 
@@ -102,7 +117,7 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringSliceVar(&s.EtcdServersOverrides, "etcd-servers-overrides", s.EtcdServersOverrides, ""+
 		"Per-resource etcd servers overrides, comma separated. The individual override "+
-		"format: group/resource#servers, where servers are http://ip:port, semicolon separated.")
+		"format: group/resource#servers, where servers are URLs, semicolon separated.")
 
 	fs.StringVar(&s.DefaultStorageMediaType, "storage-media-type", s.DefaultStorageMediaType, ""+
 		"The media type to use to store objects in storage. "+
@@ -166,29 +181,30 @@ func (s *EtcdOptions) ApplyTo(c *server.Config) error {
 	if s == nil {
 		return nil
 	}
-
-	s.addEtcdHealthEndpoint(c)
+	if err := s.addEtcdHealthEndpoint(c); err != nil {
+		return err
+	}
 	c.RESTOptionsGetter = &SimpleRestOptionsFactory{Options: *s}
 	return nil
 }
 
 func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFactory, c *server.Config) error {
-	s.addEtcdHealthEndpoint(c)
-	c.RESTOptionsGetter = &storageFactoryRestOptionsFactory{Options: *s, StorageFactory: factory}
+	if err := s.addEtcdHealthEndpoint(c); err != nil {
+		return err
+	}
+	c.RESTOptionsGetter = &StorageFactoryRestOptionsFactory{Options: *s, StorageFactory: factory}
 	return nil
 }
 
-func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) {
+func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
+	healthCheck, err := storagefactory.CreateHealthCheck(s.StorageConfig)
+	if err != nil {
+		return err
+	}
 	c.HealthzChecks = append(c.HealthzChecks, healthz.NamedCheck("etcd", func(r *http.Request) error {
-		done, err := preflight.EtcdConnection{ServerList: s.StorageConfig.ServerList}.CheckEtcdServers()
-		if !done {
-			return fmt.Errorf("etcd failed")
-		}
-		if err != nil {
-			return err
-		}
-		return nil
+		return healthCheck()
 	}))
+	return nil
 }
 
 type SimpleRestOptionsFactory struct {
@@ -218,12 +234,12 @@ func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource)
 	return ret, nil
 }
 
-type storageFactoryRestOptionsFactory struct {
+type StorageFactoryRestOptionsFactory struct {
 	Options        EtcdOptions
 	StorageFactory serverstorage.StorageFactory
 }
 
-func (f *storageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
+func (f *StorageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
 	storageConfig, err := f.StorageFactory.NewConfig(resource)
 	if err != nil {
 		return generic.RESTOptions{}, fmt.Errorf("unable to find storage destination for %v, due to %v", resource, err.Error())

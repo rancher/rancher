@@ -41,6 +41,8 @@ type Interface interface {
 	GetRealServers(*VirtualServer) ([]*RealServer, error)
 	// DeleteRealServer deletes the specified real server from the specified virtual server.
 	DeleteRealServer(*VirtualServer, *RealServer) error
+	// UpdateRealServer updates the specified real server from the specified virtual server.
+	UpdateRealServer(*VirtualServer, *RealServer) error
 }
 
 // VirtualServer is an user-oriented definition of an IPVS virtual server in its entirety.
@@ -61,7 +63,18 @@ const (
 	FlagPersistent = 0x1
 	// FlagHashed specify IPVS service hash flag
 	FlagHashed = 0x2
+	// IPVSProxyMode is match set up cluster with ipvs proxy model
+	IPVSProxyMode = "ipvs"
 )
+
+// Sets of IPVS required kernel modules.
+var ipvsModules = []string{
+	"ip_vs",
+	"ip_vs_rr",
+	"ip_vs_wrr",
+	"ip_vs_sh",
+	"nf_conntrack_ipv4",
+}
 
 // Equal check the equality of virtual server.
 // We don't use struct == since it doesn't work because of slice.
@@ -80,9 +93,11 @@ func (svc *VirtualServer) String() string {
 
 // RealServer is an user-oriented definition of an IPVS real server in its entirety.
 type RealServer struct {
-	Address net.IP
-	Port    uint16
-	Weight  int
+	Address      net.IP
+	Port         uint16
+	Weight       int
+	ActiveConn   int
+	InactiveConn int
 }
 
 func (rs *RealServer) String() string {
@@ -93,6 +108,5 @@ func (rs *RealServer) String() string {
 // We don't use struct == since it doesn't work because of slice.
 func (rs *RealServer) Equal(other *RealServer) bool {
 	return rs.Address.Equal(other.Address) &&
-		rs.Port == other.Port &&
-		rs.Weight == other.Weight
+		rs.Port == other.Port
 }

@@ -17,18 +17,31 @@ limitations under the License.
 package rollout
 
 import (
+	"context"
 	"fmt"
-	"io"
+	"time"
 
+	"github.com/spf13/cobra"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/util/interrupt"
-
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -47,11 +60,39 @@ var (
 		kubectl rollout status deployment/nginx`)
 )
 
-func NewCmdRolloutStatus(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &resource.FilenameOptions{}
+type RolloutStatusOptions struct {
+	PrintFlags *genericclioptions.PrintFlags
+
+	Namespace        string
+	EnforceNamespace bool
+	BuilderArgs      []string
+
+	Watch    bool
+	Revision int64
+	Timeout  time.Duration
+
+	StatusViewer  func(*meta.RESTMapping) (kubectl.StatusViewer, error)
+	Builder       func() *resource.Builder
+	DynamicClient dynamic.Interface
+
+	FilenameOptions *resource.FilenameOptions
+	genericclioptions.IOStreams
+}
+
+func NewRolloutStatusOptions(streams genericclioptions.IOStreams) *RolloutStatusOptions {
+	return &RolloutStatusOptions{
+		PrintFlags:      genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme),
+		FilenameOptions: &resource.FilenameOptions{},
+		IOStreams:       streams,
+		Watch:           true,
+		Timeout:         0,
+	}
+}
+
+func NewCmdRolloutStatus(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewRolloutStatusOptions(streams)
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
-	argAliases := kubectl.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
 		Use: "status (TYPE NAME | TYPE/NAME) [flags]",
@@ -60,38 +101,71 @@ func NewCmdRolloutStatus(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    status_long,
 		Example: status_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(RunStatus(f, cmd, out, args, options))
+			cmdutil.CheckErr(o.Complete(f, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
 		},
-		ValidArgs:  validArgs,
-		ArgAliases: argAliases,
+		ValidArgs: validArgs,
 	}
 
 	usage := "identifying the resource to get from a server."
-	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
-	cmd.Flags().BoolP("watch", "w", true, "Watch the status of the rollout until it's done.")
-	cmd.Flags().Int64("revision", 0, "Pin to a specific revision for showing its status. Defaults to 0 (last revision).")
+	cmdutil.AddFilenameOptionFlags(cmd, o.FilenameOptions, usage)
+	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "Watch the status of the rollout until it's done.")
+	cmd.Flags().Int64Var(&o.Revision, "revision", o.Revision, "Pin to a specific revision for showing its status. Defaults to 0 (last revision).")
+	cmd.Flags().DurationVar(&o.Timeout, "timeout", o.Timeout, "The length of time to wait before ending watch, zero means never. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
+
 	return cmd
 }
 
-func RunStatus(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string, options *resource.FilenameOptions) error {
-	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(options.Filenames) {
-		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
-	}
+func (o *RolloutStatusOptions) Complete(f cmdutil.Factory, args []string) error {
+	o.Builder = f.NewBuilder
 
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	var err error
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
 
-	r := f.NewBuilder().
-		Internal().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options).
-		ResourceTypeOrNameArgs(true, args...).
+	o.BuilderArgs = args
+	o.StatusViewer = func(mapping *meta.RESTMapping) (kubectl.StatusViewer, error) {
+		return polymorphichelpers.StatusViewerFn(f, mapping)
+	}
+
+	clientConfig, err := f.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+
+	o.DynamicClient, err = dynamic.NewForConfig(clientConfig)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (o *RolloutStatusOptions) Validate() error {
+	if len(o.BuilderArgs) == 0 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
+		return fmt.Errorf("required resource not specified")
+	}
+
+	if o.Revision < 0 {
+		return fmt.Errorf("revision must be a positive integer: %v", o.Revision)
+	}
+
+	return nil
+}
+
+func (o *RolloutStatusOptions) Run() error {
+	r := o.Builder().
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
+		NamespaceParam(o.Namespace).DefaultNamespace().
+		FilenameParam(o.EnforceNamespace, o.FilenameOptions).
+		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
 		SingleResourceType().
 		Latest().
 		Do()
-	err = r.Err()
+	err := r.Err()
 	if err != nil {
 		return err
 	}
@@ -106,61 +180,68 @@ func RunStatus(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []stri
 	info := infos[0]
 	mapping := info.ResourceMapping()
 
-	obj, err := r.Object()
-	if err != nil {
-		return err
-	}
-	rv, err := mapping.MetadataAccessor.ResourceVersion(obj)
+	statusViewer, err := o.StatusViewer(mapping)
 	if err != nil {
 		return err
 	}
 
-	statusViewer, err := f.StatusViewer(mapping)
-	if err != nil {
-		return err
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = fieldSelector
+			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = fieldSelector
+			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(options)
+		},
 	}
 
-	revision := cmdutil.GetFlagInt64(cmd, "revision")
-	if revision < 0 {
-		return fmt.Errorf("revision must be a positive integer: %v", revision)
-	}
+	preconditionFunc := func(store cache.Store) (bool, error) {
+		_, exists, err := store.Get(&metav1.ObjectMeta{Namespace: info.Namespace, Name: info.Name})
+		if err != nil {
+			return true, err
+		}
+		if !exists {
+			// We need to make sure we see the object in the cache before we start waiting for events
+			// or we would be waiting for the timeout if such object didn't exist.
+			return true, apierrors.NewNotFound(mapping.Resource.GroupResource(), info.Name)
+		}
 
-	// check if deployment's has finished the rollout
-	status, done, err := statusViewer.Status(info.Namespace, info.Name, revision)
-	if err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "%s", status)
-	if done {
-		return nil
-	}
-
-	shouldWatch := cmdutil.GetFlagBool(cmd, "watch")
-	if !shouldWatch {
-		return nil
-	}
-
-	// watch for changes to the deployment
-	w, err := r.Watch(rv)
-	if err != nil {
-		return err
+		return false, nil
 	}
 
 	// if the rollout isn't done yet, keep watching deployment status
-	intr := interrupt.New(nil, w.Stop)
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
+	intr := interrupt.New(nil, cancel)
 	return intr.Run(func() error {
-		_, err := watch.Until(0, w, func(e watch.Event) (bool, error) {
-			// print deployment's status
-			status, done, err := statusViewer.Status(info.Namespace, info.Name, revision)
-			if err != nil {
-				return false, err
+		_, err = watchtools.UntilWithSync(ctx, lw, &unstructured.Unstructured{}, preconditionFunc, func(e watch.Event) (bool, error) {
+			switch t := e.Type; t {
+			case watch.Added, watch.Modified:
+				status, done, err := statusViewer.Status(e.Object.(runtime.Unstructured), o.Revision)
+				if err != nil {
+					return false, err
+				}
+				fmt.Fprintf(o.Out, "%s", status)
+				// Quit waiting if the rollout is done
+				if done {
+					return true, nil
+				}
+
+				shouldWatch := o.Watch
+				if !shouldWatch {
+					return true, nil
+				}
+
+				return false, nil
+
+			case watch.Deleted:
+				// We need to abort to avoid cases of recreation and not to silently watch the wrong (new) object
+				return true, fmt.Errorf("object has been deleted")
+
+			default:
+				return true, fmt.Errorf("internal error: unexpected event %#v", e)
 			}
-			fmt.Fprintf(out, "%s", status)
-			// Quit waiting if the rollout is done
-			if done {
-				return true, nil
-			}
-			return false, nil
 		})
 		return err
 	})

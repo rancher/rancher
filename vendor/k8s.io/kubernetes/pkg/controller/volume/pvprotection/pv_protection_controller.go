@@ -123,7 +123,7 @@ func (c *Controller) processPV(pvName string) error {
 	glog.V(4).Infof("Processing PV %s", pvName)
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished processing PV %s (%v)", pvName, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished processing PV %s (%v)", pvName, time.Since(startTime))
 	}()
 
 	pv, err := c.pvLister.Get(pvName)
@@ -163,7 +163,7 @@ func (c *Controller) addFinalizer(pv *v1.PersistentVolume) error {
 	pvClone.ObjectMeta.Finalizers = append(pvClone.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer)
 	_, err := c.client.CoreV1().PersistentVolumes().Update(pvClone)
 	if err != nil {
-		glog.V(3).Infof("Error adding protection finalizer to PV %s: %v", pv.Name)
+		glog.V(3).Infof("Error adding protection finalizer to PV %s: %v", pv.Name, err)
 		return err
 	}
 	glog.V(3).Infof("Added protection finalizer to PV %s", pv.Name)

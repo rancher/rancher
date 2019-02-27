@@ -46,7 +46,7 @@ func IsNotFound(err error) bool {
 }
 
 func getFinder(dc *Datacenter) *find.Finder {
-	finder := find.NewFinder(dc.Client(), true)
+	finder := find.NewFinder(dc.Client(), false)
 	finder.SetDatacenter(dc.Datacenter)
 	return finder
 }
@@ -170,6 +170,15 @@ func IsManagedObjectNotFoundError(err error) bool {
 		_, isManagedObjectNotFoundError = soap.ToSoapFault(err).VimFault().(types.ManagedObjectNotFound)
 	}
 	return isManagedObjectNotFoundError
+}
+
+// IsInvalidCredentialsError returns true if error is of type InvalidLogin
+func IsInvalidCredentialsError(err error) bool {
+	isInvalidCredentialsError := false
+	if soap.IsSoapFault(err) {
+		_, isInvalidCredentialsError = soap.ToSoapFault(err).VimFault().(types.InvalidLogin)
+	}
+	return isInvalidCredentialsError
 }
 
 // VerifyVolumePathsForVM verifies if the volume paths (volPaths) are attached to VM.

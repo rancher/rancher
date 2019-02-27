@@ -83,7 +83,8 @@ func (e *errObjectName) Error() string {
 // Restore() sets the latest object pointer back to the informer object.
 // Get/List() always returns the latest object pointer.
 type assumeCache struct {
-	mutex sync.Mutex
+	// Synchronizes updates to store
+	rwMutex sync.RWMutex
 
 	// describes the object stored
 	description string
@@ -155,11 +156,33 @@ func (c *assumeCache) add(obj interface{}) {
 		return
 	}
 
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
+
+	if objInfo, _ := c.getObjInfo(name); objInfo != nil {
+		newVersion, err := c.getObjVersion(name, obj)
+		if err != nil {
+			glog.Errorf("add: couldn't get object version: %v", err)
+			return
+		}
+
+		storedVersion, err := c.getObjVersion(name, objInfo.latestObj)
+		if err != nil {
+			glog.Errorf("add: couldn't get stored object version: %v", err)
+			return
+		}
+
+		// Only update object if version is newer.
+		// This is so we don't override assumed objects due to informer resync.
+		if newVersion <= storedVersion {
+			glog.V(10).Infof("Skip adding %v %v to assume cache because version %v is not newer than %v", c.description, name, newVersion, storedVersion)
+			return
+		}
+	}
 
 	objInfo := &objInfo{name: name, latestObj: obj, apiObj: obj}
 	c.store.Update(objInfo)
+	glog.V(10).Infof("Adding %v %v to assume cache: %+v ", c.description, name, obj)
 }
 
 func (c *assumeCache) update(oldObj interface{}, newObj interface{}) {
@@ -177,8 +200,8 @@ func (c *assumeCache) delete(obj interface{}) {
 		return
 	}
 
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
 
 	objInfo := &objInfo{name: name}
 	err = c.store.Delete(objInfo)
@@ -217,8 +240,8 @@ func (c *assumeCache) getObjInfo(name string) (*objInfo, error) {
 }
 
 func (c *assumeCache) Get(objName string) (interface{}, error) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.RLock()
+	defer c.rwMutex.RUnlock()
 
 	objInfo, err := c.getObjInfo(objName)
 	if err != nil {
@@ -228,8 +251,8 @@ func (c *assumeCache) Get(objName string) (interface{}, error) {
 }
 
 func (c *assumeCache) List(indexObj interface{}) []interface{} {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.RLock()
+	defer c.rwMutex.RUnlock()
 
 	allObjs := []interface{}{}
 	objs, err := c.store.Index(c.indexName, &objInfo{latestObj: indexObj})
@@ -255,8 +278,8 @@ func (c *assumeCache) Assume(obj interface{}) error {
 		return &errObjectName{err}
 	}
 
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
 
 	objInfo, err := c.getObjInfo(name)
 	if err != nil {
@@ -284,8 +307,8 @@ func (c *assumeCache) Assume(obj interface{}) error {
 }
 
 func (c *assumeCache) Restore(objName string) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
 
 	objInfo, err := c.getObjInfo(objName)
 	if err != nil {
@@ -348,4 +371,35 @@ func (c *pvAssumeCache) ListPVs(storageClassName string) []*v1.PersistentVolume 
 		pvs = append(pvs, pv)
 	}
 	return pvs
+}
+
+// PVCAssumeCache is a AssumeCache for PersistentVolumeClaim objects
+type PVCAssumeCache interface {
+	AssumeCache
+
+	// GetPVC returns the PVC from the cache with the same
+	// namespace and the same name of the specified pod.
+	// pvcKey is the result of MetaNamespaceKeyFunc on PVC obj
+	GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error)
+}
+
+type pvcAssumeCache struct {
+	*assumeCache
+}
+
+func NewPVCAssumeCache(informer cache.SharedIndexInformer) PVCAssumeCache {
+	return &pvcAssumeCache{assumeCache: NewAssumeCache(informer, "v1.PersistentVolumeClaim", "namespace", cache.MetaNamespaceIndexFunc)}
+}
+
+func (c *pvcAssumeCache) GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error) {
+	obj, err := c.Get(pvcKey)
+	if err != nil {
+		return nil, err
+	}
+
+	pvc, ok := obj.(*v1.PersistentVolumeClaim)
+	if !ok {
+		return nil, &errWrongType{"v1.PersistentVolumeClaim", obj}
+	}
+	return pvc, nil
 }

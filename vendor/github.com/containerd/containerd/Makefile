@@ -41,7 +41,8 @@ COMMANDS=ctr containerd containerd-stress containerd-release
 BINARIES=$(addprefix bin/,$(COMMANDS))
 
 GO_TAGS=$(if $(BUILDTAGS),-tags "$(BUILDTAGS)",)
-GO_LDFLAGS=-ldflags "-s -w -X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG) $(EXTRA_LDFLAGS)"
+GO_LDFLAGS=-ldflags '-s -w -X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG) $(EXTRA_LDFLAGS)'
+SHIM_GO_LDFLAGS=-ldflags '-s -w -X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG) -extldflags "-static"'
 
 TESTFLAGS_RACE=
 GO_GCFLAGS=
@@ -55,7 +56,7 @@ include Makefile.$(target_os)
 TESTFLAGS ?= -v $(TESTFLAGS_RACE)
 TESTFLAGS_PARALLEL ?= 8
 
-.PHONY: clean all AUTHORS fmt vet lint dco build binaries test integration setup generate protos checkprotos coverage ci check help install uninstall vendor release
+.PHONY: clean all AUTHORS fmt vet lint dco build binaries test integration generate protos checkprotos coverage ci check help install uninstall vendor release
 .DEFAULT: default
 
 all: binaries
@@ -69,20 +70,13 @@ ci: check binaries checkprotos coverage coverage-integration ## to be used by th
 AUTHORS: .mailmap .git/HEAD
 	git log --format='%aN <%aE>' | sort -fu > $@
 
-setup: ## install dependencies
-	@echo "$(WHALE) $@"
-	# TODO(stevvooe): Install these from the vendor directory
-	@go get -u github.com/alecthomas/gometalinter
-	@gometalinter --install
-	@go get -u github.com/stevvooe/protobuild
-
 generate: protos
 	@echo "$(WHALE) $@"
 	@PATH=${ROOTDIR}/bin:${PATH} go generate -x ${PACKAGES}
 
 protos: bin/protoc-gen-gogoctrd ## generate protobuf
 	@echo "$(WHALE) $@"
-	@PATH=${ROOTDIR}/bin:${PATH} protobuild ${PACKAGES}
+	@PATH=${ROOTDIR}/bin:${PATH} protobuild --quiet ${PACKAGES}
 
 check-protos: protos ## check if protobufs needs to be generated again
 	@echo "$(WHALE) $@"
@@ -113,7 +107,7 @@ endif
 
 build: ## build the go packages
 	@echo "$(WHALE) $@"
-	@go build -v ${EXTRA_FLAGS} ${GO_LDFLAGS} ${GO_GCFLAGS} ${PACKAGES}
+	@go build ${EXTRA_FLAGS} ${GO_LDFLAGS} ${GO_GCFLAGS} ${PACKAGES}
 
 test: ## run tests, except integration tests and tests that require root
 	@echo "$(WHALE) $@"
@@ -124,10 +118,6 @@ root-test: ## run tests, except integration tests
 	@go test ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES}) -test.root
 
 integration: ## run integration tests
-	@echo "$(WHALE) $@"
-	@go test ${TESTFLAGS} -test.root -parallel 1
-
-integration-parallel: ## run integration tests
 	@echo "$(WHALE) $@"
 	@go test ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL}
 
@@ -141,6 +131,10 @@ FORCE:
 bin/%: cmd/% FORCE
 	@echo "$(WHALE) $@${BINARY_SUFFIX}"
 	@go build -o $@${BINARY_SUFFIX} ${GO_LDFLAGS} ${GO_TAGS} ${GO_GCFLAGS} ./$<
+
+bin/containerd-shim: cmd/containerd-shim FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
+	@echo "$(WHALE) bin/containerd-shim"
+	@CGO_ENABLED=0 go build -o bin/containerd-shim ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./cmd/containerd-shim
 
 binaries: $(BINARIES) ## build binaries
 	@echo "$(WHALE) $@"
@@ -169,29 +163,31 @@ uninstall:
 coverage: ## generate coverprofiles from the unit tests, except tests that require root
 	@echo "$(WHALE) $@"
 	@rm -f coverage.txt
-	( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES}); do \
-		go test -i ${TESTFLAGS} -test.short -coverprofile=coverage.out -covermode=atomic $$pkg || exit; \
-		if [ -f profile.out ]; then \
-			cat profile.out >> coverage.txt; \
-			rm profile.out; \
-		fi; \
-		go test ${TESTFLAGS} -test.short -coverprofile=coverage.out -covermode=atomic $$pkg || exit; \
+	@go test -i ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES}) 2> /dev/null
+	@( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES}); do \
+		go test ${TESTFLAGS} \
+			-cover \
+			-coverprofile=profile.out \
+			-covermode=atomic $$pkg || exit; \
 		if [ -f profile.out ]; then \
 			cat profile.out >> coverage.txt; \
 			rm profile.out; \
 		fi; \
 	done )
 
-root-coverage: ## generae coverage profiles for the unit tests
+root-coverage: ## generate coverage profiles for unit tests that require root
 	@echo "$(WHALE) $@"
+	@go test -i ${TESTFLAGS} $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES}) 2> /dev/null
 	@( for pkg in $(filter-out ${INTEGRATION_PACKAGE},${TEST_REQUIRES_ROOT_PACKAGES}); do \
-		go test -i ${TESTFLAGS} -test.short -coverprofile="../../../$$pkg/coverage.txt" -covermode=atomic $$pkg -test.root || exit; \
-		go test ${TESTFLAGS} -test.short -coverprofile="../../../$$pkg/coverage.txt" -covermode=atomic $$pkg -test.root || exit; \
+		go test ${TESTFLAGS} \
+			-cover \
+			-coverprofile=profile.out \
+			-covermode=atomic $$pkg -test.root || exit; \
+		if [ -f profile.out ]; then \
+			cat profile.out >> coverage.txt; \
+			rm profile.out; \
+		fi; \
 	done )
-
-coverage-integration: ## generate coverprofiles from the integration tests
-	@echo "$(WHALE) $@"
-	go test ${TESTFLAGS} -test.short -coverprofile="../../../${INTEGRATION_PACKAGE}/coverage.txt" -covermode=atomic ${INTEGRATION_PACKAGE} -test.root
 
 vendor:
 	@echo "$(WHALE) $@"

@@ -18,30 +18,37 @@ package scheduler
 
 import (
 	"fmt"
-	"k8s.io/api/core/v1"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"hash/fnv"
+	"io"
+	"sync"
+	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"sync"
-	"time"
-
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 
 	"github.com/golang/glog"
 )
 
 const (
-	nodeUpdateChannelSize = 10
-	podUpdateChannelSize  = 1
-	retries               = 5
+	// TODO (k82cn): Figure out a reasonable number of workers/channels and propagate
+	// the number of workers up making it a paramater of Run() function.
+
+	// NodeUpdateChannelSize defines the size of channel for node update events.
+	NodeUpdateChannelSize = 10
+	// UpdateWorkerSize defines the size of workers for node update or/and pod update.
+	UpdateWorkerSize     = 8
+	podUpdateChannelSize = 1
+	retries              = 5
 )
 
 // Needed to make workqueue work
@@ -59,6 +66,32 @@ type podUpdateItem struct {
 	newTolerations []v1.Toleration
 }
 
+func (n *nodeUpdateItem) name() string {
+	if n.newNode != nil {
+		return n.newNode.ObjectMeta.Name
+	}
+	if n.oldNode != nil {
+		return n.oldNode.ObjectMeta.Name
+	}
+	return ""
+}
+
+func (p *podUpdateItem) nodeName() string {
+	if p.newPod != nil {
+		return p.newPod.Spec.NodeName
+	}
+	if p.oldPod != nil {
+		return p.oldPod.Spec.NodeName
+	}
+	return ""
+}
+
+func hash(val string, max int) int {
+	hasher := fnv.New32a()
+	io.WriteString(hasher, val)
+	return int(hasher.Sum32() % uint32(max))
+}
+
 // NoExecuteTaintManager listens to Taint/Toleration changes and is responsible for removing Pods
 // from Nodes tainted with NoExecute Taints.
 type NoExecuteTaintManager struct {
@@ -70,8 +103,8 @@ type NoExecuteTaintManager struct {
 	taintedNodesLock sync.Mutex
 	taintedNodes     map[string][]v1.Taint
 
-	nodeUpdateChannel chan *nodeUpdateItem
-	podUpdateChannel  chan *podUpdateItem
+	nodeUpdateChannels []chan *nodeUpdateItem
+	podUpdateChannels  []chan *podUpdateItem
 
 	nodeUpdateQueue workqueue.Interface
 	podUpdateQueue  workqueue.Interface
@@ -155,17 +188,15 @@ func NewNoExecuteTaintManager(c clientset.Interface) *NoExecuteTaintManager {
 	eventBroadcaster.StartLogging(glog.Infof)
 	if c != nil {
 		glog.V(0).Infof("Sending events to api server.")
-		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(c.CoreV1().RESTClient()).Events("")})
+		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.CoreV1().Events("")})
 	} else {
 		glog.Fatalf("kubeClient is nil when starting NodeController")
 	}
 
 	tm := &NoExecuteTaintManager{
-		client:            c,
-		recorder:          recorder,
-		taintedNodes:      make(map[string][]v1.Taint),
-		nodeUpdateChannel: make(chan *nodeUpdateItem, nodeUpdateChannelSize),
-		podUpdateChannel:  make(chan *podUpdateItem, podUpdateChannelSize),
+		client:       c,
+		recorder:     recorder,
+		taintedNodes: make(map[string][]v1.Taint),
 
 		nodeUpdateQueue: workqueue.New(),
 		podUpdateQueue:  workqueue.New(),
@@ -178,6 +209,12 @@ func NewNoExecuteTaintManager(c clientset.Interface) *NoExecuteTaintManager {
 // Run starts NoExecuteTaintManager which will run in loop until `stopCh` is closed.
 func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
 	glog.V(0).Infof("Starting NoExecuteTaintManager")
+
+	for i := 0; i < UpdateWorkerSize; i++ {
+		tc.nodeUpdateChannels = append(tc.nodeUpdateChannels, make(chan *nodeUpdateItem, NodeUpdateChannelSize))
+		tc.podUpdateChannels = append(tc.podUpdateChannels, make(chan *podUpdateItem, podUpdateChannelSize))
+	}
+
 	// Functions that are responsible for taking work items out of the workqueues and putting them
 	// into channels.
 	go func(stopCh <-chan struct{}) {
@@ -187,11 +224,14 @@ func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
 				break
 			}
 			nodeUpdate := item.(*nodeUpdateItem)
+			hash := hash(nodeUpdate.name(), UpdateWorkerSize)
 			select {
 			case <-stopCh:
-				break
-			case tc.nodeUpdateChannel <- nodeUpdate:
+				tc.nodeUpdateQueue.Done(item)
+				return
+			case tc.nodeUpdateChannels[hash] <- nodeUpdate:
 			}
+			tc.nodeUpdateQueue.Done(item)
 		}
 	}(stopCh)
 
@@ -202,13 +242,27 @@ func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
 				break
 			}
 			podUpdate := item.(*podUpdateItem)
+			hash := hash(podUpdate.nodeName(), UpdateWorkerSize)
 			select {
 			case <-stopCh:
-				break
-			case tc.podUpdateChannel <- podUpdate:
+				tc.podUpdateQueue.Done(item)
+				return
+			case tc.podUpdateChannels[hash] <- podUpdate:
 			}
+			tc.podUpdateQueue.Done(item)
 		}
 	}(stopCh)
+
+	wg := sync.WaitGroup{}
+	wg.Add(UpdateWorkerSize)
+	for i := 0; i < UpdateWorkerSize; i++ {
+		go tc.worker(i, wg.Done, stopCh)
+	}
+	wg.Wait()
+}
+
+func (tc *NoExecuteTaintManager) worker(worker int, done func(), stopCh <-chan struct{}) {
+	defer done()
 
 	// When processing events we want to prioritize Node updates over Pod updates,
 	// as NodeUpdates that interest NoExecuteTaintManager should be handled as soon as possible -
@@ -217,15 +271,15 @@ func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
 	for {
 		select {
 		case <-stopCh:
-			break
-		case nodeUpdate := <-tc.nodeUpdateChannel:
+			return
+		case nodeUpdate := <-tc.nodeUpdateChannels[worker]:
 			tc.handleNodeUpdate(nodeUpdate)
-		case podUpdate := <-tc.podUpdateChannel:
+		case podUpdate := <-tc.podUpdateChannels[worker]:
 			// If we found a Pod update we need to empty Node queue first.
 		priority:
 			for {
 				select {
-				case nodeUpdate := <-tc.nodeUpdateChannel:
+				case nodeUpdate := <-tc.nodeUpdateChannels[worker]:
 					tc.handleNodeUpdate(nodeUpdate)
 				default:
 					break priority

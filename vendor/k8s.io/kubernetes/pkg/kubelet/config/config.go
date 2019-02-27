@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/checkpoint"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -64,7 +65,7 @@ type PodConfig struct {
 	// contains the list of all configured sources
 	sourcesLock       sync.Mutex
 	sources           sets.String
-	checkpointManager checkpoint.Manager
+	checkpointManager checkpointmanager.CheckpointManager
 }
 
 // NewPodConfig creates an object that can merge many configuration sources into a stream
@@ -112,15 +113,20 @@ func (c *PodConfig) Sync() {
 
 // Restore restores pods from the checkpoint path, *once*
 func (c *PodConfig) Restore(path string, updates chan<- interface{}) error {
-	var err error
-	if c.checkpointManager == nil {
-		c.checkpointManager = checkpoint.NewCheckpointManager(path)
-		pods, err := c.checkpointManager.LoadPods()
-		if err == nil {
-			updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.RESTORE, Source: kubetypes.ApiserverSource}
-		}
+	if c.checkpointManager != nil {
+		return nil
 	}
-	return err
+	var err error
+	c.checkpointManager, err = checkpointmanager.NewCheckpointManager(path)
+	if err != nil {
+		return err
+	}
+	pods, err := checkpoint.LoadPods(c.checkpointManager)
+	if err != nil {
+		return err
+	}
+	updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.RESTORE, Source: kubetypes.ApiserverSource}
+	return nil
 }
 
 // podStorage manages the current pod state at any point in time and ensures updates
@@ -308,6 +314,9 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		}
 	case kubetypes.RESTORE:
 		glog.V(4).Infof("Restoring pods for source %s", source)
+		for _, value := range update.Pods {
+			restorePods = append(restorePods, value)
+		}
 
 	default:
 		glog.Warningf("Received invalid update type: %v", update)
