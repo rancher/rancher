@@ -83,7 +83,8 @@ func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 	}
 
 	for i := 0; i < 4; i++ {
-		err := p.driverRemove(cluster)
+		// cluster will be forcefully removed on last attempt
+		err := p.driverRemove(cluster, i == 3)
 		if err == nil {
 			break
 		}
