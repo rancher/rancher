@@ -17,25 +17,32 @@ limitations under the License.
 package hyperkube
 
 import (
+	"flag"
+
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
 
 // NewKubeAPIServer creates a new hyperkube Server object that includes the
 // description and flags.
 func NewKubeAPIServer() *Server {
-	s := options.NewServerRunOptions()
+	var stopCh chan struct{}
+	command := app.NewAPIServerCommand(stopCh)
 
 	hks := Server{
 		name:            "apiserver",
 		AlternativeName: "kube-apiserver",
 		SimpleUsage:     "apiserver",
-		Long:            "The main API entrypoint and interface to the storage system.  The API server is also the focal point for all authorization decisions.",
-		Run: func(_ *Server, args []string, stopCh <-chan struct{}) error {
-			return app.Run(s, stopCh)
-		},
-		RespectsStopCh: true,
+		Long:            command.Long,
+		RespectsStopCh:  true,
 	}
-	s.AddFlags(hks.Flags())
+	serverFlags := hks.Flags()
+	serverFlags.AddFlagSet(command.Flags())
+
+	command.Flags().AddGoFlagSet(flag.CommandLine)
+
+	hks.Run = func(_ *Server, args []string, stopCh <-chan struct{}) error {
+		command.SetArgs(args)
+		return command.Execute()
+	}
 	return &hks
 }

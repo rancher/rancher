@@ -1,13 +1,14 @@
 package namespace
 
 import (
+	"strings"
+
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/kubernetes/pkg/printers"
-	"strings"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 )
 
 var ExportResourcePrefixMappings = map[string]string{
