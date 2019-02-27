@@ -28,6 +28,7 @@ func (c *Cluster) PrepareBackup(ctx context.Context, snapshotPath string) error 
 	// local backup case
 	var backupServer *hosts.Host
 	backupImage := c.getBackupImage()
+	var errors []error
 	if !util.IsRancherBackupSupported(c.SystemImages.Alpine) {
 		log.Warnf(ctx, "Auto local backup sync is not supported in `%s`. Using `%s` instead.", c.SystemImages.Alpine, backupImage)
 	}
@@ -41,10 +42,21 @@ func (c *Cluster) PrepareBackup(ctx context.Context, snapshotPath string) error 
 			if backupServer == nil { // start the download server, only one node should have it!
 				if err := services.StartBackupServer(ctx, host, c.PrivateRegistriesMap, backupImage, snapshotPath); err != nil {
 					log.Warnf(ctx, "failed to start backup server on host [%s]: %v", host.Address, err)
+					errors = append(errors, err)
 					continue
 				}
 				backupServer = host
+				break
 			}
+		}
+
+		if backupServer == nil { //failed to start the backupServer, I will cleanup and exit
+			for _, host := range c.EtcdHosts {
+				if err := docker.StartContainer(ctx, host.DClient, host.Address, services.EtcdContainerName); err != nil {
+					log.Warnf(ctx, "failed to start etcd container on host [%s]: %v", host.Address, err)
+				}
+			}
+			return fmt.Errorf("failed to start backup server on all etcd nodes: %v", errors)
 		}
 		// start downloading the snapshot
 		for _, host := range c.EtcdHosts {
