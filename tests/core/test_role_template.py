@@ -1,5 +1,6 @@
 from .common import random_str
 from rancher import ApiError
+import time
 
 
 def test_role_template_creation(admin_mc, remove_resource):
@@ -36,8 +37,7 @@ def test_edit_builtin_role_template(admin_mc, remove_resource):
     org_rt_name = random_str()
     rt = client.create_role_template(name=org_rt_name)
     remove_resource(rt)
-    assert rt is not None
-    assert rt.name == org_rt_name
+    wait_for_role_template_creation(admin_mc, org_rt_name)
     new_rt_name = random_str()
     rt = client.update(rt, name=new_rt_name)
     assert rt.name == new_rt_name
@@ -48,3 +48,18 @@ def test_edit_builtin_role_template(admin_mc, remove_resource):
     cm_rt = client.by_id_role_template("cluster-member")
     rt = client.update(cm_rt, name=new_rt_name)
     assert rt.name == "Cluster Member"
+
+
+def wait_for_role_template_creation(admin_mc, rt_name, timeout=60):
+    start = time.time()
+    interval = 0.5
+    client = admin_mc.client
+    found = False
+    while not found:
+        if time.time() - start > timeout:
+            raise Exception('Timeout waiting for roletemplate creation')
+        rt = client.list_role_template(name=rt_name)
+        if len(rt) > 0:
+            found = True
+        time.sleep(interval)
+        interval *= 2

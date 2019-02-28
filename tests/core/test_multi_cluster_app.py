@@ -250,9 +250,6 @@ def wait_for_roles_to_be_updated(admin_mc, mcapp, roles, timeout=60):
         mcapp = admin_mc.client.by_id_multi_cluster_app(id)
         if mcapp is not None and mcapp.roles == roles:
             found = True
-        # mcapps = admin_mc.client.list_multi_cluster_app(name=mcapp.name)
-        # if len(mcapps) > 0 and mcapps.data[0].roles == roles:
-        #     found = True
         time.sleep(interval)
         interval *= 2
 
