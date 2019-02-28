@@ -3,7 +3,6 @@ set -e
 
 git rm -rf test
 find -name '*_test.go' -exec git rm {} \;
-find -name '*_windows.go' -exec git rm {} \;
 find -depth -name testdata -type d -exec git rm -rf {} \;
 find -depth -name testing -type d -exec git rm -rf {} \;
 
