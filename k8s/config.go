@@ -3,6 +3,7 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -35,6 +36,12 @@ func getAuto(ctx context.Context, kubeConfig string) (bool, context.Context, *re
 	}
 
 	if config, err := rest.InClusterConfig(); err == nil {
+		if config.BearerToken == "" {
+			tokenBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
+			if err == nil {
+				config.BearerToken = string(tokenBytes)
+			}
+		}
 		return false, ctx, config, nil
 	}
 
