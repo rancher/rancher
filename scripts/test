@@ -23,6 +23,10 @@ cleanup()
 #[ "${ARCH}" == "amd64" ] && RACE=-race
 #go test ${RACE} -cover -tags=test ${PACKAGES}
 
+if [ ${ARCH} == arm64 ]; then
+    export ETCD_UNSUPPORTED_ARCH=arm64
+fi
+
 $(dirname $0)/run &
 PID=$!
 trap cleanup exit

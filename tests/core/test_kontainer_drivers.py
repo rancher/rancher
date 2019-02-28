@@ -1,3 +1,4 @@
+import platform
 import pytest
 import sys
 from rancher import ApiError
@@ -7,10 +8,18 @@ from .conftest import wait_for_condition, wait_until, random_str, wait_for
 NEW_DRIVER_URL = "https://github.com/rancher/kontainer-engine-driver-" \
                  "example/releases/download/v0.2.2/kontainer-engine-" \
                  "driver-example-" + sys.platform + "-amd64"
-
-DRIVER_URL = "https://github.com/rancher/kontainer-engine-driver-example/" \
+NEW_DRIVER_ARM64_URL = "https://github.com/rancher/kontainer-engine-driver-" \
+                 "example/releases/download/v0.2.2/kontainer-engine-" \
+                 "driver-example-" + sys.platform + "-arm64"
+DRIVER_AMD64_URL = "https://github.com/rancher/" \
+             "kontainer-engine-driver-example/" \
              "releases/download/v0.2.1/kontainer-engine-driver-example-" \
              + sys.platform
+DRIVER_ARM64_URL = "https://github.com/jianghang8421/" \
+             "kontainer-engine-driver-example/" \
+             "releases/download/v0.2.1-multiarch/" \
+             "kontainer-engine-driver-example-" \
+             + sys.platform + "-arm64"
 
 
 def test_builtin_drivers_are_present(admin_mc):
@@ -35,10 +44,13 @@ def test_builtin_drivers_are_present(admin_mc):
 @pytest.mark.nonparallel
 def test_kontainer_driver_lifecycle(admin_mc, remove_resource,
                                     wait_remove_resource):
+    URL = DRIVER_AMD64_URL
+    if platform.machine() == "aarch64":
+        URL = DRIVER_ARM64_URL
     kd = admin_mc.client.create_kontainerDriver(
         createDynamicSchema=True,
         active=True,
-        url=DRIVER_URL
+        url=URL
     )
     remove_resource(kd)
 
@@ -101,10 +113,13 @@ def test_kontainer_driver_lifecycle(admin_mc, remove_resource,
 def test_enabling_driver_exposes_schema(admin_mc, wait_remove_resource):
     """ Test if enabling driver exposes its dynamic schema, drivers are
      downloaded / installed once they are active """
+    URL = DRIVER_AMD64_URL
+    if platform.machine() == "aarch64":
+        URL = DRIVER_ARM64_URL
     kd = admin_mc.client.create_kontainerDriver(
         createDynamicSchema=True,
         active=False,
-        url=DRIVER_URL
+        url=URL
     )
     wait_remove_resource(kd)
 
@@ -135,10 +150,13 @@ def test_enabling_driver_exposes_schema(admin_mc, wait_remove_resource):
 @pytest.mark.nonparallel
 def test_upgrade_changes_schema(admin_mc, wait_remove_resource):
     client = admin_mc.client
+    URL = DRIVER_AMD64_URL
+    if platform.machine() == "aarch64":
+        URL = DRIVER_ARM64_URL
     kd = client.create_kontainerDriver(
         createDynamicSchema=True,
         active=True,
-        url=DRIVER_URL
+        url=URL
     )
     wait_remove_resource(kd)
 
@@ -149,7 +167,10 @@ def test_upgrade_changes_schema(admin_mc, wait_remove_resource):
     kdSchema = client.schema.types[kd.name + 'EngineConfig']
     assert 'specialTestingField' not in kdSchema.resourceFields
 
-    kd.url = NEW_DRIVER_URL
+    NEW_URL = NEW_DRIVER_URL
+    if platform.machine() == "aarch64":
+        NEW_URL = NEW_DRIVER_ARM64_URL
+    kd.url = NEW_URL
     kd = client.update_by_id_kontainerDriver(kd.id, kd)
 
     def schema_updated():
@@ -167,10 +188,13 @@ def test_upgrade_changes_schema(admin_mc, wait_remove_resource):
 def test_create_duplicate_driver_conflict(admin_mc, wait_remove_resource):
     """ Test if adding a driver with a pre-existing driver's URL
     returns a conflict error"""
+    URL = DRIVER_AMD64_URL
+    if platform.machine() == "aarch64":
+        URL = DRIVER_ARM64_URL
     kd = admin_mc.client.create_kontainerDriver(
         createDynamicSchema=True,
         active=True,
-        url=DRIVER_URL
+        url=URL
     )
     wait_remove_resource(kd)
     kd = wait_for_condition('Active', 'True', admin_mc.client, kd, timeout=90)
@@ -179,7 +203,7 @@ def test_create_duplicate_driver_conflict(admin_mc, wait_remove_resource):
         kd2 = admin_mc.client.create_kontainerDriver(
             createDynamicSchema=True,
             active=True,
-            url=DRIVER_URL
+            url=URL
         )
         wait_remove_resource(kd2)
         pytest.fail("Failed to catch duplicate driver URL on create")
@@ -192,10 +216,13 @@ def test_create_duplicate_driver_conflict(admin_mc, wait_remove_resource):
 def test_update_duplicate_driver_conflict(admin_mc, wait_remove_resource):
     """ Test if updating a driver's URL to a pre-existing driver's URL
     returns a conflict error"""
+    URL = DRIVER_AMD64_URL
+    if platform.machine() == "aarch64":
+        URL = DRIVER_ARM64_URL
     kd1 = admin_mc.client.create_kontainerDriver(
         createDynamicSchema=True,
         active=True,
-        url=DRIVER_URL
+        url=URL
     )
     wait_remove_resource(kd1)
     kd1 = wait_for_condition('Active', 'True', admin_mc.client, kd1,
@@ -204,10 +231,10 @@ def test_update_duplicate_driver_conflict(admin_mc, wait_remove_resource):
     kd2 = admin_mc.client.create_kontainerDriver(
         createDynamicSchema=True,
         active=True,
-        url=DRIVER_URL + "2"
+        url=URL + "2"
     )
     wait_remove_resource(kd2)
-    kd2.url = DRIVER_URL
+    kd2.url = URL
 
     try:
         admin_mc.client.update_by_id_kontainerDriver(kd2.id, kd2)

@@ -1,6 +1,6 @@
 ---
 kind: pipeline
-name: default
+name: default-amd64
 
 platform:
   os: linux
@@ -37,6 +37,7 @@ steps:
   image: plugins/docker
   settings:
     build_args:
+    - ARCH=amd64
     - VERSION=master
     context: package/
     custom_dns: 1.1.1.1
@@ -44,7 +45,7 @@ steps:
     password:
       from_secret: docker_password
     repo: rancher/rancher
-    tag: master
+    tag: master-amd64
     username:
       from_secret: docker_username
   when:
@@ -58,6 +59,7 @@ steps:
   image: plugins/docker
   settings:
     build_args:
+    - ARCH=amd64
     - VERSION=master
     context: package/
     custom_dns: 1.1.1.1
@@ -65,7 +67,7 @@ steps:
     password:
       from_secret: docker_password
     repo: rancher/rancher-agent
-    tag: master
+    tag: master-amd64
     username:
       from_secret: docker_username
   when:
@@ -79,6 +81,7 @@ steps:
   image: plugins/docker
   settings:
     build_args:
+    - ARCH=amd64
     - "VERSION=${DRONE_TAG}"
     context: package/
     custom_dns: 1.1.1.1
@@ -86,7 +89,7 @@ steps:
     password:
       from_secret: docker_password
     repo: rancher/rancher
-    tag: "${DRONE_TAG}"
+    tag: "${DRONE_TAG}-amd64"
     username:
       from_secret: docker_username
   when:
@@ -98,6 +101,7 @@ steps:
   image: plugins/docker
   settings:
     build_args:
+    - ARCH=amd64
     - "VERSION=${DRONE_TAG}"
     context: package/
     custom_dns: 1.1.1.1
@@ -105,7 +109,7 @@ steps:
     password:
       from_secret: docker_password
     repo: rancher/rancher-agent
-    tag: "${DRONE_TAG}"
+    tag: "${DRONE_TAG}-amd64"
     username:
       from_secret: docker_username
   when:
@@ -175,6 +179,210 @@ trigger:
   event:
     exclude:
     - promote
+---
+kind: pipeline
+name: default-arm64
+
+platform:
+  os: linux
+  arch: arm64
+
+steps:
+- name: build
+  pull: default
+  image: rancher/dapper:v0.4.1
+  commands:
+  - dapper ci
+  privileged: true
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    event:
+    - push
+    - pull_request
+    - tag
+
+- name: stage-binaries
+  pull: default
+  image: rancher/dapper:v0.4.1
+  commands:
+  - "cp -r ./bin/* ./package/"
+  when:
+    event:
+    - push
+    - tag
+
+- name: docker-publish-master
+  pull: default
+  image: plugins/docker
+  settings:
+    build_args:
+    - ARCH=arm64
+    - VERSION=master
+    context: package/
+    custom_dns: 1.1.1.1
+    dockerfile: package/Dockerfile
+    password:
+      from_secret: docker_password
+    repo: rancher/rancher
+    tag: master-arm64
+    username:
+      from_secret: docker_username
+  when:
+    branch:
+    - master
+    event:
+    - push
+
+- name: docker-publish-master-agent
+  pull: default
+  image: plugins/docker
+  settings:
+    build_args:
+    - ARCH=arm64
+    - VERSION=master
+    context: package/
+    custom_dns: 1.1.1.1
+    dockerfile: package/Dockerfile.agent
+    password:
+      from_secret: docker_password
+    repo: rancher/rancher-agent
+    tag: master-arm64
+    username:
+      from_secret: docker_username
+  when:
+    branch:
+    - master
+    event:
+    - push
+
+- name: docker-publish
+  pull: default
+  image: plugins/docker
+  settings:
+    build_args:
+    - ARCH=arm64
+    - "VERSION=${DRONE_TAG}"
+    context: package/
+    custom_dns: 1.1.1.1
+    dockerfile: package/Dockerfile
+    password:
+      from_secret: docker_password
+    repo: rancher/rancher
+    tag: "${DRONE_TAG}-arm64"
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+
+- name: docker-publish-agent
+  pull: default
+  image: plugins/docker
+  settings:
+    build_args:
+    - ARCH=arm64
+    - "VERSION=${DRONE_TAG}"
+    context: package/
+    custom_dns: 1.1.1.1
+    dockerfile: package/Dockerfile.agent
+    password:
+      from_secret: docker_password
+    repo: rancher/rancher-agent
+    tag: "${DRONE_TAG}-arm64"
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+volumes:
+- name: docker
+  host:
+    path: /var/run/docker.sock
+
+trigger:
+  event:
+    exclude:
+    - promote
+---
+kind: pipeline
+name: manifest
+
+steps:
+  - name: push-master-manifest
+    image: plugins/manifest:1.0.2
+    settings:
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+      target: "rancher/rancher:master"
+      template: "rancher/rancher:master-ARCH"
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    when:
+      branch:
+        - master
+      event:
+        - push
+  - name: push-master-agent-manifest
+    image: plugins/manifest:1.0.2
+    settings:
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+      target: "rancher/rancher-agent:master"
+      template: "rancher/rancher-agent:master-ARCH"
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    when:
+      branch:
+        - master
+      event:
+        - push
+  - name: push-manifest
+    image: plugins/manifest:1.0.2
+    settings:
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+      target: "rancher/rancher:${DRONE_TAG}"
+      template: "rancher/rancher:${DRONE_TAG}-ARCH"
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    when:
+      event:
+        - tag
+  - name: push-agent-manifest
+    image: plugins/manifest:1.0.2
+    settings:
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+      target: "rancher/rancher-agent:${DRONE_TAG}"
+      template: "rancher/rancher-agent:${DRONE_TAG}-ARCH"
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    when:
+      event:
+        - tag
+
+trigger:
+  event:
+    exclude:
+    - promote
+
+depends_on:
+- default-amd64
+- default-arm64
 ---
 kind: pipeline
 name: publish
