@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/rancher/norman/controller"
+	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/generator"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/types/apis/core/v1"
@@ -96,7 +97,8 @@ func (s *ConfigGenerator) addExcludeNamespaces(systemProjectID string) (string, 
 	var systemNamespaces []string
 	for _, v := range namespaces {
 		if v.Annotations[project.ProjectIDAnn] == systemProjectID {
-			systemNamespaces = append(systemNamespaces, v.Name)
+			namespacePattern := loggingconfig.GetNamespacePattern(v.Name)
+			systemNamespaces = append(systemNamespaces, namespacePattern)
 		}
 	}
 
