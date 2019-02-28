@@ -58,7 +58,8 @@ func GenerateProjectConfig(projectLoggings []*mgmtv3.ProjectLogging, namespaces 
 		var grepNamespace []string
 		for _, v2 := range namespaces {
 			if nsProjectName, ok := v2.Annotations[project.ProjectIDAnn]; ok && nsProjectName == v.Spec.ProjectName {
-				grepNamespace = append(grepNamespace, v2.Name)
+				namespacePattern := loggingconfig.GetNamespacePattern(v2.Name)
+				grepNamespace = append(grepNamespace, namespacePattern)
 			}
 		}
 

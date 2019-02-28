@@ -93,3 +93,7 @@ func RancherLoggingConfigSecretName() string {
 func RancherLoggingSSLSecretName() string {
 	return fmt.Sprintf("%s-%s", AppName, LoggingSSLSecretName)
 }
+
+func GetNamespacePattern(namespace string) string {
+	return fmt.Sprintf("^%s$", namespace)
+}
