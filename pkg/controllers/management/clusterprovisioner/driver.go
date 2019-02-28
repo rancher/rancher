@@ -29,7 +29,7 @@ func (p *Provisioner) driverCreate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 		return "", "", "", err
 	}
 
-	return p.Driver.Create(ctx, cluster.Name, kontainerDriver, spec)
+	return p.engineService.Create(ctx, cluster.Name, kontainerDriver, spec)
 }
 
 func (p *Provisioner) getKontainerDriver(spec v3.ClusterSpec) (*v3.KontainerDriver, error) {
@@ -75,7 +75,7 @@ func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 		return "", "", "", err
 	}
 
-	return p.Driver.Update(ctx, cluster.Name, kontainerDriver, spec)
+	return p.engineService.Update(ctx, cluster.Name, kontainerDriver, spec)
 }
 
 func (p *Provisioner) driverRemove(cluster *v3.Cluster, forceRemove bool) error {
@@ -94,7 +94,7 @@ func (p *Provisioner) driverRemove(cluster *v3.Cluster, forceRemove bool) error 
 			return nil, err
 		}
 
-		return cluster, p.Driver.Remove(ctx, cluster.Name, kontainerDriver, spec, forceRemove)
+		return cluster, p.engineService.Remove(ctx, cluster.Name, kontainerDriver, spec, forceRemove)
 	})
 
 	return err
@@ -118,7 +118,7 @@ func (p *Provisioner) driverRestore(cluster *v3.Cluster, spec v3.ClusterSpec) (s
 	}
 
 	snapshot := strings.Split(spec.RancherKubernetesEngineConfig.Restore.SnapshotName, ":")[1]
-	return p.Driver.ETCDRestore(ctx, cluster.Name, kontainerDriver, spec, snapshot)
+	return p.engineService.ETCDRestore(ctx, cluster.Name, kontainerDriver, spec, snapshot)
 
 }
 
@@ -133,7 +133,7 @@ func (p *Provisioner) generateServiceAccount(cluster *v3.Cluster, spec v3.Cluste
 		return "", err
 	}
 
-	return p.Driver.GenerateServiceAccount(ctx, cluster.Name, kontainerDriver, spec)
+	return p.engineService.GenerateServiceAccount(ctx, cluster.Name, kontainerDriver, spec)
 }
 
 func (p *Provisioner) removeLegacyServiceAccount(cluster *v3.Cluster, spec v3.ClusterSpec) error {
@@ -147,7 +147,7 @@ func (p *Provisioner) removeLegacyServiceAccount(cluster *v3.Cluster, spec v3.Cl
 		return err
 	}
 
-	return p.Driver.RemoveLegacyServiceAccount(ctx, cluster.Name, kontainerDriver, spec)
+	return p.engineService.RemoveLegacyServiceAccount(ctx, cluster.Name, kontainerDriver, spec)
 }
 
 func cleanRKE(spec v3.ClusterSpec) v3.ClusterSpec {

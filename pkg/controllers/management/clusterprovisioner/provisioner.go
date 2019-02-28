@@ -37,7 +37,7 @@ type Provisioner struct {
 	ClusterController     v3.ClusterController
 	Clusters              v3.ClusterInterface
 	NodeLister            v3.NodeLister
-	Driver                service.EngineService
+	engineService         *service.EngineService
 	backoff               *flowcontrol.Backoff
 	KontainerDriverLister v3.KontainerDriverLister
 	DynamicSchemasLister  v3.DynamicSchemaLister
@@ -46,7 +46,7 @@ type Provisioner struct {
 
 func Register(ctx context.Context, management *config.ManagementContext) {
 	p := &Provisioner{
-		Driver:                service.NewEngineService(NewPersistentStore(management.Core.Namespaces(""), management.Core)),
+		engineService:         service.NewEngineService(NewPersistentStore(management.Core.Namespaces(""), management.Core)),
 		Clusters:              management.Management.Clusters(""),
 		ClusterController:     management.Management.Clusters("").Controller(),
 		NodeLister:            management.Management.Nodes("").Controller().Lister(),
