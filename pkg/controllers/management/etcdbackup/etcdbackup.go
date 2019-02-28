@@ -34,7 +34,7 @@ type Controller struct {
 	clusterLister         v3.ClusterLister
 	backupClient          v3.EtcdBackupInterface
 	backupLister          v3.EtcdBackupLister
-	backupDriver          service.EngineService
+	backupDriver          *service.EngineService
 	secretsClient         v1.SecretInterface
 	KontainerDriverLister v3.KontainerDriverLister
 }
