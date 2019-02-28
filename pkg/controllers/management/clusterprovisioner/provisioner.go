@@ -3,6 +3,7 @@ package clusterprovisioner
 import (
 	"context"
 	"fmt"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterconfigcensor"
 	"reflect"
 	"sort"
 	"strings"
@@ -41,18 +42,22 @@ type Provisioner struct {
 	backoff               *flowcontrol.Backoff
 	KontainerDriverLister v3.KontainerDriverLister
 	DynamicSchemasLister  v3.DynamicSchemaLister
+	ConfigCensor          *clusterconfigcensor.ConfigCensor
 	Backups               v3.EtcdBackupLister
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
+	kontainerDriverLister := management.Management.KontainerDrivers("").Controller().Lister()
+	dynamicSchemaLister := management.Management.DynamicSchemas("").Controller().Lister()
+
 	p := &Provisioner{
 		Driver:                service.NewEngineService(NewPersistentStore(management.Core.Namespaces(""), management.Core)),
 		Clusters:              management.Management.Clusters(""),
 		ClusterController:     management.Management.Clusters("").Controller(),
 		NodeLister:            management.Management.Nodes("").Controller().Lister(),
 		backoff:               flowcontrol.NewBackOff(30*time.Second, 10*time.Minute),
-		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
-		DynamicSchemasLister:  management.Management.DynamicSchemas("").Controller().Lister(),
+		KontainerDriverLister: kontainerDriverLister,
+		ConfigCensor:          clusterconfigcensor.NewConfigCensor(kontainerDriverLister, dynamicSchemaLister),
 		Backups:               management.Management.EtcdBackups("").Controller().Lister(),
 	}
 
@@ -323,7 +328,7 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 			return cluster, err
 		}
 
-		censoredSpec, err := p.censorGenericEngineConfig(*spec)
+		censoredSpec, err := p.ConfigCensor.CensorGenericEngineConfig(*spec)
 		if err != nil {
 			return cluster, err
 		}
@@ -395,60 +400,6 @@ func resetRkeConfigFlags(cluster *v3.Cluster) {
 			cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Restore = v3.RestoreConfig{}
 		}
 	}
-}
-
-func copyMap(toCopy v3.MapStringInterface) v3.MapStringInterface {
-	newMap := v3.MapStringInterface{}
-
-	for k, v := range toCopy {
-		newMap[k] = v
-	}
-
-	return newMap
-}
-
-func (p *Provisioner) censorGenericEngineConfig(input v3.ClusterSpec) (v3.ClusterSpec, error) {
-	if input.GenericEngineConfig == nil {
-		// nothing to do
-		return input, nil
-	}
-
-	config := copyMap(*input.GenericEngineConfig)
-	driverName, ok := config[DriverNameField].(string)
-	if !ok {
-		// can't figure out driver type so blank out the whole thing
-		logrus.Warnf("cluster %v has a generic engine config but no driver type field; can't hide password "+
-			"fields so removing the entire config", input.DisplayName)
-		input.GenericEngineConfig = nil
-		return input, nil
-	}
-
-	driver, err := p.KontainerDriverLister.Get("", driverName)
-	if err != nil {
-		return v3.ClusterSpec{}, err
-	}
-
-	var schemaName string
-	if driver.Spec.BuiltIn {
-		schemaName = driver.Status.DisplayName + "Config"
-	} else {
-		schemaName = driver.Status.DisplayName + "EngineConfig"
-	}
-
-	kontainerDriverSchema, err := p.DynamicSchemasLister.Get("", strings.ToLower(schemaName))
-	if err != nil {
-		return v3.ClusterSpec{}, fmt.Errorf("error getting dynamic schema %v", err)
-	}
-
-	for key := range config {
-		field := kontainerDriverSchema.Spec.ResourceFields[key]
-		if field.Type == "password" {
-			delete(config, key)
-		}
-	}
-
-	input.GenericEngineConfig = &config
-	return input, nil
 }
 
 func skipProvisioning(cluster *v3.Cluster) bool {
@@ -612,7 +563,7 @@ func (p *Provisioner) getSpec(cluster *v3.Cluster) (*v3.ClusterSpec, error) {
 		return nil, err
 	}
 
-	censoredSpec, err := p.censorGenericEngineConfig(cluster.Spec)
+	censoredSpec, err := p.ConfigCensor.CensorGenericEngineConfig(cluster.Spec)
 	if err != nil {
 		return nil, err
 	}
