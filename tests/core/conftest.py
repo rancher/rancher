@@ -334,8 +334,10 @@ def wait_for_condition(condition_type, status, client, obj, timeout=45):
         obj = client.reload(obj)
         delta = time.time() - start
         if delta > timeout:
-            msg = 'Timeout waiting for [{}:{}] for condition after {}' \
-                ' seconds'.format(obj.type, obj.id, delta)
+            msg = 'Expected condition {} to have status {}\n'\
+                'Timeout waiting for [{}:{}] for condition after {} ' \
+                'seconds\n {}'.format(condition_type, status, obj.type, obj.id,
+                                      delta, str(obj))
             raise Exception(msg)
     return obj
 
