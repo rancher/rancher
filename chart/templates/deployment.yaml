@@ -116,7 +116,7 @@ spec:
 {{- end }}
 {{- if .Values.privateCA }}
         # Pass CA cert into rancher for private CA
-        - mountPath: /etc/rancher/ssl
+        - mountPath: /etc/rancher/ssl/cacerts.pem
           name: tls-ca-volume
           subPath: cacerts.pem
           readOnly: true
