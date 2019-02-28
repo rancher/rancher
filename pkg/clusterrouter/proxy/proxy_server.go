@@ -63,20 +63,6 @@ func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, er
 		return nil, err
 	}
 
-	if localConfig.TLSClientConfig.CAFile != "" && localConfig.BearerToken != "" {
-		httpTransport := &http.Transport{}
-		certBytes, err := base64.StdEncoding.DecodeString(cluster.Status.CACert)
-		if err != nil {
-			return nil, err
-		}
-		certs := x509.NewCertPool()
-		certs.AppendCertsFromPEM(certBytes)
-		httpTransport.TLSClientConfig = &tls.Config{
-			RootCAs: certs,
-		}
-		transport = httpTransport
-	}
-
 	rs := &RemoteService{
 		cluster: cluster,
 		url: func() (url.URL, error) {
