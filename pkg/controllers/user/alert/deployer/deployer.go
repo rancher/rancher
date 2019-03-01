@@ -3,6 +3,7 @@ package deployer
 import (
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	alertutil "github.com/rancher/rancher/pkg/controllers/user/alert/common"
@@ -140,19 +141,25 @@ func (d *Deployer) sync() error {
 			if err != nil {
 				return fmt.Errorf("update cluster %v failed, %v", d.clusterName, err)
 			}
+
+			cluster, err := d.clusters.Get(d.clusterName, metav1.GetOptions{})
+			if err != nil {
+				return fmt.Errorf("get cluster %s failed, %v", d.clusterName, err)
+			}
+			newCluster = cluster.DeepCopy()
 		}
 
 		if d.alertManager.IsDeploy, err = d.appDeployer.deploy(appName, appTargetNamespace, systemProjectID, systemProjectCreator); err != nil {
 			return fmt.Errorf("deploy alertmanager failed, %v", err)
 		}
 
-		return d.appDeployer.isDeploySuccess(newCluster, alertutil.GetAlertManagerDaemonsetName(appName), appTargetNamespace)
-	}
-
-	if d.alertManager.IsDeploy, err = d.appDeployer.cleanup(appName, appTargetNamespace, systemProjectID); err != nil {
-		return fmt.Errorf("clean up alertmanager failed, %v", err)
-	}
-	if mgmtv3.ClusterConditionAlertingEnabled.IsTrue(newCluster) {
+		if err = d.appDeployer.isDeploySuccess(newCluster, alertutil.GetAlertManagerDaemonsetName(appName), appTargetNamespace); err != nil {
+			return err
+		}
+	} else {
+		if d.alertManager.IsDeploy, err = d.appDeployer.cleanup(appName, appTargetNamespace, systemProjectID); err != nil {
+			return fmt.Errorf("clean up alertmanager failed, %v", err)
+		}
 		mgmtv3.ClusterConditionAlertingEnabled.False(newCluster)
 	}
 
@@ -209,11 +216,14 @@ func (d *appDeployer) isDeploySuccess(cluster *mgmtv3.Cluster, appName, appTarge
 	_, err := mgmtv3.ClusterConditionAlertingEnabled.DoUntilTrue(cluster, func() (runtime.Object, error) {
 		_, err := d.statefulsets.GetNamespaced(appTargetNamespace, appName, metav1.GetOptions{})
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				time.Sleep(5 * time.Second)
+			}
 			return nil, fmt.Errorf("failed to get Alertmanager Deployment information, %v", err)
 		}
-
 		return cluster, nil
 	})
+
 	return err
 }
 
