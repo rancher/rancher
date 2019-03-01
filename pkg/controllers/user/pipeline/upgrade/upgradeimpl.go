@@ -3,8 +3,6 @@ package upgrade
 import (
 	"context"
 	"fmt"
-	"strings"
-
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/controller/pipelineexecution"
 	"github.com/rancher/rancher/pkg/controllers/user/systemimage"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
@@ -61,16 +59,8 @@ func (l *pipelineService) Version() (string, error) {
 }
 
 func (l *pipelineService) Upgrade(currentVersion string) (newVersion string, err error) {
-	var jekinsVersion, registryVersion, minioVersion, newJekinsVersion, newRegistryVersion, newMinioVersion string
-	if currentVersion != "" {
-		versions := strings.Split(currentVersion, "-")
-		if len(versions) < 3 {
-			return "", fmt.Errorf("invalid system service %s version %s", serviceName, currentVersion)
-		}
-		jekinsVersion = versions[0]
-		registryVersion = versions[1]
-		minioVersion = versions[2]
-	}
+	var newJekinsVersion, newRegistryVersion, newMinioVersion string
+
 	d1, d2, d3 := getDeployments()
 	newJekinsVersion, err = systemimage.DefaultGetVersion(d1)
 	if err != nil {
@@ -93,28 +83,6 @@ func (l *pipelineService) Upgrade(currentVersion string) (newVersion string, err
 		return "", fmt.Errorf("list namespaces failed, %v", err)
 	}
 	for _, v := range pipelineNamespaces {
-		ns := v.Name
-		deployment := pipelineexecution.GetJenkinsDeployment(ns)
-		if jekinsVersion != newJekinsVersion {
-			if err = l.upgradeDeployment(deployment); err != nil {
-				return "", err
-			}
-		}
-
-		deployment = pipelineexecution.GetRegistryDeployment(ns)
-		if registryVersion != newRegistryVersion {
-			if err = l.upgradeDeployment(deployment); err != nil {
-				return "", err
-			}
-		}
-
-		deployment = pipelineexecution.GetMinioDeployment(ns)
-		if minioVersion != newMinioVersion {
-			if err = l.upgradeDeployment(deployment); err != nil {
-				return "", err
-			}
-		}
-
 		if err := l.ensureSecrets(v); err != nil {
 			return "", err
 		}
