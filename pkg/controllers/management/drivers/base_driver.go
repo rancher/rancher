@@ -266,11 +266,11 @@ func (d *BaseDriver) srcBinName() string {
 }
 
 func binDir() string {
-	dest := os.Getenv("GMS_BIN_DIR")
-	if dest != "" {
-		return dest
+	if dl := os.Getenv("CATTLE_DEV_MODE"); dl != "" {
+		return "./management-state/bin"
 	}
-	return "./management-state/bin"
+
+	return "/opt/drivers/management-state/bin"
 }
 
 func compare(hash hash.Hash, value string) (string, bool) {

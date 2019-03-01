@@ -13,11 +13,12 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/types/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -167,4 +168,20 @@ func DeleteCharts(port string, obj *v3.App) error {
 		return nil
 	}
 	return errors.New(string(combinedOutput))
+}
+
+func JailCommand(cmd *exec.Cmd, jailPath string) (*exec.Cmd, error) {
+	if os.Getenv("CATTLE_DEV_MODE") != "" {
+		return cmd, nil
+	}
+
+	cred, err := jailer.GetUserCred()
+	if err != nil {
+		return nil, errors.WithMessage(err, "get user cred error")
+	}
+
+	cmd.SysProcAttr = &syscall.SysProcAttr{}
+	cmd.SysProcAttr.Credential = cred
+	cmd.SysProcAttr.Chroot = jailPath
+	return cmd, nil
 }

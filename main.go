@@ -38,11 +38,16 @@ func main() {
 	os.Unsetenv("SSH_AGENT_PID")
 	os.Setenv("DISABLE_HTTP2", "true")
 
-	if dir, err := os.Getwd(); err == nil {
-		dmPath := filepath.Join(dir, "management-state", "bin")
-		os.MkdirAll(dmPath, 0700)
-		newPath := fmt.Sprintf("%s%s%s", dmPath, string(os.PathListSeparator), os.Getenv("PATH"))
+	if dm := os.Getenv("CATTLE_DEV_MODE"); dm != "" {
+		if dir, err := os.Getwd(); err == nil {
+			dmPath := filepath.Join(dir, "management-state", "bin")
+			os.MkdirAll(dmPath, 0700)
+			newPath := fmt.Sprintf("%s%s%s", dmPath, string(os.PathListSeparator), os.Getenv("PATH"))
 
+			os.Setenv("PATH", newPath)
+		}
+	} else {
+		newPath := fmt.Sprintf("%s%s%s", "/opt/drivers/management-state/bin", string(os.PathListSeparator), os.Getenv("PATH"))
 		os.Setenv("PATH", newPath)
 	}
 

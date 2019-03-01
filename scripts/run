@@ -13,4 +13,5 @@ rm -rf build/testdata
 mkdir -p build/testdata
 cd build/testdata
 export KUBECONFIG=
+export CATTLE_DEV_MODE=yes
 exec ../../$CMD --add-local=true
