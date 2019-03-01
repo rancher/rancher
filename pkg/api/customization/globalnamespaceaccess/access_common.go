@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/norman/types/set"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
@@ -134,38 +135,42 @@ func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []stri
 		}
 	}
 
-	fmt.Printf("\n\nnewProjectRoleTemplateMap: %v\n\n", newProjectRoleTemplateMap)
-	fmt.Printf("\n\ncallerID: %v\n\n", callerID)
 	for pname := range projects {
 		projectRoleTemplateFoundCount := 0
+		projectRoleTemplateFoundMap := make(map[string]bool)
 		prtbs, err := ma.PrtbLister.List(pname, labels.NewSelector())
 		if err != nil {
 			return err
 		}
 		for _, prtb := range prtbs {
-			fmt.Printf("\n\nprtb.UserName: %v\n\n", prtb.UserName)
 			if prtb.UserName == callerID && newProjectRoleTemplateMap[prtb.RoleTemplateName] {
-				fmt.Printf("\nFound %v\n", prtb.RoleTemplateName)
+				projectRoleTemplateFoundMap[prtb.RoleTemplateName] = true
 				projectRoleTemplateFoundCount++
 			}
 		}
 		if projectRoleTemplateFoundCount != len(newProjectRoleTemplateMap) {
-			return fmt.Errorf("user %v does not have all project roles provided in project %v", callerID, pname)
+			_, rolesNotFound, _ := set.Diff(projectRoleTemplateFoundMap, newProjectRoleTemplateMap)
+			errMsg := fmt.Sprintf("user %v does not have following roles in project %v: %v", callerID, pname, rolesNotFound)
+			return httperror.NewAPIError(httperror.PermissionDenied, errMsg)
 		}
 	}
 	for cname := range clusters {
 		clusterRoleTemplateFoundCount := 0
+		clusterRoleTemplateFoundMap := make(map[string]bool)
 		crtbs, err := ma.CrtbLister.List(cname, labels.NewSelector())
 		if err != nil {
 			return err
 		}
 		for _, crtb := range crtbs {
 			if crtb.UserName == callerID && newClusterRoleTemplateMap[crtb.RoleTemplateName] {
+				clusterRoleTemplateFoundMap[crtb.RoleTemplateName] = true
 				clusterRoleTemplateFoundCount++
 			}
 		}
 		if clusterRoleTemplateFoundCount != len(newClusterRoleTemplateMap) {
-			return fmt.Errorf("user %v does not have all cluster roles provided in cluster %v", callerID, cname)
+			_, rolesNotFound, _ := set.Diff(clusterRoleTemplateFoundMap, newClusterRoleTemplateMap)
+			errMsg := fmt.Sprintf("user %v does not have following roles in cluster %v: %v", callerID, cname, rolesNotFound)
+			return httperror.NewAPIError(httperror.PermissionDenied, errMsg)
 		}
 	}
 	return nil
@@ -316,7 +321,7 @@ func (ma *MemberAccess) DeriveRolesInTargets(callerID string, targets []string) 
 			}
 		}
 		if len(projectRolesToAddMap) == 0 && len(clusterRolesToAddMap) == 0 {
-			return nil, fmt.Errorf("Admin has passed no roles to multiclusterapp, and no cluster/project owner roles found")
+			return nil, httperror.NewAPIError(httperror.PermissionDenied, "Admin has passed no roles to multiclusterapp, and no cluster/project owner roles found")
 		}
 		// add projectCreatorDefault roles in all target projects
 		projectRolesToAdd := make([]string, len(projectRolesToAddMap))
@@ -400,7 +405,8 @@ func (ma *MemberAccess) DeriveRolesInTargets(callerID string, targets []string) 
 			}
 			if !projectRoleFound && !isClusterCreator {
 				// creator has no roles in target projects and is not even a cluster-owner
-				return nil, fmt.Errorf("Multiclusterapp creator %v has no roles in target project %v", callerID, target)
+				errMsg := fmt.Sprintf("Multiclusterapp creator %v has no roles in target project %v", callerID, target)
+				return nil, httperror.NewAPIError(httperror.PermissionDenied, errMsg)
 			}
 		}
 	}

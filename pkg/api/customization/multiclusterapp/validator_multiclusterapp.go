@@ -36,9 +36,8 @@ type Wrapper struct {
 }
 
 const (
-	mcAppLabel            = "io.cattle.field/multiClusterAppId"
-	creatorIDAnn          = "field.cattle.io/creatorId"
-	globalScopeAnswersKey = "global"
+	mcAppLabel   = "io.cattle.field/multiClusterAppId"
+	creatorIDAnn = "field.cattle.io/creatorId"
 )
 
 func (w Wrapper) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) error {
