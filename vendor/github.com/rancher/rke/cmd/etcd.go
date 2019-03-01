@@ -3,13 +3,14 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -146,8 +147,12 @@ func RestoreEtcdSnapshot(
 		return err
 	}
 	if _, _, _, _, _, err := ClusterUp(ctx, dialersOptions, flags); err != nil {
-		return err
+		if !strings.Contains(err.Error(), "Provisioning incomplete") {
+			return err
+		}
+		log.Warnf(ctx, err.Error())
 	}
+
 	if err := cluster.RestartClusterPods(ctx, kubeCluster); err != nil {
 		return nil
 	}
