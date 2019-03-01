@@ -2,27 +2,33 @@ package node
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base32"
 	"encoding/json"
 	"fmt"
-	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/rancher/pkg/namespace"
+	"io/ioutil"
+	"os"
+	"path"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	"github.com/rancher/rancher/pkg/encryptedstore"
+	"github.com/rancher/rancher/pkg/jailer"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	corev1 "github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -53,6 +59,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		clusterLister:             management.Management.Clusters("").Controller().Lister(),
 		schemaLister:              management.Management.DynamicSchemas("").Controller().Lister(),
 		credLister:                management.Core.Secrets("").Controller().Lister(),
+		devMode:                   os.Getenv("CATTLE_DEV_MODE") != "",
 	}
 
 	nodeClient.AddLifecycle(ctx, "node-controller", nodeLifecycle)
@@ -68,6 +75,7 @@ type Lifecycle struct {
 	clusterLister             v3.ClusterLister
 	schemaLister              v3.DynamicSchemaLister
 	credLister                corev1.SecretLister
+	devMode                   bool
 }
 
 func (m *Lifecycle) setupCustom(obj *v3.Node) {
@@ -155,6 +163,13 @@ func (m *Lifecycle) Create(obj *v3.Node) (runtime.Object, error) {
 		if err != nil {
 			return obj, errors.Wrap(err, "failed to marshal node driver config")
 		}
+		if !m.devMode {
+			err := jailer.CreateJail(obj.Namespace)
+			if err != nil {
+				logrus.Infof("Create jail error: %v", err)
+				return nil, err
+			}
+		}
 		config, err := nodeconfig.NewNodeConfig(m.secretStore, obj)
 		if err != nil {
 			return obj, errors.Wrap(err, "failed to save node driver config")
@@ -187,6 +202,15 @@ func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
 		if found {
 			return obj, errors.New("waiting for node to be removed from cluster")
 		}
+
+		if !m.devMode {
+			err := jailer.CreateJail(obj.Namespace)
+			if err != nil {
+				logrus.Infof("Create jail error: %v", err)
+				return nil, err
+			}
+		}
+
 		config, err := nodeconfig.NewNodeConfig(m.secretStore, obj)
 		if err != nil {
 			return obj, err
@@ -196,7 +220,7 @@ func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
 		}
 		defer config.Remove()
 
-		mExists, err := nodeExists(config.Dir(), obj.Spec.RequestedHostname)
+		mExists, err := nodeExists(config.Dir(), obj)
 		if err != nil {
 			return obj, err
 		}
@@ -227,8 +251,17 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.N
 		return obj, err
 	}
 
+	err = aliasToPath(obj.Status.NodeTemplateSpec.Driver, configRawMap, obj.Namespace)
+	if err != nil {
+		return obj, errors.Wrap(err, "failed writing node driver files")
+	}
+
 	createCommandsArgs := buildCreateCommand(obj, configRawMap)
-	cmd := buildCommand(nodeDir, createCommandsArgs)
+	cmd, err := buildCommand(nodeDir, obj, createCommandsArgs)
+	if err != nil {
+		return obj, err
+	}
+
 	logrus.Infof("Provisioning node %s", obj.Spec.RequestedHostname)
 
 	stdoutReader, stderrReader, err := startReturnOutput(cmd)
@@ -256,6 +289,51 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.N
 	return obj, nil
 }
 
+func aliasToPath(driver string, config map[string]interface{}, ns string) map[string]string {
+	fileMap := make(map[string]string)
+	baseDir := path.Join("/opt/jail", ns)
+	if os.Getenv("CATTLE_DEV_MODE") != "" {
+		baseDir = os.TempDir()
+	}
+	// Check if the required driver has aliased fields
+	if fields, ok := aliases[driver]; ok {
+		hasher := sha256.New()
+		for schemaField, driverField := range fields {
+			if fileRaw, ok := config[schemaField]; ok {
+				fileContents := fileRaw.(string)
+				// No file contents should just cleanup the config
+				if fileContents == "" {
+					delete(config, schemaField)
+					config[driverField] = ""
+					continue
+				}
+
+				hasher.Reset()
+				hasher.Write([]byte(fileContents))
+				sha := base32.StdEncoding.WithPadding(-1).EncodeToString(hasher.Sum(nil))[:10]
+
+				writePath := path.Join(writeDir, sha)
+
+				err := ioutil.WriteFile(writePath, []byte(fileContents), 0644)
+				if err != nil {
+					return err
+				}
+
+				realPath := writePath
+
+				if !devMode {
+					realPath = path.Join("/tmp", sha)
+				}
+
+				// Drop our aliased version of the field and replace with the proper field and path
+				delete(config, schemaField)
+				config[driverField] = realPath
+			}
+		}
+	}
+	return nil
+}
+
 func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 	token, err := m.systemAccountManager.GetOrCreateSystemClusterToken(obj.Namespace)
 	if err != nil {
@@ -264,7 +342,10 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 
 	drun := clusterregistrationtokens.NodeCommand(token)
 	args := buildAgentCommand(obj, drun)
-	cmd := buildCommand(nodeDir, args)
+	cmd, err := buildCommand(nodeDir, obj, args)
+	if err != nil {
+		return err
+	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return errors.Wrap(err, string(output))
@@ -309,7 +390,7 @@ outer:
 	}
 
 	newObj, saveError := v3.NodeConditionConfigSaved.Once(obj, func() (runtime.Object, error) {
-		return m.saveConfig(config, config.Dir(), obj)
+		return m.saveConfig(config, config.FullDir(), obj)
 	})
 	obj = newObj.(*v3.Node)
 	if err == nil {
@@ -328,6 +409,15 @@ func (m *Lifecycle) Updated(obj *v3.Node) (runtime.Object, error) {
 		if obj.Status.NodeTemplateSpec == nil {
 			m.setWaiting(obj)
 			return obj, nil
+		}
+
+		if !m.devMode {
+			logrus.Infof("Creating jail for %v", obj.Namespace)
+			err := jailer.CreateJail(obj.Namespace)
+			if err != nil {
+				logrus.Infof("Create jail error: %v", err)
+				return nil, err
+			}
 		}
 
 		obj, err := m.ready(obj)

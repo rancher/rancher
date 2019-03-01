@@ -14,7 +14,8 @@ import (
 	"github.com/pkg/errors"
 	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
-	"github.com/rancher/types/apis/project.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/jailer"
+	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -160,7 +161,31 @@ func (l *Lifecycle) generateTemplates(obj *v3.App) (string, string, string, stri
 	return template, notes, appDir, tempDir, nil
 }
 
-// filter error message, replace old with new
-func filterErrorMessage(msg, old, new string) string {
-	return strings.Replace(msg, old, new, -1)
+func createTempDir(obj *v3.App) (*common.HelmPath, error) {
+	if os.Getenv("CATTLE_DEV_MODE") != "" {
+		dir, err := ioutil.TempDir("", "helm-")
+		if err != nil {
+			return nil, err
+		}
+		return &common.HelmPath{
+			FullPath:         dir,
+			InJailPath:       dir,
+			KubeConfigFull:   filepath.Join(dir, ".kubeconfig"),
+			KubeConfigInJail: filepath.Join(dir, ".kubeconfig"),
+		}, nil
+	}
+
+	err := jailer.CreateJail(obj.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	paths := &common.HelmPath{
+		FullPath:         filepath.Join(jailer.BaseJailPath, obj.Name),
+		InJailPath:       "/",
+		KubeConfigFull:   filepath.Join(jailer.BaseJailPath, obj.Name, ".kubeconfig"),
+		KubeConfigInJail: "/.kubeconfig",
+	}
+
+	return paths, nil
 }

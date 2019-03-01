@@ -1,3 +1,7 @@
+import base64
+import hashlib
+import os
+import tempfile
 import pytest
 from rancher import ApiError
 from .common import auth_check
@@ -114,6 +118,58 @@ def test_cloud_credential_delete(admin_mc, remove_resource):
     assert e.value.error.status == 405
 
 
+def test_writing_config_to_disk(admin_mc, wait_remove_resource):
+    """Test that userdata and other fields from node driver configs are being
+    writting to disk as expected.
+    """
+    client = admin_mc.client
+    tempdir = tempfile.gettempdir()
+    cloud_credential = client.create_cloud_credential(
+        digitaloceancredentialConfig={"accessToken": "test"})
+    wait_remove_resource(cloud_credential)
+    userdata = "do cool stuff"
+    node_template = client.create_node_template(
+        digitaloceanConfig={'userdata': userdata}, name='danssweetassthing',
+        cloudCredentialId=cloud_credential.id)
+    wait_remove_resource(node_template)
+
+    node_pool = client.create_node_pool(
+        nodeTemplateId=node_template.id,
+        hostnamePrefix="test1",
+        clusterId="local")
+    wait_remove_resource(node_pool)
+
+    file_name = string_to_encoding(userdata)
+
+    full_path = os.path.join(tempdir, file_name)
+
+    def file_exists():
+        try:
+            os.stat(full_path)
+            return True
+        except FileNotFoundError:
+            return False
+
+    wait_for(file_exists)
+
+    with open(full_path, 'r') as f:
+        contents = f.read()
+
+    assert contents == userdata
+
+
+def test_node_driver_schema(admin_mc):
+    """Test node driver schemas have path fields removed."""
+    drivers = ['amazonec2config', 'digitaloceanconfig', 'azureconfig']
+    bad_fields = ['sshKeypath', 'sshKeyPath', 'existingKeyPath']
+    client = admin_mc.client
+    for driver in drivers:
+        schema = client.schema.types[driver]
+        for field in bad_fields:
+            assert field not in schema.resourceFields, \
+                'Driver {} has field {}'.format(driver, field)
+
+
 def create_node_template(client):
     cloud_credential = client.create_cloud_credential(
         azurecredentialConfig={"clientId": "test",
@@ -145,3 +201,9 @@ def wait_for_cloud_credential(client, cloud_credential_id, timeout=60):
             if val["id"] == cloud_credential_id:
                 cred = val
     return cred
+
+
+def string_to_encoding(input):
+    m = hashlib.sha256()
+    m.update(bytes(input, 'utf-8'))
+    return base64.b32encode(m.digest())[:10].decode('utf-8')
