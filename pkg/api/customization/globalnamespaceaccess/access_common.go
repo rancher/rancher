@@ -16,6 +16,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -26,6 +27,8 @@ type MemberAccess struct {
 	CrtbLister         v3.ClusterRoleTemplateBindingLister
 	GrbLister          v3.GlobalRoleBindingLister
 	GrLister           v3.GlobalRoleLister
+	Prtbs              v3.ProjectRoleTemplateBindingInterface
+	Crtbs              v3.ClusterRoleTemplateBindingInterface
 }
 
 const (
@@ -405,4 +408,56 @@ func (ma *MemberAccess) DeriveRolesInTargets(callerID string, targets []string) 
 		}
 	}
 	return targetToRoles, nil
+}
+
+func (ma *MemberAccess) RemoveRolesFromTargets(targetProjects, rolesToRemove []string, mcappName string, removeAllRoles bool) error {
+	systemUserPrincipalID := fmt.Sprintf("system://%s", mcappName)
+	// from given targets, remove prtbs/crtbs created for user with system account's userID
+	rolesToRemoveMap := make(map[string]bool)
+	if !removeAllRoles {
+		for _, role := range rolesToRemove {
+			rolesToRemoveMap[role] = true
+		}
+	}
+
+	for _, target := range targetProjects {
+		split := strings.SplitN(target, ":", 2)
+		if len(split) != 2 {
+			errMsg := fmt.Sprintf("Invalid project ID: %v", target)
+			return httperror.NewAPIError(httperror.InvalidBodyContent, errMsg)
+		}
+		clusterName, projectName := split[0], split[1]
+		clustersCovered := make(map[string]bool)
+		prtbs, err := ma.PrtbLister.List(projectName, labels.NewSelector())
+		if err != nil {
+			return err
+		}
+		for _, prtb := range prtbs {
+			if prtb.UserPrincipalName == systemUserPrincipalID {
+				if (!removeAllRoles && rolesToRemoveMap[prtb.RoleTemplateName]) || removeAllRoles {
+					if err = ma.Prtbs.DeleteNamespaced(projectName, prtb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
+						return err
+					}
+				}
+			}
+		}
+
+		if !clustersCovered[clusterName] {
+			clustersCovered[clusterName] = true
+			crtbs, err := ma.CrtbLister.List(clusterName, labels.NewSelector())
+			if err != nil {
+				return err
+			}
+			for _, crtb := range crtbs {
+				if crtb.UserPrincipalName == systemUserPrincipalID {
+					if (!removeAllRoles && rolesToRemoveMap[crtb.RoleTemplateName]) || removeAllRoles {
+						if err = ma.Crtbs.DeleteNamespaced(clusterName, crtb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
+							return err
+						}
+					}
+				}
+			}
+		}
+	}
+	return nil
 }

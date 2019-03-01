@@ -638,6 +638,8 @@ func MultiClusterApps(schemas *types.Schemas, management *config.ScaledContext) 
 		Users:                         management.Management.Users(""),
 		GrbLister:                     management.Management.GlobalRoleBindings("").Controller().Lister(),
 		GrLister:                      management.Management.GlobalRoles("").Controller().Lister(),
+		Prtbs:                         management.Management.ProjectRoleTemplateBindings(""),
+		Crtbs:                         management.Management.ClusterRoleTemplateBindings(""),
 	}
 	schema.Formatter = wrapper.Formatter
 	schema.ActionHandler = wrapper.ActionHandler
@@ -651,7 +653,7 @@ func GlobalDNSs(schemas *types.Schemas, management *config.ScaledContext) {
 		GlobalDNSLister:       management.Management.GlobalDNSs("").Controller().Lister(),
 		PrtbLister:            management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
 		MultiClusterAppLister: management.Management.MultiClusterApps("").Controller().Lister(),
-		Users:                 management.Management.Users(""),
+		Users: management.Management.Users(""),
 	}
 	schema := schemas.Schema(&managementschema.Version, client.GlobalDNSType)
 	schema.Store = &globalresource.GlobalNamespaceStore{

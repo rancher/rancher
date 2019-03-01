@@ -116,6 +116,21 @@ func (w Wrapper) removeProjects(request *types.APIContext) error {
 	if err != nil {
 		return err
 	}
+	targetsToRole := mcapp.Spec.TargetToRole
+	// remove all projects/clusters from targetsToRole which are present in input to removeProjects
+	for _, p := range inputProjects {
+		split := strings.SplitN(p, ":", 2)
+		if len(split) != 2 {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid project ID "+p)
+		}
+		clusterName, projectName := split[0], split[1]
+		if _, ok := targetsToRole[projectName]; ok {
+			delete(targetsToRole, projectName)
+		}
+		if _, ok := targetsToRole[clusterName]; ok {
+			delete(targetsToRole, clusterName)
+		}
+	}
 	mcappToUpdate := mcapp.DeepCopy()
 	toRemoveProjects := make(map[string]bool)
 	var finalTargets []v3.Target
@@ -128,6 +143,7 @@ func (w Wrapper) removeProjects(request *types.APIContext) error {
 		}
 	}
 	mcappToUpdate.Spec.Targets = finalTargets
+	mcappToUpdate.Spec.TargetToRole = targetsToRole
 	return w.updateMcApp(mcappToUpdate, request, "removedProjects")
 }
 
@@ -161,6 +177,8 @@ func (w Wrapper) modifyProjects(request *types.APIContext, actionName string) (*
 		RoleTemplateLister: w.RoleTemplateLister,
 		GrbLister:          w.GrbLister,
 		GrLister:           w.GrLister,
+		Prtbs:              w.Prtbs,
+		Crtbs:              w.Crtbs,
 	}
 	accessType, err := ma.GetAccessTypeOfCaller(callerID, creatorID, mcapp.Name, mcapp.Spec.Members)
 	if err != nil {
@@ -181,7 +199,10 @@ func (w Wrapper) modifyProjects(request *types.APIContext, actionName string) (*
 	for _, p := range mcapp.Spec.Targets {
 		existingProjects[p.ProjectName] = true
 	}
-	if actionName == addProjectsAction && len(inputProjects) > 0 {
+	if len(inputProjects) == 0 {
+		return nil, existingProjects, inputProjects, inputAnswers, targetsToRole, httperror.NewAPIError(httperror.InvalidBodyContent, "no  projects provided")
+	}
+	if actionName == addProjectsAction {
 		if len(mcapp.Spec.Roles) > 0 {
 			if err = ma.EnsureRoleInTargets(inputProjects, mcapp.Spec.Roles, callerID); err != nil {
 				return nil, existingProjects, inputProjects, inputAnswers, targetsToRole, err
@@ -192,6 +213,11 @@ func (w Wrapper) modifyProjects(request *types.APIContext, actionName string) (*
 			if err != nil {
 				return nil, existingProjects, inputProjects, inputAnswers, targetsToRole, err
 			}
+		}
+	} else if actionName == removeProjectsAction {
+		// we want to remove all roles that the mcapp's sys acc has in these projects being removed
+		if err = ma.RemoveRolesFromTargets(inputProjects, []string{}, mcapp.Name, true); err != nil {
+			return nil, existingProjects, inputProjects, inputAnswers, targetsToRole, err
 		}
 	}
 	for _, a := range updateMultiClusterAppTargetsInput.Answers {
