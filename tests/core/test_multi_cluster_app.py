@@ -27,7 +27,7 @@ def test_multiclusterapp_create_no_roles(admin_mc, admin_pc, remove_resource,
                                              templateVersionId=temp_ver,
                                              targets=targets)
     except ApiError as e:
-        assert e.error.status == 500
+        assert e.error.status == 403
         assert "has no roles in target project" in e.error.message
 
     # now admin adds user to this project with some role, creation
@@ -151,8 +151,9 @@ def test_multiclusterapp_user_create_with_roles(admin_mc, admin_pc,
                                      targets=targets,
                                      roles=roles)
     except ApiError as e:
-        assert e.error.status == 500
-        assert "does not have all cluster roles" in e.error.message
+        assert e.error.status == 403
+        assert "does not have following roles in cluster" in e.error.message
+        assert "cluster-owner" in e.error.message
 
 
 def test_multiclusterapp_admin_update_roles(admin_mc, admin_pc,
@@ -204,8 +205,9 @@ def test_multiclusterapp_user_update_roles(admin_mc, admin_pc, remove_resource,
     try:
         user.client.update(mcapp1, roles=new_roles)
     except ApiError as e:
-        assert e.error.status == 500
-        assert "does not have all project roles" in e.error.message
+        assert e.error.status == 403
+        assert "does not have following roles in project" in e.error.message
+        assert "project-member" in e.error.message
 
     # now admin adds this user to project as project-member
     prtb_member = client.create_project_role_template_binding(
