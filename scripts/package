@@ -33,4 +33,4 @@ echo
 
 cd ../bin
 mkdir -p /tmp/system-charts && git clone https://github.com/rancher/system-charts /tmp/system-charts
-go run ../pkg/image/export/main.go /tmp/system-charts $IMAGE $AGENT_IMAGE
+TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go /tmp/system-charts $IMAGE $AGENT_IMAGE
