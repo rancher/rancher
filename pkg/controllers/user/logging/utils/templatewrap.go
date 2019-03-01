@@ -104,8 +104,9 @@ type KafkaTemplateWrap struct {
 
 type SyslogTemplateWrap struct {
 	v3.SyslogConfig
-	Host string
-	Port string
+	Host         string
+	Port         string
+	WrapSeverity string
 }
 
 type FluentForwarderTemplateWrap struct {
@@ -223,10 +224,12 @@ func newSyslogTemplateWrap(syslogConfig *v3.SyslogConfig) (*SyslogTemplateWrap, 
 	if err != nil {
 		return nil, err
 	}
+
 	return &SyslogTemplateWrap{
 		SyslogConfig: *syslogConfig,
 		Host:         host,
 		Port:         port,
+		WrapSeverity: getWrapSeverity(syslogConfig.Severity),
 	}, nil
 }
 

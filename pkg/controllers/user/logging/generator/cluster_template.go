@@ -208,7 +208,7 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     @type remote_syslog
     host {{.clusterTarget.SyslogTemplateWrap.Host}}
     port {{.clusterTarget.SyslogTemplateWrap.Port}}
-    severity {{.clusterTarget.SyslogConfig.Severity}}
+    severity {{.clusterTarget.SyslogTemplateWrap.WrapSeverity}}
     protocol {{.clusterTarget.SyslogConfig.Protocol}}
     {{- if .clusterTarget.SyslogConfig.Program }}
     program {{.clusterTarget.SyslogConfig.Program}}

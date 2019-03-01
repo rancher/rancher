@@ -202,7 +202,7 @@ var ProjectTemplate = `
       @type remote_syslog
       host {{$store.SyslogTemplateWrap.Host}}
       port {{$store.SyslogTemplateWrap.Port}}
-      severity {{$store.SyslogConfig.Severity}}
+      severity {{$store.SyslogTemplateWrap.WrapSeverity}}
       protocol {{$store.SyslogConfig.Protocol}}
       {{- if $store.SyslogConfig.Program }}
       program {{$store.SyslogConfig.Program}}
