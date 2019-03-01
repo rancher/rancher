@@ -556,7 +556,10 @@ func (p *Provisioner) validateDriver(cluster *v3.Cluster) (string, error) {
 	}
 
 	if newDriver == "" {
-		return "", &controller.ForgetError{Err: fmt.Errorf("waiting for nodes")}
+		return "", &controller.ForgetError{
+			Err:    fmt.Errorf("waiting for nodes"),
+			Reason: "Pending",
+		}
 	}
 
 	if oldDriver != newDriver {
