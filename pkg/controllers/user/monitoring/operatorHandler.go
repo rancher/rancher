@@ -64,7 +64,7 @@ func (h *operatorHandler) syncProject(key string, project *mgmtv3.Project) (runt
 
 	var newCluster *mgmtv3.Cluster
 	//should deploy
-	if project.Spec.EnableProjectMonitoring {
+	if cluster.Spec.EnableClusterAlerting || project.Spec.EnableProjectMonitoring {
 		newObj, err := mgmtv3.ClusterConditionPrometheusOperatorDeployed.DoUntilTrue(cluster, func() (runtime.Object, error) {
 			cpy := cluster.DeepCopy()
 			return cpy, deploySystemMonitor(cpy, h.app)
@@ -90,8 +90,8 @@ func (h *operatorHandler) syncProject(key string, project *mgmtv3.Project) (runt
 }
 
 func withdrawSystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) error {
-	isAlertingDisabling := mgmtv3.MonitoringConditionAlertmaanagerDeployed.IsFalse(cluster) ||
-		mgmtv3.MonitoringConditionAlertmaanagerDeployed.GetStatus(cluster) == ""
+	isAlertingDisabling := mgmtv3.ClusterConditionAlertingEnabled.IsFalse(cluster) ||
+		mgmtv3.ClusterConditionAlertingEnabled.GetStatus(cluster) == ""
 	isClusterMonitoringDisabling := mgmtv3.ClusterConditionMonitoringEnabled.IsFalse(cluster) ||
 		mgmtv3.ClusterConditionMonitoringEnabled.GetStatus(cluster) == ""
 	//status false and empty should withdraw. when status unknown, it means the deployment has error while deploying apps

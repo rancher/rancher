@@ -15,17 +15,19 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/alert/deployer"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
+	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
+
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
@@ -35,6 +37,7 @@ var (
 
 func NewConfigSyncer(ctx context.Context, cluster *config.UserContext, alertManager *manager.AlertManager, operatorCRDManager *manager.PromOperatorCRDManager) *ConfigSyncer {
 	return &ConfigSyncer{
+		apps:                    cluster.Management.Project.Apps(metav1.NamespaceAll),
 		secretsGetter:           cluster.Core,
 		clusterAlertGroupLister: cluster.Management.Management.ClusterAlertGroups(cluster.ClusterName).Controller().Lister(),
 		projectAlertGroupLister: cluster.Management.Management.ProjectAlertGroups("").Controller().Lister(),
@@ -50,6 +53,7 @@ func NewConfigSyncer(ctx context.Context, cluster *config.UserContext, alertMana
 }
 
 type ConfigSyncer struct {
+	apps                    projectv3.AppInterface
 	secretsGetter           v1.SecretsGetter
 	projectAlertGroupLister v3.ProjectAlertGroupLister
 	clusterAlertGroupLister v3.ClusterAlertGroupLister
@@ -86,7 +90,18 @@ func (d *ConfigSyncer) NotifierSync(key string, alert *v3.Notifier) (runtime.Obj
 //sync: update the secret which store the configuration of alertmanager given the latest configured notifiers and alerts rules.
 //For each alert, it will generate a route and a receiver in the alertmanager's configuration file, for metric rules it will update operator crd also.
 func (d *ConfigSyncer) sync() error {
-	if d.alertManager.IsDeploy == false {
+	project, err := project.GetSystemProject(d.clusterName, d.projectLister)
+	if err != nil {
+		return err
+	}
+
+	systemProjectName := project.Name
+	isDeployed, err := d.isAppDeploy(systemProjectName)
+	if err != nil {
+		return err
+	}
+
+	if !isDeployed {
 		return nil
 	}
 
@@ -539,6 +554,24 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 
 	return receiverExist
 
+}
+
+func (d *ConfigSyncer) isAppDeploy(appNamespace string) (bool, error) {
+	appName, _ := monitorutil.ClusterAlertManagerInfo()
+	app, err := d.apps.GetNamespaced(appNamespace, appName, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+
+		return false, errors.Wrapf(err, "get app %s failed", appName)
+	}
+
+	if app.DeletionTimestamp != nil {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func includeProjectMetrics(projectAlerts []*v3.ProjectAlertRule) bool {
