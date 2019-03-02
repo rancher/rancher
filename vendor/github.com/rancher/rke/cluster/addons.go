@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rke/addons"
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
+	"github.com/rancher/rke/util"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
@@ -212,7 +213,7 @@ func (c *Cluster) deployMetricServer(ctx context.Context) error {
 		MetricsServerImage: c.SystemImages.MetricsServer,
 		RBACConfig:         c.Authorization.Mode,
 		Options:            c.Monitoring.Options,
-		Version:            getTagMajorVersion(versionTag),
+		Version:            util.GetTagMajorVersion(versionTag),
 	}
 	metricsYaml, err := addons.GetMetricsServerManifest(MetricsServerConfig)
 	if err != nil {
