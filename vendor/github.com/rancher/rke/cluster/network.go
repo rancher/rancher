@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/templates"
+	"github.com/rancher/rke/util"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -134,7 +135,7 @@ func (c *Cluster) doFlannelDeploy(ctx context.Context) error {
 			"Type": c.Network.Options[FlannelBackendType],
 		},
 		RBACConfig:     c.Authorization.Mode,
-		ClusterVersion: getTagMajorVersion(c.Version),
+		ClusterVersion: util.GetTagMajorVersion(c.Version),
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(flannelConfig)
 	if err != nil {

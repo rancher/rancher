@@ -13,3 +13,11 @@ func StrToSemVer(version string) (*semver.Version, error) {
 	}
 	return v, nil
 }
+
+func GetTagMajorVersion(tag string) string {
+	splitTag := strings.Split(tag, ".")
+	if len(splitTag) < 2 {
+		return ""
+	}
+	return strings.Join(splitTag[:2], ".")
+}
