@@ -184,7 +184,7 @@ func InitClusterObject(ctx context.Context, rkeConfig *v3.RancherKubernetesEngin
 		return nil, fmt.Errorf("Failed to classify hosts from config file: %v", err)
 	}
 	// validate cluster configuration
-	if err := c.ValidateCluster(); err != nil {
+	if err := c.ValidateCluster(ctx); err != nil {
 		return nil, fmt.Errorf("Failed to validate cluster: %v", err)
 	}
 	return c, nil
