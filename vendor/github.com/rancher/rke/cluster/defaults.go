@@ -11,7 +11,6 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/rke/templates"
-	"github.com/rancher/rke/util"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
@@ -215,13 +214,10 @@ func (c *Cluster) setClusterServicesDefaults() {
 func (c *Cluster) setClusterImageDefaults() error {
 	var privRegURL string
 
-	// Version Check
-	err := util.ValidateVersion(c.Version)
-	if err != nil {
-		return err
+	imageDefaults, ok := v3.AllK8sVersions[c.Version]
+	if !ok {
+		return nil
 	}
-
-	imageDefaults := v3.AllK8sVersions[c.Version]
 
 	for _, privReg := range c.PrivateRegistries {
 		if privReg.IsDefault {

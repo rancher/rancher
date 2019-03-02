@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
-	"github.com/rancher/rke/util"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -404,21 +403,14 @@ func getAddonManifests(reader *bufio.Reader) ([]string, error) {
 func generateSystemImagesList(version string, all bool) error {
 	allVersions := []string{}
 	currentVersionImages := make(map[string]v3.RKESystemImages)
-	for version := range v3.AllK8sVersions {
-		err := util.ValidateVersion(version)
-		if err != nil {
-			continue
+	for _, version := range v3.K8sVersionsCurrent {
+		if _, ok := v3.K8sBadVersions[version]; !ok {
+			allVersions = append(allVersions, version)
+			currentVersionImages[version] = v3.AllK8sVersions[version]
 		}
-		allVersions = append(allVersions, version)
-		currentVersionImages[version] = v3.AllK8sVersions[version]
 	}
 	if all {
 		for version, rkeSystemImages := range currentVersionImages {
-			err := util.ValidateVersion(version)
-			if err != nil {
-				continue
-			}
-
 			logrus.Infof("Generating images list for version [%s]:", version)
 			uniqueImages := getUniqueSystemImageList(rkeSystemImages)
 			for _, image := range uniqueImages {
@@ -434,6 +426,9 @@ func generateSystemImagesList(version string, all bool) error {
 		version = v3.DefaultK8s
 	}
 	rkeSystemImages := v3.AllK8sVersions[version]
+	if _, ok := v3.K8sBadVersions[version]; ok {
+		return fmt.Errorf("k8s version is not recommended, supported versions are: %v", allVersions)
+	}
 	if rkeSystemImages == (v3.RKESystemImages{}) {
 		return fmt.Errorf("k8s version is not supported, supported versions are: %v", allVersions)
 	}

@@ -1,14 +1,24 @@
 package cluster
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
+	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/services"
+	"github.com/rancher/rke/util"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
-func (c *Cluster) ValidateCluster() error {
+func (c *Cluster) ValidateCluster(ctx context.Context) error {
+	// validate kubernetes version
+	// Version Check
+	if err := validateVersion(ctx, c); err != nil {
+		return err
+	}
+
 	// validate duplicate nodes
 	if err := validateDuplicateNodes(c); err != nil {
 		return err
@@ -179,6 +189,163 @@ func validateDuplicateNodes(c *Cluster) error {
 			if c.Nodes[i].HostnameOverride == c.Nodes[j].HostnameOverride {
 				return fmt.Errorf("Cluster can't have duplicate node: %s", c.Nodes[i].HostnameOverride)
 			}
+		}
+	}
+	return nil
+}
+
+func validateVersion(ctx context.Context, c *Cluster) error {
+	_, err := util.StrToSemVer(c.Version)
+	if err != nil {
+		return fmt.Errorf("%s is not valid semver", c.Version)
+	}
+	_, ok := v3.AllK8sVersions[c.Version]
+	if !ok {
+		if err := validateSystemImages(c); err != nil {
+			return fmt.Errorf("%s is an unsupported Kubernetes version and system images are not populated: %v", c.Version, err)
+		}
+		return nil
+	}
+
+	if _, ok := v3.K8sBadVersions[c.Version]; ok {
+		log.Warnf(ctx, "%s version exists but its recommended to install this version - see 'rke config --system-images --all' for versions supported with this release", c.Version)
+		return nil
+	}
+
+	return nil
+}
+
+func validateSystemImages(c *Cluster) error {
+	if err := validateKubernetesImages(c); err != nil {
+		return err
+	}
+	if err := validateNetworkImages(c); err != nil {
+		return err
+	}
+	if err := validateDNSImages(c); err != nil {
+		return err
+	}
+	if err := validateMetricsImages(c); err != nil {
+		return err
+	}
+	if err := validateIngressImages(c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateKubernetesImages(c *Cluster) error {
+	if len(c.SystemImages.Etcd) == 0 {
+		return fmt.Errorf("etcd image is not populated")
+	}
+	if len(c.SystemImages.Kubernetes) == 0 {
+		return fmt.Errorf("kubernetes image is not populated")
+	}
+	if len(c.SystemImages.PodInfraContainer) == 0 {
+		return fmt.Errorf("pod infrastructure container image is not populated")
+	}
+	if len(c.SystemImages.Alpine) == 0 {
+		return fmt.Errorf("alpine image is not populated")
+	}
+	if len(c.SystemImages.NginxProxy) == 0 {
+		return fmt.Errorf("nginx proxy image is not populated")
+	}
+	if len(c.SystemImages.CertDownloader) == 0 {
+		return fmt.Errorf("certificate downloader image is not populated")
+	}
+	if len(c.SystemImages.KubernetesServicesSidecar) == 0 {
+		return fmt.Errorf("kubernetes sidecar image is not populated")
+	}
+	return nil
+}
+
+func validateNetworkImages(c *Cluster) error {
+	// check network provider images
+	if c.Network.Plugin == FlannelNetworkPlugin {
+		if len(c.SystemImages.Flannel) == 0 {
+			return fmt.Errorf("flannel image is not populated")
+		}
+		if len(c.SystemImages.FlannelCNI) == 0 {
+			return fmt.Errorf("flannel cni image is not populated")
+		}
+	} else if c.Network.Plugin == CanalNetworkPlugin {
+		if len(c.SystemImages.CanalNode) == 0 {
+			return fmt.Errorf("canal image is not populated")
+		}
+		if len(c.SystemImages.CanalCNI) == 0 {
+			return fmt.Errorf("canal cni image is not populated")
+		}
+		if len(c.SystemImages.CanalFlannel) == 0 {
+			return fmt.Errorf("flannel image is not populated")
+		}
+	} else if c.Network.Plugin == CalicoNetworkPlugin {
+		if len(c.SystemImages.CalicoCNI) == 0 {
+			return fmt.Errorf("calico cni image is not populated")
+		}
+		if len(c.SystemImages.CalicoCtl) == 0 {
+			return fmt.Errorf("calico ctl image is not populated")
+		}
+		if len(c.SystemImages.CalicoNode) == 0 {
+			return fmt.Errorf("calico image is not populated")
+		}
+		if len(c.SystemImages.CalicoControllers) == 0 {
+			return fmt.Errorf("calico controllers image is not populated")
+		}
+	} else if c.Network.Plugin == WeaveNetworkPlugin {
+		if len(c.SystemImages.WeaveCNI) == 0 {
+			return fmt.Errorf("weave cni image is not populated")
+		}
+		if len(c.SystemImages.WeaveNode) == 0 {
+			return fmt.Errorf("weave image is not populated")
+		}
+	}
+	return nil
+}
+
+func validateDNSImages(c *Cluster) error {
+	// check dns provider images
+	if c.DNS.Provider == "kube-dns" {
+		if len(c.SystemImages.KubeDNS) == 0 {
+			return fmt.Errorf("kubedns image is not populated")
+		}
+		if len(c.SystemImages.DNSmasq) == 0 {
+			return fmt.Errorf("dnsmasq image is not populated")
+		}
+		if len(c.SystemImages.KubeDNSSidecar) == 0 {
+			return fmt.Errorf("kubedns sidecar image is not populated")
+		}
+		if len(c.SystemImages.KubeDNSAutoscaler) == 0 {
+			return fmt.Errorf("kubedns autoscaler image is not populated")
+		}
+	} else if c.DNS.Provider == "coredns" {
+		if len(c.SystemImages.CoreDNS) == 0 {
+			return fmt.Errorf("coredns image is not populated")
+		}
+		if len(c.SystemImages.CoreDNSAutoscaler) == 0 {
+			return fmt.Errorf("coredns autoscaler image is not populated")
+		}
+	}
+	return nil
+}
+
+func validateMetricsImages(c *Cluster) error {
+	// checl metrics server image
+	if c.Monitoring.Provider != "none" {
+		if len(c.SystemImages.MetricsServer) == 0 {
+			return fmt.Errorf("metrics server images is not populated")
+		}
+	}
+	return nil
+}
+
+func validateIngressImages(c *Cluster) error {
+	// check ingress images
+	if c.Ingress.Provider != "none" {
+		if len(c.SystemImages.Ingress) == 0 {
+			return fmt.Errorf("ingress image is not populated")
+		}
+		if len(c.SystemImages.IngressBackend) == 0 {
+			return fmt.Errorf("ingress backend image is not populated")
 		}
 	}
 	return nil
