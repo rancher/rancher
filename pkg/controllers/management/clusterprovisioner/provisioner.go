@@ -18,7 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/services"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -729,5 +729,21 @@ func (p *Provisioner) restoreClusterBackup(cluster *v3.Cluster, spec v3.ClusterS
 	if backup.Spec.ClusterID != cluster.Name {
 		return "", "", "", fmt.Errorf("snapshot [%s] is not a backup of cluster [%s]", backup.Name, cluster.Name)
 	}
-	return p.driverRestore(cluster, spec)
+
+	api, token, cert, err = p.driverRestore(cluster, spec)
+	if err != nil {
+		return "", "", "", err
+	}
+	// checking if we have s3 config and that it's not inconsistent. This happens
+	// when restore is performed with invalid credentials and then the cluster is updated to fix it.
+	if spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig != nil {
+		s3Config := cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig
+		appliedS3Conf := cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig
+
+		if !reflect.DeepEqual(s3Config, appliedS3Conf) {
+			logrus.Infof("updated spec during restore detected for cluster [%s], update is required", cluster.Name)
+			api, token, cert, err = p.driverUpdate(cluster, spec)
+		}
+	}
+	return api, token, cert, err
 }
