@@ -7,8 +7,10 @@ import (
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
+	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/rke/util"
+	"golang.org/x/sync/errgroup"
 )
 
 func (c *Cluster) SnapshotEtcd(ctx context.Context, snapshotName string) error {
@@ -20,6 +22,31 @@ func (c *Cluster) SnapshotEtcd(ctx context.Context, snapshotName string) error {
 		if err := services.RunEtcdSnapshotSave(ctx, host, c.PrivateRegistriesMap, backupImage, snapshotName, true, c.Services.Etcd); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (c *Cluster) DeployRestoreCerts(ctx context.Context, clusterCerts map[string]pki.CertificatePKI) error {
+	var errgrp errgroup.Group
+	hostsQueue := util.GetObjectQueue(c.EtcdHosts)
+	restoreCerts := map[string]pki.CertificatePKI{}
+	for _, n := range []string{pki.CACertName, pki.KubeNodeCertName, pki.KubeNodeCertName} {
+		restoreCerts[n] = clusterCerts[n]
+	}
+	for w := 0; w < WorkerThreads; w++ {
+		errgrp.Go(func() error {
+			var errList []error
+			for host := range hostsQueue {
+				err := pki.DeployCertificatesOnPlaneHost(ctx, host.(*hosts.Host), c.RancherKubernetesEngineConfig, restoreCerts, c.SystemImages.CertDownloader, c.PrivateRegistriesMap, false)
+				if err != nil {
+					errList = append(errList, err)
+				}
+			}
+			return util.ErrList(errList)
+		})
+	}
+	if err := errgrp.Wait(); err != nil {
+		return err
 	}
 	return nil
 }
