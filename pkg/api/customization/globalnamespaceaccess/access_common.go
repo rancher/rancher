@@ -27,6 +27,10 @@ type MemberAccess struct {
 	CrtbLister         v3.ClusterRoleTemplateBindingLister
 	GrbLister          v3.GlobalRoleBindingLister
 	GrLister           v3.GlobalRoleLister
+	Prtbs              v3.ProjectRoleTemplateBindingInterface
+	Crtbs              v3.ClusterRoleTemplateBindingInterface
+	ProjectLister      v3.ProjectLister
+	ClusterLister      v3.ClusterLister
 }
 
 const (
@@ -91,14 +95,8 @@ func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []stri
 		// relax this check for the global admin
 		return nil
 	}
-	if len(roleTemplates) == 0 {
-		// avoid prtb/crtb calculation; create method in mcapp store will assign creator's inherited roles;
-		// create store method is called after validator
-		return nil
-	}
-	newProjectRoleTemplateMap := make(map[string]bool)
-	newClusterRoleTemplateMap := make(map[string]bool)
-	projects := make(map[string]bool)
+	newProjectRoleTemplateMap := make(map[string]*v3.RoleTemplate)
+	newClusterRoleTemplateMap := make(map[string]*v3.RoleTemplate)
 	clusters := make(map[string]bool)
 	for _, r := range roleTemplates {
 		rt, err := ma.RoleTemplateLister.Get("", r)
@@ -110,66 +108,186 @@ func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []stri
 		}
 		switch rt.Context {
 		case "project":
-			if !newProjectRoleTemplateMap[r] {
-				newProjectRoleTemplateMap[r] = true
+			if _, ok := newProjectRoleTemplateMap[r]; !ok {
+				newProjectRoleTemplateMap[r] = rt
 			}
 		case "cluster":
-			if !newClusterRoleTemplateMap[r] {
-				newClusterRoleTemplateMap[r] = true
+			if _, ok := newClusterRoleTemplateMap[r]; !ok {
+				newClusterRoleTemplateMap[r] = rt
 			}
 		}
 	}
+
+	clustersCallerIsOwnerOf := make(map[string]bool)
 	for _, t := range targetProjects {
 		split := strings.SplitN(t, ":", 2)
 		if len(split) != 2 {
 			return fmt.Errorf("invalid project ID %v", t)
 		}
-		clusterName := split[0]
-		projectName := split[1]
-
-		if !projects[projectName] {
-			projects[projectName] = true
+		cname := split[0]
+		pname := split[1]
+		if !clusters[cname] {
+			clusters[cname] = true
 		}
-		if !clusters[clusterName] {
-			clusters[clusterName] = true
-		}
-	}
-
-	for pname := range projects {
 		projectRoleTemplateFoundCount := 0
 		projectRoleTemplateFoundMap := make(map[string]bool)
+		callerIsProjectOwner := false
+		callerIsProjectMember := false
+		callerIsClusterOwner := false
 		prtbs, err := ma.PrtbLister.List(pname, labels.NewSelector())
 		if err != nil {
 			return err
 		}
 		for _, prtb := range prtbs {
-			if prtb.UserName == callerID && newProjectRoleTemplateMap[prtb.RoleTemplateName] {
-				projectRoleTemplateFoundMap[prtb.RoleTemplateName] = true
-				projectRoleTemplateFoundCount++
+			if prtb.UserName == callerID {
+				if _, ok := newProjectRoleTemplateMap[prtb.RoleTemplateName]; ok {
+					projectRoleTemplateFoundMap[prtb.RoleTemplateName] = true
+					projectRoleTemplateFoundCount++
+				}
+				if callerIsProjectOwner && callerIsProjectMember {
+					continue
+				}
+				rt, err := ma.RoleTemplateLister.Get("", prtb.RoleTemplateName)
+				if err != nil {
+					return err
+				}
+				if rt.ProjectCreatorDefault && rt.Builtin {
+					callerIsProjectOwner = true
+				}
+				if rt.Name == "project-member" {
+					callerIsProjectMember = true
+				}
 			}
 		}
 		if projectRoleTemplateFoundCount != len(newProjectRoleTemplateMap) {
-			_, rolesNotFound, _ := set.Diff(projectRoleTemplateFoundMap, newProjectRoleTemplateMap)
-			errMsg := fmt.Sprintf("user %v does not have following roles in project %v: %v", callerID, pname, rolesNotFound)
+			// user does not have prtbs for all input roles in this project, find the roles for which there are no prtbs
+			customRolesFound := false
+			inputRolesContainProjectOwnerRole := false
+			projectRolesToAddMap := make(map[string]bool)
+			for role := range newProjectRoleTemplateMap {
+				projectRolesToAddMap[role] = true
+			}
+			_, rolesNotFound, _ := set.Diff(projectRoleTemplateFoundMap, projectRolesToAddMap)
+			// find if any of the roles for which prtbs aren't found are custom
+			for _, r := range rolesNotFound {
+				if rt, ok := newProjectRoleTemplateMap[r]; ok {
+					if !rt.Builtin {
+						customRolesFound = true
+					}
+					if rt.ProjectCreatorDefault && rt.Builtin {
+						// this is the "project-owner" role
+						inputRolesContainProjectOwnerRole = true
+					}
+				}
+			}
+			// check if caller is project-owner, project-member or cluster-owner
+			if callerIsProjectOwner && !customRolesFound {
+				// project-owner should be allowed to add any built-in project roles
+				continue
+			}
+			if callerIsProjectMember && !customRolesFound && !inputRolesContainProjectOwnerRole {
+				// project-member should be allowed to add any built-in project role, EXCEPT the project-owner role
+				continue
+			}
+
+			// check if caller is cluster-owner
+			crtbs, err := ma.CrtbLister.List(cname, labels.NewSelector())
+			if err != nil {
+				return err
+			}
+			for _, crtb := range crtbs {
+				if crtb.UserName == callerID {
+					rt, err := ma.RoleTemplateLister.Get("", crtb.RoleTemplateName)
+					if err != nil {
+						return err
+					}
+					if rt.ClusterCreatorDefault && rt.Builtin {
+						// caller is the owner of the cluster that this project belongs to, no need to check other crtbs
+						callerIsClusterOwner = true
+						clustersCallerIsOwnerOf[cname] = true
+						break
+					}
+				}
+			}
+			if callerIsClusterOwner && !customRolesFound {
+				// cluster-owner should be allowed to add any built-in roles
+				continue
+			}
+			// either the user is not one of these: project-owner, project-member or cluster-owner, OR
+			// the passed in roles have some custom roles which the user does not have prtbs/crtbs for
+			p, err := ma.ProjectLister.Get(cname, pname)
+			if err != nil {
+				return err
+			}
+			projectName := pname
+			if p.Spec.DisplayName != "" {
+				projectName = p.Spec.DisplayName
+			}
+			errMsg := fmt.Sprintf("user %v does not have following roles in project %v: %v", callerID, projectName, rolesNotFound)
 			return httperror.NewAPIError(httperror.PermissionDenied, errMsg)
 		}
+	}
+
+	if len(newClusterRoleTemplateMap) == 0 {
+		return nil
 	}
 	for cname := range clusters {
 		clusterRoleTemplateFoundCount := 0
 		clusterRoleTemplateFoundMap := make(map[string]bool)
+		clusterOwner := clustersCallerIsOwnerOf[cname]
 		crtbs, err := ma.CrtbLister.List(cname, labels.NewSelector())
 		if err != nil {
 			return err
 		}
 		for _, crtb := range crtbs {
-			if crtb.UserName == callerID && newClusterRoleTemplateMap[crtb.RoleTemplateName] {
-				clusterRoleTemplateFoundMap[crtb.RoleTemplateName] = true
-				clusterRoleTemplateFoundCount++
+			if crtb.UserName == callerID {
+				if _, ok := newClusterRoleTemplateMap[crtb.RoleTemplateName]; ok {
+					clusterRoleTemplateFoundMap[crtb.RoleTemplateName] = true
+					clusterRoleTemplateFoundCount++
+				}
+				if clusterOwner {
+					// we already found a crtb with roletemplate cluster-owner for the caller in this cluster
+					continue
+				}
+				rt, err := ma.RoleTemplateLister.Get("", crtb.RoleTemplateName)
+				if err != nil {
+					return err
+				}
+				if rt.ClusterCreatorDefault && rt.Builtin {
+					clusterOwner = true
+				}
 			}
 		}
 		if clusterRoleTemplateFoundCount != len(newClusterRoleTemplateMap) {
-			_, rolesNotFound, _ := set.Diff(clusterRoleTemplateFoundMap, newClusterRoleTemplateMap)
-			errMsg := fmt.Sprintf("user %v does not have following roles in cluster %v: %v", callerID, cname, rolesNotFound)
+			customRolesFound := false
+			clusterRolesToAddMap := make(map[string]bool)
+			for role := range newClusterRoleTemplateMap {
+				clusterRolesToAddMap[role] = true
+			}
+			_, rolesNotFound, _ := set.Diff(clusterRoleTemplateFoundMap, clusterRolesToAddMap)
+			// find if any of the roles for which prtbs aren't found are builtin
+			for _, r := range rolesNotFound {
+				if rt, ok := newProjectRoleTemplateMap[r]; ok {
+					if !rt.Builtin {
+						customRolesFound = true
+					}
+				}
+			}
+			if clusterOwner && !customRolesFound {
+				// caller is cluster-owner of current cluster, relax this check
+				continue
+			}
+
+			// get cluster's displayName
+			c, err := ma.ClusterLister.Get("", cname)
+			if err != nil {
+				return err
+			}
+			clusterName := cname
+			if c.Spec.DisplayName != "" {
+				clusterName = c.Spec.DisplayName
+			}
+			errMsg := fmt.Sprintf("user %v does not have following roles in cluster %v: %v", callerID, clusterName, rolesNotFound)
 			return httperror.NewAPIError(httperror.PermissionDenied, errMsg)
 		}
 	}
@@ -188,10 +306,10 @@ func CheckAccessToUpdateMembers(members []v3.Member, data map[string]interface{}
 
 	newMemberAccessType := make(map[string]string)
 	for _, m := range newMembers {
-		if _, ok := m[client.MemberFieldUserPrincipalID]; ok {
+		if userPrincipalName, ok := m[client.MemberFieldUserPrincipalID]; ok && userPrincipalName != nil {
 			newMemberAccessType[convert.ToString(m[client.MemberFieldUserPrincipalID])] = convert.ToString(m[client.MemberFieldAccessType])
 		}
-		if _, ok := m[client.MemberFieldGroupPrincipalID]; ok {
+		if groupPrincipalName, ok := m[client.MemberFieldGroupPrincipalID]; ok && groupPrincipalName != nil {
 			newMemberAccessType[convert.ToString(m[client.MemberFieldGroupPrincipalID])] = convert.ToString(m[client.MemberFieldAccessType])
 		}
 	}
@@ -299,116 +417,54 @@ func (ma *MemberAccess) getUserFromUserPrincipalID(userPrincipalID string) (*v3.
 	return match, nil
 }
 
-func (ma *MemberAccess) DeriveRolesInTargets(callerID string, targets []string) (map[string][]string, error) {
-	targetToRoles := make(map[string][]string)
-	isAdmin, err := ma.IsAdmin(callerID)
-	if err != nil {
-		return nil, err
+func (ma *MemberAccess) RemoveRolesFromTargets(targetProjects, rolesToRemove []string, mcappName string, removeAllRoles bool) error {
+	systemUserPrincipalID := fmt.Sprintf("system://%s", mcappName)
+	// from given targets, remove prtbs/crtbs created for user with system account's userID
+	rolesToRemoveMap := make(map[string]bool)
+	if !removeAllRoles {
+		for _, role := range rolesToRemove {
+			rolesToRemoveMap[role] = true
+		}
 	}
-	if isAdmin {
-		projectRolesToAddMap := make(map[string]bool)
-		clusterRolesToAddMap := make(map[string]bool)
-		// assign clusterCreatorDefault and projectCreatorDefault roles
-		rts, err := ma.RoleTemplateLister.List("", labels.NewSelector())
-		if err != nil {
-			return nil, err
-		}
-		for _, rt := range rts {
-			if rt.ClusterCreatorDefault && !clusterRolesToAddMap[rt.Name] {
-				clusterRolesToAddMap[rt.Name] = true
-			} else if rt.ProjectCreatorDefault && !projectRolesToAddMap[rt.Name] {
-				projectRolesToAddMap[rt.Name] = true
-			}
-		}
-		if len(projectRolesToAddMap) == 0 && len(clusterRolesToAddMap) == 0 {
-			return nil, httperror.NewAPIError(httperror.PermissionDenied, "Admin has passed no roles to multiclusterapp, and no cluster/project owner roles found")
-		}
-		// add projectCreatorDefault roles in all target projects
-		projectRolesToAdd := make([]string, len(projectRolesToAddMap))
-		i := 0
-		for role := range projectRolesToAddMap {
-			projectRolesToAdd[i] = role
-			i++
-		}
-		// add clusterCreatorDefault roles in all target projects's clusters
-		clusterRolesToAdd := make([]string, len(clusterRolesToAddMap))
-		i = 0
-		for role := range clusterRolesToAddMap {
-			clusterRolesToAdd[i] = role
-			i++
-		}
-		targetToRoles := make(map[string][]string)
-		for _, target := range targets {
-			targetToRoles[target] = projectRolesToAdd
-			split := strings.SplitN(target, ":", 2)
-			if len(split) != 2 {
-				return nil, fmt.Errorf("invalid project name: %v", target)
-			}
-			clusterName := split[0]
-			if _, ok := targetToRoles[clusterName]; !ok {
-				targetToRoles[clusterName] = clusterRolesToAdd
-			}
-		}
-	} else {
-		for _, target := range targets {
-			projectRoleFound := false
-			isClusterCreator := false
-			split := strings.SplitN(target, ":", 2)
-			if len(split) != 2 {
-				return targetToRoles, fmt.Errorf("invalid project name: %v", target)
-			}
-			clusterName := split[0]
-			projectName := split[1]
-			// get roles from this project for this creator
-			prtbs, err := ma.PrtbLister.List(projectName, labels.NewSelector())
-			if err != nil {
-				return targetToRoles, err
-			}
-			for _, prtb := range prtbs {
-				if prtb.UserName == callerID {
-					projectRoleFound = true
-					if roles, ok := targetToRoles[target]; ok {
-						if !slice.ContainsString(roles, prtb.RoleTemplateName) {
-							targetToRoles[target] = append(roles, prtb.RoleTemplateName)
-						}
-					} else {
-						targetToRoles[target] = []string{prtb.RoleTemplateName}
-					}
-				}
-			}
 
-			if !projectRoleFound {
-				// get roles from this cluster for this creator, see if the creator is the cluster-creator and hence should have
-				// access to all projects
-				crtbs, err := ma.CrtbLister.List(clusterName, labels.NewSelector())
-				if err != nil {
-					return targetToRoles, err
+	for _, target := range targetProjects {
+		split := strings.SplitN(target, ":", 2)
+		if len(split) != 2 {
+			errMsg := fmt.Sprintf("Invalid project ID: %v", target)
+			return httperror.NewAPIError(httperror.InvalidBodyContent, errMsg)
+		}
+		clusterName, projectName := split[0], split[1]
+		clustersCovered := make(map[string]bool)
+		prtbs, err := ma.PrtbLister.List(projectName, labels.NewSelector())
+		if err != nil {
+			return err
+		}
+		for _, prtb := range prtbs {
+			if prtb.UserPrincipalName == systemUserPrincipalID {
+				if removeAllRoles || rolesToRemoveMap[prtb.RoleTemplateName] {
+					if err = ma.Prtbs.DeleteNamespaced(projectName, prtb.Name, &v1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
+						return err
+					}
 				}
-				for _, crtb := range crtbs {
-					if crtb.UserName == callerID {
-						roleTemplate, err := ma.RoleTemplateLister.Get("", crtb.RoleTemplateName)
-						if err != nil {
-							return targetToRoles, err
-						}
-						if roleTemplate != nil && roleTemplate.ClusterCreatorDefault {
-							isClusterCreator = true
-							if roles, ok := targetToRoles[clusterName]; ok {
-								if !slice.ContainsString(roles, crtb.RoleTemplateName) {
-									targetToRoles[clusterName] = append(roles, crtb.RoleTemplateName)
-								}
-							} else {
-								targetToRoles[clusterName] = []string{crtb.RoleTemplateName}
-							}
+			}
+		}
+
+		if !clustersCovered[clusterName] {
+			crtbs, err := ma.CrtbLister.List(clusterName, labels.NewSelector())
+			if err != nil {
+				return err
+			}
+			for _, crtb := range crtbs {
+				if crtb.UserPrincipalName == systemUserPrincipalID {
+					if removeAllRoles || rolesToRemoveMap[crtb.RoleTemplateName] {
+						if err = ma.Crtbs.DeleteNamespaced(clusterName, crtb.Name, &v1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
+							return err
 						}
 					}
 				}
 			}
-			if !projectRoleFound && !isClusterCreator {
-				// creator has no roles in target projects and is not even a cluster-owner
-				errMsg := fmt.Sprintf("Multiclusterapp creator %v has no roles in target project %v", callerID, target)
-				return nil, httperror.NewAPIError(httperror.PermissionDenied, errMsg)
-			}
+			clustersCovered[clusterName] = true
 		}
 	}
-	return targetToRoles, nil
+	return nil
 }
