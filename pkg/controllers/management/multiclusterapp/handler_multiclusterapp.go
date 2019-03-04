@@ -155,23 +155,6 @@ func (mc *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.
 		}
 	}
 
-	for target, roles := range mcapp.Spec.TargetToRole {
-		split := strings.SplitN(target, ":", 2)
-		if len(split) == 2 {
-			// create prtbs with these roles
-			projectName := split[1]
-			for _, r := range roles {
-				prtbName = mcapp.Name + "-" + r
-				mc.createPrtb(projectName, target, prtbName, r, systemUser.Name, systemUserPrincipalID)
-			}
-		} else {
-			// create crtbs with the roles
-			for _, r := range roles {
-				crtbName = mcapp.Name + "-" + r
-				mc.createCrtb(target, crtbName, r, systemUser.Name, systemUserPrincipalID)
-			}
-		}
-	}
 	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.MultiClusterAppResource, mcapp.Name, mcapp.UID,
 		mcapp.Spec.Members, creatorID, mc.managementContext); err != nil {
 		return nil, err

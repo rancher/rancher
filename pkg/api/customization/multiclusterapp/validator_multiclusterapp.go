@@ -33,6 +33,10 @@ type Wrapper struct {
 	Users                         v3.UserInterface
 	GrbLister                     v3.GlobalRoleBindingLister
 	GrLister                      v3.GlobalRoleLister
+	Prtbs                         v3.ProjectRoleTemplateBindingInterface
+	Crtbs                         v3.ClusterRoleTemplateBindingInterface
+	ProjectLister                 v3.ProjectLister
+	ClusterLister                 v3.ClusterLister
 }
 
 const (
@@ -86,6 +90,10 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 		RoleTemplateLister: w.RoleTemplateLister,
 		GrbLister:          w.GrbLister,
 		GrLister:           w.GrLister,
+		Prtbs:              w.Prtbs,
+		Crtbs:              w.Crtbs,
+		ProjectLister:      w.ProjectLister,
+		ClusterLister:      w.ClusterLister,
 	}
 	var targetProjects []string
 	callerID := request.Request.Header.Get(gaccess.ImpersonateUserHeader)
@@ -156,5 +164,8 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 	for _, t := range mcapp.Spec.Targets {
 		targetProjects = append(targetProjects, t.ProjectName)
 	}
-	return ma.EnsureRoleInTargets(targetProjects, rolesToAdd, callerID)
+	if err = ma.EnsureRoleInTargets(targetProjects, rolesToAdd, callerID); err != nil {
+		return err
+	}
+	return ma.RemoveRolesFromTargets(targetProjects, rolesToRemove, mcapp.Name, false)
 }
