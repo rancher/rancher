@@ -44,7 +44,7 @@ func (w *fluentForwarderTestWrap) TestReachable(dial dialer.Dialer, includeSendT
 			if serverName == "" {
 				host, _, err := net.SplitHostPort(s.Endpoint)
 				if err != nil {
-					return errors.Wrapf(err, "parse endpoint %s failed", s.Endpoint)
+					return errors.Wrapf(err, "couldn't parse url %s", s.Endpoint)
 				}
 				serverName = host
 			}
@@ -77,55 +77,55 @@ func (w *fluentForwarderTestWrap) TestReachable(dial dialer.Dialer, includeSendT
 func (w *fluentForwarderTestWrap) sendData2Server(conn net.Conn, shareKey, username, password, endpoint string) error {
 	if shareKey == "" && username == "" && password == "" {
 		if _, err := conn.Write(fluentdForwarderTestData); err != nil {
-			return errors.Wrapf(err, "write data to server %s failed", endpoint)
+			return errors.Wrapf(err, "couldn't write data to fluentd forwarder %s", endpoint)
 		}
 	}
 
 	buf := make([]byte, 1024)
 	if _, err := conn.Read(buf); err != nil && err != io.EOF {
-		return errors.Wrapf(err, "read data from fluent forwarder server %s failed", endpoint)
+		return errors.Wrapf(err, "couldn't read data from fluentd forwarder %s", endpoint)
 	}
 
 	var heloBody []interface{}
 	if err := msgpack.Unmarshal(buf, &heloBody); err != nil {
-		return errors.Wrapf(err, "use msgpack to unmashal helo from %s failed", endpoint)
+		return errors.Wrap(err, "couldn't unmarshal helo message")
 	}
 
 	if len(heloBody) < 2 {
-		return errors.New("helo body from fluentd don't have enough info")
+		return errors.New("received invalid helo message")
 	}
 
 	var heloOption heloOption
 	if err := convert.ToObj(heloBody[1], &heloOption); err != nil {
-		return errors.Wrapf(err, "convert helo body from %s failed", endpoint)
+		return errors.Wrap(err, "couldn't convert helo body")
 	}
 
 	nonce, err := base64.StdEncoding.DecodeString(heloOption.Nonce)
 	if err != nil {
-		return errors.Wrapf(err, "decode nonce from %s failed", endpoint)
+		return errors.Wrap(err, "couldn't decode nonce from helo body")
 	}
 
 	auth, err := base64.StdEncoding.DecodeString(heloOption.Auth)
 	if err != nil {
-		return errors.Wrapf(err, "decode auth from %s failed", endpoint)
+		return errors.Wrap(err, "couldn't decode auth from helo body")
 	}
 
 	ping, err := w.generateFluentForwarderPing(shareKey, string(nonce), username, password, string(auth))
 	if err != nil {
-		return errors.Wrap(err, "generate fluent forwarder ping failed")
+		return errors.Wrap(err, "couldn't generate ping request")
 	}
 
 	if _, err = conn.Write([]byte(ping)); err != nil {
-		return errors.Wrap(err, "write ping info to fluent forwarder failed")
+		return errors.Wrap(err, "couldn't send ping request to fluentd forwarder")
 	}
 
 	if _, err = conn.Write(fluentdForwarderTestData); err != nil {
-		return errors.Wrap(err, "write test data to fluent forwarder failed")
+		return errors.Wrap(err, "couldn't write test data to fluentd forwarder")
 	}
 
 	pongBuf := make([]byte, 1024)
 	if _, err = conn.Read(pongBuf); err != nil && err != io.EOF {
-		return errors.Wrapf(err, "read pong data from fluent forwarder server %s failed", endpoint)
+		return errors.Wrap(err, "couldn't read pong data from fluentd forwarder")
 	}
 
 	return w.decodeFluentForwarderPong(pongBuf)
@@ -135,7 +135,7 @@ func (w *fluentForwarderTestWrap) generateFluentForwarderPing(shareKey, nonce, u
 	// format from fluentd code: ['PING', self_hostname, shared_key_salt, sha512_hex(shared_key_salt + self_hostname + nonce + shared_key), username || '', sha512_hex(auth_salt + username + password) || '']
 	hostname, err := os.Hostname()
 	if err != nil {
-		return "", errors.Wrap(err, "get host failed")
+		return "", errors.Wrap(err, "couldn't get hostname")
 	}
 
 	salt := randHex(16)
@@ -162,11 +162,11 @@ func (w *fluentForwarderTestWrap) decodeFluentForwarderPong(pong []byte) error {
 	pongMsg = strings.TrimSuffix(pongMsg, "]")
 	pongMsgArray := strings.Split(pongMsg, ",")
 	if len(pongMsgArray) != 5 {
-		return errors.New("invalid format pong msg from fluentd, " + pongMsg)
+		return errors.New("received invalid pong message, pong message: " + pongMsg)
 	}
 
 	if pongMsgArray[1] == "false" {
-		return errors.New("auth failed from fluentd, pong response: " + pongMsgArray[2])
+		return errors.New("auth failed, reason: " + pongMsgArray[2])
 	}
 
 	return nil
