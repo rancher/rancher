@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/rke/util"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -127,7 +127,6 @@ func (c *Cluster) SetUpHosts(ctx context.Context, flags ExternalFlags) error {
 		}
 		hostList := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
 		var errgrp errgroup.Group
-
 		hostsQueue := util.GetObjectQueue(hostList)
 		for w := 0; w < WorkerThreads; w++ {
 			errgrp.Go(func() error {

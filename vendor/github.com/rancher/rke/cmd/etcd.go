@@ -131,6 +131,10 @@ func RestoreEtcdSnapshot(
 	if err := kubeCluster.TunnelHosts(ctx, flags); err != nil {
 		return err
 	}
+	// if we fail after cleanup, we can't find the certs to do the download, we need to redeploy them
+	if err := kubeCluster.DeployRestoreCerts(ctx, rkeFullState.DesiredState.CertificatesBundle); err != nil {
+		return err
+	}
 	// first download and check
 	if err := kubeCluster.PrepareBackup(ctx, snapshotName); err != nil {
 		return err
