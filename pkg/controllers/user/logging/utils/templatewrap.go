@@ -235,7 +235,7 @@ func newKafkaTemplateWrap(kafkaConfig *v3.KafkaConfig) (*KafkaTemplateWrap, erro
 		KafkaConfig: *kafkaConfig,
 	}
 	if len(kafkaConfig.BrokerEndpoints) == 0 && kafkaConfig.ZookeeperEndpoint == "" {
-		err := errors.New("one of the kafka endpoint must be set")
+		err := errors.New("one of the kafka endpoints must be set")
 		return nil, err
 	}
 	if len(kafkaConfig.BrokerEndpoints) != 0 {
@@ -292,11 +292,11 @@ func newFluentForwarderTemplateWrap(fluentForwarderConfig *v3.FluentForwarderCon
 func parseEndpoint(endpoint string) (host string, scheme string, err error) {
 	u, err := url.ParseRequestURI(endpoint)
 	if err != nil {
-		return "", "", errors.Wrapf(err, "invalid endpoint %s", endpoint)
+		return "", "", errors.Wrapf(err, "couldn't parse url %s", endpoint)
 	}
 
 	if u.Host == "" || u.Scheme == "" {
-		return "", "", errors.New("invalid endpoint " + endpoint + " empty host or schema")
+		return "", "", errors.New("invalid url " + endpoint + " empty host or scheme")
 	}
 
 	return u.Host, u.Scheme, nil

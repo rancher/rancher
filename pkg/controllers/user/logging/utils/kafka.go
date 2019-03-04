@@ -3,6 +3,7 @@ package utils
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net/url"
 
 	"github.com/pkg/errors"
@@ -29,7 +30,7 @@ func (w *kafkaTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog boo
 	if w.ZookeeperEndpoint != "" {
 		url, err := url.Parse(w.ZookeeperEndpoint)
 		if err != nil {
-			return errors.Wrapf(err, "parse url %s failed", url)
+			return errors.Wrapf(err, "couldn't parse url %s", w.ZookeeperEndpoint)
 		}
 
 		var tlsConfig *tls.Config
@@ -51,7 +52,7 @@ func (w *kafkaTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog boo
 	for _, v := range w.BrokerEndpoints {
 		url, err := url.Parse(v)
 		if err != nil {
-			return errors.Wrapf(err, "parse url %s failed", url)
+			return errors.Wrapf(err, "couldn't parse url %s", v)
 		}
 
 		var tlsConfig *tls.Config
@@ -80,7 +81,7 @@ func (w *kafkaTestWrap) sendData2Kafka(smartHost string, dial dialer.Dialer, tls
 	defer leaderConn.Close()
 
 	if _, err := leaderConn.WriteMessages(kafkaTestData); err != nil {
-		return errors.Wrap(err, "write test message to kafka failed")
+		return errors.Wrap(err, "couldn't write test message to kafka")
 	}
 
 	return nil
@@ -103,13 +104,13 @@ func (w *kafkaTestWrap) kafkaConn(dial dialer.Dialer, config *tls.Config, smartH
 
 	if err := kafkaConn.CreateTopics(topicConf); err != nil {
 		kafkaConn.Close()
-		return nil, err
+		return nil, errors.Wrapf(wrapErrEOF(err), "couldn't create kafka topic %s", w.Topic)
 	}
 
 	partitions, err := kafkaConn.ReadPartitions(w.Topic)
 	if err != nil {
 		kafkaConn.Close()
-		return nil, err
+		return nil, errors.Wrap(wrapErrEOF(err), "couldn't read kafka partitions")
 	}
 
 	var leader kafka.Broker
@@ -133,4 +134,12 @@ func (w *kafkaTestWrap) kafkaConn(dial dialer.Dialer, config *tls.Config, smartH
 	}
 
 	return kafka.NewConn(LeaderConn, w.Topic, defaultPartition), nil
+}
+
+func wrapErrEOF(err error) error {
+	if err == io.EOF {
+		return errors.New("unexpected EOF, connection closed by remote server")
+	}
+
+	return err
 }

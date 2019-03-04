@@ -24,7 +24,7 @@ type splunkTestWrap struct {
 func (w *splunkTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog bool) error {
 	url, err := url.Parse(w.Endpoint)
 	if err != nil {
-		return errors.Wrapf(err, "parse url %s failed", url)
+		return errors.Wrapf(err, "couldn't parse url %s", w.Endpoint)
 	}
 
 	isTLS := url.Scheme == "https"
@@ -32,7 +32,7 @@ func (w *splunkTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog bo
 	if isTLS {
 		tlsConfig, err = buildTLSConfig(w.Certificate, w.ClientCert, w.ClientKey, w.ClientKeyPass, "", url.Hostname(), w.SSLVerify)
 		if err != nil {
-			return errors.Wrap(err, "build tls config failed")
+			return err
 		}
 	}
 
