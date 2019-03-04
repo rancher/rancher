@@ -2,7 +2,7 @@ import pytest
 import sys
 from rancher import ApiError
 
-from .conftest import wait_for_condition, wait_until
+from .conftest import wait_for_condition, wait_until, random_str, wait_for
 
 NEW_DRIVER_URL = "https://github.com/rancher/kontainer-engine-driver-" \
                  "example/releases/download/v0.2.2/kontainer-engine-" \
@@ -33,7 +33,8 @@ def test_builtin_drivers_are_present(admin_mc):
 
 
 @pytest.mark.nonparallel
-def test_kontainer_driver_lifecycle(admin_mc, remove_resource):
+def test_kontainer_driver_lifecycle(admin_mc, remove_resource,
+                                    wait_remove_resource):
     kd = admin_mc.client.create_kontainerDriver(
         createDynamicSchema=True,
         active=True,
@@ -52,7 +53,6 @@ def test_kontainer_driver_lifecycle(admin_mc, remove_resource):
     kd = wait_for_condition('Active', 'True', admin_mc.client, kd,
                             timeout=90)
     verify_driver_in_types(admin_mc.client, kd)
-
     # verify the leading kontainer driver identifier and trailing system
     # type are removed from the name
     assert kd.name == "example"
@@ -65,8 +65,35 @@ def test_kontainer_driver_lifecycle(admin_mc, remove_resource):
     # verify driver has delete link
     assert kd.links.remove != ""
 
-    # test driver is removed from schema after deletion
+    # associate driver with a cluster
+    cluster = admin_mc.client.create_cluster(
+        name=random_str(),
+        exampleEngineConfig={
+            "credentials": "bad credentials",
+            "nodeCount": 3
+        })
+    remove_resource(cluster)
+
+    # verify delete link has been removed from the driver
+    def check_remove_link(kod):
+        kod = admin_mc.client.reload(kod)
+        if hasattr(kod.links, "remove"):
+            return False
+        return True
+
+    wait_for(lambda: check_remove_link(kd))
+    # try to delete it anyway
+    with pytest.raises(ApiError) as e:
+        admin_mc.client.delete(kd)
+
+    assert e.value.error.status == 405
+    # cleanup local cluster, note this depends on a force delete of the cluster
+    # within rancher since this cluster is not a "true" cluster
+    admin_mc.client.delete(cluster)
+    # wait for removal link to return
+    wait_for(lambda: not (check_remove_link(kd)))
     admin_mc.client.delete(kd)
+    # test driver is removed from schema after deletion
     verify_driver_not_in_types(admin_mc.client, kd)
 
 

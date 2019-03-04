@@ -22,6 +22,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementv3 "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -46,6 +47,7 @@ func (t *transformer) TransformerFunc(apiContext *types.APIContext, schema *type
 	return t.transposeGenericConfigToDynamicField(data)
 }
 
+//transposeGenericConfigToDynamicField converts a genericConfig to one usable by rancher and maps a kontainer id to a kontainer name
 func (t *transformer) transposeGenericConfigToDynamicField(data map[string]interface{}) (map[string]interface{}, error) {
 	if data["genericEngineConfig"] != nil {
 		drivers, err := t.KontainerDriverLister.List("", labels.Everything())
@@ -55,15 +57,16 @@ func (t *transformer) transposeGenericConfigToDynamicField(data map[string]inter
 
 		var driver *v3.KontainerDriver
 		driverName := data["genericEngineConfig"].(map[string]interface{})[clusterprovisioner.DriverNameField].(string)
+		// iterate over kontainer drivers to find the one that maps to the genericEngineConfig DriverName ("kd-**") -> "example"
 		for _, candidate := range drivers {
 			if driverName == candidate.Name {
 				driver = candidate
 				break
 			}
 		}
-
 		if driver == nil {
-			return nil, fmt.Errorf("got unknown driver from kontainer-engine: %v", data[clusterprovisioner.DriverNameField])
+			logrus.Warnf("unable to find the kontainer driver %v that maps to %v", driverName, data[clusterprovisioner.DriverNameField])
+			return data, nil
 		}
 
 		var driverTypeName string
