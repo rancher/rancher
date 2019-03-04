@@ -140,6 +140,15 @@ func (l *Lifecycle) waitResourceQuotaInitCondition(namespace string) error {
 		if err != nil {
 			return err
 		}
+
+		invalid, err := namespaceutil.IsNamespaceConditionSet(ns, resourcequota.ResourceQuotaValidatedCondition, false)
+		if err != nil {
+			return err
+		}
+		if invalid {
+			return fmt.Errorf("available resource quota in this project does not fit for the dedicated pipeline namespace, please make sure there is vacancy for the default namespace quota")
+		}
+
 		set, err := namespaceutil.IsNamespaceConditionSet(ns, resourcequota.ResourceQuotaInitCondition, true)
 		if err != nil {
 			return err

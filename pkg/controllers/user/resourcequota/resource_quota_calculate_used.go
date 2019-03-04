@@ -63,7 +63,7 @@ func (c *calculateLimitController) calculateProjectResourceQuota(projectID strin
 		if ns.DeletionTimestamp != nil {
 			continue
 		}
-		set, err := namespaceutil.IsNamespaceConditionSet(ns, resourceQuotaValidatedCondition, true)
+		set, err := namespaceutil.IsNamespaceConditionSet(ns, ResourceQuotaValidatedCondition, true)
 		if err != nil {
 			return err
 		}

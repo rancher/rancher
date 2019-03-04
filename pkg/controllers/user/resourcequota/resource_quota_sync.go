@@ -26,7 +26,7 @@ const (
 	resourceQuotaLabel              = "resourcequota.management.cattle.io/default-resource-quota"
 	resourceQuotaAnnotation         = "field.cattle.io/resourceQuota"
 	limitRangeAnnotation            = "field.cattle.io/containerDefaultResourceLimit"
-	resourceQuotaValidatedCondition = "ResourceQuotaValidated"
+	ResourceQuotaValidatedCondition = "ResourceQuotaValidated"
 	ResourceQuotaInitCondition      = "ResourceQuotaInit"
 )
 
@@ -371,12 +371,12 @@ func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace, quot
 }
 
 func (c *SyncController) setValidated(ns *corev1.Namespace, value bool, msg string) (*corev1.Namespace, error) {
-	set, err := namespaceutil.IsNamespaceConditionSet(ns, resourceQuotaValidatedCondition, value)
+	set, err := namespaceutil.IsNamespaceConditionSet(ns, ResourceQuotaValidatedCondition, value)
 	if set || err != nil {
 		return ns, err
 	}
 	toUpdate := ns.DeepCopy()
-	err = namespaceutil.SetNamespaceCondition(toUpdate, time.Second*1, resourceQuotaValidatedCondition, value, msg)
+	err = namespaceutil.SetNamespaceCondition(toUpdate, time.Second*1, ResourceQuotaValidatedCondition, value, msg)
 	if err != nil {
 		return ns, err
 	}
