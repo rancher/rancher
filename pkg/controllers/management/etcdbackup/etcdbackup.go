@@ -13,14 +13,15 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/ticker"
-	"github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v1 "github.com/rancher/types/apis/core/v1"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
@@ -69,6 +70,10 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 }
 
 func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
+	if v3.BackupConditionCompleted.IsFalse(b) {
+		return b, nil
+	}
+
 	cluster, err := c.clusterClient.Get(b.Spec.ClusterID, metav1.GetOptions{})
 	if err != nil {
 		return b, err
@@ -83,24 +88,19 @@ func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
 		b.Spec.Filename = getBackupFilename(b.Name, cluster)
 		b.Spec.BackupConfig = *cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig
 		v3.BackupConditionCreated.True(b)
+		// we set ConditionCompleted to Unknown to avoid incorrect "active" state
+		v3.BackupConditionCompleted.Unknown(b)
 		b, err = c.backupClient.Update(b)
 		if err != nil {
 			return b, err
 		}
 	}
-
-	kontainerDriver, err := c.KontainerDriverLister.Get("", service.RancherKubernetesEngineDriverName)
-	if err != nil {
-		return b, err
-	}
-	bObj, saveErr := v3.BackupConditionCompleted.Do(b, func() (runtime.Object, error) {
-		err = c.backupDriver.ETCDSave(context.Background(), cluster.Name, kontainerDriver, cluster.Spec, b.Name)
-		return b, err
-	})
+	bObj, saveErr := c.etcdSaveWithBackoff(b)
 	b, err = c.backupClient.Update(bObj.(*v3.EtcdBackup))
 	if err != nil {
 		return b, err
 	}
+
 	if saveErr != nil {
 		return b, fmt.Errorf("[etcd-backup] failed to perform etcd backup: %v", saveErr)
 	}
@@ -112,7 +112,19 @@ func (c *Controller) Remove(b *v3.EtcdBackup) (runtime.Object, error) {
 	if b.Spec.BackupConfig.S3BackupConfig == nil {
 		return b, nil
 	}
-	return b, c.deleteS3Snapshot(b)
+	// try to remove from s3 for 3 times, then give up. if we don't we get stuck forever
+	var delErr error
+	for i := 0; i < 3; i++ {
+		if delErr = c.deleteS3Snapshot(b); delErr == nil {
+			break
+		}
+		logrus.Warnf("failed to delete backup from s3: %v", delErr)
+		time.Sleep(5 * time.Second)
+	}
+	if delErr != nil {
+		logrus.Warnf("giving up on deleting backup [%s]: %v", b.Name, delErr)
+	}
+	return b, nil
 }
 
 func (c *Controller) Updated(b *v3.EtcdBackup) (runtime.Object, error) {
@@ -190,6 +202,42 @@ func (c *Controller) createNewBackup(cluster *v3.Cluster) (*v3.EtcdBackup, error
 	v3.BackupConditionCreated.CreateUnknownIfNotExists(newBackup)
 	return c.backupClient.Create(newBackup)
 
+}
+
+func (c *Controller) etcdSaveWithBackoff(b *v3.EtcdBackup) (runtime.Object, error) {
+	backoff := wait.Backoff{
+		Duration: 1000 * time.Millisecond,
+		Factor:   2,
+		Jitter:   0,
+		Steps:    5,
+	}
+	kontainerDriver, err := c.KontainerDriverLister.Get("", service.RancherKubernetesEngineDriverName)
+	if err != nil {
+		return b, err
+	}
+
+	bObj, err := v3.BackupConditionCompleted.Do(b, func() (runtime.Object, error) {
+		cluster, err := c.clusterClient.Get(b.Spec.ClusterID, metav1.GetOptions{})
+		if err != nil {
+			return b, err
+		}
+		var inErr error
+		err = wait.ExponentialBackoff(backoff, func() (bool, error) {
+			if inErr = c.backupDriver.ETCDSave(c.ctx, cluster.Name, kontainerDriver, cluster.Spec, b.Name); err != inErr {
+				logrus.Warnf("%v", inErr)
+				return false, nil
+			}
+			return true, nil
+		})
+
+		return b, inErr
+	})
+	if err != nil {
+		v3.BackupConditionCompleted.False(bObj)
+		v3.BackupConditionCompleted.ReasonAndMessageFromError(bObj, err)
+		return bObj, err
+	}
+	return bObj, nil
 }
 
 func (c *Controller) rotateExpiredBackups(cluster *v3.Cluster, clusterBackups []*v3.EtcdBackup) error {
