@@ -103,10 +103,10 @@ var ProjectTemplate = `
       @type elasticsearch
       include_tag_key  true
       {{- if and $store.ElasticsearchConfig.AuthUserName $store.ElasticsearchConfig.AuthPassword}}
-      hosts {{$store.ElasticsearchTemplateWrap.Scheme}}://{{$store.ElasticsearchConfig.AuthUserName}}:{{$store.ElasticsearchConfig.AuthPassword}}@{{$store.ElasticsearchTemplateWrap.Host}}
-      {{else }}
+      user {{$store.ElasticsearchConfig.AuthUserName}}
+      password {{$store.ElasticsearchConfig.AuthPassword}}
+      {{- end }}
       hosts {{$store.ElasticsearchConfig.Endpoint}}    
-      {{end }}
 
       logstash_prefix "{{$store.ElasticsearchConfig.IndexPrefix}}"
       logstash_format true
