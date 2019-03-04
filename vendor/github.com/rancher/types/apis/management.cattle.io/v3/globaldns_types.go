@@ -62,8 +62,7 @@ type CloudflareProviderConfig struct {
 }
 
 type UpdateGlobalDNSTargetsInput struct {
-	MultiClusterAppName string   `json:"multiClusterAppName" norman:"type=reference[multiClusterApp]"`
-	ProjectNames        []string `json:"projectNames" norman:"type=array[reference[project]]"`
+	ProjectNames []string `json:"projectNames" norman:"type=array[reference[project]]"`
 }
 
 type AlidnsProviderConfig struct {
