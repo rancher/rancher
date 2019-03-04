@@ -70,11 +70,10 @@ func (w *Wrapper) ActionHandler(actionName string, action *types.Action, request
 	for _, p := range gDNS.Spec.ProjectNames {
 		existingProjects[p] = true
 	}
-	mcAppIDInput := actionInput[client.UpdateGlobalDNSTargetsInputFieldMultiClusterAppID]
 
 	switch actionName {
 	case addProjectsAction:
-		return w.addProjects(gDNS, request, inputProjects, existingProjects, mcAppIDInput)
+		return w.addProjects(gDNS, request, inputProjects, existingProjects)
 	case removeProjectsAction:
 		return w.removeProjects(gDNS, request, existingProjects, inputProjects)
 	default:
@@ -82,20 +81,11 @@ func (w *Wrapper) ActionHandler(actionName string, action *types.Action, request
 	}
 }
 
-func (w *Wrapper) addProjects(gDNS *v3.GlobalDNS, request *types.APIContext, inputProjects []string, existingProjects map[string]bool, mcAppIDInput interface{}) error {
-	if mcAppIDInput == nil {
-		if gDNS.Spec.MultiClusterAppName != "" {
-			return httperror.NewAPIError(httperror.InvalidOption,
-				fmt.Sprintf("cannot add projects to globaldns as targets if multiclusterappID is set %s", gDNS.Spec.MultiClusterAppName))
-		}
-	} else {
-		mcAppID := convert.ToString(mcAppIDInput)
-		if mcAppID != "" {
-			return httperror.NewAPIError(httperror.InvalidOption,
-				fmt.Sprintf("cannot add projects to globaldns as targets if multiclusterappID is set %s", mcAppID))
-		}
+func (w *Wrapper) addProjects(gDNS *v3.GlobalDNS, request *types.APIContext, inputProjects []string, existingProjects map[string]bool) error {
+	if gDNS.Spec.MultiClusterAppName != "" {
+		return httperror.NewAPIError(httperror.InvalidOption,
+			fmt.Sprintf("cannot add projects to globaldns as targets if multiclusterappID is set %s", gDNS.Spec.MultiClusterAppName))
 	}
-
 	ma := gaccess.MemberAccess{
 		Users: w.Users,
 	}
@@ -109,7 +99,6 @@ func (w *Wrapper) addProjects(gDNS *v3.GlobalDNS, request *types.APIContext, inp
 			gDNSToUpdate.Spec.ProjectNames = append(gDNSToUpdate.Spec.ProjectNames, p)
 		}
 	}
-	gDNSToUpdate.Spec.MultiClusterAppName = ""
 	return w.updateGDNS(gDNSToUpdate, request, "addedProjects")
 }
 
