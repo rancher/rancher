@@ -76,11 +76,11 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     {{ if eq .clusterTarget.CurrentTarget "elasticsearch"}}
     @type elasticsearch
     include_tag_key  true
-    {{ if and .clusterTarget.ElasticsearchConfig.AuthUserName .clusterTarget.ElasticsearchConfig.AuthPassword}}
-    hosts {{.clusterTarget.WrapElasticsearch.Scheme}}://{{.clusterTarget.ElasticsearchConfig.AuthUserName}}:{{.clusterTarget.ElasticsearchConfig.AuthPassword}}@{{.clusterTarget.WrapElasticsearch.Host}}
-    {{else -}}
+    {{- if and .clusterTarget.ElasticsearchConfig.AuthUserName .clusterTarget.ElasticsearchConfig.AuthPassword}}
+    user {{.clusterTarget.ElasticsearchConfig.AuthUserName}}
+    password {{.clusterTarget.ElasticsearchConfig.AuthPassword}}
+    {{- end }}
     hosts {{.clusterTarget.ElasticsearchConfig.Endpoint}}    
-    {{end -}}
     logstash_format true
     logstash_prefix "{{.clusterTarget.ElasticsearchConfig.IndexPrefix}}"
     logstash_dateformat  {{.clusterTarget.WrapElasticsearch.DateFormat}}
