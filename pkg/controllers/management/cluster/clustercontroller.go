@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
+	errorsutil "github.com/pkg/errors"
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
@@ -14,6 +15,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -74,7 +76,11 @@ func (c *controller) capsSync(key string, cluster *v3.Cluster) (runtime.Object, 
 
 		kontainerDriver, err := c.kontainerDriverLister.Get("", driverName)
 		if err != nil {
-			return nil, fmt.Errorf("error getting kontainer driver: %v", err)
+			if !errors.IsNotFound(err) {
+				return nil, errorsutil.WithMessage(err, fmt.Sprintf("error getting kontainer driver: %v", driverName))
+			}
+			//do not return not found errors since the driver may have been deleted
+			return nil, nil
 		}
 
 		driver := service.NewEngineService(

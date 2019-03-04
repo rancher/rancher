@@ -425,6 +425,7 @@ func getDynamicFieldName(obj *v3.KontainerDriver) string {
 	return obj.Status.DisplayName + "EngineConfig"
 }
 
+// Remove the Kontainer Cluster driver, see also the Schema.Store for kontainer driver
 func (l *Lifecycle) Remove(obj *v3.KontainerDriver) (runtime.Object, error) {
 	logrus.Infof("remove kontainerdriver %v", obj.Name)
 

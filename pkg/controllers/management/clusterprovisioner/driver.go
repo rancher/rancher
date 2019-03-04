@@ -9,6 +9,8 @@ import (
 	"github.com/rancher/rancher/pkg/clusterprovisioninglogger"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -91,6 +93,10 @@ func (p *Provisioner) driverRemove(cluster *v3.Cluster, forceRemove bool) error 
 
 		kontainerDriver, err := p.getKontainerDriver(spec)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				logrus.Warnf("Could not find kontainer driver for cluster removal [%v]", err)
+				return nil, nil
+			}
 			return nil, err
 		}
 
