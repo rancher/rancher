@@ -5,8 +5,8 @@ import (
 
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/cache"
 )
 
 // Register initializes the controllers and registers
@@ -75,4 +75,19 @@ func RegisterAgent(ctx context.Context, agentContext *config.UserOnlyContext) {
 	}
 	agentContext.Core.Nodes("").AddHandler(ctx, "control-plane-endpoint", cp.sync)
 	agentContext.Core.Endpoints("cattle-prometheus").AddHandler(ctx, "control-plane-endpoint", cp.syncEndpoints)
+
+	promIndexes := cache.Indexers{
+		promByMemberNamespaceIndex: promsByMemberNamespace,
+	}
+
+	promInformer := agentContext.Monitoring.Prometheuses("").Controller().Informer()
+	promInformer.AddIndexers(promIndexes)
+
+	cr := ConfigRefreshHandler{
+		prometheusClient:  agentContext.Monitoring.Prometheuses(""),
+		nsLister:          agentContext.Core.Namespaces("").Controller().Lister(),
+		prometheusIndexer: promInformer.GetIndexer(),
+	}
+	agentContext.Core.Namespaces("").AddHandler(ctx, "project-monitoring-config-refresh", cr.syncNamespace)
+	agentContext.Monitoring.Prometheuses("").AddHandler(ctx, "project-monitoring-config-refresh", cr.syncPrometheus)
 }
