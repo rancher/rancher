@@ -60,12 +60,10 @@ func (w *syslogTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog bo
 		return errors.Wrapf(err, "couldn't write data to syslog %s", w.Endpoint)
 	}
 
-	if !w.EnableTLS {
-		// for not tls try read to check whether the server close connect already
-		resBuf := make([]byte, 1024)
-		if _, err := conn.Read(resBuf); err != nil {
-			return errors.Wrapf(err, "couldn't read data from syslog %s", w.Endpoint)
-		}
+	// try read to check whether the server close connect already
+	// because can't set read deadline for remote dialer, so if the error is timeout will treat as remote server not close the connection
+	if _, err := readDataWithTimeout(conn); err != nil && err != errReadDataTimeout {
+		return errors.Wrapf(err, "couldn't read data from syslog %s", w.Endpoint)
 	}
 
 	return nil

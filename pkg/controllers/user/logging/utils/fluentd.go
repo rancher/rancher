@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"strings"
@@ -80,9 +79,8 @@ func (w *fluentForwarderTestWrap) sendData2Server(conn net.Conn, shareKey, usern
 			return errors.Wrapf(err, "couldn't write data to fluentd forwarder %s", endpoint)
 		}
 	}
-
-	buf := make([]byte, 1024)
-	if _, err := conn.Read(buf); err != nil && err != io.EOF {
+	buf, err := readDataWithTimeout(conn)
+	if err != nil {
 		return errors.Wrapf(err, "couldn't read data from fluentd forwarder %s", endpoint)
 	}
 
@@ -123,9 +121,9 @@ func (w *fluentForwarderTestWrap) sendData2Server(conn net.Conn, shareKey, usern
 		return errors.Wrap(err, "couldn't write test data to fluentd forwarder")
 	}
 
-	pongBuf := make([]byte, 1024)
-	if _, err = conn.Read(pongBuf); err != nil && err != io.EOF {
-		return errors.Wrap(err, "couldn't read pong data from fluentd forwarder")
+	pongBuf, err := readDataWithTimeout(conn)
+	if err != nil {
+		return errors.Wrapf(err, "couldn't read pong data from fluentd forwarder")
 	}
 
 	return w.decodeFluentForwarderPong(pongBuf)
