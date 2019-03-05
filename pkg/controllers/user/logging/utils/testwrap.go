@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
@@ -25,11 +26,13 @@ const (
 )
 
 const (
-	deadlineTimeout = time.Duration(2 * time.Second)
+	deadlineTimeout     = time.Duration(2 * time.Second)
+	readDeadlineTimeout = time.Duration(5 * time.Second)
 )
 
 var (
-	testMessage = "Rancher logging target setting validated"
+	testMessage        = "Rancher logging target setting validated"
+	errReadDataTimeout = errors.New("read data timeout")
 )
 
 type LoggingTargetTestWrap interface {
@@ -203,4 +206,27 @@ func randHex(n int) string {
 		b[i] = letterHex[rand.Intn(len(letterHex))]
 	}
 	return string(b)
+}
+
+// add this func is because we can't set read deadline for remotedialer now, the conn is base on cluster dialer
+func readDataWithTimeout(conn net.Conn) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), readDeadlineTimeout)
+	defer cancel()
+	buf := make([]byte, 1024)
+	errc := make(chan error, 1)
+
+	go func() {
+		_, err := conn.Read(buf)
+		errc <- errors.Wrap(err, "couldn't read data from remote server")
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, errReadDataTimeout
+	case err := <-errc:
+		if err == nil {
+			return buf, nil
+		}
+		return nil, err
+	}
 }
