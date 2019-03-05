@@ -423,7 +423,10 @@ func (p *Provisioner) censorGenericEngineConfig(input v3.ClusterSpec) (v3.Cluste
 		input.GenericEngineConfig = nil
 		return input, nil
 	}
-
+	lists, _ := p.KontainerDriverLister.List("", labels.NewSelector())
+	if len(lists) > 0 {
+		logrus.Infof("Found drivers")
+	}
 	driver, err := p.KontainerDriverLister.Get("", driverName)
 	if err != nil {
 		return v3.ClusterSpec{}, err
@@ -435,7 +438,10 @@ func (p *Provisioner) censorGenericEngineConfig(input v3.ClusterSpec) (v3.Cluste
 	} else {
 		schemaName = driver.Status.DisplayName + "EngineConfig"
 	}
-
+	lists, _ = p.KontainerDriverLister.List("", labels.NewSelector())
+	if len(lists) > 0 {
+		logrus.Infof("Found drivers at 443")
+	}
 	kontainerDriverSchema, err := p.DynamicSchemasLister.Get("", strings.ToLower(schemaName))
 	if err != nil {
 		return v3.ClusterSpec{}, fmt.Errorf("error getting dynamic schema %v", err)
@@ -518,6 +524,10 @@ func (p *Provisioner) getDriver(cluster *v3.Cluster) (string, error) {
 
 	if cluster.Spec.GenericEngineConfig != nil {
 		kontainerDriverName := (*cluster.Spec.GenericEngineConfig)["driverName"].(string)
+		lists, _ := p.KontainerDriverLister.List("", labels.NewSelector())
+		if len(lists) > 0 {
+			logrus.Infof("Found drivers")
+		}
 		driver, err = p.KontainerDriverLister.Get("", kontainerDriverName)
 		if err != nil {
 			return "", err
