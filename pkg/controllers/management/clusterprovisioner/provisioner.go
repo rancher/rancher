@@ -18,7 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/services"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -641,7 +641,7 @@ func (p *Provisioner) getSpec(cluster *v3.Cluster) (*v3.ClusterSpec, error) {
 	}
 
 	newSpec, _, err = p.getConfig(true, cluster.Spec, driverName, cluster.Name)
-
+	logrus.Infof("Past new spec")
 	return newSpec, err
 }
 
