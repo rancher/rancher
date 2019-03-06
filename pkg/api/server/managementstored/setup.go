@@ -58,7 +58,7 @@ import (
 )
 
 func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager *clustermanager.Manager,
-	k8sProxy http.Handler) error {
+	k8sProxy http.Handler, localClusterEnabled string) error {
 	// Here we setup all types that will be stored in the Management cluster
 	schemas := apiContext.Schemas
 
@@ -154,8 +154,8 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	PodSecurityPolicyTemplate(schemas, apiContext)
 	RoleTemplate(schemas, apiContext)
 	MultiClusterApps(schemas, apiContext)
-	GlobalDNSs(schemas, apiContext)
-	GlobalDNSProviders(schemas, apiContext)
+	GlobalDNSs(schemas, apiContext, localClusterEnabled)
+	GlobalDNSProviders(schemas, apiContext, localClusterEnabled)
 	Monitor(schemas, apiContext, clusterManager)
 	KontainerDriver(schemas, apiContext)
 
@@ -649,7 +649,7 @@ func MultiClusterApps(schemas *types.Schemas, management *config.ScaledContext) 
 	schema.Validator = wrapper.Validator
 }
 
-func GlobalDNSs(schemas *types.Schemas, management *config.ScaledContext) {
+func GlobalDNSs(schemas *types.Schemas, management *config.ScaledContext, localClusterEnabled string) {
 	gdns := globaldns.Wrapper{
 		GlobalDNSes:           management.Management.GlobalDNSs(""),
 		GlobalDNSLister:       management.Management.GlobalDNSs("").Controller().Lister(),
@@ -666,13 +666,21 @@ func GlobalDNSs(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.ActionHandler = gdns.ActionHandler
 	schema.Validator = gdns.Validator
 	schema.Store = globaldnsAPIStore.Wrap(schema.Store)
+	if localClusterEnabled == "false" {
+		schema.CollectionMethods = []string{}
+		schema.ResourceMethods = []string{}
+	}
 }
 
-func GlobalDNSProviders(schemas *types.Schemas, management *config.ScaledContext) {
+func GlobalDNSProviders(schemas *types.Schemas, management *config.ScaledContext, localClusterEnabled string) {
 	schema := schemas.Schema(&managementschema.Version, client.GlobalDNSProviderType)
 	schema.Store = &globalresource.GlobalNamespaceStore{
 		Store:              schema.Store,
 		NamespaceInterface: management.Core.Namespaces(""),
 	}
 	schema.Store = globaldnsAPIStore.ProviderWrap(schema.Store)
+	if localClusterEnabled == "false" {
+		schema.CollectionMethods = []string{}
+		schema.ResourceMethods = []string{}
+	}
 }

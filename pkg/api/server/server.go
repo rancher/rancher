@@ -24,13 +24,13 @@ import (
 )
 
 func New(ctx context.Context, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager,
-	k8sProxy http.Handler) (http.Handler, error) {
+	k8sProxy http.Handler, localClusterEnabled string) (http.Handler, error) {
 	subscribe.Register(&builtin.Version, scaledContext.Schemas)
 	subscribe.Register(&managementSchema.Version, scaledContext.Schemas)
 	subscribe.Register(&clusterSchema.Version, scaledContext.Schemas)
 	subscribe.Register(&projectSchema.Version, scaledContext.Schemas)
 
-	if err := managementstored.Setup(ctx, scaledContext, clusterManager, k8sProxy); err != nil {
+	if err := managementstored.Setup(ctx, scaledContext, clusterManager, k8sProxy, localClusterEnabled); err != nil {
 		return nil, err
 	}
 
