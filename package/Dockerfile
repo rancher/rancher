@@ -26,7 +26,7 @@ RUN curl -sLf https://github.com/krallin/tini/releases/download/${TINI_VERSION}/
     chmod +x /usr/bin/helm /usr/bin/tini /usr/bin/telemetry /usr/bin/tiller
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
-ENV CATTLE_UI_VERSION 2.2.3
+ENV CATTLE_UI_VERSION 2.2.4
 ENV CATTLE_CLI_VERSION v2.2.0-rc10
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
