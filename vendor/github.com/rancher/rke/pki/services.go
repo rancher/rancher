@@ -400,6 +400,13 @@ func GenerateServiceTokenKey(ctx context.Context, certs map[string]CertificatePK
 }
 
 func GenerateRKECACerts(ctx context.Context, certs map[string]CertificatePKI, configPath, configDir string) error {
+	if err := GenerateRKEMasterCACert(ctx, certs, configPath, configDir); err != nil {
+		return err
+	}
+	return GenerateRKERequestHeaderCACert(ctx, certs, configPath, configDir)
+}
+
+func GenerateRKEMasterCACert(ctx context.Context, certs map[string]CertificatePKI, configPath, configDir string) error {
 	// generate kubernetes CA certificate and key
 	log.Infof(ctx, "[certificates] Generating CA kubernetes certificates")
 
@@ -408,7 +415,10 @@ func GenerateRKECACerts(ctx context.Context, certs map[string]CertificatePKI, co
 		return err
 	}
 	certs[CACertName] = ToCertObject(CACertName, "", "", caCrt, caKey, nil)
+	return nil
+}
 
+func GenerateRKERequestHeaderCACert(ctx context.Context, certs map[string]CertificatePKI, configPath, configDir string) error {
 	// generate request header client CA certificate and key
 	log.Infof(ctx, "[certificates] Generating Kubernetes API server aggregation layer requestheader client CA certificates")
 	requestHeaderCACrt, requestHeaderCAKey, err := GenerateCACertAndKey(RequestHeaderCACertName, nil)
