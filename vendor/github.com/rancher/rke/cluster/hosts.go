@@ -185,10 +185,11 @@ func removeFromHosts(hostToRemove *hosts.Host, hostList []*hosts.Host) []*hosts.
 }
 
 func removeFromRKENodes(nodeToRemove v3.RKEConfigNode, nodeList []v3.RKEConfigNode) []v3.RKEConfigNode {
-	for i := range nodeList {
-		if nodeToRemove.Address == nodeList[i].Address {
-			return append(nodeList[:i], nodeList[i+1:]...)
+	l := []v3.RKEConfigNode{}
+	for _, node := range nodeList {
+		if nodeToRemove.Address != node.Address {
+			l = append(l, node)
 		}
 	}
-	return nodeList
+	return l
 }

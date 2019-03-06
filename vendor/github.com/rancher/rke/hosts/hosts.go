@@ -14,7 +14,7 @@ import (
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 )
@@ -179,7 +179,7 @@ func RemoveTaintFromHost(ctx context.Context, host *Host, taintKey string, kubeC
 	return nil
 }
 
-func GetToDeleteHosts(currentHosts, configHosts, inactiveHosts []*Host) []*Host {
+func GetToDeleteHosts(currentHosts, configHosts, inactiveHosts []*Host, includeInactive bool) []*Host {
 	toDeleteHosts := []*Host{}
 	for _, currentHost := range currentHosts {
 		found := false
@@ -196,7 +196,7 @@ func GetToDeleteHosts(currentHosts, configHosts, inactiveHosts []*Host) []*Host 
 					break
 				}
 			}
-			if !inactive {
+			if (inactive && includeInactive) || !inactive {
 				toDeleteHosts = append(toDeleteHosts, currentHost)
 			}
 		}
@@ -353,4 +353,18 @@ func IsNodeInList(host *Host, hostList []*Host) bool {
 		}
 	}
 	return false
+}
+
+func GetHostListIntersect(a []*Host, b []*Host) []*Host {
+	s := []*Host{}
+	hash := map[string]*Host{}
+	for _, h := range a {
+		hash[h.Address] = h
+	}
+	for _, h := range b {
+		if _, ok := hash[h.Address]; ok {
+			s = append(s, h)
+		}
+	}
+	return s
 }

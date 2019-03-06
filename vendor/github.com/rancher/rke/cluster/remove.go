@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/rke/util"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -85,7 +85,8 @@ func (c *Cluster) RemoveOldNodes(ctx context.Context) error {
 	}
 	uniqueHosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
 	for _, node := range nodeList.Items {
-		if k8s.IsNodeReady(node) {
+		_, isEtcd := node.Labels[etcdRoleLabel]
+		if k8s.IsNodeReady(node) && !isEtcd {
 			continue
 		}
 		host := &hosts.Host{}
