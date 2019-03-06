@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -41,8 +42,10 @@ type transformer struct {
 	KontainerDriverLister v3.KontainerDriverLister
 }
 
-func (t *transformer) TransformerFunc(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
+func (t *transformer) TransformerFunc(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{},
+	opt *types.QueryOptions) (map[string]interface{}, error) {
 	data = transformSetNilSnapshotFalse(data)
+	data = setEKSLegacyVersion(data)
 	return t.transposeGenericConfigToDynamicField(data)
 }
 
@@ -101,6 +104,30 @@ func SetClusterStore(schema *types.Schema, mgmt *config.ScaledContext, clusterMa
 	}
 
 	schema.Store = s
+}
+
+func setEKSLegacyVersion(data map[string]interface{}) map[string]interface{} {
+	if config, ok := data["amazonElasticContainerServiceConfig"].(map[string]interface{}); !ok || config == nil {
+		return data
+	}
+
+	logrus.Infof("%#v", data)
+
+	v, found := values.GetValue(data, "amazonElasticContainerServiceConfig", "kubernetesVersion")
+	if !found || convert.ToString(v) == "" {
+		major, foundMajor := values.GetValue(data, "version", "major")
+		minor, foundMinor := values.GetValue(data, "version", "minor")
+		if foundMajor && foundMinor {
+			majorS := convert.ToString(major)
+			minorS := convert.ToString(minor)
+			version := majorS + "." + minorS[:2]
+			values.PutValue(data, version, "amazonElasticContainerServiceConfig", "kubernetesVersion")
+			values.PutValue(data, version, "appliedSpec", "amazonElasticContainerServiceConfig", "kubernetesVersion")
+		}
+	}
+
+	logrus.Infof("2222 %#v", data)
+	return data
 }
 
 func transformSetNilSnapshotFalse(data map[string]interface{}) map[string]interface{} {
