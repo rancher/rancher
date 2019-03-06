@@ -47,8 +47,8 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 
 	if err := creator.addCustomDriver(
 		"aliyunkubernetescontainerservice",
-		"https://github.com/rancher/kontainer-engine-driver-aliyun/releases/download/v0.2.4/kontainer-engine-driver-aliyun-linux",
-		"61e8d1a69dae4c9bee7a1618399422300b95436ca747e520329cfc1a724c4180",
+		"https://github.com/rancher/kontainer-engine-driver-aliyun/releases/download/v0.2.5/kontainer-engine-driver-aliyun-linux",
+		"31aa0a44450c5a5eb128dd0956292dfd91aab726d1a548f6d527a9212a27db9b",
 		"",
 		false,
 		"*.aliyuncs.com",
@@ -58,8 +58,8 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 
 	if err := creator.addCustomDriver(
 		"tencentkubernetesengine",
-		"https://github.com/rancher/kontainer-engine-driver-tencent/releases/download/v0.2.2/kontainer-engine-driver-tencent-linux",
-		"923bde3bcc2201e236b0e6ebcf83ca540dd12d23b5aa4804f12dd37f9beca6c6",
+		"https://github.com/rancher/kontainer-engine-driver-tencent/releases/download/v0.2.3/kontainer-engine-driver-tencent-linux",
+		"144f785473290ee2f63cf35da0c6bde12bc307878078500a47a0a8d04422ae53",
 		"",
 		false,
 		"*.tencentcloudapi.com", "*.qcloud.com",
