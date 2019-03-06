@@ -618,6 +618,7 @@ func getPrivateRepo(config *v3.RancherKubernetesEngineConfig) string {
 func (p *Provisioner) getSpec(cluster *v3.Cluster) (*v3.ClusterSpec, error) {
 	logrus.Infof("TEST Enter getSpec")
 	driverName, err := p.validateDriver(cluster)
+	logrus.Infof("%v", err)
 	if err != nil {
 		return nil, nil
 	}
