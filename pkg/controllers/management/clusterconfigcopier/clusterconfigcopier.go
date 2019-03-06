@@ -3,16 +3,23 @@ package clusterconfigcopier
 import (
 	"context"
 
+	"github.com/rancher/rancher/pkg/controllers/management/clusterconfigcensor"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type controller struct {
+	ConfigCensor *clusterconfigcensor.ConfigCensor
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
-	c := controller{}
+	kontainerDriverLister := management.Management.KontainerDrivers("").Controller().Lister()
+	dynamicSchemaLister := management.Management.DynamicSchemas("").Controller().Lister()
+
+	c := controller{
+		clusterconfigcensor.NewConfigCensor(kontainerDriverLister, dynamicSchemaLister),
+	}
 
 	management.Management.Clusters("").AddHandler(ctx, "clusterconfigcopier", c.sync)
 }
@@ -41,5 +48,13 @@ func (c *controller) sync(key string, cluster *v3.Cluster) (runtime.Object, erro
 		(*cluster.Spec.GenericEngineConfig)["driverName"] = "googlekubernetesengine"
 	}
 
-	return nil, nil
+	censoredSpec, err := c.ConfigCensor.CensorGenericEngineConfig(cluster.Spec)
+	if err != nil {
+		return nil, err
+	}
+
+	// "Apply" the generic engine config spec
+	cluster.Status.AppliedSpec.GenericEngineConfig = censoredSpec.GenericEngineConfig
+
+	return cluster, nil
 }

@@ -2,6 +2,7 @@ package management
 
 import (
 	"context"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterconfigcopier"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
@@ -35,6 +36,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	// a-z
 	catalog.Register(ctx, management)
 	cluster.Register(ctx, management)
+	clusterconfigcopier.Register(ctx, management)
 	clusterdeploy.Register(ctx, management, manager)
 	clustergc.Register(ctx, management)
 	clusterprovisioner.Register(ctx, management)
