@@ -89,7 +89,6 @@ func (n *ProviderCatalogLauncher) handleRoute53Provider(obj *v3.GlobalDNSProvide
 		"aws.secretKey": obj.Spec.Route53ProviderConfig.SecretKey,
 		"txtOwnerId":    rancherInstallUUID + "_" + obj.Name,
 		"rbac.create":   "true",
-		"logLevel":      "debug",
 		"policy":        "sync",
 	}
 
@@ -108,7 +107,6 @@ func (n *ProviderCatalogLauncher) handleCloudflareProvider(obj *v3.GlobalDNSProv
 		"cloudflare.email":  obj.Spec.CloudflareProviderConfig.APIEmail,
 		"txtOwnerId":        rancherInstallUUID + "_" + obj.Name,
 		"rbac.create":       "true",
-		"logLevel":          "debug",
 		"policy":            "sync",
 	}
 
@@ -129,7 +127,6 @@ func (n *ProviderCatalogLauncher) handleAlidnsProvider(obj *v3.GlobalDNSProvider
 		"alibabacloud.secretKey": obj.Spec.AlidnsProviderConfig.SecretKey,
 		"txtOwnerId":             rancherInstallUUID + "_" + obj.Name,
 		"rbac.create":            "true",
-		"logLevel":               "debug",
 		"policy":                 "sync",
 	}
 
