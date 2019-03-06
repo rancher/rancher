@@ -473,6 +473,10 @@ func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, driverNa
 			}
 		} else {
 			if spec.GoogleKubernetesEngineConfig != nil {
+				list, _ := p.KontainerDriverLister.List("", labels.NewSelector())
+				if len(list) > 0 {
+					logrus.Infof("TEST list")
+				}
 				(*spec.GoogleKubernetesEngineConfig)["driverName"] = "googlekubernetesengine"
 				v = *spec.GoogleKubernetesEngineConfig
 			} else {
@@ -523,12 +527,12 @@ func (p *Provisioner) getDriver(cluster *v3.Cluster) (string, error) {
 
 		if cluster.Spec.GoogleKubernetesEngineConfig != nil {
 			cluster.Spec.GenericEngineConfig = cluster.Spec.GoogleKubernetesEngineConfig
-			(*cluster.Spec.GenericEngineConfig)["driverName"] = "googleKubernetesEngine"
+			(*cluster.Spec.GenericEngineConfig)["driverName"] = "googlekubernetesengine"
 		}
 	}
 
 	if cluster.Spec.GenericEngineConfig != nil {
-		kontainerDriverName := (*cluster.Spec.GenericEngineConfig)["driverName"].(string)
+		kontainerDriverName := (*cluster.Spec.GenericEngineConfig)["driverName"].(string) // strings.ToLower((*cluster.Spec.GenericEngineConfig)["driverName"].(string))
 		lists, _ := p.KontainerDriverLister.List("", labels.NewSelector())
 		if len(lists) > 0 {
 			logrus.Infof("Found drivers")
@@ -625,7 +629,7 @@ func (p *Provisioner) getSpec(cluster *v3.Cluster) (*v3.ClusterSpec, error) {
 	driverName, err := p.validateDriver(cluster)
 	logrus.Infof("TEST ERROR: %v", err)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 	logrus.Infof("TEST Passed validate")
 	_, oldConfig, err := p.getConfig(false, cluster.Status.AppliedSpec, driverName, cluster.Name)
