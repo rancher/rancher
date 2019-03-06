@@ -523,7 +523,7 @@ func (p *Provisioner) getDriver(cluster *v3.Cluster) (string, error) {
 
 		if cluster.Spec.GoogleKubernetesEngineConfig != nil {
 			cluster.Spec.GenericEngineConfig = cluster.Spec.GoogleKubernetesEngineConfig
-			(*cluster.Spec.GenericEngineConfig)["driverName"] = "googlekubernetesengine"
+			(*cluster.Spec.GenericEngineConfig)["driverName"] = "googleKubernetesEngine"
 		}
 	}
 
