@@ -4,11 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"errors"
+	"fmt"
 	"net"
 	"net/http"
+	"reflect"
 
 	"github.com/rancher/rancher/pkg/auth/util"
+
+	"github.com/sirupsen/logrus"
 )
 
 func NewAuditLogFilter(ctx context.Context, auditWriter *LogWriter, next http.Handler) http.Handler {
@@ -67,5 +70,21 @@ func (aw *wrapWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	if hijacker, ok := aw.ResponseWriter.(http.Hijacker); ok {
 		return hijacker.Hijack()
 	}
-	return nil, nil, errors.New("the ResponseWriter doesn't support the Hijacker interface")
+	return nil, nil, fmt.Errorf("Upstream ResponseWriter of type %v does not implement http.Hijacker", reflect.TypeOf(aw.ResponseWriter))
+}
+
+func (aw *wrapWriter) CloseNotify() <-chan bool {
+	if cn, ok := aw.ResponseWriter.(http.CloseNotifier); ok {
+		return cn.CloseNotify()
+	}
+	logrus.Errorf("Upstream ResponseWriter of type %v does not implement http.CloseNotifier", reflect.TypeOf(aw.ResponseWriter))
+	return make(<-chan bool)
+}
+
+func (aw *wrapWriter) Flush() {
+	if f, ok := aw.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+		return
+	}
+	logrus.Errorf("Upstream ResponseWriter of type %v does not implement http.Flusher", reflect.TypeOf(aw.ResponseWriter))
 }
