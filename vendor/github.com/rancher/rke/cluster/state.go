@@ -174,8 +174,13 @@ func RebuildState(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConf
 		}
 		newState.DesiredState.CertificatesBundle = certBundle
 	} else {
-		// Regenerating etcd certificates for any new etcd nodes
 		pkiCertBundle := oldState.DesiredState.CertificatesBundle
+		// check for legacy clusters prior to requestheaderca
+		if pkiCertBundle[pki.RequestHeaderCACertName].Certificate == nil {
+			if err := pki.GenerateRKERequestHeaderCACert(ctx, pkiCertBundle, flags.ClusterFilePath, flags.ConfigDir); err != nil {
+				return nil, err
+			}
+		}
 		if err := pki.GenerateRKEServicesCerts(ctx, pkiCertBundle, *rkeConfig, flags.ClusterFilePath, flags.ConfigDir, false); err != nil {
 			return nil, err
 		}
