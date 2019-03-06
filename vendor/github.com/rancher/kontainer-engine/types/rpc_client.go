@@ -114,9 +114,9 @@ func (rpc *grpcClient) ETCDSave(ctx context.Context, clusterInfo *ClusterInfo, o
 	return handlErr(err)
 }
 
-func (rpc *grpcClient) ETCDRestore(ctx context.Context, clusterInfo *ClusterInfo, opts *DriverOptions, snapshotName string) error {
-	_, err := rpc.client.ETCDRestore(ctx, &RestoreETCDSnapshotRequest{Info: clusterInfo, SnapshotName: snapshotName, DriverOptions: opts})
-	return handlErr(err)
+func (rpc *grpcClient) ETCDRestore(ctx context.Context, clusterInfo *ClusterInfo, opts *DriverOptions, snapshotName string) (*ClusterInfo, error) {
+	o, err := rpc.client.ETCDRestore(ctx, &RestoreETCDSnapshotRequest{Info: clusterInfo, SnapshotName: snapshotName, DriverOptions: opts})
+	return o, handlErr(err)
 }
 
 func (rpc *grpcClient) RemoveLegacyServiceAccount(ctx context.Context, info *ClusterInfo) error {

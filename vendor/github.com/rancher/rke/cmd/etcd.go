@@ -158,7 +158,7 @@ func RestoreEtcdSnapshot(
 	}
 
 	if err := cluster.RestartClusterPods(ctx, kubeCluster); err != nil {
-		return nil
+		return err
 	}
 	if err := kubeCluster.RemoveOldNodes(ctx); err != nil {
 		return err
