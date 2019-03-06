@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-
 	"github.com/rancher/norman/leader"
 	"github.com/rancher/norman/pkg/k8scheck"
 	"github.com/rancher/rancher/pkg/audit"
@@ -90,7 +89,7 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 
 	auditLogWriter := audit.NewLogWriter(cfg.AuditLogPath, cfg.AuditLevel, cfg.AuditLogMaxage, cfg.AuditLogMaxbackup, cfg.AuditLogMaxsize)
 
-	if err := server.Start(ctx, cfg.HTTPListenPort, cfg.HTTPSListenPort, scaledContext, clusterManager, auditLogWriter); err != nil {
+	if err := server.Start(ctx, cfg.HTTPListenPort, cfg.HTTPSListenPort, cfg.AddLocal, scaledContext, clusterManager, auditLogWriter); err != nil {
 		return err
 	}
 

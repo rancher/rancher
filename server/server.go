@@ -29,7 +29,7 @@ import (
 	"github.com/rancher/types/config"
 )
 
-func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager, auditLogWriter *audit.LogWriter) error {
+func Start(ctx context.Context, httpPort, httpsPort int, localClusterEnabled string, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager, auditLogWriter *audit.LogWriter) error {
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext)
 	if err != nil {
 		return err
@@ -42,7 +42,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 
 	k8sProxy := k8sProxyPkg.New(scaledContext, scaledContext.Dialer)
 
-	managementAPI, err := managementapi.New(ctx, scaledContext, clusterManager, k8sProxy)
+	managementAPI, err := managementapi.New(ctx, scaledContext, clusterManager, k8sProxy, localClusterEnabled)
 	if err != nil {
 		return err
 	}
