@@ -103,7 +103,7 @@ def test_dns_ips(admin_pc, admin_cc_client):
         client.create_dns_record(name=dnsname,
                                  ipAddresses=['127.0.0.2'],
                                  namespaceId='default')
-        assert e.value.error.status == 422
+    assert e.value.error.status == 422
 
     found = False
     for i in client.list_dns_record():

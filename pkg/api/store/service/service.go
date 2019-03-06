@@ -1,11 +1,11 @@
 package service
 
 import (
+	"fmt"
 	"net"
 	"strconv"
 
-	"fmt"
-
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	v3 "github.com/rancher/types/client/project/v3"
@@ -71,19 +71,19 @@ func (p *Store) validateNonSpecialIP(schema *types.Schema, data map[string]inter
 			for _, ip := range ips.([]interface{}) {
 				IP := net.ParseIP(ip.(string))
 				if IP == nil {
-					return fmt.Errorf("%s must be a valid IP address", IP)
+					return httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("%s must be a valid IP address", IP))
 				}
 				if IP.IsUnspecified() {
-					return fmt.Errorf("%s may not be unspecified (0.0.0.0)", IP)
+					return httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("%s may not be unspecified (0.0.0.0)", IP))
 				}
 				if IP.IsLoopback() {
-					return fmt.Errorf("%s may not be in the loopback range (127.0.0.0/8)", IP)
+					return httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("%s may not be in the loopback range (127.0.0.0/8)", IP))
 				}
 				if IP.IsLinkLocalUnicast() {
-					return fmt.Errorf("%s may not be in the link-local range (169.254.0.0/16)", IP)
+					return httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("%s may not be in the link-local range (169.254.0.0/16)", IP))
 				}
 				if IP.IsLinkLocalMulticast() {
-					return fmt.Errorf("%s may not be in the link-local multicast range (224.0.0.0/24)", IP)
+					return httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("%s may not be in the link-local multicast range (224.0.0.0/24)", IP))
 				}
 			}
 		}
