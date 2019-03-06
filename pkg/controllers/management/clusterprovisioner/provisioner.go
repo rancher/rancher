@@ -472,7 +472,12 @@ func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, driverNa
 				return nil, nil, err
 			}
 		} else {
-			v = map[string]interface{}{}
+			if spec.GoogleKubernetesEngineConfig != nil {
+				(*spec.GoogleKubernetesEngineConfig)["driverName"] = "googlekubernetesengine"
+				v = *spec.GoogleKubernetesEngineConfig
+			} else {
+				v = map[string]interface{}{}
+			}
 		}
 	} else {
 		v = *spec.GenericEngineConfig
@@ -618,7 +623,7 @@ func getPrivateRepo(config *v3.RancherKubernetesEngineConfig) string {
 func (p *Provisioner) getSpec(cluster *v3.Cluster) (*v3.ClusterSpec, error) {
 	logrus.Infof("TEST Enter getSpec")
 	driverName, err := p.validateDriver(cluster)
-	logrus.Infof("%v", err)
+	logrus.Infof("TEST ERROR: %v", err)
 	if err != nil {
 		return nil, nil
 	}
