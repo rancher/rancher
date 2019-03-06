@@ -616,32 +616,33 @@ func getPrivateRepo(config *v3.RancherKubernetesEngineConfig) string {
 }
 
 func (p *Provisioner) getSpec(cluster *v3.Cluster) (*v3.ClusterSpec, error) {
+	logrus.Infof("TEST Enter getSpec")
 	driverName, err := p.validateDriver(cluster)
 	if err != nil {
-		return nil, err
+		return nil, nil
 	}
-
+	logrus.Infof("TEST Passed validate")
 	_, oldConfig, err := p.getConfig(false, cluster.Status.AppliedSpec, driverName, cluster.Name)
 	if err != nil || oldConfig == nil {
 		return nil, err
 	}
-
+	logrus.Infof("TEST Passed old config")
 	censoredSpec, err := p.censorGenericEngineConfig(cluster.Spec)
 	if err != nil {
 		return nil, err
 	}
-
+	logrus.Infof("TEST Passed censor config")
 	newSpec, newConfig, err := p.getConfig(true, censoredSpec, driverName, cluster.Name)
 	if err != nil {
 		return nil, err
 	}
-
+	logrus.Infof("TEST Passed new config")
 	if reflect.DeepEqual(oldConfig, newConfig) || (censoredSpec.GenericEngineConfig != nil && cluster.Spec.GoogleKubernetesEngineConfig != nil) {
 		return nil, nil
 	}
-
+	logrus.Infof("TEST Passed deepequal")
 	newSpec, _, err = p.getConfig(true, cluster.Spec, driverName, cluster.Name)
-	logrus.Infof("Past new spec")
+	logrus.Infof("TEST Past new spec")
 	return newSpec, err
 }
 
