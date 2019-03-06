@@ -622,7 +622,7 @@ func (p *Provisioner) getSpec(cluster *v3.Cluster) (*v3.ClusterSpec, error) {
 	}
 
 	_, oldConfig, err := p.getConfig(false, cluster.Status.AppliedSpec, driverName, cluster.Name)
-	if err != nil {
+	if err != nil || oldConfig == nil {
 		return nil, err
 	}
 
@@ -636,7 +636,7 @@ func (p *Provisioner) getSpec(cluster *v3.Cluster) (*v3.ClusterSpec, error) {
 		return nil, err
 	}
 
-	if reflect.DeepEqual(oldConfig, newConfig) {
+	if reflect.DeepEqual(oldConfig, newConfig) || (censoredSpec.GenericEngineConfig != nil && cluster.Spec.GoogleKubernetesEngineConfig != nil) {
 		return nil, nil
 	}
 
