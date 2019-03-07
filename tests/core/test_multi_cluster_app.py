@@ -228,6 +228,7 @@ def test_multiclusterapp_user_update_roles(admin_mc, admin_pc, remove_resource,
     except ApiError as e:
         assert e.error.status == 403
         assert "does not have following roles in project" in e.error.message
+        assert "of cluster local" in e.error.message
         assert "project-member" in e.error.message
 
     # now admin adds this user to project as project-member
