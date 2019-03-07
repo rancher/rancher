@@ -223,7 +223,16 @@ func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []stri
 			if p.Spec.DisplayName != "" {
 				projectName = p.Spec.DisplayName
 			}
-			errMsg := fmt.Sprintf("user %v does not have following roles in project %v: %v", callerID, projectName, rolesNotFound)
+			// get display name of cluster
+			c, err := ma.ClusterLister.Get("", cname)
+			if err != nil {
+				return err
+			}
+			clusterName := cname
+			if c.Spec.DisplayName != "" {
+				clusterName = c.Spec.DisplayName
+			}
+			errMsg := fmt.Sprintf("user does not have following roles in project %v of cluster %v: %v", projectName, clusterName, rolesNotFound)
 			return httperror.NewAPIError(httperror.PermissionDenied, errMsg)
 		}
 	}
