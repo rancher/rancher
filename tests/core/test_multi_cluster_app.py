@@ -19,6 +19,19 @@ def test_multiclusterapp_create_no_roles(admin_mc, admin_pc, remove_resource,
         assert e.error.status == 422
 
 
+def test_mutliclusterapp_invalid_project(admin_mc):
+    client = admin_mc.client
+    mcapp_name = random_str()
+    temp_ver = "cattle-global-data:library-wordpress-2.1.10"
+    targets = [{"projectId": "abc:def"}]
+    try:
+        client.create_multi_cluster_app(name=mcapp_name,
+                                        templateVersionId=temp_ver,
+                                        targets=targets)
+    except ApiError as e:
+        assert e.error.status == 422
+
+
 def test_multiclusterapp_create_with_members(admin_mc, admin_pc,
                                              user_factory, remove_resource):
     client = admin_mc.client
