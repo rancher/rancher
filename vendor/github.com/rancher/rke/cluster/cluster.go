@@ -486,7 +486,7 @@ func RestartClusterPods(ctx context.Context, kubeCluster *Cluster) error {
 		fmt.Sprintf("%s=%s", KubeAppLabel, CalicoNetworkPlugin),
 		fmt.Sprintf("%s=%s", KubeAppLabel, FlannelNetworkPlugin),
 		fmt.Sprintf("%s=%s", KubeAppLabel, CanalNetworkPlugin),
-		fmt.Sprintf("%s=%s", NameLabel, WeaveNetworkPlugin),
+		fmt.Sprintf("%s=%s", NameLabel, WeaveNetowrkAppName),
 		fmt.Sprintf("%s=%s", AppLabel, NginxIngressAddonAppName),
 		fmt.Sprintf("%s=%s", KubeAppLabel, DefaultMonitoringProvider),
 		fmt.Sprintf("%s=%s", KubeAppLabel, KubeDNSAddonAppName),

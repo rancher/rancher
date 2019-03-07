@@ -52,8 +52,8 @@ const (
 	CanalIface              = "canal_iface"
 	CanalFlannelBackendType = "canal_flannel_backend_type"
 
-	WeaveNetworkPlugin = "weave"
-
+	WeaveNetworkPlugin  = "weave"
+	WeaveNetowrkAppName = "weave-net"
 	// List of map keys to be used with network templates
 
 	// EtcdEndpoints is the server address for Etcd, used by calico
