@@ -3,6 +3,7 @@ package globalnamespaceaccess
 import (
 	"encoding/base32"
 	"fmt"
+	"github.com/rancher/rancher/pkg/ref"
 	"strings"
 
 	"github.com/rancher/norman/api/access"
@@ -92,7 +93,12 @@ func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []stri
 		return err
 	}
 	if isAdmin {
-		// relax this check for the global admin
+		for _, t := range targetProjects {
+			if err := ma.checkProjectExists(t); err != nil {
+				return err
+			}
+		}
+		// relax memberAccess check for the global admin
 		return nil
 	}
 	newProjectRoleTemplateMap := make(map[string]*v3.RoleTemplate)
@@ -117,15 +123,12 @@ func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []stri
 			}
 		}
 	}
-
 	clustersCallerIsOwnerOf := make(map[string]bool)
 	for _, t := range targetProjects {
-		split := strings.SplitN(t, ":", 2)
-		if len(split) != 2 {
-			return fmt.Errorf("invalid project ID %v", t)
+		if err := ma.checkProjectExists(t); err != nil {
+			return err
 		}
-		cname := split[0]
-		pname := split[1]
+		cname, pname := ref.Parse(t)
 		if !clusters[cname] {
 			clusters[cname] = true
 		}
@@ -474,6 +477,21 @@ func (ma *MemberAccess) RemoveRolesFromTargets(targetProjects, rolesToRemove []s
 			}
 			clustersCovered[clusterName] = true
 		}
+	}
+	return nil
+}
+
+func (ma *MemberAccess) checkProjectExists(target string) error {
+	split := strings.SplitN(target, ":", 2)
+	if len(split) != 2 {
+		return httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("invalid project ID %s", target))
+	}
+	_, err := ma.ProjectLister.Get(split[0], split[1])
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("project is not found %s", target))
+		}
+		return httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("error getting project %s: %v", target, err))
 	}
 	return nil
 }
