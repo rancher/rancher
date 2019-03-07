@@ -70,7 +70,7 @@ func (l *Syncer) Sync(key string, obj *v3.Project) (runtime.Object, error) {
 	if err := l.addPipelineSettings(obj); err != nil {
 		return nil, err
 	}
-	return nil, l.addSystemToken(obj)
+	return nil, l.ensureSystemAccount(obj)
 }
 
 func (l *Syncer) addSourceCodeProviderConfigs(obj *v3.Project) error {
@@ -131,11 +131,8 @@ func (l *Syncer) addPipelineSetting(settingName string, value string, obj *v3.Pr
 	return nil
 }
 
-func (l *Syncer) addSystemToken(obj *v3.Project) error {
+func (l *Syncer) ensureSystemAccount(obj *v3.Project) error {
 	if err := l.systemAccountManager.GetOrCreateProjectSystemAccount(ref.Ref(obj)); err != nil {
-		return err
-	}
-	if _, err := l.systemAccountManager.GetOrCreateProjectSystemToken(obj.Name); err != nil {
 		return err
 	}
 	return nil
