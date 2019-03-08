@@ -30,7 +30,8 @@ import (
 )
 
 const (
-	RKEDriverKey = "rancherKubernetesEngineConfig"
+	RKEDriverKey          = "rancherKubernetesEngineConfig"
+	KontainerEngineUpdate = "provisioner.cattle.io/ke-driver-update"
 )
 
 type Provisioner struct {
@@ -101,11 +102,111 @@ func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {
 
 func (p *Provisioner) Updated(cluster *v3.Cluster) (runtime.Object, error) {
 	obj, err := v3.ClusterConditionUpdated.Do(cluster, func() (runtime.Object, error) {
-		setVersion(cluster)
-		return p.update(cluster, false)
+		anno, _ := cluster.Annotations[KontainerEngineUpdate]
+		if anno == "updated" {
+			// Cluster has already been updated proceed as usual
+			setVersion(cluster)
+			return p.update(cluster, false)
+
+		} else if anno == "updating" {
+			// Go routine is already running to update the cluster so wait
+			return nil, nil
+		}
+		// Set the annotation and kickoff the update
+		c, err := p.setKontainerEngineUpdate(cluster, "updating")
+		if err != nil {
+			return cluster, err
+		}
+		go p.waitForSchema(c)
+		return nil, nil
 	})
 
 	return obj.(*v3.Cluster), err
+}
+
+// waitForSchema waits for the driver and schema to be populated for the cluster
+func (p *Provisioner) waitForSchema(cluster *v3.Cluster) {
+	var driver string
+	if cluster.Spec.GenericEngineConfig == nil {
+		if cluster.Spec.AmazonElasticContainerServiceConfig != nil {
+			driver = "amazonelasticcontainerservice"
+		}
+
+		if cluster.Spec.AzureKubernetesServiceConfig != nil {
+			driver = "azurekubernetesservice"
+		}
+
+		if cluster.Spec.GoogleKubernetesEngineConfig != nil {
+			driver = "googlekubernetesengine"
+		}
+	} else {
+		driver = (*cluster.Spec.GenericEngineConfig)["driverName"].(string)
+	}
+
+	var schemaName string
+	backoff := wait.Backoff{
+		Duration: 1 * time.Second,
+		Factor:   2,
+		Jitter:   0,
+		Steps:    3,
+	}
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		driver, err := p.KontainerDriverLister.Get("", driver)
+		if err != nil {
+			return false, err
+		}
+
+		if driver.Spec.BuiltIn {
+			schemaName = driver.Status.DisplayName + "Config"
+		} else {
+			schemaName = driver.Status.DisplayName + "EngineConfig"
+		}
+
+		_, err = p.DynamicSchemasLister.Get("", strings.ToLower(schemaName))
+		if err != nil {
+			return false, err
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		logrus.Warnf("Failed to find driver %v and schema %v on upgrade: %v", driver, schemaName, err)
+	}
+	_, err = p.setKontainerEngineUpdate(cluster, "updated")
+	if err != nil {
+		logrus.Warnf("Failed to set annotation on cluster %v on upgrade: %v", cluster.Name, err)
+	}
+	p.ClusterController.Enqueue(cluster.Namespace, cluster.Name)
+}
+
+func (p *Provisioner) setKontainerEngineUpdate(cluster *v3.Cluster, anno string) (*v3.Cluster, error) {
+	backoff := wait.Backoff{
+		Duration: 100 * time.Millisecond,
+		Factor:   2,
+		Jitter:   0,
+		Steps:    6,
+	}
+
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		newCluster, err := p.Clusters.Get(cluster.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		newCluster.Annotations[KontainerEngineUpdate] = anno
+		newCluster, err = p.Clusters.Update(newCluster)
+		if err != nil {
+			if apierrors.IsConflict(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		cluster = newCluster
+		return true, nil
+	})
+	if err != nil {
+		return cluster, fmt.Errorf("Failed to update cluster [%s]: %v", cluster.Name, err)
+	}
+	return cluster, nil
 }
 
 func setVersion(cluster *v3.Cluster) {
