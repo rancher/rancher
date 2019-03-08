@@ -24,7 +24,7 @@ import (
 )
 
 func New(ctx context.Context, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager,
-	k8sProxy http.Handler, localClusterEnabled string) (http.Handler, error) {
+	k8sProxy http.Handler, localClusterEnabled bool) (http.Handler, error) {
 	subscribe.Register(&builtin.Version, scaledContext.Schemas)
 	subscribe.Register(&managementSchema.Version, scaledContext.Schemas)
 	subscribe.Register(&clusterSchema.Version, scaledContext.Schemas)
