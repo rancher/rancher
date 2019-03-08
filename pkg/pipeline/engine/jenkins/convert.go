@@ -115,7 +115,6 @@ func (c *jenkinsPipelineConverter) configCloneStepContainer(container *v1.Contai
 
 func (c *jenkinsPipelineConverter) configRunScriptStepContainer(container *v1.Container, step *v3.Step) {
 	container.Image = step.RunScriptConfig.Image
-	injectResources(container, utils.StepCPULimitDefault, utils.StepCPURequestDefault, utils.StepMemoryLimitDefault, utils.StepMemoryRequestDefault)
 }
 
 func (c *jenkinsPipelineConverter) configPublishStepContainer(container *v1.Container, step *v3.Step) {
@@ -186,7 +185,6 @@ func (c *jenkinsPipelineConverter) configPublishStepContainer(container *v1.Cont
 			ReadOnly:  true,
 		},
 	}
-	injectResources(container, utils.StepCPULimitDefault, utils.StepCPURequestDefault, utils.StepMemoryLimitDefault, utils.StepMemoryRequestDefault)
 }
 
 func (c *jenkinsPipelineConverter) configApplyYamlStepContainer(container *v1.Container, step *v3.Step, stageOrdinal int) {
