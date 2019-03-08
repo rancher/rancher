@@ -48,7 +48,7 @@ func (l *Lifecycle) deploy(projectName string) error {
 	}
 	logrus.Debug("deploy pipeline workloads and services")
 	if _, err := l.namespaces.Create(ns); err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "Error create ns")
+		return errors.Wrapf(err, "Error creating the pipeline namespace")
 	}
 	if err := l.waitResourceQuotaInitCondition(ns.Name); err != nil {
 		return err
@@ -62,11 +62,19 @@ func (l *Lifecycle) deploy(projectName string) error {
 	nsName := utils.GetPipelineCommonName(projectName)
 	ns = getCommonPipelineNamespace()
 	if _, err := l.namespaces.Create(ns); err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "Error create ns")
+		return errors.Wrapf(err, "Error creating the cattle-pipeline namespace")
 	}
 	secret := getPipelineSecret(nsName, token)
-	if _, err := l.secrets.Create(secret); err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "Error create secret")
+	for i := 0; i < 3; i++ {
+		// If project resource quota is enabled, It won't succeed until the resource quota in namespace is synced.
+		// Do retries for this case.
+		if _, err = l.secrets.Create(secret); err == nil || apierrors.IsAlreadyExists(err) {
+			break
+		}
+		time.Sleep(2 * time.Second)
+	}
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return errors.Wrapf(err, "Error creating a pipeline secret")
 	}
 
 	apikey, err := l.systemAccountManager.GetOrCreateProjectSystemToken(projectID)
@@ -75,7 +83,7 @@ func (l *Lifecycle) deploy(projectName string) error {
 	}
 	secret = GetAPIKeySecret(nsName, apikey)
 	if _, err := l.secrets.Create(secret); err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "Error create secret")
+		return errors.Wrapf(err, "Error creating a pipeline secret")
 	}
 
 	if err := l.reconcileRegistryCASecret(clusterID); err != nil {
@@ -87,35 +95,35 @@ func (l *Lifecycle) deploy(projectName string) error {
 
 	sa := getServiceAccount(nsName)
 	if _, err := l.serviceAccounts.Create(sa); err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "Error create service account")
+		return errors.Wrapf(err, "Error creating a pipeline service account")
 	}
 	np := getNetworkPolicy(nsName)
 	if _, err := l.networkPolicies.Create(np); err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "Error create networkpolicy")
+		return errors.Wrapf(err, "Error create a pipeline networkpolicy")
 	}
 	jenkinsService := getJenkinsService(nsName)
 	if _, err := l.services.Create(jenkinsService); err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "Error create jenkins service")
+		return errors.Wrapf(err, "Error creating the jenkins service")
 	}
 	jenkinsDeployment := GetJenkinsDeployment(nsName)
 	if _, err := l.deployments.Create(jenkinsDeployment); err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "Error create jenkins deployment")
+		return errors.Wrapf(err, "Error creating the jenkins deployment")
 	}
 	registryService := getRegistryService(nsName)
 	if _, err := l.services.Create(registryService); err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "Error create registry service")
+		return errors.Wrapf(err, "Error creating the registry service")
 	}
 	registryDeployment := GetRegistryDeployment(nsName)
 	if _, err := l.deployments.Create(registryDeployment); err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "Error create registry deployment")
+		return errors.Wrapf(err, "Error creating the registry deployment")
 	}
 	minioService := getMinioService(nsName)
 	if _, err := l.services.Create(minioService); err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "Error create minio service")
+		return errors.Wrapf(err, "Error creating the minio service")
 	}
 	minioDeployment := GetMinioDeployment(nsName)
 	if _, err := l.deployments.Create(minioDeployment); err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "Error create minio deployment")
+		return errors.Wrapf(err, "Error creating the minio deployment")
 	}
 
 	if err := l.reconcileProxyConfigMap(projectID); err != nil {
@@ -127,7 +135,7 @@ func (l *Lifecycle) deploy(projectName string) error {
 	}
 	nginxDaemonset := getProxyDaemonset()
 	if _, err := l.daemonsets.Create(nginxDaemonset); err != nil && !apierrors.IsAlreadyExists(err) {
-		return errors.Wrapf(err, "Error create nginx proxy")
+		return errors.Wrapf(err, "Error creating the nginx proxy")
 	}
 
 	return l.reconcileRb(projectName)
