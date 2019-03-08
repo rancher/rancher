@@ -19,7 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementv3 "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -375,8 +375,11 @@ func enableLocalBackup(data map[string]interface{}) {
 			return
 		}
 		backupConfig := values.GetValueN(data, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig")
+
 		if backupConfig == nil {
+			enabled := true
 			backupConfig = &v3.BackupConfig{
+				Enabled:       &enabled,
 				IntervalHours: DefaultBackupIntervalHours,
 				Retention:     DefaultBackupRetention,
 			}
