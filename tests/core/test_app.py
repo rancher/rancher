@@ -191,6 +191,7 @@ def test_app_custom_values_file(admin_pc, admin_mc):
         answers=answers
     )
     workloads = wait_for_workload(client, ns.name, count=1)
+    workloads = wait_for_replicas(client, ns.name, count=2)
     print(workloads)
     assert workloads.data[0].deploymentStatus.unavailableReplicas == 2
     assert workloads.data[0].containers[0].image == "registry:2.6"
@@ -206,6 +207,20 @@ def wait_for_workload(client, ns, timeout=60, count=0):
         if time.time() - start > timeout:
             print(workloads)
             raise Exception('Timeout waiting for workload service')
+        time.sleep(interval)
+        interval *= 2
+        workloads = client.list_workload(namespaceId=ns)
+    return workloads
+
+
+def wait_for_replicas(client, ns, timeout=60, count=0):
+    start = time.time()
+    interval = 0.5
+    workloads = client.list_workload(namespaceId=ns)
+    while workloads.data[0].deploymentStatus.replicas != count:
+        if time.time() - start > timeout:
+            print(workloads)
+            raise Exception('Timeout waiting for workload replicas')
         time.sleep(interval)
         interval *= 2
         workloads = client.list_workload(namespaceId=ns)
