@@ -37,8 +37,8 @@ RUN curl -sLf ${!HELM_URL} > /usr/bin/helm && \
 RUN wget -O - ${!DOCKER_URL} > /usr/bin/docker && chmod +x /usr/bin/docker
 
 # FIXME: Update to Rancher RKE when released
-ENV RKE_URL_amd64=https://github.com/erikwilson/rancher-rke/releases/download/dev/rke \
-    RKE_URL_arm64=https://github.com/jianghang8421/rke/releases/download/multiarch-test/rke \
+ENV RKE_URL_amd64=https://github.com/rancher/rke/releases/download/v0.2.0-rc8/rke_linux-amd64 \
+    RKE_URL_arm64=https://github.com/rancher/rke/releases/download/v0.2.0-rc8/rke_linux-arm64 \
     RKE_URL=RKE_URL_${ARCH}
 
 RUN wget -O - ${!RKE_URL} > /usr/bin/rke && chmod +x /usr/bin/rke
