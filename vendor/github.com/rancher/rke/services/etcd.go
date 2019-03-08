@@ -293,7 +293,7 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 		imageCfg.Cmd = append(imageCfg.Cmd, "--creation="+es.Creation)
 	}
 
-	if es.BackupConfig != nil {
+	if es.BackupConfig != nil && es.BackupConfig.Enabled != nil && *es.BackupConfig.Enabled {
 		imageCfg = configS3BackupImgCmd(ctx, imageCfg, es.BackupConfig)
 	}
 	hostCfg := &container.HostConfig{

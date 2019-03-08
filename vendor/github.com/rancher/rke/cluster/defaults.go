@@ -11,7 +11,7 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/rke/templates"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 const (
@@ -201,7 +201,7 @@ func (c *Cluster) setClusterServicesDefaults() {
 		c.Services.Etcd.ExtraArgs[DefaultEtcdHeartbeatIntervalName] = DefaultEtcdHeartbeatIntervalValue
 	}
 
-	if c.Services.Etcd.BackupConfig != nil {
+	if c.Services.Etcd.BackupConfig != nil && c.Services.Etcd.BackupConfig.Enabled != nil && *c.Services.Etcd.BackupConfig.Enabled {
 		if c.Services.Etcd.BackupConfig.IntervalHours == 0 {
 			c.Services.Etcd.BackupConfig.IntervalHours = DefaultEtcdBackupConfigIntervalHours
 		}

@@ -14,6 +14,8 @@ const (
 )
 
 type BackupConfig struct {
+	// Enable Flag
+	Enabled *bool `yaml:"enabled" json:"enabled,omitempty" norman:"default=true"`
 	// Backup interval in hours
 	IntervalHours int `yaml:"interval_hours" json:"intervalHours,omitempty" norman:"default=12"`
 	// Number of backups to keep
