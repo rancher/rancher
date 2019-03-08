@@ -18,14 +18,13 @@ import (
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/services"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/flowcontrol"
 )
 
@@ -365,6 +364,11 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 		}
 	}
 
+	cluster, err = p.setGenericConfigs(cluster)
+	if err != nil {
+		return cluster, err
+	}
+
 	spec, err := p.getSpec(cluster)
 	if err != nil || spec == nil {
 		return cluster, err
@@ -392,7 +396,10 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 	} else {
 		logrus.Infof("Updating cluster [%s]", cluster.Name)
 
-		p.setClusterStatusUpdating(cluster)
+		cluster, err = p.setClusterStatusUpdating(cluster)
+		if err != nil {
+			return cluster, err
+		}
 		apiEndpoint, serviceAccountToken, caCert, err = p.driverUpdate(cluster, *spec)
 	}
 	// at this point we know the cluster has been modified in driverCreate/Update so reload
@@ -453,39 +460,69 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 	return cluster, nil
 }
 
-func (p *Provisioner) setClusterStatusUpdating(cluster *v3.Cluster) {
-	v3.ClusterConditionUpdated.Unknown(cluster)
-	_, err := p.Clusters.Update(cluster)
-	if err != nil {
-		if !apierrors.IsConflict(err) {
-			logrus.Warnf("Failed to update cluster status [%s]: %v", cluster.Name, err)
-		} else {
-			backoff := wait.Backoff{
-				Duration: 100 * time.Millisecond,
-				Factor:   2,
-				Jitter:   0,
-				Steps:    4,
+func (p *Provisioner) setGenericConfigs(cluster *v3.Cluster) (*v3.Cluster, error) {
+	if cluster.Spec.GenericEngineConfig != nil && cluster.Status.AppliedSpec.GenericEngineConfig != nil {
+		return cluster, nil
+	}
+
+	setGenericConfig := func(spec *v3.ClusterSpec) {
+		if spec.GenericEngineConfig == nil {
+			if spec.AmazonElasticContainerServiceConfig != nil {
+				spec.GenericEngineConfig = spec.AmazonElasticContainerServiceConfig
+				(*spec.GenericEngineConfig)["driverName"] = "amazonelasticcontainerservice"
+				spec.AmazonElasticContainerServiceConfig = nil
 			}
 
-			err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-				newCluster, err := p.Clusters.Get(cluster.Name, metav1.GetOptions{})
-				if err != nil {
-					return false, nil
-				}
-				v3.ClusterConditionUpdated.Unknown(newCluster)
-				if _, err = p.Clusters.Update(newCluster); err != nil {
-					if apierrors.IsConflict(err) {
-						return false, nil
-					}
-					return false, fmt.Errorf("%v", err)
-				}
-				return true, nil
-			})
-			if err != nil {
-				logrus.Warnf("Failed to update cluster [%s]: %v", cluster.Name, err)
+			if spec.AzureKubernetesServiceConfig != nil {
+				spec.GenericEngineConfig = spec.AzureKubernetesServiceConfig
+				(*spec.GenericEngineConfig)["driverName"] = "azurekubernetesservice"
+				spec.AzureKubernetesServiceConfig = nil
+			}
+
+			if spec.GoogleKubernetesEngineConfig != nil {
+				spec.GenericEngineConfig = spec.GoogleKubernetesEngineConfig
+				(*spec.GenericEngineConfig)["driverName"] = "googlekubernetesengine"
+				spec.GoogleKubernetesEngineConfig = nil
 			}
 		}
 	}
+
+	newCluster, err := p.Clusters.Get(cluster.Name, metav1.GetOptions{})
+	if err != nil {
+		return cluster, err
+	}
+
+	setGenericConfig(&newCluster.Spec)
+	setGenericConfig(&newCluster.Status.AppliedSpec)
+
+	newCluster, err = p.Clusters.Update(newCluster)
+	if err != nil {
+		if !apierrors.IsConflict(err) {
+			return newCluster, fmt.Errorf("%v", err)
+		}
+		logrus.Warnf("Failed to update cluster [%s]: %v", cluster.Name, err)
+	}
+
+	return newCluster, nil
+}
+
+func (p *Provisioner) setClusterStatusUpdating(cluster *v3.Cluster) (*v3.Cluster, error) {
+	newCluster, err := p.Clusters.Get(cluster.Name, metav1.GetOptions{})
+	if err != nil {
+		return cluster, err
+	}
+
+	v3.ClusterConditionUpdated.Unknown(newCluster)
+
+	newCluster, err = p.Clusters.Update(newCluster)
+	if err != nil {
+		if !apierrors.IsConflict(err) {
+			return newCluster, fmt.Errorf("%v", err)
+		}
+		logrus.Warnf("Failed to update cluster [%s]: %v", cluster.Name, err)
+	}
+
+	return newCluster, nil
 }
 
 func resetRkeConfigFlags(cluster *v3.Cluster) {
@@ -600,23 +637,6 @@ func (p *Provisioner) getDriver(cluster *v3.Cluster) (string, error) {
 	var driver *v3.KontainerDriver
 	var err error
 
-	if cluster.Spec.GenericEngineConfig == nil {
-		if cluster.Spec.AmazonElasticContainerServiceConfig != nil {
-			cluster.Spec.GenericEngineConfig = cluster.Spec.AmazonElasticContainerServiceConfig
-			(*cluster.Spec.GenericEngineConfig)["driverName"] = "amazonelasticcontainerservice"
-		}
-
-		if cluster.Spec.AzureKubernetesServiceConfig != nil {
-			cluster.Spec.GenericEngineConfig = cluster.Spec.AzureKubernetesServiceConfig
-			(*cluster.Spec.GenericEngineConfig)["driverName"] = "azurekubernetesservice"
-		}
-
-		if cluster.Spec.GoogleKubernetesEngineConfig != nil {
-			cluster.Spec.GenericEngineConfig = cluster.Spec.GoogleKubernetesEngineConfig
-			(*cluster.Spec.GenericEngineConfig)["driverName"] = "googlekubernetesengine"
-		}
-	}
-
 	if cluster.Spec.GenericEngineConfig != nil {
 		kontainerDriverName := (*cluster.Spec.GenericEngineConfig)["driverName"].(string)
 		driver, err = p.KontainerDriverLister.Get("", kontainerDriverName)
@@ -712,7 +732,12 @@ func (p *Provisioner) getSpec(cluster *v3.Cluster) (*v3.ClusterSpec, error) {
 		return nil, err
 	}
 
-	_, oldConfig, err := p.getConfig(false, cluster.Status.AppliedSpec, driverName, cluster.Name)
+	censoredOldSpec, err := p.censorGenericEngineConfig(cluster.Status.AppliedSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	_, oldConfig, err := p.getConfig(false, censoredOldSpec, driverName, cluster.Name)
 	if err != nil {
 		return nil, err
 	}
