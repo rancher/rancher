@@ -15,7 +15,7 @@ import (
 	"k8s.io/api/core/v1"
 )
 
-func (c *jenkinsPipelineConverter) getStepContainer(stageOrdinal int, stepOrdinal int) v1.Container {
+func (c *jenkinsPipelineConverter) getStepContainer(stageOrdinal int, stepOrdinal int) (v1.Container, error) {
 	stage := c.execution.Spec.PipelineConfig.Stages[stageOrdinal]
 	step := &stage.Steps[stepOrdinal]
 
@@ -26,17 +26,25 @@ func (c *jenkinsPipelineConverter) getStepContainer(stageOrdinal int, stepOrdina
 		Env:     []v1.EnvVar{},
 	}
 	if step.SourceCodeConfig != nil {
-		c.configCloneStepContainer(&container, step)
+		if err := c.configCloneStepContainer(&container, step); err != nil {
+			return container, err
+		}
 	} else if step.RunScriptConfig != nil {
 		c.configRunScriptStepContainer(&container, step)
 	} else if step.PublishImageConfig != nil {
 		c.configPublishStepContainer(&container, step)
 	} else if step.ApplyYamlConfig != nil {
-		c.configApplyYamlStepContainer(&container, step, stageOrdinal)
+		if err := c.configApplyYamlStepContainer(&container, step, stageOrdinal); err != nil {
+			return container, err
+		}
 	} else if step.PublishCatalogConfig != nil {
-		c.configPublishCatalogContainer(&container, step)
+		if err := c.configPublishCatalogContainer(&container, step); err != nil {
+			return container, err
+		}
 	} else if step.ApplyAppConfig != nil {
-		c.configApplyAppContainer(&container, step)
+		if err := c.configApplyAppContainer(&container, step); err != nil {
+			return container, err
+		}
 	}
 
 	//common step configurations
@@ -66,8 +74,8 @@ func (c *jenkinsPipelineConverter) getStepContainer(stageOrdinal int, stepOrdina
 	if step.Privileged {
 		container.SecurityContext = &v1.SecurityContext{Privileged: &step.Privileged}
 	}
-	injectSetpContainerResources(&container, step)
-	return container
+	err := injectSetpContainerResources(&container, step)
+	return container, err
 }
 
 func (c *jenkinsPipelineConverter) getJenkinsStepCommand(stageOrdinal int, stepOrdinal int) string {
@@ -95,22 +103,25 @@ func (c *jenkinsPipelineConverter) getJenkinsStepCommand(stageOrdinal int, stepO
 	return command
 }
 
-func (c *jenkinsPipelineConverter) getAgentContainer() v1.Container {
+func (c *jenkinsPipelineConverter) getAgentContainer() (v1.Container, error) {
 	container := v1.Container{
 		Name:  utils.JenkinsAgentContainerName,
 		Image: images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.JenkinsJnlp),
 		Args:  []string{"$(JENKINS_SECRET)", "$(JENKINS_NAME)"},
 	}
-	cloneContainer := c.getStepContainer(0, 0)
+	cloneContainer, err := c.getStepContainer(0, 0)
+	if err != nil {
+		return container, err
+	}
 	container.Env = append(container.Env, cloneContainer.Env...)
 	container.EnvFrom = append(container.EnvFrom, cloneContainer.EnvFrom...)
-	c.injectAgentResources(&container)
-	return container
+	err = c.injectAgentResources(&container)
+	return container, err
 }
 
-func (c *jenkinsPipelineConverter) configCloneStepContainer(container *v1.Container, step *v3.Step) {
+func (c *jenkinsPipelineConverter) configCloneStepContainer(container *v1.Container, step *v3.Step) error {
 	container.Image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.AlpineGit)
-	injectResources(container, utils.PipelineToolsCPULimitDefault, utils.PipelineToolsCPURequestDefault, utils.PipelineToolsMemoryLimitDefault, utils.PipelineToolsMemoryRequestDefault)
+	return injectResources(container, utils.PipelineToolsCPULimitDefault, utils.PipelineToolsCPURequestDefault, utils.PipelineToolsMemoryLimitDefault, utils.PipelineToolsMemoryRequestDefault)
 }
 
 func (c *jenkinsPipelineConverter) configRunScriptStepContainer(container *v1.Container, step *v3.Step) {
@@ -187,7 +198,7 @@ func (c *jenkinsPipelineConverter) configPublishStepContainer(container *v1.Cont
 	}
 }
 
-func (c *jenkinsPipelineConverter) configApplyYamlStepContainer(container *v1.Container, step *v3.Step, stageOrdinal int) {
+func (c *jenkinsPipelineConverter) configApplyYamlStepContainer(container *v1.Container, step *v3.Step, stageOrdinal int) error {
 	config := step.ApplyYamlConfig
 	container.Image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.KubeApply)
 
@@ -221,10 +232,10 @@ StageLoop:
 	for k, v := range applyEnv {
 		container.Env = append(container.Env, v1.EnvVar{Name: k, Value: v})
 	}
-	injectResources(container, utils.PipelineToolsCPULimitDefault, utils.PipelineToolsCPURequestDefault, utils.PipelineToolsMemoryLimitDefault, utils.PipelineToolsMemoryRequestDefault)
+	return injectResources(container, utils.PipelineToolsCPULimitDefault, utils.PipelineToolsCPURequestDefault, utils.PipelineToolsMemoryLimitDefault, utils.PipelineToolsMemoryRequestDefault)
 }
 
-func (c *jenkinsPipelineConverter) configPublishCatalogContainer(container *v1.Container, step *v3.Step) {
+func (c *jenkinsPipelineConverter) configPublishCatalogContainer(container *v1.Container, step *v3.Step) error {
 	config := step.PublishCatalogConfig
 	container.Image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.KubeApply)
 	envs := map[string]string{
@@ -239,10 +250,10 @@ func (c *jenkinsPipelineConverter) configPublishCatalogContainer(container *v1.C
 	for k, v := range envs {
 		container.Env = append(container.Env, v1.EnvVar{Name: k, Value: v})
 	}
-	injectResources(container, utils.PipelineToolsCPULimitDefault, utils.PipelineToolsCPURequestDefault, utils.PipelineToolsMemoryLimitDefault, utils.PipelineToolsMemoryRequestDefault)
+	return injectResources(container, utils.PipelineToolsCPULimitDefault, utils.PipelineToolsCPURequestDefault, utils.PipelineToolsMemoryLimitDefault, utils.PipelineToolsMemoryRequestDefault)
 }
 
-func (c *jenkinsPipelineConverter) configApplyAppContainer(container *v1.Container, step *v3.Step) {
+func (c *jenkinsPipelineConverter) configApplyAppContainer(container *v1.Container, step *v3.Step) error {
 	config := step.ApplyAppConfig
 	container.Image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.KubeApply)
 	answerBytes, _ := yaml.Marshal(config.Answers)
@@ -265,5 +276,5 @@ func (c *jenkinsPipelineConverter) configApplyAppContainer(container *v1.Contain
 			},
 			Key: utils.PipelineSecretAPITokenKey,
 		}}})
-	injectResources(container, utils.PipelineToolsCPULimitDefault, utils.PipelineToolsCPURequestDefault, utils.PipelineToolsMemoryLimitDefault, utils.PipelineToolsMemoryRequestDefault)
+	return injectResources(container, utils.PipelineToolsCPULimitDefault, utils.PipelineToolsCPURequestDefault, utils.PipelineToolsMemoryLimitDefault, utils.PipelineToolsMemoryRequestDefault)
 }
