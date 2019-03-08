@@ -29,7 +29,7 @@ import (
 	"github.com/rancher/types/config"
 )
 
-func Start(ctx context.Context, httpPort, httpsPort int, localClusterEnabled string, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager, auditLogWriter *audit.LogWriter) error {
+func Start(ctx context.Context, httpPort, httpsPort int, localClusterEnabled bool, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager, auditLogWriter *audit.LogWriter) error {
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext)
 	if err != nil {
 		return err

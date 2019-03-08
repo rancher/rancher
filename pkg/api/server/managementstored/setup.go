@@ -58,7 +58,7 @@ import (
 )
 
 func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager *clustermanager.Manager,
-	k8sProxy http.Handler, localClusterEnabled string) error {
+	k8sProxy http.Handler, localClusterEnabled bool) error {
 	// Here we setup all types that will be stored in the Management cluster
 	schemas := apiContext.Schemas
 
@@ -649,7 +649,7 @@ func MultiClusterApps(schemas *types.Schemas, management *config.ScaledContext) 
 	schema.Validator = wrapper.Validator
 }
 
-func GlobalDNSs(schemas *types.Schemas, management *config.ScaledContext, localClusterEnabled string) {
+func GlobalDNSs(schemas *types.Schemas, management *config.ScaledContext, localClusterEnabled bool) {
 	gdns := globaldns.Wrapper{
 		GlobalDNSes:           management.Management.GlobalDNSs(""),
 		GlobalDNSLister:       management.Management.GlobalDNSs("").Controller().Lister(),
@@ -666,20 +666,20 @@ func GlobalDNSs(schemas *types.Schemas, management *config.ScaledContext, localC
 	schema.ActionHandler = gdns.ActionHandler
 	schema.Validator = gdns.Validator
 	schema.Store = globaldnsAPIStore.Wrap(schema.Store)
-	if localClusterEnabled == "false" {
+	if !localClusterEnabled {
 		schema.CollectionMethods = []string{}
 		schema.ResourceMethods = []string{}
 	}
 }
 
-func GlobalDNSProviders(schemas *types.Schemas, management *config.ScaledContext, localClusterEnabled string) {
+func GlobalDNSProviders(schemas *types.Schemas, management *config.ScaledContext, localClusterEnabled bool) {
 	schema := schemas.Schema(&managementschema.Version, client.GlobalDNSProviderType)
 	schema.Store = &globalresource.GlobalNamespaceStore{
 		Store:              schema.Store,
 		NamespaceInterface: management.Core.Namespaces(""),
 	}
 	schema.Store = globaldnsAPIStore.ProviderWrap(schema.Store)
-	if localClusterEnabled == "false" {
+	if !localClusterEnabled {
 		schema.CollectionMethods = []string{}
 		schema.ResourceMethods = []string{}
 	}
