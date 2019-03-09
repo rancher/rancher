@@ -38,14 +38,6 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 
 	cluster.Management.Management.Projects(cluster.ClusterName).AddHandler(ctx, "resourceQuotaNamespacesReconcileController", reconcile.reconcileNamespaces)
 
-	cleanup := &cleanupController{
-		projectLister:       cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
-		namespaceLister:     cluster.Core.Namespaces("").Controller().Lister(),
-		resourceQuotas:      cluster.Core.ResourceQuotas(""),
-		resourceQuotaLister: cluster.Core.ResourceQuotas("").Controller().Lister(),
-	}
-	cluster.Core.ResourceQuotas("").AddHandler(ctx, "resourceQuotaCleanupController", cleanup.cleanup)
-
 	calculate := &calculateLimitController{
 		nsIndexer:     nsInformer.GetIndexer(),
 		projectLister: cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
