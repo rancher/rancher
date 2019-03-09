@@ -5,25 +5,20 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/api/customization/nodetemplate"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	amazonec2driver = "amazonec2"
-	azuredriver     = "azure"
-	vmwaredriver    = "vmwarevsphere"
-)
-
 var driverData = map[string]map[string][]string{
-	amazonec2driver: {"cred": []string{"accessKey"}},
-	azuredriver:     {"cred": []string{"clientId", "subscriptionId"}},
-	vmwaredriver:    {"cred": []string{"username", "vcenter", "vcenterPort"}},
+	nodetemplate.Amazonec2driver:    {"cred": []string{"accessKey"}},
+	nodetemplate.Azuredriver:        {"cred": []string{"clientId", "subscriptionId"}},
+	nodetemplate.DigitalOceandriver: {"cred": []string{"username", "vcenter", "vcenterPort"}},
 }
 var driverDefaults = map[string]map[string]string{
-	vmwaredriver: {"vcenterPort": "443"},
+	nodetemplate.Azuredriver: {"vcenterPort": "443"},
 }
 
 type machineDriverCompare struct {
@@ -41,10 +36,10 @@ func addMachineDrivers(management *config.ManagementContext) error {
 		"", "c31b9da2c977e70c2eeee5279123a95d", []string{"ecs.aliyuncs.com"}, false, false, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(amazonec2driver, "local://", "", "", []string{"*.amazonaws.com", "*.amazonaws.com.cn"}, true, true, management); err != nil {
+	if err := addMachineDriver(nodetemplate.Amazonec2driver, "local://", "", "", []string{"*.amazonaws.com", "*.amazonaws.com.cn"}, true, true, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(azuredriver, "local://", "", "", nil, true, true, management); err != nil {
+	if err := addMachineDriver(nodetemplate.Azuredriver, "local://", "", "", nil, true, true, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver("cloudca", "https://github.com/cloud-ca/docker-machine-driver-cloudca/files/2446837/docker-machine-driver-cloudca_v2.0.0_linux-amd64.zip",
@@ -52,7 +47,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 		[]string{"objects-east.cloud.ca"}, false, false, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("digitalocean", "local://", "", "", []string{"api.digitalocean.com"}, true, true, management); err != nil {
+	if err := addMachineDriver(nodetemplate.DigitalOceandriver, "local://", "", "", []string{"api.digitalocean.com"}, true, true, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver("exoscale", "local://", "", "", []string{"api.exoscale.ch"}, false, true, management); err != nil {
@@ -80,7 +75,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver("softlayer", "local://", "", "", nil, false, true, management); err != nil {
 		return err
 	}
-	return addMachineDriver(vmwaredriver, "local://", "", "", nil, true, true, management)
+	return addMachineDriver(nodetemplate.Vmwaredriver, "local://", "", "", nil, true, true, management)
 }
 
 func addMachineDriver(name, url, uiURL, checksum string, whitelist []string, active, builtin bool, management *config.ManagementContext) error {
