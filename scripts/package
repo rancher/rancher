@@ -24,8 +24,13 @@ cp ../bin/rancher ../bin/agent .
 
 IMAGE=${REPO}/rancher:${TAG}
 AGENT_IMAGE=${REPO}/rancher-agent:${TAG}
-docker build --build-arg VERSION=${TAG} -t ${IMAGE} .
-docker build --build-arg VERSION=${TAG} -t ${AGENT_IMAGE} -f Dockerfile.agent .
+
+if [ ${ARCH} == arm64 ]; then
+    sed -i -e '$a\' -e 'ENV ETCD_UNSUPPORTED_ARCH=arm64' Dockerfile
+fi
+
+docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} -t ${IMAGE} .
+docker build --build-arg VERSION=${TAG} --build-arg ARCH=${ARCH} -t ${AGENT_IMAGE} -f Dockerfile.agent .
 echo ${IMAGE} > ../dist/images
 echo ${AGENT_IMAGE} >> ../dist/images
 echo Built ${IMAGE} #${AGENT_IMAGE}
