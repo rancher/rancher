@@ -56,7 +56,7 @@ def test_node_template_delete(admin_mc, remove_resource):
     removed it should delete.
     """
     client = admin_mc.client
-    node_template = client.create_node_template(azureConfig={})
+    node_template, cloud_credential = create_node_template(client)
     node_pool = client.create_node_pool(
         nodeTemplateId=node_template.id,
         hostnamePrefix="test1",
@@ -99,24 +99,27 @@ def test_cloud_credential_delete(admin_mc, remove_resource):
     """Test deleting a cloud credential that is referenced by nodeTemplate, which
     is in use by nodePool
     """
-
     client = admin_mc.client
-    cloud_credential = client.create_cloud_credential(azurecredentialConfig={
-        "clientId": "test",
-        "subscriptionId": "test",
-        "clientSecret": "test"})
-    node_template = client.create_node_template(
-        azureConfig={},
-        cloudCredentialId=cloud_credential.id)
-    assert node_template.cloudCredentialId == cloud_credential.id
+    node_template, cloud_credential = create_node_template(client)
     node_pool = client.create_node_pool(
         nodeTemplateId=node_template.id,
         hostnamePrefix="test1",
         clusterId="local")
-
     assert node_pool.nodeTemplateId == node_template.id
 
     # Attempting to delete the template should raise an ApiError
     with pytest.raises(ApiError) as e:
         client.delete(cloud_credential)
     assert e.value.error.status == 405
+
+
+def create_node_template(client):
+    cloud_credential = client.create_cloud_credential(
+        azurecredentialConfig={"clientId": "test",
+                               "subscriptionId": "test",
+                               "clientSecret": "test"})
+    node_template = client.create_node_template(
+        azureConfig={},
+        cloudCredentialId=cloud_credential.id)
+    assert node_template.cloudCredentialId == cloud_credential.id
+    return node_template, cloud_credential
