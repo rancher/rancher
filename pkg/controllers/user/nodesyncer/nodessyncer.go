@@ -339,8 +339,8 @@ func (m *NodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Po
 
 	if machine.Annotations == nil {
 		machine.Annotations = make(map[string]string)
-		machine.Annotations[annotationName] = "true"
 	}
+	machine.Annotations[annotationName] = "true"
 
 	_, err = m.machines.Create(machine)
 	if err != nil {
