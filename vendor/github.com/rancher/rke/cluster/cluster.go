@@ -79,6 +79,8 @@ const (
 	NameLabel    = "name"
 
 	WorkerThreads = util.WorkerThreads
+
+	serviceAccountTokenFileParam = "service-account-key-file"
 )
 
 func (c *Cluster) DeployControlPlane(ctx context.Context) error {
@@ -527,4 +529,21 @@ func (c *Cluster) GetHostInfoMap() map[string]types.Info {
 		hostsInfoMap[host.Address] = host.DockerInfo
 	}
 	return hostsInfoMap
+}
+
+func IsLegacyKubeAPI(ctx context.Context, kubeCluster *Cluster) (bool, error) {
+	log.Infof(ctx, "[controlplane] Check if rotating a legacy cluster")
+	for _, host := range kubeCluster.ControlPlaneHosts {
+		kubeAPIInspect, err := docker.InspectContainer(ctx, host.DClient, host.Address, services.KubeAPIContainerName)
+		if err != nil {
+			return false, err
+		}
+		for _, arg := range kubeAPIInspect.Args {
+			if strings.Contains(arg, serviceAccountTokenFileParam) &&
+				strings.Contains(arg, pki.GetKeyPath(pki.KubeAPICertName)) {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
