@@ -185,36 +185,15 @@ func (d *Driver) Update(ctx context.Context, clusterInfo *types.ClusterInfo, opt
 	}
 	defer d.cleanup(stateDir)
 
-	certStr := ""
-
 	dialers, externalFlags := d.getFlags(rkeConfig, stateDir)
 	if err := cmd.ClusterInit(ctx, &rkeConfig, dialers, externalFlags); err != nil {
 		return nil, err
 	}
 	APIURL, caCrt, clientCert, clientKey, certs, err := cmd.ClusterUp(ctx, dialers, externalFlags)
-	if err == nil {
-		certStr, err = rkecerts.ToString(certs)
-	}
-	if err != nil {
-		return d.save(&types.ClusterInfo{
-			Metadata: map[string]string{
-				"Config": yaml,
-			},
-		}, stateDir), err
-	}
+	metadata, err := updateMetadata(APIURL, caCrt, clientCert, clientKey, yaml, certs)
 
-	if clusterInfo.Metadata == nil {
-		clusterInfo.Metadata = map[string]string{}
-	}
-
-	clusterInfo.Metadata["Endpoint"] = APIURL
-	clusterInfo.Metadata["RootCA"] = base64.StdEncoding.EncodeToString([]byte(caCrt))
-	clusterInfo.Metadata["ClientCert"] = base64.StdEncoding.EncodeToString([]byte(clientCert))
-	clusterInfo.Metadata["ClientKey"] = base64.StdEncoding.EncodeToString([]byte(clientKey))
-	clusterInfo.Metadata["Config"] = yaml
-	clusterInfo.Metadata["Certs"] = certStr
-
-	return d.save(clusterInfo, stateDir), nil
+	clusterInfo.Metadata = metadata
+	return d.save(clusterInfo, stateDir), err
 }
 
 func (d *Driver) getClientset(info *types.ClusterInfo) (*kubernetes.Clientset, error) {
@@ -516,7 +495,27 @@ func (d *Driver) ETCDRestore(ctx context.Context, clusterInfo *types.ClusterInfo
 
 	dialers, externalFlags := d.getFlags(rkeConfig, stateDir)
 
-	err = cmd.RestoreEtcdSnapshot(ctx, &rkeConfig, dialers, externalFlags, snapshotName)
-	clusterInfo.Metadata["Config"] = yaml
+	APIURL, caCrt, clientCert, clientKey, certs, err := cmd.RestoreEtcdSnapshot(ctx, &rkeConfig, dialers, externalFlags, snapshotName)
+
+	metadata, err := updateMetadata(APIURL, caCrt, clientCert, clientKey, yaml, certs)
+
+	clusterInfo.Metadata = metadata
 	return d.save(clusterInfo, stateDir), err
+}
+
+func updateMetadata(APIURL, caCrt, clientCert, clientKey, yaml string, certs map[string]pki.CertificatePKI) (map[string]string, error) {
+	m := map[string]string{}
+	certStr := ""
+	certStr, err := rkecerts.ToString(certs)
+	if err != nil {
+		m["Config"] = yaml
+		return m, err
+	}
+	m["Endpoint"] = APIURL
+	m["RootCA"] = base64.StdEncoding.EncodeToString([]byte(caCrt))
+	m["ClientCert"] = base64.StdEncoding.EncodeToString([]byte(clientCert))
+	m["ClientKey"] = base64.StdEncoding.EncodeToString([]byte(clientKey))
+	m["Config"] = yaml
+	m["Certs"] = certStr
+	return m, nil
 }

@@ -548,7 +548,7 @@ func DownloadEtcdSnapshotFromBackupServer(ctx context.Context, etcdHost *hosts.H
 			"etcd-backup",
 			"download",
 			"--name", name,
-			"--local-endpoint", backupServer.Address,
+			"--local-endpoint", backupServer.InternalAddress,
 			"--cacert", pki.GetCertPath(pki.CACertName),
 			"--cert", pki.GetCertPath(pki.KubeNodeCertName),
 			"--key", pki.GetKeyPath(pki.KubeNodeCertName),
