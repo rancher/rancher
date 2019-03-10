@@ -258,6 +258,28 @@ def test_multiclusterapp_user_update_roles(admin_mc, admin_pc, remove_resource,
     wait_for_roles_to_be_updated(admin_mc, updated_mcapp, new_roles)
 
 
+def test_admin_access(admin_mc, admin_pc, user_factory, remove_resource):
+    client = admin_mc.client
+    mcapp_name = random_str()
+    temp_ver = "cattle-global-data:library-wordpress-2.1.10"
+    targets = [{"projectId": admin_pc.project.id}]
+    user = user_factory()
+    remove_resource(user)
+    prtb_member = client.create_project_role_template_binding(
+        projectId=admin_pc.project.id,
+        roleTemplateId="project-member",
+        userId=user.user.id)
+    remove_resource(prtb_member)
+    wait_until(rtb_cb(client, prtb_member))
+    mcapp1 = user.client.\
+        create_multi_cluster_app(name=mcapp_name,
+                                 templateVersionId=temp_ver,
+                                 targets=targets,
+                                 roles=["project-member"])
+    updated_mcapp = client.update(mcapp1, roles=["cluster-owner"])
+    wait_for_roles_to_be_updated(admin_mc, updated_mcapp, ["cluster-owner"])
+
+
 def wait_for_app(admin_pc, name, timeout=60):
     start = time.time()
     interval = 0.5

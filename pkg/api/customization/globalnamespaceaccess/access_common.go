@@ -380,6 +380,15 @@ func CheckAccessToUpdateMembers(members []v3.Member, data map[string]interface{}
 
 func (ma *MemberAccess) GetAccessTypeOfCaller(callerID, creatorID, name string, members []v3.Member) (string, error) {
 	var username string
+	isAdmin, err := ma.IsAdmin(callerID)
+	if err != nil {
+		return "", err
+	}
+	if isAdmin {
+		// global admins should be allowed to update mcapp, irrespective of their accessType if they're added as member, or
+		// even if they aren't added as member at all
+		return OwnerAccess, nil
+	}
 	if callerID == creatorID {
 		return OwnerAccess, nil
 	}
