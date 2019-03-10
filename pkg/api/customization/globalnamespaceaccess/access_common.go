@@ -124,6 +124,8 @@ func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []stri
 		}
 	}
 	clustersCallerIsOwnerOf := make(map[string]bool)
+	errMsg := "User does not have "
+	roleMissing := false
 	for _, t := range targetProjects {
 		if err := ma.checkProjectExists(t); err != nil {
 			return err
@@ -235,8 +237,10 @@ func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []stri
 			if c.Spec.DisplayName != "" {
 				clusterName = c.Spec.DisplayName
 			}
-			errMsg := fmt.Sprintf("user does not have following roles in project %v of cluster %v: %v", projectName, clusterName, rolesNotFound)
-			return httperror.NewAPIError(httperror.PermissionDenied, errMsg)
+			roleMissing = true
+			missingRoles := strings.Join(rolesNotFound, ",")
+			projErr := fmt.Sprintf("roles %v in project %v of cluster %v, ", missingRoles, projectName, clusterName)
+			errMsg += projErr
 		}
 	}
 
@@ -299,9 +303,15 @@ func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []stri
 			if c.Spec.DisplayName != "" {
 				clusterName = c.Spec.DisplayName
 			}
-			errMsg := fmt.Sprintf("user %v does not have following roles in cluster %v: %v", callerID, clusterName, rolesNotFound)
-			return httperror.NewAPIError(httperror.PermissionDenied, errMsg)
+			roleMissing = true
+			missingRoles := strings.Join(rolesNotFound, ",")
+			clusErr := fmt.Sprintf("roles %v in cluster %v ", missingRoles, clusterName)
+			errMsg += clusErr
 		}
+	}
+	if roleMissing {
+		strings.TrimRight(errMsg, ",")
+		return httperror.NewAPIError(httperror.PermissionDenied, errMsg)
 	}
 	return nil
 }

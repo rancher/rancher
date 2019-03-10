@@ -186,7 +186,8 @@ def test_multiclusterapp_user_create(admin_mc, admin_pc, remove_resource,
                                      roles=roles)
     except ApiError as e:
         assert e.error.status == 403
-        assert "does not have following roles in cluster" in e.error.message
+        assert "does not have roles cluster-owner in cluster"\
+               in e.error.message
         assert "cluster-owner" in e.error.message
 
 
@@ -240,9 +241,9 @@ def test_multiclusterapp_user_update_roles(admin_mc, admin_pc, remove_resource,
         user.client.update(mcapp1, roles=new_roles)
     except ApiError as e:
         assert e.error.status == 403
-        assert "does not have following roles in project" in e.error.message
+        assert "does not have roles project-member in project" \
+               in e.error.message
         assert "of cluster local" in e.error.message
-        assert "project-member" in e.error.message
 
     # now admin adds this user to project as project-member
     prtb_member = client.create_project_role_template_binding(
