@@ -409,7 +409,7 @@ type CanalNetworkProvider struct {
 }
 
 type WeaveNetworkProvider struct {
-	Password string `yaml:"password,omitempty" json:"password,omitempty"`
+	Password string `yaml:"password,omitempty" json:"password,omitempty" norman:"type=password"`
 }
 
 type KubernetesServicesOptions struct {
