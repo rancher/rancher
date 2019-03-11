@@ -13,12 +13,12 @@ import (
 )
 
 var driverData = map[string]map[string][]string{
-	nodetemplate.Amazonec2driver:    {"cred": []string{"accessKey"}},
-	nodetemplate.Azuredriver:        {"cred": []string{"clientId", "subscriptionId"}},
-	nodetemplate.DigitalOceandriver: {"cred": []string{"username", "vcenter", "vcenterPort"}},
+	nodetemplate.Amazonec2driver: {"cred": []string{"accessKey"}},
+	nodetemplate.Azuredriver:     {"cred": []string{"clientId", "subscriptionId"}},
+	nodetemplate.Vmwaredriver:    {"cred": []string{"username", "vcenter", "vcenterPort"}},
 }
 var driverDefaults = map[string]map[string]string{
-	nodetemplate.Azuredriver: {"vcenterPort": "443"},
+	nodetemplate.Vmwaredriver: {"vcenterPort": "443"},
 }
 
 type machineDriverCompare struct {
