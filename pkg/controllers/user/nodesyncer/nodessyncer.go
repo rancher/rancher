@@ -3,6 +3,7 @@ package nodesyncer
 import (
 	"fmt"
 	"reflect"
+	"sort"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -390,6 +391,9 @@ func resetConditions(machine *v3.Node) *v3.Node {
 		toUpdateCond.LastTransitionTime = metav1.Time{}
 		toUpdateConds = append(toUpdateConds, *toUpdateCond)
 	}
+	sort.Slice(toUpdateConds, func(i, j int) bool {
+		return toUpdateConds[i].Type < toUpdateConds[j].Type
+	})
 	updated.Status.InternalNodeStatus.Conditions = toUpdateConds
 	return updated
 }
