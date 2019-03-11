@@ -68,12 +68,6 @@ def test_eks_config_appears_correctly(admin_mc, remove_resource):
     # test that a cluster returned from a GET has the correct config
     assert cluster.amazonElasticContainerServiceConfig.maximumNodes == 3
 
-    cluster.amazonElasticContainerServiceConfig.maximumNodes = 5
-    cluster = admin_mc.client.update_by_id_cluster(cluster.id, cluster)
-
-    # test that cluster returned from PUT has correct config
-    assert cluster.amazonElasticContainerServiceConfig.maximumNodes == 5
-
 
 def test_rke_config_appears_correctly(admin_mc, remove_resource):
     """ Testing a single field from the RKE config to ensure that the
