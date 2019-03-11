@@ -70,7 +70,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 }
 
 func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
-	if v3.BackupConditionCompleted.IsFalse(b) {
+	if v3.BackupConditionCompleted.IsFalse(b) || v3.BackupConditionCompleted.IsTrue(b) {
 		return b, nil
 	}
 
