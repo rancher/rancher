@@ -244,7 +244,7 @@ func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []stri
 		}
 	}
 
-	if len(newClusterRoleTemplateMap) == 0 {
+	if len(newClusterRoleTemplateMap) == 0 && !roleMissing {
 		return nil
 	}
 	for cname := range clusters {
@@ -305,12 +305,12 @@ func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []stri
 			}
 			roleMissing = true
 			missingRoles := strings.Join(rolesNotFound, ",")
-			clusErr := fmt.Sprintf("roles %v in cluster %v ", missingRoles, clusterName)
+			clusErr := fmt.Sprintf("roles %v in cluster %v, ", missingRoles, clusterName)
 			errMsg += clusErr
 		}
 	}
 	if roleMissing {
-		strings.TrimRight(errMsg, ",")
+		errMsg := strings.TrimRight(errMsg, ", ")
 		return httperror.NewAPIError(httperror.PermissionDenied, errMsg)
 	}
 	return nil
