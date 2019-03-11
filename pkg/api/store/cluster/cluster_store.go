@@ -169,14 +169,16 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, httperror.NewFieldAPIError(httperror.InvalidOption, "enableNetworkPolicy", err.Error())
 	}
 
+	annotation, _ := values.GetValue(data, managementv3.ClusterFieldAnnotations)
+	annoMap := toMap(annotation)
+	annoMap[clusterprovisioner.KontainerEngineUpdate] = "updated"
+
 	if driverName, _ := values.GetValue(data, "genericEngineConfig", "driverName"); driverName == "amazonelasticcontainerservice" {
 		sessionToken, _ := values.GetValue(data, "genericEngineConfig", "sessionToken")
-		annotation, _ := values.GetValue(data, managementv3.ClusterFieldAnnotations)
-		m := toMap(annotation)
-		m[clusterstatus.TemporaryCredentialsAnnotationKey] = strconv.FormatBool(
+		annoMap[clusterstatus.TemporaryCredentialsAnnotationKey] = strconv.FormatBool(
 			sessionToken != "" && sessionToken != nil)
-		values.PutValue(data, m, managementv3.ClusterFieldAnnotations)
 	}
+	values.PutValue(data, annoMap, managementv3.ClusterFieldAnnotations)
 
 	if err = setInitialConditions(data); err != nil {
 		return nil, err

@@ -181,7 +181,16 @@ func (l *Lifecycle) getResourceFields(obj *v3.KontainerDriver) (map[string]v3.Fi
 	driver := service.NewEngineService(
 		clusterprovisioner.NewPersistentStore(l.namespaces, l.coreV1),
 	)
-	flags, err := driver.GetDriverCreateOptions(context.Background(), obj.Name, obj, v3.ClusterSpec{
+	createFlags, err := driver.GetDriverCreateOptions(context.Background(), obj.Name, obj, v3.ClusterSpec{
+		GenericEngineConfig: &v3.MapStringInterface{
+			clusterprovisioner.DriverNameField: obj.Status.DisplayName,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	updateFlags, err := driver.GetDriverUpdateOptions(context.Background(), obj.Name, obj, v3.ClusterSpec{
 		GenericEngineConfig: &v3.MapStringInterface{
 			clusterprovisioner.DriverNameField: obj.Status.DisplayName,
 		},
@@ -191,8 +200,13 @@ func (l *Lifecycle) getResourceFields(obj *v3.KontainerDriver) (map[string]v3.Fi
 	}
 
 	resourceFields := map[string]v3.Field{}
-	for key, flag := range flags.Options {
-		formattedName, field, err := toResourceField(key, flag)
+	for key, flag := range createFlags.Options {
+		var update bool
+		if _, ok := updateFlags.Options[key]; ok {
+			update = true
+		}
+
+		formattedName, field, err := toResourceField(key, update, flag)
 		if err != nil {
 			return nil, errorsutil.WithMessage(err, "error formatting field name")
 		}
@@ -272,10 +286,10 @@ func (l *Lifecycle) createOrUpdateKontainerDriverTypes(obj *v3.KontainerDriver) 
 	return nil
 }
 
-func toResourceField(name string, flag *types.Flag) (string, v3.Field, error) {
+func toResourceField(name string, update bool, flag *types.Flag) (string, v3.Field, error) {
 	field := v3.Field{
 		Create: true,
-		Update: true,
+		Update: update,
 		Type:   "string",
 	}
 
