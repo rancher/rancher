@@ -389,6 +389,11 @@ func (d *Driver) GetDriverUpdateOptions(ctx context.Context) (*types.DriverFlags
 		Type:  types.StringType,
 		Usage: "The kubernetes node version to update",
 	}
+	driverFlag.Options["credential"] = &types.Flag{
+		Type:     types.StringType,
+		Password: true,
+		Usage:    "The contents of the GC credential file",
+	}
 	return &driverFlag, nil
 }
 
