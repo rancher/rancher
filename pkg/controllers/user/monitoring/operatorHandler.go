@@ -152,11 +152,41 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 		return errors.Wrap(err, "failed to ensure monitoring project name")
 	}
 
-	appAnswers := map[string]string{
-		"enabled":      "true",
-		"apiGroup":     monitoring.APIVersion.Group,
-		"nameOverride": "prometheus-operator",
+	mustAppAnswers := map[string]string{
+		"operator.enabled":      "true",
+		"operator.apiGroup":     monitoring.APIVersion.Group,
+		"operator.nameOverride": "prometheus-operator",
+
+		"exporter-coredns.enabled": "false",
+
+		"exporter-kube-controller-manager.enabled": "false",
+
+		"exporter-kube-dns.enabled": "false",
+
+		"exporter-kube-scheduler.enabled": "false",
+
+		"exporter-kube-state.enabled": "false",
+
+		"exporter-kubelets.enabled": "false",
+
+		"exporter-kubernetes.enabled": "false",
+
+		"exporter-node.enabled": "false",
+
+		"exporter-fluentd.enabled": "false",
+
+		"grafana.enabled": "false",
+
+		"prometheus.enabled": "false",
 	}
+
+	appAnswers := monitoring.OverwriteAppAnswers(map[string]string{}, cluster.Annotations)
+
+	// cannot overwrite mustAppAnswers
+	for mustKey, mustVal := range mustAppAnswers {
+		appAnswers[mustKey] = mustVal
+	}
+
 	annotations := monitoring.CopyCreatorID(nil, cluster.Annotations)
 	annotations["cluster.cattle.io/addon"] = appName
 	targetApp := &projectv3.App{

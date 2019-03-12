@@ -257,7 +257,7 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 	}
 
 	mustAppAnswers := map[string]string{
-		"enabled": "false",
+		"operator.enabled": "false",
 
 		"exporter-coredns.enabled":  "false",
 		"exporter-coredns.apiGroup": monitoring.APIVersion.Group,

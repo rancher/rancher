@@ -147,7 +147,7 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 	}
 
 	mustAppAnswers := map[string]string{
-		"enabled": "false",
+		"operator.enabled": "false",
 
 		"exporter-coredns.enabled": "false",
 
