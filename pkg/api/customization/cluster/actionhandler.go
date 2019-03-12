@@ -26,6 +26,7 @@ import (
 	"github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/client/cluster/v3"
 	mgmtclient "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/compose"
@@ -46,6 +47,7 @@ type ActionHandler struct {
 	UserMgr            user.Manager
 	ClusterManager     *clustermanager.Manager
 	BackupClient       v3.EtcdBackupInterface
+	AppClient          projectv3.AppInterface
 }
 
 func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -293,8 +295,17 @@ func (a ActionHandler) viewMonitoring(actionName string, action *types.Action, a
 		return httperror.NewAPIError(httperror.InvalidState, "disabling Monitoring")
 	}
 
+	appName, appTargetNamespace := monitoring.ClusterMonitoringInfo()
+	appList, err := a.AppClient.List(monitoring.OwnedAppListOptions(cluster.Name, appName, appTargetNamespace))
+	if err != nil {
+		return httperror.WrapAPIError(err, httperror.ServerError, fmt.Sprintf("failed to query %s app", appName))
+	}
+	if len(appList.Items) != 1 {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("find %d %s app", len(appList.Items), appName))
+	}
+
 	// need to support `map[string]string` as entry value type in norman Builder.convertMap
-	answers, err := convert.EncodeToMap(monitoring.GetOverwroteAppAnswers(cluster.Annotations))
+	answers, err := convert.EncodeToMap(appList.Items[0].Spec.Answers)
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.ServerError, "failed to parse response")
 	}

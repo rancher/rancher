@@ -2,8 +2,9 @@ package managementstored
 
 import (
 	"context"
-	"github.com/rancher/rancher/pkg/namespace"
 	"net/http"
+
+	"github.com/rancher/rancher/pkg/namespace"
 
 	"github.com/rancher/norman/store/crd"
 	"github.com/rancher/norman/store/proxy"
@@ -215,6 +216,7 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 		ClusterManager:     clusterManager,
 		NodeTemplateGetter: managementContext.Management,
 		BackupClient:       managementContext.Management.EtcdBackups(""),
+		AppClient:          managementContext.Project.Apps(""),
 	}
 
 	schema := schemas.Schema(&managementschema.Version, client.ClusterType)
@@ -572,6 +574,7 @@ func Project(schemas *types.Schemas, management *config.ScaledContext) {
 		ProjectLister:  management.Management.Projects("").Controller().Lister(),
 		UserMgr:        management.UserManager,
 		ClusterManager: management.ClientGetter.(*clustermanager.Manager),
+		AppClient:      management.Project.Apps(""),
 	}
 	schema.ActionHandler = handler.Actions
 }

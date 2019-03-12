@@ -20,10 +20,12 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
+	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/compose"
 	"github.com/rancher/types/user"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -49,6 +51,7 @@ type Handler struct {
 	ProjectLister  v3.ProjectLister
 	ClusterManager *clustermanager.Manager
 	UserMgr        user.Manager
+	AppClient      projectv3.AppInterface
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -136,8 +139,14 @@ func (h *Handler) viewMonitoring(actionName string, action *types.Action, apiCon
 		return httperror.NewAPIError(httperror.InvalidState, "disabling Monitoring")
 	}
 
+	appName, _ := monitoring.ProjectMonitoringInfo(project.Name)
+	monitoringApp, err := h.AppClient.GetNamespaced(project.Name, appName, v1.GetOptions{})
+	if err != nil {
+		return httperror.WrapAPIError(err, httperror.ServerError, fmt.Sprintf("failed to query %s app", appName))
+	}
+
 	// need to support `map[string]string` as entry value type in norman Builder.convertMap
-	answers, err := convert.EncodeToMap(monitoring.GetOverwroteAppAnswers(project.Annotations))
+	answers, err := convert.EncodeToMap(monitoringApp.Spec.Answers)
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.ServerError, "failed to parse response")
 	}
