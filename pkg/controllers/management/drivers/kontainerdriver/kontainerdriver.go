@@ -348,6 +348,15 @@ func (l *Lifecycle) Updated(obj *v3.KontainerDriver) (runtime.Object, error) {
 	switch { // dealing with deactivate action
 	case !obj.Spec.Active && l.DynamicSchemaExists(obj):
 		v3.KontainerDriverConditionInactive.Unknown(obj)
+		// delete the active condition
+		var i int
+		for _, con := range obj.Status.Conditions {
+			if con.Type != string(v3.KontainerDriverConditionActive) {
+				obj.Status.Conditions[i] = con
+				i++
+			}
+		}
+		obj.Status.Conditions = obj.Status.Conditions[:i]
 		// we don't need to show the Inactivating state so we don't need to store the Inactivate condition
 		fallthrough
 	case !obj.Spec.Active:
