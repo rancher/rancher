@@ -402,9 +402,6 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 	}
 
 	p.setGenericConfigs(cluster)
-	if err != nil {
-		return cluster, err
-	}
 
 	spec, err := p.getSpec(cluster)
 	if err != nil || spec == nil {
