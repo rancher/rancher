@@ -92,6 +92,7 @@ var (
 		AlertSystemImages    AlertSystemImages
 		PipelineSystemImages projectv3.PipelineSystemImages
 		LoggingSystemImages  LoggingSystemImages
+		AuthSystemImages     AuthSystemImages
 	}{
 		AlertSystemImages: AlertSystemImages{
 			AlertManager:       m("prom/alertmanager:v0.15.2"),
@@ -111,6 +112,9 @@ var (
 			Fluentd:                       m("rancher/fluentd:v0.1.11"),
 			FluentdHelper:                 m("rancher/fluentd-helper:v0.1.2"),
 			LogAggregatorFlexVolumeDriver: m("rancher/log-aggregator:v0.1.4"),
+		},
+		AuthSystemImages: AuthSystemImages{
+			KubeAPIAuth: m("rancher/kube-api-auth:v0.1.3"),
 		},
 	}
 
