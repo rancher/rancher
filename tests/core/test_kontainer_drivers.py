@@ -112,7 +112,8 @@ def test_kontainer_driver_lifecycle(admin_mc, remove_resource,
 @pytest.mark.nonparallel
 def test_enabling_driver_exposes_schema(admin_mc, wait_remove_resource):
     """ Test if enabling driver exposes its dynamic schema, drivers are
-     downloaded / installed once they are active """
+    downloaded / installed once they are active, and if re-activating a
+    driver exposes its schema again"""
     URL = DRIVER_AMD64_URL
     if platform.machine() == "aarch64":
         URL = DRIVER_ARM64_URL
@@ -145,6 +146,11 @@ def test_enabling_driver_exposes_schema(admin_mc, wait_remove_resource):
     admin_mc.client.update_by_id_kontainerDriver(kd.id, kd)
 
     verify_driver_not_in_types(admin_mc.client, kd)
+
+    # test re-activation flow
+    kd.active = True
+    admin_mc.client.update_by_id_kontainerDriver(kd.id, kd)
+    verify_driver_in_types(admin_mc.client, kd)
 
 
 @pytest.mark.nonparallel
