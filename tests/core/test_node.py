@@ -2,6 +2,7 @@ import pytest
 from rancher import ApiError
 from .common import auth_check
 from .conftest import wait_for
+import time
 
 
 def test_node_fields(admin_mc):
@@ -118,8 +119,29 @@ def create_node_template(client):
         azurecredentialConfig={"clientId": "test",
                                "subscriptionId": "test",
                                "clientSecret": "test"})
+    wait_for_cloud_credential(client, cloud_credential.id)
     node_template = client.create_node_template(
         azureConfig={},
         cloudCredentialId=cloud_credential.id)
     assert node_template.cloudCredentialId == cloud_credential.id
     return node_template, cloud_credential
+
+
+def wait_for_cloud_credential(client, cloud_credential_id, timeout=60):
+    start = time.time()
+    interval = 0.5
+    creds = client.list_cloud_credential()
+    cred = None
+    for val in creds:
+        if val["id"] == cloud_credential_id:
+            cred = val
+    while cred is None:
+        if time.time() - start > timeout:
+            print(cred)
+            raise Exception('Timeout waiting for cloud credential')
+        time.sleep(interval)
+        interval *= 2
+        for val in creds:
+            if val["id"] == cloud_credential_id:
+                cred = val
+    return cred
