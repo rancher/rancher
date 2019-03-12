@@ -141,47 +141,53 @@ func (p *Provisioner) waitForSchema(cluster *v3.Cluster) {
 			driver = "googlekubernetesengine"
 		}
 	} else {
-		driver = (*cluster.Spec.GenericEngineConfig)["driverName"].(string)
+		if d, ok := (*cluster.Spec.GenericEngineConfig)["driverName"]; ok {
+			driver = d.(string)
+		}
 	}
 
-	var schemaName string
-	backoff := wait.Backoff{
-		Duration: 2 * time.Second,
-		Factor:   1,
-		Jitter:   0,
-		Steps:    7,
-	}
-	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		driver, err := p.KontainerDriverLister.Get("", driver)
-		if err != nil {
-			if !apierrors.IsNotFound(err) {
-				return false, err
+	if driver != "" {
+		var schemaName string
+		backoff := wait.Backoff{
+			Duration: 2 * time.Second,
+			Factor:   1,
+			Jitter:   0,
+			Steps:    7,
+		}
+		err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+			driver, err := p.KontainerDriverLister.Get("", driver)
+			if err != nil {
+				if !apierrors.IsNotFound(err) {
+					return false, err
+				}
+				return false, nil
 			}
-			return false, nil
-		}
 
-		if driver.Spec.BuiltIn {
-			schemaName = driver.Status.DisplayName + "Config"
-		} else {
-			schemaName = driver.Status.DisplayName + "EngineConfig"
-		}
-
-		_, err = p.DynamicSchemasLister.Get("", strings.ToLower(schemaName))
-		if err != nil {
-			if !apierrors.IsNotFound(err) {
-				return false, err
+			if driver.Spec.BuiltIn {
+				schemaName = driver.Status.DisplayName + "Config"
+			} else {
+				schemaName = driver.Status.DisplayName + "EngineConfig"
 			}
-			return false, nil
-		}
 
-		return true, nil
-	})
-	if err != nil {
-		logrus.Warnf("Failed to find driver %v and schema %v on upgrade: %v", driver, schemaName, err)
+			_, err = p.DynamicSchemasLister.Get("", strings.ToLower(schemaName))
+			if err != nil {
+				if !apierrors.IsNotFound(err) {
+					return false, err
+				}
+				return false, nil
+			}
+
+			return true, nil
+		})
+		if err != nil {
+			logrus.Warnf("[cluster-provisioner-controller] Failed to find driver %v and schema %v for cluster %v on upgrade: %v",
+				driver, schemaName, cluster.Name, err)
+		}
 	}
-	_, err = p.setKontainerEngineUpdate(cluster, "updated")
+
+	_, err := p.setKontainerEngineUpdate(cluster, "updated")
 	if err != nil {
-		logrus.Warnf("Failed to set annotation on cluster %v on upgrade: %v", cluster.Name, err)
+		logrus.Warnf("[cluster-provisioner-controller] Failed to set annotation on cluster %v on upgrade: %v", cluster.Name, err)
 	}
 	p.ClusterController.Enqueue(cluster.Namespace, cluster.Name)
 }
