@@ -27,11 +27,9 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 	resource.AddAction(request, "exportYaml")
 	if _, ok := resource.Values["rancherKubernetesEngineConfig"]; ok {
 		resource.AddAction(request, "rotateCertificates")
-		if enabled, ok := values.GetValue(resource.Values, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "enabled"); ok {
-			if enabled.(bool) {
-				resource.AddAction(request, "backupEtcd")
-				resource.AddAction(request, "restoreFromEtcdBackup")
-			}
+		if _, ok := values.GetValue(resource.Values, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig"); ok {
+			resource.AddAction(request, "backupEtcd")
+			resource.AddAction(request, "restoreFromEtcdBackup")
 		}
 	}
 
