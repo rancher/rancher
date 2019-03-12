@@ -119,7 +119,8 @@ func DeployApp(cattleAppClient projectv3.AppInterface, projectID string, createO
 		}
 	} else {
 		app = app.DeepCopy()
-		app.Spec.Answers = createOrUpdateApp.Spec.Answers
+		// overwrite monitoring page passed
+		app.Spec.Answers = OverwriteAppAnswers(app.Spec.Answers, createOrUpdateApp.Annotations)
 		if _, err = cattleAppClient.Update(app); err != nil {
 			return errors.Wrapf(err, "failed to update %q App", appName)
 		}

@@ -72,13 +72,19 @@ func OwnedAppListOptions(clusterID, appName, appTargetNamespace string) metav1.L
 	}
 }
 
-func CopyCreatorID(toAnnotations, fromAnnotations map[string]string) map[string]string {
-	if val, exist := fromAnnotations[cattleCreatorIDAnnotationKey]; exist {
-		if toAnnotations == nil {
-			toAnnotations = make(map[string]string, 2)
-		}
+func CopyCreatorIDAndOverwroteAppAnswers(toAnnotations, fromAnnotations map[string]string) map[string]string {
+	if toAnnotations == nil {
+		toAnnotations = make(map[string]string, 2)
+	}
 
+	// copy creatorID
+	if val, exist := fromAnnotations[cattleCreatorIDAnnotationKey]; exist {
 		toAnnotations[cattleCreatorIDAnnotationKey] = val
+	}
+
+	// copy overwroteAppAnswers
+	if val, exist := fromAnnotations[cattleOverwriteAppAnswersAnnotationKey]; exist {
+		toAnnotations[cattleOverwriteAppAnswersAnnotationKey] = val
 	}
 
 	return toAnnotations

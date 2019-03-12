@@ -187,7 +187,7 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 		appAnswers[mustKey] = mustVal
 	}
 
-	annotations := monitoring.CopyCreatorID(nil, cluster.Annotations)
+	annotations := monitoring.CopyCreatorIDAndOverwroteAppAnswers(nil, cluster.Annotations)
 	annotations["cluster.cattle.io/addon"] = appName
 	targetApp := &projectv3.App{
 		ObjectMeta: metav1.ObjectMeta{
