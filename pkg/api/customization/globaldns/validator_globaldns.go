@@ -20,6 +20,8 @@ type Wrapper struct {
 	PrtbLister            v3.ProjectRoleTemplateBindingLister
 	MultiClusterAppLister v3.MultiClusterAppLister
 	Users                 v3.UserInterface
+	GrbLister             v3.GlobalRoleBindingLister
+	GrLister              v3.GlobalRoleLister
 }
 
 const (
@@ -34,7 +36,9 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 	var targetProjects []string
 	var accessType string
 	ma := gaccess.MemberAccess{
-		Users: w.Users,
+		Users:     w.Users,
+		GrLister:  w.GrLister,
+		GrbLister: w.GrbLister,
 	}
 
 	callerID := request.Request.Header.Get(gaccess.ImpersonateUserHeader)

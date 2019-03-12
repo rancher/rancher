@@ -52,7 +52,9 @@ func (w *Wrapper) ActionHandler(actionName string, action *types.Action, request
 		return fmt.Errorf("GlobalDNS %v has no creatorId annotation", metaAccessor.GetName())
 	}
 	ma := gaccess.MemberAccess{
-		Users: w.Users,
+		Users:     w.Users,
+		GrbLister: w.GrbLister,
+		GrLister:  w.GrLister,
 	}
 	accessType, err := ma.GetAccessTypeOfCaller(callerID, creatorID, gDNS.Name, gDNS.Spec.Members)
 	if err != nil {
@@ -87,7 +89,9 @@ func (w *Wrapper) addProjects(gDNS *v3.GlobalDNS, request *types.APIContext, inp
 			fmt.Sprintf("cannot add projects to globaldns as targets if multiclusterappID is set %s", gDNS.Spec.MultiClusterAppName))
 	}
 	ma := gaccess.MemberAccess{
-		Users: w.Users,
+		Users:     w.Users,
+		GrbLister: w.GrbLister,
+		GrLister:  w.GrLister,
 	}
 	if err := ma.CheckCallerAccessToTargets(request, inputProjects, client.ProjectType, &client.Project{}); err != nil {
 		return err

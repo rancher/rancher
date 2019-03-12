@@ -656,6 +656,8 @@ func GlobalDNSs(schemas *types.Schemas, management *config.ScaledContext, localC
 		PrtbLister:            management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
 		MultiClusterAppLister: management.Management.MultiClusterApps("").Controller().Lister(),
 		Users:                 management.Management.Users(""),
+		GrbLister:             management.Management.GlobalRoleBindings("").Controller().Lister(),
+		GrLister:              management.Management.GlobalRoles("").Controller().Lister(),
 	}
 	schema := schemas.Schema(&managementschema.Version, client.GlobalDNSType)
 	schema.Store = &globalresource.GlobalNamespaceStore{

@@ -148,6 +148,31 @@ def test_user_access_global_dns(admin_mc, user_factory, remove_resource):
     assert gdns is not None
 
 
+def test_update_gdns_entry(admin_mc, remove_resource):
+    client = admin_mc.client
+    provider_name = random_str()
+    access = random_str()
+    secret = random_str()
+    globaldns_provider = \
+        client.create_global_dns_provider(
+            name=provider_name,
+            rootDomain="example.com",
+            route53ProviderConfig={
+                'accessKey': access,
+                'secretKey': secret})
+
+    remove_resource(globaldns_provider)
+    fqdn = random_str() + ".example.com"
+    gdns_entry_name = random_str()
+    globaldns_entry = \
+        client.create_global_dns(name=gdns_entry_name,
+                                 fqdn=fqdn, providerId=provider_name)
+    remove_resource(globaldns_entry)
+    new_fqdn = random_str()
+    client.update(globaldns_entry, fqdn=new_fqdn)
+    wait_for_gdns_update(admin_mc, gdns_entry_name, new_fqdn)
+
+
 def wait_to_ensure_user_in_rb_subject(api, name,
                                       userId, timeout=60):
     found = False
@@ -166,3 +191,19 @@ def wait_to_ensure_user_in_rb_subject(api, name,
         if time.time() - start > timeout:
             raise AssertionError(
                 "Timed out waiting for user to get added to rb")
+
+
+def wait_for_gdns_update(admin_mc, gdns_entry_name, new_fqdn, timeout=60):
+    client = admin_mc.client
+    updated = False
+    interval = 0.5
+    start = time.time()
+    id = "cattle-global-data:" + gdns_entry_name
+    while not updated:
+        if time.time() - start > timeout:
+            raise Exception('Timeout waiting for gdns entry to update')
+        gdns = client.by_id_global_dns(id)
+        if gdns is not None and gdns.fqdn == new_fqdn:
+            updated = True
+        time.sleep(interval)
+        interval *= 2
