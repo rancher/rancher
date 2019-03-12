@@ -36,6 +36,10 @@ func (ph *projectHandler) sync(key string, project *mgmtv3.Project) (runtime.Obj
 		return project, errors.Wrapf(err, "failed to find Cluster %s", clusterID)
 	}
 
+	if !mgmtv3.ClusterConditionPrometheusOperatorDeployed.IsTrue(cluster) {
+		return cluster, nil
+	}
+
 	clusterName := cluster.Spec.DisplayName
 	projectTag := getProjectTag(project, clusterName)
 	src := project
@@ -232,6 +236,9 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 	if err != nil {
 		return err
 	}
+
+	// clean overwrote answers from annotation
+	monitoring.DropOverwroteAppAnswers(project.Annotations)
 
 	return nil
 }

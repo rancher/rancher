@@ -48,7 +48,7 @@ func (ch *clusterHandler) sync(key string, cluster *mgmtv3.Cluster) (runtime.Obj
 		return cluster, nil
 	}
 
-	if !mgmtv3.ClusterConditionAgentDeployed.IsTrue(cluster) {
+	if !mgmtv3.ClusterConditionPrometheusOperatorDeployed.IsTrue(cluster) {
 		return cluster, nil
 	}
 
@@ -364,6 +364,9 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 	if err != nil {
 		return nil, err
 	}
+
+	// clean overwrote answers from annotation
+	monitoring.DropOverwroteAppAnswers(cluster.Annotations)
 
 	return appAnswers, nil
 }

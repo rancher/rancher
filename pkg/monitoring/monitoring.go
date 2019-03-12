@@ -263,3 +263,7 @@ func GetOverwroteAppAnswers(annotations map[string]string) map[string]string {
 
 	return map[string]string{}
 }
+
+func DropOverwroteAppAnswers(annotations map[string]string) {
+	delete(annotations, cattleOverwriteAppAnswersAnnotationKey)
+}
