@@ -404,6 +404,15 @@ func (d *Driver) GetDriverUpdateOptions(ctx context.Context) (*types.DriverFlags
 		Type:  types.StringSliceType,
 		Usage: "Tags for Kubernetes cluster. For example, foo=bar.",
 	}
+	driverFlag.Options["client-id"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "Azure client ID to use.",
+	}
+	driverFlag.Options["client-secret"] = &types.Flag{
+		Type:     types.StringType,
+		Password: true,
+		Usage:    `Azure client secret associated with the "client id".`,
+	}
 
 	return &driverFlag, nil
 }
