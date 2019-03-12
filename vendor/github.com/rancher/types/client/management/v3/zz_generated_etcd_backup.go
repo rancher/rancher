@@ -13,6 +13,7 @@ const (
 	EtcdBackupFieldCreatorID            = "creatorId"
 	EtcdBackupFieldFilename             = "filename"
 	EtcdBackupFieldLabels               = "labels"
+	EtcdBackupFieldManual               = "manual"
 	EtcdBackupFieldName                 = "name"
 	EtcdBackupFieldNamespaceId          = "namespaceId"
 	EtcdBackupFieldOwnerReferences      = "ownerReferences"
@@ -33,6 +34,7 @@ type EtcdBackup struct {
 	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Filename             string            `json:"filename,omitempty" yaml:"filename,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Manual               bool              `json:"manual,omitempty" yaml:"manual,omitempty"`
 	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId          string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`

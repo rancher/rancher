@@ -14,7 +14,7 @@ const (
 )
 
 type BackupConfig struct {
-	// Enable Flag
+	// Enable or disable recurring backups in rancher
 	Enabled *bool `yaml:"enabled" json:"enabled,omitempty" norman:"default=true"`
 	// Backup interval in hours
 	IntervalHours int `yaml:"interval_hours" json:"intervalHours,omitempty" norman:"default=12"`
@@ -51,6 +51,8 @@ type EtcdBackup struct {
 type EtcdBackupSpec struct {
 	// cluster ID
 	ClusterID string `json:"clusterId,omitempty" norman:"required,type=reference[cluster]"`
+	// manual backup flag
+	Manual bool `yaml:"manual" json:"manual,omitempty"`
 	// actual file name on the target
 	Filename string `yaml:"filename" json:"filename,omitempty"`
 	// backupConfig

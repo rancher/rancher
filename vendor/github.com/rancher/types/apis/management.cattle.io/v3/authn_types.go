@@ -315,3 +315,7 @@ type KeyCloakConfig struct {
 type OKTAConfig struct {
 	SamlConfig `json:",inline" mapstructure:",squash"`
 }
+
+type AuthSystemImages struct {
+	KubeAPIAuth string `json:"kubeAPIAuth,omitempty"`
+}
