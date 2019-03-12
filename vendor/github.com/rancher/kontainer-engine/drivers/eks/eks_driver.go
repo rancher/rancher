@@ -239,6 +239,19 @@ func (d *Driver) GetDriverUpdateOptions(ctx context.Context) (*types.DriverFlags
 		Usage:   "The kubernetes version to update",
 		Default: &types.Default{DefaultString: "1.10"},
 	}
+	driverFlag.Options["access-key"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The AWS Client ID to use",
+	}
+	driverFlag.Options["secret-key"] = &types.Flag{
+		Type:     types.StringType,
+		Password: true,
+		Usage:    "The AWS Client Secret associated with the Client ID",
+	}
+	driverFlag.Options["session-token"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "A session token to use with the client key and secret if applicable.",
+	}
 
 	return &driverFlag, nil
 }

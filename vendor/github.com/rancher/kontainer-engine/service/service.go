@@ -129,6 +129,8 @@ func flatten(data map[string]interface{}, driverOptions *types.DriverOptions) {
 			} else {
 				flatten(v.(map[string]interface{}), driverOptions)
 			}
+		case nil:
+			logrus.Debugf("could not convert %v because value is nil %v=%v", reflect.TypeOf(v), k, v)
 		default:
 			logrus.Warnf("could not convert %v %v=%v", reflect.TypeOf(v), k, v)
 		}
