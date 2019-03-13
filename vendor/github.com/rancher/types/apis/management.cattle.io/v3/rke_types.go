@@ -48,7 +48,7 @@ type RancherKubernetesEngineConfig struct {
 	// Rotating Certificates Option
 	RotateCertificates *RotateCertificates `yaml:"rotate_certificates,omitempty" json:"rotateCertificates,omitempty"`
 	// DNS Config
-	DNS DNSConfig `yaml:"dns" json:"dns,omitempty"`
+	DNS *DNSConfig `yaml:"dns" json:"dns,omitempty"`
 }
 
 type BastionHost struct {

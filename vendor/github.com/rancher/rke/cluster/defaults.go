@@ -150,7 +150,8 @@ func (c *Cluster) setClusterDefaults(ctx context.Context) error {
 		return err
 	}
 
-	if len(c.DNS.Provider) == 0 {
+	if c.DNS == nil || len(c.DNS.Provider) == 0 {
+		c.DNS = &v3.DNSConfig{}
 		c.DNS.Provider = DefaultDNSProvider
 	}
 

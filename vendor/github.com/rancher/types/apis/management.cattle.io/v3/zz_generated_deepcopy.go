@@ -7201,7 +7201,11 @@ func (in *RancherKubernetesEngineConfig) DeepCopyInto(out *RancherKubernetesEngi
 		*out = new(RotateCertificates)
 		(*in).DeepCopyInto(*out)
 	}
-	in.DNS.DeepCopyInto(&out.DNS)
+	if in.DNS != nil {
+		in, out := &in.DNS, &out.DNS
+		*out = new(DNSConfig)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 

@@ -59,7 +59,7 @@ func (c *Cluster) PrepareBackup(ctx context.Context, snapshotPath string) error 
 	if !util.IsRancherBackupSupported(c.SystemImages.Alpine) {
 		log.Warnf(ctx, "Auto local backup sync is not supported in `%s`. Using `%s` instead.", c.SystemImages.Alpine, backupImage)
 	}
-	if c.Services.Etcd.BackupConfig == nil || (c.Services.Etcd.BackupConfig.Enabled != nil && !*c.Services.Etcd.BackupConfig.Enabled) || // legacy rke local backup
+	if c.Services.Etcd.BackupConfig == nil || // legacy rke local backup
 		(c.Services.Etcd.BackupConfig != nil && c.Services.Etcd.BackupConfig.S3BackupConfig == nil) { // rancher local backup, no s3
 		// stop etcd on all etcd nodes, we need this because we start the backup server on the same port
 		for _, host := range c.EtcdHosts {
@@ -102,7 +102,6 @@ func (c *Cluster) PrepareBackup(ctx context.Context, snapshotPath string) error 
 
 	// s3 backup case
 	if c.Services.Etcd.BackupConfig != nil &&
-		c.Services.Etcd.BackupConfig.Enabled != nil && *c.Services.Etcd.BackupConfig.Enabled &&
 		c.Services.Etcd.BackupConfig.S3BackupConfig != nil {
 		for _, host := range c.EtcdHosts {
 			if err := services.DownloadEtcdSnapshotFromS3(ctx, host, c.PrivateRegistriesMap, backupImage, snapshotPath, c.Services.Etcd); err != nil {
