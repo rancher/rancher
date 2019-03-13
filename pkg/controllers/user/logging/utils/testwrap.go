@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -198,6 +199,66 @@ func buildTLSConfig(rootCA, clientCert, clientKey, clientKeyPass, sslVersion, se
 	}
 
 	return config, nil
+}
+
+func IsClientAuthEnaled(clientCert, clientKey string) bool {
+	return clientCert != "" && clientKey != ""
+}
+
+func loadCertsFromPEM(certsByte []byte) ([]*x509.Certificate, error) {
+	var certs []*x509.Certificate
+	for len(certsByte) > 0 {
+		var block *pem.Block
+		block, certsByte = pem.Decode(certsByte)
+		if block == nil {
+			break
+		}
+
+		if block.Type == "CERTIFICATE" {
+			cert, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't parse certificate")
+			}
+			certs = append(certs, cert)
+		}
+	}
+
+	return certs, nil
+}
+
+func IsSelfSigned(certsByte []byte) (bool, error) {
+	if len(certsByte) == 0 {
+		return false, nil
+	}
+
+	certs, err := loadCertsFromPEM(certsByte)
+	if err != nil {
+		return false, err
+	}
+
+	if len(certs) == 0 {
+		return false, errors.New("couldn't load rootCA, make sure the certificate chain is valid and sorted")
+	}
+
+	rootCA := certs[len(certs)-1]
+	return isSignedBy(rootCA, rootCA), nil
+}
+
+func isSignedBy(cert, rootCA *x509.Certificate) bool {
+	if !bytes.Equal(rootCA.RawSubject, cert.RawIssuer) {
+		return false
+	}
+
+	// The Authority Key Identifier extension provides the key identifier of the Issuing CA certificate that signed the SSL certificate. This AKI value would match the SKI value of the Intermediate CA certificate.
+	if cert.AuthorityKeyId != nil && rootCA.SubjectKeyId != nil && !bytes.Equal(cert.AuthorityKeyId, rootCA.SubjectKeyId) {
+		return false
+	}
+
+	if err := rootCA.CheckSignature(cert.SignatureAlgorithm, cert.RawTBSCertificate, cert.Signature); err != nil {
+		return false
+	}
+
+	return true
 }
 
 func randHex(n int) string {
