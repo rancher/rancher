@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/generator"
+	loggingutils "github.com/rancher/rancher/pkg/controllers/user/logging/utils"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
@@ -84,6 +85,15 @@ func validate(level, containerLogSourceTag string, loggingTargets v3.LoggingTarg
 func validateKafka(kafkaConfig *v3.KafkaConfig) error {
 	if kafkaConfig.SaslType == "plain" && kafkaConfig.ClientCert == "" && kafkaConfig.ClientKey == "" {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "Plain SASL authentication requires SSL is configured")
+	}
+
+	isSelfSigned, err := loggingutils.IsSelfSigned([]byte(kafkaConfig.Certificate))
+	if err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "parse certificate failed")
+	}
+
+	if loggingutils.IsClientAuthEnaled(kafkaConfig.ClientCert, kafkaConfig.ClientKey) && isSelfSigned {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "Certificate verification failed, Kafka doesn't support self-signed certificate when client authentication is enabled")
 	}
 	return nil
 }

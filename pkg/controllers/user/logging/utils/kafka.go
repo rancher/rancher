@@ -109,6 +109,11 @@ func (w *kafkaTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog boo
 	} else {
 		var brokerControllerTLSConfig *tls.Config
 		if broker0URL.Scheme == "https" {
+			err := w.verifyKafkaCert()
+			if err != nil {
+				return err
+			}
+
 			if brokerControllerTLSConfig, err = buildTLSConfig(w.Certificate, w.ClientCert, w.ClientKey, "", "", brokerController.Host, true); err != nil {
 				return err
 			}
@@ -161,6 +166,11 @@ func (w *kafkaTestWrap) checkEndpointReachable(endpointURL *url.URL, dial dialer
 	var tlsConfig *tls.Config
 	var err error
 	if endpointURL.Scheme == "https" {
+		err := w.verifyKafkaCert()
+		if err != nil {
+			return err
+		}
+
 		tlsConfig, err = buildTLSConfig(w.Certificate, w.ClientCert, w.ClientKey, "", "", endpointURL.Hostname(), true)
 		if err != nil {
 			return err
@@ -237,6 +247,18 @@ func (w *kafkaTestWrap) kafkaConn(dial dialer.Dialer, config *tls.Config, smartH
 	}
 
 	return kafka.NewConn(conn, w.Topic, defaultPartition), nil
+}
+
+func (w *kafkaTestWrap) verifyKafkaCert() error {
+	isSelfSigned, err := IsSelfSigned([]byte(w.Certificate))
+	if err != nil {
+		return err
+	}
+
+	if isSelfSigned && IsClientAuthEnaled(w.ClientCert, w.ClientKey) {
+		return errors.New("Certificate verification failed, Kafka doesn't support self-signed certificate when client authentication is enabled")
+	}
+	return nil
 }
 
 func wrapErrEOF(err error) error {
