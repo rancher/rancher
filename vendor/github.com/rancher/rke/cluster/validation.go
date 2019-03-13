@@ -139,8 +139,7 @@ func validateServicesOptions(c *Cluster) error {
 }
 
 func validateEtcdBackupOptions(c *Cluster) error {
-	if c.Services.Etcd.BackupConfig != nil &&
-		c.Services.Etcd.BackupConfig.Enabled != nil && *c.Services.Etcd.BackupConfig.Enabled {
+	if c.Services.Etcd.BackupConfig != nil {
 		if c.Services.Etcd.BackupConfig.S3BackupConfig != nil {
 			if len(c.Services.Etcd.BackupConfig.S3BackupConfig.Endpoint) == 0 {
 				return fmt.Errorf("etcd s3 backup backend endpoint can't be empty")
