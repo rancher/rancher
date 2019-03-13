@@ -21,6 +21,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Wrapper struct {
@@ -113,7 +114,7 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 	if len(split) != 2 {
 		return fmt.Errorf("incorrect multiclusterapp ID %v", request.ID)
 	}
-	mcapp, err := w.MultiClusterAppLister.Get(split[0], split[1])
+	mcapp, err := w.MultiClusterApps.GetNamespaced(split[0], split[1], v1.GetOptions{})
 	if err != nil {
 		return err
 	}
