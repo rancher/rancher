@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
@@ -19,7 +20,10 @@ import (
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
@@ -58,7 +62,7 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		if err != nil {
 			return err
 		}
-		obj, err := w.MultiClusterAppLister.Get(namespace.GlobalNamespace, mcApp.Name)
+		obj, err := w.MultiClusterApps.GetNamespaced(namespace.GlobalNamespace, mcApp.Name, v1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -84,7 +88,7 @@ func (w Wrapper) addProjects(request *types.APIContext) error {
 	if err != nil {
 		return err
 	}
-	var mcappToUpdate *v3.MultiClusterApp
+	var finalTargets []v3.Target
 	if len(inputProjects) > 0 {
 		for _, p := range inputProjects {
 			if existingProjects[p] {
@@ -92,22 +96,11 @@ func (w Wrapper) addProjects(request *types.APIContext) error {
 			}
 			existingProjects[p] = true
 		}
-		mcappToUpdate = mcapp.DeepCopy()
 		for _, name := range inputProjects {
-			mcappToUpdate.Spec.Targets = append(mcappToUpdate.Spec.Targets, v3.Target{ProjectName: name})
+			finalTargets = append(finalTargets, v3.Target{ProjectName: name})
 		}
 	}
-	if len(inputAnswers) > 0 {
-		if mcappToUpdate == nil {
-			mcappToUpdate = mcapp.DeepCopy()
-		}
-		mcappToUpdate.Spec.Answers = append(mcappToUpdate.Spec.Answers, inputAnswers...)
-	}
-	if mcappToUpdate != nil {
-		return w.updateMcApp(mcappToUpdate, request, "addedProjects")
-	}
-	request.WriteResponse(http.StatusOK, nil)
-	return nil
+	return w.updateMcApp(mcapp, finalTargets, inputAnswers, request, "addedProjects", addProjectsAction)
 }
 
 func (w Wrapper) removeProjects(request *types.APIContext) error {
@@ -115,7 +108,6 @@ func (w Wrapper) removeProjects(request *types.APIContext) error {
 	if err != nil {
 		return err
 	}
-	mcappToUpdate := mcapp.DeepCopy()
 	toRemoveProjects := make(map[string]bool)
 	var finalTargets []v3.Target
 	for _, p := range inputProjects {
@@ -126,8 +118,7 @@ func (w Wrapper) removeProjects(request *types.APIContext) error {
 			finalTargets = append(finalTargets, t)
 		}
 	}
-	mcappToUpdate.Spec.Targets = finalTargets
-	return w.updateMcApp(mcappToUpdate, request, "removedProjects")
+	return w.updateMcApp(mcapp, finalTargets, []v3.Answer{}, request, "removedProjects", removeProjectsAction)
 }
 
 func (w Wrapper) modifyProjects(request *types.APIContext, actionName string) (*v3.MultiClusterApp, map[string]bool, []string, []v3.Answer, error) {
@@ -138,7 +129,7 @@ func (w Wrapper) modifyProjects(request *types.APIContext, actionName string) (*
 	var inputProjects []string
 	var inputAnswers []v3.Answer
 	existingProjects := make(map[string]bool)
-	mcapp, err := w.MultiClusterAppLister.Get(split[0], split[1])
+	mcapp, err := w.MultiClusterApps.GetNamespaced(split[0], split[1], v1.GetOptions{})
 	if err != nil {
 		return nil, existingProjects, inputProjects, inputAnswers, err
 	}
@@ -220,8 +211,34 @@ func (w Wrapper) modifyProjects(request *types.APIContext, actionName string) (*
 	return mcapp, existingProjects, inputProjects, inputAnswers, nil
 }
 
-func (w Wrapper) updateMcApp(mcappToUpdate *v3.MultiClusterApp, request *types.APIContext, message string) error {
-	if _, err := w.MultiClusterApps.Update(mcappToUpdate); err != nil {
+func (w Wrapper) updateMcApp(mcapp *v3.MultiClusterApp, targets []v3.Target, answers []v3.Answer, request *types.APIContext, message, actionName string) error {
+	backoff := wait.Backoff{
+		Duration: 100 * time.Millisecond,
+		Factor:   2,
+		Jitter:   0,
+		Steps:    6,
+	}
+
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		mcappLatest, err := w.MultiClusterApps.GetNamespaced(mcapp.Namespace, mcapp.Name, v1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		mcappLatest.Spec.Targets = targets
+		if actionName == addProjectsAction && len(answers) > 0 {
+			mcappLatest.Spec.Answers = answers
+		}
+		_, err = w.MultiClusterApps.Update(mcappLatest)
+		if err != nil {
+			if apierrors.IsConflict(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
+	})
+
+	if err != nil {
 		return err
 	}
 

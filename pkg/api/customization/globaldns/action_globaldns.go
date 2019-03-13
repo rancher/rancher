@@ -5,6 +5,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/parse"
@@ -15,7 +16,10 @@ import (
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/client/management/v3"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
@@ -37,7 +41,7 @@ func (w *Wrapper) ActionHandler(actionName string, action *types.Action, request
 		return fmt.Errorf("incorrect global DNS ID")
 	}
 	existingProjects := make(map[string]bool)
-	gDNS, err := w.GlobalDNSes.Controller().Lister().Get(split[0], split[1])
+	gDNS, err := w.GlobalDNSes.GetNamespaced(split[0], split[1], v1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -96,18 +100,16 @@ func (w *Wrapper) addProjects(gDNS *v3.GlobalDNS, request *types.APIContext, inp
 	if err := ma.CheckCallerAccessToTargets(request, inputProjects, client.ProjectType, &client.Project{}); err != nil {
 		return err
 	}
-	gDNSToUpdate := gDNS.DeepCopy()
-
+	var projectsToAdd []string
 	for _, p := range inputProjects {
 		if !existingProjects[p] {
-			gDNSToUpdate.Spec.ProjectNames = append(gDNSToUpdate.Spec.ProjectNames, p)
+			projectsToAdd = append(projectsToAdd, p)
 		}
 	}
-	return w.updateGDNS(gDNSToUpdate, request, "addedProjects")
+	return w.updateGDNS(gDNS, projectsToAdd, request, "addedProjects")
 }
 
 func (w *Wrapper) removeProjects(gDNS *v3.GlobalDNS, request *types.APIContext, existingProjects map[string]bool, inputProjects []string) error {
-	gDNSToUpdate := gDNS.DeepCopy()
 	toRemoveProjects := make(map[string]bool)
 	var finalProjects []string
 	for _, p := range inputProjects {
@@ -118,12 +120,34 @@ func (w *Wrapper) removeProjects(gDNS *v3.GlobalDNS, request *types.APIContext, 
 			finalProjects = append(finalProjects, p)
 		}
 	}
-	gDNSToUpdate.Spec.ProjectNames = finalProjects
-	return w.updateGDNS(gDNSToUpdate, request, "removedProjects")
+	return w.updateGDNS(gDNS, finalProjects, request, "removedProjects")
 }
 
-func (w Wrapper) updateGDNS(gDNSToUpdate *v3.GlobalDNS, request *types.APIContext, message string) error {
-	if _, err := w.GlobalDNSes.Update(gDNSToUpdate); err != nil {
+func (w Wrapper) updateGDNS(gDNS *v3.GlobalDNS, targetProjects []string, request *types.APIContext, message string) error {
+	backoff := wait.Backoff{
+		Duration: 100 * time.Millisecond,
+		Factor:   2,
+		Jitter:   0.5,
+		Steps:    7,
+	}
+
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		gDNSlatest, err := w.GlobalDNSes.GetNamespaced(gDNS.Namespace, gDNS.Name, v1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		gDNSlatest.Spec.ProjectNames = targetProjects
+		_, err = w.GlobalDNSes.Update(gDNSlatest)
+		if err != nil {
+			if apierrors.IsConflict(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
+	})
+
+	if err != nil {
 		return err
 	}
 	op := map[string]interface{}{
