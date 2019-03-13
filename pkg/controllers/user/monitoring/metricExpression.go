@@ -2207,7 +2207,7 @@ metadata:
     metric: server-failed-proposal
     source: rancher-monitoring
 spec:
-  expression: count(up{job="exporter-kube-etcd-cluster-monitoring"}) by (instance)
+  expression: sum(etcd_server_proposals_failed_total)
   legendFormat: Failed proposal
   description: etcd Server failed proposal
 ---
@@ -2223,7 +2223,7 @@ metadata:
     metric: server-failed-proposal
     source: rancher-monitoring
 spec:
-  expression: count(up{job="exporter-kube-etcd-cluster-monitoring"}) by (instance)
+  expression: sum(etcd_server_proposals_failed_total)
   legendFormat: Failed proposal
   description: etcd Server failed proposal
 ---
@@ -3268,7 +3268,7 @@ metadata:
     metric: upstream-response-seconds
     source: rancher-monitoring
 spec:
-  expression: sort_desc(max(nginx_ingress_controller_ingress_upstream_latency_seconds_sum) by (host, path))
+  expression: sort_desc(max(nginx_ingress_controller_response_duration_seconds_bucket) by (host, path))
   legendFormat: Upstream response seconds(host:[[host]] path:[[path]])
   description: ingresscontroller nginx upstream response seconds by host
 ---
@@ -3284,7 +3284,7 @@ metadata:
     metric: upstream-response-seconds
     source: rancher-monitoring
 spec:
-  expression: sort_desc(max(nginx_ingress_controller_ingress_upstream_latency_seconds_sum) by (host, path))
+  expression: sort_desc(max(nginx_ingress_controller_response_duration_seconds_bucket) by (host, path))
   legendFormat: Upstream response seconds(host:[[host]] path:[[path]])
   description: ingresscontroller nginx upstream response seconds by host
 ---
