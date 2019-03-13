@@ -52,7 +52,7 @@ def test_kontainer_driver_lifecycle(admin_mc, remove_resource,
         active=True,
         url=URL
     )
-    remove_resource(kd)
+    wait_remove_resource(kd)
 
     # Test that it is in downloading state while downloading
     kd = wait_for_condition('Downloaded', 'Unknown', admin_mc.client, kd)
