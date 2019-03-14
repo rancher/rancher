@@ -30,5 +30,5 @@ spec:
   tls:
   - hosts:
     - {{ .Values.hostname }}
-    secretName: tls-rancher-ingress
+    secretName: {{ .Values.tls.secretName }}
 {{- end }}
