@@ -7,5 +7,5 @@
         "or be unexported",
         "hyperkube"
     ],
-    "Deadline": "60s"
+    "Deadline": "2m"
 }
