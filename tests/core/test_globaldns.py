@@ -169,6 +169,7 @@ def test_update_gdns_entry(admin_mc, remove_resource):
                                  fqdn=fqdn, providerId=provider_name)
     remove_resource(globaldns_entry)
     new_fqdn = random_str()
+    wait_for_gdns_entry_creation(admin_mc, gdns_entry_name)
     client.update(globaldns_entry, fqdn=new_fqdn)
     wait_for_gdns_update(admin_mc, gdns_entry_name, new_fqdn)
 
@@ -205,5 +206,20 @@ def wait_for_gdns_update(admin_mc, gdns_entry_name, new_fqdn, timeout=60):
         gdns = client.by_id_global_dns(id)
         if gdns is not None and gdns.fqdn == new_fqdn:
             updated = True
+        time.sleep(interval)
+        interval *= 2
+
+
+def wait_for_gdns_entry_creation(admin_mc, gdns_name, timeout=60):
+    start = time.time()
+    interval = 0.5
+    client = admin_mc.client
+    found = False
+    while not found:
+        if time.time() - start > timeout:
+            raise Exception('Timeout waiting for globalDNS entry creation')
+        gdns = client.list_global_dns(name=gdns_name)
+        if len(gdns) > 0:
+            found = True
         time.sleep(interval)
         interval *= 2
