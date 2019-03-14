@@ -612,7 +612,8 @@ func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.Formatter = kontainerdriver.NewFormatter(management)
 	schema.Store = kontainerdriver.NewStore(management, schema.Store)
 	kontainerDriverValidator := kontainerdriver.Validator{
-		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
+		KontainerDriverLister:    management.Management.KontainerDrivers("").Controller().Lister(),
+		KontainerDriverInterface: management.Management.KontainerDrivers(""),
 	}
 	schema.Validator = kontainerDriverValidator.Validator
 }

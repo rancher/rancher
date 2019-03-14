@@ -153,41 +153,7 @@ def test_enabling_driver_exposes_schema(admin_mc, wait_remove_resource):
     verify_driver_in_types(admin_mc.client, kd)
 
 
-@pytest.mark.nonparallel
-def test_upgrade_changes_schema(admin_mc, wait_remove_resource):
-    client = admin_mc.client
-    URL = DRIVER_AMD64_URL
-    if platform.machine() == "aarch64":
-        URL = DRIVER_ARM64_URL
-    kd = client.create_kontainerDriver(
-        createDynamicSchema=True,
-        active=True,
-        url=URL
-    )
-    wait_remove_resource(kd)
 
-    kd = wait_for_condition('Active', 'True', admin_mc.client, kd,
-                            timeout=90)
-
-    verify_driver_in_types(client, kd)
-    kdSchema = client.schema.types[kd.name + 'EngineConfig']
-    assert 'specialTestingField' not in kdSchema.resourceFields
-
-    NEW_URL = NEW_DRIVER_URL
-    if platform.machine() == "aarch64":
-        NEW_URL = NEW_DRIVER_ARM64_URL
-    kd.url = NEW_URL
-    kd = client.update_by_id_kontainerDriver(kd.id, kd)
-
-    def schema_updated():
-        client.reload_schema()
-        kdSchema = client.schema.types[kd.name + 'EngineConfig']
-        return 'specialTestingField' in kdSchema.resourceFields
-
-    wait_until(schema_updated)
-
-    kdSchema = client.schema.types[kd.name + 'EngineConfig']
-    assert 'specialTestingField' in kdSchema.resourceFields
 
 
 @pytest.mark.nonparallel
@@ -270,3 +236,39 @@ def verify_driver_not_in_types(client, kd):
     wait_until(check)
     client.reload_schema()
     assert kd.name + 'EngineConfig' not in client.schema.types
+
+@pytest.mark.nonparallel
+def test_upgrade_changes_schema(admin_mc, wait_remove_resource):
+    client = admin_mc.client
+    URL = DRIVER_AMD64_URL
+    if platform.machine() == "aarch64":
+        URL = DRIVER_ARM64_URL
+    kd = client.create_kontainerDriver(
+        createDynamicSchema=True,
+        active=True,
+        url=URL
+    )
+    wait_remove_resource(kd)
+
+    kd = wait_for_condition('Active', 'True', admin_mc.client, kd,
+                            timeout=90)
+
+    verify_driver_in_types(client, kd)
+    kdSchema = client.schema.types[kd.name + 'EngineConfig']
+    assert 'specialTestingField' not in kdSchema.resourceFields
+
+    NEW_URL = NEW_DRIVER_URL
+    if platform.machine() == "aarch64":
+        NEW_URL = NEW_DRIVER_ARM64_URL
+    kd.url = NEW_URL
+    kd = client.update_by_id_kontainerDriver(kd.id, kd)
+
+    def schema_updated():
+        client.reload_schema()
+        kdSchema = client.schema.types[kd.name + 'EngineConfig']
+        return 'specialTestingField' in kdSchema.resourceFields
+
+    wait_until(schema_updated)
+
+    kdSchema = client.schema.types[kd.name + 'EngineConfig']
+    assert 'specialTestingField' in kdSchema.resourceFields

@@ -6,11 +6,12 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Validator struct {
-	KontainerDriverLister v3.KontainerDriverLister
+	KontainerDriverLister    v3.KontainerDriverLister
+	KontainerDriverInterface v3.KontainerDriverInterface
 }
 
 func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
@@ -24,12 +25,14 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 }
 
 func (v *Validator) validateKontainerDriverURL(request *types.APIContext, spec v3.KontainerDriverSpec) error {
-	kontainerDrivers, err := v.KontainerDriverLister.List("", labels.NewSelector())
+	opts := v1.ListOptions{}
+	kontainerDrivers, err := v.KontainerDriverInterface.List(opts)
+	//kontainerDrivers, err := v.KontainerDriverLister.List("", labels.NewSelector())
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.ServerError, "Failed to list kontainer drivers")
 	}
 
-	for _, driver := range kontainerDrivers {
+	for _, driver := range kontainerDrivers.Items {
 		if driver.Spec.URL == spec.URL && driver.Name != request.ID {
 			return httperror.NewAPIError(httperror.Conflict, fmt.Sprintf("Driver URL already in use: %s", spec.URL))
 		}
