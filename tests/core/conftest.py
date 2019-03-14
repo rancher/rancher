@@ -316,9 +316,12 @@ def wait_remove_resource(admin_mc, request, remove_resource, timeout=DEFAULT_TIM
 
     def _cleanup(resource):
         def clean():
+            print("begin cleanup")
             remove_resource(resource)
             wait_until(lambda: client.reload(resource) is None)
+            print("cleanup done")
         request.addfinalizer(clean)
+
     return _cleanup
 
 

@@ -47,6 +47,7 @@ def test_kontainer_driver_lifecycle(admin_mc, remove_resource,
     URL = DRIVER_AMD64_URL
     if platform.machine() == "aarch64":
         URL = DRIVER_ARM64_URL
+    print("ln 50")
     kd = admin_mc.client.create_kontainerDriver(
         createDynamicSchema=True,
         active=True,
@@ -107,6 +108,8 @@ def test_kontainer_driver_lifecycle(admin_mc, remove_resource,
     admin_mc.client.delete(kd)
     # test driver is removed from schema after deletion
     verify_driver_not_in_types(admin_mc.client, kd)
+    print("test lifecycle done")
+
 
 
 @pytest.mark.nonparallel
@@ -117,6 +120,7 @@ def test_enabling_driver_exposes_schema(admin_mc, wait_remove_resource):
     URL = DRIVER_AMD64_URL
     if platform.machine() == "aarch64":
         URL = DRIVER_ARM64_URL
+        print("ln123")
     kd = admin_mc.client.create_kontainerDriver(
         createDynamicSchema=True,
         active=False,
@@ -151,6 +155,7 @@ def test_enabling_driver_exposes_schema(admin_mc, wait_remove_resource):
     kd.active = True
     admin_mc.client.update_by_id_kontainerDriver(kd.id, kd)
     verify_driver_in_types(admin_mc.client, kd)
+    print("test enable done")
 
 
 
@@ -163,13 +168,14 @@ def test_create_duplicate_driver_conflict(admin_mc, wait_remove_resource):
     URL = DRIVER_AMD64_URL
     if platform.machine() == "aarch64":
         URL = DRIVER_ARM64_URL
+        print("line 171")
     kd = admin_mc.client.create_kontainerDriver(
         createDynamicSchema=True,
         active=True,
         url=URL
     )
     wait_remove_resource(kd)
-    kd = wait_for_condition('Active', 'True', admin_mc.client, kd, timeout=90)
+    wait_for_condition('Active', 'True', admin_mc.client, kd, timeout=90)
 
     try:
         kd2 = admin_mc.client.create_kontainerDriver(
@@ -182,6 +188,7 @@ def test_create_duplicate_driver_conflict(admin_mc, wait_remove_resource):
     except ApiError as e:
         assert e.error.status == 409
         assert "Driver URL already in use:" in e.error.message
+        print("test create done")
 
 
 @pytest.mark.nonparallel
@@ -191,13 +198,14 @@ def test_update_duplicate_driver_conflict(admin_mc, wait_remove_resource):
     URL = DRIVER_AMD64_URL
     if platform.machine() == "aarch64":
         URL = DRIVER_ARM64_URL
+        print("ln 201")
     kd1 = admin_mc.client.create_kontainerDriver(
         createDynamicSchema=True,
         active=True,
         url=URL
     )
     wait_remove_resource(kd1)
-    kd1 = wait_for_condition('Active', 'True', admin_mc.client, kd1,
+    wait_for_condition('Active', 'True', admin_mc.client, kd1,
                              timeout=90)
 
     kd2 = admin_mc.client.create_kontainerDriver(
@@ -214,6 +222,7 @@ def test_update_duplicate_driver_conflict(admin_mc, wait_remove_resource):
     except ApiError as e:
         assert e.error.status == 409
         assert "Driver URL already in use:" in e.error.message
+        print("test dup done")
 
 
 def verify_driver_in_types(client, kd):
@@ -240,6 +249,7 @@ def verify_driver_not_in_types(client, kd):
 @pytest.mark.nonparallel
 def test_upgrade_changes_schema(admin_mc, wait_remove_resource):
     client = admin_mc.client
+    print("ln 252")
     URL = DRIVER_AMD64_URL
     if platform.machine() == "aarch64":
         URL = DRIVER_ARM64_URL
@@ -272,3 +282,4 @@ def test_upgrade_changes_schema(admin_mc, wait_remove_resource):
 
     kdSchema = client.schema.types[kd.name + 'EngineConfig']
     assert 'specialTestingField' in kdSchema.resourceFields
+    print("test upgrade done")
