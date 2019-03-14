@@ -646,7 +646,7 @@ func (a ActionHandler) BackupEtcdHandler(actionName string, action *types.Action
 		return errors.Wrapf(err, "failed to get Cluster by ID %s", apiContext.ID)
 	}
 
-	newBackup := etcdbackup.NewBackupObject(cluster)
+	newBackup := etcdbackup.NewBackupObject(cluster, true)
 
 	backup, err := a.BackupClient.Create(newBackup)
 	if err != nil {
