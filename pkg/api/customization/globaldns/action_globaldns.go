@@ -50,7 +50,6 @@ func (w *Wrapper) ActionHandler(actionName string, action *types.Action, request
 	if err != nil {
 		return err
 	}
-	// ensure that caller is not a readonly member of globaldns, else abort
 	callerID := request.Request.Header.Get(gaccess.ImpersonateUserHeader)
 	metaAccessor, err := meta.Accessor(gDNS)
 	if err != nil {
@@ -116,7 +115,6 @@ func (w *Wrapper) addProjects(request *types.APIContext, inputProjects []string)
 		for _, p := range gDNS.Spec.ProjectNames {
 			existingProjects[p] = true
 		}
-		var projectsToAdd []string
 		for _, p := range inputProjects {
 			if existingProjects[p] {
 				return false, httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("duplicate projects in targets %s", p))
@@ -124,10 +122,8 @@ func (w *Wrapper) addProjects(request *types.APIContext, inputProjects []string)
 			existingProjects[p] = true
 		}
 		for _, name := range inputProjects {
-			projectsToAdd = append(projectsToAdd, name)
+			gDNS.Spec.ProjectNames = append(gDNS.Spec.ProjectNames, name)
 		}
-
-		gDNS.Spec.ProjectNames = projectsToAdd
 		_, err = w.GlobalDNSes.Update(gDNS)
 		if err != nil {
 			if apierrors.IsConflict(err) {
