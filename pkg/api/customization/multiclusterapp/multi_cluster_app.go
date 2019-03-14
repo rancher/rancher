@@ -101,7 +101,6 @@ func (w Wrapper) addProjects(request *types.APIContext) error {
 	}
 
 	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-		var finalTargets []v3.Target
 		existingProjects := make(map[string]bool)
 		mcapp, err := w.MultiClusterApps.GetNamespaced(split[0], split[1], v1.GetOptions{})
 		if err != nil {
@@ -110,20 +109,17 @@ func (w Wrapper) addProjects(request *types.APIContext) error {
 		for _, p := range mcapp.Spec.Targets {
 			existingProjects[p.ProjectName] = true
 		}
-		if len(inputProjects) > 0 {
-			for _, p := range inputProjects {
-				if existingProjects[p] {
-					return false, httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("duplicate projects in targets %s", p))
-				}
-				existingProjects[p] = true
+		for _, p := range inputProjects {
+			if existingProjects[p] {
+				return false, httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("duplicate projects in targets %s", p))
 			}
-			for _, name := range inputProjects {
-				finalTargets = append(finalTargets, v3.Target{ProjectName: name})
-			}
+			existingProjects[p] = true
 		}
-		mcapp.Spec.Targets = finalTargets
+		for _, name := range inputProjects {
+			mcapp.Spec.Targets = append(mcapp.Spec.Targets, v3.Target{ProjectName: name})
+		}
 		if len(inputAnswers) > 0 {
-			mcapp.Spec.Answers = inputAnswers
+			mcapp.Spec.Answers = append(mcapp.Spec.Answers, inputAnswers...)
 		}
 		_, err = w.MultiClusterApps.Update(mcapp)
 		if err != nil {
@@ -168,6 +164,7 @@ func (w Wrapper) removeProjects(request *types.APIContext) error {
 				finalTargets = append(finalTargets, t)
 			}
 		}
+		// after this finalTargets will contain all mcapp targets, that aren't in inputProjects
 		mcapp.Spec.Targets = finalTargets
 		_, err = w.MultiClusterApps.Update(mcapp)
 		if err != nil {
