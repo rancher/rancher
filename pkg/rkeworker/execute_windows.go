@@ -50,7 +50,7 @@ func ExecutePlan(ctx context.Context, nodeConfig *NodeConfig, writeCertOnly bool
 	// pre run docker
 	for name, process := range nodeConfig.Processes {
 		if strings.HasPrefix(name, "pre-run-docker") {
-			if err := runProcess(ctx, process.Name, process, true); err != nil {
+			if err := runProcess(ctx, process.Name, process, true, false); err != nil {
 				return err
 			}
 		}
@@ -59,7 +59,7 @@ func ExecutePlan(ctx context.Context, nodeConfig *NodeConfig, writeCertOnly bool
 	// post run docker
 	for name, process := range nodeConfig.Processes {
 		if strings.HasPrefix(name, "post-run-docker") {
-			if err := runProcess(ctx, process.Name, process, true); err != nil {
+			if err := runProcess(ctx, process.Name, process, true, false); err != nil {
 				return err
 			}
 		}
