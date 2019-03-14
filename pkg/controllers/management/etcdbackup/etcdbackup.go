@@ -203,7 +203,7 @@ func (c *Controller) doClusterBackupSync(cluster *v3.Cluster) error {
 }
 
 func (c *Controller) createNewBackup(cluster *v3.Cluster) (*v3.EtcdBackup, error) {
-	newBackup := NewBackupObject(cluster)
+	newBackup := NewBackupObject(cluster, false)
 	v3.BackupConditionCreated.CreateUnknownIfNotExists(newBackup)
 	return c.backupClient.Create(newBackup)
 
@@ -257,12 +257,22 @@ func (c *Controller) rotateExpiredBackups(cluster *v3.Cluster, clusterBackups []
 	return nil
 }
 
-func NewBackupObject(cluster *v3.Cluster) *v3.EtcdBackup {
+func NewBackupObject(cluster *v3.Cluster, manual bool) *v3.EtcdBackup {
 	controller := true
+	typeFlag := "r"     // recurring is the default
+	providerFlag := "l" // local is the default
+
+	if manual {
+		typeFlag = "m" // manual backup
+	}
+	if cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig != nil {
+		providerFlag = "s" // s3 backup
+	}
+	prefix := fmt.Sprintf("%s-%s%s-", cluster.Name, typeFlag, providerFlag)
 	return &v3.EtcdBackup{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    cluster.Name,
-			GenerateName: fmt.Sprintf("%s-", cluster.Name),
+			GenerateName: prefix,
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					Name:       cluster.Name,
@@ -275,6 +285,7 @@ func NewBackupObject(cluster *v3.Cluster) *v3.EtcdBackup {
 		},
 		Spec: v3.EtcdBackupSpec{
 			ClusterID: cluster.Name,
+			Manual:    manual,
 		},
 	}
 }
