@@ -190,6 +190,13 @@ func (d *Driver) Update(ctx context.Context, clusterInfo *types.ClusterInfo, opt
 		return nil, err
 	}
 	APIURL, caCrt, clientCert, clientKey, certs, err := cmd.ClusterUp(ctx, dialers, externalFlags)
+	if err != nil {
+		return d.save(&types.ClusterInfo{
+			Metadata: map[string]string{
+				"Config": yaml,
+			},
+		}, stateDir), err
+	}
 	metadata, err := updateMetadata(APIURL, caCrt, clientCert, clientKey, yaml, certs)
 
 	clusterInfo.Metadata = metadata
@@ -496,9 +503,15 @@ func (d *Driver) ETCDRestore(ctx context.Context, clusterInfo *types.ClusterInfo
 	dialers, externalFlags := d.getFlags(rkeConfig, stateDir)
 
 	APIURL, caCrt, clientCert, clientKey, certs, err := cmd.RestoreEtcdSnapshot(ctx, &rkeConfig, dialers, externalFlags, snapshotName)
+	if err != nil {
+		return d.save(&types.ClusterInfo{
+			Metadata: map[string]string{
+				"Config": yaml,
+			},
+		}, stateDir), err
+	}
 
 	metadata, err := updateMetadata(APIURL, caCrt, clientCert, clientKey, yaml, certs)
-
 	clusterInfo.Metadata = metadata
 	return d.save(clusterInfo, stateDir), err
 }
