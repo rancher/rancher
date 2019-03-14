@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/types/client/management/v3"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Wrapper struct {
@@ -72,7 +73,7 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 		return fmt.Errorf("incorrect global DNS ID %v", request.ID)
 	}
 
-	gDNS, err := w.GlobalDNSLister.Get(split[0], split[1])
+	gDNS, err := w.GlobalDNSes.GetNamespaced(split[0], split[1], v1.GetOptions{})
 	if err != nil {
 		return err
 	}

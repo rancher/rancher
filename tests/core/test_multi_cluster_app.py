@@ -276,6 +276,7 @@ def test_admin_access(admin_mc, admin_pc, user_factory, remove_resource):
                                  templateVersionId=temp_ver,
                                  targets=targets,
                                  roles=["project-member"])
+    wait_for_app(admin_pc, mcapp_name, 60)
     updated_mcapp = client.update(mcapp1, roles=["cluster-owner"])
     wait_for_roles_to_be_updated(admin_mc, updated_mcapp, ["cluster-owner"])
 
