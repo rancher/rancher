@@ -60,7 +60,7 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
   <record>
     tag ${tag}
     log_type k8s_normal_container 
-    {{- range $k, $val := .clusterTarget.OutputTags }}
+    {{- range $k, $val := .clusterTarget.WrapOutputTags }}
     {{$k}} {{$val}}
     {{end }}
   </record>
@@ -280,6 +280,11 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
     </server>
     {{end }}
     {{end }}    
+    {{end }}
+
+    {{- if eq .clusterTarget.CurrentTarget "customtarget"}}
+    {{.clusterTarget.CustomTargetTemplateWrap.CustomTargetConfig.Content}} 
+    {{end }}
 
     <buffer>
       @type file
@@ -290,15 +295,9 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
       {{- if eq .clusterTarget.CurrentTarget "splunk"}}
       chunk_limit_size 8m
       queued_chunks_limit_size 200
-      
       {{end }}
     </buffer> 
-
     slow_flush_log_threshold 40.0
-    {{end }}
-    {{- if eq .clusterTarget.CurrentTarget "customtarget"}}
-    {{.clusterTarget.CustomTargetWrap.Content}} 
-    {{end }}
     </store>
 
     <store>

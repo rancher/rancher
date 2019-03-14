@@ -1,14 +1,20 @@
 package utils
 
 import (
+	"fmt"
 	"net"
 	"net/url"
+	"regexp"
 	"strings"
 
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 
 	"github.com/pkg/errors"
+)
+
+var (
+	rubyCodeBlockReg = regexp.MustCompile(`#\{.*\}`)
 )
 
 type LoggingTargetTemplateWrap struct {
@@ -18,7 +24,7 @@ type LoggingTargetTemplateWrap struct {
 	SyslogTemplateWrap
 	KafkaTemplateWrap
 	FluentForwarderTemplateWrap
-	CustomTargetWrap
+	CustomTargetTemplateWrap
 }
 
 type ClusterLoggingTemplateWrap struct {
@@ -26,6 +32,7 @@ type ClusterLoggingTemplateWrap struct {
 	LoggingTargetTemplateWrap
 	ExcludeNamespace       string
 	IncludeSystemComponent bool
+	WrapOutputTags         map[string]string
 }
 
 type ProjectLoggingTemplateWrap struct {
@@ -35,6 +42,7 @@ type ProjectLoggingTemplateWrap struct {
 	GrepNamespace   string
 	IsSystemProject bool
 	WrapProjectName string
+	WrapOutputTags  map[string]string
 }
 
 func NewWrapClusterLogging(logging v3.ClusterLoggingSpec, excludeNamespace string) (*ClusterLoggingTemplateWrap, error) {
@@ -52,11 +60,19 @@ func NewWrapClusterLogging(logging v3.ClusterLoggingSpec, excludeNamespace strin
 		includeSystemComponent = *logging.IncludeSystemComponent
 	}
 
+	var wrapOutputTags map[string]string
+	if logging.OutputTags != nil {
+		if wrapOutputTags, err = ValidateCustomTags(logging.OutputTags, true); err != nil {
+			return nil, err
+		}
+	}
+
 	return &ClusterLoggingTemplateWrap{
 		LoggingCommonField:        logging.LoggingCommonField,
 		LoggingTargetTemplateWrap: *wrap,
 		ExcludeNamespace:          excludeNamespace,
 		IncludeSystemComponent:    includeSystemComponent,
+		WrapOutputTags:            wrapOutputTags,
 	}, nil
 }
 
@@ -70,6 +86,13 @@ func NewWrapProjectLogging(logging v3.ProjectLoggingSpec, grepNamespace string, 
 		return nil, nil
 	}
 
+	var wrapOutputTags map[string]string
+	if logging.OutputTags != nil {
+		if wrapOutputTags, err = ValidateCustomTags(logging.OutputTags, true); err != nil {
+			return nil, err
+		}
+	}
+
 	wrapProjectName := strings.Replace(logging.ProjectName, ":", "_", -1)
 	return &ProjectLoggingTemplateWrap{
 		ProjectName:               logging.ProjectName,
@@ -78,6 +101,7 @@ func NewWrapProjectLogging(logging v3.ProjectLoggingSpec, grepNamespace string, 
 		GrepNamespace:             grepNamespace,
 		IsSystemProject:           isSystemProject,
 		WrapProjectName:           wrapProjectName,
+		WrapOutputTags:            wrapOutputTags,
 	}, nil
 }
 
@@ -115,14 +139,15 @@ type FluentForwarderTemplateWrap struct {
 	FluentServers  []FluentServer
 }
 
+type CustomTargetTemplateWrap struct {
+	v3.CustomTargetConfig
+	WrapContent string
+}
+
 type FluentServer struct {
 	Host string
 	Port string
 	v3.FluentServer
-}
-
-type CustomTargetWrap struct {
-	v3.CustomTargetConfig
 }
 
 func newLoggingTargetTemplateWrap(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.SyslogConfig, kf *v3.KafkaConfig, ff *v3.FluentForwarderConfig, cc *v3.CustomTargetConfig) (wrapLogging *LoggingTargetTemplateWrap, err error) {
@@ -179,8 +204,11 @@ func newLoggingTargetTemplateWrap(es *v3.ElasticsearchConfig, sp *v3.SplunkConfi
 
 	} else if cc != nil {
 
-		wrap := CustomTargetWrap{*cc}
-		wp.CustomTargetWrap = wrap
+		wrap, err := newCustomTemplateWrap(cc)
+		if err != nil {
+			return nil, err
+		}
+		wp.CustomTargetTemplateWrap = *wrap
 		wp.CurrentTarget = loggingconfig.CustomTarget
 		return wp, nil
 	}
@@ -292,6 +320,17 @@ func newFluentForwarderTemplateWrap(fluentForwarderConfig *v3.FluentForwarderCon
 	}, nil
 }
 
+func newCustomTemplateWrap(customTargetConfig *v3.CustomTargetConfig) (*CustomTargetTemplateWrap, error) {
+	err := ValidateCustomTargetContent(customTargetConfig.Content)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CustomTargetTemplateWrap{
+		CustomTargetConfig: *customTargetConfig,
+	}, nil
+}
+
 func parseEndpoint(endpoint string) (host string, scheme string, err error) {
 	u, err := url.ParseRequestURI(endpoint)
 	if err != nil {
@@ -303,4 +342,90 @@ func parseEndpoint(endpoint string) (host string, scheme string, err error) {
 	}
 
 	return u.Host, u.Scheme, nil
+}
+
+func ValidateCustomTargetContent(content string) error {
+	lines := strings.Split(content, "\n")
+	for _, l := range lines {
+		line := strings.TrimSpace(l)
+		if line == "" {
+			continue
+		}
+
+		lineArray := strings.Split(line, " ")
+		if len(lineArray) == 0 {
+			continue
+		}
+
+		key := lineArray[0]
+		if err := filterFluentdTags(key); err != nil {
+			return err
+		}
+
+		value := strings.TrimSpace(strings.TrimPrefix(line, key))
+		if err := filterRubyCode(value); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func ValidateCustomTags(tags map[string]string, enableEscaped bool) (map[string]string, error) {
+	newTags := make(map[string]string)
+	for key, value := range tags {
+		if err := filterFluentdTags(key); err != nil {
+			return nil, err
+		}
+
+		if err := filterRubyCode(value); err != nil {
+			return nil, err
+		}
+
+		if enableEscaped {
+			newValue := escapeString(value)
+			newTags[key] = newValue
+		}
+	}
+
+	return newTags, nil
+}
+
+func filterFluentdTags(key string) error {
+	invalidTagKeys := []string{
+		"@include",
+		"<source", "<parse", "<filter", "<format", "<storage", "<buffer", "<match", "<record", "<system", "<label", "<route",
+		"</source>", "</parse>", "</filter>", "</format>", "</storage>", "</buffer>", "</match>", "</record>", "</system>", "</label>", "</route>",
+	}
+
+	for _, invalidKey := range invalidTagKeys {
+		if strings.Contains(key, invalidKey) {
+			return errors.New("invalid custom tag key: " + key)
+		}
+	}
+
+	return nil
+}
+
+func filterRubyCode(s string) error {
+	rubyCodeBlocks := rubyCodeBlockReg.FindStringSubmatch(s)
+	if len(rubyCodeBlocks) > 0 {
+		return errors.New("invalid custom field value: " + fmt.Sprintf("%v", rubyCodeBlocks))
+	}
+	return nil
+}
+
+func escapeString(postDoc string) string {
+	var escapeReplacer = strings.NewReplacer(
+		"\t", `\\t`,
+		"\n", `\\n`,
+		"\r", `\\r`,
+		"\f", `\\f`,
+		"\b", `\\b`,
+		"\"", `\\\"`,
+		"\\", `\\\\`,
+	)
+
+	escapeString := escapeReplacer.Replace(postDoc)
+	return fmt.Sprintf(`"%s"`, escapeString)
 }

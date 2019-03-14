@@ -50,9 +50,6 @@ var ProjectTemplate = `
     <record>
       tag ${tag}
       namespace ${record["kubernetes"]["namespace_name"]}
-      {{range $k, $val := $store.OutputTags -}}
-      {{$k}} {{$val}}
-      {{end -}}
       projectID {{$store.ProjectName}}
     </record>
   </filter>
@@ -68,6 +65,16 @@ var ProjectTemplate = `
   <filter {{$store.ProjectName}}.**>
     @type record_transformer
     remove_keys namespace
+  </filter>
+
+  <filter {{$store.ProjectName}}.**>
+    @type record_transformer
+    <record>
+      tag ${tag}
+      {{range $k, $val := $store.WrapOutputTags -}}
+      {{$k}} {{$val}}
+      {{end -}}
+    </record>
   </filter>
 
   {{- if eq $store.CurrentTarget "syslog"}}
@@ -273,6 +280,11 @@ var ProjectTemplate = `
       </server>
       {{end }}
       {{end }}   
+      {{end }}
+
+      {{- if eq $store.CurrentTarget "customtarget"}}
+      {{$store.CustomTargetTemplateWrap.CustomTargetConfig.Content}} 
+      {{end }}
 
       <buffer>
         @type file
@@ -287,11 +299,6 @@ var ProjectTemplate = `
       </buffer> 
 
       slow_flush_log_threshold 40.0
-      {{end }}
-
-      {{- if eq $store.CurrentTarget "customtarget"}}
-      {{$store.CustomTargetWrap.Content}} 
-      {{end }}
     </store>
 
     <store>
