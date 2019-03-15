@@ -16,8 +16,7 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 	if err := convert.ToObj(data, &spec); err != nil {
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "Cluster spec conversion error")
 	}
-	err := v.validateLocalClusterAuthEndpoint(request, &spec)
-	if err != nil {
+	if err := v.validateLocalClusterAuthEndpoint(request, &spec); err != nil {
 		return err
 	}
 	return nil
@@ -43,5 +42,10 @@ func (v *Validator) validateLocalClusterAuthEndpoint(request *types.APIContext, 
 	if !isValidCluster {
 		return httperror.NewFieldAPIError(httperror.InvalidState, "LocalClusterAuthEndpoint.Enabled", "Can only enable LocalClusterAuthEndpoint with RKE")
 	}
+
+	if spec.LocalClusterAuthEndpoint.CACerts != "" && spec.LocalClusterAuthEndpoint.FQDN == "" {
+		return httperror.NewFieldAPIError(httperror.MissingRequired, "LocalClusterAuthEndpoint.FQDN", "CACerts defined but FQDN is not defined")
+	}
+
 	return nil
 }
