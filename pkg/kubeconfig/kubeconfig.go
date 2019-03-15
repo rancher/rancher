@@ -118,10 +118,11 @@ func ForClusterTokenBased(cluster *managementv3.Cluster, clusterID, host, userna
 	nodes := []node{getDefaultNode(cluster.Name, clusterID, host, username)}
 
 	if cluster.LocalClusterAuthEndpoint.FQDN != "" {
+		fqdnCACerts := base64.StdEncoding.EncodeToString([]byte(cluster.LocalClusterAuthEndpoint.CACerts))
 		clusterNode := node{
 			ClusterName: cluster.Name + "-fqdn",
 			Server:      "https://" + cluster.LocalClusterAuthEndpoint.FQDN,
-			Cert:        formatCertString(cluster.LocalClusterAuthEndpoint.CACerts),
+			Cert:        formatCertString(fqdnCACerts),
 			User:        username,
 		}
 		nodes = append(nodes, clusterNode)
