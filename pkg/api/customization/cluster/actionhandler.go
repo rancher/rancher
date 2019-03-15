@@ -700,9 +700,7 @@ func (a ActionHandler) RestoreFromEtcdBackupHandler(actionName string, action *t
 	if clusterBackupConfig != nil && clusterBackupConfig.S3BackupConfig == nil {
 		ns, name := ref.Parse(input.EtcdBackupID)
 		if ns == "" || name == "" {
-			response["message"] = "invalid etcd backup id"
-			apiContext.WriteResponse(http.StatusUnprocessableEntity, response)
-			return errors.Wrapf(err, "invalid input id %s", input.EtcdBackupID)
+			return httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("invalid input id %s", input.EtcdBackupID))
 		}
 		backup, err := a.BackupClient.GetNamespaced(ns, name, metav1.GetOptions{})
 		if err != nil {
@@ -711,9 +709,8 @@ func (a ActionHandler) RestoreFromEtcdBackupHandler(actionName string, action *t
 			return errors.Wrapf(err, "failed to get backup config by ID %s", input.EtcdBackupID)
 		}
 		if backup.Spec.BackupConfig.S3BackupConfig != nil {
-			response["message"] = "restoring S3 backups with no cluster level S3 configuration is not supported"
-			apiContext.WriteResponse(http.StatusMethodNotAllowed, response)
-			return errors.Wrapf(err, "restoring S3 backups with no cluster level S3 configuration is not supported %s", input.EtcdBackupID)
+			return httperror.NewAPIError(httperror.MethodNotAllowed,
+				fmt.Sprintf("restoring S3 backups with no cluster level S3 configuration is not supported %s", input.EtcdBackupID))
 		}
 	}
 
