@@ -19,7 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementv3 "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -265,6 +265,8 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, httperror.NewFieldAPIError(httperror.InvalidOption, "enableNetworkPolicy", err.Error())
 	}
 
+	setBackupConfigSecretKeyIfNotExists(existingCluster, data)
+
 	return r.Store.Update(apiContext, schema, data, id)
 }
 
@@ -386,5 +388,20 @@ func enableLocalBackup(data map[string]interface{}) {
 			// enable rancher etcd backup
 			values.PutValue(data, backupConfig, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig")
 		}
+	}
+}
+
+func setBackupConfigSecretKeyIfNotExists(oldData, newData map[string]interface{}) {
+	s3BackupConfig := values.GetValueN(newData, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig")
+	if s3BackupConfig == nil {
+		return
+	}
+	val := convert.ToMapInterface(s3BackupConfig)
+	if val["secretKey"] != nil {
+		return
+	}
+	oldSecretKey := convert.ToString(values.GetValueN(oldData, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig", "secretKey"))
+	if oldSecretKey != "" {
+		values.PutValue(newData, oldSecretKey, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig", "secretKey")
 	}
 }
