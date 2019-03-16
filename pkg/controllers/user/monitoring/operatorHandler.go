@@ -23,6 +23,11 @@ func (h *operatorHandler) syncCluster(key string, obj *mgmtv3.Cluster) (runtime.
 	if obj == nil || obj.DeletionTimestamp != nil || obj.Name != h.clusterName {
 		return obj, nil
 	}
+
+	if !mgmtv3.ClusterConditionAgentDeployed.IsTrue(obj) {
+		return obj, nil
+	}
+
 	var newCluster *mgmtv3.Cluster
 	var err error
 	//should deploy
@@ -60,6 +65,10 @@ func (h *operatorHandler) syncProject(key string, project *mgmtv3.Project) (runt
 	cluster, err := h.cattleClusterClient.Get(clusterID, metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to find Cluster %s", clusterID)
+	}
+
+	if !mgmtv3.ClusterConditionAgentDeployed.IsTrue(cluster) {
+		return project, nil
 	}
 
 	var newCluster *mgmtv3.Cluster
@@ -113,6 +122,8 @@ func withdrawSystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) error {
 		}
 
 		mgmtv3.ClusterConditionPrometheusOperatorDeployed.False(cluster)
+		mgmtv3.ClusterConditionPrometheusOperatorDeployed.Reason(cluster, "")
+		mgmtv3.ClusterConditionPrometheusOperatorDeployed.Message(cluster, "")
 	}
 
 	return nil
@@ -121,7 +132,7 @@ func withdrawSystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) error {
 func allOwnedProjectsMonitoringDisabling(projectClient mgmtv3.ProjectInterface) (bool, error) {
 	ownedProjectList, err := projectClient.List(metav1.ListOptions{})
 	if err != nil {
-		return false, errors.Wrap(err, "failed to list all projects")
+		return false, err
 	}
 
 	for _, ownedProject := range ownedProjectList.Items {
