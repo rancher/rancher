@@ -818,7 +818,6 @@ spec:
     metric: upstream-response-seconds
   yAxis:
     unit: seconds
-  graphType: singlestat
 ---
 # Source: metric-expression-cluster/templates/graphnode.yaml
 apiVersion: management.cattle.io/v3
@@ -3077,7 +3076,7 @@ metadata:
     source: rancher-monitoring
 spec:
   expression: sum(nginx_ingress_controller_nginx_process_connections{state="reading"})
-  legendFormat: Reading connections
+  legendFormat: Reading
   description: ingresscontroller nginx connection reading
 ---
 kind: MonitorMetric
@@ -3093,7 +3092,7 @@ metadata:
     source: rancher-monitoring
 spec:
   expression: sum(nginx_ingress_controller_nginx_process_connections{state="reading"}) by (instance)
-  legendFormat: Reading connections
+  legendFormat: Reading([[instance]])
   description: ingresscontroller nginx connection reading
 ---
 kind: MonitorMetric
@@ -3109,7 +3108,7 @@ metadata:
     source: rancher-monitoring
 spec:
   expression: sum(nginx_ingress_controller_nginx_process_connections{state="waiting"})
-  legendFormat: Nginx waiting connection
+  legendFormat: Waiting
   description: ingresscontroller nginx connection waiting
 ---
 kind: MonitorMetric
@@ -3125,7 +3124,7 @@ metadata:
     source: rancher-monitoring
 spec:
   expression: sum(nginx_ingress_controller_nginx_process_connections{state="waiting"}) by (instance)
-  legendFormat: Nginx waiting connection
+  legendFormat: Waiting([[instance]])
   description: ingresscontroller nginx connection waiting
 ---
 kind: MonitorMetric
@@ -3141,7 +3140,7 @@ metadata:
     source: rancher-monitoring
 spec:
   expression: sum(nginx_ingress_controller_nginx_process_connections{state="writing"})
-  legendFormat: Writing connections
+  legendFormat: Writing
   description: ingresscontroller nginx connection writing
 ---
 kind: MonitorMetric
@@ -3157,7 +3156,7 @@ metadata:
     source: rancher-monitoring
 spec:
   expression: sum(nginx_ingress_controller_nginx_process_connections{state="writing"}) by (instance)
-  legendFormat: Writing connections
+  legendFormat: Writing([[instance]])
   description: ingresscontroller nginx connection writing
 ---
 kind: MonitorMetric
@@ -3172,8 +3171,8 @@ metadata:
     level: cluster
     source: rancher-monitoring
 spec:
-  expression: sum(increase(nginx_ingress_controller_nginx_process_connections_total{state="accepted"}[5m]))
-  legendFormat: Accepted connections
+  expression: sum(ceil(increase(nginx_ingress_controller_nginx_process_connections_total{state="accepted"}[5m])))
+  legendFormat: Accepted
   description: ingresscontroller nginx connection accepted
 ---
 kind: MonitorMetric
@@ -3188,8 +3187,8 @@ metadata:
     level: cluster
     source: rancher-monitoring
 spec:
-  expression: sum(increase(nginx_ingress_controller_nginx_process_connections_total{state="accepted"}[5m])) by (instance)
-  legendFormat: Accepted connections
+  expression: sum(ceil(increase(nginx_ingress_controller_nginx_process_connections_total{state="accepted"}[5m]))) by (instance)
+  legendFormat: Accepted([[instance]])
   description: ingresscontroller nginx connection accepted
 ---
 kind: MonitorMetric
@@ -3204,8 +3203,8 @@ metadata:
     level: cluster
     source: rancher-monitoring
 spec:
-  expression: sum(increase(nginx_ingress_controller_nginx_process_connections_total{state="active"}[5m]))
-  legendFormat: Active connections
+  expression: sum(ceil(increase(nginx_ingress_controller_nginx_process_connections_total{state="active"}[5m])))
+  legendFormat: Active
   description: ingresscontroller nginx connection active
 ---
 kind: MonitorMetric
@@ -3220,8 +3219,8 @@ metadata:
     level: cluster
     source: rancher-monitoring
 spec:
-  expression: sum(increase(nginx_ingress_controller_nginx_process_connections_total{state="active"}[5m])) by (instance)
-  legendFormat: Active connections
+  expression: sum(ceil(increase(nginx_ingress_controller_nginx_process_connections_total{state="active"}[5m]))) by (instance)
+  legendFormat: Active([[instance]])
   description: ingresscontroller nginx connection active
 ---
 kind: MonitorMetric
@@ -3236,8 +3235,8 @@ metadata:
     level: cluster
     source: rancher-monitoring
 spec:
-  expression: sum(increase(nginx_ingress_controller_nginx_process_connections_total{state="handled"}[5m]))
-  legendFormat: Handled connections
+  expression: sum(ceil(increase(nginx_ingress_controller_nginx_process_connections_total{state="handled"}[5m])))
+  legendFormat: Handled
   description: ingresscontroller nginx connection handled
 ---
 kind: MonitorMetric
@@ -3252,8 +3251,8 @@ metadata:
     level: cluster
     source: rancher-monitoring
 spec:
-  expression: sum(increase(nginx_ingress_controller_nginx_process_connections_total{state="handled"}[5m])) by (instance)
-  legendFormat: Handled connections
+  expression: sum(ceil(increase(nginx_ingress_controller_nginx_process_connections_total{state="handled"}[5m]))) by (instance)
+  legendFormat: Handled([[instance]])
   description: ingresscontroller nginx connection handled
 ---
 kind: MonitorMetric
@@ -3268,9 +3267,9 @@ metadata:
     metric: upstream-response-seconds
     source: rancher-monitoring
 spec:
-  expression: sort_desc(max(nginx_ingress_controller_response_duration_seconds_bucket) by (host, path))
-  legendFormat: Upstream response seconds(host:[[host]] path:[[path]])
-  description: ingresscontroller nginx upstream response seconds by host
+  expression: topk(10, histogram_quantile(0.95,sum by (le, host)(rate(nginx_ingress_controller_response_duration_seconds_bucket{host!="_"}[5m]))))
+  legendFormat: Upstream response duration(host:[[host]])
+  description: top 10 ingresscontroller nginx upstream response seconds by host
 ---
 kind: MonitorMetric
 apiVersion: management.cattle.io/v3
@@ -3284,14 +3283,14 @@ metadata:
     metric: upstream-response-seconds
     source: rancher-monitoring
 spec:
-  expression: sort_desc(max(nginx_ingress_controller_response_duration_seconds_bucket) by (host, path))
-  legendFormat: Upstream response seconds(host:[[host]] path:[[path]])
-  description: ingresscontroller nginx upstream response seconds by host
+  expression: topk(10, histogram_quantile(0.95,sum by (le, host, path)(rate(nginx_ingress_controller_response_duration_seconds_bucket{host!="_"}[5m]))))
+  legendFormat: Upstream response duration(host:[[host]] path:[[path]])
+  description: top 10 ingresscontroller nginx upstream response seconds by path
 ---
 kind: MonitorMetric
 apiVersion: management.cattle.io/v3
 metadata:
-  name: ingresscontroller-nginx-process-seconds-by-path
+  name: ingresscontroller-nginx-process-seconds-by-host
   labels:
     app: metric-expression
     component: ingresscontroller
@@ -3300,14 +3299,14 @@ metadata:
     metric: request-process-seconds
     source: rancher-monitoring
 spec:
-  expression: max(nginx_ingress_controller_request_duration_seconds_bucket{le="1"}) by (host, path)
-  legendFormat: Request duration(host:[[host]] path:[[path]])
-  description: ingresscontroller nginx request duration by path
+  expression: topk(10, histogram_quantile(0.95,sum by (le, host)(rate(nginx_ingress_controller_request_duration_seconds_bucket{host!="_"}[5m]))))
+  legendFormat: Request duration(host:[[host]])
+  description: top 10 ingresscontroller nginx request duration by host
 ---
 kind: MonitorMetric
 apiVersion: management.cattle.io/v3
 metadata:
-  name: ingresscontroller-nginx-process-seconds-by-path-details
+  name: ingresscontroller-nginx-process-seconds-by-host-details
   labels:
     app: metric-expression
     component: ingresscontroller
@@ -3316,9 +3315,9 @@ metadata:
     metric: request-process-seconds
     source: rancher-monitoring
 spec:
-  expression: max(nginx_ingress_controller_request_duration_seconds_bucket{le="1"}) by (host, path)
+  expression:  topk(10, histogram_quantile(0.95,sum by (le, host, path)(rate(nginx_ingress_controller_request_duration_seconds_bucket{host!="_"}[5m]))))
   legendFormat: Request duration(host:[[host]] path:[[path]])
-  description: ingresscontroller nginx request duration by path
+  description: top 10 ingresscontroller nginx request duration by path
 ---
 
 ---
