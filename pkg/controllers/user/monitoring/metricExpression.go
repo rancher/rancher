@@ -793,32 +793,6 @@ spec:
   yAxis:
     unit: seconds
 ---
-apiVersion: management.cattle.io/v3
-kind: ClusterMonitorGraph
-metadata:
-  labels:
-    app: metric-expression
-    source: rancher-monitoring
-    level: cluster
-    component: ingresscontroller
-    cluster-graph: kube-component
-  name: ingresscontroller-upstream-response-seconds
-spec:
-  resourceType: ingresscontroller
-  displayResourceType: kube-component
-  priority: 332
-  title: ingresscontroller-upstream-response-seconds
-  metricsSelector:
-    details: "false"
-    component: ingresscontroller
-    metric: upstream-response-seconds
-  detailsMetricsSelector:
-    details: "true"
-    component: ingresscontroller
-    metric: upstream-response-seconds
-  yAxis:
-    unit: seconds
----
 # Source: metric-expression-cluster/templates/graphnode.yaml
 apiVersion: management.cattle.io/v3
 kind: ClusterMonitorGraph
@@ -3254,38 +3228,6 @@ spec:
   expression: sum(ceil(increase(nginx_ingress_controller_nginx_process_connections_total{state="handled"}[5m]))) by (instance)
   legendFormat: Handled([[instance]])
   description: ingresscontroller nginx connection handled
----
-kind: MonitorMetric
-apiVersion: management.cattle.io/v3
-metadata:
-  name: ingresscontroller-upstream-response-seconds-by-host
-  labels:
-    app: metric-expression
-    component: ingresscontroller
-    details: "false"
-    level: cluster
-    metric: upstream-response-seconds
-    source: rancher-monitoring
-spec:
-  expression: topk(10, histogram_quantile(0.95,sum by (le, host)(rate(nginx_ingress_controller_response_duration_seconds_bucket{host!="_"}[5m]))))
-  legendFormat: Upstream response duration(host:[[host]])
-  description: top 10 ingresscontroller nginx upstream response seconds by host
----
-kind: MonitorMetric
-apiVersion: management.cattle.io/v3
-metadata:
-  name: ingresscontroller-upstream-response-seconds-by-host-details
-  labels:
-    app: metric-expression
-    component: ingresscontroller
-    details: "true"
-    level: cluster
-    metric: upstream-response-seconds
-    source: rancher-monitoring
-spec:
-  expression: topk(10, histogram_quantile(0.95,sum by (le, host, path)(rate(nginx_ingress_controller_response_duration_seconds_bucket{host!="_"}[5m]))))
-  legendFormat: Upstream response duration(host:[[host]] path:[[path]])
-  description: top 10 ingresscontroller nginx upstream response seconds by path
 ---
 kind: MonitorMetric
 apiVersion: management.cattle.io/v3
