@@ -658,7 +658,7 @@ func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, opts *type
 	if newState.NodeVersion != "" {
 		log.Infof(ctx, "Updating node version to %v", newState.NodeVersion)
 		operation, err := svc.Projects.Zones.Clusters.NodePools.Update(state.ProjectID, state.Zone, state.Name, state.NodePoolID, &raw.UpdateNodePoolRequest{
-			NodeVersion: state.NodeVersion,
+			NodeVersion: newState.NodeVersion,
 		}).Context(ctx).Do()
 		if err != nil {
 			return nil, err
