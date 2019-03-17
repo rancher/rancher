@@ -537,6 +537,7 @@ func StartBackupServer(ctx context.Context, etcdHost *hosts.Host, prsMap map[str
 	if err := docker.DoRunContainer(ctx, etcdHost.DClient, imageCfg, hostCfg, EtcdServeBackupContainerName, etcdHost.Address, ETCDRole, prsMap); err != nil {
 		return err
 	}
+	time.Sleep(EtcdSnapshotWaitTime * time.Second)
 	container, err := docker.InspectContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdServeBackupContainerName)
 	if err != nil {
 		return err
