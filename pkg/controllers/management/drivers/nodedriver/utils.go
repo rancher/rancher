@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/rpc"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/docker/machine/libmachine/drivers/plugin/localbinary"
@@ -56,7 +55,7 @@ func FlagToField(flag cli.Flag) (string, v3.Field, error) {
 	case *cli.IntFlag:
 		field.Description = v.Usage
 		field.Type = "int"
-		field.Default.StringValue = strconv.Itoa(v.Value)
+		field.Default.IntValue = v.Value
 	case *cli.BoolFlag:
 		field.Type = "boolean"
 		field.Description = v.Usage
