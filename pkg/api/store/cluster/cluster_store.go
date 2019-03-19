@@ -265,7 +265,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, httperror.NewFieldAPIError(httperror.InvalidOption, "enableNetworkPolicy", err.Error())
 	}
 
-	setBackupConfigSecretKeyIfNotExists(existingCluster, data)
+	setPasswordTypeIfNotExists(existingCluster, data)
 
 	return r.Store.Update(apiContext, schema, data, id)
 }
@@ -391,17 +391,50 @@ func enableLocalBackup(data map[string]interface{}) {
 	}
 }
 
-func setBackupConfigSecretKeyIfNotExists(oldData, newData map[string]interface{}) {
-	s3BackupConfig := values.GetValueN(newData, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig")
-	if s3BackupConfig == nil {
+func setValueFromExistingData(oldData, newData map[string]interface{}, field string, keys ...string) {
+	config := values.GetValueN(newData, keys...)
+	if config == nil {
 		return
 	}
-	val := convert.ToMapInterface(s3BackupConfig)
-	if val["secretKey"] != nil {
+	val := convert.ToMapInterface(config)
+	if val[field] != nil {
 		return
 	}
-	oldSecretKey := convert.ToString(values.GetValueN(oldData, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig", "secretKey"))
-	if oldSecretKey != "" {
-		values.PutValue(newData, oldSecretKey, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig", "secretKey")
+	keys = append(keys, field)
+	old := convert.ToString(values.GetValueN(oldData, keys...))
+	if old != "" {
+		values.PutValue(newData, old, keys...)
 	}
+}
+
+func setSliceValueFromExistingData(oldData, newData map[string]interface{}, id, field string, keys ...string) {
+	newSlice, ok := values.GetSlice(newData, keys...)
+	if !ok || newSlice == nil {
+		return
+	}
+	oldSlice, ok := values.GetSlice(oldData, keys...)
+	if !ok || oldSlice == nil {
+		return
+	}
+
+	var updatedConfig []map[string]interface{}
+	for _, newConfig := range newSlice {
+		if newConfig[field] != nil {
+			updatedConfig = append(updatedConfig, newConfig)
+			continue
+		}
+		for _, oldConfig := range oldSlice {
+			if newConfig[id] == oldConfig[id] && oldConfig[field] != nil {
+				newConfig[field] = oldConfig[field]
+				break
+			}
+		}
+		updatedConfig = append(updatedConfig, newConfig)
+	}
+	values.PutValue(newData, updatedConfig, keys...)
+}
+
+func setPasswordTypeIfNotExists(oldData, newData map[string]interface{}) {
+	setValueFromExistingData(oldData, newData, "secretKey", "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig")
+	setSliceValueFromExistingData(oldData, newData, "url", "password", "rancherKubernetesEngineConfig", "privateRegistries")
 }
