@@ -82,7 +82,7 @@ func ClusterInit(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfi
 		return err
 	}
 
-	err = doUpgradeLegacyCluster(ctx, kubeCluster, rkeFullState)
+	err = doUpgradeLegacyCluster(ctx, kubeCluster, rkeFullState, flags)
 	if err != nil {
 		log.Warnf(ctx, "[state] can't fetch legacy cluster state from Kubernetes")
 	}
@@ -128,7 +128,7 @@ func setS3OptionsFromCLI(c *cli.Context) *v3.S3BackupConfig {
 	return s3BackupBackend
 }
 
-func doUpgradeLegacyCluster(ctx context.Context, kubeCluster *cluster.Cluster, fullState *cluster.FullState) error {
+func doUpgradeLegacyCluster(ctx context.Context, kubeCluster *cluster.Cluster, fullState *cluster.FullState, flags cluster.ExternalFlags) error {
 	if _, err := os.Stat(kubeCluster.LocalKubeConfigPath); os.IsNotExist(err) {
 		// there is no kubeconfig. This is a new cluster
 		logrus.Debug("[state] local kubeconfig not found, this is a new cluster")
@@ -147,13 +147,24 @@ func doUpgradeLegacyCluster(ctx context.Context, kubeCluster *cluster.Cluster, f
 	}
 	recoveredCluster, err := cluster.GetStateFromKubernetes(ctx, kubeCluster)
 	if err != nil {
-		return err
+		log.Warnf(ctx, "Failed to fetch state from kubernetes: %v", err)
+		// try to fetch state from nodes
+		err = kubeCluster.TunnelHosts(ctx, flags)
+		if err != nil {
+			return err
+		}
+		recoveredCluster = cluster.GetStateFromNodes(ctx, kubeCluster)
 	}
 	// if we found a recovered cluster, we will need override the current state
 	if recoveredCluster != nil {
 		recoveredCerts, err := cluster.GetClusterCertsFromKubernetes(ctx, kubeCluster)
 		if err != nil {
-			return err
+			log.Warnf(ctx, "Failed to fetch certs from kubernetes: %v", err)
+			// try to fetch certs from nodes
+			recoveredCerts, err = cluster.GetClusterCertsFromNodes(ctx, kubeCluster)
+			if err != nil {
+				return err
+			}
 		}
 		fullState.CurrentState.RancherKubernetesEngineConfig = recoveredCluster.RancherKubernetesEngineConfig.DeepCopy()
 		fullState.CurrentState.CertificatesBundle = recoveredCerts

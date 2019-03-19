@@ -117,7 +117,7 @@ func RestoreEtcdSnapshot(
 	}
 	stateFilePath := cluster.GetStateFilePath(flags.ClusterFilePath, flags.ConfigDir)
 	rkeFullState, _ := cluster.ReadStateFile(ctx, stateFilePath)
-	if err := doUpgradeLegacyCluster(ctx, kubeCluster, rkeFullState); err != nil {
+	if err := doUpgradeLegacyCluster(ctx, kubeCluster, rkeFullState, flags); err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
 

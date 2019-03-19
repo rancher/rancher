@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -263,4 +264,30 @@ func removeStateFile(ctx context.Context, statePath string) {
 		return
 	}
 	log.Infof(ctx, "State file removed successfully")
+}
+
+func GetStateFromNodes(ctx context.Context, kubeCluster *Cluster) *Cluster {
+	log.Infof(ctx, "[state] Fetching cluster state from Nodes")
+	var currentCluster Cluster
+	var clusterFile string
+	var err error
+
+	uniqueHosts := hosts.GetUniqueHostList(kubeCluster.EtcdHosts, kubeCluster.ControlPlaneHosts, kubeCluster.WorkerHosts)
+	for _, host := range uniqueHosts {
+		filePath := path.Join(host.PrefixPath, pki.TempCertPath, pki.ClusterStateFile)
+		clusterFile, err = pki.FetchFileFromHost(ctx, filePath, kubeCluster.SystemImages.Alpine, host, kubeCluster.PrivateRegistriesMap, pki.StateDeployerContainerName, "state")
+		if err == nil {
+			break
+		}
+	}
+	if len(clusterFile) == 0 {
+		return nil
+	}
+	err = yaml.Unmarshal([]byte(clusterFile), &currentCluster)
+	if err != nil {
+		logrus.Debugf("[state] Failed to unmarshal the cluster file fetched from nodes: %v", err)
+		return nil
+	}
+	log.Infof(ctx, "[state] Successfully fetched cluster state from Nodes")
+	return &currentCluster
 }
