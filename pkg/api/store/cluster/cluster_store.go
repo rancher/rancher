@@ -266,6 +266,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	}
 
 	setBackupConfigSecretKeyIfNotExists(existingCluster, data)
+	setPrivateRegistryPasswordIfNotExists(existingCluster, data)
 
 	return r.Store.Update(apiContext, schema, data, id)
 }
@@ -404,4 +405,32 @@ func setBackupConfigSecretKeyIfNotExists(oldData, newData map[string]interface{}
 	if oldSecretKey != "" {
 		values.PutValue(newData, oldSecretKey, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig", "secretKey")
 	}
+}
+
+func setPrivateRegistryPasswordIfNotExists(oldData, newData map[string]interface{}) {
+	newSlice, ok := values.GetSlice(newData, "rancherKubernetesEngineConfig", "privateRegistries")
+	if !ok || newSlice == nil {
+		return
+	}
+	oldSlice, ok := values.GetSlice(oldData, "rancherKubernetesEngineConfig", "privateRegistries")
+	if !ok || oldSlice == nil {
+		return
+	}
+
+	var updatedConfig []map[string]interface{}
+	for _, newConfig := range newSlice {
+		if newConfig["password"] != nil {
+			updatedConfig = append(updatedConfig, newConfig)
+			continue
+		}
+		for _, oldConfig := range oldSlice {
+			if newConfig["url"] == oldConfig["url"] && newConfig["user"] == oldConfig["user"] &&
+				oldConfig["password"] != nil {
+				newConfig["password"] = oldConfig["password"]
+				break
+			}
+		}
+		updatedConfig = append(updatedConfig, newConfig)
+	}
+	values.PutValue(newData, updatedConfig, "rancherKubernetesEngineConfig", "privateRegistries")
 }
