@@ -49,7 +49,7 @@ func (s *store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 	}
 	clustersWithKontainerDriver, err := s.ClusterIndexer.ByIndex(clusterByGenericEngineConfigKey, id)
 	if err != nil {
-		return nil, errorsutil.WithMessage(err, fmt.Sprintf("error determing if kontainer driver [%s] was in use", driver.Status.DisplayName))
+		return nil, errorsutil.WithMessage(err, fmt.Sprintf("error determining if kontainer driver [%s] was in use", driver.Status.DisplayName))
 	}
 
 	if len(clustersWithKontainerDriver) != 0 {
