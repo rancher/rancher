@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/rpc"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/docker/machine/libmachine/drivers/plugin/localbinary"
@@ -53,9 +54,11 @@ func FlagToField(flag cli.Flag) (string, v3.Field, error) {
 		field.Description = v.Usage
 		field.Default.StringValue = v.Value
 	case *cli.IntFlag:
+		// This will make the int flag appear as a string field in the rancher API, but we are doing this to maintain
+		// backward compatibility, at least until we fix a bug that prevents nodeDriver schemas from updating upon
+		// a Rancher upgrade
 		field.Description = v.Usage
-		field.Type = "int"
-		field.Default.IntValue = v.Value
+		field.Default.StringValue = strconv.Itoa(v.Value)
 	case *cli.BoolFlag:
 		field.Type = "boolean"
 		field.Description = v.Usage
