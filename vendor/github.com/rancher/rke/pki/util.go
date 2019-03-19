@@ -395,7 +395,10 @@ func populateCertMap(tmpCerts map[string]CertificatePKI, localConfigPath string,
 		etcdCrt, etcdKey := tmpCerts[etcdName].Certificate, tmpCerts[etcdName].Key
 		certs[etcdName] = ToCertObject(etcdName, "", "", etcdCrt, etcdKey, nil)
 	}
-
+	// Request header ca
+	certs[RequestHeaderCACertName] = ToCertObject(RequestHeaderCACertName, "", "", tmpCerts[RequestHeaderCACertName].Certificate, tmpCerts[RequestHeaderCACertName].Key, nil)
+	// Api proxy client
+	certs[APIProxyClientCertName] = ToCertObject(APIProxyClientCertName, "", "", tmpCerts[APIProxyClientCertName].Certificate, tmpCerts[APIProxyClientCertName].Key, nil)
 	return certs
 }
 
