@@ -157,7 +157,7 @@ func (c *Controller) doClusterBackupSync(cluster *v3.Cluster) error {
 	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return nil
 	}
-	// check if the cluster is eligable for backup.
+	// check if the cluster is eligible for backup.
 	if !shouldBackup(cluster) {
 		return nil
 	}
