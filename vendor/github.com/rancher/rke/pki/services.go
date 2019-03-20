@@ -361,7 +361,7 @@ func GenerateEtcdCertificates(ctx context.Context, certs map[string]CertificateP
 	etcdAltNames := GetAltNames(etcdHosts, clusterDomain, kubernetesServiceIP, []string{})
 	for _, host := range etcdHosts {
 		etcdName := GetEtcdCrtName(host.InternalAddress)
-		if _, ok := certs[etcdName]; ok && !rotate {
+		if _, ok := certs[etcdName]; ok && certs[etcdName].CertificatePEM != "" && !rotate {
 			continue
 		}
 		var serviceKey *rsa.PrivateKey

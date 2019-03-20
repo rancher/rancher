@@ -283,7 +283,7 @@ func (c *Cluster) BuildKubeControllerProcess(prefixPath string) v3.Process {
 	}
 
 	CommandArgs := map[string]string{
-		"address":                          "127.0.0.1",
+		"address":                          "0.0.0.0",
 		"allow-untagged-cloud":             "true",
 		"allocate-node-cidrs":              "true",
 		"cloud-provider":                   c.CloudProvider.Name,
@@ -620,7 +620,7 @@ func (c *Cluster) BuildSchedulerProcess(prefixPath string) v3.Process {
 	CommandArgs := map[string]string{
 		"leader-elect": "true",
 		"v":            "2",
-		"address":      "127.0.0.1",
+		"address":      "0.0.0.0",
 		"profiling":    "false",
 		"kubeconfig":   pki.GetConfigPath(pki.KubeSchedulerCertName),
 	}
