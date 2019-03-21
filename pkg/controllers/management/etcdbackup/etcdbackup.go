@@ -296,7 +296,7 @@ func getBackupFilename(snapshotName string, cluster *v3.Cluster) string {
 		return ""
 	}
 	target := cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig
-	return fmt.Sprintf("https://s3-%s.amazonaws.com/%s/%s", target.Region, target.BucketName, snapshotName)
+	return fmt.Sprintf("https://s3.%s.amazonaws.com/%s/%s", target.Region, target.BucketName, snapshotName)
 }
 
 func (c *Controller) deleteS3Snapshot(b *v3.EtcdBackup) error {
