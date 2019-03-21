@@ -1,18 +1,17 @@
 package catalog
 
 import (
-	"github.com/rancher/rancher/pkg/ref"
-	"time"
-
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	"github.com/ghodss/yaml"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/compose"
@@ -90,6 +89,7 @@ func (a ActionHandler) ExportYamlHandler(apiContext *types.APIContext, next type
 		}
 		delete(m["catalogs"].(map[string]interface{})[catalog.Name].(map[string]interface{}), "actions")
 		delete(m["catalogs"].(map[string]interface{})[catalog.Name].(map[string]interface{}), "links")
+		delete(m["catalogs"].(map[string]interface{})[catalog.Name].(map[string]interface{}), "password")
 		data, err := json.Marshal(m)
 		if err != nil {
 			return err
