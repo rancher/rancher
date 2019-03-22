@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	errorsutil "github.com/pkg/errors"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
@@ -37,6 +39,7 @@ const (
 	creatorIDAnn              = "field.cattle.io/creatorId"
 	MultiClusterAppIDSelector = "mcapp"
 	projectIDFieldLabel       = "field.cattle.io/projectId"
+	userAction                = "userAction"
 )
 
 func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
@@ -90,6 +93,15 @@ func (l *Lifecycle) Create(obj *v3.App) (runtime.Object, error) {
 	return obj, nil
 }
 
+/*
+Updated depends on several conditions:
+	AppConditionMigrated: protects upgrade path for apps <2.1
+	AppConditionInstalled: flips status in UI and drives logic
+	AppConditionDeployed: flips status in UI
+	AppConditionForceUpgrade: add destructive `--force` param to helm upgrade
+	Annotations:
+	userAction annotation indicates user driven action
+*/
 func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 	if obj.Spec.ExternalID == "" && len(obj.Spec.Files) == 0 {
 		return obj, nil
@@ -108,6 +120,7 @@ func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 	if err != nil {
 		return obj, err
 	}
+
 	obj = newObj.(*v3.App)
 	appRevisionClient := l.AppRevisionGetter.AppRevisions(projectName)
 	if obj.Spec.AppRevisionName != "" {
@@ -115,21 +128,20 @@ func (l *Lifecycle) Updated(obj *v3.App) (runtime.Object, error) {
 		if err != nil {
 			return nil, err
 		}
-		if obj.Spec.ExternalID != "" {
-			if currentRevision.Status.ExternalID == obj.Spec.ExternalID && reflect.DeepEqual(currentRevision.Status.Answers, obj.Spec.Answers) && reflect.DeepEqual(currentRevision.Status.ValuesYaml, obj.Spec.ValuesYaml) {
-				if !v3.AppConditionForceUpgrade.IsTrue(obj) {
-					v3.AppConditionForceUpgrade.True(obj)
-				}
-				return obj, nil
+		// no-op if no change and not forcing recreation and this update was not driven by a user action
+		/*
+			This if statement gates most of the logic for Update. We should only deploy the app when we actually want to.
+			But we call update when we may only want to change a UI status. In those cases, we should return here and not
+			go further. We want to deploy the app when:
+				* The current App revision is different than the app, ex. the app is different than it was before
+				* The force upgrade flag is set, where AppConditionForceUpgrade being unknown is equal to true.
+				* The user caused the action by way of clicking either upgrade or rollback
+		*/
+		if isSame(obj, currentRevision) && !v3.AppConditionForceUpgrade.IsUnknown(obj) && !convert.ToBool(obj.Annotations[userAction]) {
+			if !v3.AppConditionForceUpgrade.IsTrue(obj) {
+				v3.AppConditionForceUpgrade.True(obj)
 			}
-		}
-		if obj.Status.AppliedFiles != nil {
-			if reflect.DeepEqual(obj.Status.AppliedFiles, obj.Spec.Files) && reflect.DeepEqual(currentRevision.Status.Answers, obj.Spec.Answers) && reflect.DeepEqual(currentRevision.Status.ValuesYaml, obj.Spec.ValuesYaml) {
-				if !v3.AppConditionForceUpgrade.IsTrue(obj) {
-					v3.AppConditionForceUpgrade.True(obj)
-				}
-				return obj, nil
-			}
+			return obj, nil
 		}
 	}
 	created := false
@@ -209,6 +221,7 @@ func (l *Lifecycle) DeployApp(obj *v3.App) (*v3.App, error) {
 	var err error
 	if !v3.AppConditionInstalled.IsUnknown(obj) {
 		v3.AppConditionInstalled.Unknown(obj)
+		// update status in the UI
 		obj, err = l.AppGetter.Apps("").Update(obj)
 		if err != nil {
 			return obj, err
@@ -305,6 +318,12 @@ func (l *Lifecycle) Run(obj *v3.App, template, templateDir, notes string) error 
 		return err
 	}
 	if err := helmInstall(templateDir, kubeConfigPath, obj); err != nil {
+		// create an app revision so that user can decide to continue
+		err2 := l.createAppRevision(obj, template, notes, true)
+		if err2 != nil {
+			return errorsutil.Wrapf(err, "error encountered while creating appRevision %v",
+				err2)
+		}
 		return err
 	}
 	return l.createAppRevision(obj, template, notes, false)
@@ -372,4 +391,22 @@ func (l *Lifecycle) writeKubeConfig(obj *v3.App, tempDir string, remove bool) (s
 		return "", err
 	}
 	return kubeConfigPath, nil
+}
+
+func isSame(obj *v3.App, revision *v3.AppRevision) bool {
+	if obj.Spec.ExternalID != "" {
+		if revision.Status.ExternalID == obj.Spec.ExternalID && reflect.DeepEqual(revision.Status.Answers, obj.Spec.Answers) && reflect.DeepEqual(revision.Status.ValuesYaml, obj.Spec.ValuesYaml) {
+			return true
+		}
+		return false
+	}
+
+	if obj.Status.AppliedFiles != nil {
+		if reflect.DeepEqual(obj.Status.AppliedFiles, obj.Spec.Files) && reflect.DeepEqual(revision.Status.Answers, obj.Spec.Answers) && reflect.DeepEqual(revision.Status.ValuesYaml, obj.Spec.ValuesYaml) {
+			return true
+		}
+		return false
+	}
+
+	return false
 }

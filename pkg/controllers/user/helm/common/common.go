@@ -31,6 +31,7 @@ const (
 
 	systemCatalogName     = "system-library"
 	systemDefaultRegistry = "global.systemDefaultRegistry"
+	userAction            = "userAction"
 )
 
 func ParseExternalID(externalID string) (string, string, error) {
@@ -88,7 +89,7 @@ func InjectDefaultRegistry(obj *v3.App) {
 // StartTiller start tiller server and return the listening address of the grpc address
 func StartTiller(context context.Context, port, probePort, namespace, kubeConfigPath string) error {
 	cmd := exec.Command(tillerName, "--listen", ":"+port, "--probe", ":"+probePort)
-	cmd.Env = []string{fmt.Sprintf("%s=%s", "KUBECONFIG", kubeConfigPath), fmt.Sprintf("%s=%s", "TILLER_NAMESPACE", namespace)}
+	cmd.Env = []string{fmt.Sprintf("%s=%s", "KUBECONFIG", kubeConfigPath), fmt.Sprintf("%s=%s", "TILLER_NAMESPACE", namespace), fmt.Sprintf("%s=%s", "TILLER_HISTORY_MAX", "1")}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
@@ -97,6 +98,7 @@ func StartTiller(context context.Context, port, probePort, namespace, kubeConfig
 	defer cmd.Wait()
 	select {
 	case <-context.Done():
+		logrus.Debug("Stopping Tiller")
 		return cmd.Process.Kill()
 	}
 }
@@ -127,8 +129,11 @@ func InstallCharts(rootDir, port string, obj *v3.App) error {
 
 	if v3.AppConditionForceUpgrade.IsUnknown(obj) {
 		commands = append(commands, forceUpgradeStr)
+		// don't leave force recreate on the object
+		v3.AppConditionForceUpgrade.True(obj)
 	}
-
+	// switch userAction back
+	obj.Annotations[userAction] = "false"
 	cmd := exec.Command(helmName, commands...)
 	cmd.Env = []string{fmt.Sprintf("%s=%s", "HELM_HOST", "127.0.0.1:"+port)}
 	stderrBuf := &bytes.Buffer{}
