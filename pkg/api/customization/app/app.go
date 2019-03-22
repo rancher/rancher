@@ -151,7 +151,8 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		if valuesYaml != nil {
 			obj.Spec.ValuesYaml = convert.ToString(valuesYaml)
 		}
-
+		// indicate this a user driven action
+		pv3.AppConditionUserTriggeredAction.True(obj)
 		if _, err := w.AppGetter.Apps(namespace).Update(obj); err != nil {
 			return err
 		}
@@ -183,7 +184,8 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 			obj.Annotations[creatorIDAnno] = w.UserManager.GetUser(apiContext)
 		}
 		obj.Spec.Files = appRevision.Status.Files
-
+		// indicate this a user driven action
+		pv3.AppConditionUserTriggeredAction.True(obj)
 		if _, err := w.AppGetter.Apps(namespace).Update(obj); err != nil {
 			return err
 		}
