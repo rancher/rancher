@@ -3,13 +3,13 @@ package monitor
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/rancher/norman/api/access"
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
@@ -106,7 +106,7 @@ func (h *ClusterGraphHandler) QuerySeriesAction(actionName string, action *types
 	seriesSlice, err := prometheusQuery.Do(queries)
 	if err != nil {
 		logrus.WithError(err).Warn("query series failed")
-		return errors.New("failed to obtain metrics. The metrics service may not be available")
+		return httperror.NewAPIError(httperror.ServerError, "Failed to obtain metrics. The metrics service may not be available.")
 	}
 
 	if seriesSlice == nil {
