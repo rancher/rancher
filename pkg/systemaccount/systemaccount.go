@@ -24,6 +24,7 @@ func NewManager(management *config.ManagementContext) *Manager {
 		crts:        management.Management.ClusterRegistrationTokens(""),
 		prtbs:       management.Management.ProjectRoleTemplateBindings(""),
 		tokens:      management.Management.Tokens(""),
+		users:       management.Management.Users(""),
 	}
 }
 
@@ -34,6 +35,7 @@ func NewManagerFromScale(management *config.ScaledContext) *Manager {
 		crts:        management.Management.ClusterRegistrationTokens(""),
 		prtbs:       management.Management.ProjectRoleTemplateBindings(""),
 		tokens:      management.Management.Tokens(""),
+		users:       management.Management.Users(""),
 	}
 }
 
@@ -43,6 +45,7 @@ type Manager struct {
 	crts        v3.ClusterRegistrationTokenInterface
 	prtbs       v3.ProjectRoleTemplateBindingInterface
 	tokens      v3.TokenInterface
+	users       v3.UserInterface
 }
 
 func (s *Manager) CreateSystemAccount(cluster *v3.Cluster) error {
@@ -145,4 +148,19 @@ func (s *Manager) GetOrCreateProjectSystemToken(projectName string) (string, err
 		return "", err
 	}
 	return s.userManager.EnsureToken(projectName+"-pipeline", "Pipeline token for project "+projectName, user.Name)
+}
+
+func (s *Manager) RemoveSystemAccount(userID string) error {
+	u, err := s.userManager.GetUserByPrincipalID(fmt.Sprintf("system://%s", userID))
+	if err != nil {
+		return err
+	}
+	if u == nil {
+		// user not found, must have been removed
+		return nil
+	}
+	if err := s.users.Delete(u.Name, &v1.DeleteOptions{}); err != nil && !errors2.IsNotFound(err) && !errors2.IsGone(err) {
+		return err
+	}
+	return nil
 }

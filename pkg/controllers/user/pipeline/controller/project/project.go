@@ -4,8 +4,6 @@ import (
 	"context"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
@@ -15,8 +13,10 @@ import (
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	pclient "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // This controller is responsible for initializing source code
@@ -60,6 +60,10 @@ func (l *Syncer) Sync(key string, obj *v3.Project) (runtime.Object, error) {
 		splits := strings.Split(key, "/")
 		if len(splits) == 2 {
 			projectID = splits[1]
+		}
+		// remove the system account created for this project
+		if err := l.systemAccountManager.RemoveSystemAccount(projectID); err != nil {
+			return nil, err
 		}
 		return nil, l.cleanInternalRegistryEntry(projectID)
 	}
