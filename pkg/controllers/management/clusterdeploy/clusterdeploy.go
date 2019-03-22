@@ -49,7 +49,11 @@ func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, 
 		err, updateErr error
 	)
 
-	if key == "" || cluster == nil {
+	if cluster == nil || cluster.DeletionTimestamp != nil {
+		// remove the system account user created for this cluster
+		if err := cd.systemAccountManager.RemoveSystemAccount(key); err != nil {
+			return nil, err
+		}
 		return nil, nil
 	}
 
