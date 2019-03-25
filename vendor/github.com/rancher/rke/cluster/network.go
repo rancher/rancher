@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 
 	"github.com/docker/docker/api/types/container"
@@ -27,14 +28,16 @@ const (
 	CPPortListenContainer     = "rke-cp-port-listener"
 	WorkerPortListenContainer = "rke-worker-port-listener"
 
-	KubeAPIPort         = "6443"
-	EtcdPort1           = "2379"
-	EtcdPort2           = "2380"
-	ScedulerPort        = "10251"
-	ControllerPort      = "10252"
-	KubeletPort         = "10250"
-	KubeProxyPort       = "10256"
-	FlannetVXLANPortUDP = "8472"
+	KubeAPIPort      = "6443"
+	EtcdPort1        = "2379"
+	EtcdPort2        = "2380"
+	ScedulerPort     = "10251"
+	ControllerPort   = "10252"
+	KubeletPort      = "10250"
+	KubeProxyPort    = "10256"
+	FlannelVxLanPort = 8472
+
+	FlannelVxLanNetworkIdentify = 1
 
 	ProtocolTCP = "TCP"
 	ProtocolUDP = "UDP"
@@ -44,6 +47,10 @@ const (
 	FlannelNetworkPlugin = "flannel"
 	FlannelIface         = "flannel_iface"
 	FlannelBackendType   = "flannel_backend_type"
+	// FlannelBackendPort must be 4789 if using VxLan mode in the cluster with Windows nodes
+	FlannelBackendPort = "flannel_backend_port"
+	// FlannelBackendVxLanNetworkIdentify should be greater than or equal to 4096 if using VxLan mode in the cluster with Windows nodes
+	FlannelBackendVxLanNetworkIdentify = "flannel_backend_vni"
 
 	CalicoNetworkPlugin = "calico"
 	CalicoCloudProvider = "calico_cloud_provider"
@@ -51,6 +58,10 @@ const (
 	CanalNetworkPlugin      = "canal"
 	CanalIface              = "canal_iface"
 	CanalFlannelBackendType = "canal_flannel_backend_type"
+	// CanalFlannelBackendPort must be 4789 if using Flannel VxLan mode in the cluster with Windows nodes
+	CanalFlannelBackendPort = "canal_flannel_backend_port"
+	// CanalFlannelBackendVxLanNetworkIdentify should be greater than or equal to 4096 if using Flannel VxLan mode in the cluster with Windows nodes
+	CanalFlannelBackendVxLanNetworkIdentify = "canal_flannel_backend_vni"
 
 	WeaveNetworkPlugin  = "weave"
 	WeaveNetowrkAppName = "weave-net"
@@ -132,6 +143,15 @@ func (c *Cluster) deployNetworkPlugin(ctx context.Context) error {
 }
 
 func (c *Cluster) doFlannelDeploy(ctx context.Context) error {
+	vni, err := atoiWithDefault(c.Network.Options[FlannelBackendVxLanNetworkIdentify], FlannelVxLanNetworkIdentify)
+	if err != nil {
+		return err
+	}
+	port, err := atoiWithDefault(c.Network.Options[FlannelBackendPort], FlannelVxLanPort)
+	if err != nil {
+		return err
+	}
+
 	flannelConfig := map[string]interface{}{
 		ClusterCIDR:      c.ClusterCIDR,
 		Image:            c.SystemImages.Flannel,
@@ -139,6 +159,8 @@ func (c *Cluster) doFlannelDeploy(ctx context.Context) error {
 		FlannelInterface: c.Network.Options[FlannelIface],
 		FlannelBackend: map[string]interface{}{
 			"Type": c.Network.Options[FlannelBackendType],
+			"VNI":  vni,
+			"Port": port,
 		},
 		RBACConfig:     c.Authorization.Mode,
 		ClusterVersion: util.GetTagMajorVersion(c.Version),
@@ -169,6 +191,15 @@ func (c *Cluster) doCalicoDeploy(ctx context.Context) error {
 }
 
 func (c *Cluster) doCanalDeploy(ctx context.Context) error {
+	flannelVni, err := atoiWithDefault(c.Network.Options[CanalFlannelBackendVxLanNetworkIdentify], FlannelVxLanNetworkIdentify)
+	if err != nil {
+		return err
+	}
+	flannelPort, err := atoiWithDefault(c.Network.Options[CanalFlannelBackendPort], FlannelVxLanPort)
+	if err != nil {
+		return err
+	}
+
 	clientConfig := pki.GetConfigPath(pki.KubeNodeCertName)
 	canalConfig := map[string]interface{}{
 		ClientCertPath:  pki.GetCertPath(pki.KubeNodeCertName),
@@ -184,6 +215,8 @@ func (c *Cluster) doCanalDeploy(ctx context.Context) error {
 		CanalInterface:  c.Network.Options[CanalIface],
 		FlannelBackend: map[string]interface{}{
 			"Type": c.Network.Options[CanalFlannelBackendType],
+			"VNI":  flannelVni,
+			"Port": flannelPort,
 		},
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(canalConfig)
@@ -509,4 +542,17 @@ func getPortBindings(hostAddress string, portList []string) []nat.PortBinding {
 		portBindingList = append(portBindingList, portMapping[0].Binding)
 	}
 	return portBindingList
+}
+
+func atoiWithDefault(val string, defaultVal int) (int, error) {
+	if val == "" {
+		return defaultVal, nil
+	}
+
+	ret, err := strconv.Atoi(val)
+	if err != nil {
+		return 0, err
+	}
+
+	return ret, nil
 }
