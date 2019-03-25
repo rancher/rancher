@@ -31,13 +31,13 @@ $RancherDir = "C:\etc\rancher"
 $KubeDir = "C:\etc\kubernetes"
 $CNIDir = "C:\etc\cni"
 $NginxConfigDir = "C:\etc\nginx"
-$RancherLogDir = "C:\var\log\rancher"
+$LogDir = "C:\var\log"
 
 $null = New-Item -Force -Type Directory -Path $RancherDir -ErrorAction Ignore
 $null = New-Item -Force -Type Directory -Path $KubeDir -ErrorAction Ignore
 $null = New-Item -Force -Type Directory -Path $CNIDir -ErrorAction Ignore
 $null = New-Item -Force -Type Directory -Path $NginxConfigDir -ErrorAction Ignore
-$null = New-Item -Force -Type Directory -Path $RancherLogDir -ErrorAction Ignore
+$null = New-Item -Force -Type Directory -Path $LogDir -ErrorAction Ignore
 
 $NodeName = $NodeName.ToLower()
 $KubeCNIMode = $KubeCNIMode.ToLower()
@@ -603,28 +603,25 @@ function start-flanneld {
     wait-ready -Path "$CNIDir\bin\flanneld.exe"
 
     ## config running params ##
+    $fgRun = get-env-var -Key "CATTLE_AGENT_FG_RUN"
     $flanneldArgs = @(
         "`"--kubeconfig-file=$KubeDir\ssl\kubecfg-kube-node.yaml`""
         "`"--iface=$NodeIP`""
         "`"--ip-masq`""
         "`"--kube-subnet-mgr`""
         "`"--iptables-forward-rules=false`""
+        "`"--logtostderr=$fgRun`""
+        "`"--alsologtostderr=true`""
+        "`"--log-file=$LogDir\flanneld.log`""
     )
 
     ## start and retry ##
-    $retryCount = 6
+    $retryCount = 3
     $process = $null
     while (-not $process) {
-        if ($retryCount -eq 1) {
-            # create an error debug log #
-            $process = Start-Process -PassThru -FilePath "$CNIDir\bin\flanneld.exe" -ArgumentList $flanneldArgs -RedirectStandardError ("{0}\flanneld_{1}.log" -f $RancherLogDir, $(Get-Date -UFormat "%Y%m%d"))
-        } else {
-            $process = Start-Process -PassThru -FilePath "$CNIDir\bin\flanneld.exe" -ArgumentList $flanneldArgs
-        }
-
+        $process = Start-Process -PassThru -FilePath "$CNIDir\bin\flanneld.exe" -ArgumentList $flanneldArgs
         print "....................."
-        Start-Sleep -s 20
-
+        Start-Sleep -s 15
         $process = Get-Process -Id $process.Id -ErrorAction Ignore
 
         $retryCount -= 1
@@ -741,30 +738,30 @@ function start-kubelet {
     }
 
     ## config running params ##
+    $fgRun = get-env-var -Key "CATTLE_AGENT_FG_RUN"
     $kubeletArgs = merge-argument-list @(
         @(
             "`"--network-plugin=cni`""
             "`"--cni-bin-dir=$CNIDir\bin`""
             "`"--cni-conf-dir=$CNIDir\conf`""
+            "`"--logtostderr=$fgRun`""
+            "`"--alsologtostderr=true`""
+            "`"--log-file=$LogDir\kubelet.log`""
         )
         @($env:CATTLE_CUSTOMIZE_KUBELET_OPTIONS -split ";")
         @($KubeletOptions -split ";")
     )
 
+    ## open firewall ##
+    $null = New-NetFirewallRule -Name 'Kubelet10250TCP' -Description "Kubelet API TCP" -Action Allow -LocalPort 10250 -Enabled True -DisplayName "Kubelet API 10250 TCP" -Protocol TCP -ErrorAction SilentlyContinue
+
     ## start kubelet ##
-    $retryCount = 6
+    $retryCount = 3
     $process = $null
     while (-not $process) {
-        if ($retryCount -eq 1) {
-            # create an error debug log #
-            $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kubelet.exe" -ArgumentList $kubeletArgs -RedirectStandardError ("{0}\kubelet_{1}.log" -f $RancherLogDir, $(Get-Date -UFormat "%Y%m%d"))
-        } else {
-            $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kubelet.exe" -ArgumentList $kubeletArgs
-        }
-
+        $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kubelet.exe" -ArgumentList $kubeletArgs
         print "....................."
         Start-Sleep -s 15
-
         $process = Get-Process -Id $process.Id -ErrorAction Ignore
 
         $retryCount -= 1
@@ -830,26 +827,28 @@ function start-kube-proxy {
 
     ## config running params ##
     $env:KUBE_NETWORK = get-env-var -Key "KUBE_NETWORK"
+    $fgRun = get-env-var -Key "CATTLE_AGENT_FG_RUN"
     $kubeproxyArgs = merge-argument-list @(
-        @("`"--cluster-cidr=$KubeClusterCIDR`"")
+        @(
+            "`"--cluster-cidr=$KubeClusterCIDR`""
+            "`"--logtostderr=$fgRun`""
+            "`"--alsologtostderr=true`""
+            "`"--log-file=$LogDir\kubeproxy.log`""
+        )
         @($env:CATTLE_CUSTOMIZE_KUBEPROXY_OPTIONS -split ";")
         @($KubeproxyOptions -split ";")
     )
 
+    ## open firewall ##
+    $null = New-NetFirewallRule -Name 'KubeProxy10256TCP' -Description "KubeProxy health check server TCP" -Action Allow -LocalPort 10256 -Enabled True -DisplayName "KubeProxy Health Check Server 10256 TCP" -Protocol TCP -ErrorAction SilentlyContinue
+
     ## start kube-proxy ##
-    $retryCount = 6
+    $retryCount = 3
     $process = $null
     while (-not $process) {
-        if ($retryCount -eq 1) {
-            # create an error debug log #
-            $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kube-proxy.exe" -ArgumentList $kubeproxyArgs -RedirectStandardError ("{0}\kubeproxy_{1}.log" -f $RancherLogDir, $(Get-Date -UFormat "%Y%m%d"))
-        } else {
-            $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kube-proxy.exe" -ArgumentList $kubeproxyArgs
-        }
-
+        $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kube-proxy.exe" -ArgumentList $kubeproxyArgs
         print "....................."
-        Start-Sleep -s 10
-
+        Start-Sleep -s 15
         $process = Get-Process -Id $process.Id -ErrorAction Ignore
 
         $retryCount -= 1
@@ -902,7 +901,7 @@ function init {
 
             print "Installing Azure cloud cli, wait a few minutes ..."
 
-            install-msi -File $azMSIBinPath -LogFile ("{0}\azurecli-installation_{1}.log" -f $RancherLogDir, $(Get-Date -UFormat "%Y%m%d"))
+            install-msi -File $azMSIBinPath -LogFile "$LogDir\azurecli-installation.log"
             if (-not $?) {
                 throw "Failed to install Azure cloud cli, crash"
             }
