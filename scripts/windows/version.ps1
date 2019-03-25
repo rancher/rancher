@@ -3,14 +3,11 @@ $ErrorActionPreference = "Stop"
 
 Write-Host "Running version getting"
 
-$psVersion = "6.0.2-nanoserver-1709"
-$versionSuffix = "nanoserver-1709"
+$psVersion = "6.1.3-nanoserver-1809"
+$versionSuffix = "windows-1809"
 $currentVersion = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\')
-switch ($currentVersion.ReleaseId) {
-    "1803" {
-        $psVersion = "6.0.2-nanoserver-1803"
-        $versionSuffix = "nanoserver-1803"
-    }
+if ($currentVersion.ReleaseId -ne "1809") {
+    throw ('cannot support release {0}' -f $currentVersion.ReleaseId)
 }
 
 $dirty = ""

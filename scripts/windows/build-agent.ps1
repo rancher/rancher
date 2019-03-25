@@ -11,7 +11,7 @@ $imageTag = "rancher/rancher-agent:$version"
 
 pushd $rootPath
 Write-Host "Running agent build"
-if ($version.endswith("-1803")) {
+if ($version.endswith("-1809")) {
     docker build `
         --build-arg PS_VERSION=$psVersion `
         --build-arg VERSION=$version `
