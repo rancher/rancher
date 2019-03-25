@@ -662,7 +662,6 @@ function start-kubelet {
     ## config running params ##
     $kubeletArgs = merge-argument-list @(
         @(
-            "`"--register-schedulable=true`""
             "`"--network-plugin=cni`""
             "`"--cni-bin-dir=$CNIDir\bin`""
             "`"--cni-conf-dir=$CNIDir\conf`""

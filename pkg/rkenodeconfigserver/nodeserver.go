@@ -6,9 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
-
 	"reflect"
+	"strings"
 
 	docketypes "github.com/docker/docker/api/types"
 	"github.com/pkg/errors"
@@ -499,7 +498,6 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 		"cluster-dns":                  dnsServiceIP,
 		"node-ip":                      configNode.InternalAddress,
 		"address":                      "0.0.0.0",
-		"cadvisor-port":                "0",
 		"read-only-port":               "0",
 		"cloud-provider":               cloudProviderName,
 		"cloud-config":                 cloudProviderConfigPath,
