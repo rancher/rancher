@@ -1,6 +1,6 @@
 ARG PS_VERSION
 
-FROM golang:1.11.0-windowsservercore-1803 AS build-stage
+FROM golang:1.12.1-windowsservercore AS build-stage
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 RUN New-Item -Type Directory -Path '"C:\Program Files\volumeplugins"' -ErrorAction Ignore; \
     \
@@ -39,7 +39,7 @@ RUN cd C:\gopath\src\github.com\rancher\rancher; \
         exit 1; \
     };
 
-FROM microsoft/powershell:$PS_VERSION
+FROM mcr.microsoft.com/powershell:$PS_VERSION
 ENV RUN_PATH="C:\\Program Files\\rancher"
 COPY --from=build-stage ["C:/Program Files/volumeplugins", "C:/Program Files/kubelet/volumeplugins"]
 COPY --from=build-stage ["C:/gopath/src/github.com/rancher/rancher/bin/agent.exe", "C:/Program Files/rancher/"]

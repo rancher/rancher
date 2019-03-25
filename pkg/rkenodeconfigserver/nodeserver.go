@@ -168,7 +168,12 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 
 	nodeDockerInfo := infos[node.Status.NodeConfig.Address]
 	if nodeDockerInfo.OSType == "windows" {
-		return n.windowsNodeConfig(ctx, cluster, node, getWindowsReleaseID(&nodeDockerInfo))
+		windowsReleaseID, err := getWindowsReleaseID(&nodeDockerInfo)
+		if err != nil {
+			return nil, err
+		}
+
+		return n.windowsNodeConfig(ctx, cluster, node, windowsReleaseID)
 	}
 
 	bundle, err := n.lookup.Lookup(cluster)
@@ -563,9 +568,9 @@ func translateMapToTuples(options map[string]string, formatter string) string {
 	return result
 }
 
-func getWindowsReleaseID(nodeDockerInfo *docketypes.Info) string {
-	windowsBuildNumber := "17134"
-	windowsReleaseID := "1803"
+// getWindowsReleaseID returns the support windows server release ID
+func getWindowsReleaseID(nodeDockerInfo *docketypes.Info) (string, error) {
+	var windowsBuildNumber, windowsReleaseID string
 
 	// get build number of windows
 	// e.g.: 10.0 16299 (16299.15.amd64fre.rs3_release.170928-1534)
@@ -576,20 +581,21 @@ func getWindowsReleaseID(nodeDockerInfo *docketypes.Info) string {
 
 	// translate build number to release id
 	// ref: https://www.microsoft.com/en-us/itpro/windows-10/release-information
-	switch windowsBuildNumber {
-	case "16299":
-		windowsReleaseID = "1709"
+	windowsReleaseID, exist := v3.SupportWindowsServerVersion[windowsBuildNumber]
+	if exist {
+		return windowsReleaseID, nil
 	}
 
-	return windowsReleaseID
+	return "", fmt.Errorf("cannot support Windows %s kernel", nodeDockerInfo.KernelVersion)
 }
 
+// formatSystemImages formats the windows images with a '-windows-${releaseID}' suffix
 func formatSystemImages(originSystemImages v3.WindowsSystemImages, windowsReleaseID string) v3.WindowsSystemImages {
 	origin := reflect.ValueOf(originSystemImages)
 	shadow := reflect.New(origin.Type()).Elem()
 	for i := 0; i < origin.NumField(); i++ {
 		originVal := origin.Field(i).String()
-		dealVal := strings.Replace(originVal, "1803", windowsReleaseID, -1)
+		dealVal := fmt.Sprintf("%s-windows-%s", originVal, windowsReleaseID)
 		shadow.Field(i).SetString(dealVal)
 	}
 
