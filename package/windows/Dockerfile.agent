@@ -14,6 +14,18 @@ RUN New-Item -Type Directory -Path '"C:\Program Files\volumeplugins"' -ErrorActi
     Expand-Archive -Force -Path '"C:\Program Files\flexvolume.zip"' -DestinationPath '"C:\Program Files\volumeplugins"'; \
     \
     Write-Host 'Complete.';
+RUN New-Item -Type Directory -Path '"C:\Program Files\nginx"' -ErrorAction Ignore; \
+    \
+    Write-Host 'Downloading Nginx ...'; \
+    \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile '"C:\Program Files\nginx.zip"' -Uri "http://nginx.org/download/nginx-1.15.9.zip"; \
+    \
+    Write-Host 'Expanding Nginx binaries ...'; \
+    \
+    Expand-Archive -Force -Path '"C:\Program Files\nginx.zip"' -DestinationPath '"C:\Program Files\nginx"'; \
+    \
+    Write-Host 'Complete.';
 ARG VERSION=dev
 ENV AGENT_VERSION=$VERSION
 COPY [".", "C:/gopath/src/github.com/rancher/rancher/"]
@@ -42,6 +54,7 @@ RUN cd C:\gopath\src\github.com\rancher\rancher; \
 FROM mcr.microsoft.com/powershell:$PS_VERSION
 ENV RUN_PATH="C:\\Program Files\\rancher"
 COPY --from=build-stage ["C:/Program Files/volumeplugins", "C:/Program Files/kubelet/volumeplugins"]
+COPY --from=build-stage ["C:/Program Files/nginx/nginx-1.15.9/nginx.exe", "C:/Program Files/nginx/"]
 COPY --from=build-stage ["C:/gopath/src/github.com/rancher/rancher/bin/agent.exe", "C:/Program Files/rancher/"]
 COPY ["package/windows/*.ps1", "package/windows/*.psm1", "C:/Program Files/rancher/"]
 WORKDIR $RUN_PATH

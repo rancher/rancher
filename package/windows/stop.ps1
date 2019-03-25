@@ -89,12 +89,24 @@ try {
     throw "Can't stop the early kube-proxy process, crash"
 }
 
+# controlplanes proxy #
+try {
+    $process = Get-Process -Name "nginx*" -ErrorAction Ignore
+    if ($process) {
+        $process | Stop-Process | Out-Null
+        print "Stopped nginx"
+
+        Start-Sleep -s 2
+    }
+} catch {
+    throw "Can't stop the early nginx process, crash"
+}
+
 try {
     # docker clean #
     docker ps -q | % { docker stop $_ *>$null } *>$null
 
     # clean up rancher parts #
-    docker rm nginx-proxy *>$null
     docker rm kubernetes-binaries *>$null
     docker rm cni-binaries *>$null
 } catch { }

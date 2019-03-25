@@ -15,6 +15,7 @@ $InformationPreference = 'SilentlyContinue'
 $RancherDir = "C:\etc\rancher"
 $KubeDir = "C:\etc\kubernetes"
 $CNIDir = "C:\etc\cni"
+$NginxConfigDir = "C:\etc\nginx"
 
 Import-Module "$RancherDir\hns.psm1" -Force
 
@@ -76,6 +77,7 @@ try {
     Remove-Item -Path "$CNIDir\*" -Recurse -Force -ErrorAction Ignore
     Remove-Item -Path "$KubeDir\*" -Recurse -Force -ErrorAction Ignore
     Remove-Item -Path "$RancherDir\*" -Recurse -Force -ErrorAction Ignore
+    Remove-Item -Path "$NginxConfigDir\*" -Recurse -Force -ErrorAction Ignore
 
     # component produces #
     # cni
