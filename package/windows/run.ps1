@@ -56,14 +56,18 @@ function get-address {
     )
 
     if (-not $Addr) {
-        try {
-            $route = Find-NetRoute -RemoteIPAddress 8.8.8.8 | Select-Object -First 1
-            return $route.IPAddress
-        } catch {
-            return ""
-        }
+        return ""
     }
 
+    # If given address is a network interface on the system, retrieve configured IP on that interface (only the first configured IP is taken)
+    try {
+        $na = Get-NetAdapter | ? Name -eq $Addr
+        if ($na) {
+            return (Get-NetIPAddress -InterfaceIndex $na.ifIndex -AddressFamily IPv4).IPAddress
+        }
+    } catch {}
+
+    # Loop through cloud provider options to get IP from metadata, if not found return given value
     switch ($Addr) {
         "awslocal" { return (scrape-text -Uri "http://169.254.169.254/latest/meta-data/local-ipv4") }
         "awspublic" { return (scrape-text -Uri "http://169.254.169.254/latest/meta-data/public-ipv4") }
@@ -112,13 +116,13 @@ trap {
 
 # check powershell #
 if ($PSVersionTable.PSVersion.Major -lt 5) {
-    throw "PowerShell version 5 or higher is required, exit"
+    throw "PowerShell version 5 or higher is required"
 }
 
 # check identity #
 $currentPrincipal = new-object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
 if (-not $currentPrincipal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    throw "You need elevated Administrator privileges in order to run this script, start Windows PowerShell by using the Run as Administrator option, exit"
+    throw "You need elevated Administrator privileges in order to run this script, start Windows PowerShell by using the Run as Administrator option"
 }
 
 # set http client #
@@ -141,7 +145,7 @@ try {
 # check docker running #
 $dockerNPipe = Get-ChildItem //./pipe/ | ? Name -eq "docker_engine"
 if (-not $dockerNPipe) {
-    throw "Please run docker daemon with host `"npipe:////./pipe//docker_engine`", exit"
+    throw "Please run docker daemon with host `"npipe:////./pipe//docker_engine`""
 }
 
 $svcAgent = get-agent-service
@@ -151,7 +155,7 @@ if ($svcAgent -and ($svcAgent.Status -eq "Running")) {
 
 # check cattle server address #
 if (-not $CATTLE_SERVER) {
-    throw "-server is a required option, exit"
+    throw "-server is a required option"
 } else {
     try {
         $null = scrape-text  -Uri "$CATTLE_SERVER/ping"
@@ -162,7 +166,7 @@ if (-not $CATTLE_SERVER) {
 
 # check cattle server token #
 if (-not $CATTLE_TOKEN) {
-    throw "-token is a required option, exit"
+    throw "-token is a required option"
 }
 
 # check node name #
@@ -170,17 +174,21 @@ if (-not $CATTLE_NODE_NAME) {
     $CATTLE_NODE_NAME = hostname
 }
 if (-not $CATTLE_NODE_NAME) {
-    throw "-nodeName is a required option, exit"
+    throw "-nodeName is a required option"
 }
 $CATTLE_NODE_NAME = $CATTLE_NODE_NAME.ToLower()
 
 # check node address #
+$CATTLE_ADDRESS = get-address -Addr $CATTLE_ADDRESS
 $CATTLE_INTERNAL_ADDRESS = get-address -Addr $CATTLE_INTERNAL_ADDRESS
 if (-not $CATTLE_ADDRESS) {
-    $CATTLE_ADDRESS = $CATTLE_INTERNAL_ADDRESS
+    try {
+        $route = Find-NetRoute -RemoteIPAddress 8.8.8.8 | Select-Object -First 1
+        $CATTLE_ADDRESS = $route.IPAddress
+    } catch {}
 }
 if (-not $CATTLE_ADDRESS) {
-    throw "-address is a required option, exit"
+    throw "-address is a required option"
 }
 
 # download cattle server CA #
@@ -193,13 +201,13 @@ if ($CATTLE_CA_CHECKSUM) {
     } catch {}
 
     if (-not $cacerts) {
-        throw "Can't get cattle server CA from $CATTLE_SERVER, exit"
+        throw "Can't get cattle server CA from $CATTLE_SERVER"
     }
     $cacerts + "`n" | Out-File -NoNewline -Encoding ascii -FilePath $temp.FullName
     $tempHasher = Get-FileHash -LiteralPath $temp.FullName -Algorithm SHA256
     if ($tempHasher.Hash.ToLower() -ne $CATTLE_CA_CHECKSUM.ToLower()) {
         $temp.Delete()
-        throw "Actual cattle server CA checksum is $($tempHasher.Hash.ToLower()), $CATTLE_SERVER/v3/settings/cacerts does not match $($CATTLE_CA_CHECKSUM.ToLower()), exit"
+        throw "Actual cattle server CA checksum is $($tempHasher.Hash.ToLower()), $CATTLE_SERVER/v3/settings/cacerts does not match $($CATTLE_CA_CHECKSUM.ToLower())"
     }
     rm -Force -Recurse "$SSL_CERT_DIR\serverca" -ErrorAction Ignore
     $null = New-Item -Force -Type Directory -Path $SSL_CERT_DIR -ErrorAction Ignore
@@ -262,6 +270,7 @@ set-env-var -Key "CATTLE_DEBUG" -Value $CATTLE_DEBUG
 set-env-var -Key "CATTLE_NODE_LABEL" -Value $CATTLE_NODE_LABEL
 set-env-var -Key "CATTLE_CUSTOMIZE_KUBELET_OPTIONS" -Value $CATTLE_CUSTOMIZE_KUBELET_OPTIONS
 set-env-var -Key "CATTLE_CUSTOMIZE_KUBEPROXY_OPTIONS" -Value $CATTLE_CUSTOMIZE_KUBEPROXY_OPTIONS
+set-env-var -Key "CATTLE_AGENT_FG_RUN" -Value $CATTLE_AGENT_FG_RUN
 
 # run rancher-agent #
 pushd $RancherDir

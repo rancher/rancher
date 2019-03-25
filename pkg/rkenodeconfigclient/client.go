@@ -47,16 +47,17 @@ func ConfigClient(ctx context.Context, url string, header http.Header, writeCert
 	for {
 		nc, err := getConfig(client, url, header)
 		if err != nil {
-			logrus.Infof("Error while getting agent config: %v", err)
+			logrus.Warnf("Error while getting agent config: %v", err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
 
 		if nc != nil {
+			logrus.Debugf("Get agent config: %#v", nc)
 			return rkeworker.ExecutePlan(ctx, nc, writeCertOnly)
 		}
 
-		logrus.Infof("waiting for node to register. Either cluster is not ready for registering or etcd and controlplane node have to be registered first")
+		logrus.Infof("Waiting for node to register. Either cluster is not ready for registering or etcd and controlplane node have to be registered first")
 		time.Sleep(2 * time.Second)
 	}
 }

@@ -1,49 +1,54 @@
-ARG PS_VERSION
+ARG POWERSHELL_IMG_TAG
 
-FROM golang:1.11.0-windowsservercore-1803 AS build-stage
-SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
-RUN New-Item -Type Directory -Path '"C:\Program Files\volumeplugins"' -ErrorAction Ignore; \
+FROM mcr.microsoft.com/powershell:${POWERSHELL_IMG_TAG}
+SHELL ["pwsh", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+ARG ARCH=amd64
+RUN $URL = 'http://nginx.org/download/nginx-1.15.9.zip'; \
+    $SRC_PATH = ('{0}\nginx.zip' -f $env:ProgramFiles); \
+    $DST_PATH = ('{0}\nginx' -f $env:ProgramFiles); \
     \
-    Write-Host 'Downloading Volume plugins ...'; \
+    $null = New-Item -Type Directory -Path $DST_PATH -ErrorAction Ignore; \
+    \
+    Write-Host ('Downloading Nginx from {0}...'  -f $URL); \
     \
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-    Invoke-WebRequest -UseBasicParsing -OutFile '"C:\Program Files\flexvolume.zip"' -Uri "https://github.com/Microsoft/K8s-Storage-Plugins/releases/download/v0.0.2/flexvolume-windows.zip"; \
+    Invoke-WebRequest -UseBasicParsing -OutFile $SRC_PATH -Uri $URL; \
     \
-    Write-Host 'Expanding volumeplugins/flexvolume binaries ...'; \
+    Write-Host 'Expanding ...'; \
     \
-    Expand-Archive -Force -Path '"C:\Program Files\flexvolume.zip"' -DestinationPath '"C:\Program Files\volumeplugins"'; \
+    Expand-Archive -Force -Path $SRC_PATH -DestinationPath $DST_PATH; \
+    \
+    Write-Host 'Cleaning ...'; \
+    \
+    Copy-Item -Force -Path ('{0}\nginx-1.15.9\nginx.exe' -f $DST_PATH) -Destination ('{0}\nginx.exe' -f $DST_PATH); \
+    Remove-Item -Force -Recurse -Path @($SRC_PATH, ('{0}\nginx-1.15.9' -f $DST_PATH)); \
     \
     Write-Host 'Complete.';
+RUN $URL = 'https://github.com/Microsoft/K8s-Storage-Plugins/releases/download/v0.0.2/flexvolume-windows.zip'; \
+    $SRC_PATH = ('{0}\flexvolume.zip' -f $env:ProgramFiles); \
+    $DST_PATH = ('{0}\kubelet\volumeplugins' -f $env:ProgramFiles); \
+    \
+    $null = New-Item -Type Directory -Path $DST_PATH -ErrorAction Ignore; \
+    \
+    Write-Host ('Downloading Volume Plugins from {0} ...' -f $URL); \
+    \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile $SRC_PATH -Uri $URL; \
+    \
+    Write-Host 'Expanding ...'; \
+    \
+    Expand-Archive -Force -Path $SRC_PATH -DestinationPath $DST_PATH; \
+    \
+    Write-Host 'Cleaning ...'; \
+    \
+    Remove-Item -Force -Recurse -Path $SRC_PATH; \
+    \
+    Write-Host 'Complete.';
+
 ARG VERSION=dev
-ENV AGENT_VERSION=$VERSION
-COPY [".", "C:/gopath/src/github.com/rancher/rancher/"]
-RUN cd C:\gopath\src\github.com\rancher\rancher; \
-    \
-    $env:GOARCH='amd64'; \
-    $env:GOOS='windows'; \
-    $env:CGO_ENABLED=0; \
-    \
-    Write-Host 'Building ...'; \
-    \
-    & .\scripts\windows\validate.ps1; \
-    \
-    go build -i -tags k8s -ldflags ('-X main.VERSION={0} -s -w -extldflags -static' -f $env:AGENT_VERSION) -o .\bin\agent.exe .\pkg\agent; \
-    \
-    if ($?) { \
-        \
-        .\bin\agent.exe --version; \
-        \
-        Write-Host 'Complete.'; \
-    } else { \
-        Write-Host 'Built failed.'; \
-        exit 1; \
-    };
+ENV AGENT_IMAGE rancher/rancher-agent:${VERSION}
 
-FROM microsoft/powershell:$PS_VERSION
-ENV RUN_PATH="C:\\Program Files\\rancher"
-COPY --from=build-stage ["C:/Program Files/volumeplugins", "C:/Program Files/kubelet/volumeplugins"]
-COPY --from=build-stage ["C:/gopath/src/github.com/rancher/rancher/bin/agent.exe", "C:/Program Files/rancher/"]
-COPY ["package/windows/*.ps1", "package/windows/*.psm1", "C:/Program Files/rancher/"]
-WORKDIR $RUN_PATH
-ENTRYPOINT ["pwsh.exe", "-f", "start.ps1"]
-
+COPY ["agent.exe", "*.ps1", "*.psm1", "C:/Program Files/rancher/"]
+WORKDIR "C:\\Program Files\\rancher"
+ENTRYPOINT ["pwsh", "-NoLogo", "-NonInteractive", "-File", "./start.ps1"]

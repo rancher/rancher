@@ -1,5 +1,3 @@
-// +build !windows
-
 package rkeworker
 
 import (
@@ -9,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/rkecerts"
@@ -36,23 +33,7 @@ func ExecutePlan(ctx context.Context, nodeConfig *NodeConfig, writeCertOnly bool
 		return nil
 	}
 
-	for name, process := range nodeConfig.Processes {
-		if strings.Contains(name, "sidekick") || strings.Contains(name, "share-mnt") {
-			if err := runProcess(ctx, name, process, false, false); err != nil {
-				return err
-			}
-		}
-	}
-
-	for name, process := range nodeConfig.Processes {
-		if !strings.Contains(name, "sidekick") {
-			if err := runProcess(ctx, name, process, true, bundleChanged); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
+	return doExecutePlan(ctx, nodeConfig, bundleChanged)
 }
 
 type fileWriter struct {

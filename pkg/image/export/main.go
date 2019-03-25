@@ -330,7 +330,7 @@ func getWindowsAgentImage() string {
 	if !ok {
 		return ""
 	}
-	return fmt.Sprintf("%s/rancher-agent:%s-nanoserver-1803", repo, tag)
+	return fmt.Sprintf("%s/rancher-agent:%s", repo, tag)
 }
 
 func getScript(arch, fileType string) string {

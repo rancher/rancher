@@ -7,14 +7,18 @@ param (
     [parameter(Mandatory = $true)] [string]$KubeDnsServiceIP,
     [parameter(Mandatory = $true)] [string]$KubeCNIComponent,
     [parameter(Mandatory = $true)] [string]$KubeCNIMode,
+    [parameter(Mandatory = $false)] [string]$KubeControlPlaneAddresses,
     [parameter(Mandatory = $false)] [string]$KubeletCloudProviderName,
     [parameter(Mandatory = $false)] [string]$KubeletCloudProviderConfig,
     [parameter(Mandatory = $false)] [string]$KubeletDockerConfig,
     [parameter(Mandatory = $true)] [string]$KubeletOptions,
     [parameter(Mandatory = $true)] [string]$KubeproxyOptions,
 
-    [parameter(Mandatory = $true)] [string]$NodeIP,
-    [parameter(Mandatory = $true)] [string]$NodeName
+    [parameter(Mandatory = $false)] [string]$FlannelBackendConfig,
+
+    [parameter(Mandatory = $false)] [string]$NodePublicIP,
+    [parameter(Mandatory = $false)] [string]$NodeIP,
+    [parameter(Mandatory = $false)] [string]$NodeName
 )
 
 $ErrorActionPreference = 'Stop'
@@ -29,12 +33,18 @@ $InformationPreference = 'SilentlyContinue'
 $RancherDir = "C:\etc\rancher"
 $KubeDir = "C:\etc\kubernetes"
 $CNIDir = "C:\etc\cni"
-$RancherLogDir = ("C:\var\log\rancher\{0}" -f $(Get-Date -UFormat "%Y%m%d"))
+$NginxConfigDir = "C:\etc\nginx"
+$LogDir = "C:\var\log"
 
 $null = New-Item -Force -Type Directory -Path $RancherDir -ErrorAction Ignore
 $null = New-Item -Force -Type Directory -Path $KubeDir -ErrorAction Ignore
 $null = New-Item -Force -Type Directory -Path $CNIDir -ErrorAction Ignore
+$null = New-Item -Force -Type Directory -Path $NginxConfigDir -ErrorAction Ignore
+$null = New-Item -Force -Type Directory -Path $LogDir -ErrorAction Ignore
 
+if (-not $NodeName) {
+    $NodeName = hostname
+}
 $NodeName = $NodeName.ToLower()
 $KubeCNIMode = $KubeCNIMode.ToLower()
 
@@ -199,19 +209,22 @@ function get-hyperv-vswitch {
     $na = $null
     $ip = $null
 
-    foreach ($nai in Get-NetAdapter) {
-        try {
-            $na = $nai
-            $ip = ($na | Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Ignore).IPAddress
-            if ($ip -eq $NodeIP) {
-                break
-            }
-        } catch {}
+    if ($NodeIP -or $NodePublicIP)  {
+        foreach ($nai in Get-NetAdapter) {
+            try {
+                $na = $nai
+                $ip = ($na | Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Ignore).IPAddress
+                if (($ip -eq $NodeIP) -or ($ip -eq $NodePublicIP)) {
+                    break
+                }
+            } catch {}
+        }
     }
+
     if (-not $na) {
         $na = Get-NetAdapter | ? Name -like "vEthernet (Ethernet*"
         if (-not $na) {
-            throw "Failed to find a suitable Hyper-V vSwitch network adapter, check your network settings, crash"
+            throw "Failed to find a suitable Hyper-V vSwitch network adapter, check your network settings"
         }
         $ip = (Get-NetIPAddress -InterfaceIndex $na.ifIndex -AddressFamily IPv4).IPAddress
     }
@@ -255,59 +268,14 @@ function wait-ready {
     }
 
     if ($count -le 0) {
-        throw ("Timeout and can't access {0}, crash" -f $Path)
+        throw ("Timeout and can't access {0}" -f $Path)
     }
-}
-
-function restart-proxy {
-    Start-Sleep -s 5
-
-    try {
-        docker restart nginx-proxy *>$null
-    } catch {}
-
-    Start-Sleep -s 5
 }
 
 function config-cni-flannel {
     param(
         [parameter(Mandatory = $false)] [switch]$Restart = $False
     )
-
-    $flannelBackendName = "vxlan0"
-    $flannelBackendType = "vxlan"
-    $flannelNetwork = $KubeClusterCIDR
-    $networkType = "overlay"
-    if ($KubeCNIMode -eq "win-bridge") {
-        $flannelBackendType = "host-gw"
-        $flannelBackendName = "cbr0"
-        $networkType = "l2bridge"
-    }
-
-    ## clean other kind network ##
-    $isCleanPreviousNetwork = Clean-HNSNetworks -Types @{ "l2bridge" = $True; "overlay" = $True } -Keeps @{ $flannelBackendName = $networkType }
-    if ($isCleanPreviousNetwork) {
-        print "...................., cleaning stale HNS network"
-
-        restart-proxy
-    }
-
-    ## generate flanneld config ##
-    $kubeFlannelPath = "C:\etc\kube-flannel"
-    if (-not (Test-Path "$kubeFlannelPath\net-conf.json")) {
-        print "...................., generating flanneld config"
-    } else {
-        print "...................., overwriting flanneld config"
-    }
-    $null = New-Item -Force -Type Directory -Path $kubeFlannelPath -ErrorAction Ignore
-    $netConfJson = @{
-        Network = $flannelNetwork
-        Backend = @{
-            name = $flannelBackendName
-            type = $flannelBackendType
-        }
-    }
-    $netConfJson | ConvertTo-Json -Compress -Depth 32 | Out-File -Encoding ascii -Force -FilePath "$kubeFlannelPath\net-conf.json"
 
     ## generate CNI config ##
     $cniConfPath = "$CNIDir\conf"
@@ -317,38 +285,36 @@ function config-cni-flannel {
         print "...................., overwriting cni config"
     }
     $null = New-Item -Force -Type Directory -Path $cniConfPath -ErrorAction Ignore
-    $delegate = $null
-    if ($KubeCNIMode -eq "win-overlay") {
-        $delegate = @{
-            type = "win-overlay"
-            dns = @{
-                nameservers = @($KubeDnsServiceIP)
-                search = @(
-                    "svc." + $KubeClusterDomain
-                )
-            }
-            policies = @(
-                @{
-                    name = "EndpointPolicy"
-                    value = @{
-                        Type = "OutBoundNAT"
-                        ExceptionList = @(
-                            $KubeClusterCIDR
-                            $KubeServiceCIDR
-                        )
-                    }
-                }
-                @{
-                    name = "EndpointPolicy"
-                    value = @{
-                        Type = "ROUTE"
-                        NeedEncap = $true
-                        DestinationPrefix = $KubeServiceCIDR
-                    }
-                }
+    $delegate = @{
+        type = "win-overlay"
+        dns = @{
+            nameservers = @($KubeDnsServiceIP)
+            search = @(
+                "svc." + $KubeClusterDomain
             )
         }
-    } elseif ($KubeCNIMode -eq "win-bridge") {
+        policies = @(
+            @{
+                name = "EndpointPolicy"
+                value = @{
+                    Type = "OutBoundNAT"
+                    ExceptionList = @(
+                        $KubeClusterCIDR
+                        $KubeServiceCIDR
+                    )
+                }
+            }
+            @{
+                name = "EndpointPolicy"
+                value = @{
+                    Type = "ROUTE"
+                    NeedEncap = $true
+                    DestinationPrefix = $KubeServiceCIDR
+                }
+            }
+        )
+    }
+    if ($KubeCNIMode -eq "win-bridge") {
         $vswitch = get-hyperv-vswitch
 
         $delegate = @{
@@ -390,6 +356,14 @@ function config-cni-flannel {
             )
         }
     }
+
+    ## generate backend name ##
+    $flannelBackendName = "vxlan0"
+    if ($KubeCNIMode -eq "win-bridge") {
+        $flannelBackendName = "cbr0"
+    }
+    set-env-var -Key "KUBE_NETWORK" -Value $flannelBackendName
+
     $cniConf = @{
         cniVersion = "0.2.0"
         name = $flannelBackendName
@@ -400,8 +374,6 @@ function config-cni-flannel {
         delegate = $delegate
     }
     $cniConf | ConvertTo-Json -Compress -Depth 32 | Out-File -Encoding ascii -Force -FilePath "$cniConfPath\cni.conf"
-
-    set-env-var -Key "KUBE_NETWORK" -Value $flannelBackendName
 }
 
 function config-azure-cloudprovider {
@@ -488,6 +460,105 @@ function config-azure-cloudprovider {
     popd
 }
 
+function print-system-info {
+    print  "******"
+    print ("*****       CNI - Component: {0}, Mode: {1}" -f $KubeCNIComponent, $KubeCNIMode)
+    if ($NodeIP) {
+        print ("****       Node - Name: {0}, IP: {1}, InternalIP: {2}" -f $NodeName, $NodePublicIP, $NodeIP)
+    } else {
+        print ("****       Node - Name: {0}, IP: {1}" -f $NodeName, $NodePublicIP)
+    }
+    print ("***     Cluster - CIDR: {0}, Domain: {1}, ServiceCIDR: {2}, DnsServiceIP: {3}" -f $KubeClusterCIDR, $KubeClusterDomain, $KubeServiceCIDR, $KubeDnsServiceIP)
+    print ("** ControlPlane - Host: {0}" -f $KubeControlPlaneAddresses)
+    if ($KubeletCloudProviderName) {
+        print ("* CloudProvider - Name: {0}" -f $KubeletCloudProviderName)
+    }
+    print "*"
+}
+
+function setup-proxy {
+    param(
+        [parameter(Mandatory = $true)] [string]$CPHosts
+    )
+
+    $tmpl =
+@'
+error_log /var/log/nginx.log notice;
+pid       /var/log/nginx.pid;
+worker_rlimit_nofile 8192;
+worker_processes auto;
+events {
+  multi_accept on;
+  worker_connections 4096;
+}
+
+stream {
+    upstream kube_apiserver {
+        least_conn;
+        {0}
+    }
+
+    server {
+        listen        127.0.0.1:6443 so_keepalive=on;
+        access_log    off;
+        proxy_pass    kube_apiserver;
+        proxy_timeout 10m;
+        proxy_connect_timeout 1s;
+    }
+}
+'@
+    $configPath = "$NginxConfigDir\nginx.conf"
+    $servers = ""
+    $tempConfig = New-TemporaryFile
+
+    $CPHosts -split "," | % {
+        $servers += ("server $_" + ":6443;`t")
+    }
+    $newConfig = $tmpl.Replace("{0}", $servers).ToString()
+
+    $mustReload = $False
+    if (Test-Path $configPath) {
+        $newConfigStream = [IO.MemoryStream]::new([Text.Encoding]::ASCII.GetBytes($newConfig))
+        $newConfigHasher = Get-FileHash -InputStream $newConfigStream -Algorithm sha256
+        $staleConfigHasher = Get-FileHash $configPath -Algorithm sha256
+        if ($staleConfigHasher.Hash -ne $newConfigHasher.Hash) {
+            $newConfig | Out-File -NoNewline -Encoding ascii -Force -FilePath $configPath
+            $mustReload = $True
+        } else {
+            $tempConfig.Delete()
+        }
+    } else {
+        $newConfig | Out-File -NoNewline -Encoding ascii -Force -FilePath $configPath
+    }
+
+    $process = Get-Process -Name "nginx" -ErrorAction Ignore
+    if ($process) {
+        if ($mustReload) {
+            print-system-info
+
+            print "Reloading controlplanes proxy ."
+            $process = Start-Process -PassThru -FilePath "$NginxConfigDir\nginx.exe" -ArgumentList "-c $configPath -s reload" -WindowStyle Hidden
+            Start-Sleep -s 5
+            $process = Get-Process -Id $process.Id -ErrorAction Ignore
+            if (-not $process) {
+                throw "........................ FAILED, agent retry"
+            }
+            print "........................... OK"
+        }
+    } else {
+        print-system-info
+
+        print "Starting controlplanes proxy ."
+        $process = Start-Process -PassThru -FilePath "$NginxConfigDir\nginx.exe" -ArgumentList "-c $configPath" -WindowStyle Hidden
+        Start-Sleep -s 5
+        $process = Get-Process -Id $process.Id -ErrorAction Ignore
+        if (-not $process) {
+            throw "....................... FAILED, agent retry"
+        }
+        print "........................... OK"
+    }
+}
+
 function stop-flanneld {
     try {
         $process = Get-Process -Name "flanneld*" -ErrorAction Ignore
@@ -512,37 +583,78 @@ function start-flanneld {
         print "Starting flanneld ..."
     }
 
+    ## generate network, backend type and backend name ##
+    $flannelBackendType = "vxlan"
+    $flannelBackendName = "vxlan0"
+    $networkType = "overlay"
+    if ($KubeCNIMode -eq "win-bridge") {
+        $flannelBackendType = "host-gw"
+        $flannelBackendName = "cbr0"
+        $networkType = "l2bridge"
+    }
+    set-env-var -Key "KUBE_NETWORK" -Value $flannelBackendName
+
+    ## clean other kind network ##
+    $isCleanPreviousNetwork = Clean-HNSNetworks -Types @{ "l2bridge" = $True; "overlay" = $True } -Keeps @{ $flannelBackendName = $networkType }
+    if ($isCleanPreviousNetwork) {
+        print "...................., cleaning stale HNS network"
+    }
+
+    ## generate flanneld config ##
+    $kubeFlannelPath = "C:\etc\kube-flannel"
+    if (-not (Test-Path "$kubeFlannelPath\net-conf.json")) {
+        print "...................., generating flanneld config"
+    } else {
+        print "...................., overwriting flanneld config"
+    }
+    $null = New-Item -Force -Type Directory -Path $kubeFlannelPath -ErrorAction Ignore
+    $flannelBackendCfg = @{}
+    try {
+        if ($FlannelBackendConfig) {
+            $flannelBackendCfg = $FlannelBackendConfig | ConvertFrom-Json -ErrorAction Ignore
+        }
+    } catch {}
+    $flannelBackendCfg = $flannelBackendCfg | Add-Member @{ Name = $flannelBackendName; Type = $flannelBackendType; } -Force -PassThru
+    $netConfJson = @{
+        Network = $KubeClusterCIDR
+        Backend = $flannelBackendCfg
+    }
+    $netConfJson | ConvertTo-Json -Compress -Depth 32 | Out-File -Encoding ascii -Force -FilePath "$kubeFlannelPath\net-conf.json"
+
     ## binary is ready or not ##
     wait-ready -Path "$CNIDir\bin\flanneld.exe"
 
     ## config running params ##
+    $fgRun = get-env-var -Key "CATTLE_AGENT_FG_RUN"
     $flanneldArgs = @(
         "`"--kubeconfig-file=$KubeDir\ssl\kubecfg-kube-node.yaml`""
-        "`"--iface=$NodeIP`""
         "`"--ip-masq`""
         "`"--kube-subnet-mgr`""
         "`"--iptables-forward-rules=false`""
+        "`"-v=2`""
+        "`"--logtostderr=$fgRun`""
+        "`"--alsologtostderr=true`""
+        "`"--log-file=$LogDir\flanneld.log`""
     )
+    if ($NodePublicIP) {
+        $flanneldArgs += @("`"--public-ip=$NodePublicIP`"")
+    }
+    if ($NodeIP) {
+        $flanneldArgs += @("`"--iface=$NodeIP`"")
+    }
+
+    ## open firewall ##
+    if ($networkType -eq "overlay") {
+        $null = New-NetFirewallRule -Name 'OverlayTraffic4789UDP' -Description "Overlay network traffic UDP" -Action Allow -LocalPort 4789 -Enabled True -DisplayName "Overlay Traffic 4789 UDP" -Protocol UDP -ErrorAction SilentlyContinue
+    }
 
     ## start and retry ##
-    $retryCount = 6
+    $retryCount = 3
     $process = $null
     while (-not $process) {
-        if ($retryCount -eq 3) {
-            restart-proxy
-        }
-
-        if ($retryCount -eq 1) {
-            # create an error debug log #
-            $null = New-Item -Force -Type Directory -Path $RancherLogDir -ErrorAction Ignore
-            $process = Start-Process -PassThru -FilePath "$CNIDir\bin\flanneld.exe" -ArgumentList $flanneldArgs -RedirectStandardError "$RancherLogDir\flanneld.log"
-        } else {
-            $process = Start-Process -PassThru -FilePath "$CNIDir\bin\flanneld.exe" -ArgumentList $flanneldArgs
-        }
-
+        $process = Start-Process -PassThru -FilePath "$CNIDir\bin\flanneld.exe" -ArgumentList $flanneldArgs
         print "....................."
-        Start-Sleep -s 20
-
+        Start-Sleep -s 15
         $process = Get-Process -Id $process.Id -ErrorAction Ignore
 
         $retryCount -= 1
@@ -556,9 +668,8 @@ function start-flanneld {
 
     ## check network created or not ##
     print "...................., checking HNS network"
-    $flannelBackendName = get-env-var -Key "KUBE_NETWORK"
     $retryCount = 6
-    $network = $null
+    $network = (Get-HnsNetwork | ? Name -eq $flannelBackendName)
     while(-not $network) {
         $network = (Get-HnsNetwork | ? Name -eq $flannelBackendName)
 
@@ -574,17 +685,6 @@ function start-flanneld {
         }
     }
 
-    $networkType = "overlay"
-    if ($KubeCNIMode -eq "win-bridge") {
-        $networkType = "l2bridge"
-    }
-    if ($network.Type -ne $networkType) {
-        ## restart flanneld
-        stop-flanneld
-        throw ".............. FAILED, agent retry"
-    }
-
-    restart-proxy
     repair-cloud-routes
 
     print ".................. OK"
@@ -623,9 +723,9 @@ function start-kubelet {
     } elseif ($KubeCNIComponent -eq "canal") {
         config-cni-flannel -Restart:$Restart
     } elseif ($KubeCNIComponent -eq "calico") {
-        throw "Don't support calico now, please change other CNI plugins, crash"
+        throw "Don't support calico now, please change other CNI plugins"
     } else {
-        throw "Unknown CNI component: $KubeCNIComponent, please change other CNI plugins, crash"
+        throw "Unknown CNI component: $KubeCNIComponent, please change other CNI plugins"
     }
 
     ## cloud provider ##
@@ -660,32 +760,30 @@ function start-kubelet {
     }
 
     ## config running params ##
+    $fgRun = get-env-var -Key "CATTLE_AGENT_FG_RUN"
     $kubeletArgs = merge-argument-list @(
         @(
-            "`"--register-schedulable=true`""
             "`"--network-plugin=cni`""
             "`"--cni-bin-dir=$CNIDir\bin`""
             "`"--cni-conf-dir=$CNIDir\conf`""
+            "`"--logtostderr=$fgRun`""
+            "`"--alsologtostderr=true`""
+            "`"--log-file=$LogDir\kubelet.log`""
         )
         @($env:CATTLE_CUSTOMIZE_KUBELET_OPTIONS -split ";")
         @($KubeletOptions -split ";")
     )
 
+    ## open firewall ##
+    $null = New-NetFirewallRule -Name 'Kubelet10250TCP' -Description "Kubelet API TCP" -Action Allow -LocalPort 10250 -Enabled True -DisplayName "Kubelet API 10250 TCP" -Protocol TCP -ErrorAction SilentlyContinue
+
     ## start kubelet ##
-    $retryCount = 6
+    $retryCount = 3
     $process = $null
     while (-not $process) {
-        if ($retryCount -eq 1) {
-            # create an error debug log #
-            $null = New-Item -Force -Type Directory -Path $RancherLogDir -ErrorAction Ignore
-            $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kubelet.exe" -ArgumentList $kubeletArgs -RedirectStandardError "$RancherLogDir\kubelet.log"
-        } else {
-            $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kubelet.exe" -ArgumentList $kubeletArgs
-        }
-
+        $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kubelet.exe" -ArgumentList $kubeletArgs
         print "....................."
         Start-Sleep -s 15
-
         $process = Get-Process -Id $process.Id -ErrorAction Ignore
 
         $retryCount -= 1
@@ -733,45 +831,50 @@ function start-kube-proxy {
 
     ## wait a few seconds ##
     print "...................., wait a few seconds"
-    if ($KubeCNIMode -eq "win-overlay") {
-        Start-Sleep -s 30
-    } else {
-        Start-Sleep -s 10
-    }
+    Start-Sleep -s 15
 
     ## binary is ready or not ##
     wait-ready -Path "$KubeDir\bin\kube-proxy.exe"
 
-    ## clean stale policies ##
-    $hnsPolicyList = Get-HnsPolicyList
-    if ($hnsPolicyList) {
-        print "...................., cleaning stale HNS policies"
-        $hnsPolicyList | Remove-HnsPolicyList
+    ## config running params ##
+    $fgRun = get-env-var -Key "CATTLE_AGENT_FG_RUN"
+    $cniModeArgs = @(
+        "`"--cluster-cidr=$KubeClusterCIDR`""
+        "`"--logtostderr=$fgRun`""
+        "`"--alsologtostderr=true`""
+        "`"--log-file=$LogDir\kubeproxy.log`""
+        "`"--feature-gates=WinOverlay=true,WindowsGMSA=true,WinDSR=true`""
+    )
+    if ($KubeCNIMode -eq "win-overlay") {
+        print "...................., generating source vip for overlay"
+        $kubeNetwork = get-env-var -Key "KUBE_NETWORK"
+        $network = (Get-HnsNetwork | ? Name -eq $kubeNetwork)
+        if (-not $network) {
+            throw ".............. FAILED, agent retry"
+        }
+
+        $subnet = $network.Subnets[0].AddressPrefix
+        $sourceVip = $subnet.substring(0, $subnet.lastIndexOf(".")) + ".2"
+        $cniModeArgs += @("`"--source-vip=$sourceVip`"")
     }
 
-    ## config running params ##
     $env:KUBE_NETWORK = get-env-var -Key "KUBE_NETWORK"
     $kubeproxyArgs = merge-argument-list @(
-        @("`"--cluster-cidr=$KubeClusterCIDR`"")
+        $cniModeArgs
         @($env:CATTLE_CUSTOMIZE_KUBEPROXY_OPTIONS -split ";")
         @($KubeproxyOptions -split ";")
     )
 
+    ## open firewall ##
+    $null = New-NetFirewallRule -Name 'KubeProxy10256TCP' -Description "KubeProxy health check server TCP" -Action Allow -LocalPort 10256 -Enabled True -DisplayName "KubeProxy Health Check Server 10256 TCP" -Protocol TCP -ErrorAction SilentlyContinue
+
     ## start kube-proxy ##
-    $retryCount = 6
+    $retryCount = 3
     $process = $null
     while (-not $process) {
-        if ($retryCount -eq 1) {
-            # create an error debug log #
-            $null = New-Item -Force -Type Directory -Path $RancherLogDir -ErrorAction Ignore
-            $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kube-proxy.exe" -ArgumentList $kubeproxyArgs -RedirectStandardError "$RancherLogDir\kube-proxy.log"
-        } else {
-            $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kube-proxy.exe" -ArgumentList $kubeproxyArgs
-        }
-
+        $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kube-proxy.exe" -ArgumentList $kubeproxyArgs
         print "....................."
-        Start-Sleep -s 10
-
+        Start-Sleep -s 15
         $process = Get-Process -Id $process.Id -ErrorAction Ignore
 
         $retryCount -= 1
@@ -783,7 +886,6 @@ function start-kube-proxy {
         }
     }
 
-    restart-proxy
     print ".................. OK"
 }
 
@@ -820,15 +922,14 @@ function init {
                 Invoke-WebRequest -TimeoutSec 300 -UseBasicParsing -Uri $azDownloadURL -OutFile $azMSIBinPath
             } catch {}
             if (-not $?) {
-                throw ("Failed to download Azure cloud cli from '{0}', crash" -f $azDownloadURL)
+                throw ("Failed to download Azure cloud cli from '{0}'" -f $azDownloadURL)
             }
 
             print "Installing Azure cloud cli, wait a few minutes ..."
 
-            $null = New-Item -Force -Type Directory -Path $RancherLogDir -ErrorAction Ignore
-            install-msi -File $azMSIBinPath -LogFile "$RancherLogDir\azurecli-installation.log"
+            install-msi -File $azMSIBinPath -LogFile "$LogDir\azurecli-installation.log"
             if (-not $?) {
-                throw "Failed to install Azure cloud cli, crash"
+                throw "Failed to install Azure cloud cli"
             }
 
             print ".................. OK"
@@ -842,6 +943,13 @@ function init {
 }
 
 function main {
+    # controlplanes proxy #
+    if (-not $KubeControlPlaneAddresses) {
+        print "Waiting for controlplanes to be ready..."
+        exit 0
+    }
+    setup-proxy -CPHosts $KubeControlPlaneAddresses
+
     # recover processes #
     $shouldUseCompsCnt = 3
     $wantRecoverComps = @()
@@ -908,26 +1016,24 @@ trap {
 
     popd
 
-    [System.Console]::Error.Write($errMsg)
-
     if ($errMsg.EndsWith("agent retry")) {
-        restart-proxy
-
+        [System.Console]::Error.Write($errMsg.Substring(0, $errMsg.Length - 13))
         exit 2
     }
 
+    [System.Console]::Error.Write($errMsg)
     exit 1
 }
 
 # check powershell #
 if ($PSVersionTable.PSVersion.Major -lt 5) {
-    throw "PowerShell version 5 or higher is required, crash"
+    throw "PowerShell version 5 or higher is required"
 }
 
 # check identity #
 $currentPrincipal = new-object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
 if (-not $currentPrincipal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    throw "You need elevated Administrator privileges in order to run this script, start Windows PowerShell by using the Run as Administrator option, crash"
+    throw "You need elevated Administrator privileges in order to run this script, start Windows PowerShell by using the Run as Administrator option"
 }
 
 init

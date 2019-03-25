@@ -85,7 +85,7 @@ func (b *Bundle) ForNode(config *v3.RancherKubernetesEngineConfig, nodeAddress s
 	}
 }
 
-func (b *Bundle) ForWindowsNode(config *v3.RancherKubernetesEngineConfig, nodeAddress string, windowsReleaseID string) *Bundle {
+func (b *Bundle) ForWindowsNode(config *v3.RancherKubernetesEngineConfig, nodeAddress string) *Bundle {
 	nb := b.ForNode(config, nodeAddress)
 
 	certs := make(map[string]pki.CertificatePKI, len(nb.certs))
@@ -97,14 +97,6 @@ func (b *Bundle) ForWindowsNode(config *v3.RancherKubernetesEngineConfig, nodeAd
 				clusterAmount := len(config.Clusters)
 				for i := 0; i < clusterAmount; i++ {
 					cluster := &config.Clusters[i].Cluster
-
-					if windowsReleaseID == "1709" {
-						cluster.Server = fmt.Sprintf("https://%s:6443", nodeAddress)
-
-						cluster.InsecureSkipTLSVerify = true
-						cluster.CertificateAuthority = ""
-						cluster.CertificateAuthorityData = nil
-					}
 
 					if len(cluster.CertificateAuthority) != 0 {
 						cluster.CertificateAuthority = "c:" + cluster.CertificateAuthority

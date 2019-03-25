@@ -1,4 +1,4 @@
 #Requires -Version 5.0
 $ErrorActionPreference = "Stop"
 
-& "$PSScriptRoot\build-agent.ps1"
+Invoke-Expression -Command "$PSScriptRoot\build-agent.ps1"

@@ -73,7 +73,6 @@ COPY entrypoint.sh rancher /usr/bin/
 RUN chmod +x /usr/bin/entrypoint.sh
 
 ENV CATTLE_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}
-ENV CATTLE_WINDOWS_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}-nanoserver-1803
 ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/rancher
 ENV ETCD_UNSUPPORTED_ARCH=${ARCH}
 

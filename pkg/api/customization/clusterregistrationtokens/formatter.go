@@ -42,7 +42,7 @@ func Formatter(request *types.APIContext, resource *types.RawResource) {
 		resource.Values["token"] = token
 		resource.Values["manifestUrl"] = url
 		resource.Values["windowsNodeCommand"] = fmt.Sprintf(windowsNodeCommandFormat,
-			image.Resolve(settings.WindowsAgentImage.Get()),
+			image.Resolve(settings.AgentImage.Get()),
 			getRootURL(request),
 			token,
 			caWindows)

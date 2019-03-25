@@ -60,5 +60,5 @@ while($true) {
         $LastIdx = $newestIdx
     } catch {}
 
-    Start-Sleep -s 5
+    Start-Sleep -s 1
 }

@@ -29,24 +29,24 @@ trap {
 
     popd
 
-    [System.Console]::Error.Write($errMsg)
-
     if ($errMsg.EndsWith("agent retry")) {
+        [System.Console]::Error.Write($errMsg.Substring(0, $errMsg.Length - 13))
         exit 2
     }
 
+    [System.Console]::Error.Write($errMsg)
     exit 1
 }
 
 # check powershell #
 if ($PSVersionTable.PSVersion.Major -lt 5) {
-    throw "PowerShell version 5 or higher is required, crash"
+    throw "PowerShell version 5 or higher is required"
 }
 
 # check identity #
 $currentPrincipal = new-object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
 if (-not $currentPrincipal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    throw "You need elevated Administrator privileges in order to run this script, start Windows PowerShell by using the Run as Administrator option, crash"
+    throw "You need elevated Administrator privileges in order to run this script, start Windows PowerShell by using the Run as Administrator option"
 }
 
 # cni #
@@ -60,7 +60,7 @@ try {
         Start-Sleep -s 2
     }
 } catch {
-    throw "Can't stop the early flanneld process, crash"
+    throw "Can't stop the early flanneld process"
 }
 
 # kubelet #
@@ -73,7 +73,7 @@ try {
         Start-Sleep -s 2
     }
 } catch {
-    throw "Can't stop the early kubelet process, crash"
+    throw "Can't stop the early kubelet process"
 }
 
 # kube-proxy #
@@ -86,7 +86,20 @@ try {
         Start-Sleep -s 2
     }
 } catch {
-    throw "Can't stop the early kube-proxy process, crash"
+    throw "Can't stop the early kube-proxy process"
+}
+
+# controlplanes proxy #
+try {
+    $process = Get-Process -Name "nginx*" -ErrorAction Ignore
+    if ($process) {
+        $process | Stop-Process | Out-Null
+        print "Stopped nginx"
+
+        Start-Sleep -s 2
+    }
+} catch {
+    throw "Can't stop the early nginx process"
 }
 
 try {
@@ -94,7 +107,6 @@ try {
     docker ps -q | % { docker stop $_ *>$null } *>$null
 
     # clean up rancher parts #
-    docker rm nginx-proxy *>$null
     docker rm kubernetes-binaries *>$null
     docker rm cni-binaries *>$null
 } catch { }
