@@ -1,32 +1,25 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
-
-	"path/filepath"
 
 	"github.com/mattn/go-colorable"
 	"github.com/rancher/rancher/pkg/agent/node"
+	libwindows "github.com/rancher/rancher/pkg/agent/windows"
+	"github.com/rancher/rancher/pkg/agent/windows/remotedialer"
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
 	"github.com/rancher/rancher/pkg/rkeworker"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
-	"golang.org/x/sys/windows/svc/debug"
-	"golang.org/x/sys/windows/svc/eventlog"
-	"golang.org/x/sys/windows/svc/mgr"
 )
 
 var (
@@ -34,148 +27,30 @@ var (
 )
 
 const (
-	Token         = "X-API-Tunnel-Token"
-	Params        = "X-API-Tunnel-Params"
-	installedPath = `C:\etc\rancher`
-	connectedPath = installedPath + `\connected`
-
-	windowsServiceName              = "rancher-agent"
-	defaultResetConnectedRetryCount = 3
+	Token  = "X-API-Tunnel-Token"
+	Params = "X-API-Tunnel-Params"
 )
-
-// see https://github.com/docker/engine/blob/8e610b2b55bfd1bfa9436ab110d311f5e8a74dcb/cmd/dockerd/service_windows.go#L64-L149
-
-const (
-	// These should match the values in event_messages.mc.
-	eventInfo  = 1
-	eventWarn  = 1
-	eventError = 1
-	eventDebug = 2
-	eventPanic = 3
-	eventFatal = 4
-
-	eventExtraOffset = 10 // Add this to any event to get a string that supports extended data
-)
-
-type etwHook struct {
-	log *eventlog.Log
-}
-
-func (h *etwHook) Levels() []logrus.Level {
-	return []logrus.Level{
-		logrus.PanicLevel,
-		logrus.FatalLevel,
-		logrus.ErrorLevel,
-		logrus.WarnLevel,
-		logrus.InfoLevel,
-		logrus.DebugLevel,
-	}
-}
-
-func (h *etwHook) Fire(e *logrus.Entry) error {
-	var (
-		etype uint16
-		eid   uint32
-	)
-
-	switch e.Level {
-	case logrus.PanicLevel:
-		etype = windows.EVENTLOG_ERROR_TYPE
-		eid = eventPanic
-	case logrus.FatalLevel:
-		etype = windows.EVENTLOG_ERROR_TYPE
-		eid = eventFatal
-	case logrus.ErrorLevel:
-		etype = windows.EVENTLOG_ERROR_TYPE
-		eid = eventError
-	case logrus.WarnLevel:
-		etype = windows.EVENTLOG_WARNING_TYPE
-		eid = eventWarn
-	case logrus.InfoLevel:
-		etype = windows.EVENTLOG_INFORMATION_TYPE
-		eid = eventInfo
-	case logrus.DebugLevel:
-		etype = windows.EVENTLOG_INFORMATION_TYPE
-		eid = eventDebug
-	default:
-		return errors.New("unknown level")
-	}
-
-	// If there is additional data, include it as a second string.
-	exts := ""
-	if len(e.Data) > 0 {
-		fs := bytes.Buffer{}
-		for k, v := range e.Data {
-			fs.WriteString(k)
-			fs.WriteByte('=')
-			fmt.Fprint(&fs, v)
-			fs.WriteByte(' ')
-		}
-
-		exts = fs.String()[:fs.Len()-1]
-		eid += eventExtraOffset
-	}
-
-	if h.log == nil {
-		fmt.Fprintf(os.Stderr, "%s [%s]\n", e.Message, exts)
-		return nil
-	}
-
-	var (
-		ss  [2]*uint16
-		err error
-	)
-
-	ss[0], err = windows.UTF16PtrFromString(e.Message)
-	if err != nil {
-		return err
-	}
-
-	count := uint16(1)
-	if exts != "" {
-		ss[1], err = windows.UTF16PtrFromString(exts)
-		if err != nil {
-			return err
-		}
-
-		count++
-	}
-
-	return windows.ReportEvent(h.log.Handle, etype, 0, eid, 0, count, 0, &ss[0], nil)
-}
-
-var (
-	eventLogRegisterCallbackFn = func() error {
-		eventlog.InstallAsEventCreate(windowsServiceName, eventlog.Error|eventlog.Warning|eventlog.Info)
-		return nil
-	}
-	eventLogUnregisterCallbackFn = func() error {
-		eventlog.Remove(windowsServiceName)
-		return nil
-	}
-)
-
-type callbackFn func() error
 
 type agentService struct {
-	isStop bool
-	done   chan struct{}
+	stopOnce  sync.Once
+	winRunner *libwindows.WinRunner
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 func (a *agentService) Execute(_ []string, svcChangeRequest <-chan svc.ChangeRequest, svcStatus chan<- svc.Status) (bool, uint32) {
 	selfChangeRequest := make(chan svc.ChangeRequest)
+	defer close(selfChangeRequest)
 
 	svcStatus <- svc.Status{State: svc.StartPending, Accepts: 0}
 	if err := a.start(selfChangeRequest); err != nil {
-		logrus.Debugf("Rancher agent version %s aborting due to failure during initialization", VERSION)
-		logrus.Errorf("Rancher agent version %s failed: %s", VERSION, err.Error())
+		logrus.Errorf("Agent cannot start, %v", err)
 		return true, 1
 	}
 
-	svcStatus <- svc.Status{State: svc.Running, Accepts: svc.AcceptStop}
-	logrus.Debugf("Rancher agent version %s running", VERSION)
+	svcStatus <- svc.Status{State: svc.Running, Accepts: svc.AcceptStop | svc.AcceptShutdown}
+	logrus.Infoln("Agent running")
 
-loop:
 	for {
 		select {
 		case c := <-svcChangeRequest:
@@ -183,30 +58,24 @@ loop:
 			case svc.Interrogate:
 				svcStatus <- c.CurrentStatus
 			case svc.Stop:
-				logrus.Debugf("Rancher agent version %s stopping", VERSION)
-				svcStatus <- svc.Status{State: svc.StopPending, Accepts: 0}
-				a.stop()
-				break loop
+				a.stop(svcStatus)
+				return false, 0
+			case svc.Shutdown:
+				a.shutdown(svcStatus)
+				return false, 0
 			}
 		case c := <-selfChangeRequest:
+			// for now selfChangeRequest only return `svc.Stop` and `svc.Shutdown`
 			switch c.Cmd {
-			case svc.Stop:
-				logrus.Debugf("Rancher agent version %s stopping", VERSION)
-				svcStatus <- svc.Status{State: svc.StopPending, Accepts: 0}
-				a.stop()
 			case svc.Shutdown:
-				logrus.Debugf("Rancher agent version %s shutting down", VERSION)
-				svcStatus <- svc.Status{State: svc.StartPending, Accepts: 0}
-				a.shutdown(func() error {
-					return eventLogUnregisterCallbackFn()
-				})
+				a.shutdown(svcStatus)
+			default:
+				a.stop(svcStatus)
 			}
 
-			break loop
+			return false, 0
 		}
 	}
-
-	return false, 0
 }
 
 func isTrue(envVal string) bool {
@@ -226,50 +95,56 @@ func getTokenAndURL() (string, string, error) {
 }
 
 func isConnected() bool {
-	_, err := os.Stat(connectedPath)
+	_, err := os.Stat("connected")
 	return err == nil
 }
 
 func resetConnected() {
-	os.RemoveAll(connectedPath)
+	os.RemoveAll("connected")
 }
 
 func connected() {
-	f, _ := os.Create(connectedPath)
+	f, _ := os.Create("connected")
 	defer f.Close()
 }
 
-func (a *agentService) stop() {
-	if a.isStop {
-		return
-	}
+func (a *agentService) stop(svcStatus chan<- svc.Status) {
+	a.stopOnce.Do(func() {
+		logrus.Infoln("Agent stopping")
+		svcStatus <- svc.Status{State: svc.StopPending, Accepts: svc.AcceptShutdown}
 
-	close(a.done)
+		a.cancel()
 
-	rkeworker.Stop(context.Background())
+		// stop kubelet, kube-proxy, networking
+		if err := rkeworker.Stop(context.Background()); err != nil {
+			logrus.Errorln("Agent cannot stop worker", err)
+		}
 
-	logrus.Infof("Rancher agent version %s was stopped", VERSION)
-
-	a.isStop = true
+		svcStatus <- svc.Status{State: svc.Stopped, Accepts: svc.AcceptShutdown}
+		logrus.Infoln("Agent stopped")
+	})
 }
 
-func (a *agentService) shutdown(callback callbackFn) {
-	a.stop()
+func (a *agentService) shutdown(svcStatus chan<- svc.Status) {
+	a.stop(svcStatus)
 
-	rkeworker.Remove(context.Background(), func() error {
-		resetConnected()
-		return unregisterService(nil)
-	})
+	logrus.Infoln("Agent shutting down")
 
-	logrus.Debugf("Rancher agent version %s shutdown", VERSION)
+	// remove kubelet, kube-proxy, networking
+	if err := rkeworker.Remove(context.Background()); err != nil {
+		logrus.Errorln("Agent cannot remove worker", err)
+	}
 
-	if callback != nil {
-		callback()
+	logrus.Infoln("Agent shut down")
+
+	// unregister agent service
+	if err := a.winRunner.UnRegister(); err != nil {
+		logrus.Errorln("Agent cannot be unregistered", err)
 	}
 }
 
 func (a *agentService) start(selfChangeRequest chan<- svc.ChangeRequest) error {
-	logrus.Infof("Rancher agent version %s is starting", VERSION)
+	logrus.Infoln("Agent starting")
 
 	params, err := getParams()
 	if err != nil {
@@ -299,29 +174,20 @@ func (a *agentService) start(selfChangeRequest chan<- svc.ChangeRequest) error {
 	blockingOnConnect := func(ctx context.Context) error {
 		connected()
 		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
-		if err := rkenodeconfigclient.ConfigClientWhileWindows(
-			ctx,
-			nil,
-			connectConfig,
-			headers,
-			false,
-		); err != nil {
+		if err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers, false); err != nil {
 			return err
 		}
 
+		// windows agent only acts as a node agent
+
 		logrus.Infoln("Starting plan monitor")
 
-	loop:
 		for {
 			select {
 			case <-time.After(2 * time.Minute):
-				if err := rkenodeconfigclient.ConfigClientWhileWindows(
-					ctx,
-					nil,
-					connectConfig,
-					headers,
-					false,
-				); err != nil {
+				err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers, false)
+				if err != nil {
+					// return the error if the node cannot connect to server or remove from a cluster
 					if _, ok := err.(*rkenodeconfigclient.ErrNodeOrClusterNotFound); ok {
 						return err
 					}
@@ -330,235 +196,141 @@ func (a *agentService) start(selfChangeRequest chan<- svc.ChangeRequest) error {
 				}
 			case <-ctx.Done():
 				logrus.Infoln("Stopped plan monitor")
-				break loop
+				return nil
 			}
 		}
-
-		return nil
 	}
 
-	go func() {
-		dialerClose := make(chan int64)
-		resetConnectedRetryCount := defaultResetConnectedRetryCount
+	go doConnect(a.ctx, serverURL.Host, token, headers, blockingOnConnect, selfChangeRequest)
 
-	loop:
-		for {
-			connected := isConnected()
+	return nil
+}
 
-			ctx, cancel := context.WithCancel(context.Background())
+func doConnect(ctx context.Context, host, token string, headers map[string][]string, onConnect func(ctx context.Context) error, selfChangeRequest chan<- svc.ChangeRequest) {
+	defer resetConnected()
 
-			wsURL := fmt.Sprintf("wss://%s/v3/connect", serverURL.Host)
-			if !connected {
-				wsURL += "/register"
-			}
-			logrus.Infof("Connecting to proxy %s with token %s", wsURL, token)
+	connectingStatus := make(chan remotedialer.ConnectingStatus)
+	defer close(connectingStatus)
 
-			go func() {
-				dialerClose <- ClientConnectWhileWindows(
-					ctx,
-					wsURL,
-					http.Header(headers),
-					nil,
-					func(proto, address string) bool {
-						switch proto {
-						case "tcp":
-							return true
-						case "npipe":
-							return address == `//./pipe/docker_engine`
-						}
-						return false
-					},
-					blockingOnConnect,
-				)
-			}()
+	connectionRetryLimit := 3
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
 
-			select {
-			case status := <-dialerClose:
-				cancel()
+		wsURL := fmt.Sprintf("wss://%s/v3/connect", host)
+		if !isConnected() {
+			wsURL += "/register"
+		}
+		logrus.Infof("Connect to %s with token %s", wsURL, token)
 
-				switch status {
-				case 200:
-					// stop
-					selfChangeRequest <- svc.ChangeRequest{Cmd: svc.Stop}
-					break loop
-				case 403:
-					// reset connected file, reconnect again
-					if resetConnectedRetryCount <= 0 {
-						logrus.Warn("Proxy reject this connection, this host was connected to a rancher server before.")
-						logrus.Info("Try to reset ", connectedPath)
-
-						resetConnected()
-						resetConnectedRetryCount = defaultResetConnectedRetryCount
+		connectCtx, cancel := context.WithCancel(ctx)
+		go func(ctx context.Context) {
+			connectingStatus <- remotedialer.ClientConnectWhileWindows(
+				ctx,
+				wsURL,
+				headers,
+				nil,
+				func(proto, address string) bool {
+					switch proto {
+					case "tcp":
+						return true
+					case "npipe":
+						return address == `//./pipe/docker_engine`
 					}
-					resetConnectedRetryCount -= 1
-				case 503:
-					// shutdown
-					selfChangeRequest <- svc.ChangeRequest{Cmd: svc.Shutdown}
-					break loop
+					return false
+				},
+				onConnect,
+			)
+		}(connectCtx)
+
+		select {
+		case <-ctx.Done():
+			connectingStatus = nil
+			cancel()
+			return
+		case status := <-connectingStatus:
+			cancel()
+			switch status {
+			case remotedialer.ConnectingStatusRetry:
+				if connectionRetryLimit < 1 {
+					logrus.Warnln("Connection retry timeout")
+					selfChangeRequest <- svc.ChangeRequest{Cmd: svc.Stop}
+					return
 				}
 
-				time.Sleep(10 * time.Second)
-			case <-a.done:
-				cancel()
-				break loop
+				logrus.Debugf("Connection retry to %d times", connectionRetryLimit)
+				connectionRetryLimit--
+			case remotedialer.ConnectingStatusStopped:
+				logrus.Infoln("Connection has stopped")
+				selfChangeRequest <- svc.ChangeRequest{Cmd: svc.Stop}
+				return
+			case remotedialer.ConnectionStatusLost:
+				logrus.Infoln("Connection has lost")
+				selfChangeRequest <- svc.ChangeRequest{Cmd: svc.Shutdown}
+				return
 			}
-		}
-	}()
 
-	return nil
-}
-
-func exePath() (string, error) {
-	prog := os.Args[0]
-	p, err := filepath.Abs(prog)
-	if err != nil {
-		return "", err
-	}
-	fi, err := os.Stat(p)
-	if err == nil {
-		if !fi.Mode().IsDir() {
-			return p, nil
-		}
-		err = fmt.Errorf("%s is directory", p)
-	}
-	if filepath.Ext(p) == "" {
-		p += ".exe"
-		fi, err := os.Stat(p)
-		if err == nil {
-			if !fi.Mode().IsDir() {
-				return p, nil
-			}
-			return "", fmt.Errorf("%s is directory", p)
+			time.Sleep(10 * time.Second)
 		}
 	}
-	return "", err
 }
-
-func registerService(callback callbackFn) error {
-	exepath, err := exePath()
-	if err != nil {
-		return err
-	}
-
-	m, err := mgr.Connect()
-	if err != nil {
-		return err
-	}
-	defer m.Disconnect()
-
-	// if a service can open then means it was registered
-	s, err := m.OpenService(windowsServiceName)
-	if err == nil {
-		s.Close()
-		return nil
-	}
-
-	s, err = m.CreateService(
-		windowsServiceName,
-		exepath,
-		mgr.Config{
-			ServiceType:  windows.SERVICE_WIN32_OWN_PROCESS,
-			StartType:    mgr.StartAutomatic,
-			ErrorControl: mgr.ErrorNormal,
-			DisplayName:  "Rancher Agent",
-		},
-	)
-	if err != nil {
-		return err
-	}
-	s.Close()
-
-	if callback != nil {
-		return callback()
-	}
-
-	return nil
-}
-
-func unregisterService(callback callbackFn) error {
-	m, err := mgr.Connect()
-	if err != nil {
-		return err
-	}
-	defer m.Disconnect()
-
-	// if a service can open then means it was registered
-	s, err := m.OpenService(windowsServiceName)
-	if err == nil {
-		err = s.Delete()
-		if err != nil {
-			return err
-		}
-		s.Close()
-	}
-
-	if callback != nil {
-		return callback()
-	}
-
-	return nil
-}
-
-var (
-	flRegisterService   = flag.Bool("register-service", false, "Register the service and exit")
-	flUnregisterService = flag.Bool("unregister-service", false, "Unregister the service and exit")
-	versionPrint        = flag.Bool("version", false, "Print version and exit")
-)
 
 func main() {
+	flRegisterService := flag.Bool("register-service", false, "Register the service and exit")
+	flUnregisterService := flag.Bool("unregister-service", false, "Unregister the service and exit")
+	versionPrint := flag.Bool("version", false, "Print version and exit")
+	flag.Parse()
+
 	logrus.SetFormatter(&logrus.TextFormatter{ForceColors: true})
 	logrus.SetOutput(colorable.NewColorableStdout())
-
-	flag.Parse()
 
 	if *versionPrint {
 		fmt.Printf("Rancher agent version is %s.\n", VERSION)
 		return
 	}
 
-	if *flUnregisterService {
-		if *flRegisterService {
-			logrus.Fatal("--register-service and --unregister-service cannot be used together")
-		}
+	if *flUnregisterService && *flRegisterService {
+		logrus.Fatal("--register-service and --unregister-service are mutually exclusive")
+	}
 
-		if err := unregisterService(eventLogUnregisterCallbackFn); err != nil {
-			logrus.Fatal(err)
+	runner := &libwindows.WinRunner{
+		ServiceName:        "rancher-agent",
+		ServiceDisplayName: "Rancher Agent",
+	}
+	runner.ServiceHandler = newAgentService(runner)
+
+	if *flUnregisterService {
+		if err := runner.UnRegister(); err != nil {
+			logrus.Fatal("Failed to unregister service", err)
 		}
 		return
 	}
 
 	if *flRegisterService {
-		if err := registerService(eventLogRegisterCallbackFn); err != nil {
-			logrus.Fatal(err)
+		if err := runner.Register(); err != nil {
+			logrus.Fatal("Failed to register service", err)
 		}
 		return
-	}
-
-	isInteractive, err := svc.IsAnInteractiveSession()
-	if err != nil {
-		logrus.Fatal(err)
-	}
-
-	if !isInteractive {
-		elog, err := eventlog.Open(windowsServiceName)
-		if err != nil {
-			logrus.Fatal(err)
-		}
-
-		logrus.AddHook(&etwHook{elog})
-		logrus.SetOutput(ioutil.Discard)
-	}
-
-	run := svc.Run
-	if isInteractive {
-		run = debug.Run
 	}
 
 	if isTrue(os.Getenv("CATTLE_DEBUG")) || isTrue(os.Getenv("RANCHER_DEBUG")) {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
-	if err := run(windowsServiceName, &agentService{isStop: false, done: make(chan struct{})}); err != nil {
+	if err := runner.Start(); err != nil {
 		logrus.Fatalf("Rancher agent failed: %v", err)
+	}
+}
+
+func newAgentService(winRunner *libwindows.WinRunner) *agentService {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	return &agentService{
+		winRunner: winRunner,
+		ctx:       ctx,
+		cancel:    cancel,
 	}
 }

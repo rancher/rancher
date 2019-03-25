@@ -1,0 +1,23 @@
+image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}master{{/if}}
+manifests:
+  -
+    image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}master{{/if}}-linux-amd64
+    platform:
+      architecture: amd64
+      os: linux
+  -
+    image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}master{{/if}}-linux-arm64
+    platform:
+      architecture: arm64
+      os: linux
+  -
+    image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}master{{/if}}-linux-arm
+    platform:
+      architecture: arm
+      os: linux
+  -
+    image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}master{{/if}}-windows-1809
+    platform:
+      architecture: amd64
+      os: windows
+      version: 1809

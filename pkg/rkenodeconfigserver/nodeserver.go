@@ -6,11 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
-	"reflect"
-
-	docketypes "github.com/docker/docker/api/types"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
@@ -168,7 +166,7 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 
 	nodeDockerInfo := infos[node.Status.NodeConfig.Address]
 	if nodeDockerInfo.OSType == "windows" {
-		return n.windowsNodeConfig(ctx, cluster, node, getWindowsReleaseID(&nodeDockerInfo))
+		return n.windowsNodeConfig(ctx, cluster, node)
 	}
 
 	bundle, err := n.lookup.Lookup(cluster)
@@ -280,7 +278,7 @@ func augmentProcesses(token string, processes map[string]v3.Process, worker, b2d
 	return processes
 }
 
-func (n *RKENodeConfigServer) windowsNodeConfig(ctx context.Context, cluster *v3.Cluster, node *v3.Node, windowsReleaseID string) (*rkeworker.NodeConfig, error) {
+func (n *RKENodeConfigServer) windowsNodeConfig(ctx context.Context, cluster *v3.Cluster, node *v3.Node) (*rkeworker.NodeConfig, error) {
 	rkeConfig := cluster.Status.AppliedSpec.RancherKubernetesEngineConfig
 	if rkeConfig == nil {
 		return nil, errors.New("only work on the clusters built with 'custom node'")
@@ -293,16 +291,16 @@ func (n *RKENodeConfigServer) windowsNodeConfig(ctx context.Context, cluster *v3
 				return nil, err
 			}
 
-			bundle = bundle.ForWindowsNode(rkeConfig, node.Status.NodeConfig.Address, windowsReleaseID)
+			bundle = bundle.ForWindowsNode(rkeConfig, node.Status.NodeConfig.Address)
 			certString, err := bundle.Marshal()
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to marshall cert bundle for %s", node.Status.NodeConfig.Address)
 			}
 
-			systemImages := formatSystemImages(v3.K8sVersionWindowsSystemImages[rkeConfig.Version], windowsReleaseID)
+			systemImages := v3.AllK8sWindowsVersions[rkeConfig.Version]
 			process, err := createWindowsProcesses(rkeConfig, node.Status.NodeConfig, systemImages)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to create windows node plan for %s", node.Status.NodeConfig.Address)
+				return nil, errors.Wrapf(err, "failed to create windows node plan for %s with RKE version %s", node.Status.NodeConfig.Address, rkeConfig.Version)
 			}
 
 			nc := &rkeworker.NodeConfig{
@@ -318,10 +316,12 @@ func (n *RKENodeConfigServer) windowsNodeConfig(ctx context.Context, cluster *v3
 	return nil, fmt.Errorf("failed to find plan for %s", node.Status.NodeConfig.Address)
 }
 
+// createWindowsProcesses only creates 2 kinds processes:
+// - `run-container-*` processes are driven by Docker
+// - `run-script-*` processes are driven by PowerShell
 func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configNode *v3.RKEConfigNode, systemImages v3.WindowsSystemImages) (map[string]v3.Process, error) {
 	cniBinariesImage := ""
 	kubernetesBinariesImage := systemImages.KubernetesBinaries
-	nginxProxyImage := systemImages.NginxProxy
 	kubeletPauseImage := systemImages.KubeletPause
 
 	// network
@@ -343,6 +343,13 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 				break
 			}
 		}
+	}
+
+	// confirm images
+	if kubernetesBinariesImage == "" ||
+		kubeletPauseImage == "" ||
+		cniBinariesImage == "" {
+		return nil, fmt.Errorf("missing system images")
 	}
 
 	// get kubernetes masters
@@ -372,7 +379,7 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 	result := make(map[string]v3.Process)
 
 	registryAuthConfig, _, _ = rkedocker.GetImageRegistryConfig(kubernetesBinariesImage, privateRegistriesMap)
-	result["pre-run-docker-kubernetes-binaries"] = v3.Process{
+	result["run-container-kubernetes-binaries"] = v3.Process{
 		Name:  "kubernetes-binaries",
 		Image: kubernetesBinariesImage,
 		Command: []string{
@@ -386,10 +393,11 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 			"c:\\etc\\kubernetes:c:\\kubernetes",
 		},
 		ImageRegistryAuthConfig: registryAuthConfig,
+		NetworkMode:             "none",
 	}
 
 	registryAuthConfig, _, _ = rkedocker.GetImageRegistryConfig(cniBinariesImage, privateRegistriesMap)
-	result["pre-run-docker-cni-binaries"] = v3.Process{
+	result["run-container-cni-binaries"] = v3.Process{
 		Name:  "cni-binaries",
 		Image: cniBinariesImage,
 		Env: []string{
@@ -406,27 +414,7 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 			"c:\\etc\\cni:c:\\cni",
 		},
 		ImageRegistryAuthConfig: registryAuthConfig,
-	}
-
-	registryAuthConfig, _, _ = rkedocker.GetImageRegistryConfig(nginxProxyImage, privateRegistriesMap)
-	result["post-run-docker-nginx-proxy"] = v3.Process{
-		Name:  "nginx-proxy",
-		Image: nginxProxyImage,
-		Env: []string{
-			fmt.Sprintf("%s=%s", rkeservices.NginxProxyEnvName, strings.Join(controlPlanes, ",")),
-		},
-		Command: []string{
-			"pwsh.exe",
-		},
-		RestartPolicy: "always",
-		Args: []string{
-			"-f",
-			"c:\\Program Files\\runtime\\start.ps1",
-		},
-		Publish: []string{
-			"6443:6443",
-		},
-		ImageRegistryAuthConfig: registryAuthConfig,
+		NetworkMode:             "none",
 	}
 
 	// hyperkube fake process
@@ -494,7 +482,6 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 		"cluster-dns":                  dnsServiceIP,
 		"node-ip":                      configNode.InternalAddress,
 		"address":                      "0.0.0.0",
-		"cadvisor-port":                "0",
 		"read-only-port":               "0",
 		"cloud-provider":               cloudProviderName,
 		"cloud-config":                 cloudProviderConfigPath,
@@ -509,7 +496,46 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 		"hostname-override": configNode.HostnameOverride,
 	}, serviceOptions.Kubeproxy)
 
-	result["hyperkube"] = v3.Process{
+	flannelBackendConfig := map[string]interface{}{}
+	switch cniComponent {
+	case "flannel":
+		if val, exist := rkeConfig.Network.Options[rkecluster.FlannelBackendPort]; exist {
+			port, err := atoiWithDefault(val, rkecluster.FlannelVxLanPort)
+			if err != nil {
+				return nil, fmt.Errorf("unable to parse flannel backend port, %v", err)
+			}
+
+			flannelBackendConfig["Port"] = port
+		}
+		if val, exist := rkeConfig.Network.Options[rkecluster.FlannelBackendVxLanNetworkIdentify]; exist {
+			vni, err := atoiWithDefault(val, rkecluster.FlannelVxLanNetworkIdentify)
+			if err != nil {
+				return nil, fmt.Errorf("unable to parse flannel backend vni, %v", err)
+			}
+
+			flannelBackendConfig["VNI"] = vni
+		}
+	case "canal":
+		if val, exist := rkeConfig.Network.Options[rkecluster.CanalFlannelBackendPort]; exist {
+			port, err := atoiWithDefault(val, rkecluster.FlannelVxLanPort)
+			if err != nil {
+				return nil, fmt.Errorf("unable to parse flannel backend port, %v", err)
+			}
+
+			flannelBackendConfig["Port"] = port
+		}
+		if val, exist := rkeConfig.Network.Options[rkecluster.CanalFlannelBackendVxLanNetworkIdentify]; exist {
+			vni, err := atoiWithDefault(val, rkecluster.FlannelVxLanNetworkIdentify)
+			if err != nil {
+				return nil, fmt.Errorf("unable to parse flannel backend vni, %v", err)
+			}
+
+			flannelBackendConfig["VNI"] = vni
+		}
+	default:
+	}
+
+	result["run-script-hyperkube"] = v3.Process{
 		Name: "hyperkube",
 		Command: []string{
 			"powershell.exe",
@@ -521,11 +547,14 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 			"-KubeDnsServiceIP", dnsServiceIP,
 			"-KubeCNIComponent", cniComponent,
 			"-KubeCNIMode", cniMode,
+			"-KubeControlPlaneAddresses", strings.Join(controlPlanes, ";"),
 			"-KubeletCloudProviderName", cloudProviderName,
 			"-KubeletCloudProviderConfig", cloudProviderConfig,
 			"-KubeletDockerConfig", dockerConfig,
 			"-KubeletOptions", translateMapToTuples(extendingKubeletOptions, `"--%s=%v"`),
 			"-KubeProxyOptions", translateMapToTuples(extendingKubeproxyOptions, `"--%s=%v"`),
+			"-FlannelBackendConfig", toJSON(flannelBackendConfig),
+			"-NodePublicIP", configNode.Address,
 			"-NodeIP", configNode.InternalAddress,
 			"-NodeName", configNode.HostnameOverride,
 		},
@@ -563,35 +592,26 @@ func translateMapToTuples(options map[string]string, formatter string) string {
 	return result
 }
 
-func getWindowsReleaseID(nodeDockerInfo *docketypes.Info) string {
-	windowsBuildNumber := "17134"
-	windowsReleaseID := "1803"
-
-	// get build number of windows
-	// e.g.: 10.0 16299 (16299.15.amd64fre.rs3_release.170928-1534)
-	kernelVersionSplits := strings.Split(nodeDockerInfo.KernelVersion, " ")
-	if len(kernelVersionSplits) == 3 {
-		windowsBuildNumber = kernelVersionSplits[1]
+func toJSON(options interface{}) string {
+	result := "{}"
+	if options != nil {
+		bs, err := json.Marshal(options)
+		if err == nil {
+			return string(bs)
+		}
 	}
-
-	// translate build number to release id
-	// ref: https://www.microsoft.com/en-us/itpro/windows-10/release-information
-	switch windowsBuildNumber {
-	case "16299":
-		windowsReleaseID = "1709"
-	}
-
-	return windowsReleaseID
+	return result
 }
 
-func formatSystemImages(originSystemImages v3.WindowsSystemImages, windowsReleaseID string) v3.WindowsSystemImages {
-	origin := reflect.ValueOf(originSystemImages)
-	shadow := reflect.New(origin.Type()).Elem()
-	for i := 0; i < origin.NumField(); i++ {
-		originVal := origin.Field(i).String()
-		dealVal := strings.Replace(originVal, "1803", windowsReleaseID, -1)
-		shadow.Field(i).SetString(dealVal)
+func atoiWithDefault(val string, defaultVal int) (int, error) {
+	if val == "" {
+		return defaultVal, nil
 	}
 
-	return shadow.Interface().(v3.WindowsSystemImages)
+	ret, err := strconv.Atoi(val)
+	if err != nil {
+		return 0, err
+	}
+
+	return ret, nil
 }

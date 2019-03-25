@@ -7,7 +7,7 @@ param (
     [parameter(Mandatory = $false)] [string]$nodeName,
     [parameter(Mandatory = $false)] [string]$address,
     [parameter(Mandatory = $false)] [string]$internalAddress,
-    [parameter(Mandatory = $false)] [string]$label,
+    [parameter(Mandatory = $false)] [string[]]$label,
     [parameter(Mandatory = $false)] [string]$customizeKubeletOptions,
     [parameter(Mandatory = $false)] [string]$customizeKubeProxyOptions,
     [parameter(Mandatory = $false)] [switch]$fgRun
@@ -33,12 +33,21 @@ if (-not (Test-Path "C:\host")) {
 $RancherDir = "C:\host\etc\rancher"
 $KubeDir = "C:\host\etc\kubernetes"
 $CNIDir = "C:\host\etc\cni"
+$NginxConfigDir = "C:\host\etc\nginx"
 $KubeletRootDir = "C:\host\var\lib\kubelet"
 
 $null = New-Item -Type Directory -Path $RancherDir -ErrorAction Ignore
 $null = New-Item -Type Directory -Path $KubeDir -ErrorAction Ignore
 $null = New-Item -Type Directory -Path $CNIDir -ErrorAction Ignore
+$null = New-Item -Type Directory -Path $NginxConfigDir -ErrorAction Ignore
 $null = New-Item -Type Directory -Path $KubeletRootDir -ErrorAction Ignore
+
+# copy nginx #
+try {
+    Copy-Item -Force -Recurse -Path "$env:ProgramFiles\nginx\*.*" -Destination $NginxConfigDir
+} catch {
+    throw ("Please empty host `"C:\etc\nginx`" path manually, because {0}" -f $_.Exception.Message)
+}
 
 # copy kubelet volume plugins #
 try {
@@ -89,7 +98,7 @@ try {
         $runPSContent = $runPSContent -replace "<CATTLE_INTERNAL_ADDRESS>",""
     }
     if ($label) {
-        $runPSContent = $runPSContent -replace "<CATTLE_NODE_LABEL>",$label
+        $runPSContent = $runPSContent -replace "<CATTLE_NODE_LABEL>",($label -join ',')
     } else {
         $runPSContent = $runPSContent -replace "<CATTLE_NODE_LABEL>",""
     }
@@ -112,10 +121,4 @@ try {
     $runPSContent | Out-File -Encoding ascii -Force -FilePath "$RancherDir\run.ps1"
 } catch {
     throw ("Failed to build `"C:\etc\rancher\run.ps1`", because {0}" -f $_.Exception.Message)
-}
-
-if (Test-Path "$RancherDir\connected") {
-    [System.Console]::Out.WriteLine("WARN[0000] This host had connected to a rancher server, please kept informed")
-
-    Start-Sleep -s 5
 }

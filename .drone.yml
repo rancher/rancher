@@ -1,6 +1,6 @@
 ---
 kind: pipeline
-name: default-amd64
+name: default-linux-amd64
 
 platform:
   os: linux
@@ -45,7 +45,7 @@ steps:
     password:
       from_secret: docker_password
     repo: rancher/rancher
-    tag: master-amd64
+    tag: master-linux-amd64
     username:
       from_secret: docker_username
   when:
@@ -67,7 +67,7 @@ steps:
     password:
       from_secret: docker_password
     repo: rancher/rancher-agent
-    tag: master-amd64
+    tag: master-linux-amd64
     username:
       from_secret: docker_username
   when:
@@ -89,7 +89,7 @@ steps:
     password:
       from_secret: docker_password
     repo: rancher/rancher
-    tag: "${DRONE_TAG}-amd64"
+    tag: "${DRONE_TAG}-linux-amd64"
     username:
       from_secret: docker_username
   when:
@@ -109,7 +109,7 @@ steps:
     password:
       from_secret: docker_password
     repo: rancher/rancher-agent
-    tag: "${DRONE_TAG}-amd64"
+    tag: "${DRONE_TAG}-linux-amd64"
     username:
       from_secret: docker_username
   when:
@@ -182,7 +182,7 @@ trigger:
     - promote
 ---
 kind: pipeline
-name: default-arm64
+name: default-linux-arm64
 
 platform:
   os: linux
@@ -227,7 +227,7 @@ steps:
     password:
       from_secret: docker_password
     repo: rancher/rancher
-    tag: master-arm64
+    tag: master-linux-arm64
     username:
       from_secret: docker_username
   when:
@@ -249,7 +249,7 @@ steps:
     password:
       from_secret: docker_password
     repo: rancher/rancher-agent
-    tag: master-arm64
+    tag: master-linux-arm64
     username:
       from_secret: docker_username
   when:
@@ -271,7 +271,7 @@ steps:
     password:
       from_secret: docker_password
     repo: rancher/rancher
-    tag: "${DRONE_TAG}-arm64"
+    tag: "${DRONE_TAG}-linux-arm64"
     username:
       from_secret: docker_username
   when:
@@ -291,7 +291,7 @@ steps:
     password:
       from_secret: docker_password
     repo: rancher/rancher-agent
-    tag: "${DRONE_TAG}-arm64"
+    tag: "${DRONE_TAG}-linux-arm64"
     username:
       from_secret: docker_username
   when:
@@ -325,21 +325,125 @@ trigger:
     - promote
 ---
 kind: pipeline
+name: default-windows-1809
+
+platform:
+  os: windows
+  arch: amd64
+  version: 1809
+
+steps:
+  - name: build
+    pull: always
+    image: maiwj/dapper:windows-1809
+    commands:
+      - dapper.exe -f Dockerfile-windows.dapper -d ci
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      event:
+        - push
+        - pull_request
+        - tag
+
+  - name: stage-binaries
+    pull: default
+    image: maiwj/dapper:windows-1809
+    commands:
+      - "cp -r ./bin/* ./package/windows/"
+    when:
+      event:
+        - push
+        - tag
+
+  - name: docker-publish-master-agent
+    pull: default
+    image: plugins/docker
+    settings:
+      build_args:
+        - ARCH=amd64
+        - VERSION=master
+      context: package/windows
+      custom_dns: 1.1.1.1
+      dockerfile: package/windows/Dockerfile.agent
+      password:
+        from_secret: docker_password
+      repo: rancher/rancher-agent
+      tag: master-windows-1809
+      username:
+        from_secret: docker_username
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      branch:
+        - master
+      event:
+        - push
+
+  - name: docker-publish-agent
+    pull: default
+    image: plugins/docker
+    settings:
+      build_args:
+        - ARCH=amd64
+        - "VERSION=${DRONE_TAG}"
+      context: package/windows
+      custom_dns: 1.1.1.1
+      dockerfile: package/windows/Dockerfile.agent
+      password:
+        from_secret: docker_password
+      repo: rancher/rancher-agent
+      tag: "${DRONE_TAG}-windows-1809"
+      username:
+        from_secret: docker_username
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      event:
+        - tag
+
+  - name: slack_notify
+    image: plugins/slack
+    settings:
+      template: "Build {{build.link}} failed to publish an image/artifact.\n"
+      username: Drone_Publish
+      webhook:
+        from_secret: slack_webhook
+    when:
+      event:
+        exclude:
+          - pull_request
+      instance:
+        - drone-publish.rancher.io
+      status:
+        - failure
+
+volumes:
+  - name: docker_pipe
+    host:
+      path: \\\\.\\pipe\\docker_engine
+
+trigger:
+  event:
+    exclude:
+      - promote
+---
+kind: pipeline
 name: manifest
 
 steps:
 - name: push-master-manifest
-  image: plugins/manifest:1.0.2
+  image: plugins/manifest:1.1.0
   settings:
     username:
       from_secret: docker_username
     password:
       from_secret: docker_password
-    target: "rancher/rancher:master"
-    template: "rancher/rancher:master-ARCH"
-    platforms:
-    - linux/amd64
-    - linux/arm64
+    spec: manifest.tmpl
+    ignore_missing: true
   when:
     branch:
     - master
@@ -347,17 +451,14 @@ steps:
     - push
 
 - name: push-master-agent-manifest
-  image: plugins/manifest:1.0.2
+  image: plugins/manifest:1.1.0
   settings:
     username:
       from_secret: docker_username
     password:
       from_secret: docker_password
-    target: "rancher/rancher-agent:master"
-    template: "rancher/rancher-agent:master-ARCH"
-    platforms:
-    - linux/amd64
-    - linux/arm64
+    spec: manifest-agent.tmpl
+    ignore_missing: true
   when:
     branch:
     - master
@@ -365,33 +466,27 @@ steps:
     - push
 
 - name: push-manifest
-  image: plugins/manifest:1.0.2
+  image: plugins/manifest:1.1.0
   settings:
     username:
       from_secret: docker_username
     password:
       from_secret: docker_password
-    target: "rancher/rancher:${DRONE_TAG}"
-    template: "rancher/rancher:${DRONE_TAG}-ARCH"
-    platforms:
-    - linux/amd64
-    - linux/arm64
+    spec: manifest.tmpl
+    ignore_missing: true
   when:
     event:
     - tag
 
 - name: push-agent-manifest
-  image: plugins/manifest:1.0.2
+  image: plugins/manifest:1.1.0
   settings:
     username:
       from_secret: docker_username
     password:
       from_secret: docker_password
-    target: "rancher/rancher-agent:${DRONE_TAG}"
-    template: "rancher/rancher-agent:${DRONE_TAG}-ARCH"
-    platforms:
-    - linux/amd64
-    - linux/arm64
+    spec: manifest-agent.tmpl
+    ignore_missing: true
   when:
     event:
     - tag
@@ -453,8 +548,9 @@ trigger:
     - promote
 
 depends_on:
-- default-amd64
-- default-arm64
+- default-linux-amd64
+- default-linux-arm64
+- default-windows-1809
 ---
 kind: pipeline
 name: publish
