@@ -7,6 +7,7 @@ param (
     [parameter(Mandatory = $true)] [string]$KubeDnsServiceIP,
     [parameter(Mandatory = $true)] [string]$KubeCNIComponent,
     [parameter(Mandatory = $true)] [string]$KubeCNIMode,
+    [parameter(Mandatory = $false)] [string]$KubeControlPlaneAddresses,
     [parameter(Mandatory = $false)] [string]$KubeletCloudProviderName,
     [parameter(Mandatory = $false)] [string]$KubeletCloudProviderConfig,
     [parameter(Mandatory = $false)] [string]$KubeletDockerConfig,
@@ -29,11 +30,14 @@ $InformationPreference = 'SilentlyContinue'
 $RancherDir = "C:\etc\rancher"
 $KubeDir = "C:\etc\kubernetes"
 $CNIDir = "C:\etc\cni"
-$RancherLogDir = ("C:\var\log\rancher\{0}" -f $(Get-Date -UFormat "%Y%m%d"))
+$NginxConfigDir = "C:\etc\nginx"
+$RancherLogDir = "C:\var\log\rancher"
 
 $null = New-Item -Force -Type Directory -Path $RancherDir -ErrorAction Ignore
 $null = New-Item -Force -Type Directory -Path $KubeDir -ErrorAction Ignore
 $null = New-Item -Force -Type Directory -Path $CNIDir -ErrorAction Ignore
+$null = New-Item -Force -Type Directory -Path $NginxConfigDir -ErrorAction Ignore
+$null = New-Item -Force -Type Directory -Path $RancherLogDir -ErrorAction Ignore
 
 $NodeName = $NodeName.ToLower()
 $KubeCNIMode = $KubeCNIMode.ToLower()
@@ -259,16 +263,6 @@ function wait-ready {
     }
 }
 
-function restart-proxy {
-    Start-Sleep -s 5
-
-    try {
-        docker restart nginx-proxy *>$null
-    } catch {}
-
-    Start-Sleep -s 5
-}
-
 function config-cni-flannel {
     param(
         [parameter(Mandatory = $false)] [switch]$Restart = $False
@@ -288,8 +282,6 @@ function config-cni-flannel {
     $isCleanPreviousNetwork = Clean-HNSNetworks -Types @{ "l2bridge" = $True; "overlay" = $True } -Keeps @{ $flannelBackendName = $networkType }
     if ($isCleanPreviousNetwork) {
         print "...................., cleaning stale HNS network"
-
-        restart-proxy
     }
 
     ## generate flanneld config ##
@@ -488,6 +480,101 @@ function config-azure-cloudprovider {
     popd
 }
 
+function print-system-info {
+    print  "******"
+    print ("*****       CNI - Component: {0}, Mode: {1}" -f $KubeCNIComponent, $KubeCNIMode)
+    print ("****       Node - Name: {0}, IP: {1}" -f $NodeName, $NodeIP)
+    print ("***     Cluster - CIDR: {0}, Domain: {1}, ServiceCIDR: {2}, DnsServiceIP: {3}" -f $KubeClusterCIDR, $KubeClusterDomain, $KubeServiceCIDR, $KubeDnsServiceIP)
+    print ("** ControlPlane - Host: {0}" -f $KubeControlPlaneAddresses)
+    if ($KubeletCloudProviderName) {
+        print ("* CloudProvider - Name: {0}" -f $KubeletCloudProviderName)
+    }
+    print "*"
+}
+
+function setup-proxy {
+    param(
+        [parameter(Mandatory = $true)] [string]$CPHosts
+    )
+
+    $tmpl =
+@'
+error_log /var/log/nginx.log notice;
+pid       /var/log/nginx.pid;
+worker_rlimit_nofile 8192;
+worker_processes auto;
+events {
+  multi_accept on;
+  worker_connections 4096;
+}
+
+stream {
+    upstream kube_apiserver {
+        least_conn;
+        {0}
+    }
+
+    server {
+        listen        127.0.0.1:6443 so_keepalive=on;
+        access_log    off;
+        proxy_pass    kube_apiserver;
+        proxy_timeout 10m;
+        proxy_connect_timeout 1s;
+    }
+}
+'@
+    $configPath = "$NginxConfigDir\nginx.conf"
+    $servers = ""
+    $tempConfig = New-TemporaryFile
+
+    $CPHosts -split "," | % {
+        $servers += ("server $_" + ":6443;`t")
+    }
+    $newConfig = $tmpl.Replace("{0}", $servers).ToString()
+
+    $mustReload = $False
+    if (Test-Path $configPath) {
+        $newConfigStream = [IO.MemoryStream]::new([Text.Encoding]::ASCII.GetBytes($newConfig))
+        $newConfigHasher = Get-FileHash -InputStream $newConfigStream -Algorithm sha256
+        $staleConfigHasher = Get-FileHash $configPath -Algorithm sha256
+        if ($staleConfigHasher.Hash -ne $newConfigHasher.Hash) {
+            $newConfig | Out-File -NoNewline -Encoding ascii -Force -FilePath $configPath
+            $mustReload = $True
+        } else {
+            $tempConfig.Delete()
+        }
+    } else {
+        $newConfig | Out-File -NoNewline -Encoding ascii -Force -FilePath $configPath
+    }
+
+    $process = Get-Process -Name "nginx" -ErrorAction Ignore
+    if ($process) {
+        if ($mustReload) {
+            print-system-info
+
+            print "Reloading controlplanes proxy ."
+            $process = Start-Process -PassThru -FilePath "$NginxConfigDir\nginx.exe" -ArgumentList "-c $configPath -s reload" -WindowStyle Hidden
+            Start-Sleep -s 5
+            $process = Get-Process -Id $process.Id -ErrorAction Ignore
+            if (-not $process) {
+                throw "........................ FAILED, agent retry"
+            }
+            print "........................... OK"
+        }
+    } else {
+        print-system-info
+
+        print "Starting controlplanes proxy ."
+        $process = Start-Process -PassThru -FilePath "$NginxConfigDir\nginx.exe" -ArgumentList "-c $configPath" -WindowStyle Hidden
+        Start-Sleep -s 5
+        $process = Get-Process -Id $process.Id -ErrorAction Ignore
+        if (-not $process) {
+            throw "....................... FAILED, agent retry"
+        }
+        print "........................... OK"
+    }
+}
+
 function stop-flanneld {
     try {
         $process = Get-Process -Name "flanneld*" -ErrorAction Ignore
@@ -528,14 +615,9 @@ function start-flanneld {
     $retryCount = 6
     $process = $null
     while (-not $process) {
-        if ($retryCount -eq 3) {
-            restart-proxy
-        }
-
         if ($retryCount -eq 1) {
             # create an error debug log #
-            $null = New-Item -Force -Type Directory -Path $RancherLogDir -ErrorAction Ignore
-            $process = Start-Process -PassThru -FilePath "$CNIDir\bin\flanneld.exe" -ArgumentList $flanneldArgs -RedirectStandardError "$RancherLogDir\flanneld.log"
+            $process = Start-Process -PassThru -FilePath "$CNIDir\bin\flanneld.exe" -ArgumentList $flanneldArgs -RedirectStandardError ("{0}\flanneld_{1}.log" -f $RancherLogDir, $(Get-Date -UFormat "%Y%m%d"))
         } else {
             $process = Start-Process -PassThru -FilePath "$CNIDir\bin\flanneld.exe" -ArgumentList $flanneldArgs
         }
@@ -584,7 +666,6 @@ function start-flanneld {
         throw ".............. FAILED, agent retry"
     }
 
-    restart-proxy
     repair-cloud-routes
 
     print ".................. OK"
@@ -676,8 +757,7 @@ function start-kubelet {
     while (-not $process) {
         if ($retryCount -eq 1) {
             # create an error debug log #
-            $null = New-Item -Force -Type Directory -Path $RancherLogDir -ErrorAction Ignore
-            $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kubelet.exe" -ArgumentList $kubeletArgs -RedirectStandardError "$RancherLogDir\kubelet.log"
+            $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kubelet.exe" -ArgumentList $kubeletArgs -RedirectStandardError ("{0}\kubelet_{1}.log" -f $RancherLogDir, $(Get-Date -UFormat "%Y%m%d"))
         } else {
             $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kubelet.exe" -ArgumentList $kubeletArgs
         }
@@ -762,8 +842,7 @@ function start-kube-proxy {
     while (-not $process) {
         if ($retryCount -eq 1) {
             # create an error debug log #
-            $null = New-Item -Force -Type Directory -Path $RancherLogDir -ErrorAction Ignore
-            $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kube-proxy.exe" -ArgumentList $kubeproxyArgs -RedirectStandardError "$RancherLogDir\kube-proxy.log"
+            $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kube-proxy.exe" -ArgumentList $kubeproxyArgs -RedirectStandardError ("{0}\kubeproxy_{1}.log" -f $RancherLogDir, $(Get-Date -UFormat "%Y%m%d"))
         } else {
             $process = Start-Process -PassThru -FilePath "$KubeDir\bin\kube-proxy.exe" -ArgumentList $kubeproxyArgs
         }
@@ -782,7 +861,6 @@ function start-kube-proxy {
         }
     }
 
-    restart-proxy
     print ".................. OK"
 }
 
@@ -824,8 +902,7 @@ function init {
 
             print "Installing Azure cloud cli, wait a few minutes ..."
 
-            $null = New-Item -Force -Type Directory -Path $RancherLogDir -ErrorAction Ignore
-            install-msi -File $azMSIBinPath -LogFile "$RancherLogDir\azurecli-installation.log"
+            install-msi -File $azMSIBinPath -LogFile ("{0}\azurecli-installation_{1}.log" -f $RancherLogDir, $(Get-Date -UFormat "%Y%m%d"))
             if (-not $?) {
                 throw "Failed to install Azure cloud cli, crash"
             }
@@ -841,6 +918,13 @@ function init {
 }
 
 function main {
+    # controlplanes proxy #
+    if (-not $KubeControlPlaneAddresses) {
+        print "Waiting for controlplanes to be ready..."
+        exit 0
+    }
+    setup-proxy -CPHosts $KubeControlPlaneAddresses
+
     # recover processes #
     $shouldUseCompsCnt = 3
     $wantRecoverComps = @()
@@ -910,8 +994,6 @@ trap {
     [System.Console]::Error.Write($errMsg)
 
     if ($errMsg.EndsWith("agent retry")) {
-        restart-proxy
-
         exit 2
     }
 

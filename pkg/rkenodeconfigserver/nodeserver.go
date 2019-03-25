@@ -325,7 +325,6 @@ func (n *RKENodeConfigServer) windowsNodeConfig(ctx context.Context, cluster *v3
 func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configNode *v3.RKEConfigNode, systemImages v3.WindowsSystemImages) (map[string]v3.Process, error) {
 	cniBinariesImage := ""
 	kubernetesBinariesImage := systemImages.KubernetesBinaries
-	nginxProxyImage := systemImages.NginxProxy
 	kubeletPauseImage := systemImages.KubeletPause
 
 	// network
@@ -408,27 +407,6 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 		},
 		Binds: []string{
 			"c:\\etc\\cni:c:\\cni",
-		},
-		ImageRegistryAuthConfig: registryAuthConfig,
-	}
-
-	registryAuthConfig, _, _ = rkedocker.GetImageRegistryConfig(nginxProxyImage, privateRegistriesMap)
-	result["post-run-docker-nginx-proxy"] = v3.Process{
-		Name:  "nginx-proxy",
-		Image: nginxProxyImage,
-		Env: []string{
-			fmt.Sprintf("%s=%s", rkeservices.NginxProxyEnvName, strings.Join(controlPlanes, ",")),
-		},
-		Command: []string{
-			"pwsh.exe",
-		},
-		RestartPolicy: "always",
-		Args: []string{
-			"-f",
-			"c:\\Program Files\\runtime\\start.ps1",
-		},
-		Publish: []string{
-			"6443:6443",
 		},
 		ImageRegistryAuthConfig: registryAuthConfig,
 	}
@@ -524,6 +502,7 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 			"-KubeDnsServiceIP", dnsServiceIP,
 			"-KubeCNIComponent", cniComponent,
 			"-KubeCNIMode", cniMode,
+			"-KubeControlPlaneAddresses", strings.Join(controlPlanes, ";"),
 			"-KubeletCloudProviderName", cloudProviderName,
 			"-KubeletCloudProviderConfig", cloudProviderConfig,
 			"-KubeletDockerConfig", dockerConfig,
