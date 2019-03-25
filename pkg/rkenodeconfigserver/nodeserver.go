@@ -303,10 +303,10 @@ func (n *RKENodeConfigServer) windowsNodeConfig(ctx context.Context, cluster *v3
 				return nil, errors.Wrapf(err, "failed to marshall cert bundle for %s", node.Status.NodeConfig.Address)
 			}
 
-			systemImages := formatSystemImages(v3.K8sVersionWindowsSystemImages[rkeConfig.Version], windowsReleaseID)
+			systemImages := formatSystemImages(v3.AllK8sWindowsVersions[rkeConfig.Version], windowsReleaseID)
 			process, err := createWindowsProcesses(rkeConfig, node.Status.NodeConfig, systemImages)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to create windows node plan for %s", node.Status.NodeConfig.Address)
+				return nil, errors.Wrapf(err, "failed to create windows node plan for %s with RKE version %s", node.Status.NodeConfig.Address, rkeConfig.Version)
 			}
 
 			nc := &rkeworker.NodeConfig{
@@ -346,6 +346,13 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 				break
 			}
 		}
+	}
+
+	// confirm images
+	if kubernetesBinariesImage == "" ||
+		kubeletPauseImage == "" ||
+		cniBinariesImage == "" {
+		return nil, fmt.Errorf("missing system images")
 	}
 
 	// get kubernetes masters
@@ -389,6 +396,7 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 			"c:\\etc\\kubernetes:c:\\kubernetes",
 		},
 		ImageRegistryAuthConfig: registryAuthConfig,
+		NetworkMode:             "none",
 	}
 
 	registryAuthConfig, _, _ = rkedocker.GetImageRegistryConfig(cniBinariesImage, privateRegistriesMap)
@@ -409,6 +417,7 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 			"c:\\etc\\cni:c:\\cni",
 		},
 		ImageRegistryAuthConfig: registryAuthConfig,
+		NetworkMode:             "none",
 	}
 
 	// hyperkube fake process
