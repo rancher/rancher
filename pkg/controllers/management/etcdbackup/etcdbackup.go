@@ -386,6 +386,7 @@ func shouldBackup(cluster *v3.Cluster) bool {
 		logrus.Debugf("[etcd-backup] No backup config for cluster [%s]", cluster.Name)
 		return false
 	}
+  
 	if etcdService.BackupConfig.Enabled == nil ||
 		!*cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.Enabled {
 		logrus.Debugf("[etcd-backup] Backup is disabled cluster [%s]", cluster.Name)

@@ -109,7 +109,15 @@ func (p *Provisioner) Updated(cluster *v3.Cluster) (runtime.Object, error) {
 			setVersion(cluster)
 			return p.update(cluster, false)
 
-		} else if anno == "updating" {
+		} else if strings.HasPrefix(anno, "updating/") {
+			// Check if it's been updating for more than 20 seconds, this lets
+			// the controller take over attempting to update the cluster
+			pieces := strings.Split(anno, "/")
+			t, err := time.Parse(time.RFC3339, pieces[1])
+			if err != nil || int(time.Since(t)/time.Second) > 20 {
+				cluster.Annotations[KontainerEngineUpdate] = "updated"
+				return p.Clusters.Update(cluster)
+			}
 			// Go routine is already running to update the cluster so wait
 			return nil, nil
 		}
@@ -194,8 +202,8 @@ func (p *Provisioner) waitForSchema(cluster *v3.Cluster) {
 
 func (p *Provisioner) setKontainerEngineUpdate(cluster *v3.Cluster, anno string) (*v3.Cluster, error) {
 	backoff := wait.Backoff{
-		Duration: 100 * time.Millisecond,
-		Factor:   2,
+		Duration: 500 * time.Millisecond,
+		Factor:   1,
 		Jitter:   0,
 		Steps:    6,
 	}
@@ -208,6 +216,13 @@ func (p *Provisioner) setKontainerEngineUpdate(cluster *v3.Cluster, anno string)
 			}
 			return false, nil
 		}
+
+		if anno == "updating" {
+			// Add a timestamp for comparison since this anno was added
+			anno = anno + "/" + time.Now().Format(time.RFC3339)
+			fmt.Println(anno)
+		}
+
 		newCluster.Annotations[KontainerEngineUpdate] = anno
 		newCluster, err = p.Clusters.Update(newCluster)
 		if err != nil {
