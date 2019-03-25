@@ -544,6 +544,7 @@ func (c *Cluster) BuildKubeProxyProcess(host *hosts.Host, prefixPath string) v3.
 	}
 	Binds := []string{
 		fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(prefixPath, "/etc/kubernetes")),
+		"/run:/run",
 	}
 
 	for arg, value := range c.Services.Kubeproxy.ExtraArgs {
