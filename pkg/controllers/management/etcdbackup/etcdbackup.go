@@ -83,8 +83,7 @@ func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
 		cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig == nil {
 		return b, fmt.Errorf("[etcd-backup] cluster doesn't have a backup config")
 	}
-	if cluster.Spec.RancherKubernetesEngineConfig != nil &&
-		cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig != nil &&
+	if cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.Enabled == nil ||
 		!*cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.Enabled {
 		return b, fmt.Errorf("[etcd-backup] backup is disabled for cluster [%s]", cluster.Name)
 	}
@@ -386,9 +385,8 @@ func shouldBackup(cluster *v3.Cluster) bool {
 		logrus.Debugf("[etcd-backup] No backup config for cluster [%s]", cluster.Name)
 		return false
 	}
-	if etcdService.BackupConfig != nil &&
-		etcdService.BackupConfig.Enabled != nil &&
-		!*etcdService.BackupConfig.Enabled {
+	if etcdService.BackupConfig.Enabled == nil ||
+		!*cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.Enabled {
 		logrus.Debugf("[etcd-backup] Backup is disabled cluster [%s]", cluster.Name)
 		return false
 	}
