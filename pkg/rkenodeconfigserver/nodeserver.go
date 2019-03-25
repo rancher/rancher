@@ -322,6 +322,9 @@ func (n *RKENodeConfigServer) windowsNodeConfig(ctx context.Context, cluster *v3
 	return nil, fmt.Errorf("failed to find plan for %s", node.Status.NodeConfig.Address)
 }
 
+// createWindowsProcesses only creates 2 kinds processes:
+// - `run-container-*` processes are driven by Docker
+// - `run-script-*` processes are driven by PowerShell
 func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configNode *v3.RKEConfigNode, systemImages v3.WindowsSystemImages) (map[string]v3.Process, error) {
 	cniBinariesImage := ""
 	kubernetesBinariesImage := systemImages.KubernetesBinaries
@@ -382,7 +385,7 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 	result := make(map[string]v3.Process)
 
 	registryAuthConfig, _, _ = rkedocker.GetImageRegistryConfig(kubernetesBinariesImage, privateRegistriesMap)
-	result["pre-run-docker-kubernetes-binaries"] = v3.Process{
+	result["run-container-kubernetes-binaries"] = v3.Process{
 		Name:  "kubernetes-binaries",
 		Image: kubernetesBinariesImage,
 		Command: []string{
@@ -400,7 +403,7 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 	}
 
 	registryAuthConfig, _, _ = rkedocker.GetImageRegistryConfig(cniBinariesImage, privateRegistriesMap)
-	result["pre-run-docker-cni-binaries"] = v3.Process{
+	result["run-container-cni-binaries"] = v3.Process{
 		Name:  "cni-binaries",
 		Image: cniBinariesImage,
 		Env: []string{
@@ -499,7 +502,7 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 		"hostname-override": configNode.HostnameOverride,
 	}, serviceOptions.Kubeproxy)
 
-	result["hyperkube"] = v3.Process{
+	result["run-script-hyperkube"] = v3.Process{
 		Name: "hyperkube",
 		Command: []string{
 			"powershell.exe",

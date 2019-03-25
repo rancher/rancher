@@ -92,6 +92,7 @@ try {
     Remove-Item -Path "C:\var\lib\kubelet\*" -Recurse -Force -ErrorAction Ignore
     Remove-Item -Path "C:\var\lib\cni\*" -Recurse -Force -ErrorAction Ignore
     Remove-Item -Path "C:\var\lib\etcd\*" -Recurse -Force -ErrorAction Ignore
+    Remove-NetFirewallRule -Name @('Kubelet10250TCP', 'KubeProxy10256TCP') -ErrorAction Ignore
 } catch { }
 
 ## END main execution
