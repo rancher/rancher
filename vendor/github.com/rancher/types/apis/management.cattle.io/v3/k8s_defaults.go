@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	DefaultK8s = "v1.13.4-rancher1-2"
+	DefaultK8s = "v1.13.5-rancher1-2"
 )
 
 var (
@@ -24,12 +24,12 @@ var (
 
 	// K8sVersionsCurrent are the latest versions available for installation
 	K8sVersionsCurrent = []string{
-		"v1.11.8-rancher1-1",
+		"v1.11.9-rancher1-1",
 		// When add a new k8s version to 2.2, make sure to add support for it to the 2.1.x branch.
 		// Account for the fact that rke-tools image is different cross branches, and it requires using
 		// different k8s version tag
-		"v1.12.6-rancher1-2",
-		"v1.13.4-rancher1-2",
+		"v1.12.7-rancher1-2",
+		"v1.13.5-rancher1-2",
 	}
 
 	// K8sVersionToRKESystemImages is dynamically populated on init() with the latest versions
@@ -680,6 +680,32 @@ var (
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
 			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.2.1"),
 		},
+		"v1.11.9-rancher1-1": {
+			Etcd:                      m("quay.io/coreos/etcd:v3.2.18"),
+			Kubernetes:                m("rancher/hyperkube:v1.11.9-rancher1"),
+			Alpine:                    m("rancher/rke-tools:v0.1.15"),
+			NginxProxy:                m("rancher/rke-tools:v0.1.15"),
+			CertDownloader:            m("rancher/rke-tools:v0.1.15"),
+			KubernetesServicesSidecar: m("rancher/rke-tools:v0.1.15"),
+			KubeDNS:                   m("gcr.io/google_containers/k8s-dns-kube-dns-amd64:1.14.10"),
+			DNSmasq:                   m("gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.14.10"),
+			KubeDNSSidecar:            m("gcr.io/google_containers/k8s-dns-sidecar-amd64:1.14.10"),
+			KubeDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.0.0"),
+			Flannel:                   m("quay.io/coreos/flannel:v0.10.0"),
+			FlannelCNI:                m("quay.io/coreos/flannel-cni:v0.3.0"),
+			CalicoNode:                m("quay.io/calico/node:v3.1.3"),
+			CalicoCNI:                 m("quay.io/calico/cni:v3.1.3"),
+			CalicoCtl:                 m("quay.io/calico/ctl:v2.0.0"),
+			CanalNode:                 m("quay.io/calico/node:v3.1.3"),
+			CanalCNI:                  m("quay.io/calico/cni:v3.1.3"),
+			CanalFlannel:              m("quay.io/coreos/flannel:v0.10.0"),
+			WeaveNode:                 m("weaveworks/weave-kube:2.1.2"),
+			WeaveCNI:                  m("weaveworks/weave-npc:2.1.2"),
+			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.1"),
+			Ingress:                   m("rancher/nginx-ingress-controller:0.16.2-rancher1"),
+			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
+			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.2.1"),
+		},
 		"v1.12.0-rancher1-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.2.24"),
 			Kubernetes:                m("rancher/hyperkube:v1.12.0-rancher1"),
@@ -848,6 +874,34 @@ var (
 			CoreDNS:                   m("coredns/coredns:1.2.2"),
 			CoreDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler:1.0.0"),
 		},
+		"v1.12.7-rancher1-2": {
+			Etcd:                      m("quay.io/coreos/etcd:v3.2.24-rancher1"),
+			Kubernetes:                m("rancher/hyperkube:v1.12.7-rancher1"),
+			Alpine:                    m("rancher/rke-tools:v0.1.27"),
+			NginxProxy:                m("rancher/rke-tools:v0.1.27"),
+			CertDownloader:            m("rancher/rke-tools:v0.1.27"),
+			KubernetesServicesSidecar: m("rancher/rke-tools:v0.1.27"),
+			KubeDNS:                   m("gcr.io/google_containers/k8s-dns-kube-dns:1.14.13"),
+			DNSmasq:                   m("gcr.io/google_containers/k8s-dns-dnsmasq-nanny:1.14.13"),
+			KubeDNSSidecar:            m("gcr.io/google_containers/k8s-dns-sidecar:1.14.13"),
+			KubeDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler:1.0.0"),
+			Flannel:                   m("quay.io/coreos/flannel:v0.10.0-rancher1"),
+			FlannelCNI:                m("rancher/flannel-cni:v0.3.0-rancher1"),
+			CalicoNode:                m("quay.io/calico/node:v3.1.3"),
+			CalicoCNI:                 m("quay.io/calico/cni:v3.1.3"),
+			CalicoCtl:                 m("quay.io/calico/ctl:v2.0.0"),
+			CanalNode:                 m("quay.io/calico/node:v3.1.3"),
+			CanalCNI:                  m("quay.io/calico/cni:v3.1.3"),
+			CanalFlannel:              m("quay.io/coreos/flannel:v0.10.0"),
+			WeaveNode:                 m("weaveworks/weave-kube:2.5.0"),
+			WeaveCNI:                  m("weaveworks/weave-npc:2.5.0"),
+			PodInfraContainer:         m("gcr.io/google_containers/pause:3.1"),
+			Ingress:                   m("rancher/nginx-ingress-controller:0.21.0-rancher3"),
+			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4-rancher1"),
+			MetricsServer:             m("gcr.io/google_containers/metrics-server:v0.3.1"),
+			CoreDNS:                   m("coredns/coredns:1.2.2"),
+			CoreDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler:1.0.0"),
+		},
 		"v1.13.1-rancher1-2": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.2.24"),
 			Kubernetes:                m("rancher/hyperkube:v1.13.1-rancher1"),
@@ -879,6 +933,34 @@ var (
 		"v1.13.4-rancher1-2": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.2.24-rancher1"),
 			Kubernetes:                m("rancher/hyperkube:v1.13.4-rancher1"),
+			Alpine:                    m("rancher/rke-tools:v0.1.27"),
+			NginxProxy:                m("rancher/rke-tools:v0.1.27"),
+			CertDownloader:            m("rancher/rke-tools:v0.1.27"),
+			KubernetesServicesSidecar: m("rancher/rke-tools:v0.1.27"),
+			KubeDNS:                   m("gcr.io/google_containers/k8s-dns-kube-dns:1.15.0"),
+			DNSmasq:                   m("gcr.io/google_containers/k8s-dns-dnsmasq-nanny:1.15.0"),
+			KubeDNSSidecar:            m("gcr.io/google_containers/k8s-dns-sidecar:1.15.0"),
+			KubeDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler:1.0.0"),
+			Flannel:                   m("quay.io/coreos/flannel:v0.10.0-rancher1"),
+			FlannelCNI:                m("rancher/flannel-cni:v0.3.0-rancher1"),
+			CalicoNode:                m("quay.io/calico/node:v3.4.0"),
+			CalicoCNI:                 m("quay.io/calico/cni:v3.4.0"),
+			CalicoCtl:                 m("quay.io/calico/ctl:v2.0.0"),
+			CanalNode:                 m("quay.io/calico/node:v3.4.0"),
+			CanalCNI:                  m("quay.io/calico/cni:v3.4.0"),
+			CanalFlannel:              m("quay.io/coreos/flannel:v0.10.0"),
+			WeaveNode:                 m("weaveworks/weave-kube:2.5.0"),
+			WeaveCNI:                  m("weaveworks/weave-npc:2.5.0"),
+			PodInfraContainer:         m("gcr.io/google_containers/pause:3.1"),
+			Ingress:                   m("rancher/nginx-ingress-controller:0.21.0-rancher3"),
+			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4-rancher1"),
+			MetricsServer:             m("gcr.io/google_containers/metrics-server:v0.3.1"),
+			CoreDNS:                   m("coredns/coredns:1.2.6"),
+			CoreDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler:1.0.0"),
+		},
+		"v1.13.5-rancher1-2": {
+			Etcd:                      m("quay.io/coreos/etcd:v3.2.24-rancher1"),
+			Kubernetes:                m("rancher/hyperkube:v1.13.5-rancher1"),
 			Alpine:                    m("rancher/rke-tools:v0.1.27"),
 			NginxProxy:                m("rancher/rke-tools:v0.1.27"),
 			CertDownloader:            m("rancher/rke-tools:v0.1.27"),
@@ -962,6 +1044,34 @@ var (
 		},
 		// k8s version from 2.1.x release with old rke-tools to allow upgrade from 2.1.x clusters
 		// without all clusters being restarted
+		"v1.12.7-rancher1-1": {
+			Etcd:                      m("quay.io/coreos/etcd:v3.2.24"),
+			Kubernetes:                m("rancher/hyperkube:v1.12.7-rancher1"),
+			Alpine:                    m("rancher/rke-tools:v0.1.16"),
+			NginxProxy:                m("rancher/rke-tools:v0.1.16"),
+			CertDownloader:            m("rancher/rke-tools:v0.1.16"),
+			KubernetesServicesSidecar: m("rancher/rke-tools:v0.1.16"),
+			KubeDNS:                   m("gcr.io/google_containers/k8s-dns-kube-dns-amd64:1.14.13"),
+			DNSmasq:                   m("gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.14.13"),
+			KubeDNSSidecar:            m("gcr.io/google_containers/k8s-dns-sidecar-amd64:1.14.13"),
+			KubeDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.0.0"),
+			Flannel:                   m("quay.io/coreos/flannel:v0.10.0"),
+			FlannelCNI:                m("quay.io/coreos/flannel-cni:v0.3.0"),
+			CalicoNode:                m("quay.io/calico/node:v3.1.3"),
+			CalicoCNI:                 m("quay.io/calico/cni:v3.1.3"),
+			CalicoCtl:                 m("quay.io/calico/ctl:v2.0.0"),
+			CanalNode:                 m("quay.io/calico/node:v3.1.3"),
+			CanalCNI:                  m("quay.io/calico/cni:v3.1.3"),
+			CanalFlannel:              m("quay.io/coreos/flannel:v0.10.0"),
+			WeaveNode:                 m("weaveworks/weave-kube:2.5.0"),
+			WeaveCNI:                  m("weaveworks/weave-npc:2.5.0"),
+			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.1"),
+			Ingress:                   m("rancher/nginx-ingress-controller:0.21.0-rancher1"),
+			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
+			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.3.1"),
+		},
+		// k8s version from 2.1.x release with old rke-tools to allow upgrade from 2.1.x clusters
+		// without all clusters being restarted
 		"v1.13.1-rancher1-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.2.24"),
 			Kubernetes:                m("rancher/hyperkube:v1.13.1-rancher1"),
@@ -993,6 +1103,34 @@ var (
 		"v1.13.4-rancher1-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.2.24"),
 			Kubernetes:                m("rancher/hyperkube:v1.13.4-rancher1"),
+			Alpine:                    m("rancher/rke-tools:v0.1.16"),
+			NginxProxy:                m("rancher/rke-tools:v0.1.16"),
+			CertDownloader:            m("rancher/rke-tools:v0.1.16"),
+			KubernetesServicesSidecar: m("rancher/rke-tools:v0.1.16"),
+			KubeDNS:                   m("gcr.io/google_containers/k8s-dns-kube-dns-amd64:1.15.0"),
+			DNSmasq:                   m("gcr.io/google_containers/k8s-dns-dnsmasq-nanny-amd64:1.15.0"),
+			KubeDNSSidecar:            m("gcr.io/google_containers/k8s-dns-sidecar-amd64:1.15.0"),
+			KubeDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.0.0"),
+			Flannel:                   m("quay.io/coreos/flannel:v0.10.0"),
+			FlannelCNI:                m("quay.io/coreos/flannel-cni:v0.3.0"),
+			CalicoNode:                m("quay.io/calico/node:v3.4.0"),
+			CalicoCNI:                 m("quay.io/calico/cni:v3.4.0"),
+			CalicoCtl:                 m("quay.io/calico/ctl:v2.0.0"),
+			CanalNode:                 m("quay.io/calico/node:v3.4.0"),
+			CanalCNI:                  m("quay.io/calico/cni:v3.4.0"),
+			CanalFlannel:              m("quay.io/coreos/flannel:v0.10.0"),
+			WeaveNode:                 m("weaveworks/weave-kube:2.5.0"),
+			WeaveCNI:                  m("weaveworks/weave-npc:2.5.0"),
+			PodInfraContainer:         m("gcr.io/google_containers/pause-amd64:3.1"),
+			Ingress:                   m("rancher/nginx-ingress-controller:0.21.0-rancher1"),
+			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
+			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.3.1"),
+		},
+		// k8s version from 2.1.x release with old rke-tools to allow upgrade from 2.1.x clusters
+		// without all clusters being restarted
+		"v1.13.5-rancher1-1": {
+			Etcd:                      m("quay.io/coreos/etcd:v3.2.24"),
+			Kubernetes:                m("rancher/hyperkube:v1.13.5-rancher1"),
 			Alpine:                    m("rancher/rke-tools:v0.1.16"),
 			NginxProxy:                m("rancher/rke-tools:v0.1.16"),
 			CertDownloader:            m("rancher/rke-tools:v0.1.16"),
