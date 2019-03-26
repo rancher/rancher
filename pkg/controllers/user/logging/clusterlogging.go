@@ -270,9 +270,12 @@ func (e *endpointWatcher) checkTarget() error {
 	obj := cls[0]
 	var waitingMsg string
 	if obj.Spec.EmbeddedConfig != nil {
-		waitingMsg, err = utils.SetEmbeddedEndpoint(e.podLister, e.serviceLister, e.nodeLister, e.k8sNodeLister, obj, e.clusterName)
+		var setEndpointErr, validateErr error
+		_, validateErr = utils.ValidateCustomTags(obj.Spec.OutputTags, false)
+		waitingMsg, setEndpointErr = utils.SetEmbeddedEndpoint(e.podLister, e.serviceLister, e.nodeLister, e.k8sNodeLister, obj, e.clusterName)
+		err = mergedErrors(validateErr, setEndpointErr)
 	} else {
-		_, _, err = utils.GetWrapConfig(obj.Spec.ElasticsearchConfig, obj.Spec.SplunkConfig, obj.Spec.SyslogConfig, obj.Spec.KafkaConfig, nil)
+		err = utils.Validate(obj.Spec.ElasticsearchConfig, obj.Spec.SplunkConfig, obj.Spec.SyslogConfig, obj.Spec.KafkaConfig, nil, obj.Spec.OutputTags)
 	}
 	updatedObj, err := setClusterLoggingErrMsg(obj, waitingMsg, err)
 	_, updateErr := e.clusterLoggings.Update(updatedObj)

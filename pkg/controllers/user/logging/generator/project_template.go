@@ -24,7 +24,7 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
   <record>
     tag ${tag}
     namespace ${record["kubernetes"]["namespace_name"]}
-    {{range $k, $val := $store.OutputTags -}}
+    {{range $k, $val := $store.WrapOutputTags -}}
     {{$k}} {{$val}}
     {{end -}}
     projectID {{$store.ProjectName}}

@@ -202,7 +202,7 @@ func (p *projectLoggingEndpointWatcher) checkTarget() error {
 
 	var mergedErrs error
 	for _, v := range pls {
-		_, _, err = utils.GetWrapConfig(v.Spec.ElasticsearchConfig, v.Spec.SplunkConfig, v.Spec.SyslogConfig, v.Spec.KafkaConfig, nil)
+		err = utils.Validate(v.Spec.ElasticsearchConfig, v.Spec.SplunkConfig, v.Spec.SyslogConfig, v.Spec.KafkaConfig, nil, v.Spec.OutputTags)
 		if err != nil {
 			updatedObj := v.DeepCopy()
 			v3.LoggingConditionUpdated.False(updatedObj)

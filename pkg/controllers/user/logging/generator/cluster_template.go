@@ -45,7 +45,7 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
   <record>
     tag ${tag}
     log_type k8s_normal_container 
-    {{range $k, $val := .clusterTarget.OutputTags -}}
+    {{range $k, $val := .clusterTarget.WrapOutputTags -}}
     {{$k}} {{$val}}
     {{end -}}
   </record>
