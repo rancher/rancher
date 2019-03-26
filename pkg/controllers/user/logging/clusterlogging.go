@@ -201,10 +201,9 @@ func (e *endpointWatcher) checkTarget() error {
 		return nil
 	}
 	obj := cls[0]
-	_, err = utils.GetWrapConfig(obj.Spec.ElasticsearchConfig, obj.Spec.SplunkConfig, obj.Spec.SyslogConfig, obj.Spec.KafkaConfig, obj.Spec.FluentForwarderConfig)
-	if err != nil {
-		return err
-	}
+
+	err = utils.Validate(obj.Spec.ElasticsearchConfig, obj.Spec.SplunkConfig, obj.Spec.SyslogConfig, obj.Spec.KafkaConfig, obj.Spec.FluentForwarderConfig, obj.Spec.OutputTags)
+
 	updatedObj := setClusterLoggingErrMsg(obj, err)
 
 	_, updateErr := e.clusterLoggings.Update(updatedObj)

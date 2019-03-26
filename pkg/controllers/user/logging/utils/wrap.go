@@ -26,6 +26,7 @@ type WrapLogging struct {
 type WrapClusterLogging struct {
 	v3.ClusterLoggingSpec
 	WrapLogging
+	WrapOutputTags map[string]string
 }
 
 type WrapProjectLogging struct {
@@ -33,6 +34,7 @@ type WrapProjectLogging struct {
 	GrepNamespace string
 	WrapLogging
 	WrapProjectName string
+	WrapOutputTags  map[string]string
 }
 
 type WrapElasticsearch struct {
@@ -69,12 +71,19 @@ type FluentServer struct {
 }
 
 func (w *WrapClusterLogging) Validate() error {
-	_, err := GetWrapConfig(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig, w.FluentForwarderConfig)
-	return err
+	return Validate(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig, w.FluentForwarderConfig, w.OutputTags)
 }
 
 func (w *WrapProjectLogging) Validate() error {
-	_, err := GetWrapConfig(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig, w.FluentForwarderConfig)
+	return Validate(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig, nil, w.OutputTags)
+}
+
+func Validate(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.SyslogConfig, kf *v3.KafkaConfig, ff *v3.FluentForwarderConfig, tags map[string]string) error {
+	if _, err := GetWrapConfig(es, sp, sl, kf, ff); err != nil {
+		return err
+	}
+
+	_, err := ValidateCustomTags(tags, false)
 	return err
 }
 
@@ -88,6 +97,10 @@ func ToWrapClusterLogging(clusterLogging v3.ClusterLoggingSpec) (*WrapClusterLog
 		return nil, err
 	}
 	wp.WrapLogging = wrapLogging
+	wp.WrapOutputTags, err = ValidateCustomTags(clusterLogging.OutputTags, true)
+	if err != nil {
+		return nil, err
+	}
 
 	return &wp, nil
 }
@@ -105,6 +118,10 @@ func ToWrapProjectLogging(grepNamespace string, projectLogging v3.ProjectLogging
 		return nil, err
 	}
 	wp.WrapLogging = wrapLogging
+	wp.WrapOutputTags, err = ValidateCustomTags(projectLogging.OutputTags, true)
+	if err != nil {
+		return nil, err
+	}
 	return &wp, nil
 }
 
