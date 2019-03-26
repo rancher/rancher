@@ -2,6 +2,7 @@ package kontainerdriver
 
 import (
 	"fmt"
+
 	errorsutil "github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -21,7 +22,7 @@ func NewStore(management *config.ScaledContext, s types.Store) types.Store {
 	clusterInformer := management.Management.Clusters("").Controller().Informer()
 	// use an indexer instead of expensive k8s api calls
 	clusterInformer.AddIndexers(map[string]cache.IndexFunc{
-		clusterByGenericEngineConfigKey: clusterByGenericEngineConfig,
+		clusterByGenericEngineConfigKey: clusterByKontainerDriver,
 	})
 	kd := management.Management.KontainerDrivers("").Controller().Lister()
 	storeObj := store{
@@ -43,7 +44,9 @@ func (s *store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 		//if driver is not found, don't return error
 		return nil, nil
 	}
-
+	if driver.Spec.BuiltIn {
+		return nil, httperror.NewAPIError(httperror.MethodNotAllowed, "builtin cluster drivers may not be removed")
+	}
 	clustersWithKontainerDriver, err := s.ClusterIndexer.ByIndex(clusterByGenericEngineConfigKey, id)
 	if err != nil {
 		return nil, errorsutil.WithMessage(err, fmt.Sprintf("error determing if kontainer driver [%s] was in use", driver.Status.DisplayName))
