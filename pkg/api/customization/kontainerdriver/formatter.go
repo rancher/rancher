@@ -17,7 +17,7 @@ func NewFormatter(manangement *config.ScaledContext) types.Formatter {
 	clusterInformer := manangement.Management.Clusters("").Controller().Informer()
 	// use an indexer instead of expensive k8s api calls
 	clusterInformer.AddIndexers(map[string]cache.IndexFunc{
-		clusterByGenericEngineConfigKey: clusterByGenericEngineConfig,
+		clusterByGenericEngineConfigKey: clusterByKontainerDriver,
 	})
 
 	format := Format{
@@ -28,9 +28,9 @@ func NewFormatter(manangement *config.ScaledContext) types.Formatter {
 
 const clusterByGenericEngineConfigKey = "genericEngineConfig"
 
-// IndexFunction that uses cluster's genericEngineConfig map[string]interface{}
-// to lookup the driverName
-func clusterByGenericEngineConfig(obj interface{}) ([]string, error) {
+// clusterByKontainerDriver is an indexer function that uses the cluster genericEngineConfig
+// driverName field
+func clusterByKontainerDriver(obj interface{}) ([]string, error) {
 	cluster, ok := obj.(*v3.Cluster)
 	if !ok {
 		return []string{}, nil

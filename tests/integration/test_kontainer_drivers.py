@@ -23,6 +23,7 @@ DRIVER_ARM64_URL = "https://github.com/jianghang8421/" \
 
 
 def test_builtin_drivers_are_present(admin_mc):
+    """Test if builtin kd are present and cannot be deleted via API or UI"""
     admin_mc.client.reload_schema()
     types = admin_mc.client.schema.types
 
@@ -39,6 +40,11 @@ def test_builtin_drivers_are_present(admin_mc):
         # verify has no delete link because its built in
         kd = admin_mc.client.by_id_kontainer_driver(name.lower())
         assert not hasattr(kd.links, 'remove')
+        # assert cannot delete it via API
+        with pytest.raises(ApiError) as e:
+            admin_mc.client.delete(kd)
+
+        assert e.value.error.status == 405
 
 
 @pytest.mark.nonparallel
