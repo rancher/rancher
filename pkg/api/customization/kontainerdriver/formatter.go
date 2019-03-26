@@ -17,7 +17,7 @@ func NewFormatter(manangement *config.ScaledContext) types.Formatter {
 	clusterInformer := manangement.Management.Clusters("").Controller().Informer()
 	// use an indexer instead of expensive k8s api calls
 	clusterInformer.AddIndexers(map[string]cache.IndexFunc{
-		clusterByKontainerDriverKey: clusterByKontainerDriver,
+		clusterByGenericEngineConfigKey: clusterByGenericEngineConfig,
 	})
 
 	format := Format{
@@ -26,15 +26,27 @@ func NewFormatter(manangement *config.ScaledContext) types.Formatter {
 	return format.Formatter
 }
 
-const clusterByKontainerDriverKey = "clusterbyKontainerDriver"
+const clusterByGenericEngineConfigKey = "genericEngineConfig"
 
-func clusterByKontainerDriver(obj interface{}) ([]string, error) {
+// IndexFunction that uses cluster's genericEngineConfig map[string]interface{}
+// to lookup the driverName
+func clusterByGenericEngineConfig(obj interface{}) ([]string, error) {
 	cluster, ok := obj.(*v3.Cluster)
 	if !ok {
 		return []string{}, nil
 	}
-	return []string{cluster.Status.Driver}, nil
+	engineConfig := cluster.Spec.GenericEngineConfig
+	if engineConfig == nil {
+		return []string{}, nil
+	}
+	driverName, ok := (*engineConfig)["driverName"].(string)
+	if !ok {
+		return []string{}, nil
+	}
+
+	return []string{driverName}, nil
 }
+
 func (f *Format) Formatter(request *types.APIContext, resource *types.RawResource) {
 	state, ok := resource.Values["state"].(string)
 	if ok {
@@ -49,11 +61,12 @@ func (f *Format) Formatter(request *types.APIContext, resource *types.RawResourc
 	// if cluster driver is a built-in, delete removal link from UI
 	if builtIn, _ := resource.Values[client.KontainerDriverFieldBuiltIn].(bool); builtIn {
 		delete(resource.Links, "remove")
+		return
 	}
-	resName := resource.Values[client.KontainerDriverFieldName]
+	resName := resource.Values["id"]
 	// resName will be nil when first added
 	if resName != nil {
-		clustersWithKontainerDriver, err := f.ClusterIndexer.ByIndex(clusterByKontainerDriverKey, resName.(string))
+		clustersWithKontainerDriver, err := f.ClusterIndexer.ByIndex(clusterByGenericEngineConfigKey, resName.(string))
 		if err != nil {
 			logrus.Warnf("failed to determine if kontainer driver %v was in use by a cluster : %v", resName.(string), err)
 		} else if len(clustersWithKontainerDriver) != 0 {
