@@ -2,7 +2,6 @@ package kontainerdriver
 
 import (
 	"fmt"
-
 	errorsutil "github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -22,7 +21,7 @@ func NewStore(management *config.ScaledContext, s types.Store) types.Store {
 	clusterInformer := management.Management.Clusters("").Controller().Informer()
 	// use an indexer instead of expensive k8s api calls
 	clusterInformer.AddIndexers(map[string]cache.IndexFunc{
-		clusterByKontainerDriverKey: clusterByKontainerDriver,
+		clusterByGenericEngineConfigKey: clusterByGenericEngineConfig,
 	})
 	kd := management.Management.KontainerDrivers("").Controller().Lister()
 	storeObj := store{
@@ -35,7 +34,7 @@ func NewStore(management *config.ScaledContext, s types.Store) types.Store {
 
 // Delete removes the KontainerDriver if it is not in use by a cluster
 func (s *store) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
-	//need to get the full driver since just the id is not enough see if a cluster uses it
+	//need to get the full driver since just the id is not enough see if it is builtin
 	driver, err := s.KontainerDriverLister.Get("", id)
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -45,7 +44,7 @@ func (s *store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 		return nil, nil
 	}
 
-	clustersWithKontainerDriver, err := s.ClusterIndexer.ByIndex(clusterByKontainerDriverKey, driver.Status.DisplayName)
+	clustersWithKontainerDriver, err := s.ClusterIndexer.ByIndex(clusterByGenericEngineConfigKey, id)
 	if err != nil {
 		return nil, errorsutil.WithMessage(err, fmt.Sprintf("error determing if kontainer driver [%s] was in use", driver.Status.DisplayName))
 	}
