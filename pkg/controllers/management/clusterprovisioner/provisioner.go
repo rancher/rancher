@@ -220,7 +220,6 @@ func (p *Provisioner) setKontainerEngineUpdate(cluster *v3.Cluster, anno string)
 		if anno == "updating" {
 			// Add a timestamp for comparison since this anno was added
 			anno = anno + "/" + time.Now().Format(time.RFC3339)
-			fmt.Println(anno)
 		}
 
 		newCluster.Annotations[KontainerEngineUpdate] = anno
