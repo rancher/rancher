@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/norman/types/convert/merge"
 	"github.com/rancher/norman/types/values"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -192,11 +193,41 @@ func (s *Store) Context() types.StorageContext {
 }
 
 func (s *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
-	namespace := getNamespace(apiContext, opt)
+	var resultList unstructured.UnstructuredList
 
-	resultList, err := s.retryList(namespace, apiContext)
-	if err != nil {
-		return nil, err
+	// if there are no namespaces field in options, a single request is made
+	if opt == nil || opt.Namespaces == nil {
+		ns := getNamespace(apiContext, opt)
+		list, err := s.retryList(ns, apiContext)
+		if err != nil {
+			return nil, err
+		}
+		resultList = *list
+	} else {
+		var (
+			errGroup errgroup.Group
+			mux      sync.Mutex
+		)
+
+		allNS := opt.Namespaces
+		for _, ns := range allNS {
+			nsCopy := ns
+			errGroup.Go(func() error {
+				list, err := s.retryList(nsCopy, apiContext)
+				if err != nil {
+					return err
+				}
+
+				mux.Lock()
+				resultList.Items = append(resultList.Items, list.Items...)
+				mux.Unlock()
+
+				return nil
+			})
+		}
+		if err := errGroup.Wait(); err != nil {
+			return nil, err
+		}
 	}
 
 	var result []map[string]interface{}

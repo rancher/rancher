@@ -184,6 +184,8 @@ type QueryOptions struct {
 	Pagination *Pagination
 	Conditions []*QueryCondition
 	Options    map[string]string
+	// Set namespaces to an empty array will result in an empty response
+	Namespaces []string
 }
 
 type ReferenceValidator interface {
