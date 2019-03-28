@@ -26,7 +26,7 @@ if ! drone -v; then
     exit 1
 fi
 
-build_number=$(drone build ls rancher/rancher --event tag --format "{{.Number}},{{.Ref}}"| grep ${1} |cut -d',' -f1)
+build_number=$(drone build ls rancher/rancher --event tag --format "{{.Number}},{{.Ref}}"| grep ${1}$ |cut -d',' -f1|head -1)
 
 if [[ -n ${build_number} ]];then 
   drone build promote rancher/rancher ${build_number} promote-stable
