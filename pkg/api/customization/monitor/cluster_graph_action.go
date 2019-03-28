@@ -63,16 +63,22 @@ func (h *ClusterGraphHandler) QuerySeriesAction(actionName string, action *types
 		return fmt.Errorf("get usercontext failed, %v", err)
 	}
 
-	prometheusName, prometheusNamespace := monitorutil.ClusterMonitoringInfo()
-	token, err := getAuthToken(userContext, prometheusName, prometheusNamespace)
-	if err != nil {
-		return err
-	}
-
 	reqContext, cancel := context.WithTimeout(context.Background(), prometheusReqTimeout)
 	defer cancel()
 
-	svcName, svcNamespace, svcPort := monitorutil.ClusterPrometheusEndpoint()
+	var svcName, svcNamespace, svcPort, token string
+	if inputParser.Input.Filters["resourceType"] == "istiocluster" {
+		inputParser.Input.MetricParams["namespace"] = ".*"
+		svcName, svcNamespace, svcPort = monitorutil.IstioPrometheusEndpoint()
+	} else {
+		prometheusName, prometheusNamespace := monitorutil.ClusterMonitoringInfo()
+		token, err = getAuthToken(userContext, prometheusName, prometheusNamespace)
+		if err != nil {
+			return err
+		}
+		svcName, svcNamespace, svcPort = monitorutil.ClusterPrometheusEndpoint()
+	}
+
 	prometheusQuery, err := NewPrometheusQuery(reqContext, clusterName, token, svcNamespace, svcName, svcPort, h.dialerFactory, userContext)
 	if err != nil {
 		return err
