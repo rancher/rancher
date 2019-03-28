@@ -22,6 +22,7 @@ const (
 )
 
 const (
+	istioNamespaceName                     = "istio-system"
 	cattleNamespaceName                    = "cattle-prometheus"
 	cattleCreatorIDAnnotationKey           = "field.cattle.io/creatorId"
 	cattleOverwriteAppAnswersAnnotationKey = "field.cattle.io/overwriteAppAnswers"
@@ -43,10 +44,14 @@ const (
 	clusterLevelAppName             = "cluster-monitoring"
 	projectLevelAppName             = "project-monitoring"
 	clusterLevelAlertManagerAppName = "cluster-alerting"
+	istioAppName                    = "istio"
 
 	// The headless service name of Prometheus
 	alertManagerHeadlessServiceName = "alertmanager-operated"
 	prometheusHeadlessServiceName   = "prometheus-operated"
+
+	// The service name of istio prometheus
+	istioPrometheusServiceName = "prometheus"
 
 	//CattlePrometheusRuleLabelKey The label info of PrometheusRule
 	CattlePrometheusRuleLabelKey             = "source"
@@ -106,6 +111,14 @@ func OwnedLabels(appName, appTargetNamespace, appProjectName string, level AppLe
 		appClusterIDLabelKey:       clusterID,
 		appLevelLabelKey:           string(level),
 	}
+}
+
+func IstioMonitoringInfo() (appName, appTargetNamespace string) {
+	return istioAppName, istioNamespaceName
+}
+
+func IstioPrometheusEndpoint() (serviceName, namespace, port string) {
+	return istioPrometheusServiceName, istioNamespaceName, "9090"
 }
 
 func SystemMonitoringInfo() (appName, appTargetNamespace string) {
