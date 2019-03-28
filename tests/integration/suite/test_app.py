@@ -1,5 +1,6 @@
 from .common import random_str
 from .test_catalog import wait_for_template_to_be_created
+import pytest
 import time
 
 
@@ -84,6 +85,69 @@ def test_app_wordpress(admin_pc, admin_mc):
         answers=answers
     )
     wait_for_workload(client, ns.name, count=2)
+
+
+@pytest.mark.skip(reason="istio disabled")
+def test_app_istio(admin_cc, admin_pc, admin_mc):
+    client = admin_pc.client
+    name = "rancher-istio"
+    url = "	https://github.com/guangbochen/system-charts.git"
+    external_id = "catalog://?catalog=system-library" \
+                  "&template=rancher-istio&version=1.1.5"
+
+    ns = admin_pc.cluster.client.create_namespace(name="istio-system",
+                                                  projectId=admin_pc.
+                                                  project.id)
+    admin_mc.client.create_catalog(name="system-library",
+                                   branch="istio",
+                                   url=url,
+                                   )
+    wait_for_template_to_be_created(admin_mc.client, "system-library")
+
+    answers = {
+        "certmanager.enabled": "false",
+        "enableCRDs": "true",
+        "galley.enabled": "true",
+        "gateways.enabled": "false",
+        "gateways.istio-ingressgateway.type": "NodePort",
+        "grafana.enabled": "true",
+        "grafana.persistence.enabled": "false",
+        "istio_cni.enabled": "false",
+        "istiocoredns.enabled": "false",
+        "kiali.enabled": "true",
+        "mixer.enabled": "true",
+        "mixer.policy.enabled": "false",
+        "mixer.telemetry.resources.limits.cpu": "4800m",
+        "mixer.telemetry.resources.limits.memory": "4048Mi",
+        "mixer.telemetry.resources.requests.cpu": "1000m",
+        "mixer.telemetry.resources.requests.memory": "1024Mi",
+        "mtls.enabled": "false",
+        "nodeagent.enabled": "false",
+        "pilot.enabled": "true",
+        "pilot.resources.limits.cpu": "1000m",
+        "pilot.resources.limits.memory": "4096Mi",
+        "pilot.resources.requests.cpu": "500m",
+        "pilot.resources.requests.memory": "2048Mi",
+        "pilot.traceSampling": "1",
+        "prometheus.enabled": "true",
+        "prometheus.resources.limits.cpu": "1000m",
+        "prometheus.resources.limits.memory": "1000Mi",
+        "prometheus.resources.requests.cpu": "750m",
+        "prometheus.resources.requests.memory": "750Mi",
+        "prometheus.retention": "6h",
+        "security.enabled": "true",
+        "sidecarInjectorWebhook.enabled": "true",
+        "tracing.enabled": "true"
+    }
+
+    client.create_app(
+        name=name,
+        externalId=external_id,
+        targetNamespace=ns.name,
+        projectId=admin_pc.project.id,
+        answers=answers
+    )
+    wait_for_monitor_metric(admin_cc, admin_mc)
 
 
 def test_prehook_chart(admin_pc, admin_mc):
@@ -244,3 +308,27 @@ def wait_for_app_to_be_deleted(client, app, timeout=120):
             break
         time.sleep(interval)
         interval *= 2
+
+
+def wait_for_monitor_metric(admin_cc, admin_mc, timeout=60):
+    client = admin_mc.client
+    start = time.time()
+    interval = 0.5
+    monitorMetrics = client.list_monitor_metric(namespaceId=admin_cc.
+                                                cluster.id)
+    while len(monitorMetrics.data) == 0:
+        if time.time() - start > timeout:
+            print(monitorMetrics)
+            raise Exception('Timeout waiting for monitorMetrics service')
+        time.sleep(interval)
+        interval *= 2
+        monitorMetrics = client.list_monitor_metric(namespaceId=admin_cc.
+                                                    cluster.id)
+    found = False
+    for m in monitorMetrics:
+        if m.labels.component == "istio":
+            found = True
+            break
+    if not found:
+        raise AssertionError(
+            "not found istio expression")
