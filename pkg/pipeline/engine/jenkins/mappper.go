@@ -268,14 +268,7 @@ func (c *jenkinsPipelineConverter) injectGitCaCert(pod *v1.Pod) {
 	}
 	for i, container := range pod.Spec.Containers {
 		if container.Name == utils.JenkinsAgentContainerName {
-			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, v1.EnvVar{
-				Name:  "GIT_SSL_CAINFO",
-				Value: utils.GitCaCertPath + "/ca.crt",
-			})
-			pod.Spec.Containers[i].VolumeMounts = append(pod.Spec.Containers[i].VolumeMounts, v1.VolumeMount{
-				Name:      utils.GitCaCertVolumeName,
-				MountPath: utils.GitCaCertPath,
-			})
+			c.injectGitCaCertToContainer(&pod.Spec.Containers[i])
 			break
 		}
 	}
@@ -284,6 +277,17 @@ func (c *jenkinsPipelineConverter) injectGitCaCert(pod *v1.Pod) {
 		VolumeSource: v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		},
+	})
+}
+
+func (c *jenkinsPipelineConverter) injectGitCaCertToContainer(container *v1.Container) {
+	container.Env = append(container.Env, v1.EnvVar{
+		Name:  "GIT_SSL_CAINFO",
+		Value: utils.GitCaCertPath + "/ca.crt",
+	})
+	container.VolumeMounts = append(container.VolumeMounts, v1.VolumeMount{
+		Name:      utils.GitCaCertVolumeName,
+		MountPath: utils.GitCaCertPath,
 	})
 }
 
