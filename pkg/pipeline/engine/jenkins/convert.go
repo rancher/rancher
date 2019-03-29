@@ -236,6 +236,9 @@ StageLoop:
 }
 
 func (c *jenkinsPipelineConverter) configPublishCatalogContainer(container *v1.Container, step *v3.Step) error {
+	if c.opts.gitCaCerts != "" {
+		c.injectGitCaCertToContainer(container)
+	}
 	config := step.PublishCatalogConfig
 	container.Image = images.Resolve(mv3.ToolsSystemImages.PipelineSystemImages.KubeApply)
 	envs := map[string]string{
