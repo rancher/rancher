@@ -5,17 +5,16 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	kcluster "github.com/rancher/kontainer-engine/cluster"
-	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/pki"
+	corev1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	k8scorev1 "k8s.io/api/core/v1"
@@ -40,6 +39,7 @@ type etcdTLSConfig struct {
 type clusterHandler struct {
 	clusterName          string
 	cattleClustersClient mgmtv3.ClusterInterface
+	agentEndpointsLister corev1.EndpointsLister
 	app                  *appHandler
 }
 
@@ -64,10 +64,6 @@ func (ch *clusterHandler) sync(key string, cluster *mgmtv3.Cluster) (runtime.Obj
 		}
 
 		cpy = updated
-	}
-
-	if err != nil {
-		err = errors.Wrapf(err, "unable to sync Cluster %s", clusterTag)
 	}
 
 	return cpy, err
@@ -99,17 +95,38 @@ func (ch *clusterHandler) doSync(cluster *mgmtv3.Cluster) error {
 			}
 		}
 
-		appAnswers, err := ch.deployApp(appName, appTargetNamespace, appProjectName, cluster, etcdTLSConfigs, systemComponentMap)
+		_, err = ch.deployApp(appName, appTargetNamespace, appProjectName, cluster, etcdTLSConfigs, systemComponentMap)
 		if err != nil {
 			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
 			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
 			return errors.Wrap(err, "failed to deploy monitoring")
 		}
 
-		if err := ch.detectAppComponentsWhileInstall(appName, appTargetNamespace, cluster, appAnswers); err != nil {
+		isReady, err := ch.isPrometheusReady(cluster)
+		if err != nil {
 			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
 			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
-			return errors.Wrap(err, "failed to detect the installation status of monitoring components")
+			return err
+		}
+		if !isReady {
+			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
+			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, "prometheus is not ready")
+			return nil
+		}
+
+		if cluster.Status.MonitoringStatus == nil {
+			cluster.Status.MonitoringStatus = &mgmtv3.MonitoringStatus{
+				GrafanaEndpoint: fmt.Sprintf("/k8s/clusters/%s/api/v1/namespaces/%s/services/http:access-grafana:80/proxy/", cluster.Name, appTargetNamespace),
+			}
+		}
+
+		_, err = ConditionMetricExpressionDeployed.DoUntilTrue(cluster.Status.MonitoringStatus, func() (status *mgmtv3.MonitoringStatus, e error) {
+			return status, ch.deployMetrics(cluster)
+		})
+		if err != nil {
+			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
+			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
+			return errors.Wrap(err, "failed to deploy monitoring metrics")
 		}
 
 		mgmtv3.ClusterConditionMonitoringEnabled.True(cluster)
@@ -121,14 +138,16 @@ func (ch *clusterHandler) doSync(cluster *mgmtv3.Cluster) error {
 			return errors.Wrap(err, "failed to withdraw monitoring")
 		}
 
-		if err := ch.detectAppComponentsWhileUninstall(appName, appTargetNamespace, cluster); err != nil {
+		if err := ch.withdrawMetrics(cluster); err != nil {
 			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
 			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
-			return errors.Wrap(err, "failed to detect the uninstallation status of monitoring components")
+			return errors.Wrap(err, "failed to withdraw monitoring metrics")
 		}
 
 		mgmtv3.ClusterConditionMonitoringEnabled.False(cluster)
 		mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, "")
+
+		cluster.Status.MonitoringStatus = nil
 	}
 
 	return nil
@@ -368,118 +387,6 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 	return appAnswers, nil
 }
 
-func (ch *clusterHandler) detectAppComponentsWhileInstall(appName, appTargetNamespace string, cluster *mgmtv3.Cluster, appAnswers map[string]string) error {
-	if cluster.Status.MonitoringStatus == nil {
-		cluster.Status.MonitoringStatus = &mgmtv3.MonitoringStatus{
-			Conditions: []mgmtv3.MonitoringCondition{
-				{Type: mgmtv3.ClusterConditionType(ConditionGrafanaDeployed), Status: k8scorev1.ConditionFalse},
-				{Type: mgmtv3.ClusterConditionType(ConditionNodeExporterDeployed), Status: k8scorev1.ConditionFalse},
-				{Type: mgmtv3.ClusterConditionType(ConditionKubeStateExporterDeployed), Status: k8scorev1.ConditionFalse},
-				{Type: mgmtv3.ClusterConditionType(ConditionPrometheusDeployed), Status: k8scorev1.ConditionFalse},
-				{Type: mgmtv3.ClusterConditionType(ConditionMetricExpressionDeployed), Status: k8scorev1.ConditionFalse},
-			},
-		}
-	}
-	monitoringStatus := cluster.Status.MonitoringStatus
-
-	enabledExporterNode := convert.ToBool(appAnswers["exporter-node.enabled"])
-	if enabledExporterNode {
-		ConditionNodeExporterDeployed.Add(monitoringStatus)
-	} else {
-		ConditionNodeExporterDeployed.Del(monitoringStatus)
-	}
-
-	enabledExporterKubeState := convert.ToBool(appAnswers["exporter-kube-state.enabled"])
-	if enabledExporterKubeState {
-		ConditionKubeStateExporterDeployed.Add(monitoringStatus)
-	} else {
-		ConditionKubeStateExporterDeployed.Del(monitoringStatus)
-	}
-
-	checkers := make([]func() error, 0, len(monitoringStatus.Conditions))
-	if !ConditionGrafanaDeployed.IsTrue(monitoringStatus) {
-		checkers = append(checkers, func() error {
-			return isGrafanaDeployed(ch.app.agentDeploymentClient, appTargetNamespace, appName, monitoringStatus, cluster.Name)
-		})
-	}
-	if enabledExporterNode && !ConditionNodeExporterDeployed.IsTrue(monitoringStatus) {
-		checkers = append(checkers, func() error {
-			return isNodeExporterDeployed(ch.app.agentDaemonSetClient, appTargetNamespace, appName, monitoringStatus)
-		})
-	}
-	if enabledExporterKubeState && !ConditionKubeStateExporterDeployed.IsTrue(monitoringStatus) {
-		checkers = append(checkers, func() error {
-			return isKubeStateExporterDeployed(ch.app.agentDeploymentClient, appTargetNamespace, appName, monitoringStatus)
-		})
-	}
-	if !ConditionPrometheusDeployed.IsTrue(monitoringStatus) {
-		checkers = append(checkers, func() error {
-			return isPrometheusDeployed(ch.app.agentStatefulSetClient, appTargetNamespace, appName, monitoringStatus)
-		})
-	}
-	if !ConditionMetricExpressionDeployed.IsTrue(monitoringStatus) {
-		checkers = append(checkers, func() error {
-			return isMetricExpressionDeployed(cluster.Name, ch.app.cattleClusterGraphClient, ch.app.cattleMonitorMetricClient, monitoringStatus)
-		})
-	}
-
-	if len(checkers) == 0 {
-		return nil
-	}
-
-	err := stream(checkers...)
-	if err != nil {
-		time.Sleep(5 * time.Second)
-	}
-
-	return err
-}
-
-func (ch *clusterHandler) detectAppComponentsWhileUninstall(appName, appTargetNamespace string, cluster *mgmtv3.Cluster) error {
-	if cluster.Status.MonitoringStatus == nil {
-		return nil
-	}
-	monitoringStatus := cluster.Status.MonitoringStatus
-
-	checkers := make([]func() error, 0, len(monitoringStatus.Conditions))
-	if !ConditionGrafanaDeployed.IsFalse(monitoringStatus) {
-		checkers = append(checkers, func() error {
-			return isGrafanaWithdrew(ch.app.agentDeploymentClient, appTargetNamespace, appName, monitoringStatus)
-		})
-	}
-	if !ConditionNodeExporterDeployed.IsFalse(monitoringStatus) {
-		checkers = append(checkers, func() error {
-			return isNodeExporterWithdrew(ch.app.agentDaemonSetClient, appTargetNamespace, appName, monitoringStatus)
-		})
-	}
-	if !ConditionKubeStateExporterDeployed.IsFalse(monitoringStatus) {
-		checkers = append(checkers, func() error {
-			return isKubeStateExporterWithdrew(ch.app.agentDeploymentClient, appTargetNamespace, appName, monitoringStatus)
-		})
-	}
-	if !ConditionPrometheusDeployed.IsFalse(monitoringStatus) {
-		checkers = append(checkers, func() error {
-			return isPrometheusWithdrew(ch.app.agentStatefulSetClient, appTargetNamespace, appName, monitoringStatus)
-		})
-	}
-	if !ConditionMetricExpressionDeployed.IsFalse(monitoringStatus) {
-		checkers = append(checkers, func() error {
-			return isMetricExpressionWithdrew(cluster.Name, ch.app.cattleClusterGraphClient, ch.app.cattleMonitorMetricClient, monitoringStatus)
-		})
-	}
-
-	if len(checkers) == 0 {
-		return nil
-	}
-
-	err := stream(checkers...)
-	if err != nil {
-		time.Sleep(5 * time.Second)
-	}
-
-	return err
-}
-
 func getClusterTag(cluster *mgmtv3.Cluster) string {
 	return fmt.Sprintf("%s(%s)", cluster.Name, cluster.Spec.DisplayName)
 }
@@ -498,4 +405,65 @@ func getCertName(name string) string {
 
 func getKeyName(name string) string {
 	return fmt.Sprintf("%s-key.pem", name)
+}
+
+func (ch *clusterHandler) deployMetrics(cluster *mgmtv3.Cluster) error {
+	clusterName := cluster.Name
+
+	for _, metric := range preDefinedClusterMetrics {
+		newObj := metric.DeepCopy()
+		newObj.Namespace = clusterName
+
+		_, err := ch.app.cattleMonitorMetricClient.Create(newObj)
+		if err != nil && !k8serrors.IsAlreadyExists(err) {
+			return err
+		}
+	}
+
+	for _, graph := range preDefinedClusterGraph {
+		newObj := graph.DeepCopy()
+		newObj.Namespace = clusterName
+
+		_, err := ch.app.cattleClusterGraphClient.Create(newObj)
+		if err != nil && !k8serrors.IsAlreadyExists(err) {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (ch *clusterHandler) withdrawMetrics(cluster *mgmtv3.Cluster) error {
+	clusterName := cluster.Name
+
+	for _, metric := range preDefinedClusterMetrics {
+		err := ch.app.cattleMonitorMetricClient.DeleteNamespaced(clusterName, metric.Name, &metav1.DeleteOptions{})
+		if err != nil && !k8serrors.IsNotFound(err) {
+			return err
+		}
+	}
+
+	for _, graph := range preDefinedClusterGraph {
+		err := ch.app.cattleClusterGraphClient.DeleteNamespaced(clusterName, graph.Name, &metav1.DeleteOptions{})
+		if err != nil && !k8serrors.IsNotFound(err) {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (ch *clusterHandler) isPrometheusReady(cluster *mgmtv3.Cluster) (bool, error) {
+	svcName, namespace, _ := monitoring.ClusterPrometheusEndpoint()
+
+	endpoints, err := ch.agentEndpointsLister.Get(namespace, svcName)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to get %s/%s endpoints", namespace, svcName)
+	}
+
+	if len(endpoints.Subsets) == 0 || len(endpoints.Subsets[0].Addresses) == 0 {
+		return false, nil
+	}
+
+	return true, nil
 }
