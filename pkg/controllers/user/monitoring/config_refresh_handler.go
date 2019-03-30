@@ -101,16 +101,16 @@ func (h *ConfigRefreshHandler) getProjectNamespaces(projectID string) ([]string,
 		return nil, err
 	}
 	var rtn []string
-	defer sort.Strings(rtn)
 	for _, ns := range nsList {
 		rtn = append(rtn, ns.Name)
 	}
+
+	sort.Strings(rtn)
 	return rtn, nil
 }
 
 func getAnnotationNamespaces(obj *monitoringv1.Prometheus) ([]string, error) {
 	var rtn []string
-	defer sort.Strings(rtn)
 	data, ok := obj.Annotations[projectNSAnnotation]
 	if !ok {
 		return rtn, nil
@@ -121,6 +121,7 @@ func getAnnotationNamespaces(obj *monitoringv1.Prometheus) ([]string, error) {
 		return rtn, err
 	}
 
+	sort.Strings(rtn)
 	return rtn, nil
 }
 
