@@ -12,8 +12,11 @@ import (
 	promapi "github.com/prometheus/client_golang/api"
 	promapiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
+	"github.com/rancher/types/config"
 	"github.com/rancher/types/config/dialer"
 	"golang.org/x/sync/errgroup"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -26,13 +29,23 @@ type Queries struct {
 	eg  *errgroup.Group
 }
 
-func NewPrometheusQuery(ctx context.Context, clusterName, authToken, svcNamespace, svcName, svcPort string, dialerFactory dialer.Factory) (*Queries, error) {
+func NewPrometheusQuery(ctx context.Context, clusterName, authToken, svcNamespace, svcName, svcPort string, dialerFactory dialer.Factory, userContext *config.UserContext) (*Queries, error) {
+	ep, err := userContext.Core.Endpoints(svcNamespace).Get(svcName, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get %s/%s endpoints, %v", svcNamespace, svcName, err)
+	}
+
+	ip := pickEndpointAddress(ep)
+	if ip == "" {
+		return nil, fmt.Errorf("failed to pick endpoint address")
+	}
+
 	dial, err := dialerFactory.ClusterDialer(clusterName)
 	if err != nil {
 		return nil, fmt.Errorf("get dail from usercontext failed, %v", err)
 	}
 
-	endpoint := fmt.Sprintf("http://%s.%s:%s", svcName, svcNamespace, svcPort)
+	endpoint := fmt.Sprintf("http://%s:%s", ip, svcPort)
 
 	api, err := newPrometheusAPI(dial, endpoint, authToken)
 	if err != nil {
@@ -264,4 +277,13 @@ func formatLegend(metric model.Metric, query *PrometheusQuery) string {
 	})
 
 	return string(result)
+}
+
+func pickEndpointAddress(ep *corev1.Endpoints) string {
+	epSubsets := ep.Subsets
+	if len(epSubsets) != 0 && len(epSubsets[0].Addresses) != 0 {
+		return epSubsets[0].Addresses[0].IP
+	}
+
+	return ""
 }

@@ -95,7 +95,7 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 		reqContext, cancel := context.WithTimeout(context.Background(), prometheusReqTimeout)
 		defer cancel()
 
-		prometheusQuery, err := NewPrometheusQuery(reqContext, clusterName, token, svcNamespace, svcName, svcPort, h.dialerFactory)
+		prometheusQuery, err := NewPrometheusQuery(reqContext, clusterName, token, svcNamespace, svcName, svcPort, h.dialerFactory, userContext)
 		if err != nil {
 			return err
 		}
@@ -152,7 +152,7 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 		defer cancel()
 
 		svcName, svcNamespace, svcPort := monitorutil.ClusterPrometheusEndpoint()
-		prometheusQuery, err := NewPrometheusQuery(reqContext, clusterName, token, svcNamespace, svcName, svcPort, h.dialerFactory)
+		prometheusQuery, err := NewPrometheusQuery(reqContext, clusterName, token, svcNamespace, svcName, svcPort, h.dialerFactory, userContext)
 		if err != nil {
 			return err
 		}
@@ -200,7 +200,7 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 		defer cancel()
 
 		svcName, svcNamespace, svcPort := monitorutil.ProjectPrometheusEndpoint(projectName)
-		prometheusQuery, err := NewPrometheusQuery(reqContext, clusterName, token, svcNamespace, svcName, svcPort, h.dialerFactory)
+		prometheusQuery, err := NewPrometheusQuery(reqContext, clusterName, token, svcNamespace, svcName, svcPort, h.dialerFactory, userContext)
 		if err != nil {
 			return err
 		}
