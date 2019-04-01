@@ -100,11 +100,8 @@ func (a awsv4) sign(req *http.Request, secrets v1.SecretInterface, auth string) 
 }
 
 func (a awsv4) getServiceAndRegion(host string) (string, string) {
-	//format : service.region.amazonaws.com
+	//format : service.region.*
 	parts := strings.Split(host, ".")
-	if len(parts) != 4 {
-		return "", ""
-	}
 	return parts[0], parts[1]
 }
 
