@@ -2,10 +2,10 @@ package common
 
 import (
 	"fmt"
-	"github.com/rancher/rancher/pkg/namespace"
 	"reflect"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/namespace"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,15 +47,17 @@ func CreateOrUpdateSecrets(secrets corev1.SecretInterface, secretInfo string, fi
 }
 
 func ReadFromSecret(secrets corev1.SecretInterface, secretInfo string, field string) (string, error) {
-	split := strings.SplitN(secretInfo, ":", 2)
-	if len(split) == 2 {
-		secret, err := secrets.GetNamespaced(split[0], split[1], metav1.GetOptions{})
-		if err != nil {
-			return "", fmt.Errorf("error getting secret %s %v", secretInfo, err)
-		}
-		for key, val := range secret.Data {
-			if key == field {
-				return string(val), nil
+	if strings.HasPrefix(secretInfo, SecretsNamespace) {
+		split := strings.SplitN(secretInfo, ":", 2)
+		if len(split) == 2 {
+			secret, err := secrets.GetNamespaced(split[0], split[1], metav1.GetOptions{})
+			if err != nil {
+				return "", fmt.Errorf("error getting secret %s %v", secretInfo, err)
+			}
+			for key, val := range secret.Data {
+				if key == field {
+					return string(val), nil
+				}
 			}
 		}
 	}
