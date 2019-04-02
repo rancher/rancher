@@ -220,3 +220,30 @@ func RestoreEtcdSnapshotFromCli(ctx *cli.Context) error {
 	_, _, _, _, _, err = RestoreEtcdSnapshot(context.Background(), rkeConfig, hosts.DialersOptions{}, flags, etcdSnapshotName)
 	return err
 }
+
+func SnapshotRemoveFromEtcdHosts(
+	ctx context.Context,
+	rkeConfig *v3.RancherKubernetesEngineConfig,
+	dialersOptions hosts.DialersOptions,
+	flags cluster.ExternalFlags, snapshotName string) error {
+
+	log.Infof(ctx, "Starting snapshot remove on etcd hosts")
+	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags)
+	if err != nil {
+		return err
+	}
+	if err := kubeCluster.SetupDialers(ctx, dialersOptions); err != nil {
+		return err
+	}
+
+	if err := kubeCluster.TunnelHosts(ctx, flags); err != nil {
+		return err
+	}
+
+	if err := kubeCluster.RemoveEtcdSnapshot(ctx, snapshotName); err != nil {
+		return err
+	}
+
+	log.Infof(ctx, "Finished removing snapshot [%s] from all etcd hosts", snapshotName)
+	return nil
+}
