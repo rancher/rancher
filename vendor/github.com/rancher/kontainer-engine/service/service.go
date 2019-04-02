@@ -507,6 +507,27 @@ func (e *EngineService) ETCDRestore(ctx context.Context, name string, kontainerD
 
 }
 
+func (e *EngineService) ETCDRemoveSnapshot(ctx context.Context, name string, kontainerDriver *v3.KontainerDriver, clusterSpec v3.ClusterSpec, snapshotName string) error {
+	runningDriver, err := e.getRunningDriver(kontainerDriver, clusterSpec)
+	if err != nil {
+		return err
+	}
+
+	listenAddr, err := runningDriver.Start()
+	if err != nil {
+		return fmt.Errorf("error starting driver: %v", err)
+	}
+	defer runningDriver.Stop()
+
+	cls, err := e.convertCluster(name, listenAddr, clusterSpec)
+	if err != nil {
+		return err
+	}
+	defer cls.Driver.Close()
+
+	return cls.ETCDRemoveSnapshot(ctx, snapshotName)
+}
+
 func (e *EngineService) GenerateServiceAccount(ctx context.Context, name string, kontainerDriver *v3.KontainerDriver, clusterSpec v3.ClusterSpec) (string, error) {
 	runningDriver, err := e.getRunningDriver(kontainerDriver, clusterSpec)
 	if err != nil {
