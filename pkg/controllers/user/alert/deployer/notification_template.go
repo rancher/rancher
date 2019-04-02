@@ -60,8 +60,7 @@ Severity: {{ .Labels.severity}}
 Cluster Name: {{.Labels.cluster_name}}
 {{- if eq .Labels.alert_type "event" }}
 {{- if .Labels.workload_name }}
-Workload Name: {{.Labels.workload_name}}
-{{end -}}
+Workload Name: {{.Labels.workload_name}}{{ end }}
 Target: {{ if .Labels.target_namespace -}}{{.Labels.target_namespace}}:{{ end -}}{{.Labels.target_name}}
 Count: {{ .Labels.event_count}}
 Event Message: {{ .Labels.event_message}}
