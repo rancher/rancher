@@ -91,7 +91,7 @@ func (l *EventWatcher) Sync(key string, obj *corev1.Event) (runtime.Object, erro
 			if alert.Spec.EventRule.ResourceKind == "Pod" || alert.Spec.EventRule.ResourceKind == "Deployment" || alert.Spec.EventRule.ResourceKind == "StatefulSet" || alert.Spec.EventRule.ResourceKind == "DaemonSet" {
 				workloadName, err := l.getWorkloadInfo(obj.InvolvedObject.Namespace, obj.InvolvedObject.Name, alert.Spec.EventRule.ResourceKind)
 				if err != nil {
-					errors.Wrap(err, "failed to fetch cho")
+					errors.Wrap(err, "failed to fetch workload info")
 				}
 
 				if workloadName != "" {
