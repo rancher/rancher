@@ -31,8 +31,9 @@ import (
 )
 
 var (
-	eventGroupInterval = 1
-	eventGroupWait     = 1
+	eventGroupInterval  = 1
+	eventGroupWait      = 1
+	eventRepeatInterval = 525600
 )
 
 func NewConfigSyncer(ctx context.Context, cluster *config.UserContext, alertManager *manager.AlertManager, operatorCRDManager *manager.PromOperatorCRDManager) *ConfigSyncer {
@@ -193,11 +194,11 @@ func (d *ConfigSyncer) sync() error {
 	config := manager.GetAlertManagerDefaultConfig()
 	config.Global.PagerdutyURL = "https://events.pagerduty.com/v2/enqueue"
 
-	if err = d.addClusterAlert2Config(config, cAlertsMap, cAlertsKey, notifiers); err != nil {
+	if err = d.addClusterAlert2Config(config, cAlertsMap, cAlertsKey, cAlertGroupsMap, notifiers); err != nil {
 		return err
 	}
 
-	if err = d.addProjectAlert2Config(config, pAlertsMap, pAlertsKey, notifiers); err != nil {
+	if err = d.addProjectAlert2Config(config, pAlertsMap, pAlertsKey, pAlertGroupsMap, notifiers); err != nil {
 		return err
 	}
 
@@ -310,7 +311,7 @@ func (d *ConfigSyncer) addClusterAlert2Operator(clusterDisplayName string, group
 	return d.operatorCRDManager.SyncPrometheusRule(promRule)
 }
 
-func (d *ConfigSyncer) addProjectAlert2Config(config *alertconfig.Config, projectGroups map[string]map[string][]*v3.ProjectAlertRule, keys []string, notifiers []*v3.Notifier) error {
+func (d *ConfigSyncer) addProjectAlert2Config(config *alertconfig.Config, projectGroups map[string]map[string][]*v3.ProjectAlertRule, keys []string, alertGroups map[string]*v3.ProjectAlertGroup, notifiers []*v3.Notifier) error {
 	for _, projectName := range keys {
 		groups := projectGroups[projectName]
 		var groupIDs []string
@@ -321,14 +322,9 @@ func (d *ConfigSyncer) addProjectAlert2Config(config *alertconfig.Config, projec
 
 		for _, groupID := range groupIDs {
 			rules := groups[groupID]
-			_, groupName := ref.Parse(groupID)
-			group, err := d.projectAlertGroupLister.Get(projectName, groupName)
-			if err != nil && !apierrors.IsNotFound(err) {
-				return fmt.Errorf("get project alert group %s:%s failed, %v", projectName, groupName, err)
-			}
-
-			if group == nil {
-				continue
+			group, ok := alertGroups[groupID]
+			if !ok {
+				return fmt.Errorf("get project alert group %s failed", groupID)
 			}
 
 			receiver := &alertconfig.Receiver{Name: groupID}
@@ -360,20 +356,14 @@ func (d *ConfigSyncer) addProjectAlert2Config(config *alertconfig.Config, projec
 	return nil
 }
 
-func (d *ConfigSyncer) addClusterAlert2Config(config *alertconfig.Config, alerts map[string][]*v3.ClusterAlertRule, keys []string, notifiers []*v3.Notifier) error {
+func (d *ConfigSyncer) addClusterAlert2Config(config *alertconfig.Config, alerts map[string][]*v3.ClusterAlertRule, keys []string, alertGroups map[string]*v3.ClusterAlertGroup, notifiers []*v3.Notifier) error {
 	for _, groupID := range keys {
 		groupRules := alerts[groupID]
-		_, groupName := ref.Parse(groupID)
-
 		receiver := &alertconfig.Receiver{Name: groupID}
 
-		group, err := d.clusterAlertGroupLister.Get(d.clusterName, groupName)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return fmt.Errorf("get cluster alert group %s:%s failed, %v", d.clusterName, groupName, err)
-		}
-
-		if group == nil {
-			continue
+		group, ok := alertGroups[groupID]
+		if !ok {
+			return fmt.Errorf("get cluster alert group %s failed", groupID)
 		}
 
 		exist := d.addRecipients(notifiers, receiver, group.Spec.Recipients)
@@ -390,12 +380,9 @@ func (d *ConfigSyncer) addClusterAlert2Config(config *alertconfig.Config, alerts
 
 				if alert.Spec.EventRule != nil {
 					timeFields := v3.TimingField{
-						GroupWaitSeconds:     eventGroupWait,
-						GroupIntervalSeconds: eventGroupInterval,
-					}
-
-					if alert.Spec.Inherited != nil && !*alert.Spec.Inherited {
-						timeFields.RepeatIntervalSeconds = alert.Spec.RepeatIntervalSeconds
+						GroupWaitSeconds:      eventGroupWait,
+						GroupIntervalSeconds:  eventGroupInterval,
+						RepeatIntervalSeconds: eventRepeatInterval,
 					}
 
 					r2 := d.newRoute(map[string]string{"rule_id": ruleID}, false, timeFields, groupBy)
@@ -585,7 +572,7 @@ func includeProjectMetrics(projectAlerts []*v3.ProjectAlertRule) bool {
 
 func getClusterAlertGroupBy(spec v3.ClusterAlertRuleSpec) []model.LabelName {
 	if spec.EventRule != nil {
-		return []model.LabelName{"rule_id", "resource_kind", "target_namespace", "target_name"}
+		return []model.LabelName{"rule_id", "resource_kind", "target_namespace", "target_name", "event_message"}
 	} else if spec.SystemServiceRule != nil {
 		return []model.LabelName{"rule_id", "component_name"}
 	} else if spec.NodeRule != nil {
