@@ -114,6 +114,9 @@ func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
 
 func (c *Controller) Remove(b *v3.EtcdBackup) (runtime.Object, error) {
 	logrus.Infof("[etcd-backup] Deleteing backup %s ", b.Name)
+	if err := c.etcdRemoveSnapshotWithBackoff(b); err != nil {
+		logrus.Warnf("giving up on deleting backup [%s]: %v", b.Name, err)
+	}
 	if b.Spec.BackupConfig.S3BackupConfig == nil {
 		return b, nil
 	}
@@ -127,7 +130,7 @@ func (c *Controller) Remove(b *v3.EtcdBackup) (runtime.Object, error) {
 		time.Sleep(5 * time.Second)
 	}
 	if delErr != nil {
-		logrus.Warnf("giving up on deleting backup [%s]: %v", b.Name, delErr)
+		logrus.Warnf("giving up on deleting backup [%s] from s3: %v", b.Name, delErr)
 	}
 	return b, nil
 }
@@ -210,12 +213,7 @@ func (c *Controller) createNewBackup(cluster *v3.Cluster) (*v3.EtcdBackup, error
 }
 
 func (c *Controller) etcdSaveWithBackoff(b *v3.EtcdBackup) (runtime.Object, error) {
-	backoff := wait.Backoff{
-		Duration: 1000 * time.Millisecond,
-		Factor:   2,
-		Jitter:   0,
-		Steps:    5,
-	}
+	backoff := getBackoff()
 	kontainerDriver, err := c.KontainerDriverLister.Get("", service.RancherKubernetesEngineDriverName)
 	if err != nil {
 		return b, err
@@ -228,7 +226,7 @@ func (c *Controller) etcdSaveWithBackoff(b *v3.EtcdBackup) (runtime.Object, erro
 		}
 		var inErr error
 		err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-			if inErr = c.backupDriver.ETCDSave(c.ctx, cluster.Name, kontainerDriver, cluster.Spec, b.Name); err != inErr {
+			if inErr = c.backupDriver.ETCDSave(c.ctx, cluster.Name, kontainerDriver, cluster.Spec, b.Name); inErr != nil {
 				logrus.Warnf("%v", inErr)
 				return false, nil
 			}
@@ -245,11 +243,34 @@ func (c *Controller) etcdSaveWithBackoff(b *v3.EtcdBackup) (runtime.Object, erro
 	return bObj, nil
 }
 
+func (c *Controller) etcdRemoveSnapshotWithBackoff(b *v3.EtcdBackup) error {
+	backoff := getBackoff()
+
+	kontainerDriver, err := c.KontainerDriverLister.Get("", service.RancherKubernetesEngineDriverName)
+	if err != nil {
+		return err
+	}
+	cluster, err := c.clusterClient.Get(b.Spec.ClusterID, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	return wait.ExponentialBackoff(backoff, func() (bool, error) {
+		if inErr := c.backupDriver.ETCDRemoveSnapshot(c.ctx, cluster.Name, kontainerDriver, cluster.Spec, b.Name); inErr != nil {
+			logrus.Warnf("%v", inErr)
+			return false, nil
+		}
+		return true, nil
+	})
+}
+
 func (c *Controller) rotateExpiredBackups(cluster *v3.Cluster, clusterBackups []*v3.EtcdBackup) error {
 	retention := cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.Retention
 	internvalHours := cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.IntervalHours
 	expiredBackups := getExpiredBackups(retention, internvalHours, clusterBackups)
 	for _, backup := range expiredBackups {
+		if backup.Spec.Manual {
+			continue
+		}
 		if err := c.backupClient.DeleteNamespaced(backup.Namespace, backup.Name, &metav1.DeleteOptions{}); err != nil {
 			return err
 		}
@@ -393,4 +414,13 @@ func shouldBackup(cluster *v3.Cluster) bool {
 		return false
 	}
 	return true
+}
+
+func getBackoff() wait.Backoff {
+	return wait.Backoff{
+		Duration: 1000 * time.Millisecond,
+		Factor:   2,
+		Jitter:   0,
+		Steps:    5,
+	}
 }
