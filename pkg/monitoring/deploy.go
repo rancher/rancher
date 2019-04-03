@@ -2,6 +2,7 @@ package monitoring
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
@@ -10,6 +11,7 @@ import (
 	corev1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	k8scorev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -98,7 +100,7 @@ func GetSystemProjectID(cattleProjectsClient mgmtv3.ProjectInterface) (string, e
 	return systemProject.Name, nil
 }
 
-func DeployApp(cattleAppClient projectv3.AppInterface, projectID string, createOrUpdateApp *projectv3.App) error {
+func DeployApp(cattleAppClient projectv3.AppInterface, projectID string, createOrUpdateApp *projectv3.App, forceRedeploy bool) error {
 	if createOrUpdateApp == nil {
 		return errors.New("cannot deploy a nil App")
 	}
@@ -114,12 +116,22 @@ func DeployApp(cattleAppClient projectv3.AppInterface, projectID string, createO
 	}
 
 	if app.Name == "" {
+		logrus.Infof("Create monitoring app %s/%s", app.Spec.TargetNamespace, app.Name)
 		if _, err = cattleAppClient.Create(createOrUpdateApp); err != nil {
 			return errors.Wrapf(err, "failed to create %q App", appName)
 		}
 	} else {
 		app = app.DeepCopy()
 		app.Spec.Answers = createOrUpdateApp.Spec.Answers
+
+		// clean up status
+		if forceRedeploy {
+			if app.Spec.Answers == nil {
+				app.Spec.Answers = make(map[string]string, 1)
+			}
+			app.Spec.Answers["redeployTs"] = fmt.Sprintf("%d", time.Now().Unix())
+		}
+
 		if _, err = cattleAppClient.Update(app); err != nil {
 			return errors.Wrapf(err, "failed to update %q App", appName)
 		}
