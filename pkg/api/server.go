@@ -16,14 +16,14 @@ func NewServer(schemas *types.Schemas) (*normanapi.Server, error) {
 }
 
 func cssURL() string {
-	if settings.UIIndex.Get() != "local" {
+	if !settings.IsUILocal() {
 		return ""
 	}
 	return "/api-ui/ui.min.css"
 }
 
 func jsURL() string {
-	if settings.UIIndex.Get() != "local" {
+	if !settings.IsUILocal() {
 		return ""
 	}
 	return "/api-ui/ui.min.js"

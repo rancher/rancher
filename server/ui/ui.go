@@ -31,7 +31,7 @@ func UI(next http.Handler) http.Handler {
 	local := err == nil
 	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		if parse.IsBrowser(req, true) {
-			if local && settings.UIIndex.Get() == "local" {
+			if local && settings.IsUILocal() {
 				http.ServeFile(resp, req, indexHTML())
 			} else {
 				ui(resp, req)
