@@ -27,6 +27,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/acme/autocert"
+
 	"k8s.io/client-go/util/cert"
 )
 
@@ -360,7 +361,23 @@ func (s *Server) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, e
 
 	serverNameCert, ok := s.certs[mapKey]
 	if ok {
-		return serverNameCert, nil
+		// check expiry time
+		certParsed, err := x509.ParseCertificate(serverNameCert.Certificate[0])
+		if err != nil {
+			logrus.Errorf("Error parsing cert: %v", err)
+		}
+		expiryTime := certParsed.NotAfter
+		currentTime := time.Now().UTC()
+		rotateBeforeStr := settings.RotateCertsIfExpiringInDays.Get()
+		rotateBefore, err := strconv.ParseInt(rotateBeforeStr, 10, 64)
+		if err != nil {
+			rotateBefore = 7
+			logrus.Errorf("Error in converting rotate cert setting: %v", err)
+		}
+		if expiryTime.Sub(currentTime) > (time.Hour * 24 * time.Duration(rotateBefore)) {
+			return serverNameCert, nil
+		}
+		logrus.Infof("Rancher server cert expires at %v, generating new cert", expiryTime)
 	}
 
 	if ipBased {
