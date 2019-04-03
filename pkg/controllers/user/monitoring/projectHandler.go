@@ -270,7 +270,7 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 		},
 	}
 
-	err = monitoring.DeployApp(ph.app.cattleAppClient, appDeployProjectID, app)
+	err = monitoring.DeployApp(ph.app.cattleAppClient, appDeployProjectID, app, false)
 	if err != nil {
 		return err
 	}
