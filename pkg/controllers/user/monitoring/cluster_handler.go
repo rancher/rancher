@@ -346,10 +346,9 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 	appCatalogID := settings.SystemMonitoringCatalogID.Get()
 	app := &v3.App{
 		ObjectMeta: metav1.ObjectMeta{
-			Annotations: monitoring.CopyCreatorID(nil, cluster.Annotations),
-			Labels:      monitoring.OwnedLabels(appName, appTargetNamespace, appProjectName, monitoring.ClusterLevel),
-			Name:        appName,
-			Namespace:   appDeployProjectID,
+			Labels:    monitoring.OwnedLabels(appName, appTargetNamespace, appProjectName, monitoring.ClusterLevel),
+			Name:      appName,
+			Namespace: appDeployProjectID,
 		},
 		Spec: v3.AppSpec{
 			Answers:         appAnswers,

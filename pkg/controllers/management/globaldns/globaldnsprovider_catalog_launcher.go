@@ -174,7 +174,6 @@ func (n *ProviderCatalogLauncher) createUpdateExternalDNSApp(obj *v3.GlobalDNSPr
 
 		toCreate := pv3.App{
 			ObjectMeta: metav1.ObjectMeta{
-				Annotations:     CopyCreatorID(nil, obj.Annotations),
 				Name:            fmt.Sprintf("%s-%s", "systemapp", obj.Name),
 				Namespace:       sysProject,
 				OwnerReferences: ownerRef,
@@ -219,15 +218,4 @@ func (n *ProviderCatalogLauncher) getSystemProjectID() (string, error) {
 	}
 
 	return systemProject.Name, nil
-}
-
-func CopyCreatorID(toAnnotations, fromAnnotations map[string]string) map[string]string {
-	if val, exist := fromAnnotations[cattleCreatorIDAnnotationKey]; exist {
-		if toAnnotations == nil {
-			toAnnotations = make(map[string]string, 2)
-		}
-
-		toAnnotations[cattleCreatorIDAnnotationKey] = val
-	}
-	return toAnnotations
 }

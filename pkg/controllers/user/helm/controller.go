@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
-	"k8s.io/api/core/v1"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
+	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	corev1 "github.com/rancher/types/apis/core/v1"
@@ -23,6 +23,7 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -59,6 +60,7 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 		AppGetter:             user.Management.Project,
 		NsLister:              user.Core.Namespaces("").Controller().Lister(),
 		NsClient:              user.Core.Namespaces(""),
+		ProjectLister:         user.Management.Management.Projects("").Controller().Lister(),
 	}
 	appClient.AddClusterScopedLifecycle(ctx, "helm-controller", user.ClusterName, stackLifecycle)
 
@@ -83,6 +85,7 @@ type Lifecycle struct {
 	AppGetter             v3.AppsGetter
 	NsLister              corev1.NamespaceLister
 	NsClient              corev1.NamespaceInterface
+	ProjectLister         mgmtv3.ProjectLister
 }
 
 func (l *Lifecycle) Create(obj *v3.App) (runtime.Object, error) {
@@ -347,11 +350,16 @@ func (l *Lifecycle) createAppRevision(obj *v3.App, template, notes string, faile
 func (l *Lifecycle) writeKubeConfig(obj *v3.App, tempDir string, remove bool) (string, error) {
 	var token string
 
+	isSystemProject, err := l.isInSystemProject(obj)
+	if err != nil {
+		return "", err
+	}
+
 	userID := obj.Annotations["field.cattle.io/creatorId"]
 	user, err := l.UserClient.Get(userID, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return "", err
-	} else if errors.IsNotFound(err) && remove {
+	} else if errors.IsNotFound(err) && (remove || isSystemProject) {
 		token, err = l.SystemAccountManager.GetOrCreateProjectSystemToken(obj.Namespace)
 	} else if err == nil {
 		token, err = l.UserManager.EnsureToken(helmTokenPrefix+user.Name, description, user.Name)
@@ -372,4 +380,12 @@ func (l *Lifecycle) writeKubeConfig(obj *v3.App, tempDir string, remove bool) (s
 		return "", err
 	}
 	return kubeConfigPath, nil
+}
+
+func (l *Lifecycle) isInSystemProject(app *v3.App) (bool, error) {
+	p, err := project.GetSystemProject(l.ClusterName, l.ProjectLister)
+	if err != nil {
+		return false, err
+	}
+	return p.Name == app.Namespace, nil
 }

@@ -168,11 +168,10 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 		"apiGroup":     monitoring.APIVersion.Group,
 		"nameOverride": "prometheus-operator",
 	}
-	annotations := monitoring.CopyCreatorID(nil, cluster.Annotations)
-	annotations["cluster.cattle.io/addon"] = appName
+
 	targetApp := &projectv3.App{
 		ObjectMeta: metav1.ObjectMeta{
-			Annotations: annotations,
+			Annotations: map[string]string{"cluster.cattle.io/addon": appName},
 			Labels:      monitoring.OwnedLabels(appName, appTargetNamespace, appProjectName, monitoring.SystemLevel),
 			Name:        appName,
 			Namespace:   appDeployProjectID,
