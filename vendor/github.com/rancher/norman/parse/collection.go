@@ -22,8 +22,12 @@ func QueryOptions(apiContext *types.APIContext, schema *types.Schema) types.Quer
 	result := &types.QueryOptions{}
 
 	result.Sort = parseSort(schema, apiContext)
-	result.Pagination = parsePagination(apiContext)
 	result.Conditions = parseFilters(schema, apiContext)
+
+	// Only paginate if limit is passed
+	if limit := apiContext.Query.Get("limit"); limit != "" {
+		result.Pagination = parsePagination(apiContext)
+	}
 
 	return *result
 }

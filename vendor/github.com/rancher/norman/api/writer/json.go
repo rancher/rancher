@@ -19,8 +19,12 @@ type EncodingResponseWriter struct {
 
 func (j *EncodingResponseWriter) start(apiContext *types.APIContext, code int, obj interface{}) {
 	AddCommonResponseHeader(apiContext)
-	apiContext.Response.Header().Set("content-type", j.ContentType)
+	apiContext.Response.Header().Set("content-type", "asdf")//j.ContentType)
 	apiContext.Response.WriteHeader(code)
+}
+
+func (j *EncodingResponseWriter) Header() http.Header  {
+	return http.Header{}
 }
 
 func (j *EncodingResponseWriter) Write(apiContext *types.APIContext, code int, obj interface{}) {
@@ -51,6 +55,9 @@ func (j *EncodingResponseWriter) VersionBody(apiContext *types.APIContext, versi
 	}
 
 	if output != nil {
+		if j.ContentType != "application/json" {
+			logrus.Info("TEST asd")
+		}
 		return j.Encoder(writer, output)
 	}
 

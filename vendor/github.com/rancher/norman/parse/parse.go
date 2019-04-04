@@ -93,7 +93,10 @@ func Parse(rw http.ResponseWriter, req *http.Request, schemas *types.Schemas, ur
 
 	result.Version = parsedURL.Version
 	result.SchemasVersion = parsedURL.SchemasVersion
-
+	if result.ResponseFormat == "json" && strings.Contains(result.Request.Header.Get("Accept-Encoding"), "gzip") {
+		result.Response.Header().Del("Content-Length")
+		result.Response.Header().Set("Content-Encoding", "gzip")
+	}
 	if err != nil {
 		return result, err
 	}
