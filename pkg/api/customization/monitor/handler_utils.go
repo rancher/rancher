@@ -237,7 +237,7 @@ func parseMetricParams(userContext *config.UserContext, nodeLister v3.NodeLister
 				}
 
 				for _, rc := range rcs.Items {
-					if rc.OwnerReferences != nil && strings.ToLower(rc.OwnerReferences[0].Kind) == workload.DeploymentType && rc.OwnerReferences[0].Name == name {
+					if len(rc.OwnerReferences) != 0 && strings.ToLower(rc.OwnerReferences[0].Kind) == workload.DeploymentType && rc.OwnerReferences[0].Name == name {
 						podOwners = append(podOwners, rc.Name)
 					}
 				}
@@ -250,10 +250,12 @@ func parseMetricParams(userContext *config.UserContext, nodeLister v3.NodeLister
 				return nil, fmt.Errorf("list pod failed, %v", err)
 			}
 			for _, pod := range pods.Items {
-				podRefName := pod.OwnerReferences[0].Name
-				podRefKind := pod.OwnerReferences[0].Kind
-				if pod.OwnerReferences != nil && contains(podRefName, podOwners...) && strings.ToLower(podRefKind) == rcType {
-					podNames = append(podNames, pod.Name)
+				if len(pod.OwnerReferences) != 0 {
+					podRefName := pod.OwnerReferences[0].Name
+					podRefKind := pod.OwnerReferences[0].Kind
+					if contains(podRefName, podOwners...) && strings.ToLower(podRefKind) == rcType {
+						podNames = append(podNames, pod.Name)
+					}
 				}
 			}
 			newMetricParams["podName"] = strings.Join(podNames, "|")
