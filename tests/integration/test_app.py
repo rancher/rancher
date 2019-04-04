@@ -25,15 +25,24 @@ def test_app_mysql(admin_pc, admin_mc):
         "service.port": "3306",
         "service.type": "ClusterIP"
     }
-    client.create_app(
+    externalid = ("catalog://?catalog=library&template=mysql&version=0.3.7&"
+                  "namespace=cattle-global-data")
+    app = client.create_app(
         name=name,
-        externalId="catalog://?catalog=library&template=mysql&version=0.3.7&"
-                   "namespace=cattle-global-data",
+        externalId=externalid,
         targetNamespace=ns.name,
         projectId=admin_pc.project.id,
         answers=answers
     )
     wait_for_workload(client, ns.name, count=1)
+    app = client.by_id_app(app.id)
+    # do nothing other than init an action
+    # have to include either ExternalID value or File
+    client.action(obj=app, action_name="upgrade", externalId=externalid)
+    # use appRevisions to ensure that deploy actually occurred
+    app_revisions = wait_for_apprevisions(client, ns, count=2)
+    assert app_revisions.data[0].labels['io.cattle.field/appId'] == \
+        app_revisions.data[1].labels['io.cattle.field/appId']
 
 
 def test_app_wordpress(admin_pc, admin_mc):
@@ -244,3 +253,18 @@ def wait_for_app_to_be_deleted(client, app, timeout=120):
             break
         time.sleep(interval)
         interval *= 2
+
+
+def wait_for_apprevisions(client, ns, timeout=300, count=0):
+    start = time.time()
+    interval = 0.5
+    projectnamespace = ns.projectId.split(":")[1]
+    apprevisions = client.list_appRevision(namespaceId=projectnamespace)
+    while len(apprevisions.data) < count:
+        if time.time() - start > timeout:
+            print(apprevisions)
+            raise Exception('Timeout waiting for AppRevisions')
+        time.sleep(interval)
+        interval *= 2
+        apprevisions = client.list_appRevision(namespaceId=projectnamespace)
+    return apprevisions
