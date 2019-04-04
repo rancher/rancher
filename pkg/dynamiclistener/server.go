@@ -348,6 +348,8 @@ func (s *Server) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, e
 	s.Lock()
 	defer s.Unlock()
 
+	fmt.Printf("\ngetCertificate is called\n")
+
 	if s.activeCert != nil {
 		return s.activeCert, nil
 	}
