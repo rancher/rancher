@@ -9,7 +9,7 @@ NEW_DRIVER_URL = "https://github.com/rancher/kontainer-engine-driver-" \
                  "example/releases/download/v0.2.2/kontainer-engine-" \
                  "driver-example-" + sys.platform + "-amd64"
 NEW_DRIVER_ARM64_URL = "https://github.com/rancher/kontainer-engine-driver-" \
-                 "example/releases/download/v0.2.2/kontainer-engine-" \
+                 "example/releases/download/v0.2.3/kontainer-engine-" \
                  "driver-example-" + sys.platform + "-arm64"
 DRIVER_AMD64_URL = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
