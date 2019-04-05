@@ -310,70 +310,73 @@ kind: pipeline
 name: manifest
 
 steps:
-  - name: push-master-manifest
-    image: plugins/manifest:1.0.2
-    settings:
-      username:
-        from_secret: docker_username
-      password:
-        from_secret: docker_password
-      target: "rancher/rancher:master"
-      template: "rancher/rancher:master-ARCH"
-      platforms:
-        - linux/amd64
-        - linux/arm64
-    when:
-      branch:
-        - master
-      event:
-        - push
-  - name: push-master-agent-manifest
-    image: plugins/manifest:1.0.2
-    settings:
-      username:
-        from_secret: docker_username
-      password:
-        from_secret: docker_password
-      target: "rancher/rancher-agent:master"
-      template: "rancher/rancher-agent:master-ARCH"
-      platforms:
-        - linux/amd64
-        - linux/arm64
-    when:
-      branch:
-        - master
-      event:
-        - push
-  - name: push-manifest
-    image: plugins/manifest:1.0.2
-    settings:
-      username:
-        from_secret: docker_username
-      password:
-        from_secret: docker_password
-      target: "rancher/rancher:${DRONE_TAG}"
-      template: "rancher/rancher:${DRONE_TAG}-ARCH"
-      platforms:
-        - linux/amd64
-        - linux/arm64
-    when:
-      event:
-        - tag
-  - name: push-agent-manifest
-    image: plugins/manifest:1.0.2
-    settings:
-      username:
-        from_secret: docker_username
-      password:
-        from_secret: docker_password
-      target: "rancher/rancher-agent:${DRONE_TAG}"
-      template: "rancher/rancher-agent:${DRONE_TAG}-ARCH"
-      platforms:
-        - linux/amd64
-        - linux/arm64
-    when:
-      event:
-        - tag
+- name: push-master-manifest
+  image: plugins/manifest:1.0.2
+  settings:
+    username:
+      from_secret: docker_username
+    password:
+      from_secret: docker_password
+    target: "rancher/rancher:master"
+    template: "rancher/rancher:master-ARCH"
+    platforms:
+    - linux/amd64
+    - linux/arm64
+  when:
+    branch:
+    - master
+    event:
+    - push
+
+- name: push-master-agent-manifest
+  image: plugins/manifest:1.0.2
+  settings:
+    username:
+      from_secret: docker_username
+    password:
+      from_secret: docker_password
+    target: "rancher/rancher-agent:master"
+    template: "rancher/rancher-agent:master-ARCH"
+    platforms:
+    - linux/amd64
+    - linux/arm64
+  when:
+    branch:
+    - master
+    event:
+    - push
+
+- name: push-manifest
+  image: plugins/manifest:1.0.2
+  settings:
+    username:
+      from_secret: docker_username
+    password:
+      from_secret: docker_password
+    target: "rancher/rancher:${DRONE_TAG}"
+    template: "rancher/rancher:${DRONE_TAG}-ARCH"
+    platforms:
+    - linux/amd64
+    - linux/arm64
+  when:
+    event:
+    - tag
+
+- name: push-agent-manifest
+  image: plugins/manifest:1.0.2
+  settings:
+    username:
+      from_secret: docker_username
+    password:
+      from_secret: docker_password
+    target: "rancher/rancher-agent:${DRONE_TAG}"
+    template: "rancher/rancher-agent:${DRONE_TAG}-ARCH"
+    platforms:
+    - linux/amd64
+    - linux/arm64
+  when:
+    event:
+    - tag
 
 trigger:
   event:
