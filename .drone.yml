@@ -155,21 +155,6 @@ steps:
       - "refs/tags/*rc*"
       - "refs/tags/*alpha*"
 
-- name: chart-publish
-  pull: default
-  image: plugins/gcs
-  settings:
-    acl:
-    - allUsers:READER
-    cache_control: "public,no-cache,proxy-revalidate"
-    source: bin/chart
-    target: releases.rancher.com/server-charts
-    token:
-      from_secret: google_auth_key
-  when:
-    event:
-    - tag
-
 - name: slack_notify
   image: plugins/slack
   settings:
@@ -411,6 +396,35 @@ steps:
     event:
     - tag
 
+- name: build-chart
+  pull: default
+  image: rancher/dapper:v0.4.1
+  commands:
+  - dapper chart/ci
+  privileged: true
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    event:
+    - push
+    - tag
+
+- name: chart-publish
+  pull: default
+  image: plugins/gcs
+  settings:
+    acl:
+    - allUsers:READER
+    cache_control: "public,no-cache,proxy-revalidate"
+    source: bin/chart
+    target: releases.rancher.com/server-charts
+    token:
+      from_secret: google_auth_key
+  when:
+    event:
+    - tag
+
 - name: slack_notify
   image: plugins/slack
   settings:
@@ -418,16 +432,20 @@ steps:
     username: Drone_Publish
     webhook:
       from_secret: slack_webhook
-    when:
-      event:
-        exclude:
-        - pull_request
-      instance:
-        include:
-        - drone-publish.rancher.io
-      status:
+  when:
+    event:
+      exclude:
+      - pull_request
+    instance:
+      include:
+      - drone-publish.rancher.io
+    status:
       - failure
 
+volumes:
+- name: docker
+  host:
+    path: /var/run/docker.sock
 
 trigger:
   event:
@@ -479,10 +497,10 @@ steps:
     username: Drone_Publish
     webhook:
       from_secret: slack_webhook
-    when:
-      event:
-        exclude:
-        - pull_request
+  when:
+    event:
+      exclude:
+      - pull_request
       instance:
         include:
         - drone-publish.rancher.io
