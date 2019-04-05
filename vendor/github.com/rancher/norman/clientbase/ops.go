@@ -120,6 +120,12 @@ func (a *APIOperations) DoNext(nextURL string, respObject interface{}) error {
 }
 
 func (a *APIOperations) DoModify(method string, url string, createObj interface{}, respObject interface{}) error {
+	if createObj == nil {
+		createObj = map[string]string{}
+	}
+	if respObject == nil {
+		respObject = &map[string]interface{}{}
+	}
 	bodyContent, err := json.Marshal(createObj)
 	if err != nil {
 		return err
