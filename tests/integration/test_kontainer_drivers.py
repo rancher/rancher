@@ -7,7 +7,7 @@ from .conftest import wait_for_condition, wait_until, random_str, wait_for
 
 NEW_DRIVER_URL = "https://github.com/rancher/kontainer-engine-driver-" \
                  "example/releases/download/v0.2.2/kontainer-engine-" \
-                 "driver-example-" + sys.platform + "-amd64"
+                 "driver-example-" + sys.platform
 NEW_DRIVER_ARM64_URL = "https://github.com/rancher/kontainer-engine-driver-" \
                  "example/releases/download/v0.2.3/kontainer-engine-" \
                  "driver-example-" + sys.platform + "-arm64"
@@ -22,7 +22,7 @@ DRIVER_AMD64_URL2 = "https://github.com/rancher/" \
 DRIVER_AMD64_URL3 = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
              "releases/download/v0.2.1/kontainer-engine-driver-example-" \
-             + sys.platform + "-amd64"
+             + sys.platform
 DRIVER_AMD64_URL4 = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
              "releases/download/v0.2.3/kontainer-engine-driver-example-" \
