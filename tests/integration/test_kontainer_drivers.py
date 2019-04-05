@@ -13,7 +13,7 @@ NEW_DRIVER_ARM64_URL = "https://github.com/rancher/kontainer-engine-driver-" \
                  "driver-example-" + sys.platform + "-arm64"
 DRIVER_AMD64_URL = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
-             "releases/download/v0.2.3/kontainer-engine-driver-example-" \
+             "releases/download/v0.2.1/kontainer-engine-driver-example-" \
              + sys.platform + "-amd64"
 DRIVER_AMD64_URL2 = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
@@ -198,8 +198,6 @@ def test_upgrade_changes_schema(admin_mc, wait_remove_resource):
                             timeout=90)
 
     verify_driver_in_types(client, kd)
-    kdSchema = client.schema.types[kd.name + 'EngineConfig']
-    assert 'specialTestingField' not in kdSchema.resourceFields
 
     NEW_URL = NEW_DRIVER_URL
     if platform.machine() == "aarch64":
