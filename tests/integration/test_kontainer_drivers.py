@@ -13,11 +13,11 @@ NEW_DRIVER_ARM64_URL = "https://github.com/rancher/kontainer-engine-driver-" \
                  "driver-example-" + sys.platform + "-arm64"
 DRIVER_AMD64_URL = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
-             "releases/download/v0.2.1/kontainer-engine-driver-example-" \
+             "releases/download/v0.2.3/kontainer-engine-driver-example-" \
              + sys.platform
 DRIVER_AMD64_URL2 = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
-             "releases/download/v0.2.1/kontainer-engine-driver-example-" \
+             "releases/download/v0.2.3/kontainer-engine-driver-example-" \
              + "copy1-" +  sys.platform
 DRIVER_AMD64_URL3 = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
@@ -25,11 +25,11 @@ DRIVER_AMD64_URL3 = "https://github.com/rancher/" \
              + "copy2-" + sys.platform
 DRIVER_AMD64_URL4 = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
-             "releases/download/v0.2.1/kontainer-engine-driver-example-" \
+             "releases/download/v0.2.3/kontainer-engine-driver-example-" \
              + "copy3-" + sys.platform
 DRIVER_AMD64_URL5 = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
-             "releases/download/v0.2.1/kontainer-engine-driver-example-" \
+             "releases/download/v0.2.3/kontainer-engine-driver-example-" \
              + "copy4-" + sys.platform
 DRIVER_ARM64_URL = "https://github.com/jianghang8421/" \
              "kontainer-engine-driver-example/" \
@@ -192,7 +192,7 @@ def test_upgrade_changes_schema(admin_mc, wait_remove_resource):
     kdSchema = client.schema.types[kd.name + 'EngineConfig']
     assert 'specialTestingField' not in kdSchema.resourceFields
 
-    NEW_URL = NEW_DRIVER_URL3
+    NEW_URL = NEW_DRIVER_URL
     '''
     if platform.machine() == "aarch64":
         NEW_URL = NEW_DRIVER_ARM64_URL
