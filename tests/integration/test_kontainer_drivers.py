@@ -14,28 +14,43 @@ NEW_DRIVER_ARM64_URL = "https://github.com/rancher/kontainer-engine-driver-" \
 DRIVER_AMD64_URL = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
              "releases/download/v0.2.3/kontainer-engine-driver-example-" \
-             + sys.platform
+             + sys.platform + "-amd64"
 DRIVER_AMD64_URL2 = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
              "releases/download/v0.2.3/kontainer-engine-driver-example-" \
-             + "copy1-" +  sys.platform
+             + "copy1-" +  sys.platform + "-amd64"
 DRIVER_AMD64_URL3 = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
              "releases/download/v0.2.1/kontainer-engine-driver-example-" \
-             + sys.platform
+             + sys.platform + "-amd64"
 DRIVER_AMD64_URL4 = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
              "releases/download/v0.2.3/kontainer-engine-driver-example-" \
-             + "copy3-" + sys.platform
+             + "copy3-" + sys.platform + "-amd64"
 DRIVER_AMD64_URL5 = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
              "releases/download/v0.2.3/kontainer-engine-driver-example-" \
-             + "copy4-" + sys.platform
-DRIVER_ARM64_URL = "https://github.com/jianghang8421/" \
+             + "copy4-" + sys.platform + "-amd64"
+DRIVER_ARM64_URL = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
-             "releases/download/v0.2.1-multiarch/" \
-             "kontainer-engine-driver-example-" \
+             "releases/download/v0.2.3/kontainer-engine-driver-example-" \
              + sys.platform + "-arm64"
+DRIVER_ARM64_URL2 = "https://github.com/rancher/" \
+             "kontainer-engine-driver-example/" \
+             "releases/download/v0.2.3/kontainer-engine-driver-example-" \
+             + "copy1-" +  sys.platform + "-arm64"
+DRIVER_ARM64_URL3 = "https://github.com/rancher/" \
+             "kontainer-engine-driver-example/" \
+             "releases/download/v0.2.1/kontainer-engine-driver-example-" \
+             + sys.platform + "-arm64"
+DRIVER_ARM64_URL4 = "https://github.com/rancher/" \
+             "kontainer-engine-driver-example/" \
+             "releases/download/v0.2.3/kontainer-engine-driver-example-" \
+             + "copy3-" + sys.platform + "-arm64"
+DRIVER_ARM64_URL5 = "https://github.com/rancher/" \
+             "kontainer-engine-driver-example/" \
+             "releases/download/v0.2.3/kontainer-engine-driver-example-" \
+             + "copy4-" + sys.platform + "-arm64"
 
 
 def test_builtin_drivers_are_present(admin_mc):
@@ -60,10 +75,8 @@ def test_builtin_drivers_are_present(admin_mc):
 def test_kontainer_driver_lifecycle(admin_mc, remove_resource,
                                     wait_remove_resource):
     URL = DRIVER_AMD64_URL
-    '''
     if platform.machine() == "aarch64":
         URL = DRIVER_ARM64_URL
-    '''
     kd = admin_mc.client.create_kontainerDriver(
         createDynamicSchema=True,
         active=True,
@@ -131,10 +144,8 @@ def test_enabling_driver_exposes_schema(admin_mc, wait_remove_resource):
     downloaded / installed once they are active, and if re-activating a
     driver exposes its schema again"""
     URL = DRIVER_AMD64_URL2
-    '''
     if platform.machine() == "aarch64":
-        URL = DRIVER_ARM64_URL
-    '''
+        URL = DRIVER_ARM64_URL2
     kd = admin_mc.client.create_kontainerDriver(
         createDynamicSchema=True,
         active=False,
@@ -174,10 +185,8 @@ def test_enabling_driver_exposes_schema(admin_mc, wait_remove_resource):
 def test_upgrade_changes_schema(admin_mc, wait_remove_resource):
     client = admin_mc.client
     URL = DRIVER_AMD64_URL3
-    '''
     if platform.machine() == "aarch64":
-        URL = DRIVER_ARM64_URL
-    '''
+        URL = DRIVER_ARM64_URL3
     kd = client.create_kontainerDriver(
         createDynamicSchema=True,
         active=True,
@@ -193,10 +202,8 @@ def test_upgrade_changes_schema(admin_mc, wait_remove_resource):
     assert 'specialTestingField' not in kdSchema.resourceFields
 
     NEW_URL = NEW_DRIVER_URL
-    '''
     if platform.machine() == "aarch64":
-        NEW_URL = NEW_DRIVER_ARM64_URL
-    '''
+        NEW_URL = NEW_DRIVER_URL_ARM64
     kd.url = NEW_URL
     kd = client.update_by_id_kontainerDriver(kd.id, kd)
 
@@ -215,10 +222,8 @@ def test_create_duplicate_driver_conflict(admin_mc, wait_remove_resource):
     """ Test if adding a driver with a pre-existing driver's URL
     returns a conflict error"""
     URL = DRIVER_AMD64_URL4
-    '''
     if platform.machine() == "aarch64":
-        URL = DRIVER_ARM64_URL
-    '''
+        URL = DRIVER_ARM64_URL4
     kd = admin_mc.client.create_kontainerDriver(
         createDynamicSchema=True,
         active=True,
@@ -244,10 +249,8 @@ def test_update_duplicate_driver_conflict(admin_mc, wait_remove_resource):
     """ Test if updating a driver's URL to a pre-existing driver's URL
     returns a conflict error"""
     URL = DRIVER_AMD64_URL5
-    '''
     if platform.machine() == "aarch64":
-        URL = DRIVER_ARM64_URL
-    '''
+        URL = DRIVER_ARM64_URL5
     kd1 = admin_mc.client.create_kontainerDriver(
         createDynamicSchema=True,
         active=True,
