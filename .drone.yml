@@ -170,6 +170,22 @@ steps:
     event:
     - tag
 
+- name: slack_notify
+  image: plugins/slack
+  settings:
+    template: "Build {{build.link}} failed to publish an image/artifact.\n"
+    username: Drone_Publish
+    webhook:
+      from_secret: slack_webhook
+  when:
+    event:
+      exclude:
+      - pull_request
+    instance:
+    - drone-publish.rancher.io
+    status:
+    - failure
+
 volumes:
 - name: docker
   host:
@@ -296,6 +312,23 @@ steps:
   when:
     event:
     - tag
+
+- name: slack_notify
+  image: plugins/slack
+  settings:
+    template: "Build {{build.link}} failed to publish an image/artifact.\n"
+    username: Drone_Publish
+    webhook:
+      from_secret: slack_webhook
+  when:
+    event:
+      exclude:
+      - pull_request
+    instance:
+    - drone-publish.rancher.io
+    status:
+    - failure
+
 volumes:
 - name: docker
   host:
@@ -378,6 +411,24 @@ steps:
     event:
     - tag
 
+- name: slack_notify
+  image: plugins/slack
+  settings:
+    template: "Build {{build.link}} failed to push manifests.\n"
+    username: Drone_Publish
+    webhook:
+      from_secret: slack_webhook
+    when:
+      event:
+        exclude:
+        - pull_request
+      instance:
+        include:
+        - drone-publish.rancher.io
+      status:
+      - failure
+
+
 trigger:
   event:
     exclude:
@@ -420,6 +471,23 @@ steps:
     target: releases.rancher.com/server-charts
     token:
       from_secret: google_auth_key
+
+- name: slack_notify
+  image: plugins/slack
+  settings:
+    template: "Build {{build.link}} failed to promote chart.\n"
+    username: Drone_Publish
+    webhook:
+      from_secret: slack_webhook
+    when:
+      event:
+        exclude:
+        - pull_request
+      instance:
+        include:
+        - drone-publish.rancher.io
+      status:
+      - failure
 
 volumes:
 - name: docker
