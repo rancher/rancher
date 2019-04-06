@@ -38,6 +38,8 @@ const (
 	creatorIDAnn              = "field.cattle.io/creatorId"
 	MultiClusterAppIDSelector = "mcapp"
 	projectIDFieldLabel       = "field.cattle.io/projectId"
+	saInjectionAnno           = "field.cattle.io/injectAccount"
+	ServiceAccountAnswerKey   = "rancherInjectedServiceAccount"
 )
 
 func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
@@ -61,6 +63,9 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 		NsLister:              user.Core.Namespaces("").Controller().Lister(),
 		NsClient:              user.Core.Namespaces(""),
 		ProjectLister:         user.Management.Management.Projects("").Controller().Lister(),
+		ClusterLister:         user.Management.Management.Clusters("").Controller().Lister(),
+		ServiceAccountClient:  user.Core.ServiceAccounts(""),
+		ServiceAccountLister:  user.Core.ServiceAccounts("").Controller().Lister(),
 	}
 	appClient.AddClusterScopedLifecycle(ctx, "helm-controller", user.ClusterName, stackLifecycle)
 
@@ -86,6 +91,9 @@ type Lifecycle struct {
 	NsLister              corev1.NamespaceLister
 	NsClient              corev1.NamespaceInterface
 	ProjectLister         mgmtv3.ProjectLister
+	ClusterLister         mgmtv3.ClusterLister
+	ServiceAccountClient  corev1.ServiceAccountInterface
+	ServiceAccountLister  corev1.ServiceAccountLister
 }
 
 func (l *Lifecycle) Create(obj *v3.App) (runtime.Object, error) {
@@ -310,7 +318,11 @@ func (l *Lifecycle) Run(obj *v3.App, template, templateDir, notes string) error 
 	if err := helmInstall(templateDir, kubeConfigPath, obj); err != nil {
 		return err
 	}
-	return l.createAppRevision(obj, template, notes, false)
+	if err := l.createAppRevision(obj, template, notes, false); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (l *Lifecycle) createAppRevision(obj *v3.App, template, notes string, failed bool) error {
@@ -355,11 +367,20 @@ func (l *Lifecycle) writeKubeConfig(obj *v3.App, tempDir string, remove bool) (s
 		return "", err
 	}
 
-	userID := obj.Annotations["field.cattle.io/creatorId"]
+	userID, ok := obj.Annotations["field.cattle.io/creatorId"]
 	user, err := l.UserClient.Get(userID, metav1.GetOptions{})
-	if err != nil && !errors.IsNotFound(err) {
+	if !ok && isSystemProject {
+		var cluster *mgmtv3.Cluster
+		cluster, err = l.ClusterLister.Get("", l.ClusterName)
+		if err != nil {
+			return "", err
+		}
+		token, err = l.SystemAccountManager.GetOrCreateClusterSystemToken(cluster)
+	} else if !ok {
+		token, err = l.SystemAccountManager.GetOrCreateProjectSystemToken(obj.Namespace)
+	} else if err != nil && !errors.IsNotFound(err) {
 		return "", err
-	} else if errors.IsNotFound(err) && (remove || isSystemProject) {
+	} else if errors.IsNotFound(err) && remove {
 		token, err = l.SystemAccountManager.GetOrCreateProjectSystemToken(obj.Namespace)
 	} else if err == nil {
 		token, err = l.UserManager.EnsureToken(helmTokenPrefix+user.Name, description, user.Name)
@@ -388,4 +409,24 @@ func (l *Lifecycle) isInSystemProject(app *v3.App) (bool, error) {
 		return false, err
 	}
 	return p.Name == app.Namespace, nil
+}
+
+func (l *Lifecycle) InjectServiceAccount(app *v3.App) {
+	if app.Annotations == nil {
+		return
+	}
+	value, ok := app.Annotations[saInjectionAnno]
+	if !ok {
+		return
+	}
+
+	if value != "member" && value != "readOnly" {
+		return
+	}
+	app.Spec.Answers[ServiceAccountAnswerKey] = app.Name
+}
+
+func (l *Lifecycle) EnsureAppServiceAccount(app *v3.App) error {
+	// TODO fulfill the function. Refer to pkg/controllers/user/rbac/prtb_handler.go#L50
+	return nil
 }
