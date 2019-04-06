@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/pkg/errors"
+	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
@@ -159,7 +160,7 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 		projectRoleName = strings.ToLower(fmt.Sprintf("%v-projectmember", projectName))
 	}
 
-	subject, err := buildSubjectFromRTB(binding)
+	subject, err := pkgrbac.BuildSubjectFromRTB(binding)
 	if err != nil {
 		return err
 	}

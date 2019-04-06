@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
+	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
@@ -175,7 +176,7 @@ func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.Proj
 	}
 
 	rtbUID := string(binding.UID)
-	subject, err := buildSubjectFromRTB(binding)
+	subject, err := pkgrbac.BuildSubjectFromRTB(binding)
 	if err != nil {
 		return err
 	}
@@ -340,12 +341,12 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 			added := false
 			for i, rule := range role.Rules {
 				if slice.ContainsString(rule.Resources, resource) {
-					role.Rules[i] = buildRule(resource, newVerbs)
+					role.Rules[i] = pkgrbac.BuildRule(resource, newVerbs)
 					added = true
 				}
 			}
 			if !added {
-				role.Rules = append(role.Rules, buildRule(resource, newVerbs))
+				role.Rules = append(role.Rules, pkgrbac.BuildRule(resource, newVerbs))
 			}
 			logrus.Infof("Updating clusterRole %v for project access to global resource.", role.Name)
 			_, err := clusterRoles.Update(role)
@@ -355,7 +356,7 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 	}
 
 	logrus.Infof("Creating clusterRole %v for project access to global resource.", roleName)
-	rules := []rbacv1.PolicyRule{buildRule(resource, newVerbs)}
+	rules := []rbacv1.PolicyRule{pkgrbac.BuildRule(resource, newVerbs)}
 	_, err := clusterRoles.Create(&rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: roleName,
@@ -367,16 +368,4 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 	}
 
 	return roleName, nil
-}
-
-func buildRule(resource string, verbs map[string]bool) rbacv1.PolicyRule {
-	var vs []string
-	for v := range verbs {
-		vs = append(vs, v)
-	}
-	return rbacv1.PolicyRule{
-		Resources: []string{resource},
-		Verbs:     vs,
-		APIGroups: []string{"*"},
-	}
 }
