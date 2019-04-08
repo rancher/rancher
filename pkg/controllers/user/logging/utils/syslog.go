@@ -112,7 +112,7 @@ func getSeverity(severityStr string) syslog.Priority {
 	return syslog.LOG_INFO
 }
 
-func getWrapSeverity(severity string) string {
+func GetWrapSeverity(severity string) string {
 	// for adapt api and fluentd config
 	severityMap := map[string]string{
 		"warning": "warn",

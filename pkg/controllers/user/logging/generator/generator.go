@@ -7,7 +7,6 @@ import (
 	"text/template"
 
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
-	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
 	"github.com/rancher/rancher/pkg/project"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 
@@ -15,21 +14,26 @@ import (
 	k8scorev1 "k8s.io/api/core/v1"
 )
 
-func generateConfig(templateM, tempalteName string, conf map[string]interface{}) ([]byte, error) {
-	tp, err := template.New(tempalteName).Parse(templateM)
-	if err != nil {
-		return nil, err
-	}
+var tmplCache = template.New("template")
 
+func init() {
+	tmplCache = tmplCache.Funcs(template.FuncMap{"escapeString": escapeString})
+	tmplCache = template.Must(tmplCache.Parse(SourceTemplate))
+	tmplCache = template.Must(tmplCache.Parse(FilterTemplate))
+	tmplCache = template.Must(tmplCache.Parse(MatchTemplate))
+	tmplCache = template.Must(tmplCache.Parse(Template))
+}
+
+func GenerateConfig(tempalteName string, conf interface{}) ([]byte, error) {
 	buf := &bytes.Buffer{}
-	if err = tp.Execute(buf, conf); err != nil {
+	if err := tmplCache.ExecuteTemplate(buf, tempalteName, conf); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
 }
 
 func GenerateClusterConfig(logging mgmtv3.ClusterLoggingSpec, excludeNamespaces, certDir string) ([]byte, error) {
-	wl, err := utils.NewWrapClusterLogging(logging, excludeNamespaces)
+	wl, err := newWrapClusterLogging(logging, excludeNamespaces, certDir)
 	if err != nil {
 		return nil, errors.Wrap(err, "to wraper cluster logging failed")
 	}
@@ -38,13 +42,25 @@ func GenerateClusterConfig(logging mgmtv3.ClusterLoggingSpec, excludeNamespaces,
 		return []byte{}, nil
 	}
 
-	conf := map[string]interface{}{
-		"clusterTarget": wl,
-		"clusterName":   logging.ClusterName,
-		"certDir":       certDir,
+	if logging.SyslogConfig != nil && logging.SyslogConfig.Token != "" {
+		if err = ValidateSyslogToken(wl); err != nil {
+			return nil, err
+		}
 	}
 
-	buf, err := generateConfig(ClusterTemplate, loggingconfig.ClusterLevel, conf)
+	if err = ValidateCustomTags(wl); err != nil {
+		return nil, err
+	}
+
+	validateData := *wl
+	if logging.FluentForwarderConfig != nil && wl.EnableShareKey {
+		validateData.EnableShareKey = false //skip generate precan configure included ruby code
+	}
+	if err = ValidateCustomTarget(validateData); err != nil {
+		return nil, err
+	}
+
+	buf, err := GenerateConfig("cluster-template", wl)
 	if err != nil {
 		return nil, errors.Wrap(err, "generate cluster config file failed")
 	}
@@ -53,7 +69,7 @@ func GenerateClusterConfig(logging mgmtv3.ClusterLoggingSpec, excludeNamespaces,
 }
 
 func GenerateProjectConfig(projectLoggings []*mgmtv3.ProjectLogging, namespaces []*k8scorev1.Namespace, systemProjectID, certDir string) ([]byte, error) {
-	var wl []utils.ProjectLoggingTemplateWrap
+	var wl []ProjectLoggingTemplateWrap
 	for _, v := range projectLoggings {
 		var grepNamespace []string
 		for _, v2 := range namespaces {
@@ -69,7 +85,7 @@ func GenerateProjectConfig(projectLoggings []*mgmtv3.ProjectLogging, namespaces 
 
 		formatgrepNamespace := fmt.Sprintf("(%s)", strings.Join(grepNamespace, "|"))
 		isSystemProject := v.Spec.ProjectName == systemProjectID
-		wpl, err := utils.NewWrapProjectLogging(v.Spec, formatgrepNamespace, isSystemProject)
+		wpl, err := newWrapProjectLogging(v.Spec, formatgrepNamespace, certDir, isSystemProject)
 		if err != nil {
 			return nil, err
 		}
@@ -78,15 +94,28 @@ func GenerateProjectConfig(projectLoggings []*mgmtv3.ProjectLogging, namespaces 
 			continue
 		}
 
+		if wpl.SyslogConfig.Token != "" {
+			if err = ValidateSyslogToken(wpl); err != nil {
+				return nil, err
+			}
+		}
+
+		if err = ValidateCustomTags(wpl); err != nil {
+			return nil, err
+		}
+
+		validateData := *wpl
+		if v.Spec.FluentForwarderConfig != nil && wpl.EnableShareKey {
+			validateData.EnableShareKey = false //skip generate precan configure included ruby code
+		}
+		if err = ValidateCustomTarget(validateData); err != nil {
+			return nil, err
+		}
+
 		wl = append(wl, *wpl)
 	}
 
-	conf := map[string]interface{}{
-		"projectTargets": wl,
-		"certDir":        certDir,
-	}
-
-	buf, err := generateConfig(ProjectTemplate, loggingconfig.ProjectLevel, conf)
+	buf, err := GenerateConfig("project-template", wl)
 	if err != nil {
 		return nil, errors.Wrap(err, "generate project config file failed")
 	}
