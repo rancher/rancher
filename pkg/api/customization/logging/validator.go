@@ -6,6 +6,8 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
+	"github.com/rancher/rancher/pkg/controllers/user/logging/generator"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
@@ -15,11 +17,7 @@ func ClusterLoggingValidator(resquest *types.APIContext, schema *types.Schema, d
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("%v", err))
 	}
 
-	if spec.KafkaConfig != nil {
-		return validateKafka(spec.KafkaConfig)
-	}
-
-	return nil
+	return validate(loggingconfig.ClusterLevel, "cluster", spec.LoggingTargets, spec.OutputTags)
 }
 
 func ProjectLoggingValidator(resquest *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
@@ -28,11 +26,59 @@ func ProjectLoggingValidator(resquest *types.APIContext, schema *types.Schema, d
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("%v", err))
 	}
 
-	if spec.KafkaConfig != nil {
-		return validateKafka(spec.KafkaConfig)
+	return validate(loggingconfig.ProjectLevel, spec.ProjectName, spec.LoggingTargets, spec.OutputTags)
+}
+
+func validate(level, containerLogSourceTag string, loggingTargets v3.LoggingTargets, outputTags map[string]string) error {
+	if loggingTargets.KafkaConfig != nil {
+		if err := validateKafka(loggingTargets.KafkaConfig); err != nil {
+			return err
+		}
 	}
 
-	return nil
+	wrapTarget, err := generator.NewLoggingTargetTemplateWrap(loggingTargets)
+	if err != nil {
+		return err
+	}
+
+	if wrapTarget == nil {
+		return nil
+	}
+
+	loggingCommomFileds := v3.LoggingCommonField{
+		OutputTags: outputTags,
+	}
+
+	if loggingTargets.FluentForwarderConfig != nil && wrapTarget.EnableShareKey {
+		wrapTarget.EnableShareKey = false //skip generate precan configure included ruby code
+	}
+
+	var wrap interface{}
+	if level == loggingconfig.ProjectLevel {
+		wrap = generator.ProjectLoggingTemplateWrap{
+			ContainerLogSourceTag:     containerLogSourceTag,
+			LoggingTargetTemplateWrap: *wrapTarget,
+			LoggingCommonField:        loggingCommomFileds,
+		}
+	} else {
+		wrap = generator.ClusterLoggingTemplateWrap{
+			ContainerLogSourceTag:     containerLogSourceTag,
+			LoggingTargetTemplateWrap: *wrapTarget,
+			LoggingCommonField:        loggingCommomFileds,
+		}
+	}
+
+	if loggingTargets.SyslogConfig != nil && loggingTargets.SyslogConfig.Token != "" {
+		if err = generator.ValidateSyslogToken(wrap); err != nil {
+			return err
+		}
+	}
+
+	if err = generator.ValidateCustomTags(wrap); err != nil {
+		return err
+	}
+
+	return generator.ValidateCustomTarget(wrap)
 }
 
 func validateKafka(kafkaConfig *v3.KafkaConfig) error {

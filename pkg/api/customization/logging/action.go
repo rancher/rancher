@@ -65,7 +65,8 @@ func CollectionFormatter(apiContext *types.APIContext, resource *types.GenericCo
 
 func (h *Handler) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	var target mgmtv3.LoggingTargets
-	var clusterName, projectName, level string
+	var clusterName, projectID, level, containerLogSourceTag string
+	var outputTags map[string]string
 
 	switch apiContext.Type {
 	case mgmtv3client.ClusterLoggingType:
@@ -82,6 +83,9 @@ func (h *Handler) ActionHandler(actionName string, action *types.Action, apiCont
 		target = input.LoggingTargets
 		clusterName = input.ClusterName
 		level = loggingconfig.ClusterLevel
+		containerLogSourceTag = level
+		outputTags = input.OutputTags
+
 	case mgmtv3client.ProjectLoggingType:
 		var input mgmtv3.ProjectTestInput
 		actionInput, err := parse.ReadBody(apiContext.Request)
@@ -94,9 +98,15 @@ func (h *Handler) ActionHandler(actionName string, action *types.Action, apiCont
 		}
 
 		target = input.LoggingTargets
-		projectName = input.ProjectName
+		projectID = input.ProjectName
 		clusterName, _ = ref.Parse(input.ProjectName)
 		level = loggingconfig.ProjectLevel
+		containerLogSourceTag = projectID
+		outputTags = input.OutputTags
+	}
+
+	if err := validate(level, containerLogSourceTag, target, outputTags); err != nil {
+		return err
 	}
 
 	switch actionName {
@@ -110,7 +120,7 @@ func (h *Handler) ActionHandler(actionName string, action *types.Action, apiCont
 
 	case "dryRun":
 
-		if err := h.dryRunLoggingTarget(apiContext, level, clusterName, projectName, target); err != nil {
+		if err := h.dryRunLoggingTarget(apiContext, level, clusterName, projectID, target); err != nil {
 			return httperror.NewAPIError(httperror.ServerError, err.Error())
 		}
 
