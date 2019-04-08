@@ -23,7 +23,6 @@ func RegisterPasswordResetCommand() {
 
 const (
 	length     = 20
-	cost       = 10
 	characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
 )
 

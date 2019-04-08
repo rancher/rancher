@@ -490,11 +490,3 @@ func (l *ProjectLifecycle) Updated(obj *v3.Project) (runtime.Object, error) {
 func (l *ProjectLifecycle) Remove(obj *v3.Project) (runtime.Object, error) {
 	return obj, nil
 }
-
-func getCommonRuleField(groupID, displayName, severity string) v3.CommonRuleField {
-	return v3.CommonRuleField{
-		DisplayName: displayName,
-		Severity:    severity,
-		TimingField: defaultTimingField,
-	}
-}

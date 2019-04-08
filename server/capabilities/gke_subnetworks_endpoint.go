@@ -14,12 +14,6 @@ func NewGKESubnetworksHandler() *GKESubnetworksHandler {
 type GKESubnetworksHandler struct {
 }
 
-type subnetworkCapabilitiesRequestBody struct {
-	capabilitiesRequestBody
-
-	Region string `json:"region"`
-}
-
 func (g *GKESubnetworksHandler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 	body := preCheck(writer, req)
 	if body == nil {

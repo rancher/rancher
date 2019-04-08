@@ -574,15 +574,6 @@ func (d *ConfigSyncer) isAppDeploy(appNamespace string) (bool, error) {
 	return true, nil
 }
 
-func includeProjectMetrics(projectAlerts []*v3.ProjectAlertRule) bool {
-	for _, v := range projectAlerts {
-		if v.Spec.MetricRule != nil {
-			return true
-		}
-	}
-	return false
-}
-
 func getClusterAlertGroupBy(spec v3.ClusterAlertRuleSpec) []model.LabelName {
 	if spec.EventRule != nil {
 		return []model.LabelName{"rule_id", "resource_kind", "target_namespace", "target_name"}

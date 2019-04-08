@@ -10,7 +10,6 @@ import (
 )
 
 const (
-	creatorIDAnnotation  = "field.cattle.io/creatorId"
 	metricsAnnotation    = "field.cattle.io/workloadMetrics"
 	metricsServiceLabel  = "cattle.io/metrics"
 	metricsServiceSuffix = "-metrics"

@@ -1,14 +1,10 @@
 package monitoring
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
-	"strings"
-	"text/template"
-
 	"github.com/ghodss/yaml"
 	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"strings"
 )
 
 var (
@@ -16,10 +12,6 @@ var (
 	preDefinedClusterGraph   = getPredefinedClusterGraph()
 	preDefinedProjectGraph   = getPredefinedProjectGraph()
 )
-
-type templateData struct {
-	ProjectName string
-}
 
 func getPredefinedClusterMetrics() []*managementv3.MonitorMetric {
 	yamls := strings.Split(MonitorMetricsTemplate, "\n---\n")
@@ -81,21 +73,6 @@ func yamlToObject(yml string, obj interface{}) error {
 		return err
 	}
 	return nil
-}
-
-func generate(text string, data templateData) (string, error) {
-	t, err := template.New("expression-yaml").Parse(text)
-	if err != nil {
-		return "", fmt.Errorf("parse template expression-yaml failed, %v", err)
-	}
-
-	var contentBuf bytes.Buffer
-	err = t.Execute(&contentBuf, data)
-	if err != nil {
-		return "", fmt.Errorf("failed to execute template expression-yaml, %v", err)
-	}
-
-	return contentBuf.String(), nil
 }
 
 var (

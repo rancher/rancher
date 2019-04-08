@@ -20,10 +20,6 @@ const (
 	BasicAuthPrefix = "Basic"
 )
 
-var crdVersions = []*types.APIVersion{
-	&managementSchema.Version,
-}
-
 func NewAPIHandler(ctx context.Context, apiContext *config.ScaledContext) (http.Handler, error) {
 	api := &tokenAPI{
 		mgr: NewManager(ctx, apiContext),

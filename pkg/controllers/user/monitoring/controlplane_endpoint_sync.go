@@ -176,14 +176,3 @@ func getNodes(client v1.NodeLister, selectors []labels.Selector) ([]*corev1.Node
 	}
 	return rtn, nil
 }
-
-func endpointHasAddress(endpoint *corev1.Endpoints, addr string) bool {
-	for _, addressSet := range endpoint.Subsets {
-		for _, address := range addressSet.Addresses {
-			if address.IP == addr && address.NodeName != nil {
-				return true
-			}
-		}
-	}
-	return false
-}

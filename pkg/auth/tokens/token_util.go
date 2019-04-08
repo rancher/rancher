@@ -13,19 +13,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func getAuthProviderName(principalID string) string {
-	parts := strings.Split(principalID, "://")
-	externalType := parts[0]
-
-	providerParts := strings.Split(externalType, "_")
-	return providerParts[0]
-}
-
-func getUserID(principalID string) string {
-	parts := strings.Split(principalID, "://")
-	return parts[1]
-}
-
 func SplitTokenParts(tokenID string) (string, string) {
 	parts := strings.Split(tokenID, ":")
 	if len(parts) != 2 {

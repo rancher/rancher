@@ -22,8 +22,7 @@ import (
 )
 
 const (
-	workloadRevisions    = "revisions"
-	DeprecatedRollbackTo = "deprecated.deployment.rollback.to"
+	workloadRevisions = "revisions"
 )
 
 type ActionWrapper struct {

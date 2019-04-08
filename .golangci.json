@@ -2,29 +2,20 @@
 	"linters": {
 		"disable-all": true,
 		"enable": [
-			"govet",
-			"errcheck",
-			"golint",
-			"typecheck",
-			"goimports",
-			"misspell",
-			"ineffassign",
-			"gofmt",
 			"deadcode",
-			"staticcheck",
-			"unused"
+			"misspell"
 		]
 	},
 	"run": {
-		"skip-files": [
-			"/zz_generated_"
-		],
         "deadline": "10m",
         "max-issues-per-linter": 0
 	},
 	"linters-settings":{
 		"gocyclo":{
 			"min-complexity": 10
+		},
+		"deadcode":{
+			"auto-fix":"true"
 		}
 	}
 }

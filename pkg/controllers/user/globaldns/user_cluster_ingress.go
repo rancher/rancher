@@ -21,7 +21,6 @@ import (
 
 const (
 	annotationGlobalDNS         = "rancher.io/globalDNS.hostname"
-	appSelectorLabel            = "io.cattle.field/appId"
 	projectSelectorLabel        = "field.cattle.io/projectId"
 	UserIngressControllerName   = "globaldns-useringress-controller"
 	UserGlobalDNSControllerName = "user-controller-watching-globaldns"

@@ -19,7 +19,6 @@ const (
 
 const (
 	levelNull = iota
-	levelMetadata
 	levelRequest
 	levelRequestResponse
 )

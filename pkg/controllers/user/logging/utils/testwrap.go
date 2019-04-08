@@ -119,15 +119,6 @@ func newTCPConn(dialer dialer.Dialer, smartHost string, tlsConfig *tls.Config, h
 	return tlsConn, nil
 }
 
-func newUDPConn(smartHost string) (net.Conn, error) {
-	conn, err := net.Dial("udp", smartHost)
-	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't dial udp endpoint %s", smartHost)
-	}
-	conn.SetDeadline(time.Now().Add(deadlineTimeout))
-	return conn, nil
-}
-
 func decodePEM(clientKey, passphrase string) ([]byte, error) {
 	clientKeyBytes := []byte(clientKey)
 	pemBlock, _ := pem.Decode(clientKeyBytes)

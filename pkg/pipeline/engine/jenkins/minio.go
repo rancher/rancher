@@ -15,10 +15,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type minioClient struct {
-	client minio.Client
-}
-
 func (j *Engine) getMinioURL(ns string) (string, error) {
 	MinioName := utils.MinioName
 	svc, err := j.ServiceLister.Get(ns, MinioName)

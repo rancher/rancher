@@ -2,7 +2,6 @@ package notifiers
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -391,12 +390,6 @@ type pagerDutyEvent struct {
 	RoutingKey  string                `json:"routing_key"`
 	EventAction string                `json:"event_action"`
 	Payload     pagerDutyEventPayload `json:"payload"`
-}
-
-func hashKey(s string) string {
-	h := sha256.New()
-	h.Write([]byte(s))
-	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
 type wechatEventPayload struct {

@@ -3,29 +3,15 @@ package servicemonitor
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
-	"sort"
-	"strings"
-
 	monitoringv1 "github.com/coreos/prometheus-operator/pkg/client/monitoring/v1"
 	util "github.com/rancher/rancher/pkg/controllers/user/workload"
-	rmonitoringv1 "github.com/rancher/types/apis/monitoring.coreos.com/v1"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"reflect"
+	"sort"
 )
-
-func filterRancherLabels(l map[string]string) labels.Set {
-	rtn := map[string]string{}
-	for k, v := range l {
-		if !strings.Contains(k, "cattle.io/") {
-			rtn[k] = v
-		}
-	}
-	return labels.Set(rtn)
-}
 
 func getWorkloadOwnerReference(w *util.Workload) metav1.OwnerReference {
 	controller := true
@@ -95,16 +81,6 @@ func getServiceMonitorFromWorkload(w *util.Workload) (*monitoringv1.ServiceMonit
 		rtn.Spec.Endpoints = append(rtn.Spec.Endpoints, endpoint)
 	}
 	return rtn, nil
-}
-
-func getWorkloadFromOwners(namespace string, owners []metav1.OwnerReference, lister rmonitoringv1.ServiceMonitorLister) (*monitoringv1.ServiceMonitor, error) {
-	for _, owner := range owners {
-		if !*owner.Controller || owner.Kind != "ServiceMonitor" {
-			continue
-		}
-		return lister.Get(namespace, owner.Name)
-	}
-	return nil, nil
 }
 
 func areServiceMonitorEqual(a, b *monitoringv1.ServiceMonitor) bool {
