@@ -301,7 +301,7 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 	}
 	hostCfg := &container.HostConfig{
 		Binds: []string{
-			fmt.Sprintf("%s:/backup", EtcdSnapshotPath),
+			fmt.Sprintf("%s:/backup:z", EtcdSnapshotPath),
 			fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(etcdHost.PrefixPath, "/etc/kubernetes"))},
 		NetworkMode:   container.NetworkMode("host"),
 		RestartPolicy: container.RestartPolicy{Name: restartPolicy},
@@ -371,7 +371,7 @@ func DownloadEtcdSnapshotFromS3(ctx context.Context, etcdHost *hosts.Host, prsMa
 
 	hostCfg := &container.HostConfig{
 		Binds: []string{
-			fmt.Sprintf("%s:/backup", EtcdSnapshotPath),
+			fmt.Sprintf("%s:/backup:z", EtcdSnapshotPath),
 			fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(etcdHost.PrefixPath, "/etc/kubernetes"))},
 		NetworkMode:   container.NetworkMode("host"),
 		RestartPolicy: container.RestartPolicy{Name: "always"},
@@ -477,7 +477,7 @@ func RunEtcdSnapshotRemove(ctx context.Context, etcdHost *hosts.Host, prsMap map
 	}
 	hostCfg := &container.HostConfig{
 		Binds: []string{
-			fmt.Sprintf("%s:/backup", EtcdSnapshotPath),
+			fmt.Sprintf("%s:/backup:z", EtcdSnapshotPath),
 		},
 		RestartPolicy: container.RestartPolicy{Name: "no"},
 	}
@@ -574,7 +574,7 @@ func StartBackupServer(ctx context.Context, etcdHost *hosts.Host, prsMap map[str
 
 	hostCfg := &container.HostConfig{
 		Binds: []string{
-			fmt.Sprintf("%s:/backup", EtcdSnapshotPath),
+			fmt.Sprintf("%s:/backup:z", EtcdSnapshotPath),
 			fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(etcdHost.PrefixPath, "/etc/kubernetes"))},
 		NetworkMode:   container.NetworkMode("host"),
 		RestartPolicy: container.RestartPolicy{Name: "no"},
@@ -622,7 +622,7 @@ func DownloadEtcdSnapshotFromBackupServer(ctx context.Context, etcdHost *hosts.H
 
 	hostCfg := &container.HostConfig{
 		Binds: []string{
-			fmt.Sprintf("%s:/backup", EtcdSnapshotPath),
+			fmt.Sprintf("%s:/backup:z", EtcdSnapshotPath),
 			fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(etcdHost.PrefixPath, "/etc/kubernetes"))},
 		NetworkMode:   container.NetworkMode("host"),
 		RestartPolicy: container.RestartPolicy{Name: "on-failure"},

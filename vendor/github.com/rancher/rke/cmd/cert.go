@@ -213,6 +213,7 @@ func rotateRKECertificates(ctx context.Context, kubeCluster *cluster.Cluster, fl
 	if err := cluster.RotateRKECertificates(ctx, currentCluster, flags, rkeFullState); err != nil {
 		return nil, err
 	}
+	rkeFullState.DesiredState.RancherKubernetesEngineConfig = &kubeCluster.RancherKubernetesEngineConfig
 	return rkeFullState, nil
 }
 

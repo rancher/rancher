@@ -200,7 +200,6 @@ func RotateRKECertificates(ctx context.Context, c *Cluster, flags ExternalFlags,
 		}
 	}
 	clusterState.DesiredState.CertificatesBundle = c.Certificates
-	clusterState.DesiredState.RancherKubernetesEngineConfig = &c.RancherKubernetesEngineConfig
 	return nil
 }
 

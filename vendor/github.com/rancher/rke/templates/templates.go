@@ -9,10 +9,12 @@ import (
 
 var VersionedTemplate = map[string]map[string]string{
 	"calico": map[string]string{
+		"v1.14":   CalicoTemplateV113,
 		"v1.13":   CalicoTemplateV113,
 		"default": CalicoTemplateV112,
 	},
 	"canal": map[string]string{
+		"v1.14":   CanalTemplateV113,
 		"v1.13":   CanalTemplateV113,
 		"default": CanalTemplateV112,
 	},

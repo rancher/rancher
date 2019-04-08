@@ -276,7 +276,7 @@ func getLocalConfigAddress(localConfigPath string) (string, error) {
 
 func getLocalAdminConfigWithNewAddress(localConfigPath, cpAddress string, clusterName string) string {
 	config, _ := clientcmd.BuildConfigFromFlags("", localConfigPath)
-	if config == nil {
+	if config == nil || config.BearerToken != "" {
 		return ""
 	}
 	config.Host = fmt.Sprintf("https://%s:6443", cpAddress)
