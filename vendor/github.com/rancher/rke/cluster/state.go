@@ -182,7 +182,7 @@ func RebuildState(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConf
 				return nil, err
 			}
 		}
-		if err := pki.GenerateRKEServicesCerts(ctx, pkiCertBundle, *rkeConfig, flags.ClusterFilePath, flags.ConfigDir, false); err != nil {
+		if err := pki.GenerateRKEServicesCerts(ctx, pkiCertBundle, *rkeConfig, flags.ClusterFilePath, flags.ConfigDir, false, false); err != nil {
 			return nil, err
 		}
 		newState.DesiredState.CertificatesBundle = pkiCertBundle
