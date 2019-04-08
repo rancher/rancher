@@ -184,9 +184,11 @@ type LoggingSystemImages struct {
 type ClusterTestInput struct {
 	ClusterName string `json:"clusterId" norman:"required,type=reference[cluster]"`
 	LoggingTargets
+	OutputTags map[string]string `json:"outputTags,omitempty"`
 }
 
 type ProjectTestInput struct {
 	ProjectName string `json:"projectId" norman:"required,type=reference[project]"`
 	LoggingTargets
+	OutputTags map[string]string `json:"outputTags,omitempty"`
 }
