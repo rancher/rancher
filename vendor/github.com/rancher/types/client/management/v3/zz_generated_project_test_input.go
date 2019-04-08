@@ -6,6 +6,7 @@ const (
 	ProjectTestInputFieldElasticsearchConfig   = "elasticsearchConfig"
 	ProjectTestInputFieldFluentForwarderConfig = "fluentForwarderConfig"
 	ProjectTestInputFieldKafkaConfig           = "kafkaConfig"
+	ProjectTestInputFieldOutputTags            = "outputTags"
 	ProjectTestInputFieldProjectName           = "projectId"
 	ProjectTestInputFieldSplunkConfig          = "splunkConfig"
 	ProjectTestInputFieldSyslogConfig          = "syslogConfig"
@@ -16,6 +17,7 @@ type ProjectTestInput struct {
 	ElasticsearchConfig   *ElasticsearchConfig   `json:"elasticsearchConfig,omitempty" yaml:"elasticsearchConfig,omitempty"`
 	FluentForwarderConfig *FluentForwarderConfig `json:"fluentForwarderConfig,omitempty" yaml:"fluentForwarderConfig,omitempty"`
 	KafkaConfig           *KafkaConfig           `json:"kafkaConfig,omitempty" yaml:"kafkaConfig,omitempty"`
+	OutputTags            map[string]string      `json:"outputTags,omitempty" yaml:"outputTags,omitempty"`
 	ProjectName           string                 `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	SplunkConfig          *SplunkConfig          `json:"splunkConfig,omitempty" yaml:"splunkConfig,omitempty"`
 	SyslogConfig          *SyslogConfig          `json:"syslogConfig,omitempty" yaml:"syslogConfig,omitempty"`
