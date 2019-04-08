@@ -150,7 +150,6 @@ func (c *Cluster) BuildKubeAPIProcess(host *hosts.Host, prefixPath string) v3.Pr
 		"requestheader-extra-headers-prefix": "X-Remote-Extra-",
 		"requestheader-group-headers":        "X-Remote-Group",
 		"requestheader-username-headers":     "X-Remote-User",
-		"repair-malformed-updates":           "false",
 		"secure-port":                        "6443",
 		"service-account-key-file":           pki.GetKeyPath(pki.ServiceAccountTokenKeyName),
 		"service-account-lookup":             "true",

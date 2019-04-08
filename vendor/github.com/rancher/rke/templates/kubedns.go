@@ -60,7 +60,7 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["nodes"]
-    verbs: ["list"]
+    verbs: ["list", "watch"]
   - apiGroups: [""]
     resources: ["replicationcontrollers/scale"]
     verbs: ["get", "update"]

@@ -102,6 +102,7 @@ spec:
       serviceAccountName: coredns
 {{- end }}
       nodeSelector:
+        beta.kubernetes.io/os: linux
       {{ range $k, $v := .NodeSelector }}
         {{ $k }}: {{ $v }}
       {{ end }}
@@ -197,6 +198,8 @@ spec:
         k8s-app: coredns-autoscaler
     spec:
       serviceAccountName: coredns-autoscaler
+      nodeSelector:
+        beta.kubernetes.io/os: linux
       containers:
       - name: autoscaler
         image: {{.CoreDNSAutoScalerImage}}
@@ -232,7 +235,7 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["nodes"]
-    verbs: ["list"]
+    verbs: ["list", "watch"]
   - apiGroups: [""]
     resources: ["replicationcontrollers/scale"]
     verbs: ["get", "update"]
