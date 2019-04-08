@@ -1,0 +1,7 @@
+vendor/
+.idea/
+*.iml
+tmp/
+bin/
+pkg/
+config-reloader

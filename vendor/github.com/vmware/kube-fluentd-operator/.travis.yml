@@ -1,0 +1,21 @@
+language: go
+install: false
+
+go:
+- "1.10"
+
+before_script:
+- wget https://storage.googleapis.com/kubernetes-helm/helm-v2.8.2-linux-amd64.tar.gz -O /tmp/helm-v2.8.2-linux-amd64.tar.gz
+- mkdir /tmp/bin -p; tar xzf /tmp/helm-v2.8.2-linux-amd64.tar.gz -C /tmp/bin --strip-components=1
+- PATH=$PATH:/tmp/bin helm init --client-only 
+
+
+services:
+- docker
+
+
+script:
+  - cd base-image && make
+  - cd ../config-reloader && make build-image
+  - cd ../log-router
+  - PATH=$PATH:/tmp/bin make helm-package
