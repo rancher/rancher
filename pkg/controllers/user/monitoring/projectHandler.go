@@ -41,7 +41,7 @@ func (ph *projectHandler) sync(key string, project *mgmtv3.Project) (runtime.Obj
 	src := project
 	cpy := src.DeepCopy()
 
-	err = ph.doSync(cpy, clusterName)
+	err = ph.doRevertSync(cpy, clusterName)
 	if !reflect.DeepEqual(cpy, src) {
 		updated, updateErr := ph.cattleProjectClient.Update(cpy)
 		if updateErr != nil {
@@ -56,6 +56,50 @@ func (ph *projectHandler) sync(key string, project *mgmtv3.Project) (runtime.Obj
 	}
 
 	return cpy, err
+}
+
+// doRevertSync reverts all previous enabling Project Monitoring
+func (ph *projectHandler) doRevertSync(project *mgmtv3.Project, clusterName string) error {
+	if !mgmtv3.NamespaceBackedResource.IsTrue(project) && !mgmtv3.ProjectConditionInitialRolesPopulated.IsTrue(project) {
+		return nil
+	}
+
+	// drop metrics expressions from management cluster
+	if !mgmtv3.ProjectConditionMetricExpressionDeployed.IsFalse(project) {
+		for _, graph := range preDefinedProjectGraph {
+			err := ph.app.cattleProjectGraphClient.DeleteNamespaced(project.Name, graph.Name, &metav1.DeleteOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				return errors.Wrap(err, "failed to withdraw metric expression")
+			}
+		}
+
+		mgmtv3.ProjectConditionMetricExpressionDeployed.False(project)
+		mgmtv3.ProjectConditionMetricExpressionDeployed.Message(project, "")
+	}
+
+	// drop project monitoring from user cluster
+	if project.Spec.EnableProjectMonitoring {
+		project.Spec.EnableProjectMonitoring = false
+	} else if enabledStatus := mgmtv3.ProjectConditionMonitoringEnabled.GetStatus(project); enabledStatus != "" && enabledStatus != "False" {
+		appName, appTargetNamespace := monitoring.ProjectMonitoringInfo(project.Name)
+
+		if err := ph.app.withdrawApp(project.Spec.ClusterName, appName, appTargetNamespace); err != nil {
+			mgmtv3.ProjectConditionMonitoringEnabled.Unknown(project)
+			mgmtv3.ProjectConditionMonitoringEnabled.Message(project, err.Error())
+			return errors.Wrap(err, "failed to withdraw monitoring")
+		}
+
+		if err := ph.detectAppComponentsWhileUninstall(appName, appTargetNamespace, project); err != nil {
+			mgmtv3.ProjectConditionMonitoringEnabled.Unknown(project)
+			mgmtv3.ProjectConditionMonitoringEnabled.Message(project, err.Error())
+			return errors.Wrap(err, "failed to detect the uninstallation status of monitoring components")
+		}
+
+		mgmtv3.ProjectConditionMonitoringEnabled.False(project)
+		mgmtv3.ProjectConditionMonitoringEnabled.Message(project, "")
+	}
+
+	return nil
 }
 
 func (ph *projectHandler) doSync(project *mgmtv3.Project, clusterName string) error {
