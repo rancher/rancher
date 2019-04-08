@@ -73,7 +73,7 @@ func getIndex(dateFormat, prefix string) string {
 	return index
 }
 
-func getDateFormat(dateformat string) string {
+func GetDateFormat(dateformat string) string {
 	ToRealMap := map[string]string{
 		"YYYY-MM-DD": "%Y-%m-%d",
 		"YYYY-MM":    "%Y-%m",
