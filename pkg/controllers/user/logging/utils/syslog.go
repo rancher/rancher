@@ -92,7 +92,7 @@ func newRFC5424Message(severityStr, app, token, msg string) []byte {
 	))
 }
 
-func getWrapSeverity(severity string) string {
+func GetWrapSeverity(severity string) string {
 	// for adapt api and fluentd config
 	severityMap := map[string]string{
 		"warning": "warn",

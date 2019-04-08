@@ -1,11 +1,13 @@
-package utils
+package generator
 
 import (
+	"fmt"
 	"net"
 	"net/url"
 	"strings"
 
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
+	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 
 	"github.com/pkg/errors"
@@ -22,23 +24,37 @@ type LoggingTargetTemplateWrap struct {
 }
 
 type ClusterLoggingTemplateWrap struct {
+	ExcludeNamespace string
+
 	v3.LoggingCommonField
 	LoggingTargetTemplateWrap
-	ExcludeNamespace       string
-	IncludeSystemComponent bool
+	IncludeRke              bool
+	CertFilePrefix          string
+	BufferFile              string
+	ContainerLogSourceTag   string
+	CustomLogSourceTag      string
+	ContainerLogPosFilename string
+	RkeLogTag               string
+	RkeLogPosFilename       string
 }
 
 type ProjectLoggingTemplateWrap struct {
-	ProjectName string
+	GrepNamespace string
+
 	v3.LoggingCommonField
 	LoggingTargetTemplateWrap
-	GrepNamespace   string
-	IsSystemProject bool
-	WrapProjectName string
+	IncludeRke              bool
+	CertFilePrefix          string
+	BufferFile              string
+	ContainerLogSourceTag   string
+	CustomLogSourceTag      string
+	ContainerLogPosFilename string
+	RkeLogTag               string
+	RkeLogPosFilename       string
 }
 
-func NewWrapClusterLogging(logging v3.ClusterLoggingSpec, excludeNamespace string) (*ClusterLoggingTemplateWrap, error) {
-	wrap, err := newLoggingTargetTemplateWrap(logging.ElasticsearchConfig, logging.SplunkConfig, logging.SyslogConfig, logging.KafkaConfig, logging.FluentForwarderConfig, logging.CustomTargetConfig)
+func newWrapClusterLogging(logging v3.ClusterLoggingSpec, excludeNamespace, certDir string) (*ClusterLoggingTemplateWrap, error) {
+	wrap, err := NewLoggingTargetTemplateWrap(logging.LoggingTargets)
 	if err != nil {
 		return nil, errors.Wrapf(err, "wrapper logging target failed")
 	}
@@ -52,16 +68,28 @@ func NewWrapClusterLogging(logging v3.ClusterLoggingSpec, excludeNamespace strin
 		includeSystemComponent = *logging.IncludeSystemComponent
 	}
 
+	level := "cluster"
+	certFilePrefix := getCertFilePrefix(certDir, level, logging.ClusterName)
+	bufferFile := getBufferFilename(level, "")
+	customLogSourceTag := getCustomLogSourceTag(level, "")
+	containerLogPosFilename := getContainerLogPosFilename(level, "")
 	return &ClusterLoggingTemplateWrap{
+		ExcludeNamespace:          excludeNamespace,
 		LoggingCommonField:        logging.LoggingCommonField,
 		LoggingTargetTemplateWrap: *wrap,
-		ExcludeNamespace:          excludeNamespace,
-		IncludeSystemComponent:    includeSystemComponent,
+		IncludeRke:                includeSystemComponent,
+		CertFilePrefix:            certFilePrefix,
+		BufferFile:                bufferFile,
+		ContainerLogSourceTag:     level,
+		CustomLogSourceTag:        customLogSourceTag,
+		ContainerLogPosFilename:   containerLogPosFilename,
+		RkeLogTag:                 "rke",
+		RkeLogPosFilename:         "fluentd-rke-logging.pos",
 	}, nil
 }
 
-func NewWrapProjectLogging(logging v3.ProjectLoggingSpec, grepNamespace string, isSystemProject bool) (*ProjectLoggingTemplateWrap, error) {
-	wrap, err := newLoggingTargetTemplateWrap(logging.ElasticsearchConfig, logging.SplunkConfig, logging.SyslogConfig, logging.KafkaConfig, logging.FluentForwarderConfig, logging.CustomTargetConfig)
+func newWrapProjectLogging(logging v3.ProjectLoggingSpec, grepNamespace, certDir string, isSystemProject bool) (*ProjectLoggingTemplateWrap, error) {
+	wrap, err := NewLoggingTargetTemplateWrap(logging.LoggingTargets)
 	if err != nil {
 		return nil, errors.Wrapf(err, "wrapper logging target failed")
 	}
@@ -70,14 +98,25 @@ func NewWrapProjectLogging(logging v3.ProjectLoggingSpec, grepNamespace string, 
 		return nil, nil
 	}
 
+	level := "project"
 	wrapProjectName := strings.Replace(logging.ProjectName, ":", "_", -1)
+	certFilePrefix := getCertFilePrefix(certDir, level, wrapProjectName)
+	bufferFile := getBufferFilename(level, wrapProjectName)
+	customLogSourceTag := getCustomLogSourceTag(level, logging.ProjectName)
+	containerLogPosFilename := getContainerLogPosFilename(level, logging.ProjectName)
+
 	return &ProjectLoggingTemplateWrap{
-		ProjectName:               logging.ProjectName,
+		GrepNamespace:             grepNamespace,
 		LoggingCommonField:        logging.LoggingCommonField,
 		LoggingTargetTemplateWrap: *wrap,
-		GrepNamespace:             grepNamespace,
-		IsSystemProject:           isSystemProject,
-		WrapProjectName:           wrapProjectName,
+		IncludeRke:                isSystemProject,
+		CertFilePrefix:            certFilePrefix,
+		BufferFile:                bufferFile,
+		ContainerLogSourceTag:     logging.ProjectName,
+		CustomLogSourceTag:        customLogSourceTag,
+		ContainerLogPosFilename:   containerLogPosFilename,
+		RkeLogTag:                 "rke-system-project",
+		RkeLogPosFilename:         "fluentd-rke-logging-system-project.pos",
 	}, nil
 }
 
@@ -125,11 +164,11 @@ type CustomTargetWrap struct {
 	v3.CustomTargetConfig
 }
 
-func newLoggingTargetTemplateWrap(es *v3.ElasticsearchConfig, sp *v3.SplunkConfig, sl *v3.SyslogConfig, kf *v3.KafkaConfig, ff *v3.FluentForwarderConfig, cc *v3.CustomTargetConfig) (wrapLogging *LoggingTargetTemplateWrap, err error) {
+func NewLoggingTargetTemplateWrap(loggingTagets v3.LoggingTargets) (wrapLogging *LoggingTargetTemplateWrap, err error) {
 	wp := &LoggingTargetTemplateWrap{}
-	if es != nil {
+	if loggingTagets.ElasticsearchConfig != nil {
 
-		wrap, err := newElasticsearchTemplateWrap(es)
+		wrap, err := newElasticsearchTemplateWrap(loggingTagets.ElasticsearchConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -137,9 +176,9 @@ func newLoggingTargetTemplateWrap(es *v3.ElasticsearchConfig, sp *v3.SplunkConfi
 		wp.CurrentTarget = loggingconfig.Elasticsearch
 		return wp, nil
 
-	} else if sp != nil {
+	} else if loggingTagets.SplunkConfig != nil {
 
-		wrap, err := newSplunkTemplateWrap(sp)
+		wrap, err := newSplunkTemplateWrap(loggingTagets.SplunkConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -147,9 +186,9 @@ func newLoggingTargetTemplateWrap(es *v3.ElasticsearchConfig, sp *v3.SplunkConfi
 		wp.CurrentTarget = loggingconfig.Splunk
 		return wp, nil
 
-	} else if sl != nil {
+	} else if loggingTagets.SyslogConfig != nil {
 
-		wrap, err := newSyslogTemplateWrap(sl)
+		wrap, err := newSyslogTemplateWrap(loggingTagets.SyslogConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -157,9 +196,9 @@ func newLoggingTargetTemplateWrap(es *v3.ElasticsearchConfig, sp *v3.SplunkConfi
 		wp.CurrentTarget = loggingconfig.Syslog
 		return wp, nil
 
-	} else if kf != nil {
+	} else if loggingTagets.KafkaConfig != nil {
 
-		wrap, err := newKafkaTemplateWrap(kf)
+		wrap, err := newKafkaTemplateWrap(loggingTagets.KafkaConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -167,9 +206,9 @@ func newLoggingTargetTemplateWrap(es *v3.ElasticsearchConfig, sp *v3.SplunkConfi
 		wp.CurrentTarget = loggingconfig.Kafka
 		return wp, nil
 
-	} else if ff != nil {
+	} else if loggingTagets.FluentForwarderConfig != nil {
 
-		wrap, err := newFluentForwarderTemplateWrap(ff)
+		wrap, err := newFluentForwarderTemplateWrap(loggingTagets.FluentForwarderConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -177,9 +216,9 @@ func newLoggingTargetTemplateWrap(es *v3.ElasticsearchConfig, sp *v3.SplunkConfi
 		wp.CurrentTarget = loggingconfig.FluentForwarder
 		return wp, nil
 
-	} else if cc != nil {
+	} else if loggingTagets.CustomTargetConfig != nil {
 
-		wrap := CustomTargetWrap{*cc}
+		wrap := CustomTargetWrap{*loggingTagets.CustomTargetConfig}
 		wp.CustomTargetWrap = wrap
 		wp.CurrentTarget = loggingconfig.CustomTarget
 		return wp, nil
@@ -197,7 +236,7 @@ func newElasticsearchTemplateWrap(elasticsearchConfig *v3.ElasticsearchConfig) (
 		ElasticsearchConfig: *elasticsearchConfig,
 		Host:                h,
 		Scheme:              s,
-		DateFormat:          getDateFormat(elasticsearchConfig.DateFormat),
+		DateFormat:          utils.GetDateFormat(elasticsearchConfig.DateFormat),
 	}, nil
 }
 
@@ -229,7 +268,7 @@ func newSyslogTemplateWrap(syslogConfig *v3.SyslogConfig) (*SyslogTemplateWrap, 
 		SyslogConfig: *syslogConfig,
 		Host:         host,
 		Port:         port,
-		WrapSeverity: getWrapSeverity(syslogConfig.Severity),
+		WrapSeverity: utils.GetWrapSeverity(syslogConfig.Severity),
 	}, nil
 }
 
@@ -303,4 +342,29 @@ func parseEndpoint(endpoint string) (host string, scheme string, err error) {
 	}
 
 	return u.Host, u.Scheme, nil
+}
+
+func getCertFilePrefix(certDir, level, identy string) string {
+	return fmt.Sprintf("%s/%s_%s", certDir, level, identy)
+}
+
+func getBufferFilename(level, identify string) string {
+	if identify != "" {
+		return fmt.Sprintf("%s.%s.buffer", level, identify)
+	}
+	return fmt.Sprintf("%s.buffer", level)
+}
+
+func getCustomLogSourceTag(level, identify string) string {
+	if identify != "" {
+		return fmt.Sprintf("%s-custom.%s", level, identify)
+	}
+	return fmt.Sprintf("%s-custom", level)
+}
+
+func getContainerLogPosFilename(level, identify string) string {
+	if identify != "" {
+		return fmt.Sprintf("fluentd-%s-%s-logging.pos", level, identify)
+	}
+	return fmt.Sprintf("fluentd-%s-logging.pos", level)
 }
