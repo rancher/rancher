@@ -1,59 +1,92 @@
 ---
-pipeline:
-  build:
-    privileged: true
-    image: rancher/dapper:1.11.2
-    volumes:
-    - /var/run/docker.sock:/var/run/docker.sock
-    commands:
-    - dapper ci
+kind: pipeline
+name: default
 
-  build-all-binaries:
-    privileged: true
-    image: rancher/dapper:1.11.2
-    volumes:
-    - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-    - CROSS=1
-    commands:
-    - dapper build
-    when:
-      branch: [ master, release/* ]
-      event: tag
+platform:
+  os: linux
+  arch: amd64
 
-  stage-binaries:
-    image: rancher/dapper:1.11.2
-    commands:
-    - cp -r ./bin/* ./package/
-    when:
-      branch: [ master, release/* ]
-      event: tag
+steps:
+- name: ci
+  pull: default
+  image: rancher/dapper:1.11.2
+  commands:
+  - dapper ci
+  privileged: true
+  volumes:
+  - name: socket
+    path: /var/run/docker.sock
 
-  github_binary_prerelease:
-    image: plugins/github-release
+- name: build-all-binaries
+  pull: default
+  image: rancher/dapper:1.11.2
+  commands:
+  - dapper build
+  environment:
+    CROSS: 1
+  privileged: true
+  volumes:
+  - name: socket
+    path: /var/run/docker.sock
+  when:
+    event:
+    - tag
+    ref:
+      include:
+      - "refs/tags/*"
+
+- name: stage-binaries
+  pull: default
+  image: rancher/dapper:1.11.2
+  commands:
+  - "cp -r ./bin/* ./package/"
+  when:
+    event:
+    - tag
+    ref:
+      include:
+      - "refs/tags/*"
+
+- name: github_binary_prerelease
+  pull: default
+  image: plugins/github-release
+  settings:
+    api_key:
+      from_secret: github_token
+    checksum:
+    - sha256
+    files:
+    - "build/bin/rke_*"
+    - "dist/artifacts/${DRONE_TAG}/*"
     prerelease: true
-    files:
-     - build/bin/rke_*
-     - dist/artifacts/${DRONE_TAG}/*
-    checksum:
-     - sha256
-    secrets: [github_token]
-    when:
-      branch: [ master, release/* ]
-      event: tag
-      ref:
-        include: [ refs/tags/*rc* ]
+  when:
+    event:
+    - tag
+    ref:
+      include:
+      - "refs/tags/*rc*"
+      - "refs/tags/*alpha*"
 
-  github_binary_release:
-    image: plugins/github-release
-    files:
-     - build/bin/rke_*
-     - dist/artifacts/${DRONE_TAG}/*
+- name: github_binary_release
+  pull: default
+  image: plugins/github-release
+  settings:
     checksum:
-     - sha256
-    secrets: [github_token]
-    when:
-      branch: [ master, release/* ]
-      event: tag
-      ref:
-        exclude: [ refs/tags/*rc* ]
+    - sha256
+    files:
+    - "build/bin/rke_*"
+    - "dist/artifacts/${DRONE_TAG}/*"
+    api_key:
+      from_secret: github_token
+  when:
+    event:
+    - tag
+    ref:
+      exclude:
+      - "refs/tags/*rc*"
+      - "refs/tags/*alpha*"
+
+volumes:
+- name: socket
+  host:
+    path: /var/run/docker.sock

@@ -62,6 +62,7 @@ type ExternalFlags struct {
 	GenerateCSR      bool
 	Local            bool
 	UpdateOnly       bool
+	Legacy           bool
 }
 
 func setDefaultIfEmptyMapValue(configMap map[string]string, key string, value string) {
