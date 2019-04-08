@@ -566,6 +566,13 @@ func Pipeline(schemas *types.Schemas, management *config.ScaledContext, clusterM
 
 func Project(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.ProjectType)
+
+	// delete monitoring resource action
+	delete(schema.ResourceActions, "disableMonitoring")
+	delete(schema.ResourceActions, "editMonitoring")
+	delete(schema.ResourceActions, "enableMonitoring")
+	delete(schema.ResourceActions, "viewMonitoring")
+
 	schema.Formatter = projectaction.Formatter
 	handler := &projectaction.Handler{
 		Projects:       management.Management.Projects(""),
