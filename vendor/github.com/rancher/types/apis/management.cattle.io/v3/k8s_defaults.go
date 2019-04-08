@@ -30,7 +30,7 @@ var (
 		// different k8s version tag
 		"v1.12.7-rancher1-2",
 		"v1.13.5-rancher1-2",
-		"v1.14.0-rancher1-1",
+		"v1.14.1-rancher1-1",
 	}
 
 	// K8sVersionToRKESystemImages is dynamically populated on init() with the latest versions
@@ -1001,9 +1001,9 @@ var (
 			CoreDNS:                   m("coredns/coredns:1.2.6"),
 			CoreDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler:1.0.0"),
 		},
-		"v1.14.0-rancher1-1": {
+		"v1.14.1-rancher1-1": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.3.10-rancher1"),
-			Kubernetes:                m("rancher/hyperkube:v1.14.0-rancher1"),
+			Kubernetes:                m("rancher/hyperkube:v1.14.1-rancher1"),
 			Alpine:                    m("rancher/rke-tools:v0.1.28"),
 			NginxProxy:                m("rancher/rke-tools:v0.1.28"),
 			CertDownloader:            m("rancher/rke-tools:v0.1.28"),
