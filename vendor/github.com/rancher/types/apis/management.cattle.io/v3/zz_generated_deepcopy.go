@@ -1898,6 +1898,13 @@ func (in *ClusterStatus) DeepCopy() *ClusterStatus {
 func (in *ClusterTestInput) DeepCopyInto(out *ClusterTestInput) {
 	*out = *in
 	in.LoggingTargets.DeepCopyInto(&out.LoggingTargets)
+	if in.OutputTags != nil {
+		in, out := &in.OutputTags, &out.OutputTags
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 
@@ -6782,6 +6789,13 @@ func (in *ProjectStatus) DeepCopy() *ProjectStatus {
 func (in *ProjectTestInput) DeepCopyInto(out *ProjectTestInput) {
 	*out = *in
 	in.LoggingTargets.DeepCopyInto(&out.LoggingTargets)
+	if in.OutputTags != nil {
+		in, out := &in.OutputTags, &out.OutputTags
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 
