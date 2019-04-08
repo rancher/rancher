@@ -2,10 +2,9 @@ package pod
 
 import (
 	"fmt"
-	"time"
-
 	"strings"
 
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/values"
@@ -13,11 +12,10 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/util/cache"
 )
 
 var (
-	ownerCache = cache.NewLRUExpireCache(1000)
+	ownerCache, _ = lru.New(100000)
 )
 
 type key struct {
@@ -65,7 +63,7 @@ func getOwnerWithKind(apiContext *types.APIContext, namespace, ownerKind, name s
 	ownerCache.Add(key, value{
 		Kind: kind,
 		Name: name,
-	}, time.Hour)
+	})
 
 	return kind, name, nil
 }
@@ -112,7 +110,7 @@ func SaveOwner(apiContext *types.APIContext, kind, name string, data map[string]
 	ownerCache.Add(key, value{
 		Kind: parentKind,
 		Name: parentName,
-	}, time.Hour)
+	})
 }
 
 func resolveWorkloadID(apiContext *types.APIContext, data map[string]interface{}) string {
