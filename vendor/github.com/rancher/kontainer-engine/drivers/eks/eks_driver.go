@@ -494,7 +494,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		stack, err := d.createStack(svc, getVPCStackName(state.DisplayName), displayName, vpcTemplate, []string{},
 			[]*cloudformation.Parameter{})
 		if err != nil {
-			return info, fmt.Errorf("error creating stack: %v", err)
+			return info, fmt.Errorf("error creating stack with VPC template: %v", err)
 		}
 
 		securityGroupsString := getParameterValueFromOutput("SecurityGroups", stack.Stacks[0].Outputs)
@@ -534,7 +534,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 		stack, err := d.createStack(svc, getServiceRoleName(state.DisplayName), displayName, serviceRoleTemplate,
 			[]string{cloudformation.CapabilityCapabilityIam}, nil)
 		if err != nil {
-			return info, fmt.Errorf("error creating stack: %v", err)
+			return info, fmt.Errorf("error creating stack with service role template: %v", err)
 		}
 
 		roleARN = getParameterValueFromOutput("RoleArn", stack.Stacks[0].Outputs)
@@ -587,7 +587,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 	keyPairName := state.KeyPairName
 
 	if keyPairName == "" {
-		keyPairName := getEC2KeyPairName(state.DisplayName)
+		keyPairName = getEC2KeyPairName(state.DisplayName)
 		_, err = ec2svc.CreateKeyPair(&ec2.CreateKeyPairInput{
 			KeyName: aws.String(keyPairName),
 		})
@@ -652,7 +652,7 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 			{ParameterKey: aws.String("PublicIp"), ParameterValue: aws.String(strconv.FormatBool(publicIP))},
 		})
 	if err != nil {
-		return info, fmt.Errorf("error creating stack: %v", err)
+		return info, fmt.Errorf("error creating stack with worker nodes template: %v", err)
 	}
 
 	nodeInstanceRole := getParameterValueFromOutput("NodeInstanceRole", stack.Stacks[0].Outputs)
