@@ -23,7 +23,6 @@ const (
 
 const (
 	cattleNamespaceName                    = "cattle-prometheus"
-	cattleCreatorIDAnnotationKey           = "field.cattle.io/creatorId"
 	cattleOverwriteAppAnswersAnnotationKey = "field.cattle.io/overwriteAppAnswers"
 )
 
@@ -70,18 +69,6 @@ func OwnedAppListOptions(clusterID, appName, appTargetNamespace string) metav1.L
 	return metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s, %s=%s, %s=%s", appClusterIDLabelKey, clusterID, appNameLabelKey, appName, appTargetNamespaceLabelKey, appTargetNamespace),
 	}
-}
-
-func CopyCreatorID(toAnnotations, fromAnnotations map[string]string) map[string]string {
-	if val, exist := fromAnnotations[cattleCreatorIDAnnotationKey]; exist {
-		if toAnnotations == nil {
-			toAnnotations = make(map[string]string, 2)
-		}
-
-		toAnnotations[cattleCreatorIDAnnotationKey] = val
-	}
-
-	return toAnnotations
 }
 
 func AppendAppOverwritingAnswers(toAnnotations map[string]string, appOverwriteAnswers string) map[string]string {

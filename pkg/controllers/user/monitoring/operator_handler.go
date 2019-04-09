@@ -164,15 +164,14 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 	}
 
 	appAnswers := map[string]string{
-		"enabled":      "true",
-		"apiGroup":     monitoring.APIVersion.Group,
-		"nameOverride": "prometheus-operator",
+		"operator.enabled":      "true",
+		"operator.apiGroup":     monitoring.APIVersion.Group,
+		"operator.nameOverride": "prometheus-operator",
 	}
-	annotations := monitoring.CopyCreatorID(nil, cluster.Annotations)
-	annotations["cluster.cattle.io/addon"] = appName
+
 	targetApp := &projectv3.App{
 		ObjectMeta: metav1.ObjectMeta{
-			Annotations: annotations,
+			Annotations: map[string]string{"cluster.cattle.io/addon": appName},
 			Labels:      monitoring.OwnedLabels(appName, appTargetNamespace, appProjectName, monitoring.SystemLevel),
 			Name:        appName,
 			Namespace:   appDeployProjectID,

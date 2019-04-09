@@ -131,7 +131,7 @@ func (ch *clusterHandler) doSync(cluster *mgmtv3.Cluster) error {
 
 		mgmtv3.ClusterConditionMonitoringEnabled.True(cluster)
 		mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, "")
-	} else if cluster.Status.MonitoringStatus != nil {
+	} else if enabledStatus := mgmtv3.ClusterConditionMonitoringEnabled.GetStatus(cluster); enabledStatus != "" && enabledStatus != "False" {
 		if err := ch.app.withdrawApp(cluster.Name, appName, appTargetNamespace); err != nil {
 			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
 			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
@@ -276,7 +276,7 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 	}
 
 	mustAppAnswers := map[string]string{
-		"enabled": "false",
+		"operator.enabled": "false",
 
 		"exporter-coredns.enabled":  "false",
 		"exporter-coredns.apiGroup": monitoring.APIVersion.Group,
@@ -365,10 +365,9 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 	appCatalogID := settings.SystemMonitoringCatalogID.Get()
 	app := &v3.App{
 		ObjectMeta: metav1.ObjectMeta{
-			Annotations: monitoring.CopyCreatorID(nil, cluster.Annotations),
-			Labels:      monitoring.OwnedLabels(appName, appTargetNamespace, appProjectName, monitoring.ClusterLevel),
-			Name:        appName,
-			Namespace:   appDeployProjectID,
+			Labels:    monitoring.OwnedLabels(appName, appTargetNamespace, appProjectName, monitoring.ClusterLevel),
+			Name:      appName,
+			Namespace: appDeployProjectID,
 		},
 		Spec: v3.AppSpec{
 			Answers:         appAnswers,

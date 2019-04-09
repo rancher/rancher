@@ -104,7 +104,7 @@ func (ph *projectHandler) doSync(project *mgmtv3.Project, clusterName string) er
 
 		mgmtv3.ProjectConditionMonitoringEnabled.True(project)
 		mgmtv3.ProjectConditionMonitoringEnabled.Message(project, "")
-	} else if project.Status.MonitoringStatus != nil {
+	} else if enabledStatus := mgmtv3.ProjectConditionMonitoringEnabled.GetStatus(project); enabledStatus != "" && enabledStatus != "False" {
 		if err := ph.app.withdrawApp(project.Spec.ClusterName, appName, appTargetNamespace); err != nil {
 			mgmtv3.ProjectConditionMonitoringEnabled.Unknown(project)
 			mgmtv3.ProjectConditionMonitoringEnabled.Message(project, err.Error())
@@ -147,7 +147,7 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 	}
 
 	mustAppAnswers := map[string]string{
-		"enabled": "false",
+		"operator.enabled": "false",
 
 		"exporter-coredns.enabled": "false",
 
@@ -167,17 +167,14 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 
 		"exporter-fluentd.enabled": "false",
 
-		"grafana.enabled":            "true",
-		"grafana.level":              "project",
-		"grafana.apiGroup":           monitoring.APIVersion.Group,
-		"grafana.serviceAccountName": appName,
+		"grafana.enabled":  "true",
+		"grafana.level":    "project",
+		"grafana.apiGroup": monitoring.APIVersion.Group,
 
-		"prometheus.enabled":                          "true",
-		"prometheus.externalLabels.prometheus_from":   clusterName,
-		"prometheus.level":                            "project",
-		"prometheus.apiGroup":                         monitoring.APIVersion.Group,
-		"prometheus.serviceAccountNameOverride":       appName,
-		"prometheus.additionalBindingClusterRoles[0]": fmt.Sprintf("%s-namespaces-readonly", appDeployProjectID),
+		"prometheus.enabled":                        "true",
+		"prometheus.externalLabels.prometheus_from": clusterName,
+		"prometheus.level":                          "project",
+		"prometheus.apiGroup":                       monitoring.APIVersion.Group,
 		"prometheus.additionalAlertManagerConfigs[0].static_configs[0].targets[0]":          fmt.Sprintf("%s.%s:%s", clusterAlertManagerSvcName, clusterAlertManagerSvcNamespaces, clusterAlertManagerPort),
 		"prometheus.additionalAlertManagerConfigs[0].static_configs[0].labels.level":        "project",
 		"prometheus.additionalAlertManagerConfigs[0].static_configs[0].labels.project_id":   project.Name,
@@ -214,7 +211,7 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 	appCatalogID := settings.SystemMonitoringCatalogID.Get()
 	app := &v3.App{
 		ObjectMeta: metav1.ObjectMeta{
-			Annotations: monitoring.CopyCreatorID(nil, project.Annotations),
+			Annotations: map[string]string{"field.cattle.io/injectAccount": "project-monitoring-view"},
 			Labels:      monitoring.OwnedLabels(appName, appTargetNamespace, appProjectName, monitoring.ProjectLevel),
 			Name:        appName,
 			Namespace:   appDeployProjectID,
