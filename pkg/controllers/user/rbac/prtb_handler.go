@@ -5,12 +5,16 @@ import (
 	"reflect"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
+	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -81,7 +85,7 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 		}
 	}
 
-	return p.reconcileProjectAccessToGlobalResources(binding, roles)
+	return p.m.reconcileProjectAccessToGlobalResources(binding, roles)
 }
 
 func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding) error {
@@ -109,15 +113,14 @@ func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding)
 		}
 	}
 
-	return p.reconcileProjectAccessToGlobalResourcesForDelete(binding)
+	return p.m.reconcileProjectAccessToGlobalResourcesForDelete(binding)
 }
 
-func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRoleTemplateBinding, rts map[string]*v3.RoleTemplate) error {
+func (m *manager) reconcileProjectAccessToGlobalResources(binding interface{}, rts map[string]*v3.RoleTemplate) error {
 	var role string
 	var createNSPerms bool
 	var roles []string
-	if parts := strings.SplitN(binding.ProjectName, ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
-		projectName := parts[1]
+	if projectName := getProjectName(binding); projectName != "" {
 		var roleVerb, roleSuffix string
 		for _, r := range rts {
 			for _, rule := range r.Rules {
@@ -140,12 +143,12 @@ func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.Proj
 
 		for _, rt := range rts {
 			for _, resource := range globalResourcesNeededInProjects {
-				verbs, err := p.m.checkForGlobalResourceRules(rt, resource)
+				verbs, err := m.checkForGlobalResourceRules(rt, resource)
 				if err != nil {
 					return err
 				}
 				if len(verbs) > 0 {
-					roleName, err := p.m.reconcileRoleForProjectAccessToGlobalResource(resource, rt, verbs)
+					roleName, err := m.reconcileRoleForProjectAccessToGlobalResource(resource, rt, verbs)
 					if err != nil {
 						return err
 					}
@@ -159,29 +162,33 @@ func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.Proj
 		return nil
 	}
 
-	bindingCli := p.m.workload.RBAC.ClusterRoleBindings("")
+	bindingCli := m.workload.RBAC.ClusterRoleBindings("")
 
 	if createNSPerms {
 		roles = append(roles, "create-ns")
-		if nsRole, _ := p.m.crLister.Get("", "create-ns"); nsRole == nil {
-			createNSRT, err := p.m.rtLister.Get("", "create-ns")
+		if nsRole, _ := m.crLister.Get("", "create-ns"); nsRole == nil {
+			createNSRT, err := m.rtLister.Get("", "create-ns")
 			if err != nil {
 				return err
 			}
-			if err := p.m.ensureRoles(map[string]*v3.RoleTemplate{"create-ns": createNSRT}); err != nil && !apierrors.IsAlreadyExists(err) {
+			if err := m.ensureRoles(map[string]*v3.RoleTemplate{"create-ns": createNSRT}); err != nil && !apierrors.IsAlreadyExists(err) {
 				return err
 			}
 		}
 	}
 
-	rtbUID := string(binding.UID)
-	subject, err := buildSubjectFromRTB(binding)
+	meta, err := meta.Accessor(binding)
+	if err != nil {
+		return err
+	}
+	rtbUID := string(meta.GetUID())
+	subject, err := pkgrbac.BuildSubjectFromRTB(binding)
 	if err != nil {
 		return err
 	}
 	for _, role := range roles {
 		crbKey := rbRoleSubjectKey(role, subject)
-		crbs, _ := p.m.crbIndexer.ByIndex(crbByRoleAndSubjectIndex, crbKey)
+		crbs, _ := m.crbIndexer.ByIndex(crbByRoleAndSubjectIndex, crbKey)
 		if len(crbs) == 0 {
 			logrus.Infof("Creating clusterRoleBinding for project access to global resource for subject %v role %v.", subject.Name, role)
 			_, err := bindingCli.Create(&rbacv1.ClusterRoleBinding{
@@ -231,11 +238,15 @@ func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.Proj
 	return nil
 }
 
-func (p *prtbLifecycle) reconcileProjectAccessToGlobalResourcesForDelete(binding *v3.ProjectRoleTemplateBinding) error {
-	bindingCli := p.m.workload.RBAC.ClusterRoleBindings("")
-	rtbUID := string(binding.UID)
+func (m *manager) reconcileProjectAccessToGlobalResourcesForDelete(binding interface{}) error {
+	bindingCli := m.workload.RBAC.ClusterRoleBindings("")
+	meta, err := meta.Accessor(binding)
+	if err != nil {
+		return err
+	}
+	rtbUID := string(meta.GetUID())
 	set := labels.Set(map[string]string{rtbUID: owner})
-	crbs, err := p.m.crbLister.List("", set.AsSelector())
+	crbs, err := m.crbLister.List("", set.AsSelector())
 	if err != nil {
 		return err
 	}
@@ -248,7 +259,7 @@ func (p *prtbLifecycle) reconcileProjectAccessToGlobalResourcesForDelete(binding
 			}
 		}
 
-		delete, err := p.m.noRemainingOwnerLabels(crb)
+		delete, err := m.noRemainingOwnerLabels(crb)
 		if err != nil {
 			return err
 		}
@@ -289,8 +300,13 @@ func (m *manager) noRemainingOwnerLabels(crb *rbacv1.ClusterRoleBinding) (bool, 
 }
 
 func (m *manager) ownerExists(uid interface{}) (bool, error) {
-	prtbs, err := m.prtbIndexer.ByIndex(prtbByUIDIndex, convert.ToString(uid))
-	return len(prtbs) > 0, err
+	uidstr := convert.ToString(uid)
+	prtbs, err := m.prtbIndexer.ByIndex(prtbByUIDIndex, uidstr)
+	if err != nil {
+		return false, err
+	}
+	apps, err := m.appIndexer.ByIndex(appByUIDIndex, uidstr)
+	return len(prtbs) > 0 || len(apps) > 0, err
 }
 
 // If the roleTemplate has rules granting access to non-namespaced (global) resource, return the verbs for those rules
@@ -340,12 +356,12 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 			added := false
 			for i, rule := range role.Rules {
 				if slice.ContainsString(rule.Resources, resource) {
-					role.Rules[i] = buildRule(resource, newVerbs)
+					role.Rules[i] = pkgrbac.BuildRule(resource, newVerbs)
 					added = true
 				}
 			}
 			if !added {
-				role.Rules = append(role.Rules, buildRule(resource, newVerbs))
+				role.Rules = append(role.Rules, pkgrbac.BuildRule(resource, newVerbs))
 			}
 			logrus.Infof("Updating clusterRole %v for project access to global resource.", role.Name)
 			_, err := clusterRoles.Update(role)
@@ -355,7 +371,7 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 	}
 
 	logrus.Infof("Creating clusterRole %v for project access to global resource.", roleName)
-	rules := []rbacv1.PolicyRule{buildRule(resource, newVerbs)}
+	rules := []rbacv1.PolicyRule{pkgrbac.BuildRule(resource, newVerbs)}
 	_, err := clusterRoles.Create(&rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: roleName,
@@ -369,14 +385,15 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 	return roleName, nil
 }
 
-func buildRule(resource string, verbs map[string]bool) rbacv1.PolicyRule {
-	var vs []string
-	for v := range verbs {
-		vs = append(vs, v)
+func getProjectName(obj interface{}) string {
+	switch obj.(type) {
+	case *v3.ProjectRoleTemplateBinding:
+		binding := obj.(*v3.ProjectRoleTemplateBinding)
+		if parts := strings.SplitN(binding.ProjectName, ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
+			return parts[1]
+		}
+	case *projectv3.App:
+		return (obj.(*projectv3.App)).Namespace
 	}
-	return rbacv1.PolicyRule{
-		Resources: []string{resource},
-		Verbs:     vs,
-		APIGroups: []string{"*"},
-	}
+	return ""
 }

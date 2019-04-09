@@ -14,6 +14,7 @@ import (
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -87,6 +88,14 @@ func (n *nsLifecycle) Remove(obj *v1.Namespace) (runtime.Object, error) {
 }
 
 func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
+	if err := n.cleanRBFromNamespace(obj); err != nil {
+		return false, err
+	}
+
+	if err := n.ensureInjectedAppRBAddToNamespace(obj); err != nil {
+		return false, err
+	}
+
 	hasPRTBs, err := n.ensurePRTBAddToNamespace(obj)
 	if err != nil {
 		return false, err
@@ -134,23 +143,135 @@ func (n *nsLifecycle) assignToInitialProject(ns *v1.Namespace) error {
 	return nil
 }
 
-func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
+// cleanRBFromNamespace cleans all role bindings when namespace is moved
+func (n *nsLifecycle) cleanRBFromNamespace(ns *v1.Namespace) error {
 	// Get project that contain this namespace
 	projectID := ns.Annotations[projectIDAnnotation]
-	if len(projectID) == 0 {
+
+	// Clean all related role bindings if namespace is moved to none
+	if projectID == "" {
 		rbs, err := n.m.rbLister.List(ns.Name, labels.Everything())
 		if err != nil {
-			return false, errors.Wrapf(err, "couldn't list role bindings in %s", ns.Name)
+			return errors.Wrapf(err, "couldn't list role bindings in %s", ns.Name)
 		}
 		client := n.m.workload.RBAC.RoleBindings(ns.Name).ObjectClient()
 		for _, rb := range rbs {
 			if uid := convert.ToString(rb.Labels[rtbOwnerLabel]); uid != "" {
 				logrus.Infof("Deleting role binding %s in %s", rb.Name, ns.Name)
 				if err := client.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-					return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
+					return errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
 				}
 			}
 		}
+		return nil
+	}
+
+	// Clean stale role bindings
+	var projectName string
+	if parts := strings.SplitN(projectID, ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
+		projectName = parts[1]
+	} else {
+		return nil
+	}
+
+	rbs, err := n.m.rbLister.List(ns.Name, labels.Everything())
+	if err != nil {
+		return errors.Wrapf(err, "couldn't list role bindings in %s", ns.Name)
+	}
+	client := n.m.workload.RBAC.RoleBindings(ns.Name).ObjectClient()
+
+	for _, rb := range rbs {
+		if uid := convert.ToString(rb.Labels[rtbOwnerLabel]); uid != "" {
+			apps, err := n.m.appIndexer.ByIndex(appByUIDIndex, uid)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return errors.Wrapf(err, "couldn't find apps for %s", rb.Name)
+			}
+			prtbs, err := n.m.prtbIndexer.ByIndex(prtbByUIDIndex, uid)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return errors.Wrapf(err, "couldn't find prtb for %s", rb.Name)
+			}
+
+			var objs []interface{}
+			objs = append(objs, apps...)
+			objs = append(objs, prtbs...)
+
+			for _, obj := range objs {
+				var objNamespace string
+
+				if app, ok := obj.(*projectv3.App); ok {
+					if getRoleTemplateName(app) != "" {
+						objNamespace = app.Namespace
+					}
+				} else if prtb, ok := obj.(*v3.ProjectRoleTemplateBinding); ok {
+					objNamespace = prtb.Namespace
+				}
+
+				if objNamespace != "" && objNamespace != projectName {
+					logrus.Infof("Deleting role binding %s in %s", rb.Name, ns.Name)
+					if err := client.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+						return errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// ensureInjectedAppRBAddToNamespace ensures the injected apps have permissions in project-owned namespaces
+func (n *nsLifecycle) ensureInjectedAppRBAddToNamespace(ns *v1.Namespace) error {
+	// Get project that contain this namespace
+	projectName := ns.Annotations[projectIDAnnotation]
+	if projectName == "" {
+		return nil
+	}
+
+	projectID := strings.TrimPrefix(projectName, n.m.clusterName+":")
+
+	// Get all apps in the project
+	apps, err := n.m.appLister.List(projectID, labels.Everything())
+	if err != nil {
+		return errors.Wrapf(err, "couldn't get apps associated with project id %s", projectID)
+	}
+
+	// Ensure injected apps role bindings
+	for _, app := range apps {
+		if app.DeletionTimestamp != nil {
+			continue
+		}
+
+		injectRoleTemplate := getRoleTemplateName(app)
+		if injectRoleTemplate == "" {
+			continue
+		}
+
+		rt, err := n.m.rtLister.Get(metav1.NamespaceAll, injectRoleTemplate)
+		if err != nil {
+			return errors.Wrapf(err, "couldn't get role template %v", injectRoleTemplate)
+		}
+
+		roles := map[string]*v3.RoleTemplate{}
+		if err := n.m.gatherRoles(rt, roles); err != nil {
+			return err
+		}
+
+		if err := n.m.ensureRoles(roles); err != nil {
+			return errors.Wrap(err, "couldn't ensure roles")
+		}
+
+		if err := n.m.ensureAppServiceAccountRoleBindings(ns.Name, roles, app); err != nil {
+			return errors.Wrapf(err, "couldn't ensure app %v in %v", app.Name, ns.Name)
+		}
+	}
+
+	return nil
+}
+
+func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
+	// Get project that contain this namespace
+	projectID := ns.Annotations[projectIDAnnotation]
+	if len(projectID) == 0 {
 		return false, nil
 	}
 
@@ -191,42 +312,6 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 
 		if err := n.m.ensureProjectRoleBindings(ns.Name, roles, prtb); err != nil {
 			return false, errors.Wrapf(err, "couldn't ensure binding %v in %v", prtb.Name, ns.Name)
-		}
-	}
-
-	var namespace string
-	if parts := strings.SplitN(projectID, ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
-		namespace = parts[1]
-	} else {
-		return hasPRTBs, nil
-	}
-
-	rbs, err := n.m.rbLister.List(ns.Name, labels.Everything())
-	if err != nil {
-		return false, errors.Wrapf(err, "couldn't list role bindings in %s", ns.Name)
-	}
-	client := n.m.workload.RBAC.RoleBindings(ns.Name).ObjectClient()
-
-	for _, rb := range rbs {
-		if uid := convert.ToString(rb.Labels[rtbOwnerLabel]); uid != "" {
-			prtbs, err := n.m.prtbIndexer.ByIndex(prtbByUIDIndex, uid)
-			if err != nil {
-				if apierrors.IsNotFound(err) {
-					continue
-				} else {
-					return false, errors.Wrapf(err, "couldn't find prtb for %s", rb.Name)
-				}
-			}
-			for _, prtb := range prtbs {
-				if prtb, ok := prtb.(*v3.ProjectRoleTemplateBinding); ok {
-					if prtb.Namespace != namespace {
-						logrus.Infof("Deleting role binding %s in %s", rb.Name, ns.Name)
-						if err := client.Delete(rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-							return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
-						}
-					}
-				}
-			}
 		}
 	}
 
@@ -460,4 +545,18 @@ func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager
 		logrus.Warnf("error updating ns %v status: %v", ns.Name, err)
 	}
 
+}
+
+// getRoleTemplateName returns the injected status of App and which role template to inject
+func getRoleTemplateName(app *projectv3.App) (injectRoleTemplate string) {
+	value, ok := app.Annotations["field.cattle.io/injectAccount"]
+	if !ok {
+		return ""
+	}
+
+	if value != "project-monitoring-view" {
+		return ""
+	}
+
+	return value
 }

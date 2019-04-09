@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	typescorev1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -23,6 +24,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/user/resourcequota"
 	nsutils "github.com/rancher/rancher/pkg/namespace"
+	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 )
 
 const (
@@ -35,24 +37,10 @@ const (
 	nsByProjectIndex                 = "authz.cluster.cattle.io/ns-by-project"
 	crByNSIndex                      = "authz.cluster.cattle.io/cr-by-ns"
 	crbByRoleAndSubjectIndex         = "authz.cluster.cattle.io/crb-by-role-and-subject"
+	appByUIDIndex                    = "authz.cluster.cattle.io/app-by-uid"
 )
 
 func Register(ctx context.Context, workload *config.UserContext) {
-	// Add cache informer to project role template bindings
-	prtbInformer := workload.Management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
-	prtbIndexers := map[string]cache.IndexFunc{
-		prtbByProjectIndex:               prtbByProjectName,
-		prtbByProjecSubjectIndex:         prtbByProjectAndSubject,
-		rtbByClusterAndRoleTemplateIndex: rtbByClusterAndRoleTemplateName,
-		prtbByUIDIndex:                   prtbByUID,
-	}
-	prtbInformer.AddIndexers(prtbIndexers)
-
-	crtbInformer := workload.Management.Management.ClusterRoleTemplateBindings("").Controller().Informer()
-	crtbIndexers := map[string]cache.IndexFunc{
-		rtbByClusterAndRoleTemplateIndex: rtbByClusterAndRoleTemplateName,
-	}
-	crtbInformer.AddIndexers(crtbIndexers)
 
 	// Index for looking up namespaces by projectID annotation
 	nsInformer := workload.Core.Namespaces("").Controller().Informer()
@@ -61,37 +49,8 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	}
 	nsInformer.AddIndexers(nsIndexers)
 
-	// Get ClusterRoles by the namespaces the authorizes because they are in a project
-	crInformer := workload.RBAC.ClusterRoles("").Controller().Informer()
-	crIndexers := map[string]cache.IndexFunc{
-		crByNSIndex: crByNS,
-	}
-	crInformer.AddIndexers(crIndexers)
+	r := NewManager(ctx, workload).(*manager)
 
-	// Get ClusterRoleBindings by subject name and kind
-	crbInformer := workload.RBAC.ClusterRoleBindings("").Controller().Informer()
-	crbIndexers := map[string]cache.IndexFunc{
-		crbByRoleAndSubjectIndex: crbByRoleAndSubject,
-	}
-	crbInformer.AddIndexers(crbIndexers)
-
-	r := &manager{
-		workload:      workload,
-		prtbIndexer:   prtbInformer.GetIndexer(),
-		crtbIndexer:   crtbInformer.GetIndexer(),
-		nsIndexer:     nsInformer.GetIndexer(),
-		crIndexer:     crInformer.GetIndexer(),
-		crbIndexer:    crbInformer.GetIndexer(),
-		rtLister:      workload.Management.Management.RoleTemplates("").Controller().Lister(),
-		rbLister:      workload.RBAC.RoleBindings("").Controller().Lister(),
-		crbLister:     workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
-		crLister:      workload.RBAC.ClusterRoles("").Controller().Lister(),
-		nsLister:      workload.Core.Namespaces("").Controller().Lister(),
-		nsController:  workload.Core.Namespaces("").Controller(),
-		clusterLister: workload.Management.Management.Clusters("").Controller().Lister(),
-		projectLister: workload.Management.Management.Projects("").Controller().Lister(),
-		clusterName:   workload.ClusterName,
-	}
 	workload.Management.Management.Projects("").AddClusterScopedLifecycle(ctx, "project-namespace-auth", workload.ClusterName, newProjectLifecycle(r))
 	workload.Management.Management.ProjectRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-prtb-sync", workload.ClusterName, newPRTBLifecycle(r))
 	workload.RBAC.ClusterRoleBindings("").AddHandler(ctx, "legacy-crb-cleaner-sync", newLegacyCRBCleaner(r).sync)
@@ -126,6 +85,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 type manager struct {
 	workload      *config.UserContext
 	rtLister      v3.RoleTemplateLister
+	appIndexer    cache.Indexer
 	prtbIndexer   cache.Indexer
 	crtbIndexer   cache.Indexer
 	nsIndexer     cache.Indexer
@@ -138,6 +98,7 @@ type manager struct {
 	nsController  typescorev1.NamespaceController
 	clusterLister v3.ClusterLister
 	projectLister v3.ProjectLister
+	appLister     projectv3.AppLister
 	clusterName   string
 }
 
@@ -288,19 +249,45 @@ func (m *manager) ensureProjectRoleBindings(ns string, roles map[string]*v3.Role
 	return m.ensureBindings(ns, roles, binding, m.workload.RBAC.RoleBindings(ns).ObjectClient(), create, list, convert)
 }
 
-type createFn func(objectMeta metav1.ObjectMeta, subjects []rbacv1.Subject, roleRef rbacv1.RoleRef) runtime.Object
-type listFn func(ns string, selector labels.Selector) ([]interface{}, error)
-type convertFn func(i interface{}) (string, string, []rbacv1.Subject)
+// ensureAppServiceAccountRoleBindings ensures ${app.Name} service account has bound with all role bindings via role templates
+func (m *manager) ensureAppServiceAccountRoleBindings(ns string, roles map[string]*v3.RoleTemplate, app *projectv3.App) error {
+	create := func(objectMeta metav1.ObjectMeta, subjects []rbacv1.Subject, roleRef rbacv1.RoleRef) runtime.Object {
+		return &rbacv1.RoleBinding{
+			ObjectMeta: objectMeta,
+			Subjects:   subjects,
+			RoleRef:    roleRef,
+		}
+	}
+
+	list := func(ns string, selector labels.Selector) ([]interface{}, error) {
+		currentRBs, err := m.rbLister.List(ns, selector)
+		if err != nil {
+			return nil, err
+		}
+		var items []interface{}
+		for _, c := range currentRBs {
+			items = append(items, c)
+		}
+		return items, nil
+	}
+
+	convert := func(i interface{}) (string, string, []rbacv1.Subject) {
+		rb, _ := i.(*rbacv1.RoleBinding)
+		return rb.Name, rb.RoleRef.Name, rb.Subjects
+	}
+
+	return m.ensureBindings(ns, roles, app, m.workload.RBAC.RoleBindings(ns).ObjectClient(), create, list, convert)
+}
 
 func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, binding interface{}, client *objectclient.ObjectClient,
-	create createFn, list listFn, convert convertFn) error {
+	create CreateFn, list ListFn, convert ConvertFn) error {
 	meta, err := meta.Accessor(binding)
 	if err != nil {
 		return err
 	}
 
 	desiredRBs := map[string]runtime.Object{}
-	subject, err := buildSubjectFromRTB(binding)
+	subject, err := pkgrbac.BuildSubjectFromRTB(binding)
 	if err != nil {
 		return err
 	}
@@ -360,53 +347,6 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 		}
 	}
 	return nil
-}
-
-func buildSubjectFromRTB(binding interface{}) (rbacv1.Subject, error) {
-	// TODO This is a duplicate of the same method that lives in the management context. When a place for common
-	// code exists, move it there and reuse it
-	var userName, groupPrincipalName, groupName, name, kind string
-	if rtb, ok := binding.(*v3.ProjectRoleTemplateBinding); ok {
-		userName = rtb.UserName
-		groupPrincipalName = rtb.GroupPrincipalName
-		groupName = rtb.GroupName
-	} else if rtb, ok := binding.(*v3.ClusterRoleTemplateBinding); ok {
-		userName = rtb.UserName
-		groupPrincipalName = rtb.GroupPrincipalName
-		groupName = rtb.GroupName
-	} else {
-		return rbacv1.Subject{}, errors.Errorf("unrecognized roleTemplateBinding type: %v", binding)
-	}
-
-	if userName != "" {
-		name = userName
-		kind = "User"
-	}
-
-	if groupPrincipalName != "" {
-		if name != "" {
-			return rbacv1.Subject{}, errors.Errorf("roletemplatebinding has more than one subject fields set: %v", binding)
-		}
-		name = groupPrincipalName
-		kind = "Group"
-	}
-
-	if groupName != "" {
-		if name != "" {
-			return rbacv1.Subject{}, errors.Errorf("roletemplatebinding has more than one subject fields set: %v", binding)
-		}
-		name = groupName
-		kind = "Group"
-	}
-
-	if name == "" {
-		return rbacv1.Subject{}, errors.Errorf("roletemplatebinding doesn't have any subject fields set: %v", binding)
-	}
-
-	return rbacv1.Subject{
-		Kind: kind,
-		Name: name,
-	}, nil
 }
 
 func bindingParts(roleName, parentUID string, subject rbacv1.Subject) (string, metav1.ObjectMeta, []rbacv1.Subject, rbacv1.RoleRef) {
@@ -472,7 +412,12 @@ func crbRoleSubjectKeys(roleName string, subjects []rbacv1.Subject) []string {
 }
 
 func rbRoleSubjectKey(roleName string, subject rbacv1.Subject) string {
-	return subject.Kind + " " + subject.Name + " Role " + roleName
+	prefix := subject.Kind + " "
+	if subject.Namespace != "" {
+		prefix += subject.Namespace + " "
+	}
+
+	return prefix + subject.Name + " Role " + roleName
 
 }
 
@@ -505,4 +450,12 @@ func rtbByClusterAndRoleTemplateName(obj interface{}) ([]string, error) {
 		return []string{}, nil
 	}
 	return []string{idx}, nil
+}
+
+func appByUID(obj interface{}) ([]string, error) {
+	app, ok := obj.(*projectv3.App)
+	if !ok {
+		return []string{}, nil
+	}
+	return []string{convert.ToString(app.UID)}, nil
 }

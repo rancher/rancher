@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/slice"
+	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	v13 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
@@ -700,12 +701,12 @@ func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs
 				added := false
 				for i, rule := range newRole.Rules {
 					if slice.ContainsString(rule.Resources, resource) {
-						newRole.Rules[i] = buildRule(resource, newVerbs)
+						newRole.Rules[i] = pkgrbac.BuildRule(resource, newVerbs)
 						added = true
 					}
 				}
 				if !added {
-					newRole.Rules = append(newRole.Rules, buildRule(resource, newVerbs))
+					newRole.Rules = append(newRole.Rules, pkgrbac.BuildRule(resource, newVerbs))
 				}
 
 			}
@@ -720,7 +721,7 @@ func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs
 
 	var rules []v1.PolicyRule
 	for resource, newVerbs := range resourceToVerbs {
-		rules = append(rules, buildRule(resource, newVerbs))
+		rules = append(rules, pkgrbac.BuildRule(resource, newVerbs))
 	}
 	logrus.Infof("[%v] Creating role %v in namespace %v", m.controller, rt.Name, namespace)
 	_, err := roleCli.Create(&v1.Role{
@@ -750,61 +751,4 @@ func (m *manager) gatherRoleTemplates(rt *v3.RoleTemplate, roleTemplates map[str
 	}
 
 	return nil
-}
-
-func buildRule(resource string, verbs map[string]bool) v1.PolicyRule {
-	var vs []string
-	for v := range verbs {
-		vs = append(vs, v)
-	}
-	return v1.PolicyRule{
-		Resources: []string{resource},
-		Verbs:     vs,
-		APIGroups: []string{"*"},
-	}
-}
-
-func buildSubjectFromRTB(binding interface{}) (v1.Subject, error) {
-	var userName, groupPrincipalName, groupName, name, kind string
-	if rtb, ok := binding.(*v3.ProjectRoleTemplateBinding); ok {
-		userName = rtb.UserName
-		groupPrincipalName = rtb.GroupPrincipalName
-		groupName = rtb.GroupName
-	} else if rtb, ok := binding.(*v3.ClusterRoleTemplateBinding); ok {
-		userName = rtb.UserName
-		groupPrincipalName = rtb.GroupPrincipalName
-		groupName = rtb.GroupName
-	} else {
-		return v1.Subject{}, errors.Errorf("unrecognized roleTemplateBinding type: %v", binding)
-	}
-
-	if userName != "" {
-		name = userName
-		kind = "User"
-	}
-
-	if groupPrincipalName != "" {
-		if name != "" {
-			return v1.Subject{}, errors.Errorf("roletemplatebinding has more than one subject fields set: %v", binding)
-		}
-		name = groupPrincipalName
-		kind = "Group"
-	}
-
-	if groupName != "" {
-		if name != "" {
-			return v1.Subject{}, errors.Errorf("roletemplatebinding has more than one subject fields set: %v", binding)
-		}
-		name = groupName
-		kind = "Group"
-	}
-
-	if name == "" {
-		return v1.Subject{}, errors.Errorf("roletemplatebinding doesn't have any subject fields set: %v", binding)
-	}
-
-	return v1.Subject{
-		Kind: kind,
-		Name: name,
-	}, nil
 }
