@@ -371,7 +371,7 @@ func (m *userManager) CreateNewUserClusterRoleBinding(userName string, userUID a
 				OwnerReferences: []v1.OwnerReference{ownerReference},
 			},
 			Subjects: []k8srbacv1.Subject{
-				k8srbacv1.Subject{
+				{
 					Kind: "User",
 					Name: userName,
 				},

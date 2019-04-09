@@ -1,21 +1,44 @@
 {
 	"linters": {
-		"disable-all": true,
 		"enable": [
 			"deadcode",
-			"misspell"
+			"misspell",
+			"typecheck",
+			"varcheck",
+			"gofmt",
+			"structcheck",
+			"govet"
+			
+		],
+		"disable":[
+			"unused",
+			"ineffassign",
+			"staticcheck",
+			"errcheck",
+			"gosimple"
 		]
 	},
-	"run": {
-        "deadline": "10m",
-        "max-issues-per-linter": 0
-	},
-	"linters-settings":{
-		"gocyclo":{
-			"min-complexity": 10
+	"linters-settings": {
+		"govet":{
+			"check-shadowing":false
 		},
-		"deadcode":{
-			"auto-fix":"true"
+		"errcheck":{
+			"ignore": "fmt:.*,io/ioutil:^Read.*",
+			"exclude": "scripts/errcheck_excludes.txt"
 		}
+	},
+	"run": {
+		"tests": false,
+        "deadline": "10m",
+		"max-issues-per-linter": 0
+	},
+	"issues":{
+		"exclude-rules":[
+			{   
+				"linters":"ineffassign",
+				"text":"err"
+			}
+		]
 	}
+	
 }

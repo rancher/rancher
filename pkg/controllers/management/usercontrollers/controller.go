@@ -146,7 +146,7 @@ func (c *ClusterLifecycleCleanup) cleanupImportedCluster(cluster *v3.Cluster) er
 	}
 
 	or := []metav1.OwnerReference{
-		metav1.OwnerReference{
+		{
 			APIVersion: "batch/v1",
 			Kind:       "Job",
 			Name:       job.Name,
@@ -187,19 +187,19 @@ func (c *ClusterLifecycleCleanup) createCleanupClusterRole(userContext *config.U
 
 	rules := []rbacV1.PolicyRule{
 		// This is needed to check for cattle-system, remove finalizers and delete
-		rbacV1.PolicyRule{
+		{
 			Verbs:     []string{"list", "get", "update", "delete"},
 			APIGroups: []string{""},
 			Resources: []string{"namespaces"},
 		},
-		rbacV1.PolicyRule{
+		{
 			Verbs:     []string{"list", "get", "delete"},
 			APIGroups: []string{"rbac.authorization.k8s.io"},
 			Resources: []string{"roles", "rolebindings", "clusterroles", "clusterrolebindings"},
 		},
 		// The job is going to delete itself after running to trigger ownerReference
 		// cleanup of the clusterRole, serviceAccount and clusterRoleBinding
-		rbacV1.PolicyRule{
+		{
 			Verbs:     []string{"list", "get", "delete"},
 			APIGroups: []string{"batch"},
 			Resources: []string{"jobs"},
@@ -234,7 +234,7 @@ func (c *ClusterLifecycleCleanup) createCleanupClusterRoleBinding(
 	clusterRoleBinding := rbacV1.ClusterRoleBinding{
 		ObjectMeta: meta,
 		Subjects: []rbacV1.Subject{
-			rbacV1.Subject{
+			{
 				Kind:      "ServiceAccount",
 				Name:      sa,
 				Namespace: "default",
@@ -263,15 +263,15 @@ func (c *ClusterLifecycleCleanup) createCleanupJob(userContext *config.UserConte
 				Spec: coreV1.PodSpec{
 					ServiceAccountName: sa,
 					Containers: []coreV1.Container{
-						coreV1.Container{
+						{
 							Name:  "cleanup-agent",
 							Image: settings.AgentImage.Get(),
 							Env: []coreV1.EnvVar{
-								coreV1.EnvVar{
+								{
 									Name:  "CLUSTER_CLEANUP",
 									Value: "true",
 								},
-								coreV1.EnvVar{
+								{
 									Name:  "SLEEP_FIRST",
 									Value: "true",
 								},

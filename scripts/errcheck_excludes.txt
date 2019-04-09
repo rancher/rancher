@@ -1,0 +1,17 @@
+# Run with -verbose to see func to exclude
+io/ioutil.ReadFile
+io.Copy(*bytes.Buffer)
+io.Copy
+io.Copy(os.Stdout)
+(*net/http.Client).Do
+(net/http.ResponseWriter).Write
+(net.Conn).Close
+os.Remove
+os.Setenv
+os.Unsetenv
+os.MkdirAll
+(*os.File).Close
+(*os/exec.Cmd).Wait
+fmt.Fprintf
+fmt.Fprintln
+(io.Closer).Close
