@@ -41,6 +41,18 @@ const (
 )
 
 var amiForRegionAndVersion = map[string]map[string]string{
+	"1.12": map[string]string{
+		"us-west-2":      "ami-0923e4b35a30a5f53",
+		"us-east-1":      "ami-0abcb9f9190e867ab",
+		"us-east-2":      "ami-04ea7cb66af82ae4a",
+		"eu-central-1":   "ami-0d741ed58ca5b342e",
+		"eu-north-1":     "ami-0c65a309fc58f6907",
+		"eu-west-1":      "ami-08716b70cac884aaa",
+		"ap-northeast-1": "ami-0bfedee6a7845c26d",
+		"ap-northeast-2": "ami-0a904348b703e620c",
+		"ap-southeast-1": "ami-07b922b9b94d9a6d2",
+		"ap-southeast-2": "ami-0f0121e9e64ebd3dc",
+	},
 	"1.11": map[string]string{
 		"us-west-2":      "ami-0a2abab4107669c1b",
 		"us-east-1":      "ami-0c24db5df6badc35a",
