@@ -53,13 +53,13 @@ func getAppSubDir(files map[string]string) string {
 	return appSubDir
 }
 
-func helmInstall(templateDir, kubeconfigPath string, app *v3.App) error {
+func helmInstall(templateDir, kubeconfigPath string, app *v3.App, extraArgs map[string]string) error {
 	cont, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	addr := common.GenerateRandomPort()
 	probeAddr := common.GenerateRandomPort()
 	go common.StartTiller(cont, addr, probeAddr, app.Spec.TargetNamespace, kubeconfigPath)
-	return common.InstallCharts(templateDir, addr, app)
+	return common.InstallCharts(templateDir, addr, app, extraArgs)
 }
 
 func helmDelete(kubeconfigPath string, app *v3.App) error {
@@ -71,7 +71,7 @@ func helmDelete(kubeconfigPath string, app *v3.App) error {
 	return common.DeleteCharts(addr, app)
 }
 
-func (l *Lifecycle) generateTemplates(obj *v3.App) (string, string, string, string, error) {
+func (l *Lifecycle) generateTemplates(obj *v3.App, extraArgs map[string]string) (string, string, string, string, error) {
 	var appSubDir string
 	files := map[string]string{}
 	if obj.Spec.ExternalID != "" {
@@ -123,7 +123,7 @@ func (l *Lifecycle) generateTemplates(obj *v3.App) (string, string, string, stri
 	appDir := filepath.Join(tempDir, appSubDir)
 
 	common.InjectDefaultRegistry(obj)
-	setValues, err := common.GenerateAnswerSetValues(obj, tempDir)
+	setValues, err := common.GenerateAnswerSetValues(obj, tempDir, extraArgs)
 	if err != nil {
 		return "", "", "", tempDir, err
 	}

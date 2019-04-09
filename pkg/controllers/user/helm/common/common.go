@@ -115,9 +115,9 @@ func GenerateRandomPort() string {
 	}
 }
 
-func InstallCharts(rootDir, port string, obj *v3.App) error {
+func InstallCharts(rootDir, port string, obj *v3.App, extraArgs map[string]string) error {
 	InjectDefaultRegistry(obj)
-	setValues, err := GenerateAnswerSetValues(obj, rootDir)
+	setValues, err := GenerateAnswerSetValues(obj, rootDir, extraArgs)
 	if err != nil {
 		return err
 	}
@@ -151,7 +151,7 @@ func InstallCharts(rootDir, port string, obj *v3.App) error {
 	return nil
 }
 
-func GenerateAnswerSetValues(app *v3.App, tempDir string) ([]string, error) {
+func GenerateAnswerSetValues(app *v3.App, tempDir string, extraArgs map[string]string) ([]string, error) {
 	setValues := []string{}
 	// a user-supplied values file will overridden default values.yaml
 	if app.Spec.ValuesYaml != "" {
@@ -162,10 +162,13 @@ func GenerateAnswerSetValues(app *v3.App, tempDir string) ([]string, error) {
 		setValues = append(setValues, "--values", valuesYaml)
 	}
 	// `--set` values will overridden the user-supplied values.yaml file
-	if app.Spec.Answers != nil {
+	if app.Spec.Answers != nil || extraArgs != nil {
 		answers := app.Spec.Answers
 		var values = []string{}
 		for k, v := range answers {
+			values = append(values, fmt.Sprintf("%s=%s", k, v))
+		}
+		for k, v := range extraArgs {
 			values = append(values, fmt.Sprintf("%s=%s", k, v))
 		}
 		setValues = append(setValues, "--set", strings.Join(values, ","))

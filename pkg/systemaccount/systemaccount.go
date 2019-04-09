@@ -146,3 +146,11 @@ func (s *Manager) GetOrCreateProjectSystemToken(projectName string) (string, err
 	}
 	return s.userManager.EnsureToken(projectName+"-pipeline", "Pipeline token for project "+projectName, user.Name)
 }
+
+func (s *Manager) GetOrCreateClusterSystemToken(cluster *v3.Cluster) (string, error) {
+	user, err := s.GetSystemUser(cluster)
+	if err != nil {
+		return "", err
+	}
+	return s.userManager.EnsureToken(cluster.Name+"-system", "System account token for cluster "+cluster.Name, user.Name)
+}

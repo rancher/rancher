@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
-	"k8s.io/api/core/v1"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -15,6 +14,8 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
+	controllerrbac "github.com/rancher/rancher/pkg/controllers/user/rbac"
+	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	corev1 "github.com/rancher/types/apis/core/v1"
@@ -23,6 +24,7 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -59,6 +61,11 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 		AppGetter:             user.Management.Project,
 		NsLister:              user.Core.Namespaces("").Controller().Lister(),
 		NsClient:              user.Core.Namespaces(""),
+		ProjectLister:         user.Management.Management.Projects("").Controller().Lister(),
+		ClusterLister:         user.Management.Management.Clusters("").Controller().Lister(),
+		ServiceAccountClient:  user.Core.ServiceAccounts(""),
+		ServiceAccountLister:  user.Core.ServiceAccounts("").Controller().Lister(),
+		rbacManager:           controllerrbac.NewManager(ctx, user),
 	}
 	appClient.AddClusterScopedLifecycle(ctx, "helm-controller", user.ClusterName, stackLifecycle)
 
@@ -83,6 +90,11 @@ type Lifecycle struct {
 	AppGetter             v3.AppsGetter
 	NsLister              corev1.NamespaceLister
 	NsClient              corev1.NamespaceInterface
+	ProjectLister         mgmtv3.ProjectLister
+	ClusterLister         mgmtv3.ClusterLister
+	ServiceAccountClient  corev1.ServiceAccountInterface
+	ServiceAccountLister  corev1.ServiceAccountLister
+	rbacManager           controllerrbac.Manager
 }
 
 func (l *Lifecycle) Create(obj *v3.App) (runtime.Object, error) {
@@ -214,17 +226,25 @@ func (l *Lifecycle) DeployApp(obj *v3.App) (*v3.App, error) {
 			return obj, err
 		}
 	}
+
+	extraArgs := l.InjectServiceAccount(obj)
+
 	newObj, err := v3.AppConditionInstalled.Do(obj, func() (runtime.Object, error) {
-		template, notes, appDir, tempDir, err := l.generateTemplates(obj)
+		template, notes, appDir, tempDir, err := l.generateTemplates(obj, extraArgs)
 		defer os.RemoveAll(tempDir)
 		if err != nil {
 			return obj, err
 		}
-		if err := l.Run(obj, template, appDir, notes); err != nil {
+		if err := l.Run(obj, template, appDir, notes, extraArgs); err != nil {
 			return obj, err
 		}
 		return obj, nil
 	})
+
+	if err == nil {
+		return newObj.(*v3.App), l.EnsureAppServiceAccount(newObj.(*v3.App))
+	}
+
 	return newObj.(*v3.App), err
 }
 
@@ -261,6 +281,11 @@ func (l *Lifecycle) Remove(obj *v3.App) (runtime.Object, error) {
 		time.Sleep(start)
 		start *= 2
 	}
+
+	if err := l.ensureServiceAccountDeleted(obj); err != nil {
+		return obj, err
+	}
+
 	ns, err := l.NsClient.Get(obj.Spec.TargetNamespace, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return obj, err
@@ -294,7 +319,7 @@ func (l *Lifecycle) Remove(obj *v3.App) (runtime.Object, error) {
 	return obj, nil
 }
 
-func (l *Lifecycle) Run(obj *v3.App, template, templateDir, notes string) error {
+func (l *Lifecycle) Run(obj *v3.App, template, templateDir, notes string, extraArgs map[string]string) error {
 	tempDir, err := ioutil.TempDir("", "kubeconfig-")
 	if err != nil {
 		return err
@@ -304,9 +329,11 @@ func (l *Lifecycle) Run(obj *v3.App, template, templateDir, notes string) error 
 	if err != nil {
 		return err
 	}
-	if err := helmInstall(templateDir, kubeConfigPath, obj); err != nil {
+
+	if err := helmInstall(templateDir, kubeConfigPath, obj, extraArgs); err != nil {
 		return err
 	}
+
 	return l.createAppRevision(obj, template, notes, false)
 }
 
@@ -347,9 +374,23 @@ func (l *Lifecycle) createAppRevision(obj *v3.App, template, notes string, faile
 func (l *Lifecycle) writeKubeConfig(obj *v3.App, tempDir string, remove bool) (string, error) {
 	var token string
 
-	userID := obj.Annotations["field.cattle.io/creatorId"]
+	isSystemProject, err := l.isInSystemProject(obj)
+	if err != nil {
+		return "", err
+	}
+
+	userID, ok := obj.Annotations["field.cattle.io/creatorId"]
 	user, err := l.UserClient.Get(userID, metav1.GetOptions{})
-	if err != nil && !errors.IsNotFound(err) {
+	if !ok && isSystemProject {
+		var cluster *mgmtv3.Cluster
+		cluster, err = l.ClusterLister.Get("", l.ClusterName)
+		if err != nil {
+			return "", err
+		}
+		token, err = l.SystemAccountManager.GetOrCreateClusterSystemToken(cluster)
+	} else if !ok {
+		token, err = l.SystemAccountManager.GetOrCreateProjectSystemToken(obj.Namespace)
+	} else if err != nil && !errors.IsNotFound(err) {
 		return "", err
 	} else if errors.IsNotFound(err) && remove {
 		token, err = l.SystemAccountManager.GetOrCreateProjectSystemToken(obj.Namespace)
@@ -372,4 +413,12 @@ func (l *Lifecycle) writeKubeConfig(obj *v3.App, tempDir string, remove bool) (s
 		return "", err
 	}
 	return kubeConfigPath, nil
+}
+
+func (l *Lifecycle) isInSystemProject(app *v3.App) (bool, error) {
+	p, err := project.GetSystemProject(l.ClusterName, l.ProjectLister)
+	if err != nil {
+		return false, err
+	}
+	return p.Name == app.Namespace, nil
 }
