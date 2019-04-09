@@ -274,7 +274,7 @@ func GetStateFromNodes(ctx context.Context, kubeCluster *Cluster) *Cluster {
 
 	uniqueHosts := hosts.GetUniqueHostList(kubeCluster.EtcdHosts, kubeCluster.ControlPlaneHosts, kubeCluster.WorkerHosts)
 	for _, host := range uniqueHosts {
-		filePath := path.Join(host.PrefixPath, pki.TempCertPath, pki.ClusterStateFile)
+		filePath := path.Join(pki.TempCertPath, pki.ClusterStateFile)
 		clusterFile, err = pki.FetchFileFromHost(ctx, filePath, kubeCluster.SystemImages.Alpine, host, kubeCluster.PrivateRegistriesMap, pki.StateDeployerContainerName, "state")
 		if err == nil {
 			break
