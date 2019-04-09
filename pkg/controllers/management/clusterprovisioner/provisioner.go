@@ -255,10 +255,8 @@ func setVersion(cluster *v3.Cluster) {
 		if cluster.Status.Version != nil {
 			setConfigVersion := func(config *v3.MapStringInterface) {
 				v, found := values.GetValue(*config, "kubernetesVersion")
-				if !found || convert.ToString(v) == "" && cluster.Status.Version != nil {
-					if minor := cluster.Status.Version.Minor; strings.HasPrefix(minor, "11") || strings.HasPrefix(minor, "10") {
-						values.PutValue(*config, "1."+minor[:2], "kubernetesVersion")
-					}
+				if !found || convert.ToString(v) == "" && cluster.Status.Version != nil && cluster.Status.Version.Major != "" && len(cluster.Status.Version.Minor) > 1 {
+					values.PutValue(*config, fmt.Sprintf("%s.%s", cluster.Status.Version.Major, cluster.Status.Version.Minor[:2]), "kubernetesVersion")
 				}
 			}
 
