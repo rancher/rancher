@@ -381,7 +381,7 @@ def ns_count(client, count):
 
 def test_appropriate_users_can_see_kontainer_drivers(user_factory):
     kds = user_factory().client.list_kontainer_driver()
-    assert len(kds) == 10
+    assert len(kds) > 5
 
     kds = user_factory('clusters-create').client.list_kontainer_driver()
     assert len(kds) == 9
