@@ -1,0 +1,45 @@
+{
+	"linters": {
+		"enable": [
+			"govet",
+			"gofmt",
+			"typecheck",
+			"golint"
+			
+		],
+		"disable":[
+			"misspell",
+			"unused",
+			"ineffassign",
+			"staticcheck",
+			"errcheck",
+			"gosimple",
+			"structcheck",
+			"deadcode",
+			"varcheck"
+			
+		]
+	},
+	"linters-settings": {
+		"govet":{
+			"check-shadowing":false
+		},
+		"gofmt":{
+			"simplify":false
+		}
+	},
+	"run": {
+		"tests": false,
+        "deadline": "10m"
+		
+	},
+	"issues":{
+		"exclude-rules":[
+			{
+				"linters":"govet",
+				"text":"^(nilness|structtag)"
+			}
+		]
+	}
+	
+}
