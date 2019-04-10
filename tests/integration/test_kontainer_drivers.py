@@ -181,7 +181,7 @@ def test_enabling_driver_exposes_schema(admin_mc, wait_remove_resource):
     admin_mc.client.update_by_id_kontainerDriver(kd.id, kd)
     verify_driver_in_types(admin_mc.client, kd)
 
-
+@pytest.mark.nonparallel
 def test_upgrade_changes_schema(admin_mc, wait_remove_resource):
     client = admin_mc.client
     URL = DRIVER_AMD64_URL3
