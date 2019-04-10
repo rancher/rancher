@@ -1,7 +1,11 @@
 package responsewriter
 
 import (
+	"bufio"
+	"fmt"
+	"net"
 	"net/http"
+	"reflect"
 	"strings"
 )
 
@@ -28,4 +32,11 @@ func ContentType(handler http.Handler) http.Handler {
 		writer := ContentTypeWriter{ResponseWriter: w}
 		handler.ServeHTTP(writer, r)
 	})
+}
+
+func (c ContentTypeWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if hijacker, ok := c.ResponseWriter.(http.Hijacker); ok {
+		return hijacker.Hijack()
+	}
+	return nil, nil, fmt.Errorf("Upstream ResponseWriter of type %v does not implement http.Hijacker", reflect.TypeOf(c.ResponseWriter))
 }
