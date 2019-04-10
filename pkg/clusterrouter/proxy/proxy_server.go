@@ -8,9 +8,10 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/rancher/norman/httperror"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config/dialer"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/proxy"
@@ -18,10 +19,17 @@ import (
 )
 
 type RemoteService struct {
+	sync.Mutex
+
 	cluster   *v3.Cluster
 	transport transportGetter
 	url       urlGetter
 	auth      authGetter
+
+	factory       dialer.Factory
+	clusterLister v3.ClusterLister
+	caCert        string
+	httpTransport *http.Transport
 }
 
 var (
@@ -60,8 +68,13 @@ func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, er
 		return nil, err
 	}
 
+	transport, err := rest.TransportFor(localConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	transportGetter := func() (http.RoundTripper, error) {
-		return rest.TransportFor(localConfig)
+		return transport, nil
 	}
 
 	rs := &RemoteService{
@@ -87,34 +100,6 @@ func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dial
 		return nil, httperror.NewAPIError(httperror.ClusterUnavailable, "cluster not provisioned")
 	}
 
-	transportGetter := func() (http.RoundTripper, error) {
-		transport := &http.Transport{}
-
-		if factory != nil {
-			d, err := factory.ClusterDialer(cluster.Name)
-			if err != nil {
-				return nil, err
-			}
-			transport.Dial = d
-		}
-		newCluster, err := clusterLister.Get("", cluster.Name)
-		if err != nil {
-			return transport, err
-		}
-		if newCluster.Status.CACert != "" {
-			certBytes, err := base64.StdEncoding.DecodeString(newCluster.Status.CACert)
-			if err != nil {
-				return nil, err
-			}
-			certs := x509.NewCertPool()
-			certs.AppendCertsFromPEM(certBytes)
-			transport.TLSClientConfig = &tls.Config{
-				RootCAs: certs,
-			}
-		}
-		return transport, nil
-	}
-
 	urlGetter := func() (url.URL, error) {
 		newCluster, err := clusterLister.Get("", cluster.Name)
 		if err != nil {
@@ -138,14 +123,69 @@ func NewRemote(cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dial
 	}
 
 	return &RemoteService{
-		cluster:   cluster,
-		transport: transportGetter,
-		url:       urlGetter,
-		auth:      authGetter,
+		cluster:       cluster,
+		url:           urlGetter,
+		auth:          authGetter,
+		clusterLister: clusterLister,
+		factory:       factory,
 	}, nil
 }
 
+func (r *RemoteService) getTransport() (http.RoundTripper, error) {
+	if r.transport != nil {
+		return r.transport()
+	}
+
+	newCluster, err := r.clusterLister.Get("", r.cluster.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Lock()
+	defer r.Unlock()
+
+	if r.httpTransport != nil && !r.cacertChanged(newCluster) {
+		return r.httpTransport, nil
+	}
+
+	transport := &http.Transport{}
+	if newCluster.Status.CACert != "" {
+		certBytes, err := base64.StdEncoding.DecodeString(newCluster.Status.CACert)
+		if err != nil {
+			return nil, err
+		}
+		certs := x509.NewCertPool()
+		certs.AppendCertsFromPEM(certBytes)
+		transport.TLSClientConfig = &tls.Config{
+			RootCAs: certs,
+		}
+	}
+
+	if r.factory != nil {
+		d, err := r.factory.ClusterDialer(newCluster.Name)
+		if err != nil {
+			return nil, err
+		}
+		transport.Dial = d
+	}
+
+	r.caCert = newCluster.Status.CACert
+	if r.httpTransport != nil {
+		r.httpTransport.CloseIdleConnections()
+	}
+	r.httpTransport = transport
+
+	return transport, nil
+}
+
+func (r *RemoteService) cacertChanged(cluster *v3.Cluster) bool {
+	return r.caCert != cluster.Status.CACert
+}
+
 func (r *RemoteService) Close() {
+	if r.httpTransport != nil {
+		r.httpTransport.CloseIdleConnections()
+	}
 }
 
 func (r *RemoteService) Handler() http.Handler {
@@ -182,7 +222,7 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 		req.Header.Set("Authorization", token)
 	}
-	transport, err := r.transport()
+	transport, err := r.getTransport()
 	if err != nil {
 		er.Error(rw, req, err)
 		return
