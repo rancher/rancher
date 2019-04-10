@@ -23,6 +23,10 @@ type gzipResponseWriter struct {
 }
 
 func (g gzipResponseWriter) Write(b []byte) (int, error) {
+	if g.Header().Get("Content-Type") == "" {
+		// If Content-Type is not set, detect it to keep consistent with the non-gzip way, otherwise it falls back to application/x-gzip
+		g.Header().Set("Content-Type", http.DetectContentType(b))
+	}
 	return g.Writer.Write(b)
 }
 
