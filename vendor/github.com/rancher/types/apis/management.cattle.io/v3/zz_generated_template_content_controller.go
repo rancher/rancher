@@ -39,7 +39,7 @@ func NewTemplateContent(namespace, name string, obj TemplateContent) *TemplateCo
 type TemplateContentList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []TemplateContent
+	Items           []TemplateContent `json:"items"`
 }
 
 type TemplateContentHandlerFunc func(key string, obj *TemplateContent) (runtime.Object, error)

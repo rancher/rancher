@@ -40,7 +40,7 @@ func NewClusterUserAttribute(namespace, name string, obj ClusterUserAttribute) *
 type ClusterUserAttributeList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ClusterUserAttribute
+	Items           []ClusterUserAttribute `json:"items"`
 }
 
 type ClusterUserAttributeHandlerFunc func(key string, obj *ClusterUserAttribute) (runtime.Object, error)

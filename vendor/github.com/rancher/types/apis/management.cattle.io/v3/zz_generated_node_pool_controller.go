@@ -40,7 +40,7 @@ func NewNodePool(namespace, name string, obj NodePool) *NodePool {
 type NodePoolList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []NodePool
+	Items           []NodePool `json:"items"`
 }
 
 type NodePoolHandlerFunc func(key string, obj *NodePool) (runtime.Object, error)

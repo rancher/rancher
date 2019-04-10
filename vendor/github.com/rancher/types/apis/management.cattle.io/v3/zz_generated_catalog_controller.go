@@ -39,7 +39,7 @@ func NewCatalog(namespace, name string, obj Catalog) *Catalog {
 type CatalogList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Catalog
+	Items           []Catalog `json:"items"`
 }
 
 type CatalogHandlerFunc func(key string, obj *Catalog) (runtime.Object, error)

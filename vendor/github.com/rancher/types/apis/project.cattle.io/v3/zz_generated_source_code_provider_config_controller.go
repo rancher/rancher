@@ -40,7 +40,7 @@ func NewSourceCodeProviderConfig(namespace, name string, obj SourceCodeProviderC
 type SourceCodeProviderConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []SourceCodeProviderConfig
+	Items           []SourceCodeProviderConfig `json:"items"`
 }
 
 type SourceCodeProviderConfigHandlerFunc func(key string, obj *SourceCodeProviderConfig) (runtime.Object, error)

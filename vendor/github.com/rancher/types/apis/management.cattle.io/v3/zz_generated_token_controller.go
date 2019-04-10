@@ -39,7 +39,7 @@ func NewToken(namespace, name string, obj Token) *Token {
 type TokenList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Token
+	Items           []Token `json:"items"`
 }
 
 type TokenHandlerFunc func(key string, obj *Token) (runtime.Object, error)

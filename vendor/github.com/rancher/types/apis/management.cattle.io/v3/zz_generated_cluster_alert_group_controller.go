@@ -40,7 +40,7 @@ func NewClusterAlertGroup(namespace, name string, obj ClusterAlertGroup) *Cluste
 type ClusterAlertGroupList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ClusterAlertGroup
+	Items           []ClusterAlertGroup `json:"items"`
 }
 
 type ClusterAlertGroupHandlerFunc func(key string, obj *ClusterAlertGroup) (runtime.Object, error)

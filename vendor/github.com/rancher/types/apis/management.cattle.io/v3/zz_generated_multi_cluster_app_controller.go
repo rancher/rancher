@@ -40,7 +40,7 @@ func NewMultiClusterApp(namespace, name string, obj MultiClusterApp) *MultiClust
 type MultiClusterAppList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []MultiClusterApp
+	Items           []MultiClusterApp `json:"items"`
 }
 
 type MultiClusterAppHandlerFunc func(key string, obj *MultiClusterApp) (runtime.Object, error)

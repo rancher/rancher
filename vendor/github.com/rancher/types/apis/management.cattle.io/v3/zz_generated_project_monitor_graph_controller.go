@@ -40,7 +40,7 @@ func NewProjectMonitorGraph(namespace, name string, obj ProjectMonitorGraph) *Pr
 type ProjectMonitorGraphList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ProjectMonitorGraph
+	Items           []ProjectMonitorGraph `json:"items"`
 }
 
 type ProjectMonitorGraphHandlerFunc func(key string, obj *ProjectMonitorGraph) (runtime.Object, error)

@@ -40,7 +40,7 @@ func NewNamespace(namespace, name string, obj v1.Namespace) *v1.Namespace {
 type NamespaceList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.Namespace
+	Items           []v1.Namespace `json:"items"`
 }
 
 type NamespaceHandlerFunc func(key string, obj *v1.Namespace) (runtime.Object, error)

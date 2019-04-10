@@ -39,7 +39,7 @@ func NewGroupMember(namespace, name string, obj GroupMember) *GroupMember {
 type GroupMemberList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []GroupMember
+	Items           []GroupMember `json:"items"`
 }
 
 type GroupMemberHandlerFunc func(key string, obj *GroupMember) (runtime.Object, error)

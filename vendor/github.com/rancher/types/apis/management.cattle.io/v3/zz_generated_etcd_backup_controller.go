@@ -40,7 +40,7 @@ func NewEtcdBackup(namespace, name string, obj EtcdBackup) *EtcdBackup {
 type EtcdBackupList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []EtcdBackup
+	Items           []EtcdBackup `json:"items"`
 }
 
 type EtcdBackupHandlerFunc func(key string, obj *EtcdBackup) (runtime.Object, error)

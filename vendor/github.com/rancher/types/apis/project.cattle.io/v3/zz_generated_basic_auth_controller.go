@@ -40,7 +40,7 @@ func NewBasicAuth(namespace, name string, obj BasicAuth) *BasicAuth {
 type BasicAuthList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []BasicAuth
+	Items           []BasicAuth `json:"items"`
 }
 
 type BasicAuthHandlerFunc func(key string, obj *BasicAuth) (runtime.Object, error)

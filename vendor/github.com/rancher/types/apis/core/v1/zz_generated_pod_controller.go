@@ -41,7 +41,7 @@ func NewPod(namespace, name string, obj v1.Pod) *v1.Pod {
 type PodList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.Pod
+	Items           []v1.Pod `json:"items"`
 }
 
 type PodHandlerFunc func(key string, obj *v1.Pod) (runtime.Object, error)

@@ -40,7 +40,7 @@ func NewCloudCredential(namespace, name string, obj CloudCredential) *CloudCrede
 type CloudCredentialList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []CloudCredential
+	Items           []CloudCredential `json:"items"`
 }
 
 type CloudCredentialHandlerFunc func(key string, obj *CloudCredential) (runtime.Object, error)

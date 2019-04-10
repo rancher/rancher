@@ -41,7 +41,7 @@ func NewDeployment(namespace, name string, obj v1beta2.Deployment) *v1beta2.Depl
 type DeploymentList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1beta2.Deployment
+	Items           []v1beta2.Deployment `json:"items"`
 }
 
 type DeploymentHandlerFunc func(key string, obj *v1beta2.Deployment) (runtime.Object, error)

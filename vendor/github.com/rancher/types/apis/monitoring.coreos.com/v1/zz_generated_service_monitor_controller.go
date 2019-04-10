@@ -41,7 +41,7 @@ func NewServiceMonitor(namespace, name string, obj v1.ServiceMonitor) *v1.Servic
 type ServiceMonitorList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.ServiceMonitor
+	Items           []v1.ServiceMonitor `json:"items"`
 }
 
 type ServiceMonitorHandlerFunc func(key string, obj *v1.ServiceMonitor) (runtime.Object, error)

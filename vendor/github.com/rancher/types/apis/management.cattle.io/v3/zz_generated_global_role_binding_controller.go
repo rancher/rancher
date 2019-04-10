@@ -39,7 +39,7 @@ func NewGlobalRoleBinding(namespace, name string, obj GlobalRoleBinding) *Global
 type GlobalRoleBindingList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []GlobalRoleBinding
+	Items           []GlobalRoleBinding `json:"items"`
 }
 
 type GlobalRoleBindingHandlerFunc func(key string, obj *GlobalRoleBinding) (runtime.Object, error)

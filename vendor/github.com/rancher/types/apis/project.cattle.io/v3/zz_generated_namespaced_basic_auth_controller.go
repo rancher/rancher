@@ -40,7 +40,7 @@ func NewNamespacedBasicAuth(namespace, name string, obj NamespacedBasicAuth) *Na
 type NamespacedBasicAuthList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []NamespacedBasicAuth
+	Items           []NamespacedBasicAuth `json:"items"`
 }
 
 type NamespacedBasicAuthHandlerFunc func(key string, obj *NamespacedBasicAuth) (runtime.Object, error)

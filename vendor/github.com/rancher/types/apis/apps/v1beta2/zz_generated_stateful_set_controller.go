@@ -41,7 +41,7 @@ func NewStatefulSet(namespace, name string, obj v1beta2.StatefulSet) *v1beta2.St
 type StatefulSetList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1beta2.StatefulSet
+	Items           []v1beta2.StatefulSet `json:"items"`
 }
 
 type StatefulSetHandlerFunc func(key string, obj *v1beta2.StatefulSet) (runtime.Object, error)

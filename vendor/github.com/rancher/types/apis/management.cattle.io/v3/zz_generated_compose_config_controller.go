@@ -39,7 +39,7 @@ func NewComposeConfig(namespace, name string, obj ComposeConfig) *ComposeConfig 
 type ComposeConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ComposeConfig
+	Items           []ComposeConfig `json:"items"`
 }
 
 type ComposeConfigHandlerFunc func(key string, obj *ComposeConfig) (runtime.Object, error)

@@ -39,7 +39,7 @@ func NewSetting(namespace, name string, obj Setting) *Setting {
 type SettingList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Setting
+	Items           []Setting `json:"items"`
 }
 
 type SettingHandlerFunc func(key string, obj *Setting) (runtime.Object, error)

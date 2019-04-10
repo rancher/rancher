@@ -40,7 +40,7 @@ func NewGlobalDNS(namespace, name string, obj GlobalDNS) *GlobalDNS {
 type GlobalDNSList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []GlobalDNS
+	Items           []GlobalDNS `json:"items"`
 }
 
 type GlobalDNSHandlerFunc func(key string, obj *GlobalDNS) (runtime.Object, error)

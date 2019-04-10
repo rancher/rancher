@@ -40,7 +40,7 @@ func NewProjectAlertGroup(namespace, name string, obj ProjectAlertGroup) *Projec
 type ProjectAlertGroupList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ProjectAlertGroup
+	Items           []ProjectAlertGroup `json:"items"`
 }
 
 type ProjectAlertGroupHandlerFunc func(key string, obj *ProjectAlertGroup) (runtime.Object, error)

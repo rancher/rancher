@@ -40,7 +40,7 @@ func NewSourceCodeCredential(namespace, name string, obj SourceCodeCredential) *
 type SourceCodeCredentialList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []SourceCodeCredential
+	Items           []SourceCodeCredential `json:"items"`
 }
 
 type SourceCodeCredentialHandlerFunc func(key string, obj *SourceCodeCredential) (runtime.Object, error)

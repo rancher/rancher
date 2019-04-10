@@ -40,7 +40,7 @@ func NewMultiClusterAppRevision(namespace, name string, obj MultiClusterAppRevis
 type MultiClusterAppRevisionList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []MultiClusterAppRevision
+	Items           []MultiClusterAppRevision `json:"items"`
 }
 
 type MultiClusterAppRevisionHandlerFunc func(key string, obj *MultiClusterAppRevision) (runtime.Object, error)

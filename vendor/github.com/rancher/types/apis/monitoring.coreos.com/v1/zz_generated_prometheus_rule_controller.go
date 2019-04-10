@@ -41,7 +41,7 @@ func NewPrometheusRule(namespace, name string, obj v1.PrometheusRule) *v1.Promet
 type PrometheusRuleList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.PrometheusRule
+	Items           []v1.PrometheusRule `json:"items"`
 }
 
 type PrometheusRuleHandlerFunc func(key string, obj *v1.PrometheusRule) (runtime.Object, error)

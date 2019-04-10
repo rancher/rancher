@@ -40,7 +40,7 @@ func NewPreference(namespace, name string, obj Preference) *Preference {
 type PreferenceList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Preference
+	Items           []Preference `json:"items"`
 }
 
 type PreferenceHandlerFunc func(key string, obj *Preference) (runtime.Object, error)

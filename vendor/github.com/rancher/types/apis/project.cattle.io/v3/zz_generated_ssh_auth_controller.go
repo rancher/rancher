@@ -40,7 +40,7 @@ func NewSSHAuth(namespace, name string, obj SSHAuth) *SSHAuth {
 type SSHAuthList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []SSHAuth
+	Items           []SSHAuth `json:"items"`
 }
 
 type SSHAuthHandlerFunc func(key string, obj *SSHAuth) (runtime.Object, error)

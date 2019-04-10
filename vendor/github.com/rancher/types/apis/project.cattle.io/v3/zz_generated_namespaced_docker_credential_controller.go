@@ -40,7 +40,7 @@ func NewNamespacedDockerCredential(namespace, name string, obj NamespacedDockerC
 type NamespacedDockerCredentialList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []NamespacedDockerCredential
+	Items           []NamespacedDockerCredential `json:"items"`
 }
 
 type NamespacedDockerCredentialHandlerFunc func(key string, obj *NamespacedDockerCredential) (runtime.Object, error)

@@ -40,7 +40,7 @@ func NewClusterRegistrationToken(namespace, name string, obj ClusterRegistration
 type ClusterRegistrationTokenList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ClusterRegistrationToken
+	Items           []ClusterRegistrationToken `json:"items"`
 }
 
 type ClusterRegistrationTokenHandlerFunc func(key string, obj *ClusterRegistrationToken) (runtime.Object, error)

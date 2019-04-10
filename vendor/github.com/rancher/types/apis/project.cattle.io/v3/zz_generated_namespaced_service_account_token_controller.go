@@ -40,7 +40,7 @@ func NewNamespacedServiceAccountToken(namespace, name string, obj NamespacedServ
 type NamespacedServiceAccountTokenList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []NamespacedServiceAccountToken
+	Items           []NamespacedServiceAccountToken `json:"items"`
 }
 
 type NamespacedServiceAccountTokenHandlerFunc func(key string, obj *NamespacedServiceAccountToken) (runtime.Object, error)

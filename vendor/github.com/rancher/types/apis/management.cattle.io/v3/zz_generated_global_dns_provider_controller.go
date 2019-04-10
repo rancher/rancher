@@ -40,7 +40,7 @@ func NewGlobalDNSProvider(namespace, name string, obj GlobalDNSProvider) *Global
 type GlobalDNSProviderList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []GlobalDNSProvider
+	Items           []GlobalDNSProvider `json:"items"`
 }
 
 type GlobalDNSProviderHandlerFunc func(key string, obj *GlobalDNSProvider) (runtime.Object, error)

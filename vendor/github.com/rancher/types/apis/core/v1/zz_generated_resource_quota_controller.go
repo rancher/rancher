@@ -41,7 +41,7 @@ func NewResourceQuota(namespace, name string, obj v1.ResourceQuota) *v1.Resource
 type ResourceQuotaList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.ResourceQuota
+	Items           []v1.ResourceQuota `json:"items"`
 }
 
 type ResourceQuotaHandlerFunc func(key string, obj *v1.ResourceQuota) (runtime.Object, error)

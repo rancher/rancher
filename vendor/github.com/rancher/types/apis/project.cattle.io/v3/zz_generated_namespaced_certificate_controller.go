@@ -40,7 +40,7 @@ func NewNamespacedCertificate(namespace, name string, obj NamespacedCertificate)
 type NamespacedCertificateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []NamespacedCertificate
+	Items           []NamespacedCertificate `json:"items"`
 }
 
 type NamespacedCertificateHandlerFunc func(key string, obj *NamespacedCertificate) (runtime.Object, error)

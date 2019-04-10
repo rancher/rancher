@@ -39,7 +39,7 @@ func NewGlobalRole(namespace, name string, obj GlobalRole) *GlobalRole {
 type GlobalRoleList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []GlobalRole
+	Items           []GlobalRole `json:"items"`
 }
 
 type GlobalRoleHandlerFunc func(key string, obj *GlobalRole) (runtime.Object, error)

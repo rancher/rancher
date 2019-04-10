@@ -40,7 +40,7 @@ func NewSourceCodeRepository(namespace, name string, obj SourceCodeRepository) *
 type SourceCodeRepositoryList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []SourceCodeRepository
+	Items           []SourceCodeRepository `json:"items"`
 }
 
 type SourceCodeRepositoryHandlerFunc func(key string, obj *SourceCodeRepository) (runtime.Object, error)

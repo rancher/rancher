@@ -41,7 +41,7 @@ func NewIngress(namespace, name string, obj v1beta1.Ingress) *v1beta1.Ingress {
 type IngressList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1beta1.Ingress
+	Items           []v1beta1.Ingress `json:"items"`
 }
 
 type IngressHandlerFunc func(key string, obj *v1beta1.Ingress) (runtime.Object, error)

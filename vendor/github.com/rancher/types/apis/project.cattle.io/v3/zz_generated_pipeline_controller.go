@@ -40,7 +40,7 @@ func NewPipeline(namespace, name string, obj Pipeline) *Pipeline {
 type PipelineList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Pipeline
+	Items           []Pipeline `json:"items"`
 }
 
 type PipelineHandlerFunc func(key string, obj *Pipeline) (runtime.Object, error)

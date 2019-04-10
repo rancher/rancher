@@ -41,7 +41,7 @@ func NewReplicaSet(namespace, name string, obj v1beta2.ReplicaSet) *v1beta2.Repl
 type ReplicaSetList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1beta2.ReplicaSet
+	Items           []v1beta2.ReplicaSet `json:"items"`
 }
 
 type ReplicaSetHandlerFunc func(key string, obj *v1beta2.ReplicaSet) (runtime.Object, error)

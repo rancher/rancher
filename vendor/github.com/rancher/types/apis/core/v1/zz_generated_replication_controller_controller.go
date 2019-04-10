@@ -41,7 +41,7 @@ func NewReplicationController(namespace, name string, obj v1.ReplicationControll
 type ReplicationControllerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.ReplicationController
+	Items           []v1.ReplicationController `json:"items"`
 }
 
 type ReplicationControllerHandlerFunc func(key string, obj *v1.ReplicationController) (runtime.Object, error)

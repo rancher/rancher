@@ -41,7 +41,7 @@ func NewServiceAccount(namespace, name string, obj v1.ServiceAccount) *v1.Servic
 type ServiceAccountList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.ServiceAccount
+	Items           []v1.ServiceAccount `json:"items"`
 }
 
 type ServiceAccountHandlerFunc func(key string, obj *v1.ServiceAccount) (runtime.Object, error)

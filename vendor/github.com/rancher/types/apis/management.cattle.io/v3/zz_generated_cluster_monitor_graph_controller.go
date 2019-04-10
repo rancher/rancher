@@ -40,7 +40,7 @@ func NewClusterMonitorGraph(namespace, name string, obj ClusterMonitorGraph) *Cl
 type ClusterMonitorGraphList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ClusterMonitorGraph
+	Items           []ClusterMonitorGraph `json:"items"`
 }
 
 type ClusterMonitorGraphHandlerFunc func(key string, obj *ClusterMonitorGraph) (runtime.Object, error)

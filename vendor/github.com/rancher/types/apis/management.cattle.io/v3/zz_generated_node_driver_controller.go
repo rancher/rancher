@@ -39,7 +39,7 @@ func NewNodeDriver(namespace, name string, obj NodeDriver) *NodeDriver {
 type NodeDriverList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []NodeDriver
+	Items           []NodeDriver `json:"items"`
 }
 
 type NodeDriverHandlerFunc func(key string, obj *NodeDriver) (runtime.Object, error)

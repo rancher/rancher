@@ -39,7 +39,7 @@ func NewKontainerDriver(namespace, name string, obj KontainerDriver) *KontainerD
 type KontainerDriverList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []KontainerDriver
+	Items           []KontainerDriver `json:"items"`
 }
 
 type KontainerDriverHandlerFunc func(key string, obj *KontainerDriver) (runtime.Object, error)

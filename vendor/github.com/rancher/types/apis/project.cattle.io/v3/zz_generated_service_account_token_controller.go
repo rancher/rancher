@@ -40,7 +40,7 @@ func NewServiceAccountToken(namespace, name string, obj ServiceAccountToken) *Se
 type ServiceAccountTokenList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ServiceAccountToken
+	Items           []ServiceAccountToken `json:"items"`
 }
 
 type ServiceAccountTokenHandlerFunc func(key string, obj *ServiceAccountToken) (runtime.Object, error)

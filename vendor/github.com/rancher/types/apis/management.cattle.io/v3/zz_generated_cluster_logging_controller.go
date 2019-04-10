@@ -40,7 +40,7 @@ func NewClusterLogging(namespace, name string, obj ClusterLogging) *ClusterLoggi
 type ClusterLoggingList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ClusterLogging
+	Items           []ClusterLogging `json:"items"`
 }
 
 type ClusterLoggingHandlerFunc func(key string, obj *ClusterLogging) (runtime.Object, error)

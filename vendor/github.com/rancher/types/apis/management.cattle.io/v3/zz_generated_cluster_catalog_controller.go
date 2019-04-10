@@ -40,7 +40,7 @@ func NewClusterCatalog(namespace, name string, obj ClusterCatalog) *ClusterCatal
 type ClusterCatalogList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ClusterCatalog
+	Items           []ClusterCatalog `json:"items"`
 }
 
 type ClusterCatalogHandlerFunc func(key string, obj *ClusterCatalog) (runtime.Object, error)

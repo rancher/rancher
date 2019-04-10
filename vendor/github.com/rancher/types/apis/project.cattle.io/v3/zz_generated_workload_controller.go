@@ -40,7 +40,7 @@ func NewWorkload(namespace, name string, obj Workload) *Workload {
 type WorkloadList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Workload
+	Items           []Workload `json:"items"`
 }
 
 type WorkloadHandlerFunc func(key string, obj *Workload) (runtime.Object, error)
