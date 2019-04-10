@@ -67,6 +67,8 @@ func Start(ctx context.Context, httpPort, httpsPort int, localClusterEnabled boo
 
 	samlRoot := saml.AuthHandler()
 	chain := responsewriter.NewMiddlewareChain(responsewriter.Gzip, responsewriter.NoCache, responsewriter.DenyFrameOptions, responsewriter.ContentType, ui.UI)
+	chainGzip := responsewriter.NewMiddlewareChain(responsewriter.Gzip)
+
 	root.Handle("/", chain.Handler(managementAPI))
 	root.PathPrefix("/v3-public").Handler(publicAPI)
 	root.Handle("/v3/import/{token}.yaml", http.HandlerFunc(clusterregistrationtokens.ClusterImportHandler))
@@ -76,7 +78,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, localClusterEnabled boo
 	root.Handle("/v3/settings/cacerts", rawAuthedAPIs).Methods(http.MethodGet)
 	root.Handle("/v3/settings/first-login", rawAuthedAPIs).Methods(http.MethodGet)
 	root.Handle("/v3/settings/ui-pl", rawAuthedAPIs).Methods(http.MethodGet)
-	root.PathPrefix("/v3").Handler(auditHandler)
+	root.PathPrefix("/v3").Handler(chainGzip.Handler(auditHandler))
 	root.PathPrefix("/hooks").Handler(webhookHandler)
 	root.PathPrefix("/k8s/clusters/").Handler(auditHandler)
 	root.PathPrefix("/meta").Handler(auditHandler)
