@@ -67,7 +67,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, localClusterEnabled boo
 
 	samlRoot := saml.AuthHandler()
 	chain := responsewriter.NewMiddlewareChain(responsewriter.Gzip, responsewriter.NoCache, responsewriter.DenyFrameOptions, responsewriter.ContentType, ui.UI)
-	chainGzip := responsewriter.NewMiddlewareChain(responsewriter.Gzip)
+	chainGzip := responsewriter.NewMiddlewareChain(responsewriter.Gzip, responsewriter.ContentType)
 
 	root.Handle("/", chain.Handler(managementAPI))
 	root.PathPrefix("/v3-public").Handler(publicAPI)
