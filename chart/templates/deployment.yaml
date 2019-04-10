@@ -109,6 +109,10 @@ spec:
 {{ toYaml .Values.resources | indent 10 }}
         volumeMounts:
 {{- if .Values.additionalTrustedCAs }}
+        - mountPath: /etc/ssl/certs/ca-additional.pem
+          name: tls-ca-additional-volume
+          subPath: ca-additional.pem
+          readOnly: true
         - mountPath: /etc/rancher/ssl/ca-additional.pem
           name: tls-ca-additional-volume
           subPath: ca-additional.pem
