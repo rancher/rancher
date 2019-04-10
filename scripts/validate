@@ -3,11 +3,13 @@ set -e
 
 cd $(dirname $0)/..
 
-echo Running: gometalinter
-if [ -n "$(gometalinter ./... --vendor | tee /dev/stderr)" ]; then
+if ! command -v golangci-lint; then
+    echo Skipping validation: no golangci-lint available
+    exit
+fi
+echo Running: golang-ci
+if [ -n "$(golangci-lint run | tee /dev/stderr)" ]; then
     failed=true
 fi
 test -z "$failed"
 
-echo Running: go fmt
-test -z "$(go fmt ./... | tee /dev/stderr)"
