@@ -79,6 +79,14 @@ func (h *Helm) request(pathURL, method string) (*http.Response, error) {
 		return nil, err
 	}
 
+	if !baseEndpoint.IsAbs() {
+		helmURL, err := url.Parse(h.url)
+		if err != nil {
+			return nil, err
+		}
+		baseEndpoint = helmURL.ResolveReference(baseEndpoint)
+	}
+
 	if len(h.username) > 0 && len(h.password) > 0 {
 		baseEndpoint.User = url.UserPassword(h.username, h.password)
 	}
