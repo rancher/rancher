@@ -391,4 +391,4 @@ def test_appropriate_users_can_see_kontainer_drivers(user_factory):
     assert len(kds) > 5
 
     kds = user_factory('settings-manage').client.list_kontainer_driver()
-    assert len(kds) > 5
+    assert len(kds) == 0
