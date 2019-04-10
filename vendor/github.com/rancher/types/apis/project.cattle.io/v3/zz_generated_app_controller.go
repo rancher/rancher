@@ -40,7 +40,7 @@ func NewApp(namespace, name string, obj App) *App {
 type AppList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []App
+	Items           []App `json:"items"`
 }
 
 type AppHandlerFunc func(key string, obj *App) (runtime.Object, error)

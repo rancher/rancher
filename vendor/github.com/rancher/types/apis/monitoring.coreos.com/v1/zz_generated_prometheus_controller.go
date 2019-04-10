@@ -41,7 +41,7 @@ func NewPrometheus(namespace, name string, obj v1.Prometheus) *v1.Prometheus {
 type PrometheusList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.Prometheus
+	Items           []v1.Prometheus `json:"items"`
 }
 
 type PrometheusHandlerFunc func(key string, obj *v1.Prometheus) (runtime.Object, error)

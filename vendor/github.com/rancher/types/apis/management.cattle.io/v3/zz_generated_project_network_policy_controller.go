@@ -40,7 +40,7 @@ func NewProjectNetworkPolicy(namespace, name string, obj ProjectNetworkPolicy) *
 type ProjectNetworkPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ProjectNetworkPolicy
+	Items           []ProjectNetworkPolicy `json:"items"`
 }
 
 type ProjectNetworkPolicyHandlerFunc func(key string, obj *ProjectNetworkPolicy) (runtime.Object, error)

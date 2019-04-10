@@ -40,7 +40,7 @@ func NewCertificate(namespace, name string, obj Certificate) *Certificate {
 type CertificateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Certificate
+	Items           []Certificate `json:"items"`
 }
 
 type CertificateHandlerFunc func(key string, obj *Certificate) (runtime.Object, error)

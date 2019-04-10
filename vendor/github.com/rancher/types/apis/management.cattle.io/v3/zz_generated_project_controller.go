@@ -40,7 +40,7 @@ func NewProject(namespace, name string, obj Project) *Project {
 type ProjectList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Project
+	Items           []Project `json:"items"`
 }
 
 type ProjectHandlerFunc func(key string, obj *Project) (runtime.Object, error)

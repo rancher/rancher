@@ -41,7 +41,7 @@ func NewRole(namespace, name string, obj v1.Role) *v1.Role {
 type RoleList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.Role
+	Items           []v1.Role `json:"items"`
 }
 
 type RoleHandlerFunc func(key string, obj *v1.Role) (runtime.Object, error)

@@ -40,7 +40,7 @@ func NewProjectRoleTemplateBinding(namespace, name string, obj ProjectRoleTempla
 type ProjectRoleTemplateBindingList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ProjectRoleTemplateBinding
+	Items           []ProjectRoleTemplateBinding `json:"items"`
 }
 
 type ProjectRoleTemplateBindingHandlerFunc func(key string, obj *ProjectRoleTemplateBinding) (runtime.Object, error)

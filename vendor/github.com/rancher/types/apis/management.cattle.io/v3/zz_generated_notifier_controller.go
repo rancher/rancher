@@ -40,7 +40,7 @@ func NewNotifier(namespace, name string, obj Notifier) *Notifier {
 type NotifierList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Notifier
+	Items           []Notifier `json:"items"`
 }
 
 type NotifierHandlerFunc func(key string, obj *Notifier) (runtime.Object, error)

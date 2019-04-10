@@ -40,7 +40,7 @@ func NewComponentStatus(namespace, name string, obj v1.ComponentStatus) *v1.Comp
 type ComponentStatusList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.ComponentStatus
+	Items           []v1.ComponentStatus `json:"items"`
 }
 
 type ComponentStatusHandlerFunc func(key string, obj *v1.ComponentStatus) (runtime.Object, error)

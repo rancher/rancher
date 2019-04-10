@@ -40,7 +40,7 @@ func NewDockerCredential(namespace, name string, obj DockerCredential) *DockerCr
 type DockerCredentialList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []DockerCredential
+	Items           []DockerCredential `json:"items"`
 }
 
 type DockerCredentialHandlerFunc func(key string, obj *DockerCredential) (runtime.Object, error)

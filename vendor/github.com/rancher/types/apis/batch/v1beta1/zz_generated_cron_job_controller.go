@@ -41,7 +41,7 @@ func NewCronJob(namespace, name string, obj v1beta1.CronJob) *v1beta1.CronJob {
 type CronJobList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1beta1.CronJob
+	Items           []v1beta1.CronJob `json:"items"`
 }
 
 type CronJobHandlerFunc func(key string, obj *v1beta1.CronJob) (runtime.Object, error)

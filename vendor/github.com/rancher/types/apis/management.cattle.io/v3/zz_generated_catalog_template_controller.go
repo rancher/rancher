@@ -40,7 +40,7 @@ func NewCatalogTemplate(namespace, name string, obj CatalogTemplate) *CatalogTem
 type CatalogTemplateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []CatalogTemplate
+	Items           []CatalogTemplate `json:"items"`
 }
 
 type CatalogTemplateHandlerFunc func(key string, obj *CatalogTemplate) (runtime.Object, error)

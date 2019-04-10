@@ -40,7 +40,7 @@ func NewProjectLogging(namespace, name string, obj ProjectLogging) *ProjectLoggi
 type ProjectLoggingList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ProjectLogging
+	Items           []ProjectLogging `json:"items"`
 }
 
 type ProjectLoggingHandlerFunc func(key string, obj *ProjectLogging) (runtime.Object, error)

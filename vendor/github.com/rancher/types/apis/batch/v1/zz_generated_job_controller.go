@@ -41,7 +41,7 @@ func NewJob(namespace, name string, obj v1.Job) *v1.Job {
 type JobList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.Job
+	Items           []v1.Job `json:"items"`
 }
 
 type JobHandlerFunc func(key string, obj *v1.Job) (runtime.Object, error)

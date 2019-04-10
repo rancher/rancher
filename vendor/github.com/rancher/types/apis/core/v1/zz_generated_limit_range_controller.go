@@ -41,7 +41,7 @@ func NewLimitRange(namespace, name string, obj v1.LimitRange) *v1.LimitRange {
 type LimitRangeList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.LimitRange
+	Items           []v1.LimitRange `json:"items"`
 }
 
 type LimitRangeHandlerFunc func(key string, obj *v1.LimitRange) (runtime.Object, error)

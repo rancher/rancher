@@ -41,7 +41,7 @@ func NewSecret(namespace, name string, obj v1.Secret) *v1.Secret {
 type SecretList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.Secret
+	Items           []v1.Secret `json:"items"`
 }
 
 type SecretHandlerFunc func(key string, obj *v1.Secret) (runtime.Object, error)

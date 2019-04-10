@@ -41,7 +41,7 @@ func NewEndpoints(namespace, name string, obj v1.Endpoints) *v1.Endpoints {
 type EndpointsList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.Endpoints
+	Items           []v1.Endpoints `json:"items"`
 }
 
 type EndpointsHandlerFunc func(key string, obj *v1.Endpoints) (runtime.Object, error)

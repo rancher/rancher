@@ -39,7 +39,7 @@ func NewLdapConfig(namespace, name string, obj LdapConfig) *LdapConfig {
 type LdapConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []LdapConfig
+	Items           []LdapConfig `json:"items"`
 }
 
 type LdapConfigHandlerFunc func(key string, obj *LdapConfig) (runtime.Object, error)

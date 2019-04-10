@@ -39,7 +39,7 @@ func NewRoleTemplate(namespace, name string, obj RoleTemplate) *RoleTemplate {
 type RoleTemplateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []RoleTemplate
+	Items           []RoleTemplate `json:"items"`
 }
 
 type RoleTemplateHandlerFunc func(key string, obj *RoleTemplate) (runtime.Object, error)

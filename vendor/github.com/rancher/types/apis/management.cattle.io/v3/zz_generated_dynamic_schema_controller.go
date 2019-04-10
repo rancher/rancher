@@ -39,7 +39,7 @@ func NewDynamicSchema(namespace, name string, obj DynamicSchema) *DynamicSchema 
 type DynamicSchemaList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []DynamicSchema
+	Items           []DynamicSchema `json:"items"`
 }
 
 type DynamicSchemaHandlerFunc func(key string, obj *DynamicSchema) (runtime.Object, error)

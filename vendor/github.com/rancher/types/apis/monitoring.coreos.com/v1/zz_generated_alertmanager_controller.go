@@ -41,7 +41,7 @@ func NewAlertmanager(namespace, name string, obj v1.Alertmanager) *v1.Alertmanag
 type AlertmanagerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.Alertmanager
+	Items           []v1.Alertmanager `json:"items"`
 }
 
 type AlertmanagerHandlerFunc func(key string, obj *v1.Alertmanager) (runtime.Object, error)

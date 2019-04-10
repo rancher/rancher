@@ -40,7 +40,7 @@ func NewNode(namespace, name string, obj Node) *Node {
 type NodeList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Node
+	Items           []Node `json:"items"`
 }
 
 type NodeHandlerFunc func(key string, obj *Node) (runtime.Object, error)

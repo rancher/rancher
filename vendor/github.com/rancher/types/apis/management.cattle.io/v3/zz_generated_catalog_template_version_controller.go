@@ -40,7 +40,7 @@ func NewCatalogTemplateVersion(namespace, name string, obj CatalogTemplateVersio
 type CatalogTemplateVersionList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []CatalogTemplateVersion
+	Items           []CatalogTemplateVersion `json:"items"`
 }
 
 type CatalogTemplateVersionHandlerFunc func(key string, obj *CatalogTemplateVersion) (runtime.Object, error)

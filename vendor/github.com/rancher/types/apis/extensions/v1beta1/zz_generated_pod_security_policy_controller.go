@@ -40,7 +40,7 @@ func NewPodSecurityPolicy(namespace, name string, obj v1beta1.PodSecurityPolicy)
 type PodSecurityPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1beta1.PodSecurityPolicy
+	Items           []v1beta1.PodSecurityPolicy `json:"items"`
 }
 
 type PodSecurityPolicyHandlerFunc func(key string, obj *v1beta1.PodSecurityPolicy) (runtime.Object, error)

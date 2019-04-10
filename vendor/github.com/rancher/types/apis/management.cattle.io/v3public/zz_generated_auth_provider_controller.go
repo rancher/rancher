@@ -39,7 +39,7 @@ func NewAuthProvider(namespace, name string, obj AuthProvider) *AuthProvider {
 type AuthProviderList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []AuthProvider
+	Items           []AuthProvider `json:"items"`
 }
 
 type AuthProviderHandlerFunc func(key string, obj *AuthProvider) (runtime.Object, error)

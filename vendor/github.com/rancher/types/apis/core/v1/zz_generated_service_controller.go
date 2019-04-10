@@ -41,7 +41,7 @@ func NewService(namespace, name string, obj v1.Service) *v1.Service {
 type ServiceList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.Service
+	Items           []v1.Service `json:"items"`
 }
 
 type ServiceHandlerFunc func(key string, obj *v1.Service) (runtime.Object, error)

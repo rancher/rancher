@@ -40,7 +40,7 @@ func NewClusterRoleBinding(namespace, name string, obj v1.ClusterRoleBinding) *v
 type ClusterRoleBindingList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.ClusterRoleBinding
+	Items           []v1.ClusterRoleBinding `json:"items"`
 }
 
 type ClusterRoleBindingHandlerFunc func(key string, obj *v1.ClusterRoleBinding) (runtime.Object, error)

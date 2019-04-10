@@ -40,7 +40,7 @@ func NewPodSecurityPolicyTemplateProjectBinding(namespace, name string, obj PodS
 type PodSecurityPolicyTemplateProjectBindingList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []PodSecurityPolicyTemplateProjectBinding
+	Items           []PodSecurityPolicyTemplateProjectBinding `json:"items"`
 }
 
 type PodSecurityPolicyTemplateProjectBindingHandlerFunc func(key string, obj *PodSecurityPolicyTemplateProjectBinding) (runtime.Object, error)

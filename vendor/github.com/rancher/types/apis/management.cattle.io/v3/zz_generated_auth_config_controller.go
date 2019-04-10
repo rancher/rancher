@@ -39,7 +39,7 @@ func NewAuthConfig(namespace, name string, obj AuthConfig) *AuthConfig {
 type AuthConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []AuthConfig
+	Items           []AuthConfig `json:"items"`
 }
 
 type AuthConfigHandlerFunc func(key string, obj *AuthConfig) (runtime.Object, error)

@@ -41,7 +41,7 @@ func NewNetworkPolicy(namespace, name string, obj v1.NetworkPolicy) *v1.NetworkP
 type NetworkPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.NetworkPolicy
+	Items           []v1.NetworkPolicy `json:"items"`
 }
 
 type NetworkPolicyHandlerFunc func(key string, obj *v1.NetworkPolicy) (runtime.Object, error)

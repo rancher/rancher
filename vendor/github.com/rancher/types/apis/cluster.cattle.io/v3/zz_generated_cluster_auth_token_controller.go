@@ -40,7 +40,7 @@ func NewClusterAuthToken(namespace, name string, obj ClusterAuthToken) *ClusterA
 type ClusterAuthTokenList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ClusterAuthToken
+	Items           []ClusterAuthToken `json:"items"`
 }
 
 type ClusterAuthTokenHandlerFunc func(key string, obj *ClusterAuthToken) (runtime.Object, error)

@@ -39,7 +39,7 @@ func NewCluster(namespace, name string, obj Cluster) *Cluster {
 type ClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Cluster
+	Items           []Cluster `json:"items"`
 }
 
 type ClusterHandlerFunc func(key string, obj *Cluster) (runtime.Object, error)

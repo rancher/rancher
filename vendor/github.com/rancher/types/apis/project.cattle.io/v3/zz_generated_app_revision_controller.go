@@ -40,7 +40,7 @@ func NewAppRevision(namespace, name string, obj AppRevision) *AppRevision {
 type AppRevisionList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []AppRevision
+	Items           []AppRevision `json:"items"`
 }
 
 type AppRevisionHandlerFunc func(key string, obj *AppRevision) (runtime.Object, error)

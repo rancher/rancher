@@ -39,7 +39,7 @@ func NewListenConfig(namespace, name string, obj ListenConfig) *ListenConfig {
 type ListenConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ListenConfig
+	Items           []ListenConfig `json:"items"`
 }
 
 type ListenConfigHandlerFunc func(key string, obj *ListenConfig) (runtime.Object, error)

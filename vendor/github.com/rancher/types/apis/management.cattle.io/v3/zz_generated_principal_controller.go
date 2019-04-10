@@ -39,7 +39,7 @@ func NewPrincipal(namespace, name string, obj Principal) *Principal {
 type PrincipalList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Principal
+	Items           []Principal `json:"items"`
 }
 
 type PrincipalHandlerFunc func(key string, obj *Principal) (runtime.Object, error)

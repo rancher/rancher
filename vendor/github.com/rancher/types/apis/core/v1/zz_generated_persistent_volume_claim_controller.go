@@ -41,7 +41,7 @@ func NewPersistentVolumeClaim(namespace, name string, obj v1.PersistentVolumeCla
 type PersistentVolumeClaimList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.PersistentVolumeClaim
+	Items           []v1.PersistentVolumeClaim `json:"items"`
 }
 
 type PersistentVolumeClaimHandlerFunc func(key string, obj *v1.PersistentVolumeClaim) (runtime.Object, error)

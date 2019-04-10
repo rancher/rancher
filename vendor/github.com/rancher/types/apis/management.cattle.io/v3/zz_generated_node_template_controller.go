@@ -40,7 +40,7 @@ func NewNodeTemplate(namespace, name string, obj NodeTemplate) *NodeTemplate {
 type NodeTemplateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []NodeTemplate
+	Items           []NodeTemplate `json:"items"`
 }
 
 type NodeTemplateHandlerFunc func(key string, obj *NodeTemplate) (runtime.Object, error)

@@ -41,7 +41,7 @@ func NewDaemonSet(namespace, name string, obj v1beta2.DaemonSet) *v1beta2.Daemon
 type DaemonSetList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1beta2.DaemonSet
+	Items           []v1beta2.DaemonSet `json:"items"`
 }
 
 type DaemonSetHandlerFunc func(key string, obj *v1beta2.DaemonSet) (runtime.Object, error)

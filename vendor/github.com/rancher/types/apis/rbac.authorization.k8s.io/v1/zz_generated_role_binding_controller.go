@@ -41,7 +41,7 @@ func NewRoleBinding(namespace, name string, obj v1.RoleBinding) *v1.RoleBinding 
 type RoleBindingList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.RoleBinding
+	Items           []v1.RoleBinding `json:"items"`
 }
 
 type RoleBindingHandlerFunc func(key string, obj *v1.RoleBinding) (runtime.Object, error)

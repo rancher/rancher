@@ -39,7 +39,7 @@ func NewUserAttribute(namespace, name string, obj UserAttribute) *UserAttribute 
 type UserAttributeList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []UserAttribute
+	Items           []UserAttribute `json:"items"`
 }
 
 type UserAttributeHandlerFunc func(key string, obj *UserAttribute) (runtime.Object, error)

@@ -41,7 +41,7 @@ func NewConfigMap(namespace, name string, obj v1.ConfigMap) *v1.ConfigMap {
 type ConfigMapList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.ConfigMap
+	Items           []v1.ConfigMap `json:"items"`
 }
 
 type ConfigMapHandlerFunc func(key string, obj *v1.ConfigMap) (runtime.Object, error)

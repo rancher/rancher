@@ -40,7 +40,7 @@ func NewEvent(namespace, name string, obj v1.Event) *v1.Event {
 type EventList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []v1.Event
+	Items           []v1.Event `json:"items"`
 }
 
 type EventHandlerFunc func(key string, obj *v1.Event) (runtime.Object, error)
