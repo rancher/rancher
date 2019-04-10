@@ -177,6 +177,8 @@ spec:
           mountPath: /var/run
         - name: run
           mountPath: /run
+        - name: docker-certs
+          mountPath: /etc/docker/certs.d
         securityContext:
           privileged: true
       volumes:
@@ -195,6 +197,10 @@ spec:
       - name: cattle-credentials
         secret:
           secretName: cattle-credentials-{{.TokenKey}}
+      - hostPath:
+          path: /etc/docker/certs.d
+          type: DirectoryOrCreate
+        name: docker-certs
   updateStrategy:
     type: RollingUpdate
 
