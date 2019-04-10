@@ -148,7 +148,7 @@ def test_enabling_driver_exposes_schema(admin_mc, wait_remove_resource):
         URL = DRIVER_ARM64_URL2
     kd = admin_mc.client.create_kontainerDriver(
         createDynamicSchema=True,
-        active=False,
+            active=False,
         url=URL
     )
     wait_remove_resource(kd)
