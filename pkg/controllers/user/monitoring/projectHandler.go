@@ -30,6 +30,10 @@ func (ph *projectHandler) sync(key string, project *mgmtv3.Project) (runtime.Obj
 		return project, nil
 	}
 
+	if !mgmtv3.NamespaceBackedResource.IsTrue(project) || !mgmtv3.ProjectConditionInitialRolesPopulated.IsTrue(project) {
+		return project, nil
+	}
+
 	clusterID := project.Spec.ClusterName
 	cluster, err := ph.cattleClusterClient.Get(clusterID, metav1.GetOptions{})
 	if err != nil {
@@ -42,6 +46,10 @@ func (ph *projectHandler) sync(key string, project *mgmtv3.Project) (runtime.Obj
 	cpy := src.DeepCopy()
 
 	err = ph.doRevertSync(cpy, clusterName)
+	if err == nil {
+		err = ph.doProjectGraphsSync(cpy)
+	}
+
 	if !reflect.DeepEqual(cpy, src) {
 		updated, updateErr := ph.cattleProjectClient.Update(cpy)
 		if updateErr != nil {
@@ -60,23 +68,6 @@ func (ph *projectHandler) sync(key string, project *mgmtv3.Project) (runtime.Obj
 
 // doRevertSync reverts all previous enabling Project Monitoring
 func (ph *projectHandler) doRevertSync(project *mgmtv3.Project, clusterName string) error {
-	if !mgmtv3.NamespaceBackedResource.IsTrue(project) && !mgmtv3.ProjectConditionInitialRolesPopulated.IsTrue(project) {
-		return nil
-	}
-
-	// drop metrics expressions from management cluster
-	if !mgmtv3.ProjectConditionMetricExpressionDeployed.IsFalse(project) {
-		for _, graph := range preDefinedProjectGraph {
-			err := ph.app.cattleProjectGraphClient.DeleteNamespaced(project.Name, graph.Name, &metav1.DeleteOptions{})
-			if err != nil && !apierrors.IsNotFound(err) {
-				return errors.Wrap(err, "failed to withdraw metric expression")
-			}
-		}
-
-		mgmtv3.ProjectConditionMetricExpressionDeployed.False(project)
-		mgmtv3.ProjectConditionMetricExpressionDeployed.Message(project, "")
-	}
-
 	// drop project monitoring from user cluster
 	if project.Spec.EnableProjectMonitoring {
 		project.Spec.EnableProjectMonitoring = false
@@ -103,27 +94,6 @@ func (ph *projectHandler) doRevertSync(project *mgmtv3.Project, clusterName stri
 }
 
 func (ph *projectHandler) doSync(project *mgmtv3.Project, clusterName string) error {
-	if !mgmtv3.NamespaceBackedResource.IsTrue(project) && !mgmtv3.ProjectConditionInitialRolesPopulated.IsTrue(project) {
-		return nil
-	}
-	_, err := mgmtv3.ProjectConditionMetricExpressionDeployed.DoUntilTrue(project, func() (runtime.Object, error) {
-		projectName := fmt.Sprintf("%s:%s", project.Spec.ClusterName, project.Name)
-
-		for _, graph := range preDefinedProjectGraph {
-			newObj := graph.DeepCopy()
-			newObj.Namespace = project.Name
-			newObj.Spec.ProjectName = projectName
-			if _, err := ph.app.cattleProjectGraphClient.Create(newObj); err != nil && !apierrors.IsAlreadyExists(err) {
-				return project, err
-			}
-		}
-
-		return project, nil
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to apply metric expression")
-	}
-
 	appName, appTargetNamespace := monitoring.ProjectMonitoringInfo(project.Name)
 
 	if project.Spec.EnableProjectMonitoring {
@@ -163,6 +133,29 @@ func (ph *projectHandler) doSync(project *mgmtv3.Project, clusterName string) er
 
 		mgmtv3.ProjectConditionMonitoringEnabled.False(project)
 		mgmtv3.ProjectConditionMonitoringEnabled.Message(project, "")
+	}
+
+	return nil
+}
+
+// doProjectGraphsSync creates the metric graphs per project for cluster monitoring
+func (ph *projectHandler) doProjectGraphsSync(project *mgmtv3.Project) error {
+	_, err := mgmtv3.ProjectConditionMetricExpressionDeployed.DoUntilTrue(project, func() (runtime.Object, error) {
+		projectName := fmt.Sprintf("%s:%s", project.Spec.ClusterName, project.Name)
+
+		for _, graph := range preDefinedProjectGraph {
+			newObj := graph.DeepCopy()
+			newObj.Namespace = project.Name
+			newObj.Spec.ProjectName = projectName
+			if _, err := ph.app.cattleProjectGraphClient.Create(newObj); err != nil && !apierrors.IsAlreadyExists(err) {
+				return project, err
+			}
+		}
+
+		return project, nil
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to apply metric expression")
 	}
 
 	return nil
