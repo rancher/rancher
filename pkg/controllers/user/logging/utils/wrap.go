@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
+	"github.com/rancher/rancher/pkg/controllers/user/logging/generator"
 )
 
 type WrapLogging struct {
@@ -26,13 +27,15 @@ type WrapClusterLogging struct {
 	v3.ClusterLoggingSpec
 	WrapEmbedded
 	WrapLogging
+	ContainerLogSourceTag string
 }
 
 type WrapProjectLogging struct {
 	v3.ProjectLoggingSpec
 	GrepNamespace string
 	WrapLogging
-	WrapProjectName string
+	WrapProjectName       string
+	ContainerLogSourceTag string
 }
 
 type WrapEmbedded struct {
@@ -61,19 +64,10 @@ type WrapSyslog struct {
 	Port string
 }
 
-func (w *WrapClusterLogging) Validate() error {
-	_, _, err := GetWrapConfig(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig, w.EmbeddedConfig)
-	return err
-}
-
-func (w *WrapProjectLogging) Validate() error {
-	_, _, err := GetWrapConfig(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig, nil)
-	return err
-}
-
 func ToWrapClusterLogging(clusterLogging v3.ClusterLoggingSpec) (*WrapClusterLogging, error) {
 	wp := WrapClusterLogging{
-		ClusterLoggingSpec: clusterLogging,
+		ClusterLoggingSpec:    clusterLogging,
+		ContainerLogSourceTag: loggingconfig.ClusterLevel,
 	}
 
 	wrapLogging, wem, err := GetWrapConfig(clusterLogging.ElasticsearchConfig, clusterLogging.SplunkConfig, clusterLogging.SyslogConfig, clusterLogging.KafkaConfig, clusterLogging.EmbeddedConfig)
@@ -83,14 +77,33 @@ func ToWrapClusterLogging(clusterLogging v3.ClusterLoggingSpec) (*WrapClusterLog
 	wp.WrapLogging = wrapLogging
 	wp.WrapEmbedded = wem
 
+	conf := map[string]interface{}{
+		"clusterTarget": wp,
+		"clusterName":   wp.ClusterName,
+	}
+
+	if err := generator.ValidateCustomTags(wp); err != nil {
+		return nil, err
+	}
+
+	if err := generator.ValidateClusterOutput(conf); err != nil {
+		return nil, err
+	}
+
+	if clusterLogging.SyslogConfig != nil && clusterLogging.SyslogConfig.Token != "" {
+		if err := generator.ValidateClusterSyslogToken(conf); err != nil {
+			return nil, err
+		}
+	}
 	return &wp, nil
 }
 
 func ToWrapProjectLogging(grepNamespace string, projectLogging v3.ProjectLoggingSpec) (*WrapProjectLogging, error) {
 	wp := WrapProjectLogging{
-		ProjectLoggingSpec: projectLogging,
-		GrepNamespace:      grepNamespace,
-		WrapProjectName:    strings.Replace(projectLogging.ProjectName, ":", "_", -1),
+		ProjectLoggingSpec:    projectLogging,
+		GrepNamespace:         grepNamespace,
+		WrapProjectName:       strings.Replace(projectLogging.ProjectName, ":", "_", -1),
+		ContainerLogSourceTag: projectLogging.ProjectName,
 	}
 
 	wrapLogging, _, err := GetWrapConfig(projectLogging.ElasticsearchConfig, projectLogging.SplunkConfig, projectLogging.SyslogConfig, projectLogging.KafkaConfig, nil)
@@ -98,7 +111,22 @@ func ToWrapProjectLogging(grepNamespace string, projectLogging v3.ProjectLogging
 	if err != nil {
 		return nil, err
 	}
+
 	wp.WrapLogging = wrapLogging
+	if err := generator.ValidateCustomTags(wp); err != nil {
+		return nil, err
+	}
+
+	if err := generator.ValidateProjectOutput(wp); err != nil {
+		return nil, err
+	}
+
+	if projectLogging.SyslogConfig != nil && projectLogging.SyslogConfig.Token != "" {
+		if err := generator.ValidateProjectSyslogToken(wp); err != nil {
+			return nil, err
+		}
+	}
+
 	return &wp, nil
 }
 
