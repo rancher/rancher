@@ -366,6 +366,7 @@ func (m *Manager) logout(actionName string, action *types.Action, request *types
 		Expires:  time.Date(1982, time.February, 10, 23, 0, 0, 0, time.UTC),
 	}
 	http.SetCookie(w, tokenCookie)
+	w.Header().Add("Content-type", "application/json")
 
 	//getToken
 	status, err := m.deleteToken(tokenAuthValue)

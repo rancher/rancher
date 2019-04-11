@@ -11,6 +11,7 @@ import (
 
 func HandleCommonAction(actionName string, action *types.Action, request *types.APIContext, authConfigName string, authConfigs v3.AuthConfigInterface) (bool, error) {
 	if actionName == "disable" {
+		request.Response.Header().Add("Content-type", "application/json")
 		o, err := authConfigs.ObjectClient().UnstructuredClient().Get(authConfigName, v1.GetOptions{})
 		if err != nil {
 			return false, err
