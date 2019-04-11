@@ -4,7 +4,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -12,6 +14,8 @@ import (
 
 const (
 	bootstrappedRole       = "authz.management.cattle.io/bootstrapped-role"
+	bootstrapAdminConfig   = "admincreated"
+	cattleNamespace        = "cattle-system"
 	defaultAdminLabelKey   = "authz.management.cattle.io/bootstrapping"
 	defaultAdminLabelValue = "admin-user"
 )
@@ -297,7 +301,23 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		return "", errors.Wrap(err, "problem reconciling role templates")
 	}
 
-	hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
+	adminName, err := bootstrapAdmin(management)
+	if err != nil {
+		return "", err
+	}
+
+	err = bootstrapDefaultRoles(management)
+	if err != nil {
+		return "", err
+	}
+
+	return adminName, nil
+}
+
+// bootstrapAdmin checks if the bootstrapAdminConfig exists, if it does this indicates rancher has
+// already created the admin user and should not attempt it again. Otherwise attempt to create the admin.
+func bootstrapAdmin(management *config.ManagementContext) (string, error) {
+	var adminName string
 
 	set := labels.Set(defaultAdminLabel)
 	admins, err := management.Management.Users("").List(v1.ListOptions{LabelSelector: set.String()})
@@ -305,10 +325,29 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		return "", err
 	}
 
-	// TODO This logic is going to be a problem in an HA setup because a race will cause more than one admin user to be created
-	var admin *v3.User
-	if len(admins.Items) == 0 {
-		admin, err = management.Management.Users("").Create(&v3.User{
+	if len(admins.Items) > 0 {
+		adminName = admins.Items[0].Name
+	}
+
+	if _, err := management.K8sClient.Core().ConfigMaps(cattleNamespace).Get(bootstrapAdminConfig, v1.GetOptions{}); err != nil {
+		if !apierrors.IsNotFound(err) {
+			logrus.Warnf("Unable to determine if admin user already created: %v", err)
+			return "", nil
+		}
+	} else {
+		// config map already exists, nothing to do
+		return adminName, nil
+	}
+
+	users, err := management.Management.Users("").List(v1.ListOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	if len(users.Items) == 0 {
+		// Config map does not exist and no users, attempt to create the default admin user
+		hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
+		admin, err := management.Management.Users("").Create(&v3.User{
 			ObjectMeta: v1.ObjectMeta{
 				GenerateName: "user-",
 				Labels:       defaultAdminLabel,
@@ -321,33 +360,45 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return "", errors.Wrap(err, "can not ensure admin user exists")
 		}
+		adminName = admin.Name
 
-	} else {
-		admin = &admins.Items[0]
+		bindings, err := management.Management.GlobalRoleBindings("").List(v1.ListOptions{LabelSelector: set.String()})
+		if err != nil {
+			return "", err
+		}
+		if len(bindings.Items) == 0 {
+			_, err = management.Management.GlobalRoleBindings("").Create(
+				&v3.GlobalRoleBinding{
+					ObjectMeta: v1.ObjectMeta{
+						GenerateName: "globalrolebinding-",
+						Labels:       defaultAdminLabel,
+					},
+					UserName:       adminName,
+					GlobalRoleName: "admin",
+				})
+			if err != nil {
+				logrus.Warnf("Failed to create default admin global role binding: %v", err)
+			} else {
+				logrus.Info("Created default admin user and binding")
+			}
+		}
 	}
 
-	bindings, err := management.Management.GlobalRoleBindings("").List(v1.ListOptions{LabelSelector: set.String()})
+	adminConfigMap := corev1.ConfigMap{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      bootstrapAdminConfig,
+			Namespace: cattleNamespace,
+		},
+	}
+
+	_, err = management.K8sClient.Core().ConfigMaps(cattleNamespace).Create(&adminConfigMap)
 	if err != nil {
-		return "", err
-	}
-	if len(bindings.Items) == 0 {
-		management.Management.GlobalRoleBindings("").Create(
-			&v3.GlobalRoleBinding{
-				ObjectMeta: v1.ObjectMeta{
-					GenerateName: "globalrolebinding-",
-					Labels:       defaultAdminLabel,
-				},
-				UserName:       admin.Name,
-				GlobalRoleName: "admin",
-			})
-	}
+		if !apierrors.IsAlreadyExists(err) {
+			logrus.Warnf("Error creating admin config map: %v", err)
+		}
 
-	err = bootstrapDefaultRoles(management)
-	if err != nil {
-		return "", err
 	}
-
-	return admin.Name, nil
+	return adminName, nil
 }
 
 // bootstrapDefaultRoles will set the default roles for user login, cluster create

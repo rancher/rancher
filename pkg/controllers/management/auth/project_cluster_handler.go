@@ -273,7 +273,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 		}
 
 		creatorID, ok := metaAccessor.GetAnnotations()[creatorIDAnn]
-		if !ok {
+		if !ok || creatorID == "" {
 			logrus.Warnf("%v %v has no creatorId annotation. Cannot add creator as owner", typeAccessor.GetKind(), metaAccessor.GetName())
 			return obj, nil
 		}
