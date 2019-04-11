@@ -7,7 +7,6 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/sirupsen/logrus"
 
 	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
 )
@@ -18,12 +17,8 @@ func ClusterLoggingValidator(resquest *types.APIContext, schema *types.Schema, d
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("%v", err))
 	}
 
-	wp := utils.WrapClusterLogging{
-		ClusterLoggingSpec: clusterLogging,
-	}
-
-	if err := wp.Validate(); err != nil {
-		logrus.Warnf("clusterlogging %s input validate failed, %v", resquest.ID, err)
+	_, err := utils.ToWrapClusterLogging(clusterLogging)
+	if err != nil {
 		return httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("%v", err))
 	}
 	return nil
@@ -35,13 +30,10 @@ func ProjectLoggingValidator(resquest *types.APIContext, schema *types.Schema, d
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("%v", err))
 	}
 
-	wp := utils.WrapProjectLogging{
-		ProjectLoggingSpec: projectLogging,
-	}
-
-	if err := wp.Validate(); err != nil {
-		logrus.Warnf("projectlogging %s input validate failed, %v", resquest.ID, err)
+	_, err := utils.ToWrapProjectLogging("", projectLogging)
+	if err != nil {
 		return httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("%v", err))
 	}
+
 	return nil
 }

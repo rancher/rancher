@@ -24,12 +24,11 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
   <record>
     tag ${tag}
     namespace ${record["kubernetes"]["namespace_name"]}
-    {{range $k, $val := $store.OutputTags -}}
-    {{$k}} {{$val}}
-    {{end -}}
     projectID {{$store.ProjectName}}
   </record>
 </filter>
+
+{{- template "filter-custom-tags" $store -}}
 
 <filter {{$store.ProjectName}}.**>
   @type grep
@@ -44,6 +43,15 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
   remove_keys namespace
 </filter>
 
+{{template "project-filter-syslog" $store}}
+{{template "project-match" $store}}
+{{end -}}
+{{end -}}
+`
+
+var projectFilterSyslogTemplate = `
+{{define "project-filter-syslog"}}
+{{$store := .}}
 {{ if eq $store.CurrentTarget "syslog"}}
 {{ if $store.SyslogConfig.Token}}
 <filter {{$store.ProjectName}}.** project-custom.{{$store.ProjectName}}.**>
@@ -54,7 +62,11 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
 </filter>
 {{end -}}
 {{end -}}
-
+{{end -}}
+`
+var projectOutputTemplate = ` 
+{{define "project-match"}}
+{{$store := .}}
 <match  {{$store.ProjectName}}.** project-custom.{{$store.ProjectName}}.**> 
     {{ if eq $store.CurrentTarget "elasticsearch"}}
     @type elasticsearch
@@ -181,6 +193,5 @@ var ProjectTemplate = `{{range $i, $store := .projectTargets -}}
     num_threads 8
     slow_flush_log_threshold 40.0
 </match>
-{{end -}}
 {{end -}}
 `

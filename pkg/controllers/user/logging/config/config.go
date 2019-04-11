@@ -52,3 +52,8 @@ const (
 	ClientCertName = "client-cert.pem"
 	ClientKeyName  = "client-key.pem"
 )
+
+const (
+	ClusterLevel = "cluster"
+	ProjectLevel = "project"
+)
