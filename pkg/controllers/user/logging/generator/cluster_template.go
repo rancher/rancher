@@ -40,17 +40,14 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
    preserve_json_log  true
 </filter>
 
-<filter cluster.**>
-  @type record_transformer
-  <record>
-    tag ${tag}
-    log_type k8s_normal_container 
-    {{range $k, $val := .clusterTarget.OutputTags -}}
-    {{$k}} {{$val}}
-    {{end -}}
-  </record>
-</filter>
+{{- template "filter-custom-tags" .clusterTarget -}}
+{{- template "cluster-filter-syslog" . -}}
+{{- template "cluster-match" . }}
+{{end -}}
+`
 
+var clusterFilterSyslogTemplate = `
+{{define "cluster-filter-syslog"}}
 {{ if eq .clusterTarget.CurrentTarget "syslog"}}
 {{ if .clusterTarget.SyslogConfig.Token}}
 <filter  cluster.** rke.** cluster-custom.**>
@@ -61,7 +58,11 @@ var ClusterTemplate = `{{ if .clusterTarget.CurrentTarget }}
 </filter>
 {{end -}}
 {{end -}}
+{{end -}}
+`
 
+var clusterOutputTemplate = `
+{{define "cluster-match"}}
 <match  cluster.** rke.** cluster-custom.**> 
     {{ if eq .clusterTarget.CurrentTarget "embedded"}}
     @type elasticsearch
