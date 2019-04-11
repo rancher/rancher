@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
+	"github.com/rancher/rancher/pkg/controllers/user/logging/generator"
 )
 
 type WrapLogging struct {
@@ -26,13 +27,15 @@ type WrapLogging struct {
 type WrapClusterLogging struct {
 	v3.ClusterLoggingSpec
 	WrapLogging
+	ContainerLogSourceTag string
 }
 
 type WrapProjectLogging struct {
 	v3.ProjectLoggingSpec
 	GrepNamespace string
 	WrapLogging
-	WrapProjectName string
+	WrapProjectName       string
+	ContainerLogSourceTag string
 }
 
 type WrapElasticsearch struct {
@@ -68,35 +71,51 @@ type FluentServer struct {
 	v3.FluentServer
 }
 
-func (w *WrapClusterLogging) Validate() error {
-	_, err := GetWrapConfig(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig, w.FluentForwarderConfig)
-	return err
-}
-
-func (w *WrapProjectLogging) Validate() error {
-	_, err := GetWrapConfig(w.ElasticsearchConfig, w.SplunkConfig, w.SyslogConfig, w.KafkaConfig, w.FluentForwarderConfig)
-	return err
-}
-
 func ToWrapClusterLogging(clusterLogging v3.ClusterLoggingSpec) (*WrapClusterLogging, error) {
 	wp := WrapClusterLogging{
-		ClusterLoggingSpec: clusterLogging,
+		ClusterLoggingSpec:    clusterLogging,
+		ContainerLogSourceTag: loggingconfig.ClusterLevel,
 	}
 
 	wrapLogging, err := GetWrapConfig(clusterLogging.ElasticsearchConfig, clusterLogging.SplunkConfig, clusterLogging.SyslogConfig, clusterLogging.KafkaConfig, clusterLogging.FluentForwarderConfig)
 	if err != nil {
 		return nil, err
 	}
+
 	wp.WrapLogging = wrapLogging
 
+	if err := generator.ValidateCustomTags(wp); err != nil {
+		return nil, err
+	}
+
+	validateData := wp
+	if wp.FluentForwarderConfig != nil && wp.EnableShareKey {
+		validateData.EnableShareKey = false //skip generate precan configure include ruby code
+	}
+
+	conf := map[string]interface{}{
+		"clusterTarget": validateData,
+		"clusterName":   wp.ClusterName,
+	}
+
+	if err := generator.ValidateClusterOutput(conf); err != nil {
+		return nil, err
+	}
+
+	if clusterLogging.SyslogConfig != nil && clusterLogging.SyslogConfig.Token != "" {
+		if err := generator.ValidateClusterSyslogToken(conf); err != nil {
+			return nil, err
+		}
+	}
 	return &wp, nil
 }
 
 func ToWrapProjectLogging(grepNamespace string, projectLogging v3.ProjectLoggingSpec) (*WrapProjectLogging, error) {
 	wp := WrapProjectLogging{
-		ProjectLoggingSpec: projectLogging,
-		GrepNamespace:      grepNamespace,
-		WrapProjectName:    strings.Replace(projectLogging.ProjectName, ":", "_", -1),
+		ProjectLoggingSpec:    projectLogging,
+		GrepNamespace:         grepNamespace,
+		WrapProjectName:       strings.Replace(projectLogging.ProjectName, ":", "_", -1),
+		ContainerLogSourceTag: projectLogging.ProjectName,
 	}
 
 	wrapLogging, err := GetWrapConfig(projectLogging.ElasticsearchConfig, projectLogging.SplunkConfig, projectLogging.SyslogConfig, projectLogging.KafkaConfig, projectLogging.FluentForwarderConfig)
@@ -104,7 +123,27 @@ func ToWrapProjectLogging(grepNamespace string, projectLogging v3.ProjectLogging
 	if err != nil {
 		return nil, err
 	}
+
 	wp.WrapLogging = wrapLogging
+	if err := generator.ValidateCustomTags(wp); err != nil {
+		return nil, err
+	}
+
+	validateData := wp
+	if wp.FluentForwarderConfig != nil && wp.EnableShareKey {
+		validateData.EnableShareKey = false //skip generate precan configure include ruby code
+	}
+
+	if err := generator.ValidateProjectOutput(validateData); err != nil {
+		return nil, err
+	}
+
+	if projectLogging.SyslogConfig != nil && projectLogging.SyslogConfig.Token != "" {
+		if err := generator.ValidateProjectSyslogToken(validateData); err != nil {
+			return nil, err
+		}
+	}
+
 	return &wp, nil
 }
 
