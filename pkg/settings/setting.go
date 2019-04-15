@@ -38,7 +38,8 @@ var (
 	UIPath                          = NewSetting("ui-path", "")
 	UIPL                            = NewSetting("ui-pl", "rancher")
 	WhitelistDomain                 = NewSetting("whitelist-domain", "forums.rancher.com")
-	RotateCertsIfExpiringInDays     = NewSetting("rotate-certs-if-expiring-in-days", "7") // 7 days
+	RotateCertsIfExpiringInDays     = NewSetting("rotate-certs-if-expiring-in-days", "10") // 7 days
+	TestCertExpirationSetting       = NewSetting("test-cert-expiration-setting", "30")
 )
 
 type Provider interface {
