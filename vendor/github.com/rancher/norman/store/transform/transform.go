@@ -53,21 +53,21 @@ func (m *MemoryCache) Add(k key, value interface{}) {
 
 func getKey(ApiContext types.APIContext) string {
 	url := ApiContext.Request.URL.Path
-
+	projectID := ApiContext.SubContext["/v3/schemas/project"]
 	if strings.Contains(url, "pod") {
-		return "pods"
+		return projectID + "/pods"
 	}
 
 	if strings.Contains(url, "config") {
-		return "configmaps"
+		return projectID + "/configmaps"
 	}
 
 	if strings.Contains(url, "workload") {
-		return "workloads"
+		return projectID + "/workloads"
 	}
 
 	if strings.Contains(url, "service") {
-		return "services"
+		return projectID + "/services"
 	}
 
 	return ""
