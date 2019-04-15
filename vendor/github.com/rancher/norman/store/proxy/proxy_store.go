@@ -194,14 +194,9 @@ func (s *Store) Context() types.StorageContext {
 
 func (s *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
 	var resultList unstructured.UnstructuredList
-	if strings.Contains(apiContext.Request.URL.Path, "pod") {
-		logrus.Info("TEST pod proxy store start.")
-	}
+
 	// if there are no namespaces field in options, a single request is made
 	if opt == nil || opt.Namespaces == nil {
-		if strings.Contains(apiContext.Request.URL.Path, "pod") {
-			logrus.Info("TEST no namespaces.")
-		}
 		ns := getNamespace(apiContext, opt)
 		list, err := s.retryList(ns, apiContext)
 		if err != nil {
@@ -230,81 +225,33 @@ func (s *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *ty
 				return nil
 			})
 		}
-
-		start := time.Now()
-
 		if err := errGroup.Wait(); err != nil {
 			return nil, err
-		}
-
-		if strings.Contains(apiContext.Request.URL.Path, "pod") {
-			logrus.Infof("TEST took %v to wait for all go routines to finish.", time.Now().Sub(start))
 		}
 	}
 
 	var result []map[string]interface{}
 
-	start := time.Now()
 	for _, obj := range resultList.Items {
 		result = append(result, s.fromInternal(apiContext, schema, obj.Object))
 	}
-	if strings.Contains(apiContext.Request.URL.Path, "pod") {
-		logrus.Infof("TEST took %v to append all items to result.", time.Now().Sub(start))
-	}
 
-	start = time.Now()
-
-	a := apiContext.AccessControl.FilterList(apiContext, schema, result, s.authContext)
-
-	if strings.Contains(apiContext.Request.URL.Path, "pod") {
-		logrus.Infof("TEST access control filter list took ", time.Now().Sub(start))
-	}
-
-	return a, nil
+	return apiContext.AccessControl.FilterList(apiContext, schema, result, s.authContext), nil
 }
 
 func (s *Store) retryList(namespace string, apiContext *types.APIContext) (*unstructured.UnstructuredList, error) {
 	var resultList *unstructured.UnstructuredList
-
-	start := time.Now()
-
 	k8sClient, err := s.k8sClient(apiContext)
-
-	if strings.Contains(apiContext.Request.URL.Path, "pod") {
-		logrus.Infof("TEST took %v to get client.", time.Now().Sub(start))
-	}
-
 	if err != nil {
 		return nil, err
 	}
 
 	for i := 0; i < 3; i++ {
-		start := time.Now()
-
 		req := s.common(namespace, k8sClient.Get())
-
-		if strings.Contains(apiContext.Request.URL.Path, "pod") {
-			logrus.Infof("TEST took %v to execute common.", time.Now().Sub(start))
-		}
-
-		start = time.Now()
+		start := time.Now()
 		resultList = &unstructured.UnstructuredList{}
-		r := req.Do()
-
-		if strings.Contains(apiContext.Request.URL.Path, "pod") {
-			logrus.Infof("TEST took %v to finish do request for pods.", time.Now().Sub(start))
-		}
-
-		start2 := time.Now()
-
-		err = r.Into(resultList)
-
-		if strings.Contains(apiContext.Request.URL.Path, "pod") {
-			logrus.Infof("TEST took %v to marshal into struct.", time.Now().Sub(start2))
-		}
-		if strings.Contains(apiContext.Request.URL.Path, "pod") {
-			logrus.Infof("TEST LIST: %v, %v", time.Now().Sub(start), s.resourcePlural)
-		}
+		err = req.Do().Into(resultList)
+		logrus.Debugf("LIST: %v, %v", time.Now().Sub(start), s.resourcePlural)
 		if err != nil {
 			if i < 2 && strings.Contains(err.Error(), "Client.Timeout exceeded") {
 				logrus.Infof("Error on LIST %v: %v. Attempt: %v. Retrying", s.resourcePlural, err, i+1)
