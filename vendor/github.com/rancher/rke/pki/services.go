@@ -470,7 +470,8 @@ func GenerateRKEServicesCerts(ctx context.Context, certs map[string]CertificateP
 	}
 	for certName, gen := range RKECerts {
 		rotateCertKey := rotate
-		if legacy && certName == KubeAPICertName {
+		if legacy && rotate && certName == KubeAPICertName {
+			certs[KubeAPICertName] = CertificatePKI{Key: certs[KubeAPICertName].Key}
 			rotateCertKey = false
 		}
 		if err := gen(ctx, certs, rkeConfig, configPath, configDir, rotateCertKey); err != nil {
