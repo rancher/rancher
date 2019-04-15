@@ -79,7 +79,7 @@ func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
 		return b, err
 	}
 
-	if !isBackupEnabled(cluster.Spec.RancherKubernetesEngineConfig) {
+	if !isBackupSet(cluster.Spec.RancherKubernetesEngineConfig) {
 		return b, fmt.Errorf("[etcd-backup] cluster doesn't have a backup config")
 	}
 
@@ -154,7 +154,7 @@ func (c *Controller) doClusterBackupSync(cluster *v3.Cluster) error {
 	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return nil
 	}
-	// check if the cluster is eligable for backup.
+	// check if the cluster is eligible for backup.
 	if !shouldBackup(cluster) {
 		return nil
 	}
@@ -404,7 +404,7 @@ func shouldBackup(cluster *v3.Cluster) bool {
 		logrus.Debugf("[etcd-backup] [%s] is not an rke cluster, skipping..", cluster.Name)
 		return false
 	}
-	if !isBackupEnabled(cluster.Spec.RancherKubernetesEngineConfig) {
+	if !isBackupSet(cluster.Spec.RancherKubernetesEngineConfig) {
 		// no backend backup config
 		logrus.Debugf("[etcd-backup] No backup config for cluster [%s]", cluster.Name)
 		return false
@@ -428,12 +428,13 @@ func getBackoff() wait.Backoff {
 		Jitter:   0,
 		Steps:    5,
 	}
+}
 
-func isBackupEnabled(rkeConfig *v3.RancherKubernetesEngineConfig) bool {
+func isBackupSet(rkeConfig *v3.RancherKubernetesEngineConfig) bool {
 	return rkeConfig != nil && // rke cluster
 		rkeConfig.Services.Etcd.BackupConfig != nil // backupConfig is set
 }
 
 func isRecurringBackupEnabled(rkeConfig *v3.RancherKubernetesEngineConfig) bool {
-	return isBackupEnabled(rkeConfig) && *rkeConfig.Services.Etcd.BackupConfig.Enabled
+	return isBackupSet(rkeConfig) && *rkeConfig.Services.Etcd.BackupConfig.Enabled
 }
