@@ -12,6 +12,11 @@ type ActionHandler struct {
 }
 
 func (a ActionHandler) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	// passing nil as the resource only works because just namespace is grabbed from it and nodedriver is not namespaced
+	if err := apiContext.AccessControl.CanDo(v3.KontainerDriverGroupVersionKind.Group, v3.KontainerDriverResource.Name, "update", apiContext, nil, apiContext.Schema); err != nil {
+		return err
+	}
+
 	switch actionName {
 	case "activate":
 		return a.activate(apiContext)
