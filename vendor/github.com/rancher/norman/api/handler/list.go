@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"github.com/sirupsen/logrus"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse"
@@ -38,6 +41,13 @@ func ListHandler(request *types.APIContext, next types.RequestHandler) error {
 		return err
 	}
 
+	start := time.Now()
+
 	request.WriteResponse(http.StatusOK, data)
+
+	if strings.Contains(request.Request.URL.Path, "pod") {
+		logrus.Infof("TEST write response for pods took %v, URL: %v", time.Now().Sub(start), request.Request.URL.Path)
+	}
+
 	return nil
 }

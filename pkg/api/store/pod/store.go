@@ -55,6 +55,7 @@ func (p *podTransformer) transformer(context *types.APIContext, schema *types.Sc
 	}
 
 	clusterName := p.clusterManager.ClusterName(context)
+
 	nodeName, _ := data["nodeId"].(string)
 	nodes, err := p.nodeIndexer.ByIndex(nodeNameIdx, ref.FromStrings(clusterName, nodeName))
 	if err != nil {

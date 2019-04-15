@@ -8,8 +8,11 @@ import (
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/client/cluster/v3"
+	"github.com/sirupsen/logrus"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"strings"
+	"time"
 )
 
 func New(store types.Store, manager *clustermanager.Manager) types.Store {
@@ -38,9 +41,14 @@ type transformer struct {
 }
 
 func (p projectSetter) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
+	start := time.Now()
 	options := *opt
 	if err := p.setOptionsNamespaces(apiContext, &options); err != nil {
 		return nil, err
+	}
+
+	if strings.Contains(apiContext.Request.URL.Path, "pod") {
+		logrus.Infof("TEST set options namespaces for pods %v, URL: %v", time.Now().Sub(start), apiContext.Request.URL.Path)
 	}
 
 	return p.Store.List(apiContext, schema, &options)
