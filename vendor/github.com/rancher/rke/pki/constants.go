@@ -1,5 +1,7 @@
 package pki
 
+import "time"
+
 const (
 	CertPathPrefix          = "/etc/kubernetes/ssl/"
 	CertificatesServiceName = "certificates"
@@ -30,4 +32,5 @@ const (
 	KubeAdminCertName         = "kube-admin"
 	KubeAdminOrganizationName = "system:masters"
 	KubeAdminConfigPrefix     = "kube_config_"
+	duration365d              = time.Hour * 24 * 365
 )
