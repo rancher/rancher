@@ -3,7 +3,6 @@ package globaldns
 import (
 	"context"
 	"fmt"
-
 	"reflect"
 
 	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
@@ -13,18 +12,22 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/cache"
 )
 
 const (
 	GlobaldnsProviderCatalogLauncher = "mgmt-global-dns-provider-catalog-launcher"
 	cattleCreatorIDAnnotationKey     = "field.cattle.io/creatorId"
 	localClusterName                 = "local"
+	clusterOwnerRole                 = "cluster-owner"
 )
 
 type ProviderCatalogLauncher struct {
@@ -32,6 +35,10 @@ type ProviderCatalogLauncher struct {
 	Apps              pv3.AppInterface
 	ProjectLister     v3.ProjectLister
 	appLister         pv3.AppLister
+	userManager       user.Manager
+	crtbLister        v3.ClusterRoleTemplateBindingLister
+	crtbs             v3.ClusterRoleTemplateBindingInterface
+	users             v3.UserInterface
 }
 
 func newGlobalDNSProviderCatalogLauncher(ctx context.Context, mgmt *config.ManagementContext) *ProviderCatalogLauncher {
@@ -40,6 +47,10 @@ func newGlobalDNSProviderCatalogLauncher(ctx context.Context, mgmt *config.Manag
 		Apps:              mgmt.Project.Apps(""),
 		ProjectLister:     mgmt.Management.Projects("").Controller().Lister(),
 		appLister:         mgmt.Project.Apps("").Controller().Lister(),
+		userManager:       mgmt.UserManager,
+		crtbLister:        mgmt.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
+		crtbs:             mgmt.Management.ClusterRoleTemplateBindings(""),
+		users:             mgmt.Management.Users(""),
 	}
 	return n
 }
@@ -47,6 +58,22 @@ func newGlobalDNSProviderCatalogLauncher(ctx context.Context, mgmt *config.Manag
 //sync is called periodically and on real updates
 func (n *ProviderCatalogLauncher) sync(key string, obj *v3.GlobalDNSProvider) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
+		// delete the system account created for this gdns provider
+		_, gdnsProviderName, err := cache.SplitMetaNamespaceKey(key)
+		if err != nil {
+			return nil, err
+		}
+		u, err := n.userManager.GetUserByPrincipalID(fmt.Sprintf("system://%s", gdnsProviderName))
+		if err != nil {
+			return nil, err
+		}
+		if u == nil {
+			// user not found, must have been removed
+			return nil, nil
+		}
+		if err := n.users.Delete(u.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
+			return nil, err
+		}
 		return nil, nil
 	}
 	metaAccessor, err := meta.Accessor(obj)
@@ -144,6 +171,36 @@ func (n *ProviderCatalogLauncher) createUpdateExternalDNSApp(obj *v3.GlobalDNSPr
 		return nil, err
 	}
 
+	// Create a system account to manage the globalDNS provider app
+	systemUserPrincipalID := fmt.Sprintf("system://%s", obj.Name)
+	systemUser, err := n.userManager.EnsureUser(systemUserPrincipalID, "System account for Global DNS Provider "+obj.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	// this system account needs cluster-owner permissions in local cluster for resources in the globaldns provider chart
+	crtbName := obj.Name + "-" + clusterOwnerRole
+	_, err = n.crtbLister.Get(localClusterName, crtbName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			_, err := n.crtbs.Create(&v3.ClusterRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      crtbName,
+					Namespace: localClusterName,
+				},
+				UserName:          systemUser.Name,
+				UserPrincipalName: systemUserPrincipalID,
+				RoleTemplateName:  clusterOwnerRole,
+				ClusterName:       localClusterName,
+			})
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
+	}
+
 	if existingApp != nil {
 		//check if answers should be updated
 		if !reflect.DeepEqual(existingApp.Spec.Answers, answers) {
@@ -174,7 +231,7 @@ func (n *ProviderCatalogLauncher) createUpdateExternalDNSApp(obj *v3.GlobalDNSPr
 
 		toCreate := pv3.App{
 			ObjectMeta: metav1.ObjectMeta{
-				Annotations:     CopyCreatorID(nil, obj.Annotations),
+				Annotations:     map[string]string{cattleCreatorIDAnnotationKey: systemUser.Name},
 				Name:            fmt.Sprintf("%s-%s", "systemapp", obj.Name),
 				Namespace:       sysProject,
 				OwnerReferences: ownerRef,
@@ -219,15 +276,4 @@ func (n *ProviderCatalogLauncher) getSystemProjectID() (string, error) {
 	}
 
 	return systemProject.Name, nil
-}
-
-func CopyCreatorID(toAnnotations, fromAnnotations map[string]string) map[string]string {
-	if val, exist := fromAnnotations[cattleCreatorIDAnnotationKey]; exist {
-		if toAnnotations == nil {
-			toAnnotations = make(map[string]string, 2)
-		}
-
-		toAnnotations[cattleCreatorIDAnnotationKey] = val
-	}
-	return toAnnotations
 }
