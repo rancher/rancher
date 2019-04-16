@@ -58,13 +58,30 @@ func Start(ctx context.Context, httpsPort int, management *config.ScaledContext)
 
 	// have two go routines running. One is to run telemetry if setting is true, one is to kill telemetry if setting is false
 	go func() {
-		for range ticker.Context(ctx, time.Second*5) {
+		t := time.NewTicker(time.Second * 5)
+		go func() {
+			<-ctx.Done()
+			t.Stop()
+		}()
+		defer t.Stop()
+		for range t.C {
 			if settings.TelemetryOpt.Get() == "in" && isLeader(management) {
 				if !p.running {
-					token, err := createToken(management)
-					if err != nil {
-						logrus.Error(err)
-						continue
+					var token string
+					var e error
+					for i := 0; i < 3; i++ {
+						token, e = createToken(management)
+						if e != nil {
+							logrus.Info(e)
+							time.Sleep(time.Second * 5)
+							continue
+						} else {
+							break
+						}
+					}
+					if token == "" {
+						logrus.Infof("Unable to obtain token for telemetry service. Telemetry will not be launched.")
+						return
 					}
 					cmd := exec.Command("telemetry", "client", "--url", fmt.Sprintf("https://localhost:%d/v3", httpsPort), "--token-key", token)
 					cmd.Stdout = os.Stdout
@@ -124,5 +141,5 @@ func createToken(management *config.ScaledContext) (string, error) {
 			return token, nil
 		}
 	}
-	return "", errors.Errorf("user %s doesn't exist . Retry after 5 seconds", adminRole)
+	return "", errors.Errorf("user %s doesn't exist for telemetry. Retry after 5 seconds", adminRole)
 }
