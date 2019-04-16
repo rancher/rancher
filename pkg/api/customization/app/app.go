@@ -128,6 +128,8 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 					obj.Spec.Answers[k] = convert.ToString(v)
 				}
 			}
+		} else {
+			obj.Spec.Answers = make(map[string]string)
 		}
 		obj.Spec.ExternalID = convert.ToString(externalID)
 		if convert.ToBool(forceUpgrade) {
@@ -150,6 +152,8 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		}
 		if valuesYaml != nil {
 			obj.Spec.ValuesYaml = convert.ToString(valuesYaml)
+		} else {
+			obj.Spec.ValuesYaml = ""
 		}
 
 		if _, err := w.AppGetter.Apps(namespace).Update(obj); err != nil {
@@ -176,6 +180,7 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		}
 		obj.Spec.Answers = appRevision.Status.Answers
 		obj.Spec.ExternalID = appRevision.Status.ExternalID
+		obj.Spec.ValuesYaml = appRevision.Status.ValuesYaml
 		if convert.ToBool(forceUpgrade) {
 			pv3.AppConditionForceUpgrade.Unknown(obj)
 		}
