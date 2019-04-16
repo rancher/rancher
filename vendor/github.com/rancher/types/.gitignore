@@ -7,3 +7,6 @@
 /trash.lock
 /types
 *trash.lock
+.vscode/
+.cache/
+
