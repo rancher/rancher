@@ -54,6 +54,8 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 		return a.ImportYamlHandler(actionName, action, apiContext)
 	case "exportYaml":
 		return a.ExportYamlHandler(actionName, action, apiContext)
+	case "rotateCertificates":
+		return a.RotateCertificates(actionName, action, apiContext)
 	}
 	return httperror.NewAPIError(httperror.NotFound, "not found")
 }
@@ -380,4 +382,39 @@ func (a ActionHandler) getKubeConfig(apiContext *types.APIContext, cluster *mana
 	}
 
 	return a.ClusterManager.KubeConfig(cluster.ID, token), nil
+}
+
+func (a ActionHandler) RotateCertificates(actionName string, action *types.Action, apiContext *types.APIContext) error {
+	rtn := map[string]interface{}{
+		"type":    "rotateCertificateOutput",
+		"message": "rotating certificates for all components",
+	}
+	var mgmtCluster mgmtclient.Cluster
+	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &mgmtCluster); err != nil {
+		rtn["message"] = "none existent Cluster"
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+
+		return errors.Wrapf(err, "failed to get Cluster by ID %s", apiContext.ID)
+	}
+
+	cluster, err := a.ClusterClient.Get(apiContext.ID, metav1.GetOptions{})
+	if err != nil {
+		rtn["message"] = "none existent Cluster"
+		apiContext.WriteResponse(http.StatusBadRequest, rtn)
+
+		return errors.Wrapf(err, "failed to get Cluster by ID %s", apiContext.ID)
+	}
+
+	cluster.Spec.RancherKubernetesEngineConfig.RotateCertificates = &v3.RotateCertificates{}
+	if _, err := a.ClusterClient.Update(cluster); err != nil {
+		rtn["message"] = "failed to update cluster object"
+		apiContext.WriteResponse(http.StatusInternalServerError, rtn)
+
+		return errors.Wrapf(err, "unable to update Cluster %s", cluster.Name)
+	}
+
+	rtn["message"] = "rotating certificates for all components"
+
+	apiContext.WriteResponse(http.StatusOK, rtn)
+	return nil
 }
