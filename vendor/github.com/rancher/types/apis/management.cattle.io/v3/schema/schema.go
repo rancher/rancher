@@ -143,6 +143,7 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.ImportClusterYamlInput{}).
 		MustImport(&Version, v3.ImportYamlOutput{}).
 		MustImport(&Version, v3.ExportOutput{}).
+		MustImport(&Version, v3.RotateCertificateOutput{}).
 		MustImportAndCustomize(&Version, v3.ETCDService{}, func(schema *types.Schema) {
 			schema.MustCustomizeField("extraArgs", func(field types.Field) types.Field {
 				field.Default = map[string]interface{}{
@@ -167,6 +168,9 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 			}
 			schema.ResourceActions["exportYaml"] = types.Action{
 				Output: "exportOutput",
+			}
+			schema.ResourceActions["rotateCertificates"] = types.Action{
+				Output: "rotateCertificateOutput",
 			}
 		})
 }

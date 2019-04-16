@@ -93,7 +93,7 @@ func SetUpAuthentication(ctx context.Context, kubeCluster, currentCluster *Clust
 			}
 
 			log.Infof(ctx, "[certificates] Temporarily saving certs to [%s] hosts", backupPlane)
-			if err := deployBackupCertificates(ctx, backupHosts, kubeCluster); err != nil {
+			if err := deployBackupCertificates(ctx, backupHosts, kubeCluster, false); err != nil {
 				return err
 			}
 			log.Infof(ctx, "[certificates] Saved certs to [%s] hosts", backupPlane)
@@ -238,13 +238,13 @@ func saveCertToKubernetes(kubeClient *kubernetes.Clientset, crtName string, crt 
 	}
 }
 
-func deployBackupCertificates(ctx context.Context, backupHosts []*hosts.Host, kubeCluster *Cluster) error {
+func deployBackupCertificates(ctx context.Context, backupHosts []*hosts.Host, kubeCluster *Cluster, force bool) error {
 	var errgrp errgroup.Group
 
 	for _, host := range backupHosts {
 		runHost := host
 		errgrp.Go(func() error {
-			return pki.DeployCertificatesOnHost(ctx, runHost, kubeCluster.Certificates, kubeCluster.SystemImages.CertDownloader, pki.TempCertPath, kubeCluster.PrivateRegistriesMap)
+			return pki.DeployCertificatesOnHost(ctx, runHost, kubeCluster.Certificates, kubeCluster.SystemImages.CertDownloader, pki.TempCertPath, kubeCluster.PrivateRegistriesMap, force)
 		})
 	}
 	return errgrp.Wait()

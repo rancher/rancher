@@ -41,6 +41,8 @@ type RancherKubernetesEngineConfig struct {
 	BastionHost BastionHost `yaml:"bastion_host" json:"bastionHost,omitempty"`
 	// Monitoring Config
 	Monitoring MonitoringConfig `yaml:"monitoring" json:"monitoring,omitempty"`
+	// Rotating Certificates Option
+	RotateCertificates *RotateCertificates `yaml:"rotate_certificates,omitempty" json:"rotateCertificates,omitempty"`
 }
 
 type BastionHost struct {
@@ -567,3 +569,5 @@ type MonitoringConfig struct {
 	// Metrics server options
 	Options map[string]string `yaml:"options" json:"options,omitempty"`
 }
+
+type RotateCertificates struct{}
