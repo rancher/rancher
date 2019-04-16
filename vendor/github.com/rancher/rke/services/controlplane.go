@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
+	"github.com/rancher/rke/util"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"golang.org/x/sync/errgroup"
 )
@@ -90,4 +91,40 @@ func doDeployControlHost(ctx context.Context, host *hosts.Host, localConnDialerF
 	}
 	// run scheduler
 	return runScheduler(ctx, host, localConnDialerFactory, prsMap, processMap[SchedulerContainerName], alpineImage)
+}
+
+func RestartControlPlane(ctx context.Context, controlHosts []*hosts.Host) error {
+	log.Infof(ctx, "[%s] Restarting the Controller Plane..", ControlRole)
+	var errgrp errgroup.Group
+
+	hostsQueue := util.GetObjectQueue(controlHosts)
+	for w := 0; w < 10; w++ {
+		errgrp.Go(func() error {
+			var errList []error
+			for host := range hostsQueue {
+				runHost := host.(*hosts.Host)
+				// restart KubeAPI
+				if err := RestartKubeAPI(ctx, runHost); err != nil {
+					errList = append(errList, err)
+				}
+
+				// restart KubeController
+				if err := RestartKubeController(ctx, runHost); err != nil {
+					errList = append(errList, err)
+				}
+
+				// restart scheduler
+				err := RestartScheduler(ctx, runHost)
+				if err != nil {
+					errList = append(errList, err)
+				}
+			}
+			return util.ErrList(errList)
+		})
+	}
+	if err := errgrp.Wait(); err != nil {
+		return err
+	}
+	log.Infof(ctx, "[%s] Successfully restarted Controller Plane..", ControlRole)
+	return nil
 }

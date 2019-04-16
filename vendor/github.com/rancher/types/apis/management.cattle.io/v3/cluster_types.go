@@ -278,3 +278,7 @@ type ImportClusterYamlInput struct {
 type ImportYamlOutput struct {
 	Message string `json:"message,omitempty"`
 }
+
+type RotateCertificateOutput struct {
+	Message string `json:"message,omitempty"`
+}
