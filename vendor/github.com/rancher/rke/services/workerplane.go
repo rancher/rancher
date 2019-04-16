@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
+	"github.com/rancher/rke/util"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"golang.org/x/sync/errgroup"
 )
@@ -101,4 +102,35 @@ func copyProcessMap(m map[string]v3.Process) map[string]v3.Process {
 		c[k] = v
 	}
 	return c
+}
+
+func RestartWorkerPlane(ctx context.Context, workerHosts []*hosts.Host) error {
+	log.Infof(ctx, "[%s] Restarting Worker Plane..", WorkerRole)
+	var errgrp errgroup.Group
+
+	hostsQueue := util.GetObjectQueue(workerHosts)
+	for w := 0; w < 10; w++ {
+		errgrp.Go(func() error {
+			var errList []error
+			for host := range hostsQueue {
+				runHost := host.(*hosts.Host)
+				if err := RestartKubelet(ctx, runHost); err != nil {
+					errList = append(errList, err)
+				}
+				if err := RestartKubeproxy(ctx, runHost); err != nil {
+					errList = append(errList, err)
+				}
+				if err := RestartNginxProxy(ctx, runHost); err != nil {
+					errList = append(errList, err)
+				}
+			}
+			return util.ErrList(errList)
+		})
+	}
+	if err := errgrp.Wait(); err != nil {
+		return err
+	}
+	log.Infof(ctx, "[%s] Successfully restarted Worker Plane..", WorkerRole)
+
+	return nil
 }

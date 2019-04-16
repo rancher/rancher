@@ -70,6 +70,9 @@ func ClusterUp(
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
+	if kubeCluster.RancherKubernetesEngineConfig.RotateCertificates != nil {
+		return ClusterRotate(ctx, rkeConfig, dockerDialerFactory, localConnDialerFactory, k8sWrapTransport, configDir)
+	}
 
 	err = kubeCluster.TunnelHosts(ctx, local)
 	if err != nil {
@@ -96,7 +99,7 @@ func ClusterUp(
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
 
-	err = kubeCluster.SetUpHosts(ctx)
+	err = kubeCluster.SetUpHosts(ctx, false)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}

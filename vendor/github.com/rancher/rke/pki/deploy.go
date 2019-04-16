@@ -24,11 +24,14 @@ const (
 	StateDeployerContainerName = "cluster-state-deployer"
 )
 
-func DeployCertificatesOnPlaneHost(ctx context.Context, host *hosts.Host, rkeConfig v3.RancherKubernetesEngineConfig, crtMap map[string]CertificatePKI, certDownloaderImage string, prsMap map[string]v3.PrivateRegistry) error {
+func DeployCertificatesOnPlaneHost(ctx context.Context, host *hosts.Host, rkeConfig v3.RancherKubernetesEngineConfig, crtMap map[string]CertificatePKI, certDownloaderImage string, prsMap map[string]v3.PrivateRegistry, force bool) error {
 	crtBundle := GenerateRKENodeCerts(ctx, rkeConfig, host.Address, crtMap)
 	env := []string{}
 	for _, crt := range crtBundle {
 		env = append(env, crt.ToEnv()...)
+	}
+	if force {
+		env = append(env, "FORCE_DEPLOY=true")
 	}
 	return doRunDeployer(ctx, host, env, certDownloaderImage, prsMap)
 }
@@ -138,9 +141,12 @@ func RemoveAdminConfig(ctx context.Context, localConfigPath string) {
 	log.Infof(ctx, "Local admin Kubeconfig removed successfully")
 }
 
-func DeployCertificatesOnHost(ctx context.Context, host *hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage, certPath string, prsMap map[string]v3.PrivateRegistry) error {
+func DeployCertificatesOnHost(ctx context.Context, host *hosts.Host, crtMap map[string]CertificatePKI, certDownloaderImage, certPath string, prsMap map[string]v3.PrivateRegistry, force bool) error {
 	env := []string{
 		"CRTS_DEPLOY_PATH=" + certPath,
+	}
+	if force {
+		env = append(env, "FORCE_DEPLOY=true")
 	}
 	for _, crt := range crtMap {
 		env = append(env, crt.ToEnv()...)
