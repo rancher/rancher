@@ -20,7 +20,9 @@ func Formatter(request *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(request, "generateKubeconfig")
 	resource.AddAction(request, "importYaml")
 	resource.AddAction(request, "exportYaml")
-
+	if _, ok := resource.Values[client.ClusterSpecFieldRancherKubernetesEngineConfig]; ok {
+		resource.AddAction(request, "rotateCertificates")
+	}
 	if gkeConfig, ok := resource.Values[client.ClusterSpecFieldGoogleKubernetesEngineConfig]; ok {
 		configMap, ok := gkeConfig.(map[string]interface{})
 		if !ok {

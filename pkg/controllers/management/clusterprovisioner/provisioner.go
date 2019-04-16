@@ -275,6 +275,9 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 			logrus.Infof("Create done, Updating cluster [%s]", cluster.Name)
 			apiEndpoint, serviceAccountToken, caCert, err = p.driverUpdate(cluster, *spec)
 		}
+	} else if spec.RancherKubernetesEngineConfig != nil && spec.RancherKubernetesEngineConfig.RotateCertificates != nil {
+		logrus.Infof("Rotating certificates for cluster [%s]", cluster.Name)
+		apiEndpoint, serviceAccountToken, caCert, err = p.driverUpdate(cluster, *spec)
 	} else {
 		logrus.Infof("Updating cluster [%s]", cluster.Name)
 		apiEndpoint, serviceAccountToken, caCert, err = p.driverUpdate(cluster, *spec)
@@ -314,6 +317,7 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 		cluster.Status.APIEndpoint = apiEndpoint
 		cluster.Status.ServiceAccountToken = serviceAccountToken
 		cluster.Status.CACert = caCert
+		resetRkeConfigFlags(cluster)
 
 		if cluster, err = p.Clusters.Update(cluster); err == nil {
 			saved = true
@@ -551,4 +555,13 @@ func (p *Provisioner) recordFailure(cluster *v3.Cluster, spec v3.ClusterSpec, er
 	newCluster, _ := p.Clusters.Update(cluster)
 	// mask the error
 	return newCluster, nil
+}
+
+func resetRkeConfigFlags(cluster *v3.Cluster) {
+	if cluster.Spec.RancherKubernetesEngineConfig != nil {
+		cluster.Spec.RancherKubernetesEngineConfig.RotateCertificates = nil
+		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
+			cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.RotateCertificates = nil
+		}
+	}
 }
