@@ -159,7 +159,7 @@ func (s *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *ty
 		return nil, err
 	}
 
-	if key.Resource != "" {
+	if key.Resource != "" && len(data) > 0 {
 		memCache.Add(key, value{
 			data,
 		})
