@@ -106,10 +106,6 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 			scaledContext.PeerManager.Leader()
 		}
 
-		if err := telemetry.Start(ctx, cfg.HTTPSListenPort, scaledContext); err != nil {
-			panic(err)
-		}
-
 		management, err := scaledContext.NewManagementContext()
 		if err != nil {
 			panic(err)
@@ -121,6 +117,10 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 		}
 
 		if err := addData(management, *cfg); err != nil {
+			panic(err)
+		}
+
+		if err := telemetry.Start(ctx, cfg.HTTPSListenPort, scaledContext); err != nil {
 			panic(err)
 		}
 
