@@ -30,6 +30,7 @@ platform:
 steps:
 - name: docker  
   image: plugins/docker:windows-1809
+  daemon_off: true
   settings:
     username: loganhz
     password: zhanghao
