@@ -28,17 +28,19 @@ platform:
   version: 1809
 
 steps:
-- name: dryrun
+- name: vet
   pull: always
-  image: plugins/docker:windows-1809
-  settings:
-    daemon_off: true
-    dockerfile: docker/Dockerfile.windows.1809
-    dry_run: true
-    repo: plugins/manifest
-    tags: windows-1809
+  image: golang:1.11-windowsservercore-1809
+  commands:
+  - dapper ci
+  privileged: true	
   volumes:
   - name: docker_pipe
+    path: \\\\.\\pipe\\docker_engine
+
+volumes:
+- name: docker_pipe
+  host:
     path: \\\\.\\pipe\\docker_engine
 
 trigger:
