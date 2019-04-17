@@ -35,8 +35,6 @@ steps:
     daemon_off: true
     dry_run: true
     dockerfile: docker/Dockerfile.windows.1809
-    username: loganhz
-    password: zhanghao
     repo: loganhz/test
     tags: latest
   volumes:
