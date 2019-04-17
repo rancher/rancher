@@ -32,17 +32,17 @@ steps:
   image: plugins/docker
   settings:
     username: loganhz
-    password: xxxx
+    password: zhanghao
     repo: loganhz/test
     tags: latest
   volumes:
   - name: docker_pipe
-    path: \\\\.\\pipe\\docker_engine1
+    path: \\\\.\\pipe\\docker_engine
 
 volumes:
 - name: docker_pipe
   host:
-    path: \\\\.\\pipe\\docker_engine1
+    path: \\\\.\\pipe\\docker_engine
 
 trigger:
   ref:
