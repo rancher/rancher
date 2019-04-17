@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"reflect"
+	"strings"
 
 	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -83,13 +83,16 @@ func (n *ProviderCatalogLauncher) handleRoute53Provider(obj *v3.GlobalDNSProvide
 	rancherInstallUUID := settings.InstallUUID.Get()
 	//create external-dns route53 provider
 	answers := map[string]string{
-		"provider":      "aws",
-		"aws.zoneType":  "public",
-		"aws.accessKey": obj.Spec.Route53ProviderConfig.AccessKey,
-		"aws.secretKey": obj.Spec.Route53ProviderConfig.SecretKey,
-		"txtOwnerId":    rancherInstallUUID + "_" + obj.Name,
-		"rbac.create":   "true",
-		"policy":        "sync",
+		"provider":            "aws",
+		"aws.zoneType":        obj.Spec.Route53ProviderConfig.ZoneType,
+		"aws.accessKey":       obj.Spec.Route53ProviderConfig.AccessKey,
+		"aws.secretKey":       obj.Spec.Route53ProviderConfig.SecretKey,
+		"txtOwnerId":          rancherInstallUUID + "_" + obj.Name,
+		"rbac.create":         "true",
+		"policy":              "sync",
+		"aws.credentialsPath": obj.Spec.Route53ProviderConfig.CredentialsPath,
+		"aws.roleArn":         obj.Spec.Route53ProviderConfig.RoleArn,
+		"aws.region":          obj.Spec.Route53ProviderConfig.Region,
 	}
 
 	if obj.Spec.RootDomain != "" {
@@ -102,12 +105,13 @@ func (n *ProviderCatalogLauncher) handleCloudflareProvider(obj *v3.GlobalDNSProv
 	rancherInstallUUID := settings.InstallUUID.Get()
 	//create external-dns route53 provider
 	answers := map[string]string{
-		"provider":          "cloudflare",
-		"cloudflare.apiKey": obj.Spec.CloudflareProviderConfig.APIKey,
-		"cloudflare.email":  obj.Spec.CloudflareProviderConfig.APIEmail,
-		"txtOwnerId":        rancherInstallUUID + "_" + obj.Name,
-		"rbac.create":       "true",
-		"policy":            "sync",
+		"provider":           "cloudflare",
+		"cloudflare.apiKey":  obj.Spec.CloudflareProviderConfig.APIKey,
+		"cloudflare.email":   obj.Spec.CloudflareProviderConfig.APIEmail,
+		"txtOwnerId":         rancherInstallUUID + "_" + obj.Name,
+		"rbac.create":        "true",
+		"policy":             "sync",
+		"cloudflare.proxied": obj.Spec.CloudflareProviderConfig.ProxySetting,
 	}
 
 	if obj.Spec.RootDomain != "" {
@@ -146,9 +150,9 @@ func (n *ProviderCatalogLauncher) createUpdateExternalDNSApp(obj *v3.GlobalDNSPr
 
 	if existingApp != nil {
 		//check if answers should be updated
-		if !reflect.DeepEqual(existingApp.Spec.Answers, answers) {
+		if answersDiffer(existingApp.Spec.Answers, answers) {
 			appToupdate := existingApp.DeepCopy()
-			appToupdate.Spec.Answers = answers
+			updateAnswers(appToupdate.Spec.Answers, answers)
 			_, err = n.Apps.Update(appToupdate)
 			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return nil, err
@@ -230,4 +234,19 @@ func CopyCreatorID(toAnnotations, fromAnnotations map[string]string) map[string]
 		toAnnotations[cattleCreatorIDAnnotationKey] = val
 	}
 	return toAnnotations
+}
+
+func answersDiffer(appAnswers map[string]string, newAnswers map[string]string) bool {
+	for key, value := range newAnswers {
+		if !strings.EqualFold(appAnswers[key], value) {
+			return true
+		}
+	}
+	return false
+}
+
+func updateAnswers(appAnswers map[string]string, newAnswers map[string]string) {
+	for key, value := range newAnswers {
+		appAnswers[key] = value
+	}
 }
