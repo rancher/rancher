@@ -45,12 +45,12 @@ imagePullSecrets: []
 ### ingress ###
 # Readme for details and instruction on adding tls secrets.
 ingress:
-  extraAnnotations: 
+  extraAnnotations:
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
   tls:
-    # rancher, letsEncrypt, secrets
+    # options: rancher, letsEncrypt, secret
     source: rancher
 
 ### LetsEncrypt config ###
@@ -67,8 +67,8 @@ privateCA: false
 # http[s] proxy server passed into rancher server.
 # proxy: http://<username>@<password>:<url>:<port>
 
-# comma separated list of domains or ip addresses that will not use the proxy 
-noProxy: 127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16 
+# comma separated list of domains or ip addresses that will not use the proxy
+noProxy: 127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
 
 # Override rancher image location for Air Gap installs
 rancherImage: rancher/rancher
@@ -82,7 +82,7 @@ replicas: 3
 # Set pod resource requests/limits for Rancher.
 resources: {}
 
-# 
+#
 # tls
 #   Where to offload the TLS/SSL encryption
 # - ingress (default)
