@@ -29,7 +29,7 @@ platform:
 
 steps:
 - name: docker  
-  image: plugins/docker
+  image: plugins/docker:windows-1809
   settings:
     username: loganhz
     password: zhanghao
