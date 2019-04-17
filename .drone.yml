@@ -32,7 +32,7 @@ steps:
   pull: always
   image: plugins/docker:windows-1809
   settings:
-    daemon_off: false
+    daemon_off: true
     dry_run: true
     dockerfile: docker/Dockerfile.windows.1809
     username: loganhz
