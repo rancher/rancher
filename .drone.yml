@@ -28,12 +28,13 @@ platform:
   version: 1809
 
 steps:
-- name: vet
-  pull: always
-  image: golang:1.11-windowsservercore-1809
-  commands:
-  - dapper ci
-  privileged: true	
+- name: docker  
+  image: plugins/docker
+  settings:
+    username: loganhz
+    password: xxxx
+    repo: loganhz/test
+    tags: latest
   volumes:
   - name: docker_pipe
     path: \\\\.\\pipe\\docker_engine1
