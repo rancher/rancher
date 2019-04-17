@@ -36,12 +36,12 @@ steps:
   privileged: true	
   volumes:
   - name: docker_pipe
-    path: \\\\.\\pipe\\docker_engine
+    path: \\\\.\\pipe\\docker_engine1
 
 volumes:
 - name: docker_pipe
   host:
-    path: \\\\.\\pipe\\docker_engine
+    path: \\\\.\\pipe\\docker_engine1
 
 trigger:
   ref:
