@@ -5,6 +5,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/logging/generator"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
@@ -21,6 +22,7 @@ type TesterDeployer struct {
 	projectLoggingLister mgmtv3.ProjectLoggingLister
 	namespacesLister     v1.NamespaceLister
 	appDeployer          *AppDeployer
+	systemAccountManager *systemaccount.Manager
 }
 
 func NewTesterDeployer(appsGetter projectv3.AppsGetter, projectLister mgmtv3.ProjectLister, pods v1.PodInterface, projectLoggingLister mgmtv3.ProjectLoggingLister, namespaces v1.NamespaceInterface, templateLister mgmtv3.CatalogTemplateLister) *TesterDeployer {
@@ -45,17 +47,20 @@ func (d *TesterDeployer) Deploy(level, clusterName, projectID string, loggingTar
 		return err
 	}
 
-	systemProjectCreator := systemProject.Annotations[creatorIDAnn]
 	systemProjectID := ref.Ref(systemProject)
+	creator, err := d.systemAccountManager.GetProjectSystemUser(systemProject.Name)
+	if err != nil {
+		return err
+	}
 
-	if err = d.deployLoggingTester(systemProjectID, systemProjectCreator, level, clusterName, projectID, loggingTarget); err != nil {
+	if err = d.deployLoggingTester(systemProjectID, creator.Name, level, clusterName, projectID, loggingTarget); err != nil {
 		return err
 	}
 
 	return d.isLoggingTesterDeploySuccess()
 }
 
-func (d *TesterDeployer) deployLoggingTester(systemProjectID, systemProjectCreator, level, clusterName, projectID string, loggingTarget mgmtv3.LoggingTargets) error {
+func (d *TesterDeployer) deployLoggingTester(systemProjectID, appCreator, level, clusterName, projectID string, loggingTarget mgmtv3.LoggingTargets) error {
 	templateVersionID := loggingconfig.RancherLoggingTemplateID()
 	template, err := d.templateLister.Get(namespace.GlobalNamespace, templateVersionID)
 	if err != nil {
@@ -105,7 +110,7 @@ func (d *TesterDeployer) deployLoggingTester(systemProjectID, systemProjectCreat
 		projectSecret = string(buf)
 	}
 
-	app := loggingTesterApp(systemProjectCreator, systemProjectID, catalogID, clusterSecret, projectSecret)
+	app := loggingTesterApp(appCreator, systemProjectID, catalogID, clusterSecret, projectSecret)
 
 	return d.appDeployer.deploy(app)
 }
