@@ -30,7 +30,7 @@ platform:
 steps:
 - name: vet
   pull: always
-  image: golang:1.11-windowsservercore-1809
+  image: plugins/docker:windows-1809
   commands:
   - ls
 
