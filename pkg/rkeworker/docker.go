@@ -6,6 +6,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -27,7 +28,7 @@ type NodeConfig struct {
 	Files       []v3.File             `json:"files"`
 }
 
-func runProcess(ctx context.Context, name string, p v3.Process, start bool) error {
+func runProcess(ctx context.Context, name string, p v3.Process, start bool, forceRestart bool) error {
 	c, err := client.NewEnvClient()
 	if err != nil {
 		return err
@@ -69,6 +70,11 @@ func runProcess(ctx context.Context, name string, p v3.Process, start bool) erro
 			}
 		} else {
 			matchedContainers = append(matchedContainers, container)
+			if forceRestart {
+				if err := restart(ctx, c, container.ID); err != nil {
+					return err
+				}
+			}
 		}
 	}
 
@@ -221,4 +227,9 @@ func sliceToMap(args []string) map[string]bool {
 		result[arg] = true
 	}
 	return result
+}
+
+func restart(ctx context.Context, c *client.Client, id string) error {
+	timeoutDuration := 10 * time.Second
+	return c.ContainerRestart(ctx, id, &timeoutDuration)
 }
