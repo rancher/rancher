@@ -1,25 +1,5 @@
 ---
 kind: pipeline
-name: testing-linux
-
-platform:
-  os: linux
-  arch: amd64
-
-steps:
-- name: vet
-  pull: always
-  image: golang:1.11
-  commands:
-  - ls
-
-trigger:
-  ref:
-  - refs/heads/master
-  - "refs/tags/**"
-  - "refs/pull/**"
----
-kind: pipeline
 name: testing-windows
 
 platform:
@@ -32,7 +12,7 @@ steps:
   pull: always
   image: plugins/docker:windows-1809
   settings:
-    daemon_off: false
+    daemon_off: true
     dry_run: true
     dockerfile: docker/Dockerfile.windows.1809
     repo: loganhz/test
