@@ -190,7 +190,7 @@ func (cd *clusterDeploy) setNetworkPolicyAnn(cluster *v3.Cluster) error {
 }
 
 func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, error) {
-	user, err := cd.systemAccountManager.GetSystemUser(cluster)
+	user, err := cd.systemAccountManager.GetSystemUser(cluster.Name)
 	if err != nil {
 		return nil, err
 	}

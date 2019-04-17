@@ -119,7 +119,7 @@ func (d *AppDeployer) isDeploySuccess(targetNamespace string, selector map[strin
 	return fmt.Errorf("timeout check deploy app status, namespace: %s, labels: %v", targetNamespace, selector)
 }
 
-func rancherLoggingApp(systemProjectCreator, systemProjectID, catalogID, driverDir string) *projectv3.App {
+func rancherLoggingApp(appCreator, systemProjectID, catalogID, driverDir string) *projectv3.App {
 	appName := loggingconfig.AppName
 	namepspace := loggingconfig.LoggingNamespace
 	_, systemProjectName := ref.Parse(systemProjectID)
@@ -127,7 +127,7 @@ func rancherLoggingApp(systemProjectCreator, systemProjectID, catalogID, driverD
 	return &projectv3.App{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				creatorIDAnn: systemProjectCreator,
+				creatorIDAnn: appCreator,
 			},
 			Name:      appName,
 			Namespace: systemProjectName,
@@ -146,7 +146,7 @@ func rancherLoggingApp(systemProjectCreator, systemProjectID, catalogID, driverD
 	}
 }
 
-func loggingTesterApp(systemProjectCreator, systemProjectID, catalogID, clusterConfig, projectConfig string) *projectv3.App {
+func loggingTesterApp(appCreator, systemProjectID, catalogID, clusterConfig, projectConfig string) *projectv3.App {
 	appName := loggingconfig.TesterAppName
 	namepspace := loggingconfig.LoggingNamespace
 	_, systemProjectName := ref.Parse(systemProjectID)
@@ -154,7 +154,7 @@ func loggingTesterApp(systemProjectCreator, systemProjectID, catalogID, clusterC
 	return &projectv3.App{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				creatorIDAnn: systemProjectCreator,
+				creatorIDAnn: appCreator,
 			},
 			Name:      appName,
 			Namespace: systemProjectName,

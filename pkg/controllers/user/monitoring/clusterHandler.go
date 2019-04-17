@@ -28,6 +28,7 @@ const (
 	exporterEtcdCertName = "exporter-etcd-cert"
 	etcd                 = "etcd"
 	controlplane         = "controlplane"
+	creatorIDAnno        = "field.cattle.io/creatorId"
 )
 
 type etcdTLSConfig struct {
@@ -362,10 +363,15 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 		}
 	}
 
+	creator, err := ch.app.systemAccountManager.GetSystemUser(ch.clusterName)
+	if err != nil {
+		return nil, err
+	}
+
 	appCatalogID := settings.SystemMonitoringCatalogID.Get()
 	app := &v3.App{
 		ObjectMeta: metav1.ObjectMeta{
-			Annotations: monitoring.CopyCreatorID(nil, cluster.Annotations),
+			Annotations: map[string]string{creatorIDAnno: creator.Name},
 			Labels:      monitoring.OwnedLabels(appName, appTargetNamespace, appProjectName, monitoring.ClusterLevel),
 			Name:        appName,
 			Namespace:   appDeployProjectID,
@@ -379,7 +385,7 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 		},
 	}
 
-	err := monitoring.DeployApp(ch.app.cattleAppClient, appDeployProjectID, app)
+	err = monitoring.DeployApp(ch.app.cattleAppClient, appDeployProjectID, app)
 	if err != nil {
 		return nil, err
 	}

@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rancher/pkg/systemaccount"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"golang.org/x/sync/errgroup"
@@ -26,6 +27,7 @@ type Deployer struct {
 	projectLister        mgmtv3.ProjectLister
 	templateLister       mgmtv3.CatalogTemplateLister
 	appDeployer          *AppDeployer
+	systemAccountManager *systemaccount.Manager
 }
 
 func NewDeployer(cluster *config.UserContext, secretSyncer *configsyncer.SecretManager) *Deployer {
@@ -46,6 +48,7 @@ func NewDeployer(cluster *config.UserContext, secretSyncer *configsyncer.SecretM
 		projectLister:        cluster.Management.Management.Projects(metav1.NamespaceAll).Controller().Lister(),
 		templateLister:       cluster.Management.Management.CatalogTemplates(metav1.NamespaceAll).Controller().Lister(),
 		appDeployer:          appDeployer,
+		systemAccountManager: systemaccount.NewManager(cluster.Management),
 	}
 }
 
@@ -66,7 +69,6 @@ func (d *Deployer) sync() error {
 		return err
 	}
 
-	systemProjectCreator := systemProject.Annotations[creatorIDAnn]
 	systemProjectID := ref.Ref(systemProject)
 
 	allDisabled, err := d.isAllLoggingDisable()
@@ -78,18 +80,23 @@ func (d *Deployer) sync() error {
 		return d.appDeployer.cleanup(appName, namepspace, systemProjectID)
 	}
 
-	return d.deploy(systemProjectID, systemProjectCreator)
+	creator, err := d.systemAccountManager.GetProjectSystemUser(systemProject.Name)
+	if err != nil {
+		return err
+	}
+
+	return d.deploy(systemProjectID, creator.Name)
 }
 
-func (d *Deployer) deploy(systemProjectID, systemProjectCreator string) error {
-	if err := d.deployRancherLogging(systemProjectID, systemProjectCreator); err != nil {
+func (d *Deployer) deploy(systemProjectID, appCreator string) error {
+	if err := d.deployRancherLogging(systemProjectID, appCreator); err != nil {
 		return err
 	}
 
 	return d.isRancherLoggingDeploySuccess()
 }
 
-func (d *Deployer) deployRancherLogging(systemProjectID, systemProjectCreator string) error {
+func (d *Deployer) deployRancherLogging(systemProjectID, appCreator string) error {
 	cluster, err := d.clusterLister.Get("", d.clusterName)
 	if err != nil {
 		return errors.Wrapf(err, "get dockerRootDir from cluster %s failed", d.clusterName)
@@ -105,7 +112,7 @@ func (d *Deployer) deployRancherLogging(systemProjectID, systemProjectCreator st
 
 	catalogID := loggingconfig.RancherLoggingCatalogID(template.Spec.DefaultVersion)
 
-	app := rancherLoggingApp(systemProjectCreator, systemProjectID, catalogID, driverDir)
+	app := rancherLoggingApp(appCreator, systemProjectID, catalogID, driverDir)
 
 	return d.appDeployer.deploy(app)
 }
