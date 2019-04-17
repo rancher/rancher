@@ -28,11 +28,18 @@ platform:
   version: 1809
 
 steps:
-- name: vet
+- name: dryrun
   pull: always
   image: plugins/docker:windows-1809
-  commands:
-  - ls
+  settings:
+    daemon_off: true
+    dockerfile: docker/Dockerfile.windows.1809
+    dry_run: true
+    repo: plugins/manifest
+    tags: windows-1809
+  volumes:
+  - name: docker_pipe
+    path: \\\\.\\pipe\\docker_engine
 
 trigger:
   ref:
