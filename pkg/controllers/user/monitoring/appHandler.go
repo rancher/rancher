@@ -2,6 +2,7 @@ package monitoring
 
 import (
 	"github.com/rancher/rancher/pkg/monitoring"
+	"github.com/rancher/rancher/pkg/systemaccount"
 	appsv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -23,6 +24,7 @@ type appHandler struct {
 	agentSecretClient           corev1.SecretInterface
 	agentNodeClient             corev1.NodeInterface
 	agentNamespaceClient        corev1.NamespaceInterface
+	systemAccountManager        *systemaccount.Manager
 }
 
 func (ah *appHandler) withdrawApp(clusterID, appName, appTargetNamespace string) error {

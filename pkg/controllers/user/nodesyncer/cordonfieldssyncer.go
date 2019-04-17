@@ -190,7 +190,7 @@ func (d *NodeDrain) getKubeConfig() (*clientcmdapi.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	user, err := d.systemAccountManager.GetSystemUser(cluster)
+	user, err := d.systemAccountManager.GetSystemUser(cluster.Name)
 	if err != nil {
 		return nil, err
 	}

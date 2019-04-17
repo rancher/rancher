@@ -211,10 +211,15 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 		appAnswers["prometheus.sync.path"] = "/api/v1/read"
 	}
 
+	creator, err := ph.app.systemAccountManager.GetProjectSystemUser(project.Name)
+	if err != nil {
+		return err
+	}
+
 	appCatalogID := settings.SystemMonitoringCatalogID.Get()
 	app := &v3.App{
 		ObjectMeta: metav1.ObjectMeta{
-			Annotations: monitoring.CopyCreatorID(nil, project.Annotations),
+			Annotations: map[string]string{creatorIDAnno: creator.Name},
 			Labels:      monitoring.OwnedLabels(appName, appTargetNamespace, appProjectName, monitoring.ProjectLevel),
 			Name:        appName,
 			Namespace:   appDeployProjectID,
@@ -228,7 +233,7 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 		},
 	}
 
-	err := monitoring.DeployApp(ph.app.cattleAppClient, appDeployProjectID, app)
+	err = monitoring.DeployApp(ph.app.cattleAppClient, appDeployProjectID, app)
 	if err != nil {
 		return err
 	}
