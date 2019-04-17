@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rancher/rancher/pkg/monitoring"
+	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +37,7 @@ func Register(ctx context.Context, agentContext *config.UserContext) {
 		agentSecretClient:           agentContext.Core.Secrets(metav1.NamespaceAll),
 		agentNodeClient:             agentContext.Core.Nodes(metav1.NamespaceAll),
 		agentNamespaceClient:        agentContext.Core.Namespaces(metav1.NamespaceAll),
+		systemAccountManager:        systemaccount.NewManager(agentContext.Management),
 	}
 
 	// operator handler

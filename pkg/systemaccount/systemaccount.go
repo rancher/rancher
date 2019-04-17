@@ -49,7 +49,7 @@ type Manager struct {
 }
 
 func (s *Manager) CreateSystemAccount(cluster *v3.Cluster) error {
-	user, err := s.GetSystemUser(cluster)
+	user, err := s.GetSystemUser(cluster.Name)
 	if err != nil {
 		return err
 	}
@@ -73,8 +73,8 @@ func (s *Manager) CreateSystemAccount(cluster *v3.Cluster) error {
 	return err
 }
 
-func (s *Manager) GetSystemUser(cluster *v3.Cluster) (*v3.User, error) {
-	return s.userManager.EnsureUser(fmt.Sprintf("system://%s", cluster.Name), "System account for Cluster "+cluster.Name)
+func (s *Manager) GetSystemUser(clusterName string) (*v3.User, error) {
+	return s.userManager.EnsureUser(fmt.Sprintf("system://%s", clusterName), "System account for Cluster "+clusterName)
 }
 
 func (s *Manager) GetOrCreateSystemClusterToken(clusterName string) (string, error) {
