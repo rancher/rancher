@@ -14,12 +14,14 @@ import (
 )
 
 func ExecutePlan(ctx context.Context, nodeConfig *NodeConfig, writeCertOnly bool) error {
+	var bundleChanged bool
 	if nodeConfig.Certs != "" {
 		bundle, err := rkecerts.Unmarshal(nodeConfig.Certs)
 		if err != nil {
 			return err
 		}
 
+		bundleChanged = bundle.Changed()
 		if err := bundle.Explode(); err != nil {
 			return err
 		}
@@ -35,7 +37,7 @@ func ExecutePlan(ctx context.Context, nodeConfig *NodeConfig, writeCertOnly bool
 
 	for name, process := range nodeConfig.Processes {
 		if strings.Contains(name, "sidekick") || strings.Contains(name, "share-mnt") {
-			if err := runProcess(ctx, name, process, false); err != nil {
+			if err := runProcess(ctx, name, process, false, false); err != nil {
 				return err
 			}
 		}
@@ -43,7 +45,7 @@ func ExecutePlan(ctx context.Context, nodeConfig *NodeConfig, writeCertOnly bool
 
 	for name, process := range nodeConfig.Processes {
 		if !strings.Contains(name, "sidekick") {
-			if err := runProcess(ctx, name, process, true); err != nil {
+			if err := runProcess(ctx, name, process, true, bundleChanged); err != nil {
 				return err
 			}
 		}

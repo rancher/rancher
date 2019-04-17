@@ -2,8 +2,10 @@ package rkecerts
 
 import (
 	"bytes"
+	"crypto/md5"
 	"crypto/rsa"
 	"crypto/x509"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -15,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/librke"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/util/cert"
 )
 
@@ -152,4 +155,25 @@ func (f *fileWriter) write(path string, content []byte, x509cert *x509.Certifica
 
 func (f *fileWriter) err() error {
 	return types.NewErrors(f.errs...)
+}
+
+func (b *Bundle) Changed() bool {
+	var newCertPEM string
+	for _, item := range b.certs {
+		oldCertPEM, err := ioutil.ReadFile(item.Path)
+		if err != nil {
+			logrus.Warnf("Unable to read certificate %s: %v", item.Name, err)
+			return false
+		}
+		if item.Certificate != nil {
+			newCertPEM = string(cert.EncodeCertPEM(item.Certificate))
+		}
+		oldCertChecksum := fmt.Sprintf("%x", md5.Sum([]byte(oldCertPEM)))
+		newCertChecksum := fmt.Sprintf("%x", md5.Sum([]byte(newCertPEM)))
+
+		if oldCertChecksum != newCertChecksum {
+			return true
+		}
+	}
+	return false
 }
