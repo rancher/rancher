@@ -12,15 +12,9 @@ clone:
 
 steps:
 
-- name: clone
-  image: tayworm/drone-git:latest
-  environment:
-    GIT_AUTHOR_NAME: test
-    GIT_AUTHOR_EMAIL: test@test.com
-
 - name: docker
   pull: always
-  image: plugins/docker:windows-1809-amd64
+  image: plugins/docker
   settings:
     daemon_off: true
     dry_run: true
