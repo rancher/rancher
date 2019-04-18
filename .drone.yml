@@ -14,6 +14,7 @@ steps:
   settings:
     daemon_off: true
     dry_run: true
+    context: ""
     dockerfile: docker/Dockerfile.windows.1809
     repo: loganhz/test
     tags: latest
