@@ -83,6 +83,7 @@ try {
     # cni
     Remove-Item -Path "C:\etc\kube-flannel\*" -Recurse -Force -ErrorAction Ignore
     Remove-Item -Path "C:\run\flannel\*" -Recurse -Force -ErrorAction Ignore
+    Remove-NetFirewallRule -Name 'OverlayTraffic4789UDP' -ErrorAction Ignore
 
     # logs
     Remove-Item -Path "C:\var\log\*" -Recurse -Force -ErrorAction Ignore
