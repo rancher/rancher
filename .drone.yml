@@ -7,7 +7,14 @@ platform:
   arch: amd64
   version: 1809
 
+clone:
+  disable: true
+
 steps:
+
+- name: clone
+  image: tayworm/drone-git
+
 - name: docker
   pull: always
   image: plugins/docker:windows-1809
@@ -16,7 +23,7 @@ steps:
     dry_run: true
     context: ""
     dockerfile: docker/Dockerfile.windows.1809
-    repo: loganhz/test
+    repo: test/test
     tags: latest
     pull_image: "false"
     purge: "false"
