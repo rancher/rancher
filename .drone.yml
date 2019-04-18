@@ -7,9 +7,6 @@ platform:
   arch: amd64
   version: 1809
 
-clone:
-  disable: true
-
 steps:
 
 - name: docker
