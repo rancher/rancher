@@ -75,7 +75,9 @@ data:
     {
       "Network": "{{.ClusterCIDR}}",
       "Backend": {
-        "Type": "{{.FlannelBackend.Type}}"
+        "Type": "{{.FlannelBackend.Type}}",
+        "VNI": {{.FlannelBackend.VNI}},
+        "Port": {{.FlannelBackend.Port}}
       }
     }
 ---
