@@ -20,16 +20,14 @@ steps:
 
 - name: docker
   pull: always
-  image: plugins/docker:windows-1809
+  image: plugins/docker:windows-1809-amd64
   settings:
     daemon_off: true
     dry_run: true
-    context: ""
     dockerfile: docker/Dockerfile.windows.1809
     repo: test/test
     tags: latest
-    pull_image: "false"
-    purge: "false"
+    purge: false
   volumes:
   - name: docker_pipe
     path: \\\\.\\pipe\\docker_engine
