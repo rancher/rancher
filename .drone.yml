@@ -18,6 +18,8 @@ steps:
     dockerfile: docker/Dockerfile.windows.1809
     repo: loganhz/test
     tags: latest
+    pull_image: "false"
+    purge: "false"
   volumes:
   - name: docker_pipe
     path: \\\\.\\pipe\\docker_engine
