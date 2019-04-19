@@ -48,6 +48,13 @@ func sizeofString(s string) int32 {
 	return 2 + int32(len(s))
 }
 
+func sizeofNullableString(s *string) int32 {
+	if s == nil {
+		return 2
+	}
+	return sizeofString(*s)
+}
+
 func sizeofBool(_ bool) int32 {
 	return 1
 }
