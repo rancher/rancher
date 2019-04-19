@@ -174,6 +174,22 @@ def test_update_gdns_entry(admin_mc, remove_resource):
     wait_for_gdns_update(admin_mc, gdns_entry_name, new_fqdn)
 
 
+def test_create_globaldns_provider_regular_user(remove_resource,
+                                                user_factory):
+    provider_name = random_str()
+    access = random_str()
+    secret = random_str()
+    user = user_factory()
+    globaldns_provider = \
+        user.client.create_global_dns_provider(
+            name=provider_name,
+            rootDomain="example.com",
+            route53ProviderConfig={
+                'accessKey': access,
+                'secretKey': secret})
+    remove_resource(globaldns_provider)
+
+
 def wait_to_ensure_user_in_rb_subject(api, name,
                                       userId, timeout=60):
     found = False
