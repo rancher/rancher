@@ -3,7 +3,6 @@ package globaldns
 import (
 	"context"
 	"fmt"
-
 	"strings"
 
 	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
@@ -13,7 +12,9 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -32,6 +33,7 @@ type ProviderCatalogLauncher struct {
 	Apps              pv3.AppInterface
 	ProjectLister     v3.ProjectLister
 	appLister         pv3.AppLister
+	userManager       user.Manager
 }
 
 func newGlobalDNSProviderCatalogLauncher(ctx context.Context, mgmt *config.ManagementContext) *ProviderCatalogLauncher {
@@ -40,6 +42,7 @@ func newGlobalDNSProviderCatalogLauncher(ctx context.Context, mgmt *config.Manag
 		Apps:              mgmt.Project.Apps(""),
 		ProjectLister:     mgmt.Management.Projects("").Controller().Lister(),
 		appLister:         mgmt.Project.Apps("").Controller().Lister(),
+		userManager:       mgmt.UserManager,
 	}
 	return n
 }
@@ -176,9 +179,13 @@ func (n *ProviderCatalogLauncher) createUpdateExternalDNSApp(obj *v3.GlobalDNSPr
 			Controller: &controller,
 		}}
 
+		creator, err := n.userManager.EnsureUser(fmt.Sprintf("system://%s", localClusterName), "System account for Cluster "+localClusterName)
+		if err != nil {
+			return nil, err
+		}
 		toCreate := pv3.App{
 			ObjectMeta: metav1.ObjectMeta{
-				Annotations:     CopyCreatorID(nil, obj.Annotations),
+				Annotations:     map[string]string{cattleCreatorIDAnnotationKey: creator.Name},
 				Name:            fmt.Sprintf("%s-%s", "systemapp", obj.Name),
 				Namespace:       sysProject,
 				OwnerReferences: ownerRef,
