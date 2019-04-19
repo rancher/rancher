@@ -394,6 +394,11 @@ set -e -x
 docker load --input ${images}
 
 for i in $(cat ${list}); do
+    if [[ ! ${i} =~ '/' ]]
+    then
+        docker tag ${i} rancher/${i}
+        i="rancher/${i}"
+    fi
     docker tag ${i} ${reg}/${i}
     docker push ${reg}/${i}
 done
@@ -463,6 +468,10 @@ $content=Get-Content -path ${image-list}
 docker load --input ${images}
 
 foreach ($item in $content) {
+    if(!$item.contains("/")) {
+        docker tag ${item} rancher/${item}
+        $item="rancher/${item}"
+    }
     docker tag $item $Registry/$item
     docker push $Registry/$item
 }
