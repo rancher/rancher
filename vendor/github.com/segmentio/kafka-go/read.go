@@ -42,6 +42,20 @@ func readInt64(r *bufio.Reader, sz int, v *int64) (int, error) {
 	return peekRead(r, sz, 8, func(b []byte) { *v = makeInt64(b) })
 }
 
+func readVarInt(r *bufio.Reader, sz int, v *int64) (remain int, err error) {
+	l := 0
+	remain = sz
+	for done := false; !done && err == nil; {
+		remain, err = peekRead(r, remain, 1, func(b []byte) {
+			done = b[0]&0x80 == 0
+			*v |= int64(b[0]&0x7f) << uint(l*7)
+		})
+		l++
+	}
+	*v = (*v >> 1) ^ -(*v & 1)
+	return
+}
+
 func readBool(r *bufio.Reader, sz int, v *bool) (int, error) {
 	return peekRead(r, sz, 1, func(b []byte) { *v = b[0] != 0 })
 }
@@ -83,13 +97,12 @@ func readBytes(r *bufio.Reader, sz int, v *[]byte) (int, error) {
 
 func readBytesWith(r *bufio.Reader, sz int, cb func(*bufio.Reader, int, int) (int, error)) (int, error) {
 	var err error
-	var len int32
+	var n int
 
-	if sz, err = readInt32(r, sz, &len); err != nil {
+	if sz, err = readArrayLen(r, sz, &n); err != nil {
 		return sz, err
 	}
 
-	n := int(len)
 	if n > sz {
 		return sz, errShortRead
 	}
@@ -100,15 +113,35 @@ func readBytesWith(r *bufio.Reader, sz int, cb func(*bufio.Reader, int, int) (in
 func readNewBytes(r *bufio.Reader, sz int, n int) ([]byte, int, error) {
 	var err error
 	var b []byte
+	var shortRead bool
 
 	if n > 0 {
+		if sz < n {
+			n = sz
+			shortRead = true
+		}
+
 		b = make([]byte, n)
 		n, err = io.ReadFull(r, b)
 		b = b[:n]
 		sz -= n
+
+		if err == nil && shortRead {
+			err = errShortRead
+		}
 	}
 
 	return b, sz, err
+}
+
+func readArrayLen(r *bufio.Reader, sz int, n *int) (int, error) {
+	var err error
+	var len int32
+	if sz, err = readInt32(r, sz, &len); err != nil {
+		return sz, err
+	}
+	*n = int(len)
+	return sz, nil
 }
 
 func readArrayWith(r *bufio.Reader, sz int, cb func(*bufio.Reader, int) (int, error)) (int, error) {
@@ -273,7 +306,7 @@ func readSlice(r *bufio.Reader, sz int, v reflect.Value) (int, error) {
 	return sz, nil
 }
 
-func readFetchResponseHeader(r *bufio.Reader, size int) (throttle int32, watermark int64, remain int, err error) {
+func readFetchResponseHeaderV2(r *bufio.Reader, size int) (throttle int32, watermark int64, remain int, err error) {
 	var n int32
 	var p struct {
 		Partition           int32
@@ -333,6 +366,201 @@ func readFetchResponseHeader(r *bufio.Reader, size int) (throttle int32, waterma
 
 	watermark = p.HighwaterMarkOffset
 	return
+}
+
+func readFetchResponseHeaderV5(r *bufio.Reader, size int) (throttle int32, watermark int64, remain int, err error) {
+	var n int32
+	type AbortedTransaction struct {
+		ProducerId  int64
+		FirstOffset int64
+	}
+	var p struct {
+		Partition           int32
+		ErrorCode           int16
+		HighwaterMarkOffset int64
+		LastStableOffset    int64
+		LogStartOffset      int64
+	}
+	var messageSetSize int32
+	var abortedTransactions []AbortedTransaction
+
+	if remain, err = readInt32(r, size, &throttle); err != nil {
+		return
+	}
+
+	if remain, err = readInt32(r, remain, &n); err != nil {
+		return
+	}
+
+	// This error should never trigger, unless there's a bug in the kafka client
+	// or server.
+	if n != 1 {
+		err = fmt.Errorf("1 kafka topic was expected in the fetch response but the client received %d", n)
+		return
+	}
+
+	// We ignore the topic name because we've requests messages for a single
+	// topic, unless there's a bug in the kafka server we will have received
+	// the name of the topic that we requested.
+	if remain, err = discardString(r, remain); err != nil {
+		return
+	}
+
+	if remain, err = readInt32(r, remain, &n); err != nil {
+		return
+	}
+
+	// This error should never trigger, unless there's a bug in the kafka client
+	// or server.
+	if n != 1 {
+		err = fmt.Errorf("1 kafka partition was expected in the fetch response but the client received %d", n)
+		return
+	}
+
+	if remain, err = read(r, remain, &p); err != nil {
+		return
+	}
+
+	var abortedTransactionLen int
+	if remain, err = readArrayLen(r, remain, &abortedTransactionLen); err != nil {
+		return
+	}
+
+	if abortedTransactionLen == -1 {
+		abortedTransactions = nil
+	} else {
+		abortedTransactions = make([]AbortedTransaction, abortedTransactionLen)
+		for i := 0; i < abortedTransactionLen; i++ {
+			if remain, err = read(r, remain, &abortedTransactions[i]); err != nil {
+				return
+			}
+		}
+	}
+
+	if p.ErrorCode != 0 {
+		err = Error(p.ErrorCode)
+		return
+	}
+
+	remain, err = readInt32(r, remain, &messageSetSize)
+	if err != nil {
+		return
+	}
+
+	// This error should never trigger, unless there's a bug in the kafka client
+	// or server.
+	if remain != int(messageSetSize) {
+		err = fmt.Errorf("the size of the message set in a fetch response doesn't match the number of remaining bytes (message set size = %d, remaining bytes = %d)", messageSetSize, remain)
+		return
+	}
+
+	watermark = p.HighwaterMarkOffset
+	return
+
+}
+
+func readFetchResponseHeaderV10(r *bufio.Reader, size int) (throttle int32, watermark int64, remain int, err error) {
+	var n int32
+	var errorCode int16
+	type AbortedTransaction struct {
+		ProducerId  int64
+		FirstOffset int64
+	}
+	var p struct {
+		Partition           int32
+		ErrorCode           int16
+		HighwaterMarkOffset int64
+		LastStableOffset    int64
+		LogStartOffset      int64
+	}
+	var messageSetSize int32
+	var abortedTransactions []AbortedTransaction
+
+	if remain, err = readInt32(r, size, &throttle); err != nil {
+		return
+	}
+
+	if remain, err = readInt16(r, remain, &errorCode); err != nil {
+		return
+	}
+	if errorCode != 0 {
+		err = Error(errorCode)
+		return
+	}
+
+	if remain, err = discardInt32(r, remain); err != nil {
+		return
+	}
+
+	if remain, err = readInt32(r, remain, &n); err != nil {
+		return
+	}
+
+	// This error should never trigger, unless there's a bug in the kafka client
+	// or server.
+	if n != 1 {
+		err = fmt.Errorf("1 kafka topic was expected in the fetch response but the client received %d", n)
+		return
+	}
+
+	// We ignore the topic name because we've requests messages for a single
+	// topic, unless there's a bug in the kafka server we will have received
+	// the name of the topic that we requested.
+	if remain, err = discardString(r, remain); err != nil {
+		return
+	}
+
+	if remain, err = readInt32(r, remain, &n); err != nil {
+		return
+	}
+
+	// This error should never trigger, unless there's a bug in the kafka client
+	// or server.
+	if n != 1 {
+		err = fmt.Errorf("1 kafka partition was expected in the fetch response but the client received %d", n)
+		return
+	}
+
+	if remain, err = read(r, remain, &p); err != nil {
+		return
+	}
+
+	var abortedTransactionLen int
+	if remain, err = readArrayLen(r, remain, &abortedTransactionLen); err != nil {
+		return
+	}
+
+	if abortedTransactionLen == -1 {
+		abortedTransactions = nil
+	} else {
+		abortedTransactions = make([]AbortedTransaction, abortedTransactionLen)
+		for i := 0; i < abortedTransactionLen; i++ {
+			if remain, err = read(r, remain, &abortedTransactions[i]); err != nil {
+				return
+			}
+		}
+	}
+
+	if p.ErrorCode != 0 {
+		err = Error(p.ErrorCode)
+		return
+	}
+
+	remain, err = readInt32(r, remain, &messageSetSize)
+	if err != nil {
+		return
+	}
+
+	// This error should never trigger, unless there's a bug in the kafka client
+	// or server.
+	if remain != int(messageSetSize) {
+		err = fmt.Errorf("the size of the message set in a fetch response doesn't match the number of remaining bytes (message set size = %d, remaining bytes = %d)", messageSetSize, remain)
+		return
+	}
+
+	watermark = p.HighwaterMarkOffset
+	return
+
 }
 
 func readMessageHeader(r *bufio.Reader, sz int) (offset int64, attributes int8, timestamp int64, remain int, err error) {
