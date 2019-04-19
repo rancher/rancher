@@ -14,6 +14,8 @@ param (
     [parameter(Mandatory = $true)] [string]$KubeletOptions,
     [parameter(Mandatory = $true)] [string]$KubeproxyOptions,
 
+    [parameter(Mandatory = $false)] [string]$FlannelBackendConfig,
+
     [parameter(Mandatory = $true)] [string]$NodeIP,
     [parameter(Mandatory = $true)] [string]$NodeName
 )
@@ -268,38 +270,15 @@ function config-cni-flannel {
         [parameter(Mandatory = $false)] [switch]$Restart = $False
     )
 
-    $flannelBackendName = "vxlan0"
+    ## set network and backend type ##
     $flannelBackendType = "vxlan"
-    $flannelNetwork = $KubeClusterCIDR
-    $networkType = "overlay"
+    $flannelBackendName = "vxlan0"
     if ($KubeCNIMode -eq "win-bridge") {
         $flannelBackendType = "host-gw"
         $flannelBackendName = "cbr0"
-        $networkType = "l2bridge"
     }
-
-    ## clean other kind network ##
-    $isCleanPreviousNetwork = Clean-HNSNetworks -Types @{ "l2bridge" = $True; "overlay" = $True } -Keeps @{ $flannelBackendName = $networkType }
-    if ($isCleanPreviousNetwork) {
-        print "...................., cleaning stale HNS network"
-    }
-
-    ## generate flanneld config ##
-    $kubeFlannelPath = "C:\etc\kube-flannel"
-    if (-not (Test-Path "$kubeFlannelPath\net-conf.json")) {
-        print "...................., generating flanneld config"
-    } else {
-        print "...................., overwriting flanneld config"
-    }
-    $null = New-Item -Force -Type Directory -Path $kubeFlannelPath -ErrorAction Ignore
-    $netConfJson = @{
-        Network = $flannelNetwork
-        Backend = @{
-            name = $flannelBackendName
-            type = $flannelBackendType
-        }
-    }
-    $netConfJson | ConvertTo-Json -Compress -Depth 32 | Out-File -Encoding ascii -Force -FilePath "$kubeFlannelPath\net-conf.json"
+    set-env-var -Key "FLANNEL_BACKEND_TYPE" -Value $flannelBackendType
+    set-env-var -Key "KUBE_NETWORK" -Value $flannelBackendName
 
     ## generate CNI config ##
     $cniConfPath = "$CNIDir\conf"
@@ -309,38 +288,36 @@ function config-cni-flannel {
         print "...................., overwriting cni config"
     }
     $null = New-Item -Force -Type Directory -Path $cniConfPath -ErrorAction Ignore
-    $delegate = $null
-    if ($KubeCNIMode -eq "win-overlay") {
-        $delegate = @{
-            type = "win-overlay"
-            dns = @{
-                nameservers = @($KubeDnsServiceIP)
-                search = @(
-                    "svc." + $KubeClusterDomain
-                )
-            }
-            policies = @(
-                @{
-                    name = "EndpointPolicy"
-                    value = @{
-                        Type = "OutBoundNAT"
-                        ExceptionList = @(
-                            $KubeClusterCIDR
-                            $KubeServiceCIDR
-                        )
-                    }
-                }
-                @{
-                    name = "EndpointPolicy"
-                    value = @{
-                        Type = "ROUTE"
-                        NeedEncap = $true
-                        DestinationPrefix = $KubeServiceCIDR
-                    }
-                }
+    $delegate = @{
+        type = "win-overlay"
+        dns = @{
+            nameservers = @($KubeDnsServiceIP)
+            search = @(
+                "svc." + $KubeClusterDomain
             )
         }
-    } elseif ($KubeCNIMode -eq "win-bridge") {
+        policies = @(
+            @{
+                name = "EndpointPolicy"
+                value = @{
+                    Type = "OutBoundNAT"
+                    ExceptionList = @(
+                        $KubeClusterCIDR
+                        $KubeServiceCIDR
+                    )
+                }
+            }
+            @{
+                name = "EndpointPolicy"
+                value = @{
+                    Type = "ROUTE"
+                    NeedEncap = $true
+                    DestinationPrefix = $KubeServiceCIDR
+                }
+            }
+        )
+    }
+    if ($KubeCNIMode -eq "win-bridge") {
         $vswitch = get-hyperv-vswitch
 
         $delegate = @{
@@ -392,8 +369,6 @@ function config-cni-flannel {
         delegate = $delegate
     }
     $cniConf | ConvertTo-Json -Compress -Depth 32 | Out-File -Encoding ascii -Force -FilePath "$cniConfPath\cni.conf"
-
-    set-env-var -Key "KUBE_NETWORK" -Value $flannelBackendName
 }
 
 function config-azure-cloudprovider {
@@ -599,6 +574,41 @@ function start-flanneld {
         print "Starting flanneld ..."
     }
 
+    ## get network and backend type ##
+    $flannelBackendType = get-env-var -Key "FLANNEL_BACKEND_TYPE"
+    $flannelBackendName = get-env-var -Key "KUBE_NETWORK"
+    $networkType = "overlay"
+    if ($flannelBackendType -eq "host-gw") {
+        $networkType = "l2bridge"
+    }
+
+    ## clean other kind network ##
+    $isCleanPreviousNetwork = Clean-HNSNetworks -Types @{ "l2bridge" = $True; "overlay" = $True } -Keeps @{ $flannelBackendName = $networkType }
+    if ($isCleanPreviousNetwork) {
+        print "...................., cleaning stale HNS network"
+    }
+
+    ## generate flanneld config ##
+    $kubeFlannelPath = "C:\etc\kube-flannel"
+    if (-not (Test-Path "$kubeFlannelPath\net-conf.json")) {
+        print "...................., generating flanneld config"
+    } else {
+        print "...................., overwriting flanneld config"
+    }
+    $null = New-Item -Force -Type Directory -Path $kubeFlannelPath -ErrorAction Ignore
+    $flannelBackendCfg = @{}
+    try {
+        if ($FlannelBackendConfig) {
+            $flannelBackendCfg = $FlannelBackendConfig | ConvertFrom-Json -ErrorAction Ignore
+        }
+    } catch {}
+    $flannelBackendCfg = $flannelBackendCfg | Add-Member @{ Name = $flannelBackendName; Type = $flannelBackendType; } -Force -PassThru
+    $netConfJson = @{
+        Network = $KubeClusterCIDR
+        Backend = $flannelBackendCfg
+    }
+    $netConfJson | ConvertTo-Json -Compress -Depth 32 | Out-File -Encoding ascii -Force -FilePath "$kubeFlannelPath\net-conf.json"
+
     ## binary is ready or not ##
     wait-ready -Path "$CNIDir\bin\flanneld.exe"
 
@@ -614,6 +624,11 @@ function start-flanneld {
         "`"--alsologtostderr=true`""
         "`"--log-file=$LogDir\flanneld.log`""
     )
+
+    ## open firewall ##
+    if ($networkType -eq "overlay") {
+        $null = New-NetFirewallRule -Name 'OverlayTraffic4789UDP' -Description "Overlay network traffic UDP" -Action Allow -LocalPort 4789 -Enabled True -DisplayName "Overlay Traffic 4789 UDP" -Protocol UDP -ErrorAction SilentlyContinue
+    }
 
     ## start and retry ##
     $retryCount = 3
@@ -635,9 +650,8 @@ function start-flanneld {
 
     ## check network created or not ##
     print "...................., checking HNS network"
-    $flannelBackendName = get-env-var -Key "KUBE_NETWORK"
     $retryCount = 6
-    $network = $null
+    $network = (Get-HnsNetwork | ? Name -eq $flannelBackendName)
     while(-not $network) {
         $network = (Get-HnsNetwork | ? Name -eq $flannelBackendName)
 
@@ -651,16 +665,6 @@ function start-flanneld {
             }
             break
         }
-    }
-
-    $networkType = "overlay"
-    if ($KubeCNIMode -eq "win-bridge") {
-        $networkType = "l2bridge"
-    }
-    if ($network.Type -ne $networkType) {
-        ## restart flanneld
-        stop-flanneld
-        throw ".............. FAILED, agent retry"
     }
 
     repair-cloud-routes
@@ -809,31 +813,38 @@ function start-kube-proxy {
 
     ## wait a few seconds ##
     print "...................., wait a few seconds"
-    if ($KubeCNIMode -eq "win-overlay") {
-        Start-Sleep -s 30
-    } else {
-        Start-Sleep -s 10
-    }
+    Start-Sleep -s 15
 
     ## binary is ready or not ##
     wait-ready -Path "$KubeDir\bin\kube-proxy.exe"
 
-    ## clean stale policies ##
-    $hnsPolicyList = Get-HnsPolicyList
-    if ($hnsPolicyList) {
-        print "...................., cleaning stale HNS policies"
-        $hnsPolicyList | Remove-HnsPolicyList
+    ## config running params ##
+    $cniModeArgs = $null
+    if ($KubeCNIMode -eq "win-overlay") {
+        print "...................., generating source vip for overlay"
+        $kubeNetwork = get-env-var -Key "KUBE_NETWORK"
+        $network = (Get-HnsNetwork | ? Name -eq $kubeNetwork)
+        if (-not $network) {
+            throw ".............. FAILED, agent retry"
+        }
+
+        $subnet = $network.Subnets[0].AddressPrefix
+        $sourceVip = $subnet.substring(0, $subnet.lastIndexOf(".")) + ".2"
+        $cniModeArgs = @(
+            "`"--source-vip=$sourceVip`""
+        )
     }
 
-    ## config running params ##
     $env:KUBE_NETWORK = get-env-var -Key "KUBE_NETWORK"
     $fgRun = get-env-var -Key "CATTLE_AGENT_FG_RUN"
     $kubeproxyArgs = merge-argument-list @(
+        $cniModeArgs
         @(
             "`"--cluster-cidr=$KubeClusterCIDR`""
             "`"--logtostderr=$fgRun`""
             "`"--alsologtostderr=true`""
             "`"--log-file=$LogDir\kubeproxy.log`""
+            "`"--feature-gates=WinOverlay=true,WindowsGMSA=true,WinDSR=true`""
         )
         @($env:CATTLE_CUSTOMIZE_KUBEPROXY_OPTIONS -split ";")
         @($KubeproxyOptions -split ";")

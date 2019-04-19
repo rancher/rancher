@@ -57,7 +57,7 @@ func connectToProxyWhileWindows(rootContext context.Context, proxyURL string, he
 	}
 
 	eg.Go(func() error {
-		connectRetryLimit := 10
+		connectRetryLimit := 20
 
 		var err error
 		for err == nil {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 
 	docketypes "github.com/docker/docker/api/types"
@@ -502,6 +503,18 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 		"hostname-override": configNode.HostnameOverride,
 	}, serviceOptions.Kubeproxy)
 
+	flannelBackendConfig := map[string]interface{}{}
+	switch cniComponent {
+	case "flannel", "canal":
+		if val, exist := rkeConfig.Network.Options[rkecluster.FlannelBackendPort]; exist {
+			flannelBackendConfig["Port"] = atoi(val, rkecluster.FlannelVxLanPort)
+		}
+		if val, exist := rkeConfig.Network.Options[rkecluster.FlannelBackendVxLanNetworkIdentify]; exist {
+			flannelBackendConfig["VNI"] = atoi(val, rkecluster.FlannelVxLanNetworkIdentify)
+		}
+	default:
+	}
+
 	result["run-script-hyperkube"] = v3.Process{
 		Name: "hyperkube",
 		Command: []string{
@@ -520,6 +533,7 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 			"-KubeletDockerConfig", dockerConfig,
 			"-KubeletOptions", translateMapToTuples(extendingKubeletOptions, `"--%s=%v"`),
 			"-KubeProxyOptions", translateMapToTuples(extendingKubeproxyOptions, `"--%s=%v"`),
+			"-FlannelBackendConfig", toJSON(flannelBackendConfig),
 			"-NodeIP", configNode.InternalAddress,
 			"-NodeName", configNode.HostnameOverride,
 		},
@@ -589,4 +603,23 @@ func formatSystemImages(originSystemImages v3.WindowsSystemImages, windowsReleas
 	}
 
 	return shadow.Interface().(v3.WindowsSystemImages)
+}
+
+func toJSON(options interface{}) string {
+	result := "{}"
+	if options != nil {
+		bs, err := json.Marshal(options)
+		if err == nil {
+			return string(bs)
+		}
+	}
+	return result
+}
+
+func atoi(val string, defaultVal int) int {
+	ret, err := strconv.Atoi(val)
+	if err == nil {
+		return ret
+	}
+	return defaultVal
 }
