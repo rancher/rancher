@@ -469,8 +469,8 @@ docker load --input ${images}
 
 foreach ($item in $content) {
     if(!$item.contains("/")) {
-        docker tag ${item} rancher/${item}
-        $item="rancher/${item}"
+        docker tag ${item} "rancher/"+${item}
+        $item="rancher/"+${item}
     }
     docker tag $item $Registry/$item
     docker push $Registry/$item
