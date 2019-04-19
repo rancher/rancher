@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-var errUnknownCodec = errors.New("invalid codec")
+var errUnknownCodec = errors.New("the compression code is invalid or its codec has not been imported")
 
 var codecs = make(map[int8]CompressionCodec)
 var codecsMutex sync.RWMutex
@@ -47,6 +47,5 @@ type CompressionCodec interface {
 	Decode(src []byte) ([]byte, error)
 }
 
-const compressionCodecMask int8 = 0x03
-const DefaultCompressionLevel int = -1
+const compressionCodecMask int8 = 0x07
 const CompressionNoneCode = 0

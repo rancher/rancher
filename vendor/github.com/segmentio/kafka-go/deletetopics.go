@@ -6,7 +6,7 @@ import (
 )
 
 // See http://kafka.apache.org/protocol.html#The_Messages_DeleteTopics
-type deleteTopicsRequestV1 struct {
+type deleteTopicsRequestV0 struct {
 	// Topics holds the topic names
 	Topics []string
 
@@ -16,55 +16,45 @@ type deleteTopicsRequestV1 struct {
 	Timeout int32
 }
 
-func (t deleteTopicsRequestV1) size() int32 {
+func (t deleteTopicsRequestV0) size() int32 {
 	return sizeofStringArray(t.Topics) +
 		sizeofInt32(t.Timeout)
 }
 
-func (t deleteTopicsRequestV1) writeTo(w *bufio.Writer) {
+func (t deleteTopicsRequestV0) writeTo(w *bufio.Writer) {
 	writeStringArray(w, t.Topics)
 	writeInt32(w, t.Timeout)
 }
 
-type deleteTopicsResponseV1 struct {
-	// ThrottleTimeMS holds the duration in milliseconds for which the request
-	// was throttled due to quota violation (Zero if the request did not violate
-	// any quota)
-	ThrottleTimeMS int32
-
+type deleteTopicsResponseV0 struct {
 	// TopicErrorCodes holds per topic error codes
-	TopicErrorCodes []deleteTopicsResponseV1TopicErrorCode
+	TopicErrorCodes []deleteTopicsResponseV0TopicErrorCode
 }
 
-func (t deleteTopicsResponseV1) size() int32 {
-	return sizeofInt32(t.ThrottleTimeMS) +
-		sizeofArray(len(t.TopicErrorCodes), func(i int) int32 { return t.TopicErrorCodes[i].size() })
+func (t deleteTopicsResponseV0) size() int32 {
+	return sizeofArray(len(t.TopicErrorCodes), func(i int) int32 { return t.TopicErrorCodes[i].size() })
 }
 
-func (t *deleteTopicsResponseV1) readFrom(r *bufio.Reader, size int) (remain int, err error) {
-	if remain, err = readInt32(r, size, &t.ThrottleTimeMS); err != nil {
-		return
-	}
+func (t *deleteTopicsResponseV0) readFrom(r *bufio.Reader, size int) (remain int, err error) {
 	fn := func(withReader *bufio.Reader, withSize int) (fnRemain int, fnErr error) {
-		var item deleteTopicsResponseV1TopicErrorCode
+		var item deleteTopicsResponseV0TopicErrorCode
 		if fnRemain, fnErr = (&item).readFrom(withReader, withSize); err != nil {
 			return
 		}
 		t.TopicErrorCodes = append(t.TopicErrorCodes, item)
 		return
 	}
-	if remain, err = readArrayWith(r, remain, fn); err != nil {
+	if remain, err = readArrayWith(r, size, fn); err != nil {
 		return
 	}
 	return
 }
 
-func (t deleteTopicsResponseV1) writeTo(w *bufio.Writer) {
-	writeInt32(w, t.ThrottleTimeMS)
+func (t deleteTopicsResponseV0) writeTo(w *bufio.Writer) {
 	writeArray(w, len(t.TopicErrorCodes), func(i int) { t.TopicErrorCodes[i].writeTo(w) })
 }
 
-type deleteTopicsResponseV1TopicErrorCode struct {
+type deleteTopicsResponseV0TopicErrorCode struct {
 	// Topic holds the topic name
 	Topic string
 
@@ -72,12 +62,12 @@ type deleteTopicsResponseV1TopicErrorCode struct {
 	ErrorCode int16
 }
 
-func (t deleteTopicsResponseV1TopicErrorCode) size() int32 {
+func (t deleteTopicsResponseV0TopicErrorCode) size() int32 {
 	return sizeofString(t.Topic) +
 		sizeofInt16(t.ErrorCode)
 }
 
-func (t *deleteTopicsResponseV1TopicErrorCode) readFrom(r *bufio.Reader, size int) (remain int, err error) {
+func (t *deleteTopicsResponseV0TopicErrorCode) readFrom(r *bufio.Reader, size int) (remain int, err error) {
 	if remain, err = readString(r, size, &t.Topic); err != nil {
 		return
 	}
@@ -87,7 +77,7 @@ func (t *deleteTopicsResponseV1TopicErrorCode) readFrom(r *bufio.Reader, size in
 	return
 }
 
-func (t deleteTopicsResponseV1TopicErrorCode) writeTo(w *bufio.Writer) {
+func (t deleteTopicsResponseV0TopicErrorCode) writeTo(w *bufio.Writer) {
 	writeString(w, t.Topic)
 	writeInt16(w, t.ErrorCode)
 }
@@ -95,8 +85,8 @@ func (t deleteTopicsResponseV1TopicErrorCode) writeTo(w *bufio.Writer) {
 // deleteTopics deletes the specified topics.
 //
 // See http://kafka.apache.org/protocol.html#The_Messages_DeleteTopics
-func (c *Conn) deleteTopics(request deleteTopicsRequestV1) (deleteTopicsResponseV1, error) {
-	var response deleteTopicsResponseV1
+func (c *Conn) deleteTopics(request deleteTopicsRequestV0) (deleteTopicsResponseV0, error) {
+	var response deleteTopicsResponseV0
 	err := c.writeOperation(
 		func(deadline time.Time, id int32) error {
 			if request.Timeout == 0 {
@@ -104,7 +94,7 @@ func (c *Conn) deleteTopics(request deleteTopicsRequestV1) (deleteTopicsResponse
 				deadline = adjustDeadlineForRTT(deadline, now, defaultRTT)
 				request.Timeout = milliseconds(deadlineToTimeout(deadline, now))
 			}
-			return c.writeRequest(deleteTopicsRequest, v1, id, request)
+			return c.writeRequest(deleteTopicsRequest, v0, id, request)
 		},
 		func(deadline time.Time, size int) error {
 			return expectZeroSize(func() (remain int, err error) {
@@ -113,7 +103,7 @@ func (c *Conn) deleteTopics(request deleteTopicsRequestV1) (deleteTopicsResponse
 		},
 	)
 	if err != nil {
-		return deleteTopicsResponseV1{}, err
+		return deleteTopicsResponseV0{}, err
 	}
 	for _, c := range response.TopicErrorCodes {
 		if c.ErrorCode != 0 {

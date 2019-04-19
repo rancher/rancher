@@ -111,3 +111,42 @@ func (p *produceResponsePartitionV2) readFrom(r *bufio.Reader, sz int) (remain i
 	}
 	return
 }
+
+type produceResponsePartitionV7 struct {
+	Partition   int32
+	ErrorCode   int16
+	Offset      int64
+	Timestamp   int64
+	StartOffset int64
+}
+
+func (p produceResponsePartitionV7) size() int32 {
+	return 4 + 2 + 8 + 8 + 8
+}
+
+func (p produceResponsePartitionV7) writeTo(w *bufio.Writer) {
+	writeInt32(w, p.Partition)
+	writeInt16(w, p.ErrorCode)
+	writeInt64(w, p.Offset)
+	writeInt64(w, p.Timestamp)
+	writeInt64(w, p.StartOffset)
+}
+
+func (p *produceResponsePartitionV7) readFrom(r *bufio.Reader, sz int) (remain int, err error) {
+	if remain, err = readInt32(r, sz, &p.Partition); err != nil {
+		return
+	}
+	if remain, err = readInt16(r, remain, &p.ErrorCode); err != nil {
+		return
+	}
+	if remain, err = readInt64(r, remain, &p.Offset); err != nil {
+		return
+	}
+	if remain, err = readInt64(r, remain, &p.Timestamp); err != nil {
+		return
+	}
+	if remain, err = readInt64(r, remain, &p.StartOffset); err != nil {
+		return
+	}
+	return
+}
