@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -172,14 +173,25 @@ type writerStats struct {
 	batchSize  summary
 }
 
-// NewWriter creates and returns a new Writer configured with config.
-func NewWriter(config WriterConfig) *Writer {
+// Validate method validates WriterConfig properties.
+func (config *WriterConfig) Validate() error {
+
 	if len(config.Brokers) == 0 {
-		panic("cannot create a kafka writer with an empty list of brokers")
+		return errors.New("cannot create a kafka writer with an empty list of brokers")
 	}
 
 	if len(config.Topic) == 0 {
-		panic("cannot create a kafka writer with an empty topic")
+		return errors.New("cannot create a kafka writer with an empty topic")
+	}
+
+	return nil
+}
+
+// NewWriter creates and returns a new Writer configured with config.
+func NewWriter(config WriterConfig) *Writer {
+
+	if err := config.Validate(); err != nil {
+		panic(err)
 	}
 
 	if config.Dialer == nil {
@@ -247,6 +259,15 @@ func NewWriter(config WriterConfig) *Writer {
 // Unless the writer was configured to write messages asynchronously, the method
 // blocks until all messages have been written, or until the maximum number of
 // attempts was reached.
+//
+// When sending synchronously and the writer's batch size is configured to be
+// greater than 1, this method blocks until either a full batch can be assembled
+// or the batch timeout is reached.  The batch size and timeouts are evaluated
+// per partition, so the choice of Balancer can also influence the flushing
+// behavior.  For example, the Hash balancer will require on average N * batch
+// size messages to trigger a flush where N is the number of partitions.  The
+// best way to achieve good batching behavior is to share one Writer amongst
+// multiple go routines.
 //
 // When the method returns an error, there's no way to know yet which messages
 // have succeeded of failed.
@@ -568,14 +589,15 @@ func (w *writer) withErrorLogger(do func(*log.Logger)) {
 func (w *writer) run() {
 	defer w.join.Done()
 
-	ticker := time.NewTicker(w.batchTimeout / 10)
-	defer ticker.Stop()
+	batchTimer := time.NewTimer(0)
+	<-batchTimer.C
+	batchTimerRunning := false
+	defer batchTimer.Stop()
 
 	var conn *Conn
 	var done bool
 	var batch = make([]Message, 0, w.batchSize)
 	var resch = make([](chan<- error), 0, w.batchSize)
-	var lastFlushAt = time.Now()
 
 	defer func() {
 		if conn != nil {
@@ -595,13 +617,23 @@ func (w *writer) run() {
 				resch = append(resch, wm.res)
 				mustFlush = len(batch) >= w.batchSize
 			}
+			if !batchTimerRunning {
+				batchTimer.Reset(w.batchTimeout)
+				batchTimerRunning = true
+			}
 
-		case now := <-ticker.C:
-			mustFlush = now.Sub(lastFlushAt) > w.batchTimeout
+		case <-batchTimer.C:
+			mustFlush = true
+			batchTimerRunning = false
 		}
 
 		if mustFlush {
-			lastFlushAt = time.Now()
+			if batchTimerRunning {
+				if stopped := batchTimer.Stop(); !stopped {
+					<-batchTimer.C
+				}
+				batchTimerRunning = false
+			}
 
 			if len(batch) == 0 {
 				continue

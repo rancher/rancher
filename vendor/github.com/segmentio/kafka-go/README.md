@@ -30,6 +30,11 @@ APIs for interacting with Kafka, mirroring concepts and implementing interfaces 
 the Go standard library to make it easy to use and integrate with existing
 software.
 
+## Kafka versions
+
+`kafka-go` is currently compatible with Kafka versions from 0.10.1.0 to 2.1.0. While latest versions will be working,
+some features available from the Kafka API may not be implemented yet.
+
 ## Connection [![GoDoc](https://godoc.org/github.com/segmentio/kafka-go?status.svg)](https://godoc.org/github.com/segmentio/kafka-go#Conn)
 
 The `Conn` type is the core of the `kafka-go` package. It wraps around a raw
@@ -112,7 +117,7 @@ r.Close()
 ### Consumer Groups
 
 ```kafka-go``` also supports Kafka consumer groups including broker managed offsets.
-To enable consumer groups, simplify specify the GroupID in the ReaderConfig.
+To enable consumer groups, simply specify the GroupID in the ReaderConfig.
 
 ReadMessage automatically commits offsets when using consumer groups.
 
@@ -238,7 +243,7 @@ w := kafka.NewWriter(kafka.WriterConfig{
 
 ### Compression
 
-Compression can be enable on the writer :
+Compression can be enabled on the `Writer` by configuring the `CompressionCodec`:
 
 ```go
 w := kafka.NewWriter(kafka.WriterConfig{
@@ -248,7 +253,15 @@ w := kafka.NewWriter(kafka.WriterConfig{
 })
 ```
 
-The reader will by default figure out if the consumed messages are compressed by intepreting the message attributes.
+The `Reader` will by determine if the consumed messages are compressed by 
+examining the message attributes.  However, the package(s) for all expected 
+codecs must be imported so that they get loaded correctly.  For example, if you 
+are going to be receiving messages compressed with Snappy, add the following
+import:
+
+```go
+import _ "github.com/segmentio/kafka-go/snappy"
+```
 
 ## TLS Support
 

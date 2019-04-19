@@ -22,17 +22,23 @@ const (
 	syncGroupRequest        apiKey = 14
 	describeGroupsRequest   apiKey = 15
 	listGroupsRequest       apiKey = 16
+	saslHandshakeRequest    apiKey = 17
+	apiVersionsRequest      apiKey = 18
 	createTopicsRequest     apiKey = 19
 	deleteTopicsRequest     apiKey = 20
+	saslAuthenticateRequest apiKey = 36
 )
 
 type apiVersion int16
 
 const (
-	v0 apiVersion = 0
-	v1 apiVersion = 1
-	v2 apiVersion = 2
-	v3 apiVersion = 3
+	v0  apiVersion = 0
+	v1  apiVersion = 1
+	v2  apiVersion = 2
+	v3  apiVersion = 3
+	v5  apiVersion = 5
+	v7  apiVersion = 7
+	v10 apiVersion = 10
 )
 
 type requestHeader struct {

@@ -3,6 +3,7 @@ package kafka
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"time"
 )
 
@@ -16,6 +17,7 @@ type Message struct {
 	Offset    int64
 	Key       []byte
 	Value     []byte
+	Headers   []Header
 
 	// If not set at the creation, Time will be automatically set when
 	// writing the message.
@@ -106,6 +108,48 @@ func (s messageSet) writeTo(w *bufio.Writer) {
 }
 
 type messageSetReader struct {
+	version int
+	v1      messageSetReaderV1
+	v2      messageSetReaderV2
+}
+
+func (r *messageSetReader) readMessage(min int64,
+	key func(*bufio.Reader, int, int) (int, error),
+	val func(*bufio.Reader, int, int) (int, error),
+) (offset int64, timestamp int64, headers []Header, err error) {
+	switch r.version {
+	case 1:
+		return r.v1.readMessage(min, key, val)
+	case 2:
+		return r.v2.readMessage(min, key, val)
+	default:
+		panic("Invalid messageSetReader - unknown message reader version")
+	}
+}
+
+func (r *messageSetReader) remaining() (remain int) {
+	switch r.version {
+	case 1:
+		return r.v1.remaining()
+	case 2:
+		return r.v2.remaining()
+	default:
+		panic("Invalid messageSetReader - unknown message reader version")
+	}
+}
+
+func (r *messageSetReader) discard() (err error) {
+	switch r.version {
+	case 1:
+		return r.v1.discard()
+	case 2:
+		return r.v2.discard()
+	default:
+		panic("Invalid messageSetReader - unknown message reader version")
+	}
+}
+
+type messageSetReaderV1 struct {
 	*readerStack
 }
 
@@ -116,17 +160,47 @@ type readerStack struct {
 	parent *readerStack
 }
 
-func newMessageSetReader(reader *bufio.Reader, remain int) *messageSetReader {
-	return &messageSetReader{&readerStack{
-		reader: reader,
-		remain: remain,
-	}}
+func newMessageSetReader(reader *bufio.Reader, remain int) (*messageSetReader, error) {
+	headerLength := 8 + 4 + 4 + 1 // offset + messageSize + crc + magicByte
+
+	if headerLength > remain {
+		return nil, errShortRead
+	}
+
+	b, err := reader.Peek(headerLength)
+	if err != nil {
+		return nil, err
+	}
+	var version int8 = int8(b[headerLength-1])
+
+	switch version {
+	case 0, 1:
+		return &messageSetReader{
+			version: 1,
+			v1: messageSetReaderV1{&readerStack{
+				reader: reader,
+				remain: remain,
+			}}}, nil
+	case 2:
+		mr := &messageSetReader{
+			version: 2,
+			v2: messageSetReaderV2{
+				readerStack: &readerStack{
+					reader: reader,
+					remain: remain,
+				},
+				messageCount: 0,
+			}}
+		return mr, nil
+	default:
+		return nil, fmt.Errorf("unsupported message version %d found in fetch response", version)
+	}
 }
 
-func (r *messageSetReader) readMessage(min int64,
+func (r *messageSetReaderV1) readMessage(min int64,
 	key func(*bufio.Reader, int, int) (int, error),
 	val func(*bufio.Reader, int, int) (int, error),
-) (offset int64, timestamp int64, err error) {
+) (offset int64, timestamp int64, headers []Header, err error) {
 	for r.readerStack != nil {
 		if r.remain == 0 {
 			r.readerStack = r.parent
@@ -143,7 +217,7 @@ func (r *messageSetReader) readMessage(min int64,
 		code := attributes & compressionCodecMask
 		if code != 0 {
 			var codec CompressionCodec
-			if codec, err = resolveCodec(attributes); err != nil {
+			if codec, err = resolveCodec(code); err != nil {
 				return
 			}
 
@@ -213,14 +287,14 @@ func (r *messageSetReader) readMessage(min int64,
 	return
 }
 
-func (r *messageSetReader) remaining() (remain int) {
+func (r *messageSetReaderV1) remaining() (remain int) {
 	for s := r.readerStack; s != nil; s = s.parent {
 		remain += s.remain
 	}
 	return
 }
 
-func (r *messageSetReader) discard() (err error) {
+func (r *messageSetReaderV1) discard() (err error) {
 	if r.readerStack == nil {
 		return
 	}
@@ -249,5 +323,237 @@ func extractOffset(base int64, msgSet []byte) (offset int64, err error) {
 		}
 	}
 	offset = base - offset
+	return
+}
+
+type Header struct {
+	Key   string
+	Value []byte
+}
+
+type messageSetHeaderV2 struct {
+	firstOffset          int64
+	length               int32
+	partitionLeaderEpoch int32
+	magic                int8
+	crc                  int32
+	batchAttributes      int16
+	lastOffsetDelta      int32
+	firstTimestamp       int64
+	maxTimestamp         int64
+	producerId           int64
+	producerEpoch        int16
+	firstSequence        int32
+}
+
+type timestampType int8
+
+const (
+	createTime    timestampType = 0
+	logAppendTime timestampType = 1
+)
+
+type transactionType int8
+
+const (
+	nonTransactional transactionType = 0
+	transactional    transactionType = 1
+)
+
+type controlType int8
+
+const (
+	nonControlMessage controlType = 0
+	controlMessage    controlType = 1
+)
+
+func (h *messageSetHeaderV2) compression() int8 {
+	return int8(h.batchAttributes & 7)
+}
+
+func (h *messageSetHeaderV2) timestampType() timestampType {
+	return timestampType((h.batchAttributes & (1 << 3)) >> 3)
+}
+
+func (h *messageSetHeaderV2) transactionType() transactionType {
+	return transactionType((h.batchAttributes & (1 << 4)) >> 4)
+}
+
+func (h *messageSetHeaderV2) controlType() controlType {
+	return controlType((h.batchAttributes & (1 << 5)) >> 5)
+}
+
+type messageSetReaderV2 struct {
+	*readerStack
+	messageCount int
+
+	header messageSetHeaderV2
+}
+
+func (r *messageSetReaderV2) readHeader() (err error) {
+	h := &r.header
+	if r.remain, err = readInt64(r.reader, r.remain, &h.firstOffset); err != nil {
+		return
+	}
+	if r.remain, err = readInt32(r.reader, r.remain, &h.length); err != nil {
+		return
+	}
+	if r.remain, err = readInt32(r.reader, r.remain, &h.partitionLeaderEpoch); err != nil {
+		return
+	}
+	if r.remain, err = readInt8(r.reader, r.remain, &h.magic); err != nil {
+		return
+	}
+	if r.remain, err = readInt32(r.reader, r.remain, &h.crc); err != nil {
+		return
+	}
+	if r.remain, err = readInt16(r.reader, r.remain, &h.batchAttributes); err != nil {
+		return
+	}
+	if r.remain, err = readInt32(r.reader, r.remain, &h.lastOffsetDelta); err != nil {
+		return
+	}
+	if r.remain, err = readInt64(r.reader, r.remain, &h.firstTimestamp); err != nil {
+		return
+	}
+	if r.remain, err = readInt64(r.reader, r.remain, &h.maxTimestamp); err != nil {
+		return
+	}
+	if r.remain, err = readInt64(r.reader, r.remain, &h.producerId); err != nil {
+		return
+	}
+	if r.remain, err = readInt16(r.reader, r.remain, &h.producerEpoch); err != nil {
+		return
+	}
+	if r.remain, err = readInt32(r.reader, r.remain, &h.firstSequence); err != nil {
+		return
+	}
+	var messageCount int32
+	if r.remain, err = readInt32(r.reader, r.remain, &messageCount); err != nil {
+		return
+	}
+	r.messageCount = int(messageCount)
+
+	return nil
+}
+
+func (r *messageSetReaderV2) readMessage(min int64,
+	key func(*bufio.Reader, int, int) (int, error),
+	val func(*bufio.Reader, int, int) (int, error),
+) (offset int64, timestamp int64, headers []Header, err error) {
+
+	if r.messageCount == 0 {
+		if r.remain == 0 {
+			if r.parent != nil {
+				r.readerStack = r.parent
+			}
+		}
+		if err = r.readHeader(); err != nil {
+			return
+		}
+		code := r.header.compression()
+		var decompressed []byte
+		if code != 0 {
+			var codec CompressionCodec
+			if codec, err = resolveCodec(code); err != nil {
+				return
+			}
+			batchRemain := int(r.header.length - 49)
+			if batchRemain > r.remain {
+				err = errShortRead
+				return
+			}
+			var compressed []byte
+			compressed, r.remain, err = readNewBytes(r.reader, r.remain, batchRemain)
+			if err != nil {
+				return
+			}
+			if decompressed, err = codec.Decode(compressed); err != nil {
+				return
+			}
+
+			r.readerStack = &readerStack{
+				reader: bufio.NewReader(bytes.NewReader(decompressed)),
+				remain: len(decompressed),
+				base:   -1, // base is unused here
+				parent: r.readerStack,
+			}
+		}
+	}
+
+	var length int64
+	if r.remain, err = readVarInt(r.reader, r.remain, &length); err != nil {
+		return
+	}
+
+	var attrs int8
+	if r.remain, err = readInt8(r.reader, r.remain, &attrs); err != nil {
+		return
+	}
+	var timestampDelta int64
+	if r.remain, err = readVarInt(r.reader, r.remain, &timestampDelta); err != nil {
+		return
+	}
+	var offsetDelta int64
+	if r.remain, err = readVarInt(r.reader, r.remain, &offsetDelta); err != nil {
+		return
+	}
+	var keyLen int64
+	if r.remain, err = readVarInt(r.reader, r.remain, &keyLen); err != nil {
+		return
+	}
+
+	if r.remain, err = key(r.reader, r.remain, int(keyLen)); err != nil {
+		return
+	}
+	var valueLen int64
+	if r.remain, err = readVarInt(r.reader, r.remain, &valueLen); err != nil {
+		return
+	}
+
+	if r.remain, err = val(r.reader, r.remain, int(valueLen)); err != nil {
+		return
+	}
+
+	var headerCount int64
+	if r.remain, err = readVarInt(r.reader, r.remain, &headerCount); err != nil {
+		return
+	}
+
+	headers = make([]Header, headerCount)
+
+	for i := 0; i < int(headerCount); i++ {
+		if err = r.readMessageHeader(&headers[i]); err != nil {
+			return
+		}
+	}
+	r.messageCount--
+	return r.header.firstOffset + offsetDelta, r.header.firstTimestamp + timestampDelta, headers, nil
+}
+
+func (r *messageSetReaderV2) readMessageHeader(header *Header) (err error) {
+	var keyLen int64
+	if r.remain, err = readVarInt(r.reader, r.remain, &keyLen); err != nil {
+		return
+	}
+	if header.Key, r.remain, err = readNewString(r.reader, r.remain, int(keyLen)); err != nil {
+		return
+	}
+	var valLen int64
+	if r.remain, err = readVarInt(r.reader, r.remain, &valLen); err != nil {
+		return
+	}
+	if header.Value, r.remain, err = readNewBytes(r.reader, r.remain, int(valLen)); err != nil {
+		return
+	}
+	return nil
+}
+
+func (r *messageSetReaderV2) remaining() (remain int) {
+	return r.remain
+}
+
+func (r *messageSetReaderV2) discard() (err error) {
+	r.remain, err = discardN(r.reader, r.remain, r.remain)
 	return
 }
