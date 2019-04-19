@@ -36,13 +36,22 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 
 func Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
 	var setting v3client.Setting
-	if err := access.ByID(request, request.Version, v3client.SettingType, request.ID, &setting); err != nil {
-		return err
+
+	// request.ID is taken from the request request url, it is possible that the request url does not contain the id
+	id := request.ID
+	if name, ok := data["name"].(string); ok && id == "" {
+		id = name
+	}
+
+	if err := access.ByID(request, request.Version, v3client.SettingType, id, &setting); err != nil {
+		if !httperror.IsNotFound(err) {
+			return err
+		}
 	}
 	if setting.Source == "env" {
-		return httperror.NewAPIError(httperror.MethodNotAllowed, fmt.Sprintf("%s is readOnly because its value is from environment variable", request.ID))
-	} else if slice.ContainsString(readOnlySettings, setting.ID) {
-		return httperror.NewAPIError(httperror.MethodNotAllowed, fmt.Sprintf("%s is readOnly", request.ID))
+		return httperror.NewAPIError(httperror.MethodNotAllowed, fmt.Sprintf("%s is readOnly because its value is from environment variable", id))
+	} else if slice.ContainsString(readOnlySettings, id) {
+		return httperror.NewAPIError(httperror.MethodNotAllowed, fmt.Sprintf("%s is readOnly", id))
 	}
 
 	newValue, ok := data["value"]
@@ -55,7 +64,7 @@ func Validator(request *types.APIContext, schema *types.Schema, data map[string]
 	}
 
 	var err error
-	switch request.ID {
+	switch id {
 	case "auth-user-info-max-age-seconds":
 		_, err = providerrefresh.ParseMaxAge(newValueString)
 	case "auth-user-info-resync-cron":
