@@ -141,7 +141,7 @@ func (u *userControllersController) amOwner(peers tpeermanager.Peers, cluster *v
 		ck--
 	}
 
-	scaled := int(ck) * len(peers.IDs) / math.MaxUint32
+	scaled := int64(ck) * int64(len(peers.IDs)) / math.MaxUint32
 	logrus.Debugf("%s(%v): (%v * %v) / %v = %v[%v] = %v, self = %v\n", cluster.Name, cluster.UID, ck,
 		uint32(len(peers.IDs)), math.MaxUint32, peers.IDs, scaled, peers.IDs[scaled], peers.SelfID)
 	return peers.IDs[scaled] == peers.SelfID
