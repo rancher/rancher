@@ -102,6 +102,10 @@ func (ch *clusterHandler) doSync(cluster *mgmtv3.Cluster) error {
 			return errors.Wrap(err, "failed to deploy monitoring")
 		}
 
+		if cluster.Status.MonitoringStatus == nil {
+			cluster.Status.MonitoringStatus = &mgmtv3.MonitoringStatus{}
+		}
+
 		isReady, err := ch.isPrometheusReady(cluster)
 		if err != nil {
 			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
@@ -114,11 +118,7 @@ func (ch *clusterHandler) doSync(cluster *mgmtv3.Cluster) error {
 			return nil
 		}
 
-		if cluster.Status.MonitoringStatus == nil {
-			cluster.Status.MonitoringStatus = &mgmtv3.MonitoringStatus{
-				GrafanaEndpoint: fmt.Sprintf("/k8s/clusters/%s/api/v1/namespaces/%s/services/http:access-grafana:80/proxy/", cluster.Name, appTargetNamespace),
-			}
-		}
+		cluster.Status.MonitoringStatus.GrafanaEndpoint = fmt.Sprintf("/k8s/clusters/%s/api/v1/namespaces/%s/services/http:access-grafana:80/proxy/", cluster.Name, appTargetNamespace)
 
 		_, err = ConditionMetricExpressionDeployed.DoUntilTrue(cluster.Status.MonitoringStatus, func() (status *mgmtv3.MonitoringStatus, e error) {
 			return status, ch.deployMetrics(cluster)
@@ -131,7 +131,7 @@ func (ch *clusterHandler) doSync(cluster *mgmtv3.Cluster) error {
 
 		mgmtv3.ClusterConditionMonitoringEnabled.True(cluster)
 		mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, "")
-	} else if cluster.Status.MonitoringStatus != nil {
+	} else if enabledStatus := mgmtv3.ClusterConditionMonitoringEnabled.GetStatus(cluster); enabledStatus != "" && enabledStatus != "False" {
 		if err := ch.app.withdrawApp(cluster.Name, appName, appTargetNamespace); err != nil {
 			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
 			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
