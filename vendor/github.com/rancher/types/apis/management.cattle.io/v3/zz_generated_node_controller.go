@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -28,7 +29,17 @@ var (
 
 		Kind: NodeGroupVersionKind.Kind,
 	}
+
+	NodeGroupVersionResource = schema.GroupVersionResource{
+		Group:    GroupName,
+		Version:  Version,
+		Resource: "nodes",
+	}
 )
+
+func init() {
+	resource.Put(NodeGroupVersionResource)
+}
 
 func NewNode(namespace, name string, obj Node) *Node {
 	obj.APIVersion, obj.Kind = NodeGroupVersionKind.ToAPIVersionAndKind()

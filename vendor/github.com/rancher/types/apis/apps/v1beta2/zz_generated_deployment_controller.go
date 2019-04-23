@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/resource"
 	"k8s.io/api/apps/v1beta2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,17 @@ var (
 
 		Kind: DeploymentGroupVersionKind.Kind,
 	}
+
+	DeploymentGroupVersionResource = schema.GroupVersionResource{
+		Group:    GroupName,
+		Version:  Version,
+		Resource: "deployments",
+	}
 )
+
+func init() {
+	resource.Put(DeploymentGroupVersionResource)
+}
 
 func NewDeployment(namespace, name string, obj v1beta2.Deployment) *v1beta2.Deployment {
 	obj.APIVersion, obj.Kind = DeploymentGroupVersionKind.ToAPIVersionAndKind()

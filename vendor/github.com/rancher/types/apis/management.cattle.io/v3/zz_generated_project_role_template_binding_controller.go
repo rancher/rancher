@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -28,7 +29,17 @@ var (
 
 		Kind: ProjectRoleTemplateBindingGroupVersionKind.Kind,
 	}
+
+	ProjectRoleTemplateBindingGroupVersionResource = schema.GroupVersionResource{
+		Group:    GroupName,
+		Version:  Version,
+		Resource: "projectroletemplatebindings",
+	}
 )
+
+func init() {
+	resource.Put(ProjectRoleTemplateBindingGroupVersionResource)
+}
 
 func NewProjectRoleTemplateBinding(namespace, name string, obj ProjectRoleTemplateBinding) *ProjectRoleTemplateBinding {
 	obj.APIVersion, obj.Kind = ProjectRoleTemplateBindingGroupVersionKind.ToAPIVersionAndKind()
