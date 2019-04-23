@@ -1,0 +1,193 @@
+from kubernetes.client import CustomObjectsApi
+from kubernetes.client import CoreV1Api
+from kubernetes.client.rest import ApiException
+from .common import random_str
+import base64
+
+group = 'management.cattle.io'
+version = 'v3'
+namespace = 'local'
+plural = 'clusterloggings'
+clusterId = "local"
+globalNS = "cattle-global-data"
+
+
+def test_cluster_logging_elasticsearch(admin_mc):
+    client = admin_mc.client
+    secretPassword = random_str()
+    indexPrefix = "prefix"
+    endpoint = "https://localhost:8443/"
+    name = random_str()
+
+    es = client.create_cluster_logging(
+                                        name=name,
+                                        clusterId=clusterId,
+                                        elasticsearchConfig={
+                                            'authPassword': secretPassword,
+                                            'endpoint': endpoint,
+                                            'indexPrefix': indexPrefix})
+
+    # Test password not present in api
+    assert es is not None
+    assert es['elasticsearchConfig'].get('authPassword') is None
+
+    crdClient, k8sclient = getClients(admin_mc)
+    ns, name = es["id"].split(":")
+    # Test password is in k8s secret after creation
+    verifyPassword(crdClient, k8sclient, ns, name, secretPassword)
+
+    # Test noop, password field should be as it is
+    es = client.update(es, elasticsearchConfig=es['elasticsearchConfig'])
+    verifyPassword(crdClient, k8sclient, ns, name, secretPassword)
+
+    # Test updating password
+    newSecretPassword = random_str()
+    es = client.update(es, elasticsearchConfig={
+                                    'authPassword': newSecretPassword})
+    verifyPassword(crdClient, k8sclient, ns, name, newSecretPassword)
+
+    # Test secret doesn't exist after object deletion
+    checkSecretAfterDelete(crdClient, k8sclient, ns, name, es, client)
+
+
+def test_cluster_logging_fluentd(admin_mc):
+    client = admin_mc.client
+    fluentdservers = getFluentdServers()
+    name = random_str()
+
+    fs = client.create_cluster_logging(
+                                    name=name,
+                                    clusterId=clusterId,
+                                    fluentForwarderConfig={
+                                        'compress': "true",
+                                        'enableTls': "false",
+                                        'fluentServers': fluentdservers})
+    assert fs is not None
+    servers = fs['fluentForwarderConfig'].get('fluentServers')
+    assert len(servers) == 3
+
+    # Test password not present in api
+    for server in servers:
+        assert server.get('password') is None
+
+    crdClient, k8sclient = getClients(admin_mc)
+
+    ns, name = fs['id'].split(":")
+    # Test password is in k8s secret after creation
+    verifyPasswords(crdClient, k8sclient, ns, name, fluentdservers)
+
+    # Test noop, password field should be as it is
+    fs = client.update(fs, fluentForwarderConfig=fs['fluentForwarderConfig'])
+    verifyPasswords(crdClient, k8sclient, ns, name, fluentdservers)
+
+    # Test updating password of one of the entries, no password passed in rest
+    newSecretPassword = random_str()
+    fs['fluentForwarderConfig'].\
+        get('fluentServers')[2].password = newSecretPassword
+    fluentdservers[2]['password'] = newSecretPassword
+
+    fs = client.update(fs, fluentForwarderConfig=fs['fluentForwarderConfig'])
+    verifyPasswords(crdClient, k8sclient, ns, name, fluentdservers)
+
+    # Change array order (delete middle entry from array)
+    servers = fs['fluentForwarderConfig'].get('fluentServers')
+    del servers[1]
+    del fluentdservers[1]
+    config = {'fluentServers': servers}
+
+    fs = client.update(fs, fluentForwarderConfig=config)
+    verifyPasswords(crdClient, k8sclient, ns, name, fluentdservers)
+
+    # Test secrets doesn't exist after object deletion
+    checkSecretsAfterDelete(crdClient, k8sclient, ns, name, fs, client)
+
+
+def verifyPassword(crdClient, k8sclient, ns, name, secretPassword):
+    k8es = crdClient.get_namespaced_custom_object(
+            group, version, namespace, plural, name)
+
+    secretName = k8es['spec']['elasticsearchConfig']['authPassword']
+    ns, name = secretName.split(":")
+    assert ns is not None
+    assert name is not None
+
+    secret = k8sclient.read_namespaced_secret(name, ns)
+    assert base64.b64decode(secret.data[name]).\
+        decode("utf-8") == secretPassword
+
+
+def verifyPasswords(crdClient, k8sclient, ns, name, fluentdServers):
+    k8fs = crdClient.get_namespaced_custom_object(
+            group, version, namespace, plural, name)
+    servers = k8fs['spec']['fluentForwarderConfig']['fluentServers']
+
+    for ind, server in enumerate(fluentdServers):
+        secretName = servers[ind]['password']
+        ns, name = secretName.split(":")
+        assert ns is not None
+        assert name is not None
+
+        secret = k8sclient.read_namespaced_secret(name, ns)
+        assert base64.b64decode(secret.data[name]).\
+            decode("utf-8") == server['password']
+
+
+def checkSecretAfterDelete(crdClient, k8sclient, ns, name, es, client):
+    k8es = crdClient.get_namespaced_custom_object(
+            group, version, namespace, plural, name)
+    secretName = k8es['spec']['elasticsearchConfig']['authPassword']
+    ns, name = secretName.split(":")
+
+    client.delete(es)
+    try:
+        k8sclient.read_namespaced_secret(name, ns)
+    except ApiException as e:
+        assert e.status == 404
+
+
+def checkSecretsAfterDelete(crdClient, k8sclient, ns, name, fs, client):
+    k8fs = crdClient.get_namespaced_custom_object(
+            group, version, namespace, plural, name)
+    servers = k8fs['spec']['fluentForwarderConfig']['fluentServers']
+
+    secretNames = []
+    for ind, server in enumerate(servers):
+        secretName = server['password']
+        ns, name = secretName.split(":")
+        secretNames.append(name)
+
+    client.delete(fs)
+    for secretName in secretNames:
+        try:
+            k8sclient.read_namespaced_secret(name, globalNS)
+        except ApiException as e:
+            assert e.status == 404
+
+
+def getClients(admin_mc):
+    return CustomObjectsApi(admin_mc.k8s_client), \
+        CoreV1Api(admin_mc.k8s_client)
+
+
+def getFluentdServers():
+    return [{
+            "endpoint": "192.168.1.10:87",
+            "standby": False,
+            "username": random_str(),
+            "weight": 100,
+            "password": random_str()
+            },
+            {
+            "endpoint": "192.168.1.10:89",
+            "standby": False,
+            "username": random_str(),
+            "weight": 100,
+            "password": random_str()
+            },
+            {
+            "endpoint": "192.168.2.10:86",
+            "standby": False,
+            "username": random_str(),
+            "weight": 100,
+            "password": random_str()
+            }]
