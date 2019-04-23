@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -28,7 +29,17 @@ var (
 
 		Kind: WorkloadGroupVersionKind.Kind,
 	}
+
+	WorkloadGroupVersionResource = schema.GroupVersionResource{
+		Group:    GroupName,
+		Version:  Version,
+		Resource: "workloads",
+	}
 )
+
+func init() {
+	resource.Put(WorkloadGroupVersionResource)
+}
 
 func NewWorkload(namespace, name string, obj Workload) *Workload {
 	obj.APIVersion, obj.Kind = WorkloadGroupVersionKind.ToAPIVersionAndKind()

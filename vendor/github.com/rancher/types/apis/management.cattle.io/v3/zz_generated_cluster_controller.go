@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -27,7 +28,17 @@ var (
 		Namespaced:   false,
 		Kind:         ClusterGroupVersionKind.Kind,
 	}
+
+	ClusterGroupVersionResource = schema.GroupVersionResource{
+		Group:    GroupName,
+		Version:  Version,
+		Resource: "clusters",
+	}
 )
+
+func init() {
+	resource.Put(ClusterGroupVersionResource)
+}
 
 func NewCluster(namespace, name string, obj Cluster) *Cluster {
 	obj.APIVersion, obj.Kind = ClusterGroupVersionKind.ToAPIVersionAndKind()

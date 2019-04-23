@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/resource"
 	"k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,17 @@ var (
 
 		Kind: NetworkPolicyGroupVersionKind.Kind,
 	}
+
+	NetworkPolicyGroupVersionResource = schema.GroupVersionResource{
+		Group:    GroupName,
+		Version:  Version,
+		Resource: "networkpolicies",
+	}
 )
+
+func init() {
+	resource.Put(NetworkPolicyGroupVersionResource)
+}
 
 func NewNetworkPolicy(namespace, name string, obj v1.NetworkPolicy) *v1.NetworkPolicy {
 	obj.APIVersion, obj.Kind = NetworkPolicyGroupVersionKind.ToAPIVersionAndKind()

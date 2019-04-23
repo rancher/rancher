@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -27,7 +28,17 @@ var (
 		Namespaced:   false,
 		Kind:         SourceCodeProviderGroupVersionKind.Kind,
 	}
+
+	SourceCodeProviderGroupVersionResource = schema.GroupVersionResource{
+		Group:    GroupName,
+		Version:  Version,
+		Resource: "sourcecodeproviders",
+	}
 )
+
+func init() {
+	resource.Put(SourceCodeProviderGroupVersionResource)
+}
 
 func NewSourceCodeProvider(namespace, name string, obj SourceCodeProvider) *SourceCodeProvider {
 	obj.APIVersion, obj.Kind = SourceCodeProviderGroupVersionKind.ToAPIVersionAndKind()

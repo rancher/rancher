@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/resource"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,17 @@ var (
 
 		Kind: LimitRangeGroupVersionKind.Kind,
 	}
+
+	LimitRangeGroupVersionResource = schema.GroupVersionResource{
+		Group:    GroupName,
+		Version:  Version,
+		Resource: "limitranges",
+	}
 )
+
+func init() {
+	resource.Put(LimitRangeGroupVersionResource)
+}
 
 func NewLimitRange(namespace, name string, obj v1.LimitRange) *v1.LimitRange {
 	obj.APIVersion, obj.Kind = LimitRangeGroupVersionKind.ToAPIVersionAndKind()

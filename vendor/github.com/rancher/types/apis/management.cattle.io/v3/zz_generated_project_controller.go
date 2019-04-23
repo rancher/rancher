@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -28,7 +29,17 @@ var (
 
 		Kind: ProjectGroupVersionKind.Kind,
 	}
+
+	ProjectGroupVersionResource = schema.GroupVersionResource{
+		Group:    GroupName,
+		Version:  Version,
+		Resource: "projects",
+	}
 )
+
+func init() {
+	resource.Put(ProjectGroupVersionResource)
+}
 
 func NewProject(namespace, name string, obj Project) *Project {
 	obj.APIVersion, obj.Kind = ProjectGroupVersionKind.ToAPIVersionAndKind()

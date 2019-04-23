@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/resource"
 	"k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,17 @@ var (
 
 		Kind: RoleGroupVersionKind.Kind,
 	}
+
+	RoleGroupVersionResource = schema.GroupVersionResource{
+		Group:    GroupName,
+		Version:  Version,
+		Resource: "roles",
+	}
 )
+
+func init() {
+	resource.Put(RoleGroupVersionResource)
+}
 
 func NewRole(namespace, name string, obj v1.Role) *v1.Role {
 	obj.APIVersion, obj.Kind = RoleGroupVersionKind.ToAPIVersionAndKind()
