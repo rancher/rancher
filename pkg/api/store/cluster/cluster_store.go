@@ -267,6 +267,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 
 	setBackupConfigSecretKeyIfNotExists(existingCluster, data)
 	setPrivateRegistryPasswordIfNotExists(existingCluster, data)
+	setCloudProviderPasswordFieldsIfNotExists(existingCluster, data)
 
 	return r.Store.Update(apiContext, schema, data, id)
 }
@@ -433,4 +434,53 @@ func setPrivateRegistryPasswordIfNotExists(oldData, newData map[string]interface
 		updatedConfig = append(updatedConfig, newConfig)
 	}
 	values.PutValue(newData, updatedConfig, "rancherKubernetesEngineConfig", "privateRegistries")
+}
+
+func setCloudProviderPasswordFieldsIfNotExists(oldData, newData map[string]interface{}) {
+	replaceWithOldSecretIfNotExists(oldData, newData, "openstackCloudProvider", "rancherKubernetesEngineConfig", "cloudProvider", "openstackCloudProvider", "global", "password")
+	replaceWithOldSecretIfNotExists(oldData, newData, "vsphereCloudProvider", "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "global", "password")
+	azureCloudProviderPasswordFields := []string{"aadClientSecret", "aadClientCertPassword"}
+	for _, secretField := range azureCloudProviderPasswordFields {
+		replaceWithOldSecretIfNotExists(oldData, newData, "azureCloudProvider", "rancherKubernetesEngineConfig", "cloudProvider", "azureCloudProvider", secretField)
+	}
+	vSphereCloudProviderConfig := values.GetValueN(newData, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider")
+	if vSphereCloudProviderConfig == nil {
+		return
+	}
+	newVCenter := values.GetValueN(newData, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter")
+	if newVCenter != nil {
+		oldVCenter := values.GetValueN(oldData, "rancherKubernetesEngineConfig", "cloudProvider", "vsphereCloudProvider", "virtualCenter")
+		newVCenterMap := convert.ToMapInterface(newVCenter)
+		oldVCenterMap := convert.ToMapInterface(oldVCenter)
+		for vCenterName, vCenterConfigInterface := range newVCenterMap {
+			vCenterConfig := convert.ToMapInterface(vCenterConfigInterface)
+			if vCenterConfig["password"] != nil {
+				continue
+			}
+			// new vcenter has no password provided
+			// see if this vcenter exists in oldData
+			if oldVCenterConfigInterface, ok := oldVCenterMap[vCenterName]; ok {
+				oldVCenterConfig := convert.ToMapInterface(oldVCenterConfigInterface)
+				if oldVCenterConfig["password"] != nil {
+					vCenterConfig["password"] = oldVCenterConfig["password"]
+					newVCenterMap[vCenterName] = vCenterConfig
+				}
+			}
+		}
+	}
+}
+
+func replaceWithOldSecretIfNotExists(oldData, newData map[string]interface{}, cloudProviderName string, keys ...string) {
+	cloudProviderConfig := values.GetValueN(newData, "rancherKubernetesEngineConfig", "cloudProvider", cloudProviderName)
+	if cloudProviderConfig == nil {
+		return
+	}
+	newSecret := convert.ToString(values.GetValueN(newData, keys...))
+	if newSecret != "" {
+		return
+	}
+	oldSecret := convert.ToString(values.GetValueN(oldData, keys...))
+	if oldSecret != "" {
+		values.PutValue(newData, oldSecret, keys...)
+	}
 }
