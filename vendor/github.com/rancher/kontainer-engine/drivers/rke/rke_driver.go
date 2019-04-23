@@ -516,6 +516,22 @@ func (d *Driver) ETCDRestore(ctx context.Context, clusterInfo *types.ClusterInfo
 	return d.save(clusterInfo, stateDir), err
 }
 
+func (d *Driver) ETCDRemoveSnapshot(ctx context.Context, clusterInfo *types.ClusterInfo, opts *types.DriverOptions, snapshotName string) error {
+	rkeConfig, err := util.ConvertToRkeConfig(clusterInfo.Metadata["Config"])
+	if err != nil {
+		return err
+	}
+	stateDir, err := d.restore(clusterInfo)
+	if err != nil {
+		return err
+	}
+	defer d.cleanup(stateDir)
+
+	dialers, externalFlags := d.getFlags(rkeConfig, stateDir)
+
+	return cmd.SnapshotRemoveFromEtcdHosts(ctx, &rkeConfig, dialers, externalFlags, snapshotName)
+}
+
 func updateMetadata(APIURL, caCrt, clientCert, clientKey, yaml string, certs map[string]pki.CertificatePKI) (map[string]string, error) {
 	m := map[string]string{}
 	certStr := ""

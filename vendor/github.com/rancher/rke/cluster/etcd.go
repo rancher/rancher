@@ -143,6 +143,19 @@ func (c *Cluster) RestoreEtcdSnapshot(ctx context.Context, snapshotPath string) 
 	return nil
 }
 
+func (c *Cluster) RemoveEtcdSnapshot(ctx context.Context, snapshotName string) error {
+	backupImage := c.getBackupImage()
+	if !util.IsRancherBackupSupported(c.SystemImages.Alpine) {
+		log.Warnf(ctx, "Auto local backup sync is not supported in `%s`. Using `%s` instead.", c.SystemImages.Alpine, backupImage)
+	}
+	for _, host := range c.EtcdHosts {
+		if err := services.RunEtcdSnapshotRemove(ctx, host, c.PrivateRegistriesMap, backupImage, snapshotName, true, c.Services.Etcd); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (c *Cluster) etcdSnapshotChecksum(ctx context.Context, snapshotPath string) bool {
 	log.Infof(ctx, "[etcd] Checking if all snapshots are identical")
 	etcdChecksums := []string{}

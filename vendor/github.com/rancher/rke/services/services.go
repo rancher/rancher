@@ -30,6 +30,7 @@ const (
 	EtcdContainerName               = "etcd"
 	EtcdSnapshotContainerName       = "etcd-rolling-snapshots"
 	EtcdSnapshotOnceContainerName   = "etcd-snapshot-once"
+	EtcdSnapshotRemoveContainerName = "etcd-remove-snapshot"
 	EtcdRestoreContainerName        = "etcd-restore"
 	EtcdDownloadBackupContainerName = "etcd-download-backup"
 	EtcdServeBackupContainerName    = "etcd-Serve-backup"
