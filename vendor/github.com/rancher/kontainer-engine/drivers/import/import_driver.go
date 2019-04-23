@@ -188,6 +188,10 @@ func (d *Driver) ETCDRestore(ctx context.Context, clusterInfo *types.ClusterInfo
 	return nil, fmt.Errorf("ETCD backup operations are not implemented")
 }
 
+func (d *Driver) ETCDRemoveSnapshot(ctx context.Context, clusterInfo *types.ClusterInfo, opts *types.DriverOptions, snapshotName string) error {
+	return fmt.Errorf("ETCD backup operations are not implemented")
+}
+
 func (d *Driver) RemoveLegacyServiceAccount(ctx context.Context, info *types.ClusterInfo) error {
 	return fmt.Errorf("not implemented")
 }

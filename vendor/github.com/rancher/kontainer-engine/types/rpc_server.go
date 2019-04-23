@@ -80,6 +80,10 @@ func (s *GrpcServer) ETCDRestore(ctx context.Context, request *RestoreETCDSnapsh
 	return s.driver.ETCDRestore(ctx, request.Info, request.DriverOptions, request.SnapshotName)
 }
 
+func (s *GrpcServer) ETCDRemoveSnapshot(ctx context.Context, request *RemoveETCDSnapshotRequest) (*Empty, error) {
+	return &Empty{}, s.driver.ETCDRemoveSnapshot(ctx, request.Info, request.DriverOptions, request.SnapshotName)
+}
+
 // Remove implements grpc method
 func (s *GrpcServer) Remove(ctx context.Context, clusterInfo *ClusterInfo) (*Empty, error) {
 	return &Empty{}, s.driver.Remove(GetCtx(ctx), clusterInfo)

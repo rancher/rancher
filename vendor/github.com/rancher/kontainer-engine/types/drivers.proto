@@ -18,6 +18,8 @@ service Driver {
 
     rpc ETCDSave (SaveETCDSnapshotRequest) returns (Empty) {}
     rpc ETCDRestore (RestoreETCDSnapshotRequest) returns (ClusterInfo) {}
+    rpc ETCDRemoveSnapshot (RemoveETCDSnapshotRequest) returns (Empty) {}
+
     rpc GetK8sCapabilities (DriverOptions) returns (K8sCapabilities) {}
     rpc RemoveLegacyServiceAccount(ClusterInfo) returns (Empty) {}
 }
@@ -130,6 +132,12 @@ message SaveETCDSnapshotRequest {
 }
 
 message RestoreETCDSnapshotRequest {
+	ClusterInfo  info = 1;
+	DriverOptions driver_options = 2;
+	string SnapshotName    = 3;
+}
+
+message RemoveETCDSnapshotRequest {
 	ClusterInfo  info = 1;
 	DriverOptions driver_options = 2;
 	string SnapshotName    = 3;

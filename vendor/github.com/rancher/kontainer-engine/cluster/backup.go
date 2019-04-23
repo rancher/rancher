@@ -59,3 +59,11 @@ func (c *Cluster) getDriverOps() (*types.DriverOptions, error) {
 
 	return &driverOpts, nil
 }
+
+func (c *Cluster) ETCDRemoveSnapshot(ctx context.Context, snapshotName string) error {
+	driverOpts, err := c.getDriverOps()
+	if err != nil {
+		return err
+	}
+	return c.Driver.ETCDRemoveSnapshot(ctx, toInfo(c), driverOpts, snapshotName)
+}
