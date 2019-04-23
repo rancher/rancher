@@ -12,7 +12,7 @@ clusterId = "local"
 globalNS = "cattle-global-data"
 
 
-def test_cluster_logging_elasticsearch(admin_mc):
+def test_cluster_logging_elasticsearch(admin_mc, remove_resource):
     client = admin_mc.client
     secretPassword = random_str()
     indexPrefix = "prefix"
@@ -26,6 +26,8 @@ def test_cluster_logging_elasticsearch(admin_mc):
                                             'authPassword': secretPassword,
                                             'endpoint': endpoint,
                                             'indexPrefix': indexPrefix})
+
+    remove_resource(es)
 
     # Test password not present in api
     assert es is not None
@@ -50,7 +52,7 @@ def test_cluster_logging_elasticsearch(admin_mc):
     checkSecretAfterDelete(crdClient, k8sclient, ns, name, es, client)
 
 
-def test_cluster_logging_fluentd(admin_mc):
+def test_cluster_logging_fluentd(admin_mc, remove_resource):
     client = admin_mc.client
     fluentdservers = getFluentdServers()
     name = random_str()
@@ -62,6 +64,8 @@ def test_cluster_logging_fluentd(admin_mc):
                                         'compress': "true",
                                         'enableTls': "false",
                                         'fluentServers': fluentdservers})
+
+    remove_resource(fs)
     assert fs is not None
     servers = fs['fluentForwarderConfig'].get('fluentServers')
     assert len(servers) == 3
@@ -138,7 +142,6 @@ def checkSecretAfterDelete(crdClient, k8sclient, ns, name, es, client):
     secretName = k8es['spec']['elasticsearchConfig']['authPassword']
     ns, name = secretName.split(":")
 
-    client.delete(es)
     try:
         k8sclient.read_namespaced_secret(name, ns)
     except ApiException as e:
