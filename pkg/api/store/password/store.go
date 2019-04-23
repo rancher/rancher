@@ -134,30 +134,30 @@ func (p *PasswordStore) replacePasswords(sepData, data, existing map[string]inte
 			if separator == reached end, check to update/create or replace password fields
 			else recursive call for map/array
 	*/
-	for key1, val1 := range sepData {
-		if convert.ToString(val1) == separator {
-			if val2, ok := data[key1]; ok {
-				if err := p.putSecretData(data, existing, key1, convert.ToString(val2), false); err != nil {
+	for sepKey, sepVal := range sepData {
+		if convert.ToString(sepVal) == separator {
+			if val2, ok := data[sepKey]; ok {
+				if err := p.putSecretData(data, existing, sepKey, convert.ToString(val2), false); err != nil {
 					logrus.Errorf("errr %v", err)
 				}
-			} else if _, ok := existing[key1]; ok {
-				if err := p.putSecretData(data, existing, key1, "", true); err != nil {
+			} else if _, ok := existing[sepKey]; ok {
+				if err := p.putSecretData(data, existing, sepKey, "", true); err != nil {
 					logrus.Errorf("errr %v", err)
 				}
 			} else if data != nil {
-				logrus.Warnf("[%v] not present in incoming data, secret not stored", key1)
+				logrus.Debugf("[%v] not present in incoming data, secret not stored", sepKey)
 			}
-		} else if val2, ok := data[key1]; ok {
+		} else if val2, ok := data[sepKey]; ok {
 			valArr := convert.ToMapSlice(val2)
-			existArr := convert.ToMapSlice(existing[key1])
+			existArr := convert.ToMapSlice(existing[sepKey])
 			if valArr == nil {
-				if err := p.replacePasswords(convert.ToMapInterface(val1), convert.ToMapInterface(data[key1]), convert.ToMapInterface(existing[key1])); err != nil {
+				if err := p.replacePasswords(convert.ToMapInterface(sepVal), convert.ToMapInterface(data[sepKey]), convert.ToMapInterface(existing[sepKey])); err != nil {
 					return err
 				}
 			}
 			// build matching array entries from existing data {uniqueKeyName: index}
 			existingDataMap := map[string]int{}
-			searchKey := arrKeys[key1]
+			searchKey := arrKeys[sepKey]
 			if searchKey != "" {
 				for i, each := range existArr {
 					if name, ok := each[searchKey]; ok {
@@ -172,7 +172,7 @@ func (p *PasswordStore) replacePasswords(sepData, data, existing map[string]inte
 				if name, ok := each[searchKey]; ok {
 					if strName := convert.ToString(name); strName != "" {
 						if ind, ok := existingDataMap[strName]; ok {
-							if err := p.replacePasswords(convert.ToMapInterface(val1), each, existArr[ind]); err != nil {
+							if err := p.replacePasswords(convert.ToMapInterface(sepVal), each, existArr[ind]); err != nil {
 								return err
 							}
 							exists = true
@@ -180,7 +180,7 @@ func (p *PasswordStore) replacePasswords(sepData, data, existing map[string]inte
 					}
 				}
 				if !exists {
-					if err := p.replacePasswords(convert.ToMapInterface(val1), each, nil); err != nil {
+					if err := p.replacePasswords(convert.ToMapInterface(sepVal), each, nil); err != nil {
 						return err
 					}
 				}
