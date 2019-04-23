@@ -6,7 +6,8 @@ defaultProjectLabel = "authz.management.cattle.io/default-project"
 initial_system_namespaces = set(["kube-system",
                                  "cattle-system",
                                  "kube-public",
-                                 "cattle-global-data"])
+                                 "cattle-global-data",
+                                 "cattle-logging"])
 
 
 def test_system_project_created(admin_cc):
