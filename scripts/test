@@ -38,6 +38,6 @@ done
 echo Running tests
 
 cd $(dirname $0)/../tests
-tox -- -m "not nonparallel driver" -n $(nproc)
+tox -- -m "not nonparallel and not drivers" -n $(nproc)
 tox -- -m "drivers and not nonparallel" -n $(nproc)
 tox -- -m nonparallel
