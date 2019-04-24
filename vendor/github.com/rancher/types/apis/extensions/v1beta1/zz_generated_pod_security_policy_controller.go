@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/resource"
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +29,17 @@ var (
 		Namespaced:   false,
 		Kind:         PodSecurityPolicyGroupVersionKind.Kind,
 	}
+
+	PodSecurityPolicyGroupVersionResource = schema.GroupVersionResource{
+		Group:    GroupName,
+		Version:  Version,
+		Resource: "podsecuritypolicies",
+	}
 )
+
+func init() {
+	resource.Put(PodSecurityPolicyGroupVersionResource)
+}
 
 func NewPodSecurityPolicy(namespace, name string, obj v1beta1.PodSecurityPolicy) *v1beta1.PodSecurityPolicy {
 	obj.APIVersion, obj.Kind = PodSecurityPolicyGroupVersionKind.ToAPIVersionAndKind()

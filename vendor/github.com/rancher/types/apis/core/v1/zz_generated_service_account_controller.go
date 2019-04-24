@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/resource"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,17 @@ var (
 
 		Kind: ServiceAccountGroupVersionKind.Kind,
 	}
+
+	ServiceAccountGroupVersionResource = schema.GroupVersionResource{
+		Group:    GroupName,
+		Version:  Version,
+		Resource: "serviceaccounts",
+	}
 )
+
+func init() {
+	resource.Put(ServiceAccountGroupVersionResource)
+}
 
 func NewServiceAccount(namespace, name string, obj v1.ServiceAccount) *v1.ServiceAccount {
 	obj.APIVersion, obj.Kind = ServiceAccountGroupVersionKind.ToAPIVersionAndKind()
