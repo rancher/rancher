@@ -147,6 +147,20 @@ def admin_pc(admin_cc, remove_resource):
 
 
 @pytest.fixture
+def admin_system_pc(admin_mc):
+    """Returns a ProjectContext for the system project in the local cluster
+    for the default global admin user."""
+    admin = admin_mc.client
+    plist = admin.list_project(name='System', clusterId='local')
+    assert len(plist) == 1
+    p = plist.data[0]
+    url = p.links.self + '/schemas'
+    return ProjectContext(admin_cc, p, rancher.Client(url=url,
+                                                      verify=False,
+                                                      token=admin.token))
+
+
+@pytest.fixture
 def user_mc(user_factory):
     """Returns a ManagementContext for a newly created standard user"""
     return user_factory()
