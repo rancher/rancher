@@ -41,6 +41,19 @@ const (
 	amazonec2               = "amazonec2"
 )
 
+// aliases maps Schema field => driver field
+// The opposite of this lives in pkg/controllers/management/drivers/nodedriver/machine_driver.go
+var aliases = map[string]map[string]string{
+	"aliyunecs":    map[string]string{"sshKeyContents": "sshKeypath"},
+	"amazonec2":    map[string]string{"sshKeyContents": "sshKeypath", "userdata": "userdata"},
+	"azure":        map[string]string{"customData": "customData"},
+	"digitalocean": map[string]string{"sshKeyContents": "sshKeyPath", "userdata": "userdata"},
+	"exoscale":     map[string]string{"sshKey": "sshKey", "userdata": "userdata"},
+	"openstack":    map[string]string{"privateKeyFile": "privateKeyFile"},
+	"otc":          map[string]string{"privateKeyFile": "privateKeyFile"},
+	"packet":       map[string]string{"userdata": "userdata"},
+}
+
 func Register(ctx context.Context, management *config.ManagementContext) {
 	secretStore, err := nodeconfig.NewStore(management.Core.Namespaces(""), management.Core)
 	if err != nil {
@@ -251,13 +264,15 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.N
 		return obj, err
 	}
 
-	err = aliasToPath(obj.Status.NodeTemplateSpec.Driver, configRawMap, obj.Namespace)
-	if err != nil {
-		return obj, errors.Wrap(err, "failed writing node driver files")
-	}
+	fileMap := aliasToPath(obj.Status.NodeTemplateSpec.Driver, configRawMap, obj.Namespace)
 
 	createCommandsArgs := buildCreateCommand(obj, configRawMap)
 	cmd, err := buildCommand(nodeDir, obj, createCommandsArgs)
+	if err != nil {
+		return obj, err
+	}
+
+	err = writeConfigFiles(fileMap)
 	if err != nil {
 		return obj, err
 	}
@@ -301,34 +316,33 @@ func aliasToPath(driver string, config map[string]interface{}, ns string) map[st
 		for schemaField, driverField := range fields {
 			if fileRaw, ok := config[schemaField]; ok {
 				fileContents := fileRaw.(string)
-				// No file contents should just cleanup the config
-				if fileContents == "" {
-					delete(config, schemaField)
-					config[driverField] = ""
-					continue
-				}
-
 				hasher.Reset()
 				hasher.Write([]byte(fileContents))
 				sha := base32.StdEncoding.WithPadding(-1).EncodeToString(hasher.Sum(nil))[:10]
-
-				writePath := path.Join(writeDir, sha)
-
-				err := ioutil.WriteFile(writePath, []byte(fileContents), 0644)
-				if err != nil {
-					return err
+				path := path.Join(baseDir, sha)
+				if fileContents == "" {
+					path = ""
 				}
-
-				realPath := writePath
-
-				if !devMode {
-					realPath = path.Join("/tmp", sha)
-				}
-
+				// Map the path to the file contents
+				fileMap[path] = fileContents
 				// Drop our aliased version of the field and replace with the proper field and path
 				delete(config, schemaField)
-				config[driverField] = realPath
+				config[driverField] = path
 			}
+		}
+	}
+	return fileMap
+}
+
+func writeConfigFiles(configs map[string]string) error {
+	for path, contents := range configs {
+		if path == "" || contents == "" {
+			continue
+		}
+		fmt.Printf("%v, %v\n", path, contents)
+		err := ioutil.WriteFile(path, []byte(contents), 0644)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
