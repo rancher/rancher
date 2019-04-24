@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -222,12 +223,14 @@ func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 	if err := w.Close(); err != nil {
 		return err
 	}
+
 	apiContext.Response.Header().Set("Content-Length", strconv.Itoa(len(buf.Bytes())))
 	apiContext.Response.Header().Set("Content-Type", "application/octet-stream")
 	apiContext.Response.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.zip", node[client.NodeSpecFieldRequestedHostname]))
 	apiContext.Response.Header().Set("Cache-Control", "private")
 	apiContext.Response.Header().Set("Pragma", "private")
 	apiContext.Response.Header().Set("Expires", "Wed 24 Feb 1982 18:42:00 GMT")
+	apiContext.Response.WriteHeader(http.StatusOK)
 	_, err = apiContext.Response.Write(buf.Bytes())
 	if err != nil {
 		return err
