@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/resource"
 	"k8s.io/api/apps/v1beta2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,17 @@ var (
 
 		Kind: DaemonSetGroupVersionKind.Kind,
 	}
+
+	DaemonSetGroupVersionResource = schema.GroupVersionResource{
+		Group:    GroupName,
+		Version:  Version,
+		Resource: "daemonsets",
+	}
 )
+
+func init() {
+	resource.Put(DaemonSetGroupVersionResource)
+}
 
 func NewDaemonSet(namespace, name string, obj v1beta2.DaemonSet) *v1beta2.DaemonSet {
 	obj.APIVersion, obj.Kind = DaemonSetGroupVersionKind.ToAPIVersionAndKind()

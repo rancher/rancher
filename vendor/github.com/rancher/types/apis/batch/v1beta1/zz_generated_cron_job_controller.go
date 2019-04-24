@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/resource"
 	"k8s.io/api/batch/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,17 @@ var (
 
 		Kind: CronJobGroupVersionKind.Kind,
 	}
+
+	CronJobGroupVersionResource = schema.GroupVersionResource{
+		Group:    GroupName,
+		Version:  Version,
+		Resource: "cronjobs",
+	}
 )
+
+func init() {
+	resource.Put(CronJobGroupVersionResource)
+}
 
 func NewCronJob(namespace, name string, obj v1beta1.CronJob) *v1beta1.CronJob {
 	obj.APIVersion, obj.Kind = CronJobGroupVersionKind.ToAPIVersionAndKind()
