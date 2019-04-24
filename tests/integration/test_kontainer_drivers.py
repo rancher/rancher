@@ -52,7 +52,7 @@ DRIVER_ARM64_URL5 = "https://github.com/rancher/" \
              "releases/download/v0.2.3/kontainer-engine-driver-example-" \
              + "copy4-" + sys.platform + "-arm64"
 
-
+@pytest.mark.drivers
 def test_builtin_drivers_are_present(admin_mc):
     admin_mc.client.reload_schema()
     types = admin_mc.client.schema.types
@@ -71,7 +71,7 @@ def test_builtin_drivers_are_present(admin_mc):
         kd = admin_mc.client.by_id_kontainer_driver(name.lower())
         assert not hasattr(kd.links, 'remove')
 
-
+@pytest.mark.drivers
 def test_kontainer_driver_lifecycle(admin_mc, remove_resource,
                                     wait_remove_resource):
     URL = DRIVER_AMD64_URL
@@ -138,7 +138,7 @@ def test_kontainer_driver_lifecycle(admin_mc, remove_resource,
     # test driver is removed from schema after deletion
     verify_driver_not_in_types(admin_mc.client, kd)
 
-
+@pytest.mark.drivers
 def test_enabling_driver_exposes_schema(admin_mc, wait_remove_resource):
     """ Test if enabling driver exposes its dynamic schema, drivers are
     downloaded / installed once they are active, and if re-activating a
@@ -181,7 +181,9 @@ def test_enabling_driver_exposes_schema(admin_mc, wait_remove_resource):
     admin_mc.client.update_by_id_kontainerDriver(kd.id, kd)
     verify_driver_in_types(admin_mc.client, kd)
 
+
 @pytest.mark.nonparallel
+@pytest.mark.drivers
 def test_upgrade_changes_schema(admin_mc, wait_remove_resource):
     client = admin_mc.client
     URL = DRIVER_AMD64_URL3
@@ -201,7 +203,7 @@ def test_upgrade_changes_schema(admin_mc, wait_remove_resource):
 
     NEW_URL = NEW_DRIVER_URL
     if platform.machine() == "aarch64":
-        NEW_URL = NEW_DRIVER_URL_ARM64
+        NEW_URL = NEW_DRIVER_ARM64_URL
     kd.url = NEW_URL
     kd = client.update_by_id_kontainerDriver(kd.id, kd)
 
@@ -215,7 +217,7 @@ def test_upgrade_changes_schema(admin_mc, wait_remove_resource):
     kdSchema = client.schema.types[kd.name + 'EngineConfig']
     assert 'specialTestingField' in kdSchema.resourceFields
 
-
+@pytest.mark.drivers
 def test_create_duplicate_driver_conflict(admin_mc, wait_remove_resource):
     """ Test if adding a driver with a pre-existing driver's URL
     returns a conflict error"""
@@ -242,7 +244,7 @@ def test_create_duplicate_driver_conflict(admin_mc, wait_remove_resource):
         assert e.error.status == 409
         assert "Driver URL already in use:" in e.error.message
 
-
+@pytest.mark.drivers
 def test_update_duplicate_driver_conflict(admin_mc, wait_remove_resource):
     """ Test if updating a driver's URL to a pre-existing driver's URL
     returns a conflict error"""
@@ -273,7 +275,7 @@ def test_update_duplicate_driver_conflict(admin_mc, wait_remove_resource):
         assert e.error.status == 409
         assert "Driver URL already in use:" in e.error.message
 
-
+@pytest.mark.drivers
 def verify_driver_in_types(client, kd):
     def check():
         client.reload_schema()
@@ -284,7 +286,7 @@ def verify_driver_in_types(client, kd):
     client.reload_schema()
     assert kd.name + 'EngineConfig' in client.schema.types
 
-
+@pytest.mark.drivers
 def verify_driver_not_in_types(client, kd):
     def check():
         client.reload_schema()
