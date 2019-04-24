@@ -472,11 +472,12 @@ steps:
 - name: push-master-3rd-party-manifest
   image: plugins/docker
   commands:
+    - echo $${DOCKER_PASSWORD} | docker login -u "$${DOCKER_USERNAME}" --password-stdin
     - ./scripts/publish-manifests.sh
-  settings:
-    username:
+  environment:
+    DOCKER_USERNAME:
       from_secret: docker_username
-    password:
+    DOCKER_PASSWORD:
       from_secret: docker_password
   privileged: true
   volumes:
