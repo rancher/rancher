@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -27,7 +28,17 @@ var (
 		Namespaced:   false,
 		Kind:         DynamicSchemaGroupVersionKind.Kind,
 	}
+
+	DynamicSchemaGroupVersionResource = schema.GroupVersionResource{
+		Group:    GroupName,
+		Version:  Version,
+		Resource: "dynamicschemas",
+	}
 )
+
+func init() {
+	resource.Put(DynamicSchemaGroupVersionResource)
+}
 
 func NewDynamicSchema(namespace, name string, obj DynamicSchema) *DynamicSchema {
 	obj.APIVersion, obj.Kind = DynamicSchemaGroupVersionKind.ToAPIVersionAndKind()

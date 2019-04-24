@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -28,7 +29,17 @@ var (
 
 		Kind: MultiClusterAppGroupVersionKind.Kind,
 	}
+
+	MultiClusterAppGroupVersionResource = schema.GroupVersionResource{
+		Group:    GroupName,
+		Version:  Version,
+		Resource: "multiclusterapps",
+	}
 )
+
+func init() {
+	resource.Put(MultiClusterAppGroupVersionResource)
+}
 
 func NewMultiClusterApp(namespace, name string, obj MultiClusterApp) *MultiClusterApp {
 	obj.APIVersion, obj.Kind = MultiClusterAppGroupVersionKind.ToAPIVersionAndKind()

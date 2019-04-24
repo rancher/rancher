@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/resource"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +29,17 @@ var (
 		Namespaced:   false,
 		Kind:         ComponentStatusGroupVersionKind.Kind,
 	}
+
+	ComponentStatusGroupVersionResource = schema.GroupVersionResource{
+		Group:    GroupName,
+		Version:  Version,
+		Resource: "componentstatuses",
+	}
 )
+
+func init() {
+	resource.Put(ComponentStatusGroupVersionResource)
+}
 
 func NewComponentStatus(namespace, name string, obj v1.ComponentStatus) *v1.ComponentStatus {
 	obj.APIVersion, obj.Kind = ComponentStatusGroupVersionKind.ToAPIVersionAndKind()

@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -28,7 +29,17 @@ var (
 
 		Kind: ProjectAlertGroupVersionKind.Kind,
 	}
+
+	ProjectAlertGroupVersionResource = schema.GroupVersionResource{
+		Group:    GroupName,
+		Version:  Version,
+		Resource: "projectalerts",
+	}
 )
+
+func init() {
+	resource.Put(ProjectAlertGroupVersionResource)
+}
 
 func NewProjectAlert(namespace, name string, obj ProjectAlert) *ProjectAlert {
 	obj.APIVersion, obj.Kind = ProjectAlertGroupVersionKind.ToAPIVersionAndKind()
