@@ -159,7 +159,7 @@ func (c *Cluster) SetUpHosts(ctx context.Context, flags ExternalFlags) error {
 			if err := deployFile(ctx, hostList, c.SystemImages.Alpine, c.PrivateRegistriesMap, authnWebhookFileName, c.Authentication.Webhook.ConfigFile); err != nil {
 				return err
 			}
-			log.Infof(ctx, "[%s] Successfully deployed authentication webhook config Cluster nodes", cloudConfigFileName)
+			log.Infof(ctx, "[%s] Successfully deployed authentication webhook config Cluster nodes", authnWebhookFileName)
 		}
 	}
 	return nil

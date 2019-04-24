@@ -6,10 +6,12 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
+	"github.com/rancher/rke/util"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -82,8 +84,11 @@ func ClusterInit(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfi
 		return err
 	}
 
-	err = doUpgradeLegacyCluster(ctx, kubeCluster, rkeFullState, flags)
+	err = checkLegacyCluster(ctx, kubeCluster, rkeFullState, flags)
 	if err != nil {
+		if strings.Contains(err.Error(), "aborting upgrade") {
+			return err
+		}
 		log.Warnf(ctx, "[state] can't fetch legacy cluster state from Kubernetes")
 	}
 	// check if certificate rotate or normal init
@@ -128,15 +133,32 @@ func setS3OptionsFromCLI(c *cli.Context) *v3.S3BackupConfig {
 	return s3BackupBackend
 }
 
-func doUpgradeLegacyCluster(ctx context.Context, kubeCluster *cluster.Cluster, fullState *cluster.FullState, flags cluster.ExternalFlags) error {
-	if _, err := os.Stat(kubeCluster.LocalKubeConfigPath); os.IsNotExist(err) {
-		// there is no kubeconfig. This is a new cluster
-		logrus.Debug("[state] local kubeconfig not found, this is a new cluster")
+func checkLegacyCluster(ctx context.Context, kubeCluster *cluster.Cluster, fullState *cluster.FullState, flags cluster.ExternalFlags) error {
+	stateFileExists, err := util.IsFileExists(kubeCluster.StateFilePath)
+	if err != nil {
+		return err
+	}
+	if stateFileExists {
+		logrus.Debug("[state] previous state found, this is not a legacy cluster")
 		return nil
 	}
-	if _, err := os.Stat(kubeCluster.StateFilePath); err == nil {
-		// this cluster has a previous state, I don't need to upgrade!
-		logrus.Debug("[state] previous state found, this is not a legacy cluster")
+	logrus.Debug("[state] previous state not found, possible legacy cluster")
+	return fetchAndUpdateStateFromLegacyCluster(ctx, kubeCluster, fullState, flags)
+}
+
+func fetchAndUpdateStateFromLegacyCluster(ctx context.Context, kubeCluster *cluster.Cluster, fullState *cluster.FullState, flags cluster.ExternalFlags) error {
+	kubeConfigExists, err := util.IsFileExists(kubeCluster.LocalKubeConfigPath)
+	if err != nil {
+		return err
+	}
+	if !kubeConfigExists {
+		// if kubeconfig doesn't exist and its a legacy cluster then error out
+		if err := kubeCluster.TunnelHosts(ctx, flags); err != nil {
+			return err
+		}
+		if recoveredCluster := cluster.GetStateFromNodes(ctx, kubeCluster); recoveredCluster != nil {
+			return fmt.Errorf("This is a legacy cluster with no kube config, aborting upgrade. Please re-run rke up with rke 0.1.x to retrieve correct state")
+		}
 		return nil
 	}
 	// We have a kubeconfig and no current state. This is a legacy cluster or a new cluster with old kubeconfig
@@ -153,6 +175,8 @@ func doUpgradeLegacyCluster(ctx context.Context, kubeCluster *cluster.Cluster, f
 		if err != nil {
 			return err
 		}
+		// fetching state/certs from nodes should be removed in rke 0.3.0
+		log.Infof(ctx, "[state] Fetching cluster state from Nodes")
 		recoveredCluster = cluster.GetStateFromNodes(ctx, kubeCluster)
 	}
 	// if we found a recovered cluster, we will need override the current state

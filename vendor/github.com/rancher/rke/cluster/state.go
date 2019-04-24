@@ -15,10 +15,10 @@ import (
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -267,14 +267,13 @@ func removeStateFile(ctx context.Context, statePath string) {
 }
 
 func GetStateFromNodes(ctx context.Context, kubeCluster *Cluster) *Cluster {
-	log.Infof(ctx, "[state] Fetching cluster state from Nodes")
 	var currentCluster Cluster
 	var clusterFile string
 	var err error
 
 	uniqueHosts := hosts.GetUniqueHostList(kubeCluster.EtcdHosts, kubeCluster.ControlPlaneHosts, kubeCluster.WorkerHosts)
 	for _, host := range uniqueHosts {
-		filePath := path.Join(host.PrefixPath, pki.TempCertPath, pki.ClusterStateFile)
+		filePath := path.Join(pki.TempCertPath, pki.ClusterStateFile)
 		clusterFile, err = pki.FetchFileFromHost(ctx, filePath, kubeCluster.SystemImages.Alpine, host, kubeCluster.PrivateRegistriesMap, pki.StateDeployerContainerName, "state")
 		if err == nil {
 			break
