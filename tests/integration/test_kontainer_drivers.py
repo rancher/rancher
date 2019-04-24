@@ -18,7 +18,7 @@ DRIVER_AMD64_URL = "https://github.com/rancher/" \
 DRIVER_AMD64_URL2 = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
              "releases/download/v0.2.3/kontainer-engine-driver-example-" \
-             + "copy1-" +  sys.platform + "-amd64"
+             + "copy1-" + sys.platform + "-amd64"
 DRIVER_AMD64_URL3 = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
              "releases/download/v0.2.1/kontainer-engine-driver-example-" \
@@ -38,7 +38,7 @@ DRIVER_ARM64_URL = "https://github.com/rancher/" \
 DRIVER_ARM64_URL2 = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
              "releases/download/v0.2.3/kontainer-engine-driver-example-" \
-             + "copy1-" +  sys.platform + "-arm64"
+             + "copy1-" + sys.platform + "-arm64"
 DRIVER_ARM64_URL3 = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
              "releases/download/v0.2.1/kontainer-engine-driver-example-" \
@@ -51,6 +51,7 @@ DRIVER_ARM64_URL5 = "https://github.com/rancher/" \
              "kontainer-engine-driver-example/" \
              "releases/download/v0.2.3/kontainer-engine-driver-example-" \
              + "copy4-" + sys.platform + "-arm64"
+
 
 @pytest.mark.drivers
 def test_builtin_drivers_are_present(admin_mc):
@@ -70,6 +71,7 @@ def test_builtin_drivers_are_present(admin_mc):
         # verify has no delete link because its built in
         kd = admin_mc.client.by_id_kontainer_driver(name.lower())
         assert not hasattr(kd.links, 'remove')
+
 
 @pytest.mark.drivers
 def test_kontainer_driver_lifecycle(admin_mc, remove_resource,
@@ -137,6 +139,7 @@ def test_kontainer_driver_lifecycle(admin_mc, remove_resource,
     admin_mc.client.delete(kd)
     # test driver is removed from schema after deletion
     verify_driver_not_in_types(admin_mc.client, kd)
+
 
 @pytest.mark.drivers
 def test_enabling_driver_exposes_schema(admin_mc, wait_remove_resource):
@@ -217,6 +220,7 @@ def test_upgrade_changes_schema(admin_mc, wait_remove_resource):
     kdSchema = client.schema.types[kd.name + 'EngineConfig']
     assert 'specialTestingField' in kdSchema.resourceFields
 
+
 @pytest.mark.drivers
 def test_create_duplicate_driver_conflict(admin_mc, wait_remove_resource):
     """ Test if adding a driver with a pre-existing driver's URL
@@ -243,6 +247,7 @@ def test_create_duplicate_driver_conflict(admin_mc, wait_remove_resource):
     except ApiError as e:
         assert e.error.status == 409
         assert "Driver URL already in use:" in e.error.message
+
 
 @pytest.mark.drivers
 def test_update_duplicate_driver_conflict(admin_mc, wait_remove_resource):
@@ -275,6 +280,7 @@ def test_update_duplicate_driver_conflict(admin_mc, wait_remove_resource):
         assert e.error.status == 409
         assert "Driver URL already in use:" in e.error.message
 
+
 @pytest.mark.drivers
 def verify_driver_in_types(client, kd):
     def check():
@@ -285,6 +291,7 @@ def verify_driver_in_types(client, kd):
     wait_until(check)
     client.reload_schema()
     assert kd.name + 'EngineConfig' in client.schema.types
+
 
 @pytest.mark.drivers
 def verify_driver_not_in_types(client, kd):
