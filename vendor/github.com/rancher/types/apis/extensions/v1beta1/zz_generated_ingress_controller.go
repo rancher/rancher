@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
+	"github.com/rancher/norman/resource"
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,17 @@ var (
 
 		Kind: IngressGroupVersionKind.Kind,
 	}
+
+	IngressGroupVersionResource = schema.GroupVersionResource{
+		Group:    GroupName,
+		Version:  Version,
+		Resource: "ingresses",
+	}
 )
+
+func init() {
+	resource.Put(IngressGroupVersionResource)
+}
 
 func NewIngress(namespace, name string, obj v1beta1.Ingress) *v1beta1.Ingress {
 	obj.APIVersion, obj.Kind = IngressGroupVersionKind.ToAPIVersionAndKind()
