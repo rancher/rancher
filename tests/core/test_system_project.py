@@ -6,8 +6,8 @@ defaultProjectLabel = "authz.management.cattle.io/default-project"
 initial_system_namespaces = set(["kube-system",
                                  "cattle-system",
                                  "kube-public",
-                                 "cattle-global-data",
-                                 "cattle-logging"])
+                                 "cattle-global-data"])
+loggingNamespace = "cattle-logging"
 
 
 def test_system_project_created(admin_cc):
@@ -43,6 +43,12 @@ def test_system_namespaces_assigned(admin_cc):
         projectId=systemProject.id)
     system_namespaces_names = set(
         [ns['name'] for ns in system_namespaces])
+
+    # If clusterLogging tests run before this, cattle-logging
+    # will be present in current system_namespaces, removing it
+    if loggingNamespace in system_namespaces_names:
+        system_namespaces_names.remove(loggingNamespace)
+
     assert system_namespaces_names == initial_system_namespaces
 
 
