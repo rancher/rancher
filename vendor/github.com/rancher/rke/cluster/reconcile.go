@@ -51,7 +51,7 @@ func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster,
 	if err := reconcileControl(ctx, currentCluster, kubeCluster, kubeClient); err != nil {
 		return err
 	}
-	if flags.CustomCerts {
+	if kubeCluster.ForceDeployCerts {
 		if err := restartComponentsWhenCertChanges(ctx, currentCluster, kubeCluster); err != nil {
 			return err
 		}
@@ -67,7 +67,7 @@ func reconcileWorker(ctx context.Context, currentCluster, kubeCluster *Cluster, 
 	wpToDelete := hosts.GetToDeleteHosts(currentCluster.WorkerHosts, kubeCluster.WorkerHosts, kubeCluster.InactiveHosts, false)
 	for _, toDeleteHost := range wpToDelete {
 		toDeleteHost.IsWorker = false
-		if err := hosts.DeleteNode(ctx, toDeleteHost, kubeClient, toDeleteHost.IsControl, kubeCluster.CloudProvider.Name); err != nil {
+		if err := hosts.DeleteNode(ctx, toDeleteHost, kubeClient, toDeleteHost.IsControl || toDeleteHost.IsEtcd, kubeCluster.CloudProvider.Name); err != nil {
 			return fmt.Errorf("Failed to delete worker node [%s] from cluster: %v", toDeleteHost.Address, err)
 		}
 		// attempting to clean services/files on the host
@@ -181,7 +181,7 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 			log.Warnf(ctx, "[reconcile] %v", err)
 			continue
 		}
-		if err := hosts.DeleteNode(ctx, etcdHost, kubeClient, etcdHost.IsControl, kubeCluster.CloudProvider.Name); err != nil {
+		if err := hosts.DeleteNode(ctx, etcdHost, kubeClient, etcdHost.IsControl || etcdHost.IsWorker, kubeCluster.CloudProvider.Name); err != nil {
 			log.Warnf(ctx, "Failed to delete etcd node [%s] from cluster: %v", etcdHost.Address, err)
 			continue
 		}
@@ -259,7 +259,7 @@ func cleanControlNode(ctx context.Context, kubeCluster, currentCluster *Cluster,
 
 	// if I am deleting a node that's already in the config, it's probably being replaced and I shouldn't remove it  from ks8
 	if !hosts.IsNodeInList(toDeleteHost, kubeCluster.ControlPlaneHosts) {
-		if err := hosts.DeleteNode(ctx, toDeleteHost, kubeClient, toDeleteHost.IsWorker, kubeCluster.CloudProvider.Name); err != nil {
+		if err := hosts.DeleteNode(ctx, toDeleteHost, kubeClient, toDeleteHost.IsWorker || toDeleteHost.IsEtcd, kubeCluster.CloudProvider.Name); err != nil {
 			return fmt.Errorf("Failed to delete controlplane node [%s] from cluster: %v", toDeleteHost.Address, err)
 		}
 	}
