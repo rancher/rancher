@@ -3,8 +3,7 @@ from rancher import ApiError
 
 from .common import random_str
 from .conftest import wait_until_available, \
-    cluster_and_client, kubernetes_api_client, wait_for, ClusterContext, \
-    admin_pc
+    cluster_and_client, kubernetes_api_client, wait_for, ClusterContext
 
 
 def test_multi_user(admin_mc, user_mc):
@@ -291,7 +290,7 @@ def test_impersonation_passthrough(admin_mc, admin_cc, user_mc, user_factory,
     impersonate_role = admin_rbac.create_cluster_role(body)
 
     request.addfinalizer(lambda: admin_rbac.delete_cluster_role(
-        impersonate_role.metadata.name, {}))
+        impersonate_role.metadata.name))
 
     binding = kubernetes.client.V1ClusterRoleBinding(
         metadata={'name': 'limited-impersonator-binding'},
@@ -306,7 +305,7 @@ def test_impersonation_passthrough(admin_mc, admin_cc, user_mc, user_factory,
     impersonate_role_binding = admin_rbac.create_cluster_role_binding(binding)
 
     request.addfinalizer(lambda: admin_rbac.delete_cluster_role_binding(
-        impersonate_role_binding.metadata.name, {}))
+        impersonate_role_binding.metadata.name))
 
     access_review2 = kubernetes.client.V1SelfSubjectAccessReview(spec={
         "resourceAttributes": {
@@ -322,10 +321,10 @@ def test_impersonation_passthrough(admin_mc, admin_cc, user_mc, user_factory,
     assert response.status.allowed is True
 
 
-def test_permissions_can_be_removed(admin_cc, admin_mc, user_mc,
-                                    request, remove_resource):
+def test_permissions_can_be_removed(admin_cc, admin_mc, user_mc, request,
+                                    remove_resource, admin_pc_factory):
     def create_project_and_add_user():
-        admin_pc_instance = admin_pc(admin_cc, remove_resource)
+        admin_pc_instance = admin_pc_factory()
 
         prtb = admin_mc.client.create_project_role_template_binding(
             userId=user_mc.user.id,
