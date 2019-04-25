@@ -121,10 +121,6 @@ func (c *Cluster) InvertIndexHosts() error {
 func (c *Cluster) SetUpHosts(ctx context.Context, flags ExternalFlags) error {
 	if c.AuthnStrategies[AuthnX509Provider] {
 		log.Infof(ctx, "[certificates] Deploying kubernetes certificates to Cluster nodes")
-		forceDeploy := false
-		if flags.CustomCerts || c.RancherKubernetesEngineConfig.RotateCertificates != nil {
-			forceDeploy = true
-		}
 		hostList := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
 		var errgrp errgroup.Group
 		hostsQueue := util.GetObjectQueue(hostList)
@@ -132,7 +128,7 @@ func (c *Cluster) SetUpHosts(ctx context.Context, flags ExternalFlags) error {
 			errgrp.Go(func() error {
 				var errList []error
 				for host := range hostsQueue {
-					err := pki.DeployCertificatesOnPlaneHost(ctx, host.(*hosts.Host), c.RancherKubernetesEngineConfig, c.Certificates, c.SystemImages.CertDownloader, c.PrivateRegistriesMap, forceDeploy)
+					err := pki.DeployCertificatesOnPlaneHost(ctx, host.(*hosts.Host), c.RancherKubernetesEngineConfig, c.Certificates, c.SystemImages.CertDownloader, c.PrivateRegistriesMap, c.ForceDeployCerts)
 					if err != nil {
 						errList = append(errList, err)
 					}

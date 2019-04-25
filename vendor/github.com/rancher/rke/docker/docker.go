@@ -101,6 +101,45 @@ func DoRunContainer(ctx context.Context, dClient *client.Client, imageCfg *conta
 	return nil
 }
 
+func DoRunOnetimeContainer(ctx context.Context, dClient *client.Client, imageCfg *container.Config, hostCfg *container.HostConfig, containerName string, hostname string, plane string, prsMap map[string]v3.PrivateRegistry) error {
+	if dClient == nil {
+		return fmt.Errorf("[%s] Failed to run container: docker client is nil for container [%s] on host [%s]", plane, containerName, hostname)
+	}
+	_, err := dClient.ContainerInspect(ctx, containerName)
+	if err != nil {
+		if !client.IsErrNotFound(err) {
+			return err
+		}
+		if err := UseLocalOrPull(ctx, dClient, hostname, imageCfg.Image, plane, prsMap); err != nil {
+			return err
+		}
+		resp, err := dClient.ContainerCreate(ctx, imageCfg, hostCfg, nil, containerName)
+		if err != nil {
+			return fmt.Errorf("Failed to create [%s] container on host [%s]: %v", containerName, hostname, err)
+		}
+		if err := dClient.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+			return fmt.Errorf("Failed to start [%s] container on host [%s]: %v", containerName, hostname, err)
+		}
+		log.Infof(ctx, "Successfully started [%s] container on host [%s]", containerName, hostname)
+		log.Infof(ctx, "Waiting for [%s] container to exit on host [%s]", containerName, hostname)
+		exitCode, err := WaitForContainer(ctx, dClient, hostname, containerName)
+		if err != nil {
+			return fmt.Errorf("Container [%s] did not complete in time on host [%s]", containerName, hostname)
+		}
+		if exitCode != 0 {
+			stderr, stdout, err := GetContainerLogsStdoutStderr(ctx, dClient, containerName, "1", false)
+			if err != nil {
+				return fmt.Errorf("Unable to retrieve logs for container [%s] on host [%s]: %v", containerName, hostname, err)
+			}
+			stderr = strings.TrimSuffix(stderr, "\n")
+			stdout = strings.TrimSuffix(stdout, "\n")
+			return fmt.Errorf("Container [%s] exited with non-zero exit code [%d] on host [%s]: stdout: %s, stderr: %s", containerName, exitCode, hostname, stdout, stderr)
+		}
+		return nil
+	}
+	return err
+}
+
 func DoRollingUpdateContainer(ctx context.Context, dClient *client.Client, imageCfg *container.Config, hostCfg *container.HostConfig, containerName, hostname, plane string, prsMap map[string]v3.PrivateRegistry) error {
 	if dClient == nil {
 		return fmt.Errorf("[%s] Failed rolling update of container: docker client is nil for container [%s] on host [%s]", plane, containerName, hostname)
@@ -267,6 +306,7 @@ func StopContainer(ctx context.Context, dClient *client.Client, hostname string,
 	}
 	// define the stop timeout
 	stopTimeoutDuration := StopTimeout * time.Second
+	logrus.Debugf("Stopping container [%s] on host [%s] with stopTimeoutDuration [%s]", containerName, hostname, stopTimeoutDuration)
 	err := dClient.ContainerStop(ctx, containerName, &stopTimeoutDuration)
 	if err != nil {
 		return fmt.Errorf("Can't stop Docker container [%s] for host [%s]: %v", containerName, hostname, err)
@@ -278,6 +318,7 @@ func RenameContainer(ctx context.Context, dClient *client.Client, hostname strin
 	if dClient == nil {
 		return fmt.Errorf("Failed to rename container: docker client is nil for container [%s] on host [%s]", oldContainerName, hostname)
 	}
+	logrus.Debugf("Renaming container [%s] to [%s] on host [%s]", oldContainerName, newContainerName, hostname)
 	err := dClient.ContainerRename(ctx, oldContainerName, newContainerName)
 	if err != nil {
 		return fmt.Errorf("Can't rename Docker container [%s] for host [%s]: %v", oldContainerName, hostname, err)
@@ -335,7 +376,7 @@ func StopRenameContainer(ctx context.Context, dClient *client.Client, hostname s
 		return err
 	}
 	if _, err := WaitForContainer(ctx, dClient, hostname, oldContainerName); err != nil {
-		return nil
+		return err
 	}
 	return RenameContainer(ctx, dClient, hostname, oldContainerName, newContainerName)
 
@@ -345,19 +386,22 @@ func WaitForContainer(ctx context.Context, dClient *client.Client, hostname stri
 	if dClient == nil {
 		return 1, fmt.Errorf("Failed waiting for container: docker client is nil for container [%s] on host [%s]", containerName, hostname)
 	}
-	// We capture the status exit code of the container
-	statusCh, errCh := dClient.ContainerWait(ctx, containerName, container.WaitConditionNotRunning)
-	select {
-	case err := <-errCh:
+	// 5 minutes timeout, especially for transferring snapshots
+	for retries := 0; retries < 300; retries++ {
+		log.Infof(ctx, "Waiting for [%s] container to exit on host [%s]", containerName, hostname)
+		container, err := dClient.ContainerInspect(ctx, containerName)
 		if err != nil {
-			// if error is present return 1 exit code
-			return 1, fmt.Errorf("Error waiting for container [%s] on host [%s]: %v", containerName, hostname, err)
+			return 1, fmt.Errorf("Could not inspect container [%s] on host [%s]: %s", containerName, hostname, err)
 		}
-	case status := <-statusCh:
-		// return the status exit code of the container
-		return status.StatusCode, nil
+		if container.State.Running {
+			log.Infof(ctx, "Container [%s] is still running on host [%s]", containerName, hostname)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		logrus.Debugf("Exit code for [%s] container on host [%s] is [%d]", containerName, hostname, int64(container.State.ExitCode))
+		return int64(container.State.ExitCode), nil
 	}
-	return 0, nil
+	return 1, fmt.Errorf("Container [%s] did not exit in time on host [%s]", containerName, hostname)
 }
 
 func IsContainerUpgradable(ctx context.Context, dClient *client.Client, imageCfg *container.Config, hostCfg *container.HostConfig, containerName string, hostname string, plane string) (bool, error) {
