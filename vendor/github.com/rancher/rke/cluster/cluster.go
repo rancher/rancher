@@ -42,6 +42,7 @@ type Cluster struct {
 	DockerDialerFactory              hosts.DialerFactory
 	EtcdHosts                        []*hosts.Host
 	EtcdReadyHosts                   []*hosts.Host
+	ForceDeployCerts                 bool
 	InactiveHosts                    []*hosts.Host
 	K8sWrapTransport                 k8s.WrapTransport
 	KubeClient                       *kubernetes.Clientset
@@ -170,7 +171,7 @@ func InitClusterObject(ctx context.Context, rkeConfig *v3.RancherKubernetesEngin
 	}
 
 	// Setting cluster Defaults
-	err := c.setClusterDefaults(ctx)
+	err := c.setClusterDefaults(ctx, flags)
 	if err != nil {
 		return nil, err
 	}

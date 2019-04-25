@@ -77,7 +77,7 @@ func setDefaultIfEmpty(varName *string, defaultValue string) {
 	}
 }
 
-func (c *Cluster) setClusterDefaults(ctx context.Context) error {
+func (c *Cluster) setClusterDefaults(ctx context.Context, flags ExternalFlags) error {
 	if len(c.SSHKeyPath) == 0 {
 		c.SSHKeyPath = DefaultClusterSSHKeyPath
 	}
@@ -154,6 +154,11 @@ func (c *Cluster) setClusterDefaults(ctx context.Context) error {
 	if c.DNS == nil || len(c.DNS.Provider) == 0 {
 		c.DNS = &v3.DNSConfig{}
 		c.DNS.Provider = DefaultDNSProvider
+	}
+
+	if c.RancherKubernetesEngineConfig.RotateCertificates != nil ||
+		flags.CustomCerts {
+		c.ForceDeployCerts = true
 	}
 
 	c.setClusterServicesDefaults()
