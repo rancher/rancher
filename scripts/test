@@ -15,6 +15,9 @@ cleanup()
         rke remove --dind --force --config $dindYML
         rm -f $dindYML
     done
+    echo '***RANCHER LOGS***'
+    cat $CWD/rancherlogs.txt
+    echo '***END RANCHER LOGS***'
     return $EXIT
 }
 
@@ -25,7 +28,8 @@ if [ ${ARCH} == arm64 ]; then
     export ETCD_UNSUPPORTED_ARCH=arm64
 fi
 
-$(dirname $0)/run &
+echo Starting rancher server
+$(dirname $0)/run &> $CWD/rancherlogs.txt &
 PID=$!
 trap cleanup exit
 
