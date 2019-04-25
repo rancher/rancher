@@ -131,7 +131,9 @@ func (c *controller) RKECapabilities(capabilities v3.Capabilities, rkeConfig v3.
 
 	ingressController := c.IngressCapability(true, NginxIngressProvider, false)
 	capabilities.IngressCapabilities = []v3.IngressCapabilities{ingressController}
-	if rkeConfig.Services.KubeAPI.ExtraArgs["service-node-port-range"] != "" {
+	if rkeConfig.Services.KubeAPI.ServiceNodePortRange != "" {
+		capabilities.NodePortRange = rkeConfig.Services.KubeAPI.ServiceNodePortRange
+	} else if rkeConfig.Services.KubeAPI.ExtraArgs["service-node-port-range"] != "" {
 		capabilities.NodePortRange = rkeConfig.Services.KubeAPI.ExtraArgs["service-node-port-range"]
 	}
 
