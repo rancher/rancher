@@ -127,23 +127,30 @@ def cluster_and_client(cluster_id, mgmt_client):
 
 
 @pytest.fixture
-def admin_pc(admin_cc, remove_resource):
+def admin_pc_factory(admin_cc, remove_resource):
     """Returns a ProjectContext for a newly created project in the local
     cluster for the default global admin user. The project will be deleted
     when this fixture is cleaned up."""
-    admin = admin_cc.management.client
-    p = admin.create_project(name='test-' + random_str(),
-                             clusterId=admin_cc.cluster.id)
-    p = admin.wait_success(p)
-    wait_for_condition("BackingNamespaceCreated", "True",
-                       admin_cc.management.client, p)
-    assert p.state == 'active'
-    remove_resource(p)
-    p = admin.reload(p)
-    url = p.links.self + '/schemas'
-    return ProjectContext(admin_cc, p, rancher.Client(url=url,
-                                                      verify=False,
-                                                      token=admin.token))
+    def _admin_pc():
+        admin = admin_cc.management.client
+        p = admin.create_project(name='test-' + random_str(),
+                                 clusterId=admin_cc.cluster.id)
+        p = admin.wait_success(p)
+        wait_for_condition("BackingNamespaceCreated", "True",
+                           admin_cc.management.client, p)
+        assert p.state == 'active'
+        remove_resource(p)
+        p = admin.reload(p)
+        url = p.links.self + '/schemas'
+        return ProjectContext(admin_cc, p, rancher.Client(url=url,
+                                                          verify=False,
+                                                          token=admin.token))
+    return _admin_pc
+
+
+@pytest.fixture
+def admin_pc(admin_pc_factory):
+    return admin_pc_factory()
 
 
 @pytest.fixture

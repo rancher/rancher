@@ -82,11 +82,11 @@ def test_service_accounts_have_role_binding(admin_mc, request):
 
     core.create_namespaced_service_account("default", service_account)
     request.addfinalizer(lambda: core.delete_namespaced_service_account(
-        "asdf", "default", service_account))
+        "asdf", "default"))
     request.addfinalizer(
         lambda: rbac.delete_namespaced_role_binding(
             "default-asdf-default-" + pspt.id + "-clusterrole-binding",
-            "default", kubernetes.client.V1DeleteOptions()))
+            "default"))
 
     wait_for(lambda: service_account_has_role_binding(rbac, pspt), timeout=30)
 
