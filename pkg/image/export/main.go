@@ -394,8 +394,16 @@ set -e -x
 docker load --input ${images}
 
 for i in $(cat ${list}); do
-    docker tag ${i} ${reg}/${i}
-    docker push ${reg}/${i}
+    case $i in
+    */*)
+        docker tag ${i} ${reg}/${i}
+        docker push ${reg}/${i}
+        ;;
+    *)
+        docker tag ${i} ${reg}/rancher/${i}
+        docker push ${reg}/rancher/${i}
+        ;;
+    esac
 done
 `
 	linuxSaveScript = `#!/bin/bash
