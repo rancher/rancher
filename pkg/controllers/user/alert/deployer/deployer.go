@@ -14,6 +14,7 @@ import (
 	projectutil "github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/systemaccount"
 	appsv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
 	"github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -48,11 +49,12 @@ type Deployer struct {
 }
 
 type appDeployer struct {
-	appsGetter       projectv3.AppsGetter
-	namespaces       v1.NamespaceInterface
-	secrets          v1.SecretInterface
-	templateVersions mgmtv3.CatalogTemplateVersionInterface
-	statefulsets     appsv1beta2.StatefulSetInterface
+	appsGetter           projectv3.AppsGetter
+	namespaces           v1.NamespaceInterface
+	secrets              v1.SecretInterface
+	templateVersions     mgmtv3.CatalogTemplateVersionInterface
+	statefulsets         appsv1beta2.StatefulSetInterface
+	systemAccountManager *systemaccount.Manager
 }
 
 type operaterDeployer struct {
@@ -67,11 +69,12 @@ type operaterDeployer struct {
 func NewDeployer(cluster *config.UserContext, manager *manager.AlertManager) *Deployer {
 	appsgetter := cluster.Management.Project
 	ad := &appDeployer{
-		appsGetter:       appsgetter,
-		namespaces:       cluster.Core.Namespaces(metav1.NamespaceAll),
-		secrets:          cluster.Core.Secrets(metav1.NamespaceAll),
-		templateVersions: cluster.Management.Management.CatalogTemplateVersions(namespace.GlobalNamespace),
-		statefulsets:     cluster.Apps.StatefulSets(metav1.NamespaceAll),
+		appsGetter:           appsgetter,
+		namespaces:           cluster.Core.Namespaces(metav1.NamespaceAll),
+		secrets:              cluster.Core.Secrets(metav1.NamespaceAll),
+		templateVersions:     cluster.Management.Management.CatalogTemplateVersions(namespace.GlobalNamespace),
+		statefulsets:         cluster.Apps.StatefulSets(metav1.NamespaceAll),
+		systemAccountManager: systemaccount.NewManager(cluster.Management),
 	}
 
 	op := &operaterDeployer{
@@ -120,7 +123,6 @@ func (d *Deployer) sync() error {
 		return err
 	}
 
-	systemProjectCreator := systemProject.Annotations[creatorIDAnn]
 	systemProjectID := ref.Ref(systemProject)
 
 	needDeploy, err := d.needDeploy()
@@ -149,7 +151,7 @@ func (d *Deployer) sync() error {
 			newCluster = cluster.DeepCopy()
 		}
 
-		if d.alertManager.IsDeploy, err = d.appDeployer.deploy(appName, appTargetNamespace, systemProjectID, systemProjectCreator); err != nil {
+		if d.alertManager.IsDeploy, err = d.appDeployer.deploy(appName, appTargetNamespace, systemProjectID); err != nil {
 			return fmt.Errorf("deploy alertmanager failed, %v", err)
 		}
 
@@ -267,7 +269,7 @@ func (d *appDeployer) getSecret(secretName, secretNamespace string) *corev1.Secr
 	}
 }
 
-func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID, systemProjectCreator string) (bool, error) {
+func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string) (bool, error) {
 	_, systemProjectName := ref.Parse(systemProjectID)
 
 	ns := &corev1.Namespace{
@@ -306,10 +308,15 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID, syste
 		return false, fmt.Errorf("failed to find catalog by ID %q, %v", catalogID, err)
 	}
 
+	creator, err := d.systemAccountManager.GetProjectSystemUser(systemProjectName)
+	if err != nil {
+		return false, err
+	}
+
 	app = &projectv3.App{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				creatorIDAnn: systemProjectCreator,
+				creatorIDAnn: creator.Name,
 			},
 			Labels:    monitorutil.OwnedLabels(appName, appTargetNamespace, systemProjectID, monitorutil.SystemLevel),
 			Name:      appName,
