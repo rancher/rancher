@@ -251,7 +251,11 @@ func IsHostListChanged(currentHosts, configHosts []*Host) bool {
 }
 
 func buildCleanerConfig(host *Host, toCleanDirs []string, cleanerImage string) (*container.Config, *container.HostConfig) {
-	cmd := append([]string{"rm", "-rf"}, toCleanDirs...)
+	cmd := []string{
+		"sh",
+		"-c",
+		fmt.Sprintf("find %s -mindepth 1 -delete", strings.Join(toCleanDirs, " ")),
+	}
 	imageCfg := &container.Config{
 		Image: cleanerImage,
 		Cmd:   cmd,
