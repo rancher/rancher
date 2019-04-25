@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 	fake1 "github.com/rancher/types/apis/core/v1/fakes"
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -42,11 +43,7 @@ func TestReadFromSecret(t *testing.T) {
 
 	for _, pair := range tests {
 		info, err := ReadFromSecret(&secretInterface, pair.in, appSecretKey)
-		if err != nil {
-			t.Error(err)
-		}
-		if info != pair.out {
-			t.Errorf("expected: %v, got: %v", pair.out, info)
-		}
+		assert.Nil(t, err)
+		assert.Equal(t, pair.out, info)
 	}
 }
