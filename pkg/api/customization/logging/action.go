@@ -146,7 +146,7 @@ func (h *Handler) dryRunLoggingTarget(apiContext *types.APIContext, level, clust
 	pods := context.Core.Pods(loggingconfig.LoggingNamespace)
 	namespaces := context.Core.Namespaces(metav1.NamespaceAll)
 	testerDeployer := deployer.NewTesterDeployer(h.appsGetter, h.projectLister, pods, h.projectLoggingLister, namespaces, h.templateLister)
-	configGenerator := configsyncer.NewConfigGenerator(metav1.NamespaceAll, nil, h.projectLoggingLister, namespaces.Controller().Lister())
+	configGenerator := configsyncer.NewConfigGenerator(metav1.NamespaceAll, h.projectLoggingLister, namespaces.Controller().Lister())
 
 	var dryRunConfigBuf []byte
 	var certificate, clientCert, clientKey, certificatePath, clientCertPath, clientKeyPath, certScretKeyName string
