@@ -234,6 +234,11 @@ def test_user_role_permissions(admin_mc, user_factory, remove_resource):
 def test_impersonation_passthrough(admin_mc, admin_cc, user_mc, user_factory,
                                    remove_resource, request):
     """Test users abalility to impersonate other users"""
+    config = kubernetes.client.Configuration()
+    config.verify_ssl = False
+    config.debug = False
+    kubernetes.client.Configuration.set_default(config)
+
     admin_client = admin_mc.client
 
     user1 = user_factory()
