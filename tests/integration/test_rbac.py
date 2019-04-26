@@ -260,9 +260,10 @@ def test_impersonation_passthrough(admin_mc, admin_cc, user_mc, user_factory,
     wait_until_available(user2.client, admin_cc.cluster)
 
     admin_k8s_client = kubernetes_api_client(admin_client, 'local')
+    print(dir(admin_k8s_client.configuration))
     user1_k8s_client = kubernetes_api_client(user1.client, 'local')
     user2_k8s_client = kubernetes_api_client(user2.client, 'local')
-
+    admin_k8s_client.verify_ssl = False
     admin_auth = kubernetes.client.AuthorizationV1Api(admin_k8s_client)
     user1_auth = kubernetes.client.AuthorizationV1Api(user1_k8s_client)
     user2_auth = kubernetes.client.AuthorizationV1Api(user2_k8s_client)
