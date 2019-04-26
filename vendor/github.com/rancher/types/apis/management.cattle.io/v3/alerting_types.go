@@ -129,13 +129,13 @@ type ProjectAlertGroup struct {
 
 type ClusterGroupSpec struct {
 	ClusterName string      `json:"clusterName" norman:"type=reference[cluster]"`
-	Recipients  []Recipient `json:"recipients,omitempty" norman:"required"`
+	Recipients  []Recipient `json:"recipients,omitempty"`
 	CommonGroupField
 }
 
 type ProjectGroupSpec struct {
 	ProjectName string      `json:"projectName" norman:"type=reference[project]"`
-	Recipients  []Recipient `json:"recipients,omitempty" norman:"required"`
+	Recipients  []Recipient `json:"recipients,omitempty"`
 	CommonGroupField
 }
 

@@ -63,7 +63,7 @@ type Route53ProviderConfig struct {
 type CloudflareProviderConfig struct {
 	APIKey       string `json:"apiKey" norman:"notnullable,required,minLength=1,type=password"`
 	APIEmail     string `json:"apiEmail" norman:"notnullable,required,minLength=1"`
-	ProxySetting string `json:"proxySetting" norman:"default=true"`
+	ProxySetting *bool  `json:"proxySetting" norman:"default=true"`
 }
 
 type UpdateGlobalDNSTargetsInput struct {
