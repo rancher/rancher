@@ -40,6 +40,6 @@ done
 echo Running tests
 
 cd $(dirname $0)/../tests
-tox test_rbac.py
+tox test_rbac.py -n $(nproc)
 #tox -- -m "not nonparallel" -n $(nproc)
 #tox -- -m nonparallel
