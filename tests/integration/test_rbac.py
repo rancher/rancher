@@ -66,7 +66,7 @@ def test_project_owner(admin_cc, admin_mc, user_mc, remove_resource):
     proj = user_client.wait_success(proj)
     assert proj.state == 'active'
 
-       k8s_client = kubernetes_api_client(user_client, 'local')
+    k8s_client = kubernetes_api_client(user_client, 'local')
 
     print("K8s client", dir(k8s_client))
     # assert False
