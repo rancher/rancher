@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
 
+	"github.com/rancher/norman/types/convert"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -114,7 +115,7 @@ func (n *ProviderCatalogLauncher) handleCloudflareProvider(obj *v3.GlobalDNSProv
 		"txtOwnerId":         rancherInstallUUID + "_" + obj.Name,
 		"rbac.create":        "true",
 		"policy":             "sync",
-		"cloudflare.proxied": obj.Spec.CloudflareProviderConfig.ProxySetting,
+		"cloudflare.proxied": convert.ToString(obj.Spec.CloudflareProviderConfig.ProxySetting),
 	}
 
 	if obj.Spec.RootDomain != "" {
