@@ -10,5 +10,5 @@ const (
 type CloudflareProviderConfig struct {
 	APIEmail     string `json:"apiEmail,omitempty" yaml:"apiEmail,omitempty"`
 	APIKey       string `json:"apiKey,omitempty" yaml:"apiKey,omitempty"`
-	ProxySetting string `json:"proxySetting,omitempty" yaml:"proxySetting,omitempty"`
+	ProxySetting *bool  `json:"proxySetting,omitempty" yaml:"proxySetting,omitempty"`
 }
