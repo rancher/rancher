@@ -66,7 +66,11 @@ def test_project_owner(admin_cc, admin_mc, user_mc, remove_resource):
     proj = user_client.wait_success(proj)
     assert proj.state == 'active'
 
+    config = user_client.Configuration()
+    config.verify_ssl = False
+    user_client.Configuration.set_default(config)
     k8s_client = kubernetes_api_client(user_client, 'local')
+
     auth = kubernetes.client.AuthorizationV1Api(k8s_client)
 
     # Rancher API doesn't have a surefire way of knowing exactly when the user
