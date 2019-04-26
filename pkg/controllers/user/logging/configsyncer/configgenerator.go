@@ -16,10 +16,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func NewConfigGenerator(clusterName string, clusterLoggingLister mgmtv3.ClusterLoggingLister, projectLoggingLister mgmtv3.ProjectLoggingLister, namespaceLister v1.NamespaceLister) *ConfigGenerator {
+func NewConfigGenerator(clusterName string, projectLoggingLister mgmtv3.ProjectLoggingLister, namespaceLister v1.NamespaceLister) *ConfigGenerator {
 	return &ConfigGenerator{
 		clusterName:          clusterName,
-		clusterLoggingLister: clusterLoggingLister,
 		projectLoggingLister: projectLoggingLister,
 		namespaceLister:      namespaceLister,
 	}
@@ -27,7 +26,6 @@ func NewConfigGenerator(clusterName string, clusterLoggingLister mgmtv3.ClusterL
 
 type ConfigGenerator struct {
 	clusterName          string
-	clusterLoggingLister mgmtv3.ClusterLoggingLister
 	projectLoggingLister mgmtv3.ProjectLoggingLister
 	namespaceLister      v1.NamespaceLister
 }
