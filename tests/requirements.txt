@@ -12,4 +12,3 @@ requests==2.21.0
 kubernetes==9.0.0
 jinja2>=2.10
 cryptography==2.6.1
-urllib3==1.24.1
