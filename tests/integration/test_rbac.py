@@ -20,7 +20,7 @@ def test_multi_user(admin_mc, user_mc):
     assert len(ac) == 0
 
 
-# @pytest.mark.parametrize('params', range(100))
+@pytest.mark.parametrize('params', range(100))
 @pytest.mark.nonparallel
 def test_project_owner(admin_cc, admin_mc, user_mc, params, remove_resource):
     """Tests that a non-admin member can create a project, create and
@@ -236,7 +236,7 @@ def test_user_role_permissions(admin_mc, user_factory, remove_resource):
                                            "to view roleTemplates")
 
 
-# @pytest.mark.parametrize('params', range(100))
+@pytest.mark.parametrize('params', range(100))
 @pytest.mark.nonparallel
 def test_impersonation_passthrough(admin_mc, admin_cc, params, user_mc,
                                    user_factory, remove_resource, request):
