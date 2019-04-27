@@ -70,12 +70,14 @@ def test_project_owner(admin_cc, admin_mc, user_mc, params, remove_resource):
 
     k8s_client = kubernetes_api_client(user_client, 'local')
 
-    print("K8s client", dir(k8s_client))
+    # print("K8s client", dir(k8s_client))
     # assert False
+    '''
     config = kubernetes.client.Configuration()
     config.verify_ssl = False
     config.debug = False
     kubernetes.client.Configuration.set_default(config)
+    '''
     auth = kubernetes.client.AuthorizationV1Api(k8s_client)
 
     # Rancher API doesn't have a surefire way of knowing exactly when the user
@@ -237,11 +239,12 @@ def test_user_role_permissions(admin_mc, user_factory, remove_resource):
 def test_impersonation_passthrough(admin_mc, admin_cc, params, user_mc,
                                    user_factory, remove_resource, request):
     """Test users abalility to impersonate other users"""
+    '''
     config = kubernetes.client.Configuration()
     config.verify_ssl = False
     config.debug = False
     kubernetes.client.Configuration.set_default(config)
-
+    '''
     admin_client = admin_mc.client
 
     user1 = user_factory()
@@ -263,7 +266,7 @@ def test_impersonation_passthrough(admin_mc, admin_cc, params, user_mc,
     wait_until_available(user2.client, admin_cc.cluster)
 
     admin_k8s_client = kubernetes_api_client(admin_client, 'local')
-    print(dir(admin_k8s_client.configuration))
+    # print(dir(admin_k8s_client.configuration))
     user1_k8s_client = kubernetes_api_client(user1.client, 'local')
     user2_k8s_client = kubernetes_api_client(user2.client, 'local')
     admin_k8s_client.verify_ssl = False
