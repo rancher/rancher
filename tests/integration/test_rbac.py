@@ -21,7 +21,7 @@ def test_multi_user(admin_mc, user_mc):
 
 
 @pytest.mark.nonparallel
-def test_project_owner(admin_cc, admin_mc, user_mc, params, remove_resource):
+def test_project_owner(admin_cc, admin_mc, user_mc, remove_resource):
     """Tests that a non-admin member can create a project, create and
     add a namespace to it, and can do workload related things in the namespace.
 
@@ -236,7 +236,7 @@ def test_user_role_permissions(admin_mc, user_factory, remove_resource):
 
 
 @pytest.mark.nonparallel
-def test_impersonation_passthrough(admin_mc, admin_cc, params, user_mc,
+def test_impersonation_passthrough(admin_mc, admin_cc, user_mc,
                                    user_factory, remove_resource, request):
     """Test users abalility to impersonate other users"""
     '''
