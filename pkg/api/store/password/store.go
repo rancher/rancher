@@ -134,6 +134,10 @@ func (p *PasswordStore) replacePasswords(sepData, data, existing map[string]inte
 			if separator == reached end, check to update/create or replace password fields
 			else recursive call for map/array
 	*/
+	if len(data) == 0 {
+		// nothing to put in data
+		return nil
+	}
 	for sepKey, sepVal := range sepData {
 		if convert.ToString(sepVal) == separator {
 			if val2, ok := data[sepKey]; ok {

@@ -172,6 +172,47 @@ def getClients(admin_mc):
         CoreV1Api(admin_mc.k8s_client)
 
 
+def test_cluster_logging_null(admin_mc, remove_resource):
+    client = admin_mc.client
+    secretPassword = random_str()
+    indexPrefix = "prefix"
+    endpoint = "https://localhost:8443/"
+    name = random_str()
+
+    es = client.create_cluster_logging(
+                                        name=name,
+                                        clusterId=clusterId,
+                                        elasticsearchConfig={
+                                            'authPassword': secretPassword,
+                                            'endpoint': endpoint,
+                                            'indexPrefix': indexPrefix})
+
+    remove_resource(es)
+
+    try:
+        es = client.update(es, elasticsearchConfig=None)
+    except ApiException as e:
+        assert e is None
+
+    fluentdservers = getFluentdServers()
+    name = random_str()
+
+    fs = client.create_cluster_logging(
+                                    name=name,
+                                    clusterId=clusterId,
+                                    fluentForwarderConfig={
+                                        'compress': "true",
+                                        'enableTls': "false",
+                                        'fluentServers': fluentdservers})
+
+    remove_resource(fs)
+
+    try:
+        fs = client.update(fs, fluentForwarderConfig=None)
+    except ApiException as e:
+        assert e is None
+
+
 def getFluentdServers():
     return [{
             "endpoint": "192.168.1.10:87",
