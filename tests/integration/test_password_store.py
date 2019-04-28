@@ -49,7 +49,7 @@ def test_cluster_logging_elasticsearch(admin_mc, remove_resource):
     verifyPassword(crdClient, k8sclient, ns, name, newSecretPassword)
 
     # Test secret doesn't exist after object deletion
-    checkSecretAfterDelete(crdClient, k8sclient, ns, name, es, client)
+    checkSecret(crdClient, k8sclient, ns, name, es, client, deleteFunc)
 
 
 def test_cluster_logging_fluentd(admin_mc, remove_resource):
@@ -103,7 +103,7 @@ def test_cluster_logging_fluentd(admin_mc, remove_resource):
     verifyPasswords(crdClient, k8sclient, ns, name, fluentdservers)
 
     # Test secrets doesn't exist after object deletion
-    checkSecretsAfterDelete(crdClient, k8sclient, ns, name, fs, client)
+    checkSecrets(crdClient, k8sclient, ns, name, fs, client, deleteFunc)
 
 
 def verifyPassword(crdClient, k8sclient, ns, name, secretPassword):
@@ -136,11 +136,13 @@ def verifyPasswords(crdClient, k8sclient, ns, name, fluentdServers):
             decode("utf-8") == server['password']
 
 
-def checkSecretAfterDelete(crdClient, k8sclient, ns, name, es, client):
+def checkSecret(crdClient, k8sclient, ns, name, es, client, func):
     k8es = crdClient.get_namespaced_custom_object(
             group, version, namespace, plural, name)
     secretName = k8es['spec']['elasticsearchConfig']['authPassword']
     ns, name = secretName.split(":")
+
+    func(client, es)
 
     try:
         k8sclient.read_namespaced_secret(name, ns)
@@ -148,7 +150,7 @@ def checkSecretAfterDelete(crdClient, k8sclient, ns, name, es, client):
         assert e.status == 404
 
 
-def checkSecretsAfterDelete(crdClient, k8sclient, ns, name, fs, client):
+def checkSecrets(crdClient, k8sclient, ns, name, fs, client, func):
     k8fs = crdClient.get_namespaced_custom_object(
             group, version, namespace, plural, name)
     servers = k8fs['spec']['fluentForwarderConfig']['fluentServers']
@@ -159,7 +161,8 @@ def checkSecretsAfterDelete(crdClient, k8sclient, ns, name, fs, client):
         ns, name = secretName.split(":")
         secretNames.append(name)
 
-    client.delete(fs)
+    func(client, fs)
+
     for secretName in secretNames:
         try:
             k8sclient.read_namespaced_secret(name, globalNS)
@@ -179,6 +182,8 @@ def test_cluster_logging_null(admin_mc, remove_resource):
     endpoint = "https://localhost:8443/"
     name = random_str()
 
+    crdClient, k8sclient = getClients(admin_mc)
+
     es = client.create_cluster_logging(
                                         name=name,
                                         clusterId=clusterId,
@@ -188,11 +193,8 @@ def test_cluster_logging_null(admin_mc, remove_resource):
                                             'indexPrefix': indexPrefix})
 
     remove_resource(es)
-
-    try:
-        es = client.update(es, elasticsearchConfig=None)
-    except ApiException as e:
-        assert e is None
+    ns, name = es['id'].split(":")
+    checkSecret(crdClient, k8sclient, ns, name, es, client, upFuncElastic)
 
     fluentdservers = getFluentdServers()
     name = random_str()
@@ -207,10 +209,26 @@ def test_cluster_logging_null(admin_mc, remove_resource):
 
     remove_resource(fs)
 
+    ns, name = fs['id'].split(":")
+    checkSecrets(crdClient, k8sclient, ns, name, fs, client, upFuncFluentd)
+
+
+def upFuncFluentd(client, fs):
     try:
         fs = client.update(fs, fluentForwarderConfig=None)
     except ApiException as e:
         assert e is None
+
+
+def upFuncElastic(client, es):
+    try:
+        es = client.update(es, elasticsearchConfig=None)
+    except ApiException as e:
+        assert e is None
+
+
+def deleteFunc(client, obj):
+    client.delete(obj)
 
 
 def getFluentdServers():
