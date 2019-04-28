@@ -257,3 +257,49 @@ func GetOverwroteAppAnswers(annotations map[string]string) map[string]string {
 
 	return map[string]string{}
 }
+
+func GetProjectMonitoringAnswers(project *mgmtv3.Project, clusterDisplayName string) map[string]string {
+	optional := map[string]string{
+		"grafana.persistence.enabled":    "false",
+		"prometheus.persistence.enabled": "false",
+		"prometheus.sync.mode":           "federate",
+	}
+	appAnswers := OverwriteAppAnswers(optional, project.Annotations)
+
+	required := map[string]string{
+		"operator.enabled":                         "false",
+		"exporter-coredns.enabled":                 "false",
+		"exporter-kube-controller-manager.enabled": "false",
+		"exporter-kube-dns.enabled":                "false",
+		"exporter-kube-scheduler.enabled":          "false",
+		"exporter-kube-state.enabled":              "false",
+		"exporter-kubelets.enabled":                "false",
+		"exporter-kubernetes.enabled":              "false",
+		"exporter-node.enabled":                    "false",
+		"exporter-fluentd.enabled":                 "false",
+		"grafana.enabled":                          "true",
+		"grafana.level":                            "project",
+		"grafana.apiGroup":                         APIVersion.Group,
+		"prometheus.enabled":                       "true",
+		"prometheus.level":                         "project",
+		"prometheus.apiGroup":                      APIVersion.Group,
+		"prometheus.project.alertManagerTarget":    fmt.Sprintf("%s.%s:%s", alertManagerHeadlessServiceName, cattleNamespaceName, "9093"),
+		"prometheus.cluster.alertManagerNamespace": cattleNamespaceName,
+		"prometheus.serviceAccountNameOverride":    projectLevelAppName,
+		"prometheus.project.projectDisplayName":    project.Spec.DisplayName,
+		"prometheus.project.clusterDisplayName":    clusterDisplayName,
+	}
+
+	for k, v := range required {
+		appAnswers[k] = v
+	}
+	// complete sync target & path
+	if appAnswers["prometheus.sync.mode"] == "federate" {
+		appAnswers["prometheus.sync.target"] = fmt.Sprintf("%s.%s:%s", prometheusHeadlessServiceName, cattleNamespaceName, "9090")
+		appAnswers["prometheus.sync.path"] = "/federate"
+	} else {
+		appAnswers["prometheus.sync.target"] = fmt.Sprintf("http://%s.%s:%s", prometheusHeadlessServiceName, cattleNamespaceName, "9090")
+		appAnswers["prometheus.sync.path"] = "/api/v1/read"
+	}
+	return appAnswers
+}

@@ -42,6 +42,7 @@ import (
 	// init upgrade implement
 	_ "github.com/rancher/rancher/pkg/controllers/user/alert/deployer"
 	_ "github.com/rancher/rancher/pkg/controllers/user/logging/deployer"
+	_ "github.com/rancher/rancher/pkg/controllers/user/monitoring/upgrade"
 	_ "github.com/rancher/rancher/pkg/controllers/user/pipeline/upgrade"
 )
 

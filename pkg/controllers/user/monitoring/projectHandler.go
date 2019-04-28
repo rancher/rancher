@@ -142,68 +142,7 @@ func (ph *projectHandler) ensureAppProjectName(appTargetNamespace string, projec
 }
 
 func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProjectName string, project *mgmtv3.Project, clusterName string) error {
-	appDeployProjectID := project.Name
-	clusterPrometheusSvcName, clusterPrometheusSvcNamespaces, clusterPrometheusPort := monitoring.ClusterPrometheusEndpoint()
-	clusterAlertManagerSvcName, clusterAlertManagerSvcNamespaces, clusterAlertManagerPort := monitoring.ClusterAlertManagerEndpoint()
-	optionalAppAnswers := map[string]string{
-		"grafana.persistence.enabled": "false",
-
-		"prometheus.persistence.enabled": "false",
-
-		"prometheus.sync.mode": "federate",
-	}
-
-	mustAppAnswers := map[string]string{
-		"operator.enabled": "false",
-
-		"exporter-coredns.enabled": "false",
-
-		"exporter-kube-controller-manager.enabled": "false",
-
-		"exporter-kube-dns.enabled": "false",
-
-		"exporter-kube-scheduler.enabled": "false",
-
-		"exporter-kube-state.enabled": "false",
-
-		"exporter-kubelets.enabled": "false",
-
-		"exporter-kubernetes.enabled": "false",
-
-		"exporter-node.enabled": "false",
-
-		"exporter-fluentd.enabled": "false",
-
-		"grafana.enabled":  "true",
-		"grafana.level":    "project",
-		"grafana.apiGroup": monitoring.APIVersion.Group,
-
-		"prometheus.enabled":                       "true",
-		"prometheus.level":                         "project",
-		"prometheus.apiGroup":                      monitoring.APIVersion.Group,
-		"prometheus.serviceAccountNameOverride":    appName,
-		"prometheus.project.alertManagerTarget":    fmt.Sprintf("%s.%s:%s", clusterAlertManagerSvcName, clusterAlertManagerSvcNamespaces, clusterAlertManagerPort),
-		"prometheus.project.projectDisplayName":    project.Spec.DisplayName,
-		"prometheus.project.clusterDisplayName":    clusterName,
-		"prometheus.cluster.alertManagerNamespace": clusterAlertManagerSvcNamespaces,
-	}
-
-	appAnswers := monitoring.OverwriteAppAnswers(optionalAppAnswers, project.Annotations)
-
-	// cannot overwrite mustAppAnswers
-	for mustKey, mustVal := range mustAppAnswers {
-		appAnswers[mustKey] = mustVal
-	}
-
-	// complete sync target & path
-	if appAnswers["prometheus.sync.mode"] == "federate" {
-		appAnswers["prometheus.sync.target"] = fmt.Sprintf("%s.%s:%s", clusterPrometheusSvcName, clusterPrometheusSvcNamespaces, clusterPrometheusPort)
-		appAnswers["prometheus.sync.path"] = "/federate"
-	} else {
-		appAnswers["prometheus.sync.target"] = fmt.Sprintf("http://%s.%s:%s", clusterPrometheusSvcName, clusterPrometheusSvcNamespaces, clusterPrometheusPort)
-		appAnswers["prometheus.sync.path"] = "/api/v1/read"
-	}
-
+	appAnswers := monitoring.GetProjectMonitoringAnswers(project, clusterName)
 	creator, err := ph.app.systemAccountManager.GetProjectSystemUser(project.Name)
 	if err != nil {
 		return err
@@ -215,7 +154,7 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 			Annotations: map[string]string{creatorIDAnno: creator.Name},
 			Labels:      monitoring.OwnedLabels(appName, appTargetNamespace, appProjectName, monitoring.ProjectLevel),
 			Name:        appName,
-			Namespace:   appDeployProjectID,
+			Namespace:   project.Name,
 		},
 		Spec: v3.AppSpec{
 			Answers:         appAnswers,
@@ -226,7 +165,7 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 		},
 	}
 
-	deployed, err := monitoring.DeployApp(ph.app.cattleAppClient, appDeployProjectID, app, false)
+	deployed, err := monitoring.DeployApp(ph.app.cattleAppClient, project.Name, app, false)
 	if err != nil {
 		return err
 	}
