@@ -135,18 +135,21 @@ func (p *PasswordStore) replacePasswords(sepData, data, existing map[string]inte
 			else recursive call for map/array
 	*/
 	if len(data) == 0 {
-		// nothing to put in data
+		// nothing to put in data, delete existing secret for this path
+		if err := p.deleteExistingSecrets(sepData, existing); err != nil {
+			return err
+		}
 		return nil
 	}
 	for sepKey, sepVal := range sepData {
 		if convert.ToString(sepVal) == separator {
 			if val2, ok := data[sepKey]; ok {
 				if err := p.putSecretData(data, existing, sepKey, convert.ToString(val2), false); err != nil {
-					logrus.Errorf("errr %v", err)
+					return err
 				}
 			} else if _, ok := existing[sepKey]; ok {
 				if err := p.putSecretData(data, existing, sepKey, "", true); err != nil {
-					logrus.Errorf("errr %v", err)
+					return err
 				}
 			} else if data != nil {
 				logrus.Debugf("[%v] not present in incoming data, secret not stored", sepKey)
@@ -180,6 +183,7 @@ func (p *PasswordStore) replacePasswords(sepData, data, existing map[string]inte
 								return err
 							}
 							exists = true
+							delete(existingDataMap, strName)
 						}
 					}
 				}
@@ -187,6 +191,45 @@ func (p *PasswordStore) replacePasswords(sepData, data, existing map[string]inte
 					if err := p.replacePasswords(convert.ToMapInterface(sepVal), each, nil); err != nil {
 						return err
 					}
+				}
+			}
+			// delete remaining secrets from existingArr
+			for _, ind := range existingDataMap {
+				if err := p.replacePasswords(convert.ToMapInterface(sepVal), nil, existArr[ind]); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (p *PasswordStore) deleteExistingSecrets(sepData, existing map[string]interface{}) error {
+	/*
+		Similar to function replacePasswords, except when data is nil,
+		traverse through existing map to find secrets for deletion
+	*/
+	for sepKey, sepVal := range sepData {
+		if convert.ToString(sepVal) == separator {
+			if exisVal, ok := existing[sepKey]; ok {
+				splitKey := strings.SplitN(convert.ToString(exisVal), ":", 2)
+				if len(splitKey) == 2 {
+					if err := p.deleteSecret(splitKey[1], splitKey[0]); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			existArr := convert.ToMapSlice(existing[sepKey])
+			if existArr == nil {
+				if err := p.deleteExistingSecrets(convert.ToMapInterface(sepData[sepKey]), convert.ToMapInterface(existing[sepKey])); err != nil {
+					return err
+				}
+				continue
+			}
+			for _, each := range existArr {
+				if err := p.deleteExistingSecrets(convert.ToMapInterface(sepData[sepKey]), each); err != nil {
+					return err
 				}
 			}
 		}
