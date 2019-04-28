@@ -6,9 +6,11 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/controllers/user/systemimage"
 	"github.com/rancher/rancher/pkg/project"
+	"github.com/rancher/rancher/pkg/settings"
 	appsv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -53,7 +55,12 @@ func (l *loggingService) Init(ctx context.Context, cluster *config.UserContext) 
 }
 
 func (l *loggingService) Version() (string, error) {
-	return loggingconfig.AppInitVersion, nil
+	catalogID := settings.SystemLoggingCatalogID.Get()
+	templateVersionID, _, err := common.ParseExternalID(catalogID)
+	if err != nil {
+		return "", fmt.Errorf("get system logging catalog version failed, %v", err)
+	}
+	return templateVersionID, nil
 }
 
 func (l *loggingService) Upgrade(currentVersion string) (string, error) {
