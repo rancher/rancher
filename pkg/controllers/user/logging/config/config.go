@@ -7,7 +7,7 @@ import (
 const (
 	AppName           = "rancher-logging"
 	TesterAppName     = "rancher-logging-tester"
-	AppInitVersion    = "0.0.1"
+	AppInitVersion    = "0.1.1"
 	systemCatalogName = "system-library"
 	templateName      = "rancher-logging"
 )
@@ -80,6 +80,10 @@ func SecretDataKeyCertKey(level, name string) string {
 
 func RancherLoggingTemplateID() string {
 	return fmt.Sprintf("%s-%s", systemCatalogName, templateName)
+}
+
+func RancherLoggingFullVersion() string {
+	return fmt.Sprintf("%s-%s-%s", systemCatalogName, templateName, AppInitVersion)
 }
 
 func RancherLoggingCatalogID(version string) string {

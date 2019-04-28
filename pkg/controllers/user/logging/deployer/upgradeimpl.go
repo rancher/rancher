@@ -53,7 +53,7 @@ func (l *loggingService) Init(ctx context.Context, cluster *config.UserContext) 
 }
 
 func (l *loggingService) Version() (string, error) {
-	return loggingconfig.AppInitVersion, nil
+	return loggingconfig.RancherLoggingFullVersion(), nil
 }
 
 func (l *loggingService) Upgrade(currentVersion string) (string, error) {
