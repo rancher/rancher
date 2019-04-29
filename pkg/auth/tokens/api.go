@@ -18,6 +18,7 @@ const (
 	AuthHeaderName  = "Authorization"
 	AuthValuePrefix = "Bearer"
 	BasicAuthPrefix = "Basic"
+	CSRFCookie      = "CSRF"
 )
 
 var crdVersions = []*types.APIVersion{
