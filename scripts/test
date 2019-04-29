@@ -43,3 +43,5 @@ cd $(dirname $0)/../tests
 # tox test_rbac.py
 tox -- -m "not nonparallel" -n $(nproc)
 tox -- -m nonparallel
+tox -- -m nonparallel1
+tox -- -m nonparallel2
