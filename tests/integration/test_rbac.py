@@ -1,7 +1,6 @@
 import kubernetes
 from rancher import ApiError
 import pytest
-import time
 
 from .common import random_str
 from .conftest import wait_until_available, \
