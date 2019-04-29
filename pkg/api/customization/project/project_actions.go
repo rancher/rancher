@@ -29,6 +29,18 @@ import (
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "setpodsecuritypolicytemplate")
 	resource.AddAction(apiContext, "exportYaml")
+	if err := apiContext.AccessControl.CanDo(v3.ProjectGroupVersionKind.Group, v3.ProjectResource.Name, "update", apiContext, resource.Values, apiContext.Schema); err == nil {
+		if convert.ToBool(resource.Values["enableProjectMonitoring"]) {
+			resource.AddAction(apiContext, "disableMonitoring")
+			resource.AddAction(apiContext, "editMonitoring")
+		} else {
+			resource.AddAction(apiContext, "enableMonitoring")
+		}
+	}
+
+	if convert.ToBool(resource.Values["enableProjectMonitoring"]) {
+		resource.AddAction(apiContext, "viewMonitoring")
+	}
 }
 
 type Handler struct {
