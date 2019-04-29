@@ -19,10 +19,10 @@ import (
 
 func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *CatalogInfo) error {
 	var templateNamespace string
-	catalog := cmt.catalog
-	projectCatalog := cmt.projectCatalog
-	clusterCatalog := cmt.clusterCatalog
-	catalogType := getCatalogType(cmt)
+	catalog := cmt.Catalog
+	projectCatalog := cmt.ProjectCatalog
+	clusterCatalog := cmt.ClusterCatalog
+	catalogType := GetCatalogType(cmt)
 
 	index, err := helm.LoadIndex()
 	if err != nil {
@@ -192,13 +192,13 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 			return err
 		}
 
-		catalog = cmt.catalog
-		projectCatalog = cmt.projectCatalog
-		clusterCatalog = cmt.clusterCatalog
+		catalog = cmt.Catalog
+		projectCatalog = cmt.ProjectCatalog
+		clusterCatalog = cmt.ClusterCatalog
 		if catalog == nil || catalog.Name == "" {
 			return errors.New("Catalog is no longer available")
 		}
-		if isUpToDate(commit, catalog) {
+		if IsUpToDate(commit, catalog) {
 			logrus.Debugf("Stopping catalog [%s] update, catalog already up to date", catalog.Name)
 			return nil
 		}
@@ -242,9 +242,9 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 	} else if clusterCatalog != nil {
 		clusterCatalog.Catalog = *catalog
 	}
-	cmt.catalog = catalog
-	cmt.projectCatalog = projectCatalog
-	cmt.clusterCatalog = clusterCatalog
+	cmt.Catalog = catalog
+	cmt.ProjectCatalog = projectCatalog
+	cmt.ClusterCatalog = clusterCatalog
 	if len(terrors) > 0 {
 		if _, err := m.updateCatalogInfo(cmt, catalogType, "", false, true); err != nil {
 			return err
@@ -266,9 +266,9 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 	} else if clusterCatalog != nil {
 		clusterCatalog.Catalog = *catalog
 	}
-	cmt.catalog = catalog
-	cmt.projectCatalog = projectCatalog
-	cmt.clusterCatalog = clusterCatalog
+	cmt.Catalog = catalog
+	cmt.ProjectCatalog = projectCatalog
+	cmt.ClusterCatalog = clusterCatalog
 	if _, err := m.updateCatalogInfo(cmt, catalogType, "", true, true); err != nil {
 		return err
 	}

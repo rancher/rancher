@@ -10,7 +10,7 @@ import (
 )
 
 func (m *Manager) updateClusterCatalogError(clusterCatalog *v3.ClusterCatalog, err error) (runtime.Object, error) {
-	setRefreshedError(&clusterCatalog.Catalog, err)
+	SetRefreshedError(&clusterCatalog.Catalog, err)
 	m.clusterCatalogClient.Update(clusterCatalog)
 	return nil, err
 }
@@ -36,7 +36,7 @@ func (m *Manager) ClusterCatalogSync(key string, obj *v3.ClusterCatalog) (runtim
 		return m.updateClusterCatalogError(clusterCatalog, err)
 	}
 
-	if isUpToDate(commit, &clusterCatalog.Catalog) {
+	if IsUpToDate(commit, &clusterCatalog.Catalog) {
 		if setRefreshed(&clusterCatalog.Catalog) {
 			m.clusterCatalogClient.Update(clusterCatalog)
 		}
@@ -44,8 +44,8 @@ func (m *Manager) ClusterCatalogSync(key string, obj *v3.ClusterCatalog) (runtim
 	}
 
 	cmt := &CatalogInfo{
-		catalog:        &clusterCatalog.Catalog,
-		clusterCatalog: clusterCatalog,
+		Catalog:        &clusterCatalog.Catalog,
+		ClusterCatalog: clusterCatalog,
 	}
 
 	logrus.Infof("Updating cluster catalog %s", clusterCatalog.Name)

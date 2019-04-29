@@ -1,17 +1,16 @@
 package manager
 
 import (
-	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/sirupsen/logrus"
-
 	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func (m *Manager) updateCatalogError(catalog *v3.Catalog, err error) (runtime.Object, error) {
-	setRefreshedError(catalog, err)
+	SetRefreshedError(catalog, err)
 	m.catalogClient.Update(catalog)
 	return nil, err
 }
@@ -32,7 +31,7 @@ func (m *Manager) Sync(key string, obj *v3.Catalog) (runtime.Object, error) {
 		return m.updateCatalogError(catalog, err)
 	}
 
-	if isUpToDate(commit, catalog) {
+	if IsUpToDate(commit, catalog) {
 		if setRefreshed(catalog) {
 			m.catalogClient.Update(catalog)
 		}
@@ -40,7 +39,7 @@ func (m *Manager) Sync(key string, obj *v3.Catalog) (runtime.Object, error) {
 	}
 
 	cmt := &CatalogInfo{
-		catalog: catalog,
+		Catalog: catalog,
 	}
 
 	logrus.Infof("Updating global catalog %s", catalog.Name)

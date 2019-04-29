@@ -5,7 +5,7 @@ import (
 )
 
 type CatalogInfo struct {
-	catalog        *v3.Catalog
-	projectCatalog *v3.ProjectCatalog
-	clusterCatalog *v3.ClusterCatalog
+	Catalog        *v3.Catalog
+	ProjectCatalog *v3.ProjectCatalog
+	ClusterCatalog *v3.ClusterCatalog
 }

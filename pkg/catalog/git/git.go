@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"net/url"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -61,4 +63,12 @@ func FormatURL(pathURL, username, password string) string {
 		}
 	}
 	return pathURL
+}
+
+func IsGitPath(path string) bool {
+	gitPath := filepath.Join(path, ".git")
+	if _, err := os.Stat(gitPath); err == nil {
+		return true
+	}
+	return false
 }

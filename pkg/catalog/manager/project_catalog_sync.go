@@ -10,7 +10,7 @@ import (
 )
 
 func (m *Manager) updateProjectCatalogError(projectCatalog *v3.ProjectCatalog, err error) (runtime.Object, error) {
-	setRefreshedError(&projectCatalog.Catalog, err)
+	SetRefreshedError(&projectCatalog.Catalog, err)
 	m.projectCatalogClient.Update(projectCatalog)
 	return nil, err
 }
@@ -36,7 +36,7 @@ func (m *Manager) ProjectCatalogSync(key string, obj *v3.ProjectCatalog) (runtim
 		return m.updateProjectCatalogError(projectCatalog, err)
 	}
 
-	if isUpToDate(commit, &projectCatalog.Catalog) {
+	if IsUpToDate(commit, &projectCatalog.Catalog) {
 		if setRefreshed(&projectCatalog.Catalog) {
 			m.projectCatalogClient.Update(projectCatalog)
 		}
@@ -44,8 +44,8 @@ func (m *Manager) ProjectCatalogSync(key string, obj *v3.ProjectCatalog) (runtim
 	}
 
 	cmt := &CatalogInfo{
-		catalog:        &projectCatalog.Catalog,
-		projectCatalog: projectCatalog,
+		Catalog:        &projectCatalog.Catalog,
+		ProjectCatalog: projectCatalog,
 	}
 
 	logrus.Infof("Updating project catalog %s", projectCatalog.Name)

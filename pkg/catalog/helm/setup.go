@@ -106,7 +106,7 @@ func (h *Helm) update() (string, error) {
 		commit string
 		err    error
 	)
-	if git.IsValid(pathURL) {
+	if git.IsGitPath(h.LocalPath) || git.IsValid(pathURL) {
 		commit, err = h.updateGit(pathURL)
 	} else {
 		commit, err = h.updateIndex()

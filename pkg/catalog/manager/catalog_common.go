@@ -18,7 +18,7 @@ func hasAllUpdates(catalog *v3.Catalog) bool {
 	return upgraded && diskCached
 }
 
-func isUpToDate(commit string, catalog *v3.Catalog) bool {
+func IsUpToDate(commit string, catalog *v3.Catalog) bool {
 	commitsEqual := commit == catalog.Status.Commit
 	updated := hasAllUpdates(catalog)
 	return commitsEqual && updated
@@ -35,7 +35,7 @@ func setRefreshed(catalog *v3.Catalog) bool {
 	return false
 }
 
-func setRefreshedError(catalog *v3.Catalog, err error) {
+func SetRefreshedError(catalog *v3.Catalog, err error) {
 	v3.CatalogConditionRefreshed.False(catalog)
 	v3.CatalogConditionRefreshed.ReasonAndMessageFromError(catalog, err)
 }
@@ -75,10 +75,10 @@ func (m *Manager) deleteTemplates(key string, namespace string) error {
 	return nil
 }
 
-func getCatalogType(cmt *CatalogInfo) string {
-	if cmt.projectCatalog == nil && cmt.clusterCatalog == nil {
+func GetCatalogType(cmt *CatalogInfo) string {
+	if cmt.ProjectCatalog == nil && cmt.ClusterCatalog == nil {
 		return client.CatalogType
-	} else if cmt.projectCatalog != nil {
+	} else if cmt.ProjectCatalog != nil {
 		return client.ProjectCatalogType
 	} else {
 		return client.ClusterCatalogType
@@ -90,11 +90,11 @@ func (m *Manager) updateCatalogInfo(cmt *CatalogInfo, catalogType string, templa
 	if condition {
 		switch catalogType {
 		case client.CatalogType:
-			obj = runtime.Object(cmt.catalog)
+			obj = runtime.Object(cmt.Catalog)
 		case client.ProjectCatalogType:
-			obj = runtime.Object(cmt.projectCatalog)
+			obj = runtime.Object(cmt.ProjectCatalog)
 		case client.ClusterCatalogType:
-			obj = runtime.Object(cmt.clusterCatalog)
+			obj = runtime.Object(cmt.ClusterCatalog)
 		default:
 			return cmt, fmt.Errorf("incorrect catalog type")
 		}
@@ -109,15 +109,15 @@ func (m *Manager) updateCatalogInfo(cmt *CatalogInfo, catalogType string, templa
 	if updateOnly {
 		switch catalogType {
 		case client.CatalogType:
-			if _, err := m.catalogClient.Update(cmt.catalog); err != nil {
+			if _, err := m.catalogClient.Update(cmt.Catalog); err != nil {
 				return nil, err
 			}
 		case client.ProjectCatalogType:
-			if _, err := m.projectCatalogClient.Update(cmt.projectCatalog); err != nil {
+			if _, err := m.projectCatalogClient.Update(cmt.ProjectCatalog); err != nil {
 				return nil, err
 			}
 		case client.ClusterCatalogType:
-			if _, err := m.clusterCatalogClient.Update(cmt.clusterCatalog); err != nil {
+			if _, err := m.clusterCatalogClient.Update(cmt.ClusterCatalog); err != nil {
 				return nil, err
 			}
 		default:
@@ -128,31 +128,31 @@ func (m *Manager) updateCatalogInfo(cmt *CatalogInfo, catalogType string, templa
 
 	switch catalogType {
 	case client.CatalogType:
-		catalog := cmt.catalog
-		if newCatalog, err := m.catalogClient.Update(cmt.catalog); err == nil {
+		catalog := cmt.Catalog
+		if newCatalog, err := m.catalogClient.Update(cmt.Catalog); err == nil {
 			catalog = newCatalog
 		} else {
 			catalog, _ = m.catalogClient.Get(catalog.Name, metav1.GetOptions{})
 		}
-		cmt.catalog = catalog
+		cmt.Catalog = catalog
 	case client.ProjectCatalogType:
-		projectCatalog := cmt.projectCatalog
+		projectCatalog := cmt.ProjectCatalog
 		if newCatalog, err := m.projectCatalogClient.Update(projectCatalog); err == nil {
 			projectCatalog = newCatalog
 		} else {
 			projectCatalog, _ = m.projectCatalogClient.Get(projectCatalog.Name, metav1.GetOptions{})
 		}
-		cmt.catalog = &projectCatalog.Catalog
-		cmt.projectCatalog = projectCatalog
+		cmt.Catalog = &projectCatalog.Catalog
+		cmt.ProjectCatalog = projectCatalog
 	case client.ClusterCatalogType:
-		clusterCatalog := cmt.clusterCatalog
+		clusterCatalog := cmt.ClusterCatalog
 		if newCatalog, err := m.clusterCatalogClient.Update(clusterCatalog); err == nil {
 			clusterCatalog = newCatalog
 		} else {
 			clusterCatalog, _ = m.clusterCatalogClient.Get(clusterCatalog.Name, metav1.GetOptions{})
 		}
-		cmt.catalog = &clusterCatalog.Catalog
-		cmt.clusterCatalog = clusterCatalog
+		cmt.Catalog = &clusterCatalog.Catalog
+		cmt.ClusterCatalog = clusterCatalog
 	default:
 		return cmt, fmt.Errorf("incorrect catalog type")
 	}
