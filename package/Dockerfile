@@ -12,6 +12,7 @@ RUN mkdir /root/.kube && \
 WORKDIR /var/lib/rancher
 
 ARG ARCH=amd64
+ARG IMAGE_REPO
 ENV CATTLE_HELM_VERSION v2.10.0-rancher10
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher6-1
 ENV LOGLEVEL_VERSION v0.1.2
@@ -71,9 +72,9 @@ ENV CATTLE_SERVER_VERSION ${VERSION}
 COPY entrypoint.sh rancher /usr/bin/
 RUN chmod +x /usr/bin/entrypoint.sh
 
-ENV CATTLE_AGENT_IMAGE rancher/rancher-agent:${VERSION}
-ENV CATTLE_WINDOWS_AGENT_IMAGE rancher/rancher-agent:${VERSION}-nanoserver-1803
-ENV CATTLE_SERVER_IMAGE rancher/rancher
+ENV CATTLE_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}
+ENV CATTLE_WINDOWS_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}-nanoserver-1803
+ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/rancher
 ENV ETCD_UNSUPPORTED_ARCH=${ARCH}
 
 ENV SSL_CERT_DIR /etc/rancher/ssl
