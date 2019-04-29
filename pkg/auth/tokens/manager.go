@@ -36,6 +36,10 @@ const (
 	secretNamespace    = "cattle-system"
 )
 
+var (
+	toDeleteCookies = []string{CookieName, CSRFCookie}
+)
+
 func NewManager(ctx context.Context, apiContext *config.ScaledContext) *Manager {
 	informer := apiContext.Management.Users("").Controller().Informer()
 	informer.AddIndexers(map[string]cache.IndexFunc{userPrincipalIndex: userPrincipalIndexer})
@@ -356,16 +360,18 @@ func (m *Manager) logout(actionName string, action *types.Action, request *types
 		isSecure = true
 	}
 
-	tokenCookie := &http.Cookie{
-		Name:     CookieName,
-		Value:    "",
-		Secure:   isSecure,
-		Path:     "/",
-		HttpOnly: true,
-		MaxAge:   -1,
-		Expires:  time.Date(1982, time.February, 10, 23, 0, 0, 0, time.UTC),
+	for _, cookieName := range toDeleteCookies {
+		tokenCookie := &http.Cookie{
+			Name:     cookieName,
+			Value:    "",
+			Secure:   isSecure,
+			Path:     "/",
+			HttpOnly: true,
+			MaxAge:   -1,
+			Expires:  time.Date(1982, time.February, 10, 23, 0, 0, 0, time.UTC),
+		}
+		http.SetCookie(w, tokenCookie)
 	}
-	http.SetCookie(w, tokenCookie)
 	w.Header().Add("Content-type", "application/json")
 
 	//getToken
