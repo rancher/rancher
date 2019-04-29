@@ -7,8 +7,7 @@ def test_create_read_only(admin_mc, remove_resource):
     client = admin_mc.client
 
     with pytest.raises(ApiError) as e:
-        setting = client.create_setting(name="cacerts", value="a")
-        remove_resource(setting)
+        client.create_setting(name="cacerts", value="a")
 
     assert e.value.error.status == 405
     assert "readOnly" in e.value.error.message
@@ -19,8 +18,7 @@ def test_update_read_only(admin_mc, remove_resource):
     client = admin_mc.client
 
     with pytest.raises(ApiError) as e:
-        setting = client.update_by_id_setting(id="cacerts", value="b")
-        remove_resource(setting)
+        client.update_by_id_setting(id="cacerts", value="b")
 
     assert e.value.error.status == 405
     assert "readOnly" in e.value.error.message
@@ -29,8 +27,19 @@ def test_update_read_only(admin_mc, remove_resource):
 # cacerts is readOnly, and should be able to be read
 def test_get_read_only(admin_mc, remove_resource):
     client = admin_mc.client
+    client.by_id_setting(id="cacerts")
+
+
+# cacerts is readOnly, and user should not be able to delete
+def test_delete_read_only(admin_mc, remove_resource):
+    client = admin_mc.client
     setting = client.by_id_setting(id="cacerts")
-    remove_resource(setting)
+
+    with pytest.raises(ApiError) as e:
+        client.delete(setting)
+
+    assert e.value.error.status == 405
+    assert "readOnly" in e.value.error.message
 
 
 # user should be able to create a setting that does not exist yet

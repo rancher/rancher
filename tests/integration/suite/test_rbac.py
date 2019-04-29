@@ -3,7 +3,7 @@ from rancher import ApiError
 
 from .common import random_str
 from .conftest import wait_until_available, \
-    cluster_and_client, wait_for, ClusterContext  # kubernetes_api_client
+    cluster_and_client, kubernetes_api_client, wait_for, ClusterContext
 
 
 def test_multi_user(admin_mc, user_mc):
@@ -19,7 +19,6 @@ def test_multi_user(admin_mc, user_mc):
     assert len(ac) == 0
 
 
-'''
 def test_project_owner(admin_cc, admin_mc, user_mc, remove_resource):
     """Tests that a non-admin member can create a project, create and
     add a namespace to it, and can do workload related things in the namespace.
@@ -140,7 +139,6 @@ def test_project_owner(admin_cc, admin_mc, user_mc, remove_resource):
     })
     response = auth.create_self_subject_access_review(access_review)
     assert response.status.allowed is True
-'''
 
 
 def test_removing_user_from_cluster(admin_pc, admin_mc, user_mc, admin_cc,
@@ -226,7 +224,6 @@ def test_user_role_permissions(admin_mc, user_factory, remove_resource):
                                            "to view roleTemplates")
 
 
-'''
 def test_impersonation_passthrough(admin_mc, admin_cc, user_mc, user_factory,
                                    remove_resource, request):
     """Test users abalility to impersonate other users"""
@@ -322,7 +319,6 @@ def test_impersonation_passthrough(admin_mc, admin_cc, user_mc, user_factory,
     # User1 should now be abele to imerpsonate as user2
     response = user1_auth.create_self_subject_access_review(access_review2)
     assert response.status.allowed is True
-'''
 
 
 def test_permissions_can_be_removed(admin_cc, admin_mc, user_mc, request,
