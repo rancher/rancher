@@ -1,7 +1,7 @@
 import kubernetes
 from rancher import ApiError
 import pytest
-import time
+
 from .common import random_str
 from .conftest import wait_until_available, \
     cluster_and_client, kubernetes_api_client, wait_for, ClusterContext
@@ -281,10 +281,6 @@ def test_impersonation_passthrough(admin_mc, admin_cc, user_mc,
             'group': '',
         },
     })
-
-    while (admin_k8s_client.configuration.ssl_ca_cert == None):
-        print("SLL CA CERT IS NON")
-        time.sleep(2)
 
     # Admin can always impersonate
     response = admin_auth.create_self_subject_access_review(access_review)
