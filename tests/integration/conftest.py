@@ -373,9 +373,10 @@ def find_condition(condition_type, status, obj):
 
 def kubernetes_api_client(rancher_client, cluster_name):
     c = rancher_client.by_id_cluster(cluster_name)
+    print("Rancher client options", dir(c))
     kc = c.generateKubeconfig()
     print("TEST KUBE CONFIG ", kc)
-    loader = KubeConfigLoader(config_dict=yaml.full_load(kc.config))
+    loader = KubeConfigLoader(config_dict=yaml.load(kc.config))
     client_configuration = type.__call__(Configuration)
     loader.load_and_set(client_configuration)
     k8s_client = ApiClient(configuration=client_configuration)

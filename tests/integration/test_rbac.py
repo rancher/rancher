@@ -1,6 +1,7 @@
 import kubernetes
 from rancher import ApiError
 import pytest
+import time
 
 from .common import random_str
 from .conftest import wait_until_available, \
@@ -266,14 +267,14 @@ def test_impersonation_passthrough(admin_mc, admin_cc, user_mc,
     wait_until_available(user2.client, admin_cc.cluster)
 
     admin_k8s_client = kubernetes_api_client(admin_client, 'local')
-    # print(dir(admin_k8s_client.configuration))
     user1_k8s_client = kubernetes_api_client(user1.client, 'local')
     user2_k8s_client = kubernetes_api_client(user2.client, 'local')
-    # admin_k8s_client.verify_ssl = False
+    print("DEFAULT HEADERS", admin_k8s_client.default_headers)
     admin_auth = kubernetes.client.AuthorizationV1Api(admin_k8s_client)
     user1_auth = kubernetes.client.AuthorizationV1Api(user1_k8s_client)
     user2_auth = kubernetes.client.AuthorizationV1Api(user2_k8s_client)
 
+    print("CONFIG", admin_k8s_client.configuration.ssl_ca_cert)
     access_review = kubernetes.client.V1SelfSubjectAccessReview(spec={
         "resourceAttributes": {
             'verb': 'impersonate',
