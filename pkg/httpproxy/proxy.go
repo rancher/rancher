@@ -17,6 +17,10 @@ const (
 	APIAuth      = "X-API-Auth-Header"
 	CattleAuth   = "X-API-CattleAuth-Header"
 	AuthHeader   = "Authorization"
+	SetCookie    = "Set-Cookie"
+	Cookie       = "Cookie"
+	APISetCookie = "X-Api-Set-Cookie-Header"
+	APICookie    = "X-Api-Cookie-Header"
 )
 
 var (
@@ -70,7 +74,18 @@ func NewProxy(prefix string, validHosts Supplier, scaledContext *config.ScaledCo
 				logrus.Infof("Failed to proxy %v: %v", req, err)
 			}
 		},
+		ModifyResponse: replaceSetCookies,
 	}
+}
+
+func replaceSetCookies(res *http.Response) error {
+	res.Header.Del(APISetCookie)
+	// There may be multiple set cookies
+	for _, setCookie := range res.Header[SetCookie] {
+		res.Header.Add(APISetCookie, setCookie)
+	}
+	res.Header.Del(SetCookie)
+	return nil
 }
 
 func (p *proxy) proxy(req *http.Request) error {
@@ -132,5 +147,17 @@ func (p *proxy) proxy(req *http.Request) error {
 		req.Header.Set(AuthHeader, cAuth)
 	}
 
+	replaceCookies(req)
+
 	return nil
+}
+
+func replaceCookies(req *http.Request) {
+	// Do not forward rancher cookies to third parties
+	req.Header.Del(Cookie)
+	// Allow client to use their own cookies with Cookie header
+	if cookie := req.Header.Get(APICookie); cookie != "" {
+		req.Header.Set(Cookie, cookie)
+		req.Header.Del(APICookie)
+	}
 }
