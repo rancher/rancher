@@ -30,7 +30,7 @@ var (
 		// different k8s version tag
 		"v1.12.7-rancher1-3",
 		"v1.13.5-rancher1-3",
-		"v1.14.1-rancher1-1",
+		"v1.14.1-rancher1-2",
 	}
 
 	// K8sVersionToRKESystemImages is dynamically populated on init() with the latest versions
@@ -41,7 +41,7 @@ var (
 		"v1.14": {
 			KubeAPI: map[string]string{
 				"tls-cipher-suites":        "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
-				"enable-admission-plugins": "NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,Priority,ResourceQuota",
+				"enable-admission-plugins": "NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota",
 			},
 			Kubelet: map[string]string{
 				"tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
@@ -1113,6 +1113,34 @@ var (
 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.5-rancher1"),
 			MetricsServer:             m("gcr.io/google_containers/metrics-server:v0.3.1"),
 			CoreDNS:                   "coredns/coredns:1.3.1",
+			CoreDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler:1.3.0"),
+		}, // Enabled in Rancher v2.2.3
+		"v1.14.1-rancher1-2": {
+			Etcd:                      m("quay.io/coreos/etcd:v3.3.10-rancher1"),
+			Kubernetes:                m("rancher/hyperkube:v1.14.1-rancher1"),
+			Alpine:                    m("rancher/rke-tools:v0.1.28"),
+			NginxProxy:                m("rancher/rke-tools:v0.1.28"),
+			CertDownloader:            m("rancher/rke-tools:v0.1.28"),
+			KubernetesServicesSidecar: m("rancher/rke-tools:v0.1.28"),
+			KubeDNS:                   m("gcr.io/google_containers/k8s-dns-kube-dns:1.15.0"),
+			DNSmasq:                   m("gcr.io/google_containers/k8s-dns-dnsmasq-nanny:1.15.0"),
+			KubeDNSSidecar:            m("gcr.io/google_containers/k8s-dns-sidecar:1.15.0"),
+			KubeDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler:1.3.0"),
+			Flannel:                   m("quay.io/coreos/flannel:v0.10.0-rancher1"),
+			FlannelCNI:                m("rancher/flannel-cni:v0.3.0-rancher1"),
+			CalicoNode:                m("quay.io/calico/node:v3.4.0"),
+			CalicoCNI:                 m("quay.io/calico/cni:v3.4.0"),
+			CalicoCtl:                 m("quay.io/calico/ctl:v2.0.0"),
+			CanalNode:                 m("quay.io/calico/node:v3.4.0"),
+			CanalCNI:                  m("quay.io/calico/cni:v3.4.0"),
+			CanalFlannel:              m("quay.io/coreos/flannel:v0.10.0"),
+			WeaveNode:                 m("weaveworks/weave-kube:2.5.0"),
+			WeaveCNI:                  m("weaveworks/weave-npc:2.5.0"),
+			PodInfraContainer:         m("gcr.io/google_containers/pause:3.1"),
+			Ingress:                   m("rancher/nginx-ingress-controller:0.21.0-rancher3"),
+			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.5-rancher1"),
+			MetricsServer:             m("gcr.io/google_containers/metrics-server:v0.3.1"),
+			CoreDNS:                   m("coredns/coredns:1.3.1"),
 			CoreDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler:1.3.0"),
 		},
 		// k8s version from 2.1.x release with old rke-tools to allow upgrade from 2.1.x clusters
