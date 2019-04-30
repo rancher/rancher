@@ -5,7 +5,7 @@ description:  an open source project that provides a container management platfo
 adopt-info: rancher
 
 grade: stable
-confinement: strict
+confinement: classic
 
 architectures:
   - build-on: i386
@@ -24,7 +24,7 @@ apps:
 
 parts:
   rancher:
-plugin: nil 
+    plugin: nil 
     source: https://github.com/rancher/rancher.git
     source-type: git
     override-pull: |
