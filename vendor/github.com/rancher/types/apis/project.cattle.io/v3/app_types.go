@@ -30,10 +30,11 @@ type AppSpec struct {
 }
 
 var (
-	AppConditionInstalled    condition.Cond = "Installed"
-	AppConditionMigrated     condition.Cond = "Migrated"
-	AppConditionDeployed     condition.Cond = "Deployed"
-	AppConditionForceUpgrade condition.Cond = "ForceUpgrade"
+	AppConditionInstalled           condition.Cond = "Installed"
+	AppConditionMigrated            condition.Cond = "Migrated"
+	AppConditionDeployed            condition.Cond = "Deployed"
+	AppConditionForceUpgrade        condition.Cond = "ForceUpgrade"
+	AppConditionUserTriggeredAction condition.Cond = "UserTriggeredAction"
 )
 
 type AppStatus struct {
