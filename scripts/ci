@@ -3,7 +3,9 @@ set -e
 
 cd $(dirname $0)
 
-./validate
+if [ ${ARCH} == amd64 ]; then
+    ./validate
+fi
 ./build
 ./test
 ./package
