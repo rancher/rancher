@@ -239,3 +239,25 @@ def wait_for_gdns_entry_creation(admin_mc, gdns_name, timeout=60):
             found = True
         time.sleep(interval)
         interval *= 2
+
+
+def test_cloudflare_provider_proxy_setting(admin_mc, remove_resource):
+    client = admin_mc.client
+    provider_name = random_str()
+    apiEmail = random_str()
+    apiKey = random_str()
+    globaldns_provider = \
+        client.create_global_dns_provider(
+                                         name=provider_name,
+                                         rootDomain="example.com",
+                                         cloudflareProviderConfig={
+                                             'proxySetting': True,
+                                             'apiEmail': apiEmail,
+                                             'apiKey': apiKey})
+
+    gdns_provider_id = "cattle-global-data:" + provider_name
+    gdns_provider = client.by_id_global_dns_provider(gdns_provider_id)
+    assert gdns_provider is not None
+    assert gdns_provider.cloudflareProviderConfig.proxySetting is True
+
+    remove_resource(globaldns_provider)
