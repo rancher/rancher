@@ -107,6 +107,12 @@ func (n *ProviderCatalogLauncher) handleRoute53Provider(obj *v3.GlobalDNSProvide
 
 func (n *ProviderCatalogLauncher) handleCloudflareProvider(obj *v3.GlobalDNSProvider) (runtime.Object, error) {
 	rancherInstallUUID := settings.InstallUUID.Get()
+
+	isProxy := "true"
+	if obj.Spec.CloudflareProviderConfig.ProxySetting != nil {
+		isProxy = convert.ToString(*obj.Spec.CloudflareProviderConfig.ProxySetting)
+	}
+
 	//create external-dns route53 provider
 	answers := map[string]string{
 		"provider":           "cloudflare",
@@ -115,7 +121,7 @@ func (n *ProviderCatalogLauncher) handleCloudflareProvider(obj *v3.GlobalDNSProv
 		"txtOwnerId":         rancherInstallUUID + "_" + obj.Name,
 		"rbac.create":        "true",
 		"policy":             "sync",
-		"cloudflare.proxied": convert.ToString(obj.Spec.CloudflareProviderConfig.ProxySetting),
+		"cloudflare.proxied": isProxy,
 	}
 
 	if obj.Spec.RootDomain != "" {
