@@ -47,6 +47,7 @@ def test_builtin_drivers_are_present(admin_mc):
         assert e.value.error.status == 405
 
 
+@pytest.mark.skip
 @pytest.mark.nonparallel
 def test_kontainer_driver_lifecycle(admin_mc, list_remove_resource):
     URL = DRIVER_AMD64_URL
@@ -125,6 +126,7 @@ def test_kontainer_driver_lifecycle(admin_mc, list_remove_resource):
     verify_driver_not_in_types(admin_mc.client, kd)
 
 
+@pytest.mark.skip
 @pytest.mark.nonparallel
 def test_enabling_driver_exposes_schema(admin_mc, wait_remove_resource):
     """ Test if enabling driver exposes its dynamic schema, drivers are
@@ -169,6 +171,7 @@ def test_enabling_driver_exposes_schema(admin_mc, wait_remove_resource):
     verify_driver_in_types(admin_mc.client, kd)
 
 
+@pytest.mark.skip
 @pytest.mark.nonparallel
 def test_upgrade_changes_schema(admin_mc, wait_remove_resource):
     client = admin_mc.client
@@ -206,6 +209,7 @@ def test_upgrade_changes_schema(admin_mc, wait_remove_resource):
     assert 'specialTestingField' in kdSchema.resourceFields
 
 
+@pytest.mark.skip
 @pytest.mark.nonparallel
 def test_create_duplicate_driver_conflict(admin_mc, wait_remove_resource):
     """ Test if adding a driver with a pre-existing driver's URL
@@ -234,6 +238,7 @@ def test_create_duplicate_driver_conflict(admin_mc, wait_remove_resource):
         assert "Driver URL already in use:" in e.error.message
 
 
+@pytest.mark.skip
 @pytest.mark.nonparallel
 def test_update_duplicate_driver_conflict(admin_mc, wait_remove_resource):
     """ Test if updating a driver's URL to a pre-existing driver's URL
