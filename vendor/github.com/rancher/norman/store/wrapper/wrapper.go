@@ -7,6 +7,10 @@ import (
 )
 
 func Wrap(store types.Store) types.Store {
+	if _, ok := store.(*StoreWrapper); ok {
+		return store
+	}
+
 	return &StoreWrapper{
 		store: store,
 	}

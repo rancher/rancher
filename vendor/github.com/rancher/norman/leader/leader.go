@@ -53,7 +53,7 @@ func run(ctx context.Context, namespace, name string, client kubernetes.Interfac
 	}
 
 	t := time.Second
-	if dl := os.Getenv("DEV_LEADERELECTION"); dl != "" {
+	if dl := os.Getenv("NORMAN_DEV_MODE"); dl != "" {
 		t = time.Hour
 	}
 
