@@ -1,0 +1,22 @@
+apiVersion: apps/v1beta2
+kind: DaemonSet
+metadata:
+  name: daemonset-test1
+  labels:
+    k8s-app: daemonset-test1
+spec:
+  selector:
+    matchLabels:
+      name: daemonset-test1
+  template:
+    metadata:
+      labels:
+        name: daemonset-test1
+    spec:
+      tolerations:
+      - key: node-role.kubernetes.io/controlplane
+        effect: NoSchedule
+      containers:
+      - name: daemonset-test1
+        image: sangeetha/mytestcontainer
+      terminationGracePeriodSeconds: 30

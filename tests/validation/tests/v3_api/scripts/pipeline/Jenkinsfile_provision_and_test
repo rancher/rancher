@@ -1,0 +1,98 @@
+// Job Params
+// Requires: PYTEST_OPTIONS, CATTLE_TEST_URL, ADMIN_TOKEN
+// Optional: AWS_SSH_PEM_KEY, AWS_SSH_KEY_NAME, DEBUG
+
+node {
+  def rootPath = "/src/rancher-validation/"
+  def provisionContainer = "${JOB_NAME}${env.BUILD_NUMBER}_prov"
+  def testContainer = "${JOB_NAME}${env.BUILD_NUMBER}_test"
+
+  def provisionResultsOut = "provision-results.xml"
+  def testResultsOut = "api-results.xml"
+  def imageName = "rancher-validation-${JOB_NAME}${env.BUILD_NUMBER}"
+  def testsDir = "tests/v3_api/"
+  def rancherConfig = "rancher_env.config"
+
+  def TESTS_TO_RUN =  [ "test_wl", "test_dns_record", "test_rbac","test_connectivity", "test_ingress",
+                        "test_secrets", "test_registry", "test_service_discovery"]
+
+  if (env.RANCHER_SKIP_INGRESS == "True") { 
+    TESTS_TO_RUN = TESTS_TO_RUN - ["test_ingress"]
+  }
+
+  def PYTEST_OPTIONS = "-k \"" + TESTS_TO_RUN.join(" or ") +"\""
+
+  def branch = "master"
+  if ("${env.branch}" != "null" && "${env.branch}" != "") {
+    branch = "${env.branch}"
+  }
+
+  println "Branch env: ${env.branch}"
+  println "Branch: ${branch}"
+
+  wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
+    stage('Checkout') {
+      deleteDir()
+      checkout([
+                $class: 'GitSCM',
+                branches: [[name: "*/${branch}"]],
+                extensions: scm.extensions + [[$class: 'CleanCheckout']],
+                userRemoteConfigs: scm.userRemoteConfigs
+              ])
+    }
+
+    dir ("tests/validation") {
+      stage('Configure and Build') {
+        if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
+          dir(".ssh") {
+            def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
+            writeFile file: AWS_SSH_KEY_NAME, text: decoded
+          }
+        }
+        sh "./tests/v3_api/scripts/configure.sh"
+        sh "./tests/v3_api/scripts/build.sh"
+      }
+      try {
+        stage('Run provisioning and validation Tests') {
+          try {
+            sh "docker run --name ${provisionContainer}  --env-file .env " +
+              "${imageName} /bin/bash -c \'pytest -v -s --junit-xml=${provisionResultsOut} ${PYTEST_PROVISION_OPTIONS} ${testsDir}\'"
+
+            // copy file containing CATTLE_TEST_URL & ADMIN_TOKEN and load into environment variables
+            sh "docker cp ${provisionContainer}:${rootPath}${testsDir}${rancherConfig} ."
+            load rancherConfig
+
+            sh "docker run --name ${testContainer}  --env-file .env " +
+              "${imageName} /bin/bash -c \'export RANCHER_CLUSTER_NAME=${env.CLUSTER_NAME} && pytest -v -s --junit-xml=${testResultsOut} ${PYTEST_OPTIONS} ${testsDir}\'"
+          } catch(err) {
+            echo 'Test run had failures. Collecting results...'
+            echo "Error: " + err
+          }
+
+        }
+
+        stage('Test report') {
+          sh "docker cp ${provisionContainer}:${rootPath}${provisionResultsOut} ."
+          step([$class: 'JUnitResultArchiver', testResults: "**/${provisionResultsOut}"])
+
+          sh "docker cp ${testContainer}:${rootPath}${testResultsOut} ."
+          step([$class: 'JUnitResultArchiver', testResults: "**/${testResultsOut}"])
+          
+          sh "docker rm -v ${provisionContainer}"
+          sh "docker rm -v ${testContainer}"
+          sh "docker rmi ${imageName}"
+        }
+      } catch(err){
+        sh "docker stop ${provisionContainer}"
+        sh "docker rm -v ${provisionContainer}"
+
+        sh "docker stop ${testContainer}"
+        sh "docker rm -v ${testContainer}"
+
+        sh "docker rmi ${imageName}"
+
+        echo "Error: " + err
+      }
+    }
+  }
+}
