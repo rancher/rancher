@@ -1,4 +1,4 @@
-ARG POWERSHELL_IMG_TAG=latest
+ARG POWERSHELL_IMG_TAG=nanoserver-1809
 
 FROM mcr.microsoft.com/powershell:${POWERSHELL_IMG_TAG}
 SHELL ["pwsh", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
