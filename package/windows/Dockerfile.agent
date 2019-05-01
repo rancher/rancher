@@ -1,4 +1,4 @@
-ARG POWERSHELL_IMG_TAG
+ARG POWERSHELL_IMG_TAG=latest
 
 FROM mcr.microsoft.com/powershell:${POWERSHELL_IMG_TAG}
 SHELL ["pwsh", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
