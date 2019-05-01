@@ -1,0 +1,526 @@
+#!groovy
+
+rootPath = "/src/rancher-validation/"
+containerPrefix = "${JOB_NAME}${BUILD_NUMBER}"
+rancherConfig = "rancher_env.config"
+imageName = "rancher-validation-${JOB_NAME}${env.BUILD_NUMBER}"
+testsDir = "tests/v3_api/"
+paramsConfigFile = "params_env.config"
+
+containerName = containerPrefix + "-validation"
+
+// If tests fail, set to `true` in the catch in order to prevent 
+// Rancher server from being deleted if RANCHER_SERVER_DELETE is true
+buildFail = false
+
+// We add the clusters the user selected as they are created
+// This is used to iterate through the clusters in some stages
+clusters = [:]
+
+htmlString = ""
+
+node {
+  try {
+    wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
+      deleteDir()
+
+      stage('Prechecks / Checkout / Build') {  
+        setEnvFromParams()
+        checkParams()
+        checkoutBranch(PREUPGRADE_BRANCH)
+        buildContainer()
+      }
+
+      dir ("tests/validation") {
+        stage('Deploy Rancher Server') {
+            deployRancherServer()
+        }
+
+        stage('Provision Cluster(s)') {
+          try {
+            loadClusterConfig()
+
+            clusters.each { type, params ->
+              runProvision(type, params)
+            }
+          } catch(err) {
+            buildFail = true
+            echo "Error: " + err
+          }
+          if (clusters == [:]) {
+            error "All clusters failed to provision. Aborting."
+            currentBuild.result = 'ABORTED'
+          }
+        }
+
+        stage('Run Preupgrade') {
+          try {
+            clusters.each { cluster, param ->
+              runPreupgradeTests(cluster, "auto-pre", "auto-pre")
+            }
+          } catch(err) {
+            buildFail = true
+            echo "Error: " + err
+            echo "Preupgrade tests failed"
+            currentBuild.result = 'UNSTABLE'
+          }
+        }
+
+        stage('Checkout Post Branch & Rebuild') {
+          checkoutBranch(POSTUPGRADE_BRANCH)
+          buildContainer()
+        }
+
+        stage('Run Upgrade') {
+          upgradeRancher()
+        }
+
+        stage('Run postupgrade tests') {
+          try {
+            // Sleep for x minutes as a safeguard to ensure
+            // all clusters are available
+            sleep(time: POSTUPGRADE_SLEEP.toInteger(), unit: "MINUTES")
+
+            // Run the postupgrade checks on all provisioned clusters
+            clusters.each { cluster, params ->
+              runPostupgradeTests(cluster, "auto-pre", "auto-post")
+            }
+          } catch(err) {
+            buildFail = true
+            currentBuild.result = 'UNSTABLE'
+            echo "Error: " + err
+            echo "Postupgrade tests failed"
+          }
+        }  
+
+        // For each cluster type, if it has been selected and has
+        // a k8s postupgrade version specified, upgrade the k8s version
+        stage('Upgrade k8s') {
+          try {
+            if (run_ec2 && k8s_post_ec2 != "") {
+              run_k8s_upgrade("ec2", k8s_post_ec2)
+            }
+            if (run_do && k8s_post_do != "") {
+              run_k8s_upgrade("do", k8s_post_do)
+            }
+            if (run_az && k8s_post_az != "") {
+              run_k8s_upgrade("az", k8s_post_az)
+            }
+            if (run_custom && k8s_post_custom != "") {
+              run_k8s_upgrade("custom", k8s_post_custom)
+            }
+          } catch(err) {
+            buildFail = true
+            echo "Error: " + err
+            echo "Upgrade cluster k8s failed."
+            currentBuild.result = 'FAILURE'
+          }
+        }
+
+        // For each cluster type, if it has been selected and has
+        // a k8s postupgrade version specified, run the postupgrade
+        // checks after the k8s version has been updated.
+        // This prevents running the postupgrade scripts unnecessarily
+        //
+        // If the final param (xmlPrefix) is supplied, the test report
+        // name will be prepended with this prefix. This allows to use 
+        // the same postupgrade method post k8s without overwriting existing 
+        // test reports
+        stage('Run k8s postupgrade scripts') {
+          try {
+            if (run_ec2 && k8s_post_ec2 != "") {
+              runPostupgradeTests("ec2", "auto-post", "auto-post-k8s", "k8s")        
+            }
+            if (run_do && k8s_post_do != "") {
+              runPostupgradeTests("do", "auto-post", "auto-post-k8s", "k8s")        
+            }
+            if (run_az && k8s_post_az != "") {
+              runPostupgradeTests("az", "auto-post", "auto-post-k8s", "k8s")        
+            }
+            if (run_custom && k8s_post_custom != "") {
+              runPostupgradeTests("custom", "auto-post", "auto-post-k8s", "k8s")        
+            }
+          } catch(err) {
+            buildFail = true
+            echo "Error: " + err
+            echo "k8s postupgrade scripts failed"
+            currentBuild.result = 'UNSTABLE'
+          }
+        }
+
+        // If RANCHER_DELETE_SERVER is true and no tests have failed (buildFail = true),
+        // delete Rancher server and all clusters
+        stage('Delete Rancher Server') {
+          deleteRancherServer()
+        }
+      }
+    }
+  } catch (e) {
+    // do nothing
+  } finally {
+    stage('Publish reports') {
+      try {
+        publishReports()
+      } catch(err) {
+        echo "Error: " + err
+      }
+    }
+
+    if (buildFail == true) {
+      currentBuild.result = 'UNSTABLE'
+    }
+
+    containerCleanup()
+    sh "docker rmi ${imageName}"
+  }
+}
+
+def setEnvFromParams() {
+  // CLUSTER_TYPES, EXTRA_VARS, K8S_UPGRADE_VERSIONS are parameters 
+  // from the Jenkins job -- these are written to a file and loaded
+  // to expose the environment variables
+  dir('.') {
+    def vars = "${CLUSTER_TYPES}\n\n${EXTRA_VARS}\n\n${K8S_UPGRADE_VERSIONS}"
+    writeFile(file: "pre_${paramsConfigFile}", text: vars)
+
+    def paramsConfigFileContents = readFile("pre_${paramsConfigFile}")
+    def paramsList = paramsConfigFileContents.split('\n')
+
+    def newParams = []
+
+    paramsList.each { param ->
+      if (param != '' && param != null) {
+        newParams << "env.${param}"
+      }
+    }
+    finalParamsList = newParams.join('\n')
+
+    println(finalParamsList)
+    writeFile(file: paramsConfigFile, text: finalParamsList)
+  }
+
+  load paramsConfigFile
+}
+
+// Enforce that the params in `requiredParams` are present
+def checkParams() {
+  requiredParams = ["RANCHER_SERVER_VERSION":RANCHER_SERVER_VERSION,
+                    "RANCHER_SERVER_VERSION_UPGRADE":RANCHER_SERVER_VERSION_UPGRADE,
+                    "PREUPGRADE_BRANCH":PREUPGRADE_BRANCH,
+                    "POSTUPGRADE_BRANCH":POSTUPGRADE_BRANCH,
+                    "RANCHER_CLUSTER_NAME":RANCHER_CLUSTER_NAME]
+            
+  requiredParams.each { param, paramValue -> 
+    if (paramValue == "") {
+      error "${param} must be provided! Aborting."
+      currentBuild.result = 'Aborted'
+    }
+
+    // Enforce that at least one cluster must be specified
+    if (!run_ec2 && !run_az && !run_custom && !run_do) {
+      error("At least one cluster type must be provided!")
+      currentBuild.result = 'ABORTED'
+    }
+  }
+}
+
+def buildContainer() {
+  try {
+    if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
+      dir(".ssh") {
+        def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
+        writeFile file: AWS_SSH_KEY_NAME, text: decoded
+      }
+    }
+    
+    sh "./tests/v3_api/scripts/configure.sh"
+    sh "./tests/v3_api/scripts/build.sh"
+  } catch(error) {
+    echo "Error: " + err
+  }
+}
+
+def checkoutBranch(def branch) {
+  checkout([
+            $class: 'GitSCM',
+            branches: [[name: "*/${branch}"]],
+            extensions: scm.extensions,
+            userRemoteConfigs: scm.userRemoteConfigs
+          ])
+}
+
+def loadClusterConfig() {
+  def params = ""
+  if (run_ec2.toLowerCase() == 'true')
+  {
+    if (k8s_pre_ec2 != '') {
+      params = "export RANCHER_K8S_VERSION=${k8s_pre_ec2} && "
+    }
+    clusters << ["ec2":"${params}"]
+  }
+  
+  if (run_do.toLowerCase() == 'true')
+  {
+    if (k8s_pre_do != '') {
+      params = "export RANCHER_K8S_VERSION=${k8s_pre_do} && "
+    }
+    clusters << ["do":"${params}"]
+  }
+
+  if (run_az.toLowerCase() == 'true')
+  {
+    if (k8s_pre_az != '') {
+      params = "export RANCHER_K8S_VERSION=${k8s_pre_az} && "
+    }
+    clusters << ["az":"${params}"]
+  }
+
+  if (run_custom.toLowerCase() == 'true')
+  {
+    if (k8s_pre_custom != '') {
+      params = "export RANCHER_K8S_VERSION=${k8s_pre_custom} && "
+    }
+    clusters << ["custom":"${params}"]
+  }
+}
+
+def deployRancherServer() {
+  try {
+    def reportName = "deploy"
+    htmlString = "--html=reports/${reportName}.html"
+
+    sh "docker run --name ${containerName} -t --env-file .env " +
+        "${imageName} /bin/bash -c \'" +
+        "pytest -v -s -k test_deploy_rancher_server ${testsDir} " +
+        "--junit-xml=reports/${reportName}.xml " +
+        "${htmlString}\'"
+
+    sh "docker cp ${containerName}:${rootPath}${testsDir}${rancherConfig} ."
+
+    load rancherConfig
+  } catch(err) {
+    echo "Error: " + err
+    echo "Deploy rancher failed"
+    buildFail = true
+    currentBuild.result = 'ABORTED'
+  } finally {
+    collectReports()
+    containerCleanup()
+  }
+}
+
+// If the exportString is provided, it will pass these additional 
+// variables to the test container
+def runProvision(def cluster, def exportString) {
+  try {
+    // Append the cluster type to RANCHER_CLUSTER_NAME to avoid 
+    // duplicate cluster names
+    def cluster_name = RANCHER_CLUSTER_NAME + "-${cluster}"
+    def reportName = "provision-${cluster}"
+    htmlString = "--html=reports/${reportName}.html"
+    
+    sh "docker run --name ${containerName} -t --env-file .env " +
+      "${imageName} /bin/bash -c \'" +
+      "export RANCHER_CLUSTER_NAME=${cluster_name} && " +
+      "export CATTLE_TEST_URL=${CATTLE_TEST_URL} && " +
+      "export ADMIN_TOKEN=${ADMIN_TOKEN} && " +
+      "${exportString}" + 
+      "pytest -v -s -k test_rke_${cluster}_host_${CLUSTER_PROFILE} ${testsDir} " +
+      "--junit-xml=reports/${reportName}.xml " +
+      "${htmlString}\'"
+  } catch (err) {
+    echo "Error: " + err
+    echo "Provision cluster failed"
+    currentBuild.result = 'FAILURE'
+    buildFail = true
+  } finally {
+    collectReports()
+    containerCleanup()
+  }
+}
+
+def runPreupgradeTests(def cluster, def validate, def create) {
+  try {
+    // Append the cluster type to RANCHER_CLUSTER_NAME to get the correct cluster
+    def cluster_name = RANCHER_CLUSTER_NAME + "-${cluster}"
+    def reportName = "preupgrade-${cluster}"
+    htmlString = "--html=reports/${reportName}.html"
+    
+    // Set the upgrade-specific variables for pre-upgrade
+    sh "docker run --name ${containerName} -t --env-file .env " +
+        "${imageName} /bin/bash -c \'" +
+        "export RANCHER_CLUSTER_NAME=${cluster_name} && " +
+        "export CATTLE_TEST_URL=${CATTLE_TEST_URL} && " + 
+        "export ADMIN_TOKEN=${ADMIN_TOKEN} && " +
+        "export RANCHER_VALIDATE_RESOURCES_PREFIX=${validate} && " +
+        "export RANCHER_CREATE_RESOURCES_PREFIX=${create} && " +
+        "export RANCHER_UPGRADE_CHECK=preupgrade && " +
+        "export RANCHER_INGRESS_CHECK=True && " +
+        "export RANCHER_ENABLE_HOST_NODE_PORT_TESTS=True && " +
+        "export RANCHER_SKIP_INGRESS=False && " +
+        "export RANCHER_CHECK_FOR_LB=False && " +
+        "pytest -v -s -k test_upgrade ${testsDir} " +
+        "--junit-xml=reports/${reportName}.xml " +
+        "${htmlString}\'"
+
+  } catch(err) {
+    buildFail = true
+    echo "Error: " + err
+    echo "Preupgrade tests failed"
+    currentBuild.result = 'UNSTABLE'
+  } finally {
+    collectReports()
+    containerCleanup()
+  }
+}
+
+def upgradeRancher() {
+  try  {
+    // The fixture in test_upgrade.py requires a cluster name
+    // in order to create a client. Though the `test_rancher_upgrade`
+    // test doesn't need a cluster name, we supply the first provisioned
+    def existing_cluster_name = ""
+    clusters.each { type,param ->
+      existing_cluster_name = type
+    }
+    def cluster_name = RANCHER_CLUSTER_NAME + "-" + existing_cluster_name
+    def reportName = "upgrade"
+    htmlString = "--html=reports/${reportName}.html"
+
+    sh "docker run --name ${containerName} -t --env-file .env " +
+      "${imageName} /bin/bash -c \'" +
+      "export RANCHER_CLUSTER_NAME=${cluster_name} && " +
+      "export CATTLE_TEST_URL=${CATTLE_TEST_URL} && " + 
+      "export ADMIN_TOKEN=${ADMIN_TOKEN} && " +
+      "export RANCHER_UPGRADE_CHECK=upgrade_rancher && " +
+      "pytest -v -s -k test_rancher_upgrade ${testsDir} " +
+      "--junit-xml=reports/${reportName}.xml " +
+      "${htmlString}\'"
+  } catch(err) {
+    echo "Error: " + err
+    echo "Upgrade rancher failed"
+    buildFail = true
+    currentBuild.result == 'FAILURE'
+  } finally {
+    collectReports()
+    containerCleanup()
+  }
+}
+
+// validate = the resource prefix for validation
+// create = the resource prefix for creation
+// xmlPrefix, if supplied, prepends the prefix to the report name
+def runPostupgradeTests(def cluster, def validate, def create, def xmlPrefix="") {
+  try {
+    // Append the cluster type to RANCHER_CLUSTER_NAME to get the correct cluster
+    def cluster_name = RANCHER_CLUSTER_NAME + "-${cluster}"
+    def reportName = "${xmlPrefix}postupgrade-${cluster}"
+    htmlString = "--html=reports/${reportName}.html"
+
+    // Set the upgrade-specific variables for pre-upgrade
+    sh "docker run --name ${containerName} -t --env-file .env " +
+        "${imageName} /bin/bash -c \'" + 
+        "export RANCHER_CLUSTER_NAME=${cluster_name} && " +
+        "export CATTLE_TEST_URL=${CATTLE_TEST_URL} && " + 
+        "export ADMIN_TOKEN=${ADMIN_TOKEN} && " +
+        "export RANCHER_VALIDATE_RESOURCES_PREFIX=${validate} && " +
+        "export RANCHER_CREATE_RESOURCES_PREFIX=${create} && " +
+        "export RANCHER_UPGRADE_CHECK=postupgrade && " +
+        "export RANCHER_INGRESS_CHECK=True && " +
+        "export RANCHER_ENABLE_HOST_NODE_PORT_TESTS=True && " +
+        "export RANCHER_SKIP_INGRESS=False && " +
+        "export RANCHER_CHECK_FOR_LB=False && " +
+        "pytest -v -s -k test_upgrade ${testsDir} " +
+        "--junit-xml=reports/${reportName}.xml " +
+        "${htmlString}\'"
+  } catch (err) {
+    buildFail = true
+    echo "Error: " + err
+    echo "Error running postupgrade tests"
+    currentBuild.result = 'UNSTABLE'
+  } finally {
+    collectReports()
+    containerCleanup()
+  }
+}
+
+// k8s_version is the version to upgrade to
+def run_k8s_upgrade(def cluster, def k8s_version) {
+  try {
+    // Get the correct cluster
+    def cluster_name = RANCHER_CLUSTER_NAME + "-${cluster}"
+    def reportName = "k8supgrade-${cluster}"
+    htmlString = "--html=reports/${reportName}.html"
+
+    sh "docker run --name ${containerName} -t --env-file .env " +
+        "${imageName} /bin/bash -c \'" +
+        "export RANCHER_CLUSTER_NAME=${cluster_name} && " +
+        "export RANCHER_K8S_VERSION_UPGRADE=${k8s_version} && " +
+        "export CATTLE_TEST_URL=${CATTLE_TEST_URL} && " + 
+        "export ADMIN_TOKEN=${ADMIN_TOKEN} && " +
+        "pytest -v -s -k test_edit_cluster_k8s_version ${testsDir} " +
+        "--junit-xml=reports/${reportName}.xml " +
+        "${htmlString}\'"
+  } catch(err) {
+    echo "Error: " + err
+    echo "k8s upgrade failed"
+    currentBuild.result = 'UNSTABLE'
+    buildFail = true
+  } finally {
+    collectReports()
+    containerCleanup()
+  }
+}
+
+def deleteRancherServer() {
+  try {
+    if (RANCHER_DELETE_SERVER.toLowerCase() == "true" && buildFail == false || DELETE_SERVER_OVERRIDE.toLowerCase() == "true") {
+      def reportName="delete"
+      htmlString = "--html=reports/${reportName}.html"
+
+      sh "docker run --name ${containerName} -t --env-file .env " +
+        "${imageName} /bin/bash -c \'" +
+        "export CATTLE_TEST_URL=${CATTLE_TEST_URL} && " + 
+        "export ADMIN_TOKEN=${ADMIN_TOKEN} && " +
+        "pytest -v -s -k test_delete_rancher_server ${testsDir} " +
+        "--junit-xml=reports/${reportName}.xml " +
+        "${htmlString}\'"
+    } else {
+      echo "Build failed or RANCHER_DELETE_SERVER is set to false"
+      echo "SERVER IS NOT DELETED"
+    }
+  } catch(err) {
+    echo "Error: " + err
+    error()
+    currentBuild.result = 'UNSTABLE'
+  } finally {
+    collectReports()
+    containerCleanup()
+  }
+}
+
+def collectReports() {
+  sh "docker cp ${containerName}:${rootPath}reports/ ."
+}
+
+def publishReports() {
+  dir('.') {
+    def reportFilesString = sh(script: 'find reports -name "*.html"', returnStdout: true).split().join(',')
+    echo "reportFiles: " + reportFilesString
+
+    publishHTML (target: [
+      allowMissing: false,
+      alwaysLinkToLastBuild: true,
+      keepAll: true,
+      reportDir: ".",
+      reportFiles: reportFilesString,
+      reportName: "Single-click Upgrade Test Results"
+    ])
+    // Archive all test reports (currently combines all into one report)
+    step([$class: 'JUnitResultArchiver', testResults: "**/*.xml"])
+  }
+}
+
+def containerCleanup() {
+  sh "docker stop ${containerName} || true && docker rm ${containerName} || true"
+}

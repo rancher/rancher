@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: pod-test-util
+  labels:
+    k8s-app: pod-test-util
+spec:
+  replicas: 1
+  selector:
+    k8s-app: pod-test-util
+  template:
+    metadata:
+      name: pod-test-util
+      labels:
+        k8s-app: pod-test-util
+    spec:
+      containers:
+      - name: pod-test-util
+        image: sangeetha/mytestcontainer
+        ports:
+        - containerPort: 80
