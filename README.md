@@ -45,6 +45,10 @@ Rancher can be deployed in either a single node or multi-node setup.  Please ref
 
 To learn more about using Rancher, please refer to our [Rancher Documentation](https://rancher.com/docs/rancher/v2.x/en/).
 
+### Using kontainerengine
+
+To learn more about using using kontainerengine and generating kontainer drivers, please refer to our [kontainerengine README](pkg/kontainerengine/README.md).
+
 ## Source Code
 
 This repo is a meta-repo used for packaging and contains the majority of rancher codebase.  Rancher does include other Rancher projects  including:

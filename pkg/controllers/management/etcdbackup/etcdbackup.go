@@ -8,9 +8,9 @@ import (
 
 	minio "github.com/minio/minio-go"
 	"github.com/minio/minio-go/pkg/credentials"
-	"github.com/rancher/kontainer-engine/drivers/rke"
-	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
+	"github.com/rancher/rancher/pkg/kontainerengine/drivers/rke"
+	"github.com/rancher/rancher/pkg/kontainerengine/service"
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/ticker"
 	v1 "github.com/rancher/types/apis/core/v1"

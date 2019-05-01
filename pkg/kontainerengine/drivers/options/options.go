@@ -1,6 +1,6 @@
 package options
 
-import "github.com/rancher/kontainer-engine/types"
+import "github.com/rancher/rancher/pkg/kontainerengine/types"
 
 func GetValueFromDriverOptions(driverOptions *types.DriverOptions, optionType string, keys ...string) interface{} {
 	switch optionType {

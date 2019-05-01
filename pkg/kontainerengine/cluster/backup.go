@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/rancher/kontainer-engine/types"
+	"github.com/rancher/rancher/pkg/kontainerengine/types"
 )
 
 func (c *Cluster) ETCDSave(ctx context.Context, snapshotName string) error {

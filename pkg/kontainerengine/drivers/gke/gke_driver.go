@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/kontainer-engine/drivers/options"
-	"github.com/rancher/kontainer-engine/drivers/util"
-	"github.com/rancher/kontainer-engine/types"
+	"github.com/rancher/rancher/pkg/kontainerengine/drivers/options"
+	"github.com/rancher/rancher/pkg/kontainerengine/drivers/util"
+	"github.com/rancher/rancher/pkg/kontainerengine/types"
 	"github.com/rancher/rke/log"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"

@@ -8,14 +8,14 @@ import (
 	"strings"
 
 	errorsutil "github.com/pkg/errors"
-	"github.com/rancher/kontainer-engine/service"
-	"github.com/rancher/kontainer-engine/types"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
-	"github.com/rancher/types/apis/core/v1"
+	"github.com/rancher/rancher/pkg/kontainerengine/service"
+	"github.com/rancher/rancher/pkg/kontainerengine/types"
 	corev1 "github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v1 "github.com/rancher/types/apis/core/v1"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -200,7 +200,7 @@ func (l *Lifecycle) getResourceFields(obj *v3.KontainerDriver) (map[string]v3.Fi
 		resourceFields[formattedName] = field
 	}
 
-	// all drivers need a driverName field so kontainer-engine knows what type they are
+	// all drivers need a driverName field so kontainerengine knows what type they are
 	resourceFields[clusterprovisioner.DriverNameField] = v3.Field{
 		Create: true,
 		Update: true,

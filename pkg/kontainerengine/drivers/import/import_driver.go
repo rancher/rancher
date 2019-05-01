@@ -9,9 +9,9 @@ import (
 
 	"fmt"
 
-	"github.com/rancher/kontainer-engine/drivers/util"
-	"github.com/rancher/kontainer-engine/store"
-	"github.com/rancher/kontainer-engine/types"
+	"github.com/rancher/rancher/pkg/kontainerengine/drivers/util"
+	"github.com/rancher/rancher/pkg/kontainerengine/store"
+	"github.com/rancher/rancher/pkg/kontainerengine/types"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	"k8s.io/client-go/kubernetes"

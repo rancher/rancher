@@ -17,9 +17,9 @@ import (
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/rancher/kontainer-engine/drivers/options"
-	"github.com/rancher/kontainer-engine/drivers/util"
-	"github.com/rancher/kontainer-engine/types"
+	"github.com/rancher/rancher/pkg/kontainerengine/drivers/options"
+	"github.com/rancher/rancher/pkg/kontainerengine/drivers/util"
+	"github.com/rancher/rancher/pkg/kontainerengine/types"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -1002,7 +1002,7 @@ func (d *Driver) ensureLogAnalyticsWorkspaceForMonitoring(ctx context.Context, c
 		return *gotRet.ID, nil
 	}
 
-	logrus.Info("Create Azure Log Analytics Workspace %q on Resource Group %q", workspaceName, workspaceResourceGroup)
+	logrus.Infof("Create Azure Log Analytics Workspace %q on Resource Group %q", workspaceName, workspaceResourceGroup)
 
 	asyncRet, asyncErr := client.CreateOrUpdate(ctx, workspaceResourceGroup, workspaceName, operationalinsights.Workspace{
 		Location: to.StringPtr(workspaceRegion),

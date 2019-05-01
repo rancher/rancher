@@ -3,9 +3,9 @@ package rkecerts
 import (
 	"fmt"
 
-	"github.com/rancher/kontainer-engine/cluster"
-	"github.com/rancher/kontainer-engine/drivers/rke/rkecerts"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
+	"github.com/rancher/rancher/pkg/kontainerengine/cluster"
+	"github.com/rancher/rancher/pkg/kontainerengine/drivers/rke/rkecerts"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"

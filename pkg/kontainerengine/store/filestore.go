@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/rancher/kontainer-engine/cluster"
-	"github.com/rancher/kontainer-engine/utils"
+	"github.com/rancher/rancher/pkg/kontainerengine/cluster"
+	"github.com/rancher/rancher/pkg/kontainerengine/utils"
 )
 
 // GetAllClusterFromStore retrieves all the cluster info from disk store
