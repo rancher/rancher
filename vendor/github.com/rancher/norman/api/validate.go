@@ -59,8 +59,9 @@ func CheckCSRF(apiContext *types.APIContext) error {
 		}
 
 		cookie = &http.Cookie{
-			Name:  csrfCookie,
-			Value: hex.EncodeToString(bytes),
+			Name:   csrfCookie,
+			Value:  hex.EncodeToString(bytes),
+			Secure: true,
 		}
 	} else if err != nil {
 		return httperror.NewAPIError(httperror.InvalidCSRFToken, "Failed to parse cookies")
