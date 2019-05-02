@@ -47,6 +47,7 @@ const (
 	ClusterFieldTransitioning                        = "transitioning"
 	ClusterFieldTransitioningMessage                 = "transitioningMessage"
 	ClusterFieldUUID                                 = "uuid"
+	ClusterFieldUserInputCapabilities                = "userInputCapabilities"
 	ClusterFieldVersion                              = "version"
 )
 
@@ -93,6 +94,7 @@ type Cluster struct {
 	Transitioning                        string                         `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage                 string                         `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                                 string                         `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UserInputCapabilities                *Capabilities                  `json:"userInputCapabilities,omitempty" yaml:"userInputCapabilities,omitempty"`
 	Version                              *Info                          `json:"version,omitempty" yaml:"version,omitempty"`
 }
 

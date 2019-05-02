@@ -1808,6 +1808,7 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		**out = **in
 	}
 	out.LocalClusterAuthEndpoint = in.LocalClusterAuthEndpoint
+	in.UserInputCapabilities.DeepCopyInto(&out.UserInputCapabilities)
 	return
 }
 

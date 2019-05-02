@@ -92,6 +92,7 @@ type ClusterSpec struct {
 	EnableClusterAlerting                bool                           `json:"enableClusterAlerting" norman:"default=false"`
 	EnableClusterMonitoring              bool                           `json:"enableClusterMonitoring" norman:"default=false"`
 	LocalClusterAuthEndpoint             LocalClusterAuthEndpoint       `json:"localClusterAuthEndpoint,omitempty"`
+	UserInputCapabilities                Capabilities                   `json:"userInputCapabilities,omitempty"`
 }
 
 type ImportedConfig struct {
@@ -215,9 +216,9 @@ type ImportYamlOutput struct {
 
 type Capabilities struct {
 	LoadBalancerCapabilities LoadBalancerCapabilities `json:"loadBalancerCapabilities,omitempty"`
-	IngressCapabilities      []IngressCapabilities    `json:"ingressCapabilities,omitempty"`
-	NodePoolScalingSupported bool                     `json:"nodePoolScalingSupported,omitempty"`
-	NodePortRange            string                   `json:"nodePortRange,omitempty"`
+	IngressCapabilities      []IngressCapabilities    `json:"ingressCapabilities,omitempty" norman:"nocreate,noupdate"`
+	NodePoolScalingSupported bool                     `json:"nodePoolScalingSupported,omitempty" norman:"nocreate,noupdate"`
+	NodePortRange            string                   `json:"nodePortRange,omitempty" norman:"nocreate,noupdate"`
 }
 
 type LoadBalancerCapabilities struct {

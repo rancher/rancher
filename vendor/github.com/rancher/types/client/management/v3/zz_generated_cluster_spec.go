@@ -20,6 +20,7 @@ const (
 	ClusterSpecFieldInternal                            = "internal"
 	ClusterSpecFieldLocalClusterAuthEndpoint            = "localClusterAuthEndpoint"
 	ClusterSpecFieldRancherKubernetesEngineConfig       = "rancherKubernetesEngineConfig"
+	ClusterSpecFieldUserInputCapabilities               = "userInputCapabilities"
 )
 
 type ClusterSpec struct {
@@ -41,4 +42,5 @@ type ClusterSpec struct {
 	Internal                            bool                           `json:"internal,omitempty" yaml:"internal,omitempty"`
 	LocalClusterAuthEndpoint            *LocalClusterAuthEndpoint      `json:"localClusterAuthEndpoint,omitempty" yaml:"localClusterAuthEndpoint,omitempty"`
 	RancherKubernetesEngineConfig       *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty" yaml:"rancherKubernetesEngineConfig,omitempty"`
+	UserInputCapabilities               *Capabilities                  `json:"userInputCapabilities,omitempty" yaml:"userInputCapabilities,omitempty"`
 }
