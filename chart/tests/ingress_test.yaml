@@ -14,6 +14,8 @@ tests:
   - isNull:
       path: spec.tls
 - it: should set default annotations
+  set:
+    hostname: host.example.com
   asserts:
   - equal:
       path: metadata.annotations
@@ -23,7 +25,8 @@ tests:
         nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
         nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
 - it: should over write proxy-connect-timeout
-  set: 
+  set:
+    hostname: host.example.com
     ingress.extraAnnotations:
       nginx.ingress.kubernetes.io/proxy-connect-timeout: "15"
   asserts:
@@ -47,3 +50,19 @@ tests:
         hosts:
         - test
         secretName: tls-rancher-ingress
+- it: should set static X-Forwarded-Host header
+  set:
+    hostname: host.example.com
+    ingress:
+      configurationSnippet: |
+        more_set_input_headers X-Forwarded-Host {{ .Values.hostname }};
+  asserts:
+  - equal:
+      path: metadata.annotations
+      value:
+        certmanager.k8s.io/issuer: RELEASE-NAME-rancher
+        nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+        nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
+        nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
+        nginx.ingress.kubernetes.io/configuration-snippet: |
+          more_set_input_headers X-Forwarded-Host host.example.com;

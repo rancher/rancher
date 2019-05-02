@@ -8,6 +8,10 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
   annotations:
+{{- if .Values.ingress.configurationSnippet }}
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      {{ template "configurationSnippet" . }}
+{{- end }}
 {{- if eq .Values.tls "external" }}
     nginx.ingress.kubernetes.io/ssl-redirect: "false" # turn off ssl redirect for external.
 {{- else }}
