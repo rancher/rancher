@@ -49,6 +49,11 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
+
+  # configurationSnippet - Add additional Nginx configuration. This example statically sets a header on the ingress.
+  # configurationSnippet: |
+  #   more_set_input_headers X-Forwarded-Host {{ .Values.hostname }};
+
   tls:
     # options: rancher, letsEncrypt, secret
     source: rancher
