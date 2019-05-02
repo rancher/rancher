@@ -34,11 +34,10 @@ if (-not $RELEASE_ID) {
 }
 $AGENT_IMAGE = ('{0}/rancher-agent:{1}-windows-{2}' -f $REPO, $TAG, $RELEASE_ID)
 
-$POWERSHELL_IMG_TAG = ('nanoserver-{0}' -f $RELEASE_ID)
 $ARCH = $env:ARCH
 if ($RELEASE_ID -eq $HOST_RELEASE_ID) {
     docker build `
-        --build-arg POWERSHELL_IMG_TAG=$POWERSHELL_IMG_TAG `
+        --build-arg SERVERCORE_VERSION=$RELEASE_ID `
         --build-arg ARCH=$ARCH `
         --build-arg VERSION=$TAG `
         -t $AGENT_IMAGE `
@@ -46,7 +45,7 @@ if ($RELEASE_ID -eq $HOST_RELEASE_ID) {
 } else {
     docker build `
         --isolation hyperv `
-        --build-arg POWERSHELL_IMG_TAG=$POWERSHELL_IMG_TAG `
+        --build-arg SERVERCORE_VERSION=$RELEASE_ID `
         --build-arg ARCH=$ARCH `
         --build-arg VERSION=$TAG `
         -t $AGENT_IMAGE `
