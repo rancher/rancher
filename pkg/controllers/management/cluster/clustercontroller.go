@@ -63,7 +63,7 @@ func (c *controller) capsSync(key string, cluster *v3.Cluster) (runtime.Object, 
 	capabilities.NodePortRange = DefaultNodePortRange
 
 	if cluster.Spec.RancherKubernetesEngineConfig != nil {
-		if capabilities, err = c.RKECapabilities(capabilities, *cluster.Spec.RancherKubernetesEngineConfig, cluster.Name); err != nil {
+		if capabilities, err = c.RKECapabilities(cluster.Spec.UserInputCapabilities, capabilities, *cluster.Spec.RancherKubernetesEngineConfig, cluster.Name); err != nil {
 			return nil, err
 		}
 	} else if cluster.Spec.GenericEngineConfig != nil {
@@ -108,14 +108,16 @@ func (c *controller) capsSync(key string, cluster *v3.Cluster) (runtime.Object, 
 	return nil, nil
 }
 
-func (c *controller) RKECapabilities(capabilities v3.Capabilities, rkeConfig v3.RancherKubernetesEngineConfig, clusterName string) (v3.Capabilities, error) {
+func (c *controller) RKECapabilities(userInputCapabilities v3.Capabilities, capabilities v3.Capabilities, rkeConfig v3.RancherKubernetesEngineConfig, clusterName string) (v3.Capabilities, error) {
+	userLbCaps := userInputCapabilities.LoadBalancerCapabilities
+	lbEnabled := userLbCaps.Enabled != nil && *userLbCaps.Enabled
 	switch rkeConfig.CloudProvider.Name {
 	case aws.AWSCloudProviderName:
 		capabilities.LoadBalancerCapabilities = c.L4Capability(true, ElasticLoadBalancer, []string{"TCP"}, true)
 	case azure.AzureCloudProviderName:
 		capabilities.LoadBalancerCapabilities = c.L4Capability(true, AzureL4LB, []string{"TCP", "UDP"}, true)
 	default:
-		capabilities.LoadBalancerCapabilities = c.L4Capability(false, "", []string{}, false)
+		capabilities.LoadBalancerCapabilities = c.L4Capability(lbEnabled, userLbCaps.Provider, userLbCaps.ProtocolsSupported, userLbCaps.HealthCheckSupported)
 	}
 	// only if not custom, non custom clusters have nodepools set
 	nodes, err := c.nodeLister.List(clusterName, labels.Everything())
