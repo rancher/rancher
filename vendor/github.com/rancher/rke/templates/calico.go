@@ -675,7 +675,7 @@ data:
       "plugins": [
         {
           "type": "calico",
-          "log_level": "info",
+          "log_level": "WARNING",
           "datastore_type": "kubernetes",
           "nodename": "__KUBERNETES_NODE_NAME__",
           "mtu": __CNI_MTU__,
@@ -845,9 +845,15 @@ spec:
             # Disable IPv6 on Kubernetes.
             - name: FELIX_IPV6SUPPORT
               value: "false"
-            # Set Felix logging to "info"
+            # Disable felix logging to file
+            - name: FELIX_LOGFILEPATH
+              value: "none"
+            # Disable felix logging for syslog
+            - name: FELIX_LOGSEVERITYSYS
+              value: ""
+            # Enable felix logging to stdout
             - name: FELIX_LOGSEVERITYSCREEN
-              value: "info"
+              value: "Warning"
             - name: FELIX_HEALTHENABLED
               value: "true"
           securityContext:
