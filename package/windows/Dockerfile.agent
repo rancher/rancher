@@ -1,6 +1,6 @@
-ARG POWERSHELL_IMG_TAG=nanoserver-1809
+ARG SERVERCORE_VERSION
 
-FROM mcr.microsoft.com/powershell:${POWERSHELL_IMG_TAG}
+FROM mcr.microsoft.com/powershell:nanoserver-${SERVERCORE_VERSION}
 SHELL ["pwsh", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
 ARG ARCH=amd64

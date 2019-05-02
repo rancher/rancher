@@ -362,6 +362,7 @@ steps:
     image: plugins/docker
     settings:
       build_args:
+        - SERVERCORE_VERSION=1809
         - ARCH=amd64
         - VERSION=master
       context: package/windows
@@ -387,6 +388,7 @@ steps:
     image: plugins/docker
     settings:
       build_args:
+        - SERVERCORE_VERSION=1809
         - ARCH=amd64
         - "VERSION=${DRONE_TAG}"
       context: package/windows
