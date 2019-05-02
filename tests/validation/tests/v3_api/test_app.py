@@ -45,9 +45,13 @@ def test_tiller():
     name = random_test_name()
     admin_client = get_admin_client()
 
+    clusters = admin_client.list_cluster(name=CLUSTER_NAME).data
+    assert len(clusters) > 0
+    cluster_id = clusters[0].id
+
     p = admin_client. \
         create_project(name="test-" + random_str(),
-                       clusterId='local',
+                       clusterId=cluster_id,
                        resourceQuota={
                            "limit": {
                                "secrets": "1"
@@ -63,7 +67,7 @@ def test_tiller():
     proj_client = rancher.Client(url=p.links.self + '/schemas', verify=False,
                                  token=ADMIN_TOKEN)
     # need a cluster scoped client to create a namespace
-    _cluster, cluster_client = cluster_and_client('local', admin_client)
+    _cluster, cluster_client = cluster_and_client(cluster_id, admin_client)
     ns = cluster_client.create_namespace(name=random_str(),
                                          projectId=p.id,
                                          resourceQuota={
