@@ -24,11 +24,10 @@ func addProxyStore(ctx context.Context, schemas *types.Schemas, context *config.
 	}
 
 	prefix := []string{"api"}
-	group := ""
-	version := "v1"
 	kind := s.CodeName
 	plural := s.PluralName
 
+	var version, group string
 	parts := strings.SplitN(apiVersion, "/", 2)
 	if len(parts) == 1 {
 		version = parts[0]

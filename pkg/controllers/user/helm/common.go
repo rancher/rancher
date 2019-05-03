@@ -86,6 +86,9 @@ func (l *Lifecycle) generateTemplates(obj *v3.App) (string, string, string, stri
 		}
 
 		namespace, catalogName, catalogType, _, _, err := common.SplitExternalID(templateVersion.Spec.ExternalID)
+		if err != nil {
+			return "", "", "", "", err
+		}
 		catalog, err := helmlib.GetCatalog(catalogType, namespace, catalogName, l.CatalogLister, l.ClusterCatalogLister, l.ProjectCatalogLister)
 		if err != nil {
 			return "", "", "", "", err

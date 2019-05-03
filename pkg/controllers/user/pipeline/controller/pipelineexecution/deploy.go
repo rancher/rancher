@@ -730,7 +730,6 @@ func (l *Lifecycle) getAvailablePort() (string, error) {
 	rand.Seed(time.Now().UnixNano())
 	rd := rand.Intn(portRange.Size)
 
-	portMap := map[string]string{}
 	cm, err := l.configMapLister.Get(utils.PipelineNamespace, utils.ProxyConfigMapName)
 	if apierrors.IsNotFound(err) {
 		return strconv.Itoa(rd + portRange.Base), nil
@@ -738,7 +737,7 @@ func (l *Lifecycle) getAvailablePort() (string, error) {
 		return "", err
 	}
 
-	portMap, err = utils.GetRegistryPortMapping(cm)
+	portMap, err := utils.GetRegistryPortMapping(cm)
 	if err != nil {
 		return "", err
 	}
