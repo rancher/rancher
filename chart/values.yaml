@@ -12,6 +12,10 @@ imagePullSecrets: []
 ### ingress ###
 # See tls section for details.
 ingress:
+  # configurationSnippet - Add additional Nginx configuration. This example statically sets a header on the ingress.
+  # configurationSnippet: |
+  #   more_set_input_headers X-Forwarded-Host {{ .Values.hostname }};
+
   tls:
     # rancher, letsEncrypt, secrets
     source: rancher
