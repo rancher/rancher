@@ -181,14 +181,17 @@ $CATTLE_NODE_NAME = $CATTLE_NODE_NAME.ToLower()
 # check node address #
 $CATTLE_ADDRESS = get-address -Addr $CATTLE_ADDRESS
 $CATTLE_INTERNAL_ADDRESS = get-address -Addr $CATTLE_INTERNAL_ADDRESS
-if (-not $CATTLE_ADDRESS) {
+if (-not $CATTLE_INTERNAL_ADDRESS) {
     try {
         $route = Find-NetRoute -RemoteIPAddress 8.8.8.8 | Select-Object -First 1
-        $CATTLE_ADDRESS = $route.IPAddress
+        $CATTLE_INTERNAL_ADDRESS = $route.IPAddress
     } catch {}
 }
+if (-not $CATTLE_INTERNAL_ADDRESS) {
+    throw "-internalAddress is a required option"
+}
 if (-not $CATTLE_ADDRESS) {
-    throw "-address is a required option"
+    $CATTLE_ADDRESS = $CATTLE_INTERNAL_ADDRESS
 }
 
 # download cattle server CA #
