@@ -8,6 +8,8 @@ import (
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -1421,6 +1423,59 @@ type DriverServer interface {
 	ETCDRemoveSnapshot(context.Context, *RemoveETCDSnapshotRequest) (*Empty, error)
 	GetK8SCapabilities(context.Context, *DriverOptions) (*K8SCapabilities, error)
 	RemoveLegacyServiceAccount(context.Context, *ClusterInfo) (*Empty, error)
+}
+
+// UnimplementedDriverServer can be embedded to have forward compatible implementations.
+type UnimplementedDriverServer struct {
+}
+
+func (*UnimplementedDriverServer) Create(ctx context.Context, req *CreateRequest) (*ClusterInfo, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
+}
+func (*UnimplementedDriverServer) Update(ctx context.Context, req *UpdateRequest) (*ClusterInfo, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Update not implemented")
+}
+func (*UnimplementedDriverServer) PostCheck(ctx context.Context, req *ClusterInfo) (*ClusterInfo, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PostCheck not implemented")
+}
+func (*UnimplementedDriverServer) Remove(ctx context.Context, req *ClusterInfo) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Remove not implemented")
+}
+func (*UnimplementedDriverServer) GetDriverCreateOptions(ctx context.Context, req *Empty) (*DriverFlags, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetDriverCreateOptions not implemented")
+}
+func (*UnimplementedDriverServer) GetDriverUpdateOptions(ctx context.Context, req *Empty) (*DriverFlags, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetDriverUpdateOptions not implemented")
+}
+func (*UnimplementedDriverServer) GetVersion(ctx context.Context, req *ClusterInfo) (*KubernetesVersion, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetVersion not implemented")
+}
+func (*UnimplementedDriverServer) SetVersion(ctx context.Context, req *SetVersionRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetVersion not implemented")
+}
+func (*UnimplementedDriverServer) GetNodeCount(ctx context.Context, req *ClusterInfo) (*NodeCount, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetNodeCount not implemented")
+}
+func (*UnimplementedDriverServer) SetNodeCount(ctx context.Context, req *SetNodeCountRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetNodeCount not implemented")
+}
+func (*UnimplementedDriverServer) GetCapabilities(ctx context.Context, req *Empty) (*Capabilities, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCapabilities not implemented")
+}
+func (*UnimplementedDriverServer) ETCDSave(ctx context.Context, req *SaveETCDSnapshotRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ETCDSave not implemented")
+}
+func (*UnimplementedDriverServer) ETCDRestore(ctx context.Context, req *RestoreETCDSnapshotRequest) (*ClusterInfo, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ETCDRestore not implemented")
+}
+func (*UnimplementedDriverServer) ETCDRemoveSnapshot(ctx context.Context, req *RemoveETCDSnapshotRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ETCDRemoveSnapshot not implemented")
+}
+func (*UnimplementedDriverServer) GetK8SCapabilities(ctx context.Context, req *DriverOptions) (*K8SCapabilities, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetK8SCapabilities not implemented")
+}
+func (*UnimplementedDriverServer) RemoveLegacyServiceAccount(ctx context.Context, req *ClusterInfo) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveLegacyServiceAccount not implemented")
 }
 
 func RegisterDriverServer(s *grpc.Server, srv DriverServer) {
