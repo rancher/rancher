@@ -37,6 +37,11 @@ imagePullSecrets: []
 # Readme for details and instruction on adding tls secrets.
 ingress:
   extraAnnotations: {}
+
+  # configurationSnippet - Add additional Nginx configuration. This example statically sets a header on the ingress.
+  # configurationSnippet: |
+  #   more_set_input_headers X-Forwarded-Host {{ .Values.hostname }};
+
   tls:
     # rancher, letsEncrypt, secrets
     source: rancher
@@ -56,7 +61,7 @@ privateCA: false
 # proxy: http://<username>@<password>:<url>:<port>
 
 # comma separated list of domains or ip addresses that will not use the proxy 
-noProxy: 127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16 
+noProxy: 127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
 
 # Override rancher image location for Air Gap installs
 rancherImage: rancher/rancher
