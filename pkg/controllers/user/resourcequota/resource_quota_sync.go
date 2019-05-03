@@ -506,11 +506,9 @@ func completeLimit(existingLimit *v3.ContainerResourceLimit, defaultLimit *v3.Co
 		return nil, nil
 	}
 
-	toReturn := existingLimit.DeepCopy()
 	newLimit := v3.ContainerResourceLimit{}
 	if err := mapstructure.Decode(newLimitMap, &newLimit); err != nil {
 		return nil, err
 	}
-	toReturn = &newLimit
-	return toReturn, nil
+	return &newLimit, nil
 }

@@ -230,7 +230,7 @@ func (l *alertService) migrateLegacyClusterAlert() error {
 			},
 		}
 
-		legacyGroup, err = l.clusterAlertGroups.Create(legacyGroup)
+		_, err = l.clusterAlertGroups.Create(legacyGroup)
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return fmt.Errorf("migrate failed, create alert group %s:%s failed, %v", l.clusterName, migrationGroupName, err)
 		}

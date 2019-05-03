@@ -153,6 +153,9 @@ func (t TemplateVerionFormatterWrapper) TemplateVersionReadmeHandler(apiContext 
 
 func (t TemplateVerionFormatterWrapper) loadChart(templateVersion *client.CatalogTemplateVersion, filter []string) (map[string]string, error) {
 	namespace, catalogName, catalogType, _, _, err := common.SplitExternalID(templateVersion.ExternalID)
+	if err != nil {
+		return nil, err
+	}
 	catalog, err := helmlib.GetCatalog(catalogType, namespace, catalogName, t.CatalogLister, t.ClusterCatalogLister, t.ProjectCatalogLister)
 	if err != nil {
 		return nil, err
