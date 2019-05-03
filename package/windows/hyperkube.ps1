@@ -636,9 +636,6 @@ function start-flanneld {
         "`"--alsologtostderr=true`""
         "`"--log-file=$LogDir\flanneld.log`""
     )
-    if ($NodePublicIP) {
-        $flanneldArgs += @("`"--public-ip=$NodePublicIP`"")
-    }
     if ($NodeIP) {
         $flanneldArgs += @("`"--iface=$NodeIP`"")
     }
