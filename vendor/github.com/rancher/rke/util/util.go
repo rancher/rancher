@@ -7,7 +7,9 @@ import (
 	"strings"
 
 	"github.com/coreos/go-semver/semver"
+	ref "github.com/docker/distribution/reference"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -102,4 +104,24 @@ func GetTagMajorVersion(tag string) string {
 		return ""
 	}
 	return strings.Join(splitTag[:2], ".")
+}
+
+func IsFileExists(filePath string) (bool, error) {
+	if _, err := os.Stat(filePath); err == nil {
+		return true, nil
+	} else if os.IsNotExist(err) {
+		return false, nil
+	} else {
+		return false, err
+	}
+}
+
+func GetImageTagFromImage(image string) (string, error) {
+	parsedImage, err := ref.ParseNormalizedNamed(image)
+	if err != nil {
+		return "", err
+	}
+	imageTag := parsedImage.(ref.Tagged).Tag()
+	logrus.Debugf("Extracted version [%s] from image [%s]", imageTag, image)
+	return imageTag, nil
 }

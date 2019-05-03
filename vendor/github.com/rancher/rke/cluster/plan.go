@@ -11,7 +11,6 @@ import (
 
 	b64 "encoding/base64"
 
-	ref "github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
@@ -35,6 +34,8 @@ const (
 	KubeletDockerConfigEnv     = "RKE_KUBELET_DOCKER_CONFIG"
 	KubeletDockerConfigFileEnv = "RKE_KUBELET_DOCKER_FILE"
 	KubeletDockerConfigPath    = "/var/lib/kubelet/config.json"
+
+	EtcdChangedEnvVersion = "v3.3.0"
 )
 
 var admissionControlOptionNames = []string{"enable-admission-plugins", "admission-control"}
@@ -769,12 +770,41 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, pr
 	}
 	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(c.Services.Etcd.Image, c.PrivateRegistriesMap)
 
+	// Determine etcd version for correct etcdctl environment variables
+	etcdTag, err := util.GetImageTagFromImage(c.Services.Etcd.Image)
+	if err != nil {
+		logrus.Warn(err)
+	}
+	etcdSemVer, err := util.StrToSemVer(etcdTag)
+	if err != nil {
+		logrus.Warn(err)
+	}
+	etcdChangedEnvSemVer, err := util.StrToSemVer(EtcdChangedEnvVersion)
+	if err != nil {
+		logrus.Warn(err)
+	}
+
+	// Configure default etcdctl environment variables
 	Env := []string{}
 	Env = append(Env, "ETCDCTL_API=3")
-	Env = append(Env, fmt.Sprintf("ETCDCTL_ENDPOINT=https://%s:2379", listenAddress))
 	Env = append(Env, fmt.Sprintf("ETCDCTL_CACERT=%s", pki.GetCertPath(pki.CACertName)))
 	Env = append(Env, fmt.Sprintf("ETCDCTL_CERT=%s", pki.GetCertPath(nodeName)))
 	Env = append(Env, fmt.Sprintf("ETCDCTL_KEY=%s", pki.GetKeyPath(nodeName)))
+
+	// Apply old configuration to avoid replacing etcd container
+	if etcdSemVer.LessThan(*etcdChangedEnvSemVer) {
+		logrus.Debugf("Version [%s] is less than version [%s]", etcdSemVer, etcdChangedEnvSemVer)
+		Env = append(Env, fmt.Sprintf("ETCDCTL_ENDPOINT=https://%s:2379", listenAddress))
+	} else {
+		logrus.Debugf("Version [%s] is equal or higher than version [%s]", etcdSemVer, etcdChangedEnvSemVer)
+		// Point etcdctl to localhost in case we have listen all (0.0.0.0) configured
+		if listenAddress == "0.0.0.0" {
+			Env = append(Env, "ETCDCTL_ENDPOINTS=https://127.0.0.1:2379")
+			// If internal address is configured, set endpoint to that address as well
+		} else {
+			Env = append(Env, fmt.Sprintf("ETCDCTL_ENDPOINTS=https://%s:2379", listenAddress))
+		}
+	}
 
 	if architecture == "aarch64" {
 		architecture = "arm64"
@@ -814,9 +844,11 @@ func BuildPortChecksFromPortList(host *hosts.Host, portList []string, proto stri
 
 func (c *Cluster) GetKubernetesServicesOptions() v3.KubernetesServicesOptions {
 	clusterMajorVersion := util.GetTagMajorVersion(c.Version)
-	NamedkK8sImage, _ := ref.ParseNormalizedNamed(c.SystemImages.Kubernetes)
+	k8sImageTag, err := util.GetImageTagFromImage(c.SystemImages.Kubernetes)
+	if err != nil {
+		logrus.Warn(err)
+	}
 
-	k8sImageTag := NamedkK8sImage.(ref.Tagged).Tag()
 	k8sImageMajorVersion := util.GetTagMajorVersion(k8sImageTag)
 
 	if clusterMajorVersion != k8sImageMajorVersion && k8sImageMajorVersion != "" {
@@ -850,8 +882,6 @@ func getUniqStringList(l []string) []string {
 func (c *Cluster) getRKEToolsEntryPoint() string {
 	v := strings.Split(c.SystemImages.KubernetesServicesSidecar, ":")
 	last := v[len(v)-1]
-
-	logrus.Debugf("Extracted version [%s] from image [%s]", last, c.SystemImages.KubernetesServicesSidecar)
 
 	sv, err := util.StrToSemVer(last)
 	if err != nil {
