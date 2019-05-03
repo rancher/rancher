@@ -149,16 +149,16 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                               string(name: 'BRANCH', value: branch) ]
 
                   // Rancher server 1 is used to test RKE clusters
-                  jobs["do"] = { build job: 'v3_ontag_do_provision_api', parameters: params }
-                  jobs["ec2"] = { build job: 'v3_ontag_ec2_provision_api', parameters: params }
-                  jobs["az"] = { build job: 'v3_ontag_az_provision_api', parameters: params }
-                  jobs["custom"] = { build job: 'v3_ontag_custom_provision_api', parameters: params}
+                  jobs["do"] = { build job: 'rancher-v3_ontag_do_provision_api', parameters: params }
+                  jobs["ec2"] = { build job: 'rancher-v3_ontag_ec2_provision_api', parameters: params }
+                  jobs["az"] = { build job: 'rancher-v3_ontag_az_provision_api', parameters: params }
+                  jobs["custom"] = { build job: 'rancher-v3_ontag_custom_provision_api', parameters: params}
 
                   // Rancher server 2 is used to test GKE, EKS, AKS and Imported clusters
-                  jobs["gke"] = { build job: 'v3_ontag_gke_provision_api', parameters: params2 }
-                  jobs["eks"] = { build job: 'v3_ontag_eks_provision_api', parameters: params2 }
-                  jobs["aks"] = { build job: 'v3_ontag_aks_provision_api', parameters: params2 }
-                  jobs["import"] = { build job: 'v3_ontag_import_provision_api', parameters: params2}
+                  jobs["gke"] = { build job: 'rancher-v3_ontag_gke_provision_api', parameters: params2 }
+                  jobs["eks"] = { build job: 'rancher-v3_ontag_eks_provision_api', parameters: params2 }
+                  jobs["aks"] = { build job: 'rancher-v3_ontag_aks_provision_api', parameters: params2 }
+                  jobs["import"] = { build job: 'rancher-v3_ontag_import_provision_api', parameters: params2}
 
                   parallel jobs
                 } catch(err) {
