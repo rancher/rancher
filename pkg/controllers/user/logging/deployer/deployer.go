@@ -80,7 +80,7 @@ func (d *Deployer) sync() error {
 		return d.appDeployer.cleanup(appName, namepspace, systemProjectID)
 	}
 
-	creator, err := d.systemAccountManager.GetProjectSystemUser(systemProject.Name)
+	creator, err := d.systemAccountManager.GetSystemUser(systemProject.Spec.ClusterName)
 	if err != nil {
 		return err
 	}
