@@ -270,7 +270,7 @@ func (d *appDeployer) getSecret(secretName, secretNamespace string) *corev1.Secr
 }
 
 func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string) (bool, error) {
-	_, systemProjectName := ref.Parse(systemProjectID)
+	clusterName, systemProjectName := ref.Parse(systemProjectID)
 
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -308,7 +308,7 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 		return false, fmt.Errorf("failed to find catalog by ID %q, %v", catalogID, err)
 	}
 
-	creator, err := d.systemAccountManager.GetProjectSystemUser(systemProjectName)
+	creator, err := d.systemAccountManager.GetSystemUser(clusterName)
 	if err != nil {
 		return false, err
 	}
