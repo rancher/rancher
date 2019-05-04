@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/encryptedstore"
+	"github.com/rancher/rancher/pkg/jailer"
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -209,7 +210,7 @@ func buildBaseHostDir(nodeName string, clusterID string) (string, string, error)
 		fullMachinePath = filepath.Join(defaultCattleHome, suffix)
 		jailDir = fullMachinePath
 	} else {
-		fullMachinePath = filepath.Join("/opt/jail/", clusterID, "management-state", suffix)
+		fullMachinePath = filepath.Join(jailer.BaseJailPath, clusterID, "management-state", suffix)
 		jailDir = filepath.Join("/management-state", suffix)
 	}
 

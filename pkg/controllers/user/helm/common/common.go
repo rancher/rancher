@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/namespace"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -29,6 +30,21 @@ const (
 	helmName        = "helm"
 	forceUpgradeStr = "--force"
 )
+
+type HelmPath struct {
+	// /opt/jail/<app-name>
+	FullPath string
+	// /
+	InJailPath string
+	// /opt/jail/<app-name>/.kubeconfig
+	KubeConfigFull string
+	// /.kubeconfig
+	KubeConfigInJail string
+	// /opt/jail/<app-name>/<app-sub>
+	AppDirFull string
+	// /<app-sub>
+	AppDirInJail string
+}
 
 func ParseExternalID(externalID string) (string, string, error) {
 	templateVersionNamespace, catalog, _, template, version, err := SplitExternalID(externalID)
@@ -63,12 +79,20 @@ func SplitExternalID(externalID string) (string, string, string, string, string,
 }
 
 // StartTiller start tiller server and return the listening address of the grpc address
-func StartTiller(context context.Context, port, probePort, namespace, kubeConfigPath string) error {
+func StartTiller(context context.Context, tempDirs *HelmPath, port, namespace string) error {
+	probePort := GenerateRandomPort()
 	cmd := exec.Command(tillerName, "--listen", ":"+port, "--probe", ":"+probePort)
-	cmd.Env = []string{fmt.Sprintf("%s=%s", "KUBECONFIG", kubeConfigPath), fmt.Sprintf("%s=%s", "TILLER_NAMESPACE", namespace), fmt.Sprintf("%s=%s", "TILLER_HISTORY_MAX", "1")}
+	cmd.Env = []string{fmt.Sprintf("%s=%s", "KUBECONFIG", tempDirs.KubeConfigInJail), fmt.Sprintf("%s=%s", "TILLER_NAMESPACE", namespace), fmt.Sprintf("%s=%s", "TILLER_HISTORY_MAX", "1")}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
+	cmd, err := JailCommand(cmd, tempDirs.FullPath)
+	if err != nil {
+		return err
+	}
+
 	if err := cmd.Start(); err != nil {
+		logrus.Warnf("START TILLER ERROR %v", err)
 		return err
 	}
 	defer cmd.Wait()
@@ -93,15 +117,16 @@ func GenerateRandomPort() string {
 	}
 }
 
-func InstallCharts(rootDir, port string, obj *v3.App) error {
+func InstallCharts(tempDirs *HelmPath, port string, obj *v3.App) error {
+	logrus.Debugf("InstallCharts - helm path info %+v\n", tempDirs)
 	extraArgs := GetExtraArgs(obj)
-	setValues, err := GenerateAnswerSetValues(obj, rootDir, extraArgs)
+	setValues, err := GenerateAnswerSetValues(obj, tempDirs, extraArgs)
 	if err != nil {
 		return err
 	}
 	commands := make([]string, 0)
 	commands = append([]string{"upgrade", "--install", "--namespace", obj.Spec.TargetNamespace, obj.Name}, setValues...)
-	commands = append(commands, rootDir)
+	commands = append(commands, tempDirs.AppDirInJail)
 
 	if v3.AppConditionForceUpgrade.IsUnknown(obj) {
 		commands = append(commands, forceUpgradeStr)
@@ -115,7 +140,12 @@ func InstallCharts(rootDir, port string, obj *v3.App) error {
 	stderrBuf := &bytes.Buffer{}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = stderrBuf
+	cmd, err = JailCommand(cmd, tempDirs.FullPath)
+	if err != nil {
+		return err
+	}
 	if err := cmd.Start(); err != nil {
+		logrus.Warn("FAILED TO START COMMAND")
 		return errors.Errorf("failed to install app %s. %s", obj.Name, stderrBuf.String())
 	}
 	if err := cmd.Wait(); err != nil {
@@ -132,15 +162,16 @@ func InstallCharts(rootDir, port string, obj *v3.App) error {
 	return nil
 }
 
-func GenerateAnswerSetValues(app *v3.App, tempDir string, extraArgs map[string]string) ([]string, error) {
+func GenerateAnswerSetValues(app *v3.App, tempDir *HelmPath, extraArgs map[string]string) ([]string, error) {
 	setValues := []string{}
 	// a user-supplied values file will overridden default values.yaml
 	if app.Spec.ValuesYaml != "" {
-		valuesYaml := filepath.Join(tempDir, "custom-values.yaml")
+		custom := "custom-values.yaml"
+		valuesYaml := filepath.Join(tempDir.FullPath, custom)
 		if err := ioutil.WriteFile(valuesYaml, []byte(app.Spec.ValuesYaml), 0755); err != nil {
 			return setValues, err
 		}
-		setValues = append(setValues, "--values", valuesYaml)
+		setValues = append(setValues, "--values", filepath.Join(tempDir.InJailPath, custom))
 	}
 	// `--set` values will overridden the user-supplied values.yaml file
 	if app.Spec.Answers != nil || extraArgs != nil {
@@ -160,9 +191,13 @@ func GenerateAnswerSetValues(app *v3.App, tempDir string, extraArgs map[string]s
 	return setValues, nil
 }
 
-func DeleteCharts(port string, obj *v3.App) error {
+func DeleteCharts(tempDirs *HelmPath, port string, obj *v3.App) error {
 	cmd := exec.Command(helmName, "delete", "--purge", obj.Name)
 	cmd.Env = []string{fmt.Sprintf("%s=%s", "HELM_HOST", "127.0.0.1:"+port)}
+	cmd, err := JailCommand(cmd, tempDirs.FullPath)
+	if err != nil {
+		return err
+	}
 	combinedOutput, err := cmd.CombinedOutput()
 	if err != nil && combinedOutput != nil && strings.Contains(string(combinedOutput), fmt.Sprintf("Error: release: \"%s\" not found", obj.Name)) {
 		return nil

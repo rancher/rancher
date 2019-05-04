@@ -7,17 +7,16 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"os/user"
 	"path"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/jailer"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +31,6 @@ var (
 )
 
 const (
-	chrootBase        = "/opt/jail/"
 	errorCreatingNode = "Error creating machine: "
 	nodeDirEnvKey     = "MACHINE_STORAGE_PATH="
 	nodeCmd           = "docker-machine"
@@ -117,7 +115,7 @@ func buildCommand(nodeDir string, node *v3.Node, cmdArgs []string) (*exec.Cmd, e
 		return command, nil
 	}
 
-	cred, err := getUserCred()
+	cred, err := jailer.GetUserCred()
 	if err != nil {
 		return nil, errors.WithMessage(err, "get user cred error")
 	}
@@ -125,7 +123,7 @@ func buildCommand(nodeDir string, node *v3.Node, cmdArgs []string) (*exec.Cmd, e
 	command := exec.Command(nodeCmd, cmdArgs...)
 	command.SysProcAttr = &syscall.SysProcAttr{}
 	command.SysProcAttr.Credential = cred
-	command.SysProcAttr.Chroot = path.Join(chrootBase, node.Namespace)
+	command.SysProcAttr.Chroot = path.Join(jailer.BaseJailPath, node.Namespace)
 	command.Env = []string{
 
 		nodeDirEnvKey + nodeDir,
@@ -305,30 +303,4 @@ func setEc2ClusterIDTag(data interface{}, clusterID string) {
 			m[ec2TagFlag] = convert.ToString(tags) + "," + tagValue
 		}
 	}
-}
-
-// getUserCred looks up the user and provides it in syscall.Credential
-func getUserCred() (*syscall.Credential, error) {
-	u, err := user.Current()
-	if err != nil {
-		uID := os.Getuid()
-		u, err = user.LookupId(strconv.Itoa(uID))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	i, err := strconv.ParseUint(u.Uid, 10, 32)
-	if err != nil {
-		return nil, err
-	}
-	uid := uint32(i)
-
-	i, err = strconv.ParseUint(u.Gid, 10, 32)
-	if err != nil {
-		return nil, err
-	}
-	gid := uint32(i)
-
-	return &syscall.Credential{Uid: uid, Gid: gid}, nil
 }
