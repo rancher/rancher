@@ -54,79 +54,82 @@ func getAppSubDir(files map[string]string) string {
 	return appSubDir
 }
 
-func helmInstall(templateDir, kubeconfigPath string, app *v3.App) error {
+func helmInstall(tempDirs *common.HelmPath, app *v3.App) error {
 	cont, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	addr := common.GenerateRandomPort()
-	probeAddr := common.GenerateRandomPort()
-	go common.StartTiller(cont, addr, probeAddr, app.Spec.TargetNamespace, kubeconfigPath)
-	return common.InstallCharts(templateDir, addr, app)
+	go common.StartTiller(cont, tempDirs, addr, app.Spec.TargetNamespace)
+	return common.InstallCharts(tempDirs, addr, app)
 }
 
-func helmDelete(kubeconfigPath string, app *v3.App) error {
+func helmDelete(tempDirs *common.HelmPath, app *v3.App) error {
 	cont, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	addr := common.GenerateRandomPort()
-	probeAddr := common.GenerateRandomPort()
-	go common.StartTiller(cont, addr, probeAddr, app.Spec.TargetNamespace, kubeconfigPath)
-	return common.DeleteCharts(addr, app)
+	go common.StartTiller(cont, tempDirs, addr, app.Spec.TargetNamespace)
+	return common.DeleteCharts(tempDirs, addr, app)
 }
 
-func (l *Lifecycle) generateTemplates(obj *v3.App) (string, string, string, string, error) {
+func (l *Lifecycle) generateTemplates(obj *v3.App) (string, string, *common.HelmPath, error) {
 	var appSubDir string
 	files := map[string]string{}
 	if obj.Spec.ExternalID != "" {
 		templateVersionID, templateVersionNamespace, err := common.ParseExternalID(obj.Spec.ExternalID)
 		if err != nil {
-			return "", "", "", "", err
+			return "", "", nil, err
 		}
 
 		templateVersion, err := l.TemplateVersionClient.GetNamespaced(templateVersionNamespace, templateVersionID, metav1.GetOptions{})
 		if err != nil {
-			return "", "", "", "", err
+			return "", "", nil, err
 		}
 
 		namespace, catalogName, catalogType, _, _, err := common.SplitExternalID(templateVersion.Spec.ExternalID)
+		if err != nil {
+			return "", "", nil, err
+		}
 		catalog, err := helmlib.GetCatalog(catalogType, namespace, catalogName, l.CatalogLister, l.ClusterCatalogLister, l.ProjectCatalogLister)
 		if err != nil {
-			return "", "", "", "", err
+			return "", "", nil, err
 		}
 
 		helm, err := helmlib.New(catalog)
 		if err != nil {
-			return "", "", "", "", err
+			return "", "", nil, err
 		}
 
 		files, err = helm.LoadChart(&templateVersion.Spec, nil)
 		if err != nil {
-			return "", "", "", "", err
+			return "", "", nil, err
 		}
 		appSubDir = templateVersion.Spec.VersionName
 	} else {
 		for k, v := range obj.Spec.Files {
 			content, err := base64.StdEncoding.DecodeString(v)
 			if err != nil {
-				return "", "", "", "", err
+				return "", "", nil, err
 			}
 			files[k] = string(content)
 		}
 		appSubDir = getAppSubDir(files)
 	}
 
-	tempDir, err := ioutil.TempDir("", "helm-")
+	tempDir, err := createTempDir(obj)
 	if err != nil {
-		return "", "", "", "", err
+		return "", "", nil, err
 	}
-	if err := writeTempDir(tempDir, files); err != nil {
-		return "", "", "", tempDir, err
+	if err := writeTempDir(tempDir.FullPath, files); err != nil {
+		return "", "", nil, err
 	}
 
-	appDir := filepath.Join(tempDir, appSubDir)
+	appDir := filepath.Join(tempDir.InJailPath, appSubDir)
+	tempDir.AppDirInJail = appDir
+	tempDir.AppDirFull = filepath.Join(tempDir.FullPath, appSubDir)
 
 	extraArgs := common.GetExtraArgs(obj)
 	setValues, err := common.GenerateAnswerSetValues(obj, tempDir, extraArgs)
 	if err != nil {
-		return "", "", "", tempDir, err
+		return "", "", nil, err
 	}
 
 	commands := append([]string{"template", appDir, "--name", obj.Name, "--namespace", obj.Spec.TargetNamespace}, setValues...)
@@ -136,11 +139,16 @@ func (l *Lifecycle) generateTemplates(obj *v3.App) (string, string, string, stri
 	sbErr := &bytes.Buffer{}
 	cmd.Stdout = sbOut
 	cmd.Stderr = sbErr
+	cmd, err = common.JailCommand(cmd, tempDir.FullPath)
+	if err != nil {
+		return "", "", nil, err
+	}
+
 	if err := cmd.Start(); err != nil {
-		return "", "", "", tempDir, errors.Wrapf(err, "helm template failed. %s", filterErrorMessage(sbErr.String(), appDir, "template-dir"))
+		return "", "", nil, errors.Wrapf(err, "start helm template failed. %s", sbErr.String())
 	}
 	if err := cmd.Wait(); err != nil {
-		return "", "", "", tempDir, errors.Wrapf(err, "helm template failed. %s", filterErrorMessage(sbErr.String(), appDir, "template-dir"))
+		return "", "", nil, errors.Wrapf(err, "wait helm template failed. %s", sbErr.String())
 	}
 
 	// notes.txt
@@ -150,15 +158,19 @@ func (l *Lifecycle) generateTemplates(obj *v3.App) (string, string, string, stri
 	sbErr = &bytes.Buffer{}
 	cmd.Stdout = noteOut
 	cmd.Stderr = sbErr
+	cmd, err = common.JailCommand(cmd, tempDir.FullPath)
+	if err != nil {
+		return "", "", nil, err
+	}
 	if err := cmd.Start(); err != nil {
-		return "", "", "", tempDir, errors.Wrapf(err, "helm template --notes failed. %s", filterErrorMessage(sbErr.String(), appDir, "template-dir"))
+		return "", "", nil, errors.Wrapf(err, "start helm template --notes failed. %s", sbErr.String())
 	}
 	if err := cmd.Wait(); err != nil {
-		return "", "", "", tempDir, errors.Wrapf(err, "helm template --notes failed. %s", filterErrorMessage(sbErr.String(), appDir, "template-dir"))
+		return "", "", nil, errors.Wrapf(err, "wait helm template --notes failed. %s", sbErr.String())
 	}
 	template := sbOut.String()
 	notes := noteOut.String()
-	return template, notes, appDir, tempDir, nil
+	return template, notes, tempDir, nil
 }
 
 func createTempDir(obj *v3.App) (*common.HelmPath, error) {
