@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
+	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
@@ -51,7 +52,7 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 		logrus.Warnf("ProjectRoleTemplateBinding %v has no role template set. Skipping.", binding.Name)
 		return nil
 	}
-	if binding.UserName == "" && binding.GroupPrincipalName == "" && binding.GroupName == "" {
+	if binding.UserName == "" && binding.GroupPrincipalName == "" && binding.GroupName == "" && binding.ServiceAccount == "" {
 		return nil
 	}
 
@@ -175,7 +176,7 @@ func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.Proj
 	}
 
 	rtbUID := string(binding.UID)
-	subject, err := buildSubjectFromRTB(binding)
+	subject, err := pkgrbac.BuildSubjectFromRTB(binding)
 	if err != nil {
 		return err
 	}

@@ -207,7 +207,7 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 		forceRedeploy = true
 	}
 
-	err = monitoring.DeployApp(app.cattleAppClient, appDeployProjectID, targetApp, forceRedeploy)
+	_, err = monitoring.DeployApp(app.cattleAppClient, appDeployProjectID, targetApp, forceRedeploy)
 	if err != nil {
 		return errors.Wrap(err, "failed to ensure prometheus operator app")
 	}
