@@ -17,9 +17,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -28,9 +26,6 @@ const (
 	tillerName      = "tiller"
 	helmName        = "helm"
 	forceUpgradeStr = "--force"
-
-	systemCatalogName     = "system-library"
-	systemDefaultRegistry = "global.systemDefaultRegistry"
 )
 
 func ParseExternalID(externalID string) (string, string, error) {
@@ -65,26 +60,6 @@ func SplitExternalID(externalID string) (string, string, string, string, string,
 	return templateVersionNamespace, catalog, catalogType, template, version, nil
 }
 
-func InjectDefaultRegistry(obj *v3.App) {
-	if obj.Spec.Answers == nil || obj.Spec.Answers[systemDefaultRegistry] != "" {
-		return
-	}
-
-	values, err := url.Parse(obj.Spec.ExternalID)
-	if err != nil {
-		logrus.Errorf("check catalog type failed: %s", err.Error())
-	}
-
-	catalogWithNamespace := values.Query().Get("catalog")
-	split := strings.SplitN(catalogWithNamespace, "/", 2)
-	catalog := split[len(split)-1]
-
-	reg := settings.SystemDefaultRegistry.Get()
-	if catalog == systemCatalogName && reg != "" {
-		obj.Spec.Answers[systemDefaultRegistry] = reg
-	}
-}
-
 // StartTiller start tiller server and return the listening address of the grpc address
 func StartTiller(context context.Context, port, probePort, namespace, kubeConfigPath string) error {
 	cmd := exec.Command(tillerName, "--listen", ":"+port, "--probe", ":"+probePort)
@@ -116,8 +91,8 @@ func GenerateRandomPort() string {
 }
 
 func InstallCharts(rootDir, port string, obj *v3.App) error {
-	InjectDefaultRegistry(obj)
-	setValues, err := GenerateAnswerSetValues(obj, rootDir)
+	extraArgs := GetExtraArgs(obj)
+	setValues, err := GenerateAnswerSetValues(obj, rootDir, extraArgs)
 	if err != nil {
 		return err
 	}
@@ -151,7 +126,7 @@ func InstallCharts(rootDir, port string, obj *v3.App) error {
 	return nil
 }
 
-func GenerateAnswerSetValues(app *v3.App, tempDir string) ([]string, error) {
+func GenerateAnswerSetValues(app *v3.App, tempDir string, extraArgs map[string]string) ([]string, error) {
 	setValues := []string{}
 	// a user-supplied values file will overridden default values.yaml
 	if app.Spec.ValuesYaml != "" {
@@ -162,10 +137,16 @@ func GenerateAnswerSetValues(app *v3.App, tempDir string) ([]string, error) {
 		setValues = append(setValues, "--values", valuesYaml)
 	}
 	// `--set` values will overridden the user-supplied values.yaml file
-	if app.Spec.Answers != nil {
+	if app.Spec.Answers != nil || extraArgs != nil {
 		answers := app.Spec.Answers
 		var values = []string{}
 		for k, v := range answers {
+			if _, ok := extraArgs[k]; ok {
+				continue
+			}
+			values = append(values, fmt.Sprintf("%s=%s", k, v))
+		}
+		for k, v := range extraArgs {
 			values = append(values, fmt.Sprintf("%s=%s", k, v))
 		}
 		setValues = append(setValues, "--set", strings.Join(values, ","))
