@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/pkg/errors"
+	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
@@ -48,6 +49,9 @@ type prtbLifecycle struct {
 }
 
 func (p *prtbLifecycle) Create(obj *v3.ProjectRoleTemplateBinding) (runtime.Object, error) {
+	if obj.ServiceAccount != "" {
+		return obj, nil
+	}
 	obj, err := p.reconcileSubject(obj)
 	if err != nil {
 		return nil, err
@@ -57,6 +61,9 @@ func (p *prtbLifecycle) Create(obj *v3.ProjectRoleTemplateBinding) (runtime.Obje
 }
 
 func (p *prtbLifecycle) Updated(obj *v3.ProjectRoleTemplateBinding) (runtime.Object, error) {
+	if obj.ServiceAccount != "" {
+		return obj, nil
+	}
 	obj, err := p.reconcileSubject(obj)
 	if err != nil {
 		return nil, err
@@ -159,7 +166,7 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 		projectRoleName = strings.ToLower(fmt.Sprintf("%v-projectmember", projectName))
 	}
 
-	subject, err := buildSubjectFromRTB(binding)
+	subject, err := pkgrbac.BuildSubjectFromRTB(binding)
 	if err != nil {
 		return err
 	}

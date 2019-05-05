@@ -174,6 +174,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("catalogtemplates").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("catalogtemplateversions").verbs("*").
 		addRule().apiGroups("monitoring.cattle.io").resources("prometheus").verbs("view").
+		addRule().apiGroups("monitoring.coreos.com").resources("prometheuses", "prometheusRules", "serviceMonitors").verbs("*").
 		setRoleTemplateNames("admin")
 
 	rb.addRoleTemplate("Project Member", "project-member", "project", true, false, false, false).
@@ -197,6 +198,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("catalogtemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("catalogtemplateversions").verbs("get", "list", "watch").
 		addRule().apiGroups("monitoring.cattle.io").resources("prometheus").verbs("view").
+		addRule().apiGroups("monitoring.coreos.com").resources("prometheuses", "prometheusRules", "serviceMonitors").verbs("*").
 		setRoleTemplateNames("edit")
 
 	rb.addRoleTemplate("Read-only", "read-only", "project", true, false, false, false).
@@ -216,6 +218,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("clustercatalogs").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectcatalogs").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectmonitorgraphs").verbs("get", "list", "watch").
+		addRule().apiGroups("monitoring.coreos.com").resources("prometheuses", "prometheusRules", "serviceMonitors").verbs("get", "list", "watch").
 		setRoleTemplateNames("view")
 
 	rb.addRoleTemplate("Create Namespaces", "create-ns", "project", true, false, false, false).
@@ -290,6 +293,10 @@ func addRoles(management *config.ManagementContext) (string, error) {
 
 	rb.addRoleTemplate("View Project Catalogs", "projectcatalogs-view", "project", true, false, false, false).
 		addRule().apiGroups("management.cattle.io").resources("projectcatalogs").verbs("get", "list", "watch")
+
+	rb.addRoleTemplate("Project Monitoring View Role", "project-monitoring-readonly", "project", true, false, true, false).
+		addRule().apiGroups("monitoring.cattle.io").resources("prometheus").verbs("view").
+		setRoleTemplateNames("view")
 
 	// Not specific to project or cluster
 	// TODO When clusterevents has value, consider adding this back in
