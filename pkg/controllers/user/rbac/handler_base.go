@@ -23,6 +23,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/user/resourcequota"
 	nsutils "github.com/rancher/rancher/pkg/namespace"
+	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 )
 
 const (
@@ -300,7 +301,7 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 	}
 
 	desiredRBs := map[string]runtime.Object{}
-	subject, err := buildSubjectFromRTB(binding)
+	subject, err := pkgrbac.BuildSubjectFromRTB(binding)
 	if err != nil {
 		return err
 	}
@@ -360,53 +361,6 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 		}
 	}
 	return nil
-}
-
-func buildSubjectFromRTB(binding interface{}) (rbacv1.Subject, error) {
-	// TODO This is a duplicate of the same method that lives in the management context. When a place for common
-	// code exists, move it there and reuse it
-	var userName, groupPrincipalName, groupName, name, kind string
-	if rtb, ok := binding.(*v3.ProjectRoleTemplateBinding); ok {
-		userName = rtb.UserName
-		groupPrincipalName = rtb.GroupPrincipalName
-		groupName = rtb.GroupName
-	} else if rtb, ok := binding.(*v3.ClusterRoleTemplateBinding); ok {
-		userName = rtb.UserName
-		groupPrincipalName = rtb.GroupPrincipalName
-		groupName = rtb.GroupName
-	} else {
-		return rbacv1.Subject{}, errors.Errorf("unrecognized roleTemplateBinding type: %v", binding)
-	}
-
-	if userName != "" {
-		name = userName
-		kind = "User"
-	}
-
-	if groupPrincipalName != "" {
-		if name != "" {
-			return rbacv1.Subject{}, errors.Errorf("roletemplatebinding has more than one subject fields set: %v", binding)
-		}
-		name = groupPrincipalName
-		kind = "Group"
-	}
-
-	if groupName != "" {
-		if name != "" {
-			return rbacv1.Subject{}, errors.Errorf("roletemplatebinding has more than one subject fields set: %v", binding)
-		}
-		name = groupName
-		kind = "Group"
-	}
-
-	if name == "" {
-		return rbacv1.Subject{}, errors.Errorf("roletemplatebinding doesn't have any subject fields set: %v", binding)
-	}
-
-	return rbacv1.Subject{
-		Kind: kind,
-		Name: name,
-	}, nil
 }
 
 func bindingParts(roleName, parentUID string, subject rbacv1.Subject) (string, metav1.ObjectMeta, []rbacv1.Subject, rbacv1.RoleRef) {
