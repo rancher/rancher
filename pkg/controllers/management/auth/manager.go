@@ -1,9 +1,8 @@
 package auth
 
 import (
-	"reflect"
-
 	"fmt"
+	"reflect"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/objectclient"
@@ -762,49 +761,4 @@ func buildRule(resource string, verbs map[string]bool) v1.PolicyRule {
 		Verbs:     vs,
 		APIGroups: []string{"*"},
 	}
-}
-
-func buildSubjectFromRTB(binding interface{}) (v1.Subject, error) {
-	var userName, groupPrincipalName, groupName, name, kind string
-	if rtb, ok := binding.(*v3.ProjectRoleTemplateBinding); ok {
-		userName = rtb.UserName
-		groupPrincipalName = rtb.GroupPrincipalName
-		groupName = rtb.GroupName
-	} else if rtb, ok := binding.(*v3.ClusterRoleTemplateBinding); ok {
-		userName = rtb.UserName
-		groupPrincipalName = rtb.GroupPrincipalName
-		groupName = rtb.GroupName
-	} else {
-		return v1.Subject{}, errors.Errorf("unrecognized roleTemplateBinding type: %v", binding)
-	}
-
-	if userName != "" {
-		name = userName
-		kind = "User"
-	}
-
-	if groupPrincipalName != "" {
-		if name != "" {
-			return v1.Subject{}, errors.Errorf("roletemplatebinding has more than one subject fields set: %v", binding)
-		}
-		name = groupPrincipalName
-		kind = "Group"
-	}
-
-	if groupName != "" {
-		if name != "" {
-			return v1.Subject{}, errors.Errorf("roletemplatebinding has more than one subject fields set: %v", binding)
-		}
-		name = groupName
-		kind = "Group"
-	}
-
-	if name == "" {
-		return v1.Subject{}, errors.Errorf("roletemplatebinding doesn't have any subject fields set: %v", binding)
-	}
-
-	return v1.Subject{
-		Kind: kind,
-		Name: name,
-	}, nil
 }
