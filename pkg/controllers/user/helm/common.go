@@ -125,8 +125,8 @@ func (l *Lifecycle) generateTemplates(obj *v3.App) (string, string, string, stri
 
 	appDir := filepath.Join(tempDir, appSubDir)
 
-	common.InjectDefaultRegistry(obj)
-	setValues, err := common.GenerateAnswerSetValues(obj, tempDir)
+	extraArgs := common.GetExtraArgs(obj)
+	setValues, err := common.GenerateAnswerSetValues(obj, tempDir, extraArgs)
 	if err != nil {
 		return "", "", "", tempDir, err
 	}
