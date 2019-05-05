@@ -18,6 +18,7 @@ const (
 	ProjectRoleTemplateBindingFieldProjectID        = "projectId"
 	ProjectRoleTemplateBindingFieldRemoved          = "removed"
 	ProjectRoleTemplateBindingFieldRoleTemplateID   = "roleTemplateId"
+	ProjectRoleTemplateBindingFieldServiceAccount   = "serviceAccount"
 	ProjectRoleTemplateBindingFieldUUID             = "uuid"
 	ProjectRoleTemplateBindingFieldUserID           = "userId"
 	ProjectRoleTemplateBindingFieldUserPrincipalID  = "userPrincipalId"
@@ -37,6 +38,7 @@ type ProjectRoleTemplateBinding struct {
 	ProjectID        string            `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Removed          string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	RoleTemplateID   string            `json:"roleTemplateId,omitempty" yaml:"roleTemplateId,omitempty"`
+	ServiceAccount   string            `json:"serviceAccount,omitempty" yaml:"serviceAccount,omitempty"`
 	UUID             string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	UserID           string            `json:"userId,omitempty" yaml:"userId,omitempty"`
 	UserPrincipalID  string            `json:"userPrincipalId,omitempty" yaml:"userPrincipalId,omitempty"`
