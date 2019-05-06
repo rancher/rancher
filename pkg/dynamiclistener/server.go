@@ -33,6 +33,7 @@ import (
 
 const (
 	httpsMode = "https"
+	httpMode  = "http"
 	acmeMode  = "acme"
 )
 
@@ -288,6 +289,10 @@ func (s *Server) reload(config *v3.ListenConfig) error {
 		if err := s.serveACME(config); err != nil {
 			return err
 		}
+	case httpMode:
+		if err := s.serveHTTP(config); err != nil {
+			return err
+		}
 	case httpsMode:
 		if err := s.serveHTTPS(config); err != nil {
 			return err
@@ -435,6 +440,21 @@ func (s *Server) cacheIPHandler(handler http.Handler) http.Handler {
 
 		handler.ServeHTTP(resp, req)
 	})
+}
+
+func (s *Server) serveHTTP(config *v3.ListenConfig) error {
+	listener, err := s.newListener(s.httpPort, nil)
+	if err != nil {
+		return err
+	}
+	logger := logrus.StandardLogger()
+	server := &http.Server{
+		Handler:  s.Handler(),
+		ErrorLog: log.New(logger.WriterLevel(logrus.DebugLevel), "", log.LstdFlags),
+	}
+	s.servers = append(s.servers, server)
+	s.startServer(listener, server)
+	return nil
 }
 
 func (s *Server) serveHTTPS(config *v3.ListenConfig) error {
