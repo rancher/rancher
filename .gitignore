@@ -11,6 +11,8 @@
 /tests/MANIFEST
 /tests/.cache
 /tests/.tox
+/tests/integration/.tox/
+/tests/integration/MANIFEST
 /tests/.venv
 /tests/.idea
 /default.etcd
