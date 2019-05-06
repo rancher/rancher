@@ -6,12 +6,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-type ClusterUserAttributeHandler struct {
+type clusterUserAttributeHandler struct {
 	userAttribute       managementv3.UserAttributeInterface
 	userAttributeLister managementv3.UserAttributeLister
 }
 
-func (h *ClusterUserAttributeHandler) Sync(key string, clusterUserAttribute *clusterv3.ClusterUserAttribute) (runtime.Object, error) {
+// Sync clusterUserAttributes and userAttributes
+func (h *clusterUserAttributeHandler) Sync(key string, clusterUserAttribute *clusterv3.ClusterUserAttribute) (runtime.Object, error) {
 	if clusterUserAttribute == nil || clusterUserAttribute.DeletionTimestamp != nil {
 		return nil, nil
 	}

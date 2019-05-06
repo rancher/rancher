@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -34,6 +35,8 @@ type userLifecycle struct {
 	grbIndexer      cache.Indexer
 	tokenIndexer    cache.Indexer
 	userManager     user.Manager
+	clusterLister   v3.ClusterLister
+	clusterManager  *clustermanager.Manager
 }
 
 const (
@@ -44,7 +47,7 @@ const (
 	userController    = "mgmt-auth-users-controller"
 )
 
-func newUserLifecycle(management *config.ManagementContext) *userLifecycle {
+func newUserLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *userLifecycle {
 	lfc := &userLifecycle{
 		prtb:            management.Management.ProjectRoleTemplateBindings(""),
 		crtb:            management.Management.ClusterRoleTemplateBindings(""),
@@ -59,6 +62,8 @@ func newUserLifecycle(management *config.ManagementContext) *userLifecycle {
 		grbLister:       management.Management.GlobalRoleBindings("").Controller().Lister(),
 		namespaceLister: management.Core.Namespaces("").Controller().Lister(),
 		userManager:     management.UserManager,
+		clusterLister:   management.Management.Clusters("").Controller().Lister(),
+		clusterManager:  clusterManager,
 	}
 
 	prtbInformer := management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
@@ -204,6 +209,11 @@ func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
 		return nil, err
 	}
 
+	err = l.deleteClusterUserAttributes(user.Name, tokens)
+	if err != nil {
+		return nil, err
+	}
+
 	err = l.deleteAllTokens(tokens)
 	if err != nil {
 		return nil, err
@@ -215,6 +225,11 @@ func (l *userLifecycle) Remove(user *v3.User) (runtime.Object, error) {
 	}
 
 	err = l.deleteUserSecret(user.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err = l.removeLegacyFinalizers(user)
 	if err != nil {
 		return nil, err
 	}
@@ -353,6 +368,33 @@ func (l *userLifecycle) deleteAllGRB(grbs []*v3.GlobalRoleBinding) error {
 	return nil
 }
 
+func (l *userLifecycle) deleteClusterUserAttributes(username string, tokens []*v3.Token) error {
+	if len(tokens) == 0 {
+		return nil
+	}
+	// find the set of clusters associated with a list of tokens
+	set := make(map[string]*v3.Cluster)
+	for _, token := range tokens {
+		cluster, err := l.clusterLister.Get("", token.ClusterName)
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+		set[token.ClusterName] = cluster
+	}
+
+	for _, cluster := range set {
+		userCtx, err := l.clusterManager.UserContext(cluster.Name)
+		if err != nil {
+			return err
+		}
+		err = userCtx.Cluster.ClusterUserAttributes("cattle-system").Delete(username, &metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
+}
+
 func (l *userLifecycle) deleteAllTokens(tokens []*v3.Token) error {
 	for _, token := range tokens {
 		logrus.Infof("[%v] Deleting token %v for user %v", userController, token.Name, token.UserID)
@@ -399,4 +441,21 @@ func (l *userLifecycle) deleteUserSecret(username string) error {
 
 	logrus.Infof("[%v] Deleting secret backing user %v", userController, username)
 	return l.secrets.DeleteNamespaced("cattle-system", username+"-secret", &metav1.DeleteOptions{})
+}
+
+func (l *userLifecycle) removeLegacyFinalizers(user *v3.User) (*v3.User, error) {
+	finalizers := user.GetFinalizers()
+	for i, finalizer := range finalizers {
+		if finalizer == "controller.cattle.io/cat-user-controller" {
+			finalizers = append(finalizers[:i], finalizers[i+1:]...)
+			user = user.DeepCopy()
+			user.SetFinalizers(finalizers)
+			updatedUser, err := l.users.Update(user)
+			if err != nil {
+				return nil, err
+			}
+			return updatedUser, err
+		}
+	}
+	return user, nil
 }

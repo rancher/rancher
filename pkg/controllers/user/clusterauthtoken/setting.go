@@ -10,70 +10,65 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-type SettingHandler struct {
+type settingHandler struct {
 	namespace              string
 	clusterConfigMap       corev1.ConfigMapInterface
 	clusterConfigMapLister corev1.ConfigMapLister
+	settingInterface       managementv3.SettingInterface
 }
 
-func (h *SettingHandler) Create(setting *managementv3.Setting) (runtime.Object, error) {
-	if setting.Name != common.AuthProviderRefreshDebounceSettingName {
+func (h *settingHandler) Sync(key string, setting *managementv3.Setting) (runtime.Object, error) {
+	if setting == nil {
 		return nil, nil
 	}
-
-	_, err := h.clusterConfigMapLister.Get(h.namespace, setting.Name)
-	if !errors.IsNotFound(err) {
-		return h.Updated(setting)
-	}
-
-	config := &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: setting.Name,
-		},
-		TypeMeta: metav1.TypeMeta{
-			Kind: "ConfigMap",
-		},
-		Data: map[string]string{
-			"value": setting.Value,
-		},
-	}
-	_, err = h.clusterConfigMap.Create(config)
-	return nil, err
-}
-
-func (h *SettingHandler) Updated(setting *managementv3.Setting) (runtime.Object, error) {
-	if setting.Name != common.AuthProviderRefreshDebounceSettingName {
-		return nil, nil
-	}
-
-	config, err := h.clusterConfigMapLister.Get(h.namespace, setting.Name)
-	if errors.IsNotFound(err) {
-		return h.Create(setting)
-	}
-	if err != nil {
+	// remove legacy finalizers
+	if setting.DeletionTimestamp != nil {
+		finalizers := setting.GetFinalizers()
+		for i, finalizer := range finalizers {
+			if finalizer == "controller.cattle.io/cat-setting-controller" {
+				finalizers = append(finalizers[:i], finalizers[i+1:]...)
+				setting = setting.DeepCopy()
+				setting.SetFinalizers(finalizers)
+				_, err := h.settingInterface.Update(setting)
+				if err != nil {
+					return nil, err
+				}
+				break
+			}
+		}
+		err := h.clusterConfigMap.Delete(setting.Name, &metav1.DeleteOptions{})
 		return nil, err
 	}
-	if config.Data == nil {
-		config.Data = make(map[string]string)
-	}
-	if config.Data["value"] == setting.Value {
-		return nil, nil
-	}
-	config.Data["value"] = setting.Value
-	_, err = h.clusterConfigMap.Update(config)
-	return nil, err
-}
-
-func (h *SettingHandler) Remove(setting *managementv3.Setting) (runtime.Object, error) {
 	if setting.Name != common.AuthProviderRefreshDebounceSettingName {
 		return nil, nil
 	}
-
-	_, err := h.clusterConfigMapLister.Get(h.namespace, setting.Name)
+	// create/update
+	config, err := h.clusterConfigMapLister.Get(h.namespace, setting.Name)
 	if errors.IsNotFound(err) {
-		return nil, nil
+		NewConfig := &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: setting.Name,
+			},
+			TypeMeta: metav1.TypeMeta{
+				Kind: "ConfigMap",
+			},
+			Data: map[string]string{
+				"value": setting.Value,
+			},
+		}
+		_, err = h.clusterConfigMap.Create(NewConfig)
+		return nil, err
+	} else if err == nil {
+		if config.Data == nil {
+			config.Data = make(map[string]string)
+		}
+		if config.Data["value"] == setting.Value {
+			return nil, nil
+		}
+		config.Data["value"] = setting.Value
+		_, err = h.clusterConfigMap.Update(config)
+		return nil, err
+	} else {
+		return nil, err
 	}
-
-	err = h.clusterConfigMap.Delete(setting.Name, &metav1.DeleteOptions{})
-	return nil, err
 }

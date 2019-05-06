@@ -24,8 +24,25 @@ func newTokenController(mgmt *config.ManagementContext) *TokenController {
 
 //sync is called periodically and on real updates
 func (n *TokenController) sync(key string, obj *v3.Token) (runtime.Object, error) {
-	if obj == nil || obj.DeletionTimestamp != nil {
+	if obj == nil {
 		return nil, nil
+	}
+	// remove legacy finalizers
+	if obj.DeletionTimestamp != nil {
+		finalizers := obj.GetFinalizers()
+		for i, finalizer := range finalizers {
+			if finalizer == "controller.cattle.io/cat-token-controller" {
+				finalizers = append(finalizers[:i], finalizers[i+1:]...)
+				newObj := obj.DeepCopy()
+				newObj.SetFinalizers(finalizers)
+				var err error
+				obj, err = n.tokens.Update(newObj)
+				if err != nil {
+					return nil, err
+				}
+				break
+			}
+		}
 	}
 
 	if obj.TTLMillis != 0 && obj.ExpiresAt == "" {
