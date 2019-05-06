@@ -5,11 +5,10 @@ import (
 	"fmt"
 
 	"github.com/rancher/rancher/pkg/controllers/user/clusterauthtoken/common"
+	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/cache"
-
-	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 const tokenByUserAndClusterIndex = "auth.management.cattle.io/token-by-user-and-cluster"
@@ -36,34 +35,39 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	userLister := cluster.Management.Management.Users("").Controller().Lister()
 	userAttribute := cluster.Management.Management.UserAttributes("")
 	userAttributeLister := cluster.Management.Management.UserAttributes("").Controller().Lister()
+	settingInterface := cluster.Management.Management.Settings("")
 
-	cluster.Management.Management.Settings("").AddLifecycle(ctx, "cat-setting-controller", &SettingHandler{
+	cluster.Management.Management.Settings("").AddHandler(ctx, "cat-setting-controller", (&settingHandler{
 		namespace,
 		clusterConfigMap,
 		clusterConfigMapLister,
-	})
-	cluster.Management.Management.Tokens("").AddLifecycle(ctx, "cat-token-controller", &TokenHandler{
-		namespace,
+		settingInterface,
+	}).Sync)
+	cluster.Management.Management.Tokens("").AddClusterScopedLifecycle(ctx,
+		"cat-token-controller",
 		clusterName,
-		clusterAuthToken,
-		clusterAuthTokenLister,
-		clusterUserAttribute,
-		clusterUserAttributeLister,
-		tokenIndexer,
-		userLister,
-		userAttributeLister,
-	})
-	cluster.Management.Management.Users("").AddLifecycle(ctx, "cat-user-controller", &UserHandler{
-		namespace,
-		clusterUserAttribute,
-		clusterUserAttributeLister,
-	})
-	cluster.Management.Management.UserAttributes("").AddHandler(ctx, "cat-user-attribute-controller", (&UserAttributeHandler{
+		&tokenHandler{
+			namespace,
+			clusterAuthToken,
+			clusterAuthTokenLister,
+			clusterUserAttribute,
+			clusterUserAttributeLister,
+			tokenIndexer,
+			userLister,
+			userAttributeLister,
+		})
+
+	cluster.Management.Management.Users("").AddHandler(ctx, "cat-user-controller", (&userHandler{
 		namespace,
 		clusterUserAttribute,
 		clusterUserAttributeLister,
 	}).Sync)
-	cluster.Cluster.ClusterUserAttributes(namespace).AddHandler(ctx, "cat-cluster-user-attribute-controller", (&ClusterUserAttributeHandler{
+	cluster.Management.Management.UserAttributes("").AddHandler(ctx, "cat-user-attribute-controller", (&userAttributeHandler{
+		namespace,
+		clusterUserAttribute,
+		clusterUserAttributeLister,
+	}).Sync)
+	cluster.Cluster.ClusterUserAttributes(namespace).AddHandler(ctx, "cat-cluster-user-attribute-controller", (&clusterUserAttributeHandler{
 		userAttribute,
 		userAttributeLister,
 	}).Sync)

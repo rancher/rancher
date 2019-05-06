@@ -7,7 +7,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/clusterauthtoken/common"
 	clusterv3 "github.com/rancher/types/apis/cluster.cattle.io/v3"
 	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -20,9 +19,8 @@ type tokenAttributeCompare struct {
 	enabled   bool
 }
 
-type TokenHandler struct {
+type tokenHandler struct {
 	namespace                  string
-	clusterName                string
 	clusterAuthToken           clusterv3.ClusterAuthTokenInterface
 	clusterAuthTokenLister     clusterv3.ClusterAuthTokenLister
 	clusterUserAttribute       clusterv3.ClusterUserAttributeInterface
@@ -32,10 +30,7 @@ type TokenHandler struct {
 	userAttributeLister        managementv3.UserAttributeLister
 }
 
-func (h *TokenHandler) Create(token *managementv3.Token) (runtime.Object, error) {
-	if token.ClusterName != h.clusterName {
-		return nil, nil
-	}
+func (h *tokenHandler) Create(token *managementv3.Token) (runtime.Object, error) {
 
 	_, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if !errors.IsNotFound(err) {
@@ -56,10 +51,7 @@ func (h *TokenHandler) Create(token *managementv3.Token) (runtime.Object, error)
 	return nil, err
 }
 
-func (h *TokenHandler) Updated(token *managementv3.Token) (runtime.Object, error) {
-	if token.ClusterName != h.clusterName {
-		return nil, nil
-	}
+func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error) {
 
 	clusterAuthToken, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if errors.IsNotFound(err) {
@@ -75,7 +67,7 @@ func (h *TokenHandler) Updated(token *managementv3.Token) (runtime.Object, error
 	}
 
 	tokenEnabled := token.Enabled == nil || *token.Enabled
-	new := tokenAttributeCompare{
+	current := tokenAttributeCompare{
 		enabled:   tokenEnabled,
 		expiresAt: token.ExpiresAt,
 		username:  token.UserID,
@@ -85,7 +77,7 @@ func (h *TokenHandler) Updated(token *managementv3.Token) (runtime.Object, error
 		expiresAt: clusterAuthToken.ExpiresAt,
 		username:  clusterAuthToken.UserName,
 	}
-	if reflect.DeepEqual(new, old) {
+	if reflect.DeepEqual(current, old) {
 		return nil, nil
 	}
 	clusterAuthToken.UserName = token.UserID
@@ -99,37 +91,32 @@ func (h *TokenHandler) Updated(token *managementv3.Token) (runtime.Object, error
 	return nil, err
 }
 
-func (h *TokenHandler) Remove(token *managementv3.Token) (runtime.Object, error) {
-	if token.ClusterName != h.clusterName {
-		return nil, nil
-	}
+func (h *tokenHandler) Remove(token *managementv3.Token) (runtime.Object, error) {
 
 	tokens, err := h.tokenIndexer.ByIndex(tokenByUserAndClusterIndex, tokenUserClusterKey(token))
-	if errors.IsNotFound(err) {
-		return nil, nil
-	}
-	if err != nil {
+	if err != nil && !errors.IsNotFound(err) {
 		return nil, err
 	}
+	err = h.clusterAuthToken.Delete(token.Name, &metav1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return nil, err
+	}
+
 	if len(tokens) == 1 {
 		lastToken := tokens[0].(*managementv3.Token)
 		if token.Name == lastToken.Name {
 			// we are about to remove the last token for this user & cluster,
 			// also remove user data from cluster
-			err := h.clusterUserAttribute.Delete(token.UserID, &metav1.DeleteOptions{})
-			if err != nil {
-				logrus.Error(err)
+			err = h.clusterUserAttribute.Delete(token.UserID, &metav1.DeleteOptions{})
+			if err != nil && !errors.IsNotFound(err) {
+				return nil, err
 			}
 		}
 	}
-	err = h.clusterAuthToken.Delete(token.Name, &metav1.DeleteOptions{})
-	if errors.IsNotFound(err) {
-		return nil, nil
-	}
-	return nil, err
+	return nil, nil
 }
 
-func (h *TokenHandler) updateClusterUserAttribute(token *managementv3.Token) error {
+func (h *tokenHandler) updateClusterUserAttribute(token *managementv3.Token) error {
 	userID := token.UserID
 	user, err := h.userLister.Get("", userID)
 	if err != nil {
@@ -141,7 +128,7 @@ func (h *TokenHandler) updateClusterUserAttribute(token *managementv3.Token) err
 		return err
 	}
 
-	groups := []string{}
+	var groups []string
 	for _, gp := range userAttribute.GroupPrincipals {
 		for i := range gp.Items {
 			groups = append(groups, gp.Items[i].Name)
@@ -171,7 +158,7 @@ func (h *TokenHandler) updateClusterUserAttribute(token *managementv3.Token) err
 		return err
 	}
 
-	new := userAttributeCompare{
+	current := userAttributeCompare{
 		groups:       groups,
 		lastRefresh:  userAttribute.LastRefresh,
 		needsRefresh: userAttribute.NeedsRefresh,
@@ -184,10 +171,10 @@ func (h *TokenHandler) updateClusterUserAttribute(token *managementv3.Token) err
 		enabled:      clusterUserAttribute.Enabled,
 	}
 
-	if reflect.DeepEqual(new, old) {
+	if reflect.DeepEqual(current, old) {
 		return nil
 	}
-
+	clusterUserAttribute = clusterUserAttribute.DeepCopy()
 	clusterUserAttribute.Groups = groups
 	clusterUserAttribute.Enabled = userEnabled
 	clusterUserAttribute.LastRefresh = userAttribute.LastRefresh
