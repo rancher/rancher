@@ -3,10 +3,11 @@ package store
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/rancher/pkg/randomtoken"
 	"reflect"
 	"strings"
+
+	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/randomtoken"
 
 	"github.com/rancher/types/config"
 
@@ -60,7 +61,10 @@ func SetPasswordStore(schemas *types.Schemas, secretStore v1.SecretInterface, ns
 	}
 
 	//add your parent schema name here
-	pwdTypes := []string{"clusterlogging"}
+	pwdTypes := []string{
+		"clusterlogging",
+		"projectlogging",
+	}
 
 	for _, storeType := range pwdTypes {
 		var schema *types.Schema

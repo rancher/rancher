@@ -45,6 +45,7 @@ def test_cluster_logging_elasticsearch(admin_mc, remove_resource):
     # Test updating password
     newSecretPassword = random_str()
     es = client.update(es, elasticsearchConfig={
+                                    'endpoint': endpoint,
                                     'authPassword': newSecretPassword})
     verifyPassword(crdClient, k8sclient, ns, name, newSecretPassword)
 
