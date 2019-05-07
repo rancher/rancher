@@ -123,6 +123,7 @@ type ProjectRoleTemplateBinding struct {
 	GroupPrincipalName string `json:"groupPrincipalName,omitempty" norman:"type=reference[principal]"`
 	ProjectName        string `json:"projectName,omitempty" norman:"required,type=reference[project]"`
 	RoleTemplateName   string `json:"roleTemplateName,omitempty" norman:"required,type=reference[roleTemplate]"`
+	ServiceAccount     string `json:"serviceAccount,omitempty" norman:"nocreate,noupdate"`
 }
 
 type ClusterRoleTemplateBinding struct {
