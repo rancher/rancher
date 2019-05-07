@@ -55,10 +55,10 @@ node {
         stage('Run provisioning tests') {
           params = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"), string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"), string(name: 'BRANCH', value: branch) ]
 
-          jobs["custom"] = { build job: 'v3_test_custom_cluster', parameters: params}
-          jobs["do"] = { build job: 'v3_test_do_cluster', parameters: params }
-          jobs["ec2"] = { build job: 'v3_test_ec2_cluster', parameters: params }
-          jobs["az"] = { build job: 'v3_test_az_cluster', parameters: params }
+          jobs["custom"] = { build job: 'rancher-v3_test_custom_cluster', parameters: params}
+          jobs["do"] = { build job: 'rancher-v3_test_do_cluster', parameters: params }
+          jobs["ec2"] = { build job: 'rancher-v3_test_ec2_cluster', parameters: params }
+          jobs["az"] = { build job: 'rancher-v3_test_az_cluster', parameters: params }
 
           parallel jobs
         }
