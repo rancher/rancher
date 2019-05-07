@@ -55,6 +55,7 @@ type appDeployer struct {
 	templateVersions     mgmtv3.CatalogTemplateVersionInterface
 	statefulsets         appsv1beta2.StatefulSetInterface
 	systemAccountManager *systemaccount.Manager
+	deployments          appsv1beta2.DeploymentInterface
 }
 
 type operaterDeployer struct {
@@ -75,6 +76,7 @@ func NewDeployer(cluster *config.UserContext, manager *manager.AlertManager) *De
 		templateVersions:     cluster.Management.Management.CatalogTemplateVersions(namespace.GlobalNamespace),
 		statefulsets:         cluster.Apps.StatefulSets(metav1.NamespaceAll),
 		systemAccountManager: systemaccount.NewManager(cluster.Management),
+		deployments:          cluster.Apps.Deployments(metav1.NamespaceAll),
 	}
 
 	op := &operaterDeployer{
@@ -138,6 +140,15 @@ func (d *Deployer) sync() error {
 	newCluster.Spec.EnableClusterAlerting = needDeploy
 
 	if needDeploy {
+		operatorAppName, operatorAppNamespace := monitorutil.SystemMonitoringInfo()
+		operatorWorkload, err := d.appDeployer.deployments.GetNamespaced(operatorAppNamespace, fmt.Sprintf("prometheus-operator-%s", operatorAppName), metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return fmt.Errorf("get deployment %s/prometheus-operator-%s failed, %v", operatorAppNamespace, operatorAppName, err)
+		}
+		if operatorWorkload == nil || operatorWorkload.DeletionTimestamp != nil {
+			d.clusters.Controller().Enqueue(metav1.NamespaceAll, d.clusterName)
+		}
+
 		if !reflect.DeepEqual(cluster, newCluster) {
 			_, err = d.clusters.Update(newCluster)
 			if err != nil {
