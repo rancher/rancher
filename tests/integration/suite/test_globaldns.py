@@ -261,3 +261,23 @@ def test_cloudflare_provider_proxy_setting(admin_mc, remove_resource):
     assert gdns_provider.cloudflareProviderConfig.proxySetting is True
 
     remove_resource(globaldns_provider)
+
+
+def test_dns_fqdn_hostname(admin_mc, remove_resource):
+    client = admin_mc.client
+    provider_name = random_str()
+    access = random_str()
+    secret = random_str()
+    globaldns_provider = \
+        client.create_global_dns_provider(
+                                         name=provider_name,
+                                         rootDomain="example.com",
+                                         route53ProviderConfig={
+                                             'accessKey': access,
+                                             'secretKey': secret})
+    remove_resource(globaldns_provider)
+
+    fqdn = random_str() + ".example!!!*.com"
+    with pytest.raises(ApiError) as e:
+        client.create_global_dns(fqdn=fqdn, providerId=provider_name)
+        assert e.value.error.status == 422
