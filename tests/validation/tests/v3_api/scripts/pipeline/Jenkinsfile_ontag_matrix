@@ -167,22 +167,24 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
             }
 
             stage('Delete Rancher Server') {
-              try {
-                if (env.RANCHER_DELETE_SERVER.toLowerCase() == "true") {
+              if (env.RANCHER_DELETE_SERVER.toLowerCase() == "true") {
+                try {
                   sh "docker run --name ${deleteContainer} -t --env-file ${envFile} " +
                   "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} && " +
                   "export ADMIN_TOKEN=${env.ADMIN_TOKEN} && pytest -v -s --junit-xml=${deleteResultsOut} " +
                   "${deletePytestOptions} ${testsDir}\'"
+                } catch(err) {
+                  echo "Error: " + err
+                }
 
+                try {
                   sh "docker run --name ${deleteContainer2} -t --env-file ${envFile} " +
                   "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${CATTLE_TEST_URL_2} && " +
                   "export ADMIN_TOKEN=${ADMIN_TOKEN_2} && pytest -v -s --junit-xml=${deleteResultsOut2} " +
                   "${deletePytestOptions} ${testsDir}\'"
+                } catch(err) {
+                  echo "Error: " + err
                 }
-              } catch(err) {
-                echo "Error: " + err
-                error()
-                currentBuild.result = 'FAILURE'
               }
             }
 
