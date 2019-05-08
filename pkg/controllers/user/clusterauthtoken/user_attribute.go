@@ -17,13 +17,13 @@ type userAttributeCompare struct {
 	enabled      bool
 }
 
-type UserAttributeHandler struct {
+type userAttributeHandler struct {
 	namespace                  string
 	clusterUserAttribute       clusterv3.ClusterUserAttributeInterface
 	clusterUserAttributeLister clusterv3.ClusterUserAttributeLister
 }
 
-func (h *UserAttributeHandler) Sync(key string, userAttribute *managementv3.UserAttribute) (runtime.Object, error) {
+func (h *userAttributeHandler) Sync(key string, userAttribute *managementv3.UserAttribute) (runtime.Object, error) {
 	if userAttribute == nil || userAttribute.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -40,6 +40,7 @@ func (h *UserAttributeHandler) Sync(key string, userAttribute *managementv3.User
 	if equal {
 		return nil, nil
 	}
+	clusterUserAttribute = clusterUserAttribute.DeepCopy()
 	clusterUserAttribute.Groups = groups
 	clusterUserAttribute.LastRefresh = userAttribute.LastRefresh
 	clusterUserAttribute.NeedsRefresh = userAttribute.NeedsRefresh
@@ -49,7 +50,7 @@ func (h *UserAttributeHandler) Sync(key string, userAttribute *managementv3.User
 }
 
 func compareUserAttributeClusterUserAttribute(userAttribute managementv3.UserAttribute, clusterUserAttribute clusterv3.ClusterUserAttribute) ([]string, bool) {
-	groups := []string{}
+	var groups []string
 	for _, gp := range userAttribute.GroupPrincipals {
 		for i := range gp.Items {
 			groups = append(groups, gp.Items[i].Name)
@@ -57,7 +58,7 @@ func compareUserAttributeClusterUserAttribute(userAttribute managementv3.UserAtt
 	}
 	sort.Strings(groups)
 
-	new := userAttributeCompare{
+	current := userAttributeCompare{
 		groups:       groups,
 		lastRefresh:  userAttribute.LastRefresh,
 		needsRefresh: userAttribute.NeedsRefresh,
@@ -67,5 +68,5 @@ func compareUserAttributeClusterUserAttribute(userAttribute managementv3.UserAtt
 		lastRefresh:  clusterUserAttribute.LastRefresh,
 		needsRefresh: clusterUserAttribute.NeedsRefresh,
 	}
-	return groups, reflect.DeepEqual(new, old)
+	return groups, reflect.DeepEqual(current, old)
 }

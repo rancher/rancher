@@ -3,15 +3,16 @@ package auth
 import (
 	"context"
 
+	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/types/config"
 )
 
-func RegisterEarly(ctx context.Context, management *config.ManagementContext) {
+func RegisterEarly(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	prtb, crtb := newRTBLifecycles(management)
 	gr := newGlobalRoleLifecycle(management)
 	grb := newGlobalRoleBindingLifecycle(management)
 	p, c := newPandCLifecycles(management)
-	u := newUserLifecycle(management)
+	u := newUserLifecycle(management, clusterManager)
 	n := newTokenController(management)
 	ua := newUserAttributeController(management)
 	s := newAuthSettingController(management)
