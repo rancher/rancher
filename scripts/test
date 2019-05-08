@@ -36,6 +36,6 @@ while ! curl -sf http://localhost:8080/ping; do
     sleep 2
 done
 
-cd tests
+cd tests/integration
 tox -- -m "not nonparallel" -n $(nproc)
 tox -- -m nonparallel
