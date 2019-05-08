@@ -92,9 +92,18 @@ func (s *ConfigSyncer) sync() error {
 		return nil
 	}
 
-	clusterLoggings, err := s.clusterLoggingLister.List("", labels.NewSelector())
+	allClusterLoggings, err := s.clusterLoggingLister.List("", labels.NewSelector())
 	if err != nil {
 		return errors.Wrapf(err, "List cluster loggings failed")
+	}
+
+	var clusterLoggings []*mgmtv3.ClusterLogging
+	for _, logging := range allClusterLoggings {
+		cp := logging.DeepCopy()
+		if err := s.passwordGetter.GetPasswordFromSecret(&cp.Spec.LoggingTargets); err != nil {
+			return errors.Wrap(err, "get password from secret failed")
+		}
+		clusterLoggings = append(clusterLoggings, cp)
 	}
 
 	allProjectLoggings, err := s.projectLoggingLister.List("", labels.NewSelector())
@@ -154,9 +163,6 @@ func (s *ConfigSyncer) syncClusterConfig(clusterLoggings []*mgmtv3.ClusterLoggin
 	var clusterLogging *mgmtv3.ClusterLogging
 	if len(clusterLoggings) != 0 {
 		clusterLogging = clusterLoggings[0]
-		if err := s.passwordGetter.GetPasswordFromSecret(&clusterLogging.Spec.LoggingTargets); err != nil {
-			return errors.Wrap(err, "get password from secret failed")
-		}
 	}
 
 	buf, err := s.configGenerator.GenerateClusterLoggingConfig(clusterLogging, systemProjectID, loggingconfig.DefaultCertDir)
