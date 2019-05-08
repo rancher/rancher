@@ -376,7 +376,10 @@ func (l *userLifecycle) deleteClusterUserAttributes(username string, tokens []*v
 	set := make(map[string]*v3.Cluster)
 	for _, token := range tokens {
 		cluster, err := l.clusterLister.Get("", token.ClusterName)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil {
+			if errors.IsNotFound(err) {
+				continue
+			}
 			return err
 		}
 		set[token.ClusterName] = cluster
