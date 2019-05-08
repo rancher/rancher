@@ -112,6 +112,8 @@ def test_cloud_credential_delete(admin_mc, remove_resource):
         clusterId="local")
     assert node_pool.nodeTemplateId == node_template.id
 
+    wait_for_node_template(client, node_template.id)
+
     # Attempting to delete the template should raise an ApiError
     with pytest.raises(ApiError) as e:
         client.delete(cloud_credential)
@@ -207,3 +209,18 @@ def string_to_encoding(input):
     m = hashlib.sha256()
     m.update(bytes(input, 'utf-8'))
     return base64.b32encode(m.digest())[:10].decode('utf-8')
+
+
+def wait_for_node_template(client, node_template_id, timeout=60):
+    start = time.time()
+    interval = 0.5
+    template = None
+    while template is None:
+        if time.time() - start > timeout:
+            raise Exception('Timeout waiting for node template lister')
+        time.sleep(interval)
+        interval *= 2
+        nodeTemplates = client.list_node_template()
+        for each_template in nodeTemplates:
+            if each_template["id"] == node_template_id:
+                template = each_template
