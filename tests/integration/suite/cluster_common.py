@@ -14,9 +14,9 @@ def generate_cluster_config(request, dind_rke_node_num):
     cluster_config_tmpl = get_rke_config_template()
     # generate nodes
     random_nodes = [
-            'node-' +
-            random_str()
-            for x in range(dind_rke_node_num)]
+        'node-' +
+        random_str()
+        for x in range(dind_rke_node_num)]
     rke_config_template = Template(cluster_config_tmpl)
     rendered_tmpl = rke_config_template.render(
         random_nodes=random_nodes)
@@ -90,16 +90,16 @@ def import_cluster(admin_mc, kube_config_file, cluster_name):
     client = admin_mc.client
 
     imported_cluster = client.create_cluster(
-                            replace=True,
-                            name=cluster_name,
-                            localClusterAuthEndpoint={
-                                'enabled': True,
-                            },
-                            rancherKubernetesEngineConfig={},
-                        )
+        replace=True,
+        name=cluster_name,
+        localClusterAuthEndpoint={
+            'enabled': True,
+        },
+        rancherKubernetesEngineConfig={},
+    )
     reg_token = client.create_cluster_registration_token(
-                    clusterId=imported_cluster.id
-                )
+        clusterId=imported_cluster.id
+    )
 
     # modify import command to add auth image
     match = r'\.yaml \|'
