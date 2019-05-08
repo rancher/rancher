@@ -114,8 +114,6 @@ func (c *controller) RKECapabilities(capabilities v3.Capabilities, rkeConfig v3.
 		capabilities.LoadBalancerCapabilities = c.L4Capability(true, ElasticLoadBalancer, []string{"TCP"}, true)
 	case azure.AzureCloudProviderName:
 		capabilities.LoadBalancerCapabilities = c.L4Capability(true, AzureL4LB, []string{"TCP", "UDP"}, true)
-	default:
-		capabilities.LoadBalancerCapabilities = c.L4Capability(false, "", []string{}, false)
 	}
 	// only if not custom, non custom clusters have nodepools set
 	nodes, err := c.nodeLister.List(clusterName, labels.Everything())
