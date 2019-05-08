@@ -22,9 +22,12 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/user/helm"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
+	"github.com/rancher/rancher/pkg/monitoring"
+	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/sirupsen/logrus"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -50,7 +53,21 @@ var (
 	}
 
 	dryRun bool
+
+	nsToRemove = []string{
+		"cattle-system",
+		"cattle-prometheus",
+		"cattle-logging",
+		"cattle-pipeline",
+	}
+
+	getNSFuncs = []getNSFunc{
+		getProjectMonitoringNamespaces,
+		getProjectPipelineNamespaces,
+	}
 )
+
+type getNSFunc func(*kubernetes.Clientset) ([]string, error)
 
 func Cluster() error {
 	if os.Getenv("DRY_RUN") == "true" {
@@ -76,10 +93,21 @@ func Cluster() error {
 	}
 
 	var errors []error
+	var toRemove []string
+	copy(toRemove, nsToRemove)
 
-	err = removeCattleNamespace(client)
-	if err != nil {
-		errors = append(errors, err)
+	for _, f := range getNSFuncs {
+		list, err := f(client)
+		if err != nil {
+			errors = append(errors, err)
+		}
+		toRemove = append(toRemove, list...)
+	}
+
+	for _, ns := range toRemove {
+		if err := removeNamespace(ns, client); err != nil {
+			errors = append(errors, err)
+		}
 	}
 
 	nsErr := cleanupNamespaces(client)
@@ -114,10 +142,10 @@ func Cluster() error {
 	return deleteJob(client)
 }
 
-func removeCattleNamespace(client *kubernetes.Clientset) error {
-	logrus.Info("Attempting to remove cattle-system namespace")
+func removeNamespace(namespace string, client *kubernetes.Clientset) error {
+	logrus.Infof("Attempting to remove %s namespace", namespace)
 	return tryUpdate(func() error {
-		ns, err := client.CoreV1().Namespaces().Get("cattle-system", metav1.GetOptions{})
+		ns, err := client.CoreV1().Namespaces().Get(namespace, metav1.GetOptions{})
 		if err != nil {
 			if apierror.IsNotFound(err) {
 				return nil
@@ -138,7 +166,7 @@ func removeCattleNamespace(client *kubernetes.Clientset) error {
 
 		logrus.Infof("Deleting namespace: %v", ns.Name)
 		if !dryRun {
-			err = client.CoreV1().Namespaces().Delete("cattle-system", &metav1.DeleteOptions{})
+			err = client.CoreV1().Namespaces().Delete(namespace, &metav1.DeleteOptions{})
 			if err != nil {
 				if !apierror.IsNotFound(err) {
 					return err
@@ -364,4 +392,39 @@ func processErrors(errs []error) error {
 		errorString += fmt.Sprintf("%s ", err)
 	}
 	return errors.New(errorString)
+}
+
+func getProjectPipelineNamespaces(client *kubernetes.Clientset) ([]string, error) {
+	var list []string
+	nsList, err := client.CoreV1().Namespaces().List(metav1.ListOptions{
+		LabelSelector: labels.Set(map[string]string{
+			utils.PipelineNamespaceLabel: "true",
+		}).AsSelector().String(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, ns := range nsList.Items {
+		list = append(list, ns.Name)
+	}
+	return list, nil
+}
+
+func getProjectMonitoringNamespaces(client *kubernetes.Clientset) ([]string, error) {
+	var list []string
+	nsList, err := client.CoreV1().Namespaces().List(metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	for _, ns := range nsList.Items {
+		value, ok := ns.Labels[nslabels.ProjectIDFieldLabel]
+		if !ok {
+			continue
+		}
+		if _, nsname := monitoring.ProjectMonitoringInfo(value); ns.Name != nsname {
+			continue
+		}
+		list = append(list, ns.Name)
+	}
+	return list, nil
 }
