@@ -124,7 +124,6 @@ func (c *Cluster) BuildKubeAPIProcess(host *hosts.Host, prefixPath string) v3.Pr
 		"LimitRanger",
 		"NamespaceLifecycle",
 		"NodeRestriction",
-		"PersistentVolumeLabel",
 		"ResourceQuota",
 		"ServiceAccount",
 	}
