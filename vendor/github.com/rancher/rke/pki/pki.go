@@ -53,7 +53,7 @@ func GenerateRKECerts(ctx context.Context, rkeConfig v3.RancherKubernetesEngineC
 		return certs, err
 	}
 	// Generating certificates for kubernetes components
-	if err := GenerateRKEServicesCerts(ctx, certs, rkeConfig, configPath, configDir, false, false); err != nil {
+	if err := GenerateRKEServicesCerts(ctx, certs, rkeConfig, configPath, configDir, false); err != nil {
 		return certs, err
 	}
 	return certs, nil
