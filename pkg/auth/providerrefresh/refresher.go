@@ -3,6 +3,7 @@ package providerrefresh
 import (
 	"context"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rancher/rancher/pkg/auth/providers"
@@ -39,6 +40,7 @@ func NewUserAuthRefresher(ctx context.Context, scaledContext *config.ScaledConte
 }
 
 type refresher struct {
+	sync.Mutex
 	tokenLister         v3.TokenLister
 	tokens              v3.TokenInterface
 	tokenMGR            *tokens.Manager
@@ -71,8 +73,9 @@ func (r *refresher) TriggerUserRefresh(userName string, force bool) {
 	} else {
 		logrus.Debugf("Triggering auth refresh on %v", userName)
 	}
-
+	r.Lock()
 	r.ensureMaxAgeUpToDate(settings.AuthUserInfoMaxAgeSeconds.Get())
+	r.Unlock()
 	if !force && (r.maxAge <= 0) {
 		logrus.Debugf("Skipping refresh trigger on user %v because max age setting is <= 0", userName)
 		return
