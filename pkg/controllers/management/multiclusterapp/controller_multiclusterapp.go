@@ -3,21 +3,20 @@ package multiclusterapp
 import (
 	"context"
 	"fmt"
-	"github.com/rancher/types/user"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
-
-	"github.com/rancher/rancher/pkg/ref"
-	"github.com/sirupsen/logrus"
-
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/user"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -99,7 +98,7 @@ func (m *MCAppManager) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Obje
 		return mcapp, err
 	}
 
-	changed, err := m.isChanged(mcapp)
+	changed, rolesBasedChange, err := m.isChanged(mcapp)
 	if err != nil {
 		return mcapp, err
 	}
@@ -113,13 +112,13 @@ func (m *MCAppManager) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Obje
 	}
 
 	batchSize := len(mcapp.Spec.Targets)
-	if toUpdate && mcapp.Spec.UpgradeStrategy.RollingUpdate != nil {
+	if toUpdate && mcapp.Spec.UpgradeStrategy.RollingUpdate != nil && !rolesBasedChange {
 		if mcapp.Spec.UpgradeStrategy.RollingUpdate.Interval != 0 {
 			batchSize = mcapp.Spec.UpgradeStrategy.RollingUpdate.BatchSize
 		}
 	}
 
-	resp, err := m.createApps(mcapp, externalID, answerMap, creatorID, batchSize, toUpdate)
+	resp, err := m.createApps(mcapp, externalID, answerMap, creatorID, batchSize, toUpdate, rolesBasedChange)
 	if err != nil {
 		return resp.object, err
 	}
@@ -142,6 +141,9 @@ func (m *MCAppManager) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Obje
 	}
 
 	for i, app := range resp.updateApps {
+		if rolesBasedChange {
+			pv3.AppConditionUserTriggeredAction.True(app)
+		}
 		if _, err := m.updateApp(app, answerMap, externalID, resp.projects[i]); err != nil {
 			return mcapp, err
 		}
@@ -149,6 +151,9 @@ func (m *MCAppManager) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Obje
 		if resp.remaining == 0 {
 			break
 		}
+	}
+	if rolesBasedChange {
+		return m.setRevisionAndUpdate(mcapp, creatorID)
 	}
 
 	setInstalledUnknown(mcapp)
@@ -169,7 +174,7 @@ type Response struct {
 }
 
 func (m *MCAppManager) createApps(mcapp *v3.MultiClusterApp, externalID string, answerMap map[string]map[string]string,
-	creatorID string, batchSize int, toUpdate bool) (*Response, error) {
+	creatorID string, batchSize int, toUpdate bool, rolesBasedChange bool) (*Response, error) {
 
 	var mcappToUpdate *v3.MultiClusterApp
 	var updateApps []*pv3.App
@@ -204,7 +209,7 @@ func (m *MCAppManager) createApps(mcapp *v3.MultiClusterApp, externalID string, 
 			}
 			appUpdated := false
 			if app.Spec.ExternalID == externalID {
-				if reflect.DeepEqual(app.Spec.Answers, getAnswerMap(answerMap, t.ProjectName)) {
+				if reflect.DeepEqual(app.Spec.Answers, getAnswerMap(answerMap, t.ProjectName)) && !rolesBasedChange {
 					appUpdated = true
 				}
 			}
@@ -305,6 +310,7 @@ func (m *MCAppManager) createRevision(mcapp *v3.MultiClusterApp, creatorID strin
 	revision.Answers = mcapp.Spec.Answers
 	revision.TemplateVersionName = mcapp.Spec.TemplateVersionName
 	revision.Namespace = namespace.GlobalNamespace
+	revision.Roles = mcapp.Spec.Roles
 	return m.multiClusterAppRevisions.Create(revision)
 }
 
@@ -318,8 +324,10 @@ func (m *MCAppManager) setRevisionAndUpdate(mcapp *v3.MultiClusterApp, creatorID
 		if err != nil {
 			return mcapp, err
 		}
+		sort.Strings(latestMcApp.Spec.Roles)
+		sort.Strings(currRevision.Roles)
 		if currRevision.TemplateVersionName == mcapp.Spec.TemplateVersionName &&
-			reflect.DeepEqual(currRevision.Answers, mcapp.Spec.Answers) {
+			reflect.DeepEqual(currRevision.Answers, mcapp.Spec.Answers) && reflect.DeepEqual(latestMcApp.Spec.Roles, currRevision.Roles) {
 			return mcapp, nil
 		}
 		mcapp = latestMcApp
@@ -333,21 +341,29 @@ func (m *MCAppManager) setRevisionAndUpdate(mcapp *v3.MultiClusterApp, creatorID
 	return m.updateCondition(mcapp, setInstalledDone)
 }
 
-func (m *MCAppManager) isChanged(mcapp *v3.MultiClusterApp) (bool, error) {
+func (m *MCAppManager) isChanged(mcapp *v3.MultiClusterApp) (bool, bool, error) {
 	if mcapp.Status.RevisionName == "" {
-		return false, nil
+		return false, false, nil
 	}
 	mcappRevision, err := m.multiClusterAppRevisionLister.Get(namespace.GlobalNamespace, mcapp.Status.RevisionName)
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 	if mcapp.Spec.TemplateVersionName != mcappRevision.TemplateVersionName {
-		return true, nil
+		return true, false, nil
 	}
 	if !reflect.DeepEqual(mcapp.Spec.Answers, mcappRevision.Answers) {
-		return true, nil
+		return true, false, nil
 	}
-	return false, nil
+	if len(mcapp.Spec.Roles) != len(mcappRevision.Roles) {
+		return true, true, nil
+	}
+	sort.Strings(mcapp.Spec.Roles)
+	sort.Strings(mcappRevision.Roles)
+	if !reflect.DeepEqual(mcapp.Spec.Roles, mcappRevision.Roles) {
+		return true, true, nil
+	}
+	return false, false, nil
 }
 
 func (m *MCAppManager) toUpdate(mcapp *v3.MultiClusterApp) (bool, error) {
