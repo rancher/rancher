@@ -16,7 +16,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/librke"
-	"github.com/rancher/rancher/pkg/rkecerts"
 	"github.com/rancher/rancher/pkg/rkeworker"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
@@ -38,14 +37,14 @@ var (
 
 type RKENodeConfigServer struct {
 	auth                 *tunnelserver.Authorizer
-	lookup               *rkecerts.BundleLookup
+	lookup               *BundleLookup
 	systemAccountManager *systemaccount.Manager
 }
 
 func Handler(auth *tunnelserver.Authorizer, scaledContext *config.ScaledContext) http.Handler {
 	return &RKENodeConfigServer{
 		auth:                 auth,
-		lookup:               rkecerts.NewLookup(scaledContext.Core.Namespaces(""), scaledContext.Core),
+		lookup:               NewLookup(scaledContext.Core.Namespaces(""), scaledContext.Core),
 		systemAccountManager: systemaccount.NewManagerFromScale(scaledContext),
 	}
 }
