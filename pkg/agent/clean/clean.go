@@ -1,3 +1,5 @@
+// +build !windows
+
 /*
 The cleanup is designed to get a cluster that was imported to Rancher disconnected
 and cleanup some objects
