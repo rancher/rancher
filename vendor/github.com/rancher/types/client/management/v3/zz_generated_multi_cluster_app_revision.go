@@ -14,6 +14,7 @@ const (
 	MultiClusterAppRevisionFieldName              = "name"
 	MultiClusterAppRevisionFieldOwnerReferences   = "ownerReferences"
 	MultiClusterAppRevisionFieldRemoved           = "removed"
+	MultiClusterAppRevisionFieldRoles             = "roles"
 	MultiClusterAppRevisionFieldTemplateVersionID = "templateVersionId"
 	MultiClusterAppRevisionFieldUUID              = "uuid"
 )
@@ -28,6 +29,7 @@ type MultiClusterAppRevision struct {
 	Name              string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences   []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed           string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Roles             []string          `json:"roles,omitempty" yaml:"roles,omitempty"`
 	TemplateVersionID string            `json:"templateVersionId,omitempty" yaml:"templateVersionId,omitempty"`
 	UUID              string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }

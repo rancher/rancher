@@ -4448,6 +4448,11 @@ func (in *MultiClusterAppRevision) DeepCopyInto(out *MultiClusterAppRevision) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.Roles != nil {
+		in, out := &in.Roles, &out.Roles
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

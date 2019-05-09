@@ -77,6 +77,7 @@ type MultiClusterAppRevision struct {
 
 	TemplateVersionName string   `json:"templateVersionName,omitempty" norman:"type=reference[templateVersion]"`
 	Answers             []Answer `json:"answers,omitempty"`
+	Roles               []string `json:"roles,omitempty" norman:"type=array[reference[roleTemplate]]"`
 }
 
 type MultiClusterAppRollbackInput struct {
