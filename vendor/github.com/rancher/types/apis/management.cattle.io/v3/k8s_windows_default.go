@@ -335,7 +335,7 @@ var (
 		"v1.14.1-rancher1-2": {
 			// NginxProxy image is replaced by host running nginx, fixed rancher#16074
 			KubernetesBinaries: m("rancher/hyperkube:v1.14.1-rancher2"),
-			FlannelCNIBinaries: m("rancher/flannel-cni:v0.3.0-rancher3"),
+			FlannelCNIBinaries: m("rancher/flannel-cni:v0.3.0-rancher4"),
 			KubeletPause:       m("rancher/kubelet-pause:v0.1.2"),
 		},
 	}
