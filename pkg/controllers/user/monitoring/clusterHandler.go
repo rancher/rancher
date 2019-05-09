@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -340,6 +341,7 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 			appAnswers["prometheus.secrets[0]"] = exporterEtcdCertName
 			appAnswers["exporter-kube-etcd.enabled"] = "true"
 			appAnswers["exporter-kube-etcd.ports.metrics.port"] = "2379"
+			sort.Strings(etcdEndpoints)
 			for k, v := range etcdEndpoints {
 				key := fmt.Sprintf("exporter-kube-etcd.endpoints[%d]", k)
 				appAnswers[key] = v
@@ -354,6 +356,7 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 		if controlplaneEndpoints, ok := systemComponentMap[controlplane]; ok {
 			appAnswers["exporter-kube-scheduler.enabled"] = "true"
 			appAnswers["exporter-kube-controller-manager.enabled"] = "true"
+			sort.Strings(controlplaneEndpoints)
 			for k, v := range controlplaneEndpoints {
 				key1 := fmt.Sprintf("exporter-kube-scheduler.endpoints[%d]", k)
 				key2 := fmt.Sprintf("exporter-kube-controller-manager.endpoints[%d]", k)
