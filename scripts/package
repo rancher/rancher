@@ -37,5 +37,5 @@ echo Built ${IMAGE} #${AGENT_IMAGE}
 echo
 
 cd ../bin
-mkdir -p /tmp/system-charts && git clone --branch master https://github.com/rancher/system-charts /tmp/system-charts
+mkdir -p /tmp/system-charts && git clone --branch dev https://github.com/rancher/system-charts /tmp/system-charts
 TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go /tmp/system-charts $IMAGE $AGENT_IMAGE
