@@ -333,6 +333,46 @@ def test_remove_projects(admin_mc, admin_pc, admin_cc, remove_resource):
              fail_handler=projects_fail_handler)
 
 
+def test_app_upgrade_mcapp_roles_change(admin_mc, admin_pc,
+                                        remove_resource):
+    client = admin_mc.client
+    mcapp_name = random_str()
+    temp_ver = "cattle-global-data:library-grafana-0.0.31"
+    targets = [{"projectId": admin_pc.project.id}]
+    roles = ["project-member"]
+    mcapp1 = client.create_multi_cluster_app(name=mcapp_name,
+                                             templateVersionId=temp_ver,
+                                             targets=targets,
+                                             roles=roles)
+    remove_resource(mcapp1)
+    wait_for_app(admin_pc, mcapp_name, 60)
+    # changing roles should trigger app upgrade
+    roles = ["cluster-owner"]
+    client.update(mcapp1, roles=roles)
+    wait_for_app_condition(admin_pc, mcapp_name, 'UserTriggeredAction', 60)
+
+
+def wait_for_app_condition(admin_pc, name, condition, timeout=60):
+    start = time.time()
+    interval = 0.5
+    client = admin_pc.client
+    cluster_id, project_id = admin_pc.project.id.split(':')
+    app_name = name+"-"+project_id
+    found = False
+    while not found:
+        if time.time() - start > timeout:
+            raise Exception('Timeout waiting for app of multiclusterapp')
+        apps = client.list_app(name=app_name)
+        if len(apps) > 0:
+            conditions = apps['data'][0]['conditions']
+            for c in conditions:
+                if c['type'] == condition and\
+                        c['status'] == 'True':
+                    found = True
+        time.sleep(interval)
+        interval *= 2
+
+
 def wait_for_app(admin_pc, name, timeout=60):
     start = time.time()
     interval = 0.5
