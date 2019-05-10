@@ -56,10 +56,6 @@ func (s *factory) get(req *http.Request) (*v3.Cluster, http.Handler, error) {
 	s.serverLock.Lock("cluster." + clusterID)
 	defer s.serverLock.Unlock("cluster." + clusterID)
 
-	if newCluster, handler := s.lookupCluster(clusterID); newCluster != nil {
-		return newCluster, handler, nil
-	}
-
 	var srv interface{}
 	srv, err = s.newServer(cluster)
 	if err != nil || srv == nil {
