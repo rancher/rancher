@@ -1136,19 +1136,17 @@ def wait_for_mcapp_to_active(client, multiClusterApp,
 
 def wait_for_app_to_active(client, app_id,
                            timeout=DEFAULT_MULTI_CLUSTER_APP_TIMEOUT):
-    app_data = client.list_app(name=app_id).data
     start = time.time()
-    assert len(app_data) == 1, "Cannot find app"
-    application = app_data[0]
-    while application.state != "active":
+    while True:
+        app_data = client.list_app(name=app_id).data
+        if len(app_data) == 1:
+            application = app_data[0]
+            if application.state == "active":
+                return application
         if time.time() - start > timeout:
             raise AssertionError(
                 "Timed out waiting for state to get to active")
         time.sleep(.5)
-        app = client.list_app(name=app_id).data
-        assert len(app) == 1
-        application = app[0]
-    return application
 
 
 def validate_response_app_endpoint(p_client, appId):
