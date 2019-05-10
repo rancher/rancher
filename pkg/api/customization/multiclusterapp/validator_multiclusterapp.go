@@ -14,14 +14,17 @@ import (
 	"github.com/rancher/norman/types/set"
 	"github.com/rancher/norman/types/values"
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
-
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
+	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/client/management/v3"
 	"github.com/sirupsen/logrus"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 type Wrapper struct {
@@ -38,6 +41,7 @@ type Wrapper struct {
 	Crtbs                         v3.ClusterRoleTemplateBindingInterface
 	ProjectLister                 v3.ProjectLister
 	ClusterLister                 v3.ClusterLister
+	Apps                          pv3.AppInterface
 }
 
 const (
@@ -167,6 +171,33 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 	}
 	if err = ma.EnsureRoleInTargets(targetProjects, rolesToAdd, callerID); err != nil {
 		return err
+	}
+	// at this point we know the roles have changed, and that the user has the new roles in targets,
+	// retry underlying app upgrade
+	for _, t := range mcapp.Spec.Targets {
+		_, projectNS := ref.Parse(t.ProjectName)
+		if t.AppName != "" {
+			err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+				app, err := w.Apps.GetNamespaced(projectNS, t.AppName, v1.GetOptions{})
+				if err != nil || app == nil {
+					return false, fmt.Errorf("error %v getting app %s in %s", err, t.AppName, projectNS)
+				}
+				if val, ok := app.Labels["mcapp"]; !ok || val != mcapp.Name {
+					return false, fmt.Errorf("app %s in %s missing multi cluster app label", t.AppName, projectNS)
+				}
+				pv3.AppConditionUserTriggeredAction.True(app)
+				if _, err := w.Apps.Update(app); err != nil {
+					if apierrors.IsConflict(err) {
+						return false, nil
+					}
+					return false, err
+				}
+				return true, nil
+			})
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return ma.RemoveRolesFromTargets(targetProjects, rolesToRemove, mcapp.Name, false)
 }
