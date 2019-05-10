@@ -4,19 +4,18 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
+	hCommon "github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/rancher/pkg/ref"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
@@ -143,11 +142,11 @@ func (l *Lifecycle) Updated(obj *v3.App) (*v3.App, error) {
 func (l *Lifecycle) DeployApp(obj *v3.App) (*v3.App, error) {
 	newObj, err := v3.AppConditionInstalled.Do(obj, func() (runtime.Object, error) {
 		template, notes, tempDir, err := generateTemplates(obj, l.TemplateVersionClient, l.TemplateContentClient)
-		defer os.RemoveAll(tempDir)
 		if err != nil {
 			return obj, err
 		}
-		if err := l.Run(obj, template, tempDir, notes); err != nil {
+		defer os.RemoveAll(tempDir.FullPath)
+		if err := l.Run(obj, template, notes, tempDir); err != nil {
 			return obj, err
 		}
 		return obj, nil
@@ -169,19 +168,19 @@ func (l *Lifecycle) Remove(obj *v3.App) (*v3.App, error) {
 			return obj, err
 		}
 	}
-	tempDir, err := ioutil.TempDir("", "helm-")
+	tempDirs, err := createTempDir(obj)
 	if err != nil {
 		return obj, err
 	}
-	defer os.RemoveAll(tempDir)
-	kubeConfigPath, err := l.writeKubeConfig(obj, tempDir)
+	defer os.RemoveAll(tempDirs.FullPath)
+	err = l.writeKubeConfig(obj, tempDirs.KubeConfigFull)
 	if err != nil {
 		return obj, err
 	}
 	// try three times and succeed
 	start := time.Second * 1
 	for i := 0; i < 3; i++ {
-		if err := helmDelete(kubeConfigPath, obj); err == nil {
+		if err := helmDelete(tempDirs, obj); err == nil {
 			break
 		}
 		logrus.Error(err)
@@ -214,17 +213,12 @@ func (l *Lifecycle) Remove(obj *v3.App) (*v3.App, error) {
 	return obj, nil
 }
 
-func (l *Lifecycle) Run(obj *v3.App, template, templateDir, notes string) error {
-	tempDir, err := ioutil.TempDir("", "kubeconfig-")
+func (l *Lifecycle) Run(obj *v3.App, template, notes string, tempDirs *hCommon.HelmPath) error {
+	err := l.writeKubeConfig(obj, tempDirs.KubeConfigFull)
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(tempDir)
-	kubeConfigPath, err := l.writeKubeConfig(obj, tempDir)
-	if err != nil {
-		return err
-	}
-	if err := helmInstall(templateDir, kubeConfigPath, obj); err != nil {
+	if err := helmInstall(tempDirs, obj); err != nil {
 		return err
 	}
 	return l.createAppRevision(obj, template, notes, false)
@@ -270,27 +264,21 @@ func (l *Lifecycle) createAppRevision(obj *v3.App, template, notes string, faile
 	return err
 }
 
-func (l *Lifecycle) writeKubeConfig(obj *v3.App, tempDir string) (string, error) {
+func (l *Lifecycle) writeKubeConfig(obj *v3.App, kubePath string) error {
 	userID := obj.Annotations["field.cattle.io/creatorId"]
 	user, err := l.UserClient.Get(userID, metav1.GetOptions{})
 	if err != nil {
-		return "", err
+		return err
 	}
 	token, err := l.UserManager.EnsureToken(helmTokenPrefix+user.Name, description, user.Name)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	kubeConfig := l.KubeConfigGetter.KubeConfig(l.ClusterName, token)
 	for k := range kubeConfig.Clusters {
 		kubeConfig.Clusters[k].InsecureSkipTLSVerify = true
 	}
-	if err := os.MkdirAll(filepath.Join(tempDir, obj.Namespace), 0755); err != nil {
-		return "", err
-	}
-	kubeConfigPath := filepath.Join(tempDir, obj.Namespace, ".kubeconfig")
-	if err := clientcmd.WriteToFile(*kubeConfig, kubeConfigPath); err != nil {
-		return "", err
-	}
-	return kubeConfigPath, nil
+
+	return clientcmd.WriteToFile(*kubeConfig, kubePath)
 }

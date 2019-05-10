@@ -9,8 +9,9 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/encryptedstore"
-	"github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/jailer"
+	v1 "github.com/rancher/types/apis/core/v1"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
@@ -22,10 +23,11 @@ const (
 )
 
 type NodeConfig struct {
-	store   *encryptedstore.GenericEncryptedStore
-	baseDir string
-	id      string
-	cm      map[string]string
+	store           *encryptedstore.GenericEncryptedStore
+	fullMachinePath string
+	jailDir         string
+	id              string
+	cm              map[string]string
 }
 
 func NewStore(namespaceInterface v1.NamespaceInterface, secretsGetter v1.SecretsGetter) (*encryptedstore.GenericEncryptedStore, error) {
@@ -33,16 +35,17 @@ func NewStore(namespaceInterface v1.NamespaceInterface, secretsGetter v1.Secrets
 }
 
 func NewNodeConfig(store *encryptedstore.GenericEncryptedStore, node *v3.Node) (*NodeConfig, error) {
-	nodeDir, err := buildBaseHostDir(node.Spec.RequestedHostname)
+	jailDir, fullMachinePath, err := buildBaseHostDir(node.Spec.RequestedHostname, node.Namespace)
 	if err != nil {
 		return nil, err
 	}
-	logrus.Debugf("Created node storage directory %s", nodeDir)
+	logrus.Debugf("Created node storage directory %s", fullMachinePath)
 
 	return &NodeConfig{
-		store:   store,
-		id:      node.Name,
-		baseDir: nodeDir,
+		store:           store,
+		id:              node.Name,
+		fullMachinePath: fullMachinePath,
+		jailDir:         jailDir,
 	}, nil
 }
 
@@ -77,11 +80,15 @@ func (m *NodeConfig) SSHUser() (string, error) {
 }
 
 func (m *NodeConfig) Dir() string {
-	return m.baseDir
+	return m.jailDir
+}
+
+func (m *NodeConfig) FullDir() string {
+	return m.fullMachinePath
 }
 
 func (m *NodeConfig) Cleanup() error {
-	return os.RemoveAll(m.baseDir)
+	return os.RemoveAll(m.fullMachinePath)
 }
 
 func (m *NodeConfig) Remove() error {
@@ -115,7 +122,7 @@ func (m *NodeConfig) InternalIP() (string, error) {
 }
 
 func (m *NodeConfig) Save() error {
-	extractedConfig, err := compressConfig(m.baseDir)
+	extractedConfig, err := compressConfig(m.fullMachinePath)
 	if err != nil {
 		return err
 	}
@@ -148,7 +155,7 @@ func (m *NodeConfig) Restore() error {
 		return nil
 	}
 
-	return extractConfig(m.baseDir, data)
+	return extractConfig(m.fullMachinePath, data)
 }
 
 func (m *NodeConfig) loadConfig() error {
@@ -194,18 +201,18 @@ func (m *NodeConfig) getConfig() (map[string]interface{}, error) {
 	return extractConfigJSON(data)
 }
 
-func buildBaseHostDir(nodeName string) (string, error) {
-	nodeDir := filepath.Join(getWorkDir(), "nodes", nodeName)
-	return nodeDir, os.MkdirAll(nodeDir, 0740)
-}
+func buildBaseHostDir(nodeName string, clusterID string) (string, string, error) {
+	var fullMachinePath string
+	var jailDir string
 
-func getWorkDir() string {
-	workDir := os.Getenv("MACHINE_WORK_DIR")
-	if workDir == "" {
-		workDir = os.Getenv("CATTLE_HOME")
+	suffix := filepath.Join("node", "nodes", nodeName)
+	if dm := os.Getenv("CATTLE_DEV_MODE"); dm != "" {
+		fullMachinePath = filepath.Join(defaultCattleHome, suffix)
+		jailDir = fullMachinePath
+	} else {
+		fullMachinePath = filepath.Join(jailer.BaseJailPath, clusterID, "management-state", suffix)
+		jailDir = filepath.Join("/management-state", suffix)
 	}
-	if workDir == "" {
-		workDir = defaultCattleHome
-	}
-	return filepath.Join(workDir, "node")
+
+	return jailDir, fullMachinePath, os.MkdirAll(fullMachinePath, 0740)
 }
