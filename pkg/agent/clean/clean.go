@@ -95,7 +95,7 @@ func Cluster() error {
 	}
 
 	var errors []error
-	var toRemove []string
+	var toRemove = make([]string, len(nsToRemove))
 	copy(toRemove, nsToRemove)
 
 	for _, f := range getNSFuncs {
