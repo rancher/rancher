@@ -175,7 +175,7 @@ func addData(management *config.ManagementContext, cfg Config) error {
 		return err
 	}
 
-	if err := addCatalogs(management); err != nil {
+	if err := syncCatalogs(management); err != nil {
 		return err
 	}
 
