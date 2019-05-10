@@ -643,6 +643,7 @@ func MultiClusterApps(schemas *types.Schemas, management *config.ScaledContext) 
 		Crtbs:                         management.Management.ClusterRoleTemplateBindings(""),
 		ProjectLister:                 management.Management.Projects("").Controller().Lister(),
 		ClusterLister:                 management.Management.Clusters("").Controller().Lister(),
+		Apps:                          management.Project.Apps(""),
 	}
 	schema.Formatter = wrapper.Formatter
 	schema.ActionHandler = wrapper.ActionHandler
