@@ -14,7 +14,7 @@ const (
 	libraryName   = "library"
 
 	systemLibraryURL    = "https://git.rancher.io/system-charts"
-	systemLibraryBranch = "master"
+	systemLibraryBranch = "v2.3-preview1"
 	systemLibraryName   = "system-library"
 )
 
