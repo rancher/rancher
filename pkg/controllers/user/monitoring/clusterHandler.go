@@ -348,6 +348,9 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 			}
 
 			if etcdTLSConfig != nil {
+				sort.Slice(etcdTLSConfig, func(i, j int) bool {
+					return etcdTLSConfig[i].internalAddress < etcdTLSConfig[j].internalAddress
+				})
 				appAnswers["exporter-kube-etcd.certFile"] = etcdTLSConfig[0].certPath
 				appAnswers["exporter-kube-etcd.keyFile"] = etcdTLSConfig[0].keyPath
 			}
