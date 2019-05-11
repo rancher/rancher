@@ -131,6 +131,7 @@ function repair-cloud-routes {
     switch ($KubeletCloudProviderName) {
         "aws" { add-routes -IPAddrs  @("169.254.169.254/32", "169.254.169.250/32", "169.254.169.251/32") }
         "azure" { add-routes -IPAddrs  @("169.254.169.254/32") }
+        "gce" { add-routes -IPAddrs  @("169.254.169.254/32") }
     }
 }
 
@@ -209,27 +210,24 @@ function get-hyperv-vswitch {
     $na = $null
     $ip = $null
 
-    if ($NodeIP -or $NodePublicIP)  {
-        foreach ($nai in Get-NetAdapter) {
-            try {
-                $na = $nai
-                $ip = ($na | Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Ignore).IPAddress
-                if (($ip -eq $NodeIP) -or ($ip -eq $NodePublicIP)) {
-                    break
-                }
-            } catch {}
-        }
+    if ($NodeIP)  {
+        $ip = $NodeIP
+    } elseif ($NodePublicIP) {
+        $ip = $NodePublicIP
+    }
+    if ($ip) {
+        $na = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Ignore | ? IPv4Address -eq $ip | Get-NetAdapter | ? Status -eq Up
     }
 
     if (-not $na) {
-        $na = Get-NetAdapter | ? Name -like "vEthernet (Ethernet*"
+        $na = Get-NetAdapter | ? Status -eq Up | ? Name -like "vEthernet (Ethernet*"
         if (-not $na) {
             throw "Failed to find a suitable Hyper-V vSwitch network adapter, check your network settings"
         }
-        $ip = (Get-NetIPAddress -InterfaceIndex $na.ifIndex -AddressFamily IPv4).IPAddress
+        $ip = (Get-NetIPAddress -AddressFamily IPv4 -InterfaceIndex $na.ifIndex -ErrorAction Ignore).IPv4Address
     }
 
-    $subnetMask = (Get-WmiObject Win32_NetworkAdapterConfiguration | ? InterfaceIndex -eq $($na.InterfaceIndex)).IPSubnet[0]
+    $subnetMask = (Get-WmiObject Win32_NetworkAdapterConfiguration | ? InterfaceIndex -eq $($na.ifIndex)).IPSubnet[0]
     $subnet = (convert-to-decimal-ip $ip) -band (convert-to-decimal-ip $subnetMask)
     $subnet = convert-to-dotted-ip $subnet
     $subnetCIDR = "$subnet/$(convert-to-mask-length $subnetMask)"
@@ -933,9 +931,22 @@ function init {
         }
     } elseif ($KubeletCloudProviderName -eq "aws") {
         repair-cloud-routes
+
         ## using private DNS name
         $NodeName = scrape-text -Uri "http://169.254.169.254/latest/meta-data/hostname"
+    } elseif ($KubeletCloudProviderName -eq "gce") {
+        repair-cloud-routes
+
+        ## using instance name
+        $hostname = scrape-text -Headers @{"Metadata-Flavor"="Google"} -Uri "http://169.254.169.254/computeMetadata/v1/instance/hostname?alt=json"
+        try {
+            $splited = $hostname -split "\."
+            if ($splited.Length -lt 1) {
+                $NodeName = $splited[0]
+            }
+        } catch {}
     }
+
     set-env-var -Key "NODE_NAME" -Value $NodeName
 }
 
