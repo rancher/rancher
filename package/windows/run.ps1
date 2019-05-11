@@ -75,8 +75,8 @@ function get-address {
         "dopublic" { return (scrape-text -Uri "http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address") }
         "azprivate" { return (scrape-text -Headers @{"Metadata"="true"} -Uri "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress?api-version=2017-08-01&format=text") }
         "azpublic" { return (scrape-text -Headers @{"Metadata"="true"} -Uri "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2017-08-01&format=text") }
-        "gceinternal" { return (scrape-text -Headers @{"Metadata-Flavor"="Google"} -Uri "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip") }
-        "gceexternal" { return (scrape-text -Headers @{"Metadata-Flavor"="Google"} -Uri "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip") }
+        "gceinternal" { return (scrape-text -Headers @{"Metadata-Flavor"="Google"} -Uri "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip?alt=json") }
+        "gceexternal" { return (scrape-text -Headers @{"Metadata-Flavor"="Google"} -Uri "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip?alt=json") }
         "packetlocal" { return (scrape-text -Uri "https://metadata.packet.net/2009-04-04/meta-data/local-ipv4") }
         "packetpublic" { return (scrape-text -Uri "https://metadata.packet.net/2009-04-04/meta-data/public-ipv4") }
         "ipify" { return (scrape-text -Uri "https://api.ipify.org") }
