@@ -511,7 +511,7 @@ stream {
     $servers = ""
     $tempConfig = New-TemporaryFile
 
-    $CPHosts -split "," | % {
+    $CPHosts -split ";" | % {
         $servers += ("server $_" + ":6443;`t")
     }
     $newConfig = $tmpl.Replace("{0}", $servers).ToString()
