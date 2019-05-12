@@ -70,7 +70,7 @@ func formatData(id string, data map[string]interface{}, forFrontend bool) {
 
 	updateCerts(data, forFrontend, oldState, newState)
 	setState(data, newState)
-	workload.SetPublicEnpointsFields(data)
+	workload.SetPublicEndpointsFields(data)
 }
 
 func updateDataRules(data map[string]interface{}) {
