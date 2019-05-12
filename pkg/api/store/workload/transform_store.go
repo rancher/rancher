@@ -38,7 +38,7 @@ func NewTransformStore(store types.Store) types.Store {
 			if typeName != "" && id != "" {
 				data["id"] = strings.ToLower(typeName) + ":" + id
 			}
-			SetPublicEnpointsFields(data)
+			SetPublicEndpointsFields(data)
 			nodeName := convert.ToString(values.GetValueN(data, "nodeId"))
 			if nodeName != "" {
 				state := getState(data)
@@ -52,7 +52,7 @@ func NewTransformStore(store types.Store) types.Store {
 	}
 }
 
-func SetPublicEnpointsFields(data map[string]interface{}) {
+func SetPublicEndpointsFields(data map[string]interface{}) {
 	if val, ok := data["publicEndpoints"]; ok {
 		eps := convert.ToInterfaceSlice(val)
 		for _, ep := range eps {
