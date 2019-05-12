@@ -25,7 +25,7 @@ func SetupStore(schema *types.Schema) {
 			Store: schema.Store,
 		},
 		Transformer: func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
-			workload.SetPublicEnpointsFields(data)
+			workload.SetPublicEndpointsFields(data)
 			setState(data)
 			return data, nil
 		},
