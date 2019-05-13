@@ -48,6 +48,7 @@ spec:
 {{- end }}
       containers:
       - image: {{ .Values.rancherImage }}:{{ default .Chart.AppVersion .Values.rancherImageTag }}
+        imagePullPolicy: {{ default "IfNotPresent" .Values.rancherImagePullPolicy }}
         name: {{ template "rancher.name" . }}
         ports:
         - containerPort: 80
@@ -163,4 +164,3 @@ spec:
         emptyDir: {}
   {{- end }}
 {{- end }}
-
