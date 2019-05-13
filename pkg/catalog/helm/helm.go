@@ -47,6 +47,7 @@ type Helm struct {
 	IconPath    string
 	catalogName string
 	Hash        string
+	Kind        string
 	url         string
 	branch      string
 	username    string
