@@ -42,12 +42,6 @@ $null = New-Item -Force -Type Directory -Path $CNIDir -ErrorAction Ignore
 $null = New-Item -Force -Type Directory -Path $NginxConfigDir -ErrorAction Ignore
 $null = New-Item -Force -Type Directory -Path $LogDir -ErrorAction Ignore
 
-if (-not $NodeName) {
-    $NodeName = hostname
-}
-$NodeName = $NodeName.ToLower()
-$KubeCNIMode = $KubeCNIMode.ToLower()
-
 Import-Module "$RancherDir\hns.psm1" -Force
 
 function print {
@@ -459,12 +453,14 @@ function config-azure-cloudprovider {
 }
 
 function print-system-info {
+    $nn = get-env-var -Key "NODE_NAME"
+
     print  "******"
     print ("*****       CNI - Component: {0}, Mode: {1}" -f $KubeCNIComponent, $KubeCNIMode)
     if ($NodeIP) {
-        print ("****       Node - Name: {0}, IP: {1}, InternalIP: {2}" -f $NodeName, $NodePublicIP, $NodeIP)
+        print ("****       Node - Name: {0}, IP: {1}, InternalIP: {2}" -f $nn, $NodePublicIP, $NodeIP)
     } else {
-        print ("****       Node - Name: {0}, IP: {1}" -f $NodeName, $NodePublicIP)
+        print ("****       Node - Name: {0}, IP: {1}" -f $nn, $NodePublicIP)
     }
     print ("***     Cluster - CIDR: {0}, Domain: {1}, ServiceCIDR: {2}, DnsServiceIP: {3}" -f $KubeClusterCIDR, $KubeClusterDomain, $KubeServiceCIDR, $KubeDnsServiceIP)
     print ("** ControlPlane - Host: {0}" -f $KubeControlPlaneAddresses)
@@ -755,9 +751,11 @@ function start-kubelet {
     }
 
     ## config running params ##
+    $nn = get-env-var -Key "NODE_NAME"
     $fgRun = get-env-var -Key "CATTLE_AGENT_FG_RUN"
     $kubeletArgs = merge-argument-list @(
         @(
+            "`"--hostname-override=$nn`""
             "`"--network-plugin=cni`""
             "`"--cni-bin-dir=$CNIDir\bin`""
             "`"--cni-conf-dir=$CNIDir\conf`""
@@ -832,8 +830,10 @@ function start-kube-proxy {
     wait-ready -Path "$KubeDir\bin\kube-proxy.exe"
 
     ## config running params ##
+    $nn = get-env-var -Key "NODE_NAME"
     $fgRun = get-env-var -Key "CATTLE_AGENT_FG_RUN"
     $cniModeArgs = @(
+        "`"--hostname-override=$nn`""
         "`"--cluster-cidr=$KubeClusterCIDR`""
         "`"--logtostderr=$fgRun`""
         "`"--alsologtostderr=true`""
@@ -905,6 +905,7 @@ function init {
     }
 
     # cloud provider #
+    $nn = $NodeName
     if ($KubeletCloudProviderName -eq "azure") {
         ## verify az cli is installed or not
         $azBinPath = "C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\wbin\az.cmd"
@@ -933,7 +934,7 @@ function init {
         repair-cloud-routes
 
         ## using private DNS name
-        $NodeName = scrape-text -Uri "http://169.254.169.254/latest/meta-data/hostname"
+        $nn = scrape-text -Uri "http://169.254.169.254/latest/meta-data/hostname"
     } elseif ($KubeletCloudProviderName -eq "gce") {
         repair-cloud-routes
 
@@ -947,7 +948,7 @@ function init {
         } catch {}
     }
 
-    set-env-var -Key "NODE_NAME" -Value $NodeName
+    set-env-var -Key "NODE_NAME" -Value $nn.ToLower()
 }
 
 function main {
