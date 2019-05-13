@@ -15,6 +15,7 @@ import (
 	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -58,7 +59,12 @@ func helmInstall(templateDir, kubeconfigPath string, app *v3.App) error {
 	defer cancel()
 	addr := common.GenerateRandomPort()
 	probeAddr := common.GenerateRandomPort()
-	go common.StartTiller(cont, addr, probeAddr, app.Spec.TargetNamespace, kubeconfigPath)
+	go func() {
+		err := common.StartTiller(cont, addr, probeAddr, app.Spec.TargetNamespace, kubeconfigPath)
+		if err != nil {
+			logrus.Errorf("got error while stopping tiller, error message: %s", err.Error())
+		}
+	}()
 	return common.InstallCharts(templateDir, addr, app)
 }
 
@@ -67,7 +73,12 @@ func helmDelete(kubeconfigPath string, app *v3.App) error {
 	defer cancel()
 	addr := common.GenerateRandomPort()
 	probeAddr := common.GenerateRandomPort()
-	go common.StartTiller(cont, addr, probeAddr, app.Spec.TargetNamespace, kubeconfigPath)
+	go func() {
+		err := common.StartTiller(cont, addr, probeAddr, app.Spec.TargetNamespace, kubeconfigPath)
+		if err != nil {
+			logrus.Errorf("got error while stopping tiller, error message: %s", err.Error())
+		}
+	}()
 	return common.DeleteCharts(addr, app)
 }
 
