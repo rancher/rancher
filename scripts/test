@@ -26,6 +26,7 @@ echo Running tests
 rm -rf build/testdata
 mkdir -p build/testdata
 cd build/testdata
+export CATTLE_DEV_MODE=yes
 KUBECONFIG= ../../$CMD --add-local=true &
 PID=$!
 trap cleanup exit
