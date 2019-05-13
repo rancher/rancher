@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/rancher/pkg/jailer"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -58,7 +59,12 @@ func helmInstall(tempDirs *common.HelmPath, app *v3.App) error {
 	cont, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	addr := common.GenerateRandomPort()
-	go common.StartTiller(cont, tempDirs, addr, app.Spec.TargetNamespace)
+	go func() {
+		err := common.StartTiller(cont, tempDirs, addr, app.Spec.TargetNamespace)
+		if err != nil {
+			logrus.Errorf("got error while stopping tiller, error message: %s", err.Error())
+		}
+	}()
 	return common.InstallCharts(tempDirs, addr, app)
 }
 
@@ -66,7 +72,12 @@ func helmDelete(tempDirs *common.HelmPath, app *v3.App) error {
 	cont, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	addr := common.GenerateRandomPort()
-	go common.StartTiller(cont, tempDirs, addr, app.Spec.TargetNamespace)
+	go func() {
+		err := common.StartTiller(cont, tempDirs, addr, app.Spec.TargetNamespace)
+		if err != nil {
+			logrus.Errorf("got error while stopping tiller, error message: %s", err.Error())
+		}
+	}()
 	return common.DeleteCharts(tempDirs, addr, app)
 }
 
