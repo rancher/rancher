@@ -44,6 +44,11 @@ tests:
         value: NAMESPACE
       - name: CATTLE_PEER_SERVICE
         value: RELEASE-NAME-rancher
+- it: should default imagePullPolicy to IfNotPresent
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[0].imagePullPolicy
+      value: IfNotPresent
 - it: should set busybox image as busybox
   set:
     auditLog:
