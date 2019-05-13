@@ -49,6 +49,13 @@ tests:
   - equal:
       path: spec.template.spec.containers[0].imagePullPolicy
       value: IfNotPresent
+- it: should override imagePullPolicy to Always
+  set:
+    rancherImagePullPolicy: Always
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[0].imagePullPolicy
+      value: Always
 - it: should set busybox image as busybox
   set:
     auditLog:
