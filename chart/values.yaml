@@ -82,6 +82,7 @@ rancherImage: rancher/rancher
 # rancherImageTag: v2.0.7
 
 # Override imagePullPolicy for rancher server images
+# options: Always, Never, IfNotPresent
 # Defaults to IfNotPresent
 # rancherImagePullPolicy: <pullPolicy>
 
