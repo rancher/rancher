@@ -15,9 +15,10 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
+	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/templatecontent"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -30,23 +31,25 @@ const (
 	kcEnv       = "KUBECONFIG"
 )
 
-func WriteTempDir(rootDir string, files map[string]string) (string, error) {
+func WriteTempDir(tempDirs *common.HelmPath, files map[string]string) error {
 	for name, content := range files {
-		fp := filepath.Join(rootDir, name)
+		fp := filepath.Join(tempDirs.FullPath, name)
 		if err := os.MkdirAll(filepath.Dir(fp), 0755); err != nil {
-			return "", err
+			return err
 		}
 		if err := ioutil.WriteFile(fp, []byte(content), 0755); err != nil {
-			return "", err
+			return err
 		}
 	}
 	for name := range files {
 		parts := strings.Split(name, "/")
 		if len(parts) > 0 {
-			return filepath.Join(rootDir, parts[0]), nil
+			tempDirs.AppDirFull = filepath.Join(tempDirs.FullPath, parts[0])
+			tempDirs.AppDirInJail = filepath.Join(tempDirs.InJailPath, parts[0])
+			return nil
 		}
 	}
-	return "", nil
+	return nil
 }
 
 func kubectlApply(template, kubeconfig string, app *v3.App) error {
@@ -145,38 +148,38 @@ func convertTemplates(files map[string]string, templateContentClient mgmtv3.Temp
 	return templates, nil
 }
 
-func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersionInterface, templateContentClient mgmtv3.TemplateContentInterface) (string, string, error) {
+func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersionInterface, templateContentClient mgmtv3.TemplateContentInterface) (string, string, *common.HelmPath, error) {
 	files := map[string]string{}
 	if obj.Spec.ExternalID != "" {
 		templateVersionID, err := common.ParseExternalID(obj.Spec.ExternalID)
 		if err != nil {
-			return "", "", err
+			return "", "", nil, err
 		}
 		templateVersion, err := templateVersionClient.Get(templateVersionID, metav1.GetOptions{})
 		if err != nil {
-			return "", "", err
+			return "", "", nil, err
 		}
 		files, err = convertTemplates(templateVersion.Spec.Files, templateContentClient)
 		if err != nil {
-			return "", "", err
+			return "", "", nil, err
 		}
 	} else {
 		for k, v := range obj.Spec.Files {
 			content, err := base64.StdEncoding.DecodeString(v)
 			if err != nil {
-				return "", "", err
+				return "", "", nil, err
 			}
 			files[k] = string(content)
 		}
 	}
-	tempDir, err := ioutil.TempDir("", "helm-")
+	tempDirs, err := createTempDir(obj)
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
-	dir, err := WriteTempDir(tempDir, files)
-	defer os.RemoveAll(dir)
+
+	err = WriteTempDir(tempDirs, files)
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 
 	setValues := []string{}
@@ -188,39 +191,78 @@ func generateTemplates(obj *v3.App, templateVersionClient mgmtv3.TemplateVersion
 		}
 		setValues = append([]string{"--set"}, strings.Join(result, ","))
 	}
-	commands := append([]string{"template", dir, "--name", obj.Name, "--namespace", obj.Spec.TargetNamespace}, setValues...)
+	commands := append([]string{"template", tempDirs.AppDirInJail, "--name", obj.Name, "--namespace", obj.Spec.TargetNamespace}, setValues...)
 
 	cmd := exec.Command(helmName, commands...)
 	sbOut := &bytes.Buffer{}
 	sbErr := &bytes.Buffer{}
 	cmd.Stdout = sbOut
 	cmd.Stderr = sbErr
+	cmd, err = common.JailCommand(cmd, tempDirs.FullPath)
+	if err != nil {
+		return "", "", nil, err
+	}
+
 	if err := cmd.Start(); err != nil {
-		return "", "", errors.Wrapf(err, "helm template failed. %s", filterErrorMessage(sbErr.String(), dir, "template-dir"))
+		return "", "", nil, errors.Wrapf(err, "helm template failed. %s", filterErrorMessage(sbErr.String(), tempDirs.AppDirInJail, "template-dir"))
 	}
 	if err := cmd.Wait(); err != nil {
-		return "", "", errors.Wrapf(err, "helm template failed. %s", filterErrorMessage(sbErr.String(), dir, "template-dir"))
+		return "", "", nil, errors.Wrapf(err, "helm template failed. %s", filterErrorMessage(sbErr.String(), tempDirs.AppDirInJail, "template-dir"))
 	}
 
 	// notes.txt
-	commands = append([]string{"template", dir, "--name", obj.Name, "--namespace", obj.Spec.TargetNamespace, "--notes"}, setValues...)
+	commands = append([]string{"template", tempDirs.AppDirInJail, "--name", obj.Name, "--namespace", obj.Spec.TargetNamespace, "--notes"}, setValues...)
 	cmd = exec.Command(helmName, commands...)
 	noteOut := &bytes.Buffer{}
 	sbErr = &bytes.Buffer{}
 	cmd.Stdout = noteOut
 	cmd.Stderr = sbErr
+	cmd, err = common.JailCommand(cmd, tempDirs.FullPath)
+	if err != nil {
+		return "", "", nil, err
+	}
+
 	if err := cmd.Start(); err != nil {
-		return "", "", errors.Wrapf(err, "helm template --notes failed. %s", filterErrorMessage(sbErr.String(), dir, "template-dir"))
+		return "", "", nil, errors.Wrapf(err, "helm template --notes failed. %s", filterErrorMessage(sbErr.String(), tempDirs.AppDirInJail, "template-dir"))
 	}
 	if err := cmd.Wait(); err != nil {
-		return "", "", errors.Wrapf(err, "helm template --notes failed. %s", filterErrorMessage(sbErr.String(), dir, "template-dir"))
+		return "", "", nil, errors.Wrapf(err, "helm template --notes failed. %s", filterErrorMessage(sbErr.String(), tempDirs.AppDirInJail, "template-dir"))
 	}
 	template := sbOut.String()
 	notes := noteOut.String()
-	return template, notes, nil
+	return template, notes, tempDirs, nil
 }
 
 // filter error message, replace old with new
 func filterErrorMessage(msg, old, new string) string {
 	return strings.Replace(msg, old, new, -1)
+}
+
+func createTempDir(obj *v3.App) (*common.HelmPath, error) {
+	if os.Getenv("CATTLE_DEV_MODE") != "" {
+		dir, err := ioutil.TempDir("", "helm-")
+		if err != nil {
+			return nil, err
+		}
+		return &common.HelmPath{
+			FullPath:         dir,
+			InJailPath:       dir,
+			KubeConfigFull:   filepath.Join(dir, ".kubeconfig"),
+			KubeConfigInJail: filepath.Join(dir, ".kubeconfig"),
+		}, nil
+	}
+
+	err := jailer.CreateJail(obj.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	paths := &common.HelmPath{
+		FullPath:         filepath.Join(jailer.BaseJailPath, obj.Name),
+		InJailPath:       "/",
+		KubeConfigFull:   filepath.Join(jailer.BaseJailPath, obj.Name, ".kubeconfig"),
+		KubeConfigInJail: "/.kubeconfig",
+	}
+
+	return paths, nil
 }
