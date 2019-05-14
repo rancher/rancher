@@ -34,17 +34,16 @@ type heloOption struct {
 }
 
 func (w *fluentForwarderTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog bool) error {
-	var err error
-
 	for _, s := range w.FluentServers {
+		host, _, err := net.SplitHostPort(s.Endpoint)
+		if err != nil {
+			return errors.Wrapf(err, "couldn't parse url %s", s.Endpoint)
+		}
+
 		var tlsConfig *tls.Config
 		if w.EnableTLS {
 			serverName := s.Hostname
 			if serverName == "" {
-				host, _, err := net.SplitHostPort(s.Endpoint)
-				if err != nil {
-					return errors.Wrapf(err, "couldn't parse url %s", s.Endpoint)
-				}
 				serverName = host
 			}
 			tlsConfig, err = buildTLSConfig(w.Certificate, "", "", "", "", serverName, true)
@@ -74,11 +73,15 @@ func (w *fluentForwarderTestWrap) TestReachable(dial dialer.Dialer, includeSendT
 }
 
 func (w *fluentForwarderTestWrap) sendData2Server(conn net.Conn, shareKey, username, password, endpoint string) error {
+	// server not enable authentication
 	if shareKey == "" && username == "" && password == "" {
 		if _, err := conn.Write(fluentdForwarderTestData); err != nil {
 			return errors.Wrapf(err, "couldn't write data to fluentd forwarder %s", endpoint)
 		}
+		return nil
 	}
+
+	// server enable authentication, need read nonce from server
 	buf, err := readDataWithTimeout(conn)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't read data from fluentd forwarder %s", endpoint)
