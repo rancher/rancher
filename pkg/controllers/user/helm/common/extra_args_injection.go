@@ -31,12 +31,20 @@ func injectDefaultRegistry(obj *v3.App) map[string]string {
 
 	catalogWithNamespace := values.Query().Get("catalog")
 	split := strings.SplitN(catalogWithNamespace, "/", 2)
-	catalog := split[len(split)-1]
-
-	reg := settings.SystemDefaultRegistry.Get()
-	if catalog != systemCatalogName || reg == "" {
+	if len(split) != 2 {
 		return nil
 	}
+	catalog := split[len(split)-1]
+
+	if catalog != systemCatalogName {
+		return nil
+	}
+
+	reg := settings.SystemDefaultRegistry.Get()
+	if reg == "" {
+		return nil
+	}
+
 	return map[string]string{"systemDefaultRegistry": reg}
 }
 
