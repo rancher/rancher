@@ -42,7 +42,7 @@ func (p *CloudProvider) GenerateCloudConfigFile() (string, error) {
 	}
 	// Generate INI style configuration
 	buf := new(bytes.Buffer)
-	cloudConfig, _ := ini.LoadSources(ini.LoadOptions{IgnoreInlineComment: true}, []byte(""))
+	cloudConfig := ini.Empty()
 	if err := ini.ReflectFrom(cloudConfig, p.Config); err != nil {
 		return "", fmt.Errorf("Failed to parse Openstack cloud config")
 	}
