@@ -160,13 +160,6 @@ func (c *Cluster) deployAddonsInclude(ctx context.Context) error {
 			if err := validateUserAddonYAML(addonYAML); err != nil {
 				return err
 			}
-
-			// Put 3 dashes (---) at beginning of next YAML if it is not there already so we can append to manifests
-			dashes := "---\n"
-			if !strings.HasPrefix(string(addonYAML[:]), dashes) {
-				addonYAML = append([]byte(dashes), addonYAML...)
-			}
-
 			manifests = append(manifests, addonYAML...)
 		} else if isFilePath(addon) {
 			addonYAML, err := ioutil.ReadFile(addon)

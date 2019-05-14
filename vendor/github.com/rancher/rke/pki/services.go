@@ -456,20 +456,25 @@ func GenerateRKERequestHeaderCACert(ctx context.Context, certs map[string]Certif
 	return nil
 }
 
-func GenerateRKEServicesCerts(ctx context.Context, certs map[string]CertificatePKI, rkeConfig v3.RancherKubernetesEngineConfig, configPath, configDir string, rotate bool) error {
-	RKECerts := []GenFunc{
-		GenerateKubeAPICertificate,
-		GenerateServiceTokenKey,
-		GenerateKubeControllerCertificate,
-		GenerateKubeSchedulerCertificate,
-		GenerateKubeProxyCertificate,
-		GenerateKubeNodeCertificate,
-		GenerateKubeAdminCertificate,
-		GenerateAPIProxyClientCertificate,
-		GenerateEtcdCertificates,
+func GenerateRKEServicesCerts(ctx context.Context, certs map[string]CertificatePKI, rkeConfig v3.RancherKubernetesEngineConfig, configPath, configDir string, rotate, legacy bool) error {
+	RKECerts := map[string]GenFunc{
+		KubeAPICertName:            GenerateKubeAPICertificate,
+		ServiceAccountTokenKeyName: GenerateServiceTokenKey,
+		KubeControllerCertName:     GenerateKubeControllerCertificate,
+		KubeSchedulerCertName:      GenerateKubeSchedulerCertificate,
+		KubeProxyCertName:          GenerateKubeProxyCertificate,
+		KubeNodeCertName:           GenerateKubeNodeCertificate,
+		KubeAdminCertName:          GenerateKubeAdminCertificate,
+		APIProxyClientCertName:     GenerateAPIProxyClientCertificate,
+		EtcdCertName:               GenerateEtcdCertificates,
 	}
-	for _, gen := range RKECerts {
-		if err := gen(ctx, certs, rkeConfig, configPath, configDir, rotate); err != nil {
+	for certName, gen := range RKECerts {
+		rotateCertKey := rotate
+		if legacy && rotate && certName == KubeAPICertName {
+			certs[KubeAPICertName] = CertificatePKI{Key: certs[KubeAPICertName].Key}
+			rotateCertKey = false
+		}
+		if err := gen(ctx, certs, rkeConfig, configPath, configDir, rotateCertKey); err != nil {
 			return err
 		}
 	}
