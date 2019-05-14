@@ -264,15 +264,13 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.N
 		return obj, err
 	}
 
-	fileMap := aliasToPath(obj.Status.NodeTemplateSpec.Driver, configRawMap, obj.Namespace)
-
-	createCommandsArgs := buildCreateCommand(obj, configRawMap)
-	cmd, err := buildCommand(nodeDir, obj, createCommandsArgs)
+	err = aliasToPath(obj.Status.NodeTemplateSpec.Driver, configRawMap, obj.Namespace)
 	if err != nil {
 		return obj, err
 	}
 
-	err = writeConfigFiles(fileMap)
+	createCommandsArgs := buildCreateCommand(obj, configRawMap)
+	cmd, err := buildCommand(nodeDir, obj, createCommandsArgs)
 	if err != nil {
 		return obj, err
 	}
@@ -304,10 +302,10 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.N
 	return obj, nil
 }
 
-func aliasToPath(driver string, config map[string]interface{}, ns string) map[string]string {
-	fileMap := make(map[string]string)
+func aliasToPath(driver string, config map[string]interface{}, ns string) error {
+	devMode := os.Getenv("CATTLE_DEV_MODE") != ""
 	baseDir := path.Join("/opt/jail", ns)
-	if os.Getenv("CATTLE_DEV_MODE") != "" {
+	if devMode {
 		baseDir = os.TempDir()
 	}
 	// Check if the required driver has aliased fields
@@ -316,33 +314,26 @@ func aliasToPath(driver string, config map[string]interface{}, ns string) map[st
 		for schemaField, driverField := range fields {
 			if fileRaw, ok := config[schemaField]; ok {
 				fileContents := fileRaw.(string)
+				// Delete our aliased fields
+				delete(config, schemaField)
+				if fileContents == "" {
+					continue
+				}
 				hasher.Reset()
 				hasher.Write([]byte(fileContents))
 				sha := base32.StdEncoding.WithPadding(-1).EncodeToString(hasher.Sum(nil))[:10]
-				path := path.Join(baseDir, sha)
-				if fileContents == "" {
-					path = ""
+				fullPath := path.Join(baseDir, sha)
+				err := ioutil.WriteFile(fullPath, []byte(fileContents), 0644)
+				if err != nil {
+					return err
 				}
-				// Map the path to the file contents
-				fileMap[path] = fileContents
-				// Drop our aliased version of the field and replace with the proper field and path
-				delete(config, schemaField)
-				config[driverField] = path
+				// Add the field and path
+				if devMode {
+					config[driverField] = fullPath
+				} else {
+					config[driverField] = path.Join("/", sha)
+				}
 			}
-		}
-	}
-	return fileMap
-}
-
-func writeConfigFiles(configs map[string]string) error {
-	for path, contents := range configs {
-		if path == "" || contents == "" {
-			continue
-		}
-		fmt.Printf("%v, %v\n", path, contents)
-		err := ioutil.WriteFile(path, []byte(contents), 0644)
-		if err != nil {
-			return err
 		}
 	}
 	return nil
