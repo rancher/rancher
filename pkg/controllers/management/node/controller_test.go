@@ -2,6 +2,7 @@ package node
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"testing"
@@ -29,22 +30,33 @@ func TestAliasMaps(t *testing.T) {
 
 func TestAliasToPath(t *testing.T) {
 	assert := assert.New(t)
+	require := require.New(t)
 	os.Setenv("CATTLE_DEV_MODE", "true")
 	defer os.Unsetenv("CATTLE_DEV_MODE")
 
 	for driver, fields := range aliases {
-		testData, fakeContents := createFakeConfig(fields)
+		testData, _ := createFakeConfig(fields)
 
-		pathed := aliasToPath(driver, testData, "fake")
+		err := aliasToPath(driver, testData, "fake")
+		assert.Nil(err)
 		for alias := range nodedriver.Aliases[driver] {
 			assert.Contains(testData, alias)
 		}
-
 		tempdir := os.TempDir()
 
-		for k, v := range pathed {
-			assert.Contains(k, tempdir)
-			assert.Contains(fakeContents, v)
+		for _, v := range testData {
+			filePath := v.(string)
+			// validate the temp dir is in the path for the field
+			assert.Contains(filePath, tempdir)
+			// valide the file exists on disk
+			_, err = os.Stat(filePath)
+			require.Nil(err)
+
+			// assert the file contents starts with our expected string
+			b, err := ioutil.ReadFile(filePath)
+			require.Nil(err)
+			assert.Contains(string(b), "fakecontent")
+			os.Remove(filePath)
 		}
 	}
 }
