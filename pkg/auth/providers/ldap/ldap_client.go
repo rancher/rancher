@@ -102,6 +102,7 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult
 	var nonDupGroupPrincipals []v3.Principal
 	var userScope, groupScope string
 	var nestedGroupPrincipals []v3.Principal
+	var freeipaNonEntrydnApproach bool
 
 	groupMap := make(map[string]bool)
 	entry := result.Entries[0]
@@ -140,6 +141,7 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult
 	}
 
 	userPrincipal = *user
+	userDN := result.Entries[0].DN
 
 	if len(userMemberAttribute) > 0 {
 		for i := 0; i < len(userMemberAttribute); i += 50 {
@@ -183,8 +185,24 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv2.SearchResult
 			return userPrincipal, groupPrincipals, err
 		}
 	}
+
+	if len(groupPrincipals) == 0 {
+		// In case of Freeipa, some servers might not have entrydn attribute, so we can't use it to get details of all groups returned when user logged in.
+		// So we run a separate query with the filer: (&(member=uid of user logging in)(objectclass=groupofnames))
+		// This returns all details of a user's groups that we need to create principals, but doesn't return nested membership,
+		// so we derive nested membership using the logic we have for openldap
+		logrus.Debugf("EntryDN attribute not returned, retrieving group membership using the member attribute")
+		// didn't get the entrydn as expected, so use query with member attribute and manually gather nested group
+		query := fmt.Sprintf("(&(%v=%v)(%v=%v))", config.GroupMemberMappingAttribute, ldapv2.EscapeFilter(userDN), ObjectClass, config.GroupObjectClass)
+		groupPrincipals, err = p.searchLdap(query, groupScope, config, lConn)
+		if err != nil {
+			return userPrincipal, groupPrincipals, err
+		}
+		logrus.Debugf("Retrieved following groups using member attribute: %v", groupPrincipals)
+		freeipaNonEntrydnApproach = true
+	}
 	// Handle nestedgroups for openldap, filter operationalAttrList already handles nestedgroups for freeipa
-	if config.NestedGroupMembershipEnabled && groupScope == "openldap_group" {
+	if (config.NestedGroupMembershipEnabled && groupScope == "openldap_group") || freeipaNonEntrydnApproach {
 		searchDomain := config.UserSearchBase
 		if config.GroupSearchBase != "" {
 			searchDomain = config.GroupSearchBase
