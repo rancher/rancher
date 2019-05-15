@@ -22,28 +22,28 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 	shellLink = strings.Replace(shellLink, "http", "ws", 1)
 	shellLink = strings.Replace(shellLink, "/shell", "?shell=true", 1)
 	resource.Links["shell"] = shellLink
-	resource.AddAction(request, "generateKubeconfig")
-	resource.AddAction(request, "importYaml")
-	resource.AddAction(request, "exportYaml")
+	resource.AddAction(request, v3.ClusterActionGenerateKubeconfig)
+	resource.AddAction(request, v3.ClusterActionImportYaml)
+	resource.AddAction(request, v3.ClusterActionExportYaml)
 	if _, ok := resource.Values["rancherKubernetesEngineConfig"]; ok {
-		resource.AddAction(request, "rotateCertificates")
+		resource.AddAction(request, v3.ClusterActionRotateCertificates)
 		if _, ok := values.GetValue(resource.Values, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig"); ok {
-			resource.AddAction(request, "backupEtcd")
-			resource.AddAction(request, "restoreFromEtcdBackup")
+			resource.AddAction(request, v3.ClusterActionBackupEtcd)
+			resource.AddAction(request, v3.ClusterActionRestoreFromEtcdBackup)
 		}
 	}
 
 	if err := request.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", request, resource.Values, request.Schema); err == nil {
 		if convert.ToBool(resource.Values["enableClusterMonitoring"]) {
-			resource.AddAction(request, "disableMonitoring")
-			resource.AddAction(request, "editMonitoring")
+			resource.AddAction(request, v3.ClusterActionDisableMonitoring)
+			resource.AddAction(request, v3.ClusterActionEditMonitoring)
 		} else {
-			resource.AddAction(request, "enableMonitoring")
+			resource.AddAction(request, v3.ClusterActionEnableMonitoring)
 		}
 	}
 
 	if convert.ToBool(resource.Values["enableClusterMonitoring"]) {
-		resource.AddAction(request, "viewMonitoring")
+		resource.AddAction(request, v3.ClusterActionViewMonitoring)
 	}
 
 	if gkeConfig, ok := resource.Values["googleKubernetesEngineConfig"]; ok {
