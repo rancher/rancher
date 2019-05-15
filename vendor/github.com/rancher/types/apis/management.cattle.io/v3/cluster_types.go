@@ -20,6 +20,17 @@ func init() {
 type ClusterConditionType string
 
 const (
+	ClusterActionGenerateKubeconfig    = "generateKubeconfig"
+	ClusterActionImportYaml            = "importYaml"
+	ClusterActionExportYaml            = "exportYaml"
+	ClusterActionViewMonitoring        = "viewMonitoring"
+	ClusterActionEditMonitoring        = "editMonitoring"
+	ClusterActionEnableMonitoring      = "enableMonitoring"
+	ClusterActionDisableMonitoring     = "disableMonitoring"
+	ClusterActionBackupEtcd            = "backupEtcd"
+	ClusterActionRestoreFromEtcdBackup = "restoreFromEtcdBackup"
+	ClusterActionRotateCertificates    = "rotateCertificates"
+
 	// ClusterConditionReady Cluster ready to serve API (healthy when true, unhealthy when false)
 	ClusterConditionReady          condition.Cond = "Ready"
 	ClusterConditionPending        condition.Cond = "Pending"
