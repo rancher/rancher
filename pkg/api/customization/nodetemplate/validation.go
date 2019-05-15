@@ -9,6 +9,7 @@ import (
 const (
 	Amazonec2driver    = "amazonec2"
 	Azuredriver        = "azure"
+	Linodedriver       = "linode"
 	Vmwaredriver       = "vmwarevsphere"
 	DigitalOceandriver = "digitalocean"
 )
