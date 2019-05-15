@@ -18,7 +18,7 @@ var SourceTemplate = `
   @type  tail
   path  /var/log/containers/*.log
   pos_file  /fluentd/log/{{ .ContainerLogPosFilename}}
-  time_format  %Y-%m-%dT%H:%M:%S
+  time_format  %Y-%m-%dT%H:%M:%S.%N
   tag  {{ .ContainerLogSourceTag }}.*
   format  json
   read_from_head  true
