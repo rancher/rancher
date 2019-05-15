@@ -58,40 +58,40 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 	}
 
 	switch actionName {
-	case "generateKubeconfig":
+	case v3.ClusterActionGenerateKubeconfig:
 		return a.GenerateKubeconfigActionHandler(actionName, action, apiContext)
-	case "importYaml":
+	case v3.ClusterActionImportYaml:
 		return a.ImportYamlHandler(actionName, action, apiContext)
-	case "exportYaml":
+	case v3.ClusterActionExportYaml:
 		return a.ExportYamlHandler(actionName, action, apiContext)
-	case "viewMonitoring":
+	case v3.ClusterActionViewMonitoring:
 		return a.viewMonitoring(actionName, action, apiContext)
-	case "editMonitoring":
+	case v3.ClusterActionEditMonitoring:
 		if !canUpdateCluster() {
 			return httperror.NewAPIError(httperror.Unauthorized, "can not access")
 		}
 		return a.editMonitoring(actionName, action, apiContext)
-	case "enableMonitoring":
+	case v3.ClusterActionEnableMonitoring:
 		if !canUpdateCluster() {
 			return httperror.NewAPIError(httperror.Unauthorized, "can not access")
 		}
 		return a.enableMonitoring(actionName, action, apiContext)
-	case "disableMonitoring":
+	case v3.ClusterActionDisableMonitoring:
 		if !canUpdateCluster() {
 			return httperror.NewAPIError(httperror.Unauthorized, "can not access")
 		}
 		return a.disableMonitoring(actionName, action, apiContext)
-	case "backupEtcd":
+	case v3.ClusterActionBackupEtcd:
 		if !canUpdateCluster() {
 			return httperror.NewAPIError(httperror.Unauthorized, "can not backup etcd")
 		}
 		return a.BackupEtcdHandler(actionName, action, apiContext)
-	case "restoreFromEtcdBackup":
+	case v3.ClusterActionRestoreFromEtcdBackup:
 		if !canUpdateCluster() {
 			return httperror.NewAPIError(httperror.Unauthorized, "can not restore etcd backup")
 		}
 		return a.RestoreFromEtcdBackupHandler(actionName, action, apiContext)
-	case "rotateCertificates":
+	case v3.ClusterActionRotateCertificates:
 		if !canUpdateCluster() {
 			return httperror.NewAPIError(httperror.Unauthorized, "can not rotate certificates")
 		}
