@@ -198,31 +198,31 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 				field.Required = false
 				return field
 			})
-			schema.ResourceActions["generateKubeconfig"] = types.Action{
+			schema.ResourceActions[v3.ClusterActionGenerateKubeconfig] = types.Action{
 				Output: "generateKubeConfigOutput",
 			}
-			schema.ResourceActions["importYaml"] = types.Action{
+			schema.ResourceActions[v3.ClusterActionImportYaml] = types.Action{
 				Input:  "importClusterYamlInput",
 				Output: "importYamlOutput",
 			}
-			schema.ResourceActions["exportYaml"] = types.Action{
+			schema.ResourceActions[v3.ClusterActionExportYaml] = types.Action{
 				Output: "exportOutput",
 			}
-			schema.ResourceActions["enableMonitoring"] = types.Action{
+			schema.ResourceActions[v3.ClusterActionEnableMonitoring] = types.Action{
 				Input: "monitoringInput",
 			}
-			schema.ResourceActions["disableMonitoring"] = types.Action{}
-			schema.ResourceActions["viewMonitoring"] = types.Action{
+			schema.ResourceActions[v3.ClusterActionDisableMonitoring] = types.Action{}
+			schema.ResourceActions[v3.ClusterActionViewMonitoring] = types.Action{
 				Output: "monitoringOutput",
 			}
-			schema.ResourceActions["editMonitoring"] = types.Action{
+			schema.ResourceActions[v3.ClusterActionEditMonitoring] = types.Action{
 				Input: "monitoringInput",
 			}
-			schema.ResourceActions["backupEtcd"] = types.Action{}
-			schema.ResourceActions["restoreFromEtcdBackup"] = types.Action{
+			schema.ResourceActions[v3.ClusterActionBackupEtcd] = types.Action{}
+			schema.ResourceActions[v3.ClusterActionRestoreFromEtcdBackup] = types.Action{
 				Input: "restoreFromEtcdBackupInput",
 			}
-			schema.ResourceActions["rotateCertificates"] = types.Action{
+			schema.ResourceActions[v3.ClusterActionRotateCertificates] = types.Action{
 				Input:  "rotateCertificateInput",
 				Output: "rotateCertificateOutput",
 			}
