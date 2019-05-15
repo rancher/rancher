@@ -15,6 +15,7 @@ import (
 var driverData = map[string]map[string][]string{
 	nodetemplate.Amazonec2driver: {"cred": []string{"accessKey"}},
 	nodetemplate.Azuredriver:     {"cred": []string{"clientId", "subscriptionId"}},
+	nodetemplate.Linodedriver:    {"password": []string{"token"}},
 	nodetemplate.Vmwaredriver:    {"cred": []string{"username", "vcenter", "vcenterPort"}},
 }
 var driverDefaults = map[string]map[string]string{
@@ -57,9 +58,9 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver("exoscale", "local://", "", "", []string{"api.exoscale.ch"}, false, true, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("linode", "https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.7/docker-machine-driver-linode_linux-amd64.zip",
+	if err := addMachineDriver(nodetemplate.Linodedriver, "https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.7/docker-machine-driver-linode_linux-amd64.zip",
 		"https://linode.github.io/rancher-ui-driver-linode/releases/v0.2.0/component.js", "faaf1d7d53b55a369baeeb0855b069921a36131868fe3641eb595ac1ff4cf16f",
-		[]string{"linode.github.io"}, false, false, management); err != nil {
+		[]string{"linode.github.io", "api.linode.com"}, false, false, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver("openstack", "local://", "", "", nil, false, true, management); err != nil {
