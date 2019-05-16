@@ -67,7 +67,7 @@ func CatalogSHA256Hash(catalog *v3.Catalog) string {
 func newCache(catalog *v3.Catalog) *Helm {
 	hash := CatalogSHA256Hash(catalog)
 	localPath := filepath.Join(CatalogCache, hash)
-	kind := GetCatalogKind(catalog, localPath)
+	kind := getCatalogKind(catalog, localPath)
 
 	return &Helm{
 		LocalPath:   localPath,
@@ -83,7 +83,7 @@ func newCache(catalog *v3.Catalog) *Helm {
 	}
 }
 
-func GetCatalogKind(catalog *v3.Catalog, localPath string) string {
+func getCatalogKind(catalog *v3.Catalog, localPath string) string {
 	if validCatalogKind[catalog.Spec.CatalogKind] {
 		return catalog.Spec.CatalogKind
 	}
