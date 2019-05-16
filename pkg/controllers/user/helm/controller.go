@@ -5,10 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
-	"k8s.io/api/core/v1"
 	"os"
-	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
@@ -16,14 +13,16 @@ import (
 
 	errorsutil "github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
+	hCommon "github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -226,12 +225,12 @@ func (l *Lifecycle) DeployApp(obj *v3.App) (*v3.App, error) {
 		}
 	}
 	newObj, err := v3.AppConditionInstalled.Do(obj, func() (runtime.Object, error) {
-		template, notes, appDir, tempDir, err := l.generateTemplates(obj)
-		defer os.RemoveAll(tempDir)
+		template, notes, tempDirs, err := l.generateTemplates(obj)
 		if err != nil {
 			return obj, err
 		}
-		if err := l.Run(obj, template, appDir, notes); err != nil {
+		defer os.RemoveAll(tempDirs.FullPath)
+		if err := l.Run(obj, template, notes, tempDirs); err != nil {
 			return obj, err
 		}
 		return obj, nil
@@ -253,19 +252,19 @@ func (l *Lifecycle) Remove(obj *v3.App) (runtime.Object, error) {
 			return obj, err
 		}
 	}
-	tempDir, err := ioutil.TempDir("", "helm-")
+	tempDirs, err := createTempDir(obj)
 	if err != nil {
 		return obj, err
 	}
-	defer os.RemoveAll(tempDir)
-	kubeConfigPath, err := l.writeKubeConfig(obj, tempDir, true)
+	defer os.RemoveAll(tempDirs.FullPath)
+	err = l.writeKubeConfig(obj, tempDirs.KubeConfigFull, true)
 	if err != nil {
 		return obj, err
 	}
 	// try three times and succeed
 	start := time.Second * 1
 	for i := 0; i < 3; i++ {
-		if err = helmDelete(kubeConfigPath, obj); err == nil {
+		if err = helmDelete(tempDirs, obj); err == nil {
 			break
 		}
 		logrus.Warn(err)
@@ -305,17 +304,12 @@ func (l *Lifecycle) Remove(obj *v3.App) (runtime.Object, error) {
 	return obj, nil
 }
 
-func (l *Lifecycle) Run(obj *v3.App, template, templateDir, notes string) error {
-	tempDir, err := ioutil.TempDir("", "kubeconfig-")
+func (l *Lifecycle) Run(obj *v3.App, template, notes string, tempDirs *hCommon.HelmPath) error {
+	err := l.writeKubeConfig(obj, tempDirs.KubeConfigFull, false)
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(tempDir)
-	kubeConfigPath, err := l.writeKubeConfig(obj, tempDir, false)
-	if err != nil {
-		return err
-	}
-	if err := helmInstall(templateDir, kubeConfigPath, obj); err != nil {
+	if err := helmInstall(tempDirs, obj); err != nil {
 		// create an app revision so that user can decide to continue
 		err2 := l.createAppRevision(obj, template, notes, true)
 		if err2 != nil {
@@ -361,34 +355,28 @@ func (l *Lifecycle) createAppRevision(obj *v3.App, template, notes string, faile
 	return err
 }
 
-func (l *Lifecycle) writeKubeConfig(obj *v3.App, tempDir string, remove bool) (string, error) {
+func (l *Lifecycle) writeKubeConfig(obj *v3.App, kubePath string, remove bool) error {
 	var token string
 
 	userID := obj.Annotations["field.cattle.io/creatorId"]
 	user, err := l.UserClient.Get(userID, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
-		return "", err
+		return err
 	} else if errors.IsNotFound(err) && remove {
 		token, err = l.SystemAccountManager.GetOrCreateProjectSystemToken(obj.Namespace)
 	} else if err == nil {
 		token, err = l.UserManager.EnsureToken(helmTokenPrefix+user.Name, description, user.Name)
 	}
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	kubeConfig := l.KubeConfigGetter.KubeConfig(l.ClusterName, token)
 	for k := range kubeConfig.Clusters {
 		kubeConfig.Clusters[k].InsecureSkipTLSVerify = true
 	}
-	if err := os.MkdirAll(filepath.Join(tempDir, obj.Namespace), 0755); err != nil {
-		return "", err
-	}
-	kubeConfigPath := filepath.Join(tempDir, obj.Namespace, ".kubeconfig")
-	if err := clientcmd.WriteToFile(*kubeConfig, kubeConfigPath); err != nil {
-		return "", err
-	}
-	return kubeConfigPath, nil
+
+	return clientcmd.WriteToFile(*kubeConfig, kubePath)
 }
 
 func isSame(obj *v3.App, revision *v3.AppRevision) bool {
