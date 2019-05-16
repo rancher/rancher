@@ -32,7 +32,7 @@ type Bundle struct {
 	certs map[string]pki.CertificatePKI
 }
 
-func newBundle(certs map[string]pki.CertificatePKI) *Bundle {
+func NewBundle(certs map[string]pki.CertificatePKI) *Bundle {
 	return &Bundle{
 		certs: certs,
 	}
@@ -40,7 +40,7 @@ func newBundle(certs map[string]pki.CertificatePKI) *Bundle {
 
 func Unmarshal(input string) (*Bundle, error) {
 	certs, err := rkecerts.LoadString(input)
-	return newBundle(certs), err
+	return NewBundle(certs), err
 }
 
 func (b *Bundle) Certs() map[string]pki.CertificatePKI {
@@ -58,7 +58,7 @@ func LoadLocal() (*Bundle, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newBundle(certMap), nil
+	return NewBundle(certMap), nil
 }
 
 func Generate(config *v3.RancherKubernetesEngineConfig) (*Bundle, error) {
