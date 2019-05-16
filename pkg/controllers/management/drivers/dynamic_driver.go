@@ -86,11 +86,3 @@ func (d *BaseDriver) Excutable() error {
 	}
 	return nil
 }
-
-func (d *DynamicDriver) binDir() string {
-	dest := os.Getenv("GMS_BIN_DIR")
-	if dest != "" {
-		return dest
-	}
-	return "./management-state/bin"
-}

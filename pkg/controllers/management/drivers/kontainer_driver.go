@@ -37,8 +37,8 @@ func (d *KontainerDriver) Install() (string, error) {
 		return "", nil
 	}
 
-	binaryPath := path.Join(binDir(), d.DriverName)
-	tmpPath := binaryPath + "-tmp"
+	installPath := path.Join(installDir(), d.DriverName)
+	tmpPath := installPath + "-tmp"
 	f, err := os.OpenFile(tmpPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 	if err != nil {
 		return "", errors.Wrapf(err, "Couldn't open %v for writing", tmpPath)
@@ -57,10 +57,38 @@ func (d *KontainerDriver) Install() (string, error) {
 		return "", errors.Wrapf(err, "Couldn't copy %v to %v", d.srcBinName(), tmpPath)
 	}
 
-	err = os.Rename(tmpPath, binaryPath)
+	err = os.Rename(tmpPath, installPath)
 	if err != nil {
-		return "", errors.Wrapf(err, "Couldn't copy driver %v to %v", d.Name(), binaryPath)
+		return "", errors.Wrapf(err, "Couldn't copy driver %v to %v", d.Name(), installPath)
 	}
 
-	return binaryPath, nil
+	return path.Join(runDir(), d.DriverName), nil
+}
+
+func (d *KontainerDriver) Exists() bool {
+	if d.DriverName == "" {
+		return false
+	}
+	if d.Builtin {
+		return true
+	}
+	binaryPath := path.Join(installDir(), d.DriverName)
+	_, err := os.Stat(binaryPath)
+	return err == nil
+}
+
+func installDir() string {
+	if dl := os.Getenv("CATTLE_DEV_MODE"); dl != "" {
+		return "./management-state/bin"
+	}
+
+	return "/opt/jail/driver-jail/management-state/bin"
+}
+
+func runDir() string {
+	if dl := os.Getenv("CATTLE_DEV_MODE"); dl != "" {
+		return "./management-state/bin"
+	}
+
+	return "/management-state/bin"
 }
