@@ -6,19 +6,22 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"reflect"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rancher/kontainer-engine/cluster"
 	"github.com/rancher/kontainer-engine/drivers/aks"
 	"github.com/rancher/kontainer-engine/drivers/eks"
 	"github.com/rancher/kontainer-engine/drivers/gke"
-	"github.com/rancher/kontainer-engine/drivers/import"
+	kubeimport "github.com/rancher/kontainer-engine/drivers/import"
 	"github.com/rancher/kontainer-engine/drivers/rke"
 	"github.com/rancher/kontainer-engine/types"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -427,6 +430,20 @@ func (r *RunningDriver) Start() (string, error) {
 
 		cmd := exec.CommandContext(processContext, r.Path, strconv.Itoa(port))
 
+		if os.Getenv("CATTLE_DEV_MODE") == "" {
+			cred, err := getUserCred()
+			if err != nil {
+				return "", errors.WithMessage(err, "get user cred error")
+			}
+
+			cmd.SysProcAttr = &syscall.SysProcAttr{}
+			cmd.SysProcAttr.Credential = cred
+			cmd.SysProcAttr.Chroot = "/opt/jail/driver-jail"
+			cmd.Env = []string{"PATH=/usr/bin"}
+			logrus.Infof("CMD info: %+v", cmd)
+			logrus.Infof("SysProc: %+v", cmd.SysProcAttr)
+		}
+
 		// redirect output to console
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -573,4 +590,30 @@ func (e *EngineService) RemoveLegacyServiceAccount(ctx context.Context, name str
 	defer cls.Driver.Close()
 
 	return cls.RemoveLegacyServiceAccount(ctx)
+}
+
+// getUserCred looks up the user and provides it in syscall.Credential
+func getUserCred() (*syscall.Credential, error) {
+	u, err := user.Current()
+	if err != nil {
+		uID := os.Getuid()
+		u, err = user.LookupId(strconv.Itoa(uID))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	i, err := strconv.ParseUint(u.Uid, 10, 32)
+	if err != nil {
+		return nil, err
+	}
+	uid := uint32(i)
+
+	i, err = strconv.ParseUint(u.Gid, 10, 32)
+	if err != nil {
+		return nil, err
+	}
+	gid := uint32(i)
+
+	return &syscall.Credential{Uid: uid, Gid: gid}, nil
 }
