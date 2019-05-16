@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"os"
+
 	"github.com/rancher/norman/leader"
 	"github.com/rancher/norman/pkg/k8scheck"
 	"github.com/rancher/rancher/pkg/audit"
@@ -10,7 +12,9 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
+	"github.com/rancher/rancher/pkg/cron"
 	"github.com/rancher/rancher/pkg/dialer"
+	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/tls"
@@ -95,6 +99,16 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 
 	if err := scaledContext.Start(ctx); err != nil {
 		return err
+	}
+
+	if dm := os.Getenv("CATTLE_DEV_MODE"); dm == "" {
+		if err := jailer.CreateJail("driver-jail"); err != nil {
+			return err
+		}
+
+		if err := cron.StartJailSyncCron(scaledContext); err != nil {
+			return err
+		}
 	}
 
 	go leader.RunOrDie(ctx, "", "cattle-controllers", scaledContext.K8sClient, func(ctx context.Context) {

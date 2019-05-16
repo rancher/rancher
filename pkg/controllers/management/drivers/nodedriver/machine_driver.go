@@ -3,16 +3,15 @@ package nodedriver
 import (
 	"context"
 	"fmt"
-	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/rancher/pkg/controllers/management/drivers"
 	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 
-	"github.com/rancher/norman/types"
-
 	errs "github.com/pkg/errors"
+	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/controllers/management/drivers"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -25,6 +24,18 @@ import (
 var (
 	SchemaLock = sync.Mutex{}
 	driverLock = sync.Mutex{}
+	// Aliases maps Driver field => schema field
+	// The opposite of this lives in pkg/controllers/management/node/controller.go
+	Aliases = map[string]map[string]string{
+		"aliyunecs":    map[string]string{"sshKeypath": "sshKeyContents"},
+		"amazonec2":    map[string]string{"sshKeypath": "sshKeyContents", "userdata": "userdata"},
+		"azure":        map[string]string{"customData": "customData"},
+		"digitalocean": map[string]string{"sshKeyPath": "sshKeyContents", "userdata": "userdata"},
+		"exoscale":     map[string]string{"sshKey": "sshKey", "userdata": "userdata"},
+		"openstack":    map[string]string{"privateKeyFile": "privateKeyFile"},
+		"otc":          map[string]string{"privateKeyFile": "privateKeyFile"},
+		"packet":       map[string]string{"userdata": "userdata"},
+	}
 )
 
 const (
@@ -151,6 +162,14 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 		if pwdFields[name] {
 			field.Type = "password"
 		}
+		if aliases, ok := Aliases[driverName]; ok {
+			// convert path fields to their alias to take file contents
+			if alias, ok := aliases[name]; ok {
+				name = alias
+				field.Description = fmt.Sprintf("File contents for %v", alias)
+			}
+		}
+
 		if field.Type == "password" || userCredFields[name] {
 			credField := field
 			credField.Required = true
