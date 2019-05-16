@@ -1,11 +1,12 @@
-package rkecerts
+package rkenodeconfigserver
 
 import (
 	"fmt"
 
 	"github.com/rancher/kontainer-engine/cluster"
-	"github.com/rancher/kontainer-engine/drivers/rke/rkecerts"
+	kecerts "github.com/rancher/kontainer-engine/drivers/rke/rkecerts"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
+	"github.com/rancher/rancher/pkg/rkecerts"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
@@ -21,7 +22,7 @@ func NewLookup(namespaces v1.NamespaceInterface, secrets v1.SecretsGetter) *Bund
 	}
 }
 
-func (r *BundleLookup) Lookup(cluster *v3.Cluster) (*Bundle, error) {
+func (r *BundleLookup) Lookup(cluster *v3.Cluster) (*rkecerts.Bundle, error) {
 	c, err := r.engineStore.Get(cluster.Name)
 	if err != nil {
 		return nil, err
@@ -32,7 +33,7 @@ func (r *BundleLookup) Lookup(cluster *v3.Cluster) (*Bundle, error) {
 		return nil, fmt.Errorf("waiting for certs to be generated for cluster %s", cluster.Name)
 	}
 
-	certMap, err := rkecerts.LoadString(certs)
+	certMap, err := kecerts.LoadString(certs)
 	if err != nil {
 		return nil, err
 	}
@@ -51,5 +52,5 @@ func (r *BundleLookup) Lookup(cluster *v3.Cluster) (*Bundle, error) {
 		newCertMap[k] = v
 	}
 
-	return newBundle(newCertMap), nil
+	return rkecerts.NewBundle(newCertMap), nil
 }
