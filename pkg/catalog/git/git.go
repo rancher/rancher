@@ -2,7 +2,6 @@ package git
 
 import (
 	"bytes"
-	"fmt"
 	"net/url"
 	"os/exec"
 	"strings"
@@ -14,11 +13,11 @@ func Clone(path, url, branch string) error {
 	return runcmd("git", "clone", "-b", branch, "--single-branch", url, path)
 }
 
-func Update(path, branch string) error {
+func Update(path, commit string) error {
 	if err := runcmd("git", "-C", path, "fetch"); err != nil {
 		return err
 	}
-	return runcmd("git", "-C", path, "checkout", fmt.Sprintf("origin/%s", branch))
+	return runcmd("git", "-C", path, "checkout", commit)
 }
 
 func HeadCommit(path string) (string, error) {

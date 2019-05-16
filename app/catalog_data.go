@@ -148,7 +148,7 @@ func doAddCatalogs(management *config.ManagementContext, name, url, branch strin
 			},
 			Spec: v3.CatalogSpec{
 				URL:         url,
-				CatalogKind: "helm",
+				CatalogKind: "helm:git",
 				Branch:      branch,
 			},
 		}
