@@ -18,12 +18,25 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	kindHelmGit  = "helm:git"
+	kindHelmHTTP = "helm:http"
+)
+
+var (
+	validCatalogKind = map[string]bool{
+		kindHelmGit:  true,
+		kindHelmHTTP: true,
+	}
+)
+
 func New(catalog *v3.Catalog) (*Helm, error) {
 	h, err := NewNoUpdate(catalog)
 	if err != nil {
 		return nil, err
 	}
-	return h, h.UpdateIfCacheNotExists()
+	_, err = h.Update(false)
+	return h, err
 }
 
 func NewNoUpdate(catalog *v3.Catalog) (*Helm, error) {
@@ -38,7 +51,7 @@ func NewForceUpdate(catalog *v3.Catalog) (string, *Helm, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	commit, err := h.Update()
+	commit, err := h.Update(true)
 	return commit, h, err
 }
 
@@ -53,11 +66,15 @@ func CatalogSHA256Hash(catalog *v3.Catalog) string {
 
 func newCache(catalog *v3.Catalog) *Helm {
 	hash := CatalogSHA256Hash(catalog)
+	localPath := filepath.Join(CatalogCache, hash)
+	kind := getCatalogKind(catalog, localPath)
+
 	return &Helm{
-		LocalPath:   filepath.Join(CatalogCache, hash),
+		LocalPath:   localPath,
 		IconPath:    filepath.Join(IconCache, hash),
 		catalogName: catalog.Name,
 		Hash:        hash,
+		Kind:        kind,
 		url:         catalog.Spec.URL,
 		branch:      catalog.Spec.Branch,
 		username:    catalog.Spec.Username,
@@ -66,26 +83,27 @@ func newCache(catalog *v3.Catalog) *Helm {
 	}
 }
 
-func (h *Helm) UpdateIfCacheNotExists() error {
-	h.lock()
-	defer h.unlock()
+func getCatalogKind(catalog *v3.Catalog, localPath string) string {
+	if validCatalogKind[catalog.Spec.CatalogKind] {
+		return catalog.Spec.CatalogKind
+	}
 
-	if _, err := os.Stat(h.LocalPath); os.IsNotExist(err) {
-		if _, err = h.update(); err != nil {
-			return err
-		}
+	if _, err := os.Stat(filepath.Join(localPath, ".git", "HEAD")); !os.IsNotExist(err) {
+		return kindHelmGit
 	}
-	if err := os.MkdirAll(h.IconPath, 0755); err != nil {
-		return err
+
+	pathURL := git.FormatURL(catalog.Spec.URL, catalog.Spec.Username, catalog.Spec.Password)
+	if git.IsValid(pathURL) {
+		return kindHelmGit
 	}
-	return nil
+
+	return kindHelmHTTP
 }
 
-func (h *Helm) Update() (string, error) {
+func (h *Helm) Update(fetchLatest bool) (string, error) {
 	h.lock()
 	defer h.unlock()
-
-	commit, err := h.update()
+	commit, err := h.update(fetchLatest)
 	if err != nil {
 		return "", err
 	}
@@ -95,26 +113,32 @@ func (h *Helm) Update() (string, error) {
 	return commit, nil
 }
 
-func (h *Helm) update() (string, error) {
+func (h *Helm) update(fetchLatest bool) (string, error) {
 	logrus.Debugf("Helm preparing catalog cache [%s] for update", h.catalogName)
 	if err := os.MkdirAll(h.LocalPath, 0755); err != nil {
 		return "", err
 	}
 
-	pathURL := git.FormatURL(h.url, h.username, h.password)
 	var (
 		commit string
 		err    error
 	)
-	if git.IsValid(pathURL) {
-		commit, err = h.updateGit(pathURL)
-	} else {
-		commit, err = h.updateIndex()
+	switch h.Kind {
+	case kindHelmGit:
+		commit, err = h.updateGit(fetchLatest)
+	case kindHelmHTTP:
+		commit, err = h.updateIndex(fetchLatest)
+	default:
+		return "", fmt.Errorf("Unknown helm catalog kind [%s] for [%s]", h.Kind, h.url)
 	}
 	return commit, err
 }
 
-func (h *Helm) updateIndex() (string, error) {
+func (h *Helm) updateIndex(fetchLatest bool) (string, error) {
+	if !fetchLatest {
+		return "", nil
+	}
+
 	index, err := h.downloadIndex(h.url)
 	if err != nil {
 		return "", err
@@ -132,10 +156,17 @@ func md5Hash(content string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func (h *Helm) updateGit(repoURL string) (string, error) {
+func (h *Helm) updateGit(fetchLatest bool) (string, error) {
+	var (
+		changed bool
+		err     error
+		commit  string
+	)
+
 	if h.branch == "" {
 		h.branch = "master"
 	}
+	repoURL := git.FormatURL(h.url, h.username, h.password)
 
 	empty, err := dirEmpty(h.LocalPath)
 	if err != nil {
@@ -147,19 +178,28 @@ func (h *Helm) updateGit(repoURL string) (string, error) {
 			return "", errors.Wrap(err, "Clone failed")
 		}
 	} else {
-		changed, err := remoteShaChanged(repoURL, h.branch, h.lastCommit, uuid)
-		if err != nil {
-			return "", errors.Wrap(err, "Remote commit check failed")
+		if fetchLatest || h.lastCommit == "" {
+			commit = fmt.Sprintf("origin/%s", h.branch)
+			changed, err = remoteShaChanged(repoURL, h.branch, h.lastCommit, uuid)
+			if err != nil {
+				return "", errors.Wrap(err, "Remote commit check failed")
+			}
+		} else {
+			commit = h.lastCommit
+			changed, err = localShaDiffers(h.LocalPath, h.lastCommit)
+			if err != nil {
+				return "", errors.Wrap(err, "Local commit check failed")
+			}
 		}
 		if changed {
-			if err = git.Update(h.LocalPath, h.branch); err != nil {
+			if err = git.Update(h.LocalPath, commit); err != nil {
 				return "", errors.Wrap(err, "Update failed")
 			}
 			logrus.Debugf("Helm updated git repository for catalog [%s]", h.catalogName)
 		}
 	}
 
-	commit, err := git.HeadCommit(h.LocalPath)
+	commit, err = git.HeadCommit(h.LocalPath)
 	if err != nil {
 		err = errors.Wrap(err, "Retrieving head commit failed")
 	}
@@ -186,6 +226,11 @@ func formatGitURL(endpoint, branch string) string {
 		}
 	}
 	return formattedURL
+}
+
+func localShaDiffers(localPath, commit string) (bool, error) {
+	currentCommit, err := git.HeadCommit(localPath)
+	return currentCommit != commit, err
 }
 
 func remoteShaChanged(repoURL, branch, sha, uuid string) (bool, error) {
