@@ -146,7 +146,7 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 		if err := driver.Install(); err != nil {
 			return nil, err
 		}
-		if err = driver.Excutable(); err != nil {
+		if err = driver.Executable(); err != nil {
 			return nil, err
 		}
 		obj.Spec.DisplayName = strings.TrimPrefix(driver.Name(), drivers.DockerMachineDriverPrefix)
