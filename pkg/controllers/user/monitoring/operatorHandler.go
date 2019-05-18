@@ -3,6 +3,7 @@ package monitoring
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/monitoring"
@@ -169,6 +170,23 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 		"enabled":      "true",
 		"apiGroup":     monitoring.APIVersion.Group,
 		"nameOverride": "prometheus-operator",
+	}
+
+	mustAppAnswers := map[string]string{
+		"operator.apiGroup":     monitoring.APIVersion.Group,
+		"operator.nameOverride": "prometheus-operator",
+	}
+
+	// take operator answers from overwrite answers
+	for ansKey, ansVal := range monitoring.GetOverwroteAppAnswers(cluster.Annotations) {
+		if strings.HasPrefix(ansKey, "operator.") {
+			appAnswers[ansKey] = ansVal
+		}
+	}
+
+	// cannot overwrite mustAppAnswers
+	for mustKey, mustVal := range mustAppAnswers {
+		appAnswers[mustKey] = mustVal
 	}
 
 	creator, err := app.systemAccountManager.GetSystemUser(cluster.Name)
