@@ -5,7 +5,6 @@ AGENT_REG_CMD = os.environ.get('RANCHER_AGENT_REG_CMD', "")
 HOST_COUNT = int(os.environ.get('RANCHER_HOST_COUNT', 1))
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "testsa")
 RANCHER_SERVER_VERSION = os.environ.get('RANCHER_SERVER_VERSION', "master")
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', "None")
 rke_config = {"authentication": {"type": "authnConfig", "strategy": "x509"},
               "ignoreDockerVersion": False,
               "network": {"type": "networkConfig", "plugin": "canal"},
@@ -49,7 +48,7 @@ def test_deploy_rancher_server():
     RANCHER_SET_DEBUG_CMD = "docker exec rancher-server loglevel --set debug"
     aws_nodes[0].execute_command(RANCHER_SET_DEBUG_CMD)
 
-    token = get_admin_token(RANCHER_SERVER_URL)
+    token = set_url_password_token(RANCHER_SERVER_URL)
     env_details = "env.CATTLE_TEST_URL='" + RANCHER_SERVER_URL + "'\n"
     env_details += "env.ADMIN_TOKEN='" + token + "'\n"
 
@@ -100,26 +99,3 @@ def test_delete_rancher_server():
     assert len(aws_nodes) == 1
     AmazonWebServices().delete_nodes(aws_nodes)
 
-
-def get_admin_token(RANCHER_SERVER_URL):
-    """Returns a ManagementContext for the default global admin user."""
-    CATTLE_AUTH_URL = \
-        RANCHER_SERVER_URL + "/v3-public/localproviders/local?action=login"
-    r = requests.post(CATTLE_AUTH_URL, json={
-        'username': 'admin',
-        'password': 'admin',
-        'responseType': 'json',
-    }, verify=False)
-    print(r.json())
-    token = r.json()['token']
-    print(token)
-    # Change admin password
-    client = rancher.Client(url=RANCHER_SERVER_URL+"/v3",
-                            token=token, verify=False)
-    admin_user = client.list_user(username="admin").data
-    admin_user[0].setpassword(newPassword=ADMIN_PASSWORD)
-
-    # Set server-url settings
-    serverurl = client.list_setting(name="server-url").data
-    client.update(serverurl[0], value=RANCHER_SERVER_URL)
-    return token

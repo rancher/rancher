@@ -11,8 +11,8 @@ logging.getLogger('boto3').setLevel(logging.CRITICAL)
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 
 
-AWS_REGION = 'us-east-2'
-AWS_REGION_AZ = 'us-east-2a'
+AWS_REGION = os.environ.get("AWS_REGION", 'us-east-2')
+AWS_REGION_AZ = os.environ.get("AWS_REGION_AZ", 'us-east-2a')
 AWS_SECURITY_GROUP = os.environ.get("AWS_SECURITY_GROUPS",
                                     'sg-0e753fd5550206e55')
 AWS_SECURITY_GROUPS = [AWS_SECURITY_GROUP]
@@ -50,13 +50,22 @@ PUBLIC_AMI = {
         "ubuntu-16.04": {
             'image': 'ami-cf6c47aa', 'ssh_user': 'ubuntu'},
         "rhel-7.4": {
-            'image': 'ami-0b1e356e', 'ssh_user': 'ec2-user'}}
-}
+            'image': 'ami-0b1e356e', 'ssh_user': 'ec2-user'}},
+    'us-west-1': {
+        "ubuntu-16.04": {
+            'image': 'ami-069339bea0125f50d', 'ssh_user': 'ubuntu'}}
+    }
 
 
 class AmazonWebServices(CloudProviderBase):
 
     def __init__(self):
+        self._elbv2_client = boto3.client(
+            'elbv2',
+            aws_access_key_id=AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+            region_name=AWS_REGION)
+
         self._client = boto3.client(
             'ec2',
             aws_access_key_id=AWS_ACCESS_KEY_ID,
@@ -326,3 +335,26 @@ class AmazonWebServices(CloudProviderBase):
                 if keyName.startswith(name_prefix):
                     print(keyName)
                     self._client.delete_key_pair(KeyName=keyName)
+
+    def register_targets(self, targets, target_group_arn):
+        self._elbv2_client.register_targets(
+            TargetGroupArn=target_group_arn,
+            Targets=targets)
+
+    def describe_target_health(self, target_group_arn):
+        return self._elbv2_client.describe_target_health(
+            TargetGroupArn=target_group_arn)
+
+    def deregister_all_targets(self, target_group_arn):
+        target_health_descriptions = self.describe_target_health(target_group_arn)
+        
+        if len(target_health_descriptions["TargetHealthDescriptions"]) > 0:
+            targets = []
+
+            for target in target_health_descriptions["TargetHealthDescriptions"]:
+                target_obj = target["Target"]
+                targets.append(target_obj)
+
+            self._elbv2_client.deregister_targets(
+                TargetGroupArn=target_group_arn,
+                Targets=targets)

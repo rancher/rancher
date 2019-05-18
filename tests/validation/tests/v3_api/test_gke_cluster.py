@@ -66,15 +66,6 @@ def get_gke_version_credentials():
     return gkemasterversion, credentialdata
 
 
-def readDataFile(data_dir, name):
-    fname = os.path.join(data_dir, name)
-    print(fname)
-    is_file = os.path.isfile(fname)
-    assert is_file
-    with open(fname) as f:
-        return f.read()
-
-
 def get_gke_config():
 
     # Obtain GKE master version and credentials
