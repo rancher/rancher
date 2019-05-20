@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/project"
 	corev1 "github.com/rancher/types/apis/core/v1"
@@ -61,20 +60,6 @@ func EnsureAppProjectName(agentNamespacesClient corev1.NamespaceInterface, owned
 	}
 
 	return appProjectName, nil
-}
-
-func DetectAppCatalogExistence(appCatalogID string, cattleTemplateVersionsClient mgmtv3.CatalogTemplateVersionInterface) error {
-	templateVersionID, templateVersionNamespace, err := common.ParseExternalID(appCatalogID)
-	if err != nil {
-		return errors.Wrapf(err, "failed to parse catalog ID %q", appCatalogID)
-	}
-
-	_, err = cattleTemplateVersionsClient.GetNamespaced(templateVersionNamespace, templateVersionID, metav1.GetOptions{})
-	if err != nil {
-		return errors.Wrapf(err, "failed to find catalog by ID %q", appCatalogID)
-	}
-
-	return nil
 }
 
 func GetSystemProjectID(cattleProjectsClient mgmtv3.ProjectInterface) (string, error) {
