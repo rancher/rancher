@@ -150,10 +150,6 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 	appName, appTargetNamespace := monitoring.SystemMonitoringInfo()
 
 	appCatalogID := settings.SystemMonitoringCatalogID.Get()
-	err := monitoring.DetectAppCatalogExistence(appCatalogID, app.cattleTemplateVersionClient)
-	if err != nil {
-		return errors.Wrapf(err, "failed to ensure catalog %q", appCatalogID)
-	}
 
 	appDeployProjectID, err := monitoring.GetSystemProjectID(app.cattleProjectClient)
 	if err != nil {
