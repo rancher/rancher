@@ -16,6 +16,8 @@ const (
 	ResourceWorkload          = "workload"
 	ResourcePod               = "pod"
 	ResourceContainer         = "container"
+	ResourceKubeComponent     = "kube-component"
+	ResourceRancherComponent  = "rancher-component"
 )
 
 const (

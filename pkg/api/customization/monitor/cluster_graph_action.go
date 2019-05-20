@@ -20,6 +20,7 @@ import (
 	mgmtclientv3 "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/config/dialer"
+
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -53,7 +54,11 @@ func (h *ClusterGraphHandler) QuerySeriesAction(actionName string, action *types
 	}
 
 	inputParser := newClusterGraphInputParser(queryGraphInput)
-	if err = inputParser.parse(); err != nil {
+	if err = inputParser.parseFilter(); err != nil {
+		return err
+	}
+
+	if err = newClusterAuthChecker(apiContext, inputParser.ClusterName).check(); err != nil {
 		return err
 	}
 
@@ -61,6 +66,12 @@ func (h *ClusterGraphHandler) QuerySeriesAction(actionName string, action *types
 	userContext, err := h.clustermanager.UserContext(clusterName)
 	if err != nil {
 		return fmt.Errorf("get usercontext failed, %v", err)
+	}
+
+	mgmtClient := h.clustermanager.ScaledContext.Management
+	nodeLister := mgmtClient.Nodes(metav1.NamespaceAll).Controller().Lister()
+	if err = inputParser.parseClusterParams(userContext, nodeLister); err != nil {
+		return err
 	}
 
 	prometheusName, prometheusNamespace := monitorutil.ClusterMonitoringInfo()
@@ -77,9 +88,6 @@ func (h *ClusterGraphHandler) QuerySeriesAction(actionName string, action *types
 	if err != nil {
 		return err
 	}
-
-	mgmtClient := h.clustermanager.ScaledContext.Management
-	nodeLister := mgmtClient.Nodes(metav1.NamespaceAll).Controller().Lister()
 
 	nodeMap, err := getNodeName2InternalIPMap(nodeLister, clusterName)
 	if err != nil {
@@ -142,12 +150,6 @@ type metricWrap struct {
 }
 
 func graph2Metrics(userContext *config.UserContext, mgmtClient v3.Interface, clusterName, resourceType, refGraphName string, metricSelector, detailsMetricSelector map[string]string, metricParams map[string]string, isDetails bool) ([]*metricWrap, error) {
-	nodeLister := mgmtClient.Nodes(metav1.NamespaceAll).Controller().Lister()
-	newMetricParams, err := parseMetricParams(userContext, nodeLister, resourceType, clusterName, metricParams)
-	if err != nil {
-		return nil, err
-	}
-
 	var excuteMetrics []*metricWrap
 	var set labels.Set
 	if isDetails && detailsMetricSelector != nil {
@@ -161,7 +163,7 @@ func graph2Metrics(userContext *config.UserContext, mgmtClient v3.Interface, clu
 	}
 
 	for _, v := range metrics.Items {
-		executeExpression := replaceParams(newMetricParams, v.Spec.Expression)
+		executeExpression := replaceParams(metricParams, v.Spec.Expression)
 		excuteMetrics = append(excuteMetrics, &metricWrap{
 			MonitorMetric:              *v.DeepCopy(),
 			ExecuteExpression:          executeExpression,

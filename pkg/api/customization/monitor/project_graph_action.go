@@ -44,7 +44,7 @@ func (h *ProjectGraphHandler) QuerySeriesAction(actionName string, action *types
 	}
 
 	inputParser := newProjectGraphInputParser(queryGraphInput)
-	if err = inputParser.parse(); err != nil {
+	if err = inputParser.parseFilter(); err != nil {
 		return err
 	}
 
@@ -54,8 +54,11 @@ func (h *ProjectGraphHandler) QuerySeriesAction(actionName string, action *types
 		return fmt.Errorf("get usercontext failed, %v", err)
 	}
 
-	check := newAuthChecker(apiContext.Request.Context(), userContext, inputParser.Input, inputParser.ProjectID)
-	if err = check.check(); err != nil {
+	if err = inputParser.parseProjectParams(apiContext.Request.Context(), userContext); err != nil {
+		return err
+	}
+
+	if err = newProjectAuthChecker(userContext, apiContext, inputParser.Input, inputParser.ProjectID).check(); err != nil {
 		return err
 	}
 

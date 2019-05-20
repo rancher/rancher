@@ -6,11 +6,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
+	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
+	mgmtclient "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
+
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -25,6 +29,22 @@ var (
 	defaultFrom        = "now-" + defaultQueryDuring
 )
 
+var (
+	clusterResourceTypes = map[string]bool{
+		ResourceCluster:          true,
+		ResourceEtcd:             true,
+		ResourceKubeComponent:    true,
+		ResourceRancherComponent: true,
+		ResourceNode:             true,
+	}
+
+	projectResourceTypes = map[string]bool{
+		ResourceWorkload:  true,
+		ResourcePod:       true,
+		ResourceContainer: true,
+	}
+)
+
 func newClusterGraphInputParser(input v3.QueryGraphInput) *clusterGraphInputParser {
 	return &clusterGraphInputParser{
 		Input: &input,
@@ -32,35 +52,46 @@ func newClusterGraphInputParser(input v3.QueryGraphInput) *clusterGraphInputPars
 }
 
 type clusterGraphInputParser struct {
-	Input       *v3.QueryGraphInput
-	ClusterName string
-	Start       time.Time
-	End         time.Time
-	Step        time.Duration
-	Conditions  []*types.QueryCondition
+	Input        *v3.QueryGraphInput
+	ClusterName  string
+	ResourceType string
+	Start        time.Time
+	End          time.Time
+	Step         time.Duration
+	Conditions   []*types.QueryCondition
 }
 
-func (p *clusterGraphInputParser) parse() (err error) {
-	if p.Input.MetricParams == nil {
-		p.Input.MetricParams = make(map[string]string)
-	}
-
+func (p *clusterGraphInputParser) parseClusterParams(userContext *config.UserContext, nodeLister v3.NodeLister) (err error) {
 	p.Start, p.End, p.Step, err = parseTimeParams(p.Input.From, p.Input.To, p.Input.Interval)
 	if err != nil {
 		return err
 	}
 
-	return p.parseFilter()
+	return p.parseClusterMetricParams(userContext, nodeLister)
 }
 
 func (p *clusterGraphInputParser) parseFilter() error {
 	if p.Input.Filters == nil {
-		return fmt.Errorf("must have clusterId filter")
+		return fmt.Errorf("must have param filters")
 	}
 
 	p.ClusterName = p.Input.Filters["clusterId"]
 	if p.ClusterName == "" {
-		return fmt.Errorf("clusterId is empty")
+		return fmt.Errorf(`param filters["clusterId"] is empty`)
+	}
+
+	p.ResourceType = p.Input.Filters["resourceType"]
+
+	if p.ResourceType == "" {
+		p.ResourceType = p.Input.Filters["displayResourceType"]
+	}
+
+	if p.ResourceType == "" {
+		return fmt.Errorf(`param filters["resourceType"] is empty`)
+	}
+
+	if _, ok := clusterResourceTypes[p.ResourceType]; !ok {
+		return fmt.Errorf(`invalid param filters["resourceType"`)
 	}
 
 	for name, value := range p.Input.Filters {
@@ -68,6 +99,53 @@ func (p *clusterGraphInputParser) parseFilter() error {
 	}
 
 	return nil
+}
+
+func (p *clusterGraphInputParser) parseClusterMetricParams(userContext *config.UserContext, nodeLister v3.NodeLister) error {
+	if p.Input.MetricParams == nil {
+		p.Input.MetricParams = make(map[string]string)
+		return nil
+	}
+
+	var ip string
+	var err error
+	if p.ResourceType == ResourceNode {
+		instance := p.Input.MetricParams["instance"]
+		if instance == "" {
+			return fmt.Errorf(`param metricParams["instance"] is empty`)
+		}
+		ip, err = nodeName2InternalIP(nodeLister, p.ClusterName, instance)
+		if err != nil {
+			return err
+		}
+	}
+	p.Input.MetricParams["instance"] = ip + ".*"
+	return nil
+}
+
+type clusterAuthChecker struct {
+	clusterID  string
+	apiContext *types.APIContext
+}
+
+func newClusterAuthChecker(apiContext *types.APIContext, clusterID string) *clusterAuthChecker {
+	return &clusterAuthChecker{
+		clusterID:  clusterID,
+		apiContext: apiContext,
+	}
+}
+
+func (a *clusterAuthChecker) check() error {
+	canGetCluster := func() error {
+		cluster := map[string]interface{}{
+			"id": a.clusterID,
+		}
+
+		clusterSchema := managementschema.Schemas.Schema(&managementschema.Version, mgmtclient.ClusterType)
+		return a.apiContext.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "get", a.apiContext, cluster, clusterSchema)
+	}
+
+	return canGetCluster()
 }
 
 func newProjectGraphInputParser(input v3.QueryGraphInput) *projectGraphInputParser {
@@ -77,40 +155,50 @@ func newProjectGraphInputParser(input v3.QueryGraphInput) *projectGraphInputPars
 }
 
 type projectGraphInputParser struct {
-	Input       *v3.QueryGraphInput
-	ProjectID   string
-	ClusterName string
-	Start       time.Time
-	End         time.Time
-	Step        time.Duration
-	Conditions  []*types.QueryCondition
+	Input        *v3.QueryGraphInput
+	ProjectID    string
+	ClusterName  string
+	ResourceType string
+	Start        time.Time
+	End          time.Time
+	Step         time.Duration
+	Conditions   []*types.QueryCondition
 }
 
-func (p *projectGraphInputParser) parse() (err error) {
-	if p.Input.MetricParams == nil {
-		p.Input.MetricParams = make(map[string]string)
-	}
-
+func (p *projectGraphInputParser) parseProjectParams(ctx context.Context, userContext *config.UserContext) (err error) {
 	p.Start, p.End, p.Step, err = parseTimeParams(p.Input.From, p.Input.To, p.Input.Interval)
 	if err != nil {
 		return err
 	}
 
-	return p.parseFilter()
+	if p.Input.MetricParams == nil {
+		p.Input.MetricParams = make(map[string]string)
+	}
+
+	return p.parseProjectMetricParams(ctx, userContext)
 }
 
 func (p *projectGraphInputParser) parseFilter() error {
 	if p.Input.Filters == nil {
-		return fmt.Errorf("must have projectId filter")
+		return fmt.Errorf("must have param filters")
 	}
 
 	p.ProjectID = p.Input.Filters["projectId"]
 	if p.ProjectID == "" {
-		return fmt.Errorf("projectId is empty")
+		return fmt.Errorf(`param filters["projectId"] is empty`)
 	}
 
 	if p.ClusterName, _ = ref.Parse(p.ProjectID); p.ClusterName == "" {
-		return fmt.Errorf("clusterName is empty")
+		return fmt.Errorf(`invalid param filters["projectId"`)
+	}
+
+	p.ResourceType = p.Input.Filters["resourceType"]
+	if p.ResourceType == "" {
+		return fmt.Errorf(`param filters["resourceType"] is empty`)
+	}
+
+	if _, ok := projectResourceTypes[p.ResourceType]; !ok {
+		return fmt.Errorf(`invalid param filters["resourceType"`)
 	}
 
 	for name, value := range p.Input.Filters {
@@ -120,30 +208,43 @@ func (p *projectGraphInputParser) parseFilter() error {
 	return nil
 }
 
-type authChecker struct {
-	ProjectID          string
-	Input              *v3.QueryGraphInput
-	UserContext        *config.UserContext
-	WorkloadController workload.CommonController
+type projectAuthChecker struct {
+	projectID   string
+	input       *v3.QueryGraphInput
+	userContext *config.UserContext
+	apiContext  *types.APIContext
 }
 
-func newAuthChecker(ctx context.Context, userContext *config.UserContext, input *v3.QueryGraphInput, projectID string) *authChecker {
-	return &authChecker{
-		ProjectID:          projectID,
-		Input:              input,
-		UserContext:        userContext,
-		WorkloadController: workload.NewWorkloadController(ctx, userContext.UserOnlyContext(), nil),
+func newProjectAuthChecker(userContext *config.UserContext, apiContext *types.APIContext, input *v3.QueryGraphInput, projectID string) *projectAuthChecker {
+	return &projectAuthChecker{
+		projectID:   projectID,
+		input:       input,
+		userContext: userContext,
+		apiContext:  apiContext,
 	}
 }
 
-func (a *authChecker) check() error {
+func (a *projectAuthChecker) check() error {
+	canGetProject := func() error {
+		project := map[string]interface{}{
+			"id": a.projectID,
+		}
+
+		projectSchema := managementschema.Schemas.Schema(&managementschema.Version, mgmtclient.ProjectType)
+		return a.apiContext.AccessControl.CanDo(v3.ProjectGroupVersionKind.Group, v3.ProjectResource.Name, "get", a.apiContext, project, projectSchema)
+	}
+
+	if err := canGetProject(); err != nil {
+		return err
+	}
+
 	return a.parseNamespace()
 }
 
-func (a *authChecker) parseNamespace() error {
-	if a.Input.MetricParams["namespace"] != "" {
+func (a *projectAuthChecker) parseNamespace() error {
+	if a.input.MetricParams["namespace"] != "" {
 		if !a.isAuthorizeNamespace() {
-			return fmt.Errorf("could not query unauthorize namespace")
+			return httperror.NewAPIError(httperror.PermissionDenied, fmt.Sprintf("couldn't query unauthorize namespace %s", a.input.MetricParams["namespace"]))
 		}
 		return nil
 	}
@@ -152,27 +253,27 @@ func (a *authChecker) parseNamespace() error {
 	if err != nil {
 		return err
 	}
-	a.Input.MetricParams["namespace"] = nss
+	a.input.MetricParams["namespace"] = nss
 	return nil
 }
 
-func (a *authChecker) isAuthorizeNamespace() bool {
-	ns, err := a.UserContext.Core.Namespaces(metav1.NamespaceAll).Get(a.Input.MetricParams["namespace"], metav1.GetOptions{})
+func (a *projectAuthChecker) isAuthorizeNamespace() bool {
+	ns, err := a.userContext.Core.Namespaces(metav1.NamespaceAll).Get(a.input.MetricParams["namespace"], metav1.GetOptions{})
 	if err != nil {
-		logrus.Errorf("get namespace %s info failed, %v", a.Input.MetricParams["namespace"], err)
+		logrus.Errorf("get namespace %s info failed, %v", a.input.MetricParams["namespace"], err)
 		return false
 	}
-	return ns.Annotations[projectIDAnn] == a.ProjectID
+	return ns.Annotations[projectIDAnn] == a.projectID
 }
 
-func (a *authChecker) getAuthroizeNamespace() (string, error) {
-	nss, err := a.UserContext.Core.Namespaces(metav1.NamespaceAll).List(metav1.ListOptions{})
+func (a *projectAuthChecker) getAuthroizeNamespace() (string, error) {
+	nss, err := a.userContext.Core.Namespaces(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
 		return "", fmt.Errorf("list namespace failed, %v", err)
 	}
 	var authNs []string
 	for _, v := range nss.Items {
-		if v.Annotations[projectIDAnn] == a.ProjectID {
+		if v.Annotations[projectIDAnn] == a.projectID {
 			authNs = append(authNs, v.Name)
 		}
 	}
@@ -198,30 +299,18 @@ func getAuthToken(userContext *config.UserContext, appName, namespace string) (s
 	return string(secret.Data["token"]), nil
 }
 
-func parseMetricParams(userContext *config.UserContext, nodeLister v3.NodeLister, resourceType, clusterName string, metricParams map[string]string) (map[string]string, error) {
-	newMetricParams := make(map[string]string)
-	for k, v := range metricParams {
-		newMetricParams[k] = v
+func (p *projectGraphInputParser) parseProjectMetricParams(ctx context.Context, userContext *config.UserContext) error {
+	if p.Input.MetricParams == nil {
+		p.Input.MetricParams = make(map[string]string)
+		return nil
 	}
 
-	var ip string
-	var err error
-	switch resourceType {
-	case ResourceNode:
-		instance := newMetricParams["instance"]
-		if instance == "" {
-			return nil, fmt.Errorf("instance in metric params is empty")
-		}
-		ip, err = nodeName2InternalIP(nodeLister, clusterName, instance)
-		if err != nil {
-			return newMetricParams, err
-		}
-
+	switch p.ResourceType {
 	case ResourceWorkload:
-		workloadName := newMetricParams["workloadName"]
+		workloadName := p.Input.MetricParams["workloadName"]
 		rcType, ns, name, err := parseWorkloadName(workloadName)
 		if err != nil {
-			return newMetricParams, err
+			return fmt.Errorf("get workload %s failed, %v", workloadName, err)
 		}
 
 		var podOwners []string
@@ -233,7 +322,7 @@ func parseMetricParams(userContext *config.UserContext, nodeLister v3.NodeLister
 			if rcType == workload.DeploymentType {
 				rcs, err := userContext.Apps.ReplicaSets(ns).List(metav1.ListOptions{})
 				if err != nil {
-					return newMetricParams, fmt.Errorf("list replicasets failed, %v", err)
+					return fmt.Errorf("list replicasets failed, %v", err)
 				}
 
 				for _, rc := range rcs.Items {
@@ -247,7 +336,7 @@ func parseMetricParams(userContext *config.UserContext, nodeLister v3.NodeLister
 			var podNames []string
 			pods, err := userContext.Core.Pods(ns).List(metav1.ListOptions{})
 			if err != nil {
-				return nil, fmt.Errorf("list pod failed, %v", err)
+				return fmt.Errorf("list pod failed, %v", err)
 			}
 			for _, pod := range pods.Items {
 				if len(pod.OwnerReferences) != 0 {
@@ -258,32 +347,32 @@ func parseMetricParams(userContext *config.UserContext, nodeLister v3.NodeLister
 					}
 				}
 			}
-			newMetricParams["podName"] = strings.Join(podNames, "|")
+			p.Input.MetricParams["podName"] = strings.Join(podNames, "|")
+			p.Input.MetricParams["namespace"] = ns
 		}
 	case ResourcePod:
-		podName := newMetricParams["podName"]
+		podName := p.Input.MetricParams["podName"]
 		if podName == "" {
-			return nil, fmt.Errorf("pod name is empty")
+			return fmt.Errorf(`param metricParams["podName"] is empty`)
 		}
 		ns, name := ref.Parse(podName)
-		newMetricParams["namespace"] = ns
-		newMetricParams["podName"] = name
+		p.Input.MetricParams["namespace"] = ns
+		p.Input.MetricParams["podName"] = name
 	case ResourceContainer:
-		podName := newMetricParams["podName"]
+		podName := p.Input.MetricParams["podName"]
 		if podName == "" {
-			return nil, fmt.Errorf("pod name is empty")
+			return fmt.Errorf(`param metricParams["podName"] is empty`)
 		}
 		ns, name := ref.Parse(podName)
-		newMetricParams["namespace"] = ns
-		newMetricParams["podName"] = name
+		p.Input.MetricParams["namespace"] = ns
+		p.Input.MetricParams["podName"] = name
 
-		containerName := newMetricParams["containerName"]
+		containerName := p.Input.MetricParams["containerName"]
 		if containerName == "" {
-			return nil, fmt.Errorf("container name is empty")
+			return fmt.Errorf(`param metricParams["containerName"] is empty`)
 		}
 	}
-	newMetricParams["instance"] = ip + ".*"
-	return newMetricParams, nil
+	return nil
 }
 
 func replaceParams(metricParams map[string]string, expr string) string {
@@ -332,7 +421,7 @@ func parseTimeParams(from, to, interval string) (start, end time.Time, step time
 func parseWorkloadName(id string) (typeName, namespace, name string, err error) {
 	arr := strings.Split(id, ":")
 	if len(arr) < 3 {
-		return "", "", "", fmt.Errorf("invalid workload name: %s", id)
+		return "", "", "", fmt.Errorf(`invalid param metricParams["workloadName"]: %s`, id)
 	}
 	return arr[0], arr[1], arr[2], nil
 }
@@ -345,7 +434,6 @@ func contains(str string, arr ...string) bool {
 	}
 	return false
 }
-
 func isInstanceGraph(graphType string) bool {
 	return graphType == "singlestat"
 }
