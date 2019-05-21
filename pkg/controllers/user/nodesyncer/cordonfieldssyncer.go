@@ -26,7 +26,7 @@ const (
 var nodeMapLock = sync.Mutex{}
 var toIgnoreErrs = []string{"--ignore-daemonsets", "--delete-local-data", "--force", "did not complete within"}
 
-func (m *NodesSyncer) syncCordonFields(key string, obj *v3.Node) (runtime.Object, error) {
+func (m *nodesSyncer) syncCordonFields(key string, obj *v3.Node) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil || obj.Spec.DesiredNodeUnschedulable == "" {
 		return nil, nil
 	}
@@ -43,7 +43,7 @@ func (m *NodesSyncer) syncCordonFields(key string, obj *v3.Node) (runtime.Object
 	if node.Spec.Unschedulable != desiredValue {
 		toUpdate := node.DeepCopy()
 		toUpdate.Spec.Unschedulable = desiredValue
-		if _, err := m.nodeClient.Update(toUpdate); err != nil {
+		if _, err = m.nodeClient.Update(toUpdate); err != nil {
 			return nil, err
 		}
 	}
@@ -59,7 +59,7 @@ func (m *NodesSyncer) syncCordonFields(key string, obj *v3.Node) (runtime.Object
 	return nil, nil
 }
 
-func (d *NodeDrain) drainNode(key string, obj *v3.Node) (runtime.Object, error) {
+func (d *nodeDrain) drainNode(key string, obj *v3.Node) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil || obj.Spec.DesiredNodeUnschedulable == "" {
 		return nil, nil
 	}
@@ -91,7 +91,7 @@ func (d *NodeDrain) drainNode(key string, obj *v3.Node) (runtime.Object, error) 
 	return nil, nil
 }
 
-func (d *NodeDrain) updateNode(node *v3.Node, updateFunc func(node *v3.Node, originalErr error, kubeErr error), originalErr error, kubeErr error) (*v3.Node, error) {
+func (d *nodeDrain) updateNode(node *v3.Node, updateFunc func(node *v3.Node, originalErr error, kubeErr error), originalErr error, kubeErr error) (*v3.Node, error) {
 	updatedObj, err := d.machines.Update(node)
 	if err != nil && errors.IsConflict(err) {
 		// retrying twelve times, if conflict error still exists, give up
@@ -114,7 +114,7 @@ func (d *NodeDrain) updateNode(node *v3.Node, updateFunc func(node *v3.Node, ori
 	return updatedObj, err
 }
 
-func (d *NodeDrain) drain(ctx context.Context, obj *v3.Node, cancel context.CancelFunc) {
+func (d *nodeDrain) drain(ctx context.Context, obj *v3.Node, cancel context.CancelFunc) {
 	defer deleteFromContextMap(d.nodesToContext, obj.Name)
 
 	for {
@@ -175,7 +175,7 @@ func (d *NodeDrain) drain(ctx context.Context, obj *v3.Node, cancel context.Canc
 	}
 }
 
-func (d *NodeDrain) resetDesiredNodeUnschedulable(obj *v3.Node) error {
+func (d *nodeDrain) resetDesiredNodeUnschedulable(obj *v3.Node) error {
 	nodeCopy := obj.DeepCopy()
 	removeDrainCondition(nodeCopy)
 	nodeCopy.Spec.DesiredNodeUnschedulable = ""
@@ -185,7 +185,7 @@ func (d *NodeDrain) resetDesiredNodeUnschedulable(obj *v3.Node) error {
 	return nil
 }
 
-func (d *NodeDrain) getKubeConfig() (*clientcmdapi.Config, error) {
+func (d *nodeDrain) getKubeConfig() (*clientcmdapi.Config, error) {
 	cluster, err := d.clusterLister.Get("", d.clusterName)
 	if err != nil {
 		return nil, err
@@ -215,7 +215,7 @@ func getFlags(input *v3.NodeDrainInput) []string {
 }
 
 func filterErrorMsg(msg string, nodeName string) string {
-	upd := []string{}
+	var upd []string
 	lines := strings.Split(msg, "\n")
 	for _, line := range lines[1:] {
 		if strings.HasPrefix(line, "WARNING") || strings.HasPrefix(line, nodeName) {

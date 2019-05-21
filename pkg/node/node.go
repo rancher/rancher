@@ -13,19 +13,20 @@ const (
 	LabelNodeName             = "management.cattle.io/nodename"
 )
 
-func GetNodeName(node *v3.Node) string {
-	if node.Status.NodeName != "" {
-		return node.Status.NodeName
+func GetNodeName(machine *v3.Node) string {
+	if machine.Status.NodeName != "" {
+		return machine.Status.NodeName
 	}
-	// to handle the case when node was provisioned first
-	if node.Status.NodeConfig != nil {
-		if node.Status.NodeConfig.HostnameOverride != "" {
-			return node.Status.NodeConfig.HostnameOverride
+	// to handle the case when machine was provisioned first
+	if machine.Status.NodeConfig != nil {
+		if machine.Status.NodeConfig.HostnameOverride != "" {
+			return machine.Status.NodeConfig.HostnameOverride
 		}
 	}
 	return ""
 }
 
+// IsNodeForNode returns true if node names or addresses are equal
 func IsNodeForNode(node *corev1.Node, machine *v3.Node) bool {
 	nodeName := GetNodeName(machine)
 	if nodeName == node.Name {
@@ -102,7 +103,8 @@ func GetNodeForMachine(machine *v3.Node, nodeLister v1.NodeLister) (*corev1.Node
 	var nodes []*corev1.Node
 	var err error
 	if nodeName != "" {
-		node, err := nodeLister.Get("", nodeName)
+		var node *corev1.Node
+		node, err = nodeLister.Get("", nodeName)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return nil, err
 
