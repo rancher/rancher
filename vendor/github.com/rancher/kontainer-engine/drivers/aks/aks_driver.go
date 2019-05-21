@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2018-03-31/containerservice"
@@ -36,9 +35,6 @@ type Driver struct {
 }
 
 type state struct {
-	// Path to the public key to use for SSH into cluster
-	SSHPublicKeyPath string `json:"sshPublicKeyPath,omitempty"`
-
 	v3.AzureKubernetesServiceConfig
 
 	// Cluster Name
@@ -213,7 +209,6 @@ func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state.ResourceGroup = options.GetValueFromDriverOptions(driverOptions, types.StringType, "resource-group", "resourceGroup").(string)
 	state.AgentPoolName = options.GetValueFromDriverOptions(driverOptions, types.StringType, "node-pool-name", "agentPoolName").(string)
 	state.MasterDNSPrefix = options.GetValueFromDriverOptions(driverOptions, types.StringType, "master-dns-prefix", "masterDnsPrefix").(string)
-	state.SSHPublicKeyPath = options.GetValueFromDriverOptions(driverOptions, types.StringType, "public-key").(string)
 	state.SSHPublicKeyContents = options.GetValueFromDriverOptions(driverOptions, types.StringType, "sshPublicKeyContents").(string)
 	state.AdminUsername = options.GetValueFromDriverOptions(driverOptions, types.StringType, "admin-username", "adminUsername").(string)
 	state.BaseURL = options.GetValueFromDriverOptions(driverOptions, types.StringType, "base-url").(string)
@@ -245,8 +240,8 @@ func (state *state) validate() error {
 		return fmt.Errorf("resource group is required")
 	}
 
-	if state.SSHPublicKeyPath == "" && state.SSHPublicKeyContents == "" {
-		return fmt.Errorf("path to ssh public key or public key contents is required")
+	if state.SSHPublicKeyContents == "" {
+		return fmt.Errorf("public key contents is required")
 	}
 
 	if state.ClientID == "" {
@@ -371,17 +366,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 		agentDNSPrefix = driverState.getDefaultDNSPrefix() + "-agent"
 	}
 
-	var publicKey []byte
-
-	if driverState.SSHPublicKeyContents == "" {
-		publicKey, err = ioutil.ReadFile(driverState.SSHPublicKeyPath)
-	} else {
-		publicKey = []byte(driverState.SSHPublicKeyContents)
-	}
-
-	if err != nil {
-		return nil, err
-	}
+	publicKey := []byte(driverState.SSHPublicKeyContents)
 
 	publicKeyContents := string(publicKey)
 	tags := make(map[string]*string)
