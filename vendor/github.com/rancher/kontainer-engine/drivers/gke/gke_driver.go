@@ -126,10 +126,6 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Usage: "The zone to launch the cluster",
 		Value: "us-central1-a",
 	}
-	driverFlag.Options["gke-credential-path"] = &types.Flag{
-		Type:  types.StringType,
-		Usage: "the path to the credential json file(example: $HOME/key.json)",
-	}
 	driverFlag.Options["cluster-ipv4-cidr"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "The IP address range of the container pods",
@@ -539,25 +535,19 @@ func (d *Driver) getServiceClient(ctx context.Context, state state) (*raw.Servic
 	}
 	defer cleanup()
 
-	if state.CredentialPath != "" {
-		setEnv = true
-		os.Setenv(defaultCredentialEnv, state.CredentialPath)
+	file, err := ioutil.TempFile("", "credential-file")
+	if err != nil {
+		return nil, err
 	}
-	if state.CredentialContent != "" {
-		file, err := ioutil.TempFile("", "credential-file")
-		if err != nil {
-			return nil, err
-		}
-		defer os.Remove(file.Name())
-		defer file.Close()
+	defer os.Remove(file.Name())
+	defer file.Close()
 
-		if _, err := io.Copy(file, strings.NewReader(state.CredentialContent)); err != nil {
-			return nil, err
-		}
-
-		setEnv = true
-		os.Setenv(defaultCredentialEnv, file.Name())
+	if _, err := io.Copy(file, strings.NewReader(state.CredentialContent)); err != nil {
+		return nil, err
 	}
+
+	setEnv = true
+	os.Setenv(defaultCredentialEnv, file.Name())
 
 	ts, err := google.DefaultTokenSource(ctx, raw.CloudPlatformScope)
 	if err != nil {
