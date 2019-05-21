@@ -2,6 +2,7 @@ package monitoring
 
 import (
 	"fmt"
+	"github.com/rancher/rancher/pkg/utils"
 	"reflect"
 	"time"
 
@@ -133,7 +134,7 @@ func (ph *projectHandler) doSync(project *mgmtv3.Project, clusterName string) er
 }
 
 func (ph *projectHandler) ensureAppProjectName(appTargetNamespace string, project *mgmtv3.Project) (string, error) {
-	appProjectName, err := monitoring.EnsureAppProjectName(ph.app.agentNamespaceClient, project.Name, project.Spec.ClusterName, appTargetNamespace)
+	appProjectName, err := utils.EnsureAppProjectName(ph.app.agentNamespaceClient, project.Name, project.Spec.ClusterName, appTargetNamespace)
 	if err != nil {
 		return "", err
 	}
@@ -226,7 +227,7 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 		},
 	}
 
-	deployed, err := monitoring.DeployApp(ph.app.cattleAppClient, appDeployProjectID, app, false)
+	deployed, err := utils.DeployApp(ph.app.cattleAppClient, appDeployProjectID, app, false)
 	if err != nil {
 		return err
 	}

@@ -3,6 +3,7 @@ package monitoring
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/rancher/rancher/pkg/utils"
 	"reflect"
 	"sort"
 	"strings"
@@ -156,12 +157,12 @@ func (ch *clusterHandler) doSync(cluster *mgmtv3.Cluster) error {
 }
 
 func (ch *clusterHandler) ensureAppProjectName(clusterID, appTargetNamespace string) (string, error) {
-	appDeployProjectID, err := monitoring.GetSystemProjectID(ch.app.cattleProjectClient)
+	appDeployProjectID, err := utils.GetSystemProjectID(ch.app.cattleProjectClient)
 	if err != nil {
 		return "", err
 	}
 
-	appProjectName, err := monitoring.EnsureAppProjectName(ch.app.agentNamespaceClient, appDeployProjectID, clusterID, appTargetNamespace)
+	appProjectName, err := utils.EnsureAppProjectName(ch.app.agentNamespaceClient, appDeployProjectID, clusterID, appTargetNamespace)
 	if err != nil {
 		return "", err
 	}
@@ -391,7 +392,7 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 		},
 	}
 
-	_, err = monitoring.DeployApp(ch.app.cattleAppClient, appDeployProjectID, app, false)
+	_, err = utils.DeployApp(ch.app.cattleAppClient, appDeployProjectID, app, false)
 	if err != nil {
 		return nil, err
 	}
