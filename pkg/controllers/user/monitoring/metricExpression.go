@@ -2377,7 +2377,7 @@ metadata:
     metric: server-proposals-committed-sum-increase
     source: rancher-monitoring
 spec:
-  expression: sum(increase(etcd_server_proposals_committed_total[5m])) 
+  expression: sum(rate(etcd_server_proposals_committed_total[5m])) 
   legendFormat: Proposal commit rate
   description: etcd server proposals committed sum increase
 ---
@@ -2394,7 +2394,7 @@ metadata:
     metric: server-proposals-committed-sum-increase
     source: rancher-monitoring
 spec:
-  expression: sum(increase(etcd_server_proposals_committed_total[5m])) by (instance)
+  expression: sum(rate(etcd_server_proposals_committed_total[5m])) by (instance)
   legendFormat: Proposal commit rate([[instance]])
   description: etcd server proposals committed sum increase
 ---
@@ -2411,7 +2411,7 @@ metadata:
     metric: server-proposals-applied-sum-increase
     source: rancher-monitoring
 spec:
-  expression: sum(increase(etcd_server_proposals_applied_total[5m])) 
+  expression: sum(rate(etcd_server_proposals_applied_total[5m])) 
   legendFormat: Proposal applied
   description: etcd server proposals applied sum increase
 ---
@@ -2428,7 +2428,7 @@ metadata:
     metric: server-proposals-applied-sum-increase
     source: rancher-monitoring
 spec:
-  expression: sum(increase(etcd_server_proposals_applied_total[5m])) by (instance)
+  expression: sum(rate(etcd_server_proposals_applied_total[5m])) by (instance)
   legendFormat: Proposal applied([[instance]])
   description: etcd server proposals applied sum increase
 ---
@@ -2445,7 +2445,7 @@ metadata:
     metric: server-proposals-failed-sum-increase
     source: rancher-monitoring
 spec:
-  expression: sum(increase(etcd_server_proposals_failed_total[5m])) 
+  expression: sum(rate(etcd_server_proposals_failed_total[5m])) 
   legendFormat: Proposal failed
   description: etcd server proposals failed sum increase
 ---
@@ -2462,7 +2462,7 @@ metadata:
     metric: server-proposals-failed-sum-increase
     source: rancher-monitoring
 spec:
-  expression: sum(increase(etcd_server_proposals_failed_total[5m])) by (instance)
+  expression: sum(rate(etcd_server_proposals_failed_total[5m])) by (instance)
   legendFormat: Proposal failed([[instance]])
   description: etcd server proposals failed sum increase
 ---
@@ -2479,7 +2479,7 @@ metadata:
     metric: server-proposals-pending-sum-increase
     source: rancher-monitoring
 spec:
-  expression: sum(increase(etcd_server_proposals_pending[5m])) 
+  expression: sum(etcd_server_proposals_pending) 
   legendFormat: Proposal pending
   description: etcd server proposals pending sum increase
 ---
@@ -2496,7 +2496,7 @@ metadata:
     metric: server-proposals-pending-sum-increase
     source: rancher-monitoring
 spec:
-  expression: sum(increase(etcd_server_proposals_pending[5m])) by (instance)
+  expression: sum(etcd_server_proposals_pending) by (instance)
   legendFormat: Proposal pending([[instance]])
   description: etcd server proposals pending sum increase
 ---
