@@ -38,14 +38,6 @@ func doExecutePlan(ctx context.Context, nodeConfig *NodeConfig, _ bool) error {
 	return nil
 }
 
-func Stop(ctx context.Context) error {
-	return executePowerShell(ctx, "stop")
-}
-
-func Remove(ctx context.Context) error {
-	return executePowerShell(ctx, "remove")
-}
-
 func executePowerShell(rootCtx context.Context, scriptName string, args ...string) error {
 	scriptPath, err := getPowerShellScript(scriptName)
 	if err != nil {
