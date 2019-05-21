@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/leaderelection"
@@ -53,7 +53,7 @@ func run(ctx context.Context, namespace, name string, client kubernetes.Interfac
 	}
 
 	t := time.Second
-	if dl := os.Getenv("DEV_LEADERELECTION"); dl != "" {
+	if dl := os.Getenv("CATTLE_DEV_MODE"); dl != "" {
 		t = time.Hour
 	}
 
