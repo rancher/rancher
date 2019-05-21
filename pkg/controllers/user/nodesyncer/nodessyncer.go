@@ -1,13 +1,10 @@
 package nodesyncer
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
-
-	"k8s.io/apimachinery/pkg/runtime"
-
-	"context"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
@@ -22,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -32,19 +30,13 @@ const (
 
 var apiUpdateMap = map[string]string{apiUpdate: "true"}
 
-type NodeSyncer struct {
+type nodeSyncer struct {
 	machines         v3.NodeInterface
 	clusterNamespace string
-	nodesSyncer      *NodesSyncer
+	nodesSyncer      *nodesSyncer
 }
 
-type PodsStatsSyncer struct {
-	clusterName      string
-	clusterNamespace string
-	machinesClient   v3.NodeInterface
-}
-
-type NodesSyncer struct {
+type nodesSyncer struct {
 	machines         v3.NodeInterface
 	machineLister    v3.NodeLister
 	nodeLister       v1.NodeLister
@@ -54,7 +46,7 @@ type NodesSyncer struct {
 	clusterLister    v3.ClusterLister
 }
 
-type NodeDrain struct {
+type nodeDrain struct {
 	userManager          user.Manager
 	tokenClient          v3.TokenInterface
 	userClient           v3.UserInterface
@@ -68,7 +60,7 @@ type NodeDrain struct {
 }
 
 func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
-	m := &NodesSyncer{
+	m := &nodesSyncer{
 		clusterNamespace: cluster.ClusterName,
 		machines:         cluster.Management.Management.Nodes(cluster.ClusterName),
 		machineLister:    cluster.Management.Management.Nodes(cluster.ClusterName).Controller().Lister(),
@@ -78,13 +70,13 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 		clusterLister:    cluster.Management.Management.Clusters("").Controller().Lister(),
 	}
 
-	n := &NodeSyncer{
+	n := &nodeSyncer{
 		clusterNamespace: cluster.ClusterName,
 		machines:         cluster.Management.Management.Nodes(cluster.ClusterName),
 		nodesSyncer:      m,
 	}
 
-	d := &NodeDrain{
+	d := &nodeDrain{
 		userManager:          cluster.Management.UserManager,
 		tokenClient:          cluster.Management.Management.Tokens(""),
 		userClient:           cluster.Management.Management.Users(""),
@@ -104,7 +96,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "drainNodeSyncer", d.drainNode)
 }
 
-func (n *NodeSyncer) sync(key string, node *corev1.Node) (runtime.Object, error) {
+func (n *nodeSyncer) sync(key string, node *corev1.Node) (runtime.Object, error) {
 	needUpdate, err := n.needUpdate(key, node)
 	if err != nil {
 		return nil, err
@@ -116,7 +108,7 @@ func (n *NodeSyncer) sync(key string, node *corev1.Node) (runtime.Object, error)
 	return nil, nil
 }
 
-func (n *NodeSyncer) needUpdate(key string, node *corev1.Node) (bool, error) {
+func (n *nodeSyncer) needUpdate(key string, node *corev1.Node) (bool, error) {
 	if node == nil || node.DeletionTimestamp != nil {
 		return true, nil
 	}
@@ -131,7 +123,7 @@ func (n *NodeSyncer) needUpdate(key string, node *corev1.Node) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	toUpdate, err := n.nodesSyncer.convertNodeToNode(node, existing, nodeToPodMap)
+	toUpdate, err := n.nodesSyncer.convertNodeToMachine(node, existing, nodeToPodMap)
 	if err != nil {
 		return false, err
 	}
@@ -143,14 +135,14 @@ func (n *NodeSyncer) needUpdate(key string, node *corev1.Node) (bool, error) {
 	return true, nil
 }
 
-func (m *NodesSyncer) sync(key string, machine *v3.Node) (runtime.Object, error) {
+func (m *nodesSyncer) sync(key string, machine *v3.Node) (runtime.Object, error) {
 	if key == fmt.Sprintf("%s/%s", m.clusterNamespace, AllNodeKey) {
 		return nil, m.reconcileAll()
 	}
 	return nil, nil
 }
 
-func (m *NodesSyncer) syncLabels(key string, obj *v3.Node) (runtime.Object, error) {
+func (m *nodesSyncer) syncLabels(key string, obj *v3.Node) (runtime.Object, error) {
 	if obj == nil {
 		return nil, nil
 	}
@@ -196,7 +188,7 @@ func (m *NodesSyncer) syncLabels(key string, obj *v3.Node) (runtime.Object, erro
 			toUpdate.Annotations = obj.Spec.DesiredNodeAnnotations
 		}
 		logrus.Infof("Updating node %v with labels %v and annotations %v", toUpdate.Name, toUpdate.Labels, toUpdate.Annotations)
-		if _, err := m.nodeClient.Update(toUpdate); err != nil {
+		if _, err = m.nodeClient.Update(toUpdate); err != nil {
 			return nil, err
 		}
 	}
@@ -214,7 +206,7 @@ func (m *NodesSyncer) syncLabels(key string, obj *v3.Node) (runtime.Object, erro
 	return nil, nil
 }
 
-func (m *NodesSyncer) reconcileAll() error {
+func (m *nodesSyncer) reconcileAll() error {
 	nodes, err := m.nodeLister.List("", labels.NewSelector())
 	if err != nil {
 		return err
@@ -250,7 +242,7 @@ func (m *NodesSyncer) reconcileAll() error {
 
 	// reconcile machines for existing nodes
 	for name, node := range nodeMap {
-		machine, _ := machineMap[name]
+		machine := machineMap[name]
 		err = m.reconcileNodeForNode(machine, node, nodeToPodMap)
 		if err != nil {
 			return err
@@ -259,14 +251,14 @@ func (m *NodesSyncer) reconcileAll() error {
 	// run the logic for machine to remove
 	for name, machine := range machineMap {
 		if _, ok := nodeMap[name]; !ok {
-			if err := m.removeNode(machine); err != nil {
+			if err = m.removeNode(machine); err != nil {
 				return err
 			}
 		}
 	}
 
 	for _, machine := range toDelete {
-		if err := m.removeNode(machine); err != nil {
+		if err = m.removeNode(machine); err != nil {
 			return err
 		}
 	}
@@ -274,14 +266,14 @@ func (m *NodesSyncer) reconcileAll() error {
 	return nil
 }
 
-func (m *NodesSyncer) reconcileNodeForNode(machine *v3.Node, node *corev1.Node, pods map[string][]*corev1.Pod) error {
+func (m *nodesSyncer) reconcileNodeForNode(machine *v3.Node, node *corev1.Node, pods map[string][]*corev1.Pod) error {
 	if machine == nil {
 		return m.createNode(node, pods)
 	}
 	return m.updateNode(machine, node, pods)
 }
 
-func (m *NodesSyncer) removeNode(machine *v3.Node) error {
+func (m *nodesSyncer) removeNode(machine *v3.Node) error {
 	if machine.Annotations == nil {
 		return nil
 	}
@@ -298,8 +290,8 @@ func (m *NodesSyncer) removeNode(machine *v3.Node) error {
 	return nil
 }
 
-func (m *NodesSyncer) updateNode(existing *v3.Node, node *corev1.Node, pods map[string][]*corev1.Pod) error {
-	toUpdate, err := m.convertNodeToNode(node, existing, pods)
+func (m *nodesSyncer) updateNode(existing *v3.Node, node *corev1.Node, pods map[string][]*corev1.Pod) error {
+	toUpdate, err := m.convertNodeToMachine(node, existing, pods)
 	if err != nil {
 		return err
 	}
@@ -316,7 +308,7 @@ func (m *NodesSyncer) updateNode(existing *v3.Node, node *corev1.Node, pods map[
 	return nil
 }
 
-func (m *NodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Pod) error {
+func (m *nodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Pod) error {
 	// do not create machine for rke cluster
 	cluster, err := m.clusterLister.Get("", m.clusterNamespace)
 	if err != nil {
@@ -333,7 +325,7 @@ func (m *NodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Po
 	if existing != nil {
 		return nil
 	}
-	machine, err := m.convertNodeToNode(node, existing, pods)
+	machine, err := m.convertNodeToMachine(node, existing, pods)
 	if err != nil {
 		return err
 	}
@@ -351,7 +343,7 @@ func (m *NodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Po
 	return nil
 }
 
-func (m *NodesSyncer) getMachineForNode(node *corev1.Node, cache bool) (*v3.Node, error) {
+func (m *nodesSyncer) getMachineForNode(node *corev1.Node, cache bool) (*v3.Node, error) {
 	if cache {
 		return nodehelper.GetMachineForNode(node, m.clusterNamespace, m.machineLister)
 	}
@@ -490,7 +482,7 @@ func statusEqualTest(proposed, existing corev1.NodeStatus) bool {
 	return true
 }
 
-func (m *NodesSyncer) convertNodeToNode(node *corev1.Node, existing *v3.Node, pods map[string][]*corev1.Pod) (*v3.Node, error) {
+func (m *nodesSyncer) convertNodeToMachine(node *corev1.Node, existing *v3.Node, pods map[string][]*corev1.Pod) (*v3.Node, error) {
 	var machine *v3.Node
 	if existing == nil {
 		machine = &v3.Node{
@@ -555,7 +547,7 @@ func (m *NodesSyncer) convertNodeToNode(node *corev1.Node, existing *v3.Node, po
 	return machine, nil
 }
 
-func (m *NodesSyncer) getNonTerminatedPods() (map[string][]*corev1.Pod, error) {
+func (m *nodesSyncer) getNonTerminatedPods() (map[string][]*corev1.Pod, error) {
 	pods := make(map[string][]*corev1.Pod)
 	fromCache, err := m.podLister.List("", labels.NewSelector())
 	if err != nil {
@@ -602,7 +594,7 @@ func aggregateRequestAndLimitsForNode(pods []*corev1.Pod) (map[corev1.ResourceNa
 }
 
 func isEqual(data1 map[corev1.ResourceName]resource.Quantity, data2 map[corev1.ResourceName]resource.Quantity) bool {
-	if (data1 == nil || len(data1) == 0) && (data2 == nil || len(data2) == 0) {
+	if len(data1) == 0 && len(data2) == 0 {
 		return true
 	}
 	if data1 == nil || data2 == nil {
