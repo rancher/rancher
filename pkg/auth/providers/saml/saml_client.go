@@ -33,6 +33,8 @@ var root *mux.Router
 var appliedVersion string
 var initMu sync.Mutex
 
+const UITranslationKeyForErrorMessage = "invalidSamlAttrs"
+
 func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) error {
 
 	initMu.Lock()
@@ -276,7 +278,8 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	userPrincipal, groupPrincipals, err = s.getSamlPrincipals(config, samlData)
 	if err != nil {
 		log.Error(err)
-		http.Redirect(w, r, redirectURL+"errorCode=422&errorMsg=Invalid saml attributes", http.StatusFound)
+		// UI uses this translation key to get the error message
+		http.Redirect(w, r, redirectURL+"errorCode=422&errorMsg="+UITranslationKeyForErrorMessage, http.StatusFound)
 		return
 	}
 	allowedPrincipals := config.AllowedPrincipalIDs
