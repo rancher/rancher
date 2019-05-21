@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/types/apis/core/v1"
@@ -123,4 +124,33 @@ func DeployApp(mgmtAppClient projv3.AppInterface, projectID string, createOrUpda
 	}
 
 	return rtn, nil
+}
+
+func DetectAppCatalogExistence(appCatalogID string, cattleTemplateVersionsClient v3.CatalogTemplateVersionInterface) error {
+	templateVersionID, templateVersionNamespace, err := common.ParseExternalID(appCatalogID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to parse catalog ID %q", appCatalogID)
+	}
+
+	_, err = cattleTemplateVersionsClient.GetNamespaced(templateVersionNamespace, templateVersionID, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "failed to find catalog by ID %q", appCatalogID)
+	}
+
+	return nil
+}
+
+func DeleteApp(mgmtAppClient projv3.AppInterface, projectID, appName string) error {
+	app, err := mgmtAppClient.GetNamespaced(projectID, appName, metav1.GetOptions{})
+	if err != nil && !kerrors.IsNotFound(err) {
+		return errors.Wrapf(err, "failed to find app %s in project %v", appName, projectID)
+	}
+
+	if app.DeletionTimestamp == nil {
+		if err := mgmtAppClient.DeleteNamespaced(projectID, appName, &metav1.DeleteOptions{}); err != nil {
+			return errors.Wrapf(err, "failed to delete app %v", appName)
+		}
+	}
+
+	return nil
 }

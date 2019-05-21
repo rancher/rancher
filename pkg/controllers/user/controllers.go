@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	"github.com/rancher/rancher/pkg/controllers/user/alert"
 	"github.com/rancher/rancher/pkg/controllers/user/approuter"
+	"github.com/rancher/rancher/pkg/controllers/user/cis"
 	"github.com/rancher/rancher/pkg/controllers/user/clusterauthtoken"
 	"github.com/rancher/rancher/pkg/controllers/user/dnsrecord"
 	"github.com/rancher/rancher/pkg/controllers/user/endpoints"
@@ -51,6 +52,7 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	helm.Register(ctx, cluster, kubeConfigGetter)
 	logging.Register(ctx, cluster)
 	networkpolicy.Register(ctx, cluster)
+	cis.Register(ctx, cluster)
 	noderemove.Register(ctx, cluster)
 	nodesyncer.Register(ctx, cluster, kubeConfigGetter)
 	pipeline.Register(ctx, cluster)

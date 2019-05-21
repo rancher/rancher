@@ -69,6 +69,8 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 			return httperror.NewAPIError(httperror.Unauthorized, "can not rotate certificates")
 		}
 		return a.RotateCertificates(actionName, action, apiContext)
+	case v3.ClusterActionRunCISScan:
+		return a.runCISScan(actionName, action, apiContext)
 	}
 	return httperror.NewAPIError(httperror.NotFound, "not found")
 }
