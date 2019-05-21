@@ -36,20 +36,13 @@ function get-env-var {
 #########################################################################
 ## START main execution
 
-# 0 - success
-# 1 - crash
-# 2 - agent retry
 trap {
-    $errMsg = $_.Exception.Message
+    Write-Host -NoNewline -ForegroundColor DarkRed "ERRO"
+    Write-Host -NoNewline -ForegroundColor Gray "[0000] "
+    Write-Host -ForegroundColor Gray $_
 
     popd
 
-    if ($errMsg.EndsWith("agent retry")) {
-        [System.Console]::Error.Write($errMsg.Substring(0, $errMsg.Length - 13))
-        exit 2
-    }
-
-    [System.Console]::Error.Write($errMsg)
     exit 1
 }
 
@@ -64,6 +57,52 @@ $currentPrincipal = new-object System.Security.Principal.WindowsPrincipal([Syste
 if (-not $currentPrincipal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)) {
     throw "You need elevated Administrator privileges in order to run this script, start Windows PowerShell by using the Run as Administrator option"
 }
+
+try {
+    $svcAgent = Get-Service -Name "rancher-agent" -ErrorAction Ignore
+    if ($svcAgent) {
+        if ($svcAgent.Status -eq "Running") {
+            $svcAgent | Stop-Service -Force -ErrorAction Ignore
+        }
+
+        pushd $RancherDir
+        .\agent.exe --unregister-service *>$null
+        popd
+    }
+} catch { }
+
+try {
+    # flanneld #
+    $process = Get-Process -Name "flanneld*" -ErrorAction Ignore
+    if ($process) {
+        $process | Stop-Process -Force | Out-Null
+    }
+
+    # kubelet #
+    $process = Get-Process -Name "kubelet*" -ErrorAction Ignore
+    if ($process) {
+        $process | Stop-Process -Force | Out-Null
+    }
+
+    # kube-proxy #
+    $process = Get-Process -Name "kube-proxy*" -ErrorAction Ignore
+    if ($process) {
+        $process | Stop-Process -Force | Out-Null
+    }
+
+    # controlplanes proxy #
+    $process = Get-Process -Name "nginx*" -ErrorAction Ignore
+    if ($process) {
+        $process | Stop-Process -Force | Out-Null
+    }
+
+    # docker stop #
+    docker ps -q | % { docker stop $_ *>$null } *>$null
+
+    # clean up rancher parts #
+    docker rm kubernetes-binaries *>$null
+    docker rm cni-binaries *>$null
+} catch { }
 
 try {
     $networkName = get-env-var "KUBE_NETWORK"

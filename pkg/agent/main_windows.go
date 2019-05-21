@@ -17,7 +17,6 @@ import (
 	libwindows "github.com/rancher/rancher/pkg/agent/windows"
 	"github.com/rancher/rancher/pkg/agent/windows/remotedialer"
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
-	"github.com/rancher/rancher/pkg/rkeworker"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/svc"
 )
@@ -115,11 +114,6 @@ func (a *agentService) stop(svcStatus chan<- svc.Status) {
 
 		a.cancel()
 
-		// stop kubelet, kube-proxy, networking
-		if err := rkeworker.Stop(context.Background()); err != nil {
-			logrus.Errorln("Agent cannot stop worker", err)
-		}
-
 		svcStatus <- svc.Status{State: svc.Stopped, Accepts: svc.AcceptShutdown}
 		logrus.Infoln("Agent stopped")
 	})
@@ -127,15 +121,6 @@ func (a *agentService) stop(svcStatus chan<- svc.Status) {
 
 func (a *agentService) shutdown(svcStatus chan<- svc.Status) {
 	a.stop(svcStatus)
-
-	logrus.Infoln("Agent shutting down")
-
-	// remove kubelet, kube-proxy, networking
-	if err := rkeworker.Remove(context.Background()); err != nil {
-		logrus.Errorln("Agent cannot remove worker", err)
-	}
-
-	logrus.Infoln("Agent shut down")
 
 	// unregister agent service
 	if err := a.winRunner.UnRegister(); err != nil {

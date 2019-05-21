@@ -988,7 +988,7 @@ function main {
         $recoverKubelet = $False
         $wantRecoverComps | % {
             switch ($_) {
-                "kubelet$" {
+                "kubelet" {
                     $recoverKubelet = $True
                     start-kubelet -Restart
                     break
