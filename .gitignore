@@ -23,3 +23,5 @@ __pycache__
 /rancher
 *.pytest_cache
 .kube/
+.DS_Store
+tests/validation/.idea
