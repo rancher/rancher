@@ -394,8 +394,10 @@ func getPRTBProjectAndSubjectKey(prtb *v3.ProjectRoleTemplateBinding) string {
 		name = prtb.UserPrincipalName
 	} else if prtb.GroupName != "" {
 		name = prtb.GroupName
-	} else {
+	} else if prtb.GroupPrincipalName != "" {
 		name = prtb.GroupPrincipalName
+	} else if prtb.ServiceAccount != "" {
+		name = prtb.ServiceAccount
 	}
 	return prtb.ProjectName + "." + name
 }
