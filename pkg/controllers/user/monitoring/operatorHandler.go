@@ -2,6 +2,7 @@ package monitoring
 
 import (
 	"fmt"
+	"github.com/rancher/rancher/pkg/app/utils"
 	"reflect"
 	"strings"
 
@@ -152,12 +153,12 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 
 	appCatalogID := settings.SystemMonitoringCatalogID.Get()
 
-	appDeployProjectID, err := monitoring.GetSystemProjectID(app.cattleProjectClient)
+	appDeployProjectID, err := utils.GetSystemProjectID(app.cattleProjectClient)
 	if err != nil {
 		return errors.Wrap(err, "failed to get System Project ID")
 	}
 
-	appProjectName, err := monitoring.EnsureAppProjectName(app.agentNamespaceClient, appDeployProjectID, cluster.Name, appTargetNamespace)
+	appProjectName, err := utils.EnsureAppProjectName(app.agentNamespaceClient, appDeployProjectID, cluster.Name, appTargetNamespace)
 	if err != nil {
 		return errors.Wrap(err, "failed to ensure monitoring project name")
 	}
@@ -221,7 +222,7 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 		forceRedeploy = true
 	}
 
-	_, err = monitoring.DeployApp(app.cattleAppClient, appDeployProjectID, targetApp, forceRedeploy)
+	_, err = utils.DeployApp(app.cattleAppClient, appDeployProjectID, targetApp, forceRedeploy)
 	if err != nil {
 		return errors.Wrap(err, "failed to ensure prometheus operator app")
 	}
