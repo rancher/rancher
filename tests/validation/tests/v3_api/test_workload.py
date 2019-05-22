@@ -12,7 +12,6 @@ if_check_lb = pytest.mark.skipif(
 
 ENABLE_HOST_NODE_PORT_TESTS = ast.literal_eval(
     os.environ.get('RANCHER_ENABLE_HOST_NODE_PORT_TESTS', "True"))
-
 skip_host_node_port = pytest.mark.skipif(
     not ENABLE_HOST_NODE_PORT_TESTS,
     reason='Tests Skipped for AKS,GKE,EKS Clusters')
@@ -28,14 +27,15 @@ def test_wl_sidekick():
                                         containers=con,
                                         namespaceId=ns.id)
     validate_workload(p_client, workload, "deployment", ns.name)
+
     side_con = {"name": "test2",
-                "image": "ubuntu",
+                "image": TEST_IMAGE_NGINX,
                 "stdin": True,
                 "tty": True}
     con.append(side_con)
     workload = p_client.update(workload,
                                containers=con)
-    time.sleep(60)
+    time.sleep(90)
     validate_workload_with_sidekicks(
         p_client, workload, "deployment", ns.name)
 
@@ -118,31 +118,31 @@ def test_wl_upgrade():
             firstrevision = revision.id
 
     con = [{"name": "test1",
-            "image": "nginx"}]
+            "image": TEST_IMAGE_NGINX}]
     p_client.update(workload, containers=con)
-    wait_for_pod_images(p_client, workload, ns.name, "nginx", 2)
+    wait_for_pod_images(p_client, workload, ns.name, TEST_IMAGE_NGINX, 2)
     wait_for_pods_in_workload(p_client, workload, 2)
     validate_workload(p_client, workload, "deployment", ns.name, 2)
-    validate_workload_image(p_client, workload, "nginx", ns)
+    validate_workload_image(p_client, workload, TEST_IMAGE_NGINX, ns)
     revisions = workload.revisions()
     assert len(revisions) == 2
     for revision in revisions:
-        if revision["containers"][0]["image"] == "nginx":
+        if revision["containers"][0]["image"] == TEST_IMAGE_NGINX:
             secondrevision = revision.id
 
     con = [{"name": "test1",
-            "image": "ubuntu",
+            "image": TEST_IMAGE_OS_BASE,
             "tty": True,
             "stdin": True}]
     p_client.update(workload, containers=con)
-    wait_for_pod_images(p_client, workload, ns.name, "ubuntu", 2)
+    wait_for_pod_images(p_client, workload, ns.name, TEST_IMAGE_OS_BASE, 2)
     wait_for_pods_in_workload(p_client, workload, 2)
     validate_workload(p_client, workload, "deployment", ns.name, 2)
-    validate_workload_image(p_client, workload, "ubuntu", ns)
+    validate_workload_image(p_client, workload, TEST_IMAGE_OS_BASE, ns)
     revisions = workload.revisions()
     assert len(revisions) == 3
     for revision in revisions:
-        if revision["containers"][0]["image"] == "ubuntu":
+        if revision["containers"][0]["image"] == TEST_IMAGE_OS_BASE:
             thirdrevision = revision.id
 
     p_client.action(workload, "rollback", replicaSetId=firstrevision)
@@ -152,16 +152,16 @@ def test_wl_upgrade():
     validate_workload_image(p_client, workload, TEST_IMAGE, ns)
 
     p_client.action(workload, "rollback", replicaSetId=secondrevision)
-    wait_for_pod_images(p_client, workload, ns.name, "nginx", 2)
+    wait_for_pod_images(p_client, workload, ns.name, TEST_IMAGE_NGINX, 2)
     wait_for_pods_in_workload(p_client, workload, 2)
     validate_workload(p_client, workload, "deployment", ns.name, 2)
-    validate_workload_image(p_client, workload, "nginx", ns)
+    validate_workload_image(p_client, workload, TEST_IMAGE_NGINX, ns)
 
     p_client.action(workload, "rollback", replicaSetId=thirdrevision)
-    wait_for_pod_images(p_client, workload, ns.name, "ubuntu", 2)
+    wait_for_pod_images(p_client, workload, ns.name, TEST_IMAGE_OS_BASE, 2)
     wait_for_pods_in_workload(p_client, workload, 2)
     validate_workload(p_client, workload, "deployment", ns.name, 2)
-    validate_workload_image(p_client, workload, "ubuntu", ns)
+    validate_workload_image(p_client, workload, TEST_IMAGE_OS_BASE, ns)
 
 
 def test_wl_pod_scale_up():
@@ -239,16 +239,18 @@ def test_wl_pause_orchestration():
     p_client.action(workload, "pause")
     validate_workload_paused(p_client, workload, True)
     con = [{"name": "test1",
-            "image": "nginx"}]
+            "image": TEST_IMAGE_NGINX}]
     p_client.update(workload, containers=con)
     validate_pod_images(TEST_IMAGE, workload, ns.name)
     p_client.action(workload, "resume")
     workload = wait_for_wl_to_active(p_client, workload)
     wait_for_pods_in_workload(p_client, workload, 2)
     validate_workload_paused(p_client, workload, False)
-    validate_pod_images("nginx", workload, ns.name)
+    validate_pod_images(TEST_IMAGE_NGINX, workload, ns.name)
 
 
+# Windows could not support host port for now.
+@skip_test_windows_os
 @skip_host_node_port
 def test_wl_with_hostPort():
     p_client = namespace["p_client"]
@@ -293,7 +295,7 @@ def test_wl_with_nodePort():
                                         daemonSetConfig={})
 
     workload = wait_for_wl_to_active(p_client, workload)
-    validate_nodePort(p_client, workload, namespace["cluster"],source_port)
+    validate_nodePort(p_client, workload, namespace["cluster"], source_port)
 
 
 def test_wl_with_clusterIp():
@@ -456,6 +458,8 @@ def test_wl_with_nodePort_scale_and_upgrade():
     validate_nodePort(p_client, workload, namespace["cluster"], source_port)
 
 
+# Windows could not support host port for now.
+@skip_test_windows_os
 @skip_host_node_port
 def test_wl_with_hostPort_scale_and_upgrade():
     p_client = namespace["p_client"]

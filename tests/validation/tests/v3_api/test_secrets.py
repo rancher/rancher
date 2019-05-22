@@ -205,14 +205,16 @@ def validate_workload_with_secret(p_client, workload,
         key = list(keyvaluepair.keys())[i]
         if workloadwithsecretasVolume:
             key_file_in_pod = mountpath + "/" + key
-            print(key_file_in_pod)
             command = "cat " + key_file_in_pod + ''
-            print(" Command to display secret value from container is: ")
-            print(command)
+            if is_windows():
+                command = 'powershell -NoLogo -NonInteractive -Command "& {{ cat {0} }}"'.format(key_file_in_pod)
             result = kubectl_pod_exec(pod_list[0], command)
-            assert result == base64.b64decode(list(keyvaluepair.values())[i])
+            assert result.rstrip() == base64.b64decode(list(keyvaluepair.values())[i])
         elif workloadwithsecretasenvvar:
             command = 'env'
+            if is_windows():
+                command = 'powershell -NoLogo -NonInteractive -Command \'& {{ (Get-Item -Path Env:).Name | ' \
+                          '% { "$_=$((Get-Item -Path Env:\\$_).Value)" }}\''
             result = kubectl_pod_exec(pod_list[0], command)
             if base64.b64decode(list(keyvaluepair.values())[i]) in result:
                 assert True

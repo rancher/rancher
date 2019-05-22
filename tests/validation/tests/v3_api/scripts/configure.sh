@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -x
 set -eu
 
 DEBUG="${DEBUG:-false}"

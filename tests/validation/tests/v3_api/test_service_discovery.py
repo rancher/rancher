@@ -132,7 +132,7 @@ def test_service_discovery_when_workload_upgrade():
 
     # upgrade
     con = [{"name": "test1",
-            "image": "nginx"}]
+            "image": TEST_IMAGE_NGINX}]
     update_and_validate_workload(workload, con, scale)
     # test service discovery
     time.sleep(DNS_RESOLUTION_DEFAULT_SECONDS)
@@ -220,7 +220,7 @@ def test_dns_record_type_workload_when_workload_upgrade():
 
     # upgrade the workload
     con = [{"name": "test1",
-            "image": "nginx"}]
+            "image": TEST_IMAGE_NGINX}]
     update_and_validate_workload(workload, con, scale)
     # test service discovery
     time.sleep(DNS_RESOLUTION_DEFAULT_SECONDS)
@@ -235,6 +235,9 @@ def test_dns_record_type_workload_when_workload_upgrade():
     validate_dns_record_for_workload(workload, scale, record)
 
 
+# Windows could not transpose the remote ICMP packages, since TCP/UDP packets can still be transposed,
+# one can substitute ping <destination> with curl <destination> to be able to debug connectivity to outside
+@skip_test_windows_os
 @if_skip_ping_check_test
 def test_dns_record_type_external_ip():
     ns = namespace["ns"]
@@ -244,6 +247,9 @@ def test_dns_record_type_external_ip():
     create_and_validate_dns_record(record, expected)
 
 
+# Windows could not transpose the remote ICMP packages, since TCP/UDP packets can still be transposed,
+# one can substitute ping <destination> with curl <destination> to be able to debug connectivity to outside
+@skip_test_windows_os
 @if_skip_ping_check_test
 def test_dns_record_type_multiple_external_ips():
     ns = namespace["ns"]
@@ -253,6 +259,9 @@ def test_dns_record_type_multiple_external_ips():
     create_and_validate_dns_record(record, expected)
 
 
+# Windows could not transpose the remote ICMP packages, since TCP/UDP packets can still be transposed,
+# one can substitute ping <destination> with curl <destination> to be able to debug connectivity to outside
+@skip_test_windows_os
 @if_skip_ping_check_test
 def test_dns_record_type_hostname():
     ns = namespace["ns"]
@@ -262,6 +271,9 @@ def test_dns_record_type_hostname():
     create_and_validate_dns_record(record, expected)
 
 
+# Windows could not transpose the remote ICMP packages, since TCP/UDP packets can still be transposed,
+# one can substitute ping <destination> with curl <destination> to be able to debug connectivity to outside
+@skip_test_windows_os
 @if_skip_ping_check_test
 def test_dns_record_type_alias():
     ns = namespace["ns"]

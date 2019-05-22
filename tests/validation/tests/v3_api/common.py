@@ -9,6 +9,7 @@ import requests
 import ast
 import paramiko
 import rancher
+import pytest
 from rancher import ApiError
 from lib.aws import AmazonWebServices
 
@@ -32,7 +33,16 @@ kube_fname = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                           "k8s_kube_config")
 MACHINE_TIMEOUT = float(os.environ.get('RANCHER_MACHINE_TIMEOUT', "1200"))
 
+TEST_OS = os.environ.get('RANCHER_TEST_OS', "linux")
 TEST_IMAGE = os.environ.get('RANCHER_TEST_IMAGE', "sangeetha/mytestcontainer")
+TEST_IMAGE_NGINX = os.environ.get('RANCHER_TEST_IMAGE_NGINX', "nginx")
+TEST_IMAGE_OS_BASE = os.environ.get('RANCHER_TEST_IMAGE_OS_BASE', "ubuntu")
+if TEST_OS == "windows":
+    DEFAULT_TIMEOUT = 300
+skip_test_windows_os = pytest.mark.skipif(
+    TEST_OS == "windows",
+    reason='Tests Skipped for including Windows nodes cluster')
+
 CLUSTER_NAME = os.environ.get("RANCHER_CLUSTER_NAME", "")
 CLUSTER_NAME_2 = os.environ.get("RANCHER_CLUSTER_NAME_2", "")
 RANCHER_CLEANUP_CLUSTER = \
@@ -85,6 +95,10 @@ rbac_data = {
         PROJECT_READ_ONLY: {},
     }
 }
+
+
+def is_windows(os_type=TEST_OS):
+    return os_type == "windows"
 
 
 def random_str():
@@ -367,21 +381,33 @@ def execute_kubectl_cmd(cmd, json_out=True, stderr=False):
         kube_fname, cmd)
     if json_out:
         command += ' -o json'
+    print("run cmd: \t{0}".format(command))
+
     if stderr:
-        result = run_command_with_stderr(command)
+        result = run_command_with_stderr(command, False)
     else:
-        result = run_command(command)
+        result = run_command(command, False)
+    print("returns: \t{0}".format(result))
+
     if json_out:
         result = json.loads(result)
-    print(result)
     return result
 
 
-def run_command(command):
-    return subprocess.check_output(command, shell=True, text=True)
+def run_command(command, log_out=True):
+    if log_out:
+        print("run cmd: \t{0}".format(command))
+
+    try:
+        return subprocess.check_output(command, shell=True, text=True)
+    except subprocess.CalledProcessError as e:
+        return None
 
 
-def run_command_with_stderr(command):
+def run_command_with_stderr(command, log_out=True):
+    if log_out:
+        print("run cmd: \t{0}".format(command))
+
     try:
         output = subprocess.check_output(command, shell=True,
                                          stderr=subprocess.PIPE)
@@ -389,7 +415,10 @@ def run_command_with_stderr(command):
     except subprocess.CalledProcessError as e:
         output = e.output
         returncode = e.returncode
-    print(returncode)
+
+    if log_out:
+        print("returns: \t{0}".format(returncode))
+
     return output
 
 
@@ -458,13 +487,13 @@ def wait_for_pod_to_running(client, pod, timeout=DEFAULT_TIMEOUT):
     return p
 
 
-def get_schedulable_nodes(cluster, client=None):
+def get_schedulable_nodes(cluster, client=None, os_type=TEST_OS):
     if not client:
         client = get_user_client()
     nodes = client.list_node(clusterId=cluster.id).data
     schedulable_nodes = []
     for node in nodes:
-        if node.worker:
+        if node.worker and (not node.unschedulable) and (node.labels['kubernetes.io/os'] == os_type or node.labels['beta.kubernetes.io/os'] == os_type):
             schedulable_nodes.append(node)
         # Including master in list of nodes as master is also schedulable
         if 'k3s' in cluster.version["gitVersion"] and node.controlPlane:
@@ -504,7 +533,7 @@ def validate_ingress(p_client, cluster, workloads, host, path,
         curl_args = " -L --insecure "
     if len(host) > 0:
         curl_args += " --header 'Host: " + host + "'"
-    nodes = get_schedulable_nodes(cluster)
+    nodes = get_schedulable_nodes(cluster, os_type="linux")
     target_name_list = get_target_names(p_client, workloads)
     for node in nodes:
         host_ip = resolve_node_ip(node)
@@ -641,12 +670,14 @@ def validate_http_response(cmd, target_name_list, client_pod=None):
             curl_cmd = "curl " + cmd
             result = run_command(curl_cmd)
         else:
-            wget_cmd = "wget -qO- " + cmd
+            if is_windows():
+                wget_cmd = 'powershell -NoLogo -NonInteractive -Command "& {{ (Invoke-WebRequest -UseBasicParsing -Uri ' \
+                           '{0}).Content }}"'.format(cmd)
+            else:
+                wget_cmd = "wget -qO- " + cmd
             result = kubectl_pod_exec(client_pod, wget_cmd)
             result = result.decode()
         result = result.rstrip()
-        print("cmd: \t" + cmd)
-        print("result: \t" + result)
         assert result in target_name_list
         if result in target_hit_list:
             target_hit_list.remove(result)
@@ -736,6 +767,10 @@ def validate_dns_record(pod, record, expected):
 
 
 def validate_dns_entry(pod, host, expected):
+    if is_windows():
+        validate_dns_entry_windows(pod, host, expected)
+        return
+
     # requires pod with `dig` available - TEST_IMAGE
     cmd = 'ping -c 1 -W 1 {0}'.format(host)
     ping_output = kubectl_pod_exec(pod, cmd)
@@ -755,6 +790,29 @@ def validate_dns_entry(pod, host, expected):
     for expected_value in expected:
         assert expected_value in str(dig_output)
 
+
+def validate_dns_entry_windows(pod, host, expected):
+    def ping_check():
+        ping_cmd = 'ping -w 1 -n 1 {0}'.format(host)
+        ping_output = kubectl_pod_exec(pod, ping_cmd)
+        ping_validation_pass = False
+        for expected_value in expected:
+            if expected_value in str(ping_output):
+                ping_validation_pass = True
+                break
+        return ping_validation_pass and (" (0% loss)" in str(ping_output))
+    wait_for(callback=ping_check, timeout_message="Failed to ping {0}".format(host))
+
+    def dig_check():
+        dig_cmd = 'powershell -NoLogo -NonInteractive -Command "& {{ (Resolve-DnsName {0}).IPAddress }}"'.format(host)
+        dig_output = kubectl_pod_exec(pod, dig_cmd)
+        dig_validation_pass = True
+        for expected_value in expected:
+            if expected_value not in str(dig_output):
+                dig_validation_pass = False
+                break
+        return dig_validation_pass
+    wait_for(callback=dig_check, timeout_message="Failed to resolve {0}".format(host))
 
 def wait_for_nodes_to_become_active(client, cluster, exception_list=[],
                                     retry_count=0):
@@ -930,12 +988,21 @@ def check_connectivity_between_pods(pod1, pod2, allow_connectivity=True):
     pod_ip = pod2.status.podIp
 
     cmd = "ping -c 1 -W 1 " + pod_ip
+    if is_windows():
+        cmd = 'ping -w 1 -n 1 {0}'.format(pod_ip)
+
     response = kubectl_pod_exec(pod1, cmd)
-    print("Actual ping Response from " + pod1.name + ":" + str(response))
+    assert pod_ip in str(response)
     if allow_connectivity:
-        assert pod_ip in str(response) and " 0% packet loss" in str(response)
+        if is_windows():
+            assert " (0% loss)" in str(response)
+        else:
+            assert " 0% packet loss" in str(response)
     else:
-        assert pod_ip in str(response) and " 100% packet loss" in str(response)
+        if is_windows():
+            assert " (100% loss)" in str(response)
+        else:
+            assert " 100% packet loss" in str(response)
 
 
 def kubectl_pod_exec(pod, cmd):
@@ -1140,7 +1207,7 @@ def validate_lb(p_client, workload, source_port):
 
 
 def validate_nodePort(p_client, workload, cluster, source_port):
-    get_endpoint_url_for_workload(p_client, workload, 60)
+    get_endpoint_url_for_workload(p_client, workload, 600)
     wl = p_client.list_workload(uuid=workload.uuid).data[0]
     source_port_wk = wl.publicEndpoints[0]["port"]
     assert source_port == source_port_wk, "Source ports do not match"
@@ -1237,12 +1304,16 @@ def create_wl_with_nfs(p_client, ns_id, pvc_name, wl_name,
 
 def write_content_to_file(pod, content, filename):
     cmd_write = "/bin/bash -c 'echo {1} > {0}'".format(filename, content)
+    if is_windows():
+        cmd_write = 'powershell -NoLogo -NonInteractive -Command "& { echo {1} > {0} }"'.format(filename, content)
     output = kubectl_pod_exec(pod, cmd_write)
     assert output.strip().decode('utf-8') == ""
 
 
 def validate_file_content(pod, content, filename):
     cmd_get_content = "/bin/bash -c 'cat {0}' ".format(filename)
+    if is_windows():
+        cmd_get_content = 'powershell -NoLogo -NonInteractive -Command "& { cat {0} }"'.format(filename)
     output = kubectl_pod_exec(pod, cmd_get_content)
     assert output.strip().decode('utf-8') == content
 
