@@ -1,0 +1,9 @@
+ignore_docker_version: true
+ssh_key_path: {{ master_ssh_key_path }}
+network:
+  plugin: {{ network_plugin }}
+  {{ network_plugin_options }}
+nodes:
+  - address: {{ ip_address_0 }}
+    user: {{ ssh_user_0 }}
+    role: [controlplane,etcd,worker]

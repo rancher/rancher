@@ -1,0 +1,203 @@
+# Pod
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-pod
+  labels:
+    app: nginx-pod
+spec:
+  containers:
+  - name: nginx
+    image: husseingalal/nginx-curl
+    ports:
+    - containerPort: 80
+
+# RC
+---
+
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: nginx
+spec:
+  replicas: 2
+  selector:
+    name: nginx
+    type: rc
+  template:
+    metadata:
+      labels:
+        type: rc
+        name: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: sangeetha/testnewhostrouting
+          ports:
+            - containerPort: 80
+
+# service LoadBalancer
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-lb
+  labels:
+    name: nginx-lb
+spec:
+  type: LoadBalancer
+  ports:
+  - port: {{ k8s_base_lb_port }}{{ port_ext }}
+    nodePort: {{ k8s_base_lb_node_port }}{{ port_ext }}
+    targetPort: 80
+  selector:
+    name: nginx
+
+# service external
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-external
+  labels:
+    name: nginx-external
+spec:
+  type: NodePort
+  externalIPs: ['{{ external_node }}']
+  ports:
+  - port: 80
+    targetPort: 80
+    nodePort: {{ k8s_base_external_port }}{{ port_ext }}
+  selector:
+    name: nginx
+
+# service cluster ip
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-clusterip
+  labels:
+    name: nginx-clusterip
+spec:
+  sessionAffinity: ClientIP
+  type: ClusterIP
+  clusterIP: 10.233.0.1{{ port_ext }}
+  ports:
+  - port: 8000
+    targetPort: 80
+  selector:
+    name: nginx
+
+# service nodeport
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nodeport-nginx
+  labels:
+    name: nodeport-nginx
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 80
+    nodePort: {{ k8s_base_node_port }}{{ port_ext }}
+  selector:
+    name: nginx
+
+# Ingress testing
+---
+
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+ name: ingress1
+ annotations:
+   http.port: "{{ k8s_base_ingress_port }}{{ port_ext }}"
+spec:
+ rules:
+ - host: foo.bar.com
+   http:
+     paths:
+     - path: /service3.html
+       backend:
+         serviceName: k8test1
+         servicePort: 81
+     - path: /name.html
+       backend:
+         serviceName: k8test2
+         servicePort: 80
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+ name: k8test1
+ labels:
+   k8s-app: k8test1-service
+spec:
+ ports:
+ - port: 81
+   targetPort: 81
+   protocol: TCP
+   name: http
+ selector:
+   k8s-app: k8test1-service
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: k8testrc1
+spec:
+  replicas: 1
+  selector:
+    k8s-app: k8test1-service
+  template:
+    metadata:
+      labels:
+        k8s-app: k8test1-service
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: testcontainer
+        image: sangeetha/testnewhostrouting
+        ports:
+        - containerPort: 81
+        tty: true
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+ name: k8test2
+ labels:
+   k8s-app: k8test2-service
+spec:
+ ports:
+ - port: 80
+   targetPort: 80
+   protocol: TCP
+   name: http
+ selector:
+   k8s-app: k8test2-service
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-ingress2
+  labels:
+    k8s-app: k8test2-service
+spec:
+  containers:
+  - name: testcontainer
+    image: sangeetha/testnewhostrouting
+    ports:
+    - containerPort: 80

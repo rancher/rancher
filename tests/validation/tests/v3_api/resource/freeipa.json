@@ -1,0 +1,70 @@
+{
+  "admin_user": "testautoadmin",
+  "allowed_users": [
+    "testauto2"
+  ],
+  "allowed_groups": [
+    "testautogroup3"
+  ],
+  "allowed_nestedgroups": [
+    "testautogroupnested1"
+  ],
+  "users_under_nestedgroups": [
+    "testauto2",
+    "testauto5",
+    "testauto3",
+    "testauto4"
+  ],
+  "dis_allowed_users": [
+    "testauto3",
+    "testauto4"
+  ],
+  "dis_allowed_groups": [
+    "testautogroup4"
+  ],
+  "groups_added_to_cluster": [
+    "testautogroup1"
+  ],
+  "groups_added_to_project": [
+    "testautogroup2"
+  ],
+  "users_added_to_cluster": [
+    "testauto5"
+  ],
+  "users_added_to_project": [
+    "testauto6"
+  ],
+  "testautogroup1": [
+    "testauto1",
+    "testauto2"
+  ],
+  "testautogroup2": [
+    "testauto3",
+    "testauto4"
+  ],
+  "testautogroup3": [
+    "testauto5",
+    "testauto6"
+  ],
+  "testautogroup4": [
+    "testauto7",
+    "testauto8"
+  ],
+  "testautogroupnested1": [
+    "testauto1"
+  ],
+  "specialchar_in_users": [
+    "testauto20$",
+    "testauto21",
+    "testauto22"
+  ],
+  "specialchar_in_password": [
+    "testuser23"
+  ],
+    "specialchar_in_groupname": [
+    "specialgroup1-_.$"
+  ],
+  "specialgroup1-_.$": [
+    "testauto25"
+  ]
+}
