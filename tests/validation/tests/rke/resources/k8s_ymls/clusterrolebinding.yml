@@ -1,0 +1,12 @@
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: read-pods-global
+subjects:
+- kind: User
+  name: user1
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: read-pods-global
+  apiGroup: rbac.authorization.k8s.io
