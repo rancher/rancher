@@ -9,7 +9,6 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/pkg/api/store/auth"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	corev1 "github.com/rancher/types/apis/core/v1"
@@ -63,17 +62,17 @@ func (p *adProvider) CustomizeSchema(schema *types.Schema) {
 	schema.Formatter = p.formatter
 }
 
-func (p *adProvider) TransformToAuthProvider(authConfig map[string]interface{}) map[string]interface{} {
+func (p *adProvider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
 	ap := common.TransformToAuthProvider(authConfig)
 	defaultDomain := ""
 	if dld, ok := authConfig[client.ActiveDirectoryProviderFieldDefaultLoginDomain].(string); ok {
 		defaultDomain = dld
 	}
 	ap[client.ActiveDirectoryProviderFieldDefaultLoginDomain] = defaultDomain
-	return ap
+	return ap, nil
 }
 
-func (p *adProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (p *adProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
 	login, ok := input.(*v3public.BasicLogin)
 	if !ok {
 		return v3.Principal{}, nil, "", errors.New("unexpected input type")
@@ -187,7 +186,7 @@ func (p *adProvider) getActiveDirectoryConfig() (*v3.ActiveDirectoryConfig, *x50
 
 	if storedADConfig.ServiceAccountPassword != "" {
 		value, err := common.ReadFromSecret(p.secrets, storedADConfig.ServiceAccountPassword,
-			strings.ToLower(auth.TypeToField[v3client.ActiveDirectoryConfigType]))
+			strings.ToLower(v3client.ActiveDirectoryConfigFieldServiceAccountPassword))
 		if err != nil {
 			return nil, nil, err
 		}

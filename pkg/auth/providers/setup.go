@@ -23,6 +23,7 @@ var authConfigTypes = []string{
 	client.ADFSConfigType,
 	client.KeyCloakConfigType,
 	client.OKTAConfigType,
+	client.GoogleOauthConfigType,
 }
 
 func SetupAuthConfig(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) {

@@ -11,16 +11,17 @@ import (
 	"strings"
 )
 
-var TypeToField = map[string]string{
-	client.GithubConfigType:          "clientSecret",
-	client.ActiveDirectoryConfigType: "serviceAccountPassword",
-	client.AzureADConfigType:         "applicationSecret",
-	client.OpenLdapConfigType:        "serviceAccountPassword",
-	client.FreeIpaConfigType:         "serviceAccountPassword",
-	client.PingConfigType:            "spKey",
-	client.ADFSConfigType:            "spKey",
-	client.KeyCloakConfigType:        "spKey",
-	client.OKTAConfigType:            "spKey",
+var TypeToFields = map[string][]string{
+	client.GithubConfigType:          {client.GithubConfigFieldClientSecret},
+	client.ActiveDirectoryConfigType: {client.ActiveDirectoryConfigFieldServiceAccountPassword},
+	client.AzureADConfigType:         {client.AzureADConfigFieldApplicationSecret},
+	client.OpenLdapConfigType:        {client.LdapConfigFieldServiceAccountPassword},
+	client.FreeIpaConfigType:         {client.LdapConfigFieldServiceAccountPassword},
+	client.PingConfigType:            {client.PingConfigFieldSpKey},
+	client.ADFSConfigType:            {client.ADFSConfigFieldSpKey},
+	client.KeyCloakConfigType:        {client.KeyCloakConfigFieldSpKey},
+	client.OKTAConfigType:            {client.OKTAConfigFieldSpKey},
+	client.GoogleOauthConfigType:     {client.GoogleOauthConfigFieldOauthCredential, client.GoogleOauthConfigFieldServiceAccountCredential},
 }
 
 func Wrap(store types.Store, secrets corev1.SecretInterface) types.Store {
@@ -36,14 +37,16 @@ type Store struct {
 }
 
 func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-	for kind, field := range TypeToField {
-		if val, ok := data[field]; ok {
-			val := convert.ToString(val)
-			if err := common.CreateOrUpdateSecrets(s.Secrets, val, strings.ToLower(field), strings.ToLower(kind)); err != nil {
-				return nil, fmt.Errorf("error creating secret for %s:%s", kind, field)
+	for kind, fields := range TypeToFields {
+		for _, field := range fields {
+			if val, ok := data[field]; ok {
+				val := convert.ToString(val)
+				if err := common.CreateOrUpdateSecrets(s.Secrets, val, strings.ToLower(field), strings.ToLower(kind)); err != nil {
+					return nil, fmt.Errorf("error creating secret for %s:%s", kind, field)
+				}
+				data[field] = fmt.Sprintf("%s:%s-%s", namespace.GlobalNamespace, strings.ToLower(kind), strings.ToLower(field))
+				break
 			}
-			data[field] = fmt.Sprintf("%s:%s-%s", namespace.GlobalNamespace, strings.ToLower(kind), strings.ToLower(field))
-			break
 		}
 	}
 	return s.Store.Update(apiContext, schema, data, id)

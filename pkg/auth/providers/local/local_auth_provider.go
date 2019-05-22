@@ -74,8 +74,8 @@ func (l *Provider) CustomizeSchema(schema *types.Schema) {
 	schema.ActionHandler = l.actionHandler
 }
 
-func (l *Provider) TransformToAuthProvider(authConfig map[string]interface{}) map[string]interface{} {
-	return common.TransformToAuthProvider(authConfig)
+func (l *Provider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
+	return common.TransformToAuthProvider(authConfig), nil
 }
 
 func (l *Provider) getUser(username string) (*v3.User, error) {
@@ -99,7 +99,7 @@ func (l *Provider) getUser(username string) (*v3.User, error) {
 	return user, nil
 }
 
-func (l *Provider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (l *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
 	localInput, ok := input.(*v3public.BasicLogin)
 	if !ok {
 		return v3.Principal{}, nil, "", httperror.NewAPIError(httperror.ServerError, "Unexpected input type")

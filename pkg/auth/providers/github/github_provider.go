@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/rancher/pkg/api/store/auth"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	corev1 "github.com/rancher/types/apis/core/v1"
@@ -65,10 +64,10 @@ func (g *ghProvider) CustomizeSchema(schema *types.Schema) {
 	schema.Formatter = g.formatter
 }
 
-func (g *ghProvider) TransformToAuthProvider(authConfig map[string]interface{}) map[string]interface{} {
+func (g *ghProvider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
 	p := common.TransformToAuthProvider(authConfig)
 	p[publicclient.GithubProviderFieldRedirectURL] = formGithubRedirectURLFromMap(authConfig)
-	return p
+	return p, nil
 }
 
 func (g *ghProvider) getGithubConfigCR() (*v3.GithubConfig, error) {
@@ -95,7 +94,7 @@ func (g *ghProvider) getGithubConfigCR() (*v3.GithubConfig, error) {
 	storedGithubConfig.ObjectMeta = *typemeta
 
 	if storedGithubConfig.ClientSecret != "" {
-		value, err := common.ReadFromSecret(g.secrets, storedGithubConfig.ClientSecret, strings.ToLower(auth.TypeToField[client.GithubConfigType]))
+		value, err := common.ReadFromSecret(g.secrets, storedGithubConfig.ClientSecret, strings.ToLower(client.GithubConfigFieldClientSecret))
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +115,7 @@ func (g *ghProvider) saveGithubConfig(config *v3.GithubConfig) error {
 	config.ObjectMeta = storedGithubConfig.ObjectMeta
 
 	secretInfo := convert.ToString(config.ClientSecret)
-	field := strings.ToLower(auth.TypeToField[config.Type])
+	field := strings.ToLower(client.GithubConfigFieldClientSecret)
 	if err := common.CreateOrUpdateSecrets(g.secrets, secretInfo, field, strings.ToLower(config.Type)); err != nil {
 		return err
 	}
@@ -130,7 +129,7 @@ func (g *ghProvider) saveGithubConfig(config *v3.GithubConfig) error {
 	return nil
 }
 
-func (g *ghProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (g *ghProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
 	login, ok := input.(*v3public.GithubLogin)
 	if !ok {
 		return v3.Principal{}, nil, "", errors.New("unexpected input type")
