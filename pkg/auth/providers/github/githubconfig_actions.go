@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/pkg/api/store/auth"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
@@ -98,7 +97,7 @@ func (g *ghProvider) testAndApply(actionName string, action *types.Action, reque
 
 	if githubConfig.ClientSecret != "" {
 		value, err := common.ReadFromSecret(g.secrets, githubConfig.ClientSecret,
-			strings.ToLower(auth.TypeToField[client.GithubConfigType]))
+			strings.ToLower(client.GithubConfigFieldClientSecret))
 		if err != nil {
 			return err
 		}

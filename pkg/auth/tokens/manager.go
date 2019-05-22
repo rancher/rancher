@@ -632,8 +632,7 @@ var uaBackoff = wait.Backoff{
 
 func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string) (v3.Token, error) {
 	provider := userPrincipal.Provider
-
-	if (provider == "github" || provider == "azuread") && providerToken != "" {
+	if (provider == "github" || provider == "azuread" || provider == "googleoauth") && providerToken != "" {
 		err := m.CreateSecret(userID, provider, providerToken)
 		if err != nil {
 			return v3.Token{}, fmt.Errorf("unable to create secret: %s", err)

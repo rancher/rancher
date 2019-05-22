@@ -32,6 +32,7 @@ var authProviderTypes = []string{
 	v3public.ADFSProviderType,
 	v3public.KeyCloakProviderType,
 	v3public.OKTAProviderType,
+	v3public.GoogleOAuthProviderType,
 }
 
 func authProviderSchemas(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) error {

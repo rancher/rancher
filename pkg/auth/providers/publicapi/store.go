@@ -34,7 +34,11 @@ func (s *authProvidersStore) ByID(apiContext *types.APIContext, schema *types.Sc
 	u, _ := o.(runtime.Unstructured)
 	config := u.UnstructuredContent()
 	if t, ok := config["type"].(string); ok && t != "" {
-		return providers.GetProviderByType(t).TransformToAuthProvider(config), nil
+		provider, err := providers.GetProviderByType(t).TransformToAuthProvider(config)
+		if err != nil {
+			return nil, err
+		}
+		return provider, nil
 	}
 
 	return nil, httperror.NewAPIError(httperror.NotFound, "")
@@ -47,7 +51,11 @@ func (s *authProvidersStore) List(apiContext *types.APIContext, schema *types.Sc
 	for _, i := range list.Items {
 		if t, ok := i.Object["type"].(string); ok && t != "" {
 			if enabled, ok := i.Object["enabled"].(bool); ok && enabled {
-				result = append(result, providers.GetProviderByType(t).TransformToAuthProvider(i.Object))
+				provider, err := providers.GetProviderByType(t).TransformToAuthProvider(i.Object)
+				if err != nil {
+					return result, err
+				}
+				result = append(result, provider)
 			}
 		}
 	}

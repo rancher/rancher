@@ -74,7 +74,7 @@ func (s *Provider) CustomizeSchema(schema *types.Schema) {
 	schema.Formatter = s.formatter
 }
 
-func (s *Provider) TransformToAuthProvider(authConfig map[string]interface{}) map[string]interface{} {
+func (s *Provider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
 	p := common.TransformToAuthProvider(authConfig)
 	switch s.name {
 	case PingName:
@@ -86,10 +86,10 @@ func (s *Provider) TransformToAuthProvider(authConfig map[string]interface{}) ma
 	case OKTAName:
 		p[publicclient.OKTAProviderFieldRedirectURL] = formSamlRedirectURLFromMap(authConfig, s.name)
 	}
-	return p
+	return p, nil
 }
 
-func (s *Provider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (s *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
 	return v3.Principal{}, nil, "", fmt.Errorf("SAML providers do not implement Authenticate User API")
 }
 
@@ -150,7 +150,7 @@ func (s *Provider) getSamlConfig() (*v3.SamlConfig, error) {
 
 	if storedSamlConfig.SpKey != "" {
 		value, err := common.ReadFromSecret(s.secrets, storedSamlConfig.SpKey,
-			strings.ToLower(auth.TypeToField[client.PingConfigType]))
+			strings.ToLower(client.PingConfigFieldSpKey))
 		if err != nil {
 			return nil, err
 		}
@@ -185,7 +185,7 @@ func (s *Provider) saveSamlConfig(config *v3.SamlConfig) error {
 	storedSamlConfig.Annotations = config.Annotations
 	config.ObjectMeta = storedSamlConfig.ObjectMeta
 
-	field := strings.ToLower(auth.TypeToField[configType])
+	field := strings.ToLower(auth.TypeToFields[configType][0])
 	if err := common.CreateOrUpdateSecrets(s.secrets, config.SpKey,
 		field, strings.ToLower(config.Type)); err != nil {
 		return err

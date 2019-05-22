@@ -13,7 +13,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/pkg/api/store/auth"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	corev1 "github.com/rancher/types/apis/core/v1"
@@ -64,7 +63,7 @@ func (ap *azureProvider) GetName() string {
 }
 
 func (ap *azureProvider) AuthenticateUser(
-	input interface{},
+	ctx context.Context, input interface{},
 ) (v3.Principal, []v3.Principal, string, error) {
 	login, ok := input.(*v3public.AzureADLogin)
 	if !ok {
@@ -200,10 +199,10 @@ func (ap *azureProvider) CustomizeSchema(schema *types.Schema) {
 
 func (ap *azureProvider) TransformToAuthProvider(
 	authConfig map[string]interface{},
-) map[string]interface{} {
+) (map[string]interface{}, error) {
 	p := common.TransformToAuthProvider(authConfig)
 	p[publicclient.AzureADProviderFieldRedirectURL] = formAzureRedirectURL(authConfig)
-	return p
+	return p, nil
 }
 
 func (ap *azureProvider) loginUser(
@@ -366,7 +365,7 @@ func (ap *azureProvider) saveAzureConfigK8s(config *v3.AzureADConfig) error {
 	config.Type = client.AzureADConfigType
 	config.ObjectMeta = storedAzureConfig.ObjectMeta
 
-	field := strings.ToLower(auth.TypeToField[config.Type])
+	field := strings.ToLower(client.AzureADConfigFieldApplicationSecret)
 	if err := common.CreateOrUpdateSecrets(ap.secrets, config.ApplicationSecret, field, strings.ToLower(config.Type)); err != nil {
 		return err
 	}
@@ -407,7 +406,7 @@ func (ap *azureProvider) getAzureConfigK8s() (*v3.AzureADConfig, error) {
 
 	if storedAzureADConfig.ApplicationSecret != "" {
 		value, err := common.ReadFromSecret(ap.secrets, storedAzureADConfig.ApplicationSecret,
-			strings.ToLower(auth.TypeToField[client.AzureADConfigType]))
+			strings.ToLower(client.AzureADConfigFieldApplicationSecret))
 		if err != nil {
 			return nil, err
 		}
