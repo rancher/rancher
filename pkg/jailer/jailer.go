@@ -1,13 +1,16 @@
 package jailer
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/user"
 	"path"
 	"strconv"
+	"sync"
 	"syscall"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -15,15 +18,36 @@ import (
 
 const BaseJailPath = "/opt/jail"
 
+var lock = sync.Mutex{}
+
 // CreateJail sets up the named directory for use with chroot
 func CreateJail(name string) error {
-	logrus.Debugf("Creating jail for %v", name)
-	_, err := os.Stat(path.Join(BaseJailPath, name))
+	lock.Lock()
+	defer lock.Unlock()
+
+	jailPath := path.Join(BaseJailPath, name)
+
+	// Check for the done file, if that exists the jail is ready to be used
+	_, err := os.Stat(path.Join(jailPath, "done"))
 	if err == nil {
 		return nil
 	}
 
-	cmd := exec.Command("/usr/bin/jailer.sh", name)
+	// If the base dir exists without the done file rebuild the directory
+	_, err = os.Stat(jailPath)
+	if err == nil {
+		if err := os.RemoveAll(jailPath); err != nil {
+			return err
+		}
+
+	}
+
+	logrus.Debugf("Creating jail for %v", name)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "/usr/bin/jailer.sh", name)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return errors.WithMessage(err, fmt.Sprintf("error running the jail command: %v", string(out)))
