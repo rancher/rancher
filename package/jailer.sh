@@ -25,7 +25,13 @@ cp /etc/ssl/certs/ca-certificates.crt /opt/jail/$NAME/etc/ssl/certs
 cp /etc/resolv.conf /opt/jail/$NAME/etc/
 
 if [ -d /var/lib/rancher/management-state/bin ]; then
-    cp -r /var/lib/rancher/management-state/bin /opt/drivers/management-state
+  ( cd /var/lib/rancher/management-state/bin
+    for f in *; do
+      if [ ! -f "/opt/drivers/management-state/bin/$f" ]; then
+        cp "$f" "/opt/drivers/management-state/bin/$f"
+      fi
+    done
+  )
 fi
 
 # Hard link driver binaries
