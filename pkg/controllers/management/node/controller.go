@@ -179,8 +179,7 @@ func (m *Lifecycle) Create(obj *v3.Node) (runtime.Object, error) {
 		if !m.devMode {
 			err := jailer.CreateJail(obj.Namespace)
 			if err != nil {
-				logrus.Infof("Create jail error: %v", err)
-				return nil, err
+				return nil, errors.WithMessage(err, "node create jail error")
 			}
 		}
 		config, err := nodeconfig.NewNodeConfig(m.secretStore, obj)
@@ -219,8 +218,7 @@ func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
 		if !m.devMode {
 			err := jailer.CreateJail(obj.Namespace)
 			if err != nil {
-				logrus.Infof("Create jail error: %v", err)
-				return nil, err
+				return nil, errors.WithMessage(err, "node remove jail error")
 			}
 		}
 
@@ -420,8 +418,7 @@ func (m *Lifecycle) Updated(obj *v3.Node) (runtime.Object, error) {
 			logrus.Infof("Creating jail for %v", obj.Namespace)
 			err := jailer.CreateJail(obj.Namespace)
 			if err != nil {
-				logrus.Infof("Create jail error: %v", err)
-				return nil, err
+				return nil, errors.WithMessage(err, "node update jail error")
 			}
 		}
 
