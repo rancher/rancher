@@ -98,8 +98,9 @@ func main() {
 			Value: "simple",
 		},
 		cli.StringSliceFlag{
-			Name:  "acme-domain",
-			Usage: "Domain to register with LetsEncrypt",
+			Name:   "acme-domain",
+			EnvVar: "ACME_DOMAIN",
+			Usage:  "Domain to register with LetsEncrypt",
 		},
 		cli.BoolFlag{
 			Name:  "no-cacerts",
