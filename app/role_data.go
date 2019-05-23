@@ -69,7 +69,9 @@ func addRoles(management *config.ManagementContext) (string, error) {
 
 	rb.addRole("User Base", "user-base").addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch")
+		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch").
+		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
+		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*")
 
 	// TODO user should be dynamically authorized to only see herself
 	// TODO Need "self-service" for nodetemplates such that a user can create them, but only RUD their own
