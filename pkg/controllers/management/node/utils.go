@@ -126,8 +126,6 @@ func buildCommand(nodeDir string, node *v3.Node, cmdArgs []string) (*exec.Cmd, e
 		nodeDirEnvKey + nodeDir,
 		"PATH=/usr/bin:/var/lib/rancher/management-state/bin",
 	}
-	logrus.Infof("CMD info: %+v", command)
-	logrus.Infof("SysProc: %+v", command.SysProcAttr)
 	return command, nil
 }
 
