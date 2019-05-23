@@ -24,6 +24,10 @@ cp -r /lib64 /opt/jail/$NAME
 cp /etc/ssl/certs/ca-certificates.crt /opt/jail/$NAME/etc/ssl/certs
 cp /etc/resolv.conf /opt/jail/$NAME/etc/
 
+if [ -d /var/lib/rancher/management-state/bin ]; then
+    cp -r /var/lib/rancher/management-state/bin /opt/drivers/management-state
+fi
+
 # Hard link driver binaries
 cp -r -l /opt/drivers/management-state/bin /opt/jail/$NAME/var/lib/rancher/management-state
 
@@ -36,3 +40,5 @@ cp -l /usr/bin/helm /opt/jail/$NAME/usr/bin
 cd /dev
 # tar copy /dev excluding mqueue and shm
 tar cf - --exclude=mqueue --exclude=shm . | (cd /opt/jail/${NAME}/dev; tar xfp -)
+
+touch /opt/jail/$NAME/done
