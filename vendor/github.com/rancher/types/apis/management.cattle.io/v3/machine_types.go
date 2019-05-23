@@ -3,7 +3,7 @@ package v3
 import (
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -225,7 +225,10 @@ type NodeDriver struct {
 }
 
 type NodeDriverStatus struct {
-	Conditions []Condition `json:"conditions"`
+	Conditions                  []Condition `json:"conditions"`
+	AppliedURL                  string      `json:"appliedURL"`
+	AppliedChecksum             string      `json:"appliedChecksum"`
+	AppliedDockerMachineVersion string      `json:"appliedDockerMachineVersion"`
 }
 
 var (
