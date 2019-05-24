@@ -217,11 +217,19 @@ if ($CATTLE_CA_CHECKSUM) {
     $temp.MoveTo("$SSL_CERT_DIR\serverca")
 
     #import the self-signed certificate#
-    $cacertsBytes = [Convert]::FromBase64String((Get-Content "$SSL_CERT_DIR\serverca" | select -Skip 1 | select -SkipLast 1))
-    $cacertsFile = "$env:TEMP\serverca.cer"
-    Set-Content -Value $cacertsBytes -Path $cacertsFile -Encoding Byte
-    Import-Certificate -CertStoreLocation 'Cert:\LocalMachine\Root' -FilePath $cacertsFile | Out-Null
-    rm -Force $cacertsFile -ErrorAction Ignore
+    $caBytes = $null
+    Get-Content "$SSL_CERT_DIR\serverca" | % {
+        if ($_ -match '-+BEGIN CERTIFICATE-+') {
+            $caBytes = @()
+        } elseif ($_ -match '-+END CERTIFICATE-+') {
+            $caTemp = New-TemporaryFile
+            Set-Content -Value $caBytes -Path $caTemp.FullName -Encoding Byte
+            Import-Certificate -CertStoreLocation 'Cert:\LocalMachine\Root' -FilePath $caTemp.FullName | Out-Null
+            $caTemp.Delete()
+        } else {
+            $caBytes += [Convert]::FromBase64String($_)
+        }
+    }
 }
 
 # add labels #
