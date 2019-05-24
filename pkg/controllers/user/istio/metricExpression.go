@@ -80,7 +80,7 @@ metadata:
   labels:
     app: metric-expression
     component: istio
-    details: "false"
+    details: "true"
     level: cluster
     graph: 4xxs
     source: rancher-istio
@@ -96,7 +96,7 @@ metadata:
   labels:
     app: metric-expression
     component: istio
-    details: "false"
+    details: "true"
     level: cluster
     graph: 5xxs
     source: rancher-istio
@@ -112,7 +112,7 @@ metadata:
   labels:
     app: metric-expression
     component: istio
-    details: "false"
+    details: "true"
     level: cluster
     graph: global-success-rate
     source: rancher-istio
@@ -129,7 +129,7 @@ metadata:
   labels:
     app: metric-expression
     component: istio
-    details: "false"
+    details: "true"
     level: cluster
     graph: global-request-volume
     source: rancher-istio
@@ -145,7 +145,7 @@ metadata:
   labels:
     app: metric-expression
     component: istio
-    details: "false"
+    details: "true"
     level: project 
     graph: 4xxs
     source: rancher-istio
@@ -161,7 +161,7 @@ metadata:
   labels:
     app: metric-expression
     component: istio
-    details: "false"
+    details: "true"
     level: project 
     graph: 4xxs-top10
     source: rancher-istio
@@ -177,7 +177,7 @@ metadata:
   labels:
     app: metric-expression
     component: istio
-    details: "false"
+    details: "true"
     level: project 
     graph: 5xxs
     source: rancher-istio
@@ -193,7 +193,7 @@ metadata:
   labels:
     app: metric-expression
     component: istio
-    details: "false"
+    details: "true"
     level: project 
     graph: 5xxs-top10
     source: rancher-istio
@@ -209,7 +209,7 @@ metadata:
   labels:
     app: metric-expression
     component: istio
-    details: "false"
+    details: "true"
     level: project 
     graph: global-success-rate
     source: rancher-istio
@@ -225,7 +225,7 @@ metadata:
   labels:
     app: metric-expression
     component: istio
-    details: "false"
+    details: "true"
     level: project 
     graph: global-request-volume
     source: rancher-istio
@@ -241,7 +241,7 @@ metadata:
   labels:
     app: metric-expression
     component: istio
-    details: "false"
+    details: "true"
     level: project 
     graph: global-request-volume-top10
     source: rancher-istio
@@ -257,7 +257,7 @@ metadata:
   labels:
     app: metric-expression
     component: istio
-    details: "false"
+    details: "true"
     level: project 
     graph: request-duration-p50-top10 
     source: rancher-istio
@@ -273,7 +273,7 @@ metadata:
   labels:
     app: metric-expression
     component: istio
-    details: "false"
+    details: "true"
     level: project 
     graph: request-duration-p90-top10 
     source: rancher-istio
@@ -289,7 +289,7 @@ metadata:
   labels:
     app: metric-expression
     component: istio
-    details: "false"
+    details: "true"
     level: project 
     graph: request-duration-p99-top10 
     source: rancher-istio
@@ -314,15 +314,10 @@ spec:
   resourceType: istiocluster
   priority: 800
   title: istio-4xxs
-  metricsSelector:
-    details: "false"
-    component: istio
-    graph: 4xxs
-    level: cluster
   detailsMetricsSelector:
     details: "true"
     component: istio
-    graph: 4xxs-details
+    graph: 4xxs
     level: cluster
 ---
 apiVersion: management.cattle.io/v3
@@ -338,15 +333,10 @@ spec:
   resourceType: istiocluster
   priority: 800
   title: istio-5xxs
-  metricsSelector:
-    details: "false"
-    component: istio
-    graph: 5xxs
-    level: cluster
   detailsMetricsSelector:
     details: "true"
     component: istio
-    graph: 5xxs-details
+    graph: 5xxs
     level: cluster
 ---
 apiVersion: management.cattle.io/v3
@@ -362,15 +352,10 @@ spec:
   resourceType: istiocluster
   priority: 800
   title: istio-global-success-rate
-  metricsSelector:
-    details: "false"
-    component: istio
-    graph: global-success-rate
-    level: cluster
   detailsMetricsSelector:
     details: "true"
     component: istio
-    graph: global-success-rate-details
+    graph: global-success-rate
     level: cluster
 ---
 `
@@ -389,15 +374,10 @@ spec:
   resourceType: istioproject 
   priority: 800
   title: istio-4xxs
-  metricsSelector:
-    details: "false"
-    component: istio
-    graph: 4xxs
-    level: project
   detailsMetricsSelector:
     details: "true"
     component: istio
-    graph: 4xxs-details
+    graph: 4xxs
     level: project
 ---
 apiVersion: management.cattle.io/v3
@@ -413,15 +393,10 @@ spec:
   resourceType: istioproject 
   priority: 800
   title: istio-4xxs-top10
-  metricsSelector:
-    details: "false"
-    component: istio
-    graph: 4xxs-top10
-    level: project
   detailsMetricsSelector:
     details: "true"
     component: istio
-    graph: 4xxs-details-top10
+    graph: 4xxs-top10
     level: project
 ---
 apiVersion: management.cattle.io/v3
@@ -437,15 +412,10 @@ spec:
   resourceType: istioproject 
   priority: 800
   title: istio-5xxs
-  metricsSelector:
-    details: "false"
-    component: istio
-    graph: 5xxs
-    level: project
   detailsMetricsSelector:
     details: "true"
     component: istio
-    graph: 5xxs-details
+    graph: 5xxs
     level: project
 ---
 apiVersion: management.cattle.io/v3
@@ -461,15 +431,10 @@ spec:
   resourceType: istioproject 
   priority: 800
   title: istio-5xxs-top10
-  metricsSelector:
-    details: "false"
-    component: istio
-    graph: 5xxs-top10
-    level: project
   detailsMetricsSelector:
     details: "true"
     component: istio
-    graph: 5xxs-details-top10
+    graph: 5xxs-top10
     level: project
 ---
 apiVersion: management.cattle.io/v3
@@ -485,15 +450,10 @@ spec:
   resourceType: istioproject 
   priority: 800
   title: istio-global-success-rate
-  metricsSelector:
-    details: "false"
-    component: istio
-    graph: global-success-rate
-    level: project
   detailsMetricsSelector:
     details: "true"
     component: istio
-    graph: global-success-rate-details
+    graph: global-success-rate
     level: project
 ---
 apiVersion: management.cattle.io/v3
@@ -509,15 +469,10 @@ spec:
   resourceType: istioproject 
   priority: 800
   title: istio-global-request-volume
-  metricsSelector:
-    details: "false"
-    component: istio
-    graph: global-request-volume
-    level: project
   detailsMetricsSelector:
     details: "true"
     component: istio
-    graph: global-request-volume-details
+    graph: global-request-volume
     level: project
 ---
 apiVersion: management.cattle.io/v3
@@ -533,15 +488,10 @@ spec:
   resourceType: istioproject 
   priority: 800
   title: istio-global-request-volume-top10
-  metricsSelector:
-    details: "false"
-    component: istio
-    graph: global-request-volume-top10
-    level: project
   detailsMetricsSelector:
     details: "true"
     component: istio
-    graph: global-request-volume-details-top10
+    graph: global-request-volume-top10
     level: project
 ---
 apiVersion: management.cattle.io/v3
@@ -557,15 +507,10 @@ spec:
   resourceType: istioproject 
   priority: 800
   title: istio-request-duration-p50-top10
-  metricsSelector:
-    details: "false"
-    component: istio
-    graph: request-duration-p50-top10
-    level: project
   detailsMetricsSelector:
     details: "true"
     component: istio
-    graph: request-duration-details-p50-top10
+    graph: request-duration-p50-top10
     level: project
 ---
 apiVersion: management.cattle.io/v3
@@ -581,15 +526,10 @@ spec:
   resourceType: istioproject 
   priority: 800
   title: istio-request-duration-p90-top10
-  metricsSelector:
-    details: "false"
-    component: istio
-    graph: request-duration-p90-top10
-    level: project
   detailsMetricsSelector:
     details: "true"
     component: istio
-    graph: request-duration-details-p90-top10
+    graph: request-duration-p90-top10
     level: project
 ---
 apiVersion: management.cattle.io/v3
@@ -605,15 +545,10 @@ spec:
   resourceType: istioproject 
   priority: 800
   title: istio-request-duration-p99-top10
-  metricsSelector:
-    details: "false"
-    component: istio
-    graph: request-duration-p99-top10
-    level: project
   detailsMetricsSelector:
     details: "true"
     component: istio
-    graph: request-duration-details-p99-top10
+    graph: request-duration-p99-top10
     level: project
 ---
 `
