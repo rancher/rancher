@@ -20,6 +20,7 @@ cp -r /lib $BASE
 cp -r /lib64 $BASE
 cp /etc/ssl/certs/ca-certificates.crt $BASE/etc/ssl/certs
 cp /etc/resolv.conf $BASE/etc/
+cp /etc/hosts $BASE/etc/
 
 # Copy driver binaries
 cp -a /usr/local/bin/. $BASE/usr/local/bin/
@@ -32,3 +33,5 @@ fi
 cd /dev
 # tar copy /dev excluding mqueue and shm
 tar cf - --exclude=mqueue --exclude=shm . | (cd ${BASE}/dev; tar xfp -)
+
+touch $BASE/done
