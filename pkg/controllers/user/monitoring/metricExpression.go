@@ -5059,7 +5059,7 @@ spec:
     container_name!=""}[5m])) by (pod_name)
   legendFormat: CPU cfs throttled([[pod_name]])
   description: workload cpu cfs throttled seconds sum rate
---- 
+---
 `
 
 	ProjectMetricExpression = `
