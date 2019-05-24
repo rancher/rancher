@@ -268,6 +268,10 @@ func (m *Lifecycle) createCredSchema(obj *v3.NodeDriver, credFields map[string]v
 }
 
 func (m *Lifecycle) checkDriverVersion(obj *v3.NodeDriver) bool {
+	if v3.NodeDriverConditionDownloaded.IsUnknown(obj) || v3.NodeDriverConditionInstalled.IsUnknown(obj) {
+		return true
+	}
+
 	// Builtin drivers use the docker-machine version to validate against
 	if obj.Spec.Builtin {
 		if obj.Status.AppliedDockerMachineVersion != m.dockerMachineVersion {
