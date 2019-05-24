@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"fmt"
 	"reflect"
+	"sort"
 
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
@@ -359,10 +360,37 @@ func GenerateEtcdCertificates(ctx context.Context, certs map[string]CertificateP
 	clusterDomain := rkeConfig.Services.Kubelet.ClusterDomain
 	etcdHosts := hosts.NodesToHosts(rkeConfig.Nodes, etcdRole)
 	etcdAltNames := GetAltNames(etcdHosts, clusterDomain, kubernetesServiceIP, []string{})
+	var (
+		dnsNames = make([]string, len(etcdAltNames.DNSNames))
+		ips      = make([]string, len(etcdAltNames.IPs))
+	)
+	copy(dnsNames, etcdAltNames.DNSNames)
+	sort.Strings(dnsNames)
+	for _, ip := range etcdAltNames.IPs {
+		ips = append(ips, ip.String())
+	}
+	sort.Strings(ips)
+
 	for _, host := range etcdHosts {
 		etcdName := GetEtcdCrtName(host.InternalAddress)
 		if _, ok := certs[etcdName]; ok && certs[etcdName].CertificatePEM != "" && !rotate {
-			continue
+			cert := certs[etcdName].Certificate
+			if cert != nil && len(dnsNames) == len(cert.DNSNames) && len(ips) == len(cert.IPAddresses) {
+				var (
+					certDNSNames = make([]string, len(cert.DNSNames))
+					certIPs      = make([]string, len(cert.IPAddresses))
+				)
+				copy(certDNSNames, cert.DNSNames)
+				sort.Strings(certDNSNames)
+				for _, ip := range cert.IPAddresses {
+					certIPs = append(certIPs, ip.String())
+				}
+				sort.Strings(certIPs)
+
+				if reflect.DeepEqual(dnsNames, certDNSNames) && reflect.DeepEqual(ips, certIPs) {
+					continue
+				}
+			}
 		}
 		var serviceKey *rsa.PrivateKey
 		if !rotate {
