@@ -24,7 +24,7 @@ cp -r /lib64 /opt/jail/$NAME
 cp /etc/ssl/certs/ca-certificates.crt /opt/jail/$NAME/etc/ssl/certs
 cp /etc/resolv.conf /opt/jail/$NAME/etc/
 
-if [ -d /var/lib/rancher/management-state/bin ]; then
+if [ -d /var/lib/rancher/management-state/bin ] && [ "$(ls -A /var/lib/rancher/management-state/bin)" ]; then
   ( cd /var/lib/rancher/management-state/bin
     for f in *; do
       if [ ! -f "/opt/drivers/management-state/bin/$f" ]; then
