@@ -67,6 +67,7 @@ type SourceCodeProviderController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() SourceCodeProviderLister
 	AddHandler(ctx context.Context, name string, handler SourceCodeProviderHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync SourceCodeProviderHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler SourceCodeProviderHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -86,7 +87,9 @@ type SourceCodeProviderInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() SourceCodeProviderController
 	AddHandler(ctx context.Context, name string, sync SourceCodeProviderHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync SourceCodeProviderHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle SourceCodeProviderLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle SourceCodeProviderLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync SourceCodeProviderHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle SourceCodeProviderLifecycle)
 }
@@ -139,6 +142,20 @@ func (c *sourceCodeProviderController) Lister() SourceCodeProviderLister {
 func (c *sourceCodeProviderController) AddHandler(ctx context.Context, name string, handler SourceCodeProviderHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*SourceCodeProvider); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *sourceCodeProviderController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler SourceCodeProviderHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*SourceCodeProvider); ok {
 			return handler(key, v)
@@ -256,9 +273,18 @@ func (s *sourceCodeProviderClient) AddHandler(ctx context.Context, name string, 
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *sourceCodeProviderClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync SourceCodeProviderHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *sourceCodeProviderClient) AddLifecycle(ctx context.Context, name string, lifecycle SourceCodeProviderLifecycle) {
 	sync := NewSourceCodeProviderLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *sourceCodeProviderClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle SourceCodeProviderLifecycle) {
+	sync := NewSourceCodeProviderLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *sourceCodeProviderClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync SourceCodeProviderHandlerFunc) {

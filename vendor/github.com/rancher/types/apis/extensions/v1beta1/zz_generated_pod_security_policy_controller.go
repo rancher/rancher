@@ -68,6 +68,7 @@ type PodSecurityPolicyController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() PodSecurityPolicyLister
 	AddHandler(ctx context.Context, name string, handler PodSecurityPolicyHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync PodSecurityPolicyHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler PodSecurityPolicyHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -87,7 +88,9 @@ type PodSecurityPolicyInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PodSecurityPolicyController
 	AddHandler(ctx context.Context, name string, sync PodSecurityPolicyHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync PodSecurityPolicyHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle PodSecurityPolicyLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle PodSecurityPolicyLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync PodSecurityPolicyHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PodSecurityPolicyLifecycle)
 }
@@ -140,6 +143,20 @@ func (c *podSecurityPolicyController) Lister() PodSecurityPolicyLister {
 func (c *podSecurityPolicyController) AddHandler(ctx context.Context, name string, handler PodSecurityPolicyHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*v1beta1.PodSecurityPolicy); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *podSecurityPolicyController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler PodSecurityPolicyHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*v1beta1.PodSecurityPolicy); ok {
 			return handler(key, v)
@@ -257,9 +274,18 @@ func (s *podSecurityPolicyClient) AddHandler(ctx context.Context, name string, s
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *podSecurityPolicyClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync PodSecurityPolicyHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *podSecurityPolicyClient) AddLifecycle(ctx context.Context, name string, lifecycle PodSecurityPolicyLifecycle) {
 	sync := NewPodSecurityPolicyLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *podSecurityPolicyClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle PodSecurityPolicyLifecycle) {
+	sync := NewPodSecurityPolicyLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *podSecurityPolicyClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync PodSecurityPolicyHandlerFunc) {

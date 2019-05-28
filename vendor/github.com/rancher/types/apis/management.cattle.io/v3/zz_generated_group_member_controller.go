@@ -67,6 +67,7 @@ type GroupMemberController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() GroupMemberLister
 	AddHandler(ctx context.Context, name string, handler GroupMemberHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync GroupMemberHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler GroupMemberHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -86,7 +87,9 @@ type GroupMemberInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() GroupMemberController
 	AddHandler(ctx context.Context, name string, sync GroupMemberHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync GroupMemberHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle GroupMemberLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle GroupMemberLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync GroupMemberHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle GroupMemberLifecycle)
 }
@@ -139,6 +142,20 @@ func (c *groupMemberController) Lister() GroupMemberLister {
 func (c *groupMemberController) AddHandler(ctx context.Context, name string, handler GroupMemberHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*GroupMember); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *groupMemberController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler GroupMemberHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*GroupMember); ok {
 			return handler(key, v)
@@ -256,9 +273,18 @@ func (s *groupMemberClient) AddHandler(ctx context.Context, name string, sync Gr
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *groupMemberClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync GroupMemberHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *groupMemberClient) AddLifecycle(ctx context.Context, name string, lifecycle GroupMemberLifecycle) {
 	sync := NewGroupMemberLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *groupMemberClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle GroupMemberLifecycle) {
+	sync := NewGroupMemberLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *groupMemberClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync GroupMemberHandlerFunc) {

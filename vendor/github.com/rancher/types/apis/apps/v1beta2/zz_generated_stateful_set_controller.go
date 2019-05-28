@@ -69,6 +69,7 @@ type StatefulSetController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() StatefulSetLister
 	AddHandler(ctx context.Context, name string, handler StatefulSetHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync StatefulSetHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler StatefulSetHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -88,7 +89,9 @@ type StatefulSetInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() StatefulSetController
 	AddHandler(ctx context.Context, name string, sync StatefulSetHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync StatefulSetHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle StatefulSetLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle StatefulSetLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync StatefulSetHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle StatefulSetLifecycle)
 }
@@ -141,6 +144,20 @@ func (c *statefulSetController) Lister() StatefulSetLister {
 func (c *statefulSetController) AddHandler(ctx context.Context, name string, handler StatefulSetHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*v1beta2.StatefulSet); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *statefulSetController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler StatefulSetHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*v1beta2.StatefulSet); ok {
 			return handler(key, v)
@@ -258,9 +275,18 @@ func (s *statefulSetClient) AddHandler(ctx context.Context, name string, sync St
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *statefulSetClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync StatefulSetHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *statefulSetClient) AddLifecycle(ctx context.Context, name string, lifecycle StatefulSetLifecycle) {
 	sync := NewStatefulSetLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *statefulSetClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle StatefulSetLifecycle) {
+	sync := NewStatefulSetLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *statefulSetClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync StatefulSetHandlerFunc) {

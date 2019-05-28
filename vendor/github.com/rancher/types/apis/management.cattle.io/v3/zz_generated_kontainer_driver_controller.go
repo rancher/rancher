@@ -67,6 +67,7 @@ type KontainerDriverController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() KontainerDriverLister
 	AddHandler(ctx context.Context, name string, handler KontainerDriverHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync KontainerDriverHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler KontainerDriverHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -86,7 +87,9 @@ type KontainerDriverInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() KontainerDriverController
 	AddHandler(ctx context.Context, name string, sync KontainerDriverHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync KontainerDriverHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle KontainerDriverLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle KontainerDriverLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync KontainerDriverHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle KontainerDriverLifecycle)
 }
@@ -139,6 +142,20 @@ func (c *kontainerDriverController) Lister() KontainerDriverLister {
 func (c *kontainerDriverController) AddHandler(ctx context.Context, name string, handler KontainerDriverHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*KontainerDriver); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *kontainerDriverController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler KontainerDriverHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*KontainerDriver); ok {
 			return handler(key, v)
@@ -256,9 +273,18 @@ func (s *kontainerDriverClient) AddHandler(ctx context.Context, name string, syn
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *kontainerDriverClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync KontainerDriverHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *kontainerDriverClient) AddLifecycle(ctx context.Context, name string, lifecycle KontainerDriverLifecycle) {
 	sync := NewKontainerDriverLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *kontainerDriverClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle KontainerDriverLifecycle) {
+	sync := NewKontainerDriverLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *kontainerDriverClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync KontainerDriverHandlerFunc) {

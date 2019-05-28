@@ -67,6 +67,7 @@ type TemplateController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() TemplateLister
 	AddHandler(ctx context.Context, name string, handler TemplateHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync TemplateHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler TemplateHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -86,7 +87,9 @@ type TemplateInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() TemplateController
 	AddHandler(ctx context.Context, name string, sync TemplateHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync TemplateHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle TemplateLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle TemplateLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync TemplateHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle TemplateLifecycle)
 }
@@ -139,6 +142,20 @@ func (c *templateController) Lister() TemplateLister {
 func (c *templateController) AddHandler(ctx context.Context, name string, handler TemplateHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*Template); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *templateController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler TemplateHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*Template); ok {
 			return handler(key, v)
@@ -256,9 +273,18 @@ func (s *templateClient) AddHandler(ctx context.Context, name string, sync Templ
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *templateClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync TemplateHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *templateClient) AddLifecycle(ctx context.Context, name string, lifecycle TemplateLifecycle) {
 	sync := NewTemplateLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *templateClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle TemplateLifecycle) {
+	sync := NewTemplateLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *templateClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync TemplateHandlerFunc) {

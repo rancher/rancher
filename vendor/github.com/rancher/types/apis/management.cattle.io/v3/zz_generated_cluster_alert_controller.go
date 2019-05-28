@@ -68,6 +68,7 @@ type ClusterAlertController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ClusterAlertLister
 	AddHandler(ctx context.Context, name string, handler ClusterAlertHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ClusterAlertHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ClusterAlertHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -87,7 +88,9 @@ type ClusterAlertInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterAlertController
 	AddHandler(ctx context.Context, name string, sync ClusterAlertHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ClusterAlertHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle ClusterAlertLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ClusterAlertLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ClusterAlertHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterAlertLifecycle)
 }
@@ -140,6 +143,20 @@ func (c *clusterAlertController) Lister() ClusterAlertLister {
 func (c *clusterAlertController) AddHandler(ctx context.Context, name string, handler ClusterAlertHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*ClusterAlert); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *clusterAlertController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler ClusterAlertHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*ClusterAlert); ok {
 			return handler(key, v)
@@ -257,9 +274,18 @@ func (s *clusterAlertClient) AddHandler(ctx context.Context, name string, sync C
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *clusterAlertClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ClusterAlertHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *clusterAlertClient) AddLifecycle(ctx context.Context, name string, lifecycle ClusterAlertLifecycle) {
 	sync := NewClusterAlertLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *clusterAlertClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ClusterAlertLifecycle) {
+	sync := NewClusterAlertLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *clusterAlertClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ClusterAlertHandlerFunc) {

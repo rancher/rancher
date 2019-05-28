@@ -49,6 +49,7 @@ type Client struct {
 	ClusterAlertRule                        ClusterAlertRuleOperations
 	ProjectAlertRule                        ProjectAlertRuleOperations
 	ComposeConfig                           ComposeConfigOperations
+	ClusterRandomizer                       ClusterRandomizerOperations
 	ProjectCatalog                          ProjectCatalogOperations
 	ClusterCatalog                          ClusterCatalogOperations
 	MultiClusterApp                         MultiClusterAppOperations
@@ -116,6 +117,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.ClusterAlertRule = newClusterAlertRuleClient(client)
 	client.ProjectAlertRule = newProjectAlertRuleClient(client)
 	client.ComposeConfig = newComposeConfigClient(client)
+	client.ClusterRandomizer = newClusterRandomizerClient(client)
 	client.ProjectCatalog = newProjectCatalogClient(client)
 	client.ClusterCatalog = newClusterCatalogClient(client)
 	client.MultiClusterApp = newMultiClusterAppClient(client)

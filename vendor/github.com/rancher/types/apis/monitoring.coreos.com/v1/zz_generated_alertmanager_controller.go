@@ -3,7 +3,7 @@ package v1
 import (
 	"context"
 
-	"github.com/coreos/prometheus-operator/pkg/client/monitoring/v1"
+	v1 "github.com/coreos/prometheus-operator/pkg/client/monitoring/v1"
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/resource"
@@ -69,6 +69,7 @@ type AlertmanagerController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() AlertmanagerLister
 	AddHandler(ctx context.Context, name string, handler AlertmanagerHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync AlertmanagerHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler AlertmanagerHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -88,7 +89,9 @@ type AlertmanagerInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() AlertmanagerController
 	AddHandler(ctx context.Context, name string, sync AlertmanagerHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync AlertmanagerHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle AlertmanagerLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle AlertmanagerLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync AlertmanagerHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle AlertmanagerLifecycle)
 }
@@ -141,6 +144,20 @@ func (c *alertmanagerController) Lister() AlertmanagerLister {
 func (c *alertmanagerController) AddHandler(ctx context.Context, name string, handler AlertmanagerHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*v1.Alertmanager); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *alertmanagerController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler AlertmanagerHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*v1.Alertmanager); ok {
 			return handler(key, v)
@@ -258,9 +275,18 @@ func (s *alertmanagerClient) AddHandler(ctx context.Context, name string, sync A
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *alertmanagerClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync AlertmanagerHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *alertmanagerClient) AddLifecycle(ctx context.Context, name string, lifecycle AlertmanagerLifecycle) {
 	sync := NewAlertmanagerLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *alertmanagerClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle AlertmanagerLifecycle) {
+	sync := NewAlertmanagerLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *alertmanagerClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync AlertmanagerHandlerFunc) {

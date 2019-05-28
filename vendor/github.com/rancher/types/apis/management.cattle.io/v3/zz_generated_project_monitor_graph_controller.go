@@ -68,6 +68,7 @@ type ProjectMonitorGraphController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ProjectMonitorGraphLister
 	AddHandler(ctx context.Context, name string, handler ProjectMonitorGraphHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ProjectMonitorGraphHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ProjectMonitorGraphHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -87,7 +88,9 @@ type ProjectMonitorGraphInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ProjectMonitorGraphController
 	AddHandler(ctx context.Context, name string, sync ProjectMonitorGraphHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ProjectMonitorGraphHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle ProjectMonitorGraphLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ProjectMonitorGraphLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ProjectMonitorGraphHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ProjectMonitorGraphLifecycle)
 }
@@ -140,6 +143,20 @@ func (c *projectMonitorGraphController) Lister() ProjectMonitorGraphLister {
 func (c *projectMonitorGraphController) AddHandler(ctx context.Context, name string, handler ProjectMonitorGraphHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*ProjectMonitorGraph); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *projectMonitorGraphController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler ProjectMonitorGraphHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*ProjectMonitorGraph); ok {
 			return handler(key, v)
@@ -257,9 +274,18 @@ func (s *projectMonitorGraphClient) AddHandler(ctx context.Context, name string,
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *projectMonitorGraphClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ProjectMonitorGraphHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *projectMonitorGraphClient) AddLifecycle(ctx context.Context, name string, lifecycle ProjectMonitorGraphLifecycle) {
 	sync := NewProjectMonitorGraphLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *projectMonitorGraphClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ProjectMonitorGraphLifecycle) {
+	sync := NewProjectMonitorGraphLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *projectMonitorGraphClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ProjectMonitorGraphHandlerFunc) {

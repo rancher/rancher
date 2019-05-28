@@ -68,6 +68,7 @@ type MultiClusterAppController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() MultiClusterAppLister
 	AddHandler(ctx context.Context, name string, handler MultiClusterAppHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync MultiClusterAppHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler MultiClusterAppHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -87,7 +88,9 @@ type MultiClusterAppInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() MultiClusterAppController
 	AddHandler(ctx context.Context, name string, sync MultiClusterAppHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync MultiClusterAppHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle MultiClusterAppLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle MultiClusterAppLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync MultiClusterAppHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle MultiClusterAppLifecycle)
 }
@@ -140,6 +143,20 @@ func (c *multiClusterAppController) Lister() MultiClusterAppLister {
 func (c *multiClusterAppController) AddHandler(ctx context.Context, name string, handler MultiClusterAppHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*MultiClusterApp); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *multiClusterAppController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler MultiClusterAppHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*MultiClusterApp); ok {
 			return handler(key, v)
@@ -257,9 +274,18 @@ func (s *multiClusterAppClient) AddHandler(ctx context.Context, name string, syn
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *multiClusterAppClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync MultiClusterAppHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *multiClusterAppClient) AddLifecycle(ctx context.Context, name string, lifecycle MultiClusterAppLifecycle) {
 	sync := NewMultiClusterAppLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *multiClusterAppClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle MultiClusterAppLifecycle) {
+	sync := NewMultiClusterAppLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *multiClusterAppClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync MultiClusterAppHandlerFunc) {

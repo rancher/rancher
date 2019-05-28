@@ -67,6 +67,7 @@ type AuthProviderController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() AuthProviderLister
 	AddHandler(ctx context.Context, name string, handler AuthProviderHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync AuthProviderHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler AuthProviderHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -86,7 +87,9 @@ type AuthProviderInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() AuthProviderController
 	AddHandler(ctx context.Context, name string, sync AuthProviderHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync AuthProviderHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle AuthProviderLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle AuthProviderLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync AuthProviderHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle AuthProviderLifecycle)
 }
@@ -139,6 +142,20 @@ func (c *authProviderController) Lister() AuthProviderLister {
 func (c *authProviderController) AddHandler(ctx context.Context, name string, handler AuthProviderHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*AuthProvider); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *authProviderController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler AuthProviderHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*AuthProvider); ok {
 			return handler(key, v)
@@ -256,9 +273,18 @@ func (s *authProviderClient) AddHandler(ctx context.Context, name string, sync A
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *authProviderClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync AuthProviderHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *authProviderClient) AddLifecycle(ctx context.Context, name string, lifecycle AuthProviderLifecycle) {
 	sync := NewAuthProviderLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *authProviderClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle AuthProviderLifecycle) {
+	sync := NewAuthProviderLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *authProviderClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync AuthProviderHandlerFunc) {

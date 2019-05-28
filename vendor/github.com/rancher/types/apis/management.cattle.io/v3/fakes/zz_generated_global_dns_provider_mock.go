@@ -141,6 +141,7 @@ func (mock *GlobalDNSProviderListerMock) ListCalls() []struct {
 
 var (
 	lockGlobalDNSProviderControllerMockAddClusterScopedHandler sync.RWMutex
+	lockGlobalDNSProviderControllerMockAddFeatureHandler       sync.RWMutex
 	lockGlobalDNSProviderControllerMockAddHandler              sync.RWMutex
 	lockGlobalDNSProviderControllerMockEnqueue                 sync.RWMutex
 	lockGlobalDNSProviderControllerMockGeneric                 sync.RWMutex
@@ -162,6 +163,9 @@ var _ v3.GlobalDNSProviderController = &GlobalDNSProviderControllerMock{}
 //         mockedGlobalDNSProviderController := &GlobalDNSProviderControllerMock{
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.GlobalDNSProviderHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, sync v3.GlobalDNSProviderHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
 //             },
 //             AddHandlerFunc: func(ctx context.Context, name string, handler v3.GlobalDNSProviderHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
@@ -193,6 +197,9 @@ var _ v3.GlobalDNSProviderController = &GlobalDNSProviderControllerMock{}
 type GlobalDNSProviderControllerMock struct {
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.GlobalDNSProviderHandlerFunc)
+
+	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
+	AddFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, sync v3.GlobalDNSProviderHandlerFunc)
 
 	// AddHandlerFunc mocks the AddHandler method.
 	AddHandlerFunc func(ctx context.Context, name string, handler v3.GlobalDNSProviderHandlerFunc)
@@ -227,6 +234,19 @@ type GlobalDNSProviderControllerMock struct {
 			ClusterName string
 			// Handler is the handler argument value.
 			Handler v3.GlobalDNSProviderHandlerFunc
+		}
+		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
+		AddFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// Sync is the sync argument value.
+			Sync v3.GlobalDNSProviderHandlerFunc
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -308,6 +328,53 @@ func (mock *GlobalDNSProviderControllerMock) AddClusterScopedHandlerCalls() []st
 	lockGlobalDNSProviderControllerMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
 	lockGlobalDNSProviderControllerMockAddClusterScopedHandler.RUnlock()
+	return calls
+}
+
+// AddFeatureHandler calls AddFeatureHandlerFunc.
+func (mock *GlobalDNSProviderControllerMock) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync v3.GlobalDNSProviderHandlerFunc) {
+	if mock.AddFeatureHandlerFunc == nil {
+		panic("GlobalDNSProviderControllerMock.AddFeatureHandlerFunc: method is nil but GlobalDNSProviderController.AddFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled func(string) bool
+		Feat    string
+		Ctx     context.Context
+		Name    string
+		Sync    v3.GlobalDNSProviderHandlerFunc
+	}{
+		Enabled: enabled,
+		Feat:    feat,
+		Ctx:     ctx,
+		Name:    name,
+		Sync:    sync,
+	}
+	lockGlobalDNSProviderControllerMockAddFeatureHandler.Lock()
+	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
+	lockGlobalDNSProviderControllerMockAddFeatureHandler.Unlock()
+	mock.AddFeatureHandlerFunc(enabled, feat, ctx, name, sync)
+}
+
+// AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
+// Check the length with:
+//     len(mockedGlobalDNSProviderController.AddFeatureHandlerCalls())
+func (mock *GlobalDNSProviderControllerMock) AddFeatureHandlerCalls() []struct {
+	Enabled func(string) bool
+	Feat    string
+	Ctx     context.Context
+	Name    string
+	Sync    v3.GlobalDNSProviderHandlerFunc
+} {
+	var calls []struct {
+		Enabled func(string) bool
+		Feat    string
+		Ctx     context.Context
+		Name    string
+		Sync    v3.GlobalDNSProviderHandlerFunc
+	}
+	lockGlobalDNSProviderControllerMockAddFeatureHandler.RLock()
+	calls = mock.calls.AddFeatureHandler
+	lockGlobalDNSProviderControllerMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
@@ -532,6 +599,8 @@ func (mock *GlobalDNSProviderControllerMock) SyncCalls() []struct {
 var (
 	lockGlobalDNSProviderInterfaceMockAddClusterScopedHandler   sync.RWMutex
 	lockGlobalDNSProviderInterfaceMockAddClusterScopedLifecycle sync.RWMutex
+	lockGlobalDNSProviderInterfaceMockAddFeatureHandler         sync.RWMutex
+	lockGlobalDNSProviderInterfaceMockAddFeatureLifecycle       sync.RWMutex
 	lockGlobalDNSProviderInterfaceMockAddHandler                sync.RWMutex
 	lockGlobalDNSProviderInterfaceMockAddLifecycle              sync.RWMutex
 	lockGlobalDNSProviderInterfaceMockController                sync.RWMutex
@@ -562,6 +631,12 @@ var _ v3.GlobalDNSProviderInterface = &GlobalDNSProviderInterfaceMock{}
 //             },
 //             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v3.GlobalDNSProviderLifecycle)  {
 // 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, sync v3.GlobalDNSProviderHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle v3.GlobalDNSProviderLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
 //             },
 //             AddHandlerFunc: func(ctx context.Context, name string, sync v3.GlobalDNSProviderHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
@@ -614,6 +689,12 @@ type GlobalDNSProviderInterfaceMock struct {
 
 	// AddClusterScopedLifecycleFunc mocks the AddClusterScopedLifecycle method.
 	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v3.GlobalDNSProviderLifecycle)
+
+	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
+	AddFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, sync v3.GlobalDNSProviderHandlerFunc)
+
+	// AddFeatureLifecycleFunc mocks the AddFeatureLifecycle method.
+	AddFeatureLifecycleFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle v3.GlobalDNSProviderLifecycle)
 
 	// AddHandlerFunc mocks the AddHandler method.
 	AddHandlerFunc func(ctx context.Context, name string, sync v3.GlobalDNSProviderHandlerFunc)
@@ -675,6 +756,32 @@ type GlobalDNSProviderInterfaceMock struct {
 			Name string
 			// ClusterName is the clusterName argument value.
 			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.GlobalDNSProviderLifecycle
+		}
+		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
+		AddFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// Sync is the sync argument value.
+			Sync v3.GlobalDNSProviderHandlerFunc
+		}
+		// AddFeatureLifecycle holds details about calls to the AddFeatureLifecycle method.
+		AddFeatureLifecycle []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
 			// Lifecycle is the lifecycle argument value.
 			Lifecycle v3.GlobalDNSProviderLifecycle
 		}
@@ -847,6 +954,100 @@ func (mock *GlobalDNSProviderInterfaceMock) AddClusterScopedLifecycleCalls() []s
 	lockGlobalDNSProviderInterfaceMockAddClusterScopedLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedLifecycle
 	lockGlobalDNSProviderInterfaceMockAddClusterScopedLifecycle.RUnlock()
+	return calls
+}
+
+// AddFeatureHandler calls AddFeatureHandlerFunc.
+func (mock *GlobalDNSProviderInterfaceMock) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync v3.GlobalDNSProviderHandlerFunc) {
+	if mock.AddFeatureHandlerFunc == nil {
+		panic("GlobalDNSProviderInterfaceMock.AddFeatureHandlerFunc: method is nil but GlobalDNSProviderInterface.AddFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled func(string) bool
+		Feat    string
+		Ctx     context.Context
+		Name    string
+		Sync    v3.GlobalDNSProviderHandlerFunc
+	}{
+		Enabled: enabled,
+		Feat:    feat,
+		Ctx:     ctx,
+		Name:    name,
+		Sync:    sync,
+	}
+	lockGlobalDNSProviderInterfaceMockAddFeatureHandler.Lock()
+	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
+	lockGlobalDNSProviderInterfaceMockAddFeatureHandler.Unlock()
+	mock.AddFeatureHandlerFunc(enabled, feat, ctx, name, sync)
+}
+
+// AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
+// Check the length with:
+//     len(mockedGlobalDNSProviderInterface.AddFeatureHandlerCalls())
+func (mock *GlobalDNSProviderInterfaceMock) AddFeatureHandlerCalls() []struct {
+	Enabled func(string) bool
+	Feat    string
+	Ctx     context.Context
+	Name    string
+	Sync    v3.GlobalDNSProviderHandlerFunc
+} {
+	var calls []struct {
+		Enabled func(string) bool
+		Feat    string
+		Ctx     context.Context
+		Name    string
+		Sync    v3.GlobalDNSProviderHandlerFunc
+	}
+	lockGlobalDNSProviderInterfaceMockAddFeatureHandler.RLock()
+	calls = mock.calls.AddFeatureHandler
+	lockGlobalDNSProviderInterfaceMockAddFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddFeatureLifecycle calls AddFeatureLifecycleFunc.
+func (mock *GlobalDNSProviderInterfaceMock) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle v3.GlobalDNSProviderLifecycle) {
+	if mock.AddFeatureLifecycleFunc == nil {
+		panic("GlobalDNSProviderInterfaceMock.AddFeatureLifecycleFunc: method is nil but GlobalDNSProviderInterface.AddFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Enabled   func(string) bool
+		Feat      string
+		Ctx       context.Context
+		Name      string
+		Lifecycle v3.GlobalDNSProviderLifecycle
+	}{
+		Enabled:   enabled,
+		Feat:      feat,
+		Ctx:       ctx,
+		Name:      name,
+		Lifecycle: lifecycle,
+	}
+	lockGlobalDNSProviderInterfaceMockAddFeatureLifecycle.Lock()
+	mock.calls.AddFeatureLifecycle = append(mock.calls.AddFeatureLifecycle, callInfo)
+	lockGlobalDNSProviderInterfaceMockAddFeatureLifecycle.Unlock()
+	mock.AddFeatureLifecycleFunc(enabled, feat, ctx, name, lifecycle)
+}
+
+// AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
+// Check the length with:
+//     len(mockedGlobalDNSProviderInterface.AddFeatureLifecycleCalls())
+func (mock *GlobalDNSProviderInterfaceMock) AddFeatureLifecycleCalls() []struct {
+	Enabled   func(string) bool
+	Feat      string
+	Ctx       context.Context
+	Name      string
+	Lifecycle v3.GlobalDNSProviderLifecycle
+} {
+	var calls []struct {
+		Enabled   func(string) bool
+		Feat      string
+		Ctx       context.Context
+		Name      string
+		Lifecycle v3.GlobalDNSProviderLifecycle
+	}
+	lockGlobalDNSProviderInterfaceMockAddFeatureLifecycle.RLock()
+	calls = mock.calls.AddFeatureLifecycle
+	lockGlobalDNSProviderInterfaceMockAddFeatureLifecycle.RUnlock()
 	return calls
 }
 

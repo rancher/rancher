@@ -68,6 +68,7 @@ type NamespacedDockerCredentialController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() NamespacedDockerCredentialLister
 	AddHandler(ctx context.Context, name string, handler NamespacedDockerCredentialHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NamespacedDockerCredentialHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler NamespacedDockerCredentialHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -87,7 +88,9 @@ type NamespacedDockerCredentialInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NamespacedDockerCredentialController
 	AddHandler(ctx context.Context, name string, sync NamespacedDockerCredentialHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NamespacedDockerCredentialHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle NamespacedDockerCredentialLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle NamespacedDockerCredentialLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NamespacedDockerCredentialHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NamespacedDockerCredentialLifecycle)
 }
@@ -140,6 +143,20 @@ func (c *namespacedDockerCredentialController) Lister() NamespacedDockerCredenti
 func (c *namespacedDockerCredentialController) AddHandler(ctx context.Context, name string, handler NamespacedDockerCredentialHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*NamespacedDockerCredential); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *namespacedDockerCredentialController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler NamespacedDockerCredentialHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*NamespacedDockerCredential); ok {
 			return handler(key, v)
@@ -257,9 +274,18 @@ func (s *namespacedDockerCredentialClient) AddHandler(ctx context.Context, name 
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *namespacedDockerCredentialClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NamespacedDockerCredentialHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *namespacedDockerCredentialClient) AddLifecycle(ctx context.Context, name string, lifecycle NamespacedDockerCredentialLifecycle) {
 	sync := NewNamespacedDockerCredentialLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *namespacedDockerCredentialClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle NamespacedDockerCredentialLifecycle) {
+	sync := NewNamespacedDockerCredentialLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *namespacedDockerCredentialClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NamespacedDockerCredentialHandlerFunc) {

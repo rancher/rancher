@@ -69,6 +69,7 @@ type DaemonSetController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() DaemonSetLister
 	AddHandler(ctx context.Context, name string, handler DaemonSetHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync DaemonSetHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler DaemonSetHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -88,7 +89,9 @@ type DaemonSetInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DaemonSetController
 	AddHandler(ctx context.Context, name string, sync DaemonSetHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync DaemonSetHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle DaemonSetLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle DaemonSetLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync DaemonSetHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle DaemonSetLifecycle)
 }
@@ -141,6 +144,20 @@ func (c *daemonSetController) Lister() DaemonSetLister {
 func (c *daemonSetController) AddHandler(ctx context.Context, name string, handler DaemonSetHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*v1beta2.DaemonSet); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *daemonSetController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler DaemonSetHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*v1beta2.DaemonSet); ok {
 			return handler(key, v)
@@ -258,9 +275,18 @@ func (s *daemonSetClient) AddHandler(ctx context.Context, name string, sync Daem
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *daemonSetClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync DaemonSetHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *daemonSetClient) AddLifecycle(ctx context.Context, name string, lifecycle DaemonSetLifecycle) {
 	sync := NewDaemonSetLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *daemonSetClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle DaemonSetLifecycle) {
+	sync := NewDaemonSetLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *daemonSetClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync DaemonSetHandlerFunc) {

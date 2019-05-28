@@ -67,6 +67,7 @@ type DynamicSchemaController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() DynamicSchemaLister
 	AddHandler(ctx context.Context, name string, handler DynamicSchemaHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync DynamicSchemaHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler DynamicSchemaHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -86,7 +87,9 @@ type DynamicSchemaInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DynamicSchemaController
 	AddHandler(ctx context.Context, name string, sync DynamicSchemaHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync DynamicSchemaHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle DynamicSchemaLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle DynamicSchemaLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync DynamicSchemaHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle DynamicSchemaLifecycle)
 }
@@ -139,6 +142,20 @@ func (c *dynamicSchemaController) Lister() DynamicSchemaLister {
 func (c *dynamicSchemaController) AddHandler(ctx context.Context, name string, handler DynamicSchemaHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*DynamicSchema); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *dynamicSchemaController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler DynamicSchemaHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*DynamicSchema); ok {
 			return handler(key, v)
@@ -256,9 +273,18 @@ func (s *dynamicSchemaClient) AddHandler(ctx context.Context, name string, sync 
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *dynamicSchemaClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync DynamicSchemaHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *dynamicSchemaClient) AddLifecycle(ctx context.Context, name string, lifecycle DynamicSchemaLifecycle) {
 	sync := NewDynamicSchemaLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *dynamicSchemaClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle DynamicSchemaLifecycle) {
+	sync := NewDynamicSchemaLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *dynamicSchemaClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync DynamicSchemaHandlerFunc) {

@@ -6,7 +6,7 @@ import (
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/resource"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -69,6 +69,7 @@ type ResourceQuotaController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ResourceQuotaLister
 	AddHandler(ctx context.Context, name string, handler ResourceQuotaHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ResourceQuotaHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ResourceQuotaHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -88,7 +89,9 @@ type ResourceQuotaInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ResourceQuotaController
 	AddHandler(ctx context.Context, name string, sync ResourceQuotaHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ResourceQuotaHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle ResourceQuotaLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ResourceQuotaLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ResourceQuotaHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ResourceQuotaLifecycle)
 }
@@ -141,6 +144,20 @@ func (c *resourceQuotaController) Lister() ResourceQuotaLister {
 func (c *resourceQuotaController) AddHandler(ctx context.Context, name string, handler ResourceQuotaHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*v1.ResourceQuota); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *resourceQuotaController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler ResourceQuotaHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*v1.ResourceQuota); ok {
 			return handler(key, v)
@@ -258,9 +275,18 @@ func (s *resourceQuotaClient) AddHandler(ctx context.Context, name string, sync 
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *resourceQuotaClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ResourceQuotaHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *resourceQuotaClient) AddLifecycle(ctx context.Context, name string, lifecycle ResourceQuotaLifecycle) {
 	sync := NewResourceQuotaLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *resourceQuotaClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ResourceQuotaLifecycle) {
+	sync := NewResourceQuotaLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *resourceQuotaClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ResourceQuotaHandlerFunc) {

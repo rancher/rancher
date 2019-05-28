@@ -67,6 +67,7 @@ type ClusterController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ClusterLister
 	AddHandler(ctx context.Context, name string, handler ClusterHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ClusterHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ClusterHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -86,7 +87,9 @@ type ClusterInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterController
 	AddHandler(ctx context.Context, name string, sync ClusterHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ClusterHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle ClusterLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ClusterLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ClusterHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterLifecycle)
 }
@@ -139,6 +142,20 @@ func (c *clusterController) Lister() ClusterLister {
 func (c *clusterController) AddHandler(ctx context.Context, name string, handler ClusterHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*Cluster); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *clusterController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler ClusterHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*Cluster); ok {
 			return handler(key, v)
@@ -256,9 +273,18 @@ func (s *clusterClient) AddHandler(ctx context.Context, name string, sync Cluste
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *clusterClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ClusterHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *clusterClient) AddLifecycle(ctx context.Context, name string, lifecycle ClusterLifecycle) {
 	sync := NewClusterLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *clusterClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ClusterLifecycle) {
+	sync := NewClusterLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *clusterClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ClusterHandlerFunc) {

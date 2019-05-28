@@ -69,6 +69,7 @@ type ReplicaSetController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ReplicaSetLister
 	AddHandler(ctx context.Context, name string, handler ReplicaSetHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ReplicaSetHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ReplicaSetHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -88,7 +89,9 @@ type ReplicaSetInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ReplicaSetController
 	AddHandler(ctx context.Context, name string, sync ReplicaSetHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ReplicaSetHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle ReplicaSetLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ReplicaSetLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ReplicaSetHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ReplicaSetLifecycle)
 }
@@ -141,6 +144,20 @@ func (c *replicaSetController) Lister() ReplicaSetLister {
 func (c *replicaSetController) AddHandler(ctx context.Context, name string, handler ReplicaSetHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*v1beta2.ReplicaSet); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *replicaSetController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler ReplicaSetHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*v1beta2.ReplicaSet); ok {
 			return handler(key, v)
@@ -258,9 +275,18 @@ func (s *replicaSetClient) AddHandler(ctx context.Context, name string, sync Rep
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *replicaSetClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ReplicaSetHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *replicaSetClient) AddLifecycle(ctx context.Context, name string, lifecycle ReplicaSetLifecycle) {
 	sync := NewReplicaSetLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *replicaSetClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ReplicaSetLifecycle) {
+	sync := NewReplicaSetLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *replicaSetClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ReplicaSetHandlerFunc) {

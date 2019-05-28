@@ -67,6 +67,7 @@ type TokenController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() TokenLister
 	AddHandler(ctx context.Context, name string, handler TokenHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync TokenHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler TokenHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -86,7 +87,9 @@ type TokenInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() TokenController
 	AddHandler(ctx context.Context, name string, sync TokenHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync TokenHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle TokenLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle TokenLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync TokenHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle TokenLifecycle)
 }
@@ -139,6 +142,20 @@ func (c *tokenController) Lister() TokenLister {
 func (c *tokenController) AddHandler(ctx context.Context, name string, handler TokenHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*Token); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *tokenController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler TokenHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*Token); ok {
 			return handler(key, v)
@@ -256,9 +273,18 @@ func (s *tokenClient) AddHandler(ctx context.Context, name string, sync TokenHan
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *tokenClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync TokenHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *tokenClient) AddLifecycle(ctx context.Context, name string, lifecycle TokenLifecycle) {
 	sync := NewTokenLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *tokenClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle TokenLifecycle) {
+	sync := NewTokenLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *tokenClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync TokenHandlerFunc) {

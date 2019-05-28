@@ -68,6 +68,7 @@ type BasicAuthController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() BasicAuthLister
 	AddHandler(ctx context.Context, name string, handler BasicAuthHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync BasicAuthHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler BasicAuthHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -87,7 +88,9 @@ type BasicAuthInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() BasicAuthController
 	AddHandler(ctx context.Context, name string, sync BasicAuthHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync BasicAuthHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle BasicAuthLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle BasicAuthLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync BasicAuthHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle BasicAuthLifecycle)
 }
@@ -140,6 +143,20 @@ func (c *basicAuthController) Lister() BasicAuthLister {
 func (c *basicAuthController) AddHandler(ctx context.Context, name string, handler BasicAuthHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*BasicAuth); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *basicAuthController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler BasicAuthHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*BasicAuth); ok {
 			return handler(key, v)
@@ -257,9 +274,18 @@ func (s *basicAuthClient) AddHandler(ctx context.Context, name string, sync Basi
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *basicAuthClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync BasicAuthHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *basicAuthClient) AddLifecycle(ctx context.Context, name string, lifecycle BasicAuthLifecycle) {
 	sync := NewBasicAuthLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *basicAuthClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle BasicAuthLifecycle) {
+	sync := NewBasicAuthLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *basicAuthClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync BasicAuthHandlerFunc) {

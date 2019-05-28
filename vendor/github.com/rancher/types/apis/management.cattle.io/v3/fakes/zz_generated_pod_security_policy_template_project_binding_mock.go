@@ -141,6 +141,7 @@ func (mock *PodSecurityPolicyTemplateProjectBindingListerMock) ListCalls() []str
 
 var (
 	lockPodSecurityPolicyTemplateProjectBindingControllerMockAddClusterScopedHandler sync.RWMutex
+	lockPodSecurityPolicyTemplateProjectBindingControllerMockAddFeatureHandler       sync.RWMutex
 	lockPodSecurityPolicyTemplateProjectBindingControllerMockAddHandler              sync.RWMutex
 	lockPodSecurityPolicyTemplateProjectBindingControllerMockEnqueue                 sync.RWMutex
 	lockPodSecurityPolicyTemplateProjectBindingControllerMockGeneric                 sync.RWMutex
@@ -162,6 +163,9 @@ var _ v3.PodSecurityPolicyTemplateProjectBindingController = &PodSecurityPolicyT
 //         mockedPodSecurityPolicyTemplateProjectBindingController := &PodSecurityPolicyTemplateProjectBindingControllerMock{
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, sync v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
 //             },
 //             AddHandlerFunc: func(ctx context.Context, name string, handler v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
@@ -193,6 +197,9 @@ var _ v3.PodSecurityPolicyTemplateProjectBindingController = &PodSecurityPolicyT
 type PodSecurityPolicyTemplateProjectBindingControllerMock struct {
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc)
+
+	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
+	AddFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, sync v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc)
 
 	// AddHandlerFunc mocks the AddHandler method.
 	AddHandlerFunc func(ctx context.Context, name string, handler v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc)
@@ -227,6 +234,19 @@ type PodSecurityPolicyTemplateProjectBindingControllerMock struct {
 			ClusterName string
 			// Handler is the handler argument value.
 			Handler v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc
+		}
+		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
+		AddFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// Sync is the sync argument value.
+			Sync v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -308,6 +328,53 @@ func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) AddClusterSco
 	lockPodSecurityPolicyTemplateProjectBindingControllerMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
 	lockPodSecurityPolicyTemplateProjectBindingControllerMockAddClusterScopedHandler.RUnlock()
+	return calls
+}
+
+// AddFeatureHandler calls AddFeatureHandlerFunc.
+func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc) {
+	if mock.AddFeatureHandlerFunc == nil {
+		panic("PodSecurityPolicyTemplateProjectBindingControllerMock.AddFeatureHandlerFunc: method is nil but PodSecurityPolicyTemplateProjectBindingController.AddFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled func(string) bool
+		Feat    string
+		Ctx     context.Context
+		Name    string
+		Sync    v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc
+	}{
+		Enabled: enabled,
+		Feat:    feat,
+		Ctx:     ctx,
+		Name:    name,
+		Sync:    sync,
+	}
+	lockPodSecurityPolicyTemplateProjectBindingControllerMockAddFeatureHandler.Lock()
+	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
+	lockPodSecurityPolicyTemplateProjectBindingControllerMockAddFeatureHandler.Unlock()
+	mock.AddFeatureHandlerFunc(enabled, feat, ctx, name, sync)
+}
+
+// AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
+// Check the length with:
+//     len(mockedPodSecurityPolicyTemplateProjectBindingController.AddFeatureHandlerCalls())
+func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) AddFeatureHandlerCalls() []struct {
+	Enabled func(string) bool
+	Feat    string
+	Ctx     context.Context
+	Name    string
+	Sync    v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc
+} {
+	var calls []struct {
+		Enabled func(string) bool
+		Feat    string
+		Ctx     context.Context
+		Name    string
+		Sync    v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc
+	}
+	lockPodSecurityPolicyTemplateProjectBindingControllerMockAddFeatureHandler.RLock()
+	calls = mock.calls.AddFeatureHandler
+	lockPodSecurityPolicyTemplateProjectBindingControllerMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
@@ -532,6 +599,8 @@ func (mock *PodSecurityPolicyTemplateProjectBindingControllerMock) SyncCalls() [
 var (
 	lockPodSecurityPolicyTemplateProjectBindingInterfaceMockAddClusterScopedHandler   sync.RWMutex
 	lockPodSecurityPolicyTemplateProjectBindingInterfaceMockAddClusterScopedLifecycle sync.RWMutex
+	lockPodSecurityPolicyTemplateProjectBindingInterfaceMockAddFeatureHandler         sync.RWMutex
+	lockPodSecurityPolicyTemplateProjectBindingInterfaceMockAddFeatureLifecycle       sync.RWMutex
 	lockPodSecurityPolicyTemplateProjectBindingInterfaceMockAddHandler                sync.RWMutex
 	lockPodSecurityPolicyTemplateProjectBindingInterfaceMockAddLifecycle              sync.RWMutex
 	lockPodSecurityPolicyTemplateProjectBindingInterfaceMockController                sync.RWMutex
@@ -562,6 +631,12 @@ var _ v3.PodSecurityPolicyTemplateProjectBindingInterface = &PodSecurityPolicyTe
 //             },
 //             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v3.PodSecurityPolicyTemplateProjectBindingLifecycle)  {
 // 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, sync v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle v3.PodSecurityPolicyTemplateProjectBindingLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
 //             },
 //             AddHandlerFunc: func(ctx context.Context, name string, sync v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
@@ -614,6 +689,12 @@ type PodSecurityPolicyTemplateProjectBindingInterfaceMock struct {
 
 	// AddClusterScopedLifecycleFunc mocks the AddClusterScopedLifecycle method.
 	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v3.PodSecurityPolicyTemplateProjectBindingLifecycle)
+
+	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
+	AddFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, sync v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc)
+
+	// AddFeatureLifecycleFunc mocks the AddFeatureLifecycle method.
+	AddFeatureLifecycleFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle v3.PodSecurityPolicyTemplateProjectBindingLifecycle)
 
 	// AddHandlerFunc mocks the AddHandler method.
 	AddHandlerFunc func(ctx context.Context, name string, sync v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc)
@@ -675,6 +756,32 @@ type PodSecurityPolicyTemplateProjectBindingInterfaceMock struct {
 			Name string
 			// ClusterName is the clusterName argument value.
 			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.PodSecurityPolicyTemplateProjectBindingLifecycle
+		}
+		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
+		AddFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// Sync is the sync argument value.
+			Sync v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc
+		}
+		// AddFeatureLifecycle holds details about calls to the AddFeatureLifecycle method.
+		AddFeatureLifecycle []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
 			// Lifecycle is the lifecycle argument value.
 			Lifecycle v3.PodSecurityPolicyTemplateProjectBindingLifecycle
 		}
@@ -847,6 +954,100 @@ func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddClusterScop
 	lockPodSecurityPolicyTemplateProjectBindingInterfaceMockAddClusterScopedLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedLifecycle
 	lockPodSecurityPolicyTemplateProjectBindingInterfaceMockAddClusterScopedLifecycle.RUnlock()
+	return calls
+}
+
+// AddFeatureHandler calls AddFeatureHandlerFunc.
+func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc) {
+	if mock.AddFeatureHandlerFunc == nil {
+		panic("PodSecurityPolicyTemplateProjectBindingInterfaceMock.AddFeatureHandlerFunc: method is nil but PodSecurityPolicyTemplateProjectBindingInterface.AddFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled func(string) bool
+		Feat    string
+		Ctx     context.Context
+		Name    string
+		Sync    v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc
+	}{
+		Enabled: enabled,
+		Feat:    feat,
+		Ctx:     ctx,
+		Name:    name,
+		Sync:    sync,
+	}
+	lockPodSecurityPolicyTemplateProjectBindingInterfaceMockAddFeatureHandler.Lock()
+	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
+	lockPodSecurityPolicyTemplateProjectBindingInterfaceMockAddFeatureHandler.Unlock()
+	mock.AddFeatureHandlerFunc(enabled, feat, ctx, name, sync)
+}
+
+// AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
+// Check the length with:
+//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.AddFeatureHandlerCalls())
+func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddFeatureHandlerCalls() []struct {
+	Enabled func(string) bool
+	Feat    string
+	Ctx     context.Context
+	Name    string
+	Sync    v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc
+} {
+	var calls []struct {
+		Enabled func(string) bool
+		Feat    string
+		Ctx     context.Context
+		Name    string
+		Sync    v3.PodSecurityPolicyTemplateProjectBindingHandlerFunc
+	}
+	lockPodSecurityPolicyTemplateProjectBindingInterfaceMockAddFeatureHandler.RLock()
+	calls = mock.calls.AddFeatureHandler
+	lockPodSecurityPolicyTemplateProjectBindingInterfaceMockAddFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddFeatureLifecycle calls AddFeatureLifecycleFunc.
+func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle v3.PodSecurityPolicyTemplateProjectBindingLifecycle) {
+	if mock.AddFeatureLifecycleFunc == nil {
+		panic("PodSecurityPolicyTemplateProjectBindingInterfaceMock.AddFeatureLifecycleFunc: method is nil but PodSecurityPolicyTemplateProjectBindingInterface.AddFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Enabled   func(string) bool
+		Feat      string
+		Ctx       context.Context
+		Name      string
+		Lifecycle v3.PodSecurityPolicyTemplateProjectBindingLifecycle
+	}{
+		Enabled:   enabled,
+		Feat:      feat,
+		Ctx:       ctx,
+		Name:      name,
+		Lifecycle: lifecycle,
+	}
+	lockPodSecurityPolicyTemplateProjectBindingInterfaceMockAddFeatureLifecycle.Lock()
+	mock.calls.AddFeatureLifecycle = append(mock.calls.AddFeatureLifecycle, callInfo)
+	lockPodSecurityPolicyTemplateProjectBindingInterfaceMockAddFeatureLifecycle.Unlock()
+	mock.AddFeatureLifecycleFunc(enabled, feat, ctx, name, lifecycle)
+}
+
+// AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
+// Check the length with:
+//     len(mockedPodSecurityPolicyTemplateProjectBindingInterface.AddFeatureLifecycleCalls())
+func (mock *PodSecurityPolicyTemplateProjectBindingInterfaceMock) AddFeatureLifecycleCalls() []struct {
+	Enabled   func(string) bool
+	Feat      string
+	Ctx       context.Context
+	Name      string
+	Lifecycle v3.PodSecurityPolicyTemplateProjectBindingLifecycle
+} {
+	var calls []struct {
+		Enabled   func(string) bool
+		Feat      string
+		Ctx       context.Context
+		Name      string
+		Lifecycle v3.PodSecurityPolicyTemplateProjectBindingLifecycle
+	}
+	lockPodSecurityPolicyTemplateProjectBindingInterfaceMockAddFeatureLifecycle.RLock()
+	calls = mock.calls.AddFeatureLifecycle
+	lockPodSecurityPolicyTemplateProjectBindingInterfaceMockAddFeatureLifecycle.RUnlock()
 	return calls
 }
 

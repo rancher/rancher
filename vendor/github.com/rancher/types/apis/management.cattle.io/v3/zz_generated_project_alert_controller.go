@@ -68,6 +68,7 @@ type ProjectAlertController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ProjectAlertLister
 	AddHandler(ctx context.Context, name string, handler ProjectAlertHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ProjectAlertHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ProjectAlertHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -87,7 +88,9 @@ type ProjectAlertInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ProjectAlertController
 	AddHandler(ctx context.Context, name string, sync ProjectAlertHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ProjectAlertHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle ProjectAlertLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ProjectAlertLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ProjectAlertHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ProjectAlertLifecycle)
 }
@@ -140,6 +143,20 @@ func (c *projectAlertController) Lister() ProjectAlertLister {
 func (c *projectAlertController) AddHandler(ctx context.Context, name string, handler ProjectAlertHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*ProjectAlert); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *projectAlertController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler ProjectAlertHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*ProjectAlert); ok {
 			return handler(key, v)
@@ -257,9 +274,18 @@ func (s *projectAlertClient) AddHandler(ctx context.Context, name string, sync P
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *projectAlertClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ProjectAlertHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *projectAlertClient) AddLifecycle(ctx context.Context, name string, lifecycle ProjectAlertLifecycle) {
 	sync := NewProjectAlertLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *projectAlertClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ProjectAlertLifecycle) {
+	sync := NewProjectAlertLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *projectAlertClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ProjectAlertHandlerFunc) {

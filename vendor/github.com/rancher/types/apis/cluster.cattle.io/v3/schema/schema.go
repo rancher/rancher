@@ -1,14 +1,11 @@
 package schema
 
 import (
-	"reflect"
-	"strings"
-
 	"github.com/rancher/norman/types"
 	m "github.com/rancher/norman/types/mapper"
-	"github.com/rancher/types/apis/cluster.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/cluster.cattle.io/v3"
 	"github.com/rancher/types/factory"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 )
 
@@ -81,24 +78,7 @@ func persistentVolumeTypes(schemas *types.Schemas) *types.Schemas {
 		}{}).
 		MustImport(&Version, v1.PersistentVolume{}, struct {
 			Description string `json:"description"`
-		}{}).
-		MustImportAndCustomize(&Version, v1.PersistentVolume{}, func(schema *types.Schema) {
-			schema.MustCustomizeField("volumeMode", func(field types.Field) types.Field {
-				field.Update = false
-				return field
-			})
-			// All fields of PersistentVolumeSource are immutable
-			val := reflect.ValueOf(v1.PersistentVolumeSource{})
-			for i := 0; i < val.Type().NumField(); i++ {
-				if tag, ok := val.Type().Field(i).Tag.Lookup("json"); ok {
-					name := strings.Split(tag, ",")[0]
-					schema.MustCustomizeField(name, func(field types.Field) types.Field {
-						field.Update = false
-						return field
-					})
-				}
-			}
-		})
+		}{})
 }
 
 func storageClassTypes(schemas *types.Schemas) *types.Schemas {

@@ -68,6 +68,7 @@ type NamespacedCertificateController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() NamespacedCertificateLister
 	AddHandler(ctx context.Context, name string, handler NamespacedCertificateHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NamespacedCertificateHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler NamespacedCertificateHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -87,7 +88,9 @@ type NamespacedCertificateInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NamespacedCertificateController
 	AddHandler(ctx context.Context, name string, sync NamespacedCertificateHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NamespacedCertificateHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle NamespacedCertificateLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle NamespacedCertificateLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NamespacedCertificateHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NamespacedCertificateLifecycle)
 }
@@ -140,6 +143,20 @@ func (c *namespacedCertificateController) Lister() NamespacedCertificateLister {
 func (c *namespacedCertificateController) AddHandler(ctx context.Context, name string, handler NamespacedCertificateHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*NamespacedCertificate); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *namespacedCertificateController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler NamespacedCertificateHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*NamespacedCertificate); ok {
 			return handler(key, v)
@@ -257,9 +274,18 @@ func (s *namespacedCertificateClient) AddHandler(ctx context.Context, name strin
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *namespacedCertificateClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NamespacedCertificateHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *namespacedCertificateClient) AddLifecycle(ctx context.Context, name string, lifecycle NamespacedCertificateLifecycle) {
 	sync := NewNamespacedCertificateLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *namespacedCertificateClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle NamespacedCertificateLifecycle) {
+	sync := NewNamespacedCertificateLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *namespacedCertificateClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NamespacedCertificateHandlerFunc) {

@@ -67,6 +67,7 @@ type GlobalRoleBindingController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() GlobalRoleBindingLister
 	AddHandler(ctx context.Context, name string, handler GlobalRoleBindingHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync GlobalRoleBindingHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler GlobalRoleBindingHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -86,7 +87,9 @@ type GlobalRoleBindingInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() GlobalRoleBindingController
 	AddHandler(ctx context.Context, name string, sync GlobalRoleBindingHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync GlobalRoleBindingHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle GlobalRoleBindingLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle GlobalRoleBindingLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync GlobalRoleBindingHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle GlobalRoleBindingLifecycle)
 }
@@ -139,6 +142,20 @@ func (c *globalRoleBindingController) Lister() GlobalRoleBindingLister {
 func (c *globalRoleBindingController) AddHandler(ctx context.Context, name string, handler GlobalRoleBindingHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*GlobalRoleBinding); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *globalRoleBindingController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler GlobalRoleBindingHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*GlobalRoleBinding); ok {
 			return handler(key, v)
@@ -256,9 +273,18 @@ func (s *globalRoleBindingClient) AddHandler(ctx context.Context, name string, s
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *globalRoleBindingClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync GlobalRoleBindingHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *globalRoleBindingClient) AddLifecycle(ctx context.Context, name string, lifecycle GlobalRoleBindingLifecycle) {
 	sync := NewGlobalRoleBindingLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *globalRoleBindingClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle GlobalRoleBindingLifecycle) {
+	sync := NewGlobalRoleBindingLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *globalRoleBindingClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync GlobalRoleBindingHandlerFunc) {

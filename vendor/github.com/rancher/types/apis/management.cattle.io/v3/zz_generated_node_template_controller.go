@@ -68,6 +68,7 @@ type NodeTemplateController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() NodeTemplateLister
 	AddHandler(ctx context.Context, name string, handler NodeTemplateHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NodeTemplateHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler NodeTemplateHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -87,7 +88,9 @@ type NodeTemplateInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NodeTemplateController
 	AddHandler(ctx context.Context, name string, sync NodeTemplateHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NodeTemplateHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle NodeTemplateLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle NodeTemplateLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NodeTemplateHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NodeTemplateLifecycle)
 }
@@ -140,6 +143,20 @@ func (c *nodeTemplateController) Lister() NodeTemplateLister {
 func (c *nodeTemplateController) AddHandler(ctx context.Context, name string, handler NodeTemplateHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*NodeTemplate); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *nodeTemplateController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler NodeTemplateHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*NodeTemplate); ok {
 			return handler(key, v)
@@ -257,9 +274,18 @@ func (s *nodeTemplateClient) AddHandler(ctx context.Context, name string, sync N
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *nodeTemplateClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NodeTemplateHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *nodeTemplateClient) AddLifecycle(ctx context.Context, name string, lifecycle NodeTemplateLifecycle) {
 	sync := NewNodeTemplateLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *nodeTemplateClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle NodeTemplateLifecycle) {
+	sync := NewNodeTemplateLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *nodeTemplateClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NodeTemplateHandlerFunc) {

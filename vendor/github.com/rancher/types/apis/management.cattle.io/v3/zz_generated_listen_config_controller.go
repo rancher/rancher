@@ -67,6 +67,7 @@ type ListenConfigController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ListenConfigLister
 	AddHandler(ctx context.Context, name string, handler ListenConfigHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ListenConfigHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ListenConfigHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -86,7 +87,9 @@ type ListenConfigInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ListenConfigController
 	AddHandler(ctx context.Context, name string, sync ListenConfigHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ListenConfigHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle ListenConfigLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ListenConfigLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ListenConfigHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ListenConfigLifecycle)
 }
@@ -139,6 +142,20 @@ func (c *listenConfigController) Lister() ListenConfigLister {
 func (c *listenConfigController) AddHandler(ctx context.Context, name string, handler ListenConfigHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*ListenConfig); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *listenConfigController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler ListenConfigHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*ListenConfig); ok {
 			return handler(key, v)
@@ -256,9 +273,18 @@ func (s *listenConfigClient) AddHandler(ctx context.Context, name string, sync L
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *listenConfigClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ListenConfigHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *listenConfigClient) AddLifecycle(ctx context.Context, name string, lifecycle ListenConfigLifecycle) {
 	sync := NewListenConfigLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *listenConfigClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ListenConfigLifecycle) {
+	sync := NewListenConfigLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *listenConfigClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ListenConfigHandlerFunc) {

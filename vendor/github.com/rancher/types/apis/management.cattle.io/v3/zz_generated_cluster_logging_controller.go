@@ -68,6 +68,7 @@ type ClusterLoggingController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ClusterLoggingLister
 	AddHandler(ctx context.Context, name string, handler ClusterLoggingHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ClusterLoggingHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ClusterLoggingHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -87,7 +88,9 @@ type ClusterLoggingInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterLoggingController
 	AddHandler(ctx context.Context, name string, sync ClusterLoggingHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ClusterLoggingHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle ClusterLoggingLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ClusterLoggingLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ClusterLoggingHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterLoggingLifecycle)
 }
@@ -140,6 +143,20 @@ func (c *clusterLoggingController) Lister() ClusterLoggingLister {
 func (c *clusterLoggingController) AddHandler(ctx context.Context, name string, handler ClusterLoggingHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*ClusterLogging); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *clusterLoggingController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler ClusterLoggingHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*ClusterLogging); ok {
 			return handler(key, v)
@@ -257,9 +274,18 @@ func (s *clusterLoggingClient) AddHandler(ctx context.Context, name string, sync
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *clusterLoggingClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ClusterLoggingHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *clusterLoggingClient) AddLifecycle(ctx context.Context, name string, lifecycle ClusterLoggingLifecycle) {
 	sync := NewClusterLoggingLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *clusterLoggingClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ClusterLoggingLifecycle) {
+	sync := NewClusterLoggingLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *clusterLoggingClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ClusterLoggingHandlerFunc) {

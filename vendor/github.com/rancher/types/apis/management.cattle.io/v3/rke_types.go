@@ -504,8 +504,8 @@ type LoadBalancerOpenstackOpts struct {
 	LBMethod             string `json:"lb-method" yaml:"lb-method" ini:"lb-method,omitempty"`                               // default to ROUND_ROBIN.
 	LBProvider           string `json:"lb-provider" yaml:"lb-provider" ini:"lb-provider,omitempty"`
 	CreateMonitor        bool   `json:"create-monitor" yaml:"create-monitor" ini:"create-monitor,omitempty"`
-	MonitorDelay         string `json:"monitor-delay" yaml:"monitor-delay" ini:"monitor-delay,omitempty"`
-	MonitorTimeout       string `json:"monitor-timeout" yaml:"monitor-timeout" ini:"monitor-timeout,omitempty"`
+	MonitorDelay         int    `json:"monitor-delay" yaml:"monitor-delay" ini:"monitor-delay,omitempty"`
+	MonitorTimeout       int    `json:"monitor-timeout" yaml:"monitor-timeout" ini:"monitor-timeout,omitempty"`
 	MonitorMaxRetries    int    `json:"monitor-max-retries" yaml:"monitor-max-retries" ini:"monitor-max-retries,omitempty"`
 	ManageSecurityGroups bool   `json:"manage-security-groups" yaml:"manage-security-groups" ini:"manage-security-groups,omitempty"`
 }

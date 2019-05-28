@@ -69,6 +69,7 @@ type DeploymentController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() DeploymentLister
 	AddHandler(ctx context.Context, name string, handler DeploymentHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync DeploymentHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler DeploymentHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -88,7 +89,9 @@ type DeploymentInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DeploymentController
 	AddHandler(ctx context.Context, name string, sync DeploymentHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync DeploymentHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle DeploymentLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle DeploymentLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync DeploymentHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle DeploymentLifecycle)
 }
@@ -141,6 +144,20 @@ func (c *deploymentController) Lister() DeploymentLister {
 func (c *deploymentController) AddHandler(ctx context.Context, name string, handler DeploymentHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*v1beta2.Deployment); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *deploymentController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler DeploymentHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*v1beta2.Deployment); ok {
 			return handler(key, v)
@@ -258,9 +275,18 @@ func (s *deploymentClient) AddHandler(ctx context.Context, name string, sync Dep
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *deploymentClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync DeploymentHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *deploymentClient) AddLifecycle(ctx context.Context, name string, lifecycle DeploymentLifecycle) {
 	sync := NewDeploymentLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *deploymentClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle DeploymentLifecycle) {
+	sync := NewDeploymentLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *deploymentClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync DeploymentHandlerFunc) {

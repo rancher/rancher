@@ -67,6 +67,7 @@ type SettingController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() SettingLister
 	AddHandler(ctx context.Context, name string, handler SettingHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync SettingHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler SettingHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -86,7 +87,9 @@ type SettingInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() SettingController
 	AddHandler(ctx context.Context, name string, sync SettingHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync SettingHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle SettingLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle SettingLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync SettingHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle SettingLifecycle)
 }
@@ -139,6 +142,20 @@ func (c *settingController) Lister() SettingLister {
 func (c *settingController) AddHandler(ctx context.Context, name string, handler SettingHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*Setting); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *settingController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler SettingHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*Setting); ok {
 			return handler(key, v)
@@ -256,9 +273,18 @@ func (s *settingClient) AddHandler(ctx context.Context, name string, sync Settin
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *settingClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync SettingHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *settingClient) AddLifecycle(ctx context.Context, name string, lifecycle SettingLifecycle) {
 	sync := NewSettingLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *settingClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle SettingLifecycle) {
+	sync := NewSettingLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *settingClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync SettingHandlerFunc) {

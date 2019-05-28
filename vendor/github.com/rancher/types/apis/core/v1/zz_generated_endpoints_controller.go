@@ -6,7 +6,7 @@ import (
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/resource"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -69,6 +69,7 @@ type EndpointsController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() EndpointsLister
 	AddHandler(ctx context.Context, name string, handler EndpointsHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync EndpointsHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler EndpointsHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -88,7 +89,9 @@ type EndpointsInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() EndpointsController
 	AddHandler(ctx context.Context, name string, sync EndpointsHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync EndpointsHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle EndpointsLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle EndpointsLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync EndpointsHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle EndpointsLifecycle)
 }
@@ -141,6 +144,20 @@ func (c *endpointsController) Lister() EndpointsLister {
 func (c *endpointsController) AddHandler(ctx context.Context, name string, handler EndpointsHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*v1.Endpoints); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *endpointsController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler EndpointsHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*v1.Endpoints); ok {
 			return handler(key, v)
@@ -258,9 +275,18 @@ func (s *endpointsClient) AddHandler(ctx context.Context, name string, sync Endp
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *endpointsClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync EndpointsHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *endpointsClient) AddLifecycle(ctx context.Context, name string, lifecycle EndpointsLifecycle) {
 	sync := NewEndpointsLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *endpointsClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle EndpointsLifecycle) {
+	sync := NewEndpointsLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *endpointsClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync EndpointsHandlerFunc) {

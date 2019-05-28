@@ -68,6 +68,7 @@ type CertificateController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() CertificateLister
 	AddHandler(ctx context.Context, name string, handler CertificateHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync CertificateHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler CertificateHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -87,7 +88,9 @@ type CertificateInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() CertificateController
 	AddHandler(ctx context.Context, name string, sync CertificateHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync CertificateHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle CertificateLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle CertificateLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync CertificateHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle CertificateLifecycle)
 }
@@ -140,6 +143,20 @@ func (c *certificateController) Lister() CertificateLister {
 func (c *certificateController) AddHandler(ctx context.Context, name string, handler CertificateHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*Certificate); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *certificateController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler CertificateHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*Certificate); ok {
 			return handler(key, v)
@@ -257,9 +274,18 @@ func (s *certificateClient) AddHandler(ctx context.Context, name string, sync Ce
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *certificateClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync CertificateHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *certificateClient) AddLifecycle(ctx context.Context, name string, lifecycle CertificateLifecycle) {
 	sync := NewCertificateLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *certificateClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle CertificateLifecycle) {
+	sync := NewCertificateLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *certificateClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync CertificateHandlerFunc) {

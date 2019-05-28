@@ -68,6 +68,7 @@ type NotifierController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() NotifierLister
 	AddHandler(ctx context.Context, name string, handler NotifierHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NotifierHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler NotifierHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -87,7 +88,9 @@ type NotifierInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NotifierController
 	AddHandler(ctx context.Context, name string, sync NotifierHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NotifierHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle NotifierLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle NotifierLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NotifierHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NotifierLifecycle)
 }
@@ -140,6 +143,20 @@ func (c *notifierController) Lister() NotifierLister {
 func (c *notifierController) AddHandler(ctx context.Context, name string, handler NotifierHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*Notifier); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *notifierController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler NotifierHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*Notifier); ok {
 			return handler(key, v)
@@ -257,9 +274,18 @@ func (s *notifierClient) AddHandler(ctx context.Context, name string, sync Notif
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *notifierClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NotifierHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *notifierClient) AddLifecycle(ctx context.Context, name string, lifecycle NotifierLifecycle) {
 	sync := NewNotifierLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *notifierClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle NotifierLifecycle) {
+	sync := NewNotifierLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *notifierClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NotifierHandlerFunc) {

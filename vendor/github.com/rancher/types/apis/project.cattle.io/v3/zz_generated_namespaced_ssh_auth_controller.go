@@ -68,6 +68,7 @@ type NamespacedSSHAuthController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() NamespacedSSHAuthLister
 	AddHandler(ctx context.Context, name string, handler NamespacedSSHAuthHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NamespacedSSHAuthHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler NamespacedSSHAuthHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -87,7 +88,9 @@ type NamespacedSSHAuthInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NamespacedSSHAuthController
 	AddHandler(ctx context.Context, name string, sync NamespacedSSHAuthHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NamespacedSSHAuthHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle NamespacedSSHAuthLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle NamespacedSSHAuthLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NamespacedSSHAuthHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NamespacedSSHAuthLifecycle)
 }
@@ -140,6 +143,20 @@ func (c *namespacedSshAuthController) Lister() NamespacedSSHAuthLister {
 func (c *namespacedSshAuthController) AddHandler(ctx context.Context, name string, handler NamespacedSSHAuthHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*NamespacedSSHAuth); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *namespacedSshAuthController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler NamespacedSSHAuthHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*NamespacedSSHAuth); ok {
 			return handler(key, v)
@@ -257,9 +274,18 @@ func (s *namespacedSshAuthClient) AddHandler(ctx context.Context, name string, s
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *namespacedSshAuthClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NamespacedSSHAuthHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *namespacedSshAuthClient) AddLifecycle(ctx context.Context, name string, lifecycle NamespacedSSHAuthLifecycle) {
 	sync := NewNamespacedSSHAuthLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *namespacedSshAuthClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle NamespacedSSHAuthLifecycle) {
+	sync := NewNamespacedSSHAuthLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *namespacedSshAuthClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NamespacedSSHAuthHandlerFunc) {

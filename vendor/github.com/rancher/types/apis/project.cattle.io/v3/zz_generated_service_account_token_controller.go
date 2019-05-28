@@ -68,6 +68,7 @@ type ServiceAccountTokenController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ServiceAccountTokenLister
 	AddHandler(ctx context.Context, name string, handler ServiceAccountTokenHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ServiceAccountTokenHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ServiceAccountTokenHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -87,7 +88,9 @@ type ServiceAccountTokenInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ServiceAccountTokenController
 	AddHandler(ctx context.Context, name string, sync ServiceAccountTokenHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ServiceAccountTokenHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle ServiceAccountTokenLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ServiceAccountTokenLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ServiceAccountTokenHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ServiceAccountTokenLifecycle)
 }
@@ -140,6 +143,20 @@ func (c *serviceAccountTokenController) Lister() ServiceAccountTokenLister {
 func (c *serviceAccountTokenController) AddHandler(ctx context.Context, name string, handler ServiceAccountTokenHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*ServiceAccountToken); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *serviceAccountTokenController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler ServiceAccountTokenHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*ServiceAccountToken); ok {
 			return handler(key, v)
@@ -257,9 +274,18 @@ func (s *serviceAccountTokenClient) AddHandler(ctx context.Context, name string,
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *serviceAccountTokenClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ServiceAccountTokenHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *serviceAccountTokenClient) AddLifecycle(ctx context.Context, name string, lifecycle ServiceAccountTokenLifecycle) {
 	sync := NewServiceAccountTokenLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *serviceAccountTokenClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ServiceAccountTokenLifecycle) {
+	sync := NewServiceAccountTokenLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *serviceAccountTokenClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ServiceAccountTokenHandlerFunc) {

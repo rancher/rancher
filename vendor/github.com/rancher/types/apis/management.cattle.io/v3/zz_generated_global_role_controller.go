@@ -67,6 +67,7 @@ type GlobalRoleController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() GlobalRoleLister
 	AddHandler(ctx context.Context, name string, handler GlobalRoleHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync GlobalRoleHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler GlobalRoleHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -86,7 +87,9 @@ type GlobalRoleInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() GlobalRoleController
 	AddHandler(ctx context.Context, name string, sync GlobalRoleHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync GlobalRoleHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle GlobalRoleLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle GlobalRoleLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync GlobalRoleHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle GlobalRoleLifecycle)
 }
@@ -139,6 +142,20 @@ func (c *globalRoleController) Lister() GlobalRoleLister {
 func (c *globalRoleController) AddHandler(ctx context.Context, name string, handler GlobalRoleHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*GlobalRole); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *globalRoleController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler GlobalRoleHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*GlobalRole); ok {
 			return handler(key, v)
@@ -256,9 +273,18 @@ func (s *globalRoleClient) AddHandler(ctx context.Context, name string, sync Glo
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *globalRoleClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync GlobalRoleHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *globalRoleClient) AddLifecycle(ctx context.Context, name string, lifecycle GlobalRoleLifecycle) {
 	sync := NewGlobalRoleLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *globalRoleClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle GlobalRoleLifecycle) {
+	sync := NewGlobalRoleLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *globalRoleClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync GlobalRoleHandlerFunc) {

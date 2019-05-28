@@ -68,6 +68,7 @@ type NodeController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() NodeLister
 	AddHandler(ctx context.Context, name string, handler NodeHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NodeHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler NodeHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -87,7 +88,9 @@ type NodeInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NodeController
 	AddHandler(ctx context.Context, name string, sync NodeHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NodeHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle NodeLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle NodeLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NodeHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NodeLifecycle)
 }
@@ -140,6 +143,20 @@ func (c *nodeController) Lister() NodeLister {
 func (c *nodeController) AddHandler(ctx context.Context, name string, handler NodeHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*Node); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *nodeController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler NodeHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*Node); ok {
 			return handler(key, v)
@@ -257,9 +274,18 @@ func (s *nodeClient) AddHandler(ctx context.Context, name string, sync NodeHandl
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *nodeClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NodeHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *nodeClient) AddLifecycle(ctx context.Context, name string, lifecycle NodeLifecycle) {
 	sync := NewNodeLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *nodeClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle NodeLifecycle) {
+	sync := NewNodeLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *nodeClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NodeHandlerFunc) {

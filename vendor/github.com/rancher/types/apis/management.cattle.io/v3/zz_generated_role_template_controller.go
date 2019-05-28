@@ -67,6 +67,7 @@ type RoleTemplateController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() RoleTemplateLister
 	AddHandler(ctx context.Context, name string, handler RoleTemplateHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync RoleTemplateHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler RoleTemplateHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -86,7 +87,9 @@ type RoleTemplateInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() RoleTemplateController
 	AddHandler(ctx context.Context, name string, sync RoleTemplateHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync RoleTemplateHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle RoleTemplateLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle RoleTemplateLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync RoleTemplateHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle RoleTemplateLifecycle)
 }
@@ -139,6 +142,20 @@ func (c *roleTemplateController) Lister() RoleTemplateLister {
 func (c *roleTemplateController) AddHandler(ctx context.Context, name string, handler RoleTemplateHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*RoleTemplate); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *roleTemplateController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler RoleTemplateHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*RoleTemplate); ok {
 			return handler(key, v)
@@ -256,9 +273,18 @@ func (s *roleTemplateClient) AddHandler(ctx context.Context, name string, sync R
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *roleTemplateClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync RoleTemplateHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *roleTemplateClient) AddLifecycle(ctx context.Context, name string, lifecycle RoleTemplateLifecycle) {
 	sync := NewRoleTemplateLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *roleTemplateClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle RoleTemplateLifecycle) {
+	sync := NewRoleTemplateLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *roleTemplateClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync RoleTemplateHandlerFunc) {

@@ -67,6 +67,7 @@ type ComposeConfigController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ComposeConfigLister
 	AddHandler(ctx context.Context, name string, handler ComposeConfigHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ComposeConfigHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ComposeConfigHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -86,7 +87,9 @@ type ComposeConfigInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ComposeConfigController
 	AddHandler(ctx context.Context, name string, sync ComposeConfigHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ComposeConfigHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle ComposeConfigLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ComposeConfigLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ComposeConfigHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ComposeConfigLifecycle)
 }
@@ -139,6 +142,20 @@ func (c *composeConfigController) Lister() ComposeConfigLister {
 func (c *composeConfigController) AddHandler(ctx context.Context, name string, handler ComposeConfigHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*ComposeConfig); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *composeConfigController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler ComposeConfigHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*ComposeConfig); ok {
 			return handler(key, v)
@@ -256,9 +273,18 @@ func (s *composeConfigClient) AddHandler(ctx context.Context, name string, sync 
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *composeConfigClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ComposeConfigHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *composeConfigClient) AddLifecycle(ctx context.Context, name string, lifecycle ComposeConfigLifecycle) {
 	sync := NewComposeConfigLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *composeConfigClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ComposeConfigLifecycle) {
+	sync := NewComposeConfigLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *composeConfigClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ComposeConfigHandlerFunc) {

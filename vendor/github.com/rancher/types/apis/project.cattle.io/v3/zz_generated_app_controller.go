@@ -68,6 +68,7 @@ type AppController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() AppLister
 	AddHandler(ctx context.Context, name string, handler AppHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync AppHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler AppHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -87,7 +88,9 @@ type AppInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() AppController
 	AddHandler(ctx context.Context, name string, sync AppHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync AppHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle AppLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle AppLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync AppHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle AppLifecycle)
 }
@@ -140,6 +143,20 @@ func (c *appController) Lister() AppLister {
 func (c *appController) AddHandler(ctx context.Context, name string, handler AppHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*App); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *appController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler AppHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*App); ok {
 			return handler(key, v)
@@ -257,9 +274,18 @@ func (s *appClient) AddHandler(ctx context.Context, name string, sync AppHandler
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *appClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync AppHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *appClient) AddLifecycle(ctx context.Context, name string, lifecycle AppLifecycle) {
 	sync := NewAppLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *appClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle AppLifecycle) {
+	sync := NewAppLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *appClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync AppHandlerFunc) {

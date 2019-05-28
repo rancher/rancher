@@ -68,6 +68,7 @@ type PreferenceController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() PreferenceLister
 	AddHandler(ctx context.Context, name string, handler PreferenceHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync PreferenceHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler PreferenceHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -87,7 +88,9 @@ type PreferenceInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PreferenceController
 	AddHandler(ctx context.Context, name string, sync PreferenceHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync PreferenceHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle PreferenceLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle PreferenceLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync PreferenceHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PreferenceLifecycle)
 }
@@ -140,6 +143,20 @@ func (c *preferenceController) Lister() PreferenceLister {
 func (c *preferenceController) AddHandler(ctx context.Context, name string, handler PreferenceHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*Preference); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *preferenceController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler PreferenceHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*Preference); ok {
 			return handler(key, v)
@@ -257,9 +274,18 @@ func (s *preferenceClient) AddHandler(ctx context.Context, name string, sync Pre
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *preferenceClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync PreferenceHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *preferenceClient) AddLifecycle(ctx context.Context, name string, lifecycle PreferenceLifecycle) {
 	sync := NewPreferenceLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *preferenceClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle PreferenceLifecycle) {
+	sync := NewPreferenceLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *preferenceClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync PreferenceHandlerFunc) {

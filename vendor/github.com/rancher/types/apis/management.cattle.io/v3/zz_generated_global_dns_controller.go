@@ -68,6 +68,7 @@ type GlobalDNSController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() GlobalDNSLister
 	AddHandler(ctx context.Context, name string, handler GlobalDNSHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync GlobalDNSHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler GlobalDNSHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -87,7 +88,9 @@ type GlobalDNSInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() GlobalDNSController
 	AddHandler(ctx context.Context, name string, sync GlobalDNSHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync GlobalDNSHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle GlobalDNSLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle GlobalDNSLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync GlobalDNSHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle GlobalDNSLifecycle)
 }
@@ -140,6 +143,20 @@ func (c *globalDnsController) Lister() GlobalDNSLister {
 func (c *globalDnsController) AddHandler(ctx context.Context, name string, handler GlobalDNSHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*GlobalDNS); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *globalDnsController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler GlobalDNSHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*GlobalDNS); ok {
 			return handler(key, v)
@@ -257,9 +274,18 @@ func (s *globalDnsClient) AddHandler(ctx context.Context, name string, sync Glob
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *globalDnsClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync GlobalDNSHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *globalDnsClient) AddLifecycle(ctx context.Context, name string, lifecycle GlobalDNSLifecycle) {
 	sync := NewGlobalDNSLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *globalDnsClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle GlobalDNSLifecycle) {
+	sync := NewGlobalDNSLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *globalDnsClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync GlobalDNSHandlerFunc) {

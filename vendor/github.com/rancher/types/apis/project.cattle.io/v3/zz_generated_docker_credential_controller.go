@@ -68,6 +68,7 @@ type DockerCredentialController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() DockerCredentialLister
 	AddHandler(ctx context.Context, name string, handler DockerCredentialHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync DockerCredentialHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler DockerCredentialHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -87,7 +88,9 @@ type DockerCredentialInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DockerCredentialController
 	AddHandler(ctx context.Context, name string, sync DockerCredentialHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync DockerCredentialHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle DockerCredentialLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle DockerCredentialLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync DockerCredentialHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle DockerCredentialLifecycle)
 }
@@ -140,6 +143,20 @@ func (c *dockerCredentialController) Lister() DockerCredentialLister {
 func (c *dockerCredentialController) AddHandler(ctx context.Context, name string, handler DockerCredentialHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*DockerCredential); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *dockerCredentialController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler DockerCredentialHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*DockerCredential); ok {
 			return handler(key, v)
@@ -257,9 +274,18 @@ func (s *dockerCredentialClient) AddHandler(ctx context.Context, name string, sy
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *dockerCredentialClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync DockerCredentialHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *dockerCredentialClient) AddLifecycle(ctx context.Context, name string, lifecycle DockerCredentialLifecycle) {
 	sync := NewDockerCredentialLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *dockerCredentialClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle DockerCredentialLifecycle) {
+	sync := NewDockerCredentialLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *dockerCredentialClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync DockerCredentialHandlerFunc) {

@@ -6,7 +6,7 @@ import (
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/resource"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -68,6 +68,7 @@ type ComponentStatusController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ComponentStatusLister
 	AddHandler(ctx context.Context, name string, handler ComponentStatusHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ComponentStatusHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ComponentStatusHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -87,7 +88,9 @@ type ComponentStatusInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ComponentStatusController
 	AddHandler(ctx context.Context, name string, sync ComponentStatusHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ComponentStatusHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle ComponentStatusLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ComponentStatusLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ComponentStatusHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ComponentStatusLifecycle)
 }
@@ -140,6 +143,20 @@ func (c *componentStatusController) Lister() ComponentStatusLister {
 func (c *componentStatusController) AddHandler(ctx context.Context, name string, handler ComponentStatusHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*v1.ComponentStatus); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *componentStatusController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler ComponentStatusHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*v1.ComponentStatus); ok {
 			return handler(key, v)
@@ -257,9 +274,18 @@ func (s *componentStatusClient) AddHandler(ctx context.Context, name string, syn
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *componentStatusClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ComponentStatusHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *componentStatusClient) AddLifecycle(ctx context.Context, name string, lifecycle ComponentStatusLifecycle) {
 	sync := NewComponentStatusLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *componentStatusClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ComponentStatusLifecycle) {
+	sync := NewComponentStatusLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *componentStatusClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ComponentStatusHandlerFunc) {

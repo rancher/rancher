@@ -67,6 +67,7 @@ type NodeDriverController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() NodeDriverLister
 	AddHandler(ctx context.Context, name string, handler NodeDriverHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NodeDriverHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler NodeDriverHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -86,7 +87,9 @@ type NodeDriverInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NodeDriverController
 	AddHandler(ctx context.Context, name string, sync NodeDriverHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NodeDriverHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle NodeDriverLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle NodeDriverLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NodeDriverHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NodeDriverLifecycle)
 }
@@ -139,6 +142,20 @@ func (c *nodeDriverController) Lister() NodeDriverLister {
 func (c *nodeDriverController) AddHandler(ctx context.Context, name string, handler NodeDriverHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*NodeDriver); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *nodeDriverController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler NodeDriverHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*NodeDriver); ok {
 			return handler(key, v)
@@ -256,9 +273,18 @@ func (s *nodeDriverClient) AddHandler(ctx context.Context, name string, sync Nod
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *nodeDriverClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync NodeDriverHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *nodeDriverClient) AddLifecycle(ctx context.Context, name string, lifecycle NodeDriverLifecycle) {
 	sync := NewNodeDriverLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *nodeDriverClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle NodeDriverLifecycle) {
+	sync := NewNodeDriverLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *nodeDriverClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NodeDriverHandlerFunc) {

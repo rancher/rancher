@@ -6,7 +6,7 @@ import (
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/resource"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -69,6 +69,7 @@ type ReplicationControllerController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ReplicationControllerLister
 	AddHandler(ctx context.Context, name string, handler ReplicationControllerHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ReplicationControllerHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ReplicationControllerHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
@@ -88,7 +89,9 @@ type ReplicationControllerInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ReplicationControllerController
 	AddHandler(ctx context.Context, name string, sync ReplicationControllerHandlerFunc)
+	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ReplicationControllerHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle ReplicationControllerLifecycle)
+	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ReplicationControllerLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ReplicationControllerHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ReplicationControllerLifecycle)
 }
@@ -141,6 +144,20 @@ func (c *replicationControllerController) Lister() ReplicationControllerLister {
 func (c *replicationControllerController) AddHandler(ctx context.Context, name string, handler ReplicationControllerHandlerFunc) {
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*v1.ReplicationController); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *replicationControllerController) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, handler ReplicationControllerHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*v1.ReplicationController); ok {
 			return handler(key, v)
@@ -258,9 +275,18 @@ func (s *replicationControllerClient) AddHandler(ctx context.Context, name strin
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *replicationControllerClient) AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ReplicationControllerHandlerFunc) {
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
+}
+
 func (s *replicationControllerClient) AddLifecycle(ctx context.Context, name string, lifecycle ReplicationControllerLifecycle) {
 	sync := NewReplicationControllerLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *replicationControllerClient) AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ReplicationControllerLifecycle) {
+	sync := NewReplicationControllerLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(enabled, feat, ctx, name, sync)
 }
 
 func (s *replicationControllerClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ReplicationControllerHandlerFunc) {

@@ -5,10 +5,10 @@ import (
 
 	"github.com/rancher/norman/types"
 	m "github.com/rancher/norman/types/mapper"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/factory"
 	"github.com/rancher/types/mapper"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 var (
@@ -34,6 +34,7 @@ var (
 		Init(rkeTypes).
 		Init(alertTypes).
 		Init(composeType).
+		Init(ClusterRandomizerType).
 		Init(projectCatalogTypes).
 		Init(clusterCatalogTypes).
 		Init(multiClusterAppTypes).
@@ -650,6 +651,10 @@ func alertTypes(schema *types.Schemas) *types.Schemas {
 
 func composeType(schemas *types.Schemas) *types.Schemas {
 	return schemas.MustImport(&Version, v3.ComposeConfig{})
+}
+
+func ClusterRandomizerType(schemas *types.Schemas) *types.Schemas {
+	return schemas.MustImport(&Version, v3.ClusterRandomizer{})
 }
 
 func projectCatalogTypes(schemas *types.Schemas) *types.Schemas {
