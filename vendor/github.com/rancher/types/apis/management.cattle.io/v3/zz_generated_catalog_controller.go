@@ -149,6 +149,7 @@ func (c *catalogController) AddHandler(ctx context.Context, name string, handler
 }
 
 func (c *catalogController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler CatalogHandlerFunc) {
+	resource.PutClusterScoped(CatalogGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

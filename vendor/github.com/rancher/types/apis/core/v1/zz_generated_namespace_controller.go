@@ -150,6 +150,7 @@ func (c *namespaceController) AddHandler(ctx context.Context, name string, handl
 }
 
 func (c *namespaceController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler NamespaceHandlerFunc) {
+	resource.PutClusterScoped(NamespaceGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

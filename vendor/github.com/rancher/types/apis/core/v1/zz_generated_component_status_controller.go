@@ -150,6 +150,7 @@ func (c *componentStatusController) AddHandler(ctx context.Context, name string,
 }
 
 func (c *componentStatusController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ComponentStatusHandlerFunc) {
+	resource.PutClusterScoped(ComponentStatusGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

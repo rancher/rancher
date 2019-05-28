@@ -150,6 +150,7 @@ func (c *projectAlertGroupController) AddHandler(ctx context.Context, name strin
 }
 
 func (c *projectAlertGroupController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ProjectAlertGroupHandlerFunc) {
+	resource.PutClusterScoped(ProjectAlertGroupGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
