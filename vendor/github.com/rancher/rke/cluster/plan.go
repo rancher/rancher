@@ -100,7 +100,7 @@ func BuildRKEConfigNodePlan(ctx context.Context, myCluster *Cluster, host *hosts
 
 func (c *Cluster) BuildKubeAPIProcess(host *hosts.Host, prefixPath string) v3.Process {
 	// check if external etcd is used
-	etcdConnectionString := services.GetEtcdConnString(c.EtcdHosts)
+	etcdConnectionString := services.GetEtcdConnString(c.EtcdHosts, host.Address)
 	etcdPathPrefix := EtcdPathPrefix
 	etcdClientCert := pki.GetCertPath(pki.KubeNodeCertName)
 	etcdClientKey := pki.GetKeyPath(pki.KubeNodeCertName)
