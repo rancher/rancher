@@ -2,6 +2,7 @@ package settings
 
 import (
 	"fmt"
+	"github.com/rancher/rancher/pkg/features"
 	"os"
 
 	"github.com/rancher/rancher/pkg/settings"
@@ -18,6 +19,10 @@ func Register(context *config.ScaledContext) error {
 	}
 
 	if err := settings.SetProvider(sp); err != nil {
+		return err
+	}
+
+	if err := sp.SetAll(features.GlobalGate.FeatureSetting); err != nil {
 		return err
 	}
 

@@ -2,6 +2,7 @@ package management
 
 import (
 	"context"
+	"github.com/rancher/rancher/pkg/controllers/management/feature"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
@@ -30,6 +31,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	// auth handlers need to run early to create namespaces that back clusters and projects
 	// also, these handlers are purely in the mgmt plane, so they are lightweight compared to those that interact with machines and clusters
 	auth.RegisterEarly(ctx, management, manager)
+	feature.RegisterEarly(ctx, management, manager)
 	usercontrollers.RegisterEarly(ctx, management, manager)
 
 	// a-z

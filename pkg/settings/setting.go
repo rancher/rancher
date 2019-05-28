@@ -62,8 +62,7 @@ var (
 
 	// Features
 	Features						= NewSetting("all-features", "" )
-	//KontainerDriver					= features.NewFeature("kontainer-driver", false, "alpha")
-	//ClusterRandomName				= features.NewFeature("cluster-random-name", false, "alpha")
+
 )
 
 func init() {

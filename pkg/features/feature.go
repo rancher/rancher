@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	gates = newFeatureGate()
+	GlobalGate = newFeatureGate()
 
 	KontainerDriver   = NewFeature("kontainer-driver", false, "alpha")
 	ClusterRandomName = NewFeature("cluster-random-name", false, "alpha")
@@ -19,7 +19,7 @@ type featureGate struct {
 	feature.FeatureGate
 
 	// keep track of features as knownfeatures function is not sufficient
-	featureSetting map[string]*settings.Setting
+	FeatureSetting map[string]settings.Setting
 }
 
 func SetFeature(name string, val string) error {
@@ -28,9 +28,7 @@ func SetFeature(name string, val string) error {
 		return fmt.Errorf("unable to convert value to type bool for setting %s", name)
 	}
 
-	gates.SetFromMap(map[string]bool{name: b})
-	setting := gates.featureSetting[name]
-	setting.Set(val)
+	GlobalGate.SetFromMap(map[string]bool{name: b})
 
 	return nil
 }
@@ -57,11 +55,11 @@ func NewFeature(name string, def bool, stage string) settings.Setting {
 		featureName: fspec,
 	}
 
-	gates.Add(addFeature)
+	GlobalGate.Add(addFeature)
 	addToFeaturesSetting(name)
 
 	setting := settings.NewSetting(name, strconv.FormatBool(def))
-	gates.featureSetting[name] = &setting
+	GlobalGate.FeatureSetting[name] = setting
 
 	return settings.NewSetting(name, strconv.FormatBool(def))
 }
@@ -70,7 +68,7 @@ func newFeatureGate() *featureGate {
 	return &featureGate{
 		feature.NewFeatureGate(),
 
-		map[string]*settings.Setting{},
+		map[string]settings.Setting{},
 	}
 }
 
@@ -84,10 +82,8 @@ func addToFeaturesSetting(name string) {
 }
 
 func SettingExists(name string) bool {
-	for feature := range gates.featureSetting {
-		if name == feature {
-			return true
-		}
+	if GlobalGate.FeatureSetting[name] != (settings.Setting{}) {
+		return true
 	}
 	return false
 }
