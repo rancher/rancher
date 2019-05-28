@@ -2,6 +2,9 @@ package settings
 
 import (
 	"encoding/json"
+	//"github.com/rancher/rancher/pkg/features"
+
+	//"github.com/rancher/rancher/pkg/features"
 	"os"
 	"strings"
 
@@ -56,6 +59,11 @@ var (
 	AuthUserInfoMaxAgeSeconds       = NewSetting("auth-user-info-max-age-seconds", "3600") // 1 hour
 	APIUIVersion                    = NewSetting("api-ui-version", "1.1.6")                // Please update the CATTLE_API_UI_VERSION in package/Dockerfile when updating the version here.
 	RotateCertsIfExpiringInDays     = NewSetting("rotate-certs-if-expiring-in-days", "7")  // 7 days
+
+	// Features
+	Features						= NewSetting("all-features", "" )
+	//KontainerDriver					= features.NewFeature("kontainer-driver", false, "alpha")
+	//ClusterRandomName				= features.NewFeature("cluster-random-name", false, "alpha")
 )
 
 func init() {
