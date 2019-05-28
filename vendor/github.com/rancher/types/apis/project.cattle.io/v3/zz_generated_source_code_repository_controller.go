@@ -150,6 +150,7 @@ func (c *sourceCodeRepositoryController) AddHandler(ctx context.Context, name st
 }
 
 func (c *sourceCodeRepositoryController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler SourceCodeRepositoryHandlerFunc) {
+	resource.PutClusterScoped(SourceCodeRepositoryGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

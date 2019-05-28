@@ -151,6 +151,7 @@ func (c *serviceController) AddHandler(ctx context.Context, name string, handler
 }
 
 func (c *serviceController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ServiceHandlerFunc) {
+	resource.PutClusterScoped(ServiceGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
