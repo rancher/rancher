@@ -321,7 +321,7 @@ func aliasToPath(driver string, config map[string]interface{}, ns string) error 
 				hasher.Write([]byte(fileContents))
 				sha := base32.StdEncoding.WithPadding(-1).EncodeToString(hasher.Sum(nil))[:10]
 				fullPath := path.Join(baseDir, sha)
-				err := ioutil.WriteFile(fullPath, []byte(fileContents), 0644)
+				err := ioutil.WriteFile(fullPath, []byte(fileContents), 0600)
 				if err != nil {
 					return err
 				}
@@ -447,7 +447,12 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 		return obj, err
 	}
 
-	sshKey, err := getSSHKey(nodeDir, obj)
+	keyPath, err := config.SSHKeyPath()
+	if err != nil {
+		return obj, err
+	}
+
+	sshKey, err := getSSHKey(nodeDir, keyPath, obj)
 	if err != nil {
 		return obj, err
 	}
