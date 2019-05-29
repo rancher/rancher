@@ -20,7 +20,7 @@ ENV CATTLE_HELM_VERSION v2.10.0-rancher11
 ENV CATTLE_MACHINE_VERSION v0.15.0-rancher7-1
 ENV LOGLEVEL_VERSION v0.1.2
 ENV TINI_VERSION v0.18.0
-ENV TELEMETRY_VERSION v0.5.4
+ENV TELEMETRY_VERSION v0.5.5
 
 
 RUN curl -sLf https://github.com/rancher/machine-package/releases/download/${CATTLE_MACHINE_VERSION}/docker-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin && \
