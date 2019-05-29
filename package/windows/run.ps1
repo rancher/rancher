@@ -133,20 +133,24 @@ if (-not $currentPrincipal.IsInRole([System.Security.Principal.WindowsBuiltInRol
 
 # set http client #
 try {
-    add-type @"
-    using System.Net;
-    using System.Security.Cryptography.X509Certificates;
-    public class TrustAllCertsPolicy : ICertificatePolicy {
-        public bool CheckValidationResult(
-            ServicePoint srvPoint, X509Certificate certificate,
-            WebRequest request, int certificateProblem) {
-            return true;
-        }
+    if (-not ([System.Management.Automation.PSTypeName]"SkipServerCertificateValidation").Type) {
+        Add-Type -TypeDefinition  @"
+using System.Net;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
+public static class SkipServerCertificateValidation
+{
+    private static bool Callback(object sender, X509Certificate certificate, X509Chain chain,
+        SslPolicyErrors sslPolicyErrors) { return true; }
+    public static void Enable() {
+        ServicePointManager.ServerCertificateValidationCallback = Callback;
+        ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 | SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
     }
+}
 "@
+    }
+    [SkipServerCertificateValidation]::Enable()
 } catch {}
-[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
-[Net.ServicePointManager]::SecurityProtocol = @([Net.SecurityProtocolType]::SystemDefault, [Net.SecurityProtocolType]::Ssl3, [Net.SecurityProtocolType]::Tls, [Net.SecurityProtocolType]::Tls11, [Net.SecurityProtocolType]::Tls12)
 
 # check docker running #
 $dockerNPipe = Get-ChildItem //./pipe/ -ErrorAction Ignore | ? Name -eq "docker_engine"
@@ -166,7 +170,7 @@ if (-not $CATTLE_SERVER) {
     throw "-server is a required option"
 } else {
     try {
-        $null = scrape-text  -Uri "$CATTLE_SERVER/ping"
+        $null = scrape-text -Uri "$CATTLE_SERVER/ping"
     } catch {
         throw ("{0} is not accessible ({1})" -f $CATTLE_SERVER, $_.Exception.Message)
     }
