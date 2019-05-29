@@ -180,23 +180,23 @@ func fetchAndUpdateStateFromLegacyCluster(ctx context.Context, kubeCluster *clus
 		recoveredCluster = cluster.GetStateFromNodes(ctx, kubeCluster)
 	}
 	// if we found a recovered cluster, we will need override the current state
-	if recoveredCluster != nil {
-		recoveredCerts, err := cluster.GetClusterCertsFromKubernetes(ctx, kubeCluster)
+	recoveredCerts, err := cluster.GetClusterCertsFromKubernetes(ctx, kubeCluster)
+	if err != nil {
+		log.Warnf(ctx, "Failed to fetch certs from kubernetes: %v", err)
+		// try to fetch certs from nodes
+		recoveredCerts, err = cluster.GetClusterCertsFromNodes(ctx, kubeCluster)
 		if err != nil {
-			log.Warnf(ctx, "Failed to fetch certs from kubernetes: %v", err)
-			// try to fetch certs from nodes
-			recoveredCerts, err = cluster.GetClusterCertsFromNodes(ctx, kubeCluster)
-			if err != nil {
-				return err
-			}
+			return err
 		}
+	}
+	fullState.CurrentState.RancherKubernetesEngineConfig = kubeCluster.RancherKubernetesEngineConfig.DeepCopy()
+	if recoveredCluster != nil {
 		fullState.CurrentState.RancherKubernetesEngineConfig = recoveredCluster.RancherKubernetesEngineConfig.DeepCopy()
-		fullState.CurrentState.CertificatesBundle = recoveredCerts
-
-		// we don't want to regenerate certificates
-		fullState.DesiredState.CertificatesBundle = recoveredCerts
-		return fullState.WriteStateFile(ctx, kubeCluster.StateFilePath)
 	}
 
-	return nil
+	fullState.CurrentState.CertificatesBundle = recoveredCerts
+
+	// we don't want to regenerate certificates
+	fullState.DesiredState.CertificatesBundle = recoveredCerts
+	return fullState.WriteStateFile(ctx, kubeCluster.StateFilePath)
 }
