@@ -96,6 +96,13 @@ func persistentVolumeTypes(schemas *types.Schemas) *types.Schemas {
 						field.Update = false
 						return field
 					})
+					pvSchema := schemas.Schema(&Version, val.Type().Field(i).Type.String()[4:])
+					for name := range pvSchema.ResourceFields {
+						pvSchema.MustCustomizeField(name, func(field types.Field) types.Field {
+							field.Update = false
+							return field
+						})
+					}
 				}
 			}
 		})
