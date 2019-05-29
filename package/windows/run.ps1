@@ -31,6 +31,12 @@ $null = New-Item -Force -Type Directory -Path $RancherDir -ErrorAction Ignore
 $null = New-Item -Force -Type Directory -Path $KubeDir -ErrorAction Ignore
 $null = New-Item -Force -Type Directory -Path $CNIDir -ErrorAction Ignore
 
+function warn {
+    Write-Host -NoNewline -ForegroundColor DarkYellow "WARN"
+    Write-Host -NoNewline -ForegroundColor Gray "[0000] "
+    Write-Host -ForegroundColor Gray $_
+}
+
 function scrape-text {
     param(
         [parameter(Mandatory = $false)] $Headers = @{"Cache-Control"="no-cache"},
@@ -143,9 +149,11 @@ try {
 [Net.ServicePointManager]::SecurityProtocol = @([Net.SecurityProtocolType]::SystemDefault, [Net.SecurityProtocolType]::Ssl3, [Net.SecurityProtocolType]::Tls, [Net.SecurityProtocolType]::Tls11, [Net.SecurityProtocolType]::Tls12)
 
 # check docker running #
-$dockerNPipe = Get-ChildItem //./pipe/ | ? Name -eq "docker_engine"
+$dockerNPipe = Get-ChildItem //./pipe/ -ErrorAction Ignore | ? Name -eq "docker_engine"
 if (-not $dockerNPipe) {
-    throw "Please run docker daemon with host `"npipe:////./pipe//docker_engine`""
+    warn "Default docker named pipe is not found"
+    warn "Please bind mount in the docker socket to //./pipe/docker_engine if docker errors occur"
+    warn "example:  docker run -v //./pipe/docker_engine://./pipe/docker_engine ..."
 }
 
 $svcAgent = get-agent-service
