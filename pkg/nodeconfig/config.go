@@ -103,6 +103,15 @@ func (m *NodeConfig) TLSConfig() (*TLSConfig, error) {
 	return extractTLS(m.cm[configKey])
 }
 
+func (m *NodeConfig) SSHKeyPath() (string, error) {
+	config, err := m.getConfig()
+	if err != nil {
+		return "", err
+	}
+
+	return convert.ToString(values.GetValueN(config, "Driver", "SSHKeyPath")), nil
+}
+
 func (m *NodeConfig) IP() (string, error) {
 	config, err := m.getConfig()
 	if err != nil {

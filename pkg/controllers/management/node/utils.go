@@ -173,12 +173,16 @@ func startReturnOutput(command *exec.Cmd) (io.ReadCloser, io.ReadCloser, error) 
 	return readerStdout, readerStderr, nil
 }
 
-func getSSHKey(nodeDir string, obj *v3.Node) (string, error) {
-	if err := waitUntilSSHKey(nodeDir, obj); err != nil {
+func getSSHKey(nodeDir, keyPath string, obj *v3.Node) (string, error) {
+	keyName := filepath.Base(keyPath)
+	if keyName == "" || keyName == "." || keyName == string(filepath.Separator) {
+		keyName = "id_rsa"
+	}
+	if err := waitUntilSSHKey(nodeDir, keyName, obj); err != nil {
 		return "", err
 	}
 
-	return getSSHPrivateKey(nodeDir, obj)
+	return getSSHPrivateKey(nodeDir, keyName, obj)
 }
 
 func (m *Lifecycle) reportStatus(stdoutReader io.Reader, stderrReader io.Reader, node *v3.Node) (*v3.Node, error) {
@@ -267,8 +271,8 @@ func deleteNode(nodeDir string, node *v3.Node) error {
 	return command.Wait()
 }
 
-func getSSHPrivateKey(nodeDir string, node *v3.Node) (string, error) {
-	keyPath := filepath.Join(nodeDir, "machines", node.Spec.RequestedHostname, "id_rsa")
+func getSSHPrivateKey(nodeDir, keyName string, node *v3.Node) (string, error) {
+	keyPath := filepath.Join(nodeDir, "machines", node.Spec.RequestedHostname, keyName)
 	data, err := ioutil.ReadFile(keyPath)
 	if err != nil {
 		return "", nil
@@ -276,8 +280,8 @@ func getSSHPrivateKey(nodeDir string, node *v3.Node) (string, error) {
 	return string(data), nil
 }
 
-func waitUntilSSHKey(nodeDir string, node *v3.Node) error {
-	keyPath := filepath.Join(nodeDir, "machines", node.Spec.RequestedHostname, "id_rsa")
+func waitUntilSSHKey(nodeDir, keyName string, node *v3.Node) error {
+	keyPath := filepath.Join(nodeDir, "machines", node.Spec.RequestedHostname, keyName)
 	startTime := time.Now()
 	increments := 1
 	for {
