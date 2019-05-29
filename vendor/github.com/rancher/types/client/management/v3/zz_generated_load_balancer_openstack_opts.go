@@ -22,9 +22,9 @@ type LoadBalancerOpenstackOpts struct {
 	LBProvider           string `json:"lb-provider,omitempty" yaml:"lb-provider,omitempty"`
 	LBVersion            string `json:"lb-version,omitempty" yaml:"lb-version,omitempty"`
 	ManageSecurityGroups bool   `json:"manage-security-groups,omitempty" yaml:"manage-security-groups,omitempty"`
-	MonitorDelay         int64  `json:"monitor-delay,omitempty" yaml:"monitor-delay,omitempty"`
+	MonitorDelay         string `json:"monitor-delay,omitempty" yaml:"monitor-delay,omitempty"`
 	MonitorMaxRetries    int64  `json:"monitor-max-retries,omitempty" yaml:"monitor-max-retries,omitempty"`
-	MonitorTimeout       int64  `json:"monitor-timeout,omitempty" yaml:"monitor-timeout,omitempty"`
+	MonitorTimeout       string `json:"monitor-timeout,omitempty" yaml:"monitor-timeout,omitempty"`
 	SubnetID             string `json:"subnet-id,omitempty" yaml:"subnet-id,omitempty"`
 	UseOctavia           bool   `json:"use-octavia,omitempty" yaml:"use-octavia,omitempty"`
 }
