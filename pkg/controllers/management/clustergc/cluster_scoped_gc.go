@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/resource"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,25 +61,44 @@ func cleanFinalizers(clusterName string, object *unstructured.Unstructured, dyna
 	return object, nil
 }
 
+// Remove check all objects that have had a cluster scoped finalizer added to them to ensure dangling finalizers do not
+// remain on objects that no longer have handlers associated with them
 func (c *gcLifecycle) Remove(cluster *v3.Cluster) (runtime.Object, error) {
-
-	for key := range resource.Get() {
-		objList, err := c.mgmt.DynamicClient.Resource(key).List(metav1.ListOptions{})
-		if err != nil {
-			if errors.IsNotFound(err) {
-				// skip this iteration, no objects were initialized of this type for the cluster
-				continue
-			}
-			return cluster, err
-		}
-
-		for _, obj := range objList.Items {
-			_, err = cleanFinalizers(cluster.Name, &obj, c.mgmt.DynamicClient.Resource(key).Namespace(obj.GetNamespace()))
-			if err != nil {
-				return cluster, err
-			}
-		}
+	RESTconfig := c.mgmt.RESTConfig
+	// due to the large number of api calls, temporary raise the burst limit in order to reduce client throttling
+	RESTconfig.Burst = 25
+	dynamicClient, err := dynamic.NewForConfig(&RESTconfig)
+	if err != nil {
+		return nil, err
 	}
+	decodedMap := resource.GetClusterScopedTypes()
+	//if map is empty, fall back to checking all Rancher types
+	if len(decodedMap) == 0 {
+		decodedMap = resource.Get()
+	}
+	var g errgroup.Group
 
+	for key := range decodedMap {
+		actualKey := key // https://golang.org/doc/faq#closures_and_goroutines
+		g.Go(func() error {
+			objList, err := dynamicClient.Resource(actualKey).List(metav1.ListOptions{})
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return nil
+				}
+				return err
+			}
+			for _, obj := range objList.Items {
+				_, err = cleanFinalizers(cluster.Name, &obj, dynamicClient.Resource(actualKey).Namespace(obj.GetNamespace()))
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+	}
+	if err = g.Wait(); err != nil {
+		return nil, err
+	}
 	return nil, nil
 }
