@@ -12,7 +12,7 @@ var (
 	GlobalGate = newFeatureGate()
 
 	KontainerDriver   = NewFeature("kontainer-driver", false, "alpha")
-	ClusterRandomName = NewFeature("cluster-random-name", false, "alpha")
+	ClusterRandomName = NewFeature("cluster-randomizer", true, "alpha")
 )
 
 type featureGate struct {
@@ -86,4 +86,9 @@ func SettingExists(name string) bool {
 		return true
 	}
 	return false
+}
+
+func IsFeatEnabled(name string) bool {
+	feat := feature.Feature(name)
+	return GlobalGate.Enabled(feat)
 }

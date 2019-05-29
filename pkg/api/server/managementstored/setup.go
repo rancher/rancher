@@ -2,6 +2,7 @@ package managementstored
 
 import (
 	"context"
+	"github.com/rancher/rancher/pkg/api/customization/clusterrandomizer"
 	"github.com/rancher/rancher/pkg/namespace"
 	"net/http"
 
@@ -116,7 +117,8 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.UserAttributeType,
 		client.UserType,
 		client.GlobalDNSType,
-		client.GlobalDNSProviderType)
+		client.GlobalDNSProviderType,
+		client.ClusterRandomizerType)
 
 	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &projectschema.Version,
 		projectclient.AppType,
@@ -616,6 +618,13 @@ func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
 	}
 	schema.Validator = kontainerDriverValidator.Validator
+}
+
+func ClusterRandomizer(schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.ClusterRandomizerType)
+	schema.Store = schema.Store
+	crValidator := clusterrandomizer.Validator{}
+	schema.Validator = crValidator.Validator
 }
 
 func MultiClusterApps(schemas *types.Schemas, management *config.ScaledContext) {
