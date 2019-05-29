@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	etcdclient "github.com/coreos/etcd/client"
@@ -112,15 +114,24 @@ func getEtcdDialer(localConnDialerFactory hosts.DialerFactory, etcdHost *hosts.H
 	return etcdFactory(etcdHost)
 }
 
-func GetEtcdConnString(hosts []*hosts.Host) string {
-	connString := ""
-	for i, host := range hosts {
-		connString += "https://" + host.InternalAddress + ":2379"
-		if i < (len(hosts) - 1) {
-			connString += ","
+func GetEtcdConnString(hosts []*hosts.Host, hostAddress string) string {
+	connHosts := []string{}
+	containsHostAddress := false
+	for _, host := range hosts {
+		if host.InternalAddress == hostAddress {
+			containsHostAddress = true
+			continue
 		}
+		connHosts = append(connHosts, "https://"+host.InternalAddress+":2379")
 	}
-	return connString
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(connHosts), func(i, j int) {
+		connHosts[i], connHosts[j] = connHosts[j], connHosts[i]
+	})
+	if containsHostAddress {
+		connHosts = append([]string{"https://" + hostAddress + ":2379"}, connHosts...)
+	}
+	return strings.Join(connHosts, ",")
 }
 
 func getEtcdTLSConfig(certificate, key []byte) (*tls.Config, error) {
