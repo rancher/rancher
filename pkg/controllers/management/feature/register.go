@@ -16,7 +16,7 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 		management.Management.Settings(""),
 	}
 
-	management.Management.Settings("").AddHandler(ctx, "feat-kontainer-driver", s.sync)
+	management.Management.Settings("").AddHandler(ctx, "feature-settings", s.sync)
 }
 
 type SettingController struct {

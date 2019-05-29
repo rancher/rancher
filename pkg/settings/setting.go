@@ -2,13 +2,10 @@ package settings
 
 import (
 	"encoding/json"
-	//"github.com/rancher/rancher/pkg/features"
-
-	//"github.com/rancher/rancher/pkg/features"
 	"os"
 	"strings"
 
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 var (
@@ -61,8 +58,7 @@ var (
 	RotateCertsIfExpiringInDays     = NewSetting("rotate-certs-if-expiring-in-days", "7")  // 7 days
 
 	// Features
-	Features						= NewSetting("all-features", "" )
-
+	Features = NewSetting("all-features", "")
 )
 
 func init() {

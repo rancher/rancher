@@ -1,9 +1,0 @@
-apiVersion: management.cattle.io/v3
-kind: KontainerDriver
-metadata:
-  clusterName: ""
-  generation: 1
-  labels:
-    cattle.io/creator: norman
-  name: test
-  namespace: ""
