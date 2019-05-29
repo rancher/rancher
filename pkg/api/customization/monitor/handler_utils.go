@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/rancher/pkg/ref"
@@ -198,7 +199,7 @@ func getAuthToken(userContext *config.UserContext, appName, namespace string) (s
 	return string(secret.Data["token"]), nil
 }
 
-func parseMetricParams(userContext *config.UserContext, nodeLister v3.NodeLister, resourceType, clusterName string, metricParams map[string]string) (map[string]string, error) {
+func parseMetricParams(userContext *config.UserContext, nodeLister v3.NodeLister, resourceType, clusterName, projectName string, metricParams map[string]string) (map[string]string, error) {
 	newMetricParams := make(map[string]string)
 	for k, v := range metricParams {
 		newMetricParams[k] = v
@@ -222,6 +223,9 @@ func parseMetricParams(userContext *config.UserContext, nodeLister v3.NodeLister
 		rcType, ns, name, err := parseWorkloadName(workloadName)
 		if err != nil {
 			return newMetricParams, err
+		}
+		if !validateNS(newMetricParams, ns) {
+			return nil, httperror.NewAPIError(httperror.PermissionDenied, fmt.Sprintf("can't access namespace %s from project %s", ns, projectName))
 		}
 
 		var podOwners []string
@@ -266,6 +270,9 @@ func parseMetricParams(userContext *config.UserContext, nodeLister v3.NodeLister
 			return nil, fmt.Errorf("pod name is empty")
 		}
 		ns, name := ref.Parse(podName)
+		if !validateNS(newMetricParams, ns) {
+			return nil, httperror.NewAPIError(httperror.PermissionDenied, fmt.Sprintf("can't access namespace %s from project %s", ns, projectName))
+		}
 		newMetricParams["namespace"] = ns
 		newMetricParams["podName"] = name
 	case ResourceContainer:
@@ -274,6 +281,9 @@ func parseMetricParams(userContext *config.UserContext, nodeLister v3.NodeLister
 			return nil, fmt.Errorf("pod name is empty")
 		}
 		ns, name := ref.Parse(podName)
+		if !validateNS(newMetricParams, ns) {
+			return nil, httperror.NewAPIError(httperror.PermissionDenied, fmt.Sprintf("can't access namespace %s from project %s", ns, projectName))
+		}
 		newMetricParams["namespace"] = ns
 		newMetricParams["podName"] = name
 
@@ -348,4 +358,18 @@ func contains(str string, arr ...string) bool {
 
 func isInstanceGraph(graphType string) bool {
 	return graphType == "singlestat"
+}
+
+func validateNS(params map[string]string, ns string) bool {
+	value, ok := params["namespace"]
+	if !ok {
+		return false
+	}
+	nss := strings.Split(value, "|")
+	for _, v := range nss {
+		if v == ns {
+			return true
+		}
+	}
+	return false
 }
