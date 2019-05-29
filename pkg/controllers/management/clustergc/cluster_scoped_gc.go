@@ -2,7 +2,11 @@ package clustergc
 
 import (
 	"context"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/rancher/norman/lifecycle"
 	"github.com/rancher/norman/resource"
@@ -55,30 +59,76 @@ func cleanFinalizers(clusterName string, object *unstructured.Unstructured, dyna
 	if modified {
 		md.SetFinalizers(finalizers)
 		obj, e := dynamicClient.Update(object, metav1.UpdateOptions{})
+		logrus.Printf("We actually FOUND something! for obj: %v", obj)
 		return obj, e
 	}
 	return object, nil
 }
 
 func (c *gcLifecycle) Remove(cluster *v3.Cluster) (runtime.Object, error) {
-
-	for key := range resource.Get() {
-		objList, err := c.mgmt.DynamicClient.Resource(key).List(metav1.ListOptions{})
-		if err != nil {
-			if errors.IsNotFound(err) {
-				// skip this iteration, no objects were initialized of this type for the cluster
-				continue
-			}
-			return cluster, err
-		}
-
-		for _, obj := range objList.Items {
-			_, err = cleanFinalizers(cluster.Name, &obj, c.mgmt.DynamicClient.Resource(key).Namespace(obj.GetNamespace()))
-			if err != nil {
-				return cluster, err
-			}
-		}
+	config := c.mgmt.RESTConfig
+	config.Burst = 100
+	dynamicClient, err := dynamic.NewForConfig(&config)
+	if err != nil {
+		panic(err)
 	}
+	//dynamicClient := c.mgmt.DynamicClient
 
+	// DEBUG CODE
+	start := time.Now()
+	fileName := "output-" + start.String() + ".log"
+	f, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0755)
+	if err != nil {
+		panic(err)
+	}
+	decodedMap := resource.GetClusterScopedTypes()
+	logrus.SetOutput(f)
+	defer logrus.SetOutput(os.Stdout)
+	logrus.Print(cluster.Name)
+	for key, value := range decodedMap {
+		logrus.Warnf("Map values: %v", key)
+		if value == false {
+			logrus.Errorf("Map value was false: %v %v", key, value)
+		}
+
+	}
+	// ^^ DEBUG CODE
+	//if map is empty, fall back to checking all Rancher types
+	if len(decodedMap) == 0 {
+		decodedMap = resource.Get()
+	}
+	var g errgroup.Group
+
+	for key := range decodedMap {
+		actualKey := key // https://golang.org/doc/faq#closures_and_goroutines
+		g.Go(func() error {
+			logrus.Printf("Listing all resources of type: %s ", actualKey)
+			apiTime := time.Now()
+			objList, err := dynamicClient.Resource(actualKey).List(metav1.ListOptions{})
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return nil
+				}
+				return err
+			}
+			logrus.Infof("api call took: %s for %s", time.Since(apiTime), actualKey)
+			iterationTime := time.Now()
+			for _, obj := range objList.Items {
+				logrus.Printf("cleaning object: %v ", obj)
+				_, err = cleanFinalizers(cluster.Name, &obj, dynamicClient.Resource(actualKey).Namespace(obj.GetNamespace()))
+				if err != nil {
+					return err
+				}
+			}
+			logrus.Printf("time to iterate over the obj list: %s", time.Since(iterationTime))
+			return nil
+		})
+	}
+	logrus.Printf("Goroutines are cool")
+	if err := g.Wait(); err != nil {
+		logrus.Errorf("errgroup:", err)
+		return nil, err
+	}
+	logrus.Printf("function took %s \n \n \n ", time.Since(start))
 	return nil, nil
 }
