@@ -78,6 +78,12 @@ func (s *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *ty
 			continue
 		}
 
+		if schema.Enabled != nil && schema.EnableKey != "" {
+			if !schema.Enabled(schema.EnableKey) {
+				continue
+			}
+		}
+
 		if schema.CanList(apiContext) == nil || schema.CanGet(apiContext) == nil {
 			schemas = s.addSchema(apiContext, schema, schemaMap, schemas, included)
 		}
