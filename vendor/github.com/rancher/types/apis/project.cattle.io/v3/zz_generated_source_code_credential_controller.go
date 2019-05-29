@@ -150,6 +150,7 @@ func (c *sourceCodeCredentialController) AddHandler(ctx context.Context, name st
 }
 
 func (c *sourceCodeCredentialController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler SourceCodeCredentialHandlerFunc) {
+	resource.PutClusterScoped(SourceCodeCredentialGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

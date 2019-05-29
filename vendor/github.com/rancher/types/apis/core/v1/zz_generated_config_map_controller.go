@@ -151,6 +151,7 @@ func (c *configMapController) AddHandler(ctx context.Context, name string, handl
 }
 
 func (c *configMapController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ConfigMapHandlerFunc) {
+	resource.PutClusterScoped(ConfigMapGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

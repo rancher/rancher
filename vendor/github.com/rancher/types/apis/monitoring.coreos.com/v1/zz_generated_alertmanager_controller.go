@@ -151,6 +151,7 @@ func (c *alertmanagerController) AddHandler(ctx context.Context, name string, ha
 }
 
 func (c *alertmanagerController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler AlertmanagerHandlerFunc) {
+	resource.PutClusterScoped(AlertmanagerGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
