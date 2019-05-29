@@ -2,8 +2,6 @@ package managementstored
 
 import (
 	"context"
-	"github.com/rancher/rancher/pkg/api/customization/clusterrandomizer"
-	"github.com/rancher/rancher/pkg/namespace"
 	"net/http"
 
 	"github.com/rancher/norman/store/crd"
@@ -15,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/authn"
 	"github.com/rancher/rancher/pkg/api/customization/catalog"
 	ccluster "github.com/rancher/rancher/pkg/api/customization/cluster"
+	"github.com/rancher/rancher/pkg/api/customization/clusterrandomizer"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	"github.com/rancher/rancher/pkg/api/customization/cred"
 	"github.com/rancher/rancher/pkg/api/customization/globaldns"
@@ -49,11 +48,13 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
+	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	sourcecodeproviders "github.com/rancher/rancher/pkg/pipeline/providers"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
-	"github.com/rancher/types/client/management/v3"
+	client "github.com/rancher/types/client/management/v3"
 	projectclient "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
 )
@@ -160,6 +161,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	GlobalDNSProviders(schemas, apiContext, localClusterEnabled)
 	Monitor(schemas, apiContext, clusterManager)
 	KontainerDriver(schemas, apiContext)
+	ClusterRandomizer(schemas, apiContext)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
@@ -623,6 +625,8 @@ func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 func ClusterRandomizer(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.ClusterRandomizerType)
 	schema.Store = schema.Store
+	schema.Enabled = features.IsFeatEnabled
+	schema.EnableKey = "cluster-randomizer"
 	crValidator := clusterrandomizer.Validator{}
 	schema.Validator = crValidator.Validator
 }

@@ -12,7 +12,7 @@ var (
 	GlobalGate = newFeatureGate()
 
 	KontainerDriver   = NewFeature("kontainer-driver", false, "alpha")
-	ClusterRandomName = NewFeature("cluster-randomizer", true, "alpha")
+	ClusterRandomName = NewFeature("cluster-randomizer", false, "alpha")
 )
 
 type featureGate struct {
