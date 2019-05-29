@@ -22,7 +22,7 @@ func Register(context *config.ScaledContext) error {
 		return err
 	}
 
-	if err := sp.SetAll(features.GlobalGate.FeatureSetting); err != nil {
+	if err := sp.SetAll(features.GetFeatureSettings()); err != nil {
 		return err
 	}
 

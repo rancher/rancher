@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	GlobalGate = newFeatureGate()
+	globalGate = newFeatureGate()
 
 	KontainerDriver   = NewFeature("kontainer-driver", false, "alpha")
 	ClusterRandomName = NewFeature("cluster-randomizer", false, "alpha")
@@ -28,7 +28,7 @@ func SetFeature(name string, val string) error {
 		return fmt.Errorf("unable to convert value to type bool for setting %s", name)
 	}
 
-	GlobalGate.SetFromMap(map[string]bool{name: b})
+	globalGate.SetFromMap(map[string]bool{name: b})
 
 	return nil
 }
@@ -55,11 +55,11 @@ func NewFeature(name string, def bool, stage string) settings.Setting {
 		featureName: fspec,
 	}
 
-	GlobalGate.Add(addFeature)
+	globalGate.Add(addFeature)
 	addToFeaturesSetting(name)
 
 	setting := settings.NewSetting(name, strconv.FormatBool(def))
-	GlobalGate.FeatureSetting[name] = setting
+	globalGate.FeatureSetting[name] = setting
 
 	return settings.NewSetting(name, strconv.FormatBool(def))
 }
@@ -82,7 +82,7 @@ func addToFeaturesSetting(name string) {
 }
 
 func SettingExists(name string) bool {
-	if GlobalGate.FeatureSetting[name] != (settings.Setting{}) {
+	if globalGate.FeatureSetting[name] != (settings.Setting{}) {
 		return true
 	}
 	return false
@@ -90,5 +90,9 @@ func SettingExists(name string) bool {
 
 func IsFeatEnabled(name string) bool {
 	feat := feature.Feature(name)
-	return GlobalGate.Enabled(feat)
+	return globalGate.Enabled(feat)
+}
+
+func GetFeatureSettings() map[string]settings.Setting {
+	return globalGate.FeatureSetting
 }
