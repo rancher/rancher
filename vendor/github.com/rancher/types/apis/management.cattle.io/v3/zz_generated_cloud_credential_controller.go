@@ -319,7 +319,7 @@ func (s *cloudCredentialClient) AddClusterScopedLifecycle(ctx context.Context, n
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *cloudCredentialClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle CloudCredentialLifecycle) {
+func (s *cloudCredentialClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle CloudCredentialLifecycle) {
 	sync := NewCloudCredentialLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

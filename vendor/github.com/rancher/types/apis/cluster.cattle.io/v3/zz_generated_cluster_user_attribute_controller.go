@@ -319,7 +319,7 @@ func (s *clusterUserAttributeClient) AddClusterScopedLifecycle(ctx context.Conte
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *clusterUserAttributeClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterUserAttributeLifecycle) {
+func (s *clusterUserAttributeClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle ClusterUserAttributeLifecycle) {
 	sync := NewClusterUserAttributeLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

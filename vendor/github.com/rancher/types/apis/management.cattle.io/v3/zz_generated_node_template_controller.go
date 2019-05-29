@@ -319,7 +319,7 @@ func (s *nodeTemplateClient) AddClusterScopedLifecycle(ctx context.Context, name
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *nodeTemplateClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NodeTemplateLifecycle) {
+func (s *nodeTemplateClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle NodeTemplateLifecycle) {
 	sync := NewNodeTemplateLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

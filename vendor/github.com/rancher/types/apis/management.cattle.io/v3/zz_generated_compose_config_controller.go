@@ -318,7 +318,7 @@ func (s *composeConfigClient) AddClusterScopedLifecycle(ctx context.Context, nam
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *composeConfigClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ComposeConfigLifecycle) {
+func (s *composeConfigClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle ComposeConfigLifecycle) {
 	sync := NewComposeConfigLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

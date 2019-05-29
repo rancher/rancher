@@ -319,7 +319,7 @@ func (s *clusterAuthTokenClient) AddClusterScopedLifecycle(ctx context.Context, 
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *clusterAuthTokenClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterAuthTokenLifecycle) {
+func (s *clusterAuthTokenClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle ClusterAuthTokenLifecycle) {
 	sync := NewClusterAuthTokenLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

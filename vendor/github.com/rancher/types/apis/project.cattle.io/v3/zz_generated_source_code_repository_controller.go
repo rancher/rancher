@@ -319,7 +319,7 @@ func (s *sourceCodeRepositoryClient) AddClusterScopedLifecycle(ctx context.Conte
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *sourceCodeRepositoryClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle SourceCodeRepositoryLifecycle) {
+func (s *sourceCodeRepositoryClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle SourceCodeRepositoryLifecycle) {
 	sync := NewSourceCodeRepositoryLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

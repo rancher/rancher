@@ -319,7 +319,7 @@ func (s *sourceCodeCredentialClient) AddClusterScopedLifecycle(ctx context.Conte
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *sourceCodeCredentialClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle SourceCodeCredentialLifecycle) {
+func (s *sourceCodeCredentialClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle SourceCodeCredentialLifecycle) {
 	sync := NewSourceCodeCredentialLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

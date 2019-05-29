@@ -318,7 +318,7 @@ func (s *clusterRandomizerClient) AddClusterScopedLifecycle(ctx context.Context,
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *clusterRandomizerClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterRandomizerLifecycle) {
+func (s *clusterRandomizerClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle ClusterRandomizerLifecycle) {
 	sync := NewClusterRandomizerLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

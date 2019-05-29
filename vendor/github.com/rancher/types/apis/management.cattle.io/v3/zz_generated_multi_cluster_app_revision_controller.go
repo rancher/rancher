@@ -319,7 +319,7 @@ func (s *multiClusterAppRevisionClient) AddClusterScopedLifecycle(ctx context.Co
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *multiClusterAppRevisionClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle MultiClusterAppRevisionLifecycle) {
+func (s *multiClusterAppRevisionClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle MultiClusterAppRevisionLifecycle) {
 	sync := NewMultiClusterAppRevisionLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

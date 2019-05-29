@@ -318,7 +318,7 @@ func (s *templateVersionClient) AddClusterScopedLifecycle(ctx context.Context, n
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *templateVersionClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle TemplateVersionLifecycle) {
+func (s *templateVersionClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle TemplateVersionLifecycle) {
 	sync := NewTemplateVersionLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

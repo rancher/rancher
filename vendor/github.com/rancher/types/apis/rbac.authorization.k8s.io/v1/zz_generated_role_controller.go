@@ -320,7 +320,7 @@ func (s *roleClient) AddClusterScopedLifecycle(ctx context.Context, name, cluste
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *roleClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle RoleLifecycle) {
+func (s *roleClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle RoleLifecycle) {
 	sync := NewRoleLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

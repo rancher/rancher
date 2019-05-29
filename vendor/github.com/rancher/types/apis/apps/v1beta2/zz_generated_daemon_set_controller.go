@@ -320,7 +320,7 @@ func (s *daemonSetClient) AddClusterScopedLifecycle(ctx context.Context, name, c
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *daemonSetClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle DaemonSetLifecycle) {
+func (s *daemonSetClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle DaemonSetLifecycle) {
 	sync := NewDaemonSetLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

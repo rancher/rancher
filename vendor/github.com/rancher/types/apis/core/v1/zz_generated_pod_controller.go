@@ -320,7 +320,7 @@ func (s *podClient) AddClusterScopedLifecycle(ctx context.Context, name, cluster
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *podClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PodLifecycle) {
+func (s *podClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle PodLifecycle) {
 	sync := NewPodLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

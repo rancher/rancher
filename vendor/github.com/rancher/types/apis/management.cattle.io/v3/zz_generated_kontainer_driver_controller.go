@@ -318,7 +318,7 @@ func (s *kontainerDriverClient) AddClusterScopedLifecycle(ctx context.Context, n
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *kontainerDriverClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle KontainerDriverLifecycle) {
+func (s *kontainerDriverClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle KontainerDriverLifecycle) {
 	sync := NewKontainerDriverLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

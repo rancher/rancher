@@ -319,7 +319,7 @@ func (s *podSecurityPolicyTemplateProjectBindingClient) AddClusterScopedLifecycl
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *podSecurityPolicyTemplateProjectBindingClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PodSecurityPolicyTemplateProjectBindingLifecycle) {
+func (s *podSecurityPolicyTemplateProjectBindingClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle PodSecurityPolicyTemplateProjectBindingLifecycle) {
 	sync := NewPodSecurityPolicyTemplateProjectBindingLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

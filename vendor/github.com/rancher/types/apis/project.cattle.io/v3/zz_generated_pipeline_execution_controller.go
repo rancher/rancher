@@ -319,7 +319,7 @@ func (s *pipelineExecutionClient) AddClusterScopedLifecycle(ctx context.Context,
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *pipelineExecutionClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PipelineExecutionLifecycle) {
+func (s *pipelineExecutionClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle PipelineExecutionLifecycle) {
 	sync := NewPipelineExecutionLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

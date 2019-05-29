@@ -319,7 +319,7 @@ func (s *projectClient) AddClusterScopedLifecycle(ctx context.Context, name, clu
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *projectClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ProjectLifecycle) {
+func (s *projectClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle ProjectLifecycle) {
 	sync := NewProjectLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

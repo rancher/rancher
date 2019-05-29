@@ -319,7 +319,7 @@ func (s *catalogTemplateVersionClient) AddClusterScopedLifecycle(ctx context.Con
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *catalogTemplateVersionClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle CatalogTemplateVersionLifecycle) {
+func (s *catalogTemplateVersionClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle CatalogTemplateVersionLifecycle) {
 	sync := NewCatalogTemplateVersionLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

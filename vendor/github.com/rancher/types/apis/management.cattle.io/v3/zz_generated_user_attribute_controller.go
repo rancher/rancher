@@ -318,7 +318,7 @@ func (s *userAttributeClient) AddClusterScopedLifecycle(ctx context.Context, nam
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *userAttributeClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle UserAttributeLifecycle) {
+func (s *userAttributeClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle UserAttributeLifecycle) {
 	sync := NewUserAttributeLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

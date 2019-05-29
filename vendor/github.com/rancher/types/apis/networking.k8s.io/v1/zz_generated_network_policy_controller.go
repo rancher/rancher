@@ -320,7 +320,7 @@ func (s *networkPolicyClient) AddClusterScopedLifecycle(ctx context.Context, nam
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *networkPolicyClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NetworkPolicyLifecycle) {
+func (s *networkPolicyClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle NetworkPolicyLifecycle) {
 	sync := NewNetworkPolicyLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

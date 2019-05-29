@@ -320,7 +320,7 @@ func (s *secretClient) AddClusterScopedLifecycle(ctx context.Context, name, clus
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *secretClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle SecretLifecycle) {
+func (s *secretClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle SecretLifecycle) {
 	sync := NewSecretLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

@@ -319,7 +319,7 @@ func (s *monitorMetricClient) AddClusterScopedLifecycle(ctx context.Context, nam
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *monitorMetricClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle MonitorMetricLifecycle) {
+func (s *monitorMetricClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle MonitorMetricLifecycle) {
 	sync := NewMonitorMetricLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }

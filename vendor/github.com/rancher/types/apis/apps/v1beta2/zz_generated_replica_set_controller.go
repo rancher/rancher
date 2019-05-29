@@ -320,7 +320,7 @@ func (s *replicaSetClient) AddClusterScopedLifecycle(ctx context.Context, name, 
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
-func (s *replicaSetClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ReplicaSetLifecycle) {
+func (s *replicaSetClient) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle ReplicaSetLifecycle) {
 	sync := NewReplicaSetLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
