@@ -148,8 +148,9 @@ type metricWrap struct {
 }
 
 func graph2Metrics(userContext *config.UserContext, mgmtClient v3.Interface, clusterName, resourceType, refGraphName string, metricSelector, detailsMetricSelector map[string]string, metricParams map[string]string, isDetails bool) ([]*metricWrap, error) {
+	projectName, _ := ref.Parse(refGraphName)
 	nodeLister := mgmtClient.Nodes(metav1.NamespaceAll).Controller().Lister()
-	newMetricParams, err := parseMetricParams(userContext, nodeLister, resourceType, clusterName, metricParams)
+	newMetricParams, err := parseMetricParams(userContext, nodeLister, resourceType, clusterName, projectName, metricParams)
 	if err != nil {
 		return nil, err
 	}
