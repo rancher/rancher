@@ -139,7 +139,7 @@ func main() {
 			Name:   "features",
 			EnvVar: "DEF_FEATURE_VALUES",
 			Value:  "",
-			Usage:  "Decalare specific feature values on start up. Example: \"kontainerdriver=true\" - kontainer driver feature will be enabled despite false default value",
+			Usage:  "Decalare specific feature values on start up. Example: \"kontainer-driver=true\" - kontainer driver feature will be enabled despite false default value",
 			Destination: &config.Features,
 		},
 	}
