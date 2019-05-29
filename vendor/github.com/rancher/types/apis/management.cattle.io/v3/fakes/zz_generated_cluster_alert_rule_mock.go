@@ -140,15 +140,16 @@ func (mock *ClusterAlertRuleListerMock) ListCalls() []struct {
 }
 
 var (
-	lockClusterAlertRuleControllerMockAddClusterScopedHandler sync.RWMutex
-	lockClusterAlertRuleControllerMockAddFeatureHandler       sync.RWMutex
-	lockClusterAlertRuleControllerMockAddHandler              sync.RWMutex
-	lockClusterAlertRuleControllerMockEnqueue                 sync.RWMutex
-	lockClusterAlertRuleControllerMockGeneric                 sync.RWMutex
-	lockClusterAlertRuleControllerMockInformer                sync.RWMutex
-	lockClusterAlertRuleControllerMockLister                  sync.RWMutex
-	lockClusterAlertRuleControllerMockStart                   sync.RWMutex
-	lockClusterAlertRuleControllerMockSync                    sync.RWMutex
+	lockClusterAlertRuleControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockClusterAlertRuleControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockClusterAlertRuleControllerMockAddFeatureHandler              sync.RWMutex
+	lockClusterAlertRuleControllerMockAddHandler                     sync.RWMutex
+	lockClusterAlertRuleControllerMockEnqueue                        sync.RWMutex
+	lockClusterAlertRuleControllerMockGeneric                        sync.RWMutex
+	lockClusterAlertRuleControllerMockInformer                       sync.RWMutex
+	lockClusterAlertRuleControllerMockLister                         sync.RWMutex
+	lockClusterAlertRuleControllerMockStart                          sync.RWMutex
+	lockClusterAlertRuleControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that ClusterAlertRuleControllerMock does implement ClusterAlertRuleController.
@@ -161,6 +162,9 @@ var _ v3.ClusterAlertRuleController = &ClusterAlertRuleControllerMock{}
 //
 //         // make and configure a mocked ClusterAlertRuleController
 //         mockedClusterAlertRuleController := &ClusterAlertRuleControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.ClusterAlertRuleHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.ClusterAlertRuleHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -195,6 +199,9 @@ var _ v3.ClusterAlertRuleController = &ClusterAlertRuleControllerMock{}
 //
 //     }
 type ClusterAlertRuleControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.ClusterAlertRuleHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.ClusterAlertRuleHandlerFunc)
 
@@ -224,6 +231,21 @@ type ClusterAlertRuleControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v3.ClusterAlertRuleHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -286,6 +308,57 @@ type ClusterAlertRuleControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *ClusterAlertRuleControllerMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.ClusterAlertRuleHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("ClusterAlertRuleControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but ClusterAlertRuleController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.ClusterAlertRuleHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockClusterAlertRuleControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockClusterAlertRuleControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedClusterAlertRuleController.AddClusterScopedFeatureHandlerCalls())
+func (mock *ClusterAlertRuleControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Handler     v3.ClusterAlertRuleHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.ClusterAlertRuleHandlerFunc
+	}
+	lockClusterAlertRuleControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockClusterAlertRuleControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -597,23 +670,25 @@ func (mock *ClusterAlertRuleControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockClusterAlertRuleInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockClusterAlertRuleInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockClusterAlertRuleInterfaceMockAddFeatureHandler         sync.RWMutex
-	lockClusterAlertRuleInterfaceMockAddFeatureLifecycle       sync.RWMutex
-	lockClusterAlertRuleInterfaceMockAddHandler                sync.RWMutex
-	lockClusterAlertRuleInterfaceMockAddLifecycle              sync.RWMutex
-	lockClusterAlertRuleInterfaceMockController                sync.RWMutex
-	lockClusterAlertRuleInterfaceMockCreate                    sync.RWMutex
-	lockClusterAlertRuleInterfaceMockDelete                    sync.RWMutex
-	lockClusterAlertRuleInterfaceMockDeleteCollection          sync.RWMutex
-	lockClusterAlertRuleInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockClusterAlertRuleInterfaceMockGet                       sync.RWMutex
-	lockClusterAlertRuleInterfaceMockGetNamespaced             sync.RWMutex
-	lockClusterAlertRuleInterfaceMockList                      sync.RWMutex
-	lockClusterAlertRuleInterfaceMockObjectClient              sync.RWMutex
-	lockClusterAlertRuleInterfaceMockUpdate                    sync.RWMutex
-	lockClusterAlertRuleInterfaceMockWatch                     sync.RWMutex
+	lockClusterAlertRuleInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockClusterAlertRuleInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockClusterAlertRuleInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockClusterAlertRuleInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockClusterAlertRuleInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockClusterAlertRuleInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockClusterAlertRuleInterfaceMockAddHandler                       sync.RWMutex
+	lockClusterAlertRuleInterfaceMockAddLifecycle                     sync.RWMutex
+	lockClusterAlertRuleInterfaceMockController                       sync.RWMutex
+	lockClusterAlertRuleInterfaceMockCreate                           sync.RWMutex
+	lockClusterAlertRuleInterfaceMockDelete                           sync.RWMutex
+	lockClusterAlertRuleInterfaceMockDeleteCollection                 sync.RWMutex
+	lockClusterAlertRuleInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockClusterAlertRuleInterfaceMockGet                              sync.RWMutex
+	lockClusterAlertRuleInterfaceMockGetNamespaced                    sync.RWMutex
+	lockClusterAlertRuleInterfaceMockList                             sync.RWMutex
+	lockClusterAlertRuleInterfaceMockObjectClient                     sync.RWMutex
+	lockClusterAlertRuleInterfaceMockUpdate                           sync.RWMutex
+	lockClusterAlertRuleInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that ClusterAlertRuleInterfaceMock does implement ClusterAlertRuleInterface.
@@ -626,6 +701,12 @@ var _ v3.ClusterAlertRuleInterface = &ClusterAlertRuleInterfaceMock{}
 //
 //         // make and configure a mocked ClusterAlertRuleInterface
 //         mockedClusterAlertRuleInterface := &ClusterAlertRuleInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.ClusterAlertRuleHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.ClusterAlertRuleLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.ClusterAlertRuleHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -684,6 +765,12 @@ var _ v3.ClusterAlertRuleInterface = &ClusterAlertRuleInterfaceMock{}
 //
 //     }
 type ClusterAlertRuleInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.ClusterAlertRuleHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.ClusterAlertRuleLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.ClusterAlertRuleHandlerFunc)
 
@@ -737,6 +824,36 @@ type ClusterAlertRuleInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v3.ClusterAlertRuleHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.ClusterAlertRuleLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -869,6 +986,108 @@ type ClusterAlertRuleInterfaceMock struct {
 			Opts v1.ListOptions
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *ClusterAlertRuleInterfaceMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.ClusterAlertRuleHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("ClusterAlertRuleInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but ClusterAlertRuleInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.ClusterAlertRuleHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockClusterAlertRuleInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockClusterAlertRuleInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedClusterAlertRuleInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *ClusterAlertRuleInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Sync        v3.ClusterAlertRuleHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.ClusterAlertRuleHandlerFunc
+	}
+	lockClusterAlertRuleInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockClusterAlertRuleInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *ClusterAlertRuleInterfaceMock) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.ClusterAlertRuleLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("ClusterAlertRuleInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but ClusterAlertRuleInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.ClusterAlertRuleLifecycle
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockClusterAlertRuleInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockClusterAlertRuleInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(enabled, feat, ctx, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedClusterAlertRuleInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *ClusterAlertRuleInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Lifecycle   v3.ClusterAlertRuleLifecycle
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.ClusterAlertRuleLifecycle
+	}
+	lockClusterAlertRuleInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockClusterAlertRuleInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.

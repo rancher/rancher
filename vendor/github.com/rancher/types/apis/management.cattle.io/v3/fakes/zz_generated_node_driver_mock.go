@@ -140,15 +140,16 @@ func (mock *NodeDriverListerMock) ListCalls() []struct {
 }
 
 var (
-	lockNodeDriverControllerMockAddClusterScopedHandler sync.RWMutex
-	lockNodeDriverControllerMockAddFeatureHandler       sync.RWMutex
-	lockNodeDriverControllerMockAddHandler              sync.RWMutex
-	lockNodeDriverControllerMockEnqueue                 sync.RWMutex
-	lockNodeDriverControllerMockGeneric                 sync.RWMutex
-	lockNodeDriverControllerMockInformer                sync.RWMutex
-	lockNodeDriverControllerMockLister                  sync.RWMutex
-	lockNodeDriverControllerMockStart                   sync.RWMutex
-	lockNodeDriverControllerMockSync                    sync.RWMutex
+	lockNodeDriverControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockNodeDriverControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockNodeDriverControllerMockAddFeatureHandler              sync.RWMutex
+	lockNodeDriverControllerMockAddHandler                     sync.RWMutex
+	lockNodeDriverControllerMockEnqueue                        sync.RWMutex
+	lockNodeDriverControllerMockGeneric                        sync.RWMutex
+	lockNodeDriverControllerMockInformer                       sync.RWMutex
+	lockNodeDriverControllerMockLister                         sync.RWMutex
+	lockNodeDriverControllerMockStart                          sync.RWMutex
+	lockNodeDriverControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that NodeDriverControllerMock does implement NodeDriverController.
@@ -161,6 +162,9 @@ var _ v3.NodeDriverController = &NodeDriverControllerMock{}
 //
 //         // make and configure a mocked NodeDriverController
 //         mockedNodeDriverController := &NodeDriverControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.NodeDriverHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.NodeDriverHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -195,6 +199,9 @@ var _ v3.NodeDriverController = &NodeDriverControllerMock{}
 //
 //     }
 type NodeDriverControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.NodeDriverHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.NodeDriverHandlerFunc)
 
@@ -224,6 +231,21 @@ type NodeDriverControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v3.NodeDriverHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -286,6 +308,57 @@ type NodeDriverControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *NodeDriverControllerMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.NodeDriverHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("NodeDriverControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but NodeDriverController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.NodeDriverHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockNodeDriverControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockNodeDriverControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedNodeDriverController.AddClusterScopedFeatureHandlerCalls())
+func (mock *NodeDriverControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Handler     v3.NodeDriverHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.NodeDriverHandlerFunc
+	}
+	lockNodeDriverControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockNodeDriverControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -597,23 +670,25 @@ func (mock *NodeDriverControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockNodeDriverInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockNodeDriverInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockNodeDriverInterfaceMockAddFeatureHandler         sync.RWMutex
-	lockNodeDriverInterfaceMockAddFeatureLifecycle       sync.RWMutex
-	lockNodeDriverInterfaceMockAddHandler                sync.RWMutex
-	lockNodeDriverInterfaceMockAddLifecycle              sync.RWMutex
-	lockNodeDriverInterfaceMockController                sync.RWMutex
-	lockNodeDriverInterfaceMockCreate                    sync.RWMutex
-	lockNodeDriverInterfaceMockDelete                    sync.RWMutex
-	lockNodeDriverInterfaceMockDeleteCollection          sync.RWMutex
-	lockNodeDriverInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockNodeDriverInterfaceMockGet                       sync.RWMutex
-	lockNodeDriverInterfaceMockGetNamespaced             sync.RWMutex
-	lockNodeDriverInterfaceMockList                      sync.RWMutex
-	lockNodeDriverInterfaceMockObjectClient              sync.RWMutex
-	lockNodeDriverInterfaceMockUpdate                    sync.RWMutex
-	lockNodeDriverInterfaceMockWatch                     sync.RWMutex
+	lockNodeDriverInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockNodeDriverInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockNodeDriverInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockNodeDriverInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockNodeDriverInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockNodeDriverInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockNodeDriverInterfaceMockAddHandler                       sync.RWMutex
+	lockNodeDriverInterfaceMockAddLifecycle                     sync.RWMutex
+	lockNodeDriverInterfaceMockController                       sync.RWMutex
+	lockNodeDriverInterfaceMockCreate                           sync.RWMutex
+	lockNodeDriverInterfaceMockDelete                           sync.RWMutex
+	lockNodeDriverInterfaceMockDeleteCollection                 sync.RWMutex
+	lockNodeDriverInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockNodeDriverInterfaceMockGet                              sync.RWMutex
+	lockNodeDriverInterfaceMockGetNamespaced                    sync.RWMutex
+	lockNodeDriverInterfaceMockList                             sync.RWMutex
+	lockNodeDriverInterfaceMockObjectClient                     sync.RWMutex
+	lockNodeDriverInterfaceMockUpdate                           sync.RWMutex
+	lockNodeDriverInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that NodeDriverInterfaceMock does implement NodeDriverInterface.
@@ -626,6 +701,12 @@ var _ v3.NodeDriverInterface = &NodeDriverInterfaceMock{}
 //
 //         // make and configure a mocked NodeDriverInterface
 //         mockedNodeDriverInterface := &NodeDriverInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.NodeDriverHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.NodeDriverLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.NodeDriverHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -684,6 +765,12 @@ var _ v3.NodeDriverInterface = &NodeDriverInterfaceMock{}
 //
 //     }
 type NodeDriverInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.NodeDriverHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.NodeDriverLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.NodeDriverHandlerFunc)
 
@@ -737,6 +824,36 @@ type NodeDriverInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v3.NodeDriverHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.NodeDriverLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -869,6 +986,108 @@ type NodeDriverInterfaceMock struct {
 			Opts v1.ListOptions
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *NodeDriverInterfaceMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.NodeDriverHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("NodeDriverInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but NodeDriverInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.NodeDriverHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockNodeDriverInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockNodeDriverInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedNodeDriverInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *NodeDriverInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Sync        v3.NodeDriverHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.NodeDriverHandlerFunc
+	}
+	lockNodeDriverInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockNodeDriverInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *NodeDriverInterfaceMock) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.NodeDriverLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("NodeDriverInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but NodeDriverInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.NodeDriverLifecycle
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockNodeDriverInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockNodeDriverInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(enabled, feat, ctx, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedNodeDriverInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *NodeDriverInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Lifecycle   v3.NodeDriverLifecycle
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.NodeDriverLifecycle
+	}
+	lockNodeDriverInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockNodeDriverInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.

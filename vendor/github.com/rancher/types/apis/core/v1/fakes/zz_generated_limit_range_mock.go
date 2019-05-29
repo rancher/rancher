@@ -141,15 +141,16 @@ func (mock *LimitRangeListerMock) ListCalls() []struct {
 }
 
 var (
-	lockLimitRangeControllerMockAddClusterScopedHandler sync.RWMutex
-	lockLimitRangeControllerMockAddFeatureHandler       sync.RWMutex
-	lockLimitRangeControllerMockAddHandler              sync.RWMutex
-	lockLimitRangeControllerMockEnqueue                 sync.RWMutex
-	lockLimitRangeControllerMockGeneric                 sync.RWMutex
-	lockLimitRangeControllerMockInformer                sync.RWMutex
-	lockLimitRangeControllerMockLister                  sync.RWMutex
-	lockLimitRangeControllerMockStart                   sync.RWMutex
-	lockLimitRangeControllerMockSync                    sync.RWMutex
+	lockLimitRangeControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockLimitRangeControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockLimitRangeControllerMockAddFeatureHandler              sync.RWMutex
+	lockLimitRangeControllerMockAddHandler                     sync.RWMutex
+	lockLimitRangeControllerMockEnqueue                        sync.RWMutex
+	lockLimitRangeControllerMockGeneric                        sync.RWMutex
+	lockLimitRangeControllerMockInformer                       sync.RWMutex
+	lockLimitRangeControllerMockLister                         sync.RWMutex
+	lockLimitRangeControllerMockStart                          sync.RWMutex
+	lockLimitRangeControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that LimitRangeControllerMock does implement LimitRangeController.
@@ -162,6 +163,9 @@ var _ v1a.LimitRangeController = &LimitRangeControllerMock{}
 //
 //         // make and configure a mocked LimitRangeController
 //         mockedLimitRangeController := &LimitRangeControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v1a.LimitRangeHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v1a.LimitRangeHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -196,6 +200,9 @@ var _ v1a.LimitRangeController = &LimitRangeControllerMock{}
 //
 //     }
 type LimitRangeControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v1a.LimitRangeHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v1a.LimitRangeHandlerFunc)
 
@@ -225,6 +232,21 @@ type LimitRangeControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v1a.LimitRangeHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -287,6 +309,57 @@ type LimitRangeControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *LimitRangeControllerMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v1a.LimitRangeHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("LimitRangeControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but LimitRangeController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v1a.LimitRangeHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockLimitRangeControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockLimitRangeControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedLimitRangeController.AddClusterScopedFeatureHandlerCalls())
+func (mock *LimitRangeControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Handler     v1a.LimitRangeHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v1a.LimitRangeHandlerFunc
+	}
+	lockLimitRangeControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockLimitRangeControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -598,23 +671,25 @@ func (mock *LimitRangeControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockLimitRangeInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockLimitRangeInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockLimitRangeInterfaceMockAddFeatureHandler         sync.RWMutex
-	lockLimitRangeInterfaceMockAddFeatureLifecycle       sync.RWMutex
-	lockLimitRangeInterfaceMockAddHandler                sync.RWMutex
-	lockLimitRangeInterfaceMockAddLifecycle              sync.RWMutex
-	lockLimitRangeInterfaceMockController                sync.RWMutex
-	lockLimitRangeInterfaceMockCreate                    sync.RWMutex
-	lockLimitRangeInterfaceMockDelete                    sync.RWMutex
-	lockLimitRangeInterfaceMockDeleteCollection          sync.RWMutex
-	lockLimitRangeInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockLimitRangeInterfaceMockGet                       sync.RWMutex
-	lockLimitRangeInterfaceMockGetNamespaced             sync.RWMutex
-	lockLimitRangeInterfaceMockList                      sync.RWMutex
-	lockLimitRangeInterfaceMockObjectClient              sync.RWMutex
-	lockLimitRangeInterfaceMockUpdate                    sync.RWMutex
-	lockLimitRangeInterfaceMockWatch                     sync.RWMutex
+	lockLimitRangeInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockLimitRangeInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockLimitRangeInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockLimitRangeInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockLimitRangeInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockLimitRangeInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockLimitRangeInterfaceMockAddHandler                       sync.RWMutex
+	lockLimitRangeInterfaceMockAddLifecycle                     sync.RWMutex
+	lockLimitRangeInterfaceMockController                       sync.RWMutex
+	lockLimitRangeInterfaceMockCreate                           sync.RWMutex
+	lockLimitRangeInterfaceMockDelete                           sync.RWMutex
+	lockLimitRangeInterfaceMockDeleteCollection                 sync.RWMutex
+	lockLimitRangeInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockLimitRangeInterfaceMockGet                              sync.RWMutex
+	lockLimitRangeInterfaceMockGetNamespaced                    sync.RWMutex
+	lockLimitRangeInterfaceMockList                             sync.RWMutex
+	lockLimitRangeInterfaceMockObjectClient                     sync.RWMutex
+	lockLimitRangeInterfaceMockUpdate                           sync.RWMutex
+	lockLimitRangeInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that LimitRangeInterfaceMock does implement LimitRangeInterface.
@@ -627,6 +702,12 @@ var _ v1a.LimitRangeInterface = &LimitRangeInterfaceMock{}
 //
 //         // make and configure a mocked LimitRangeInterface
 //         mockedLimitRangeInterface := &LimitRangeInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v1a.LimitRangeHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v1a.LimitRangeLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v1a.LimitRangeHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -685,6 +766,12 @@ var _ v1a.LimitRangeInterface = &LimitRangeInterfaceMock{}
 //
 //     }
 type LimitRangeInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v1a.LimitRangeHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v1a.LimitRangeLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v1a.LimitRangeHandlerFunc)
 
@@ -738,6 +825,36 @@ type LimitRangeInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v1a.LimitRangeHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v1a.LimitRangeLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -870,6 +987,108 @@ type LimitRangeInterfaceMock struct {
 			Opts v1b.ListOptions
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *LimitRangeInterfaceMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v1a.LimitRangeHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("LimitRangeInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but LimitRangeInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v1a.LimitRangeHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockLimitRangeInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockLimitRangeInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedLimitRangeInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *LimitRangeInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Sync        v1a.LimitRangeHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v1a.LimitRangeHandlerFunc
+	}
+	lockLimitRangeInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockLimitRangeInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *LimitRangeInterfaceMock) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v1a.LimitRangeLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("LimitRangeInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but LimitRangeInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v1a.LimitRangeLifecycle
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockLimitRangeInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockLimitRangeInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(enabled, feat, ctx, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedLimitRangeInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *LimitRangeInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Lifecycle   v1a.LimitRangeLifecycle
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v1a.LimitRangeLifecycle
+	}
+	lockLimitRangeInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockLimitRangeInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.

@@ -140,15 +140,16 @@ func (mock *KontainerDriverListerMock) ListCalls() []struct {
 }
 
 var (
-	lockKontainerDriverControllerMockAddClusterScopedHandler sync.RWMutex
-	lockKontainerDriverControllerMockAddFeatureHandler       sync.RWMutex
-	lockKontainerDriverControllerMockAddHandler              sync.RWMutex
-	lockKontainerDriverControllerMockEnqueue                 sync.RWMutex
-	lockKontainerDriverControllerMockGeneric                 sync.RWMutex
-	lockKontainerDriverControllerMockInformer                sync.RWMutex
-	lockKontainerDriverControllerMockLister                  sync.RWMutex
-	lockKontainerDriverControllerMockStart                   sync.RWMutex
-	lockKontainerDriverControllerMockSync                    sync.RWMutex
+	lockKontainerDriverControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockKontainerDriverControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockKontainerDriverControllerMockAddFeatureHandler              sync.RWMutex
+	lockKontainerDriverControllerMockAddHandler                     sync.RWMutex
+	lockKontainerDriverControllerMockEnqueue                        sync.RWMutex
+	lockKontainerDriverControllerMockGeneric                        sync.RWMutex
+	lockKontainerDriverControllerMockInformer                       sync.RWMutex
+	lockKontainerDriverControllerMockLister                         sync.RWMutex
+	lockKontainerDriverControllerMockStart                          sync.RWMutex
+	lockKontainerDriverControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that KontainerDriverControllerMock does implement KontainerDriverController.
@@ -161,6 +162,9 @@ var _ v3.KontainerDriverController = &KontainerDriverControllerMock{}
 //
 //         // make and configure a mocked KontainerDriverController
 //         mockedKontainerDriverController := &KontainerDriverControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.KontainerDriverHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.KontainerDriverHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -195,6 +199,9 @@ var _ v3.KontainerDriverController = &KontainerDriverControllerMock{}
 //
 //     }
 type KontainerDriverControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.KontainerDriverHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.KontainerDriverHandlerFunc)
 
@@ -224,6 +231,21 @@ type KontainerDriverControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v3.KontainerDriverHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -286,6 +308,57 @@ type KontainerDriverControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *KontainerDriverControllerMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.KontainerDriverHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("KontainerDriverControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but KontainerDriverController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.KontainerDriverHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockKontainerDriverControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockKontainerDriverControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedKontainerDriverController.AddClusterScopedFeatureHandlerCalls())
+func (mock *KontainerDriverControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Handler     v3.KontainerDriverHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.KontainerDriverHandlerFunc
+	}
+	lockKontainerDriverControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockKontainerDriverControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -597,23 +670,25 @@ func (mock *KontainerDriverControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockKontainerDriverInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockKontainerDriverInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockKontainerDriverInterfaceMockAddFeatureHandler         sync.RWMutex
-	lockKontainerDriverInterfaceMockAddFeatureLifecycle       sync.RWMutex
-	lockKontainerDriverInterfaceMockAddHandler                sync.RWMutex
-	lockKontainerDriverInterfaceMockAddLifecycle              sync.RWMutex
-	lockKontainerDriverInterfaceMockController                sync.RWMutex
-	lockKontainerDriverInterfaceMockCreate                    sync.RWMutex
-	lockKontainerDriverInterfaceMockDelete                    sync.RWMutex
-	lockKontainerDriverInterfaceMockDeleteCollection          sync.RWMutex
-	lockKontainerDriverInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockKontainerDriverInterfaceMockGet                       sync.RWMutex
-	lockKontainerDriverInterfaceMockGetNamespaced             sync.RWMutex
-	lockKontainerDriverInterfaceMockList                      sync.RWMutex
-	lockKontainerDriverInterfaceMockObjectClient              sync.RWMutex
-	lockKontainerDriverInterfaceMockUpdate                    sync.RWMutex
-	lockKontainerDriverInterfaceMockWatch                     sync.RWMutex
+	lockKontainerDriverInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockKontainerDriverInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockKontainerDriverInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockKontainerDriverInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockKontainerDriverInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockKontainerDriverInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockKontainerDriverInterfaceMockAddHandler                       sync.RWMutex
+	lockKontainerDriverInterfaceMockAddLifecycle                     sync.RWMutex
+	lockKontainerDriverInterfaceMockController                       sync.RWMutex
+	lockKontainerDriverInterfaceMockCreate                           sync.RWMutex
+	lockKontainerDriverInterfaceMockDelete                           sync.RWMutex
+	lockKontainerDriverInterfaceMockDeleteCollection                 sync.RWMutex
+	lockKontainerDriverInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockKontainerDriverInterfaceMockGet                              sync.RWMutex
+	lockKontainerDriverInterfaceMockGetNamespaced                    sync.RWMutex
+	lockKontainerDriverInterfaceMockList                             sync.RWMutex
+	lockKontainerDriverInterfaceMockObjectClient                     sync.RWMutex
+	lockKontainerDriverInterfaceMockUpdate                           sync.RWMutex
+	lockKontainerDriverInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that KontainerDriverInterfaceMock does implement KontainerDriverInterface.
@@ -626,6 +701,12 @@ var _ v3.KontainerDriverInterface = &KontainerDriverInterfaceMock{}
 //
 //         // make and configure a mocked KontainerDriverInterface
 //         mockedKontainerDriverInterface := &KontainerDriverInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.KontainerDriverHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.KontainerDriverLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.KontainerDriverHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -684,6 +765,12 @@ var _ v3.KontainerDriverInterface = &KontainerDriverInterfaceMock{}
 //
 //     }
 type KontainerDriverInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.KontainerDriverHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.KontainerDriverLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.KontainerDriverHandlerFunc)
 
@@ -737,6 +824,36 @@ type KontainerDriverInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v3.KontainerDriverHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.KontainerDriverLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -869,6 +986,108 @@ type KontainerDriverInterfaceMock struct {
 			Opts v1.ListOptions
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *KontainerDriverInterfaceMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.KontainerDriverHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("KontainerDriverInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but KontainerDriverInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.KontainerDriverHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockKontainerDriverInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockKontainerDriverInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedKontainerDriverInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *KontainerDriverInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Sync        v3.KontainerDriverHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.KontainerDriverHandlerFunc
+	}
+	lockKontainerDriverInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockKontainerDriverInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *KontainerDriverInterfaceMock) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.KontainerDriverLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("KontainerDriverInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but KontainerDriverInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.KontainerDriverLifecycle
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockKontainerDriverInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockKontainerDriverInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(enabled, feat, ctx, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedKontainerDriverInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *KontainerDriverInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Lifecycle   v3.KontainerDriverLifecycle
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.KontainerDriverLifecycle
+	}
+	lockKontainerDriverInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockKontainerDriverInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.

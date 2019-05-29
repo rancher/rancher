@@ -140,15 +140,16 @@ func (mock *CatalogTemplateListerMock) ListCalls() []struct {
 }
 
 var (
-	lockCatalogTemplateControllerMockAddClusterScopedHandler sync.RWMutex
-	lockCatalogTemplateControllerMockAddFeatureHandler       sync.RWMutex
-	lockCatalogTemplateControllerMockAddHandler              sync.RWMutex
-	lockCatalogTemplateControllerMockEnqueue                 sync.RWMutex
-	lockCatalogTemplateControllerMockGeneric                 sync.RWMutex
-	lockCatalogTemplateControllerMockInformer                sync.RWMutex
-	lockCatalogTemplateControllerMockLister                  sync.RWMutex
-	lockCatalogTemplateControllerMockStart                   sync.RWMutex
-	lockCatalogTemplateControllerMockSync                    sync.RWMutex
+	lockCatalogTemplateControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockCatalogTemplateControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockCatalogTemplateControllerMockAddFeatureHandler              sync.RWMutex
+	lockCatalogTemplateControllerMockAddHandler                     sync.RWMutex
+	lockCatalogTemplateControllerMockEnqueue                        sync.RWMutex
+	lockCatalogTemplateControllerMockGeneric                        sync.RWMutex
+	lockCatalogTemplateControllerMockInformer                       sync.RWMutex
+	lockCatalogTemplateControllerMockLister                         sync.RWMutex
+	lockCatalogTemplateControllerMockStart                          sync.RWMutex
+	lockCatalogTemplateControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that CatalogTemplateControllerMock does implement CatalogTemplateController.
@@ -161,6 +162,9 @@ var _ v3.CatalogTemplateController = &CatalogTemplateControllerMock{}
 //
 //         // make and configure a mocked CatalogTemplateController
 //         mockedCatalogTemplateController := &CatalogTemplateControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.CatalogTemplateHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.CatalogTemplateHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -195,6 +199,9 @@ var _ v3.CatalogTemplateController = &CatalogTemplateControllerMock{}
 //
 //     }
 type CatalogTemplateControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.CatalogTemplateHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.CatalogTemplateHandlerFunc)
 
@@ -224,6 +231,21 @@ type CatalogTemplateControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v3.CatalogTemplateHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -286,6 +308,57 @@ type CatalogTemplateControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *CatalogTemplateControllerMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.CatalogTemplateHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("CatalogTemplateControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but CatalogTemplateController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.CatalogTemplateHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockCatalogTemplateControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockCatalogTemplateControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedCatalogTemplateController.AddClusterScopedFeatureHandlerCalls())
+func (mock *CatalogTemplateControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Handler     v3.CatalogTemplateHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.CatalogTemplateHandlerFunc
+	}
+	lockCatalogTemplateControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockCatalogTemplateControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -597,23 +670,25 @@ func (mock *CatalogTemplateControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockCatalogTemplateInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockCatalogTemplateInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockCatalogTemplateInterfaceMockAddFeatureHandler         sync.RWMutex
-	lockCatalogTemplateInterfaceMockAddFeatureLifecycle       sync.RWMutex
-	lockCatalogTemplateInterfaceMockAddHandler                sync.RWMutex
-	lockCatalogTemplateInterfaceMockAddLifecycle              sync.RWMutex
-	lockCatalogTemplateInterfaceMockController                sync.RWMutex
-	lockCatalogTemplateInterfaceMockCreate                    sync.RWMutex
-	lockCatalogTemplateInterfaceMockDelete                    sync.RWMutex
-	lockCatalogTemplateInterfaceMockDeleteCollection          sync.RWMutex
-	lockCatalogTemplateInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockCatalogTemplateInterfaceMockGet                       sync.RWMutex
-	lockCatalogTemplateInterfaceMockGetNamespaced             sync.RWMutex
-	lockCatalogTemplateInterfaceMockList                      sync.RWMutex
-	lockCatalogTemplateInterfaceMockObjectClient              sync.RWMutex
-	lockCatalogTemplateInterfaceMockUpdate                    sync.RWMutex
-	lockCatalogTemplateInterfaceMockWatch                     sync.RWMutex
+	lockCatalogTemplateInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockCatalogTemplateInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockCatalogTemplateInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockCatalogTemplateInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockCatalogTemplateInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockCatalogTemplateInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockCatalogTemplateInterfaceMockAddHandler                       sync.RWMutex
+	lockCatalogTemplateInterfaceMockAddLifecycle                     sync.RWMutex
+	lockCatalogTemplateInterfaceMockController                       sync.RWMutex
+	lockCatalogTemplateInterfaceMockCreate                           sync.RWMutex
+	lockCatalogTemplateInterfaceMockDelete                           sync.RWMutex
+	lockCatalogTemplateInterfaceMockDeleteCollection                 sync.RWMutex
+	lockCatalogTemplateInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockCatalogTemplateInterfaceMockGet                              sync.RWMutex
+	lockCatalogTemplateInterfaceMockGetNamespaced                    sync.RWMutex
+	lockCatalogTemplateInterfaceMockList                             sync.RWMutex
+	lockCatalogTemplateInterfaceMockObjectClient                     sync.RWMutex
+	lockCatalogTemplateInterfaceMockUpdate                           sync.RWMutex
+	lockCatalogTemplateInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that CatalogTemplateInterfaceMock does implement CatalogTemplateInterface.
@@ -626,6 +701,12 @@ var _ v3.CatalogTemplateInterface = &CatalogTemplateInterfaceMock{}
 //
 //         // make and configure a mocked CatalogTemplateInterface
 //         mockedCatalogTemplateInterface := &CatalogTemplateInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.CatalogTemplateHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.CatalogTemplateLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.CatalogTemplateHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -684,6 +765,12 @@ var _ v3.CatalogTemplateInterface = &CatalogTemplateInterfaceMock{}
 //
 //     }
 type CatalogTemplateInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.CatalogTemplateHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.CatalogTemplateLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.CatalogTemplateHandlerFunc)
 
@@ -737,6 +824,36 @@ type CatalogTemplateInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v3.CatalogTemplateHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.CatalogTemplateLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -869,6 +986,108 @@ type CatalogTemplateInterfaceMock struct {
 			Opts v1.ListOptions
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *CatalogTemplateInterfaceMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.CatalogTemplateHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("CatalogTemplateInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but CatalogTemplateInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.CatalogTemplateHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockCatalogTemplateInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockCatalogTemplateInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedCatalogTemplateInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *CatalogTemplateInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Sync        v3.CatalogTemplateHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.CatalogTemplateHandlerFunc
+	}
+	lockCatalogTemplateInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockCatalogTemplateInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *CatalogTemplateInterfaceMock) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.CatalogTemplateLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("CatalogTemplateInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but CatalogTemplateInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.CatalogTemplateLifecycle
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockCatalogTemplateInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockCatalogTemplateInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(enabled, feat, ctx, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedCatalogTemplateInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *CatalogTemplateInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Lifecycle   v3.CatalogTemplateLifecycle
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.CatalogTemplateLifecycle
+	}
+	lockCatalogTemplateInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockCatalogTemplateInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.

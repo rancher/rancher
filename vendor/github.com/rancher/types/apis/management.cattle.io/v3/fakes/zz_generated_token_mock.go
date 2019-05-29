@@ -140,15 +140,16 @@ func (mock *TokenListerMock) ListCalls() []struct {
 }
 
 var (
-	lockTokenControllerMockAddClusterScopedHandler sync.RWMutex
-	lockTokenControllerMockAddFeatureHandler       sync.RWMutex
-	lockTokenControllerMockAddHandler              sync.RWMutex
-	lockTokenControllerMockEnqueue                 sync.RWMutex
-	lockTokenControllerMockGeneric                 sync.RWMutex
-	lockTokenControllerMockInformer                sync.RWMutex
-	lockTokenControllerMockLister                  sync.RWMutex
-	lockTokenControllerMockStart                   sync.RWMutex
-	lockTokenControllerMockSync                    sync.RWMutex
+	lockTokenControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockTokenControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockTokenControllerMockAddFeatureHandler              sync.RWMutex
+	lockTokenControllerMockAddHandler                     sync.RWMutex
+	lockTokenControllerMockEnqueue                        sync.RWMutex
+	lockTokenControllerMockGeneric                        sync.RWMutex
+	lockTokenControllerMockInformer                       sync.RWMutex
+	lockTokenControllerMockLister                         sync.RWMutex
+	lockTokenControllerMockStart                          sync.RWMutex
+	lockTokenControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that TokenControllerMock does implement TokenController.
@@ -161,6 +162,9 @@ var _ v3.TokenController = &TokenControllerMock{}
 //
 //         // make and configure a mocked TokenController
 //         mockedTokenController := &TokenControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.TokenHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.TokenHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -195,6 +199,9 @@ var _ v3.TokenController = &TokenControllerMock{}
 //
 //     }
 type TokenControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.TokenHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.TokenHandlerFunc)
 
@@ -224,6 +231,21 @@ type TokenControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v3.TokenHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -286,6 +308,57 @@ type TokenControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *TokenControllerMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.TokenHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("TokenControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but TokenController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.TokenHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockTokenControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockTokenControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedTokenController.AddClusterScopedFeatureHandlerCalls())
+func (mock *TokenControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Handler     v3.TokenHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.TokenHandlerFunc
+	}
+	lockTokenControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockTokenControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -597,23 +670,25 @@ func (mock *TokenControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockTokenInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockTokenInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockTokenInterfaceMockAddFeatureHandler         sync.RWMutex
-	lockTokenInterfaceMockAddFeatureLifecycle       sync.RWMutex
-	lockTokenInterfaceMockAddHandler                sync.RWMutex
-	lockTokenInterfaceMockAddLifecycle              sync.RWMutex
-	lockTokenInterfaceMockController                sync.RWMutex
-	lockTokenInterfaceMockCreate                    sync.RWMutex
-	lockTokenInterfaceMockDelete                    sync.RWMutex
-	lockTokenInterfaceMockDeleteCollection          sync.RWMutex
-	lockTokenInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockTokenInterfaceMockGet                       sync.RWMutex
-	lockTokenInterfaceMockGetNamespaced             sync.RWMutex
-	lockTokenInterfaceMockList                      sync.RWMutex
-	lockTokenInterfaceMockObjectClient              sync.RWMutex
-	lockTokenInterfaceMockUpdate                    sync.RWMutex
-	lockTokenInterfaceMockWatch                     sync.RWMutex
+	lockTokenInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockTokenInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockTokenInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockTokenInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockTokenInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockTokenInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockTokenInterfaceMockAddHandler                       sync.RWMutex
+	lockTokenInterfaceMockAddLifecycle                     sync.RWMutex
+	lockTokenInterfaceMockController                       sync.RWMutex
+	lockTokenInterfaceMockCreate                           sync.RWMutex
+	lockTokenInterfaceMockDelete                           sync.RWMutex
+	lockTokenInterfaceMockDeleteCollection                 sync.RWMutex
+	lockTokenInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockTokenInterfaceMockGet                              sync.RWMutex
+	lockTokenInterfaceMockGetNamespaced                    sync.RWMutex
+	lockTokenInterfaceMockList                             sync.RWMutex
+	lockTokenInterfaceMockObjectClient                     sync.RWMutex
+	lockTokenInterfaceMockUpdate                           sync.RWMutex
+	lockTokenInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that TokenInterfaceMock does implement TokenInterface.
@@ -626,6 +701,12 @@ var _ v3.TokenInterface = &TokenInterfaceMock{}
 //
 //         // make and configure a mocked TokenInterface
 //         mockedTokenInterface := &TokenInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.TokenHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.TokenLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.TokenHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -684,6 +765,12 @@ var _ v3.TokenInterface = &TokenInterfaceMock{}
 //
 //     }
 type TokenInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.TokenHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.TokenLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.TokenHandlerFunc)
 
@@ -737,6 +824,36 @@ type TokenInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v3.TokenHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.TokenLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -869,6 +986,108 @@ type TokenInterfaceMock struct {
 			Opts v1.ListOptions
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *TokenInterfaceMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.TokenHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("TokenInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but TokenInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.TokenHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockTokenInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockTokenInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedTokenInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *TokenInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Sync        v3.TokenHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.TokenHandlerFunc
+	}
+	lockTokenInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockTokenInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *TokenInterfaceMock) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.TokenLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("TokenInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but TokenInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.TokenLifecycle
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockTokenInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockTokenInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(enabled, feat, ctx, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedTokenInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *TokenInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Lifecycle   v3.TokenLifecycle
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.TokenLifecycle
+	}
+	lockTokenInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockTokenInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.

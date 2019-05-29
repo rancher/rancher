@@ -140,15 +140,16 @@ func (mock *GroupMemberListerMock) ListCalls() []struct {
 }
 
 var (
-	lockGroupMemberControllerMockAddClusterScopedHandler sync.RWMutex
-	lockGroupMemberControllerMockAddFeatureHandler       sync.RWMutex
-	lockGroupMemberControllerMockAddHandler              sync.RWMutex
-	lockGroupMemberControllerMockEnqueue                 sync.RWMutex
-	lockGroupMemberControllerMockGeneric                 sync.RWMutex
-	lockGroupMemberControllerMockInformer                sync.RWMutex
-	lockGroupMemberControllerMockLister                  sync.RWMutex
-	lockGroupMemberControllerMockStart                   sync.RWMutex
-	lockGroupMemberControllerMockSync                    sync.RWMutex
+	lockGroupMemberControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockGroupMemberControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockGroupMemberControllerMockAddFeatureHandler              sync.RWMutex
+	lockGroupMemberControllerMockAddHandler                     sync.RWMutex
+	lockGroupMemberControllerMockEnqueue                        sync.RWMutex
+	lockGroupMemberControllerMockGeneric                        sync.RWMutex
+	lockGroupMemberControllerMockInformer                       sync.RWMutex
+	lockGroupMemberControllerMockLister                         sync.RWMutex
+	lockGroupMemberControllerMockStart                          sync.RWMutex
+	lockGroupMemberControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that GroupMemberControllerMock does implement GroupMemberController.
@@ -161,6 +162,9 @@ var _ v3.GroupMemberController = &GroupMemberControllerMock{}
 //
 //         // make and configure a mocked GroupMemberController
 //         mockedGroupMemberController := &GroupMemberControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.GroupMemberHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.GroupMemberHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -195,6 +199,9 @@ var _ v3.GroupMemberController = &GroupMemberControllerMock{}
 //
 //     }
 type GroupMemberControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.GroupMemberHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.GroupMemberHandlerFunc)
 
@@ -224,6 +231,21 @@ type GroupMemberControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v3.GroupMemberHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -286,6 +308,57 @@ type GroupMemberControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *GroupMemberControllerMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.GroupMemberHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("GroupMemberControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but GroupMemberController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.GroupMemberHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockGroupMemberControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockGroupMemberControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedGroupMemberController.AddClusterScopedFeatureHandlerCalls())
+func (mock *GroupMemberControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Handler     v3.GroupMemberHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.GroupMemberHandlerFunc
+	}
+	lockGroupMemberControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockGroupMemberControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -597,23 +670,25 @@ func (mock *GroupMemberControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockGroupMemberInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockGroupMemberInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockGroupMemberInterfaceMockAddFeatureHandler         sync.RWMutex
-	lockGroupMemberInterfaceMockAddFeatureLifecycle       sync.RWMutex
-	lockGroupMemberInterfaceMockAddHandler                sync.RWMutex
-	lockGroupMemberInterfaceMockAddLifecycle              sync.RWMutex
-	lockGroupMemberInterfaceMockController                sync.RWMutex
-	lockGroupMemberInterfaceMockCreate                    sync.RWMutex
-	lockGroupMemberInterfaceMockDelete                    sync.RWMutex
-	lockGroupMemberInterfaceMockDeleteCollection          sync.RWMutex
-	lockGroupMemberInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockGroupMemberInterfaceMockGet                       sync.RWMutex
-	lockGroupMemberInterfaceMockGetNamespaced             sync.RWMutex
-	lockGroupMemberInterfaceMockList                      sync.RWMutex
-	lockGroupMemberInterfaceMockObjectClient              sync.RWMutex
-	lockGroupMemberInterfaceMockUpdate                    sync.RWMutex
-	lockGroupMemberInterfaceMockWatch                     sync.RWMutex
+	lockGroupMemberInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockGroupMemberInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockGroupMemberInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockGroupMemberInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockGroupMemberInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockGroupMemberInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockGroupMemberInterfaceMockAddHandler                       sync.RWMutex
+	lockGroupMemberInterfaceMockAddLifecycle                     sync.RWMutex
+	lockGroupMemberInterfaceMockController                       sync.RWMutex
+	lockGroupMemberInterfaceMockCreate                           sync.RWMutex
+	lockGroupMemberInterfaceMockDelete                           sync.RWMutex
+	lockGroupMemberInterfaceMockDeleteCollection                 sync.RWMutex
+	lockGroupMemberInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockGroupMemberInterfaceMockGet                              sync.RWMutex
+	lockGroupMemberInterfaceMockGetNamespaced                    sync.RWMutex
+	lockGroupMemberInterfaceMockList                             sync.RWMutex
+	lockGroupMemberInterfaceMockObjectClient                     sync.RWMutex
+	lockGroupMemberInterfaceMockUpdate                           sync.RWMutex
+	lockGroupMemberInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that GroupMemberInterfaceMock does implement GroupMemberInterface.
@@ -626,6 +701,12 @@ var _ v3.GroupMemberInterface = &GroupMemberInterfaceMock{}
 //
 //         // make and configure a mocked GroupMemberInterface
 //         mockedGroupMemberInterface := &GroupMemberInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.GroupMemberHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.GroupMemberLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.GroupMemberHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -684,6 +765,12 @@ var _ v3.GroupMemberInterface = &GroupMemberInterfaceMock{}
 //
 //     }
 type GroupMemberInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.GroupMemberHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.GroupMemberLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.GroupMemberHandlerFunc)
 
@@ -737,6 +824,36 @@ type GroupMemberInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v3.GroupMemberHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.GroupMemberLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -869,6 +986,108 @@ type GroupMemberInterfaceMock struct {
 			Opts v1.ListOptions
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *GroupMemberInterfaceMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.GroupMemberHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("GroupMemberInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but GroupMemberInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.GroupMemberHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockGroupMemberInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockGroupMemberInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedGroupMemberInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *GroupMemberInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Sync        v3.GroupMemberHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.GroupMemberHandlerFunc
+	}
+	lockGroupMemberInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockGroupMemberInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *GroupMemberInterfaceMock) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.GroupMemberLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("GroupMemberInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but GroupMemberInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.GroupMemberLifecycle
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockGroupMemberInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockGroupMemberInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(enabled, feat, ctx, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedGroupMemberInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *GroupMemberInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Lifecycle   v3.GroupMemberLifecycle
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.GroupMemberLifecycle
+	}
+	lockGroupMemberInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockGroupMemberInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.

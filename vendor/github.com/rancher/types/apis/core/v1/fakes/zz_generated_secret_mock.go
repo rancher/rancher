@@ -141,15 +141,16 @@ func (mock *SecretListerMock) ListCalls() []struct {
 }
 
 var (
-	lockSecretControllerMockAddClusterScopedHandler sync.RWMutex
-	lockSecretControllerMockAddFeatureHandler       sync.RWMutex
-	lockSecretControllerMockAddHandler              sync.RWMutex
-	lockSecretControllerMockEnqueue                 sync.RWMutex
-	lockSecretControllerMockGeneric                 sync.RWMutex
-	lockSecretControllerMockInformer                sync.RWMutex
-	lockSecretControllerMockLister                  sync.RWMutex
-	lockSecretControllerMockStart                   sync.RWMutex
-	lockSecretControllerMockSync                    sync.RWMutex
+	lockSecretControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockSecretControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockSecretControllerMockAddFeatureHandler              sync.RWMutex
+	lockSecretControllerMockAddHandler                     sync.RWMutex
+	lockSecretControllerMockEnqueue                        sync.RWMutex
+	lockSecretControllerMockGeneric                        sync.RWMutex
+	lockSecretControllerMockInformer                       sync.RWMutex
+	lockSecretControllerMockLister                         sync.RWMutex
+	lockSecretControllerMockStart                          sync.RWMutex
+	lockSecretControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that SecretControllerMock does implement SecretController.
@@ -162,6 +163,9 @@ var _ v1a.SecretController = &SecretControllerMock{}
 //
 //         // make and configure a mocked SecretController
 //         mockedSecretController := &SecretControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v1a.SecretHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v1a.SecretHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -196,6 +200,9 @@ var _ v1a.SecretController = &SecretControllerMock{}
 //
 //     }
 type SecretControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v1a.SecretHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v1a.SecretHandlerFunc)
 
@@ -225,6 +232,21 @@ type SecretControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v1a.SecretHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -287,6 +309,57 @@ type SecretControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *SecretControllerMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v1a.SecretHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("SecretControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but SecretController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v1a.SecretHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockSecretControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockSecretControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedSecretController.AddClusterScopedFeatureHandlerCalls())
+func (mock *SecretControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Handler     v1a.SecretHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v1a.SecretHandlerFunc
+	}
+	lockSecretControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockSecretControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -598,23 +671,25 @@ func (mock *SecretControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockSecretInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockSecretInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockSecretInterfaceMockAddFeatureHandler         sync.RWMutex
-	lockSecretInterfaceMockAddFeatureLifecycle       sync.RWMutex
-	lockSecretInterfaceMockAddHandler                sync.RWMutex
-	lockSecretInterfaceMockAddLifecycle              sync.RWMutex
-	lockSecretInterfaceMockController                sync.RWMutex
-	lockSecretInterfaceMockCreate                    sync.RWMutex
-	lockSecretInterfaceMockDelete                    sync.RWMutex
-	lockSecretInterfaceMockDeleteCollection          sync.RWMutex
-	lockSecretInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockSecretInterfaceMockGet                       sync.RWMutex
-	lockSecretInterfaceMockGetNamespaced             sync.RWMutex
-	lockSecretInterfaceMockList                      sync.RWMutex
-	lockSecretInterfaceMockObjectClient              sync.RWMutex
-	lockSecretInterfaceMockUpdate                    sync.RWMutex
-	lockSecretInterfaceMockWatch                     sync.RWMutex
+	lockSecretInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockSecretInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockSecretInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockSecretInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockSecretInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockSecretInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockSecretInterfaceMockAddHandler                       sync.RWMutex
+	lockSecretInterfaceMockAddLifecycle                     sync.RWMutex
+	lockSecretInterfaceMockController                       sync.RWMutex
+	lockSecretInterfaceMockCreate                           sync.RWMutex
+	lockSecretInterfaceMockDelete                           sync.RWMutex
+	lockSecretInterfaceMockDeleteCollection                 sync.RWMutex
+	lockSecretInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockSecretInterfaceMockGet                              sync.RWMutex
+	lockSecretInterfaceMockGetNamespaced                    sync.RWMutex
+	lockSecretInterfaceMockList                             sync.RWMutex
+	lockSecretInterfaceMockObjectClient                     sync.RWMutex
+	lockSecretInterfaceMockUpdate                           sync.RWMutex
+	lockSecretInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that SecretInterfaceMock does implement SecretInterface.
@@ -627,6 +702,12 @@ var _ v1a.SecretInterface = &SecretInterfaceMock{}
 //
 //         // make and configure a mocked SecretInterface
 //         mockedSecretInterface := &SecretInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v1a.SecretHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v1a.SecretLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v1a.SecretHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -685,6 +766,12 @@ var _ v1a.SecretInterface = &SecretInterfaceMock{}
 //
 //     }
 type SecretInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v1a.SecretHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v1a.SecretLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v1a.SecretHandlerFunc)
 
@@ -738,6 +825,36 @@ type SecretInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v1a.SecretHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v1a.SecretLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -870,6 +987,108 @@ type SecretInterfaceMock struct {
 			Opts v1b.ListOptions
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *SecretInterfaceMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v1a.SecretHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("SecretInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but SecretInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v1a.SecretHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockSecretInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockSecretInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedSecretInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *SecretInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Sync        v1a.SecretHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v1a.SecretHandlerFunc
+	}
+	lockSecretInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockSecretInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *SecretInterfaceMock) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v1a.SecretLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("SecretInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but SecretInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v1a.SecretLifecycle
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockSecretInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockSecretInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(enabled, feat, ctx, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedSecretInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *SecretInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Lifecycle   v1a.SecretLifecycle
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v1a.SecretLifecycle
+	}
+	lockSecretInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockSecretInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.

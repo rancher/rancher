@@ -140,15 +140,16 @@ func (mock *PrincipalListerMock) ListCalls() []struct {
 }
 
 var (
-	lockPrincipalControllerMockAddClusterScopedHandler sync.RWMutex
-	lockPrincipalControllerMockAddFeatureHandler       sync.RWMutex
-	lockPrincipalControllerMockAddHandler              sync.RWMutex
-	lockPrincipalControllerMockEnqueue                 sync.RWMutex
-	lockPrincipalControllerMockGeneric                 sync.RWMutex
-	lockPrincipalControllerMockInformer                sync.RWMutex
-	lockPrincipalControllerMockLister                  sync.RWMutex
-	lockPrincipalControllerMockStart                   sync.RWMutex
-	lockPrincipalControllerMockSync                    sync.RWMutex
+	lockPrincipalControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockPrincipalControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockPrincipalControllerMockAddFeatureHandler              sync.RWMutex
+	lockPrincipalControllerMockAddHandler                     sync.RWMutex
+	lockPrincipalControllerMockEnqueue                        sync.RWMutex
+	lockPrincipalControllerMockGeneric                        sync.RWMutex
+	lockPrincipalControllerMockInformer                       sync.RWMutex
+	lockPrincipalControllerMockLister                         sync.RWMutex
+	lockPrincipalControllerMockStart                          sync.RWMutex
+	lockPrincipalControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that PrincipalControllerMock does implement PrincipalController.
@@ -161,6 +162,9 @@ var _ v3.PrincipalController = &PrincipalControllerMock{}
 //
 //         // make and configure a mocked PrincipalController
 //         mockedPrincipalController := &PrincipalControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.PrincipalHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.PrincipalHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -195,6 +199,9 @@ var _ v3.PrincipalController = &PrincipalControllerMock{}
 //
 //     }
 type PrincipalControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.PrincipalHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.PrincipalHandlerFunc)
 
@@ -224,6 +231,21 @@ type PrincipalControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v3.PrincipalHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -286,6 +308,57 @@ type PrincipalControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *PrincipalControllerMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.PrincipalHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("PrincipalControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but PrincipalController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.PrincipalHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockPrincipalControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockPrincipalControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedPrincipalController.AddClusterScopedFeatureHandlerCalls())
+func (mock *PrincipalControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Handler     v3.PrincipalHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.PrincipalHandlerFunc
+	}
+	lockPrincipalControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockPrincipalControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -597,23 +670,25 @@ func (mock *PrincipalControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockPrincipalInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockPrincipalInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockPrincipalInterfaceMockAddFeatureHandler         sync.RWMutex
-	lockPrincipalInterfaceMockAddFeatureLifecycle       sync.RWMutex
-	lockPrincipalInterfaceMockAddHandler                sync.RWMutex
-	lockPrincipalInterfaceMockAddLifecycle              sync.RWMutex
-	lockPrincipalInterfaceMockController                sync.RWMutex
-	lockPrincipalInterfaceMockCreate                    sync.RWMutex
-	lockPrincipalInterfaceMockDelete                    sync.RWMutex
-	lockPrincipalInterfaceMockDeleteCollection          sync.RWMutex
-	lockPrincipalInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockPrincipalInterfaceMockGet                       sync.RWMutex
-	lockPrincipalInterfaceMockGetNamespaced             sync.RWMutex
-	lockPrincipalInterfaceMockList                      sync.RWMutex
-	lockPrincipalInterfaceMockObjectClient              sync.RWMutex
-	lockPrincipalInterfaceMockUpdate                    sync.RWMutex
-	lockPrincipalInterfaceMockWatch                     sync.RWMutex
+	lockPrincipalInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockPrincipalInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockPrincipalInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockPrincipalInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockPrincipalInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockPrincipalInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockPrincipalInterfaceMockAddHandler                       sync.RWMutex
+	lockPrincipalInterfaceMockAddLifecycle                     sync.RWMutex
+	lockPrincipalInterfaceMockController                       sync.RWMutex
+	lockPrincipalInterfaceMockCreate                           sync.RWMutex
+	lockPrincipalInterfaceMockDelete                           sync.RWMutex
+	lockPrincipalInterfaceMockDeleteCollection                 sync.RWMutex
+	lockPrincipalInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockPrincipalInterfaceMockGet                              sync.RWMutex
+	lockPrincipalInterfaceMockGetNamespaced                    sync.RWMutex
+	lockPrincipalInterfaceMockList                             sync.RWMutex
+	lockPrincipalInterfaceMockObjectClient                     sync.RWMutex
+	lockPrincipalInterfaceMockUpdate                           sync.RWMutex
+	lockPrincipalInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that PrincipalInterfaceMock does implement PrincipalInterface.
@@ -626,6 +701,12 @@ var _ v3.PrincipalInterface = &PrincipalInterfaceMock{}
 //
 //         // make and configure a mocked PrincipalInterface
 //         mockedPrincipalInterface := &PrincipalInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.PrincipalHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.PrincipalLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.PrincipalHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -684,6 +765,12 @@ var _ v3.PrincipalInterface = &PrincipalInterfaceMock{}
 //
 //     }
 type PrincipalInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.PrincipalHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.PrincipalLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.PrincipalHandlerFunc)
 
@@ -737,6 +824,36 @@ type PrincipalInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v3.PrincipalHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.PrincipalLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -869,6 +986,108 @@ type PrincipalInterfaceMock struct {
 			Opts v1.ListOptions
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *PrincipalInterfaceMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.PrincipalHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("PrincipalInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but PrincipalInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.PrincipalHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockPrincipalInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockPrincipalInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedPrincipalInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *PrincipalInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Sync        v3.PrincipalHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.PrincipalHandlerFunc
+	}
+	lockPrincipalInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockPrincipalInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *PrincipalInterfaceMock) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.PrincipalLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("PrincipalInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but PrincipalInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.PrincipalLifecycle
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockPrincipalInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockPrincipalInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(enabled, feat, ctx, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedPrincipalInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *PrincipalInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Lifecycle   v3.PrincipalLifecycle
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.PrincipalLifecycle
+	}
+	lockPrincipalInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockPrincipalInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.

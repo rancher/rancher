@@ -69,6 +69,7 @@ type ClusterRandomizerController interface {
 	AddHandler(ctx context.Context, name string, handler ClusterRandomizerHandlerFunc)
 	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync ClusterRandomizerHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ClusterRandomizerHandlerFunc)
+	AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, handler ClusterRandomizerHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -91,7 +92,9 @@ type ClusterRandomizerInterface interface {
 	AddLifecycle(ctx context.Context, name string, lifecycle ClusterRandomizerLifecycle)
 	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle ClusterRandomizerLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ClusterRandomizerHandlerFunc)
+	AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync ClusterRandomizerHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterRandomizerLifecycle)
+	AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle ClusterRandomizerLifecycle)
 }
 
 type clusterRandomizerLister struct {
@@ -166,8 +169,24 @@ func (c *clusterRandomizerController) AddFeatureHandler(enabled func(string) boo
 }
 
 func (c *clusterRandomizerController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ClusterRandomizerHandlerFunc) {
+	resource.PutClusterScoped(ClusterRandomizerGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*ClusterRandomizer); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *clusterRandomizerController) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, cluster string, handler ClusterRandomizerHandlerFunc) {
+	resource.PutClusterScoped(ClusterRandomizerGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*ClusterRandomizer); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -290,9 +309,18 @@ func (s *clusterRandomizerClient) AddClusterScopedHandler(ctx context.Context, n
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *clusterRandomizerClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync ClusterRandomizerHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+}
+
 func (s *clusterRandomizerClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterRandomizerLifecycle) {
 	sync := NewClusterRandomizerLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *clusterRandomizerClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterRandomizerLifecycle) {
+	sync := NewClusterRandomizerLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
 }
 
 type ClusterRandomizerIndexer func(obj *ClusterRandomizer) ([]string, error)

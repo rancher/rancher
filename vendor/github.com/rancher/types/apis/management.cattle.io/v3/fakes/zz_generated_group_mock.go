@@ -140,15 +140,16 @@ func (mock *GroupListerMock) ListCalls() []struct {
 }
 
 var (
-	lockGroupControllerMockAddClusterScopedHandler sync.RWMutex
-	lockGroupControllerMockAddFeatureHandler       sync.RWMutex
-	lockGroupControllerMockAddHandler              sync.RWMutex
-	lockGroupControllerMockEnqueue                 sync.RWMutex
-	lockGroupControllerMockGeneric                 sync.RWMutex
-	lockGroupControllerMockInformer                sync.RWMutex
-	lockGroupControllerMockLister                  sync.RWMutex
-	lockGroupControllerMockStart                   sync.RWMutex
-	lockGroupControllerMockSync                    sync.RWMutex
+	lockGroupControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockGroupControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockGroupControllerMockAddFeatureHandler              sync.RWMutex
+	lockGroupControllerMockAddHandler                     sync.RWMutex
+	lockGroupControllerMockEnqueue                        sync.RWMutex
+	lockGroupControllerMockGeneric                        sync.RWMutex
+	lockGroupControllerMockInformer                       sync.RWMutex
+	lockGroupControllerMockLister                         sync.RWMutex
+	lockGroupControllerMockStart                          sync.RWMutex
+	lockGroupControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that GroupControllerMock does implement GroupController.
@@ -161,6 +162,9 @@ var _ v3.GroupController = &GroupControllerMock{}
 //
 //         // make and configure a mocked GroupController
 //         mockedGroupController := &GroupControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.GroupHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.GroupHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -195,6 +199,9 @@ var _ v3.GroupController = &GroupControllerMock{}
 //
 //     }
 type GroupControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.GroupHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.GroupHandlerFunc)
 
@@ -224,6 +231,21 @@ type GroupControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v3.GroupHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -286,6 +308,57 @@ type GroupControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *GroupControllerMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.GroupHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("GroupControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but GroupController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.GroupHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockGroupControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockGroupControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedGroupController.AddClusterScopedFeatureHandlerCalls())
+func (mock *GroupControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Handler     v3.GroupHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.GroupHandlerFunc
+	}
+	lockGroupControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockGroupControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -597,23 +670,25 @@ func (mock *GroupControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockGroupInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockGroupInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockGroupInterfaceMockAddFeatureHandler         sync.RWMutex
-	lockGroupInterfaceMockAddFeatureLifecycle       sync.RWMutex
-	lockGroupInterfaceMockAddHandler                sync.RWMutex
-	lockGroupInterfaceMockAddLifecycle              sync.RWMutex
-	lockGroupInterfaceMockController                sync.RWMutex
-	lockGroupInterfaceMockCreate                    sync.RWMutex
-	lockGroupInterfaceMockDelete                    sync.RWMutex
-	lockGroupInterfaceMockDeleteCollection          sync.RWMutex
-	lockGroupInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockGroupInterfaceMockGet                       sync.RWMutex
-	lockGroupInterfaceMockGetNamespaced             sync.RWMutex
-	lockGroupInterfaceMockList                      sync.RWMutex
-	lockGroupInterfaceMockObjectClient              sync.RWMutex
-	lockGroupInterfaceMockUpdate                    sync.RWMutex
-	lockGroupInterfaceMockWatch                     sync.RWMutex
+	lockGroupInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockGroupInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockGroupInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockGroupInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockGroupInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockGroupInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockGroupInterfaceMockAddHandler                       sync.RWMutex
+	lockGroupInterfaceMockAddLifecycle                     sync.RWMutex
+	lockGroupInterfaceMockController                       sync.RWMutex
+	lockGroupInterfaceMockCreate                           sync.RWMutex
+	lockGroupInterfaceMockDelete                           sync.RWMutex
+	lockGroupInterfaceMockDeleteCollection                 sync.RWMutex
+	lockGroupInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockGroupInterfaceMockGet                              sync.RWMutex
+	lockGroupInterfaceMockGetNamespaced                    sync.RWMutex
+	lockGroupInterfaceMockList                             sync.RWMutex
+	lockGroupInterfaceMockObjectClient                     sync.RWMutex
+	lockGroupInterfaceMockUpdate                           sync.RWMutex
+	lockGroupInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that GroupInterfaceMock does implement GroupInterface.
@@ -626,6 +701,12 @@ var _ v3.GroupInterface = &GroupInterfaceMock{}
 //
 //         // make and configure a mocked GroupInterface
 //         mockedGroupInterface := &GroupInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.GroupHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.GroupLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.GroupHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -684,6 +765,12 @@ var _ v3.GroupInterface = &GroupInterfaceMock{}
 //
 //     }
 type GroupInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.GroupHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.GroupLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.GroupHandlerFunc)
 
@@ -737,6 +824,36 @@ type GroupInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v3.GroupHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.GroupLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -869,6 +986,108 @@ type GroupInterfaceMock struct {
 			Opts v1.ListOptions
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *GroupInterfaceMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.GroupHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("GroupInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but GroupInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.GroupHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockGroupInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockGroupInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedGroupInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *GroupInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Sync        v3.GroupHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.GroupHandlerFunc
+	}
+	lockGroupInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockGroupInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *GroupInterfaceMock) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.GroupLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("GroupInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but GroupInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.GroupLifecycle
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockGroupInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockGroupInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(enabled, feat, ctx, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedGroupInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *GroupInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Lifecycle   v3.GroupLifecycle
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.GroupLifecycle
+	}
+	lockGroupInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockGroupInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.

@@ -70,6 +70,7 @@ type CertificateController interface {
 	AddHandler(ctx context.Context, name string, handler CertificateHandlerFunc)
 	AddFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, sync CertificateHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler CertificateHandlerFunc)
+	AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, handler CertificateHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -92,7 +93,9 @@ type CertificateInterface interface {
 	AddLifecycle(ctx context.Context, name string, lifecycle CertificateLifecycle)
 	AddFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, lifecycle CertificateLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync CertificateHandlerFunc)
+	AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync CertificateHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle CertificateLifecycle)
+	AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, lifecycle CertificateLifecycle)
 }
 
 type certificateLister struct {
@@ -170,6 +173,21 @@ func (c *certificateController) AddClusterScopedHandler(ctx context.Context, nam
 	resource.PutClusterScoped(CertificateGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*Certificate); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *certificateController) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, cluster string, handler CertificateHandlerFunc) {
+	resource.PutClusterScoped(CertificateGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled(feat) {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*Certificate); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -292,9 +310,18 @@ func (s *certificateClient) AddClusterScopedHandler(ctx context.Context, name, c
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *certificateClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync CertificateHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+}
+
 func (s *certificateClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle CertificateLifecycle) {
 	sync := NewCertificateLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *certificateClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle CertificateLifecycle) {
+	sync := NewCertificateLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
 }
 
 type CertificateIndexer func(obj *Certificate) ([]string, error)

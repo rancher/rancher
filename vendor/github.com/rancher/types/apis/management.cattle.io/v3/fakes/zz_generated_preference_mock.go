@@ -140,15 +140,16 @@ func (mock *PreferenceListerMock) ListCalls() []struct {
 }
 
 var (
-	lockPreferenceControllerMockAddClusterScopedHandler sync.RWMutex
-	lockPreferenceControllerMockAddFeatureHandler       sync.RWMutex
-	lockPreferenceControllerMockAddHandler              sync.RWMutex
-	lockPreferenceControllerMockEnqueue                 sync.RWMutex
-	lockPreferenceControllerMockGeneric                 sync.RWMutex
-	lockPreferenceControllerMockInformer                sync.RWMutex
-	lockPreferenceControllerMockLister                  sync.RWMutex
-	lockPreferenceControllerMockStart                   sync.RWMutex
-	lockPreferenceControllerMockSync                    sync.RWMutex
+	lockPreferenceControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockPreferenceControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockPreferenceControllerMockAddFeatureHandler              sync.RWMutex
+	lockPreferenceControllerMockAddHandler                     sync.RWMutex
+	lockPreferenceControllerMockEnqueue                        sync.RWMutex
+	lockPreferenceControllerMockGeneric                        sync.RWMutex
+	lockPreferenceControllerMockInformer                       sync.RWMutex
+	lockPreferenceControllerMockLister                         sync.RWMutex
+	lockPreferenceControllerMockStart                          sync.RWMutex
+	lockPreferenceControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that PreferenceControllerMock does implement PreferenceController.
@@ -161,6 +162,9 @@ var _ v3.PreferenceController = &PreferenceControllerMock{}
 //
 //         // make and configure a mocked PreferenceController
 //         mockedPreferenceController := &PreferenceControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.PreferenceHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.PreferenceHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -195,6 +199,9 @@ var _ v3.PreferenceController = &PreferenceControllerMock{}
 //
 //     }
 type PreferenceControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.PreferenceHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.PreferenceHandlerFunc)
 
@@ -224,6 +231,21 @@ type PreferenceControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v3.PreferenceHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -286,6 +308,57 @@ type PreferenceControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *PreferenceControllerMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.PreferenceHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("PreferenceControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but PreferenceController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.PreferenceHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockPreferenceControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockPreferenceControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedPreferenceController.AddClusterScopedFeatureHandlerCalls())
+func (mock *PreferenceControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Handler     v3.PreferenceHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.PreferenceHandlerFunc
+	}
+	lockPreferenceControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockPreferenceControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -597,23 +670,25 @@ func (mock *PreferenceControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockPreferenceInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockPreferenceInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockPreferenceInterfaceMockAddFeatureHandler         sync.RWMutex
-	lockPreferenceInterfaceMockAddFeatureLifecycle       sync.RWMutex
-	lockPreferenceInterfaceMockAddHandler                sync.RWMutex
-	lockPreferenceInterfaceMockAddLifecycle              sync.RWMutex
-	lockPreferenceInterfaceMockController                sync.RWMutex
-	lockPreferenceInterfaceMockCreate                    sync.RWMutex
-	lockPreferenceInterfaceMockDelete                    sync.RWMutex
-	lockPreferenceInterfaceMockDeleteCollection          sync.RWMutex
-	lockPreferenceInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockPreferenceInterfaceMockGet                       sync.RWMutex
-	lockPreferenceInterfaceMockGetNamespaced             sync.RWMutex
-	lockPreferenceInterfaceMockList                      sync.RWMutex
-	lockPreferenceInterfaceMockObjectClient              sync.RWMutex
-	lockPreferenceInterfaceMockUpdate                    sync.RWMutex
-	lockPreferenceInterfaceMockWatch                     sync.RWMutex
+	lockPreferenceInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockPreferenceInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockPreferenceInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockPreferenceInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockPreferenceInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockPreferenceInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockPreferenceInterfaceMockAddHandler                       sync.RWMutex
+	lockPreferenceInterfaceMockAddLifecycle                     sync.RWMutex
+	lockPreferenceInterfaceMockController                       sync.RWMutex
+	lockPreferenceInterfaceMockCreate                           sync.RWMutex
+	lockPreferenceInterfaceMockDelete                           sync.RWMutex
+	lockPreferenceInterfaceMockDeleteCollection                 sync.RWMutex
+	lockPreferenceInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockPreferenceInterfaceMockGet                              sync.RWMutex
+	lockPreferenceInterfaceMockGetNamespaced                    sync.RWMutex
+	lockPreferenceInterfaceMockList                             sync.RWMutex
+	lockPreferenceInterfaceMockObjectClient                     sync.RWMutex
+	lockPreferenceInterfaceMockUpdate                           sync.RWMutex
+	lockPreferenceInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that PreferenceInterfaceMock does implement PreferenceInterface.
@@ -626,6 +701,12 @@ var _ v3.PreferenceInterface = &PreferenceInterfaceMock{}
 //
 //         // make and configure a mocked PreferenceInterface
 //         mockedPreferenceInterface := &PreferenceInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.PreferenceHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.PreferenceLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.PreferenceHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -684,6 +765,12 @@ var _ v3.PreferenceInterface = &PreferenceInterfaceMock{}
 //
 //     }
 type PreferenceInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.PreferenceHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.PreferenceLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.PreferenceHandlerFunc)
 
@@ -737,6 +824,36 @@ type PreferenceInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v3.PreferenceHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.PreferenceLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -869,6 +986,108 @@ type PreferenceInterfaceMock struct {
 			Opts v1.ListOptions
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *PreferenceInterfaceMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.PreferenceHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("PreferenceInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but PreferenceInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.PreferenceHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockPreferenceInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockPreferenceInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedPreferenceInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *PreferenceInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Sync        v3.PreferenceHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.PreferenceHandlerFunc
+	}
+	lockPreferenceInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockPreferenceInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *PreferenceInterfaceMock) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.PreferenceLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("PreferenceInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but PreferenceInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.PreferenceLifecycle
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockPreferenceInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockPreferenceInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(enabled, feat, ctx, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedPreferenceInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *PreferenceInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Lifecycle   v3.PreferenceLifecycle
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.PreferenceLifecycle
+	}
+	lockPreferenceInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockPreferenceInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.

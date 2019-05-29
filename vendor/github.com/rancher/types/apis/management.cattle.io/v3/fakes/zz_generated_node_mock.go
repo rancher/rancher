@@ -140,15 +140,16 @@ func (mock *NodeListerMock) ListCalls() []struct {
 }
 
 var (
-	lockNodeControllerMockAddClusterScopedHandler sync.RWMutex
-	lockNodeControllerMockAddFeatureHandler       sync.RWMutex
-	lockNodeControllerMockAddHandler              sync.RWMutex
-	lockNodeControllerMockEnqueue                 sync.RWMutex
-	lockNodeControllerMockGeneric                 sync.RWMutex
-	lockNodeControllerMockInformer                sync.RWMutex
-	lockNodeControllerMockLister                  sync.RWMutex
-	lockNodeControllerMockStart                   sync.RWMutex
-	lockNodeControllerMockSync                    sync.RWMutex
+	lockNodeControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockNodeControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockNodeControllerMockAddFeatureHandler              sync.RWMutex
+	lockNodeControllerMockAddHandler                     sync.RWMutex
+	lockNodeControllerMockEnqueue                        sync.RWMutex
+	lockNodeControllerMockGeneric                        sync.RWMutex
+	lockNodeControllerMockInformer                       sync.RWMutex
+	lockNodeControllerMockLister                         sync.RWMutex
+	lockNodeControllerMockStart                          sync.RWMutex
+	lockNodeControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that NodeControllerMock does implement NodeController.
@@ -161,6 +162,9 @@ var _ v3.NodeController = &NodeControllerMock{}
 //
 //         // make and configure a mocked NodeController
 //         mockedNodeController := &NodeControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.NodeHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.NodeHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -195,6 +199,9 @@ var _ v3.NodeController = &NodeControllerMock{}
 //
 //     }
 type NodeControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.NodeHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.NodeHandlerFunc)
 
@@ -224,6 +231,21 @@ type NodeControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v3.NodeHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -286,6 +308,57 @@ type NodeControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *NodeControllerMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.NodeHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("NodeControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but NodeController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.NodeHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockNodeControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockNodeControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedNodeController.AddClusterScopedFeatureHandlerCalls())
+func (mock *NodeControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Handler     v3.NodeHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.NodeHandlerFunc
+	}
+	lockNodeControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockNodeControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -597,23 +670,25 @@ func (mock *NodeControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockNodeInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockNodeInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockNodeInterfaceMockAddFeatureHandler         sync.RWMutex
-	lockNodeInterfaceMockAddFeatureLifecycle       sync.RWMutex
-	lockNodeInterfaceMockAddHandler                sync.RWMutex
-	lockNodeInterfaceMockAddLifecycle              sync.RWMutex
-	lockNodeInterfaceMockController                sync.RWMutex
-	lockNodeInterfaceMockCreate                    sync.RWMutex
-	lockNodeInterfaceMockDelete                    sync.RWMutex
-	lockNodeInterfaceMockDeleteCollection          sync.RWMutex
-	lockNodeInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockNodeInterfaceMockGet                       sync.RWMutex
-	lockNodeInterfaceMockGetNamespaced             sync.RWMutex
-	lockNodeInterfaceMockList                      sync.RWMutex
-	lockNodeInterfaceMockObjectClient              sync.RWMutex
-	lockNodeInterfaceMockUpdate                    sync.RWMutex
-	lockNodeInterfaceMockWatch                     sync.RWMutex
+	lockNodeInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockNodeInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockNodeInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockNodeInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockNodeInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockNodeInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockNodeInterfaceMockAddHandler                       sync.RWMutex
+	lockNodeInterfaceMockAddLifecycle                     sync.RWMutex
+	lockNodeInterfaceMockController                       sync.RWMutex
+	lockNodeInterfaceMockCreate                           sync.RWMutex
+	lockNodeInterfaceMockDelete                           sync.RWMutex
+	lockNodeInterfaceMockDeleteCollection                 sync.RWMutex
+	lockNodeInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockNodeInterfaceMockGet                              sync.RWMutex
+	lockNodeInterfaceMockGetNamespaced                    sync.RWMutex
+	lockNodeInterfaceMockList                             sync.RWMutex
+	lockNodeInterfaceMockObjectClient                     sync.RWMutex
+	lockNodeInterfaceMockUpdate                           sync.RWMutex
+	lockNodeInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that NodeInterfaceMock does implement NodeInterface.
@@ -626,6 +701,12 @@ var _ v3.NodeInterface = &NodeInterfaceMock{}
 //
 //         // make and configure a mocked NodeInterface
 //         mockedNodeInterface := &NodeInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.NodeHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.NodeLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.NodeHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -684,6 +765,12 @@ var _ v3.NodeInterface = &NodeInterfaceMock{}
 //
 //     }
 type NodeInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.NodeHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.NodeLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.NodeHandlerFunc)
 
@@ -737,6 +824,36 @@ type NodeInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v3.NodeHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.NodeLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -869,6 +986,108 @@ type NodeInterfaceMock struct {
 			Opts v1.ListOptions
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *NodeInterfaceMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.NodeHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("NodeInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but NodeInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.NodeHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockNodeInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockNodeInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedNodeInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *NodeInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Sync        v3.NodeHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.NodeHandlerFunc
+	}
+	lockNodeInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockNodeInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *NodeInterfaceMock) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.NodeLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("NodeInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but NodeInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.NodeLifecycle
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockNodeInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockNodeInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(enabled, feat, ctx, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedNodeInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *NodeInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Lifecycle   v3.NodeLifecycle
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.NodeLifecycle
+	}
+	lockNodeInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockNodeInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.

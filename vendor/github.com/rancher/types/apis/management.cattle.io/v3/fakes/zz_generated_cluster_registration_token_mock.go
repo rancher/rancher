@@ -140,15 +140,16 @@ func (mock *ClusterRegistrationTokenListerMock) ListCalls() []struct {
 }
 
 var (
-	lockClusterRegistrationTokenControllerMockAddClusterScopedHandler sync.RWMutex
-	lockClusterRegistrationTokenControllerMockAddFeatureHandler       sync.RWMutex
-	lockClusterRegistrationTokenControllerMockAddHandler              sync.RWMutex
-	lockClusterRegistrationTokenControllerMockEnqueue                 sync.RWMutex
-	lockClusterRegistrationTokenControllerMockGeneric                 sync.RWMutex
-	lockClusterRegistrationTokenControllerMockInformer                sync.RWMutex
-	lockClusterRegistrationTokenControllerMockLister                  sync.RWMutex
-	lockClusterRegistrationTokenControllerMockStart                   sync.RWMutex
-	lockClusterRegistrationTokenControllerMockSync                    sync.RWMutex
+	lockClusterRegistrationTokenControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockClusterRegistrationTokenControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockClusterRegistrationTokenControllerMockAddFeatureHandler              sync.RWMutex
+	lockClusterRegistrationTokenControllerMockAddHandler                     sync.RWMutex
+	lockClusterRegistrationTokenControllerMockEnqueue                        sync.RWMutex
+	lockClusterRegistrationTokenControllerMockGeneric                        sync.RWMutex
+	lockClusterRegistrationTokenControllerMockInformer                       sync.RWMutex
+	lockClusterRegistrationTokenControllerMockLister                         sync.RWMutex
+	lockClusterRegistrationTokenControllerMockStart                          sync.RWMutex
+	lockClusterRegistrationTokenControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that ClusterRegistrationTokenControllerMock does implement ClusterRegistrationTokenController.
@@ -161,6 +162,9 @@ var _ v3.ClusterRegistrationTokenController = &ClusterRegistrationTokenControlle
 //
 //         // make and configure a mocked ClusterRegistrationTokenController
 //         mockedClusterRegistrationTokenController := &ClusterRegistrationTokenControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.ClusterRegistrationTokenHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.ClusterRegistrationTokenHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -195,6 +199,9 @@ var _ v3.ClusterRegistrationTokenController = &ClusterRegistrationTokenControlle
 //
 //     }
 type ClusterRegistrationTokenControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.ClusterRegistrationTokenHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.ClusterRegistrationTokenHandlerFunc)
 
@@ -224,6 +231,21 @@ type ClusterRegistrationTokenControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v3.ClusterRegistrationTokenHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -286,6 +308,57 @@ type ClusterRegistrationTokenControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *ClusterRegistrationTokenControllerMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, handler v3.ClusterRegistrationTokenHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("ClusterRegistrationTokenControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but ClusterRegistrationTokenController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.ClusterRegistrationTokenHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockClusterRegistrationTokenControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockClusterRegistrationTokenControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedClusterRegistrationTokenController.AddClusterScopedFeatureHandlerCalls())
+func (mock *ClusterRegistrationTokenControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Handler     v3.ClusterRegistrationTokenHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Handler     v3.ClusterRegistrationTokenHandlerFunc
+	}
+	lockClusterRegistrationTokenControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockClusterRegistrationTokenControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -597,23 +670,25 @@ func (mock *ClusterRegistrationTokenControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockClusterRegistrationTokenInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockClusterRegistrationTokenInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockClusterRegistrationTokenInterfaceMockAddFeatureHandler         sync.RWMutex
-	lockClusterRegistrationTokenInterfaceMockAddFeatureLifecycle       sync.RWMutex
-	lockClusterRegistrationTokenInterfaceMockAddHandler                sync.RWMutex
-	lockClusterRegistrationTokenInterfaceMockAddLifecycle              sync.RWMutex
-	lockClusterRegistrationTokenInterfaceMockController                sync.RWMutex
-	lockClusterRegistrationTokenInterfaceMockCreate                    sync.RWMutex
-	lockClusterRegistrationTokenInterfaceMockDelete                    sync.RWMutex
-	lockClusterRegistrationTokenInterfaceMockDeleteCollection          sync.RWMutex
-	lockClusterRegistrationTokenInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockClusterRegistrationTokenInterfaceMockGet                       sync.RWMutex
-	lockClusterRegistrationTokenInterfaceMockGetNamespaced             sync.RWMutex
-	lockClusterRegistrationTokenInterfaceMockList                      sync.RWMutex
-	lockClusterRegistrationTokenInterfaceMockObjectClient              sync.RWMutex
-	lockClusterRegistrationTokenInterfaceMockUpdate                    sync.RWMutex
-	lockClusterRegistrationTokenInterfaceMockWatch                     sync.RWMutex
+	lockClusterRegistrationTokenInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockClusterRegistrationTokenInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockClusterRegistrationTokenInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockClusterRegistrationTokenInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockClusterRegistrationTokenInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockClusterRegistrationTokenInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockClusterRegistrationTokenInterfaceMockAddHandler                       sync.RWMutex
+	lockClusterRegistrationTokenInterfaceMockAddLifecycle                     sync.RWMutex
+	lockClusterRegistrationTokenInterfaceMockController                       sync.RWMutex
+	lockClusterRegistrationTokenInterfaceMockCreate                           sync.RWMutex
+	lockClusterRegistrationTokenInterfaceMockDelete                           sync.RWMutex
+	lockClusterRegistrationTokenInterfaceMockDeleteCollection                 sync.RWMutex
+	lockClusterRegistrationTokenInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockClusterRegistrationTokenInterfaceMockGet                              sync.RWMutex
+	lockClusterRegistrationTokenInterfaceMockGetNamespaced                    sync.RWMutex
+	lockClusterRegistrationTokenInterfaceMockList                             sync.RWMutex
+	lockClusterRegistrationTokenInterfaceMockObjectClient                     sync.RWMutex
+	lockClusterRegistrationTokenInterfaceMockUpdate                           sync.RWMutex
+	lockClusterRegistrationTokenInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that ClusterRegistrationTokenInterfaceMock does implement ClusterRegistrationTokenInterface.
@@ -626,6 +701,12 @@ var _ v3.ClusterRegistrationTokenInterface = &ClusterRegistrationTokenInterfaceM
 //
 //         // make and configure a mocked ClusterRegistrationTokenInterface
 //         mockedClusterRegistrationTokenInterface := &ClusterRegistrationTokenInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.ClusterRegistrationTokenHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.ClusterRegistrationTokenLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.ClusterRegistrationTokenHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
@@ -684,6 +765,12 @@ var _ v3.ClusterRegistrationTokenInterface = &ClusterRegistrationTokenInterfaceM
 //
 //     }
 type ClusterRegistrationTokenInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.ClusterRegistrationTokenHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.ClusterRegistrationTokenLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.ClusterRegistrationTokenHandlerFunc)
 
@@ -737,6 +824,36 @@ type ClusterRegistrationTokenInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v3.ClusterRegistrationTokenHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Enabled is the enabled argument value.
+			Enabled func(string) bool
+			// Feat is the feat argument value.
+			Feat string
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.ClusterRegistrationTokenLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -869,6 +986,108 @@ type ClusterRegistrationTokenInterfaceMock struct {
 			Opts v1.ListOptions
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *ClusterRegistrationTokenInterfaceMock) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, sync v3.ClusterRegistrationTokenHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("ClusterRegistrationTokenInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but ClusterRegistrationTokenInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.ClusterRegistrationTokenHandlerFunc
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockClusterRegistrationTokenInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockClusterRegistrationTokenInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(enabled, feat, ctx, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedClusterRegistrationTokenInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *ClusterRegistrationTokenInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Sync        v3.ClusterRegistrationTokenHandlerFunc
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Sync        v3.ClusterRegistrationTokenHandlerFunc
+	}
+	lockClusterRegistrationTokenInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockClusterRegistrationTokenInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *ClusterRegistrationTokenInterfaceMock) AddClusterScopedFeatureLifecycle(enabled func(string) bool, feat string, ctx context.Context, name string, clusterName string, lifecycle v3.ClusterRegistrationTokenLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("ClusterRegistrationTokenInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but ClusterRegistrationTokenInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.ClusterRegistrationTokenLifecycle
+	}{
+		Enabled:     enabled,
+		Feat:        feat,
+		Ctx:         ctx,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockClusterRegistrationTokenInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockClusterRegistrationTokenInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(enabled, feat, ctx, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedClusterRegistrationTokenInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *ClusterRegistrationTokenInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Enabled     func(string) bool
+	Feat        string
+	Ctx         context.Context
+	Name        string
+	ClusterName string
+	Lifecycle   v3.ClusterRegistrationTokenLifecycle
+} {
+	var calls []struct {
+		Enabled     func(string) bool
+		Feat        string
+		Ctx         context.Context
+		Name        string
+		ClusterName string
+		Lifecycle   v3.ClusterRegistrationTokenLifecycle
+	}
+	lockClusterRegistrationTokenInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockClusterRegistrationTokenInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
