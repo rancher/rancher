@@ -310,7 +310,7 @@ func (s *templateClient) AddClusterScopedHandler(ctx context.Context, name, clus
 }
 
 func (s *templateClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync TemplateHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *templateClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle TemplateLifecycle) {
@@ -320,7 +320,7 @@ func (s *templateClient) AddClusterScopedLifecycle(ctx context.Context, name, cl
 
 func (s *templateClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle TemplateLifecycle) {
 	sync := NewTemplateLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type TemplateIndexer func(obj *Template) ([]string, error)

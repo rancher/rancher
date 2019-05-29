@@ -312,7 +312,7 @@ func (s *serviceClient) AddClusterScopedHandler(ctx context.Context, name, clust
 }
 
 func (s *serviceClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync ServiceHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *serviceClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ServiceLifecycle) {
@@ -322,7 +322,7 @@ func (s *serviceClient) AddClusterScopedLifecycle(ctx context.Context, name, clu
 
 func (s *serviceClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ServiceLifecycle) {
 	sync := NewServiceLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type ServiceIndexer func(obj *v1.Service) ([]string, error)

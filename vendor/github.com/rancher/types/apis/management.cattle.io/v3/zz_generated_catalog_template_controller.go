@@ -311,7 +311,7 @@ func (s *catalogTemplateClient) AddClusterScopedHandler(ctx context.Context, nam
 }
 
 func (s *catalogTemplateClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync CatalogTemplateHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *catalogTemplateClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle CatalogTemplateLifecycle) {
@@ -321,7 +321,7 @@ func (s *catalogTemplateClient) AddClusterScopedLifecycle(ctx context.Context, n
 
 func (s *catalogTemplateClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle CatalogTemplateLifecycle) {
 	sync := NewCatalogTemplateLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type CatalogTemplateIndexer func(obj *CatalogTemplate) ([]string, error)

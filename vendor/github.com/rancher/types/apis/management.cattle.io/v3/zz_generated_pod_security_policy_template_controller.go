@@ -310,7 +310,7 @@ func (s *podSecurityPolicyTemplateClient) AddClusterScopedHandler(ctx context.Co
 }
 
 func (s *podSecurityPolicyTemplateClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync PodSecurityPolicyTemplateHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *podSecurityPolicyTemplateClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PodSecurityPolicyTemplateLifecycle) {
@@ -320,7 +320,7 @@ func (s *podSecurityPolicyTemplateClient) AddClusterScopedLifecycle(ctx context.
 
 func (s *podSecurityPolicyTemplateClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PodSecurityPolicyTemplateLifecycle) {
 	sync := NewPodSecurityPolicyTemplateLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type PodSecurityPolicyTemplateIndexer func(obj *PodSecurityPolicyTemplate) ([]string, error)

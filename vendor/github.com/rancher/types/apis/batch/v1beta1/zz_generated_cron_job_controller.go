@@ -312,7 +312,7 @@ func (s *cronJobClient) AddClusterScopedHandler(ctx context.Context, name, clust
 }
 
 func (s *cronJobClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync CronJobHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *cronJobClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle CronJobLifecycle) {
@@ -322,7 +322,7 @@ func (s *cronJobClient) AddClusterScopedLifecycle(ctx context.Context, name, clu
 
 func (s *cronJobClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle CronJobLifecycle) {
 	sync := NewCronJobLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type CronJobIndexer func(obj *v1beta1.CronJob) ([]string, error)

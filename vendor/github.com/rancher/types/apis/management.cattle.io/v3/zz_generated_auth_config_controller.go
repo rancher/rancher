@@ -310,7 +310,7 @@ func (s *authConfigClient) AddClusterScopedHandler(ctx context.Context, name, cl
 }
 
 func (s *authConfigClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync AuthConfigHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *authConfigClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle AuthConfigLifecycle) {
@@ -320,7 +320,7 @@ func (s *authConfigClient) AddClusterScopedLifecycle(ctx context.Context, name, 
 
 func (s *authConfigClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle AuthConfigLifecycle) {
 	sync := NewAuthConfigLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type AuthConfigIndexer func(obj *AuthConfig) ([]string, error)

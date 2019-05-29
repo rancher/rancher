@@ -312,7 +312,7 @@ func (s *limitRangeClient) AddClusterScopedHandler(ctx context.Context, name, cl
 }
 
 func (s *limitRangeClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync LimitRangeHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *limitRangeClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle LimitRangeLifecycle) {
@@ -322,7 +322,7 @@ func (s *limitRangeClient) AddClusterScopedLifecycle(ctx context.Context, name, 
 
 func (s *limitRangeClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle LimitRangeLifecycle) {
 	sync := NewLimitRangeLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type LimitRangeIndexer func(obj *v1.LimitRange) ([]string, error)

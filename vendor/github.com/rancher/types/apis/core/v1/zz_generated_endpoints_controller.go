@@ -312,7 +312,7 @@ func (s *endpointsClient) AddClusterScopedHandler(ctx context.Context, name, clu
 }
 
 func (s *endpointsClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync EndpointsHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *endpointsClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle EndpointsLifecycle) {
@@ -322,7 +322,7 @@ func (s *endpointsClient) AddClusterScopedLifecycle(ctx context.Context, name, c
 
 func (s *endpointsClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle EndpointsLifecycle) {
 	sync := NewEndpointsLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type EndpointsIndexer func(obj *v1.Endpoints) ([]string, error)

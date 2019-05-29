@@ -311,7 +311,7 @@ func (s *clusterUserAttributeClient) AddClusterScopedHandler(ctx context.Context
 }
 
 func (s *clusterUserAttributeClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync ClusterUserAttributeHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *clusterUserAttributeClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterUserAttributeLifecycle) {
@@ -321,7 +321,7 @@ func (s *clusterUserAttributeClient) AddClusterScopedLifecycle(ctx context.Conte
 
 func (s *clusterUserAttributeClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterUserAttributeLifecycle) {
 	sync := NewClusterUserAttributeLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type ClusterUserAttributeIndexer func(obj *ClusterUserAttribute) ([]string, error)

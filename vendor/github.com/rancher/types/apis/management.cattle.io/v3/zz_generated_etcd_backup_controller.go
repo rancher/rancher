@@ -311,7 +311,7 @@ func (s *etcdBackupClient) AddClusterScopedHandler(ctx context.Context, name, cl
 }
 
 func (s *etcdBackupClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync EtcdBackupHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *etcdBackupClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle EtcdBackupLifecycle) {
@@ -321,7 +321,7 @@ func (s *etcdBackupClient) AddClusterScopedLifecycle(ctx context.Context, name, 
 
 func (s *etcdBackupClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle EtcdBackupLifecycle) {
 	sync := NewEtcdBackupLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type EtcdBackupIndexer func(obj *EtcdBackup) ([]string, error)

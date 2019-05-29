@@ -311,7 +311,7 @@ func (s *multiClusterAppRevisionClient) AddClusterScopedHandler(ctx context.Cont
 }
 
 func (s *multiClusterAppRevisionClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync MultiClusterAppRevisionHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *multiClusterAppRevisionClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle MultiClusterAppRevisionLifecycle) {
@@ -321,7 +321,7 @@ func (s *multiClusterAppRevisionClient) AddClusterScopedLifecycle(ctx context.Co
 
 func (s *multiClusterAppRevisionClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle MultiClusterAppRevisionLifecycle) {
 	sync := NewMultiClusterAppRevisionLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type MultiClusterAppRevisionIndexer func(obj *MultiClusterAppRevision) ([]string, error)

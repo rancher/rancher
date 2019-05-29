@@ -311,7 +311,7 @@ func (s *globalDnsClient) AddClusterScopedHandler(ctx context.Context, name, clu
 }
 
 func (s *globalDnsClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync GlobalDNSHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *globalDnsClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle GlobalDNSLifecycle) {
@@ -321,7 +321,7 @@ func (s *globalDnsClient) AddClusterScopedLifecycle(ctx context.Context, name, c
 
 func (s *globalDnsClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle GlobalDNSLifecycle) {
 	sync := NewGlobalDNSLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type GlobalDNSIndexer func(obj *GlobalDNS) ([]string, error)

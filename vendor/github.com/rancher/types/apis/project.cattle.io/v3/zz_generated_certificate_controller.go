@@ -311,7 +311,7 @@ func (s *certificateClient) AddClusterScopedHandler(ctx context.Context, name, c
 }
 
 func (s *certificateClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync CertificateHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *certificateClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle CertificateLifecycle) {
@@ -321,7 +321,7 @@ func (s *certificateClient) AddClusterScopedLifecycle(ctx context.Context, name,
 
 func (s *certificateClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle CertificateLifecycle) {
 	sync := NewCertificateLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type CertificateIndexer func(obj *Certificate) ([]string, error)

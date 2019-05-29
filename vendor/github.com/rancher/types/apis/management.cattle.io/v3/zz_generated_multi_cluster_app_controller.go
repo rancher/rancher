@@ -311,7 +311,7 @@ func (s *multiClusterAppClient) AddClusterScopedHandler(ctx context.Context, nam
 }
 
 func (s *multiClusterAppClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync MultiClusterAppHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *multiClusterAppClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle MultiClusterAppLifecycle) {
@@ -321,7 +321,7 @@ func (s *multiClusterAppClient) AddClusterScopedLifecycle(ctx context.Context, n
 
 func (s *multiClusterAppClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle MultiClusterAppLifecycle) {
 	sync := NewMultiClusterAppLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type MultiClusterAppIndexer func(obj *MultiClusterApp) ([]string, error)

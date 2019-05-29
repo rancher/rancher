@@ -311,7 +311,7 @@ func (s *sourceCodeProviderConfigClient) AddClusterScopedHandler(ctx context.Con
 }
 
 func (s *sourceCodeProviderConfigClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync SourceCodeProviderConfigHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *sourceCodeProviderConfigClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle SourceCodeProviderConfigLifecycle) {
@@ -321,7 +321,7 @@ func (s *sourceCodeProviderConfigClient) AddClusterScopedLifecycle(ctx context.C
 
 func (s *sourceCodeProviderConfigClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle SourceCodeProviderConfigLifecycle) {
 	sync := NewSourceCodeProviderConfigLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type SourceCodeProviderConfigIndexer func(obj *SourceCodeProviderConfig) ([]string, error)

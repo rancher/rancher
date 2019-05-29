@@ -311,7 +311,7 @@ func (s *namespacedServiceAccountTokenClient) AddClusterScopedHandler(ctx contex
 }
 
 func (s *namespacedServiceAccountTokenClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync NamespacedServiceAccountTokenHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *namespacedServiceAccountTokenClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NamespacedServiceAccountTokenLifecycle) {
@@ -321,7 +321,7 @@ func (s *namespacedServiceAccountTokenClient) AddClusterScopedLifecycle(ctx cont
 
 func (s *namespacedServiceAccountTokenClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NamespacedServiceAccountTokenLifecycle) {
 	sync := NewNamespacedServiceAccountTokenLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type NamespacedServiceAccountTokenIndexer func(obj *NamespacedServiceAccountToken) ([]string, error)

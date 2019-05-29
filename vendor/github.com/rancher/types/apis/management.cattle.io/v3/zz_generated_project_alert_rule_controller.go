@@ -311,7 +311,7 @@ func (s *projectAlertRuleClient) AddClusterScopedHandler(ctx context.Context, na
 }
 
 func (s *projectAlertRuleClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync ProjectAlertRuleHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *projectAlertRuleClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ProjectAlertRuleLifecycle) {
@@ -321,7 +321,7 @@ func (s *projectAlertRuleClient) AddClusterScopedLifecycle(ctx context.Context, 
 
 func (s *projectAlertRuleClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ProjectAlertRuleLifecycle) {
 	sync := NewProjectAlertRuleLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type ProjectAlertRuleIndexer func(obj *ProjectAlertRule) ([]string, error)

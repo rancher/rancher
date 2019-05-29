@@ -310,7 +310,7 @@ func (s *clusterRandomizerClient) AddClusterScopedHandler(ctx context.Context, n
 }
 
 func (s *clusterRandomizerClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync ClusterRandomizerHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *clusterRandomizerClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterRandomizerLifecycle) {
@@ -320,7 +320,7 @@ func (s *clusterRandomizerClient) AddClusterScopedLifecycle(ctx context.Context,
 
 func (s *clusterRandomizerClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterRandomizerLifecycle) {
 	sync := NewClusterRandomizerLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type ClusterRandomizerIndexer func(obj *ClusterRandomizer) ([]string, error)

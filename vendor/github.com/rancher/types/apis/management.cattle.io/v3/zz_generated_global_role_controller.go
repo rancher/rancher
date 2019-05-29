@@ -310,7 +310,7 @@ func (s *globalRoleClient) AddClusterScopedHandler(ctx context.Context, name, cl
 }
 
 func (s *globalRoleClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync GlobalRoleHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *globalRoleClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle GlobalRoleLifecycle) {
@@ -320,7 +320,7 @@ func (s *globalRoleClient) AddClusterScopedLifecycle(ctx context.Context, name, 
 
 func (s *globalRoleClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle GlobalRoleLifecycle) {
 	sync := NewGlobalRoleLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type GlobalRoleIndexer func(obj *GlobalRole) ([]string, error)

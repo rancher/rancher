@@ -310,7 +310,7 @@ func (s *composeConfigClient) AddClusterScopedHandler(ctx context.Context, name,
 }
 
 func (s *composeConfigClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync ComposeConfigHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *composeConfigClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ComposeConfigLifecycle) {
@@ -320,7 +320,7 @@ func (s *composeConfigClient) AddClusterScopedLifecycle(ctx context.Context, nam
 
 func (s *composeConfigClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ComposeConfigLifecycle) {
 	sync := NewComposeConfigLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type ComposeConfigIndexer func(obj *ComposeConfig) ([]string, error)

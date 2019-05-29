@@ -312,7 +312,7 @@ func (s *alertmanagerClient) AddClusterScopedHandler(ctx context.Context, name, 
 }
 
 func (s *alertmanagerClient) AddClusterScopedFeatureHandler(enabled func(string) bool, feat string, ctx context.Context, name, clusterName string, sync AlertmanagerHandlerFunc) {
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 func (s *alertmanagerClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle AlertmanagerLifecycle) {
@@ -322,7 +322,7 @@ func (s *alertmanagerClient) AddClusterScopedLifecycle(ctx context.Context, name
 
 func (s *alertmanagerClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle AlertmanagerLifecycle) {
 	sync := NewAlertmanagerLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
-	s.Controller().AddClusterScopedFeatureHandler(ctx, name, clusterName, sync)
+	s.Controller().AddClusterScopedFeatureHandler(enabled, feat, ctx, name, clusterName, sync)
 }
 
 type AlertmanagerIndexer func(obj *v1.Alertmanager) ([]string, error)
