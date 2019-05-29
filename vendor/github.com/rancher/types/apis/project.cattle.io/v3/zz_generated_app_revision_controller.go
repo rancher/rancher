@@ -150,6 +150,7 @@ func (c *appRevisionController) AddHandler(ctx context.Context, name string, han
 }
 
 func (c *appRevisionController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler AppRevisionHandlerFunc) {
+	resource.PutClusterScoped(AppRevisionGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

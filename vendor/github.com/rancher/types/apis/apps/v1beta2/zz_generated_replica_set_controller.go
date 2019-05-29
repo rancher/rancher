@@ -151,6 +151,7 @@ func (c *replicaSetController) AddHandler(ctx context.Context, name string, hand
 }
 
 func (c *replicaSetController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ReplicaSetHandlerFunc) {
+	resource.PutClusterScoped(ReplicaSetGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

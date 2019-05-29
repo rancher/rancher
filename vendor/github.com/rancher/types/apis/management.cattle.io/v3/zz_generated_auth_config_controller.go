@@ -149,6 +149,7 @@ func (c *authConfigController) AddHandler(ctx context.Context, name string, hand
 }
 
 func (c *authConfigController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler AuthConfigHandlerFunc) {
+	resource.PutClusterScoped(AuthConfigGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

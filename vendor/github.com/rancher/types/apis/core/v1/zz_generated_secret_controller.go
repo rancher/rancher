@@ -151,6 +151,7 @@ func (c *secretController) AddHandler(ctx context.Context, name string, handler 
 }
 
 func (c *secretController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler SecretHandlerFunc) {
+	resource.PutClusterScoped(SecretGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
