@@ -114,8 +114,8 @@ type Schema struct {
 	CollectionFilters    map[string]Filter `json:"collectionFilters,omitempty"`
 	DynamicSchemaVersion string            `json:"dynamicSchemaVersion,omitempty"`
 	Scope                TypeScope         `json:"-"`
-	Enabled				 func(string) bool `json:"-"`
-	EnableKey			 string			   `json:"-"`
+	Enabled              func(string) bool `json:"-"`
+	EnableKey            string            `json:"-"`
 
 	InternalSchema      *Schema             `json:"-"`
 	Mapper              Mapper              `json:"-"`
