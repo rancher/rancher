@@ -9,7 +9,7 @@ import (
 
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"k8s.io/client-go/util/cert"
 )
 
@@ -362,7 +362,7 @@ func GenerateEtcdCertificates(ctx context.Context, certs map[string]CertificateP
 	etcdAltNames := GetAltNames(etcdHosts, clusterDomain, kubernetesServiceIP, []string{})
 	var (
 		dnsNames = make([]string, len(etcdAltNames.DNSNames))
-		ips      = make([]string, len(etcdAltNames.IPs))
+		ips      = []string{}
 	)
 	copy(dnsNames, etcdAltNames.DNSNames)
 	sort.Strings(dnsNames)
@@ -378,7 +378,7 @@ func GenerateEtcdCertificates(ctx context.Context, certs map[string]CertificateP
 			if cert != nil && len(dnsNames) == len(cert.DNSNames) && len(ips) == len(cert.IPAddresses) {
 				var (
 					certDNSNames = make([]string, len(cert.DNSNames))
-					certIPs      = make([]string, len(cert.IPAddresses))
+					certIPs      = []string{}
 				)
 				copy(certDNSNames, cert.DNSNames)
 				sort.Strings(certDNSNames)
