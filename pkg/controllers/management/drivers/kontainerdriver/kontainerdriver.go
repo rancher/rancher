@@ -13,9 +13,9 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
-	"github.com/rancher/types/apis/core/v1"
 	corev1 "github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v1 "github.com/rancher/types/apis/core/v1"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -85,7 +85,7 @@ func (l *Lifecycle) driverExists(obj *v3.KontainerDriver) bool {
 
 func (l *Lifecycle) download(obj *v3.KontainerDriver) (*v3.KontainerDriver, error) {
 	driver := drivers.NewKontainerDriver(obj.Spec.BuiltIn, obj.Status.DisplayName, obj.Spec.URL, obj.Spec.Checksum)
-	err := driver.Stage()
+	err := driver.Stage(false)
 	if err != nil {
 		return nil, err
 	}
