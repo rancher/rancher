@@ -454,13 +454,15 @@ func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
 func App(schemas *types.Schemas, management *config.ScaledContext, kubeConfigGetter common.KubeConfigGetter) {
 	schema := schemas.Schema(&projectschema.Version, projectclient.AppType)
 	store := &appStore.Store{
-		Store: schema.Store,
-		Apps:  management.Project.Apps("").Controller().Lister(),
+		Store:                 schema.Store,
+		Apps:                  management.Project.Apps("").Controller().Lister(),
+		TemplateVersionLister: management.Management.CatalogTemplateVersions("").Controller().Lister(),
 	}
 	schema.Store = store
 	wrapper := app.Wrapper{
 		Clusters:              management.Management.Clusters(""),
 		TemplateVersionClient: management.Management.CatalogTemplateVersions(""),
+		TemplateVersionLister: management.Management.CatalogTemplateVersions("").Controller().Lister(),
 		KubeConfigGetter:      kubeConfigGetter,
 		AppGetter:             management.Project,
 		UserLister:            management.Management.Users("").Controller().Lister(),
@@ -681,6 +683,7 @@ func MultiClusterApps(schemas *types.Schemas, management *config.ScaledContext) 
 		ProjectLister:                 management.Management.Projects("").Controller().Lister(),
 		ClusterLister:                 management.Management.Clusters("").Controller().Lister(),
 		Apps:                          management.Project.Apps(""),
+		TemplateVersionLister:         management.Management.CatalogTemplateVersions("").Controller().Lister(),
 	}
 	schema.Formatter = wrapper.Formatter
 	schema.ActionHandler = wrapper.ActionHandler
