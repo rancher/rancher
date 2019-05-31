@@ -4,7 +4,11 @@ import (
 	"strings"
 
 	"github.com/blang/semver"
+	mVersion "github.com/mcuadros/go-version"
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/catalog/utils/version"
+	"github.com/rancher/rancher/pkg/settings"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 func VersionBetween(a, b, c string) bool {
@@ -53,4 +57,36 @@ func VersionSatisfiesRange(v, rng string) (bool, error) {
 
 func VersionGreaterThan(a, b string) bool {
 	return version.GreaterThan(a, b)
+}
+
+func ValidateRancherVersion(template *v3.CatalogTemplateVersion) error {
+	rancherMin := template.Spec.RancherMinVersion
+	rancherMax := template.Spec.RancherMaxVersion
+
+	serverVersion := settings.ServerVersion.Get()
+
+	// don't compare if we are running as dev or in the build env
+	if !ReleaseServerVersion(serverVersion) {
+		return nil
+	}
+
+	if rancherMin != "" && !mVersion.Compare(serverVersion, rancherMin, ">=") {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "rancher min version not met")
+	}
+
+	if rancherMax != "" && !mVersion.Compare(serverVersion, rancherMax, "<=") {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "rancher max version exceeded")
+	}
+
+	return nil
+}
+
+func ReleaseServerVersion(serverVersion string) bool {
+	if serverVersion == "dev" ||
+		serverVersion == "master" ||
+		serverVersion == "" ||
+		strings.HasSuffix(serverVersion, "-head") {
+		return false
+	}
+	return true
 }

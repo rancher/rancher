@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	hcommon "github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/rancher/pkg/ref"
@@ -28,6 +29,7 @@ import (
 type Wrapper struct {
 	Clusters              v3.ClusterInterface
 	TemplateVersionClient v3.CatalogTemplateVersionInterface
+	TemplateVersionLister v3.CatalogTemplateVersionLister
 	KubeConfigGetter      common.KubeConfigGetter
 	AppGetter             pv3.AppsGetter
 	UserLister            v3.UserLister
@@ -114,7 +116,13 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 	}
 	switch actionName {
 	case "upgrade":
-		externalID := actionInput["externalId"]
+		externalID := convert.ToString(actionInput["externalId"])
+
+		err := w.validateRancherVersion(externalID)
+		if err != nil {
+			return err
+		}
+
 		answers := actionInput["answers"]
 		forceUpgrade := actionInput["forceUpgrade"]
 		files := actionInput["files"]
@@ -135,7 +143,7 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		} else {
 			obj.Spec.Answers = make(map[string]string)
 		}
-		obj.Spec.ExternalID = convert.ToString(externalID)
+		obj.Spec.ExternalID = externalID
 		if convert.ToBool(forceUpgrade) {
 			pv3.AppConditionForceUpgrade.Unknown(obj)
 		}
@@ -178,6 +186,12 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 		if err := access.ByID(apiContext, &projectschema.Version, projectv3.AppRevisionType, revisionID, &appRevision); err != nil {
 			return err
 		}
+
+		err := w.validateRancherVersion(appRevision.Status.ExternalID)
+		if err != nil {
+			return err
+		}
+
 		_, namespace := ref.Parse(app.ProjectID)
 		obj, err := w.AppGetter.Apps(namespace).Get(app.Name, metav1.GetOptions{})
 		if err != nil {
@@ -226,4 +240,19 @@ func (w Wrapper) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 		return nil
 	}
 	return nil
+}
+
+func (w Wrapper) validateRancherVersion(externalID string) error {
+	if externalID == "" {
+		return nil
+	}
+	templateVersionID, namespace, err := hcommon.ParseExternalID(externalID)
+	if err != nil {
+		return err
+	}
+	template, err := w.TemplateVersionLister.Get(namespace, templateVersionID)
+	if err != nil {
+		return err
+	}
+	return catUtil.ValidateRancherVersion(template)
 }
