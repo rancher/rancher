@@ -14,6 +14,7 @@ import (
 	managementController "github.com/rancher/rancher/pkg/controllers/management"
 	"github.com/rancher/rancher/pkg/cron"
 	"github.com/rancher/rancher/pkg/dialer"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/telemetry"
@@ -42,6 +43,7 @@ type Config struct {
 	AuditLogMaxsize   int
 	AuditLogMaxbackup int
 	AuditLevel        int
+	Features          string
 }
 
 func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config) (*config.ScaledContext, *clustermanager.Manager, error) {
@@ -96,6 +98,10 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 	if err := server.Start(ctx, cfg.HTTPListenPort, cfg.HTTPSListenPort, localClusterEnabled(*cfg), scaledContext, clusterManager, auditLogWriter); err != nil {
 		return err
 	}
+
+	// this step needs to happen prior to starting scaled context to ensure
+	// cache works properly
+	features.InitializeFeatures(scaledContext, cfg.Features)
 
 	if err := scaledContext.Start(ctx); err != nil {
 		return err
