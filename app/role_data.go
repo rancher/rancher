@@ -43,6 +43,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 	rb.addRole("Manage Roles", "roles-manage").addRule().apiGroups("management.cattle.io").resources("roletemplates").verbs("*")
 	rb.addRole("Manage Authentication", "authn-manage").addRule().apiGroups("management.cattle.io").resources("authconfigs").verbs("get", "list", "watch", "update")
 	rb.addRole("Manage Settings", "settings-manage").addRule().apiGroups("management.cattle.io").resources("settings").verbs("*")
+	rb.addRole("Manage Features", "features-manage").addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch", "update")
 	rb.addRole("Manage PodSecurityPolicy Templates", "podsecuritypolicytemplates-manage").addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("*")
 
 	rb.addRole("Admin", "admin").addRule().apiGroups("*").resources("*").verbs("*").
@@ -51,6 +52,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 	rb.addRole("User", "user").addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions", "catalogs").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("get", "list", "watch").
@@ -64,7 +66,8 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("etcdbackups").verbs("get", "list", "watch")
 
 	rb.addRole("User Base", "user-base").addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch")
+		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch")
 
 	// TODO user should be dynamically authorized to only see herself
 	// TODO Need "self-service" for nodetemplates such that a user can create them, but only RUD their own

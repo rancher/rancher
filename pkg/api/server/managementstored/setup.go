@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/clusterscan"
 	"github.com/rancher/rancher/pkg/api/customization/clustertemplate"
 	"github.com/rancher/rancher/pkg/api/customization/cred"
+	"github.com/rancher/rancher/pkg/api/customization/feature"
 	"github.com/rancher/rancher/pkg/api/customization/globaldns"
 	"github.com/rancher/rancher/pkg/api/customization/globalresource"
 	"github.com/rancher/rancher/pkg/api/customization/kontainerdriver"
@@ -37,6 +38,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/cluster"
 	clustertemplatestore "github.com/rancher/rancher/pkg/api/store/clustertemplate"
+	featStore "github.com/rancher/rancher/pkg/api/store/feature"
 	globaldnsAPIStore "github.com/rancher/rancher/pkg/api/store/globaldns"
 	nodeStore "github.com/rancher/rancher/pkg/api/store/node"
 	nodeTemplateStore "github.com/rancher/rancher/pkg/api/store/nodetemplate"
@@ -51,6 +53,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	sourcecodeproviders "github.com/rancher/rancher/pkg/pipeline/providers"
@@ -86,6 +89,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ComposeConfigType,
 		client.DynamicSchemaType,
 		client.EtcdBackupType,
+		client.FeatureType,
 		client.GlobalRoleBindingType,
 		client.GlobalRoleType,
 		client.GroupMemberType,
@@ -150,6 +154,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	SecretTypes(ctx, schemas, apiContext)
 	App(schemas, apiContext, clusterManager)
 	Setting(schemas)
+	Feature(schemas)
 	Preference(schemas, apiContext)
 	ClusterRegistrationTokens(schemas)
 	NodeTemplates(schemas, apiContext)
@@ -469,6 +474,12 @@ func Setting(schemas *types.Schemas) {
 	schema.Store = settingstore.New(schema.Store)
 }
 
+func Feature(schemas *types.Schemas) {
+	schema := schemas.Schema(&managementschema.Version, client.FeatureType)
+	schema.Validator = feature.Validator
+	schema.Store = featStore.New(schema.Store)
+}
+
 func LoggingTypes(schemas *types.Schemas, management *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler) {
 	handler := logging.NewHandler(
 		management.Dialer,
@@ -632,6 +643,7 @@ func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 	schema.ActionHandler = handler.ActionHandler
 	schema.Formatter = kontainerdriver.NewFormatter(management)
 	schema.Store = kontainerdriver.NewStore(management, schema.Store)
+	schema.Enabled = features.ClusterRandomizer.Enabled
 	kontainerDriverValidator := kontainerdriver.Validator{
 		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
 	}

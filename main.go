@@ -135,6 +135,13 @@ func main() {
 			EnvVar: "AUDIT_LEVEL",
 			Usage:  "Audit log level: 0 - disable audit log, 1 - log event metadata, 2 - log event metadata and request body, 3 - log event metadata, request body and response body",
 		},
+		cli.StringFlag{
+			Name:        "features",
+			EnvVar:      "CATTLE_FEATURES",
+			Value:       "",
+			Usage:       "Decalare specific feature values on start up. Example: \"kontainer-driver=true\" - kontainer driver feature will be enabled despite false default value",
+			Destination: &config.Features,
+		},
 	}
 
 	app.Action = func(c *cli.Context) error {
