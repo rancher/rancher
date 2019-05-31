@@ -101,11 +101,6 @@ function set-env-var {
     [Environment]::SetEnvironmentVariable($Key, $Value, [EnvironmentVariableTarget]::Machine)
 }
 
-function get-agent-service {
-    $svcRancherAgt = Get-Service -Name "rancher-agent" -ErrorAction Ignore
-    return $svcRancherAgt
-}
-
 ## END main definitaion
 #########################################################################
 ## START main execution
@@ -152,17 +147,28 @@ public static class SkipServerCertificateValidation
     [SkipServerCertificateValidation]::Enable()
 } catch {}
 
+# check rancher-agent running #
+$svcAgent = Get-Service -Name "rancher-agent" -ErrorAction Ignore
+if ($svcAgent -and ($svcAgent.Status -eq "Running")) {
+    throw "rancher agent is already on running"
+}
+
+# check msiscsi servcie running #
+$svcMsiscsi = Get-Service -Name "msiscsi" -ErrorAction Ignore
+if ($svcMsiscsi -and ($svcMsiscsi.Status -ne "Running")) {
+    Set-Service -Name "msiscsi" -StartupType Automatic
+    Start-Service -Name "msiscsi" -ErrorAction Ignore
+    if (-not $?) {
+        warn "Failed to start msiscsi service, you may not be able to use the iSCSI flexvolume properly"
+    }
+}
+
 # check docker running #
 $dockerNPipe = Get-ChildItem //./pipe/ -ErrorAction Ignore | ? Name -eq "docker_engine"
 if (-not $dockerNPipe) {
     warn "Default docker named pipe is not found"
     warn "Please bind mount in the docker socket to //./pipe/docker_engine if docker errors occur"
     warn "example:  docker run -v //./pipe/docker_engine://./pipe/docker_engine ..."
-}
-
-$svcAgent = get-agent-service
-if ($svcAgent -and ($svcAgent.Status -eq "Running")) {
-    throw "rancher agent is already on running"
 }
 
 # check cattle server address #
@@ -302,14 +308,10 @@ if ($CATTLE_AGENT_FG_RUN -eq "true") {
     .\agent.exe
 } else {
     .\agent.exe --register-service *>$null
-    $svcAgent = get-agent-service
-    if (-not $svcAgent) {
-        throw "Can't start rancher agent service, because no exist"
-    } else {
-        Start-Service -Name "rancher-agent" -ErrorAction Ignore
-        if (-not $?) {
-            throw "Start rancher agent failed"
-        }
+
+    Start-Service -Name "rancher-agent" -ErrorAction Ignore
+    if (-not $?) {
+        throw "Start rancher agent failed"
     }
 
     .\log.ps1
