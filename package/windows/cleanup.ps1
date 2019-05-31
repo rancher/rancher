@@ -112,6 +112,11 @@ try {
         }
     }
 
+    # restore repair #
+    if (Test-Path "$RancherDir\GetGcePdName.dll") {
+        Remove-Module GetGcePdName -Force -ErrorAction Ignore
+    }
+
     # rancher #
     Remove-Item -Path "$CNIDir\*" -Recurse -Force -ErrorAction Ignore
     Remove-Item -Path "$KubeDir\*" -Recurse -Force -ErrorAction Ignore

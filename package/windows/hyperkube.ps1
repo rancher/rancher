@@ -943,9 +943,39 @@ function init {
         try {
             $splited = $hostname -split "\."
             if ($splited.Length -lt 1) {
-                $NodeName = $splited[0]
+                $nn = $splited[0]
             }
         } catch {}
+
+        ## repair Get-GcePdName method ##
+        $getGcePodNameCommand = Get-Command -Name Get-GcePdName -ErrorAction Ignore
+        if (-not $getGcePodNameCommand) {
+            print "Can't find Get-GcePodName, try to repair ..."
+
+            $dllDownloadURL = "https://github.com/pjh/gce-tools/raw/master/GceTools/GetGcePdName/GetGcePdName.dll"
+            $dllPath = "$RancherDir\GetGcePdName.dll"
+            try {
+                Invoke-WebRequest -TimeoutSec 300 -UseBasicParsing -Uri $dllDownloadURL -OutFile $dllPath
+            } catch {}
+            if (-not $?) {
+                throw ("Failed to download GetGcePodName.dll from '{0}'" -f $dllDownloadURL)
+            }
+
+            print "Importing GetGcePodName.dll, wait a few seconds ..."
+
+            $profilePath = "$PsHome\profile.ps1"
+            if (-not (Test-Path $profilePath)) {
+                $nul = New-Item -Path $profilePath -Type file -ErrorAction Ignore
+            }
+            $appendProfile =
+@'
+Unblock-File -Path DLLPATH -ErrorAction Ignore
+Import-Module -Name DLLPATH -ErrorAction Ignore
+'@
+            Add-Content -Path $profilePath -Value $appendProfile.replace('DLLPATH', $dllPath) -ErrorAction Ignore
+
+            print ".................. OK"
+        }
     }
 
     set-env-var -Key "NODE_NAME" -Value $nn.ToLower()
