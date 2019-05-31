@@ -4,15 +4,28 @@ import (
 	"fmt"
 
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	pv3app "github.com/rancher/rancher/pkg/api/customization/app"
+	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
+	hcommon "github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/rancher/pkg/ref"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
 type Store struct {
 	types.Store
-	Apps pv3.AppLister
+	Apps                  pv3.AppLister
+	TemplateVersionLister v3.CatalogTemplateVersionLister
+}
+
+func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
+	if err := s.validateRancherVersion(data); err != nil {
+		return nil, err
+	}
+
+	return s.Store.Create(apiContext, schema, data)
 }
 
 func (s *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
@@ -23,9 +36,14 @@ func (s *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 }
 
 func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
+	if err := s.validateRancherVersion(data); err != nil {
+		return nil, err
+	}
+
 	if err := s.validateForMultiClusterApp(id, "update"); err != nil {
 		return nil, err
 	}
+
 	return s.Store.Update(apiContext, schema, data, id)
 }
 
@@ -45,4 +63,23 @@ func (s *Store) validateForMultiClusterApp(id string, msg string) error {
 		return fmt.Errorf("app %s is controlled by mcapp %s : cannot be %sd", id, label, msg)
 	}
 	return nil
+}
+
+func (s *Store) validateRancherVersion(data map[string]interface{}) error {
+	externalID := convert.ToString(data["externalId"])
+	if externalID == "" {
+		return nil
+	}
+
+	templateVersionID, namespace, err := hcommon.ParseExternalID(externalID)
+	if err != nil {
+		return err
+	}
+
+	template, err := s.TemplateVersionLister.Get(namespace, templateVersionID)
+	if err != nil {
+		return err
+	}
+
+	return catUtil.ValidateRancherVersion(template)
 }

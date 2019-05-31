@@ -114,7 +114,8 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 							errs = append(errs, err)
 							continue
 						}
-						v.RancherVersion = value.RancherVersion
+						v.RancherMinVersion = value.RancherMin
+						v.RancherMaxVersion = value.RancherMax
 						v.RequiredNamespace = value.Namespace
 						label = labels.Merge(label, value.Labels)
 						for _, category := range value.Categories {
@@ -279,8 +280,9 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 var supportedFiles = []string{"catalog.yml", "catalog.yaml", "questions.yml", "questions.yaml"}
 
 type catalogYml struct {
-	RancherVersion string            `yaml:"rancher_version,omitempty"`
-	Categories     []string          `yaml:"categories,omitempty"`
-	Namespace      string            `yaml:"namespace,omitempty"`
-	Labels         map[string]string `yaml:"labels,omitempty"`
+	RancherMin string            `yaml:"rancher_min_version,omitempty"`
+	RancherMax string            `yaml:"rancher_max_version,omitempty"`
+	Categories []string          `yaml:"categories,omitempty"`
+	Namespace  string            `yaml:"namespace,omitempty"`
+	Labels     map[string]string `yaml:"labels,omitempty"`
 }

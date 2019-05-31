@@ -12,6 +12,8 @@ import (
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
+	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/namespace"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	client "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
@@ -54,14 +56,15 @@ func SetMemberStore(ctx context.Context, schema *types.Schema, mgmt *config.Scal
 	}
 
 	s := &Store{
-		Store:      t,
-		auth:       requests.NewAuthenticator(ctx, mgmt),
-		crtbLister: mgmt.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
-		prtbLister: mgmt.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
-		grbLister:  mgmt.Management.GlobalRoleBindings("").Controller().Lister(),
-		grLister:   mgmt.Management.GlobalRoles("").Controller().Lister(),
-		users:      mgmt.Management.Users(""),
-		rtLister:   mgmt.Management.RoleTemplates("").Controller().Lister(),
+		Store:                 t,
+		auth:                  requests.NewAuthenticator(ctx, mgmt),
+		crtbLister:            mgmt.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
+		prtbLister:            mgmt.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		grbLister:             mgmt.Management.GlobalRoleBindings("").Controller().Lister(),
+		grLister:              mgmt.Management.GlobalRoles("").Controller().Lister(),
+		templateVersionLister: mgmt.Management.CatalogTemplateVersions("").Controller().Lister(),
+		users:                 mgmt.Management.Users(""),
+		rtLister:              mgmt.Management.RoleTemplates("").Controller().Lister(),
 	}
 
 	schema.Store = s
@@ -69,16 +72,21 @@ func SetMemberStore(ctx context.Context, schema *types.Schema, mgmt *config.Scal
 
 type Store struct {
 	types.Store
-	auth       requests.Authenticator
-	crtbLister v3.ClusterRoleTemplateBindingLister
-	prtbLister v3.ProjectRoleTemplateBindingLister
-	grbLister  v3.GlobalRoleBindingLister
-	grLister   v3.GlobalRoleLister
-	users      v3.UserInterface
-	rtLister   v3.RoleTemplateLister
+	auth                  requests.Authenticator
+	crtbLister            v3.ClusterRoleTemplateBindingLister
+	prtbLister            v3.ProjectRoleTemplateBindingLister
+	grbLister             v3.GlobalRoleBindingLister
+	grLister              v3.GlobalRoleLister
+	templateVersionLister v3.CatalogTemplateVersionLister
+	users                 v3.UserInterface
+	rtLister              v3.RoleTemplateLister
 }
 
 func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
+	if err := s.validateRancherVersion(data); err != nil {
+		return nil, err
+	}
+
 	if err := checkDuplicateTargets(data); err != nil {
 		return nil, err
 	}
@@ -93,6 +101,10 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 }
 
 func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
+	if err := s.validateRancherVersion(data); err != nil {
+		return nil, err
+	}
+
 	data, err := s.setDisplayName(apiContext, schema, data)
 	if err != nil {
 		return nil, err
@@ -151,6 +163,27 @@ func (s *Store) ensureRolesNotDisabled(apiContext *types.APIContext, data map[st
 		}
 	}
 	return nil
+}
+
+func (s *Store) validateRancherVersion(data map[string]interface{}) error {
+	rawTempVersion, ok := data["templateVersionId"]
+	if !ok {
+		return nil
+	}
+
+	tempVersion := rawTempVersion.(string)
+
+	parts := strings.Split(tempVersion, ":")
+	if len(parts) != 2 {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid templateVersionId")
+	}
+
+	template, err := s.templateVersionLister.Get(namespace.GlobalNamespace, parts[1])
+	if err != nil {
+		return err
+	}
+
+	return catUtil.ValidateRancherVersion(template)
 }
 
 func checkDuplicateTargets(data map[string]interface{}) error {

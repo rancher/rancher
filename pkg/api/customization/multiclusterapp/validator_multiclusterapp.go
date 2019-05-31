@@ -42,6 +42,7 @@ type Wrapper struct {
 	ProjectLister                 v3.ProjectLister
 	ClusterLister                 v3.ClusterLister
 	Apps                          pv3.AppInterface
+	TemplateVersionLister         v3.CatalogTemplateVersionLister
 }
 
 const (
