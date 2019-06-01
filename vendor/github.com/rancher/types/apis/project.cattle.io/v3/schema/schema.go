@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/types/factory"
 	"github.com/rancher/types/mapper"
 	"k8s.io/api/apps/v1beta2"
+	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
@@ -44,7 +45,8 @@ var (
 		Init(workloadTypes).
 		Init(appTypes).
 		Init(pipelineTypes).
-		Init(monitoringTypes)
+		Init(monitoringTypes).
+		Init(autoscalingTypes)
 )
 
 func configMapTypes(schemas *types.Schemas) *types.Schemas {
@@ -1019,4 +1021,70 @@ func monitoringTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Drop{Field: "status"},
 		).
 		MustImport(&Version, monitoringv1.Alertmanager{}, projectOverride{})
+}
+
+func autoscalingTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.
+		AddMapperForType(&Version, autoscaling.HorizontalPodAutoscaler{},
+			&m.ChangeType{Field: "scaleTargetRef", Type: "reference[workload]"},
+			&m.Move{From: "scaleTargetRef", To: "workloadId"},
+			mapper.CrossVersionObjectToWorkload{Field: "workloadId"},
+			&m.Required{Fields: []string{"workloadId", "maxReplicas"}},
+			&m.AnnotationField{Field: "displayName"},
+			&m.DisplayName{},
+			&m.AnnotationField{Field: "description"},
+			&m.Embed{Field: "status"},
+			mapper.NewMergeListByIndexMapper("currentMetrics", "metrics", "type"),
+		).
+		AddMapperForType(&Version, autoscaling.MetricTarget{},
+			&m.Enum{Field: "type", Options: []string{"Utilization", "Value", "AverageValue"}},
+			&m.Move{To: "utilization", From: "averageUtilization"},
+		).
+		AddMapperForType(&Version, autoscaling.MetricValueStatus{},
+			&m.Move{To: "utilization", From: "averageUtilization"},
+		).
+		AddMapperForType(&Version, autoscaling.MetricSpec{},
+			&m.Condition{Field: "type", Value: "Object", Mapper: types.Mappers{
+				&m.Move{To: "target", From: "object/target", DestDefined: true, NoDeleteFromField: true},
+				&m.Move{To: "metric", From: "object/metric", DestDefined: true, NoDeleteFromField: true},
+			}},
+			&m.Condition{Field: "type", Value: "Pods", Mapper: types.Mappers{
+				&m.Move{To: "target", From: "pods/target", DestDefined: true, NoDeleteFromField: true},
+				&m.Move{To: "metric", From: "pods/metric", DestDefined: true, NoDeleteFromField: true},
+			}},
+			&m.Condition{Field: "type", Value: "Resource", Mapper: types.Mappers{
+				&m.Move{To: "metric/name", From: "resource/name", DestDefined: true, NoDeleteFromField: true},
+				&m.Move{To: "target", From: "resource/target", DestDefined: true, NoDeleteFromField: true},
+			}},
+			&m.Condition{Field: "type", Value: "External", Mapper: types.Mappers{
+				&m.Move{To: "target", From: "external/target", DestDefined: true, NoDeleteFromField: true},
+				&m.Move{To: "metric", From: "external/metric", DestDefined: true, NoDeleteFromField: true},
+			}},
+			&m.Embed{Field: "object", Ignore: []string{"target", "metric"}},
+			&m.Embed{Field: "pods", Ignore: []string{"target", "metric"}},
+			&m.Embed{Field: "external", Ignore: []string{"target", "metric"}},
+			&m.Embed{Field: "resource", Ignore: []string{"target", "name"}},
+			&m.Embed{Field: "metric"},
+			&m.Enum{Field: "type", Options: []string{"Object", "Pods", "Resource", "External"}},
+		).
+		MustImportAndCustomize(&Version, autoscaling.MetricSpec{}, func(s *types.Schema) {
+			s.CodeName = "Metric"
+			s.PluralName = "metrics"
+			s.ID = "metric"
+			s.CodeNamePlural = "Metrics"
+		}, struct {
+			Target  autoscaling.MetricTarget      `json:"target"`
+			Metric  autoscaling.MetricIdentifier  `json:"metric"`
+			Current autoscaling.MetricValueStatus `json:"current" norman:"nocreate,noupdate"`
+		}{}).
+		AddMapperForType(&Version, autoscaling.MetricStatus{},
+			&m.Condition{Field: "type", Value: "Object", Mapper: &m.Move{To: "current", From: "object/current", DestDefined: true, NoDeleteFromField: true}},
+			&m.Condition{Field: "type", Value: "Pods", Mapper: &m.Move{To: "current", From: "pods/current", DestDefined: true, NoDeleteFromField: true}},
+			&m.Condition{Field: "type", Value: "Resource", Mapper: &m.Move{To: "current", From: "resource/current"}},
+			&m.Condition{Field: "type", Value: "External", Mapper: &m.Move{To: "current", From: "external/current", DestDefined: true, NoDeleteFromField: true}},
+		).
+		MustImport(&Version, autoscaling.HorizontalPodAutoscaler{}, projectOverride{}, struct {
+			DisplayName string `json:"displayName,omitempty"`
+			Description string `json:"description,omitempty"`
+		}{})
 }
