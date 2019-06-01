@@ -15,6 +15,8 @@ const (
 	AzureCloudProviderFieldCloudProviderRateLimit       = "cloudProviderRateLimit"
 	AzureCloudProviderFieldCloudProviderRateLimitBucket = "cloudProviderRateLimitBucket"
 	AzureCloudProviderFieldCloudProviderRateLimitQPS    = "cloudProviderRateLimitQPS"
+	AzureCloudProviderFieldExcludeMasterFromStandardLB  = "excludeMasterFromStandardLB"
+	AzureCloudProviderFieldLoadBalancerSku              = "loadBalancerSku"
 	AzureCloudProviderFieldLocation                     = "location"
 	AzureCloudProviderFieldMaximumLoadBalancerRuleCount = "maximumLoadBalancerRuleCount"
 	AzureCloudProviderFieldPrimaryAvailabilitySetName   = "primaryAvailabilitySetName"
@@ -27,6 +29,7 @@ const (
 	AzureCloudProviderFieldTenantID                     = "tenantId"
 	AzureCloudProviderFieldUseInstanceMetadata          = "useInstanceMetadata"
 	AzureCloudProviderFieldUseManagedIdentityExtension  = "useManagedIdentityExtension"
+	AzureCloudProviderFieldUserAssignedIdentityID       = "userAssignedIdentityID"
 	AzureCloudProviderFieldVMType                       = "vmType"
 	AzureCloudProviderFieldVnetName                     = "vnetName"
 	AzureCloudProviderFieldVnetResourceGroup            = "vnetResourceGroup"
@@ -46,6 +49,8 @@ type AzureCloudProvider struct {
 	CloudProviderRateLimit       bool   `json:"cloudProviderRateLimit,omitempty" yaml:"cloudProviderRateLimit,omitempty"`
 	CloudProviderRateLimitBucket int64  `json:"cloudProviderRateLimitBucket,omitempty" yaml:"cloudProviderRateLimitBucket,omitempty"`
 	CloudProviderRateLimitQPS    int64  `json:"cloudProviderRateLimitQPS,omitempty" yaml:"cloudProviderRateLimitQPS,omitempty"`
+	ExcludeMasterFromStandardLB  *bool  `json:"excludeMasterFromStandardLB,omitempty" yaml:"excludeMasterFromStandardLB,omitempty"`
+	LoadBalancerSku              string `json:"loadBalancerSku,omitempty" yaml:"loadBalancerSku,omitempty"`
 	Location                     string `json:"location,omitempty" yaml:"location,omitempty"`
 	MaximumLoadBalancerRuleCount int64  `json:"maximumLoadBalancerRuleCount,omitempty" yaml:"maximumLoadBalancerRuleCount,omitempty"`
 	PrimaryAvailabilitySetName   string `json:"primaryAvailabilitySetName,omitempty" yaml:"primaryAvailabilitySetName,omitempty"`
@@ -58,6 +63,7 @@ type AzureCloudProvider struct {
 	TenantID                     string `json:"tenantId,omitempty" yaml:"tenantId,omitempty"`
 	UseInstanceMetadata          bool   `json:"useInstanceMetadata,omitempty" yaml:"useInstanceMetadata,omitempty"`
 	UseManagedIdentityExtension  bool   `json:"useManagedIdentityExtension,omitempty" yaml:"useManagedIdentityExtension,omitempty"`
+	UserAssignedIdentityID       string `json:"userAssignedIdentityID,omitempty" yaml:"userAssignedIdentityID,omitempty"`
 	VMType                       string `json:"vmType,omitempty" yaml:"vmType,omitempty"`
 	VnetName                     string `json:"vnetName,omitempty" yaml:"vnetName,omitempty"`
 	VnetResourceGroup            string `json:"vnetResourceGroup,omitempty" yaml:"vnetResourceGroup,omitempty"`

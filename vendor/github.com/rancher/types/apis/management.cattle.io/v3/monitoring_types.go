@@ -60,7 +60,7 @@ type ProjectMonitorGraph struct {
 
 type ClusterMonitorGraphSpec struct {
 	ClusterName         string `json:"clusterName" norman:"type=reference[cluster]"`
-	ResourceType        string `json:"resourceType,omitempty"  norman:"type=enum,options=node|cluster|etcd|apiserver|scheduler|controllermanager|fluentd"`
+	ResourceType        string `json:"resourceType,omitempty"  norman:"type=enum,options=node|cluster|etcd|apiserver|scheduler|controllermanager|fluentd|istiocluster|istioproject"`
 	DisplayResourceType string `json:"displayResourceType,omitempty" norman:"type=enum,options=node|cluster|etcd|kube-component|rancher-component"`
 	CommonMonitorGraphSpec
 }

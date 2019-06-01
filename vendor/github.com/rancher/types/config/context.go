@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
 	appsv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
+	autoscaling "github.com/rancher/types/apis/autoscaling/v2beta2"
 	batchv1 "github.com/rancher/types/apis/batch/v1"
 	batchv1beta1 "github.com/rancher/types/apis/batch/v1beta1"
 	clusterv3 "github.com/rancher/types/apis/cluster.cattle.io/v3"
@@ -178,6 +179,7 @@ type UserContext struct {
 	K8sClient         kubernetes.Interface
 
 	Apps         appsv1beta2.Interface
+	Autoscaling  autoscaling.Interface
 	Project      projectv3.Interface
 	Core         corev1.Interface
 	RBAC         rbacv1.Interface
@@ -212,6 +214,7 @@ func (w *UserContext) UserOnlyContext() *UserOnlyContext {
 		UnversionedClient: w.UnversionedClient,
 		K8sClient:         w.K8sClient,
 
+		Autoscaling:  w.Autoscaling,
 		Apps:         w.Apps,
 		Project:      w.Project,
 		Core:         w.Core,
@@ -232,6 +235,7 @@ type UserOnlyContext struct {
 	K8sClient         kubernetes.Interface
 
 	Apps         appsv1beta2.Interface
+	Autoscaling  autoscaling.Interface
 	Project      projectv3.Interface
 	Core         corev1.Interface
 	RBAC         rbacv1.Interface
@@ -393,6 +397,11 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		return nil, err
 	}
 
+	context.Autoscaling, err = autoscaling.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
 	context.Monitoring, err = monitoringv1.NewForConfig(config)
 	context.Cluster, err = clusterv3.NewForConfig(config)
 	if err != nil {
@@ -473,6 +482,11 @@ func NewUserOnlyContext(config rest.Config) (*UserOnlyContext, error) {
 	}
 
 	context.BatchV1Beta1, err = batchv1beta1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Autoscaling, err = autoscaling.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
