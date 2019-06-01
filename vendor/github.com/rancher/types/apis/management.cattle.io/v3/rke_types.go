@@ -563,12 +563,16 @@ type AzureCloudProvider struct {
 	// In other words, if you use multiple agent pools (scale sets), you MUST set this field.
 	PrimaryScaleSetName string `json:"primaryScaleSetName" yaml:"primaryScaleSetName"`
 	// The ClientID for an AAD application with RBAC access to talk to Azure RM APIs
+	// This's used for service principal authentication: https://github.com/Azure/aks-engine/blob/master/docs/topics/service-principals.md
 	AADClientID string `json:"aadClientId" yaml:"aadClientId"`
 	// The ClientSecret for an AAD application with RBAC access to talk to Azure RM APIs
+	// This's used for service principal authentication: https://github.com/Azure/aks-engine/blob/master/docs/topics/service-principals.md
 	AADClientSecret string `json:"aadClientSecret" yaml:"aadClientSecret" norman:"type=password"`
 	// The path of a client certificate for an AAD application with RBAC access to talk to Azure RM APIs
+	// This's used for client certificate authentication: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-protocols-oauth-service-to-service
 	AADClientCertPath string `json:"aadClientCertPath" yaml:"aadClientCertPath"`
 	// The password of the client certificate for an AAD application with RBAC access to talk to Azure RM APIs
+	// This's used for client certificate authentication: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-protocols-oauth-service-to-service
 	AADClientCertPassword string `json:"aadClientCertPassword" yaml:"aadClientCertPassword" norman:"type=password"`
 	// Enable exponential backoff to manage resource request retries
 	CloudProviderBackoff bool `json:"cloudProviderBackoff" yaml:"cloudProviderBackoff"`
@@ -589,9 +593,19 @@ type AzureCloudProvider struct {
 	// Use instance metadata service where possible
 	UseInstanceMetadata bool `json:"useInstanceMetadata" yaml:"useInstanceMetadata"`
 	// Use managed service identity for the virtual machine to access Azure ARM APIs
+	// This's used for managed identity authentication: https://docs.microsoft.com/en-us/azure/active-directory/managed-service-identity/overview
+	// For user-assigned managed identity, need to set the below UserAssignedIdentityID
 	UseManagedIdentityExtension bool `json:"useManagedIdentityExtension" yaml:"useManagedIdentityExtension"`
-	// Maximum allowed LoadBalancer Rule Count is the limit enforced by Azure Load balancer
+	// The Client ID of the user assigned MSI which is assigned to the underlying VMs
+	// This's used for managed identity authentication: https://docs.microsoft.com/en-us/azure/active-directory/managed-service-identity/overview
+	UserAssignedIdentityID string `json:"userAssignedIdentityID,omitempty" yaml:"userAssignedIdentityID,omitempty"`
+	// Maximum allowed LoadBalancer Rule Count is the limit enforced by Azure Load balancer, default(0) to 148
 	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount" yaml:"maximumLoadBalancerRuleCount"`
+	// Sku of Load Balancer and Public IP: `basic` or `standard`, default(blank) to `basic`
+	LoadBalancerSku string `json:"loadBalancerSku,omitempty" yaml:"loadBalancerSku,omitempty"`
+	// Excludes master nodes (labeled with `node-role.kubernetes.io/master`) from the backend pool of Azure standard loadbalancer, default(nil) to `true`
+	// If want adding the master nodes to ALB, this should be set to `false` and remove the `node-role.kubernetes.io/master` label from master nodes
+	ExcludeMasterFromStandardLB *bool `json:"excludeMasterFromStandardLB,omitempty" yaml:"excludeMasterFromStandardLB,omitempty"`
 }
 
 // AWSCloudProvider options
