@@ -9,6 +9,7 @@ import (
 	v1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
+	"github.com/rancher/types/config"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -25,7 +26,7 @@ type TesterDeployer struct {
 	systemAccountManager *systemaccount.Manager
 }
 
-func NewTesterDeployer(appsGetter projectv3.AppsGetter, projectLister mgmtv3.ProjectLister, pods v1.PodInterface, projectLoggingLister mgmtv3.ProjectLoggingLister, namespaces v1.NamespaceInterface, templateLister mgmtv3.CatalogTemplateLister) *TesterDeployer {
+func NewTesterDeployer(mgmtCtx *config.ManagementContext, appsGetter projectv3.AppsGetter, projectLister mgmtv3.ProjectLister, pods v1.PodInterface, projectLoggingLister mgmtv3.ProjectLoggingLister, namespaces v1.NamespaceInterface, templateLister mgmtv3.CatalogTemplateLister) *TesterDeployer {
 	appDeployer := &AppDeployer{
 		AppsGetter: appsGetter,
 		Namespaces: namespaces,
@@ -38,6 +39,7 @@ func NewTesterDeployer(appsGetter projectv3.AppsGetter, projectLister mgmtv3.Pro
 		projectLoggingLister: projectLoggingLister,
 		namespacesLister:     namespaces.Controller().Lister(),
 		appDeployer:          appDeployer,
+		systemAccountManager: systemaccount.NewManager(mgmtCtx),
 	}
 }
 
@@ -47,12 +49,13 @@ func (d *TesterDeployer) Deploy(level, clusterName, projectID string, loggingTar
 		return err
 	}
 
-	systemProjectID := ref.Ref(systemProject)
-	creator, err := d.systemAccountManager.GetProjectSystemUser(systemProject.Name)
+	// This app will be deployed to system project, and the chart has clusterrole rbac, project user couldn't create clusterroles rbac, so use cluster system user.
+	creator, err := d.systemAccountManager.GetSystemUser(systemProject.Spec.ClusterName)
 	if err != nil {
 		return err
 	}
 
+	systemProjectID := ref.Ref(systemProject)
 	if err = d.deployLoggingTester(systemProjectID, creator.Name, level, clusterName, projectID, loggingTarget); err != nil {
 		return err
 	}
