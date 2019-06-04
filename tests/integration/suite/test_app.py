@@ -1,7 +1,9 @@
-from .common import random_str
-from .test_catalog import wait_for_template_to_be_created
-import pytest
 import time
+import pytest
+from rancher import ApiError
+from .test_catalog import wait_for_template_to_be_created
+from .common import random_str
+from .conftest import set_server_version, wait_for
 
 
 def test_app_mysql(admin_pc, admin_mc):
@@ -261,6 +263,269 @@ def test_app_custom_values_file(admin_pc, admin_mc):
     assert workloads.data[0].containers[0].image == "registry:2.6"
     client.delete(app)
     wait_for_app_to_be_deleted(client, app)
+
+
+@pytest.mark.nonparallel
+def test_app_create_validation(admin_mc, admin_pc, custom_catalog,
+                               remove_resource, restore_rancher_version):
+    """Test create validation for apps. This test will set the rancher version
+    explicitly and attempt to create apps with rancher version requirements.
+    """
+    # 1.6.0 uses 2.0.0-2.2.0
+    # 1.6.2 uses 2.1.0-2.3.0
+    client = admin_mc.client
+
+    c_name = random_str()
+    custom_catalog(name=c_name)
+
+    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                  projectId=admin_pc.
+                                                  project.id)
+    remove_resource(ns)
+
+    cat_base = "catalog://?catalog="+c_name+"&template=chartmuseum&version="
+
+    app_data = {
+        'name': random_str(),
+        'externalId': cat_base+"1.6.2",
+        'targetNamespace': ns.name,
+        'projectId': admin_pc.project.id,
+        "answers": [{
+            "type": "answer",
+            "clusterId": None,
+            "projectId": None,
+            "values": {
+                "defaultImage": "true",
+                "image.repository": "chartmuseum/chartmuseum",
+                "image.tag": "v0.7.1",
+                "env.open.STORAGE": "local",
+                "gcp.secret.enabled": "false",
+                "gcp.secret.key": "credentials.json",
+                "persistence.enabled": "true",
+                "persistence.size": "10Gi",
+                "ingress.enabled": "true",
+                "ingress.hosts[0]": "xip.io",
+                "service.type": "NodePort",
+                "env.open.SHOW_ADVANCED": "false",
+                "env.open.DEPTH": "0",
+                "env.open.ALLOW_OVERWRITE": "false",
+                "env.open.AUTH_ANONYMOUS_GET": "false",
+                "env.open.DISABLE_METRICS": "true"
+            }
+        }]
+    }
+
+    set_server_version(client, "2.1.0-beta2")
+
+    # First try requires a min of 2.1 so an error should be returned
+    with pytest.raises(ApiError) as e:
+        app1 = admin_pc.client.create_app(app_data)
+        remove_resource(app1)
+    assert e.value.error.status == 422
+    assert e.value.error.message == 'rancher min version not met'
+
+    set_server_version(client, "2.3.1")
+
+    # Second try requires a max of 2.3 so an error should be returned
+    with pytest.raises(ApiError) as e:
+        app1 = admin_pc.client.create_app(app_data)
+        remove_resource(app1)
+    assert e.value.error.status == 422
+    assert e.value.error.message == 'rancher max version exceeded'
+
+    set_server_version(client, "2.2.1-rc4")
+
+    # Third try should work
+    app1 = admin_pc.client.create_app(app_data)
+    remove_resource(app1)
+    wait_for_workload(admin_pc.client, ns.name, count=1)
+
+
+@pytest.mark.nonparallel
+def test_app_update_validation(admin_mc, admin_pc, custom_catalog,
+                               remove_resource, restore_rancher_version):
+    """Test update validation for apps. This test will set the rancher version
+    explicitly and attempt to update apps with rancher version requirements.
+    """
+    # 1.6.0 uses 2.0.0-2.2.0
+    # 1.6.2 uses 2.1.0-2.3.0
+    client = admin_mc.client
+
+    c_name = random_str()
+    custom_catalog(name=c_name)
+
+    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                  projectId=admin_pc.
+                                                  project.id)
+    remove_resource(ns)
+
+    cat_base = "catalog://?catalog="+c_name+"&template=chartmuseum&version="
+
+    app_data = {
+        'name': random_str(),
+        'externalId': cat_base+"1.6.0",
+        'targetNamespace': ns.name,
+        'projectId': admin_pc.project.id,
+        "answers": [{
+            "type": "answer",
+            "clusterId": None,
+            "projectId": None,
+            "values": {
+                "defaultImage": "true",
+                "image.repository": "chartmuseum/chartmuseum",
+                "image.tag": "v0.7.1",
+                "env.open.STORAGE": "local",
+                "gcp.secret.enabled": "false",
+                "gcp.secret.key": "credentials.json",
+                "persistence.enabled": "true",
+                "persistence.size": "10Gi",
+                "ingress.enabled": "true",
+                "ingress.hosts[0]": "xip.io",
+                "service.type": "NodePort",
+                "env.open.SHOW_ADVANCED": "false",
+                "env.open.DEPTH": "0",
+                "env.open.ALLOW_OVERWRITE": "false",
+                "env.open.AUTH_ANONYMOUS_GET": "false",
+                "env.open.DISABLE_METRICS": "true"
+            }
+        }]
+    }
+
+    set_server_version(client, "2.1.0-rc3")
+
+    # Launch the app version 1.6.0 with rancher 2.1.0-rc3
+    app1 = admin_pc.client.create_app(app_data)
+    remove_resource(app1)
+    wait_for_workload(admin_pc.client, ns.name, count=1)
+
+    upgrade_dict = {
+        'obj': app1,
+        'action_name': 'upgrade',
+        'answers': app_data['answers'],
+        'externalId': cat_base+"1.6.2",
+        'forceUpgrade': False,
+    }
+
+    # Attempt to upgrade, app version 1.6.2 requires a min of 2.1.0 so this
+    # will error
+    with pytest.raises(ApiError) as e:
+        app1 = client.action(**upgrade_dict)
+    assert e.value.error.status == 422
+    assert e.value.error.message == 'rancher min version not met'
+
+    set_server_version(client, "2.3.1")
+
+    # # Second try requires a max of 2.3.0 so an error should be returned
+    with pytest.raises(ApiError) as e:
+        app1 = client.action(**upgrade_dict)
+    assert e.value.error.status == 422
+    assert e.value.error.message == 'rancher max version exceeded'
+
+
+@pytest.mark.nonparallel
+def test_app_rollback_validation(admin_mc, admin_pc, custom_catalog,
+                                 remove_resource, restore_rancher_version):
+    """Test rollback validation for apps. This test will set the rancher version
+    explicitly and attempt to rollback apps with rancher version requirements.
+    """
+    # 1.6.0 uses 2.0.0-2.2.0
+    # 1.6.2 uses 2.1.0-2.3.0
+    client = admin_mc.client
+
+    c_name = random_str()
+    custom_catalog(name=c_name)
+
+    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                  projectId=admin_pc.
+                                                  project.id)
+    remove_resource(ns)
+
+    cat_base = "catalog://?catalog="+c_name+"&template=chartmuseum&version="
+
+    app_data = {
+        'name': random_str(),
+        'externalId': cat_base+"1.6.0",
+        'targetNamespace': ns.name,
+        'projectId': admin_pc.project.id,
+        "answers": [{
+            "type": "answer",
+            "clusterId": None,
+            "projectId": None,
+            "values": {
+                "defaultImage": "true",
+                "image.repository": "chartmuseum/chartmuseum",
+                "image.tag": "v0.7.1",
+                "env.open.STORAGE": "local",
+                "gcp.secret.enabled": "false",
+                "gcp.secret.key": "credentials.json",
+                "persistence.enabled": "true",
+                "persistence.size": "10Gi",
+                "ingress.enabled": "true",
+                "ingress.hosts[0]": "xip.io",
+                "service.type": "NodePort",
+                "env.open.SHOW_ADVANCED": "false",
+                "env.open.DEPTH": "0",
+                "env.open.ALLOW_OVERWRITE": "false",
+                "env.open.AUTH_ANONYMOUS_GET": "false",
+                "env.open.DISABLE_METRICS": "true"
+            }
+        }]
+    }
+
+    set_server_version(client, "2.1.0")
+
+    # Launch the app version 1.6.0 with rancher 2.1.0-rc3
+    app1 = admin_pc.client.create_app(app_data)
+    remove_resource(app1)
+    wait_for_workload(admin_pc.client, ns.name, count=1)
+
+    app1 = admin_pc.client.reload(app1)
+
+    original_rev = app1.appRevisionId
+
+    upgrade_dict = {
+        'obj': app1,
+        'action_name': 'upgrade',
+        'answers': app_data['answers'],
+        'externalId': cat_base+"1.6.2",
+        'forceUpgrade': False,
+    }
+
+    # Upgrade the app to get a rollback revision
+    client.action(**upgrade_dict)
+
+    def _app_revisions():
+        app = admin_pc.client.reload(app1)
+        return len(app.revision().data) > 1
+
+    wait_for(_app_revisions, fail_handler=lambda: 'app did not upgrade')
+
+    app1 = admin_pc.client.reload(app1)
+
+    assert app1.appRevisionId != original_rev, 'app did not upgrade'
+
+    rollback_dict = {
+        'obj': app1,
+        'action_name': 'rollback',
+        'revisionId': original_rev,
+        'forceUpgrade': False,
+    }
+
+    set_server_version(client, "2.3.1")
+
+    # Rollback requires a max of 2.2.0 so an error should be returned
+    with pytest.raises(ApiError) as e:
+        app1 = client.action(**rollback_dict)
+    assert e.value.error.status == 422
+    assert e.value.error.message == 'rancher max version exceeded'
+
+    set_server_version(client, "2.0.0-rc3")
+
+    # Second try requires a min of 2.0.0 so an error should be returned
+    with pytest.raises(ApiError) as e:
+        app1 = client.action(**rollback_dict)
+    assert e.value.error.status == 422
+    assert e.value.error.message == 'rancher min version not met'
 
 
 def wait_for_workload(client, ns, timeout=60, count=0):
