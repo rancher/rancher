@@ -34,12 +34,14 @@ $RancherDir = "C:\host\etc\rancher"
 $KubeDir = "C:\host\etc\kubernetes"
 $CNIDir = "C:\host\etc\cni"
 $NginxConfigDir = "C:\host\etc\nginx"
+$WMIExporterDir = "C:\host\etc\wmi-exporter"
 $KubeletRootDir = "C:\host\var\lib\kubelet"
 
 $null = New-Item -Type Directory -Path $RancherDir -ErrorAction Ignore
 $null = New-Item -Type Directory -Path $KubeDir -ErrorAction Ignore
 $null = New-Item -Type Directory -Path $CNIDir -ErrorAction Ignore
 $null = New-Item -Type Directory -Path $NginxConfigDir -ErrorAction Ignore
+$null = New-Item -Type Directory -Path $WMIExporterDir -ErrorAction Ignore
 $null = New-Item -Type Directory -Path $KubeletRootDir -ErrorAction Ignore
 
 # copy nginx #
@@ -55,6 +57,13 @@ try {
     Copy-Item -Force -Recurse -Path "$env:ProgramFiles\kubelet\volumeplugins\*" -Destination "$KubeletRootDir\volumeplugins"
 } catch {
     throw ("Please empty host `"C:\var\lib\kubelet\volumeplugins`" path manually, because {0}" -f $_.Exception.Message)
+}
+
+# copy wmi exporter #
+try {
+    Copy-Item -Force -Recurse -Path "$env:ProgramFiles\wmi-exporter\*" -Destination $WMIExporterDir
+} catch {
+    throw ("Please empty host `"C:\etc\wmi-exporter`" path manually, because {0}" -f $_.Exception.Message)
 }
 
 # copy rancher agent artifacts #

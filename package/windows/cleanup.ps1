@@ -16,6 +16,7 @@ $RancherDir = "C:\etc\rancher"
 $KubeDir = "C:\etc\kubernetes"
 $CNIDir = "C:\etc\cni"
 $NginxConfigDir = "C:\etc\nginx"
+$WMIExporterDir = "C:\etc\wmi-exporter"
 
 Import-Module "$RancherDir\hns.psm1" -Force
 
@@ -90,6 +91,12 @@ try {
         $process | Stop-Process -Force | Out-Null
     }
 
+    # wmi-exporter #
+    $process = Get-Process -Name "wmi-exporter*" -ErrorAction Ignore
+    if ($process) {
+        $process | Stop-Process -Force | Out-Null
+    }
+
     # controlplanes proxy #
     $process = Get-Process -Name "nginx*" -ErrorAction Ignore
     if ($process) {
@@ -119,6 +126,10 @@ try {
     Remove-Item -Path "$NginxConfigDir\*" -Recurse -Force -ErrorAction Ignore
 
     # component produces #
+    # wmi exporter
+    Remove-Item -Path "$WMIExporterDir\*" -Recurse -Force -ErrorAction Ignore
+    Remove-NetFirewallRule -Name @('WMIExporter9182TCP', 'WMIExporter9182TCP') -ErrorAction Ignore    
+
     # cni
     Remove-Item -Path "C:\etc\kube-flannel\*" -Recurse -Force -ErrorAction Ignore
     Remove-Item -Path "C:\run\flannel\*" -Recurse -Force -ErrorAction Ignore

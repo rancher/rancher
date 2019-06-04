@@ -34,12 +34,14 @@ $RancherDir = "C:\etc\rancher"
 $KubeDir = "C:\etc\kubernetes"
 $CNIDir = "C:\etc\cni"
 $NginxConfigDir = "C:\etc\nginx"
+$WMIExporterDir = "C:\etc\wmi-exporter"
 $LogDir = "C:\var\log"
 
 $null = New-Item -Force -Type Directory -Path $RancherDir -ErrorAction Ignore
 $null = New-Item -Force -Type Directory -Path $KubeDir -ErrorAction Ignore
 $null = New-Item -Force -Type Directory -Path $CNIDir -ErrorAction Ignore
 $null = New-Item -Force -Type Directory -Path $NginxConfigDir -ErrorAction Ignore
+$null = New-Item -Force -Type Directory -Path $WMIExporterDir -ErrorAction Ignore
 $null = New-Item -Force -Type Directory -Path $LogDir -ErrorAction Ignore
 
 Import-Module "$RancherDir\hns.psm1" -Force
@@ -884,6 +886,70 @@ function start-kube-proxy {
     print ".................. OK"
 }
 
+function stop-wmi-exporter {
+    try {
+        $process = Get-Process -Name "wmi-exporter*" -ErrorAction Ignore
+        if ($process) {
+            $process | Stop-Process -Force | Out-Null
+        }
+    } catch {
+    }
+}
+
+function start-wmi-exporter {
+    param(
+        [parameter(Mandatory = $false)] [switch]$Restart = $False
+    )
+
+    ## stop stale ##
+    stop-wmi-exporter
+
+    if ($Restart) {
+        print "Restarting wmi-exporter"
+    } else {
+        print "Starting wmi-exporter ."
+    }
+
+    ## wait a few seconds ##
+    print "...................., wait a few seconds"
+    Start-Sleep -s 15
+
+    ## binary is ready or not ##
+    wait-ready -Path "$WMIExporterDir\bin\wmi-exporter.exe"
+
+    ## config msi ##
+    print "Installing wmi-exporter, wait a few minutes ..."
+
+    $wmiExporterMSIBinPath = "$WMIExporterDir\bin\wmi-exporter.msi"
+    install-msi -File $wmiExporterMSIBinPath -LogFile "$LogDir\wmi-exporter-installation.log"
+    if (-not $?) {
+        throw "Failed to install wmi-exporter"
+    }
+
+    ## open firewall ##
+    $null = New-NetFirewallRule -Name 'WMIExporter9182TCP' -Description "WMI Exporter API TCP" -Action Allow -LocalPort 9182 -Enabled True -DisplayName "WMI Exporter 9182 TCP" -Protocol TCP -ErrorAction SilentlyContinue
+
+    ## start wmi_exporter ##
+    $retryCount = 3
+    $process = $null
+    while (-not $process) {
+        $process = Start-Process -PassThru -FilePath "$WMIExporterDir\bin\wmi-exporter.exe"
+        print "....................."
+        Start-Sleep -s 15
+        $process = Get-Process -Id $process.Id -ErrorAction Ignore
+
+        $retryCount -= 1
+        if ($retryCount -le 0) {
+            if (-not $process) {
+                throw ".............. FAILED, agent retry"
+            }
+            break
+        }
+    }
+
+    print ".................. OK"
+}
+
 function init {
     # stale binaries clean #
     $removeStaleBinaries = $false
@@ -960,7 +1026,7 @@ function main {
     setup-proxy -CPHosts $KubeControlPlaneAddresses
 
     # recover processes #
-    $shouldUseCompsCnt = 3
+    $shouldUseCompsCnt = 4
     $wantRecoverComps = @()
 
     # kubelet #
@@ -976,6 +1042,12 @@ function main {
         if (-not $process) {
             $wantRecoverComps += @("flanneld")
         }
+    }
+
+    # wmi exporter
+    $process = Get-Process -Name "wmi-exporter*" -ErrorAction Ignore
+    if (-not $process) {
+        $wantRecoverComps += @("wmi-exporter")
     }
 
     # kube-proxy #
@@ -997,6 +1069,10 @@ function main {
                     if (-not $recoverKubelet) {
                         start-flanneld -Restart
                     }
+                }
+                "wmi-exporter" {
+                    start-wmi-exporter -Restart
+                    break
                 }
                 "kube-proxy" {
                     start-kube-proxy -Restart

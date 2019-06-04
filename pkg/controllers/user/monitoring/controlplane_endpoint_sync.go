@@ -20,14 +20,20 @@ type ControlPlaneEndpointController struct {
 	ServiceLister       v1.ServiceLister
 }
 
+const (
+	nodeMetricsWindowsEndpointName = "expose-node-metrics-windows"
+)
+
 var (
 	etcdLabel         = labels.Set(map[string]string{"node-role.kubernetes.io/etcd": "true"}).AsSelector()
 	controlPlaneLabel = labels.Set(map[string]string{"node-role.kubernetes.io/controlplane": "true"}).AsSelector()
 	masterLabel       = labels.Set(map[string]string{"node-role.kubernetes.io/master": "true"}).AsSelector()
+	windowNodeLabel   = labels.Set(map[string]string{"kubernetes.io/os": "windows"}).AsSelector()
 	selectorMap       = map[string][]labels.Selector{
 		"expose-kube-etcd-metrics":      {etcdLabel, masterLabel},
 		"expose-kube-cm-metrics":        {controlPlaneLabel, masterLabel},
 		"expose-kube-scheduler-metrics": {controlPlaneLabel, masterLabel},
+		nodeMetricsWindowsEndpointName:  {windowNodeLabel},
 	}
 )
 

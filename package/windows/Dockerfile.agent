@@ -45,6 +45,28 @@ RUN $URL = 'https://github.com/Microsoft/K8s-Storage-Plugins/releases/download/v
     Remove-Item -Force -Recurse -Path $SRC_PATH; \
     \
     Write-Host 'Complete.';
+RUN $BINARY_URL = 'https://github.com/martinlindhe/wmi_exporter/releases/download/v0.7.0/wmi_exporter-0.7.0-amd64.exe'; \
+    $DST_DIR = ('{0}\wmi-exporter\bin\' -f $env:ProgramFiles); \
+    $DST_PATH = ('{0}\wmi-exporter\bin\wmi-exporter.exe' -f $env:ProgramFiles); \
+    \
+    $null = New-Item -Type Directory -Path $DST_DIR -ErrorAction Ignore; \
+    \
+    Write-Host ('Downloading WMI Exporter binary from {0} ...' -f $BINARY_URL); \
+    \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile $DST_PATH -Uri $BINARY_URL; \
+    \
+    Write-Host 'Downloading WMI Exporter binary complete.'; \
+    \
+    $MSI_URL = 'https://github.com/martinlindhe/wmi_exporter/releases/download/v0.7.0/wmi_exporter-0.7.0-amd64.msi'; \
+    $DST_PATH = ('{0}\wmi-exporter\bin\wmi-exporter.msi' -f $env:ProgramFiles); \
+    \
+    Write-Host ('Downloading WMI Exporter msi file from {0} ...' -f $MSI_URL); \
+    \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile $DST_PATH -Uri $MSI_URL; \
+    \
+    Write-Host 'Downloading WMI Exporter msi complete.';
 
 ARG VERSION=dev
 ENV AGENT_IMAGE rancher/rancher-agent:${VERSION}
