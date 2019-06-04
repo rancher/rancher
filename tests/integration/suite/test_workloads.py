@@ -10,33 +10,33 @@ def test_workload_image_change_private_registry(admin_pc):
 
     registry1_name = random_str()
     registries = {'index.docker.io': {
-                    'username': 'testuser',
+        'username': 'testuser',
                     'password': 'foobarbaz',
-                }}
+    }}
     registry1 = client.create_dockerCredential(name=registry1_name,
                                                registries=registries)
     assert registry1.name == registry1_name
 
     registry2_name = random_str()
     registries = {'quay.io': {
-                    'username': 'testuser',
+        'username': 'testuser',
                     'password': 'foobarbaz',
-                }}
+    }}
     registry2 = client.create_dockerCredential(name=registry2_name,
                                                registries=registries)
 
     ns = admin_pc.cluster.client.create_namespace(
-                                                name=random_str(),
-                                                projectId=admin_pc.project.id)
+        name=random_str(),
+        projectId=admin_pc.project.id)
     name = random_str()
     workload = client.create_workload(
-                                    name=name,
-                                    namespaceId=ns.id,
-                                    scale=1,
-                                    containers=[{
-                                        'name': 'one',
-                                        'image': 'testuser/testimage',
-                                    }])
+        name=name,
+        namespaceId=ns.id,
+        scale=1,
+        containers=[{
+            'name': 'one',
+            'image': 'testuser/testimage',
+        }])
 
     assert workload.name == name
     assert len(workload.imagePullSecrets) == 1
@@ -44,9 +44,9 @@ def test_workload_image_change_private_registry(admin_pc):
         assert secret['name'] == registry1_name
 
     containers = [{
-                    'name': 'one',
-                    'image': 'quay.io/testuser/testimage',
-                 }]
+        'name': 'one',
+        'image': 'quay.io/testuser/testimage',
+    }]
 
     workload = client.update(workload, containers=containers)
 
@@ -122,70 +122,70 @@ def test_statefulset_workload_volumemount_subpath(admin_pc):
 
     # valid volumeMounts
     volumeMounts = [{
-         'name': 'vol1',
-         'mountPath': 'var/lib/mysql',
-         'subPath': 'mysql',
+        'name': 'vol1',
+        'mountPath': 'var/lib/mysql',
+        'subPath': 'mysql',
     }]
 
     containers = [{
-         'name': 'mystatefulset',
-         'image': 'ubuntu:xenial',
-         'volumeMounts': volumeMounts,
+        'name': 'mystatefulset',
+        'image': 'ubuntu:xenial',
+        'volumeMounts': volumeMounts,
     }]
 
     # invalid volumeMounts
     volumeMounts_one = [{
-          'name': 'vol1',
-          'mountPath': 'var/lib/mysql',
-          'subPath': '/mysql',
+        'name': 'vol1',
+        'mountPath': 'var/lib/mysql',
+        'subPath': '/mysql',
     }]
 
     containers_one = [{
-         'name': 'mystatefulset',
-         'image': 'ubuntu:xenial',
-         'volumeMounts': volumeMounts_one,
+        'name': 'mystatefulset',
+        'image': 'ubuntu:xenial',
+        'volumeMounts': volumeMounts_one,
     }]
 
     volumeMounts_two = [{
-         'name': 'vol1',
-         'mountPath': 'var/lib/mysql',
-         'subPath': '../mysql',
+        'name': 'vol1',
+        'mountPath': 'var/lib/mysql',
+        'subPath': '../mysql',
     }]
 
     containers_two = [{
-         'name': 'mystatefulset',
-         'image': 'ubuntu:xenial',
-         'volumeMounts': volumeMounts_two,
+        'name': 'mystatefulset',
+        'image': 'ubuntu:xenial',
+        'volumeMounts': volumeMounts_two,
     }]
 
     statefulSetConfig = {
-           'podManagementPolicy': 'OrderedReady',
-           'revisionHistoryLimit': 10,
-           'strategy': 'RollingUpdate',
-           'type': 'statefulSetConfig',
+        'podManagementPolicy': 'OrderedReady',
+        'revisionHistoryLimit': 10,
+        'strategy': 'RollingUpdate',
+        'type': 'statefulSetConfig',
     }
 
     volumes = [{
-            'name': 'vol1',
-            'persistentVolumeClaim': {
+        'name': 'vol1',
+        'persistentVolumeClaim': {
                 'persistentVolumeClaimId': "default: myvolume",
                 'readOnly': False,
                 'type': 'persistentVolumeClaimVolumeSource',
-            },
-            'type': 'volume',
+        },
+        'type': 'volume',
     }]
 
     # 1. validate volumeMounts.subPath when workload creating
     # invalid volumeMounts.subPath: absolute path
     with pytest.raises(ApiError) as e:
-            client.create_workload(name=name,
-                                   namespaceId='default',
-                                   scale=1,
-                                   containers=containers_one,
-                                   statefulSetConfig=statefulSetConfig,
-                                   volumes=volumes)
+        client.create_workload(name=name,
+                               namespaceId='default',
+                               scale=1,
+                               containers=containers_one,
+                               statefulSetConfig=statefulSetConfig,
+                               volumes=volumes)
 
-            assert e.value.error.status == 422
+        assert e.value.error.status == 422
 
     # invalid volumeMounts.subPath: contains '..'
     with pytest.raises(ApiError) as e:

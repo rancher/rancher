@@ -1,6 +1,8 @@
+import pytest
+import time
 from .common import wait_for_template_to_be_created, \
     wait_for_template_to_be_deleted, random_str
-import time
+from .conftest import set_server_version
 
 
 def test_catalog(admin_mc):
@@ -94,3 +96,62 @@ def test_user_can_list_global_catalog(user_factory, remove_resource):
     user_client = user1.client
     c = user_client.list_catalog(name="library")
     assert len(c) == 1
+
+
+@pytest.mark.nonparallel
+def test_template_version_links(admin_mc, admin_pc, custom_catalog,
+                                remove_resource, restore_rancher_version):
+    """Test that template versionLinks are being updated based off the rancher
+    version set on the server and the query paramater 'rancherVersion' being
+    set.
+    """
+    # 1.6.0 uses 2.0.0-2.2.0
+    # 1.6.2 uses 2.1.0-2.3.0
+    client = admin_mc.client
+
+    c_name = random_str()
+    custom_catalog(name=c_name)
+
+    # Set the server expecting both versions
+    set_server_version(client, "2.1.0")
+
+    templates = client.list_template(
+        rancherVersion='2.1.0', catalogId=c_name)
+
+    assert len(templates.data[0]['versionLinks']) == 2
+    assert '1.6.0' in templates.data[0]['versionLinks']
+    assert '1.6.2' in templates.data[0]['versionLinks']
+
+    # Set the server expecting only the older version
+    set_server_version(client, "2.0.0")
+
+    templates = client.list_template(
+        rancherVersion='2.0.0', catalogId=c_name)
+
+    assert len(templates.data[0]['versionLinks']) == 1
+    assert '1.6.0' in templates.data[0]['versionLinks']
+
+    # Set the server expecting only the newer version
+    set_server_version(client, "2.3.0")
+
+    templates = client.list_template(
+        rancherVersion='2.3.0', catalogId=c_name)
+
+    assert len(templates.data[0]['versionLinks']) == 1
+    assert '1.6.2' in templates.data[0]['versionLinks']
+
+    # Set the server expecting no versions, this should be outside both
+    # versions acceptable ranges
+    set_server_version(client, "2.4.0")
+
+    templates = client.list_template(
+        rancherVersion='2.4.0', catalogId=c_name)
+
+    assert len(templates.data[0]['versionLinks']) == 0
+
+    # If no rancher version is set get back both versions
+    templates = client.list_template(catalogId=c_name)
+
+    assert len(templates.data[0]['versionLinks']) == 2
+    assert '1.6.0' in templates.data[0]['versionLinks']
+    assert '1.6.2' in templates.data[0]['versionLinks']

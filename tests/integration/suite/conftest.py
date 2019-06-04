@@ -9,7 +9,7 @@ import subprocess
 import json
 import rancher
 from sys import platform
-from .common import random_str
+from .common import random_str, wait_for_template_to_be_created
 from kubernetes.client import ApiClient, Configuration, CustomObjectsApi
 from kubernetes.client.rest import ApiException
 from kubernetes.config.kube_config import KubeConfigLoader
@@ -42,6 +42,7 @@ SERVER_URL = 'https://' + IP + ':8443'
 BASE_URL = SERVER_URL + '/v3'
 AUTH_URL = BASE_URL + '-public/localproviders/local?action=login'
 DEFAULT_TIMEOUT = 45
+DEFAULT_CATALOG = "https://github.com/rancher/integration-test-charts"
 
 
 class ManagementContext:
@@ -215,6 +216,41 @@ def admin_pc_client(admin_pc):
 
 
 @pytest.fixture(scope="session")
+def custom_catalog(admin_mc, remove_resource_session):
+    """Create a catalog from the URL and cleanup after tests finish"""
+    def _create_catalog(name=random_str(), catalogURL=DEFAULT_CATALOG):
+        client = admin_mc.client
+        catalog = client.create_catalog(name=name,
+                                        branch="master",
+                                        url=catalogURL,
+                                        )
+        remove_resource_session(catalog)
+        wait_for_template_to_be_created(client, name)
+    return _create_catalog
+
+
+@pytest.fixture()
+def restore_rancher_version(request, admin_mc):
+    client = admin_mc.client
+    server_version = client.by_id_setting('server-version')
+
+    def _restore():
+        client.update_by_id_setting(
+            id=server_version.id, value=server_version.value)
+    request.addfinalizer(_restore)
+
+
+def set_server_version(client, version):
+    client.update_by_id_setting(id='server-version', value=version)
+
+    def _wait_for_version():
+        server_version = client.by_id_setting('server-version')
+        return server_version.value == version
+
+    wait_for(_wait_for_version)
+
+
+@pytest.fixture(scope="session")
 def dind_cc(request, admin_mc):
     # verify platform is linux
     if platform != 'linux':
@@ -327,6 +363,24 @@ def remove_resource(admin_mc, request):
                         in e.error.message:
                     pass
                 elif code != 404:
+                    raise e
+        request.addfinalizer(clean)
+    return _cleanup
+
+
+@pytest.fixture(scope="session")
+def remove_resource_session(admin_mc, request):
+    """Remove a resource after the test session finishes. Can only be used
+    with fixtures that are 'session' scoped.
+    """
+    client = admin_mc.client
+
+    def _cleanup(resource):
+        def clean():
+            try:
+                client.delete(resource)
+            except ApiError as e:
+                if e.error.status != 404:
                     raise e
         request.addfinalizer(clean)
     return _cleanup
