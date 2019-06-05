@@ -1,0 +1,14 @@
+image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "/" "-" build.branch }}{{/if}}
+manifests:
+- image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "/" "-" build.branch }}{{/if}}-linux-amd64
+  platform:
+    architecture: amd64
+    os: linux
+- image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "/" "-" build.branch }}{{/if}}-linux-arm64
+  platform:
+    architecture: arm64
+    os: linux
+- image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "/" "-" build.branch }}{{/if}}-linux-arm
+  platform:
+    architecture: arm
+    os: linux
