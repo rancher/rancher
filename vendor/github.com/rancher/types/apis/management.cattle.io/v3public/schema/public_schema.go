@@ -56,6 +56,19 @@ func authProvidersTypes(schemas *types.Schemas) *types.Schemas {
 			schema.ResourceMethods = []string{http.MethodGet}
 		}).
 		MustImport(&PublicVersion, v3public.GithubLogin{}).
+		// Google OAuth provider
+		MustImportAndCustomize(&PublicVersion, v3public.GoogleOAuthProvider{}, func(schema *types.Schema) {
+			schema.BaseType = "authProvider"
+			schema.ResourceActions = map[string]types.Action{
+				"login": {
+					Input:  "googleOauthLogin",
+					Output: "token",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet}
+		}).
+		MustImport(&PublicVersion, v3public.GoogleOauthLogin{}).
 		// Active Directory provider
 		MustImportAndCustomize(&PublicVersion, v3public.ActiveDirectoryProvider{}, func(schema *types.Schema) {
 			schema.BaseType = "authProvider"

@@ -162,6 +162,28 @@ type GithubConfigApplyInput struct {
 	Enabled      bool         `json:"enabled,omitempty"`
 }
 
+type GoogleOauthConfig struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	AuthConfig        `json:",inline" mapstructure:",squash"`
+
+	OauthCredential          string `json:"oauthCredential,omitempty" norman:"required"`
+	ServiceAccountCredential string `json:"serviceAccountCredential,omitempty"`
+	AdminEmail               string `json:"adminEmail,omitempty"`
+	Hostname                 string `json:"hostname,omitempty" norman:"required"`
+	UserInfoEndpoint         string `json:"userInfoEndpoint" norman:"default=https://openidconnect.googleapis.com/v1/userinfo,required,notnullable"`
+}
+
+type GoogleOauthConfigTestOutput struct {
+	RedirectURL string `json:"redirectUrl"`
+}
+
+type GoogleOauthConfigApplyInput struct {
+	GoogleOauthConfig GoogleOauthConfig `json:"googleOauthConfig,omitempty"`
+	Code              string            `json:"code,omitempty"`
+	Enabled           bool              `json:"enabled,omitempty"`
+}
+
 type AzureADConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
