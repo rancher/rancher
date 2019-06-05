@@ -81,7 +81,6 @@ type ProjectAlertLifecycle struct {
 }
 
 func (l *ProjectAlertLifecycle) Create(obj *v3.ProjectAlertRule) (runtime.Object, error) {
-	l.podWatcher.podRestartTrack.Store(obj.Namespace+":"+obj.Name, make([]restartTrack, 0))
 	return obj, nil
 }
 
@@ -156,54 +155,52 @@ func (w *PodWatcher) watchRule() error {
 func (w *PodWatcher) checkPodRestarts(pod *corev1.Pod, alert *v3.ProjectAlertRule) {
 
 	for _, containerStatus := range pod.Status.ContainerStatuses {
-		if containerStatus.State.Running == nil {
-			curCount := containerStatus.RestartCount
-			preCount := w.getRestartTimeFromTrack(alert, curCount)
+		curCount := containerStatus.RestartCount
+		preCount := w.getRestartTimeFromTrack(alert, curCount)
 
-			if curCount-preCount >= int32(alert.Spec.PodRule.RestartTimes) {
-				ruleID := common.GetRuleID(alert.Spec.GroupName, alert.Name)
+		if curCount-preCount >= int32(alert.Spec.PodRule.RestartTimes) {
+			ruleID := common.GetRuleID(alert.Spec.GroupName, alert.Name)
 
-				details := ""
-				if containerStatus.State.Waiting != nil {
-					details = containerStatus.State.Waiting.Message
-				}
-
-				clusterDisplayName := common.GetClusterDisplayName(w.clusterName, w.clusterLister)
-				projectDisplayName := common.GetProjectDisplayName(alert.Spec.ProjectName, w.projectLister)
-
-				data := map[string]string{}
-				data["rule_id"] = ruleID
-				data["group_id"] = alert.Spec.GroupName
-				data["alert_name"] = alert.Spec.DisplayName
-				data["alert_type"] = "podRestarts"
-				data["severity"] = alert.Spec.Severity
-				data["cluster_name"] = clusterDisplayName
-				data["project_name"] = projectDisplayName
-				data["namespace"] = pod.Namespace
-				data["pod_name"] = pod.Name
-				data["container_name"] = containerStatus.Name
-				data["restart_times"] = strconv.Itoa(alert.Spec.PodRule.RestartTimes)
-				data["restart_interval"] = strconv.Itoa(alert.Spec.PodRule.RestartIntervalSeconds)
-
-				if details != "" {
-					data["logs"] = details
-				}
-
-				workloadName, err := w.getWorkloadInfo(pod)
-				if err != nil {
-					logrus.Warnf("Failed to get workload info for %s:%s %v", pod.Namespace, pod.Name, err)
-				}
-				if workloadName != "" {
-					data["workload_name"] = workloadName
-				}
-
-				if err := w.alertManager.SendAlert(data); err != nil {
-					logrus.Debugf("Error occurred while getting pod %s: %v", alert.Spec.PodRule.PodName, err)
-				}
+			details := ""
+			if containerStatus.State.Waiting != nil {
+				details = containerStatus.State.Waiting.Message
 			}
 
-			return
+			clusterDisplayName := common.GetClusterDisplayName(w.clusterName, w.clusterLister)
+			projectDisplayName := common.GetProjectDisplayName(alert.Spec.ProjectName, w.projectLister)
+
+			data := map[string]string{}
+			data["rule_id"] = ruleID
+			data["group_id"] = alert.Spec.GroupName
+			data["alert_name"] = alert.Spec.DisplayName
+			data["alert_type"] = "podRestarts"
+			data["severity"] = alert.Spec.Severity
+			data["cluster_name"] = clusterDisplayName
+			data["project_name"] = projectDisplayName
+			data["namespace"] = pod.Namespace
+			data["pod_name"] = pod.Name
+			data["container_name"] = containerStatus.Name
+			data["restart_times"] = strconv.Itoa(alert.Spec.PodRule.RestartTimes)
+			data["restart_interval"] = strconv.Itoa(alert.Spec.PodRule.RestartIntervalSeconds)
+
+			if details != "" {
+				data["logs"] = details
+			}
+
+			workloadName, err := w.getWorkloadInfo(pod)
+			if err != nil {
+				logrus.Warnf("Failed to get workload info for %s:%s %v", pod.Namespace, pod.Name, err)
+			}
+			if workloadName != "" {
+				data["workload_name"] = workloadName
+			}
+
+			if err := w.alertManager.SendAlert(data); err != nil {
+				logrus.Debugf("Error occurred while getting pod %s: %v", alert.Spec.PodRule.PodName, err)
+			}
 		}
+
+		return
 	}
 
 }
@@ -211,31 +208,23 @@ func (w *PodWatcher) checkPodRestarts(pod *corev1.Pod, alert *v3.ProjectAlertRul
 func (w *PodWatcher) getRestartTimeFromTrack(alert *v3.ProjectAlertRule, curCount int32) int32 {
 	name := alert.Name
 	namespace := alert.Namespace
-
-	obj, ok := w.podRestartTrack.Load(namespace + ":" + name)
-	if !ok {
-		return curCount
-	}
-	tracks := obj.([]restartTrack)
-
 	now := time.Now()
+	currentRestartTrack := restartTrack{Count: curCount, Time: now}
+	currentRestartTrackArr := []restartTrack{currentRestartTrack}
 
-	if len(tracks) == 0 {
-		tracks = append(tracks, restartTrack{Count: curCount, Time: now})
-		w.podRestartTrack.Store(namespace+":"+name, tracks)
-		return curCount
-	}
-
-	for i, track := range tracks {
-		if now.Sub(track.Time).Seconds() < float64(alert.Spec.PodRule.RestartIntervalSeconds) {
-			tracks = tracks[i:]
-			tracks = append(tracks, restartTrack{Count: curCount, Time: now})
-			w.podRestartTrack.Store(namespace+":"+name, tracks)
-			return track.Count
+	obj, loaded := w.podRestartTrack.LoadOrStore(namespace+":"+name, currentRestartTrackArr)
+	if loaded {
+		tracks := obj.([]restartTrack)
+		for i, track := range tracks {
+			if now.Sub(track.Time).Seconds() < float64(alert.Spec.PodRule.RestartIntervalSeconds) {
+				tracks = tracks[i:]
+				tracks = append(tracks, currentRestartTrack)
+				w.podRestartTrack.Store(namespace+":"+name, tracks)
+				return track.Count
+			}
 		}
 	}
 
-	w.podRestartTrack.Store(namespace+":"+name, []restartTrack{})
 	return curCount
 }
 
