@@ -22,8 +22,18 @@ func Register(ctx context.Context, agentContext *config.UserContext) {
 	ah := &appHandler{
 		istioClusterGraphClient:  mgmtContext.ClusterMonitorGraphs(metav1.NamespaceAll),
 		istioMonitorMetricClient: mgmtContext.MonitorMetrics(metav1.NamespaceAll),
+		clusterInterface:         mgmtContext.Clusters(""),
 		clusterName:              clusterName,
 	}
 
 	cattleAppClient.Controller().AddClusterScopedHandler(ctx, "istio-app-handler", clusterName, ah.sync)
+
+	ch := &clusterHandler{
+		clusterName:      clusterName,
+		clusterInterface: mgmtContext.Clusters(""),
+		appLister:        cattleAppClient.Controller().Lister(),
+		projectLister:    mgmtContext.Projects(clusterName).Controller().Lister(),
+	}
+
+	mgmtContext.Clusters("").AddHandler(ctx, "istio-cluster-status-handler", ch.sync)
 }

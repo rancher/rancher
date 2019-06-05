@@ -23,6 +23,7 @@ var (
 type appHandler struct {
 	istioClusterGraphClient  mgmtv3.ClusterMonitorGraphInterface
 	istioMonitorMetricClient mgmtv3.MonitorMetricInterface
+	clusterInterface         mgmtv3.ClusterInterface
 
 	clusterName string
 }
@@ -114,8 +115,15 @@ func (ah *appHandler) sync(key string, obj *v3.App) (runtime.Object, error) {
 		return obj, nil
 	}
 
-	if obj.DeletionTimestamp != nil {
-		err := isIstioMetricExpressionWithdraw(ah.clusterName, ah.istioClusterGraphClient, ah.istioMonitorMetricClient, obj)
+	if obj == nil || obj.DeletionTimestamp != nil {
+		err := ah.updateClusterIstioCondition(false)
+		if err != nil {
+			return obj, err
+		}
+		return obj, isIstioMetricExpressionWithdraw(ah.clusterName, ah.istioClusterGraphClient, ah.istioMonitorMetricClient, obj)
+	}
+
+	if err := ah.updateClusterIstioCondition(true); err != nil {
 		return obj, err
 	}
 
@@ -123,7 +131,30 @@ func (ah *appHandler) sync(key string, obj *v3.App) (runtime.Object, error) {
 		return obj, errors.Errorf("waiting for the app %s to be installed", obj.Name)
 	}
 
-	err := isIstioMetricExpressionDeployed(ah.clusterName, ah.istioClusterGraphClient, ah.istioMonitorMetricClient, obj)
+	return obj, isIstioMetricExpressionDeployed(ah.clusterName, ah.istioClusterGraphClient, ah.istioMonitorMetricClient, obj)
+}
 
-	return obj, err
+func (ah *appHandler) updateClusterIstioCondition(enabled bool) error {
+	var err error
+	retryCount := 20
+	for i := 0; i < retryCount; i++ {
+		err = nil
+		var cluster *mgmtv3.Cluster
+		cluster, err = ah.clusterInterface.Get(ah.clusterName, metav1.GetOptions{})
+		if err != nil {
+			logrus.Errorf("failed to get cluster %s from interface, err: %s", ah.clusterName, err)
+			continue
+		}
+		if cluster.Status.IstioEnabled == enabled {
+			return nil
+		}
+		cluster.Status.IstioEnabled = enabled
+		_, err = ah.clusterInterface.Update(cluster)
+		if err == nil {
+			return nil
+		}
+
+		logrus.Errorf("failed to update cluster condition, error: %s", err.Error())
+	}
+	return errors.Wrapf(err, "failed to update cluster condition, retry %d times", retryCount)
 }
