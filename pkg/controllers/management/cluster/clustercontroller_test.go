@@ -32,13 +32,11 @@ func TestSetNodePortRange(t *testing.T) {
 		ObjectMeta: v1.ObjectMeta{
 			Name: "testCluster",
 		},
-		Spec: v3.ClusterSpec{
-			RancherKubernetesEngineConfig: &v3.RancherKubernetesEngineConfig{
-				Services: v3.RKEConfigServices{
-					KubeAPI: v3.KubeAPIService{
-						ServiceNodePortRange: testServiceNodePortRange,
-					},
-				},
+	}
+	testCluster.Spec.RancherKubernetesEngineConfig = &v3.RancherKubernetesEngineConfig{
+		Services: v3.RKEConfigServices{
+			KubeAPI: v3.KubeAPIService{
+				ServiceNodePortRange: testServiceNodePortRange,
 			},
 		},
 	}
@@ -55,10 +53,9 @@ func TestLoadBalancerCapability(t *testing.T) {
 		ObjectMeta: v1.ObjectMeta{
 			Name: "testCluster",
 		},
-		Spec: v3.ClusterSpec{
-			RancherKubernetesEngineConfig: &v3.RancherKubernetesEngineConfig{},
-		},
 	}
+	testCluster.Spec.RancherKubernetesEngineConfig = &v3.RancherKubernetesEngineConfig{}
+
 	// map of cloud provider name to expected lb capability
 	cloudProviderLBCapabilityMap := map[v3.CloudProvider]*bool{
 		v3.CloudProvider{}: nil,
