@@ -439,7 +439,7 @@ func (r *RunningDriver) Start() (string, error) {
 			cmd.SysProcAttr = &syscall.SysProcAttr{}
 			cmd.SysProcAttr.Credential = cred
 			cmd.SysProcAttr.Chroot = "/opt/jail/driver-jail"
-			cmd.Env = []string{"PATH=/usr/bin"}
+			cmd.Env = whitelistEnvvars([]string{"PATH=/usr/bin"})
 		}
 
 		// redirect output to console
@@ -614,4 +614,25 @@ func getUserCred() (*syscall.Credential, error) {
 	gid := uint32(i)
 
 	return &syscall.Credential{Uid: uid, Gid: gid}, nil
+}
+
+func whitelistEnvvars(envvars []string) []string {
+	wl := os.Getenv("CATTLE_KONTAINER_ENGINE_WHITELIST_ENVVARS")
+	envWhiteList := strings.Split(wl, ",")
+
+	if len(envWhiteList) == 0 {
+		envWhiteList = []string{
+			"HTTP_PROXY",
+			"HTTPS_PROXY",
+			"NO_PROXY",
+		}
+	}
+
+	for _, wlVar := range envWhiteList {
+		if val := os.Getenv(wlVar); val != "" {
+			envvars = append(envvars, wlVar+"="+val)
+		}
+	}
+
+	return envvars
 }
