@@ -83,3 +83,7 @@ func setIntIfNil(configMap map[string]interface{}, fieldName string, replaceVal 
 		configMap[fieldName] = replaceVal
 	}
 }
+
+func (f *Formatter) CollectionFormatter(request *types.APIContext, collection *types.GenericCollection) {
+	collection.AddAction(request, "createFromTemplate")
+}
