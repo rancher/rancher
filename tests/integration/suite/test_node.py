@@ -130,9 +130,20 @@ def test_writing_config_to_disk(admin_mc, wait_remove_resource):
         digitaloceancredentialConfig={"accessToken": "test"})
     wait_remove_resource(cloud_credential)
     userdata = "do cool stuff"
-    node_template = client.create_node_template(
-        digitaloceanConfig={'userdata': userdata}, name='danssweetassthing',
-        cloudCredentialId=cloud_credential.id)
+
+    def _node_template():
+        try:
+            return client.create_node_template(
+                digitaloceanConfig={'userdata': userdata},
+                name='danssweetassthing',
+                cloudCredentialId=cloud_credential.id)
+
+        except ApiError:
+            return False
+
+    node_template = wait_for(_node_template,
+                             fail_handler=lambda:
+                             'failed to create node template')
     wait_remove_resource(node_template)
 
     node_pool = client.create_node_pool(
