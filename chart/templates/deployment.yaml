@@ -65,6 +65,16 @@ spec:
         # Public trusted CA - clear ca certs
         - "--no-cacerts"
 {{- end }}
+{{- if .Values.database.use }}
+        - "--db-host {{ .Values.database.host }}"
+        - "--db-port {{ .Values.database.port }}"
+        - "--db-user {{ .Values.database.user }}"
+        - "--db-pass {{ .Values.database.password }}"
+        - "--db-name {{ .Values.database.name }}"
+{{- end }}
+{{- if .Values.database.strictEnforcing }}
+        - "--db-strict-enforcing {{ .Values.database.strictEnforcing }}"
+{{- end }}
         - "--http-listen-port=80"
         - "--https-listen-port=443"
         - "--add-local={{ .Values.addLocal }}"

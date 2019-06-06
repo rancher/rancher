@@ -37,6 +37,17 @@ debug: false
 # Fully qualified name to reach your Rancher server
 # hostname: rancher.my.org
 
+# Using External Dabatase
+## Ref: https://rancher.com/docs/rancher/v1.6/en/installing-rancher/installing-server/#single-container-external-database
+database:
+  use: false
+  host: "db.example.com"
+  port: "3306"
+  user: "rancher"
+  password: "rancher"
+  name: "cattle"
+  strictEnforcing: false
+
 ## Optional array of imagePullSecrets containing private registry credentials
 ## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 imagePullSecrets: []
