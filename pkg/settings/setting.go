@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 var (
@@ -50,6 +50,7 @@ var (
 	UIKubernetesSupportedVersions   = NewSetting("ui-k8s-supported-versions-range", ">= 1.11.0 <=1.13.x")
 	UIKubernetesDefaultVersion      = NewSetting("ui-k8s-default-version-range", "<=1.13.x")
 	WhitelistDomain                 = NewSetting("whitelist-domain", "forums.rancher.com")
+	WhitelistEnvironmentVars        = NewSetting("whitelist-envvars", "HTTP_PROXY,HTTPS_PROXY,NO_PROXY")
 	SystemMonitoringCatalogID       = NewSetting("system-monitoring-catalog-id", "catalog://?catalog=system-library&template=rancher-monitoring&version=0.0.3")
 	SystemLoggingCatalogID          = NewSetting("system-logging-catalog-id", "catalog://?catalog=system-library&template=rancher-logging&version=0.1.1")
 	SystemExternalDNSCatalogID      = NewSetting("system-externaldns-catalog-id", "catalog://?catalog=system-library&template=rancher-external-dns&version=0.0.1")

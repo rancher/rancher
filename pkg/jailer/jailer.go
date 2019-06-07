@@ -8,11 +8,13 @@ import (
 	"os/user"
 	"path"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 )
 
@@ -80,4 +82,22 @@ func GetUserCred() (*syscall.Credential, error) {
 	gid := uint32(i)
 
 	return &syscall.Credential{Uid: uid, Gid: gid}, nil
+}
+
+func WhitelistEnvvars(envvars []string) []string {
+	wl := settings.WhitelistEnvironmentVars.Get()
+	envWhiteList := strings.Split(wl, ",")
+
+	if len(envWhiteList) == 0 {
+		return envvars
+	}
+
+	for _, wlVar := range envWhiteList {
+		wlVar = strings.TrimSpace(wlVar)
+		if val := os.Getenv(wlVar); val != "" {
+			envvars = append(envvars, wlVar+"="+val)
+		}
+	}
+
+	return envvars
 }
