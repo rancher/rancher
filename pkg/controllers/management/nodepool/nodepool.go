@@ -52,7 +52,7 @@ func (c *Controller) Create(nodePool *v3.NodePool) (runtime.Object, error) {
 
 func (c *Controller) Updated(nodePool *v3.NodePool) (runtime.Object, error) {
 	obj, err := v3.NodePoolConditionUpdated.Do(nodePool, func() (runtime.Object, error) {
-		return nodePool, c.createNodes(nodePool)
+		return nodePool, c.reconcile(nodePool)
 	})
 	return obj.(*v3.NodePool), err
 }
@@ -140,7 +140,7 @@ func (c *Controller) deleteNode(node *v3.Node, duration time.Duration) error {
 	})
 }
 
-func (c *Controller) createNodes(nodePool *v3.NodePool) error {
+func (c *Controller) reconcile(nodePool *v3.NodePool) error {
 	changed, err := c.createOrCheckNodes(nodePool, true)
 	if err != nil {
 		return err
