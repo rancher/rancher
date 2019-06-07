@@ -175,6 +175,10 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("catalogtemplateversions").verbs("*").
 		addRule().apiGroups("monitoring.cattle.io").resources("prometheus").verbs("view").
 		addRule().apiGroups("monitoring.coreos.com").resources("prometheuses", "prometheusRules", "serviceMonitors").verbs("*").
+		addRule().apiGroups("networking.istio.io").resources("destinationrules", "envoyfilters", "gateways", "serviceentries", "sidecars", "virtualservices").verbs("*").
+		addRule().apiGroups("config.istio.io").resources("apikeys", "authorizations", "checknothings", "circonuses", "deniers", "fluentds", "handlers", "kubernetesenvs", "kuberneteses", "listcheckers", "listentries", "logentries", "memquotas", "metrics", "opas", "prometheuses", "quotas", "quotaspecbindings", "quotaspecs", "rbacs", "reportnothings", "rules", "solarwindses", "stackdrivers", "statsds", "stdios").verbs("*").
+		addRule().apiGroups("authentication.istio.io").resources("policies").verbs("*").
+		addRule().apiGroups("rbac.istio.io").resources("rbacconfigs", "serviceroles", "servicerolebindings").verbs("*").
 		setRoleTemplateNames("admin")
 
 	rb.addRoleTemplate("Project Member", "project-member", "project", true, false, false, false).
@@ -199,6 +203,10 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("catalogtemplateversions").verbs("get", "list", "watch").
 		addRule().apiGroups("monitoring.cattle.io").resources("prometheus").verbs("view").
 		addRule().apiGroups("monitoring.coreos.com").resources("prometheuses", "prometheusRules", "serviceMonitors").verbs("*").
+		addRule().apiGroups("networking.istio.io").resources("destinationrules", "envoyfilters", "gateways", "serviceentries", "sidecars", "virtualservices").verbs("*").
+		addRule().apiGroups("config.istio.io").resources("apikeys", "authorizations", "checknothings", "circonuses", "deniers", "fluentds", "handlers", "kubernetesenvs", "kuberneteses", "listcheckers", "listentries", "logentries", "memquotas", "metrics", "opas", "prometheuses", "quotas", "quotaspecbindings", "quotaspecs", "rbacs", "reportnothings", "rules", "solarwindses", "stackdrivers", "statsds", "stdios").verbs("*").
+		addRule().apiGroups("authentication.istio.io").resources("policies").verbs("*").
+		addRule().apiGroups("rbac.istio.io").resources("rbacconfigs", "serviceroles", "servicerolebindings").verbs("*").
 		setRoleTemplateNames("edit")
 
 	rb.addRoleTemplate("Read-only", "read-only", "project", true, false, false, false).
@@ -219,6 +227,10 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("projectcatalogs").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectmonitorgraphs").verbs("get", "list", "watch").
 		addRule().apiGroups("monitoring.coreos.com").resources("prometheuses", "prometheusRules", "serviceMonitors").verbs("get", "list", "watch").
+		addRule().apiGroups("networking.istio.io").resources("destinationrules", "envoyfilters", "gateways", "serviceentries", "sidecars", "virtualservices").verbs("get", "list", "watch").
+		addRule().apiGroups("config.istio.io").resources("apikeys", "authorizations", "checknothings", "circonuses", "deniers", "fluentds", "handlers", "kubernetesenvs", "kuberneteses", "listcheckers", "listentries", "logentries", "memquotas", "metrics", "opas", "prometheuses", "quotas", "quotaspecbindings", "quotaspecs", "rbacs", "reportnothings", "rules", "solarwindses", "stackdrivers", "statsds", "stdios").verbs("get", "list", "watch").
+		addRule().apiGroups("authentication.istio.io").resources("policies").verbs("get", "list", "watch").
+		addRule().apiGroups("rbac.istio.io").resources("rbacconfigs", "serviceroles", "servicerolebindings").verbs("get", "list", "watch").
 		setRoleTemplateNames("view")
 
 	rb.addRoleTemplate("Create Namespaces", "create-ns", "project", true, false, false, false).
