@@ -5,7 +5,7 @@ import (
 	"github.com/rancher/rancher/pkg/project"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3"
-	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -41,14 +41,13 @@ func (h *clusterHandler) getIstioAppEnabled() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	apps, err := h.appLister.List(p.Name, labels.Everything())
-	if err != nil {
+
+	app, err := h.appLister.Get(p.Name, istioAppName)
+	if errors.IsNotFound(err) || app.DeletionTimestamp != nil {
+		return false, nil
+	} else if err != nil {
 		return false, err
 	}
-	for _, app := range apps {
-		if isIstioApp(app) {
-			return true, nil
-		}
-	}
-	return false, nil
+
+	return true, nil
 }

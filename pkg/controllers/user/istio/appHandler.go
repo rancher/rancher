@@ -14,6 +14,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	systemCatalogName = "system-library"
+	istioTemplateName = "rancher-istio"
+	istioAppName      = "cluster-istio"
+)
+
 var (
 	preDefinedIstioMetrics      = getPredefinedIstioMetrics()
 	preDefinedIstioClusterGraph = getPredefinedIstioClusterGraph()
@@ -29,6 +35,9 @@ type appHandler struct {
 }
 
 func isIstioApp(obj *v3.App) bool {
+	if obj.Name != istioAppName {
+		return false
+	}
 	values, err := url.Parse(obj.Spec.ExternalID)
 	if err != nil {
 		logrus.Errorf("check catalog type failed: %s", err.Error())
@@ -42,7 +51,7 @@ func isIstioApp(obj *v3.App) bool {
 
 	template := values.Query().Get("template")
 
-	if catalog == "system-library" && template == "rancher-istio" {
+	if catalog == systemCatalogName && template == istioTemplateName {
 		return true
 	}
 	return false
@@ -135,26 +144,14 @@ func (ah *appHandler) sync(key string, obj *v3.App) (runtime.Object, error) {
 }
 
 func (ah *appHandler) updateClusterIstioCondition(enabled bool) error {
-	var err error
-	retryCount := 20
-	for i := 0; i < retryCount; i++ {
-		err = nil
-		var cluster *mgmtv3.Cluster
-		cluster, err = ah.clusterInterface.Get(ah.clusterName, metav1.GetOptions{})
-		if err != nil {
-			logrus.Errorf("failed to get cluster %s from interface, err: %s", ah.clusterName, err)
-			continue
-		}
-		if cluster.Status.IstioEnabled == enabled {
-			return nil
-		}
-		cluster.Status.IstioEnabled = enabled
-		_, err = ah.clusterInterface.Update(cluster)
-		if err == nil {
-			return nil
-		}
-
-		logrus.Errorf("failed to update cluster condition, error: %s", err.Error())
+	cluster, err := ah.clusterInterface.Get(ah.clusterName, metav1.GetOptions{})
+	if err != nil {
+		return err
 	}
-	return errors.Wrapf(err, "failed to update cluster condition, retry %d times", retryCount)
+	if cluster.Status.IstioEnabled == enabled {
+		return nil
+	}
+	cluster.Status.IstioEnabled = enabled
+	_, err = ah.clusterInterface.Update(cluster)
+	return err
 }
