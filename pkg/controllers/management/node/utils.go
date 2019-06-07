@@ -124,11 +124,11 @@ func buildCommand(nodeDir string, node *v3.Node, cmdArgs []string) (*exec.Cmd, e
 	command.SysProcAttr = &syscall.SysProcAttr{}
 	command.SysProcAttr.Credential = cred
 	command.SysProcAttr.Chroot = path.Join(jailer.BaseJailPath, node.Namespace)
-	command.Env = []string{
-
+	envvars := []string{
 		nodeDirEnvKey + nodeDir,
 		"PATH=/usr/bin:/var/lib/rancher/management-state/bin",
 	}
+	command.Env = jailer.WhitelistEnvvars(envvars)
 	return command, nil
 }
 
