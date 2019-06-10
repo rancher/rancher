@@ -291,14 +291,17 @@ type SMTPConfig struct {
 type SlackConfig struct {
 	DefaultRecipient string `json:"defaultRecipient,omitempty" norman:"required"`
 	URL              string `json:"url,omitempty" norman:"required"`
+	*HTTPClientConfig
 }
 
 type PagerdutyConfig struct {
 	ServiceKey string `json:"serviceKey,omitempty" norman:"required"`
+	*HTTPClientConfig
 }
 
 type WebhookConfig struct {
 	URL string `json:"url,omitempty" norman:"required"`
+	*HTTPClientConfig
 }
 
 type WechatConfig struct {
@@ -307,6 +310,7 @@ type WechatConfig struct {
 	Agent            string `json:"agent,omitempty" norman:"required"`
 	Corp             string `json:"corp,omitempty" norman:"required"`
 	RecipientType    string `json:"recipientType,omitempty" norman:"required,options=tag|party|user,default=party"`
+	*HTTPClientConfig
 }
 
 type NotifierStatus struct {
@@ -315,4 +319,10 @@ type NotifierStatus struct {
 type AlertSystemImages struct {
 	AlertManager       string `json:"alertManager,omitempty"`
 	AlertManagerHelper string `json:"alertManagerHelper,omitempty"`
+}
+
+// HTTPClientConfig configures an HTTP client.
+type HTTPClientConfig struct {
+	// HTTP proxy server to use to connect to the targets.
+	ProxyURL string `json:"proxyUrl,omitempty"`
 }

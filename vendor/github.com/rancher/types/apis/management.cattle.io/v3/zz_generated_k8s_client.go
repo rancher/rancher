@@ -75,6 +75,8 @@ type Interface interface {
 	ClusterMonitorGraphsGetter
 	ProjectMonitorGraphsGetter
 	CloudCredentialsGetter
+	ClusterTemplatesGetter
+	ClusterTemplateRevisionsGetter
 }
 
 type Clients struct {
@@ -135,6 +137,8 @@ type Clients struct {
 	ClusterMonitorGraph                     ClusterMonitorGraphClient
 	ProjectMonitorGraph                     ProjectMonitorGraphClient
 	CloudCredential                         CloudCredentialClient
+	ClusterTemplate                         ClusterTemplateClient
+	ClusterTemplateRevision                 ClusterTemplateRevisionClient
 }
 
 type Client struct {
@@ -197,6 +201,8 @@ type Client struct {
 	clusterMonitorGraphControllers                     map[string]ClusterMonitorGraphController
 	projectMonitorGraphControllers                     map[string]ProjectMonitorGraphController
 	cloudCredentialControllers                         map[string]CloudCredentialController
+	clusterTemplateControllers                         map[string]ClusterTemplateController
+	clusterTemplateRevisionControllers                 map[string]ClusterTemplateRevisionController
 }
 
 func Factory(ctx context.Context, config rest.Config) (context.Context, controller.Starter, error) {
@@ -397,6 +403,12 @@ func NewClientsFromInterface(iface Interface) *Clients {
 		CloudCredential: &cloudCredentialClient2{
 			iface: iface.CloudCredentials(""),
 		},
+		ClusterTemplate: &clusterTemplateClient2{
+			iface: iface.ClusterTemplates(""),
+		},
+		ClusterTemplateRevision: &clusterTemplateRevisionClient2{
+			iface: iface.ClusterTemplateRevisions(""),
+		},
 	}
 }
 
@@ -468,6 +480,8 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		clusterMonitorGraphControllers:                     map[string]ClusterMonitorGraphController{},
 		projectMonitorGraphControllers:                     map[string]ProjectMonitorGraphController{},
 		cloudCredentialControllers:                         map[string]CloudCredentialController{},
+		clusterTemplateControllers:                         map[string]ClusterTemplateController{},
+		clusterTemplateRevisionControllers:                 map[string]ClusterTemplateRevisionController{},
 	}, nil
 }
 
@@ -1192,6 +1206,32 @@ type CloudCredentialsGetter interface {
 func (c *Client) CloudCredentials(namespace string) CloudCredentialInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &CloudCredentialResource, CloudCredentialGroupVersionKind, cloudCredentialFactory{})
 	return &cloudCredentialClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type ClusterTemplatesGetter interface {
+	ClusterTemplates(namespace string) ClusterTemplateInterface
+}
+
+func (c *Client) ClusterTemplates(namespace string) ClusterTemplateInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ClusterTemplateResource, ClusterTemplateGroupVersionKind, clusterTemplateFactory{})
+	return &clusterTemplateClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type ClusterTemplateRevisionsGetter interface {
+	ClusterTemplateRevisions(namespace string) ClusterTemplateRevisionInterface
+}
+
+func (c *Client) ClusterTemplateRevisions(namespace string) ClusterTemplateRevisionInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ClusterTemplateRevisionResource, ClusterTemplateRevisionGroupVersionKind, clusterTemplateRevisionFactory{})
+	return &clusterTemplateRevisionClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,
