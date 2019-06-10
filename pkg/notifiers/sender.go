@@ -5,21 +5,25 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"mime/multipart"
 	"net"
 	"net/http"
 	"net/smtp"
 	"net/textproto"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/prometheus/common/model"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
+
+const contentTypeJSON = "application/json"
 
 type Message struct {
 	Title   string
@@ -40,7 +44,7 @@ func SendMessage(notifier *v3.Notifier, recipient string, msg *Message) error {
 		if recipient == "" {
 			recipient = notifier.Spec.SlackConfig.DefaultRecipient
 		}
-		return TestSlack(notifier.Spec.SlackConfig.URL, recipient, msg.Content)
+		return TestSlack(notifier.Spec.SlackConfig.URL, recipient, msg.Content, notifier.Spec.SlackConfig.HTTPClientConfig)
 	}
 
 	if notifier.Spec.SMTPConfig != nil {
@@ -52,7 +56,7 @@ func SendMessage(notifier *v3.Notifier, recipient string, msg *Message) error {
 	}
 
 	if notifier.Spec.PagerdutyConfig != nil {
-		return TestPagerduty(notifier.Spec.PagerdutyConfig.ServiceKey, msg.Content)
+		return TestPagerduty(notifier.Spec.PagerdutyConfig.ServiceKey, msg.Content, notifier.Spec.PagerdutyConfig.HTTPClientConfig)
 	}
 
 	if notifier.Spec.WechatConfig != nil {
@@ -60,17 +64,17 @@ func SendMessage(notifier *v3.Notifier, recipient string, msg *Message) error {
 		if recipient == "" {
 			recipient = s.DefaultRecipient
 		}
-		return TestWechat(notifier.Spec.WechatConfig.Secret, notifier.Spec.WechatConfig.Agent, notifier.Spec.WechatConfig.Corp, notifier.Spec.WechatConfig.RecipientType, recipient, msg.Content)
+		return TestWechat(notifier.Spec.WechatConfig.Secret, notifier.Spec.WechatConfig.Agent, notifier.Spec.WechatConfig.Corp, notifier.Spec.WechatConfig.RecipientType, recipient, msg.Content, notifier.Spec.WechatConfig.HTTPClientConfig)
 	}
 
 	if notifier.Spec.WebhookConfig != nil {
-		return TestWebhook(notifier.Spec.WebhookConfig.URL, msg.Content)
+		return TestWebhook(notifier.Spec.WebhookConfig.URL, msg.Content, notifier.Spec.WebhookConfig.HTTPClientConfig)
 	}
 
 	return errors.New("Notifier not configured")
 }
 
-func TestPagerduty(key, msg string) error {
+func TestPagerduty(key, msg string, cfg *v3.HTTPClientConfig) error {
 	if msg == "" {
 		msg = "Pagerduty setting validated"
 	}
@@ -92,19 +96,25 @@ func TestPagerduty(key, msg string) error {
 	if err := json.NewEncoder(&buf).Encode(pd); err != nil {
 		return err
 	}
-	resp, err := http.Post(url, "application/json", &buf)
+
+	client, err := NewClientFromConfig(cfg)
+	if err != nil {
+		return err
+	}
+
+	resp, err := post(client, url, contentTypeJSON, &buf)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return fmt.Errorf("http status code is %d, not include in the 2xx success HTTP status codes", resp.StatusCode)
+		return fmt.Errorf("HTTP status code is %d, not included in the 2xx success HTTP status codes", resp.StatusCode)
 	}
 
 	return nil
 }
 
-func TestWechat(secret, agent, corp, receiverType, receiver, msg string) error {
+func TestWechat(secret, agent, corp, receiverType, receiver, msg string, cfg *v3.HTTPClientConfig) error {
 	if msg == "" {
 		msg = "Wechat setting validated"
 	}
@@ -119,10 +129,10 @@ func TestWechat(secret, agent, corp, receiverType, receiver, msg string) error {
 	q.Add("corpsecret", secret)
 	req.URL.RawQuery = q.Encode()
 
-	client := &http.Client{
-		Timeout: 15 * time.Second,
+	client, err := NewClientFromConfig(cfg)
+	if err != nil {
+		return err
 	}
-	var wechatToken wechatToken
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
@@ -134,6 +144,7 @@ func TestWechat(secret, agent, corp, receiverType, receiver, msg string) error {
 		return err
 	}
 
+	var wechatToken wechatToken
 	if err := json.Unmarshal(requestBytes, &wechatToken); err != nil {
 		return err
 	}
@@ -165,15 +176,15 @@ func TestWechat(secret, agent, corp, receiverType, receiver, msg string) error {
 	if err := json.NewEncoder(&buf).Encode(wc); err != nil {
 		return err
 	}
-	resp, err = http.Post(url, "application/json", &buf)
 
+	resp, err = post(client, url, contentTypeJSON, &buf)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return fmt.Errorf("http status code is %d, not include in the 2xx success HTTP status codes", resp.StatusCode)
+		return fmt.Errorf("HTTP status code is %d, not included in the 2xx success HTTP status codes", resp.StatusCode)
 	}
 
 	requestBytes, err = ioutil.ReadAll(resp.Body)
@@ -193,7 +204,7 @@ func TestWechat(secret, agent, corp, receiverType, receiver, msg string) error {
 	return nil
 }
 
-func TestWebhook(url, msg string) error {
+func TestWebhook(url, msg string, cfg *v3.HTTPClientConfig) error {
 	if msg == "" {
 		msg = "Webhook setting validated"
 	}
@@ -210,20 +221,25 @@ func TestWebhook(url, msg string) error {
 		return err
 	}
 
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(alertData))
+	client, err := NewClientFromConfig(cfg)
+	if err != nil {
+		return err
+	}
+
+	resp, err := post(client, url, contentTypeJSON, bytes.NewBuffer(alertData))
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return fmt.Errorf("http status code is %d, not include in the 2xx success HTTP status codes", resp.StatusCode)
+		return fmt.Errorf("HTTP status code is %d, not included in the 2xx success HTTP status codes", resp.StatusCode)
 	}
 
 	return nil
 }
 
-func TestSlack(url, channel, msg string) error {
+func TestSlack(url, channel, msg string, cfg *v3.HTTPClientConfig) error {
 	if msg == "" {
 		msg = "Slack setting validated"
 	}
@@ -240,23 +256,28 @@ func TestSlack(url, channel, msg string) error {
 		return err
 	}
 
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(data))
+	client, err := NewClientFromConfig(cfg)
+	if err != nil {
+		return err
+	}
+
+	resp, err := post(client, url, contentTypeJSON, bytes.NewBuffer(data))
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("http status code is not 200")
-	}
 
 	res, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
 
-	if string(res) != "ok" {
-		return fmt.Errorf("http response is not ok")
+	if resp.StatusCode/100 != 2 {
+		return fmt.Errorf("HTTP status code is %d, not included in the 2xx success HTTP status codes, response: %v", resp.StatusCode, string(res))
+	}
+
+	if !strings.Contains(string(res), "ok") {
+		return fmt.Errorf("HTTP response is not ok")
 	}
 
 	return nil
@@ -424,7 +445,7 @@ func auth(mechs string, username, password string) (smtp.Auth, error) {
 			return &loginAuth{username, password}, nil
 		}
 	}
-	return nil, fmt.Errorf("smtp server does not support login auth")
+	return nil, fmt.Errorf("SMTP server does not support login auth")
 }
 
 type loginAuth struct {
@@ -448,4 +469,33 @@ func (a *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
 		}
 	}
 	return nil, nil
+}
+
+// NewClientFromConfig returns a new HTTP client configured for the
+// given HTTPClientConfig.
+func NewClientFromConfig(cfg *v3.HTTPClientConfig) (*http.Client, error) {
+	client := http.Client{
+		Timeout: time.Second * 10,
+	}
+
+	if cfg != nil {
+		proxyURL, err := url.Parse(cfg.ProxyURL)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Failed to parse notifier proxy url %s", cfg.ProxyURL)
+		}
+		client.Transport = &http.Transport{
+			Proxy: http.ProxyURL(proxyURL),
+		}
+	}
+
+	return &client, nil
+}
+
+func post(client *http.Client, url string, bodyType string, body io.Reader) (*http.Response, error) {
+	req, err := http.NewRequest("POST", url, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", bodyType)
+	return client.Do(req)
 }
