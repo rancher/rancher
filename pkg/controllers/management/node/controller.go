@@ -301,11 +301,12 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.N
 }
 
 func aliasToPath(driver string, config map[string]interface{}, ns string) error {
-	devMode := os.Getenv("CATTLE_DEV_MODE") != ""
+	devMode := os.Getenv("CATTLE_DEV_MODE") == "true"
 	baseDir := path.Join("/opt/jail", ns)
 	if devMode {
 		baseDir = os.TempDir()
 	}
+
 	// Check if the required driver has aliased fields
 	if fields, ok := aliases[driver]; ok {
 		hasher := sha256.New()
@@ -326,11 +327,7 @@ func aliasToPath(driver string, config map[string]interface{}, ns string) error 
 					return err
 				}
 				// Add the field and path
-				if devMode {
-					config[driverField] = fullPath
-				} else {
-					config[driverField] = path.Join("/", sha)
-				}
+				config[driverField] = fullPath
 			}
 		}
 	}
