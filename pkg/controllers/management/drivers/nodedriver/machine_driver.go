@@ -2,6 +2,7 @@ package nodedriver
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"reflect"
@@ -40,7 +41,8 @@ var (
 )
 
 const (
-	driverNameLabel = "io.cattle.node_driver.name"
+	driverNameLabel  = "io.cattle.node_driver.name"
+	uiFieldHintsAnno = "io.cattle.nodedriver/ui-field-hints"
 )
 
 func Register(ctx context.Context, management *config.ManagementContext) {
@@ -123,12 +125,35 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 		v3.NodeDriverConditionInstalled.Unknown(obj)
 	}
 
+	driverName := strings.TrimPrefix(driver.Name(), drivers.DockerMachineDriverPrefix)
+
 	newObj, err := v3.NodeDriverConditionDownloaded.Once(obj, func() (runtime.Object, error) {
 		if obj.Spec.Builtin {
 			obj.Status.AppliedDockerMachineVersion = m.dockerMachineVersion
 		} else {
 			obj.Status.AppliedURL = obj.Spec.URL
 			obj.Status.AppliedChecksum = obj.Spec.Checksum
+		}
+
+		if aliases, ok := Aliases[driverName]; ok {
+			anno := make(map[string]map[string]string)
+
+			for _, aliased := range aliases {
+				anno[aliased] = map[string]string{
+					"type": "multiline",
+				}
+			}
+
+			jsonAnno, err := json.Marshal(anno)
+			if err != nil {
+				return obj, err
+			}
+
+			if obj.Annotations == nil {
+				obj.Annotations = make(map[string]string)
+			}
+
+			obj.Annotations[uiFieldHintsAnno] = string(jsonAnno)
 		}
 		// update status
 		obj, err = m.nodeDriverClient.Update(obj)
@@ -161,7 +186,6 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	}
 
 	obj = newObj.(*v3.NodeDriver)
-	driverName := strings.TrimPrefix(driver.Name(), drivers.DockerMachineDriverPrefix)
 	flags, err := getCreateFlagsForDriver(driverName)
 	if err != nil {
 		return nil, err
@@ -270,6 +294,14 @@ func (m *Lifecycle) createCredSchema(obj *v3.NodeDriver, credFields map[string]v
 func (m *Lifecycle) checkDriverVersion(obj *v3.NodeDriver) bool {
 	if v3.NodeDriverConditionDownloaded.IsUnknown(obj) || v3.NodeDriverConditionInstalled.IsUnknown(obj) {
 		return true
+	}
+
+	driverName := strings.TrimPrefix(obj.Spec.DisplayName, drivers.DockerMachineDriverPrefix)
+
+	if _, ok := Aliases[driverName]; ok {
+		if val, ok := obj.Annotations[uiFieldHintsAnno]; !ok || val == "" {
+			return true
+		}
 	}
 
 	// Builtin drivers use the docker-machine version to validate against
