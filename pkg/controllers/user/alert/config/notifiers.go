@@ -1,7 +1,9 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -173,6 +175,8 @@ func (c *EmailConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 type PagerdutyConfig struct {
 	NotifierConfig `yaml:",inline" json:",inline"`
 
+	HTTPConfig *HTTPClientConfig `yaml:"http_config,omitempty" json:"http_config,omitempty"`
+
 	ServiceKey  Secret            `yaml:"service_key,omitempty" json:"service_key,omitempty"`
 	URL         string            `yaml:"url,omitempty" json:"url,omitempty"`
 	Client      string            `yaml:"client,omitempty" json:"client,omitempty"`
@@ -199,6 +203,8 @@ func (c *PagerdutyConfig) UnmarshalYAML(unmarshal func(interface{}) error) error
 
 type WechatConfig struct {
 	NotifierConfig `yaml:",inline" json:",inline"`
+
+	HTTPConfig *HTTPClientConfig `yaml:"http_config,omitempty" json:"http_config,omitempty"`
 
 	APISecret Secret `yaml:"api_secret,omitempty" json:"api_secret,omitempty"`
 	APIURL    string `yaml:"api_url,omitempty" json:"api_url,omitempty"`
@@ -240,6 +246,8 @@ func (c *WechatConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 // SlackConfig configures notifications via Slack.
 type SlackConfig struct {
 	NotifierConfig `yaml:",inline" json:",inline"`
+
+	HTTPConfig *HTTPClientConfig `yaml:"http_config,omitempty" json:"http_config,omitempty"`
 
 	APIURL Secret `yaml:"api_url,omitempty" json:"api_url,omitempty"`
 
@@ -306,6 +314,8 @@ func (c *HipchatConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 type WebhookConfig struct {
 	NotifierConfig `yaml:",inline" json:",inline"`
 
+	HTTPConfig *HTTPClientConfig `yaml:"http_config,omitempty" json:"http_config,omitempty"`
+
 	// URL to send POST request to.
 	URL string `yaml:"url" json:"url"`
 
@@ -329,6 +339,8 @@ func (c *WebhookConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 // OpsGenieConfig configures notifications via OpsGenie.
 type OpsGenieConfig struct {
 	NotifierConfig `yaml:",inline" json:",inline"`
+
+	HTTPConfig *HTTPClientConfig `yaml:"http_config,omitempty" json:"http_config,omitempty"`
 
 	APIKey      Secret            `yaml:"api_key,omitempty" json:"api_key,omitempty"`
 	APIHost     string            `yaml:"api_host,omitempty" json:"api_host,omitempty"`
@@ -360,6 +372,8 @@ func (c *OpsGenieConfig) UnmarshalYAML(unmarshal func(interface{}) error) error 
 // VictorOpsConfig configures notifications via VictorOps.
 type VictorOpsConfig struct {
 	NotifierConfig `yaml:",inline" json:",inline"`
+
+	HTTPConfig *HTTPClientConfig `yaml:"http_config,omitempty" json:"http_config,omitempty"`
 
 	APIKey            Secret `yaml:"api_key" json:"api_key"`
 	APIURL            string `yaml:"api_url" json:"api_url"`
@@ -402,6 +416,8 @@ func (d duration) MarshalText() ([]byte, error) {
 type PushoverConfig struct {
 	NotifierConfig `yaml:",inline" json:",inline"`
 
+	HTTPConfig *HTTPClientConfig `yaml:"http_config,omitempty" json:"http_config,omitempty"`
+
 	UserKey  Secret   `yaml:"user_key,omitempty" json:"user_key,omitempty"`
 	Token    Secret   `yaml:"token,omitempty" json:"token,omitempty"`
 	Title    string   `yaml:"title,omitempty" json:"title,omitempty"`
@@ -429,4 +445,108 @@ func (c *PushoverConfig) UnmarshalYAML(unmarshal func(interface{}) error) error 
 		return fmt.Errorf("missing token in Pushover config")
 	}
 	return checkOverflow(c.XXX, "pushover config")
+}
+
+// HTTPClientConfig configures an HTTP client.
+type HTTPClientConfig struct {
+	// The HTTP basic authentication credentials for the targets.
+	BasicAuth *BasicAuth `yaml:"basic_auth,omitempty"`
+	// The bearer token for the targets.
+	BearerToken Secret `yaml:"bearer_token,omitempty"`
+	// The bearer token file for the targets.
+	BearerTokenFile string `yaml:"bearer_token_file,omitempty"`
+	// HTTP proxy server to use to connect to the targets.
+	ProxyURL URL `yaml:"proxy_url,omitempty"`
+	// TLSConfig to use to connect to the targets.
+	TLSConfig TLSConfig `yaml:"tls_config,omitempty"`
+}
+
+// BasicAuth contains basic HTTP authentication credentials.
+type BasicAuth struct {
+	Username     string `yaml:"username"`
+	Password     Secret `yaml:"password,omitempty"`
+	PasswordFile string `yaml:"password_file,omitempty"`
+}
+
+// TLSConfig configures the options for TLS connections.
+type TLSConfig struct {
+	// The CA cert to use for the targets.
+	CAFile string `yaml:"ca_file,omitempty"`
+	// The client cert file for the targets.
+	CertFile string `yaml:"cert_file,omitempty"`
+	// The client key file for the targets.
+	KeyFile string `yaml:"key_file,omitempty"`
+	// Used to verify the hostname for the targets.
+	ServerName string `yaml:"server_name,omitempty"`
+	// Disable target certificate validation.
+	InsecureSkipVerify bool `yaml:"insecure_skip_verify"`
+}
+
+// URL is a custom URL type that allows validation at configuration load time.
+type URL struct {
+	*url.URL
+}
+
+// Copy makes a deep-copy of the struct.
+func (u *URL) Copy() *URL {
+	v := *u.URL
+	return &URL{&v}
+}
+
+// MarshalYAML implements the yaml.Marshaler interface for URL.
+func (u URL) MarshalYAML() (interface{}, error) {
+	if u.URL != nil {
+		return u.URL.String(), nil
+	}
+	return nil, nil
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface for URL.
+func (u *URL) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var s string
+	if err := unmarshal(&s); err != nil {
+		return err
+	}
+	urlp, err := parseURL(s)
+	if err != nil {
+		return err
+	}
+	u.URL = urlp.URL
+	return nil
+}
+
+// MarshalJSON implements the json.Marshaler interface for URL.
+func (u URL) MarshalJSON() ([]byte, error) {
+	if u.URL != nil {
+		return json.Marshal(u.URL.String())
+	}
+	return nil, nil
+}
+
+// UnmarshalJSON implements the json.Marshaler interface for URL.
+func (u *URL) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	urlp, err := parseURL(s)
+	if err != nil {
+		return err
+	}
+	u.URL = urlp.URL
+	return nil
+}
+
+func parseURL(s string) (*URL, error) {
+	u, err := url.Parse(s)
+	if err != nil {
+		return nil, err
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return nil, fmt.Errorf("unsupported scheme %q for URL", u.Scheme)
+	}
+	if u.Host == "" {
+		return nil, fmt.Errorf("missing host for URL")
+	}
+	return &URL{u}, nil
 }
