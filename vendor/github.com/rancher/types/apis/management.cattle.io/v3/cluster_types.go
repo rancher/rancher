@@ -84,18 +84,10 @@ type Cluster struct {
 	Status ClusterStatus `json:"status"`
 }
 
-type ClusterSpec struct {
-	DisplayName                          string                         `json:"displayName" norman:"required"`
-	Description                          string                         `json:"description"`
-	Internal                             bool                           `json:"internal" norman:"nocreate,noupdate"`
+type ClusterSpecBase struct {
 	DesiredAgentImage                    string                         `json:"desiredAgentImage"`
 	DesiredAuthImage                     string                         `json:"desiredAuthImage"`
-	ImportedConfig                       *ImportedConfig                `json:"importedConfig,omitempty" norman:"nocreate,noupdate"`
-	GoogleKubernetesEngineConfig         *MapStringInterface            `json:"googleKubernetesEngineConfig,omitempty"`
-	AzureKubernetesServiceConfig         *MapStringInterface            `json:"azureKubernetesServiceConfig,omitempty"`
 	RancherKubernetesEngineConfig        *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty"`
-	AmazonElasticContainerServiceConfig  *MapStringInterface            `json:"amazonElasticContainerServiceConfig,omitempty"`
-	GenericEngineConfig                  *MapStringInterface            `json:"genericEngineConfig,omitempty"`
 	DefaultPodSecurityPolicyTemplateName string                         `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
 	DefaultClusterRoleForProjectMembers  string                         `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
 	DockerRootDir                        string                         `json:"dockerRootDir,omitempty" norman:"default=/var/lib/docker"`
@@ -103,6 +95,21 @@ type ClusterSpec struct {
 	EnableClusterAlerting                bool                           `json:"enableClusterAlerting" norman:"default=false"`
 	EnableClusterMonitoring              bool                           `json:"enableClusterMonitoring" norman:"default=false"`
 	LocalClusterAuthEndpoint             LocalClusterAuthEndpoint       `json:"localClusterAuthEndpoint,omitempty"`
+}
+
+type ClusterSpec struct {
+	ClusterSpecBase
+	DisplayName                         string              `json:"displayName" norman:"required"`
+	Description                         string              `json:"description"`
+	Internal                            bool                `json:"internal" norman:"nocreate,noupdate"`
+	ImportedConfig                      *ImportedConfig     `json:"importedConfig,omitempty" norman:"nocreate,noupdate"`
+	GoogleKubernetesEngineConfig        *MapStringInterface `json:"googleKubernetesEngineConfig,omitempty"`
+	AzureKubernetesServiceConfig        *MapStringInterface `json:"azureKubernetesServiceConfig,omitempty"`
+	AmazonElasticContainerServiceConfig *MapStringInterface `json:"amazonElasticContainerServiceConfig,omitempty"`
+	GenericEngineConfig                 *MapStringInterface `json:"genericEngineConfig,omitempty"`
+	ClusterTemplateName                 string              `json:"clusterTemplateName,omitempty" norman:"type=reference[clusterTemplate]"`
+	ClusterTemplateRevisionName         string              `json:"clusterTemplateRevisionName,omitempty" norman:"type=reference[clusterTemplateRevision]"`
+	ClusterTemplateAnswers              Answer              `json:"answers,omitempty"`
 }
 
 type ImportedConfig struct {

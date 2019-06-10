@@ -62,6 +62,8 @@ type Client struct {
 	ProjectMonitorGraph                     ProjectMonitorGraphOperations
 	CloudCredential                         CloudCredentialOperations
 	ManagementSecret                        ManagementSecretOperations
+	ClusterTemplate                         ClusterTemplateOperations
+	ClusterTemplateRevision                 ClusterTemplateRevisionOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -129,6 +131,8 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.ProjectMonitorGraph = newProjectMonitorGraphClient(client)
 	client.CloudCredential = newCloudCredentialClient(client)
 	client.ManagementSecret = newManagementSecretClient(client)
+	client.ClusterTemplate = newClusterTemplateClient(client)
+	client.ClusterTemplateRevision = newClusterTemplateRevisionClient(client)
 
 	return client, nil
 }

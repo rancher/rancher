@@ -24,7 +24,6 @@ var (
 
 	// K8sVersionsCurrent are the latest versions available for installation
 	K8sVersionsCurrent = []string{
-		"v1.11.9-rancher1-2",
 		// When add a new k8s version to 2.2, make sure to add support for it to the 2.1.x branch.
 		// Account for the fact that rke-tools image is different cross branches, and it requires using
 		// different k8s version tag

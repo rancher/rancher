@@ -143,6 +143,10 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ProjectMonitorGraphList{},
 		&CloudCredential{},
 		&CloudCredentialList{},
+		&ClusterTemplate{},
+		&ClusterTemplateList{},
+		&ClusterTemplateRevision{},
+		&ClusterTemplateRevisionList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
