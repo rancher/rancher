@@ -34,7 +34,7 @@ var (
 		"azure":        map[string]string{"customData": "customData"},
 		"digitalocean": map[string]string{"sshKeyPath": "sshKeyContents", "userdata": "userdata"},
 		"exoscale":     map[string]string{"sshKey": "sshKey", "userdata": "userdata"},
-		"openstack":    map[string]string{"privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
+		"openstack":    map[string]string{"cacert": "cacert", "privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
 		"otc":          map[string]string{"privateKeyFile": "privateKeyFile"},
 		"packet":       map[string]string{"userdata": "userdata"},
 	}
