@@ -233,7 +233,6 @@ func (g *googleOauthProvider) GetPrincipal(principalID string, token v3.Token) (
 	default:
 		return principal, fmt.Errorf("cannot get the google account due to invalid externalIDType %v", principalType)
 	}
-	return principal, nil
 }
 
 func (g *googleOauthProvider) GetName() string {

@@ -198,7 +198,6 @@ func (g *googleOauthProvider) paginateResults(adminSvc *admin.Service, hostedDom
 	default:
 		return nil, nil, fmt.Errorf("paginateResults: Invalid principal type")
 	}
-	return users, groups, nil
 }
 
 func (g *googleOauthProvider) getdirectoryServiceFromStoredToken(storedOauthToken string, config *v3.GoogleOauthConfig) (*admin.Service, error) {
