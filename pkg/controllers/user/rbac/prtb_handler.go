@@ -22,7 +22,7 @@ import (
 
 const owner = "owner-user"
 
-var globalResourcesNeededInProjects = []string{"persistentvolumes", "storageclasses"}
+var globalResourcesNeededInProjects = []string{"persistentvolumes", "storageclasses", "apiservices"}
 
 func newPRTBLifecycle(m *manager) *prtbLifecycle {
 	return &prtbLifecycle{m: m}
