@@ -29,6 +29,9 @@ var globalResourcesNeededInProjects = map[string]map[string]bool{
 	"storageclasses": {
 		"storage.k8s.io": true,
 	},
+	"apiservices": {
+		"apiregistration.k8s.io": true,
+	},
 }
 
 func newPRTBLifecycle(m *manager) *prtbLifecycle {
