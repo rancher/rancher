@@ -94,16 +94,12 @@ func getTokenAndURL() (string, string, error) {
 }
 
 func isConnected() bool {
-	_, err := os.Stat("connected")
+	_, err := os.Stat(`C:\etc\rancher\connected`)
 	return err == nil
 }
 
-func resetConnected() {
-	os.RemoveAll("connected")
-}
-
 func connected() {
-	f, _ := os.Create("connected")
+	f, _ := os.Create(`C:\etc\rancher\connected`)
 	defer f.Close()
 }
 
@@ -192,8 +188,6 @@ func (a *agentService) start(selfChangeRequest chan<- svc.ChangeRequest) error {
 }
 
 func doConnect(ctx context.Context, host, token string, headers map[string][]string, onConnect func(ctx context.Context) error, selfChangeRequest chan<- svc.ChangeRequest) {
-	defer resetConnected()
-
 	connectingStatus := make(chan remotedialer.ConnectingStatus)
 	defer close(connectingStatus)
 

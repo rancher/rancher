@@ -44,9 +44,20 @@ func newErrNodeOrClusterNotFound(msg, occursType string) *ErrNodeOrClusterNotFou
 }
 
 func ConfigClient(ctx context.Context, url string, header http.Header, writeCertOnly bool) error {
+	// try a few more times because there is a delay after registering a new node
+	nodeOrClusterNotFoundRetryLimit := 3
 	for {
 		nc, err := getConfig(client, url, header)
 		if err != nil {
+			if _, ok := err.(*ErrNodeOrClusterNotFound); ok {
+				if nodeOrClusterNotFoundRetryLimit < 1 {
+					// return the error if the node cannot connect to server or remove from a cluster
+					return err
+				}
+
+				nodeOrClusterNotFoundRetryLimit--
+			}
+
 			logrus.Warnf("Error while getting agent config: %v", err)
 			time.Sleep(5 * time.Second)
 			continue
