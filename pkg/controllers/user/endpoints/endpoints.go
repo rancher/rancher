@@ -15,9 +15,9 @@ import (
 
 	workloadUtil "github.com/rancher/rancher/pkg/controllers/user/workload"
 	nodehelper "github.com/rancher/rancher/pkg/node"
-	"github.com/rancher/types/apis/core/v1"
+	v1 "github.com/rancher/types/apis/core/v1"
 	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"

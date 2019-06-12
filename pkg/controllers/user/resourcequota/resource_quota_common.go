@@ -6,7 +6,7 @@ import (
 
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	api "k8s.io/kubernetes/pkg/apis/core"

@@ -3,7 +3,7 @@ package rkecerts
 import (
 	"os"
 
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 func Stage(rkeConfig *v3.RancherKubernetesEngineConfig) (*Bundle, error) {

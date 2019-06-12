@@ -3,10 +3,11 @@ package multiclusterapp
 import (
 	"context"
 	"fmt"
-	"github.com/rancher/types/user"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/rancher/types/user"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
@@ -15,7 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"golang.org/x/sync/errgroup"

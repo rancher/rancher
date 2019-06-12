@@ -1,12 +1,13 @@
 package projectsetter
 
 import (
-	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/pkg/project"
-	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
 	"testing"
+
+	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/project"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Tests that getMatchingNamespaces returns the proper amount namespaces given duplicates, empty slices, and multiple

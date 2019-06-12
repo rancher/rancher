@@ -7,16 +7,17 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"github.com/rancher/norman/httperror"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/rancher/norman/httperror"
+
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/signer/v4"
-	"github.com/rancher/types/apis/core/v1"
+	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
+	v1 "github.com/rancher/types/apis/core/v1"
 )
 
 var requiredHeadersForAws = map[string]bool{"host": true,

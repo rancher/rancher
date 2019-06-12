@@ -20,7 +20,7 @@ import (
 	clusterschema "github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	clusterClient "github.com/rancher/types/client/cluster/v3"
-	"github.com/rancher/types/client/project/v3"
+	client "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
 )
 

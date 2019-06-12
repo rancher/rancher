@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/api/customization/nodetemplate"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var driverData = map[string]map[string][]string{

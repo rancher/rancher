@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/resourcequota"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	mgmtschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	clusterclient "github.com/rancher/types/client/cluster/v3"
 	mgmtclient "github.com/rancher/types/client/management/v3"

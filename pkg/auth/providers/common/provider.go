@@ -2,7 +2,7 @@ package common
 
 import (
 	"github.com/rancher/norman/types"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 type AuthProvider interface {

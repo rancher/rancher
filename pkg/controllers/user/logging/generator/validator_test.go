@@ -7,7 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 func TestValidateFragments(t *testing.T) {
