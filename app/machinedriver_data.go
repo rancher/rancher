@@ -72,6 +72,11 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver("rackspace", "local://", "", "", nil, false, true, management); err != nil {
 		return err
 	}
+	if err := addMachineDriver("smtxos", "https://github.com/smartxworks/docker-machine-driver-smtxos/releases/download/v0.1.0/docker-machine-driver-smtxos-0.1.0.linux-amd64.tar.gz",
+		"https://smartxworks.github.io/rancher-ui-driver-smtxos/releases/v0.1.x/component.js", "7b5c51ac02a62e7dedcea4bf9efe076899e4cf71daae431498c6d06c9319ef0c",
+		[]string{"smartxworks.github.io"}, false, false, management); err != nil {
+		return err
+	}
 	if err := addMachineDriver("softlayer", "local://", "", "", nil, false, true, management); err != nil {
 		return err
 	}
