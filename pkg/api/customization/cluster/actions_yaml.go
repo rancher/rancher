@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -19,11 +18,12 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
 	corev1 "github.com/rancher/types/apis/core/v1"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	clusterclient "github.com/rancher/types/client/cluster/v3"
 	mgmtclient "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/compose"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func (a ActionHandler) ImportYamlHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {

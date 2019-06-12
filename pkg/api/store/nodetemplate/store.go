@@ -2,6 +2,8 @@ package nodetemplate
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
@@ -9,10 +11,9 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
 	corev1 "github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
-	"strings"
 )
 
 type Store struct {

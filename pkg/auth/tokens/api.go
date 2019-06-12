@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/norman/types"
 	rancherapi "github.com/rancher/rancher/pkg/api"
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	"github.com/rancher/types/client/management/v3"
+	client "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 )

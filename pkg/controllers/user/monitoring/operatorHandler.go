@@ -2,9 +2,10 @@ package monitoring
 
 import (
 	"fmt"
-	"github.com/rancher/rancher/pkg/app/utils"
 	"reflect"
 	"strings"
+
+	"github.com/rancher/rancher/pkg/app/utils"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/monitoring"

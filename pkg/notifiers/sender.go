@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/prometheus/common/model"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 type Message struct {

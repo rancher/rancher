@@ -5,11 +5,11 @@ import (
 
 	"github.com/rancher/rke/cloudprovider/aws"
 	"github.com/rancher/rke/cloudprovider/azure"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 

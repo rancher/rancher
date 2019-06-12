@@ -6,7 +6,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/types/apis/apps/v1beta2"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )

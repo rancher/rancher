@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"k8s.io/api/core/v1"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v1 "k8s.io/api/core/v1"
 )
 
 func gatherIngressEndpoints(ingressEps []v1.LoadBalancerIngress) []string {

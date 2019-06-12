@@ -22,7 +22,7 @@ import (
 	"github.com/rancher/norman/controller"
 	nsutil "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	mgmtv3 "github.com/rancher/types/client/management/v3"
 
 	"github.com/blang/semver"

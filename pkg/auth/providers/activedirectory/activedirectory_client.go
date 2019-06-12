@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
 	"github.com/sirupsen/logrus"
 	ldapv2 "gopkg.in/ldap.v2"

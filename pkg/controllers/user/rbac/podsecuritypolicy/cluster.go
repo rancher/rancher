@@ -8,8 +8,8 @@ import (
 
 	v12 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/extensions/v1beta1"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	v1beta13 "k8s.io/api/extensions/v1beta1"

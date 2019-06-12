@@ -7,7 +7,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 
 	corev1 "github.com/rancher/types/apis/core/v1"

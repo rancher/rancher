@@ -3,23 +3,20 @@ package multiclusterapp
 import (
 	"context"
 	"fmt"
-	"github.com/rancher/types/user"
 	"reflect"
 	"strings"
 	"time"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
-
-	"github.com/rancher/rancher/pkg/ref"
-	"github.com/sirupsen/logrus"
-
 	"github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/ref"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/user"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"

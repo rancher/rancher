@@ -11,7 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/k8s"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config/dialer"
 )
 

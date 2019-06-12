@@ -20,7 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/rancher/server"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"

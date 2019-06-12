@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	workloadutil "github.com/rancher/rancher/pkg/controllers/user/workload"
-	"github.com/rancher/types/apis/core/v1"
+	v1 "github.com/rancher/types/apis/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )

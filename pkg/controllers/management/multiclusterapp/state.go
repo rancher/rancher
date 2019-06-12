@@ -3,13 +3,14 @@ package multiclusterapp
 import (
 	"context"
 	"fmt"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"strings"
+
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"strings"
 )
 
 const (

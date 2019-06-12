@@ -6,7 +6,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/librke"
 	"github.com/rancher/rke/services"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 func (m *Lifecycle) checkLabels(node *v3.Node) (*v3.Node, error) {

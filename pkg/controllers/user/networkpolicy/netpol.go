@@ -8,13 +8,13 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	typescorev1 "github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	rnetworkingv1 "github.com/rancher/types/apis/networking.k8s.io/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	knetworkingv1 "k8s.io/api/networking/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 

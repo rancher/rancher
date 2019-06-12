@@ -4,7 +4,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 type Validator struct {

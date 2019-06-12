@@ -4,7 +4,7 @@ import (
 	"context"
 
 	util "github.com/rancher/rancher/pkg/controllers/user/workload"
-	"github.com/rancher/types/apis/core/v1"
+	v1 "github.com/rancher/types/apis/core/v1"
 	rmonitoringv1 "github.com/rancher/types/apis/monitoring.coreos.com/v1"
 	"github.com/rancher/types/config"
 )

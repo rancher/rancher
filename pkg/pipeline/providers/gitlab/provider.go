@@ -9,9 +9,9 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/pipeline/providers/common"
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
-	"github.com/rancher/types/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
-	"github.com/rancher/types/client/project/v3"
+	client "github.com/rancher/types/client/project/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )

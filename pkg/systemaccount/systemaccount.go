@@ -5,11 +5,11 @@ import (
 
 	"github.com/rancher/rancher/pkg/randomtoken"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
 	errors2 "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (

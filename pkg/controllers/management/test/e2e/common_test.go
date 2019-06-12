@@ -14,7 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/typed/core/v1"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 )
 

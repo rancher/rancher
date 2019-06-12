@@ -5,7 +5,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/user/alert/common"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -16,7 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	mgmtclientv3 "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/config/dialer"

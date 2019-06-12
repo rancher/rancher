@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/pipeline/remote/model"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
-	"github.com/rancher/types/client/project/v3"
+	client "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
 	"k8s.io/client-go/tools/cache"
 )

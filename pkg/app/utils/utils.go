@@ -2,17 +2,18 @@ package utils
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/project"
-	"github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v1 "github.com/rancher/types/apis/core/v1"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"time"
 )
 
 func EnsureAppProjectName(userNSClient v1.NamespaceInterface, ownedProjectID, clusterName, appTargetNamespace string) (string, error) {

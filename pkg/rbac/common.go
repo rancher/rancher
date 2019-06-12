@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	rbacv1 "k8s.io/api/rbac/v1"
 )
 

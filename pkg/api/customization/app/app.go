@@ -15,7 +15,7 @@ import (
 	hcommon "github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/rancher/pkg/ref"
 	clusterschema "github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	clusterv3 "github.com/rancher/types/client/cluster/v3"

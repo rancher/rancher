@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/rancher/rancher/server/whitelist"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"k8s.io/apimachinery/pkg/runtime"
 )

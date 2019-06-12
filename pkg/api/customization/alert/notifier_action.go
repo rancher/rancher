@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/notifiers"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
