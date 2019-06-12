@@ -15,15 +15,14 @@ import (
 	"github.com/rancher/norman/types/values"
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
-	"github.com/rancher/types/client/management/v3"
+	client "github.com/rancher/types/client/management/v3"
 	"github.com/sirupsen/logrus"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 

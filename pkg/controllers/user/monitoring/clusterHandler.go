@@ -3,13 +3,13 @@ package monitoring
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/rancher/rancher/pkg/app/utils"
 	"reflect"
 	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
 	kcluster "github.com/rancher/kontainer-engine/cluster"
+	"github.com/rancher/rancher/pkg/app/utils"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/node"
@@ -18,7 +18,7 @@ import (
 	"github.com/rancher/rke/pki"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	k8scorev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

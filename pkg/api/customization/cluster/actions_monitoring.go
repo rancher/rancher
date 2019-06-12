@@ -9,8 +9,8 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/monitoring"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func (a ActionHandler) viewMonitoring(actionName string, action *types.Action, apiContext *types.APIContext) error {

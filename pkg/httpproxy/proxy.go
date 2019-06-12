@@ -2,14 +2,15 @@ package httpproxy
 
 import (
 	"fmt"
-	"github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/config"
-	"github.com/sirupsen/logrus"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"regexp"
 	"strings"
+
+	v1 "github.com/rancher/types/apis/core/v1"
+	"github.com/rancher/types/config"
+	"github.com/sirupsen/logrus"
 )
 
 const (

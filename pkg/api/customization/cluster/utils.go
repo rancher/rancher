@@ -3,18 +3,19 @@ package cluster
 import (
 	"bytes"
 	"encoding/json"
+	"io"
+	"io/ioutil"
+	"time"
+
 	yaml2 "github.com/ghodss/yaml"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
-	"github.com/rancher/types/apis/core/v1"
-	"io"
-	"io/ioutil"
+	v1 "github.com/rancher/types/apis/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	"time"
 )
 
 type noopCloser struct {

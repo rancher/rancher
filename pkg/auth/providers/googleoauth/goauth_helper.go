@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	"google.golang.org/api/admin/directory/v1"
+	admin "google.golang.org/api/admin/directory/v1"
 	"google.golang.org/api/googleapi"
 )
 

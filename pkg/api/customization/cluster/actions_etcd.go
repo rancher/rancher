@@ -15,8 +15,8 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
 	"github.com/rancher/rancher/pkg/ref"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/client/management/v3"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	client "github.com/rancher/types/client/management/v3"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func (a ActionHandler) BackupEtcdHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {

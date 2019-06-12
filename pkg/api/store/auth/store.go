@@ -2,13 +2,14 @@ package auth
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/namespace"
 	corev1 "github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/client/management/v3"
-	"strings"
+	client "github.com/rancher/types/client/management/v3"
 )
 
 var TypeToFields = map[string][]string{

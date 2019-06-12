@@ -2,20 +2,16 @@ package workload
 
 import (
 	"context"
-	"github.com/rancher/norman/types/convert"
+	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
-	"fmt"
-
-	"encoding/json"
-
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/types/apis/apps/v1beta2"
 	batchv1 "github.com/rancher/types/apis/batch/v1"
 	"github.com/rancher/types/apis/batch/v1beta1"
-	"github.com/rancher/types/apis/core/v1"
+	v1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/config"
 	corev1beta2 "k8s.io/api/apps/v1beta2"
 	corebatchv1 "k8s.io/api/batch/v1"
@@ -24,6 +20,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )

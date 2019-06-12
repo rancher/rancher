@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/types/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 )
 
 const (

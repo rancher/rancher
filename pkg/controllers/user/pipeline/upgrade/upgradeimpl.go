@@ -3,13 +3,14 @@ package upgrade
 import (
 	"context"
 	"fmt"
+
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/controller/pipelineexecution"
 	"github.com/rancher/rancher/pkg/controllers/user/systemimage"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	rv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
-	"github.com/rancher/types/apis/core/v1"
+	v1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/config"
 	"k8s.io/api/apps/v1beta2"
 	corev1 "k8s.io/api/core/v1"

@@ -1,9 +1,10 @@
 package httpproxy
 
 import (
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // ReplaceSetCookies should rename set cookie header to api set cookie header

@@ -11,7 +11,7 @@ import (
 
 	"github.com/rancher/norman/types/convert"
 	libhelm "github.com/rancher/rancher/pkg/catalog/helm"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/image"
 	"gopkg.in/yaml.v2"
 )

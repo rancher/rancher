@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	v1Rancher "github.com/rancher/types/apis/core/v1"
 	v1beta1Rancher "github.com/rancher/types/apis/extensions/v1beta1"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"

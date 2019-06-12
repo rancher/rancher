@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	clusterClient "github.com/rancher/types/client/cluster/v3"
 	managementClient "github.com/rancher/types/client/management/v3"
 	projectClient "github.com/rancher/types/client/project/v3"

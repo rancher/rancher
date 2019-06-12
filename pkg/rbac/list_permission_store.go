@@ -1,6 +1,6 @@
 package rbac
 
-import "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
+import v1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 
 type ListPermissionStore struct {
 	users  *permissionIndex
