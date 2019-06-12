@@ -18,7 +18,7 @@ import (
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/rke/util"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -100,7 +100,7 @@ func BuildRKEConfigNodePlan(ctx context.Context, myCluster *Cluster, host *hosts
 
 func (c *Cluster) BuildKubeAPIProcess(host *hosts.Host, prefixPath string) v3.Process {
 	// check if external etcd is used
-	etcdConnectionString := services.GetEtcdConnString(c.EtcdHosts, host.Address)
+	etcdConnectionString := services.GetEtcdConnString(c.EtcdHosts, host.InternalAddress)
 	etcdPathPrefix := EtcdPathPrefix
 	etcdClientCert := pki.GetCertPath(pki.KubeNodeCertName)
 	etcdClientKey := pki.GetKeyPath(pki.KubeNodeCertName)
