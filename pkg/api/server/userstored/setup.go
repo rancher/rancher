@@ -9,9 +9,9 @@ import (
 	namespacecustom "github.com/rancher/rancher/pkg/api/customization/namespace"
 	sec "github.com/rancher/rancher/pkg/api/customization/secret"
 	"github.com/rancher/rancher/pkg/api/customization/yaml"
+	"github.com/rancher/rancher/pkg/api/store/apiservice"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/crd"
-	"github.com/rancher/rancher/pkg/api/store/hpa"
 	"github.com/rancher/rancher/pkg/api/store/ingress"
 	"github.com/rancher/rancher/pkg/api/store/namespace"
 	"github.com/rancher/rancher/pkg/api/store/pod"
@@ -49,7 +49,7 @@ func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clus
 	addProxyStore(ctx, schemas, mgmt, clusterClient.NamespaceType, "v1", namespace.New)
 	addProxyStore(ctx, schemas, mgmt, clusterClient.PersistentVolumeType, "v1", nil)
 	addProxyStore(ctx, schemas, mgmt, clusterClient.APIServiceType, "apiregistration.k8s.io/v1", nil)
-	addProxyStore(ctx, schemas, mgmt, client.HorizontalPodAutoscalerType, "autoscaling/v2beta2", nil)
+	addProxyStore(ctx, schemas, mgmt, client.HorizontalPodAutoscalerType, "autoscaling/v2beta2", apiservice.NewAPIServicFilterStoreFunc(clusterManager, "autoscaling/v2beta2"))
 	addProxyStore(ctx, schemas, mgmt, clusterClient.StorageClassType, "storage.k8s.io/v1", nil)
 	addProxyStore(ctx, schemas, mgmt, client.PrometheusType, "monitoring.coreos.com/v1", nil)
 	addProxyStore(ctx, schemas, mgmt, client.PrometheusRuleType, "monitoring.coreos.com/v1", nil)
@@ -62,7 +62,6 @@ func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clus
 	Service(ctx, schemas, mgmt)
 	Workload(schemas, clusterManager)
 	Namespace(schemas, clusterManager)
-	HPA(schemas, clusterManager, mgmt)
 	Istio(schemas)
 
 	SetProjectID(schemas, clusterManager, k8sProxy)
@@ -131,16 +130,6 @@ func Secret(ctx context.Context, management *config.ScaledContext, schemas *type
 
 	schema = schemas.Schema(&schema.Version, "namespacedCertificate")
 	schema.Store = cert.Wrap(schema.Store)
-}
-
-func HPA(schemas *types.Schemas, clusterManager *clustermanager.Manager, mgmt *config.ScaledContext) {
-	schema := schemas.Schema(&schema.Version, client.HorizontalPodAutoscalerType)
-	store := &hpa.NoWatchByClusterVersionStore{
-		Store:         schema.Store,
-		ClusterLister: mgmt.Management.Clusters("").Controller().Lister(),
-		Manager:       clusterManager,
-	}
-	schema.Store = store
 }
 
 func Istio(schemas *types.Schemas) {
