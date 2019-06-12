@@ -218,8 +218,11 @@ def validate_workload(p_client, workload, type, ns_name, pod_count=1,
     # scheduled wait time
     if type == "cronJob":
         time.sleep(wait_for_cron_pods)
+    pods = wait_for_pods_in_workload(p_client, workload, pod_count)
+    assert len(pods) == pod_count
     pods = p_client.list_pod(workloadId=workload.id).data
     assert len(pods) == pod_count
+
     for pod in pods:
         wait_for_pod_to_running(p_client, pod)
     wl_result = execute_kubectl_cmd(
@@ -1173,4 +1176,3 @@ def resolve_node_ip(node):
     else:
         node_ip = node.ipAddress
     return node_ip
-    
