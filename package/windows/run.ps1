@@ -31,30 +31,7 @@ $null = New-Item -Force -Type Directory -Path $RancherDir -ErrorAction Ignore
 $null = New-Item -Force -Type Directory -Path $KubeDir -ErrorAction Ignore
 $null = New-Item -Force -Type Directory -Path $CNIDir -ErrorAction Ignore
 
-function warn {
-    Write-Host -NoNewline -ForegroundColor DarkYellow "WARN"
-    Write-Host -NoNewline -ForegroundColor Gray "[0000] "
-    Write-Host -ForegroundColor Gray $_
-}
-
-function scrape-text {
-    param(
-        [parameter(Mandatory = $false)] $Headers = @{"Cache-Control"="no-cache"},
-        [parameter(Mandatory = $true)] [string]$Uri
-    )
-
-    $scraped = Invoke-WebRequest -Headers $Headers -UseBasicParsing -Uri $Uri
-    return $scraped.Content
-}
-
-function scrape-json {
-    param(
-        [parameter(Mandatory = $true)] [string]$Uri
-    )
-
-    $scraped = Invoke-WebRequest -Headers @{"Accept"="application/json";"Cache-Control"="no-cache"} -UseBasicParsing -Uri $Uri
-    return ($scraped.Content | ConvertFrom-Json)
-}
+Import-Module -Force -Name "$RancherDir\tool.psm1"
 
 function get-address {
     param(
@@ -75,110 +52,91 @@ function get-address {
 
     # Loop through cloud provider options to get IP from metadata, if not found return given value
     switch ($Addr) {
-        "awslocal" { return (scrape-text -Uri "http://169.254.169.254/latest/meta-data/local-ipv4") }
-        "awspublic" { return (scrape-text -Uri "http://169.254.169.254/latest/meta-data/public-ipv4") }
-        "doprivate" { return (scrape-text -Uri "http://169.254.169.254/metadata/v1/interfaces/private/0/ipv4/address") }
-        "dopublic" { return (scrape-text -Uri "http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address") }
-        "azprivate" { return (scrape-text -Headers @{"Metadata"="true"} -Uri "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress?api-version=2017-08-01&format=text") }
-        "azpublic" { return (scrape-text -Headers @{"Metadata"="true"} -Uri "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2017-08-01&format=text") }
-        "gceinternal" { return (scrape-text -Headers @{"Metadata-Flavor"="Google"} -Uri "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip?alt=json") }
-        "gceexternal" { return (scrape-text -Headers @{"Metadata-Flavor"="Google"} -Uri "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip?alt=json") }
-        "packetlocal" { return (scrape-text -Uri "https://metadata.packet.net/2009-04-04/meta-data/local-ipv4") }
-        "packetpublic" { return (scrape-text -Uri "https://metadata.packet.net/2009-04-04/meta-data/public-ipv4") }
-        "ipify" { return (scrape-text -Uri "https://api.ipify.org") }
+        "awslocal" { return (Scrape-Content -Uri "http://169.254.169.254/latest/meta-data/local-ipv4") }
+        "awspublic" { return (Scrape-Content -Uri "http://169.254.169.254/latest/meta-data/public-ipv4") }
+        "doprivate" { return (Scrape-Content -Uri "http://169.254.169.254/metadata/v1/interfaces/private/0/ipv4/address") }
+        "dopublic" { return (Scrape-Content -Uri "http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address") }
+        "azprivate" { return (Scrape-Content -Headers @{"Metadata"="true"} -Uri "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress?api-version=2017-08-01&format=text") }
+        "azpublic" { return (Scrape-Content -Headers @{"Metadata"="true"} -Uri "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2017-08-01&format=text") }
+        "gceinternal" { return (Scrape-Content -Headers @{"Metadata-Flavor"="Google"} -Uri "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip?alt=json") }
+        "gceexternal" { return (Scrape-Content -Headers @{"Metadata-Flavor"="Google"} -Uri "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip?alt=json") }
+        "packetlocal" { return (Scrape-Content -Uri "https://metadata.packet.net/2009-04-04/meta-data/local-ipv4") }
+        "packetpublic" { return (Scrape-Content -Uri "https://metadata.packet.net/2009-04-04/meta-data/public-ipv4") }
+        "ipify" { return (Scrape-Content -Uri "https://api.ipify.org") }
     }
 
     return $Addr
-}
-
-function set-env-var {
-    param(
-        [parameter(Mandatory = $true)] [string]$Key,
-        [parameter(Mandatory = $false)] [string]$Value = ""
-    )
-
-    [Environment]::SetEnvironmentVariable($Key, $Value, [EnvironmentVariableTarget]::Process)
-    [Environment]::SetEnvironmentVariable($Key, $Value, [EnvironmentVariableTarget]::Machine)
-}
-
-function get-agent-service {
-    $svcRancherAgt = Get-Service -Name "rancher-agent" -ErrorAction Ignore
-    return $svcRancherAgt
 }
 
 ## END main definitaion
 #########################################################################
 ## START main execution
 
-trap {
-    Write-Host -NoNewline -ForegroundColor DarkRed "ERRO"
-    Write-Host -NoNewline -ForegroundColor Gray "[0000] "
-    Write-Host -ForegroundColor Gray $_
-
-    popd
-
-    exit 1
-}
-
-# check powershell #
-if ($PSVersionTable.PSVersion.Major -lt 5) {
-    throw "PowerShell version 5 or higher is required"
-}
-
 # check identity #
-$currentPrincipal = new-object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
-if (-not $currentPrincipal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    throw "You need elevated Administrator privileges in order to run this script, start Windows PowerShell by using the Run as Administrator option"
+if (-not (Is-Administrator)) {
+    Log-Fatal "You need elevated Administrator privileges in order to run this script, start Windows PowerShell by using the Run as Administrator option"
 }
 
-# set http client #
-try {
-    if (-not ([System.Management.Automation.PSTypeName]"SkipServerCertificateValidation").Type) {
-        Add-Type -TypeDefinition  @"
-using System.Net;
-using System.Net.Security;
-using System.Security.Cryptography.X509Certificates;
-public static class SkipServerCertificateValidation
-{
-    private static bool Callback(object sender, X509Certificate certificate, X509Chain chain,
-        SslPolicyErrors sslPolicyErrors) { return true; }
-    public static void Enable() {
-        ServicePointManager.ServerCertificateValidationCallback = Callback;
-        ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 | SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
+# check rancher-agent running #
+$svcAgent = Get-Service -Name "rancher-agent" -ErrorAction Ignore
+if ($svcAgent -and ($svcAgent.Status -eq "Running")) {
+    Log-Fatal "rancher agent is already on running"
+}
+
+# check msiscsi servcie running #
+$svcMsiscsi = Get-Service -Name "msiscsi" -ErrorAction Ignore
+if ($svcMsiscsi -and ($svcMsiscsi.Status -ne "Running")) {
+    Set-Service -Name "msiscsi" -StartupType Automatic
+    Start-Service -Name "msiscsi" -ErrorAction Ignore
+    if (-not $?) {
+        Log-Warn "Failed to start msiscsi service, you may not be able to use the iSCSI flexvolume properly"
     }
 }
-"@
-    }
-    [SkipServerCertificateValidation]::Enable()
-} catch {}
 
 # check docker running #
 $dockerNPipe = Get-ChildItem //./pipe/ -ErrorAction Ignore | ? Name -eq "docker_engine"
 if (-not $dockerNPipe) {
-    warn "Default docker named pipe is not found"
-    warn "Please bind mount in the docker socket to //./pipe/docker_engine if docker errors occur"
-    warn "example:  docker run -v //./pipe/docker_engine://./pipe/docker_engine ..."
+    Log-Warn "Default docker named pipe is not found"
+    Log-Warn "Please bind mount in the docker socket to //./pipe/docker_engine if docker errors occur"
+    Log-Warn "example:  docker run -v //./pipe/docker_engine://./pipe/docker_engine ..."
 }
 
-$svcAgent = get-agent-service
-if ($svcAgent -and ($svcAgent.Status -eq "Running")) {
-    throw "rancher agent is already on running"
+# check docker release #
+$ret = Execute-Binary -FilePath "docker.exe" -ArgumentList @("version", "-f", "{{.Server.Platform.Name}}") -PassThru
+if (-not ($ret.StdOut -like '*Enterprise*')) {
+    Log-Fatal "Only support with Docker EE"
+}
+
+# check system locale #
+$sysLocale = Get-WinSystemLocale | Select-Object -ExpandProperty "IetfLanguageTag"
+if (-not $sysLocale.StartsWith('en-')) {
+    Log-Fatal "Only support with English System Locale"
+}
+
+# check network count #
+$vNetAdapters = Get-HnsNetwork | Select-Object -ExpandProperty "Subnets" | Select-Object -ExpandProperty "GatewayAddress"
+$allNetAdapters = Get-WmiObject -Class Win32_NetworkAdapterConfiguration -Filter "IPEnabled=True" | Sort-Object Index | % { $_.IPAddress[0] } | ? { -not ($vNetAdapters -contains $_) }
+if (($allNetAdapters | Measure-Object | Select-Object -ExpandProperty "Count") -gt 1) {
+    if (-not $CATTLE_INTERNAL_ADDRESS) {
+        Log-Warn "More than 1 network interfaces are found: $($allNetAdapters -join ", ")"
+        Log-Warn "Please indicate -internalAddress when adding"
+    }
 }
 
 # check cattle server address #
 if (-not $CATTLE_SERVER) {
-    throw "-server is a required option"
+    Log-Fatal "-server is a required option"
 } else {
     try {
-        $null = scrape-text -Uri "$CATTLE_SERVER/ping"
+        $null = Scrape-Content -Uri "$CATTLE_SERVER/ping" -SkipCertificateCheck
     } catch {
-        throw ("{0} is not accessible ({1})" -f $CATTLE_SERVER, $_.Exception.Message)
+        Log-Fatal "$CATTLE_SERVER is not accessible $($_.Exception.Message)"
     }
 }
 
 # check cattle server token #
 if (-not $CATTLE_TOKEN) {
-    throw "-token is a required option"
+    Log-Fatal "-token is a required option"
 }
 
 # check node name #
@@ -186,7 +144,7 @@ if (-not $CATTLE_NODE_NAME) {
     $CATTLE_NODE_NAME = hostname
 }
 if (-not $CATTLE_NODE_NAME) {
-    throw "-nodeName is a required option"
+    Log-Fatal "-nodeName is a required option"
 }
 $CATTLE_NODE_NAME = $CATTLE_NODE_NAME.ToLower()
 
@@ -197,10 +155,12 @@ if (-not $CATTLE_INTERNAL_ADDRESS) {
     try {
         $route = Find-NetRoute -RemoteIPAddress 8.8.8.8 | Select-Object -First 1
         $CATTLE_INTERNAL_ADDRESS = $route.IPAddress
-    } catch {}
+    } catch {
+        Log-Warn "Can't detect internal IP automatically"
+    }
 }
 if (-not $CATTLE_INTERNAL_ADDRESS) {
-    throw "-internalAddress is a required option"
+    Log-Fatal "-internalAddress is a required option"
 }
 if (-not $CATTLE_ADDRESS) {
     $CATTLE_ADDRESS = $CATTLE_INTERNAL_ADDRESS
@@ -210,19 +170,16 @@ if (-not $CATTLE_ADDRESS) {
 $SSL_CERT_DIR = "C:\etc\kubernetes\ssl\certs"
 if ($CATTLE_CA_CHECKSUM) {
     $temp = New-TemporaryFile
-    $cacerts = $null
-    try {
-        $cacerts = (scrape-json -Uri "$CATTLE_SERVER/v3/settings/cacerts").value
-    } catch {}
+    $cacerts = (Scrape-Content -Headers @{"Cache-Control"="no-cache";"Accept"="application/json"} -Uri "$CATTLE_SERVER/v3/settings/cacerts" -SkipCertificateCheck).value
 
     if (-not $cacerts) {
-        throw "Can't get cattle server CA from $CATTLE_SERVER"
+        Log-Fatal "Can't get cattle server CA from $CATTLE_SERVER"
     }
     $cacerts + "`n" | Out-File -NoNewline -Encoding ascii -FilePath $temp.FullName
     $tempHasher = Get-FileHash -LiteralPath $temp.FullName -Algorithm SHA256
     if ($tempHasher.Hash.ToLower() -ne $CATTLE_CA_CHECKSUM.ToLower()) {
         $temp.Delete()
-        throw "Actual cattle server CA checksum is $($tempHasher.Hash.ToLower()), $CATTLE_SERVER/v3/settings/cacerts does not match $($CATTLE_CA_CHECKSUM.ToLower())"
+        Log-Fatal "Actual cattle server CA checksum is $($tempHasher.Hash.ToLower()), $CATTLE_SERVER/v3/settings/cacerts does not match $($CATTLE_CA_CHECKSUM.ToLower())"
     }
     rm -Force -Recurse "$SSL_CERT_DIR\serverca" -ErrorAction Ignore
     $null = New-Item -Force -Type Directory -Path $SSL_CERT_DIR -ErrorAction Ignore
@@ -271,49 +228,41 @@ if ($labels.Count -gt 0) {
 }
 
 # set environment variables #
-#$env:DOCKER_HOST = "npipe:////./pipe//docker_engine"
-#$env:SSL_CERT_DIR = $SSL_CERT_DIR
-#$env:CATTLE_INTERNAL_ADDRESS = $CATTLE_INTERNAL_ADDRESS
-#$env:CATTLE_NODE_NAME = $CATTLE_NODE_NAME
-#$env:CATTLE_ADDRESS = $CATTLE_ADDRESS
-#$env:CATTLE_ROLE = "worker"
-#$env:CATTLE_SERVER = $CATTLE_SERVER
-#$env:CATTLE_TOKEN = $CATTLE_TOKEN
-#$env:CATTLE_DEBUG = $CATTLE_DEBUG
-#$env:CATTLE_NODE_LABEL = $CATTLE_NODE_LABEL
-set-env-var -Key "DOCKER_HOST" -Value "npipe:////./pipe/docker_engine"
-set-env-var -Key "SSL_CERT_DIR" -Value $SSL_CERT_DIR
-set-env-var -Key "CATTLE_INTERNAL_ADDRESS" -Value $CATTLE_INTERNAL_ADDRESS
-set-env-var -Key "CATTLE_NODE_NAME" -Value $CATTLE_NODE_NAME
-set-env-var -Key "CATTLE_ADDRESS" -Value $CATTLE_ADDRESS
-set-env-var -Key "CATTLE_ROLE" -Value "worker"
-set-env-var -Key "CATTLE_SERVER" -Value $CATTLE_SERVER
-set-env-var -Key "CATTLE_TOKEN" -Value $CATTLE_TOKEN
-set-env-var -Key "CATTLE_DEBUG" -Value $CATTLE_DEBUG
-set-env-var -Key "CATTLE_NODE_LABEL" -Value $CATTLE_NODE_LABEL
-set-env-var -Key "CATTLE_CUSTOMIZE_KUBELET_OPTIONS" -Value $CATTLE_CUSTOMIZE_KUBELET_OPTIONS
-set-env-var -Key "CATTLE_CUSTOMIZE_KUBEPROXY_OPTIONS" -Value $CATTLE_CUSTOMIZE_KUBEPROXY_OPTIONS
-set-env-var -Key "CATTLE_AGENT_FG_RUN" -Value $CATTLE_AGENT_FG_RUN
+Set-Env -Key "DOCKER_HOST" -Value "npipe:////./pipe/docker_engine"
+Set-Env -Key "SSL_CERT_DIR" -Value $SSL_CERT_DIR
+Set-Env -Key "CATTLE_INTERNAL_ADDRESS" -Value $CATTLE_INTERNAL_ADDRESS
+Set-Env -Key "CATTLE_NODE_NAME" -Value $CATTLE_NODE_NAME
+Set-Env -Key "CATTLE_ADDRESS" -Value $CATTLE_ADDRESS
+Set-Env -Key "CATTLE_ROLE" -Value "worker"
+Set-Env -Key "CATTLE_SERVER" -Value $CATTLE_SERVER
+Set-Env -Key "CATTLE_TOKEN" -Value $CATTLE_TOKEN
+Set-Env -Key "CATTLE_DEBUG" -Value $CATTLE_DEBUG
+Set-Env -Key "CATTLE_NODE_LABEL" -Value $CATTLE_NODE_LABEL
+Set-Env -Key "CATTLE_CUSTOMIZE_KUBELET_OPTIONS" -Value $CATTLE_CUSTOMIZE_KUBELET_OPTIONS
+Set-Env -Key "CATTLE_CUSTOMIZE_KUBEPROXY_OPTIONS" -Value $CATTLE_CUSTOMIZE_KUBEPROXY_OPTIONS
+Set-Env -Key "CATTLE_AGENT_FG_RUN" -Value $CATTLE_AGENT_FG_RUN
 
 # run rancher-agent #
-pushd $RancherDir
-.\agent.exe --unregister-service *>$null
-if ($CATTLE_AGENT_FG_RUN -eq "true") {
-    .\agent.exe
-} else {
-    .\agent.exe --register-service *>$null
-    $svcAgent = get-agent-service
-    if (-not $svcAgent) {
-        throw "Can't start rancher agent service, because no exist"
-    } else {
-        Start-Service -Name "rancher-agent" -ErrorAction Ignore
-        if (-not $?) {
-            throw "Start rancher agent failed"
-        }
+$ret = Execute-Binary -FilePath "$RancherDir\agent.exe" -ArgumentList @("--unregister-service") -PassThru
+if (-not $ret.Success) {
+    Log-Warn "Can't unregister rancher-agent service, $($ret.StdErr)"
+}
+if ($CATTLE_AGENT_FG_RUN -ne "true") {
+    $ret = Execute-Binary -FilePath "$RancherDir\agent.exe" -ArgumentList @("--register-service") -PassThru
+    if (-not $ret.Success) {
+        Log-Fatal "Can't register rancher-agent service, $($ret.StdErr)"
     }
 
-    .\log.ps1
+    Start-Service -Name "rancher-agent" -ErrorAction Ignore
+    if (-not $?) {
+        Log-Fatal "Start rancher agent failed"
+    }
+
+    Invoke-Expression -Command "$RancherDir\log.ps1"
+
+    exit 0
 }
+Execute-Binary -FilePath "$RancherDir\agent.exe"
 
 ## END main execution
 #########################################################################

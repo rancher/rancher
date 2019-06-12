@@ -11,6 +11,8 @@ $VerbosePreference = 'SilentlyContinue'
 $DebugPreference = 'SilentlyContinue'
 $InformationPreference = 'SilentlyContinue'
 
+Import-Module -Force -Name "C:\etc\rancher\tool.psm1"
+
 $SVCRancherAgtName = "rancher-agent"
 $LastIdx = 0
 try {
@@ -38,21 +40,13 @@ while($true) {
 
             switch ($item.EntryType) {
                 "Error" {
-                    Write-Host -NoNewline -ForegroundColor DarkRed "ERRO"
-                    Write-Host -NoNewline -ForegroundColor Gray ("[{0}] " -f $item.Index)
-                    Write-Host -ForegroundColor Gray $item.Message
-                    break
+                    Log-Error $item.Message
                 }
                 "Warning" {
-                    Write-Host -NoNewline -ForegroundColor DarkYellow "WARN"
-                    Write-Host -NoNewline -ForegroundColor Gray ("[{0}] " -f $item.Index)
-                    Write-Host -ForegroundColor Gray $item.Message
-                    break
+                    Log-Warn $item.Message
                 }
                 "Information" {
-                    Write-Host -NoNewline -ForegroundColor DarkBlue "INFO"
-                    Write-Host -NoNewline -ForegroundColor Gray ("[{0}] " -f $item.Index)
-                    Write-Host -ForegroundColor Gray $item.Message
+                    Log-Info $item.Message
                 }
             }
         }

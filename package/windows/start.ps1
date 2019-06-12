@@ -19,15 +19,10 @@ $VerbosePreference = 'SilentlyContinue'
 $DebugPreference = 'SilentlyContinue'
 $InformationPreference = 'SilentlyContinue'
 
-trap {
-    [System.Console]::Error.Write("ERRO[0000] ")
-    [System.Console]::Error.WriteLine($_)
-
-    exit 1
-}
+Import-Module -Force -Name "$env:ProgramFiles\rancher\tool.psm1"
 
 if (-not (Test-Path "C:\host")) {
-    throw "Please mount host `"C:\`" path to container `"C:\host`" path"
+    Log-Fatal "Please mount host `"C:\`" path to container `"C:\host`" path"
 }
 
 $RancherDir = "C:\host\etc\rancher"
@@ -46,7 +41,7 @@ $null = New-Item -Type Directory -Path $KubeletRootDir -ErrorAction Ignore
 try {
     Copy-Item -Force -Recurse -Path "$env:ProgramFiles\nginx\*.*" -Destination $NginxConfigDir
 } catch {
-    throw ("Please empty host `"C:\etc\nginx`" path manually, because {0}" -f $_.Exception.Message)
+    Log-Warn "Please empty host `"C:\etc\nginx`" path manually, because $($_.Exception.Message)"
 }
 
 # copy kubelet volume plugins #
@@ -54,17 +49,14 @@ try {
     $null = New-Item -Type Directory -Path "$KubeletRootDir\volumeplugins" -ErrorAction Ignore
     Copy-Item -Force -Recurse -Path "$env:ProgramFiles\kubelet\volumeplugins\*" -Destination "$KubeletRootDir\volumeplugins"
 } catch {
-    throw ("Please empty host `"C:\var\lib\kubelet\volumeplugins`" path manually, because {0}" -f $_.Exception.Message)
+    Log-Warn "Please empty host `"C:\var\lib\kubelet\volumeplugins`" path manually, because $($_.Exception.Message)"
 }
 
 # copy rancher agent artifacts #
 try {
-    Copy-Item -Force -Recurse -Path "$env:ProgramFiles\rancher\*.*" -Destination $RancherDir
-    try {
-        Remove-Item -Force -Path "$RancherDir\start.ps1" -ErrorAction Ignore
-    } catch {}
+    Copy-Item -Force -Recurse -Path "$env:ProgramFiles\rancher\*.*" -Destination $RancherDir -Exclude @("run.ps1", "start.ps1")
 } catch {
-    throw ("Please empty host `"C:\etc\rancher`" path manually, because {0}" -f $_.Exception.Message)
+    Log-Fatal "Please empty host `"C:\etc\rancher`" path manually, because $($_.Exception.Message)"
 }
 
 # build rancher agent run.ps1 #
@@ -120,5 +112,5 @@ try {
 
     $runPSContent | Out-File -Encoding ascii -Force -FilePath "$RancherDir\run.ps1"
 } catch {
-    throw ("Failed to build `"C:\etc\rancher\run.ps1`", because {0}" -f $_.Exception.Message)
+    Log-Fatal "Failed to build `"C:\etc\rancher\run.ps1`", because $($_.Exception.Message)"
 }

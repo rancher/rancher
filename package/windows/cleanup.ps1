@@ -17,128 +17,100 @@ $KubeDir = "C:\etc\kubernetes"
 $CNIDir = "C:\etc\cni"
 $NginxConfigDir = "C:\etc\nginx"
 
-Import-Module "$RancherDir\hns.psm1" -Force
-
-function get-env-var {
-    param(
-        [parameter(Mandatory = $true)] [string]$Key
-    )
-
-    $val = [Environment]::GetEnvironmentVariable($Key, [EnvironmentVariableTarget]::Process)
-    if ($val) {
-        return $val
-    }
-
-    return [Environment]::GetEnvironmentVariable($Key, [EnvironmentVariableTarget]::Machine)
-}
+Import-Module -Force -Name @("$RancherDir\hns.psm1", "$RancherDir\tool.psm1")
 
 ## END main definition
 #########################################################################
 ## START main execution
 
-trap {
-    Write-Host -NoNewline -ForegroundColor DarkRed "ERRO"
-    Write-Host -NoNewline -ForegroundColor Gray "[0000] "
-    Write-Host -ForegroundColor Gray $_
-
-    popd
-
-    exit 1
-}
-
-
-# check powershell #
-if ($PSVersionTable.PSVersion.Major -lt 5) {
-    throw "PowerShell version 5 or higher is required"
-}
-
 # check identity #
-$currentPrincipal = new-object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
-if (-not $currentPrincipal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    throw "You need elevated Administrator privileges in order to run this script, start Windows PowerShell by using the Run as Administrator option"
+if (-not (Is-Administrator)) {
+    Log-Fatal "You need elevated Administrator privileges in order to run this script, start Windows PowerShell by using the Run as Administrator option"
 }
 
+# remove rancher-agent service #
+Get-Service -Name "rancher-agent" -ErrorAction Ignore | % {
+    if ($_.Status -eq "Running") {
+        Log-Info "Stopping rancher-agent service ..."
+        $_ | Stop-Service -Force -PassThru -ErrorAction Ignore | Out-Null
+    }
+
+    $ret = Execute-Binary -FilePath "$RancherDir\agent.exe" -ArgumentList @("--unregister-service") -PassThru
+    if (-not $ret.Success) {
+        Log-Warn "Can't unregister rancher-agent service, $($ret.StdErr)"
+    }
+}
+
+# stop kubernetes components processes #
+Get-Process -ErrorAction Ignore -Name @(
+    "flanneld*"
+    "kubelet*"
+    "kube-proxy*"
+    "nginx*"
+) | % {
+    Log-Info "Stopping $($_.Name) process ..."
+    $_ | Stop-Process -Force -ErrorAction Ignore
+}
+
+# clean up docker conatiner: docker rm -fv $(docker ps -qa) #
+Log-Info "Removing Docker containers ..."
+Execute-Binary -FilePath "docker.exe" -ArgumentList @('ps', '-qa') -PassThru | `
+    Select-Object -ExpandProperty "StdOut" | `
+    % { Execute-Binary -FilePath "docker.exe" -ArgumentList @('rm', '-fv', $_) }
+
+# clean network interface #
+Log-Info "Removing network interface ..."
+Get-Env -Key "KUBE_NETWORK" | % {
+    Clean-HNSNetworks -Names @{
+        $_ = $True
+    } | Out-Null
+}
 try {
-    $svcAgent = Get-Service -Name "rancher-agent" -ErrorAction Ignore
-    if ($svcAgent) {
-        if ($svcAgent.Status -eq "Running") {
-            $svcAgent | Stop-Service -Force -ErrorAction Ignore
-        }
+    Get-HnsPolicyList | Remove-HnsPolicyList
+} catch {}
 
-        pushd $RancherDir
-        .\agent.exe --unregister-service *>$null
-        popd
-    }
-} catch { }
+# restore repair #
+if (Test-Path "$RancherDir\GetGcePdName.dll") {
+    Log-Info "Removing repaired 'Get-GcePdName' command ..."
+    Remove-Module GetGcePdName -Force -ErrorAction Ignore | Out-Null
+}
 
-try {
-    # flanneld #
-    $process = Get-Process -Name "flanneld*" -ErrorAction Ignore
-    if ($process) {
-        $process | Stop-Process -Force | Out-Null
-    }
+# clean firewall rules #
+Log-Info "Removing firewall rules ..."
+Remove-NetFirewallRule -ErrorAction Ignore -Name @(
+    'OverlayTraffic4789UDP'
+    'Kubelet10250TCP'
+    'KubeProxy10256TCP'
+) | Out-Null
 
-    # kubelet #
-    $process = Get-Process -Name "kubelet*" -ErrorAction Ignore
-    if ($process) {
-        $process | Stop-Process -Force | Out-Null
-    }
+# backup #
+Log-Info "Backing up ..."
+$date = (Get-Date).ToString('yyyyMMddHHmm')
+Copy-Item -Recurse -Path $RancherDir -Destination "$RancherDir-bak-$date" -Exclude "connected" -Force -ErrorAction Ignore | Out-Null
+Copy-Item -Recurse -Path $NginxConfigDir -Destination "$NginxConfigDir-bak-$date" -Force -ErrorAction Ignore | Out-Null
+Copy-Item -Recurse -Path $CNIDir -Destination "$CNIDir-bak-$date" -Force -ErrorAction Ignore | Out-Null
+Copy-Item -Recurse -Path $KubeDir -Destination "$KubeDir-bak-$date" -Force -ErrorAction Ignore | Out-Null
 
-    # kube-proxy #
-    $process = Get-Process -Name "kube-proxy*" -ErrorAction Ignore
-    if ($process) {
-        $process | Stop-Process -Force | Out-Null
-    }
+# clean up #
+Log-Info "Cleaning up ..."
+Remove-Item -Recurse -Force -ErrorAction Ignore -Path @(
+    $KubeDir
+    $CNIDir
+    $NginxConfigDir
+    "$RancherDir\*"
+    "C:\etc\kube-flannel"
+    "C:\run\flannel"
+    "C:\var\log"
+    "C:\var\lib\rancher"
+    "C:\var\lib\kubelet"
+    "C:\var\lib\cni"
+) | Out-Null
 
-    # controlplanes proxy #
-    $process = Get-Process -Name "nginx*" -ErrorAction Ignore
-    if ($process) {
-        $process | Stop-Process -Force | Out-Null
-    }
+# restart docker service #
+Log-Info "Restarting Docker service ..."
+Restart-Service -Name "docker" -ErrorAction Ignore | Out-Null
 
-    # docker stop #
-    docker ps -q | % { docker stop $_ *>$null } *>$null
-
-    # clean up rancher parts #
-    docker rm kubernetes-binaries *>$null
-    docker rm cni-binaries *>$null
-} catch { }
-
-try {
-    $networkName = get-env-var "KUBE_NETWORK"
-    if ($networkName) {
-        $null = Clean-HNSNetworks -Names @{
-            $networkName = $True
-        }
-    }
-
-    # restore repair #
-    if (Test-Path "$RancherDir\GetGcePdName.dll") {
-        Remove-Module GetGcePdName -Force -ErrorAction Ignore
-    }
-
-    # rancher #
-    Remove-Item -Path "$CNIDir\*" -Recurse -Force -ErrorAction Ignore
-    Remove-Item -Path "$KubeDir\*" -Recurse -Force -ErrorAction Ignore
-    Remove-Item -Path "$RancherDir\*" -Recurse -Force -ErrorAction Ignore
-    Remove-Item -Path "$NginxConfigDir\*" -Recurse -Force -ErrorAction Ignore
-
-    # component produces #
-    # cni
-    Remove-Item -Path "C:\etc\kube-flannel\*" -Recurse -Force -ErrorAction Ignore
-    Remove-Item -Path "C:\run\flannel\*" -Recurse -Force -ErrorAction Ignore
-    Remove-NetFirewallRule -Name 'OverlayTraffic4789UDP' -ErrorAction Ignore
-
-    # logs
-    Remove-Item -Path "C:\var\log\*" -Recurse -Force -ErrorAction Ignore
-
-    # kuberentes
-    Remove-Item -Path "C:\var\lib\rancher\*" -Recurse -Force -ErrorAction Ignore
-    Remove-Item -Path "C:\var\lib\kubelet\*" -Recurse -Force -ErrorAction Ignore
-    Remove-Item -Path "C:\var\lib\cni\*" -Recurse -Force -ErrorAction Ignore
-    Remove-Item -Path "C:\var\lib\etcd\*" -Recurse -Force -ErrorAction Ignore
-    Remove-NetFirewallRule -Name @('Kubelet10250TCP', 'KubeProxy10256TCP') -ErrorAction Ignore
-} catch { }
+Log-Info "Finished!!!"
 
 ## END main execution
 #########################################################################

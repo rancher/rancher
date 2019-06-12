@@ -42,71 +42,7 @@ $null = New-Item -Force -Type Directory -Path $CNIDir -ErrorAction Ignore
 $null = New-Item -Force -Type Directory -Path $NginxConfigDir -ErrorAction Ignore
 $null = New-Item -Force -Type Directory -Path $LogDir -ErrorAction Ignore
 
-Import-Module "$RancherDir\hns.psm1" -Force
-
-function print {
-    [System.Console]::Out.Write($args[0])
-    Start-Sleep -Milliseconds 100
-}
-
-function set-env-var {
-    param(
-        [parameter(Mandatory = $true)] [string]$Key,
-        [parameter(Mandatory = $false)] [string]$Value = ""
-    )
-
-    [Environment]::SetEnvironmentVariable($Key, $Value, [EnvironmentVariableTarget]::Process)
-    [Environment]::SetEnvironmentVariable($Key, $Value, [EnvironmentVariableTarget]::Machine)
-}
-
-function get-env-var {
-    param(
-        [parameter(Mandatory = $true)] [string]$Key
-    )
-
-    $val = [Environment]::GetEnvironmentVariable($Key, [EnvironmentVariableTarget]::Process)
-    if ($val) {
-        return $val
-    }
-
-    return [Environment]::GetEnvironmentVariable($Key, [EnvironmentVariableTarget]::Machine)
-}
-
-function scrape-text {
-    param(
-        [parameter(Mandatory = $false)] $Headers = @{"Cache-Control"="no-cache"},
-        [parameter(Mandatory = $true)] [string]$Uri
-    )
-
-    $scraped = Invoke-WebRequest -Headers $Headers -UseBasicParsing -Uri $Uri
-    return $scraped.Content
-}
-
-function scrape-json {
-    param(
-        [parameter(Mandatory = $true)] [string]$Uri
-    )
-
-    $scraped = Invoke-WebRequest -Headers @{"Accept"="application/json";"Cache-Control"="no-cache"} -UseBasicParsing -Uri $Uri
-    return ($scraped.Content | ConvertFrom-Json)
-}
-
-function install-msi {
-    param(
-        [parameter(Mandatory = $true)] [string]$File,
-        [parameter(Mandatory = $true)] [string]$LogFile
-    )
-
-    $installArgs = @(
-        "/i"
-        $File
-        "/qn"
-        "/norestart"
-        "/Le"
-        $LogFile
-    )
-    Start-Process "msiexec.exe" -ArgumentList $installArgs -Wait -NoNewWindow
-}
+Import-Module -Force -Name @("$RancherDir\hns.psm1", "$RancherDir\tool.psm1")
 
 function add-routes {
     param(
@@ -216,7 +152,7 @@ function get-hyperv-vswitch {
     if (-not $na) {
         $na = Get-NetAdapter | ? Status -eq Up | ? Name -like "vEthernet (Ethernet*"
         if (-not $na) {
-            throw "Failed to find a suitable Hyper-V vSwitch network adapter, check your network settings"
+            Fatal "Failed to find a suitable Hyper-V vSwitch network adapter, check your network settings"
         }
         $ip = (Get-NetIPAddress -AddressFamily IPv4 -InterfaceIndex $na.ifIndex -ErrorAction Ignore).IPv4Address
     }
@@ -260,7 +196,7 @@ function wait-ready {
     }
 
     if ($count -le 0) {
-        throw ("Timeout and can't access {0}" -f $Path)
+        Fatal "Timeout and can't access $Path"
     }
 }
 
@@ -354,7 +290,7 @@ function config-cni-flannel {
     if ($KubeCNIMode -eq "win-bridge") {
         $flannelBackendName = "cbr0"
     }
-    set-env-var -Key "KUBE_NETWORK" -Value $flannelBackendName
+    Set-Env -Key "KUBE_NETWORK" -Value $flannelBackendName
 
     $cniConf = @{
         cniVersion = "0.2.0"
@@ -381,10 +317,10 @@ function config-azure-cloudprovider {
 
     $azureMetaURL = "http://169.254.169.254/metadata/instance/compute"
 
-    $azResourcesGroup = scrape-text -Headers @{"Metadata"="true"} -Uri "$azureMetaURL/resourceGroupName?api-version=2017-08-01&format=text"
-    $azSubscriptionId = scrape-text -Headers @{"Metadata"="true"} -Uri "$azureMetaURL/subscriptionId?api-version=2017-08-01&format=text"
-    $azLocation = scrape-text -Headers @{"Metadata"="true"} -Uri "$azureMetaURL/location?api-version=2017-08-01&format=text"
-    $azVmName = scrape-text -Headers @{"Metadata"="true"} -Uri "$azureMetaURL/name?api-version=2017-08-01&format=text"
+    $azResourcesGroup = Scrape-Content -Headers @{"Metadata"="true"} -Uri "$azureMetaURL/resourceGroupName?api-version=2017-08-01&format=text"
+    $azSubscriptionId = Scrape-Content -Headers @{"Metadata"="true"} -Uri "$azureMetaURL/subscriptionId?api-version=2017-08-01&format=text"
+    $azLocation = Scrape-Content -Headers @{"Metadata"="true"} -Uri "$azureMetaURL/location?api-version=2017-08-01&format=text"
+    $azVmName = Scrape-Content -Headers @{"Metadata"="true"} -Uri "$azureMetaURL/name?api-version=2017-08-01&format=text"
 
     $azCloudConfig = @{}
     try {
@@ -400,11 +336,11 @@ function config-azure-cloudprovider {
     $azureTenantId = $azCloudConfig.tenantId
 
     if (-not $azureClientId) {
-        throw ("Can't find 'aadClientId' in '{0}'" -f $ConfigPath)
+        Fatal "Can't find 'aadClientId' in '$ConfigPath'"
     } elseif (-not $azureClientSecret) {
-        throw ("Can't find 'aadClientSecret' in '{0}'" -f $ConfigPath)
+        Fatal "Can't find 'aadClientSecret' in '$ConfigPath'"
     } elseif (-not $azureTenantId) {
-        throw ("Can't find 'tenantId' in '{0}'" -f $ConfigPath)
+        Fatal "Can't find 'tenantId' in '$ConfigPath'"
     }
 
     if ((-not $azLocation) -or (-not $azSubscriptionId) -or (-not $azResourcesGroup) -or (-not $azVmName)) {
@@ -453,7 +389,7 @@ function config-azure-cloudprovider {
 }
 
 function print-system-info {
-    $nn = get-env-var -Key "NODE_NAME"
+    $nn = Get-Env -Key "NODE_NAME"
 
     print  "******"
     print ("*****       CNI - Component: {0}, Mode: {1}" -f $KubeCNIComponent, $KubeCNIMode)
@@ -468,6 +404,12 @@ function print-system-info {
         print ("* CloudProvider - Name: {0}" -f $KubeletCloudProviderName)
     }
     print "*"
+}
+
+function agent-retry {
+    [System.Console]::Error.Write($Args[0] -f $Args[1..$Args.Length])
+
+    exit 2
 }
 
 function setup-proxy {
@@ -535,7 +477,7 @@ stream {
             Start-Sleep -s 5
             $process = Get-Process -Id $process.Id -ErrorAction Ignore
             if (-not $process) {
-                throw "........................ FAILED, agent retry"
+                agent-retry "........................ FAILED"
             }
             print "........................... OK"
         }
@@ -547,7 +489,7 @@ stream {
         Start-Sleep -s 5
         $process = Get-Process -Id $process.Id -ErrorAction Ignore
         if (-not $process) {
-            throw "....................... FAILED, agent retry"
+            agent-retry "....................... FAILED"
         }
         print "........................... OK"
     }
@@ -586,7 +528,7 @@ function start-flanneld {
         $flannelBackendName = "cbr0"
         $networkType = "l2bridge"
     }
-    set-env-var -Key "KUBE_NETWORK" -Value $flannelBackendName
+    Set-Env -Key "KUBE_NETWORK" -Value $flannelBackendName
 
     ## clean other kind network ##
     $isCleanPreviousNetwork = Clean-HNSNetworks -Types @{ "l2bridge" = $True; "overlay" = $True } -Keeps @{ $flannelBackendName = $networkType }
@@ -619,7 +561,7 @@ function start-flanneld {
     wait-ready -Path "$CNIDir\bin\flanneld.exe"
 
     ## config running params ##
-    $fgRun = get-env-var -Key "CATTLE_AGENT_FG_RUN"
+    $fgRun = Get-Env -Key "CATTLE_AGENT_FG_RUN"
     $flanneldArgs = @(
         "`"--kubeconfig-file=$KubeDir\ssl\kubecfg-kube-node.yaml`""
         "`"--ip-masq`""
@@ -651,7 +593,7 @@ function start-flanneld {
         $retryCount -= 1
         if ($retryCount -le 0) {
             if (-not $process) {
-                throw ".............. FAILED, agent retry"
+                agent-retry ".............. FAILED"
             }
             break
         }
@@ -670,7 +612,7 @@ function start-flanneld {
         $retryCount -= 1
         if ($retryCount -le 0) {
             if (-not $network) {
-                throw ".............. FAILED, agent retry"
+                agent-retry ".............. FAILED"
             }
             break
         }
@@ -714,9 +656,9 @@ function start-kubelet {
     } elseif ($KubeCNIComponent -eq "canal") {
         config-cni-flannel -Restart:$Restart
     } elseif ($KubeCNIComponent -eq "calico") {
-        throw "Don't support calico now, please change other CNI plugins"
+        Fatal "Don't support calico now, please change other CNI plugins"
     } else {
-        throw "Unknown CNI component: $KubeCNIComponent, please change other CNI plugins"
+        Fatal "Unknown CNI component: $KubeCNIComponent, please change other CNI plugins"
     }
 
     ## cloud provider ##
@@ -751,8 +693,8 @@ function start-kubelet {
     }
 
     ## config running params ##
-    $nn = get-env-var -Key "NODE_NAME"
-    $fgRun = get-env-var -Key "CATTLE_AGENT_FG_RUN"
+    $nn = Get-Env -Key "NODE_NAME"
+    $fgRun = Get-Env -Key "CATTLE_AGENT_FG_RUN"
     $kubeletArgs = merge-argument-list @(
         @(
             "`"--hostname-override=$nn`""
@@ -782,7 +724,7 @@ function start-kubelet {
         $retryCount -= 1
         if ($retryCount -le 0) {
             if (-not $process) {
-                throw ".............. FAILED, agent retry"
+                agent-retry ".............. FAILED"
             }
             break
         }
@@ -804,6 +746,9 @@ function stop-kube-proxy {
         if ($process) {
             $process | Stop-Process -Force | Out-Null
         }
+
+        ## clean stale policies ##
+        Get-HnsPolicyList | Remove-HnsPolicyList
     } catch {
     }
 }
@@ -830,8 +775,8 @@ function start-kube-proxy {
     wait-ready -Path "$KubeDir\bin\kube-proxy.exe"
 
     ## config running params ##
-    $nn = get-env-var -Key "NODE_NAME"
-    $fgRun = get-env-var -Key "CATTLE_AGENT_FG_RUN"
+    $nn = Get-Env -Key "NODE_NAME"
+    $fgRun = Get-Env -Key "CATTLE_AGENT_FG_RUN"
     $cniModeArgs = @(
         "`"--hostname-override=$nn`""
         "`"--cluster-cidr=$KubeClusterCIDR`""
@@ -842,10 +787,10 @@ function start-kube-proxy {
     )
     if ($KubeCNIMode -eq "win-overlay") {
         print "...................., generating source vip for overlay"
-        $kubeNetwork = get-env-var -Key "KUBE_NETWORK"
+        $kubeNetwork = Get-Env -Key "KUBE_NETWORK"
         $network = (Get-HnsNetwork | ? Name -eq $kubeNetwork)
         if (-not $network) {
-            throw ".............. FAILED, agent retry"
+            agent-retry ".............. FAILED"
         }
 
         $subnet = $network.Subnets[0].AddressPrefix
@@ -853,7 +798,7 @@ function start-kube-proxy {
         $cniModeArgs += @("`"--source-vip=$sourceVip`"")
     }
 
-    $env:KUBE_NETWORK = get-env-var -Key "KUBE_NETWORK"
+    $env:KUBE_NETWORK = Get-Env -Key "KUBE_NETWORK"
     $kubeproxyArgs = merge-argument-list @(
         $cniModeArgs
         @($env:CATTLE_CUSTOMIZE_KUBEPROXY_OPTIONS -split ";")
@@ -875,7 +820,7 @@ function start-kube-proxy {
         $retryCount -= 1
         if ($retryCount -le 0) {
             if (-not $process) {
-                throw ".............. FAILED, agent retry"
+                agent-retry ".............. FAILED"
             }
             break
         }
@@ -901,7 +846,7 @@ function init {
         $removeStaleBinaries = $true
     }
     if ($removeStaleBinaries) {
-        throw "The previous binaries have already been cleaned, agent retry"
+        agent-retry "The previous binaries have already been cleaned"
     }
 
     # cloud provider #
@@ -915,17 +860,19 @@ function init {
             $azDownloadURL = "https://aka.ms/installazurecliwindows"
             $azMSIBinPath = "$env:TEMP\az.msi"
             try {
-                Invoke-WebRequest -TimeoutSec 300 -UseBasicParsing -Uri $azDownloadURL -OutFile $azMSIBinPath
-            } catch {}
-            if (-not $?) {
-                throw ("Failed to download Azure cloud cli from '{0}'" -f $azDownloadURL)
+                Download-File -TimeoutSec 300 -Uri $azDownloadURL -OutFile $azMSIBinPath
+                if (-not $?) {
+                    Fatal "Failed to download Azure cloud cli from '$azDownloadURL'"
+                }
+            } catch {
+                Fatal "Failed to download Azure cloud cli from '$azDownloadURL', $($_.Exception.Message)"
             }
 
             print "Installing Azure cloud cli, wait a few minutes ..."
 
-            install-msi -File $azMSIBinPath -LogFile "$LogDir\azurecli-installation.log"
+            Install-MSI -File $azMSIBinPath -LogFile "$LogDir\azurecli-installation.log"
             if (-not $?) {
-                throw "Failed to install Azure cloud cli"
+                Fatal "Failed to install Azure cloud cli"
             }
 
             print ".................. OK"
@@ -934,12 +881,12 @@ function init {
         repair-cloud-routes
 
         ## using private DNS name
-        $nn = scrape-text -Uri "http://169.254.169.254/latest/meta-data/hostname"
+        $nn = Scrape-Content -Uri "http://169.254.169.254/latest/meta-data/hostname"
     } elseif ($KubeletCloudProviderName -eq "gce") {
         repair-cloud-routes
 
         ## using instance name
-        $hostname = scrape-text -Headers @{"Metadata-Flavor"="Google"} -Uri "http://169.254.169.254/computeMetadata/v1/instance/hostname?alt=json"
+        $hostname = Scrape-Content -Headers @{"Metadata-Flavor"="Google"} -Uri "http://169.254.169.254/computeMetadata/v1/instance/hostname?alt=json"
         try {
             $splited = $hostname -split "\."
             if ($splited.Length -lt 1) {
@@ -955,10 +902,12 @@ function init {
             $dllDownloadURL = "https://github.com/pjh/gce-tools/raw/master/GceTools/GetGcePdName/GetGcePdName.dll"
             $dllPath = "$RancherDir\GetGcePdName.dll"
             try {
-                Invoke-WebRequest -TimeoutSec 300 -UseBasicParsing -Uri $dllDownloadURL -OutFile $dllPath
-            } catch {}
-            if (-not $?) {
-                throw ("Failed to download GetGcePodName.dll from '{0}'" -f $dllDownloadURL)
+                Download-File -TimeoutSec 300 -Uri $dllDownloadURL -OutFile $dllPath
+                if (-not $?) {
+                    Fatal "Failed to download GetGcePodName.dll from '$dllDownloadURL'"
+                }
+            } catch {
+                Fatal "Failed to download GetGcePodName.dll from '$dllDownloadURL', $($_.Exception.Message)"
             }
 
             print "Importing GetGcePodName.dll, wait a few seconds ..."
@@ -978,7 +927,7 @@ Import-Module -Name DLLPATH -ErrorAction Ignore
         }
     }
 
-    set-env-var -Key "NODE_NAME" -Value $nn.ToLower()
+    Set-Env -Key "NODE_NAME" -Value $nn.ToLower()
 }
 
 function main {
@@ -1046,34 +995,6 @@ function main {
 ## END main definitaion
 #########################################################################
 ## START main execution
-
-# 0 - success
-# 1 - crash
-# 2 - agent retry
-trap {
-    $errMsg = $_.Exception.Message
-
-    popd
-
-    if ($errMsg.EndsWith("agent retry")) {
-        [System.Console]::Error.Write($errMsg.Substring(0, $errMsg.Length - 13))
-        exit 2
-    }
-
-    [System.Console]::Error.Write($errMsg)
-    exit 1
-}
-
-# check powershell #
-if ($PSVersionTable.PSVersion.Major -lt 5) {
-    throw "PowerShell version 5 or higher is required"
-}
-
-# check identity #
-$currentPrincipal = new-object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
-if (-not $currentPrincipal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    throw "You need elevated Administrator privileges in order to run this script, start Windows PowerShell by using the Run as Administrator option"
-}
 
 init
 
