@@ -1,7 +1,7 @@
 package v1
 
 import (
-	"github.com/coreos/prometheus-operator/pkg/client/monitoring/v1"
+	v1 "github.com/coreos/prometheus-operator/pkg/client/monitoring/v1"
 	"github.com/rancher/norman/lifecycle"
 	"k8s.io/apimachinery/pkg/runtime"
 )
