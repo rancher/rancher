@@ -11,3 +11,6 @@ test -z "$failed"
 
 echo Running: go fmt
 test -z "$(go fmt ./... | tee /dev/stderr)"
+
+echo Running: goimports
+test -z "$(goimports -d $(find . -type f -name '*.go' -not -path "./vendor/*") | tee /dev/stderr)" 
