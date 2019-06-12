@@ -2,12 +2,13 @@ package globalnamespacerbac
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/types"
 	"reflect"
 	"sort"
 
+	"k8s.io/apimachinery/pkg/types"
+
 	"github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 

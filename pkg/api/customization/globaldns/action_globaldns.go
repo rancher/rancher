@@ -2,10 +2,11 @@ package globaldns
 
 import (
 	"fmt"
-	"github.com/rancher/norman/httperror"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/rancher/norman/httperror"
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/parse"
@@ -13,11 +14,11 @@ import (
 	"github.com/rancher/norman/types/convert"
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	"github.com/rancher/types/client/management/v3"
+	client "github.com/rancher/types/client/management/v3"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 

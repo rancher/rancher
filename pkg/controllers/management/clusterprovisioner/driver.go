@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/clusterprovisioninglogger"
 	"github.com/rancher/rke/services"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"

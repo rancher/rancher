@@ -2,13 +2,14 @@ package providers
 
 import (
 	"context"
+
 	"github.com/rancher/rancher/pkg/api/store/auth"
 	"github.com/rancher/rancher/pkg/namespace"
 
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	"github.com/rancher/types/client/management/v3"
+	client "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 )
 

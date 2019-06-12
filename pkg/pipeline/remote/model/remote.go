@@ -1,7 +1,7 @@
 package model
 
 import (
-	"github.com/rancher/types/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 )
 
 type Remote interface {

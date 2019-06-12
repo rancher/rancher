@@ -5,7 +5,7 @@ import (
 
 	"github.com/rancher/norman/store/crd"
 	clusterSchema "github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
-	"github.com/rancher/types/client/cluster/v3"
+	client "github.com/rancher/types/client/cluster/v3"
 	"github.com/rancher/types/config"
 )
 

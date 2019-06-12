@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/docker/machine/libmachine/drivers/plugin/localbinary"
-	"github.com/docker/machine/libmachine/drivers/rpc"
+	rpcdriver "github.com/docker/machine/libmachine/drivers/rpc"
 	cli "github.com/docker/machine/libmachine/mcnflag"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 

@@ -13,7 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/alert/statesyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/watcher"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

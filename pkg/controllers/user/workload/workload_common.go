@@ -2,9 +2,10 @@ package workload
 
 import (
 	"context"
-	"github.com/rancher/norman/types/convert"
 	"strconv"
 	"strings"
+
+	"github.com/rancher/norman/types/convert"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -15,7 +16,7 @@ import (
 	"github.com/rancher/types/apis/apps/v1beta2"
 	batchv1 "github.com/rancher/types/apis/batch/v1"
 	"github.com/rancher/types/apis/batch/v1beta1"
-	"github.com/rancher/types/apis/core/v1"
+	v1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/config"
 	corev1beta2 "k8s.io/api/apps/v1beta2"
 	corebatchv1 "k8s.io/api/batch/v1"

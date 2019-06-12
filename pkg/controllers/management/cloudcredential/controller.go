@@ -3,14 +3,15 @@ package cloudcredential
 import (
 	"context"
 	"fmt"
-	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
-	corev1 "github.com/rancher/types/apis/core/v1"
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
 	"strings"
 
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
+	corev1 "github.com/rancher/types/apis/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
+
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 )
 

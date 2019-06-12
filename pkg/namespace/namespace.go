@@ -1,6 +1,6 @@
 package namespace
 
-import "k8s.io/api/core/v1"
+import v1 "k8s.io/api/core/v1"
 
 var projectIDAnnotation = "field.cattle.io/projectId"
 
