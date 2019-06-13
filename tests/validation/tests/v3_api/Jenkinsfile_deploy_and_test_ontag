@@ -94,7 +94,7 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                 load rancherConfig
 
                 // run tests
-                sh "docker run --name ${testContainer} -t --env-file ${envFile} " +
+                sh "docker run --name ${testContainer} -t --env-file ${envFile} -v /var/run/docker.sock:/var/run/docker.sock " +
                   "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} " +
                   "&& export ADMIN_TOKEN=${env.ADMIN_TOKEN} && pytest -v -s --junit-xml=${testResultsOut} " +
                   "${PYTEST_OPTIONS} ${testsDir}\'"

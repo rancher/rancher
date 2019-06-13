@@ -8,11 +8,17 @@ ARG RKE_VERSION=v0.1.17
 
 COPY [".", "$WORKSPACE"]
 
-RUN wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERSION/bin/linux/amd64/kubectl && \
+RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - && \
+    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list && \
+    apt-get update && apt-get install -y unzip libnss3 google-chrome-stable=75.0.3770.80-1 && \
+    wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERSION/bin/linux/amd64/kubectl && \
     mv kubectl /bin/kubectl && \
     chmod +x /bin/kubectl  && \
     wget https://github.com/rancher/rke/releases/download/$RKE_VERSION/rke_linux-amd64 && \
     mv rke_linux-amd64 /bin/rke && \
     chmod +x /bin/rke && \
+    curl https://releases.rancher.com/install-docker/18.09.sh | sh && \
+    wget https://chromedriver.storage.googleapis.com/75.0.3770.8/chromedriver_linux64.zip && \
+    unzip chromedriver_linux64.zip && mv chromedriver /bin/chromedriver && rm chromedriver_linux64.zip && \
     cd $WORKSPACE && \
     pip install -r requirements_v3api.txt

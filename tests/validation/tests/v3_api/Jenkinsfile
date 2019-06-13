@@ -42,7 +42,7 @@ node {
       try {
         stage('Run Validation Tests') {
           try {
-            sh "docker run --name ${testContainer}  --env-file .env " +
+            sh "docker run --name ${testContainer}  --env-file .env -v /var/run/docker.sock:/var/run/docker.sock " +
               "${imageName} /bin/bash -c \'pytest -v -s --junit-xml=${testResultsOut} ${PYTEST_OPTIONS} ${testsDir}\'"
           } catch(err) {
             echo 'Test run had failures. Collecting results...'
