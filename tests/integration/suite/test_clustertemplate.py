@@ -1,6 +1,7 @@
 from .common import random_str
 from rancher import ApiError
 import pytest
+import time
 
 
 def test_create_cluster_template_with_revision(admin_mc, remove_resource):
@@ -38,15 +39,17 @@ def test_create_cluster_with_template(admin_mc, remove_resource):
                                     clusterTemplateRevisionId=revId,
                                     description="template from cluster",
                                     answers=answers)
+    remove_resource(cluster)
     assert cluster.conditions[0].type == 'Pending'
     assert cluster.conditions[0].status == 'True'
 
     # delete the cluster template, it should error out
     with pytest.raises(ApiError) as e:
         client.delete(cluster_template)
-        assert e.value.error.status is None
+        assert e.value.error.status == 403
 
-    remove_resource(cluster)
+    client.delete(cluster)
+    wait_for_cluster_to_be_deleted(client, cluster.id)
 
 
 def test_create_cluster_validations(admin_mc, remove_resource):
@@ -175,3 +178,18 @@ def getRKEConfig():
         }
     }
     return rke_config
+
+
+def wait_for_cluster_to_be_deleted(client, clusterId, timeout=45):
+    deleted = False
+    start = time.time()
+    interval = 0.5
+    while not deleted:
+        if time.time() - start > timeout:
+            raise AssertionError(
+                "Timed out waiting for clusters")
+        cluster = client.by_id_cluster(clusterId)
+        if cluster is None:
+            deleted = True
+        time.sleep(interval)
+        interval *= 2

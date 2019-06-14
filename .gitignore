@@ -9,8 +9,10 @@
 /package/rancher
 /package/agent
 /tests/MANIFEST
+/tests/integration/MANIFEST
 /tests/.cache
 /tests/.tox
+/tests/integration/.tox/
 /tests/.venv
 /tests/.idea
 /default.etcd
