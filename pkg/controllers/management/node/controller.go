@@ -301,7 +301,7 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.N
 }
 
 func aliasToPath(driver string, config map[string]interface{}, ns string) error {
-	devMode := os.Getenv("CATTLE_DEV_MODE") == "true"
+	devMode := os.Getenv("CATTLE_DEV_MODE") != ""
 	baseDir := path.Join("/opt/jail", ns)
 	if devMode {
 		baseDir = os.TempDir()
