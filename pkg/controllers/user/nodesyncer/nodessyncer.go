@@ -119,6 +119,13 @@ func (n *nodeSyncer) needUpdate(key string, node *corev1.Node) (bool, error) {
 	if existing == nil {
 		return true, nil
 	}
+	if existing.Annotations[annotationName] == "" {
+		existing.Annotations[annotationName] = "true"
+		if _, err = n.nodesSyncer.machines.Update(existing); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
 	nodeToPodMap, err := n.nodesSyncer.getNonTerminatedPods()
 	if err != nil {
 		return false, err
@@ -286,7 +293,7 @@ func (m *nodesSyncer) removeNode(machine *v3.Node) error {
 	if err != nil {
 		return errors.Wrapf(err, "Failed to delete machine [%s]", machine.Name)
 	}
-	logrus.Infof("Deleted cluster node [%s]", machine.Name)
+	logrus.Infof("Deleted cluster node %s [%s]", machine.Name, machine.Status.NodeName)
 	return nil
 }
 
@@ -309,14 +316,6 @@ func (m *nodesSyncer) updateNode(existing *v3.Node, node *corev1.Node, pods map[
 }
 
 func (m *nodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Pod) error {
-	// do not create machine for rke cluster
-	cluster, err := m.clusterLister.Get("", m.clusterNamespace)
-	if err != nil {
-		return err
-	}
-	if cluster.Spec.RancherKubernetesEngineConfig != nil {
-		return nil
-	}
 	// try to get machine from api, in case cache didn't get the update
 	existing, err := m.getMachineForNode(node, false)
 	if err != nil {
