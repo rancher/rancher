@@ -1,8 +1,9 @@
 package rbac
 
 import (
-	"k8s.io/apimachinery/pkg/runtime"
 	"regexp"
+
+	"k8s.io/apimachinery/pkg/runtime"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"

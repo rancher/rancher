@@ -8,7 +8,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
 	"github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 

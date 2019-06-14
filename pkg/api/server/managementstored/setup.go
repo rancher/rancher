@@ -2,8 +2,9 @@ package managementstored
 
 import (
 	"context"
-	"github.com/rancher/rancher/pkg/namespace"
 	"net/http"
+
+	"github.com/rancher/rancher/pkg/namespace"
 
 	"github.com/rancher/norman/store/crd"
 	"github.com/rancher/norman/store/proxy"
@@ -15,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/catalog"
 	ccluster "github.com/rancher/rancher/pkg/api/customization/cluster"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
+	"github.com/rancher/rancher/pkg/api/customization/clustertemplate"
 	"github.com/rancher/rancher/pkg/api/customization/cred"
 	"github.com/rancher/rancher/pkg/api/customization/globaldns"
 	"github.com/rancher/rancher/pkg/api/customization/globalresource"
@@ -34,6 +36,7 @@ import (
 	appStore "github.com/rancher/rancher/pkg/api/store/app"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/cluster"
+	clustertemplatestore "github.com/rancher/rancher/pkg/api/store/clustertemplate"
 	globaldnsAPIStore "github.com/rancher/rancher/pkg/api/store/globaldns"
 	nodeStore "github.com/rancher/rancher/pkg/api/store/node"
 	nodeTemplateStore "github.com/rancher/rancher/pkg/api/store/nodetemplate"
@@ -52,7 +55,7 @@ import (
 	sourcecodeproviders "github.com/rancher/rancher/pkg/pipeline/providers"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
-	"github.com/rancher/types/client/management/v3"
+	client "github.com/rancher/types/client/management/v3"
 	projectclient "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
 )
@@ -116,7 +119,10 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.UserAttributeType,
 		client.UserType,
 		client.GlobalDNSType,
-		client.GlobalDNSProviderType)
+		client.GlobalDNSProviderType,
+		client.ClusterTemplateType,
+		client.ClusterTemplateRevisionType,
+	)
 
 	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, schemas, &projectschema.Version,
 		projectclient.AppType,
@@ -158,6 +164,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	GlobalDNSProviders(schemas, apiContext, localClusterEnabled)
 	Monitor(schemas, apiContext, clusterManager)
 	KontainerDriver(schemas, apiContext)
+	ClusterTemplates(schemas, apiContext)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
@@ -208,6 +215,15 @@ func setupScopedTypes(schemas *types.Schemas) {
 }
 
 func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler) {
+	schema := schemas.Schema(&managementschema.Version, client.ClusterType)
+	clusterFormatter := ccluster.Formatter{
+		KontainerDriverLister: managementContext.Management.KontainerDrivers("").Controller().Lister(),
+	}
+	schema.Formatter = clusterFormatter.Formatter
+	schema.CollectionFormatter = clusterFormatter.CollectionFormatter
+	clusterStore := cluster.GetClusterStore(schema, managementContext, clusterManager, k8sProxy)
+	schema.Store = clusterStore
+
 	handler := ccluster.ActionHandler{
 		NodepoolGetter:     managementContext.Management,
 		ClusterClient:      managementContext.Management.Clusters(""),
@@ -217,11 +233,6 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 		BackupClient:       managementContext.Management.EtcdBackups(""),
 	}
 
-	schema := schemas.Schema(&managementschema.Version, client.ClusterType)
-	clusterFormatter := ccluster.Formatter{
-		KontainerDriverLister: managementContext.Management.KontainerDrivers("").Controller().Lister(),
-	}
-	schema.Formatter = clusterFormatter.Formatter
 	schema.ActionHandler = handler.ClusterActionHandler
 
 	clusterValidator := ccluster.Validator{
@@ -229,7 +240,6 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 	}
 	schema.Validator = clusterValidator.Validator
 
-	cluster.SetClusterStore(schema, managementContext, clusterManager, k8sProxy)
 }
 
 func Templates(ctx context.Context, schemas *types.Schemas, managementContext *config.ScaledContext) {
@@ -687,4 +697,30 @@ func GlobalDNSProviders(schemas *types.Schemas, management *config.ScaledContext
 		schema.CollectionMethods = []string{}
 		schema.ResourceMethods = []string{}
 	}
+}
+
+func ClusterTemplates(schemas *types.Schemas, management *config.ScaledContext) {
+	wrapper := clustertemplate.Wrapper{
+		ClusterTemplates:              management.Management.ClusterTemplates(""),
+		ClusterTemplateLister:         management.Management.ClusterTemplates("").Controller().Lister(),
+		ClusterTemplateRevisionLister: management.Management.ClusterTemplateRevisions("").Controller().Lister(),
+		ClusterTemplateRevisions:      management.Management.ClusterTemplateRevisions(""),
+	}
+
+	schema := schemas.Schema(&managementschema.Version, client.ClusterTemplateType)
+	schema.Store = &globalresource.GlobalNamespaceStore{
+		Store:              schema.Store,
+		NamespaceInterface: management.Core.Namespaces(""),
+	}
+	schema.Store = clustertemplatestore.WrapStore(schema.Store)
+
+	schema.Formatter = wrapper.Formatter
+	schema.LinkHandler = wrapper.LinkHandler
+
+	revisionSchema := schemas.Schema(&managementschema.Version, client.ClusterTemplateRevisionType)
+	revisionSchema.Store = &globalresource.GlobalNamespaceStore{
+		Store:              revisionSchema.Store,
+		NamespaceInterface: management.Core.Namespaces(""),
+	}
+	revisionSchema.Store = clustertemplatestore.WrapStore(revisionSchema.Store)
 }

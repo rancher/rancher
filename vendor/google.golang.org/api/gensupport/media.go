@@ -336,7 +336,14 @@ func (mi *MediaInfo) ResumableUpload(locURI string) *ResumableUpload {
 	}
 }
 
-// SetGetBody sets the GetBody field of req to f.
+// SetGetBody sets the GetBody field of req to f. This was once needed
+// to gracefully support Go 1.7 and earlier which didn't have that
+// field.
+//
+// Deprecated: the code generator no longer uses this as of
+// 2019-02-19. Nothing else should be calling this anyway, but we
+// won't delete this immediately; it will be deleted in as early as 6
+// months.
 func SetGetBody(req *http.Request, f func() (io.ReadCloser, error)) {
 	req.GetBody = f
 }

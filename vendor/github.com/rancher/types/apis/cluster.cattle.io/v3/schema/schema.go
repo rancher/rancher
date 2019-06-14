@@ -6,9 +6,9 @@ import (
 
 	"github.com/rancher/norman/types"
 	m "github.com/rancher/norman/types/mapper"
-	"github.com/rancher/types/apis/cluster.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/cluster.cattle.io/v3"
 	"github.com/rancher/types/factory"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 )
 

@@ -9,13 +9,12 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/pkg/api/store/auth"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	corev1 "github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
-	"github.com/rancher/types/client/management/v3"
+	client "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
@@ -73,12 +72,12 @@ func (p *ldapProvider) CustomizeSchema(schema *types.Schema) {
 	schema.Formatter = p.formatter
 }
 
-func (p *ldapProvider) TransformToAuthProvider(authConfig map[string]interface{}) map[string]interface{} {
+func (p *ldapProvider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
 	ldap := common.TransformToAuthProvider(authConfig)
-	return ldap
+	return ldap, nil
 }
 
-func (p *ldapProvider) AuthenticateUser(input interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (p *ldapProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
 	login, ok := input.(*v3public.BasicLogin)
 	if !ok {
 		return v3.Principal{}, nil, "", errors.New("unexpected input type")
@@ -205,7 +204,7 @@ func (p *ldapProvider) getLDAPConfig() (*v3.LdapConfig, *x509.CertPool, error) {
 
 	if storedLdapConfig.ServiceAccountPassword != "" {
 		value, err := common.ReadFromSecret(p.secrets, storedLdapConfig.ServiceAccountPassword,
-			strings.ToLower(auth.TypeToField[client.OpenLdapConfigType]))
+			strings.ToLower(client.LdapConfigFieldServiceAccountPassword))
 		if err != nil {
 			return nil, nil, err
 		}

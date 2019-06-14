@@ -1,10 +1,12 @@
 package client
 
 const (
-	WebhookConfigType     = "webhookConfig"
-	WebhookConfigFieldURL = "url"
+	WebhookConfigType          = "webhookConfig"
+	WebhookConfigFieldProxyURL = "proxyUrl"
+	WebhookConfigFieldURL      = "url"
 )
 
 type WebhookConfig struct {
-	URL string `json:"url,omitempty" yaml:"url,omitempty"`
+	ProxyURL string `json:"proxyUrl,omitempty" yaml:"proxyUrl,omitempty"`
+	URL      string `json:"url,omitempty" yaml:"url,omitempty"`
 }

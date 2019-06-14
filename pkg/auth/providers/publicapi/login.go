@@ -12,14 +12,15 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
+	"github.com/rancher/rancher/pkg/auth/providers/googleoauth"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
 	"github.com/rancher/types/apis/management.cattle.io/v3public/schema"
-	"github.com/rancher/types/client/management/v3public"
+	client "github.com/rancher/types/client/management/v3public"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
@@ -136,6 +137,9 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	case client.OKTAProviderType:
 		input = &v3public.SamlLoginInput{}
 		providerName = saml.OKTAName
+	case client.GoogleOAuthProviderType:
+		input = &v3public.GoogleOauthLogin{}
+		providerName = googleoauth.Name
 	default:
 		return v3.Token{}, "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
 	}
@@ -155,12 +159,10 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		return v3.Token{}, "saml", err
 	}
 
-	userPrincipal, groupPrincipals, providerToken, err = providers.AuthenticateUser(input, providerName)
+	userPrincipal, groupPrincipals, providerToken, err = providers.AuthenticateUser(request.Request.Context(), input, providerName)
 	if err != nil {
 		return v3.Token{}, "", err
 	}
-
-	logrus.Debug("User Authenticated")
 
 	displayName := userPrincipal.DisplayName
 	if displayName == "" {

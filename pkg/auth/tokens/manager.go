@@ -13,8 +13,8 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/util"
 	"github.com/rancher/rancher/pkg/randomtoken"
-	"github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v1 "github.com/rancher/types/apis/core/v1"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	clientv3 "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -632,8 +632,7 @@ var uaBackoff = wait.Backoff{
 
 func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string) (v3.Token, error) {
 	provider := userPrincipal.Provider
-
-	if (provider == "github" || provider == "azuread") && providerToken != "" {
+	if (provider == "github" || provider == "azuread" || provider == "googleoauth") && providerToken != "" {
 		err := m.CreateSecret(userID, provider, providerToken)
 		if err != nil {
 			return v3.Token{}, fmt.Errorf("unable to create secret: %s", err)

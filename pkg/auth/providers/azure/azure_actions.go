@@ -10,12 +10,11 @@ import (
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/pkg/api/store/auth"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
-	"github.com/rancher/types/client/management/v3"
+	client "github.com/rancher/types/client/management/v3"
 )
 
 func (ap *azureProvider) formatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -73,7 +72,7 @@ func (ap *azureProvider) testAndApply(actionName string, action *types.Action, r
 
 	if azureADConfig.ApplicationSecret != "" {
 		value, err := common.ReadFromSecret(ap.secrets, azureADConfig.ApplicationSecret,
-			strings.ToLower(auth.TypeToField[client.AzureADConfigType]))
+			strings.ToLower(client.AzureADConfigFieldApplicationSecret))
 		if err != nil {
 			return err
 		}

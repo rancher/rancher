@@ -8,12 +8,11 @@ import (
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/pkg/api/store/auth"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
-	"github.com/rancher/types/client/management/v3"
+	client "github.com/rancher/types/client/management/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -64,7 +63,7 @@ func (p *ldapProvider) testAndApply(actionName string, action *types.Action, req
 
 	if config.ServiceAccountPassword != "" {
 		value, err := common.ReadFromSecret(p.secrets, config.ServiceAccountPassword,
-			strings.ToLower(auth.TypeToField[client.FreeIpaConfigType]))
+			strings.ToLower(client.LdapConfigFieldServiceAccountPassword))
 		if err != nil {
 			return err
 		}
@@ -116,7 +115,7 @@ func (p *ldapProvider) saveLDAPConfig(config *v3.LdapConfig) error {
 
 	config.ObjectMeta = storedConfig.ObjectMeta
 
-	field := strings.ToLower(auth.TypeToField[config.Type])
+	field := strings.ToLower(client.LdapConfigFieldServiceAccountPassword)
 	if err := common.CreateOrUpdateSecrets(p.secrets, config.ServiceAccountPassword,
 		field, strings.ToLower(config.Type)); err != nil {
 		return err

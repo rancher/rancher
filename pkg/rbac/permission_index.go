@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/rancher/norman/types/slice"
-	"github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
+	v1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/client-go/tools/cache"
 )

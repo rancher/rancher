@@ -4,7 +4,7 @@ import (
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/rancher/pkg/project"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 )

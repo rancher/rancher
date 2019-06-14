@@ -7,7 +7,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/pki"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 type rke struct {

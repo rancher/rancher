@@ -2,9 +2,11 @@ package clustergc
 
 import (
 	"context"
+	"strings"
+
 	"github.com/rancher/norman/lifecycle"
 	"github.com/rancher/norman/resource"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -13,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
-	"strings"
 )
 
 func Register(ctx context.Context, management *config.ManagementContext) {

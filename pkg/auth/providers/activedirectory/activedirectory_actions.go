@@ -9,12 +9,11 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/rancher/pkg/api/store/auth"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
-	"github.com/rancher/types/client/management/v3"
+	client "github.com/rancher/types/client/management/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -60,7 +59,7 @@ func (p *adProvider) testAndApply(actionName string, action *types.Action, reque
 
 	if config.ServiceAccountPassword != "" {
 		value, err := common.ReadFromSecret(p.secrets, config.ServiceAccountPassword,
-			strings.ToLower(auth.TypeToField[client.ActiveDirectoryConfigType]))
+			strings.ToLower(client.ActiveDirectoryConfigFieldServiceAccountPassword))
 		if err != nil {
 			return err
 		}
@@ -109,7 +108,7 @@ func (p *adProvider) saveActiveDirectoryConfig(config *v3.ActiveDirectoryConfig)
 	config.Type = client.ActiveDirectoryConfigType
 	config.ObjectMeta = storedConfig.ObjectMeta
 
-	field := strings.ToLower(auth.TypeToField[config.Type])
+	field := strings.ToLower(client.ActiveDirectoryConfigFieldServiceAccountPassword)
 	if err := common.CreateOrUpdateSecrets(p.secrets, config.ServiceAccountPassword, field, strings.ToLower(convert.ToString(config.Type))); err != nil {
 		return err
 	}

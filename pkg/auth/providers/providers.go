@@ -9,12 +9,13 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
+	"github.com/rancher/rancher/pkg/auth/providers/googleoauth"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/client/management/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	client "github.com/rancher/types/client/management/v3"
 	publicclient "github.com/rancher/types/client/management/v3public"
 	"github.com/rancher/types/config"
 )
@@ -114,10 +115,17 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	providers[saml.OKTAName] = p
 	providersByType[client.OKTAConfigType] = p
 	providersByType[publicclient.OKTAProviderType] = p
+
+	p = googleoauth.Configure(ctx, mgmt, userMGR, tokenMGR)
+	ProviderNames[googleoauth.Name] = true
+	ProvidersWithSecrets[googleoauth.Name] = true
+	providers[googleoauth.Name] = p
+	providersByType[client.GoogleOauthConfigType] = p
+	providersByType[publicclient.GoogleOAuthProviderType] = p
 }
 
-func AuthenticateUser(input interface{}, providerName string) (v3.Principal, []v3.Principal, string, error) {
-	return providers[providerName].AuthenticateUser(input)
+func AuthenticateUser(ctx context.Context, input interface{}, providerName string) (v3.Principal, []v3.Principal, string, error) {
+	return providers[providerName].AuthenticateUser(ctx, input)
 }
 
 func GetPrincipal(principalID string, myToken v3.Token) (v3.Principal, error) {

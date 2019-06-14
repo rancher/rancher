@@ -7,11 +7,10 @@ import (
 	"github.com/pkg/errors"
 	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
 	"github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/client/management/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	client "github.com/rancher/types/client/management/v3"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"

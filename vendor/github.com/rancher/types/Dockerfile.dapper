@@ -6,7 +6,7 @@ RUN go get -d golang.org/x/lint/golint && \
     go install golang.org/x/lint/golint && \
     rm -rf /go/src /go/pkg
 RUN go get -d golang.org/x/tools/cmd/goimports && \
-    git -C /go/src/golang.org/x/tools/cmd/goimports checkout -b current 0b24b358f4c7eaa92895f67a3f6cea2a0cf525d5 && \
+    git -C /go/src/golang.org/x/tools/cmd/goimports checkout -b current 26e35f15edef9a960ed13c88b445c5674371da18 && \
     go install golang.org/x/tools/cmd/goimports && \
     rm -rf /go/src /go/pkg
 

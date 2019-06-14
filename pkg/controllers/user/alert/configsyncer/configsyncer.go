@@ -3,6 +3,7 @@ package configsyncer
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"sort"
 	"strconv"
 	"time"
@@ -17,8 +18,8 @@ import (
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v1 "github.com/rancher/types/apis/core/v1"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
 
@@ -461,6 +462,17 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 					ServiceKey:  alertconfig.Secret(notifier.Spec.PagerdutyConfig.ServiceKey),
 					Description: `{{ template "rancher.title" . }}`,
 				}
+
+				if notifier.Spec.PagerdutyConfig.HTTPClientConfig != nil {
+					url, err := toAlertManagerURL(notifier.Spec.PagerdutyConfig.HTTPClientConfig.ProxyURL)
+					if err != nil {
+						logrus.Errorf("Failed to parse pagerduty proxy url %s, %v", notifier.Spec.PagerdutyConfig.HTTPClientConfig.ProxyURL, err)
+						continue
+					}
+					pagerduty.HTTPConfig = &alertconfig.HTTPClientConfig{
+						ProxyURL: *url,
+					}
+				}
 				if r.Recipient != "" {
 					pagerduty.ServiceKey = alertconfig.Secret(r.Recipient)
 				}
@@ -489,6 +501,17 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 					wechat.ToParty = recipient
 				}
 
+				if notifier.Spec.WechatConfig.HTTPClientConfig != nil {
+					url, err := toAlertManagerURL(notifier.Spec.WechatConfig.HTTPClientConfig.ProxyURL)
+					if err != nil {
+						logrus.Errorf("Failed to parse wechat proxy url %s, %v", notifier.Spec.WechatConfig.HTTPClientConfig.ProxyURL, err)
+						continue
+					}
+					wechat.HTTPConfig = &alertconfig.HTTPClientConfig{
+						ProxyURL: *url,
+					}
+				}
+
 				receiver.WechatConfigs = append(receiver.WechatConfigs, wechat)
 				receiverExist = true
 
@@ -499,6 +522,18 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 				if r.Recipient != "" {
 					webhook.URL = r.Recipient
 				}
+
+				if notifier.Spec.WebhookConfig.HTTPClientConfig != nil {
+					url, err := toAlertManagerURL(notifier.Spec.WebhookConfig.HTTPClientConfig.ProxyURL)
+					if err != nil {
+						logrus.Errorf("Failed to parse webhook proxy url %s, %v", notifier.Spec.WebhookConfig.HTTPClientConfig.ProxyURL, err)
+						continue
+					}
+					webhook.HTTPConfig = &alertconfig.HTTPClientConfig{
+						ProxyURL: *url,
+					}
+				}
+
 				receiver.WebhookConfigs = append(receiver.WebhookConfigs, webhook)
 				receiverExist = true
 			} else if notifier.Spec.SlackConfig != nil {
@@ -512,6 +547,17 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 				}
 				if r.Recipient != "" {
 					slack.Channel = r.Recipient
+				}
+
+				if notifier.Spec.SlackConfig.HTTPClientConfig != nil {
+					url, err := toAlertManagerURL(notifier.Spec.SlackConfig.HTTPClientConfig.ProxyURL)
+					if err != nil {
+						logrus.Errorf("Failed to parse slack proxy url %s, %v", notifier.Spec.SlackConfig.HTTPClientConfig.ProxyURL, err)
+						continue
+					}
+					slack.HTTPConfig = &alertconfig.HTTPClientConfig{
+						ProxyURL: *url,
+					}
 				}
 				receiver.SlackConfigs = append(receiver.SlackConfigs, slack)
 				receiverExist = true
@@ -594,4 +640,12 @@ func getProjectAlertGroupBy(spec v3.ProjectAlertRuleSpec) []model.LabelName {
 	}
 
 	return nil
+}
+
+func toAlertManagerURL(urlStr string) (*alertconfig.URL, error) {
+	url, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, err
+	}
+	return &alertconfig.URL{url}, nil
 }

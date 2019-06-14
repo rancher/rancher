@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"k8s.io/api/rbac/v1"
+	v1 "k8s.io/api/rbac/v1"
 )
 
 func rbByOwner(obj interface{}) ([]string, error) {

@@ -17,18 +17,19 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/util"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/client-go/util/cert"
 )
 
 const (
-	EtcdSnapshotPath     = "/opt/rke/etcd-snapshots/"
-	EtcdRestorePath      = "/opt/rke/etcd-snapshots-restore/"
-	EtcdDataDir          = "/var/lib/rancher/etcd/"
-	EtcdInitWaitTime     = 10
-	EtcdSnapshotWaitTime = 5
+	EtcdSnapshotPath                = "/opt/rke/etcd-snapshots/"
+	EtcdRestorePath                 = "/opt/rke/etcd-snapshots-restore/"
+	EtcdDataDir                     = "/var/lib/rancher/etcd/"
+	EtcdInitWaitTime                = 10
+	EtcdSnapshotWaitTime            = 5
+	EtcdSnapshotCompressedExtension = "zip"
 )
 
 func RunEtcdPlane(
@@ -52,10 +53,10 @@ func RunEtcdPlane(
 			return err
 		}
 		if *es.Snapshot == true {
-			if err := RunEtcdSnapshotSave(ctx, host, prsMap, alpineImage, EtcdSnapshotContainerName, false, es); err != nil {
+			if err := RunEtcdSnapshotSave(ctx, host, prsMap, util.DefaultRKETools, EtcdSnapshotContainerName, false, es); err != nil {
 				return err
 			}
-			if err := pki.SaveBackupBundleOnHost(ctx, host, alpineImage, EtcdSnapshotPath, prsMap); err != nil {
+			if err := pki.SaveBackupBundleOnHost(ctx, host, util.DefaultRKETools, EtcdSnapshotPath, prsMap); err != nil {
 				return err
 			}
 		} else {
@@ -272,9 +273,6 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 	log.Infof(ctx, "[etcd] Saving snapshot [%s] on host [%s]", name, etcdHost.Address)
 	backupCmd := "etcd-backup"
 	restartPolicy := "always"
-	if !util.IsRancherBackupSupported(etcdSnapshotImage) {
-		backupCmd = "rolling-backup"
-	}
 	imageCfg := &container.Config{
 		Cmd: []string{
 			"/opt/rke-tools/rke-etcd-backup",
@@ -374,7 +372,7 @@ func DownloadEtcdSnapshotFromS3(ctx context.Context, etcdHost *hosts.Host, prsMa
 			fmt.Sprintf("%s:/backup:z", EtcdSnapshotPath),
 			fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(etcdHost.PrefixPath, "/etc/kubernetes"))},
 		NetworkMode:   container.NetworkMode("host"),
-		RestartPolicy: container.RestartPolicy{Name: "always"},
+		RestartPolicy: container.RestartPolicy{Name: "no"},
 	}
 	if err := docker.DoRemoveContainer(ctx, etcdHost.DClient, EtcdDownloadBackupContainerName, etcdHost.Address); err != nil {
 		return err
@@ -457,7 +455,7 @@ func RestoreEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 
 func RunEtcdSnapshotRemove(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdSnapshotImage string, name string, once bool, es v3.ETCDService) error {
 	log.Infof(ctx, "[etcd] Removing snapshot [%s] from host [%s]", name, etcdHost.Address)
-	fullPath := fmt.Sprintf("/backup/%s", name)
+	fullPath := fmt.Sprintf("/backup/%s{,.%s}", name, EtcdSnapshotCompressedExtension)
 	// Make sure we have a safe path to remove
 	safePath, err := filepath.Match("/backup/*", fullPath)
 	if err != nil {
@@ -469,9 +467,7 @@ func RunEtcdSnapshotRemove(ctx context.Context, etcdHost *hosts.Host, prsMap map
 
 	imageCfg := &container.Config{
 		Cmd: []string{
-			"rm",
-			"-f",
-			fullPath,
+			"sh", "-c", fmt.Sprintf("rm -f %s", fullPath),
 		},
 		Image: etcdSnapshotImage,
 	}
@@ -505,13 +501,14 @@ func RunEtcdSnapshotRemove(ctx context.Context, etcdHost *hosts.Host, prsMap map
 func GetEtcdSnapshotChecksum(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, alpineImage, snapshotName string) (string, error) {
 	var checksum string
 	var err error
+	var stderr string
 
+	// compressedSnapshotPath := fmt.Sprintf("%s%s.%s", EtcdSnapshotPath, snapshotName, EtcdSnapshotCompressedExtension)
 	snapshotPath := fmt.Sprintf("%s%s", EtcdSnapshotPath, snapshotName)
 	imageCfg := &container.Config{
 		Cmd: []string{
 			"sh", "-c", strings.Join([]string{
-				"md5sum", snapshotPath,
-				"|", "cut", "-f1", "-d' '", "|", "tr", "-d", "'\n'"}, " "),
+				"if [ -f ", snapshotPath, " ]; then md5sum ", snapshotPath, " | cut -f1 -d' ' | tr -d '\n'; else echo 'snapshot file does not exist' >&2; fi"}, ""),
 		},
 		Image: alpineImage,
 	}
@@ -526,9 +523,13 @@ func GetEtcdSnapshotChecksum(ctx context.Context, etcdHost *hosts.Host, prsMap m
 	if _, err := docker.WaitForContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdChecksumContainerName); err != nil {
 		return checksum, err
 	}
-	_, checksum, err = docker.GetContainerLogsStdoutStderr(ctx, etcdHost.DClient, EtcdChecksumContainerName, "1", false)
+	stderr, checksum, err = docker.GetContainerLogsStdoutStderr(ctx, etcdHost.DClient, EtcdChecksumContainerName, "1", false)
 	if err != nil {
 		return checksum, err
+	}
+	if stderr != "" {
+		return checksum, fmt.Errorf("Error output not nil from snapshot checksum container [%s]: %s", EtcdChecksumContainerName, stderr)
+
 	}
 	if err := docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdChecksumContainerName); err != nil {
 		return checksum, err

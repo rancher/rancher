@@ -1,4 +1,4 @@
-// Copyright 2018 Google Inc. All rights reserved.
+// Copyright 2019 Google LLC.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -6,13 +6,35 @@
 
 // Package container provides access to the Kubernetes Engine API.
 //
-// See https://cloud.google.com/container-engine/
+// For product documentation, see: https://cloud.google.com/container-engine/
+//
+// Creating a client
 //
 // Usage example:
 //
 //   import "google.golang.org/api/container/v1"
 //   ...
-//   containerService, err := container.New(oauthHttpClient)
+//   ctx := context.Background()
+//   containerService, err := container.NewService(ctx)
+//
+// In this example, Google Application Default Credentials are used for authentication.
+//
+// For information on how to create and obtain Application Default Credentials, see https://developers.google.com/identity/protocols/application-default-credentials.
+//
+// Other authentication options
+//
+// To use an API key for authentication (note: some APIs do not support API keys), use option.WithAPIKey:
+//
+//   containerService, err := container.NewService(ctx, option.WithAPIKey("AIza..."))
+//
+// To use an OAuth token (e.g., a user token obtained via a three-legged OAuth flow), use option.WithTokenSource:
+//
+//   config := &oauth2.Config{...}
+//   // ...
+//   token, err := config.Exchange(ctx, ...)
+//   containerService, err := container.NewService(ctx, option.WithTokenSource(config.TokenSource(ctx, token)))
+//
+// See https://godoc.org/google.golang.org/api/option/ for details on options.
 package container // import "google.golang.org/api/container/v1"
 
 import (
@@ -29,6 +51,8 @@ import (
 
 	gensupport "google.golang.org/api/gensupport"
 	googleapi "google.golang.org/api/googleapi"
+	option "google.golang.org/api/option"
+	htransport "google.golang.org/api/transport/http"
 )
 
 // Always reference these packages, just in case the auto-generated code
@@ -56,6 +80,32 @@ const (
 	CloudPlatformScope = "https://www.googleapis.com/auth/cloud-platform"
 )
 
+// NewService creates a new Service.
+func NewService(ctx context.Context, opts ...option.ClientOption) (*Service, error) {
+	scopesOption := option.WithScopes(
+		"https://www.googleapis.com/auth/cloud-platform",
+	)
+	// NOTE: prepend, so we don't override user-specified scopes.
+	opts = append([]option.ClientOption{scopesOption}, opts...)
+	client, endpoint, err := htransport.NewClient(ctx, opts...)
+	if err != nil {
+		return nil, err
+	}
+	s, err := New(client)
+	if err != nil {
+		return nil, err
+	}
+	if endpoint != "" {
+		s.BasePath = endpoint
+	}
+	return s, nil
+}
+
+// New creates a new Service. It uses the provided http.Client for requests.
+//
+// Deprecated: please use NewService instead.
+// To provide a custom HTTP client, use option.WithHTTPClient.
+// If you are using google.golang.org/api/googleapis/transport.APIKey, use option.WithAPIKey with NewService instead.
 func New(client *http.Client) (*Service, error) {
 	if client == nil {
 		return nil, errors.New("client is nil")
@@ -113,6 +163,7 @@ type ProjectsLocationsService struct {
 func NewProjectsLocationsClustersService(s *Service) *ProjectsLocationsClustersService {
 	rs := &ProjectsLocationsClustersService{s: s}
 	rs.NodePools = NewProjectsLocationsClustersNodePoolsService(s)
+	rs.WellKnown = NewProjectsLocationsClustersWellKnownService(s)
 	return rs
 }
 
@@ -120,6 +171,8 @@ type ProjectsLocationsClustersService struct {
 	s *Service
 
 	NodePools *ProjectsLocationsClustersNodePoolsService
+
+	WellKnown *ProjectsLocationsClustersWellKnownService
 }
 
 func NewProjectsLocationsClustersNodePoolsService(s *Service) *ProjectsLocationsClustersNodePoolsService {
@@ -128,6 +181,15 @@ func NewProjectsLocationsClustersNodePoolsService(s *Service) *ProjectsLocations
 }
 
 type ProjectsLocationsClustersNodePoolsService struct {
+	s *Service
+}
+
+func NewProjectsLocationsClustersWellKnownService(s *Service) *ProjectsLocationsClustersWellKnownService {
+	rs := &ProjectsLocationsClustersWellKnownService{s: s}
+	return rs
+}
+
+type ProjectsLocationsClustersWellKnownService struct {
 	s *Service
 }
 
@@ -1074,6 +1136,94 @@ type Empty struct {
 	googleapi.ServerResponse `json:"-"`
 }
 
+// GetJSONWebKeysResponse: GetJSONWebKeysResponse is a valid JSON Web
+// Key Set as specififed in rfc 7517
+type GetJSONWebKeysResponse struct {
+	// Keys: The public component of the keys used by the cluster to sign
+	// token
+	// requests.
+	Keys []*Jwk `json:"keys,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "Keys") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Keys") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *GetJSONWebKeysResponse) MarshalJSON() ([]byte, error) {
+	type NoMethod GetJSONWebKeysResponse
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// GetOpenIDConfigResponse: GetOpenIDConfigResponse is an OIDC discovery
+// document for the cluster.
+// See the OpenID Connect Discovery 1.0 specification for details.
+type GetOpenIDConfigResponse struct {
+	// ClaimsSupported: NOLINT
+	ClaimsSupported []string `json:"claims_supported,omitempty"`
+
+	// GrantTypes: NOLINT
+	GrantTypes []string `json:"grant_types,omitempty"`
+
+	// IdTokenSigningAlgValuesSupported: NOLINT
+	IdTokenSigningAlgValuesSupported []string `json:"id_token_signing_alg_values_supported,omitempty"`
+
+	// Issuer: NOLINT
+	Issuer string `json:"issuer,omitempty"`
+
+	// JwksUri: NOLINT
+	JwksUri string `json:"jwks_uri,omitempty"`
+
+	// ResponseTypesSupported: NOLINT
+	ResponseTypesSupported []string `json:"response_types_supported,omitempty"`
+
+	// SubjectTypesSupported: NOLINT
+	SubjectTypesSupported []string `json:"subject_types_supported,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "ClaimsSupported") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "ClaimsSupported") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *GetOpenIDConfigResponse) MarshalJSON() ([]byte, error) {
+	type NoMethod GetOpenIDConfigResponse
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // HorizontalPodAutoscaling: Configuration options for the horizontal
 // pod autoscaling feature, which
 // increases or decreases the number of replica pods a replication
@@ -1286,6 +1436,60 @@ type IPAllocationPolicy struct {
 
 func (s *IPAllocationPolicy) MarshalJSON() ([]byte, error) {
 	type NoMethod IPAllocationPolicy
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// Jwk: Jwk is a JSON Web Key as specified in RFC 7517
+type Jwk struct {
+	// Alg: NOLINT
+	Alg string `json:"alg,omitempty"`
+
+	// Crv: NOLINT
+	Crv string `json:"crv,omitempty"`
+
+	// E: NOLINT
+	E string `json:"e,omitempty"`
+
+	// Kid: NOLINT
+	Kid string `json:"kid,omitempty"`
+
+	// Kty: NOLINT
+	Kty string `json:"kty,omitempty"`
+
+	// N: Fields for RSA keys.
+	// NOLINT
+	N string `json:"n,omitempty"`
+
+	// Use: NOLINT
+	Use string `json:"use,omitempty"`
+
+	// X: Fields for ECDSA keys.
+	// NOLINT
+	X string `json:"x,omitempty"`
+
+	// Y: NOLINT
+	Y string `json:"y,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Alg") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Alg") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *Jwk) MarshalJSON() ([]byte, error) {
+	type NoMethod Jwk
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -1824,6 +2028,7 @@ type NodeConfig struct {
 	//  "cluster-name"
 	//  "cluster-uid"
 	//  "configure-sh"
+	//  "containerd-configure-sh"
 	//  "enable-os-login"
 	//  "gci-update-strategy"
 	//  "gci-ensure-gke-docker"
@@ -3596,7 +3801,7 @@ func (c *ProjectsLocationsGetServerConfigCall) Do(opts ...googleapi.CallOption) 
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The name (project and location) of the server config to get\nSpecified in the format 'projects/*/locations/*'.",
+	//       "description": "The name (project and location) of the server config to get,\nspecified in the format 'projects/*/locations/*'.",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/locations/[^/]+$",
 	//       "required": true,
@@ -4283,6 +4488,154 @@ func (c *ProjectsLocationsClustersGetCall) Do(opts ...googleapi.CallOption) (*Cl
 	//   "path": "v1/{+name}",
 	//   "response": {
 	//     "$ref": "Cluster"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform"
+	//   ]
+	// }
+
+}
+
+// method id "container.projects.locations.clusters.getJwks":
+
+type ProjectsLocationsClustersGetJwksCall struct {
+	s            *Service
+	parent       string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// GetJwks: GetJSONWebKeys gets the public component of the cluster
+// signing keys in
+// JSON Web Key format.
+// This API is not yet intended for general use, and is not available
+// for all
+// clusters.
+func (r *ProjectsLocationsClustersService) GetJwks(parent string) *ProjectsLocationsClustersGetJwksCall {
+	c := &ProjectsLocationsClustersGetJwksCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.parent = parent
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsLocationsClustersGetJwksCall) Fields(s ...googleapi.Field) *ProjectsLocationsClustersGetJwksCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *ProjectsLocationsClustersGetJwksCall) IfNoneMatch(entityTag string) *ProjectsLocationsClustersGetJwksCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsLocationsClustersGetJwksCall) Context(ctx context.Context) *ProjectsLocationsClustersGetJwksCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsLocationsClustersGetJwksCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsLocationsClustersGetJwksCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+parent}/jwks")
+	urls += "?" + c.urlParams_.Encode()
+	req, err := http.NewRequest("GET", urls, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"parent": c.parent,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "container.projects.locations.clusters.getJwks" call.
+// Exactly one of *GetJSONWebKeysResponse or error will be non-nil. Any
+// non-2xx status code is an error. Response headers are in either
+// *GetJSONWebKeysResponse.ServerResponse.Header or (if a response was
+// returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsLocationsClustersGetJwksCall) Do(opts ...googleapi.CallOption) (*GetJSONWebKeysResponse, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &GetJSONWebKeysResponse{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "GetJSONWebKeys gets the public component of the cluster signing keys in\nJSON Web Key format.\nThis API is not yet intended for general use, and is not available for all\nclusters.",
+	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/clusters/{clustersId}/jwks",
+	//   "httpMethod": "GET",
+	//   "id": "container.projects.locations.clusters.getJwks",
+	//   "parameterOrder": [
+	//     "parent"
+	//   ],
+	//   "parameters": {
+	//     "parent": {
+	//       "description": "The cluster (project, location, cluster id) to get keys for. Specified in\nthe format 'projects/*/locations/*/clusters/*'.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/locations/[^/]+/clusters/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v1/{+parent}/jwks",
+	//   "response": {
+	//     "$ref": "GetJSONWebKeysResponse"
 	//   },
 	//   "scopes": [
 	//     "https://www.googleapis.com/auth/cloud-platform"
@@ -7554,6 +7907,157 @@ func (c *ProjectsLocationsClustersNodePoolsUpdateCall) Do(opts ...googleapi.Call
 
 }
 
+// method id "container.projects.locations.clusters.well-known.getOpenid-configuration":
+
+type ProjectsLocationsClustersWellKnownGetOpenidConfigurationCall struct {
+	s            *Service
+	parent       string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// GetOpenidConfiguration: GetOpenIDConfig gets the OIDC discovery
+// document for the cluster.
+// See the OpenID Connect Discovery 1.0 specification for
+// details.
+// https://openid.net/specs/openid-connect-discovery-1_0.html
+// Th
+// is API is not yet intended for general use, and is not available for
+// all
+// clusters.
+func (r *ProjectsLocationsClustersWellKnownService) GetOpenidConfiguration(parent string) *ProjectsLocationsClustersWellKnownGetOpenidConfigurationCall {
+	c := &ProjectsLocationsClustersWellKnownGetOpenidConfigurationCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.parent = parent
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *ProjectsLocationsClustersWellKnownGetOpenidConfigurationCall) Fields(s ...googleapi.Field) *ProjectsLocationsClustersWellKnownGetOpenidConfigurationCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets the optional parameter which makes the operation
+// fail if the object's ETag matches the given value. This is useful for
+// getting updates only after the object has changed since the last
+// request. Use googleapi.IsNotModified to check whether the response
+// error from Do is the result of In-None-Match.
+func (c *ProjectsLocationsClustersWellKnownGetOpenidConfigurationCall) IfNoneMatch(entityTag string) *ProjectsLocationsClustersWellKnownGetOpenidConfigurationCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *ProjectsLocationsClustersWellKnownGetOpenidConfigurationCall) Context(ctx context.Context) *ProjectsLocationsClustersWellKnownGetOpenidConfigurationCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *ProjectsLocationsClustersWellKnownGetOpenidConfigurationCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ProjectsLocationsClustersWellKnownGetOpenidConfigurationCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/{+parent}/.well-known/openid-configuration")
+	urls += "?" + c.urlParams_.Encode()
+	req, err := http.NewRequest("GET", urls, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"parent": c.parent,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "container.projects.locations.clusters.well-known.getOpenid-configuration" call.
+// Exactly one of *GetOpenIDConfigResponse or error will be non-nil. Any
+// non-2xx status code is an error. Response headers are in either
+// *GetOpenIDConfigResponse.ServerResponse.Header or (if a response was
+// returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsLocationsClustersWellKnownGetOpenidConfigurationCall) Do(opts ...googleapi.CallOption) (*GetOpenIDConfigResponse, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &GetOpenIDConfigResponse{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "GetOpenIDConfig gets the OIDC discovery document for the cluster.\nSee the OpenID Connect Discovery 1.0 specification for details.\nhttps://openid.net/specs/openid-connect-discovery-1_0.html\nThis API is not yet intended for general use, and is not available for all\nclusters.",
+	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/clusters/{clustersId}/.well-known/openid-configuration",
+	//   "httpMethod": "GET",
+	//   "id": "container.projects.locations.clusters.well-known.getOpenid-configuration",
+	//   "parameterOrder": [
+	//     "parent"
+	//   ],
+	//   "parameters": {
+	//     "parent": {
+	//       "description": "The cluster (project, location, cluster id) to get the discovery document\nfor. Specified in the format 'projects/*/locations/*/clusters/*'.",
+	//       "location": "path",
+	//       "pattern": "^projects/[^/]+/locations/[^/]+/clusters/[^/]+$",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "v1/{+parent}/.well-known/openid-configuration",
+	//   "response": {
+	//     "$ref": "GetOpenIDConfigResponse"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform"
+	//   ]
+	// }
+
+}
+
 // method id "container.projects.locations.operations.cancel":
 
 type ProjectsLocationsOperationsCancelCall struct {
@@ -8079,8 +8583,8 @@ func (r *ProjectsZonesService) GetServerconfig(projectId string, zone string) *P
 }
 
 // Name sets the optional parameter "name": The name (project and
-// location) of the server config to get
-// Specified in the format 'projects/*/locations/*'.
+// location) of the server config to get,
+// specified in the format 'projects/*/locations/*'.
 func (c *ProjectsZonesGetServerconfigCall) Name(name string) *ProjectsZonesGetServerconfigCall {
 	c.urlParams_.Set("name", name)
 	return c
@@ -8195,7 +8699,7 @@ func (c *ProjectsZonesGetServerconfigCall) Do(opts ...googleapi.CallOption) (*Se
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The name (project and location) of the server config to get\nSpecified in the format 'projects/*/locations/*'.",
+	//       "description": "The name (project and location) of the server config to get,\nspecified in the format 'projects/*/locations/*'.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },

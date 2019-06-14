@@ -2,11 +2,12 @@ package store
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/types/apis/core/v1"
+	v1 "github.com/rancher/types/apis/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strings"
 )
 
 func GetValueForPasswordField(name string, secrets v1.SecretInterface) (string, error) {

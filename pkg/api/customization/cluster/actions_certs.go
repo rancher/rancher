@@ -10,8 +10,8 @@ import (
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/types"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/client/management/v3"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	client "github.com/rancher/types/client/management/v3"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func (a ActionHandler) RotateCertificates(actionName string, action *types.Action, apiContext *types.APIContext) error {

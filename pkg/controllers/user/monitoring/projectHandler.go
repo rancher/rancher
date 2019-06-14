@@ -2,17 +2,16 @@ package monitoring
 
 import (
 	"fmt"
-	"github.com/rancher/rancher/pkg/app/utils"
 	"reflect"
 	"time"
 
-	"github.com/rancher/rancher/pkg/ref"
-
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/app/utils"
 	"github.com/rancher/rancher/pkg/monitoring"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	k8scorev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

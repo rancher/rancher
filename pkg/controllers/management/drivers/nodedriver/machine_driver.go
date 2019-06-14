@@ -2,6 +2,7 @@ package nodedriver
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"reflect"
@@ -33,14 +34,15 @@ var (
 		"azure":        map[string]string{"customData": "customData"},
 		"digitalocean": map[string]string{"sshKeyPath": "sshKeyContents", "userdata": "userdata"},
 		"exoscale":     map[string]string{"sshKey": "sshKey", "userdata": "userdata"},
-		"openstack":    map[string]string{"privateKeyFile": "privateKeyFile"},
+		"openstack":    map[string]string{"cacert": "cacert", "privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
 		"otc":          map[string]string{"privateKeyFile": "privateKeyFile"},
 		"packet":       map[string]string{"userdata": "userdata"},
 	}
 )
 
 const (
-	driverNameLabel = "io.cattle.node_driver.name"
+	driverNameLabel  = "io.cattle.node_driver.name"
+	uiFieldHintsAnno = "io.cattle.nodedriver/ui-field-hints"
 )
 
 func Register(ctx context.Context, management *config.ManagementContext) {
@@ -124,12 +126,6 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	}
 
 	newObj, err := v3.NodeDriverConditionDownloaded.Once(obj, func() (runtime.Object, error) {
-		if obj.Spec.Builtin {
-			obj.Status.AppliedDockerMachineVersion = m.dockerMachineVersion
-		} else {
-			obj.Status.AppliedURL = obj.Spec.URL
-			obj.Status.AppliedChecksum = obj.Spec.Checksum
-		}
 		// update status
 		obj, err = m.nodeDriverClient.Update(obj)
 		if err != nil {
@@ -162,6 +158,14 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 
 	obj = newObj.(*v3.NodeDriver)
 	driverName := strings.TrimPrefix(driver.Name(), drivers.DockerMachineDriverPrefix)
+
+	obj = m.addVersionInfo(obj)
+
+	obj, err = m.addUIHintsAnno(driverName, obj)
+	if err != nil {
+		return obj, errs.Wrap(err, "failed JSON in addUIHintsAnno")
+	}
+
 	flags, err := getCreateFlagsForDriver(driverName)
 	if err != nil {
 		return nil, err
@@ -272,6 +276,14 @@ func (m *Lifecycle) checkDriverVersion(obj *v3.NodeDriver) bool {
 		return true
 	}
 
+	driverName := strings.TrimPrefix(obj.Spec.DisplayName, drivers.DockerMachineDriverPrefix)
+
+	if _, ok := Aliases[driverName]; ok {
+		if val, ok := obj.Annotations[uiFieldHintsAnno]; !ok || val == "" {
+			return true
+		}
+	}
+
 	// Builtin drivers use the docker-machine version to validate against
 	if obj.Spec.Builtin {
 		if obj.Status.AppliedDockerMachineVersion != m.dockerMachineVersion {
@@ -285,6 +297,40 @@ func (m *Lifecycle) checkDriverVersion(obj *v3.NodeDriver) bool {
 	}
 
 	return false
+}
+
+func (m *Lifecycle) addVersionInfo(obj *v3.NodeDriver) *v3.NodeDriver {
+	if obj.Spec.Builtin {
+		obj.Status.AppliedDockerMachineVersion = m.dockerMachineVersion
+	} else {
+		obj.Status.AppliedURL = obj.Spec.URL
+		obj.Status.AppliedChecksum = obj.Spec.Checksum
+	}
+	return obj
+}
+
+func (m *Lifecycle) addUIHintsAnno(driverName string, obj *v3.NodeDriver) (*v3.NodeDriver, error) {
+	if aliases, ok := Aliases[driverName]; ok {
+		anno := make(map[string]map[string]string)
+
+		for _, aliased := range aliases {
+			anno[aliased] = map[string]string{
+				"type": "multiline",
+			}
+		}
+
+		jsonAnno, err := json.Marshal(anno)
+		if err != nil {
+			return obj, err
+		}
+
+		if obj.Annotations == nil {
+			obj.Annotations = make(map[string]string)
+		}
+
+		obj.Annotations[uiFieldHintsAnno] = string(jsonAnno)
+	}
+	return obj, nil
 }
 
 func (m *Lifecycle) Updated(obj *v3.NodeDriver) (runtime.Object, error) {

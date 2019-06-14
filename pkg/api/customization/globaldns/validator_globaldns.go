@@ -8,11 +8,10 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"github.com/rancher/types/client/management/v3"
-
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	client "github.com/rancher/types/client/management/v3"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Wrapper struct {

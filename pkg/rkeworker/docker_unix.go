@@ -14,7 +14,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/services"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 

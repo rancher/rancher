@@ -3,15 +3,16 @@ package cred
 import (
 	"encoding/base64"
 	"fmt"
+	"strings"
+
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/api/customization/globalresource"
-	"github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v1 "github.com/rancher/types/apis/core/v1"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/labels"
-	"strings"
 )
 
 func Wrap(store types.Store, ns v1.NamespaceInterface, nodeTemplateLister v3.NodeTemplateLister) types.Store {

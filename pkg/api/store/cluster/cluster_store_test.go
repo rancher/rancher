@@ -1,10 +1,11 @@
 package cluster
 
 import (
+	"testing"
+
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 type testCloudProviderConfig struct {

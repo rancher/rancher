@@ -61,6 +61,8 @@ type Config struct {
 	ProjectMonitorGraphs                     map[string]managementClient.ProjectMonitorGraph                     `json:"projectMonitorGraphs,omitempty" yaml:"projectMonitorGraphs,omitempty"`
 	CloudCredentials                         map[string]managementClient.CloudCredential                         `json:"cloudCredentials,omitempty" yaml:"cloudCredentials,omitempty"`
 	ManagementSecrets                        map[string]managementClient.ManagementSecret                        `json:"managementSecrets,omitempty" yaml:"managementSecrets,omitempty"`
+	ClusterTemplates                         map[string]managementClient.ClusterTemplate                         `json:"clusterTemplates,omitempty" yaml:"clusterTemplates,omitempty"`
+	ClusterTemplateRevisions                 map[string]managementClient.ClusterTemplateRevision                 `json:"clusterTemplateRevisions,omitempty" yaml:"clusterTemplateRevisions,omitempty"`
 
 	// Cluster Client
 	Namespaces        map[string]clusterClient.Namespace        `json:"namespaces,omitempty" yaml:"namespaces,omitempty"`

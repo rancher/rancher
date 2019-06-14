@@ -18,7 +18,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/librke"
 	"github.com/rancher/rke/pki"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	k8sclientv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	"k8s.io/client-go/util/cert"

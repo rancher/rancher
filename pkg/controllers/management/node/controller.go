@@ -49,7 +49,7 @@ var aliases = map[string]map[string]string{
 	"azure":        map[string]string{"customData": "customData"},
 	"digitalocean": map[string]string{"sshKeyContents": "sshKeyPath", "userdata": "userdata"},
 	"exoscale":     map[string]string{"sshKey": "sshKey", "userdata": "userdata"},
-	"openstack":    map[string]string{"privateKeyFile": "privateKeyFile"},
+	"openstack":    map[string]string{"cacert": "cacert", "privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
 	"otc":          map[string]string{"privateKeyFile": "privateKeyFile"},
 	"packet":       map[string]string{"userdata": "userdata"},
 }
