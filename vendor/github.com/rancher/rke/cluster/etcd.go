@@ -20,9 +20,6 @@ const (
 
 func (c *Cluster) SnapshotEtcd(ctx context.Context, snapshotName string) error {
 	backupImage := c.getBackupImage()
-	if !util.IsRancherBackupSupported(c.SystemImages.Alpine) {
-		log.Warnf(ctx, "Auto local backup sync is not supported in `%s`. Using `%s` instead.", c.SystemImages.Alpine, backupImage)
-	}
 	for _, host := range c.EtcdHosts {
 		if err := services.RunEtcdSnapshotSave(ctx, host, c.PrivateRegistriesMap, backupImage, snapshotName, true, c.Services.Etcd); err != nil {
 			return err
@@ -62,9 +59,6 @@ func (c *Cluster) PrepareBackup(ctx context.Context, snapshotPath string) error 
 	var backupServer *hosts.Host
 	backupImage := c.getBackupImage()
 	var errors []error
-	if !util.IsRancherBackupSupported(c.SystemImages.Alpine) {
-		log.Warnf(ctx, "Auto local backup sync is not supported in `%s`. Using `%s` instead.", c.SystemImages.Alpine, backupImage)
-	}
 	if c.Services.Etcd.BackupConfig == nil || // legacy rke local backup
 		(c.Services.Etcd.BackupConfig != nil && IsLocalSnapshot(snapshotPath)) { // rancher local backup and snapshot name indicates a local snapshot
 		// stop etcd on all etcd nodes, we need this because we start the backup server on the same port
@@ -145,9 +139,6 @@ func (c *Cluster) RestoreEtcdSnapshot(ctx context.Context, snapshotPath string) 
 
 func (c *Cluster) RemoveEtcdSnapshot(ctx context.Context, snapshotName string) error {
 	backupImage := c.getBackupImage()
-	if !util.IsRancherBackupSupported(c.SystemImages.Alpine) {
-		log.Warnf(ctx, "Auto local backup sync is not supported in `%s`. Using `%s` instead.", c.SystemImages.Alpine, backupImage)
-	}
 	for _, host := range c.EtcdHosts {
 		if err := services.RunEtcdSnapshotRemove(ctx, host, c.PrivateRegistriesMap, backupImage, snapshotName, true, c.Services.Etcd); err != nil {
 			return err
@@ -179,10 +170,7 @@ func (c *Cluster) etcdSnapshotChecksum(ctx context.Context, snapshotPath string)
 }
 
 func (c *Cluster) getBackupImage() string {
-	if util.IsRancherBackupSupported(c.SystemImages.Alpine) {
-		return c.SystemImages.Alpine
-	}
-	return util.GetDefaultRKETools()
+	return util.DefaultRKETools
 }
 
 func IsLocalSnapshot(name string) bool {
