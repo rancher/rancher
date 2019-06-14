@@ -5,8 +5,9 @@ RUN go get -d golang.org/x/lint/golint && \
     git -C /go/src/golang.org/x/lint/golint checkout -b current 06c8688daad7faa9da5a0c2f163a3d14aac986ca && \
     go install golang.org/x/lint/golint && \
     rm -rf /go/src /go/pkg
+# This install needs to be kept up to date with rancher/rancher
 RUN go get -d golang.org/x/tools/cmd/goimports && \
-    git -C /go/src/golang.org/x/tools/cmd/goimports checkout -b current 0b24b358f4c7eaa92895f67a3f6cea2a0cf525d5 && \
+    git -C /go/src/golang.org/x/tools/cmd/goimports checkout -b release-branch.go1.12 origin/release-branch.go1.12 && \
     go install golang.org/x/tools/cmd/goimports && \
     rm -rf /go/src /go/pkg
 
