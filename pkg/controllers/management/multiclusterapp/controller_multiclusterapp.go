@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rancher/types/user"
+	"k8s.io/apimachinery/pkg/api/meta"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
@@ -76,14 +77,22 @@ func (m *MCAppManager) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Obje
 		deleteContext(mcappName)
 		return m.deleteApps(mcappName, mcapp)
 	}
-	var creatorID string
 
-	// creatorID is the username of the service account created for this multiclusterapp
+	// creatorID is actual user who created mcapp, to be used for mcapp revisions of this mcapp
+	metaAccessor, err := meta.Accessor(mcapp)
+	if err != nil {
+		return mcapp, err
+	}
+	creatorID, ok := metaAccessor.GetAnnotations()[globalnamespacerbac.CreatorIDAnn]
+	if !ok {
+		return mcapp, fmt.Errorf("MultiClusterApp %v has no creatorId annotation. Cannot create apps for %v", metaAccessor.GetName(), mcapp.Name)
+	}
+	// systemUserName is creatorID for app, the username of the service account created for this multiclusterapp
 	systemUser, err := m.userManager.EnsureUser(fmt.Sprintf("system://%s", mcapp.Name), "System account for Multiclusterapp "+mcapp.Name)
 	if err != nil {
 		return nil, err
 	}
-	creatorID = systemUser.Name
+	systemUserName := systemUser.Name
 
 	answerMap, err := m.createAnswerMap(mcapp.Spec.Answers)
 	if err != nil {
@@ -120,7 +129,7 @@ func (m *MCAppManager) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Obje
 		}
 	}
 
-	resp, err := m.createApps(mcapp, externalID, answerMap, creatorID, batchSize, toUpdate)
+	resp, err := m.createApps(mcapp, externalID, answerMap, systemUserName, batchSize, toUpdate)
 	if err != nil {
 		return resp.object, err
 	}
