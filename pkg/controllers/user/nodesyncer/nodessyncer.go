@@ -236,7 +236,7 @@ func (m *nodesSyncer) reconcileAll() error {
 			return err
 		}
 		if node == nil {
-			logrus.Debugf("Failed to get node for machine [%s]", machine.Name)
+			logrus.Debugf("Failed to get node for machine [%s], preparing to delete", machine.Name)
 			toDelete[machine.Name] = machine
 			continue
 		}
