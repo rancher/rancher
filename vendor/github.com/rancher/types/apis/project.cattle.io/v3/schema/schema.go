@@ -6,13 +6,13 @@ import (
 	monitoringv1 "github.com/coreos/prometheus-operator/pkg/client/monitoring/v1"
 	"github.com/rancher/norman/types"
 	m "github.com/rancher/norman/types/mapper"
-	"github.com/rancher/types/apis/project.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/factory"
 	"github.com/rancher/types/mapper"
 	"k8s.io/api/apps/v1beta2"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 )
 
