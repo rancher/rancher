@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/pipeline/hooks"
 	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/pkg/telemetry"
+	"github.com/rancher/rancher/pkg/websocket"
 	"github.com/rancher/rancher/server/capabilities"
 	"github.com/rancher/rancher/server/responsewriter"
 	"github.com/rancher/rancher/server/ui"
@@ -58,8 +59,9 @@ func Start(ctx context.Context, httpPort, httpsPort int, localClusterEnabled boo
 	if err != nil {
 		return err
 	}
+	websocketHandler := websocket.NewWebsocketHandler(authedHandler)
 
-	auditHandler := audit.NewAuditLogFilter(ctx, auditLogWriter, authedHandler)
+	auditHandler := audit.NewAuditLogFilter(ctx, auditLogWriter, websocketHandler)
 
 	webhookHandler := hooks.New(scaledContext)
 

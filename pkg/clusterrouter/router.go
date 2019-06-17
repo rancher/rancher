@@ -11,7 +11,6 @@ import (
 )
 
 type Router struct {
-	clusterLookup ClusterLookup
 	serverFactory *factory
 }
 
@@ -25,7 +24,12 @@ func New(localConfig *rest.Config, lookup ClusterLookup, dialer dialer.Factory, 
 func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	c, handler, err := r.serverFactory.get(req)
 	if err != nil {
-		response(rw, httperror.ServerError, err.Error())
+		e, ok := err.(*httperror.APIError)
+		if ok {
+			response(rw, e.Code, e.Message)
+		} else {
+			response(rw, httperror.ServerError, err.Error())
+		}
 		return
 	}
 
