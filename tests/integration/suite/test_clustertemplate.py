@@ -16,6 +16,19 @@ def test_create_cluster_template_with_revision(admin_mc, remove_resource):
     assert template_reloaded.links.revisions is not None
 
 
+def test_check_default_revision(admin_mc, remove_resource):
+    cluster_template = create_cluster_template(admin_mc, remove_resource)
+    templateId = cluster_template.id
+    first_revision = \
+        create_cluster_template_revision(admin_mc, templateId)
+    client = admin_mc.client
+    wait_for_default_revision(client, templateId, first_revision.id)
+    # delete the cluster template revision, it should error out
+    with pytest.raises(ApiError) as e:
+        client.delete(first_revision)
+        assert e.value.error.status == 403
+
+
 def test_create_cluster_with_template(admin_mc, remove_resource):
     cluster_template = create_cluster_template(admin_mc, remove_resource)
     templateId = cluster_template.id
@@ -191,5 +204,19 @@ def wait_for_cluster_to_be_deleted(client, clusterId, timeout=45):
         cluster = client.by_id_cluster(clusterId)
         if cluster is None:
             deleted = True
+        time.sleep(interval)
+        interval *= 2
+
+
+def wait_for_default_revision(client, templateId, revisionId, timeout=45):
+    updated = False
+    interval = 0.5
+    start = time.time()
+    while not updated:
+        if time.time() - start > timeout:
+            raise Exception('Timeout waiting for clustertemplate to update')
+        template_reloaded = client.by_id_cluster_template(templateId)
+        if template_reloaded.defaultRevisionId is not None:
+            updated = True
         time.sleep(interval)
         interval *= 2

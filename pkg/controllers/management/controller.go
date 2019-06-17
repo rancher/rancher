@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstats"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
+	"github.com/rancher/rancher/pkg/controllers/management/clustertemplate"
 	"github.com/rancher/rancher/pkg/controllers/management/compose"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/kontainerdriver"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
@@ -50,6 +51,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	etcdbackup.Register(ctx, management)
 	globaldns.Register(ctx, management)
 	multiclusterapp.Register(ctx, management, manager)
+	clustertemplate.Register(ctx, management)
 
 	// Register last
 	auth.RegisterLate(ctx, management)
