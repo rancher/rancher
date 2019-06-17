@@ -11,7 +11,9 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/rke/templates"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/rke/util"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -44,7 +46,9 @@ const (
 	DefaultMonitoringProvider            = "metrics-server"
 	DefaultEtcdBackupConfigIntervalHours = 12
 	DefaultEtcdBackupConfigRetention     = 6
-	DefaultDNSProvider                   = "kube-dns"
+
+	DefaultDNSProvider = "kube-dns"
+	K8sVersionCoreDNS  = "1.14.0"
 
 	DefaultEtcdHeartbeatIntervalName  = "heartbeat-interval"
 	DefaultEtcdHeartbeatIntervalValue = "500"
@@ -151,16 +155,15 @@ func (c *Cluster) setClusterDefaults(ctx context.Context, flags ExternalFlags) e
 		return err
 	}
 
-	if c.DNS == nil || len(c.DNS.Provider) == 0 {
-		c.DNS = &v3.DNSConfig{}
-		c.DNS.Provider = DefaultDNSProvider
-	}
-
 	if c.RancherKubernetesEngineConfig.RotateCertificates != nil ||
 		flags.CustomCerts {
 		c.ForceDeployCerts = true
 	}
 
+	err = c.setClusterDNSDefaults()
+	if err != nil {
+		return err
+	}
 	c.setClusterServicesDefaults()
 	c.setClusterNetworkDefaults()
 	c.setClusterAuthnDefaults()
@@ -267,6 +270,32 @@ func (c *Cluster) setClusterImageDefaults() error {
 		setDefaultIfEmpty(k, v)
 	}
 
+	return nil
+}
+
+func (c *Cluster) setClusterDNSDefaults() error {
+	if c.DNS != nil && len(c.DNS.Provider) != 0 {
+		return nil
+	}
+	clusterSemVer, err := util.StrToSemVer(c.Version)
+	if err != nil {
+		return err
+	}
+	logrus.Debugf("No DNS provider configured, setting default based on cluster version [%s]", clusterSemVer)
+	K8sVersionCoreDNSSemVer, err := util.StrToSemVer(K8sVersionCoreDNS)
+	if err != nil {
+		return err
+	}
+	// Default DNS provider for cluster version 1.14.0 and higher is coredns
+	ClusterDNSProvider := CoreDNSProvider
+	// If cluster version is less than 1.14.0 (K8sVersionCoreDNSSemVer), use kube-dns
+	if clusterSemVer.LessThan(*K8sVersionCoreDNSSemVer) {
+		logrus.Debugf("Cluster version [%s] is less than version [%s], using DNS provider [%s]", clusterSemVer, K8sVersionCoreDNSSemVer, DefaultDNSProvider)
+		ClusterDNSProvider = DefaultDNSProvider
+	}
+	c.DNS = &v3.DNSConfig{}
+	c.DNS.Provider = ClusterDNSProvider
+	logrus.Debugf("DNS provider set to [%s]", ClusterDNSProvider)
 	return nil
 }
 
