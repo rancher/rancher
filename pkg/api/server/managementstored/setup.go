@@ -243,12 +243,13 @@ func Templates(ctx context.Context, schemas *types.Schemas, managementContext *c
 		"v3",
 		"CatalogTemplate",
 		"catalogtemplates")
-	schema.Formatter = catalog.TemplateFormatter
 	wrapper := catalog.TemplateWrapper{
-		CatalogLister:        managementContext.Management.Catalogs("").Controller().Lister(),
-		ClusterCatalogLister: managementContext.Management.ClusterCatalogs("").Controller().Lister(),
-		ProjectCatalogLister: managementContext.Management.ProjectCatalogs("").Controller().Lister(),
+		CatalogLister:                managementContext.Management.Catalogs("").Controller().Lister(),
+		ClusterCatalogLister:         managementContext.Management.ClusterCatalogs("").Controller().Lister(),
+		ProjectCatalogLister:         managementContext.Management.ProjectCatalogs("").Controller().Lister(),
+		CatalogTemplateVersionLister: managementContext.Management.CatalogTemplateVersions("").Controller().Lister(),
 	}
+	schema.Formatter = wrapper.TemplateFormatter
 	schema.LinkHandler = wrapper.TemplateIconHandler
 
 	schemaCatalogTemplate := schemas.Schema(&managementschema.Version, client.CatalogTemplateType)

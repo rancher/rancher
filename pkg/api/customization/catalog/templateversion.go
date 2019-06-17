@@ -108,27 +108,6 @@ func (t TemplateVerionFormatterWrapper) TemplateVersionFormatter(apiContext *typ
 	resource.Values["files"] = files
 }
 
-func extractVersionLinks(apiContext *types.APIContext, resource *types.RawResource) map[string]string {
-	schema := apiContext.Schemas.Schema(&managementschema.Version, client.TemplateVersionType)
-	r := map[string]string{}
-	versionMap, ok := resource.Values["versions"].([]interface{})
-	if ok {
-		for _, version := range versionMap {
-			revision := ""
-			if v, ok := version.(map[string]interface{})["revision"].(int64); ok {
-				revision = strconv.FormatInt(v, 10)
-			}
-			version := version.(map[string]interface{})["version"].(string)
-			versionID := fmt.Sprintf("%v-%v", resource.ID, version)
-			if revision != "" {
-				versionID = fmt.Sprintf("%v-%v", resource.ID, revision)
-			}
-			r[version] = apiContext.URLBuilder.ResourceLinkByID(schema, versionID)
-		}
-	}
-	return r
-}
-
 func (t TemplateVerionFormatterWrapper) TemplateVersionReadmeHandler(apiContext *types.APIContext, next types.RequestHandler) error {
 	templateVersion := &client.CatalogTemplateVersion{}
 	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, templateVersion); err != nil {
