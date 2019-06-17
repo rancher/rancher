@@ -20,6 +20,7 @@ import (
 	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	monitoringv1 "github.com/rancher/types/apis/monitoring.coreos.com/v1"
+	istiov1alpha3 "github.com/rancher/types/apis/networking.istio.io/v1alpha3"
 	knetworkingv1 "github.com/rancher/types/apis/networking.k8s.io/v1"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	projectSchema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
@@ -189,6 +190,7 @@ type UserContext struct {
 	Networking   knetworkingv1.Interface
 	Monitoring   monitoringv1.Interface
 	Cluster      clusterv3.Interface
+	Istio        istiov1alpha3.Interface
 }
 
 func (w *UserContext) controllers() []controller.Starter {
@@ -224,6 +226,7 @@ func (w *UserContext) UserOnlyContext() *UserOnlyContext {
 		BatchV1Beta1: w.BatchV1Beta1,
 		Monitoring:   w.Monitoring,
 		Cluster:      w.Cluster,
+		Istio:        w.Istio,
 	}
 }
 
@@ -244,6 +247,7 @@ type UserOnlyContext struct {
 	BatchV1Beta1 batchv1beta1.Interface
 	Monitoring   monitoringv1.Interface
 	Cluster      clusterv3.Interface
+	Istio        istiov1alpha3.Interface
 }
 
 func (w *UserOnlyContext) controllers() []controller.Starter {
@@ -408,6 +412,11 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		return nil, err
 	}
 
+	context.Istio, err = istiov1alpha3.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
 	dynamicConfig := config
 	if dynamicConfig.NegotiatedSerializer == nil {
 		dynamicConfig.NegotiatedSerializer = dynamic.NegotiatedSerializer
@@ -493,6 +502,11 @@ func NewUserOnlyContext(config rest.Config) (*UserOnlyContext, error) {
 
 	context.Monitoring, err = monitoringv1.NewForConfig(config)
 	context.Cluster, err = clusterv3.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Istio, err = istiov1alpha3.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
