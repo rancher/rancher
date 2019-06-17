@@ -46,6 +46,20 @@ func (p projectSetter) List(apiContext *types.APIContext, schema *types.Schema, 
 	return p.Store.List(apiContext, schema, &options)
 }
 
+func (p projectSetter) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
+	if _, ok := data[client.NamespaceFieldProjectID]; ok {
+		delete(data, client.NamespaceFieldProjectID)
+	}
+	return p.Store.Create(apiContext, schema, data)
+}
+
+func (p projectSetter) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
+	if _, ok := data[client.NamespaceFieldProjectID]; ok {
+		delete(data, client.NamespaceFieldProjectID)
+	}
+	return p.Store.Update(apiContext, schema, data, id)
+}
+
 func (t *transformer) object(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
 	t.lookupAndSetProjectID(apiContext, schema, data)
 	return data, nil
