@@ -281,6 +281,35 @@ def test_admin_access(admin_mc, admin_pc, user_factory, remove_resource):
     wait_for_roles_to_be_updated(admin_mc, updated_mcapp, ["cluster-owner"])
 
 
+def test_multiclusterapp_revision_access(admin_mc, admin_pc, remove_resource,
+                                         user_factory):
+    client = admin_mc.client
+    mcapp_name = random_str()
+    temp_ver = "cattle-global-data:library-mysql-0.3.8"
+    targets = [{"projectId": admin_pc.project.id}]
+    user = user_factory()
+    remove_resource(user)
+    user_client = user.client
+    # assign user to local cluster as project-member
+    prtb_member = client.create_project_role_template_binding(
+        projectId=admin_pc.project.id,
+        roleTemplateId="project-member",
+        userId=user.user.id)
+
+    remove_resource(prtb_member)
+    wait_until(rtb_cb(client, prtb_member))
+    roles = ["project-member"]
+    mcapp1 = user_client.create_multi_cluster_app(name=mcapp_name,
+                                                  templateVersionId=temp_ver,
+                                                  targets=targets,
+                                                  roles=roles)
+    remove_resource(mcapp1)
+    wait_for_app(admin_pc, mcapp_name, 60)
+
+    mcapp_revisions = user_client.list_multi_cluster_app_revision()
+    assert len(mcapp_revisions) == 1
+
+
 def test_app_upgrade_mcapp_roles_change(admin_mc, admin_pc,
                                         remove_resource):
     client = admin_mc.client
