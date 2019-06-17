@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/pipeline/hooks"
 	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/pkg/telemetry"
+	"github.com/rancher/rancher/pkg/websocket"
 	"github.com/rancher/rancher/server/capabilities"
 	"github.com/rancher/rancher/server/responsewriter"
 	"github.com/rancher/rancher/server/ui"
@@ -55,6 +56,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 	if err != nil {
 		return err
 	}
+	websocketHandler := websocket.NewWebsocketHandler(authedHandler)
 
 	webhookHandler := hooks.New(scaledContext)
 
@@ -71,11 +73,11 @@ func Start(ctx context.Context, httpPort, httpsPort int, scaledContext *config.S
 	root.Handle("/v3/settings/cacerts", rawAuthedAPIs).Methods(http.MethodGet)
 	root.Handle("/v3/settings/first-login", rawAuthedAPIs).Methods(http.MethodGet)
 	root.Handle("/v3/settings/ui-pl", rawAuthedAPIs).Methods(http.MethodGet)
-	root.PathPrefix("/v3").Handler(authedHandler)
+	root.PathPrefix("/v3").Handler(websocketHandler)
 	root.PathPrefix("/hooks").Handler(webhookHandler)
-	root.PathPrefix("/k8s/clusters/").Handler(authedHandler)
-	root.PathPrefix("/meta").Handler(authedHandler)
-	root.PathPrefix("/v1-telemetry").Handler(authedHandler)
+	root.PathPrefix("/k8s/clusters/").Handler(websocketHandler)
+	root.PathPrefix("/meta").Handler(websocketHandler)
+	root.PathPrefix("/v1-telemetry").Handler(websocketHandler)
 	root.NotFoundHandler = chain.Handler(http.NotFoundHandler())
 	root.PathPrefix("/v1-saml").Handler(samlRoot)
 
