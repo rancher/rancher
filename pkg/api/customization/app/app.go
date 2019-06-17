@@ -101,6 +101,16 @@ func (w Wrapper) ActionHandler(actionName string, action *types.Action, apiConte
 	if err := access.ByID(apiContext, &projectschema.Version, projectv3.AppType, apiContext.ID, &app); err != nil {
 		return err
 	}
+
+	var appMap map[string]interface{}
+	if err := access.ByID(apiContext, &projectschema.Version, projectv3.AppType, apiContext.ID, &appMap); err != nil {
+		return httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("unable to access app by id: %v", err))
+	}
+
+	if err := apiContext.AccessControl.CanDo(pv3.AppGroupVersionKind.Group, pv3.AppResource.Name, "update", apiContext, appMap, apiContext.Schema); err != nil {
+		return httperror.NewAPIError(httperror.PermissionDenied, fmt.Sprintf("user does not have permission to update for action %s", actionName))
+	}
+
 	actionInput, err := parse.ReadBody(apiContext.Request)
 	if err != nil {
 		return err
