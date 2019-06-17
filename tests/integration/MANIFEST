@@ -9,9 +9,9 @@ suite/test_app.py
 suite/test_auth_configs.py
 suite/test_catalog.py
 suite/test_cluster_auth_tokens.py
-suite/test_cluster_capabilities.py
 suite/test_cluster_catalog.py
 suite/test_cluster_defaults.py
+suite/test_clustertemplate.py
 suite/test_default_roles.py
 suite/test_dns.py
 suite/test_dynamic_schemas.py
@@ -25,6 +25,7 @@ suite/test_multi_cluster_app.py
 suite/test_namespaced_secrets.py
 suite/test_node.py
 suite/test_password_store.py
+suite/test_persistent_volume.py
 suite/test_pod_security_policies.py
 suite/test_project_catalog.py
 suite/test_project_resource_quota.py
