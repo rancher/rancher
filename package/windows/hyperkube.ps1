@@ -18,7 +18,9 @@ param (
 
     [parameter(Mandatory = $false)] [string]$NodePublicIP,
     [parameter(Mandatory = $false)] [string]$NodeIP,
-    [parameter(Mandatory = $false)] [string]$NodeName
+    [parameter(Mandatory = $false)] [string]$NodeName,
+
+    [parameter(Mandatory = $false)] [switch]$RestartKubeComponents
 )
 
 $ErrorActionPreference = 'Stop'
@@ -407,7 +409,7 @@ function print-system-info {
 }
 
 function agent-retry {
-    [System.Console]::Error.Write($Args[0] -f $Args[1..$Args.Length])
+    [System.Console]::Error.Write(($Args -join " "))
 
     exit 2
 }
@@ -938,6 +940,13 @@ function main {
     }
     setup-proxy -CPHosts $KubeControlPlaneAddresses
 
+    # restart processes #
+    if ($RestartKubeComponents) {
+        start-kubelet -Restart
+        start-kube-proxy -Restart
+        exit 0
+    }
+
     # recover processes #
     $shouldUseCompsCnt = 3
     $wantRecoverComps = @()
@@ -970,7 +979,6 @@ function main {
                 "kubelet" {
                     $recoverKubelet = $True
                     start-kubelet -Restart
-                    break
                 }
                 "flanneld" {
                     if (-not $recoverKubelet) {
@@ -979,7 +987,6 @@ function main {
                 }
                 "kube-proxy" {
                     start-kube-proxy -Restart
-                    break
                 }
             }
         }

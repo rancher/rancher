@@ -16,7 +16,7 @@ import (
 
 var ErrHyperKubePSScriptAgentRetry = errors.New("PowerShell process is going to retry")
 
-func doExecutePlan(ctx context.Context, nodeConfig *NodeConfig, _ bool) error {
+func doExecutePlan(ctx context.Context, nodeConfig *NodeConfig, bundleChanged bool) error {
 	// run as docker
 	for name, process := range nodeConfig.Processes {
 		if strings.HasPrefix(name, "run-container-") {
@@ -29,7 +29,14 @@ func doExecutePlan(ctx context.Context, nodeConfig *NodeConfig, _ bool) error {
 	// run as powershell
 	for name, process := range nodeConfig.Processes {
 		if strings.HasPrefix(name, "run-script-") {
-			if err := executePowerShell(ctx, process.Name, process.Args...); err != nil {
+			pName, pArgs := process.Name, process.Args
+
+			// rotate worker certificate
+			if pName == "hyperkube" && bundleChanged {
+				pArgs = append(pArgs, "-RestartKubeComponents")
+			}
+
+			if err := executePowerShell(ctx, pName, pArgs...); err != nil {
 				return err
 			}
 		}
