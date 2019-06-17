@@ -151,6 +151,10 @@ type SyslogConfig struct {
 type FluentForwarderConfig struct {
 	EnableTLS     bool           `json:"enableTls,omitempty" norman:"default=false"`
 	Certificate   string         `json:"certificate,omitempty"`
+	ClientCert    string         `json:"clientCert,omitempty"`
+	ClientKey     string         `json:"clientKey,omitempty"`
+	ClientKeyPass string         `json:"clientKeyPass,omitempty"`
+	SSLVerify     bool           `json:"sslVerify,omitempty"`
 	Compress      bool           `json:"compress,omitempty" norman:"default=true"`
 	FluentServers []FluentServer `json:"fluentServers,omitempty" norman:"required"`
 }

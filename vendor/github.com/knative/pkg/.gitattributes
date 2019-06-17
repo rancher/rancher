@@ -1,0 +1,10 @@
+# This file is documented at https://git-scm.com/docs/gitattributes.
+# Linguist-specific attributes are documented at
+# https://github.com/github/linguist.
+
+**/zz_generated.*.go linguist-generated=true
+/client/** linguist-generated=true
+/test/** coverage-excluded=true
+/metrics/gcp_metadata.go coverage-excluded=true
+
+*.sh text eol=lf
