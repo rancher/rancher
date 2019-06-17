@@ -677,7 +677,7 @@ type RotateCertificates struct {
 
 type DNSConfig struct {
 	// DNS provider
-	Provider string `yaml:"provider" json:"provider,omitempty" norman:"default=kube-dns"`
+	Provider string `yaml:"provider" json:"provider,omitempty"`
 	// Upstream nameservers
 	UpstreamNameservers []string `yaml:"upstreamnameservers" json:"upstreamnameservers,omitempty"`
 	// ReverseCIDRs
