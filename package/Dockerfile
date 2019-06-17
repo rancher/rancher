@@ -13,7 +13,7 @@ WORKDIR /var/lib/rancher
 
 ARG ARCH=amd64
 ARG IMAGE_REPO=rancher
-ARG SYSTEM_CHART_DEFAULT_BRANCH=release-v2.2
+ARG SYSTEM_CHART_DEFAULT_BRANCH=v2.3-preview2
 
 ENV CATTLE_SYSTEM_CHART_DEFAULT_BRANCH=$SYSTEM_CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.10.0-rancher11
@@ -44,7 +44,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     chmod +x /usr/bin/helm /usr/bin/tini /usr/bin/telemetry /usr/bin/tiller
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
-ENV CATTLE_UI_VERSION 2.3.1
+ENV CATTLE_UI_VERSION 2.3.2
 ENV CATTLE_CLI_VERSION v2.2.0
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
