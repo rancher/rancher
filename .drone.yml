@@ -1,6 +1,6 @@
 ---
 kind: pipeline
-name: default
+name: default-linux-amd64
 
 platform:
   os: linux
@@ -8,7 +8,6 @@ platform:
 
 steps:
 - name: build
-  pull: default
   image: rancher/dapper:v0.4.1
   commands:
   - dapper ci
@@ -23,7 +22,6 @@ steps:
     - tag
 
 - name: stage-binaries
-  pull: default
   image: rancher/dapper:v0.4.1
   commands:
   - "cp -r ./bin/* ./package/"
@@ -32,53 +30,58 @@ steps:
     - push
     - tag
 
-- name: docker-publish-master
-  pull: default
+- name: docker-publish-head
   image: plugins/docker
   settings:
     build_args:
-    - VERSION=master
+    - ARCH=amd64
+    - "VERSION=${DRONE_BRANCH}"
+    - SYSTEM_CHART_DEFAULT_BRANCH=dev
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile
+    tag: ${DRONE_BRANCH/\//-}-linux-amd64
     password:
       from_secret: docker_password
     repo: rancher/rancher
-    tag: master
     username:
       from_secret: docker_username
   when:
-    branch:
-    - master
+    ref:
+      include:
+      - "refs/heads/master"
+      - "refs/heads/release/v*"
     event:
     - push
 
 - name: docker-publish-master-agent
-  pull: default
   image: plugins/docker
   settings:
     build_args:
-    - VERSION=master
+    - ARCH=amd64
+    - "VERSION=${DRONE_BRANCH}"
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.agent
+    tag: ${DRONE_BRANCH/\//-}-linux-amd64
     password:
       from_secret: docker_password
     repo: rancher/rancher-agent
-    tag: master
     username:
       from_secret: docker_username
   when:
-    branch:
-    - master
+    ref:
+      include:
+      - "refs/heads/master"
+      - "refs/heads/release/v*"
     event:
     - push
 
 - name: docker-publish
-  pull: default
   image: plugins/docker
   settings:
     build_args:
+    - ARCH=amd64
     - "VERSION=${DRONE_TAG}"
     context: package/
     custom_dns: 1.1.1.1
@@ -86,7 +89,7 @@ steps:
     password:
       from_secret: docker_password
     repo: rancher/rancher
-    tag: "${DRONE_TAG}"
+    tag: "${DRONE_TAG}-linux-amd64"
     username:
       from_secret: docker_username
   when:
@@ -94,10 +97,10 @@ steps:
     - tag
 
 - name: docker-publish-agent
-  pull: default
   image: plugins/docker
   settings:
     build_args:
+    - ARCH=amd64
     - "VERSION=${DRONE_TAG}"
     context: package/
     custom_dns: 1.1.1.1
@@ -105,7 +108,7 @@ steps:
     password:
       from_secret: docker_password
     repo: rancher/rancher-agent
-    tag: "${DRONE_TAG}"
+    tag: "${DRONE_TAG}-linux-amd64"
     username:
       from_secret: docker_username
   when:
@@ -113,7 +116,6 @@ steps:
     - tag
 
 - name: github_binary_prerelease
-  pull: default
   image: plugins/github-release
   settings:
     api_key:
@@ -127,12 +129,10 @@ steps:
     event:
     - tag
     ref:
-      include:
-      - "refs/tags/*rc*"
-      - "refs/tags/*alpha*"
+    - "refs/tags/*rc*"
+    - "refs/tags/*alpha*"
 
 - name: github_binary_release
-  pull: default
   image: plugins/github-release
   settings:
     api_key:
@@ -151,8 +151,115 @@ steps:
       - "refs/tags/*rc*"
       - "refs/tags/*alpha*"
 
+- name: slack_notify
+  image: plugins/slack
+  settings:
+    template: "Build {{build.link}} failed to publish an image/artifact.\n"
+    username: Drone_Publish
+    webhook:
+      from_secret: slack_webhook
+  when:
+    event:
+      exclude:
+      - pull_request
+    instance:
+    - drone-publish.rancher.io
+    status:
+    - failure
+
+volumes:
+- name: docker
+  host:
+    path: /var/run/docker.sock
+
+trigger:
+  event:
+    exclude:
+    - promote
+
+---
+kind: pipeline
+name: manifest
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+- name: push-head-manifest
+  image: plugins/manifest:1.1.0
+  settings:
+    ignore_missing: true
+    password:
+      from_secret: docker_password
+    spec: manifest.tmpl
+    username:
+      from_secret: docker_username
+  when:
+    ref:
+      include:
+      - "refs/heads/master"
+      - "refs/heads/release/v*"
+    event:
+    - push
+
+- name: push-head-agent-manifest
+  image: plugins/manifest:1.1.0
+  settings:
+    ignore_missing: true
+    password:
+      from_secret: docker_password
+    spec: manifest-agent.tmpl
+    username:
+      from_secret: docker_username
+  when:
+    ref:
+      include:
+      - "refs/heads/master"
+      - "refs/heads/release/v*"
+    event:
+    - push
+
+- name: push-manifest
+  image: plugins/manifest:1.1.0
+  settings:
+    ignore_missing: true
+    password:
+      from_secret: docker_password
+    spec: manifest.tmpl
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+
+- name: push-agent-manifest
+  image: plugins/manifest:1.1.0
+  settings:
+    ignore_missing: true
+    password:
+      from_secret: docker_password
+    spec: manifest-agent.tmpl
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+
+- name: build-chart
+  image: rancher/dapper:v0.4.1
+  commands:
+  - dapper chart/ci
+  privileged: true
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+  when:
+    event:
+    - push
+    - tag
+
 - name: chart-publish
-  pull: default
   image: plugins/gcs
   settings:
     acl:
@@ -166,6 +273,22 @@ steps:
     event:
     - tag
 
+- name: slack_notify
+  image: plugins/slack
+  settings:
+    template: "Build {{build.link}} failed to push manifests.\n"
+    username: Drone_Publish
+    webhook:
+      from_secret: slack_webhook
+  when:
+    event:
+      exclude:
+      - pull_request
+    instance:
+    - drone-publish.rancher.io
+    status:
+    - failure
+
 volumes:
 - name: docker
   host:
@@ -175,17 +298,20 @@ trigger:
   event:
     exclude:
     - promote
+
+depends_on:
+- default-linux-amd64
+
 ---
 kind: pipeline
 name: publish
 
 platform:
   os: linux
-  arch: amd64 
+  arch: amd64
 
 steps:
 - name: chart-promote
-  pull: default
   image: rancher/dapper:v0.4.1
   commands:
   - dapper chart/copy
@@ -199,7 +325,6 @@ steps:
     - promote-stable
 
 - name: chart-publish
-  pull: default
   image: plugins/gcs
   settings:
     acl:
@@ -210,6 +335,18 @@ steps:
     token:
       from_secret: google_auth_key
 
+- name: slack_notify
+  image: plugins/slack
+  settings:
+    template: "Build {{build.link}} failed to promote chart.\n"
+    username: Drone_Publish
+    webhook:
+      from_secret: slack_webhook
+  when:
+    event:
+      exclude:
+      - pull_request
+
 volumes:
 - name: docker
   host:
@@ -218,4 +355,3 @@ volumes:
 trigger:
   event:
   - promote
-...
