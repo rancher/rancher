@@ -134,3 +134,12 @@ def wait_for_template_to_be_deleted(client, name, timeout=45):
             found = True
         time.sleep(interval)
         interval *= 2
+
+
+def check_subject_in_rb(rbac, ns, subject_id):
+    rbs = rbac.list_namespaced_role_binding(ns)
+    for rb in rbs.items:
+        for i in range(0, len(rb.subjects)):
+            if rb.subjects[i].name == subject_id:
+                return True
+    return False

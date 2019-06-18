@@ -38,6 +38,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	if n != nil {
 		management.Management.ClusterTemplateRevisions("").AddHandler(ctx, RevisionController, n.sync)
 	}
+	registerRbacControllers(ctx, management)
 }
 
 //sync is called periodically and on real updates
