@@ -409,6 +409,9 @@ func (ma *MemberAccess) GetAccessTypeOfCaller(callerID, creatorID, name string, 
 		if username != "" { // found the caller
 			return m.AccessType, nil
 		}
+		if m.GroupPrincipalName == "*" {
+			return m.AccessType, nil
+		}
 	}
 	return "", fmt.Errorf("user %v is not in members list", callerID)
 }

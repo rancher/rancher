@@ -22,20 +22,22 @@ import (
 )
 
 type MCAppController struct {
-	multiClusterApps  v3.MultiClusterAppInterface
-	managementContext *config.ManagementContext
-	prtbs             v3.ProjectRoleTemplateBindingInterface
-	prtbLister        v3.ProjectRoleTemplateBindingLister
-	crtbs             v3.ClusterRoleTemplateBindingInterface
-	crtbLister        v3.ClusterRoleTemplateBindingLister
-	rtLister          v3.RoleTemplateLister
-	gDNSs             v3.GlobalDNSInterface
-	users             v3.UserInterface
-	userManager       user.Manager
+	multiClusterApps              v3.MultiClusterAppInterface
+	multiClusterAppRevisionLister v3.MultiClusterAppRevisionLister
+	managementContext             *config.ManagementContext
+	prtbs                         v3.ProjectRoleTemplateBindingInterface
+	prtbLister                    v3.ProjectRoleTemplateBindingLister
+	crtbs                         v3.ClusterRoleTemplateBindingInterface
+	crtbLister                    v3.ClusterRoleTemplateBindingLister
+	rtLister                      v3.RoleTemplateLister
+	gDNSs                         v3.GlobalDNSInterface
+	users                         v3.UserInterface
+	userManager                   user.Manager
 }
 
 type MCAppRevisionController struct {
-	managementContext *config.ManagementContext
+	managementContext     *config.ManagementContext
+	multiClusterAppLister v3.MultiClusterAppLister
 }
 
 type ProjectController struct {
@@ -53,19 +55,21 @@ type ClusterController struct {
 func Register(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	mcApps := management.Management.MultiClusterApps("")
 	m := MCAppController{
-		multiClusterApps:  mcApps,
-		managementContext: management,
-		prtbs:             management.Management.ProjectRoleTemplateBindings(""),
-		prtbLister:        management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
-		crtbs:             management.Management.ClusterRoleTemplateBindings(""),
-		crtbLister:        management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
-		rtLister:          management.Management.RoleTemplates("").Controller().Lister(),
-		gDNSs:             management.Management.GlobalDNSs(""),
-		userManager:       management.UserManager,
-		users:             management.Management.Users(""),
+		multiClusterApps:              mcApps,
+		multiClusterAppRevisionLister: management.Management.MultiClusterAppRevisions("").Controller().Lister(),
+		managementContext:             management,
+		prtbs:                         management.Management.ProjectRoleTemplateBindings(""),
+		prtbLister:                    management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		crtbs:                         management.Management.ClusterRoleTemplateBindings(""),
+		crtbLister:                    management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
+		rtLister:                      management.Management.RoleTemplates("").Controller().Lister(),
+		gDNSs:                         management.Management.GlobalDNSs(""),
+		userManager:                   management.UserManager,
+		users:                         management.Management.Users(""),
 	}
 	r := MCAppRevisionController{
-		managementContext: management,
+		managementContext:     management,
+		multiClusterAppLister: management.Management.MultiClusterApps("").Controller().Lister(),
 	}
 	projects := management.Management.Projects("")
 	p := ProjectController{
@@ -155,10 +159,28 @@ func (mc *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.
 		}
 	}
 
-	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.MultiClusterAppResource, mcapp.Name, mcapp.UID,
-		mcapp.Spec.Members, creatorID, mc.managementContext); err != nil {
+	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.MultiClusterAppResource, mcapp.Name,
+		globalnamespacerbac.RancherManagementAPIVersion, creatorID, []string{globalnamespacerbac.RancherManagementAPIVersion},
+		mcapp.UID,
+		mcapp.Spec.Members, mc.managementContext); err != nil {
 		return nil, err
 	}
+
+	// see if any revision exists and call CreateRoleAndRoleBinding for it so that if this is an update request adding/removing members,
+	// it reflects on the permissions for revisions too
+	revisions, err := mc.multiClusterAppRevisionLister.List(namespace.GlobalNamespace, labels.SelectorFromSet(map[string]string{mcAppLabel: mcapp.Name}))
+	if err != nil {
+		return mcapp, err
+	}
+	for _, rev := range revisions {
+		if err := globalnamespacerbac.CreateRoleAndRoleBinding(
+			globalnamespacerbac.MultiClusterAppRevisionResource, rev.Name, globalnamespacerbac.RancherManagementAPIVersion,
+			creatorID, []string{globalnamespacerbac.RancherManagementAPIVersion}, rev.UID, mcapp.Spec.Members,
+			mc.managementContext); err != nil {
+			return nil, err
+		}
+	}
+
 	return nil, nil
 }
 
@@ -174,11 +196,23 @@ func (r *MCAppRevisionController) sync(key string, mcappRevision *v3.MultiCluste
 	if !ok {
 		return mcappRevision, fmt.Errorf("mcapp revision %v has no creatorId annotation", mcappRevision.Name)
 	}
+	// get the Members field from mcapp
+	mcappName, ok := mcappRevision.Labels[mcAppLabel]
+	if !ok {
+		return mcappRevision, fmt.Errorf("mcapp revision created without setting mcapp label")
+	}
+	mcapp, err := r.multiClusterAppLister.Get(namespace.GlobalNamespace, mcappName)
+	if err != nil {
+		return mcappRevision, err
+	}
+
 	if err := globalnamespacerbac.CreateRoleAndRoleBinding(
-		globalnamespacerbac.MultiClusterAppRevisionResource, mcappRevision.Name, mcappRevision.UID, []v3.Member{}, creatorID,
+		globalnamespacerbac.MultiClusterAppRevisionResource, mcappRevision.Name, globalnamespacerbac.RancherManagementAPIVersion,
+		creatorID, []string{globalnamespacerbac.RancherManagementAPIVersion}, mcappRevision.UID, mcapp.Spec.Members,
 		r.managementContext); err != nil {
 		return nil, err
 	}
+
 	return mcappRevision, nil
 }
 

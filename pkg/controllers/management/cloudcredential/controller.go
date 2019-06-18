@@ -44,10 +44,11 @@ func (n *Controller) ccSync(key string, cloudCredential *v1.Secret) (runtime.Obj
 		return cloudCredential, fmt.Errorf("cloud credential %v has no creatorId annotation", cloudCredential.Name)
 	}
 	if err := globalnamespacerbac.CreateRoleAndRoleBinding(
-		globalnamespacerbac.CloudCredentialResource, cloudCredential.Name, cloudCredential.UID, []v3.Member{}, creatorID,
-		n.managementContext, "*"); err != nil {
+		globalnamespacerbac.CloudCredentialResource, cloudCredential.Name, "v1", creatorID, []string{"*"}, cloudCredential.UID, []v3.Member{},
+		n.managementContext); err != nil {
 		return nil, err
 	}
+
 	return cloudCredential, nil
 }
 

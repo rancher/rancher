@@ -1,8 +1,14 @@
-from .common import random_str
+from .common import random_str, check_if_members_updated, \
+ check_subject_in_rb
 from rancher import ApiError
 from .conftest import wait_until, wait_for
 import time
 import pytest
+import kubernetes
+
+roles_resource = 'roles'
+projects_resource = 'projects'
+members_resource = 'members'
 
 
 def test_multiclusterapp_create_no_roles(admin_mc, admin_pc, remove_resource,
@@ -34,7 +40,8 @@ def test_mutliclusterapp_invalid_project(admin_mc):
 
 
 def test_multiclusterapp_create_with_members(admin_mc, admin_pc,
-                                             user_factory, remove_resource):
+                                             user_factory, remove_resource,
+                                             ):
     client = admin_mc.client
     mcapp_name = random_str()
     temp_ver = "cattle-global-data:library-wordpress-1.0.5"
@@ -66,11 +73,45 @@ def test_multiclusterapp_create_with_members(admin_mc, admin_pc,
     mcapp = um_client.by_id_multi_cluster_app(id)
     assert mcapp is not None
 
+    # member should also get access to the mcapp revision
+    if mcapp['status']['revisionId'] != '':
+        mcapp_revision_id = "cattle-global-data:" + \
+                            mcapp['status']['revisionId']
+        mcr = um_client.\
+            by_id_multi_cluster_app_revision(mcapp_revision_id)
+        assert mcr is not None
+
+    # user who's not a member shouldn't get access
     unm_client = user_not_member.client
     try:
         unm_client.by_id_multi_cluster_app(id)
     except ApiError as e:
         assert e.error.status == 403
+
+    # add the special char * to indicate sharing of resource with all
+    # authenticated users
+    new_members = [{"userPrincipalId": "local://"+user_member.user.id,
+                   "accessType": "read-only"}, {"groupPrincipalId": "*"}]
+    client.update(mcapp, members=new_members, roles=roles)
+    wait_for(lambda: check_if_members_updated(admin_mc, id, 'groupPrincipalId',
+                                              '*'),
+             timeout=60, fail_handler=fail_handler(members_resource))
+
+    # now user_not_member should be able to access this mcapp without
+    # being explicitly added
+    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
+    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
+                                         'system:authenticated'),
+             timeout=60, fail_handler=fail_handler('rolebinding'))
+
+    mcapp = user_not_member.client.by_id_multi_cluster_app(id)
+    assert mcapp is not None
+
+    # even newly created users should be able to access this mcapp
+    new_user = user_factory()
+    remove_resource(new_user)
+    mcapp = new_user.client.by_id_multi_cluster_app(id)
+    assert mcapp is not None
 
 
 def test_multiclusterapp_admin_create(admin_mc, admin_pc, remove_resource):
@@ -212,7 +253,7 @@ def test_multiclusterapp_admin_update_roles(admin_mc, admin_pc,
     new_roles = ["cluster-owner", "project-member"]
     client.update(mcapp1, roles=new_roles)
     wait_for(lambda: check_updated_roles(admin_mc, mcapp_name, new_roles),
-             timeout=60, fail_handler=roles_fail_handler())
+             timeout=60, fail_handler=fail_handler(roles_resource))
 
 
 def test_multiclusterapp_user_update_roles(admin_mc, admin_pc, remove_resource,
@@ -258,7 +299,7 @@ def test_multiclusterapp_user_update_roles(admin_mc, admin_pc, remove_resource,
     # now user should be able to add project-member role
     user.client.update(mcapp1, roles=new_roles)
     wait_for(lambda: check_updated_roles(admin_mc, mcapp_name, new_roles),
-             timeout=60, fail_handler=roles_fail_handler())
+             timeout=60, fail_handler=fail_handler(roles_resource))
 
 
 def test_admin_access(admin_mc, admin_pc, user_factory, remove_resource):
@@ -283,7 +324,7 @@ def test_admin_access(admin_mc, admin_pc, user_factory, remove_resource):
     client.update(mcapp1, roles=["cluster-owner"])
     wait_for(lambda: check_updated_roles(admin_mc, mcapp_name,
                                          ["cluster-owner"]), timeout=60,
-             fail_handler=roles_fail_handler())
+             fail_handler=fail_handler(roles_resource))
 
 
 def test_add_projects(admin_mc, admin_pc, admin_cc, remove_resource):
@@ -307,7 +348,7 @@ def test_add_projects(admin_mc, admin_pc, admin_cc, remove_resource):
     new_projects = [admin_pc.project.id, p.id]
     wait_for(lambda: check_updated_projects(admin_mc, mcapp_name,
                                             new_projects), timeout=60,
-             fail_handler=projects_fail_handler)
+             fail_handler=fail_handler(projects_resource))
 
 
 def test_remove_projects(admin_mc, admin_pc, admin_cc, remove_resource):
@@ -331,7 +372,7 @@ def test_remove_projects(admin_mc, admin_pc, admin_cc, remove_resource):
     new_projects = [admin_pc.project.id]
     wait_for(lambda: check_updated_projects(admin_mc, mcapp_name,
                                             new_projects), timeout=60,
-             fail_handler=projects_fail_handler)
+             fail_handler=fail_handler(projects_resource))
 
 
 def test_multiclusterapp_revision_access(admin_mc, admin_pc, remove_resource,
@@ -448,9 +489,5 @@ def check_updated_roles(admin_mc, mcapp_name, roles):
     return False
 
 
-def projects_fail_handler():
-    return "failed waiting for multiclusterapp projects to get updated"
-
-
-def roles_fail_handler():
-    return "failed waiting for multiclusterapp roles to get updated"
+def fail_handler(resource):
+    return "failed waiting for multiclusterapp" + resource + " to get updated"

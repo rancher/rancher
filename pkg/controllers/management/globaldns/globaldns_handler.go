@@ -67,7 +67,8 @@ func (n *GDController) sync(key string, obj *v3.GlobalDNS) (runtime.Object, erro
 	}
 
 	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.GlobalDNSResource, obj.Name,
-		obj.UID, obj.Spec.Members, creatorID, n.managementContext); err != nil {
+		globalnamespacerbac.RancherManagementAPIVersion, creatorID, []string{globalnamespacerbac.RancherManagementAPIVersion},
+		obj.UID, obj.Spec.Members, n.managementContext); err != nil {
 		return nil, err
 	}
 	//check if status.endpoints is set, if yes create a dummy ingress if not already present
