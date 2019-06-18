@@ -17,9 +17,9 @@ import (
 )
 
 const (
-	ownerAccess                     = "owner"
-	memberAccess                    = "member"
-	readOnlyAccess                  = "read-only"
+	OwnerAccess                     = "owner"
+	MemberAccess                    = "member"
+	ReadOnlyAccess                  = "read-only"
 	MultiClusterAppResource         = "multiclusterapps"
 	MultiClusterAppRevisionResource = "multiclusterapprevisions"
 	GlobalDNSResource               = "globaldnses"
@@ -45,7 +45,7 @@ func CreateRoleAndRoleBinding(resource, name, apiVersion, creatorID string, apiG
 	3. Role with "update" verb (Member access); name multiclusterapp.Name + "-mu" / (globalDNS.Name + "-gu")
 	*/
 
-	if _, err := createRole(resource, name, ownerAccess, apiVersion, apiGroup, UID, mgmt); err != nil {
+	if _, err := createRole(resource, name, OwnerAccess, apiVersion, apiGroup, UID, mgmt); err != nil {
 		return err
 	}
 
@@ -59,11 +59,11 @@ func CreateRoleAndRoleBinding(resource, name, apiVersion, creatorID string, apiG
 			return err
 		}
 		switch m.AccessType {
-		case ownerAccess:
+		case OwnerAccess:
 			ownerAccessSubjects = append(ownerAccessSubjects, s)
-		case memberAccess:
+		case MemberAccess:
 			memberAccessSubjects = append(memberAccessSubjects, s)
-		case readOnlyAccess:
+		case ReadOnlyAccess:
 			readOnlyAccessSubjects = append(readOnlyAccessSubjects, s)
 		default:
 			if resource == GlobalDNSProviderResource || resource == GlobalDNSResource {
@@ -76,24 +76,24 @@ func CreateRoleAndRoleBinding(resource, name, apiVersion, creatorID string, apiG
 		}
 	}
 
-	if err := createRoleBindingForMembers(resource, name, ownerAccess, apiVersion, UID, ownerAccessSubjects, mgmt); err != nil {
+	if err := createRoleBindingForMembers(resource, name, OwnerAccess, apiVersion, UID, ownerAccessSubjects, mgmt); err != nil {
 		return err
 	}
 
 	// Check if there are members with readonly or member(update) access; if found then create rolebindings for those
 	if len(readOnlyAccessSubjects) > 0 {
-		if _, err := createRole(resource, name, readOnlyAccess, apiVersion, apiGroup, UID, mgmt); err != nil {
+		if _, err := createRole(resource, name, ReadOnlyAccess, apiVersion, apiGroup, UID, mgmt); err != nil {
 			return err
 		}
-		if err := createRoleBindingForMembers(resource, name, readOnlyAccess, apiVersion, UID, readOnlyAccessSubjects, mgmt); err != nil {
+		if err := createRoleBindingForMembers(resource, name, ReadOnlyAccess, apiVersion, UID, readOnlyAccessSubjects, mgmt); err != nil {
 			return err
 		}
 	}
 	if len(memberAccessSubjects) > 0 {
-		if _, err := createRole(resource, name, memberAccess, apiVersion, apiGroup, UID, mgmt); err != nil {
+		if _, err := createRole(resource, name, MemberAccess, apiVersion, apiGroup, UID, mgmt); err != nil {
 			return err
 		}
-		if err := createRoleBindingForMembers(resource, name, memberAccess, apiVersion, UID, memberAccessSubjects, mgmt); err != nil {
+		if err := createRoleBindingForMembers(resource, name, MemberAccess, apiVersion, UID, memberAccessSubjects, mgmt); err != nil {
 			return err
 		}
 	}
@@ -102,7 +102,7 @@ func CreateRoleAndRoleBinding(resource, name, apiVersion, creatorID string, apiG
 
 func createRole(resourceType, resourceName, roleAccess, apiVersion string, apiGroups []string, resourceUID types.UID,
 	mgmt *config.ManagementContext) (*k8srbacv1.Role, error) {
-	roleName, verbs := getRoleNameAndVerbs(roleAccess, resourceName, resourceType)
+	roleName, verbs := GetRoleNameAndVerbs(roleAccess, resourceName, resourceType)
 	ownerReference := metav1.OwnerReference{
 		APIVersion: apiVersion,
 		Kind:       resourceType,
@@ -124,7 +124,7 @@ func createRole(resourceType, resourceName, roleAccess, apiVersion string, apiGr
 			},
 		},
 	}
-	role, err := mgmt.RBAC.Roles("").GetNamespaced(namespace.GlobalNamespace, roleName, metav1.GetOptions{})
+	role, err := mgmt.RBAC.Roles("").Controller().Lister().Get(namespace.GlobalNamespace, roleName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			role, err = mgmt.RBAC.Roles("").Create(newRole)
@@ -148,7 +148,7 @@ func createRole(resourceType, resourceName, roleAccess, apiVersion string, apiGr
 
 func createRoleBindingForMembers(resourceType, resourceName, roleAccess, apiVersion string, UID types.UID,
 	subjects []k8srbacv1.Subject, mgmt *config.ManagementContext) error {
-	roleName, _ := getRoleNameAndVerbs(roleAccess, resourceName, resourceType)
+	roleName, _ := GetRoleNameAndVerbs(roleAccess, resourceName, resourceType)
 	// we can define the rolebinding first, since if it's not already present we can call create. And if it's present then we'll
 	// still need to compare the current members' list
 	sort.Slice(subjects, func(i, j int) bool { return subjects[i].Name < subjects[j].Name })
@@ -175,7 +175,7 @@ func createRoleBinding(resourceType, resourceName, roleName, apiVersion string, 
 		},
 		Subjects: subjects,
 	}
-	roleBinding, err := mgmt.RBAC.RoleBindings("").GetNamespaced(namespace.GlobalNamespace, roleName, metav1.GetOptions{})
+	roleBinding, err := mgmt.RBAC.RoleBindings("").Controller().Lister().Get(namespace.GlobalNamespace, roleName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			_, err = mgmt.RBAC.RoleBindings("").Create(newRoleBinding)
@@ -197,7 +197,7 @@ func createRoleBinding(resourceType, resourceName, roleName, apiVersion string, 
 	return nil
 }
 
-func getRoleNameAndVerbs(roleAccess string, resourceName string, resourceType string) (string, []string) {
+func GetRoleNameAndVerbs(roleAccess string, resourceName string, resourceType string) (string, []string) {
 	var roleName string
 	var verbs []string
 
@@ -216,13 +216,13 @@ func getRoleNameAndVerbs(roleAccess string, resourceName string, resourceType st
 		resourceName += "-ctr-"
 	}
 	switch roleAccess {
-	case ownerAccess:
+	case OwnerAccess:
 		roleName = resourceName + "a"
 		verbs = []string{"*"}
-	case memberAccess:
+	case MemberAccess:
 		roleName = resourceName + "u"
 		verbs = []string{"update", "get", "list", "watch"}
-	case readOnlyAccess:
+	case ReadOnlyAccess:
 		roleName = resourceName + "r"
 		verbs = []string{"get", "list", "watch"}
 	}

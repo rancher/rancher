@@ -1,5 +1,4 @@
-from .common import random_str, check_if_members_updated, \
- check_subject_in_rb
+from .common import random_str, check_subject_in_rb
 from rancher import ApiError
 from .conftest import wait_until, wait_for
 import time
@@ -93,9 +92,6 @@ def test_multiclusterapp_create_with_members(admin_mc, admin_pc,
     new_members = [{"userPrincipalId": "local://"+user_member.user.id,
                    "accessType": "read-only"}, {"groupPrincipalId": "*"}]
     client.update(mcapp, members=new_members, roles=roles)
-    wait_for(lambda: check_if_members_updated(admin_mc, id, 'groupPrincipalId',
-                                              '*'),
-             timeout=60, fail_handler=fail_handler(members_resource))
 
     # now user_not_member should be able to access this mcapp without
     # being explicitly added
@@ -490,4 +486,4 @@ def check_updated_roles(admin_mc, mcapp_name, roles):
 
 
 def fail_handler(resource):
-    return "failed waiting for multiclusterapp" + resource + " to get updated"
+    return "failed waiting for multiclusterapp " + resource + " to get updated"

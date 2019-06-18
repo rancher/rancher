@@ -1,11 +1,15 @@
-from .common import random_str
+from .common import random_str, check_subject_in_rb
 from rancher import ApiError
+from .conftest import wait_for
 import pytest
 import time
+import kubernetes
+
+rb_resource = 'rolebinding'
 
 
 def test_create_cluster_template_with_revision(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc, remove_resource)
+    cluster_template = create_cluster_template(admin_mc, remove_resource, [])
     templateId = cluster_template.id
     _ = \
         create_cluster_template_revision(admin_mc, templateId)
@@ -17,7 +21,7 @@ def test_create_cluster_template_with_revision(admin_mc, remove_resource):
 
 
 def test_check_default_revision(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc, remove_resource)
+    cluster_template = create_cluster_template(admin_mc, remove_resource, [])
     templateId = cluster_template.id
     first_revision = \
         create_cluster_template_revision(admin_mc, templateId)
@@ -30,7 +34,7 @@ def test_check_default_revision(admin_mc, remove_resource):
 
 
 def test_create_cluster_with_template(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc, remove_resource)
+    cluster_template = create_cluster_template(admin_mc, remove_resource, [])
     templateId = cluster_template.id
 
     template_revision = \
@@ -66,7 +70,7 @@ def test_create_cluster_with_template(admin_mc, remove_resource):
 
 
 def test_create_cluster_validations(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc, remove_resource)
+    cluster_template = create_cluster_template(admin_mc, remove_resource, [])
     templateId = cluster_template.id
     template_revision = \
         create_cluster_template_revision(admin_mc, templateId)
@@ -83,14 +87,62 @@ def test_create_cluster_validations(admin_mc, remove_resource):
         assert e.value.error.status == 500
 
 
-def create_cluster_template(admin_mc, remove_resource):
+def test_create_cluster_template_with_members(admin_mc, remove_resource,
+                                              user_factory):
+    client = admin_mc.client
+    user_member = user_factory()
+    remove_resource(user_member)
+    user_not_member = user_factory()
+    remove_resource(user_not_member)
+    members = [{"userPrincipalId": "local://" + user_member.user.id,
+                "accessType": "read-only"}]
+    cluster_template = create_cluster_template(admin_mc, remove_resource,
+                                               members)
+    time.sleep(60)
+    # check who has access to the cluster template
+    # admin and user_member should be able to list it
+    id = cluster_template.id
+    ct = client.by_id_cluster_template(id)
+    assert ct is not None
+    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
+    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
+                                         user_member.user.id),
+             timeout=60,
+             fail_handler=fail_handler(rb_resource))
+    um_client = user_member.client
+    ct = um_client.by_id_cluster_template(id)
+    assert ct is not None
+
+    # user not added as member shouldn't be able to access
+    unm_client = user_not_member.client
+    try:
+        unm_client.by_id_cluster_template(id)
+    except ApiError as e:
+        assert e.error.status == 403
+
+    # add * as member to share with all
+    new_members = [{"userPrincipalId": "local://" + user_member.user.id,
+                    "accessType": "read-only"}, {"groupPrincipalId": "*"}]
+    client.update(ct, members=new_members)
+
+    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
+                                         'system:authenticated'),
+             timeout=60,
+             fail_handler=fail_handler(rb_resource))
+    time.sleep(60)
+    ct = user_not_member.client.by_id_cluster_template(id)
+    assert ct is not None
+
+
+def create_cluster_template(admin_mc, remove_resource, members):
     client = admin_mc.client
     template_name = random_str()
 
     cluster_template = \
         client.create_cluster_template(
                                          name=template_name,
-                                         description="demo template")
+                                         description="demo template",
+                                         members=members)
     remove_resource(cluster_template)
     return cluster_template
 
@@ -220,3 +272,7 @@ def wait_for_default_revision(client, templateId, revisionId, timeout=45):
             updated = True
         time.sleep(interval)
         interval *= 2
+
+
+def fail_handler(resource):
+    return "failed waiting for clustertemplate" + resource + " to get updated"
