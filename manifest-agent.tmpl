@@ -3,3 +3,4 @@ manifests:
 - image: rancher/rancher-agent:{{#if build.tag}}{{build.tag}}{{else}}{{replace "/" "-" build.branch }}{{/if}}-linux-amd64
   platform:
     architecture: amd64
+    os: linux
