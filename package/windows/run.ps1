@@ -34,7 +34,7 @@ $null = New-Item -Force -Type Directory -Path $CNIDir -ErrorAction Ignore
 function warn {
     Write-Host -NoNewline -ForegroundColor DarkYellow "WARN"
     Write-Host -NoNewline -ForegroundColor Gray "[0000] "
-    Write-Host -ForegroundColor Gray $_
+    Write-Host -ForegroundColor Gray $args
 }
 
 function scrape-text {
@@ -158,6 +158,38 @@ if (-not $dockerNPipe) {
     warn "Default docker named pipe is not found"
     warn "Please bind mount in the docker socket to //./pipe/docker_engine if docker errors occur"
     warn "example:  docker run -v //./pipe/docker_engine://./pipe/docker_engine ..."
+}
+
+# check docker release #
+$stdout = New-TemporaryFile
+$stderr = New-TemporaryFile
+Start-Process -NoNewWindow -Wait `
+      -FilePath docker.exe `
+      -ArgumentList @("version", "-f", "{{.Server.Platform.Name}}") `
+      -RedirectStandardOutput $stdout.FullName `
+      -RedirectStandardError $stderr.FullName `
+      -ErrorAction Ignore
+$ret = Get-Content $stdout.FullName
+$stdout.Delete()
+$stderr.Delete()
+if (-not ($ret -like '*Enterprise*')) {
+    throw "Only support with Docker EE"
+}
+
+# check system locale #
+$sysLocale = Get-WinSystemLocale | % {$_.IetfLanguageTag}
+if (-not $sysLocale.StartsWith('en-')) {
+    throw "Only support with English System Locale"
+}
+
+# check network count #
+$vNetAdapters = Get-HnsNetwork | Select-Object -ExpandProperty Subnets | Select-Object -ExpandProperty GatewayAddress
+$allNetAdapters = Get-WmiObject -Class Win32_NetworkAdapterConfiguration -Filter "IPEnabled=True" | Sort-Object Index | % { $_.IPAddress[0] } | ? { -not ($vNetAdapters -contains $_) }
+if (($allNetAdapters | Measure-Object | Select-Object -ExpandProperty "Count") -gt 1) {
+    if (-not $CATTLE_INTERNAL_ADDRESS) {
+        warn "More than 1 network interfaces are found: $($allNetAdapters -join ", ")"
+        warn "Please indicate -internalAddress when adding"
+    }
 }
 
 $svcAgent = get-agent-service
