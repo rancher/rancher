@@ -63,7 +63,8 @@ func (n *ProviderCatalogLauncher) sync(key string, obj *v3.GlobalDNSProvider) (r
 	}
 
 	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.GlobalDNSProviderResource, obj.Name,
-		obj.UID, obj.Spec.Members, creatorID, n.managementContext); err != nil {
+		globalnamespacerbac.RancherManagementAPIVersion, creatorID, []string{globalnamespacerbac.RancherManagementAPIVersion},
+		obj.UID, obj.Spec.Members, n.managementContext); err != nil {
 		return nil, err
 	}
 
