@@ -54,7 +54,7 @@ steps:
     event:
     - push
 
-- name: docker-publish-master-agent
+- name: docker-publish-head-agent
   image: plugins/docker
   settings:
     build_args:
