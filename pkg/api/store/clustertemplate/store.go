@@ -85,8 +85,14 @@ func setLabelsAndOwnerRef(apiContext *types.APIContext, data map[string]interfac
 		return err
 	}
 
+	split := strings.SplitN(template.ID, ":", 2)
+	if len(split) != 2 {
+		return fmt.Errorf("error in splitting clusterTemplate ID %v", template.ID)
+	}
+	templateName := split[1]
+
 	labels := map[string]string{
-		clusterTemplateLabelName: template.Name,
+		clusterTemplateLabelName: templateName,
 	}
 	data["labels"] = labels
 
@@ -94,7 +100,7 @@ func setLabelsAndOwnerRef(apiContext *types.APIContext, data map[string]interfac
 	ownerReference := map[string]interface{}{
 		managementv3.OwnerReferenceFieldKind:       "ClusterTemplate",
 		managementv3.OwnerReferenceFieldAPIVersion: "management.cattle.io/v3",
-		managementv3.OwnerReferenceFieldName:       template.Name,
+		managementv3.OwnerReferenceFieldName:       templateName,
 		managementv3.OwnerReferenceFieldUID:        template.UUID,
 	}
 	ownerReferencesSlice = append(ownerReferencesSlice, ownerReference)

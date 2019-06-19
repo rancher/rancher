@@ -1,6 +1,6 @@
 from .common import random_str, check_subject_in_rb
 from rancher import ApiError
-from .conftest import wait_for
+from .conftest import wait_until, wait_for
 import pytest
 import time
 import kubernetes
@@ -175,6 +175,80 @@ def test_creation_standard_user(admin_mc, remove_resource, user_factory):
              fail_handler=fail_handler(rb_resource))
     ctr = um_client.by_id_cluster_template_revision(template_revision.id)
     assert ctr is not None
+
+
+def test_check_enforcement(admin_mc, remove_resource, user_factory):
+    cluster_template = create_cluster_template(admin_mc.client,
+                                               remove_resource, [])
+    templateId = cluster_template.id
+    rev = \
+        create_cluster_template_revision(admin_mc.client, templateId)
+
+    client = admin_mc.client
+
+    # turn on the enforcement
+    client.update_by_id_setting(id='cluster-template-enforcement',
+                                value="true")
+
+    # a globaladmin can create a rke cluster without a template
+    cluster = client.create_cluster(
+            name=random_str(), rancherKubernetesEngineConfig={
+                "accessKey": "asdfsd"})
+    remove_resource(cluster)
+
+    # a user cannot create an rke cluster without template
+    user = user_factory()
+    remove_resource(user)
+    crtb_owner = client.create_cluster_role_template_binding(
+          clusterId="local",
+          roleTemplateId="cluster-owner",
+          userId=user.user.id)
+    remove_resource(crtb_owner)
+    wait_until(rtb_cb(client, crtb_owner))
+
+    user_client = user.client
+    with pytest.raises(ApiError) as e:
+        user_client.create_cluster(name=random_str(),
+                                   rancherKubernetesEngineConfig={
+                                        "accessKey": "asdfsd"})
+        assert e.value.error.status == 422
+
+    # a user can create a non-rke cluster without template
+    cluster = user_client.create_cluster(
+            name=random_str(), amazonElasticContainerServiceConfig={
+                "accessKey": "asdfsd"})
+    remove_resource(cluster)
+
+    # a user cannot create an rke cluster without a public
+    # and enforced template
+    with pytest.raises(ApiError) as e:
+        user_client.create_cluster(name=random_str(),
+                                   clusterTemplateId=cluster_template.id,
+                                   clusterTemplateRevisionId=rev.id,
+                                   description="cluster from temp")
+        assert e.value.error.status == 403
+
+    # a user can create an rke cluster with a public and enforced template
+    client.update(cluster_template, enforced="true")
+    template_reloaded = client.by_id_cluster_template(templateId)
+    new_members = [{"groupPrincipalId": "*"}]
+    client.update(template_reloaded, members=new_members)
+
+    cluster = user_client.create_cluster(name=random_str(),
+                                         clusterTemplateId=cluster_template.id,
+                                         clusterTemplateRevisionId=rev.id,
+                                         description="cluster from temp")
+    remove_resource(cluster)
+    client.update_by_id_setting(id='cluster-template-enforcement',
+                                value="false")
+
+
+def rtb_cb(client, rtb):
+    """Wait for the prtb to have the userId populated"""
+    def cb():
+        rt = client.reload(rtb)
+        return rt.userPrincipalId is not None
+    return cb
 
 
 def create_cluster_template(client, remove_resource, members):

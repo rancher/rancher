@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -21,6 +22,7 @@ const (
 type RevController struct {
 	clusterTemplates              v3.ClusterTemplateInterface
 	clusterTemplateLister         v3.ClusterTemplateLister
+	clusterTemplateRevisions      v3.ClusterTemplateRevisionInterface
 	clusterTemplateRevisionLister v3.ClusterTemplateRevisionLister
 }
 
@@ -28,6 +30,7 @@ func newRevController(ctx context.Context, mgmt *config.ManagementContext) *RevC
 	n := &RevController{
 		clusterTemplates:              mgmt.Management.ClusterTemplates(namespace.GlobalNamespace),
 		clusterTemplateLister:         mgmt.Management.ClusterTemplates(namespace.GlobalNamespace).Controller().Lister(),
+		clusterTemplateRevisions:      mgmt.Management.ClusterTemplateRevisions(namespace.GlobalNamespace),
 		clusterTemplateRevisionLister: mgmt.Management.ClusterTemplateRevisions(namespace.GlobalNamespace).Controller().Lister(),
 	}
 	return n
@@ -64,12 +67,24 @@ func (n *RevController) sync(key string, obj *v3.ClusterTemplateRevision) (runti
 		return nil, nil
 	}
 	//if default is not set, set the revision to this revision if only one found
-	set := labels.Set(map[string]string{clusterTemplateLabel: template.Spec.DisplayName})
+	set := labels.Set(map[string]string{clusterTemplateLabel: templateName})
 	revisionList, err := n.clusterTemplateRevisionLister.List(namespace.GlobalNamespace, set.AsSelector())
 	if err != nil {
 		return nil, err
 	}
-	if len(revisionList) == 1 {
+	revisionCount := len(revisionList)
+	if revisionCount == 0 {
+		//check from etcd
+		revlist, err := n.clusterTemplateRevisions.List(metav1.ListOptions{LabelSelector: set.AsSelector().String()})
+		if err != nil {
+			return nil, err
+		}
+		if len(revlist.Items) != 0 {
+			revisionCount = len(revlist.Items)
+		}
+	}
+
+	if revisionCount == 1 {
 		templateCopy := template.DeepCopy()
 		templateCopy.Spec.DefaultRevisionName = namespace.GlobalNamespace + ":" + obj.Name
 		_, err := n.clusterTemplates.Update(templateCopy)

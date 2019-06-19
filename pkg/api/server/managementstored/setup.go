@@ -236,7 +236,12 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 	schema.ActionHandler = handler.ClusterActionHandler
 
 	clusterValidator := ccluster.Validator{
-		ClusterLister: managementContext.Management.Clusters("").Controller().Lister(),
+		ClusterLister:                 managementContext.Management.Clusters("").Controller().Lister(),
+		ClusterTemplateLister:         managementContext.Management.ClusterTemplates("").Controller().Lister(),
+		ClusterTemplateRevisionLister: managementContext.Management.ClusterTemplateRevisions("").Controller().Lister(),
+		Users:                         managementContext.Management.Users(""),
+		GrbLister:                     managementContext.Management.GlobalRoleBindings("").Controller().Lister(),
+		GrLister:                      managementContext.Management.GlobalRoles("").Controller().Lister(),
 	}
 	schema.Validator = clusterValidator.Validator
 
