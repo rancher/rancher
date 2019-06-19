@@ -436,5 +436,5 @@ func isBackupSet(rkeConfig *v3.RancherKubernetesEngineConfig) bool {
 }
 
 func isRecurringBackupEnabled(rkeConfig *v3.RancherKubernetesEngineConfig) bool {
-	return isBackupSet(rkeConfig) && *rkeConfig.Services.Etcd.BackupConfig.Enabled
+	return isBackupSet(rkeConfig) && rkeConfig.Services.Etcd.BackupConfig.Enabled != nil && *rkeConfig.Services.Etcd.BackupConfig.Enabled
 }
