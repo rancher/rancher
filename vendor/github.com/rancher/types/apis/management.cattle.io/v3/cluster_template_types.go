@@ -20,6 +20,7 @@ type ClusterTemplateSpec struct {
 	DisplayName         string `json:"displayName" norman:"required"`
 	Description         string `json:"description"`
 	Enabled             *bool  `json:"enabled,omitempty" norman:"default=true"`
+	Enforced            bool   `json:"enforced,omitempty"`
 	DefaultRevisionName string `json:"defaultRevisionName,omitempty" norman:"type=reference[clusterTemplateRevision]"`
 
 	Members []Member `json:"members,omitempty"`
