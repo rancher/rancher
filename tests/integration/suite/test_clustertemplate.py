@@ -73,9 +73,8 @@ def create_cluster_template(admin_mc, remove_resource):
 
     cluster_template = \
         client.create_cluster_template(
-                                         displayName=template_name,
-                                         description="demo template",
-                                         revisionLimit=10)
+                                         name=template_name,
+                                         description="demo template")
     remove_resource(cluster_template)
     return cluster_template
 
