@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -40,7 +40,7 @@ func doDeployFile(ctx context.Context, host *hosts.Host, fileName, fileContents,
 		Cmd: []string{
 			"sh",
 			"-c",
-			fmt.Sprintf("t=$(mktemp); echo -e \"$%s\" > $t && mv $t %s && chmod 644 %s", ConfigEnv, fileName, fileName),
+			fmt.Sprintf("t=$(mktemp); echo -e \"$%s\" > $t && mv $t %s && chmod 600 %s", ConfigEnv, fileName, fileName),
 		},
 		Env: containerEnv,
 	}
