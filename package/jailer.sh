@@ -26,6 +26,7 @@ cp /etc/ssl/certs/ca-certificates.crt /opt/jail/$NAME/etc/ssl/certs
 cp /etc/resolv.conf /opt/jail/$NAME/etc/
 cp /etc/passwd /opt/jail/$NAME/etc/
 cp /etc/hosts /opt/jail/$NAME/etc/
+cp /etc/nsswitch.conf /opt/jail/$NAME/etc/
 
 if [ -d /var/lib/rancher/management-state/bin ] && [ "$(ls -A /var/lib/rancher/management-state/bin)" ]; then
   ( cd /var/lib/rancher/management-state/bin
