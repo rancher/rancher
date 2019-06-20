@@ -8,7 +8,6 @@ platform:
 
 steps:
 - name: build
-  pull: default
   image: rancher/dapper:v0.4.1
   commands:
   - dapper ci
@@ -23,7 +22,6 @@ steps:
     - tag
 
 - name: stage-binaries
-  pull: default
   image: rancher/dapper:v0.4.1
   commands:
   - "cp -r ./bin/* ./package/"
@@ -37,7 +35,7 @@ steps:
   settings:
     build_args:
     - ARCH=amd64
-    - "VERSION=${DRONE_BRANCH}"
+    - VERSION=${DRONE_BRANCH/\//-}
     - SYSTEM_CHART_DEFAULT_BRANCH=dev
     context: package/
     custom_dns: 1.1.1.1
@@ -56,12 +54,12 @@ steps:
     event:
     - push
 
-- name: docker-publish-master-agent
+- name: docker-publish-head-agent
   image: plugins/docker
   settings:
     build_args:
     - ARCH=amd64
-    - "VERSION=${DRONE_BRANCH}"
+    - VERSION=${DRONE_BRANCH/\//-}
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.agent
@@ -80,12 +78,11 @@ steps:
     - push
 
 - name: docker-publish
-  pull: default
   image: plugins/docker
   settings:
     build_args:
     - ARCH=amd64
-    - "VERSION=${DRONE_TAG}"
+    - VERSION=${DRONE_BRANCH/\//-}
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile
@@ -100,7 +97,6 @@ steps:
     - tag
 
 - name: docker-publish-agent
-  pull: default
   image: plugins/docker
   settings:
     build_args:
@@ -120,7 +116,6 @@ steps:
     - tag
 
 - name: github_binary_prerelease
-  pull: default
   image: plugins/github-release
   settings:
     api_key:
@@ -139,7 +134,6 @@ steps:
       - "refs/tags/*alpha*"
 
 - name: github_binary_release
-  pull: default
   image: plugins/github-release
   settings:
     api_key:
@@ -193,7 +187,6 @@ platform:
 
 steps:
 - name: build
-  pull: default
   image: rancher/dapper:v0.4.1
   commands:
   - dapper ci
@@ -208,7 +201,6 @@ steps:
     - tag
 
 - name: stage-binaries
-  pull: default
   image: rancher/dapper:v0.4.1
   commands:
   - "cp -r ./bin/* ./package/"
@@ -222,7 +214,7 @@ steps:
   settings:
     build_args:
     - ARCH=arm64
-    - "VERSION=${DRONE_BRANCH}"
+    - VERSION=${DRONE_BRANCH/\//-}
     - SYSTEM_CHART_DEFAULT_BRANCH=dev
     context: package/
     custom_dns: 1.1.1.1
@@ -246,7 +238,7 @@ steps:
   settings:
     build_args:
     - ARCH=arm64
-    - "VERSION=${DRONE_BRANCH}"
+    - VERSION=${DRONE_BRANCH/\//-}
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile.agent
@@ -265,7 +257,6 @@ steps:
     - push
 
 - name: docker-publish
-  pull: default
   image: plugins/docker
   settings:
     build_args:
@@ -285,7 +276,6 @@ steps:
     - tag
 
 - name: docker-publish-agent
-  pull: default
   image: plugins/docker
   settings:
     build_args:
@@ -354,7 +344,6 @@ steps:
         - tag
 
   - name: stage-binaries
-    pull: default
     image: maiwj/dapper:windows-1809
     commands:
       - "cp -r ./bin/* ./package/windows/"
@@ -363,34 +352,34 @@ steps:
         - push
         - tag
 
-  - name: docker-publish-master-agent
-    pull: default
+  - name: docker-publish-head-agent
     image: plugins/docker
     settings:
       build_args:
         - SERVERCORE_VERSION=1809
         - ARCH=amd64
-        - VERSION=master
+        - VERSION=${DRONE_BRANCH/\//-}
       context: package/windows
       custom_dns: 1.1.1.1
       dockerfile: package/windows/Dockerfile.agent
       password:
         from_secret: docker_password
       repo: rancher/rancher-agent
-      tag: master-windows-1809
+      tag: ${DRONE_BRANCH/\//-}-windows-1809
       username:
         from_secret: docker_username
     volumes:
       - name: docker_pipe
         path: \\\\.\\pipe\\docker_engine
     when:
-      branch:
-        - master
+      ref:
+        include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
       event:
         - push
 
   - name: docker-publish-agent
-    pull: default
     image: plugins/docker
     settings:
       build_args:
@@ -504,7 +493,6 @@ steps:
     - tag
 
 - name: build-chart
-  pull: default
   image: rancher/dapper:v0.4.1
   commands:
   - dapper chart/ci
@@ -518,7 +506,6 @@ steps:
     - tag
 
 - name: chart-publish
-  pull: default
   image: plugins/gcs
   settings:
     acl:
@@ -573,7 +560,6 @@ platform:
 
 steps:
 - name: chart-promote
-  pull: default
   image: rancher/dapper:v0.4.1
   commands:
   - dapper chart/copy
@@ -587,7 +573,6 @@ steps:
     - promote-stable
 
 - name: chart-publish
-  pull: default
   image: plugins/gcs
   settings:
     acl:
