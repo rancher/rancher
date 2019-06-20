@@ -18,9 +18,12 @@ mkdir -p $BASE/usr/local/bin
 # Copy over required files to the jail
 cp -r /lib $BASE
 cp -r /lib64 $BASE
+cp -r /usr/lib $BASE/usr
 cp /etc/ssl/certs/ca-certificates.crt $BASE/etc/ssl/certs
 cp /etc/resolv.conf $BASE/etc/
 cp /etc/hosts $BASE/etc/
+cp /etc/passwd $BASE/etc/
+cp /etc/nsswitch.conf $BASE/etc/
 
 # Copy driver binaries
 cp -a /usr/local/bin/. $BASE/usr/local/bin/
@@ -30,8 +33,13 @@ if [[ ! -x "$BASE/usr/bin/docker-machine" ]]; then
     cp /usr/bin/docker-machine $BASE/usr/bin
 fi
 
+# Copy ssh into the jail
+if [[ ! -x "$BASE/usr/bin/ssh" ]]; then
+  cp /usr/bin/ssh $BASE/usr/bin
+fi
+
 cd /dev
 # tar copy /dev excluding mqueue and shm
-tar cf - --exclude=mqueue --exclude=shm . | (cd ${BASE}/dev; tar xfp -)
+tar cf - --exclude=mqueue --exclude=shm --exclude=pts . | (cd ${BASE}/dev; tar xfp -)
 
 touch $BASE/done
