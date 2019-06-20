@@ -2,7 +2,10 @@ package etcdbackup
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -321,6 +324,7 @@ func (c *Controller) deleteS3Snapshot(b *v3.EtcdBackup) error {
 	var err error
 	var s3Client = &minio.Client{}
 	var creds = &credentials.Credentials{}
+	var tr = &http.Transport{}
 	endpoint := b.Spec.BackupConfig.S3BackupConfig.Endpoint
 	bucketLookup := getBucketLookupType(endpoint)
 	bucket := b.Spec.BackupConfig.S3BackupConfig.BucketName
@@ -344,6 +348,10 @@ func (c *Controller) deleteS3Snapshot(b *v3.EtcdBackup) error {
 	})
 	if err != nil {
 		return err
+	}
+	if b.Spec.BackupConfig.S3BackupConfig.EndpointCA != "" {
+		tr = getCustomCATransport(b.Spec.BackupConfig.S3BackupConfig.EndpointCA)
+		s3Client.SetCustomTransport(tr)
 	}
 
 	exists, err := s3Client.BucketExists(bucket)
@@ -437,4 +445,15 @@ func isBackupSet(rkeConfig *v3.RancherKubernetesEngineConfig) bool {
 
 func isRecurringBackupEnabled(rkeConfig *v3.RancherKubernetesEngineConfig) bool {
 	return isBackupSet(rkeConfig) && rkeConfig.Services.Etcd.BackupConfig.Enabled != nil && *rkeConfig.Services.Etcd.BackupConfig.Enabled
+}
+
+func getCustomCATransport(ca string) *http.Transport {
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM([]byte(ca))
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			RootCAs: certPool,
+		},
+	}
+	return tr
 }
