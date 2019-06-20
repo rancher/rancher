@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
+	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/util"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -89,7 +90,7 @@ func ClusterInit(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfi
 		if strings.Contains(err.Error(), "aborting upgrade") {
 			return err
 		}
-		log.Warnf(ctx, "[state] can't fetch legacy cluster state from Kubernetes")
+		log.Warnf(ctx, "[state] can't fetch legacy cluster state from Kubernetes: %v", err)
 	}
 	// check if certificate rotate or normal init
 	if kubeCluster.RancherKubernetesEngineConfig.RotateCertificates != nil {
@@ -114,6 +115,7 @@ func setS3OptionsFromCLI(c *cli.Context) *v3.S3BackupConfig {
 	region := c.String("region")
 	accessKey := c.String("access-key")
 	secretKey := c.String("secret-key")
+	endpointCA := c.String("s3-endpoint-ca")
 	var s3BackupBackend = &v3.S3BackupConfig{}
 	if len(endpoint) != 0 {
 		s3BackupBackend.Endpoint = endpoint
@@ -129,6 +131,14 @@ func setS3OptionsFromCLI(c *cli.Context) *v3.S3BackupConfig {
 	}
 	if len(secretKey) != 0 {
 		s3BackupBackend.SecretKey = secretKey
+	}
+	if len(endpointCA) != 0 {
+		caStr, err := pki.ReadCertToStr(endpointCA)
+		if err != nil {
+			logrus.Warnf("Failed to read s3-endpoint-ca [%s]: %v", endpointCA, err)
+		} else {
+			s3BackupBackend.EndpointCA = caStr
+		}
 	}
 	return s3BackupBackend
 }

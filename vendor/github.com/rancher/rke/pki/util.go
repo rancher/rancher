@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/rancher/rke/hosts"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/util/cert"
 )
@@ -743,4 +743,20 @@ func validateCAIssuer(rkeConfig *v3.RancherKubernetesEngineConfig, certBundle ma
 		return fmt.Errorf("Component [%s] is not signed by the custom Request Header CA certificate", APIProxyClientCertName)
 	}
 	return nil
+}
+
+func ReadCertToStr(file string) (string, error) {
+	certStr, err := ioutil.ReadFile(file)
+	if err != nil {
+		return "", fmt.Errorf("failed to read certificate [%s]: %v", file, err)
+	}
+	return string(certStr), nil
+}
+
+func IsValidCertStr(c string) (bool, error) {
+	_, err := cert.ParseCertsPEM([]byte(c))
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
