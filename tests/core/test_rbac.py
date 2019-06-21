@@ -1,5 +1,7 @@
 import kubernetes
+import pytest
 from rancher import ApiError
+import time
 from .common import random_str
 from .conftest import wait_until_available,\
     cluster_and_client, kubernetes_api_client, wait_for
@@ -196,3 +198,111 @@ def test_user_role_permissions(admin_mc, user_factory, remove_resource):
     role_templates = user2.client.list_role_template()
     assert len(role_templates.data) == 0, ("user2 does not have permission " +
                                            "to view roleTemplates")
+
+
+def test_readonly_cannot_perform_app_action(admin_mc, admin_pc, user_factory,
+                                            remove_resource):
+    client = admin_pc.client
+    project = admin_pc.project
+
+    user = user_factory()
+    remove_resource(user)
+    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                  projectId=project.id)
+
+    prtb = admin_mc.client.create_project_role_template_binding(
+        name="prtb",
+        userId=user.user.id,
+        projectId=project.id,
+        roleTemplateId="read-only")
+    remove_resource(prtb)
+
+    wait_until_available(user.client, project)
+
+    app = client.create_app(
+        name="testapp",
+        externalId="catalog://?catalog=library&template=docker-registry"
+                   "&version=1.6.1&namespace=cattle-global-data",
+        targetNamespace=ns.name,
+        projectId=project.id
+    )
+
+    wait_for_workload(client, ns.name)
+
+    with pytest.raises(ApiError) as e:
+        user.client.action(obj=app, action_name="upgrade",
+                           answers={"abc": "123"})
+    assert e.value.error.status == 403
+
+    with pytest.raises(ApiError) as e:
+        user.client.action(obj=app, action_name="rollback",
+                           revisionId="test")
+    assert e.value.error.status == 403
+
+
+def test_member_can_perform_app_action(admin_mc, admin_pc, remove_resource,
+                                       user_factory):
+    client = admin_pc.client
+    project = admin_pc.project
+
+    user = user_factory()
+    remove_resource(user)
+
+    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                  projectId=project.id)
+
+    prtb = admin_mc.client.create_project_role_template_binding(
+        name="test-prtb",
+        userId=user.user.id,
+        projectId=project.id,
+        roleTemplateId="project-owner")
+    remove_resource(prtb)
+
+    wait_until_available(user.client, project)
+
+    app = client.create_app(
+        name="testapp1",
+        externalId="catalog://?catalog=library&template=docker-registry"
+                   "&version=1.6.1&namespace=cattle-global-data",
+        targetNamespace=ns.name,
+        projectId=project.id
+    )
+
+    wait_for_workload(client, ns.name)
+
+    user.client.action(
+        obj=app,
+        action_name="upgrade",
+        answers={"asdf": "asdf"})
+    '''
+        TODO: write rollback test, currently blocked by issue #20204
+    '''
+
+
+def wait_for_template_to_be_created(client, name, timeout=45):
+    found = False
+    start = time.time()
+    interval = 0.5
+    while not found:
+        if time.time() - start > timeout:
+            raise AssertionError(
+                "Timed out waiting for templates")
+        templates = client.list_template(catalogId=name)
+        if len(templates) > 0:
+            found = True
+        time.sleep(interval)
+        interval *= 2
+
+
+def wait_for_workload(client, ns, timeout=60, count=0):
+    start = time.time()
+    interval = 0.5
+    workloads = client.list_workload(namespaceId=ns)
+    while len(workloads.data) != count:
+        if time.time() - start > timeout:
+            print(workloads)
+            raise Exception('Timeout waiting for workload service')
+        time.sleep(interval)
+        interval *= 2
+        workloads = client.list_workload(namespaceId=ns)
+    return workloads
