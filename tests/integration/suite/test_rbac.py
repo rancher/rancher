@@ -5,7 +5,8 @@ import time
 
 from .common import random_str
 from .conftest import wait_until_available, \
-    cluster_and_client, kubernetes_api_client, wait_for, ClusterContext, \
+    cluster_and_client, user_project_client, \
+    kubernetes_api_client, wait_for, ClusterContext, \
     admin_pc
 
 
@@ -475,19 +476,131 @@ def test_member_can_perform_app_action(admin_mc, admin_pc, remove_resource,
     '''
 
 
-def wait_for_template_to_be_created(client, name, timeout=45):
-    found = False
-    start = time.time()
-    interval = 0.5
-    while not found:
-        if time.time() - start > timeout:
-            raise AssertionError(
-                "Timed out waiting for templates")
-        templates = client.list_template(catalogId=name)
-        if len(templates) > 0:
-            found = True
-        time.sleep(interval)
-        interval *= 2
+def test_readonly_cannot_edit_secret(admin_mc, user_mc, admin_pc,
+                                     remove_resource):
+    """Tests that a user with readonly access is not able to create/update
+     a secret or ns secret
+    """
+    project = admin_pc.project
+    user_client = user_mc.client
+
+    prtb = admin_mc.client.create_project_role_template_binding(
+        name="prtb",
+        userId=user_mc.user.id,
+        projectId=project.id,
+        roleTemplateId="read-only")
+    remove_resource(prtb)
+
+    wait_until_available(user_client, project)
+
+    proj_client = user_project_client(user_mc, project)
+
+    # readonly should failed to create a regular secret
+    with pytest.raises(ApiError) as e:
+        proj_client.create_secret(name="testasfdsecret", stringData={
+            'abc': '123'
+        })
+    assert e.value.error.status == 403
+
+    admin_pc.client.create_secret(name="testasfdsecret", stringData={
+        'abc': '123'
+    })
+
+    # readonly should failed to update a regular secret
+    with pytest.raises(ApiError) as e:
+        proj_client.update_by_id_secret(id="testasfdsecret", stringData={
+            'asd': 'fgh'
+        })
+    assert e.value.error.status == 404
+
+    ns = admin_pc.cluster.client.create_namespace(name='test-' + random_str(),
+                                                  projectId=project.id)
+
+    # readonly should fail to create ns secret
+    with pytest.raises(ApiError) as e:
+        proj_client.create_namespaced_secret(namespaceId=ns.id,
+                                             name="testseasfdcret",
+                                             stringData={
+                                                'abc': '123'
+                                             })
+    assert e.value.error.status == 403
+
+    secret = admin_pc.client.create_namespaced_secret(namespaceId=ns.id,
+                                                      name="testseasfdcret1",
+                                                      stringData={
+                                                          'abc': '123'
+                                                      })
+
+    # readonly should fail to update ns secret
+    with pytest.raises(ApiError) as e:
+        proj_client.update_by_id_namespaced_secret(namespaceId=ns.id,
+                                                   id=secret.id,
+                                                   stringData={
+                                                       'asd': 'fgh'
+                                                   })
+    assert e.value.error.status == 404
+
+
+def test_member_can_edit_secret(admin_mc, admin_pc, remove_resource,
+                                user_mc):
+    """Tests that a user with project-member role is able to create/update
+    a secret
+    """
+    project = admin_pc.project
+    user_client = user_mc.client
+
+    prtb = admin_mc.client.create_project_role_template_binding(
+        name="prtb",
+        userId=user_mc.user.id,
+        projectId=project.id,
+        roleTemplateId="project-member")
+    remove_resource(prtb)
+
+    wait_until_available(user_client, project)
+
+    proj_client = user_project_client(user_mc, project)
+
+    secret = proj_client.create_secret(name="testseasfdcret", stringData={
+        'abc': '123'
+    })
+
+    proj_client.update_by_id_secret(id=secret.id, stringData={
+        'asd': 'fgh'
+     })
+
+
+def test_member_can_edit_ns_secret(admin_mc, admin_pc, remove_resource,
+                                   user_mc):
+    """Tests that a user with project-member role is able to create/update an
+    ns secret"""
+    project = admin_pc.project
+    user_client = user_mc.client
+
+    ns = admin_pc.cluster.client.create_namespace(name='test-' + random_str(),
+                                                  projectId=project.id)
+
+    prtb = admin_mc.client.create_project_role_template_binding(
+        name="prtb",
+        userId=user_mc.user.id,
+        projectId=project.id,
+        roleTemplateId="project-member")
+    remove_resource(prtb)
+
+    wait_until_available(user_client, project)
+
+    proj_client = user_project_client(user_mc, project)
+
+    secret = proj_client.create_namespaced_secret(namespaceId=ns.id,
+                                                  stringData={
+                                                      'abc': '123'
+                                                  })
+    wait_until_available(proj_client, secret)
+
+    proj_client.update_by_id_namespaced_secret(namespaceId=ns.id,
+                                               id=secret.id,
+                                               stringData={
+                                                   'asd': 'fgh'
+                                               })
 
 
 def wait_for_workload(client, ns, timeout=60, count=0):

@@ -126,6 +126,12 @@ def cluster_and_client(cluster_id, mgmt_client):
     return cluster, client
 
 
+def user_project_client(user, project):
+    """Returns a project level  client for the user"""
+    return rancher.Client(url=project.links.self+'/schemas', verify=False,
+                          token=user.client.token)
+
+
 @pytest.fixture
 def admin_pc(admin_cc, remove_resource):
     """Returns a ProjectContext for a newly created project in the local
