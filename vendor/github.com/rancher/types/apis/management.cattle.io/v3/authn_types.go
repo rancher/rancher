@@ -168,9 +168,9 @@ type GoogleOauthConfig struct {
 	AuthConfig        `json:",inline" mapstructure:",squash"`
 
 	OauthCredential          string `json:"oauthCredential,omitempty" norman:"required,type=password"`
-	ServiceAccountCredential string `json:"serviceAccountCredential,omitempty" norman:"type=password"`
+	ServiceAccountCredential string `json:"serviceAccountCredential,omitempty" norman:"required,type=password"`
 	AdminEmail               string `json:"adminEmail,omitempty"`
-	Hostname                 string `json:"hostname,omitempty" norman:"required"`
+	Hostname                 string `json:"hostname,omitempty" norman:"required,noupdate"`
 	UserInfoEndpoint         string `json:"userInfoEndpoint" norman:"default=https://openidconnect.googleapis.com/v1/userinfo,required,notnullable"`
 }
 
