@@ -247,6 +247,8 @@ if [ -n "$CATTLE_CA_CHECKSUM" ]; then
     else
         mkdir -p /etc/kubernetes/ssl/certs
         mv $temp /etc/kubernetes/ssl/certs/serverca
+        chmod 700 /etc/kubernetes/ssl /etc/kubernetes/ssl/certs
+	chmod 600 /etc/kubernetes/ssl/certs/serverca
         mkdir -p /etc/docker/certs.d/$CATTLE_SERVER_HOSTNAME_WITH_PORT
         cp /etc/kubernetes/ssl/certs/serverca /etc/docker/certs.d/$CATTLE_SERVER_HOSTNAME_WITH_PORT/ca.crt
 
