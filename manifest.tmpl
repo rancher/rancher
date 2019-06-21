@@ -1,22 +1,22 @@
-image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "/" "-" build.branch }}{{/if}}
+image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-head{{/if}}
 manifests:
   -
-    image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "/" "-" build.branch }}{{/if}}-linux-amd64
+    image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-head{{/if}}-linux-amd64
     platform:
       architecture: amd64
       os: linux
   -
-    image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "/" "-" build.branch }}{{/if}}-linux-arm64
+    image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-head{{/if}}-linux-arm64
     platform:
       architecture: arm64
       os: linux
   -
-    image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "/" "-" build.branch }}{{/if}}-linux-arm
+    image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-head{{/if}}-linux-arm
     platform:
       architecture: arm
       os: linux
   -
-    image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "/" "-" build.branch }}{{/if}}-windows-1809
+    image: rancher/rancher:{{#if build.tag}}{{build.tag}}{{else}}{{replace "release/" "" build.branch }}-head{{/if}}-windows-1809
     platform:
       architecture: amd64
       os: windows
