@@ -281,13 +281,11 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 	mustAppAnswers := map[string]string{
 		"enabled": "false",
 
-		"exporter-coredns.enabled":  "false",
 		"exporter-coredns.apiGroup": monitoring.APIVersion.Group,
 
 		"exporter-kube-controller-manager.enabled":  "false",
 		"exporter-kube-controller-manager.apiGroup": monitoring.APIVersion.Group,
 
-		"exporter-kube-dns.enabled":  "false",
 		"exporter-kube-dns.apiGroup": monitoring.APIVersion.Group,
 
 		"exporter-kube-etcd.enabled":  "false",
