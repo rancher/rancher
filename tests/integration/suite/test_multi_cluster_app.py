@@ -38,6 +38,7 @@ def test_mutliclusterapp_invalid_project(admin_mc):
         assert e.error.status == 422
 
 
+@pytest.mark.nonparallel
 def test_multiclusterapp_create_with_members(admin_mc, admin_pc,
                                              user_factory, remove_resource,
                                              ):
@@ -96,9 +97,13 @@ def test_multiclusterapp_create_with_members(admin_mc, admin_pc,
     # now user_not_member should be able to access this mcapp without
     # being explicitly added
     rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
+    split = mcapp.id.split(":")
+    name = split[1]
+    rb_name = name + "-m-r"
     wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
-                                         'system:authenticated'),
-             timeout=60, fail_handler=fail_handler('rolebinding'))
+                                         'system:authenticated', rb_name),
+             timeout=60, fail_handler=lambda:
+             'failed to check updated rolebinding')
 
     mcapp = user_not_member.client.by_id_multi_cluster_app(id)
     assert mcapp is not None

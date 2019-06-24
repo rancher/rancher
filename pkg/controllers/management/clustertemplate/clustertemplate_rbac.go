@@ -3,6 +3,7 @@ package clustertemplate
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -44,6 +45,7 @@ func registerRbacControllers(ctx context.Context, mgmt *config.ManagementContext
 	ct.clusterTemplates.AddHandler(ctx, "cluster-template-rbac-controller", ct.sync)
 
 	ctr := clusterTemplateRevisionController{
+		managementContext:             mgmt,
 		clusterTemplateRevisions:      mgmt.Management.ClusterTemplateRevisions(""),
 		clusterTemplateRevisionLister: mgmt.Management.ClusterTemplateRevisions("").Controller().Lister(),
 		clusterTemplateLister:         mgmt.Management.ClusterTemplates("").Controller().Lister(),
@@ -95,17 +97,17 @@ func (ctr *clusterTemplateRevisionController) sync(key string, clusterTemplateRe
 	if !ok {
 		return clusterTemplateRev, fmt.Errorf("clusterTemplateRevision %v has no creatorId annotation", metaAccessor.GetName())
 	}
-
 	// get members field from clusterTemplate
-	clusterTemplateName, ok := clusterTemplateRev.Labels[ctLabel]
-	if !ok {
-		return clusterTemplateRev, fmt.Errorf("clustertemplate revision created without setting clustertemplate label")
+	split := strings.SplitN(clusterTemplateRev.Spec.ClusterTemplateName, ":", 2)
+	if len(split) != 2 {
+		return nil, fmt.Errorf("error in splitting clusterTemplate name %v", clusterTemplateRev.Spec.ClusterTemplateName)
 	}
-	clusterTemp, err := ctr.clusterTemplateLister.Get(namespace.GlobalNamespace, clusterTemplateName)
+	templateName := split[1]
+	clusterTemp, err := ctr.clusterTemplateLister.Get(namespace.GlobalNamespace, templateName)
 	if err != nil {
-		return clusterTemplateRev, err
+		return nil, err
 	}
-	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.ClusterTemplateResource, clusterTemplateRev.Name,
+	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.ClusterTemplateRevisionResource, clusterTemplateRev.Name,
 		globalnamespacerbac.RancherManagementAPIVersion, creatorID, []string{globalnamespacerbac.RancherManagementAPIVersion},
 		clusterTemplateRev.UID,
 		clusterTemp.Spec.Members, ctr.managementContext); err != nil {
