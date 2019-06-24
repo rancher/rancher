@@ -67,7 +67,7 @@ func (c *rtLifecycle) syncRT(template *v3.RoleTemplate, usedInProjects bool) err
 
 	if usedInProjects {
 		for _, rt := range roles {
-			for _, resource := range globalResourcesNeededInProjects {
+			for resource := range globalResourcesNeededInProjects {
 				verbs, err := c.m.checkForGlobalResourceRules(rt, resource)
 				if err != nil {
 					return err

@@ -5,8 +5,6 @@ import (
 	"reflect"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
@@ -18,11 +16,20 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const owner = "owner-user"
 
-var globalResourcesNeededInProjects = []string{"persistentvolumes", "storageclasses"}
+var globalResourcesNeededInProjects = map[string]map[string]bool{
+	"persistentvolumes": {
+		"":     true,
+		"core": true,
+	},
+	"storageclasses": {
+		"storage.k8s.io": true,
+	},
+}
 
 func newPRTBLifecycle(m *manager) *prtbLifecycle {
 	return &prtbLifecycle{m: m}
@@ -140,7 +147,7 @@ func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.Proj
 		roles = append(roles, role)
 
 		for _, rt := range rts {
-			for _, resource := range globalResourcesNeededInProjects {
+			for resource := range globalResourcesNeededInProjects {
 				verbs, err := p.m.checkForGlobalResourceRules(rt, resource)
 				if err != nil {
 					return err
@@ -313,8 +320,10 @@ func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource st
 	verbs := map[string]bool{}
 	for _, rule := range rules {
 		if (slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, "*")) && len(rule.ResourceNames) == 0 {
-			for _, v := range rule.Verbs {
-				verbs[v] = true
+			if checkGroup(resource, rule) {
+				for _, v := range rule.Verbs {
+					verbs[v] = true
+				}
 			}
 		}
 	}
@@ -368,6 +377,24 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 	}
 
 	return roleName, nil
+}
+
+func checkGroup(resource string, rule rbacv1.PolicyRule) bool {
+	if slice.ContainsString(rule.APIGroups, "*") {
+		return true
+	}
+
+	groups, ok := globalResourcesNeededInProjects[resource]
+	if !ok {
+		return false
+	}
+
+	for _, rg := range rule.APIGroups {
+		if _, ok := groups[rg]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func buildRule(resource string, verbs map[string]bool) rbacv1.PolicyRule {
