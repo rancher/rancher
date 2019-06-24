@@ -351,7 +351,7 @@ func (c *Controller) deleteS3Snapshot(b *v3.EtcdBackup) error {
 	}
 	var err error
 	var s3Client = &minio.Client{}
-	var creds = &credentials.Credentials{}
+	var creds *credentials.Credentials
 	var tr = &http.Transport{}
 	endpoint := b.Spec.BackupConfig.S3BackupConfig.Endpoint
 	bucketLookup := getBucketLookupType(endpoint)
