@@ -72,7 +72,7 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	istio.Register(ctx, cluster)
 	certsexpiration.Register(ctx, cluster)
 
-	if clusterRec.Spec.LocalClusterAuthEndpoint.Enabled {
+	if clusterRec.Spec.LocalClusterAuthEndpoint.Enabled && managementv3.ClusterConditionReady.IsTrue(clusterRec) {
 		err := clusterauthtoken.CRDSetup(ctx, cluster.UserOnlyContext())
 		if err != nil {
 			return err
