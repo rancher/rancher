@@ -12,7 +12,6 @@ import (
 
 func TestValidateFragments(t *testing.T) {
 
-	customTags := make(map[string]string)
 	projectWrap := ProjectLoggingTemplateWrap{
 		ContainerLogSourceTag: loggingconfig.ProjectLevel,
 		LoggingCommonField:    v3.LoggingCommonField{},
@@ -24,7 +23,7 @@ func TestValidateFragments(t *testing.T) {
 	}
 	// case:
 	// 1. custom tags key include valid custom key value, expected validate success
-	customTags = map[string]string{
+	customTags := map[string]string{
 		"key": "value",
 	}
 	if err := compareCustomTags(clusterWrap, projectWrap, customTags, ""); err != nil {
