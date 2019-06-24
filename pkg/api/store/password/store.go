@@ -80,7 +80,7 @@ func SetPasswordStore(schemas *types.Schemas, secretStore v1.SecretInterface, ns
 			pwdStore.Fields[id] = data
 			schema.Store = pwdStore
 			ans, _ := json.Marshal(data)
-			logrus.Infof("password fields %s", string(ans))
+			logrus.Debugf("password fields %s", string(ans))
 		}
 	}
 }
