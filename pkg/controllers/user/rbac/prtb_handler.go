@@ -5,8 +5,6 @@ import (
 	"reflect"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
@@ -18,10 +16,13 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const owner = "owner-user"
 
+// When adding to this list the apiGroup of the resource needs to be accounted
+// for in the for loop in checkForGlobalResourceRules
 var globalResourcesNeededInProjects = []string{"persistentvolumes", "storageclasses"}
 
 func newPRTBLifecycle(m *manager) *prtbLifecycle {
@@ -313,8 +314,14 @@ func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource st
 	verbs := map[string]bool{}
 	for _, rule := range rules {
 		if (slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, "*")) && len(rule.ResourceNames) == 0 {
-			for _, v := range rule.Verbs {
-				verbs[v] = true
+			// When adding a resource to globalResourcesNeededInProjects this check needs to be updated.
+			// This is currently hard coded to keep the code cleaner but if things need to be added perhaps
+			// the checks need to be changed to be dynamic
+			if (resource == "persistentvolumes" && (slice.ContainsString(rule.APIGroups, "") || slice.ContainsString(rule.APIGroups, "core"))) ||
+				(resource == "storageclasses" && slice.ContainsString(rule.APIGroups, "storage.k8s.io")) {
+				for _, v := range rule.Verbs {
+					verbs[v] = true
+				}
 			}
 		}
 	}
