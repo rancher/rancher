@@ -16,6 +16,7 @@ suite/test_default_roles.py
 suite/test_dns.py
 suite/test_dynamic_schemas.py
 suite/test_globaldns.py
+suite/test_hpa.py
 suite/test_ingress.py
 suite/test_kontainer_drivers.py
 suite/test_kontainer_engine_annotations.py

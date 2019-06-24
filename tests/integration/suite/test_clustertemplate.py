@@ -9,22 +9,24 @@ rb_resource = 'rolebinding'
 
 
 def test_create_cluster_template_with_revision(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc, remove_resource, [])
+    cluster_template = create_cluster_template(admin_mc.client,
+                                               remove_resource, [])
     templateId = cluster_template.id
     _ = \
-        create_cluster_template_revision(admin_mc, templateId)
+        create_cluster_template_revision(admin_mc.client, templateId)
     _ = \
-        create_cluster_template_revision(admin_mc, templateId)
+        create_cluster_template_revision(admin_mc.client, templateId)
     client = admin_mc.client
     template_reloaded = client.by_id_cluster_template(cluster_template.id)
     assert template_reloaded.links.revisions is not None
 
 
 def test_check_default_revision(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc, remove_resource, [])
+    cluster_template = create_cluster_template(admin_mc.client,
+                                               remove_resource, [])
     templateId = cluster_template.id
     first_revision = \
-        create_cluster_template_revision(admin_mc, templateId)
+        create_cluster_template_revision(admin_mc.client, templateId)
     client = admin_mc.client
     wait_for_default_revision(client, templateId, first_revision.id)
     # delete the cluster template revision, it should error out
@@ -34,11 +36,12 @@ def test_check_default_revision(admin_mc, remove_resource):
 
 
 def test_create_cluster_with_template(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc, remove_resource, [])
+    cluster_template = create_cluster_template(admin_mc.client,
+                                               remove_resource, [])
     templateId = cluster_template.id
 
     template_revision = \
-        create_cluster_template_revision(admin_mc, templateId)
+        create_cluster_template_revision(admin_mc.client, templateId)
 
     # create a cluster with this template
     answers = {
@@ -70,10 +73,11 @@ def test_create_cluster_with_template(admin_mc, remove_resource):
 
 
 def test_create_cluster_validations(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc, remove_resource, [])
+    cluster_template = create_cluster_template(admin_mc.client,
+                                               remove_resource, [])
     templateId = cluster_template.id
     template_revision = \
-        create_cluster_template_revision(admin_mc, templateId)
+        create_cluster_template_revision(admin_mc.client, templateId)
     # create a cluster with this template
     revId = template_revision.id
     client = admin_mc.client
@@ -87,6 +91,7 @@ def test_create_cluster_validations(admin_mc, remove_resource):
         assert e.value.error.status == 500
 
 
+@pytest.mark.nonparallel
 def test_create_cluster_template_with_members(admin_mc, remove_resource,
                                               user_factory):
     client = admin_mc.client
@@ -96,19 +101,22 @@ def test_create_cluster_template_with_members(admin_mc, remove_resource,
     remove_resource(user_not_member)
     members = [{"userPrincipalId": "local://" + user_member.user.id,
                 "accessType": "read-only"}]
-    cluster_template = create_cluster_template(admin_mc, remove_resource,
-                                               members)
-    time.sleep(60)
+    cluster_template = create_cluster_template(admin_mc.client,
+                                               remove_resource, members)
+    time.sleep(30)
     # check who has access to the cluster template
     # admin and user_member should be able to list it
     id = cluster_template.id
     ct = client.by_id_cluster_template(id)
     assert ct is not None
     rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
+    split = cluster_template.id.split(":")
+    name = split[1]
+    rb_name = name + "-ct-r"
     wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
-                                         user_member.user.id),
+                                         user_member.user.id, rb_name),
              timeout=60,
-             fail_handler=fail_handler(rb_resource))
+             fail_handler=lambda: "failed to check rolebinding")
     um_client = user_member.client
     ct = um_client.by_id_cluster_template(id)
     assert ct is not None
@@ -125,17 +133,51 @@ def test_create_cluster_template_with_members(admin_mc, remove_resource,
                     "accessType": "read-only"}, {"groupPrincipalId": "*"}]
     client.update(ct, members=new_members)
 
+    split = cluster_template.id.split(":")
+    name = split[1]
+    rb_name = name + "-ct-r"
     wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
-                                         'system:authenticated'),
+                                         'system:authenticated', rb_name),
              timeout=60,
              fail_handler=fail_handler(rb_resource))
-    time.sleep(60)
+    time.sleep(30)
     ct = user_not_member.client.by_id_cluster_template(id)
     assert ct is not None
 
 
-def create_cluster_template(admin_mc, remove_resource, members):
-    client = admin_mc.client
+def test_creation_standard_user(admin_mc, remove_resource, user_factory):
+    user_member = user_factory()
+    remove_resource(user_member)
+    um_client = user_member.client
+    cluster_template = create_cluster_template(um_client, remove_resource,
+                                               [])
+    id = cluster_template.id
+    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
+    split = cluster_template.id.split(":")
+    name = split[1]
+    rb_name = name + "-ct-a"
+    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
+                                         user_member.user.id, rb_name),
+             timeout=60,
+             fail_handler=fail_handler(rb_resource))
+    ct = um_client.by_id_cluster_template(id)
+    assert ct is not None
+
+    templateId = cluster_template.id
+    template_revision = \
+        create_cluster_template_revision(um_client, templateId)
+    split = template_revision.id.split(":")
+    name = split[1]
+    rb_name = name + "-ctr-a"
+    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
+                                         user_member.user.id, rb_name),
+             timeout=60,
+             fail_handler=fail_handler(rb_resource))
+    ctr = um_client.by_id_cluster_template_revision(template_revision.id)
+    assert ctr is not None
+
+
+def create_cluster_template(client, remove_resource, members):
     template_name = random_str()
 
     cluster_template = \
@@ -147,8 +189,7 @@ def create_cluster_template(admin_mc, remove_resource, members):
     return cluster_template
 
 
-def create_cluster_template_revision(admin_mc, clusterTemplateId):
-    client = admin_mc.client
+def create_cluster_template_revision(client, clusterTemplateId):
     rke_config = getRKEConfig()
 
     cluster_config = {
@@ -260,7 +301,7 @@ def wait_for_cluster_to_be_deleted(client, clusterId, timeout=45):
         interval *= 2
 
 
-def wait_for_default_revision(client, templateId, revisionId, timeout=45):
+def wait_for_default_revision(client, templateId, revisionId, timeout=60):
     updated = False
     interval = 0.5
     start = time.time()
