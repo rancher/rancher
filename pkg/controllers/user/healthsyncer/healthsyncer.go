@@ -1,6 +1,7 @@
 package healthsyncer
 
 import (
+	"fmt"
 	"time"
 
 	"context"
@@ -74,6 +75,12 @@ func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
 	sort.Slice(cluster.Status.ComponentStatuses, func(i, j int) bool {
 		return cluster.Status.ComponentStatuses[i].Name < cluster.Status.ComponentStatuses[j].Name
 	})
+	// Individual componentstatus are checked here to make sure the function doesn't retrun before they are updated in the cluster object
+	for _, cs := range cses.Items {
+		if failed, csError := checkComponentFailure(cs); failed {
+			return condition.Error("ComponentHealthCheckFailure", fmt.Errorf("component check failed for [%s]: %s", cs.Name, csError))
+		}
+	}
 	return nil
 }
 
@@ -127,4 +134,13 @@ func convertToClusterComponentStatus(cs *v1.ComponentStatus) *v3.ClusterComponen
 		Name:       cs.Name,
 		Conditions: cs.Conditions,
 	}
+}
+
+func checkComponentFailure(cs v1.ComponentStatus) (bool, string) {
+	for _, cond := range cs.Conditions {
+		if cond.Status != v1.ConditionTrue {
+			return true, cond.Message
+		}
+	}
+	return false, ""
 }
