@@ -33,20 +33,6 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			want:     map[string]bool{"put": true},
 		},
 		{
-			name: "valid_api_group_persistentvolumes",
-			role: &v3.RoleTemplate{
-				Rules: []v1.PolicyRule{
-					{
-						Verbs:     []string{"put"},
-						APIGroups: []string{"*"},
-						Resources: []string{"persistentvolumes"},
-					},
-				},
-			},
-			resource: "persistentvolumes",
-			want:     map[string]bool{"put": true},
-		},
-		{
 			name: "invalid_api_group_persistentvolumes",
 			role: &v3.RoleTemplate{
 				Rules: []v1.PolicyRule{
@@ -89,7 +75,7 @@ func Test_manager_checkForGlobalResourceRules(t *testing.T) {
 			want:     map[string]bool{},
 		},
 		{
-			name: "valid_api_group_star",
+			name: "valid_api_group_start",
 			role: &v3.RoleTemplate{
 				Rules: []v1.PolicyRule{
 					{
