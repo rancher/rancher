@@ -12,14 +12,20 @@ import (
 )
 
 func Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
+	unauthedError := httperror.NewAPIError(httperror.PermissionDenied, "unauthorized")
+
 	if request.Method == http.MethodPost {
 		id := ""
 
 		// extracting project name from data
 		if projectData, ok := data["projectId"].(string); ok {
-			if projectParts := strings.Split(projectData, ":"); len(projectParts) > 1 {
+			if projectParts := strings.Split(projectData, ":"); len(projectParts) == 2 {
 				id = fmt.Sprintf("%s:%s", projectParts[1], data["name"])
 			}
+		}
+
+		if id == "" {
+			return unauthedError
 		}
 
 		// minimum info needed to use CanDo
@@ -31,7 +37,7 @@ func Validator(request *types.APIContext, schema *types.Schema, data map[string]
 
 		// update is used here to avoid the application of general user permissions for secrets
 		if err := request.AccessControl.CanDo(v1.SecretGroupVersionKind.Group, v1.SecretResource.Name, "update", request, secretState, schema); err != nil {
-			return httperror.NewAPIError(httperror.PermissionDenied, "unauthorized")
+			return unauthedError
 		}
 	} else if request.Method == http.MethodPut {
 		var secretState map[string]interface{}
@@ -44,7 +50,7 @@ func Validator(request *types.APIContext, schema *types.Schema, data map[string]
 		}
 		// this is unused but will be necessary if readonly users are ever given permission to view secrets
 		if err := request.AccessControl.CanDo(v1.SecretGroupVersionKind.Group, v1.SecretResource.Name, "update", request, secretState, schema); err != nil {
-			return httperror.NewAPIError(httperror.PermissionDenied, "unauthorized")
+			return unauthedError
 		}
 	}
 	return nil
