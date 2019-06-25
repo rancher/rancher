@@ -73,3 +73,32 @@ tests:
   - equal:
       path: spec.template.spec.containers[1].image
       value: my.private.repo:5000/rancher/busybox:1.0.1
+- it: should not have command arg "--no-cacerts" when using private CA
+  set:
+    privateCA: "true"
+  asserts:
+  - notContains:
+      path: spec.template.spec.containers[0].args
+      content: "--no-cacerts"
+- it: should not have command arg "--no-cacerts" when using default (rancher) ingress TLS
+  set:
+    tls: "ingress"
+  asserts:
+  - notContains:
+      path: spec.template.spec.containers[0].args
+      content: "--no-cacerts"
+- it: should have command arg "--no-cacerts" when using letsEncrypt ingress TLS
+  set:
+    tls: "ingress"
+    ingress.tls.source: "letsEncrypt"
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].args
+      content: "--no-cacerts"
+- it: should have command arg "--no-cacerts" when using external TLS
+  set:
+    tls: "external"
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].args
+      content: "--no-cacerts"
