@@ -397,6 +397,8 @@ def test_multiclusterapp_revision_access(admin_mc, admin_pc, remove_resource,
     wait_for_app(admin_pc, mcapp_name, 60)
 
     mcapp_revisions = user_client.list_multi_cluster_app_revision()
+    if len(mcapp_revisions) != 1:
+        print(mcapp_revisions)
     assert len(mcapp_revisions) == 1
 
 
