@@ -18,7 +18,7 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/util"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/client-go/util/cert"
@@ -367,8 +367,8 @@ func DownloadEtcdSnapshotFromS3(ctx context.Context, etcdHost *hosts.Host, prsMa
 		},
 		Image: etcdSnapshotImage,
 	}
-	if s3Backend.EndpointCA != "" {
-		caStr := base64.StdEncoding.EncodeToString([]byte(s3Backend.EndpointCA))
+	if s3Backend.CustomCA != "" {
+		caStr := base64.StdEncoding.EncodeToString([]byte(s3Backend.CustomCA))
 		imageCfg.Cmd = append(imageCfg.Cmd, "--s3-endpoint-ca="+caStr)
 	}
 	hostCfg := &container.HostConfig{
@@ -556,8 +556,8 @@ func configS3BackupImgCmd(ctx context.Context, imageCfg *container.Config, bc *v
 			"--s3-bucketName=" + bc.S3BackupConfig.BucketName,
 			"--s3-region=" + bc.S3BackupConfig.Region,
 		}...)
-		if bc.S3BackupConfig.EndpointCA != "" {
-			caStr := base64.StdEncoding.EncodeToString([]byte(bc.S3BackupConfig.EndpointCA))
+		if bc.S3BackupConfig.CustomCA != "" {
+			caStr := base64.StdEncoding.EncodeToString([]byte(bc.S3BackupConfig.CustomCA))
 			cmd = append(cmd, "--s3-endpoint-ca="+caStr)
 		}
 	}

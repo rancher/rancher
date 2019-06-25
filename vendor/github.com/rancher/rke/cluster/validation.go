@@ -148,8 +148,8 @@ func validateEtcdBackupOptions(c *Cluster) error {
 			if len(c.Services.Etcd.BackupConfig.S3BackupConfig.BucketName) == 0 {
 				return fmt.Errorf("etcd s3 backup backend bucketName can't be empty")
 			}
-			if len(c.Services.Etcd.BackupConfig.S3BackupConfig.EndpointCA) != 0 {
-				if isValid, err := pki.IsValidCertStr(c.Services.Etcd.BackupConfig.S3BackupConfig.EndpointCA); !isValid {
+			if len(c.Services.Etcd.BackupConfig.S3BackupConfig.CustomCA) != 0 {
+				if isValid, err := pki.IsValidCertStr(c.Services.Etcd.BackupConfig.S3BackupConfig.CustomCA); !isValid {
 					return fmt.Errorf("invalid S3 endpoint CA certificate: %v", err)
 				}
 			}
