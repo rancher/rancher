@@ -35,7 +35,9 @@ const (
 	KubeletDockerConfigFileEnv = "RKE_KUBELET_DOCKER_FILE"
 	KubeletDockerConfigPath    = "/var/lib/kubelet/config.json"
 
-	EtcdChangedEnvVersion = "v3.3.0"
+	// MaxEtcdOldEnvVersion The versions are maxed out for minor versions because -rancher1 suffix will cause semver to think its older, example: v1.15.0 > v1.15.0-rancher1
+	MaxEtcdOldEnvVersion = "v3.2.99"
+	MaxK8s115Version     = "v1.15"
 )
 
 var admissionControlOptionNames = []string{"enable-admission-plugins", "admission-control"}
@@ -381,7 +383,6 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 
 	CommandArgs := map[string]string{
 		"address":                           "0.0.0.0",
-		"allow-privileged":                  "true",
 		"anonymous-auth":                    "false",
 		"authentication-token-webhook":      "true",
 		"cgroups-per-qos":                   "True",
@@ -431,6 +432,11 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 			c.Services.Kubelet.ExtraEnv,
 			fmt.Sprintf("%s=%s", KubeletDockerConfigFileEnv, path.Join(prefixPath, KubeletDockerConfigPath)))
 	}
+	// allow-privileged is removed in k8s 1.15
+	if c.Version < MaxK8s115Version {
+		CommandArgs["allow-privileged"] = "true"
+	}
+
 	// check if our version has specific options for this component
 	serviceOptions := c.GetKubernetesServicesOptions()
 	if serviceOptions.Kubelet != nil {
@@ -778,7 +784,7 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, pr
 	if err != nil {
 		logrus.Warn(err)
 	}
-	etcdChangedEnvSemVer, err := util.StrToSemVer(EtcdChangedEnvVersion)
+	maxEtcdOldEnvSemVer, err := util.StrToSemVer(MaxEtcdOldEnvVersion)
 	if err != nil {
 		logrus.Warn(err)
 	}
@@ -791,11 +797,11 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, pr
 	Env = append(Env, fmt.Sprintf("ETCDCTL_KEY=%s", pki.GetKeyPath(nodeName)))
 
 	// Apply old configuration to avoid replacing etcd container
-	if etcdSemVer.LessThan(*etcdChangedEnvSemVer) {
-		logrus.Debugf("Version [%s] is less than version [%s]", etcdSemVer, etcdChangedEnvSemVer)
+	if etcdSemVer.LessThan(*maxEtcdOldEnvSemVer) {
+		logrus.Debugf("Version [%s] is less than version [%s]", etcdSemVer, maxEtcdOldEnvSemVer)
 		Env = append(Env, fmt.Sprintf("ETCDCTL_ENDPOINT=https://%s:2379", listenAddress))
 	} else {
-		logrus.Debugf("Version [%s] is equal or higher than version [%s]", etcdSemVer, etcdChangedEnvSemVer)
+		logrus.Debugf("Version [%s] is equal or higher than version [%s]", etcdSemVer, maxEtcdOldEnvSemVer)
 		// Point etcdctl to localhost in case we have listen all (0.0.0.0) configured
 		if listenAddress == "0.0.0.0" {
 			Env = append(Env, "ETCDCTL_ENDPOINTS=https://127.0.0.1:2379")

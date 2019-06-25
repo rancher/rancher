@@ -212,7 +212,7 @@ func (c *Cluster) doWeaveDeploy(ctx context.Context) error {
 func (c *Cluster) getNetworkPluginManifest(pluginConfig map[string]interface{}) (string, error) {
 	switch c.Network.Plugin {
 	case FlannelNetworkPlugin:
-		return templates.CompileTemplateFromMap(templates.FlannelTemplate, pluginConfig)
+		return templates.CompileTemplateFromMap(templates.GetVersionedTemplates(FlannelNetworkPlugin, c.Version), pluginConfig)
 	case CalicoNetworkPlugin:
 		return templates.CompileTemplateFromMap(templates.GetVersionedTemplates(CalicoNetworkPlugin, c.Version), pluginConfig)
 	case CanalNetworkPlugin:
