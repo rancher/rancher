@@ -137,7 +137,7 @@ func setS3OptionsFromCLI(c *cli.Context) *v3.S3BackupConfig {
 		if err != nil {
 			logrus.Warnf("Failed to read s3-endpoint-ca [%s]: %v", endpointCA, err)
 		} else {
-			s3BackupBackend.EndpointCA = caStr
+			s3BackupBackend.CustomCA = caStr
 		}
 	}
 	return s3BackupBackend
