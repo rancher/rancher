@@ -35,8 +35,8 @@ type S3BackupConfig struct {
 	Region string `yaml:"region" json:"region,omitempty"`
 	// Endpoint is used if this is not an AWS API
 	Endpoint string `yaml:"endpoint" json:"endpoint"`
-	// EndpointCA is used to connect to custom s3 endpoints
-	EndpointCA string `yaml:"endpoint_ca" json:"endpointCa,omitempty"`
+	// CustomCA is used to connect to custom s3 endpoints
+	CustomCA string `yaml:"custom_ca" json:"customCa,omitempty"`
 }
 type EtcdBackup struct {
 	types.Namespaced

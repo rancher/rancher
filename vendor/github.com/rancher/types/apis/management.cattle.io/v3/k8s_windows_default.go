@@ -59,6 +59,15 @@ var (
 				"resolv-conf":              "",
 			},
 		},
+		"v1.15": {
+			Kubelet: map[string]string{
+				"tls-cipher-suites":        "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+				"feature-gates":            "HyperVContainer=true",
+				"cgroups-per-qos":          "false",
+				"enforce-node-allocatable": "",
+				"resolv-conf":              "",
+			},
+		},
 	}
 
 	// AllK8sWindowsVersions - images map for 2.0
@@ -353,6 +362,12 @@ var (
 			CalicoCNIBinaries:  m("rancher/calico-cni:v0.0.1-nanoserver-1803"),
 			CanalCNIBinaries:   m("rancher/canal-cni:v0.0.1-nanoserver-1803"),
 			KubeletPause:       m("rancher/kubelet-pause:v0.0.1-nanoserver-1803"),
+		},
+		"v1.15.0-rancher1-1": {
+			// NginxProxy image is replaced by host running nginx, fixed rancher#16074
+			KubernetesBinaries: m("rancher/hyperkube:v1.15.0-rancher1"),
+			FlannelCNIBinaries: m("rancher/flannel-cni:v0.3.0-rancher4"),
+			KubeletPause:       m("rancher/kubelet-pause:v0.1.2"),
 		},
 	}
 )
