@@ -167,10 +167,10 @@ type GoogleOauthConfig struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	AuthConfig        `json:",inline" mapstructure:",squash"`
 
-	OauthCredential          string `json:"oauthCredential,omitempty" norman:"required,type=password"`
-	ServiceAccountCredential string `json:"serviceAccountCredential,omitempty" norman:"required,type=password"`
-	AdminEmail               string `json:"adminEmail,omitempty"`
-	Hostname                 string `json:"hostname,omitempty" norman:"required,noupdate"`
+	OauthCredential          string `json:"oauthCredential,omitempty" norman:"required,type=password,notnullable"`
+	ServiceAccountCredential string `json:"serviceAccountCredential,omitempty" norman:"required,type=password,notnullable"`
+	AdminEmail               string `json:"adminEmail,omitempty" norman:"required,notnullable"`
+	Hostname                 string `json:"hostname,omitempty" norman:"required,notnullable,noupdate"`
 	UserInfoEndpoint         string `json:"userInfoEndpoint" norman:"default=https://openidconnect.googleapis.com/v1/userinfo,required,notnullable"`
 }
 
