@@ -67,7 +67,6 @@ func (csh *cisScanHandler) Remove(cs *v3.ClusterScan) (runtime.Object, error) {
 		if !kerrors.IsNotFound(err) {
 			return cs, fmt.Errorf("cisScanHandler: Remove: error deleting cm=%v", cs.Name)
 		}
-		return cs, nil
 	}
 
 	if err := csh.deleteApp(cs.Name); err != nil {

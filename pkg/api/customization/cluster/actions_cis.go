@@ -66,6 +66,13 @@ func (a ActionHandler) runCISScan(actionName string, action *types.Action, apiCo
 			break
 		}
 		time.Sleep(RetryIntervalInMilliseconds * time.Millisecond)
+		cluster, err = a.ClusterClient.Get(apiContext.ID, v1.GetOptions{})
+		if err != nil {
+			logrus.Errorf("error fetching cluster with id %v: %v", apiContext.ID, err)
+			continue
+		}
+		updatedCluster = cluster.DeepCopy()
+		updatedCluster.Annotations[cis.RunCISScanAnnotation] = cisScan.Name
 	}
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.ServerError, "failed to update cluster annotation for cis scan")
