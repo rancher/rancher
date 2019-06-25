@@ -135,6 +135,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&KontainerDriverList{},
 		&EtcdBackup{},
 		&EtcdBackupList{},
+		&ClusterScan{},
+		&ClusterScanList{},
 		&MonitorMetric{},
 		&MonitorMetricList{},
 		&ClusterMonitorGraph{},

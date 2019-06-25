@@ -71,6 +71,7 @@ type Interface interface {
 	GlobalDNSProvidersGetter
 	KontainerDriversGetter
 	EtcdBackupsGetter
+	ClusterScansGetter
 	MonitorMetricsGetter
 	ClusterMonitorGraphsGetter
 	ProjectMonitorGraphsGetter
@@ -133,6 +134,7 @@ type Clients struct {
 	GlobalDNSProvider                       GlobalDNSProviderClient
 	KontainerDriver                         KontainerDriverClient
 	EtcdBackup                              EtcdBackupClient
+	ClusterScan                             ClusterScanClient
 	MonitorMetric                           MonitorMetricClient
 	ClusterMonitorGraph                     ClusterMonitorGraphClient
 	ProjectMonitorGraph                     ProjectMonitorGraphClient
@@ -197,6 +199,7 @@ type Client struct {
 	globalDnsProviderControllers                       map[string]GlobalDNSProviderController
 	kontainerDriverControllers                         map[string]KontainerDriverController
 	etcdBackupControllers                              map[string]EtcdBackupController
+	clusterScanControllers                             map[string]ClusterScanController
 	monitorMetricControllers                           map[string]MonitorMetricController
 	clusterMonitorGraphControllers                     map[string]ClusterMonitorGraphController
 	projectMonitorGraphControllers                     map[string]ProjectMonitorGraphController
@@ -391,6 +394,9 @@ func NewClientsFromInterface(iface Interface) *Clients {
 		EtcdBackup: &etcdBackupClient2{
 			iface: iface.EtcdBackups(""),
 		},
+		ClusterScan: &clusterScanClient2{
+			iface: iface.ClusterScans(""),
+		},
 		MonitorMetric: &monitorMetricClient2{
 			iface: iface.MonitorMetrics(""),
 		},
@@ -476,6 +482,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		globalDnsProviderControllers:                       map[string]GlobalDNSProviderController{},
 		kontainerDriverControllers:                         map[string]KontainerDriverController{},
 		etcdBackupControllers:                              map[string]EtcdBackupController{},
+		clusterScanControllers:                             map[string]ClusterScanController{},
 		monitorMetricControllers:                           map[string]MonitorMetricController{},
 		clusterMonitorGraphControllers:                     map[string]ClusterMonitorGraphController{},
 		projectMonitorGraphControllers:                     map[string]ProjectMonitorGraphController{},
@@ -1154,6 +1161,19 @@ type EtcdBackupsGetter interface {
 func (c *Client) EtcdBackups(namespace string) EtcdBackupInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &EtcdBackupResource, EtcdBackupGroupVersionKind, etcdBackupFactory{})
 	return &etcdBackupClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type ClusterScansGetter interface {
+	ClusterScans(namespace string) ClusterScanInterface
+}
+
+func (c *Client) ClusterScans(namespace string) ClusterScanInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &ClusterScanResource, ClusterScanGroupVersionKind, clusterScanFactory{})
+	return &clusterScanClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

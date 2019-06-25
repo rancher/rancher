@@ -22,6 +22,7 @@ steps:
   image: rancher/dapper:1.11.2
   commands:
   - dapper build
+  - ls -lR dist/artifacts
   environment:
     CROSS: 1
   privileged: true

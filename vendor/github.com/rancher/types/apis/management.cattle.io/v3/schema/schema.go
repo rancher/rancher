@@ -40,6 +40,7 @@ var (
 		Init(globalDNSTypes).
 		Init(kontainerTypes).
 		Init(etcdBackupTypes).
+		Init(clusterScanTypes).
 		Init(monitorTypes).
 		Init(credTypes).
 		Init(mgmtSecretTypes).
@@ -227,6 +228,7 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 				Input:  "rotateCertificateInput",
 				Output: "rotateCertificateOutput",
 			}
+			schema.ResourceActions[v3.ClusterActionRunCISScan] = types.Action{}
 		})
 }
 
@@ -831,4 +833,11 @@ func clusterTemplateTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v3.ClusterTemplateRevision{}, m.Drop{Field: "namespaceId"}).
 		MustImport(&Version, v3.ClusterTemplate{}).
 		MustImport(&Version, v3.ClusterTemplateRevision{})
+}
+
+func clusterScanTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.MustImportAndCustomize(&Version, v3.ClusterScan{}, func(schema *types.Schema) {
+		schema.CollectionMethods = []string{http.MethodGet}
+		schema.ResourceMethods = []string{http.MethodGet, http.MethodDelete}
+	})
 }
