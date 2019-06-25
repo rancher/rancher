@@ -349,8 +349,8 @@ func (c *Controller) deleteS3Snapshot(b *v3.EtcdBackup) error {
 	if err != nil {
 		return err
 	}
-	if b.Spec.BackupConfig.S3BackupConfig.EndpointCA != "" {
-		tr = getCustomCATransport(b.Spec.BackupConfig.S3BackupConfig.EndpointCA)
+	if b.Spec.BackupConfig.S3BackupConfig.CustomCA != "" {
+		tr = getCustomCATransport(b.Spec.BackupConfig.S3BackupConfig.CustomCA)
 		s3Client.SetCustomTransport(tr)
 	}
 
