@@ -2,7 +2,9 @@ package watcher
 
 import (
 	"context"
+	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/rancher/norman/controller"
@@ -10,8 +12,12 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/rancher/pkg/ticker"
+	"github.com/rancher/types/apis/apps/v1beta2"
+	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -28,14 +34,19 @@ const (
 )
 
 type WorkloadWatcher struct {
-	workloadController     workload.CommonController
-	alertManager           *manager.AlertManager
-	projectAlertPolicies   v3.ProjectAlertRuleInterface
-	projectAlertRuleLister v3.ProjectAlertRuleLister
-	clusterName            string
-	clusterLister          v3.ClusterLister
-	projectLister          v3.ProjectLister
-	namespaceIndexer       cache.Indexer
+	workloadController          workload.CommonController
+	alertManager                *manager.AlertManager
+	projectAlertPolicies        v3.ProjectAlertRuleInterface
+	projectAlertRuleLister      v3.ProjectAlertRuleLister
+	clusterName                 string
+	clusterLister               v3.ClusterLister
+	projectLister               v3.ProjectLister
+	namespaceIndexer            cache.Indexer
+	replicationControllerLister v1.ReplicationControllerLister
+	replicaSetLister            v1beta2.ReplicaSetLister
+	daemonsetLister             v1beta2.DaemonSetLister
+	deploymentLister            v1beta2.DeploymentLister
+	statefulsetLister           v1beta2.StatefulSetLister
 }
 
 func StartWorkloadWatcher(ctx context.Context, cluster *config.UserContext, manager *manager.AlertManager) {
@@ -46,14 +57,19 @@ func StartWorkloadWatcher(ctx context.Context, cluster *config.UserContext, mana
 	nsInformer.AddIndexers(nsIndexers)
 	projectAlerts := cluster.Management.Management.ProjectAlertRules("")
 	d := &WorkloadWatcher{
-		projectAlertPolicies:   projectAlerts,
-		projectAlertRuleLister: projectAlerts.Controller().Lister(),
-		workloadController:     workload.NewWorkloadController(ctx, cluster.UserOnlyContext(), nil),
-		alertManager:           manager,
-		clusterName:            cluster.ClusterName,
-		clusterLister:          cluster.Management.Management.Clusters("").Controller().Lister(),
-		projectLister:          cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
-		namespaceIndexer:       nsInformer.GetIndexer(),
+		projectAlertPolicies:        projectAlerts,
+		projectAlertRuleLister:      projectAlerts.Controller().Lister(),
+		workloadController:          workload.NewWorkloadController(ctx, cluster.UserOnlyContext(), nil),
+		alertManager:                manager,
+		clusterName:                 cluster.ClusterName,
+		clusterLister:               cluster.Management.Management.Clusters("").Controller().Lister(),
+		projectLister:               cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
+		namespaceIndexer:            nsInformer.GetIndexer(),
+		replicationControllerLister: cluster.Core.ReplicationControllers(metav1.NamespaceAll).Controller().Lister(),
+		replicaSetLister:            cluster.Apps.ReplicaSets(metav1.NamespaceAll).Controller().Lister(),
+		daemonsetLister:             cluster.Apps.DaemonSets(metav1.NamespaceAll).Controller().Lister(),
+		deploymentLister:            cluster.Apps.Deployments(metav1.NamespaceAll).Controller().Lister(),
+		statefulsetLister:           cluster.Apps.StatefulSets(metav1.NamespaceAll).Controller().Lister(),
 	}
 
 	go d.watch(ctx, syncInterval)
@@ -140,10 +156,13 @@ func (w *WorkloadWatcher) checkWorkloadCondition(wl *workload.Workload, alert *v
 	if percentage == 0 {
 		return
 	}
-
-	availableThreshold := int32(percentage) * (wl.Status.Replicas) / 100
-
-	if wl.Status.AvailableReplicas < availableThreshold {
+	desiredReplicas, err := w.getDesiredReplicas(fmt.Sprintf("%s:%s:%s", wl.Kind, wl.Namespace, wl.Name))
+	if err != nil {
+		logrus.Errorf("Failed to get workload %s desired replicas %v", wl.Name, err)
+		return
+	}
+	availableThreshold := float32(percentage) * float32(desiredReplicas) / 100
+	if float32(wl.Status.AvailableReplicas) < availableThreshold {
 		ruleID := common.GetRuleID(alert.Spec.GroupName, alert.Name)
 
 		clusterDisplayName := common.GetClusterDisplayName(w.clusterName, w.clusterLister)
@@ -162,11 +181,63 @@ func (w *WorkloadWatcher) checkWorkloadCondition(wl *workload.Workload, alert *v
 		data["workload_kind"] = wl.Kind
 		data["available_percentage"] = strconv.Itoa(percentage)
 		data["available_replicas"] = strconv.Itoa(int(wl.Status.AvailableReplicas))
-		data["desired_replicas"] = strconv.Itoa(int(wl.Status.Replicas))
+		data["desired_replicas"] = strconv.Itoa(int(desiredReplicas))
 
 		if err := w.alertManager.SendAlert(data); err != nil {
 			logrus.Errorf("Failed to send alert: %v", err)
 		}
 	}
 
+}
+
+func (w *WorkloadWatcher) getDesiredReplicas(workloadName string) (int32, error) {
+	var desiredReplicas int32
+	splitted := strings.Split(workloadName, ":")
+	if len(splitted) != 3 {
+		return desiredReplicas, errors.New("invalid workloadName: " + workloadName)
+	}
+	workloadType := strings.ToLower(splitted[0])
+	namespace := splitted[1]
+	name := splitted[2]
+	switch workloadType {
+	case workload.ReplicationControllerType:
+		o, err := w.replicationControllerLister.Get(namespace, name)
+		if err != nil {
+			return desiredReplicas, err
+		}
+		if o.Spec.Replicas != nil {
+			return *o.Spec.Replicas, nil
+		}
+	case workload.ReplicaSetType:
+		o, err := w.replicaSetLister.Get(namespace, name)
+		if err != nil {
+			return desiredReplicas, err
+		}
+		if o.Spec.Replicas != nil {
+			return *o.Spec.Replicas, nil
+		}
+	case workload.DaemonSetType:
+		o, err := w.daemonsetLister.Get(namespace, name)
+		if err != nil {
+			return desiredReplicas, err
+		}
+		return o.Status.DesiredNumberScheduled, nil
+	case workload.StatefulSetType:
+		o, err := w.statefulsetLister.Get(namespace, name)
+		if err != nil {
+			return desiredReplicas, err
+		}
+		if o.Spec.Replicas != nil {
+			return *o.Spec.Replicas, nil
+		}
+	default:
+		o, err := w.deploymentLister.Get(namespace, name)
+		if err != nil {
+			return desiredReplicas, err
+		}
+		if o.Spec.Replicas != nil {
+			return *o.Spec.Replicas, nil
+		}
+	}
+	return desiredReplicas, errors.New("empty replicas")
 }
