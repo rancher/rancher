@@ -124,13 +124,13 @@ func DeployApp(mgmtAppClient projv3.AppInterface, projectID string, createOrUpda
 	return rtn, nil
 }
 
-func DetectAppCatalogExistence(appCatalogID string, cattleTemplateVersionsClient v3.CatalogTemplateVersionInterface) error {
+func DetectAppCatalogExistence(appCatalogID string, cattleTemplateVersionsLister v3.CatalogTemplateVersionLister) error {
 	templateVersionID, templateVersionNamespace, err := common.ParseExternalID(appCatalogID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to parse catalog ID %q", appCatalogID)
 	}
 
-	_, err = cattleTemplateVersionsClient.GetNamespaced(templateVersionNamespace, templateVersionID, metav1.GetOptions{})
+	_, err = cattleTemplateVersionsLister.Get(templateVersionNamespace, templateVersionID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to find catalog by ID %q", appCatalogID)
 	}

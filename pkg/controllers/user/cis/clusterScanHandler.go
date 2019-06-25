@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	rcorev1 "github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -23,7 +23,7 @@ type cisScanHandler struct {
 	mgmtCtxClusterClient         v3.ClusterInterface
 	mgmtCtxProjClient            v3.ProjectInterface
 	mgmtCtxAppClient             projv3.AppInterface
-	mgmtCtxTemplateVersionClient v3.CatalogTemplateVersionInterface
+	mgmtCtxTemplateVersionLister v3.CatalogTemplateVersionLister
 	mgmtCtxClusterScanClient     v3.ClusterScanInterface
 	userCtx                      *config.UserContext
 	userCtxNSClient              rcorev1.NamespaceInterface
@@ -119,7 +119,7 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 
 func (csh *cisScanHandler) deployApp(clusterName, appName string) error {
 	appCatalogID := settings.SystemCISBenchmarkCatalogID.Get()
-	err := utils.DetectAppCatalogExistence(appCatalogID, csh.mgmtCtxTemplateVersionClient)
+	err := utils.DetectAppCatalogExistence(appCatalogID, csh.mgmtCtxTemplateVersionLister)
 	if err != nil {
 		return errors.Wrapf(err, "cisScanHandler: deployApp: failed to find cis system catalog %q", appCatalogID)
 	}

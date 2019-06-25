@@ -2,8 +2,8 @@ package cis
 
 import (
 	"context"
-	"github.com/rancher/rancher/pkg/systemaccount"
 
+	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,7 +22,7 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 	userNSClient := userContext.Core.Namespaces(metav1.NamespaceAll)
 	mgmtProjClient := mgmtContext.Management.Projects(clusterName)
 	mgmtAppClient := mgmtContext.Project.Apps(metav1.NamespaceAll)
-	mgmtTemplateVersionClient := mgmtContext.Management.CatalogTemplateVersions(metav1.NamespaceAll)
+	mgmtTemplateVersionLister := mgmtContext.Management.CatalogTemplateVersions(metav1.NamespaceAll).Controller().Lister()
 	systemAccountManager := systemaccount.NewManager(mgmtContext)
 
 	mgmtClusterClient := mgmtContext.Management.Clusters(metav1.NamespaceAll)
@@ -41,7 +41,7 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 		mgmtCtxClusterClient:         mgmtClusterClient,
 		mgmtCtxProjClient:            mgmtProjClient,
 		mgmtCtxAppClient:             mgmtAppClient,
-		mgmtCtxTemplateVersionClient: mgmtTemplateVersionClient,
+		mgmtCtxTemplateVersionLister: mgmtTemplateVersionLister,
 		mgmtCtxClusterScanClient:     mgmtClusterScanClient,
 		systemAccountManager:         systemAccountManager,
 		userCtx:                      userContext,

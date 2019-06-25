@@ -2,12 +2,12 @@ package clusterscan
 
 import (
 	"encoding/json"
-	"github.com/rancher/norman/types/convert"
 	"net/http"
 	"strconv"
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/user/cis"
 	"github.com/rancher/rancher/pkg/ref"

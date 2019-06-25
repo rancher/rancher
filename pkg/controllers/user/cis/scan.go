@@ -2,9 +2,10 @@ package cis
 
 import (
 	"fmt"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"time"
+
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (

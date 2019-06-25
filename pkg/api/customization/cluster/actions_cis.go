@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	mgmtclient "github.com/rancher/types/client/management/v3"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
