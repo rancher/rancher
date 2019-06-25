@@ -30,6 +30,7 @@ const (
 	ClusterActionBackupEtcd            = "backupEtcd"
 	ClusterActionRestoreFromEtcdBackup = "restoreFromEtcdBackup"
 	ClusterActionRotateCertificates    = "rotateCertificates"
+	ClusterActionRunCISScan            = "runSecurityScan"
 
 	// ClusterConditionReady Cluster ready to serve API (healthy when true, unhealthy when false)
 	ClusterConditionReady          condition.Cond = "Ready"

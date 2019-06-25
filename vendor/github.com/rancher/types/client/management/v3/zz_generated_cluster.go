@@ -142,6 +142,8 @@ type ClusterOperations interface {
 
 	ActionRotateCertificates(resource *Cluster, input *RotateCertificateInput) (*RotateCertificateOutput, error)
 
+	ActionRunSecurityScan(resource *Cluster) error
+
 	ActionViewMonitoring(resource *Cluster) (*MonitoringOutput, error)
 }
 
@@ -243,6 +245,11 @@ func (c *ClusterClient) ActionRotateCertificates(resource *Cluster, input *Rotat
 	resp := &RotateCertificateOutput{}
 	err := c.apiClient.Ops.DoAction(ClusterType, "rotateCertificates", &resource.Resource, input, resp)
 	return resp, err
+}
+
+func (c *ClusterClient) ActionRunSecurityScan(resource *Cluster) error {
+	err := c.apiClient.Ops.DoAction(ClusterType, "runSecurityScan", &resource.Resource, nil, nil)
+	return err
 }
 
 func (c *ClusterClient) ActionViewMonitoring(resource *Cluster) (*MonitoringOutput, error) {
