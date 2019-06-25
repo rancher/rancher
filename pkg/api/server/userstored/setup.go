@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
 	namespacecustom "github.com/rancher/rancher/pkg/api/customization/namespace"
+	sec "github.com/rancher/rancher/pkg/api/customization/secret"
 	"github.com/rancher/rancher/pkg/api/customization/yaml"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/ingress"
@@ -111,10 +112,12 @@ func Service(ctx context.Context, schemas *types.Schemas, mgmt *config.ScaledCon
 func Secret(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) {
 	schema := schemas.Schema(&schema.Version, "namespacedSecret")
 	schema.Store = secret.NewNamespacedSecretStore(ctx, management.ClientGetter)
+	schema.Validator = sec.Validator
 
 	for _, subSchema := range schemas.Schemas() {
 		if subSchema.BaseType == schema.ID && subSchema.ID != schema.ID {
 			subSchema.Store = subtype.NewSubTypeStore(subSchema.ID, schema.Store)
+			subSchema.Validator = sec.Validator
 		}
 	}
 
