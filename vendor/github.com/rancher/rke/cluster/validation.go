@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/rancher/rke/log"
+	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/rke/util"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -146,6 +147,11 @@ func validateEtcdBackupOptions(c *Cluster) error {
 			}
 			if len(c.Services.Etcd.BackupConfig.S3BackupConfig.BucketName) == 0 {
 				return fmt.Errorf("etcd s3 backup backend bucketName can't be empty")
+			}
+			if len(c.Services.Etcd.BackupConfig.S3BackupConfig.EndpointCA) != 0 {
+				if isValid, err := pki.IsValidCertStr(c.Services.Etcd.BackupConfig.S3BackupConfig.EndpointCA); !isValid {
+					return fmt.Errorf("invalid S3 endpoint CA certificate: %v", err)
+				}
 			}
 		}
 	}
