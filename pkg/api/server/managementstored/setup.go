@@ -2,6 +2,7 @@ package managementstored
 
 import (
 	"context"
+	"github.com/rancher/rancher/pkg/api/customization/clusterscan"
 	"net/http"
 
 	"github.com/rancher/rancher/pkg/namespace"
@@ -80,6 +81,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ClusterMonitorGraphType,
 		client.ClusterRegistrationTokenType,
 		client.ClusterRoleTemplateBindingType,
+		client.ClusterScanType,
 		client.ClusterType,
 		client.ComposeConfigType,
 		client.DynamicSchemaType,
@@ -165,6 +167,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	Monitor(schemas, apiContext, clusterManager)
 	KontainerDriver(schemas, apiContext)
 	ClusterTemplates(schemas, apiContext)
+	ClusterScans(schemas, apiContext, clusterManager)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
@@ -231,6 +234,7 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 		ClusterManager:     clusterManager,
 		NodeTemplateGetter: managementContext.Management,
 		BackupClient:       managementContext.Management.EtcdBackups(""),
+		ClusterScanClient:  managementContext.Management.ClusterScans(""),
 	}
 
 	schema.ActionHandler = handler.ClusterActionHandler
@@ -728,4 +732,15 @@ func ClusterTemplates(schemas *types.Schemas, management *config.ScaledContext) 
 		NamespaceInterface: management.Core.Namespaces(""),
 	}
 	revisionSchema.Store = clustertemplatestore.WrapStore(revisionSchema.Store)
+}
+
+func ClusterScans(schemas *types.Schemas, management *config.ScaledContext, clusterManager *clustermanager.Manager) error {
+	clusterScanHandler := clusterscan.Handler{
+		ClusterManager: clusterManager,
+	}
+	schema := schemas.Schema(&managementschema.Version, client.ClusterScanType)
+	schema.Formatter = clusterscan.Formatter
+	schema.LinkHandler = clusterScanHandler.LinkHandler
+
+	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/project"
 	v1 "github.com/rancher/types/apis/core/v1"
@@ -14,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 func EnsureAppProjectName(userNSClient v1.NamespaceInterface, ownedProjectID, clusterName, appTargetNamespace string) (string, error) {
@@ -63,18 +65,14 @@ func EnsureAppProjectName(userNSClient v1.NamespaceInterface, ownedProjectID, cl
 	return appProjectName, nil
 }
 
-func GetSystemProjectID(cattleProjectsClient v3.ProjectInterface) (string, error) {
+func GetSystemProjectID(cattleProjectsLister v3.ProjectLister) (string, error) {
 	// fetch all system Projects
-	cattletSystemProjects, _ := cattleProjectsClient.List(metav1.ListOptions{
-		LabelSelector: "authz.management.cattle.io/system-project=true",
-	})
+	cattleSystemProjects, _ := cattleProjectsLister.List(metav1.NamespaceAll, labels.Set(project.SystemProjectLabel).AsSelector())
 
 	var systemProject *v3.Project
-	cattletSystemProjects = cattletSystemProjects.DeepCopy()
-	for _, defaultProject := range cattletSystemProjects.Items {
-		systemProject = &defaultProject
-
-		if defaultProject.Spec.DisplayName == project.System {
+	for _, p := range cattleSystemProjects {
+		if p.Spec.DisplayName == project.System {
+			systemProject = p
 			break
 		}
 	}
@@ -124,4 +122,33 @@ func DeployApp(mgmtAppClient projv3.AppInterface, projectID string, createOrUpda
 	}
 
 	return rtn, nil
+}
+
+func DetectAppCatalogExistence(appCatalogID string, cattleTemplateVersionsClient v3.CatalogTemplateVersionInterface) error {
+	templateVersionID, templateVersionNamespace, err := common.ParseExternalID(appCatalogID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to parse catalog ID %q", appCatalogID)
+	}
+
+	_, err = cattleTemplateVersionsClient.GetNamespaced(templateVersionNamespace, templateVersionID, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "failed to find catalog by ID %q", appCatalogID)
+	}
+
+	return nil
+}
+
+func DeleteApp(mgmtAppClient projv3.AppInterface, projectID, appName string) error {
+	app, err := mgmtAppClient.GetNamespaced(projectID, appName, metav1.GetOptions{})
+	if err != nil && !kerrors.IsNotFound(err) {
+		return errors.Wrapf(err, "failed to find app %s in project %v", appName, projectID)
+	}
+
+	if app.DeletionTimestamp == nil {
+		if err := mgmtAppClient.DeleteNamespaced(projectID, appName, &metav1.DeleteOptions{}); err != nil {
+			return errors.Wrapf(err, "failed to delete app %v", appName)
+		}
+	}
+
+	return nil
 }
