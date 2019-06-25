@@ -39,6 +39,10 @@ func EtcdCommand() cli.Command {
 			Value: s3Endpoint,
 		},
 		cli.StringFlag{
+			Name:  "s3-endpoint-ca",
+			Usage: "Specify a custom CA cert to connect to S3 endpoint",
+		},
+		cli.StringFlag{
 			Name:  "access-key",
 			Usage: "Specify s3 accessKey",
 		},
