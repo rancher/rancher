@@ -340,6 +340,7 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 				"alertmanager.apiGroup":               monitorutil.APIVersion.Group,
 				"alertmanager.enabledRBAC":            "false",
 				"alertmanager.configFromSecret":       secret.Name,
+				"operator.enabled":                    "false",
 			},
 			Description:     "Alertmanager for Rancher Monitoring",
 			ExternalID:      catalogID,

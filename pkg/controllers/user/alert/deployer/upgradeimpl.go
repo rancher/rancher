@@ -89,9 +89,6 @@ func (l *alertService) Upgrade(currentVersion string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if currentVersion == NewVersion {
-		return currentVersion, nil
-	}
 
 	appName, _ := monitorutil.ClusterAlertManagerInfo()
 	//migrate legacy
@@ -132,6 +129,7 @@ func (l *alertService) Upgrade(currentVersion string) (string, error) {
 	}
 	newApp := app.DeepCopy()
 	newApp.Spec.ExternalID = newCatalogID
+	newApp.Spec.Answers["operator.enabled"] = "false"
 
 	if !reflect.DeepEqual(newApp, app) {
 		if _, err = l.apps.Update(newApp); err != nil {
