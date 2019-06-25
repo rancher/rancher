@@ -23,6 +23,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
@@ -85,6 +86,14 @@ func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config
 	return scaledContext, manager, nil
 }
 
+func runOrDie(ctx context.Context, cfg *Config, client kubernetes.Interface, cb leader.Callback) {
+	if cfg.Embedded {
+		cb(ctx)
+	} else {
+		leader.RunOrDie(ctx, "", "cattle-controllers", client, cb)
+	}
+}
+
 func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 	scaledContext, clusterManager, err := buildScaledContext(ctx, kubeConfig, cfg)
 	if err != nil {
@@ -111,7 +120,7 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 		}
 	}
 
-	go leader.RunOrDie(ctx, "", "cattle-controllers", scaledContext.K8sClient, func(ctx context.Context) {
+	go runOrDie(ctx, cfg, scaledContext.K8sClient, func(ctx context.Context) {
 		if scaledContext.PeerManager != nil {
 			scaledContext.PeerManager.Leader()
 		}
