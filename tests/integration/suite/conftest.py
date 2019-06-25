@@ -126,6 +126,12 @@ def cluster_and_client(cluster_id, mgmt_client):
     return cluster, client
 
 
+def user_project_client(user, project):
+    """Returns a project level  client for the user"""
+    return rancher.Client(url=project.links.self+'/schemas', verify=False,
+                          token=user.client.token)
+
+
 @pytest.fixture
 def admin_pc_factory(admin_cc, remove_resource):
     """Returns a ProjectContext for a newly created project in the local
@@ -323,7 +329,11 @@ def remove_resource(admin_mc, request):
             try:
                 client.delete(resource)
             except ApiError as e:
-                if e.error.status != 404:
+                code = e.error.status
+                if code == 409 and "namespace will automatically be purged " \
+                        in e.error.message:
+                    pass
+                elif code != 404:
                     raise e
         request.addfinalizer(clean)
     return _cleanup
@@ -340,7 +350,11 @@ def wait_remove_resource(admin_mc, request, timeout=DEFAULT_TIMEOUT):
             try:
                 client.delete(resource)
             except ApiError as e:
-                if e.error.status != 404:
+                code = e.error.status
+                if code == 409 and "namespace will automatically be purged " \
+                        in e.error.message:
+                    pass
+                elif code != 404:
                     raise e
             wait_until(lambda: client.reload(resource) is None)
         request.addfinalizer(clean)

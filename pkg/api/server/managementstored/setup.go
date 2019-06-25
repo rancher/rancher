@@ -32,6 +32,7 @@ import (
 	projectaction "github.com/rancher/rancher/pkg/api/customization/project"
 	"github.com/rancher/rancher/pkg/api/customization/roletemplate"
 	"github.com/rancher/rancher/pkg/api/customization/roletemplatebinding"
+	"github.com/rancher/rancher/pkg/api/customization/secret"
 	"github.com/rancher/rancher/pkg/api/customization/setting"
 	appStore "github.com/rancher/rancher/pkg/api/store/app"
 	"github.com/rancher/rancher/pkg/api/store/cert"
@@ -359,11 +360,12 @@ func SecretTypes(ctx context.Context, schemas *types.Schemas, management *config
 		"v1",
 		"Secret",
 		"secrets")
-
+	secretSchema.Validator = secret.Validator
 	for _, subSchema := range schemas.SchemasForVersion(projectschema.Version) {
 		if subSchema.BaseType == projectclient.SecretType && subSchema.ID != projectclient.SecretType {
 			if subSchema.CanList(nil) == nil {
 				subSchema.Store = subtype.NewSubTypeStore(subSchema.ID, secretSchema.Store)
+				subSchema.Validator = secret.Validator
 			}
 		}
 	}
