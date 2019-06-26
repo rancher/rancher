@@ -271,7 +271,6 @@ func IsEtcdMember(ctx context.Context, etcdHost *hosts.Host, etcdHosts []*hosts.
 }
 
 func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdSnapshotImage string, name string, once bool, es v3.ETCDService) error {
-	log.Infof(ctx, "[etcd] Saving snapshot [%s] on host [%s]", name, etcdHost.Address)
 	backupCmd := "etcd-backup"
 	restartPolicy := "always"
 	imageCfg := &container.Config{
@@ -288,9 +287,11 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 		Image: etcdSnapshotImage,
 	}
 	if once {
+		log.Infof(ctx, "[etcd] Running snapshot save once on host [%s]", etcdHost.Address)
 		imageCfg.Cmd = append(imageCfg.Cmd, "--once")
 		restartPolicy = "no"
 	} else if es.BackupConfig == nil {
+		log.Infof(ctx, "[etcd] Running snapshot container [%s] on host [%s]", EtcdSnapshotOnceContainerName, etcdHost.Address)
 		imageCfg.Cmd = append(imageCfg.Cmd, "--retention="+es.Retention)
 		imageCfg.Cmd = append(imageCfg.Cmd, "--creation="+es.Creation)
 	}
