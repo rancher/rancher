@@ -370,6 +370,7 @@ def test_readonly_cannot_edit_secret(admin_mc, user_mc, admin_pc,
     assert e.value.error.status == 404
 
 
+@pytest.mark.parametrize('run_multiplpe', range(150))
 def test_member_can_edit_secret(admin_mc, admin_pc, remove_resource,
                                 user_mc):
     """Tests that a user with project-member role is able to create/update
