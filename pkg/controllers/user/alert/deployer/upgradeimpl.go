@@ -89,9 +89,6 @@ func (l *alertService) Upgrade(currentVersion string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if currentVersion == NewVersion {
-		return currentVersion, nil
-	}
 
 	appName, _ := monitorutil.ClusterAlertManagerInfo()
 	//migrate legacy
