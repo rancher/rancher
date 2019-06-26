@@ -154,7 +154,7 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 
 	appCatalogID := settings.SystemMonitoringCatalogID.Get()
 
-	appDeployProjectID, err := utils.GetSystemProjectID(app.cattleProjectClient)
+	appDeployProjectID, err := utils.GetSystemProjectID(app.projectLister)
 	if err != nil {
 		return errors.Wrap(err, "failed to get System Project ID")
 	}
