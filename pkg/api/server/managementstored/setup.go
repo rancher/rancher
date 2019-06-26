@@ -716,6 +716,7 @@ func ClusterTemplates(schemas *types.Schemas, management *config.ScaledContext) 
 		ClusterTemplateRevisionLister: management.Management.ClusterTemplateRevisions("").Controller().Lister(),
 		ClusterTemplateRevisions:      management.Management.ClusterTemplateRevisions(""),
 	}
+	wrapper.ClusterTemplateQuestions = wrapper.BuildQuestionsFromSchema(schemas.Schema(&managementschema.Version, client.ClusterSpecBaseType), schemas, "")
 
 	schema := schemas.Schema(&managementschema.Version, client.ClusterTemplateType)
 	schema.Store = &globalresource.GlobalNamespaceStore{
@@ -733,6 +734,8 @@ func ClusterTemplates(schemas *types.Schemas, management *config.ScaledContext) 
 		NamespaceInterface: management.Core.Namespaces(""),
 	}
 	revisionSchema.Store = clustertemplatestore.WrapStore(revisionSchema.Store)
+	revisionSchema.CollectionFormatter = wrapper.CollectionFormatter
+	revisionSchema.ActionHandler = wrapper.ClusterTemplateRevisionsActionHandler
 }
 
 func ClusterScans(schemas *types.Schemas, management *config.ScaledContext, clusterManager *clustermanager.Manager) error {
