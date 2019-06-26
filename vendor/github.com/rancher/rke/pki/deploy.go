@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
@@ -94,15 +93,15 @@ func doRunDeployer(ctx context.Context, host *hosts.Host, containerEnv []string,
 		},
 		Privileged: true,
 	}
-	resp, err := host.DClient.ContainerCreate(ctx, imageCfg, hostCfg, nil, CrtDownloaderContainer)
+	_, err = docker.CreateContainer(ctx, host.DClient, host.Address, CrtDownloaderContainer, imageCfg, hostCfg)
 	if err != nil {
 		return fmt.Errorf("Failed to create Certificates deployer container on host [%s]: %v", host.Address, err)
 	}
 
-	if err := host.DClient.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+	if err := docker.StartContainer(ctx, host.DClient, host.Address, CrtDownloaderContainer); err != nil {
 		return fmt.Errorf("Failed to start Certificates deployer container on host [%s]: %v", host.Address, err)
 	}
-	logrus.Debugf("[certificates] Successfully started Certificate deployer container: %s", resp.ID)
+	logrus.Debugf("[certificates] Successfully started Certificate deployer container: %s", CrtDownloaderContainer)
 	for {
 		isDeployerRunning, err := docker.IsContainerRunning(ctx, host.DClient, host.Address, CrtDownloaderContainer, false)
 		if err != nil {
@@ -112,7 +111,7 @@ func doRunDeployer(ctx context.Context, host *hosts.Host, containerEnv []string,
 			time.Sleep(5 * time.Second)
 			continue
 		}
-		if err := host.DClient.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{RemoveVolumes: true}); err != nil {
+		if err := docker.RemoveContainer(ctx, host.DClient, host.Address, CrtDownloaderContainer); err != nil {
 			return fmt.Errorf("Failed to delete Certificates deployer container on host [%s]: %v", host.Address, err)
 		}
 		return nil
