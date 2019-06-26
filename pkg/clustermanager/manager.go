@@ -23,6 +23,7 @@ import (
 	"github.com/rancher/types/config/dialer"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -133,8 +134,10 @@ func (m *Manager) startController(r *record, controllers, clusterOwner bool) err
 	if !controllers {
 		return nil
 	}
-
-	if _, err := r.cluster.K8sClient.Discovery().ServerVersion(); err != nil {
+	// Prior to k8s v1.14, we simply did a DiscoveryClient.Version() check to see if the user cluster is alive
+	// As of k8s v1.14, kubeapi returns a successfull version response even if etcd is not available.
+	// To work around this, now we try to get a namespace from the API, even if not found, it means the API is up.
+	if _, err := r.cluster.K8sClient.CoreV1().Namespaces().Get("kube-system", v1.GetOptions{}); err != nil && !apierrors.IsNotFound(err) {
 		return errors.Wrapf(err, "failed to contact server")
 	}
 
