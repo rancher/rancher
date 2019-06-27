@@ -6,6 +6,7 @@ import (
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/namespace"
 	corev1 "github.com/rancher/types/apis/core/v1"
@@ -38,16 +39,20 @@ type Store struct {
 }
 
 func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-	for kind, fields := range TypeToFields {
-		for _, field := range fields {
-			if val, ok := data[field]; ok {
-				val := convert.ToString(val)
-				if err := common.CreateOrUpdateSecrets(s.Secrets, val, strings.ToLower(field), strings.ToLower(kind)); err != nil {
-					return nil, fmt.Errorf("error creating secret for %s:%s", kind, field)
-				}
-				data[field] = fmt.Sprintf("%s:%s-%s", namespace.GlobalNamespace, strings.ToLower(kind), strings.ToLower(field))
-				break
+	authType, found := values.GetValue(data, "type")
+	if !found {
+		return nil, fmt.Errorf("invalid data for auth store update")
+	}
+
+	kind := convert.ToString(authType)
+	fields := TypeToFields[kind]
+	for _, field := range fields {
+		if val, ok := data[field]; ok {
+			val := convert.ToString(val)
+			if err := common.CreateOrUpdateSecrets(s.Secrets, val, strings.ToLower(field), strings.ToLower(kind)); err != nil {
+				return nil, fmt.Errorf("error creating secret for %s:%s", kind, field)
 			}
+			data[field] = fmt.Sprintf("%s:%s-%s", namespace.GlobalNamespace, strings.ToLower(kind), strings.ToLower(field))
 		}
 	}
 	return s.Store.Update(apiContext, schema, data, id)
