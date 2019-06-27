@@ -23,6 +23,7 @@ import (
 	"github.com/rancher/rancher/pkg/nodeconfig"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
+	"github.com/rancher/rancher/pkg/taints"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -39,6 +40,10 @@ import (
 const (
 	defaultEngineInstallURL = "https://releases.rancher.com/install-docker/17.03.2.sh"
 	amazonec2               = "amazonec2"
+)
+
+var (
+	falseValue = false
 )
 
 // aliases maps Schema field => driver field
@@ -103,6 +108,7 @@ func (m *Lifecycle) setupCustom(obj *v3.Node) {
 		Labels:           obj.Spec.CustomConfig.Label,
 		Port:             "22",
 		Role:             roles(obj),
+		Taints:           taints.GetTaintsFromStrings(obj.Spec.CustomConfig.Taints),
 	}
 
 	if obj.Status.NodeConfig.User == "" {
@@ -115,6 +121,9 @@ func (m *Lifecycle) setupCustom(obj *v3.Node) {
 			Address: obj.Status.NodeConfig.Address,
 		},
 	}
+
+	obj.Spec.DesiredNodeTaints = obj.Status.NodeConfig.Taints
+	obj.Spec.UpdateTaintsFromAPI = &falseValue
 }
 
 func isCustom(obj *v3.Node) bool {
@@ -490,6 +499,11 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 
 	if len(obj.Status.NodeConfig.Role) == 0 {
 		obj.Status.NodeConfig.Role = []string{"worker"}
+	}
+
+	if len(template.Spec.NodeTaints) > 0 {
+		obj.Spec.DesiredNodeTaints = append(obj.Spec.DesiredNodeTaints, template.Spec.NodeTaints...)
+		obj.Spec.UpdateTaintsFromAPI = &falseValue
 	}
 
 	return obj, nil

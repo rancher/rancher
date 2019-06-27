@@ -27,6 +27,7 @@ var (
 		Key:    "node.kubernetes.io/unreachable",
 		Effect: "NoExecute",
 	}
+	falseValue = false
 )
 
 type Controller struct {
@@ -121,6 +122,11 @@ func (c *Controller) createNode(name string, nodePool *v3.NodePool, simulate boo
 			NodePoolName:      ref.Ref(nodePool),
 			RequestedHostname: name,
 		},
+	}
+
+	if len(nodePool.Spec.NodeTaints) > 0 {
+		newNode.Spec.DesiredNodeTaints = append(newNode.Spec.DesiredNodeTaints, nodePool.Spec.NodeTaints...)
+		newNode.Spec.UpdateTaintsFromAPI = &falseValue
 	}
 
 	if simulate {

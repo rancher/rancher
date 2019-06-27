@@ -86,6 +86,9 @@ func format(data map[string]interface{}) {
 	data["currentNodeAnnotations"] = map[string]string{apiUpdate: "true"}
 	data["desiredNodeLabels"] = data["labels"]
 	data["desiredNodeAnnotations"] = data["annotations"]
+	data["desiredNodeTaints"] = data["taints"]
+	trueValue := true
+	data["updateTaintsFromAPI"] = &trueValue
 }
 
 func setState(data map[string]interface{}) {

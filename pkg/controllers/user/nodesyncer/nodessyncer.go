@@ -94,6 +94,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "machinesLabelSyncer", m.syncLabels)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "cordonFieldsSyncer", m.syncCordonFields)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "drainNodeSyncer", d.drainNode)
+	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "machineTaintSyncer", m.syncTaints)
 }
 
 func (n *nodeSyncer) sync(key string, node *corev1.Node) (runtime.Object, error) {

@@ -16,6 +16,7 @@ func TokenAndURL() (string, string, error) {
 
 func Params() map[string]interface{} {
 	labels := parseLabel(os.Getenv("CATTLE_NODE_LABEL"))
+	taints := split(os.Getenv("CATTLE_NODE_TAINTS"))
 	roles := split(os.Getenv("CATTLE_ROLE"))
 	params := map[string]interface{}{
 		"customConfig": map[string]interface{}{
@@ -23,6 +24,7 @@ func Params() map[string]interface{} {
 			"internalAddress": os.Getenv("CATTLE_INTERNAL_ADDRESS"),
 			"roles":           split(os.Getenv("CATTLE_ROLE")),
 			"label":           labels,
+			"taints":          taints,
 		},
 		"etcd":              slice.ContainsString(roles, "etcd"),
 		"controlPlane":      slice.ContainsString(roles, "controlplane"),
