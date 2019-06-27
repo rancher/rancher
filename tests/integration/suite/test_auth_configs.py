@@ -1,5 +1,7 @@
 import pytest
 from rancher import ApiError
+from kubernetes.client import CoreV1Api
+from .conftest import wait_for
 
 
 def test_auth_configs(admin_mc):
@@ -81,3 +83,30 @@ def test_auth_configs(admin_mc):
 
     assert googleoauth.actions.configureTest
     assert googleoauth.actions.testAndApply
+
+
+def test_auth_config_secrets(admin_mc):
+    client = admin_mc.client
+    key_data = {
+        "spKey": "-----BEGIN PRIVATE KEY-----",
+    }
+    ping_config = client.by_id_auth_config("ping")
+    client.update(ping_config, key_data)
+    k8sclient = CoreV1Api(admin_mc.k8s_client)
+    # wait for ping secret to get created
+    wait_for(lambda: key_secret_creation(k8sclient), timeout=60,
+             fail_handler=lambda: "failed to create secret for ping spKey")
+
+    secrets = k8sclient.list_namespaced_secret("cattle-global-data")
+    auth_configs_not_setup = ["adfsconfig-spkey", "oktaconfig-spkey",
+                              "keycloakconfig-spkey"]
+    for s in secrets.items:
+        assert s.metadata.name not in auth_configs_not_setup
+
+
+def key_secret_creation(k8sclient):
+    secrets = k8sclient.list_namespaced_secret("cattle-global-data")
+    for s in secrets.items:
+        if s.metadata.name == "pingconfig-spkey":
+            return True
+    return False
