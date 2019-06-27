@@ -13,6 +13,7 @@ import (
 
 	"github.com/rancher/norman/pkg/remotedialer"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/taints"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	client "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
@@ -128,6 +129,7 @@ func (t *Authorizer) Authorize(req *http.Request) (*Client, bool, error) {
 			node = node.DeepCopy()
 			node.Status.NodeConfig.Address = input.Node.CustomConfig.Address
 			node.Status.NodeConfig.InternalAddress = input.Node.CustomConfig.InternalAddress
+			node.Status.NodeConfig.Taints = taints.GetTaintsFromStrings(input.Node.CustomConfig.Taints)
 		}
 		return &Client{
 			Cluster: cluster,

@@ -119,6 +119,7 @@ export CATTLE_SERVER
 export CATTLE_TOKEN
 export CATTLE_NODE_LABEL
 export CATTLE_WRITE_CERT_ONLY
+export CATTLE_NODE_TAINTS
 
 while true; do
     case "$1" in
@@ -136,6 +137,7 @@ while true; do
         -i | --internal-address) shift; CATTLE_INTERNAL_ADDRESS=$1  ;;
         -l | --label)            shift; CATTLE_NODE_LABEL+=",$1"    ;;
         -o | --only-write-certs)        CATTLE_WRITE_CERT_ONLY=true ;;
+        --taints)                shift; CATTLE_NODE_TAINTS+=",$1"   ;;
         *) break;
     esac
     shift
