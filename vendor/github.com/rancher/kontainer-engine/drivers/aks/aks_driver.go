@@ -2,6 +2,7 @@ package aks
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -975,14 +976,17 @@ func (d *Driver) ensureLogAnalyticsWorkspaceForMonitoring(ctx context.Context, c
 
 	workspaceName := state.LogAnalyticsWorkspace
 	if workspaceName == "" {
-		workspaceName = fmt.Sprintf("%s-%s-%s", state.ResourceGroup, state.SubscriptionID, workspaceRegionCode)
+		workspaceName = fmt.Sprintf("%s-%s", state.ResourceGroup, workspaceRegionCode)
+	}
+	if len(workspaceName) > 63 {
+		workspaceName = generateUniqueLogWorkspace(workspaceName)
 	}
 
 	if gotRet, gotErr := client.Get(ctx, workspaceResourceGroup, workspaceName); gotErr == nil {
 		return *gotRet.ID, nil
 	}
 
-	logrus.Info("Create Azure Log Analytics Workspace %q on Resource Group %q", workspaceName, workspaceResourceGroup)
+	logrus.Infof("Create Azure Log Analytics Workspace %q on Resource Group %q", workspaceName, workspaceResourceGroup)
 
 	asyncRet, asyncErr := client.CreateOrUpdate(ctx, workspaceResourceGroup, workspaceName, operationalinsights.Workspace{
 		Location: to.StringPtr(workspaceRegion),
@@ -1393,4 +1397,13 @@ func (d *Driver) GetK8SCapabilities(ctx context.Context, _ *types.DriverOptions)
 			HealthCheckSupported: true,
 		},
 	}, nil
+}
+
+func generateUniqueLogWorkspace(workspaceName string) string {
+	s := workspaceName[0:46]
+	h := sha256.New()
+	h.Write([]byte(workspaceName))
+	hexHash := h.Sum(nil)
+	shaString := fmt.Sprintf("%x", hexHash)
+	return fmt.Sprintf("%s-%s", s, shaString[0:16])
 }
