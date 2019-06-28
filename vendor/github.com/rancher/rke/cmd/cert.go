@@ -94,7 +94,7 @@ func rotateRKECertificatesFromCli(ctx *cli.Context) error {
 	if err := ClusterInit(context.Background(), rkeConfig, hosts.DialersOptions{}, externalFlags); err != nil {
 		return err
 	}
-	_, _, _, _, _, err = ClusterUp(context.Background(), hosts.DialersOptions{}, externalFlags)
+	_, _, _, _, _, err = ClusterUp(context.Background(), hosts.DialersOptions{}, externalFlags, map[string]interface{}{})
 	return err
 }
 
@@ -126,7 +126,7 @@ func showRKECertificatesFromCli(ctx *cli.Context) error {
 
 func rebuildClusterWithRotatedCertificates(ctx context.Context,
 	dialersOptions hosts.DialersOptions,
-	flags cluster.ExternalFlags) (string, string, string, string, map[string]pki.CertificatePKI, error) {
+	flags cluster.ExternalFlags, svcOptions *v3.KubernetesServicesOptions) (string, string, string, string, map[string]pki.CertificatePKI, error) {
 	var APIURL, caCrt, clientCert, clientKey string
 	log.Infof(ctx, "Rebuilding Kubernetes cluster with rotated certificates")
 	clusterState, err := cluster.ReadStateFile(ctx, cluster.GetStateFilePath(flags.ClusterFilePath, flags.ConfigDir))
@@ -179,7 +179,7 @@ func rebuildClusterWithRotatedCertificates(ctx context.Context,
 	}
 	if isLegacyKubeAPI {
 		log.Infof(ctx, "[controlplane] Redeploying controlplane to update kubeapi parameters")
-		if err := kubeCluster.DeployControlPlane(ctx); err != nil {
+		if err := kubeCluster.DeployControlPlane(ctx, svcOptions); err != nil {
 			return APIURL, caCrt, clientCert, clientKey, nil, err
 		}
 	}

@@ -11,7 +11,7 @@ import (
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/urfave/cli"
 	"k8s.io/client-go/util/cert"
 )
@@ -75,21 +75,21 @@ func UpCommand() cli.Command {
 	}
 }
 
-func ClusterUp(ctx context.Context, dialersOptions hosts.DialersOptions, flags cluster.ExternalFlags) (string, string, string, string, map[string]pki.CertificatePKI, error) {
+func ClusterUp(ctx context.Context, dialersOptions hosts.DialersOptions, flags cluster.ExternalFlags, data map[string]interface{}) (string, string, string, string, map[string]pki.CertificatePKI, error) {
 	var APIURL, caCrt, clientCert, clientKey string
 
 	clusterState, err := cluster.ReadStateFile(ctx, cluster.GetStateFilePath(flags.ClusterFilePath, flags.ConfigDir))
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
-
 	kubeCluster, err := cluster.InitClusterObject(ctx, clusterState.DesiredState.RancherKubernetesEngineConfig.DeepCopy(), flags)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
+	svcOptions, _ := data["k8s-service-options"].(*v3.KubernetesServicesOptions)
 	// check if rotate certificates is triggered
 	if kubeCluster.RancherKubernetesEngineConfig.RotateCertificates != nil {
-		return rebuildClusterWithRotatedCertificates(ctx, dialersOptions, flags)
+		return rebuildClusterWithRotatedCertificates(ctx, dialersOptions, flags, svcOptions)
 	}
 
 	log.Infof(ctx, "Building Kubernetes cluster")
@@ -130,7 +130,7 @@ func ClusterUp(ctx context.Context, dialersOptions hosts.DialersOptions, flags c
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
 
-	err = cluster.ReconcileCluster(ctx, kubeCluster, currentCluster, flags)
+	err = cluster.ReconcileCluster(ctx, kubeCluster, currentCluster, flags, svcOptions)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
@@ -143,7 +143,7 @@ func ClusterUp(ctx context.Context, dialersOptions hosts.DialersOptions, flags c
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
 
-	err = kubeCluster.DeployControlPlane(ctx)
+	err = kubeCluster.DeployControlPlane(ctx, svcOptions)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
@@ -164,7 +164,7 @@ func ClusterUp(ctx context.Context, dialersOptions hosts.DialersOptions, flags c
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
 
-	err = kubeCluster.DeployWorkerPlane(ctx)
+	err = kubeCluster.DeployWorkerPlane(ctx, svcOptions)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
@@ -178,7 +178,7 @@ func ClusterUp(ctx context.Context, dialersOptions hosts.DialersOptions, flags c
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
 
-	err = cluster.ConfigureCluster(ctx, kubeCluster.RancherKubernetesEngineConfig, kubeCluster.Certificates, flags, dialersOptions, false)
+	err = cluster.ConfigureCluster(ctx, kubeCluster.RancherKubernetesEngineConfig, kubeCluster.Certificates, flags, dialersOptions, data, false)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
@@ -239,7 +239,7 @@ func clusterUpFromCli(ctx *cli.Context) error {
 		return err
 	}
 
-	_, _, _, _, _, err = ClusterUp(context.Background(), hosts.DialersOptions{}, flags)
+	_, _, _, _, _, err = ClusterUp(context.Background(), hosts.DialersOptions{}, flags, map[string]interface{}{})
 	return err
 }
 
@@ -270,7 +270,7 @@ func clusterUpLocal(ctx *cli.Context) error {
 	if err := ClusterInit(context.Background(), rkeConfig, dialers, flags); err != nil {
 		return err
 	}
-	_, _, _, _, _, err = ClusterUp(context.Background(), dialers, flags)
+	_, _, _, _, _, err = ClusterUp(context.Background(), dialers, flags, map[string]interface{}{})
 	return err
 }
 
@@ -298,7 +298,7 @@ func clusterUpDind(ctx *cli.Context) error {
 		return err
 	}
 	// start cluster
-	_, _, _, _, _, err = ClusterUp(context.Background(), dialers, flags)
+	_, _, _, _, _, err = ClusterUp(context.Background(), dialers, flags, map[string]interface{}{})
 	return err
 }
 

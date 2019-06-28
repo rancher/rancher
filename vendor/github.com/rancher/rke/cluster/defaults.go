@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"github.com/rancher/rke/metadata"
 	"strings"
 
 	"github.com/rancher/rke/cloudprovider"
@@ -24,8 +25,6 @@ const (
 	DefaultClusterDomain         = "cluster.local"
 	DefaultClusterName           = "local"
 	DefaultClusterSSHKeyPath     = "~/.ssh/id_rsa"
-
-	DefaultK8sVersion = v3.DefaultK8s
 
 	DefaultSSHPort        = "22"
 	DefaultDockerSockPath = "/var/run/docker.sock"
@@ -137,7 +136,7 @@ func (c *Cluster) setClusterDefaults(ctx context.Context, flags ExternalFlags) e
 		c.ClusterName = DefaultClusterName
 	}
 	if len(c.Version) == 0 {
-		c.Version = DefaultK8sVersion
+		c.Version = metadata.DefaultK8sVersion
 	}
 	if c.AddonJobTimeout == 0 {
 		c.AddonJobTimeout = k8s.DefaultTimeout
@@ -229,7 +228,7 @@ func (c *Cluster) setClusterServicesDefaults() {
 func (c *Cluster) setClusterImageDefaults() error {
 	var privRegURL string
 
-	imageDefaults, ok := v3.AllK8sVersions[c.Version]
+	imageDefaults, ok := metadata.K8sVersionToRKESystemImages[c.Version]
 	if !ok {
 		return nil
 	}

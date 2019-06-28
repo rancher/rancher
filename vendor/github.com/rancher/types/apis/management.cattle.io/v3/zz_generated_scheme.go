@@ -151,6 +151,14 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterTemplateList{},
 		&ClusterTemplateRevision{},
 		&ClusterTemplateRevisionList{},
+		&RKEK8sSystemImage{},
+		&RKEK8sSystemImageList{},
+		&RKEK8sServiceOption{},
+		&RKEK8sServiceOptionList{},
+		&RKEAddon{},
+		&RKEAddonList{},
+		&RKEK8sWindowsSystemImage{},
+		&RKEK8sWindowsSystemImageList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
