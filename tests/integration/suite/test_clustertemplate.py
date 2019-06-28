@@ -62,6 +62,8 @@ def test_create_cluster_with_template(admin_mc, remove_resource):
     remove_resource(cluster)
     assert cluster.conditions[0].type == 'Pending'
     assert cluster.conditions[0].status == 'True'
+    k8s_version = cluster.rancherKubernetesEngineConfig.kubernetesVersion
+    assert k8s_version != "v1.13.x"
 
     # delete the cluster template, it should error out
     with pytest.raises(ApiError) as e:
@@ -311,7 +313,7 @@ def getRKEConfig():
         "ignoreDockerVersion": "true",
         "sshAgentAuth": "false",
         "type": "rancherKubernetesEngineConfig",
-        "kubernetesVersion": "v1.13.5-rancher1-3",
+        "kubernetesVersion": "1.13.x",
         "authentication": {
             "strategy": "x509",
             "type": "authnConfig"

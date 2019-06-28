@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/blang/semver"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse/builder"
@@ -174,11 +175,14 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		}
 	}
 
-	setKubernetesVersion(data)
+	err := setKubernetesVersion(data)
+	if err != nil {
+		return nil, err
+	}
 	// enable local backups for rke clusters by default
 	enableLocalBackup(data)
 
-	data, err := r.transposeDynamicFieldToGenericConfig(data)
+	data, err = r.transposeDynamicFieldToGenericConfig(data)
 	if err != nil {
 		return nil, err
 	}
@@ -219,14 +223,15 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, d
 
 	for _, question := range clusterTemplateRevision.Spec.Questions {
 		answer, ok := allAnswers[question.Variable]
-		if ok {
-			val, err := builder.ConvertSimple(question.Type, answer, builder.Create)
-			if err != nil {
-				return nil, err
-			}
-			keyParts := strings.Split(question.Variable, ".")
-			values.PutValue(dataFromTemplate, val, keyParts...)
+		if !ok {
+			answer = question.Default
 		}
+		val, err := builder.ConvertSimple(question.Type, answer, builder.Create)
+		if err != nil {
+			return nil, err
+		}
+		keyParts := strings.Split(question.Variable, ".")
+		values.PutValue(dataFromTemplate, val, keyParts...)
 	}
 	return dataFromTemplate, nil
 }
@@ -386,7 +391,10 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		data = clusterUpdate
 	}
 
-	setKubernetesVersion(data)
+	err = setKubernetesVersion(data)
+	if err != nil {
+		return nil, err
+	}
 
 	data, err = r.transposeDynamicFieldToGenericConfig(data)
 	if err != nil {
@@ -465,17 +473,51 @@ func canUseClusterName(apiContext *types.APIContext, requestedName string) error
 	return nil
 }
 
-func setKubernetesVersion(data map[string]interface{}) {
+func setKubernetesVersion(data map[string]interface{}) error {
 	rkeConfig, ok := values.GetValue(data, "rancherKubernetesEngineConfig")
-
 	if ok && rkeConfig != nil {
 		k8sVersion := values.GetValueN(data, "rancherKubernetesEngineConfig", "kubernetesVersion")
 		if k8sVersion == nil || k8sVersion == "" {
 			//set k8s version to system default on the spec
 			defaultVersion := settings.KubernetesVersion.Get()
 			values.PutValue(data, defaultVersion, "rancherKubernetesEngineConfig", "kubernetesVersion")
+		} else {
+			//if k8s version is already of rancher version form, noop
+			//if k8s version is of form 1.14.x, figure out the latest
+			k8sVersionRequested := convert.ToString(k8sVersion)
+			if !strings.Contains(k8sVersionRequested, "-rancher") {
+				translatedVersion, err := getSupportedK8sVersion(k8sVersionRequested)
+				if err != nil {
+					return httperror.WrapAPIError(err, httperror.ServerError, "")
+				}
+				if translatedVersion == "" {
+					return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Requested kubernetesVersion %v is not supported currently", k8sVersionRequested))
+				}
+				values.PutValue(data, translatedVersion, "rancherKubernetesEngineConfig", "kubernetesVersion")
+			}
 		}
 	}
+	return nil
+}
+
+func getSupportedK8sVersion(k8sVersionRequest string) (string, error) {
+
+	supportedVersions := strings.Split(settings.KubernetesVersionsCurrent.Get(), ",")
+	range1, err := semver.ParseRange("=" + k8sVersionRequest)
+	if err != nil {
+		return "", fmt.Errorf("Requested kubernetesVersion %v is not of valid semver [major.minor.patch] format", k8sVersionRequest)
+	}
+
+	for _, v := range supportedVersions {
+		semv, err := semver.ParseTolerant(strings.Split(v, "-rancher")[0])
+		if err != nil {
+			return "", fmt.Errorf("Semver translation failed for the current K8bernetes Version %v, err: %v", v, err)
+		}
+		if range1(semv) {
+			return v, nil
+		}
+	}
+	return "", nil
 }
 
 func validateNetworkFlag(data map[string]interface{}, create bool) error {
