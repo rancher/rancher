@@ -1,11 +1,11 @@
-package v3
+package rke
 
-var (
-	// K8sVersionWindowsSystemImages is dynamically populated on initWindows() with the latest versions
-	K8sVersionWindowsSystemImages map[string]WindowsSystemImages
+import (
+	"github.com/rancher/types/apis/management.cattle.io/v3"
+)
 
-	// K8sVersionWindowsServiceOptions - service options per k8s version
-	K8sVersionWindowsServiceOptions = map[string]KubernetesServicesOptions{
+func loadK8sVersionWindowsServiceOptions() map[string]v3.KubernetesServicesOptions {
+	return map[string]v3.KubernetesServicesOptions{
 		"v1.8": {
 			Kubelet: map[string]string{
 				"feature-gates":            "MountPropagation=false",
@@ -77,9 +77,10 @@ var (
 			},
 		},
 	}
+}
 
-	// AllK8sWindowsVersions - images map for 2.0
-	AllK8sWindowsVersions = map[string]WindowsSystemImages{
+func loadK8sVersionWindowsSystemimages() map[string]v3.WindowsSystemImages {
+	return map[string]v3.WindowsSystemImages{
 		"v1.8.10-rancher1-1": {
 			NginxProxy:         m("rancher/nginx-proxy:v0.0.1-nanoserver-1803"),
 			KubernetesBinaries: m("rancher/hyperkube:v1.8.10-nanoserver-1803"),
@@ -373,30 +374,5 @@ var (
 			FlannelCNIBinaries: m("rancher/flannel-cni:v0.3.0-rancher4"),
 			KubeletPause:       m("rancher/kubelet-pause:v0.1.2"),
 		},
-	}
-)
-
-func initWindows() {
-	if K8sVersionWindowsSystemImages != nil {
-		panic("Do not initialize or add values to K8sVersionWindowsSystemImages")
-	}
-
-	K8sVersionWindowsSystemImages = map[string]WindowsSystemImages{}
-
-	for version := range K8sVersionToRKESystemImages {
-		if K8sBadVersions[version] {
-			continue
-		}
-
-		images, ok := AllK8sWindowsVersions[version]
-		if !ok {
-			panic("K8s version " + " is not found in AllK8sWindowsVersions map")
-		}
-
-		K8sVersionWindowsSystemImages[version] = images
-	}
-
-	if _, ok := K8sVersionWindowsSystemImages[DefaultK8s]; !ok {
-		panic("Default K8s version " + DefaultK8s + " is not found in k8sVersionsCurrent list")
 	}
 }

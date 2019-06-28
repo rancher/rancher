@@ -3,13 +3,13 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"github.com/rancher/rke/metadata"
 	"strings"
 
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/rke/util"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
@@ -205,7 +205,7 @@ func validateVersion(ctx context.Context, c *Cluster) error {
 	if err != nil {
 		return fmt.Errorf("%s is not valid semver", c.Version)
 	}
-	_, ok := v3.AllK8sVersions[c.Version]
+	_, ok := metadata.K8sVersionToRKESystemImages[c.Version]
 	if !ok {
 		if err := validateSystemImages(c); err != nil {
 			return fmt.Errorf("%s is an unsupported Kubernetes version and system images are not populated: %v", c.Version, err)
@@ -213,9 +213,9 @@ func validateVersion(ctx context.Context, c *Cluster) error {
 		return nil
 	}
 
-	if _, ok := v3.K8sBadVersions[c.Version]; ok {
+	if _, ok := metadata.K8sBadVersions[c.Version]; ok {
 		log.Warnf(ctx, "%s version exists but its recommended to install this version - see 'rke config --system-images --all' for versions supported with this release", c.Version)
-		return nil
+		return fmt.Errorf("%s is an unsupported Kubernetes version and system images are not populated: %v", c.Version, err)
 	}
 
 	return nil

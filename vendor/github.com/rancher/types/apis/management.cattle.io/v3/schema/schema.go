@@ -44,7 +44,8 @@ var (
 		Init(monitorTypes).
 		Init(credTypes).
 		Init(mgmtSecretTypes).
-		Init(clusterTemplateTypes)
+		Init(clusterTemplateTypes).
+		Init(driverMetadataTypes)
 
 	TokenSchemas = factory.Schemas(&Version).
 			Init(tokens)
@@ -74,6 +75,18 @@ func mgmtSecretTypes(schemas *types.Schemas) *types.Schemas {
 		schema.CodeName = "ManagementSecret"
 		schema.CodeNamePlural = "ManagementSecrets"
 	})
+}
+
+func driverMetadataTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.
+		AddMapperForType(&Version, v3.RKEK8sSystemImage{}, m.Drop{Field: "namespaceId"}).
+		AddMapperForType(&Version, v3.RKEK8sServiceOption{}, m.Drop{Field: "namespaceId"}).
+		AddMapperForType(&Version, v3.RKEAddon{}, m.Drop{Field: "namespaceId"}).
+		AddMapperForType(&Version, v3.RKEK8sWindowsSystemImage{}, m.Drop{Field: "namespaceId"}).
+		MustImport(&Version, v3.RKEK8sSystemImage{}).
+		MustImport(&Version, v3.RKEK8sServiceOption{}).
+		MustImport(&Version, v3.RKEAddon{}).
+		MustImport(&Version, v3.RKEK8sWindowsSystemImage{})
 }
 
 func catalogTypes(schemas *types.Schemas) *types.Schemas {

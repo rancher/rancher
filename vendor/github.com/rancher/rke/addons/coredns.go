@@ -1,8 +1,10 @@
 package addons
 
-import "github.com/rancher/rke/templates"
+import (
+	rkeData "github.com/rancher/kontainer-driver-metadata/rke/templates"
+	"github.com/rancher/rke/templates"
+)
 
-func GetCoreDNSManifest(CoreDNSConfig interface{}) (string, error) {
-
-	return templates.CompileTemplateFromMap(templates.CoreDNSTemplate, CoreDNSConfig)
+func GetCoreDNSManifest(CoreDNSConfig interface{}, data map[string]interface{}) (string, error) {
+	return templates.CompileTemplateFromMap(templates.GetDefaultVersionedTemplate(rkeData.CoreDNS, data), CoreDNSConfig)
 }

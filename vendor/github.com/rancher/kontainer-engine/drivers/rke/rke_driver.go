@@ -40,11 +40,18 @@ type WrapTransportFactory func(config *v3.RancherKubernetesEngineConfig) k8s.Wra
 type Driver struct {
 	DockerDialer         hosts.DialerFactory
 	LocalDialer          hosts.DialerFactory
+	DataStore            Store
 	WrapTransportFactory WrapTransportFactory
 	driverCapabilities   types.Capabilities
 
 	types.UnimplementedVersionAccess
 	types.UnimplementedClusterSizeAccess
+}
+
+type Store interface {
+	// Add methods here to get rke driver specific data
+	GetAddonTemplates(k8sVersion string) map[string]interface{}
+	GetServiceOptions(k8sVersion string) v3.KubernetesServicesOptions
 }
 
 func NewDriver() types.Driver {
@@ -143,7 +150,7 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions, info *ty
 
 	certsStr := ""
 	dialers, externalFlags := d.getFlags(rkeConfig, stateDir)
-	APIURL, caCrt, clientCert, clientKey, certs, err := clusterUp(ctx, &rkeConfig, dialers, externalFlags)
+	APIURL, caCrt, clientCert, clientKey, certs, err := clusterUp(ctx, &rkeConfig, dialers, externalFlags, getData(d.DataStore, rkeConfig.Version))
 	if len(certs) > 0 {
 		certsStr, err = rkecerts.ToString(certs)
 	}
@@ -165,6 +172,13 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions, info *ty
 			"Certs":      certsStr,
 		},
 	}, stateDir), err
+}
+
+func getData(s Store, k8sVersion string) map[string]interface{} {
+	data := s.GetAddonTemplates(k8sVersion)
+	data2 := s.GetServiceOptions(k8sVersion)
+	data["k8s-service-options"] = data2
+	return data
 }
 
 // Update updates the rke cluster
@@ -189,7 +203,7 @@ func (d *Driver) Update(ctx context.Context, clusterInfo *types.ClusterInfo, opt
 	if err := cmd.ClusterInit(ctx, &rkeConfig, dialers, externalFlags); err != nil {
 		return nil, err
 	}
-	APIURL, caCrt, clientCert, clientKey, certs, err := cmd.ClusterUp(ctx, dialers, externalFlags)
+	APIURL, caCrt, clientCert, clientKey, certs, err := cmd.ClusterUp(ctx, dialers, externalFlags, getData(d.DataStore, rkeConfig.Version))
 	if err != nil {
 		return d.save(&types.ClusterInfo{
 			Metadata: map[string]string{
@@ -317,7 +331,7 @@ func (d *Driver) SetVersion(ctx context.Context, info *types.ClusterInfo, versio
 	if err := cmd.ClusterInit(ctx, &config, dialers, externalFlags); err != nil {
 		return err
 	}
-	_, _, _, _, _, err = cmd.ClusterUp(ctx, dialers, externalFlags)
+	_, _, _, _, _, err = cmd.ClusterUp(ctx, dialers, externalFlags, getData(d.DataStore, config.Version))
 
 	if err != nil {
 		return err
@@ -457,11 +471,11 @@ func clusterUp(
 	ctx context.Context,
 	rkeConfig *v3.RancherKubernetesEngineConfig,
 	dialers hosts.DialersOptions,
-	externalFlags cluster.ExternalFlags) (string, string, string, string, map[string]pki.CertificatePKI, error) {
+	externalFlags cluster.ExternalFlags, data map[string]interface{}) (string, string, string, string, map[string]pki.CertificatePKI, error) {
 	if err := cmd.ClusterInit(ctx, rkeConfig, dialers, externalFlags); err != nil {
 		log.Warnf(ctx, "%v", err)
 	}
-	APIURL, caCrt, clientCert, clientKey, certs, err := cmd.ClusterUp(ctx, dialers, externalFlags)
+	APIURL, caCrt, clientCert, clientKey, certs, err := cmd.ClusterUp(ctx, dialers, externalFlags, data)
 	if err != nil {
 		log.Warnf(ctx, "%v", err)
 	}
@@ -501,8 +515,7 @@ func (d *Driver) ETCDRestore(ctx context.Context, clusterInfo *types.ClusterInfo
 	defer d.cleanup(stateDir)
 
 	dialers, externalFlags := d.getFlags(rkeConfig, stateDir)
-
-	APIURL, caCrt, clientCert, clientKey, certs, err := cmd.RestoreEtcdSnapshot(ctx, &rkeConfig, dialers, externalFlags, snapshotName)
+	APIURL, caCrt, clientCert, clientKey, certs, err := cmd.RestoreEtcdSnapshot(ctx, &rkeConfig, dialers, externalFlags, getData(d.DataStore, rkeConfig.Version), snapshotName)
 	if err != nil {
 		return d.save(&types.ClusterInfo{
 			Metadata: map[string]string{

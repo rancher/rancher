@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/rancher/rke/metadata"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -73,6 +74,9 @@ func ClusterInit(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfi
 	stateFilePath := cluster.GetStateFilePath(flags.ClusterFilePath, flags.ConfigDir)
 	if len(flags.CertificateDir) == 0 {
 		flags.CertificateDir = cluster.GetCertificateDirPath(flags.ClusterFilePath, flags.ConfigDir)
+	}
+	if metadata.K8sVersionToRKESystemImages == nil {
+		metadata.InitMetadata(ctx)
 	}
 	rkeFullState, _ := cluster.ReadStateFile(ctx, stateFilePath)
 

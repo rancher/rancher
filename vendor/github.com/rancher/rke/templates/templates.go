@@ -5,27 +5,11 @@ import (
 	"encoding/json"
 	"text/template"
 
+	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rke/metadata"
+
 	"github.com/rancher/rke/util"
 )
-
-var VersionedTemplate = map[string]map[string]string{
-	"calico": map[string]string{
-		"v1.15":   CalicoTemplateV115,
-		"v1.14":   CalicoTemplateV113,
-		"v1.13":   CalicoTemplateV113,
-		"default": CalicoTemplateV112,
-	},
-	"canal": map[string]string{
-		"v1.15":   CanalTemplateV115,
-		"v1.14":   CanalTemplateV113,
-		"v1.13":   CanalTemplateV113,
-		"default": CanalTemplateV112,
-	},
-	"flannel": map[string]string{
-		"v1.15":   FlannelTemplateV115,
-		"default": FlannelTemplate,
-	},
-}
 
 func CompileTemplateFromMap(tmplt string, configMap interface{}) (string, error) {
 	out := new(bytes.Buffer)
@@ -36,9 +20,11 @@ func CompileTemplateFromMap(tmplt string, configMap interface{}) (string, error)
 	return out.String(), nil
 }
 
-func GetVersionedTemplates(templateName string, k8sVersion string) string {
-
-	versionedTemplate := VersionedTemplate[templateName]
+func GetVersionedTemplates(templateName string, data map[string]interface{}, k8sVersion string) string {
+	if template, ok := data[templateName]; ok {
+		return convert.ToString(template)
+	}
+	versionedTemplate := metadata.K8sVersionToTemplates[templateName]
 	if t, ok := versionedTemplate[util.GetTagMajorVersion(k8sVersion)]; ok {
 		return t
 	}
@@ -48,4 +34,11 @@ func GetVersionedTemplates(templateName string, k8sVersion string) string {
 func GetKubednsStubDomains(stubDomains map[string][]string) string {
 	json, _ := json.Marshal(stubDomains)
 	return string(json)
+}
+
+func GetDefaultVersionedTemplate(templateName string, data map[string]interface{}) string {
+	if template, ok := data[templateName]; ok {
+		return convert.ToString(template)
+	}
+	return metadata.K8sVersionToTemplates[templateName]["default"]
 }
