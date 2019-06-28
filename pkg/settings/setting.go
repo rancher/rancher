@@ -13,54 +13,57 @@ var (
 	provider       Provider
 	InjectDefaults string
 
-	AgentImage                      = NewSetting("agent-image", "rancher/rancher-agent:master")
-	AuthImage                       = NewSetting("auth-image", v3.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
-	CACerts                         = NewSetting("cacerts", "")
-	CLIURLDarwin                    = NewSetting("cli-url-darwin", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-darwin-amd64-v1.0.0-alpha8.tar.gz")
-	CLIURLLinux                     = NewSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
-	CLIURLWindows                   = NewSetting("cli-url-windows", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-windows-386-v1.0.0-alpha8.zip")
-	EngineInstallURL                = NewSetting("engine-install-url", "https://releases.rancher.com/install-docker/18.09.sh")
-	EngineISOURL                    = NewSetting("engine-iso-url", "https://releases.rancher.com/os/latest/rancheros-vmware.iso")
-	EngineNewestVersion             = NewSetting("engine-newest-version", "v17.12.0")
-	EngineSupportedRange            = NewSetting("engine-supported-range", "~v1.11.2 || ~v1.12.0 || ~v1.13.0 || ~v17.03.0 || ~v17.06.0 || ~v17.09.0 || ~v18.06.0 || ~v18.09.0")
-	FirstLogin                      = NewSetting("first-login", "true")
-	GlobalRegistryEnabled           = NewSetting("global-registry-enabled", "false")
-	HelmVersion                     = NewSetting("helm-version", "dev")
-	IngressIPDomain                 = NewSetting("ingress-ip-domain", "xip.io")
-	InstallUUID                     = NewSetting("install-uuid", "")
-	KubernetesVersion               = NewSetting("k8s-version", v3.DefaultK8s)
-	KubernetesVersionToSystemImages = NewSetting("k8s-version-to-images", getSystemImages())
-	KubernetesVersionsCurrent       = NewSetting("k8s-versions-current", getK8sVersionsCurrent())
-	MachineVersion                  = NewSetting("machine-version", "dev")
-	Namespace                       = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
-	PeerServices                    = NewSetting("peer-service", os.Getenv("CATTLE_PEER_SERVICE"))
-	RDNSServerBaseURL               = NewSetting("rdns-base-url", "https://api.lb.rancher.cloud/v1")
-	RkeVersion                      = NewSetting("rke-version", "")
-	ServerImage                     = NewSetting("server-image", "rancher/rancher")
-	ServerURL                       = NewSetting("server-url", "")
-	ServerVersion                   = NewSetting("server-version", "dev")
-	SystemDefaultRegistry           = NewSetting("system-default-registry", "")
-	SystemNamespaces                = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,cattle-prometheus,ingress-nginx,cattle-global-data,cattle-istio,kube-node-lease")
-	TelemetryOpt                    = NewSetting("telemetry-opt", "prompt")
-	TLSMinVersion                   = NewSetting("tls-min-version", "1.2")
-	TLSCiphers                      = NewSetting("tls-ciphers", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305")
-	UIFeedBackForm                  = NewSetting("ui-feedback-form", "")
-	UIIndex                         = NewSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
-	UIPath                          = NewSetting("ui-path", "")
-	UIPL                            = NewSetting("ui-pl", "rancher")
-	UIKubernetesSupportedVersions   = NewSetting("ui-k8s-supported-versions-range", ">= 1.11.0 <=1.14.x")
-	UIKubernetesDefaultVersion      = NewSetting("ui-k8s-default-version-range", "<=1.14.x")
-	WhitelistDomain                 = NewSetting("whitelist-domain", "forums.rancher.com")
-	SystemMonitoringCatalogID       = NewSetting("system-monitoring-catalog-id", "catalog://?catalog=system-library&template=rancher-monitoring&version=0.0.3")
-	SystemLoggingCatalogID          = NewSetting("system-logging-catalog-id", "catalog://?catalog=system-library&template=rancher-logging&version=0.1.1")
-	SystemExternalDNSCatalogID      = NewSetting("system-externaldns-catalog-id", "catalog://?catalog=system-library&template=rancher-external-dns&version=0.0.1")
-	SystemGlobalIstioCatalogID      = NewSetting("system-global-istio-catalog-id", "catalog://?catalog=system-library&template=rancher-istio&version=0.0.1")
-	SystemCISBenchmarkCatalogID     = NewSetting("system-cis-benchmark-catalog-id", "catalog://?catalog=system-library&template=rancher-cis-benchmark&version=0.1.0")
-	AuthUserInfoResyncCron          = NewSetting("auth-user-info-resync-cron", "0 0 * * *")
-	AuthUserInfoMaxAgeSeconds       = NewSetting("auth-user-info-max-age-seconds", "3600") // 1 hour
-	APIUIVersion                    = NewSetting("api-ui-version", "1.1.6")                // Please update the CATTLE_API_UI_VERSION in package/Dockerfile when updating the version here.
-	RotateCertsIfExpiringInDays     = NewSetting("rotate-certs-if-expiring-in-days", "7")  // 7 days
-	ClusterTemplateEnforcement      = NewSetting("cluster-template-enforcement", "false")
+	AgentImage                        = NewSetting("agent-image", "rancher/rancher-agent:master")
+	AuthImage                         = NewSetting("auth-image", v3.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
+	CACerts                           = NewSetting("cacerts", "")
+	CLIURLDarwin                      = NewSetting("cli-url-darwin", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-darwin-amd64-v1.0.0-alpha8.tar.gz")
+	CLIURLLinux                       = NewSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
+	CLIURLWindows                     = NewSetting("cli-url-windows", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-windows-386-v1.0.0-alpha8.zip")
+	EngineInstallURL                  = NewSetting("engine-install-url", "https://releases.rancher.com/install-docker/18.09.sh")
+	EngineISOURL                      = NewSetting("engine-iso-url", "https://releases.rancher.com/os/latest/rancheros-vmware.iso")
+	EngineNewestVersion               = NewSetting("engine-newest-version", "v17.12.0")
+	EngineSupportedRange              = NewSetting("engine-supported-range", "~v1.11.2 || ~v1.12.0 || ~v1.13.0 || ~v17.03.0 || ~v17.06.0 || ~v17.09.0 || ~v18.06.0 || ~v18.09.0")
+	FirstLogin                        = NewSetting("first-login", "true")
+	GlobalRegistryEnabled             = NewSetting("global-registry-enabled", "false")
+	HelmVersion                       = NewSetting("helm-version", "dev")
+	IngressIPDomain                   = NewSetting("ingress-ip-domain", "xip.io")
+	InstallUUID                       = NewSetting("install-uuid", "")
+	KubernetesVersion                 = NewSetting("k8s-version", "")
+	KubernetesVersionToServiceOptions = NewSetting("k8s-version-to-service-options", "")
+	KubernetesVersionToSystemImages   = NewSetting("k8s-version-to-images", "")
+	KubernetesVersionsCurrent         = NewSetting("k8s-versions-current", "")
+	MachineVersion                    = NewSetting("machine-version", "dev")
+	Namespace                         = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
+	PeerServices                      = NewSetting("peer-service", os.Getenv("CATTLE_PEER_SERVICE"))
+	RDNSServerBaseURL                 = NewSetting("rdns-base-url", "https://api.lb.rancher.cloud/v1")
+	RkeVersion                        = NewSetting("rke-version", "")
+	RkeMetadataURL                    = NewSetting("rke-metadata-url", "https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/master/data/data.json")
+	RkeMetadataRefreshIntervalMins    = NewSetting("rke-metadata-refresh-interval-minutes", "1440")
+	ServerImage                       = NewSetting("server-image", "rancher/rancher")
+	ServerURL                         = NewSetting("server-url", "")
+	ServerVersion                     = NewSetting("server-version", "dev")
+	SystemDefaultRegistry             = NewSetting("system-default-registry", "")
+	SystemNamespaces                  = NewSetting("system-namespaces", "kube-system,kube-public,cattle-system,cattle-alerting,cattle-logging,cattle-pipeline,cattle-prometheus,ingress-nginx,cattle-global-data,cattle-istio,kube-node-lease")
+	TelemetryOpt                      = NewSetting("telemetry-opt", "prompt")
+	TLSMinVersion                     = NewSetting("tls-min-version", "1.2")
+	TLSCiphers                        = NewSetting("tls-ciphers", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305")
+	UIFeedBackForm                    = NewSetting("ui-feedback-form", "")
+	UIIndex                           = NewSetting("ui-index", "https://releases.rancher.com/ui/latest2/index.html")
+	UIPath                            = NewSetting("ui-path", "")
+	UIPL                              = NewSetting("ui-pl", "rancher")
+	UIKubernetesSupportedVersions     = NewSetting("ui-k8s-supported-versions-range", ">= 1.11.0 <=1.14.x")
+	UIKubernetesDefaultVersion        = NewSetting("ui-k8s-default-version-range", "<=1.14.x")
+	WhitelistDomain                   = NewSetting("whitelist-domain", "forums.rancher.com")
+	SystemMonitoringCatalogID         = NewSetting("system-monitoring-catalog-id", "catalog://?catalog=system-library&template=rancher-monitoring&version=0.0.3")
+	SystemLoggingCatalogID            = NewSetting("system-logging-catalog-id", "catalog://?catalog=system-library&template=rancher-logging&version=0.1.1")
+	SystemExternalDNSCatalogID        = NewSetting("system-externaldns-catalog-id", "catalog://?catalog=system-library&template=rancher-external-dns&version=0.0.1")
+	SystemGlobalIstioCatalogID        = NewSetting("system-global-istio-catalog-id", "catalog://?catalog=system-library&template=rancher-istio&version=0.0.1")
+	SystemCISBenchmarkCatalogID       = NewSetting("system-cis-benchmark-catalog-id", "catalog://?catalog=system-library&template=rancher-cis-benchmark&version=0.1.0")
+	AuthUserInfoResyncCron            = NewSetting("auth-user-info-resync-cron", "0 0 * * *")
+	AuthUserInfoMaxAgeSeconds         = NewSetting("auth-user-info-max-age-seconds", "3600") // 1 hour
+	APIUIVersion                      = NewSetting("api-ui-version", "1.1.6")                // Please update the CATTLE_API_UI_VERSION in package/Dockerfile when updating the version here.
+	RotateCertsIfExpiringInDays       = NewSetting("rotate-certs-if-expiring-in-days", "7")  // 7 days
+	ClusterTemplateEnforcement        = NewSetting("cluster-template-enforcement", "false")
 )
 
 func init() {
@@ -139,21 +142,8 @@ func NewSetting(name, def string) Setting {
 	return s
 }
 
-func getSystemImages() string {
-	newMap := map[string]interface{}{}
-	for k := range v3.K8sVersionToRKESystemImages {
-		newMap[k] = nil
-	}
-
-	data, err := json.Marshal(newMap)
-	if err != nil {
-		return ""
-	}
-	return string(data)
-}
-
 func getK8sVersionsCurrent() string {
-	return strings.Join(v3.K8sVersionsCurrent, ",")
+	return ""
 }
 
 func GetEnvKey(key string) string {

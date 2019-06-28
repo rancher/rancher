@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
+	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/librke"
 	"github.com/rancher/rancher/pkg/rkeworker"
@@ -37,6 +38,10 @@ type RKENodeConfigServer struct {
 	auth                 *tunnelserver.Authorizer
 	lookup               *BundleLookup
 	systemAccountManager *systemaccount.Manager
+	systemImagesLister   v3.RKEK8sWindowsSystemImageLister
+	systemImages         v3.RKEK8sWindowsSystemImageInterface
+	serviceOptionsLister v3.RKEK8sServiceOptionLister
+	serviceOptions       v3.RKEK8sServiceOptionInterface
 }
 
 func Handler(auth *tunnelserver.Authorizer, scaledContext *config.ScaledContext) http.Handler {
@@ -44,6 +49,10 @@ func Handler(auth *tunnelserver.Authorizer, scaledContext *config.ScaledContext)
 		auth:                 auth,
 		lookup:               NewLookup(scaledContext.Core.Namespaces(""), scaledContext.Core),
 		systemAccountManager: systemaccount.NewManagerFromScale(scaledContext),
+		systemImagesLister:   scaledContext.Management.RKEK8sWindowsSystemImages("").Controller().Lister(),
+		systemImages:         scaledContext.Management.RKEK8sWindowsSystemImages(""),
+		serviceOptionsLister: scaledContext.Management.RKEK8sServiceOptions("").Controller().Lister(),
+		serviceOptions:       scaledContext.Management.RKEK8sServiceOptions(""),
 	}
 }
 
@@ -296,8 +305,18 @@ func (n *RKENodeConfigServer) windowsNodeConfig(ctx context.Context, cluster *v3
 				return nil, errors.Wrapf(err, "failed to marshall cert bundle for %s", node.Status.NodeConfig.Address)
 			}
 
-			systemImages := v3.AllK8sWindowsVersions[rkeConfig.Version]
-			process, err := createWindowsProcesses(rkeConfig, node.Status.NodeConfig, systemImages)
+			systemImages, err := kd.GetRKEWindowsSystemImages(rkeConfig.Version, n.systemImagesLister, n.systemImages)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to get windows system images %s", rkeConfig.Version)
+			}
+
+			clusterMajorVersion := getTagMajorVersion(rkeConfig.Version)
+			serviceOptions, err := kd.GetRKEK8sServiceOptionsWindows(clusterMajorVersion, n.serviceOptionsLister, n.serviceOptions)
+			if err != nil || serviceOptions == nil {
+				return nil, errors.Wrapf(err, "failed to get windows service options for major version %s", clusterMajorVersion)
+			}
+
+			process, err := createWindowsProcesses(rkeConfig, node.Status.NodeConfig, systemImages, *serviceOptions)
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to create windows node plan for %s with RKE version %s", node.Status.NodeConfig.Address, rkeConfig.Version)
 			}
@@ -318,7 +337,8 @@ func (n *RKENodeConfigServer) windowsNodeConfig(ctx context.Context, cluster *v3
 // createWindowsProcesses only creates 2 kinds processes:
 // - `run-container-*` processes are driven by Docker
 // - `run-script-*` processes are driven by PowerShell
-func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configNode *v3.RKEConfigNode, systemImages v3.WindowsSystemImages) (map[string]v3.Process, error) {
+func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configNode *v3.RKEConfigNode,
+	systemImages v3.WindowsSystemImages, serviceOptions v3.KubernetesServicesOptions) (map[string]v3.Process, error) {
 	cniBinariesImage := ""
 	kubernetesBinariesImage := systemImages.KubernetesBinaries
 	kubeletPauseImage := systemImages.KubeletPause
@@ -433,8 +453,6 @@ func createWindowsProcesses(rkeConfig *v3.RancherKubernetesEngineConfig, configN
 	if len(dnsServiceIP) == 0 {
 		dnsServiceIP = rkecluster.DefaultClusterDNSService
 	}
-	clusterMajorVersion := getTagMajorVersion(rkeConfig.Version)
-	serviceOptions := v3.K8sVersionWindowsServiceOptions[clusterMajorVersion]
 	dockerConfig := ""
 	if len(privateRegistriesMap) > 0 {
 		configFile, err := rkedocker.GetKubeletDockerConfig(privateRegistriesMap)
