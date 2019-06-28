@@ -21,9 +21,15 @@ import (
 
 const owner = "owner-user"
 
-// When adding to this list the apiGroup of the resource needs to be accounted
-// for in the for loop in checkForGlobalResourceRules
-var globalResourcesNeededInProjects = []string{"persistentvolumes", "storageclasses"}
+var globalResourcesNeededInProjects = map[string]map[string]bool{
+	"persistentvolumes": {
+		"":     true,
+		"core": true,
+	},
+	"storageclasses": {
+		"storage.k8s.io": true,
+	},
+}
 
 func newPRTBLifecycle(m *manager) *prtbLifecycle {
 	return &prtbLifecycle{m: m}
@@ -141,7 +147,7 @@ func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.Proj
 		roles = append(roles, role)
 
 		for _, rt := range rts {
-			for _, resource := range globalResourcesNeededInProjects {
+			for resource := range globalResourcesNeededInProjects {
 				verbs, err := p.m.checkForGlobalResourceRules(rt, resource)
 				if err != nil {
 					return err
@@ -314,11 +320,7 @@ func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource st
 	verbs := map[string]bool{}
 	for _, rule := range rules {
 		if (slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, "*")) && len(rule.ResourceNames) == 0 {
-			// When adding a resource to globalResourcesNeededInProjects this check needs to be updated.
-			// This is currently hard coded to keep the code cleaner but if things need to be added perhaps
-			// the checks need to be changed to be dynamic
-			if (resource == "persistentvolumes" && (slice.ContainsString(rule.APIGroups, "") || slice.ContainsString(rule.APIGroups, "core"))) ||
-				(resource == "storageclasses" && slice.ContainsString(rule.APIGroups, "storage.k8s.io")) {
+			if checkGroup(resource, rule) {
 				for _, v := range rule.Verbs {
 					verbs[v] = true
 				}
@@ -375,6 +377,24 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 	}
 
 	return roleName, nil
+}
+
+func checkGroup(resource string, rule rbacv1.PolicyRule) bool {
+	if slice.ContainsString(rule.APIGroups, "*") {
+		return true
+	}
+
+	groups, ok := globalResourcesNeededInProjects[resource]
+	if !ok {
+		return false
+	}
+
+	for _, rg := range rule.APIGroups {
+		if _, ok := groups[rg]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func buildRule(resource string, verbs map[string]bool) rbacv1.PolicyRule {
