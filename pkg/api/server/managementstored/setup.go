@@ -112,6 +112,10 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.ProjectNetworkPolicyType,
 		client.ProjectRoleTemplateBindingType,
 		client.ProjectType,
+		client.RKEK8sSystemImageType,
+		client.RKEK8sServiceOptionType,
+		client.RKEAddonType,
+		client.RKEK8sWindowsSystemImageType,
 		client.RoleTemplateType,
 		client.SettingType,
 		client.TemplateType,
@@ -168,6 +172,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	KontainerDriver(schemas, apiContext)
 	ClusterTemplates(schemas, apiContext)
 	ClusterScans(schemas, apiContext, clusterManager)
+	SystemImages(schemas, apiContext)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
@@ -744,4 +749,12 @@ func ClusterScans(schemas *types.Schemas, management *config.ScaledContext, clus
 	schema.LinkHandler = clusterScanHandler.LinkHandler
 
 	return nil
+}
+
+func SystemImages(schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.RKEK8sSystemImageType)
+	schema.Store = &globalresource.GlobalNamespaceStore{
+		Store:              schema.Store,
+		NamespaceInterface: management.Core.Namespaces(""),
+	}
 }

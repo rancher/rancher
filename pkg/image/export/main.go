@@ -9,11 +9,15 @@ import (
 	"sort"
 	"strings"
 
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+
+	metadata "github.com/rancher/kontainer-driver-metadata/rke"
+	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
+	"gopkg.in/yaml.v2"
+
 	"github.com/rancher/norman/types/convert"
 	libhelm "github.com/rancher/rancher/pkg/catalog/helm"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/image"
-	"gopkg.in/yaml.v2"
 )
 
 var (
@@ -56,7 +60,20 @@ func main() {
 }
 
 func run(images ...string) error {
-	targetImages, err := collectionImages(v3.K8sVersionToRKESystemImages, v3.ToolsSystemImages)
+	tag, ok := os.LookupEnv("TAG")
+	if !ok {
+		return fmt.Errorf("no tag %s", tag)
+	}
+	rancherVersion := tag
+	if tag == "dev" || tag == "master" {
+		rancherVersion = kd.RancherVersionDev
+	}
+	k8sVersionToRKESystemImages, k8sVersionToWindowsSystemImages, _ := kd.GetK8sVersionInfo(rancherVersion,
+		metadata.DriverData.K8sVersionRKESystemImages, metadata.DriverData.K8sVersionWindowsSystemImages,
+		metadata.DriverData.K8sVersionServiceOptions,
+		metadata.DriverData.K8sVersionInfo)
+
+	targetImages, err := collectionImages(k8sVersionToRKESystemImages, v3.ToolsSystemImages)
 	if err != nil {
 		return err
 	}
@@ -65,7 +82,7 @@ func run(images ...string) error {
 		targetImages = append(targetImages, image.Mirror(i))
 	}
 
-	targetWindowsImages, err := collectionImages(v3.K8sVersionWindowsSystemImages)
+	targetWindowsImages, err := collectionImages(k8sVersionToWindowsSystemImages)
 	if err != nil {
 		return err
 	}
@@ -490,7 +507,7 @@ param(
 $content=Get-Content -path ${image-list}
 
 foreach ($item in $content) {
-	docker pull $item 
+	docker pull $item
 }
 
 docker save $($content) -o $images

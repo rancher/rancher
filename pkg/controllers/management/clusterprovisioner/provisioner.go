@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/norman/types/values"
+	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/settings"
@@ -44,6 +45,8 @@ type Provisioner struct {
 	KontainerDriverLister v3.KontainerDriverLister
 	DynamicSchemasLister  v3.DynamicSchemaLister
 	Backups               v3.EtcdBackupLister
+	RKESystemImages       v3.RKEK8sSystemImageInterface
+	RKESystemImagesLister v3.RKEK8sSystemImageLister
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
@@ -56,6 +59,8 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
 		DynamicSchemasLister:  management.Management.DynamicSchemas("").Controller().Lister(),
 		Backups:               management.Management.EtcdBackups("").Controller().Lister(),
+		RKESystemImagesLister: management.Management.RKEK8sSystemImages("").Controller().Lister(),
+		RKESystemImages:       management.Management.RKEK8sSystemImages(""),
 	}
 
 	// Add handlers
@@ -75,6 +80,11 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	rkeDriver.DockerDialer = docker.Build
 	rkeDriver.LocalDialer = local.Build
 	rkeDriver.WrapTransportFactory = docker.WrapTransport
+	mgmt := management.Management
+	rkeDriver.DataStore = NewDataStore(mgmt.RKEAddons("").Controller().Lister(),
+		mgmt.RKEAddons(""),
+		mgmt.RKEK8sServiceOptions("").Controller().Lister(),
+		mgmt.RKEK8sServiceOptions(""))
 }
 
 func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {
@@ -629,7 +639,7 @@ func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, driverNa
 			return nil, nil, err
 		}
 
-		systemImages, err := getSystemImages(spec)
+		systemImages, err := p.getSystemImages(spec)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -703,12 +713,12 @@ func (p *Provisioner) validateDriver(cluster *v3.Cluster) (string, error) {
 	return newDriver, nil
 }
 
-func getSystemImages(spec v3.ClusterSpec) (*v3.RKESystemImages, error) {
+func (p *Provisioner) getSystemImages(spec v3.ClusterSpec) (*v3.RKESystemImages, error) {
 	// fetch system images from settings
 	version := spec.RancherKubernetesEngineConfig.Version
-	systemImages, ok := v3.AllK8sVersions[version]
-	if !ok {
-		return nil, fmt.Errorf("failed to find system images for version %v", version)
+	systemImages, err := kd.GetRKESystemImages(version, p.RKESystemImagesLister, p.RKESystemImages)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find system images for version %s: %v", version, err)
 	}
 
 	privateRegistry := getPrivateRepo(spec.RancherKubernetesEngineConfig)
