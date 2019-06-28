@@ -1,0 +1,5 @@
+./.dapper
+./.cache
+./.trash-cache
+./dist
+.idea

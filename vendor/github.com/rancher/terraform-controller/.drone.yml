@@ -1,0 +1,381 @@
+---
+kind: pipeline
+name: amd64
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+- name: build
+  image: rancher/dapper:v0.4.1
+  commands:
+  - dapper ci
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+
+- name: stage-binaries
+  pull: default
+  image: rancher/dapper:v0.4.1
+  commands:
+  - "cp -r ./bin/* ./package/"
+  - "mkdir -p ./package/yaml"
+  - "cp ./manifests/*.yaml ./package/yaml"
+  when:
+    event:
+    - tag
+
+- name: publish-terraform-controller-image
+  pull: default
+  image: plugins/docker
+  settings:
+    context: package/
+    dockerfile: package/Dockerfile.controller
+    password:
+      from_secret: docker_password
+    repo: rancher/terraform-controller
+    tag:
+    - "${DRONE_TAG}-amd64"
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+
+- name: publish-terraform-executor-image
+  pull: default
+  image: plugins/docker
+  settings:
+    context: package/
+    dockerfile: package/Dockerfile.executor
+    password:
+      from_secret: docker_password
+    repo: rancher/terraform-controller-executor
+    tags:
+    - "${DRONE_TAG}-amd64"
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+
+- name: publish-terraform-appliance-image
+  pull: default
+  image: plugins/docker
+  settings:
+    context: package/
+    dockerfile: package/Dockerfile.appliance
+    password:
+      from_secret: docker_password
+    repo: rancher/terraform-controller-appliance
+    tags:
+    - "${DRONE_TAG}-amd64"
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+
+volumes:
+- name: docker
+  host:
+    path: /var/run/docker.sock
+
+---
+kind: pipeline
+name: arm64
+
+platform:
+  os: linux
+  arch: arm64
+
+steps:
+- name: build
+  image: rancher/dapper:v0.4.1
+  commands:
+  - dapper ci
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+
+- name: stage-binaries
+  pull: default
+  image: rancher/dapper:v0.4.1
+  commands:
+  - "cp -r ./bin/* ./package/"
+  - "mkdir -p ./package/yaml"
+  - "cp ./manifests/*.yaml ./package/yaml"
+  when:
+    event:
+    - tag
+
+- name: publish-terraform-controller-image
+  pull: default
+  image: plugins/docker
+  settings:
+    context: package/
+    dockerfile: package/Dockerfile.controller
+    password:
+      from_secret: docker_password
+    repo: rancher/terraform-controller
+    tag: "${DRONE_TAG}-arm64"
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+
+- name: publish-terraform-appliance-image
+  pull: default
+  image: plugins/docker
+  settings:
+    context: package/
+    dockerfile: package/Dockerfile.appliance
+    password:
+      from_secret: docker_password
+    repo: rancher/terraform-controller-appliance
+    tags:
+    - "${DRONE_TAG}-arm64"
+    - latest
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+
+volumes:
+- name: docker
+  host:
+    path: /var/run/docker.sock
+
+---
+kind: pipeline
+name: arm
+
+platform:
+  os: linux
+  arch: arm
+
+steps:
+- name: build
+  image: rancher/dapper:v0.4.1
+  commands:
+  - dapper ci
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+
+- name: stage-binaries
+  pull: default
+  image: rancher/dapper:v0.4.1
+  commands:
+  - "cp -r ./bin/* ./package/"
+  - "mkdir -p ./package/yaml"
+  - "cp ./manifests/*.yaml ./package/yaml"
+  when:
+    event:
+    - tag
+
+- name: publish-terraform-controller-image
+  pull: default
+  image: plugins/docker
+  settings:
+    context: package/
+    dockerfile: package/Dockerfile.controller
+    password:
+      from_secret: docker_password
+    repo: rancher/terraform-controller
+    tag: "${DRONE_TAG}-arm"
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+
+- name: publish-terraform-appliance-image
+  pull: default
+  image: plugins/docker
+  settings:
+    context: package/
+    dockerfile: package/Dockerfile.appliance
+    password:
+      from_secret: docker_password
+    repo: rancher/terraform-controller-appliance
+    tags:
+    - "${DRONE_TAG}-arm"
+    - latest
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+
+volumes:
+- name: docker
+  host:
+    path: /var/run/docker.sock
+
+---
+kind: pipeline
+name: manifest
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+- name: manifest-controller
+  image: plugins/manifest:1.0.2
+  settings:
+    password:
+      from_secret: docker_password
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    - linux/arm
+    target: "rancher/terraform-controller:${DRONE_TAG}"
+    template: "rancher/terraform-controller:${DRONE_TAG}-ARCH"
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+    instance:
+    - drone-publish.rancher.io
+    ref:
+    - refs/head/master
+    - "refs/tags/*"
+
+- name: manifest-appliance
+  image: plugins/manifest:1.0.2
+  settings:
+    password:
+      from_secret: docker_password
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    - linux/arm
+    target: "rancher/terraform-controller-appliance:${DRONE_TAG}"
+    template: "rancher/terraform-controller-appliance:${DRONE_TAG}-ARCH"
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+    instance:
+    - drone-publish.rancher.io
+    ref:
+    - refs/head/master
+    - "refs/tags/*"
+
+- name: manifest-executor
+  image: plugins/manifest:1.0.2
+  settings:
+    password:
+      from_secret: docker_password
+    platforms:
+    - linux/amd64
+    target: "rancher/terraform-controller-executor:${DRONE_TAG}"
+    template: "rancher/terraform-controller-executor:${DRONE_TAG}-ARCH"
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+    instance:
+    - drone-publish.rancher.io
+    ref:
+    - refs/head/master
+    - "refs/tags/*"
+
+depends_on:
+- amd64
+- arm64
+- arm
+---
+kind: pipeline
+name: manifest-latest
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+- name: manifest-controller
+  image: plugins/manifest:1.0.2
+  settings:
+    password:
+      from_secret: docker_password
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    - linux/arm
+    target: "rancher/terraform-controller:latest"
+    template: "rancher/terraform-controller:${DRONE_TAG}-ARCH"
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+    instance:
+    - drone-publish.rancher.io
+    ref:
+    - refs/head/master
+    - "refs/tags/*"
+
+- name: manifest-appliance
+  image: plugins/manifest:1.0.2
+  settings:
+    password:
+      from_secret: docker_password
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    - linux/arm
+    target: "rancher/terraform-controller-appliance:latest"
+    template: "rancher/terraform-controller-appliance:${DRONE_TAG}-ARCH"
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+    instance:
+    - drone-publish.rancher.io
+    ref:
+    - refs/head/master
+    - "refs/tags/*"
+
+- name: manifest-executor
+  image: plugins/manifest:1.0.2
+  settings:
+    password:
+      from_secret: docker_password
+    platforms:
+    - linux/amd64
+    target: "rancher/terraform-controller-executor:latest"
+    template: "rancher/terraform-controller-executor:${DRONE_TAG}-ARCH"
+    username:
+      from_secret: docker_username
+  when:
+    event:
+    - tag
+    instance:
+    - drone-publish.rancher.io
+    ref:
+    - refs/head/master
+    - "refs/tags/*"
+
+trigger:
+  event:
+    tag
+  ref:
+    exclude:
+    - "refs/tags/*rc*"
+
+depends_on:
+- amd64
+- arm64
+- arm
+
+...

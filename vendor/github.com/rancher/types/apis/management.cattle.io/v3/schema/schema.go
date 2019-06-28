@@ -312,6 +312,7 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			m.DisplayName{}).
 		AddMapperForType(&Version, v3.NodeDriver{}, m.DisplayName{}).
 		AddMapperForType(&Version, v3.NodeTemplate{}, m.DisplayName{}).
+		AddMapperForType(&Version, v3.NodeTemplateTerraform{}, m.DisplayName{}).
 		MustImport(&Version, v3.PublicEndpoint{}).
 		MustImport(&Version, v3.NodePool{}).
 		MustImport(&Version, v3.NodeDrainInput{}).
@@ -345,6 +346,9 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			}
 		}).
 		MustImportAndCustomize(&Version, v3.NodeTemplate{}, func(schema *types.Schema) {
+			delete(schema.ResourceFields, "namespaceId")
+		}).
+		MustImportAndCustomize(&Version, v3.NodeTemplateTerraform{}, func(schema *types.Schema) {
 			delete(schema.ResourceFields, "namespaceId")
 		})
 }
@@ -827,7 +831,7 @@ func clusterTemplateTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		TypeName("clusterTemplate", v3.ClusterTemplate{}).
 		TypeName("clusterTemplateRevision", v3.ClusterTemplateRevision{}).
-		AddMapperForType(&Version, v3.ClusterTemplate{}, m.Drop{Field: "namespaceId"}).
+		AddMapperForType(&Version, v3.ClusterTemplate{}, m.Drop{Field: "namespaceId"}, m.DisplayName{}).
 		AddMapperForType(&Version, v3.ClusterTemplateRevision{}, m.Drop{Field: "namespaceId"}).
 		MustImport(&Version, v3.ClusterTemplate{}).
 		MustImport(&Version, v3.ClusterTemplateRevision{})
