@@ -112,7 +112,9 @@ func RestoreEtcdSnapshot(
 	ctx context.Context,
 	rkeConfig *v3.RancherKubernetesEngineConfig,
 	dialersOptions hosts.DialersOptions,
-	flags cluster.ExternalFlags, snapshotName string) (string, string, string, string, map[string]pki.CertificatePKI, error) {
+	flags cluster.ExternalFlags,
+	data map[string]interface{},
+	snapshotName string) (string, string, string, string, map[string]pki.CertificatePKI, error) {
 	var APIURL, caCrt, clientCert, clientKey string
 	log.Infof(ctx, "Restoring etcd snapshot %s", snapshotName)
 	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags)
@@ -154,7 +156,7 @@ func RestoreEtcdSnapshot(
 	if err := ClusterInit(ctx, rkeConfig, dialersOptions, flags); err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
-	APIURL, caCrt, clientCert, clientKey, certs, err := ClusterUp(ctx, dialersOptions, flags)
+	APIURL, caCrt, clientCert, clientKey, certs, err := ClusterUp(ctx, dialersOptions, flags, data)
 	if err != nil {
 		if !strings.Contains(err.Error(), "Provisioning incomplete") {
 			return APIURL, caCrt, clientCert, clientKey, nil, err
@@ -221,7 +223,7 @@ func RestoreEtcdSnapshotFromCli(ctx *cli.Context) error {
 	// setting up the flags
 	flags := cluster.GetExternalFlags(false, false, false, "", filePath)
 
-	_, _, _, _, _, err = RestoreEtcdSnapshot(context.Background(), rkeConfig, hosts.DialersOptions{}, flags, etcdSnapshotName)
+	_, _, _, _, _, err = RestoreEtcdSnapshot(context.Background(), rkeConfig, hosts.DialersOptions{}, flags, map[string]interface{}{}, etcdSnapshotName)
 	return err
 }
 

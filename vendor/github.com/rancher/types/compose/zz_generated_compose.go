@@ -63,6 +63,10 @@ type Config struct {
 	ManagementSecrets                        map[string]managementClient.ManagementSecret                        `json:"managementSecrets,omitempty" yaml:"managementSecrets,omitempty"`
 	ClusterTemplates                         map[string]managementClient.ClusterTemplate                         `json:"clusterTemplates,omitempty" yaml:"clusterTemplates,omitempty"`
 	ClusterTemplateRevisions                 map[string]managementClient.ClusterTemplateRevision                 `json:"clusterTemplateRevisions,omitempty" yaml:"clusterTemplateRevisions,omitempty"`
+	RKEK8sSystemImages                       map[string]managementClient.RKEK8sSystemImage                       `json:"rkeK8sSystemImages,omitempty" yaml:"rkeK8sSystemImages,omitempty"`
+	RKEK8sServiceOptions                     map[string]managementClient.RKEK8sServiceOption                     `json:"rkeK8sServiceOptions,omitempty" yaml:"rkeK8sServiceOptions,omitempty"`
+	RKEAddons                                map[string]managementClient.RKEAddon                                `json:"rkeAddons,omitempty" yaml:"rkeAddons,omitempty"`
+	RKEK8sWindowsSystemImages                map[string]managementClient.RKEK8sWindowsSystemImage                `json:"rkeK8sWindowsSystemImages,omitempty" yaml:"rkeK8sWindowsSystemImages,omitempty"`
 
 	// Cluster Client
 	Namespaces        map[string]clusterClient.Namespace        `json:"namespaces,omitempty" yaml:"namespaces,omitempty"`

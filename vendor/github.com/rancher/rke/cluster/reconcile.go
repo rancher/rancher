@@ -24,7 +24,7 @@ const (
 	EtcdPlaneNodesReplacedErr = "Etcd plane nodes are replaced. Stopping provisioning. Please restore your cluster from backup."
 )
 
-func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster, flags ExternalFlags) error {
+func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster, flags ExternalFlags, svcOptions *v3.KubernetesServicesOptions) error {
 	log.Infof(ctx, "[reconcile] Reconciling cluster state")
 	kubeCluster.UpdateWorkersOnly = flags.UpdateOnly
 	if currentCluster == nil {
@@ -40,7 +40,7 @@ func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster,
 	// sync node labels to define the toDelete labels
 	syncLabels(ctx, currentCluster, kubeCluster)
 
-	if err := reconcileEtcd(ctx, currentCluster, kubeCluster, kubeClient); err != nil {
+	if err := reconcileEtcd(ctx, currentCluster, kubeCluster, kubeClient, svcOptions); err != nil {
 		return fmt.Errorf("Failed to reconcile etcd plane: %v", err)
 	}
 
@@ -165,7 +165,7 @@ func reconcileHost(ctx context.Context, toDeleteHost *hosts.Host, worker, etcd b
 	return nil
 }
 
-func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, kubeClient *kubernetes.Clientset) error {
+func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, kubeClient *kubernetes.Clientset, svcOptions *v3.KubernetesServicesOptions) error {
 	log.Infof(ctx, "[reconcile] Check etcd hosts to be deleted")
 	if isEtcdPlaneReplaced(ctx, currentCluster, kubeCluster) {
 		logrus.Warnf("%v", EtcdPlaneNodesReplacedErr)
@@ -213,7 +213,7 @@ func reconcileEtcd(ctx context.Context, currentCluster, kubeCluster *Cluster, ku
 
 		etcdNodePlanMap := make(map[string]v3.RKEConfigNodePlan)
 		for _, etcdReadyHost := range kubeCluster.EtcdReadyHosts {
-			etcdNodePlanMap[etcdReadyHost.Address] = BuildRKEConfigNodePlan(ctx, kubeCluster, etcdReadyHost, etcdReadyHost.DockerInfo)
+			etcdNodePlanMap[etcdReadyHost.Address] = BuildRKEConfigNodePlan(ctx, kubeCluster, etcdReadyHost, etcdReadyHost.DockerInfo, svcOptions)
 		}
 		// this will start the newly added etcd node and make sure it started correctly before restarting other node
 		// https://github.com/etcd-io/etcd/blob/master/Documentation/op-guide/runtime-configuration.md#add-a-new-member

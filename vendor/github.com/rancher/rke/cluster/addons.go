@@ -96,21 +96,21 @@ func getAddonResourceName(addon string) string {
 	return AddonResourceName
 }
 
-func (c *Cluster) deployK8sAddOns(ctx context.Context) error {
-	if err := c.deployDNS(ctx); err != nil {
+func (c *Cluster) deployK8sAddOns(ctx context.Context, data map[string]interface{}) error {
+	if err := c.deployDNS(ctx, data); err != nil {
 		if err, ok := err.(*addonError); ok && err.isCritical {
 			return err
 		}
 		log.Warnf(ctx, "Failed to deploy DNS addon execute job for provider %s: %v", c.DNS.Provider, err)
 
 	}
-	if err := c.deployMetricServer(ctx); err != nil {
+	if err := c.deployMetricServer(ctx, data); err != nil {
 		if err, ok := err.(*addonError); ok && err.isCritical {
 			return err
 		}
 		log.Warnf(ctx, "Failed to deploy addon execute job [%s]: %v", MetricsServerAddonResourceName, err)
 	}
-	if err := c.deployIngress(ctx); err != nil {
+	if err := c.deployIngress(ctx, data); err != nil {
 		if err, ok := err.(*addonError); ok && err.isCritical {
 			return err
 		}
@@ -245,7 +245,7 @@ func getAddonFromURL(yamlURL string) ([]byte, error) {
 
 }
 
-func (c *Cluster) deployKubeDNS(ctx context.Context) error {
+func (c *Cluster) deployKubeDNS(ctx context.Context, data map[string]interface{}) error {
 	log.Infof(ctx, "[addons] Setting up %s", c.DNS.Provider)
 	KubeDNSConfig := KubeDNSOptions{
 		KubeDNSImage:           c.SystemImages.KubeDNS,
@@ -259,7 +259,7 @@ func (c *Cluster) deployKubeDNS(ctx context.Context) error {
 		ReverseCIDRs:           c.DNS.ReverseCIDRs,
 		NodeSelector:           c.DNS.NodeSelector,
 	}
-	kubeDNSYaml, err := addons.GetKubeDNSManifest(KubeDNSConfig)
+	kubeDNSYaml, err := addons.GetKubeDNSManifest(KubeDNSConfig, data)
 	if err != nil {
 		return err
 	}
@@ -270,7 +270,7 @@ func (c *Cluster) deployKubeDNS(ctx context.Context) error {
 	return nil
 }
 
-func (c *Cluster) deployCoreDNS(ctx context.Context) error {
+func (c *Cluster) deployCoreDNS(ctx context.Context, data map[string]interface{}) error {
 	log.Infof(ctx, "[addons] Setting up %s", c.DNS.Provider)
 	CoreDNSConfig := CoreDNSOptions{
 		CoreDNSImage:           c.SystemImages.CoreDNS,
@@ -282,7 +282,7 @@ func (c *Cluster) deployCoreDNS(ctx context.Context) error {
 		ReverseCIDRs:           c.DNS.ReverseCIDRs,
 		NodeSelector:           c.DNS.NodeSelector,
 	}
-	coreDNSYaml, err := addons.GetCoreDNSManifest(CoreDNSConfig)
+	coreDNSYaml, err := addons.GetCoreDNSManifest(CoreDNSConfig, data)
 	if err != nil {
 		return err
 	}
@@ -293,7 +293,7 @@ func (c *Cluster) deployCoreDNS(ctx context.Context) error {
 	return nil
 }
 
-func (c *Cluster) deployMetricServer(ctx context.Context) error {
+func (c *Cluster) deployMetricServer(ctx context.Context, data map[string]interface{}) error {
 	if c.Monitoring.Provider == "none" {
 		addonJobExists, err := addons.AddonJobExists(MetricsServerAddonJobName, c.LocalKubeConfigPath, c.K8sWrapTransport)
 		if err != nil {
@@ -321,7 +321,7 @@ func (c *Cluster) deployMetricServer(ctx context.Context) error {
 		Options:            c.Monitoring.Options,
 		Version:            util.GetTagMajorVersion(versionTag),
 	}
-	metricsYaml, err := addons.GetMetricsServerManifest(MetricsServerConfig)
+	metricsYaml, err := addons.GetMetricsServerManifest(MetricsServerConfig, data)
 	if err != nil {
 		return err
 	}
@@ -443,7 +443,7 @@ func (c *Cluster) ApplySystemAddonExecuteJob(addonJob string, addonUpdated bool)
 	return nil
 }
 
-func (c *Cluster) deployIngress(ctx context.Context) error {
+func (c *Cluster) deployIngress(ctx context.Context, data map[string]interface{}) error {
 	if c.Ingress.Provider == "none" {
 		addonJobExists, err := addons.AddonJobExists(IngressAddonJobName, c.LocalKubeConfigPath, c.K8sWrapTransport)
 		if err != nil {
@@ -481,7 +481,7 @@ func (c *Cluster) deployIngress(ctx context.Context) error {
 	}
 
 	// Currently only deploying nginx ingress controller
-	ingressYaml, err := addons.GetNginxIngressManifest(ingressConfig)
+	ingressYaml, err := addons.GetNginxIngressManifest(ingressConfig, data)
 	if err != nil {
 		return err
 	}
@@ -508,7 +508,7 @@ func (c *Cluster) removeDNSProvider(ctx context.Context, dnsprovider string) err
 	return nil
 }
 
-func (c *Cluster) deployDNS(ctx context.Context) error {
+func (c *Cluster) deployDNS(ctx context.Context, data map[string]interface{}) error {
 	for _, dnsprovider := range DNSProviders {
 		if strings.EqualFold(dnsprovider, c.DNS.Provider) {
 			continue
@@ -519,7 +519,7 @@ func (c *Cluster) deployDNS(ctx context.Context) error {
 	}
 	switch DNSProvider := c.DNS.Provider; DNSProvider {
 	case DefaultDNSProvider:
-		if err := c.deployKubeDNS(ctx); err != nil {
+		if err := c.deployKubeDNS(ctx, data); err != nil {
 			if err, ok := err.(*addonError); ok && err.isCritical {
 				return err
 			}
@@ -528,7 +528,7 @@ func (c *Cluster) deployDNS(ctx context.Context) error {
 		log.Infof(ctx, "[dns] DNS provider %s deployed successfully", c.DNS.Provider)
 		return nil
 	case CoreDNSProvider:
-		if err := c.deployCoreDNS(ctx); err != nil {
+		if err := c.deployCoreDNS(ctx, data); err != nil {
 			if err, ok := err.(*addonError); ok && err.isCritical {
 				return err
 			}

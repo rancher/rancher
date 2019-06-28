@@ -1,13 +1,14 @@
 package cluster
 
 import (
+	"github.com/rancher/rke/metadata"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 func GetLocalRKEConfig() *v3.RancherKubernetesEngineConfig {
 	rkeLocalNode := GetLocalRKENodeConfig()
-	imageDefaults := v3.K8sVersionToRKESystemImages[DefaultK8sVersion]
+	imageDefaults := metadata.K8sVersionToRKESystemImages[metadata.DefaultK8sVersion]
 
 	rkeServices := v3.RKEConfigServices{
 		Kubelet: v3.KubeletService{
