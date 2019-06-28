@@ -96,6 +96,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.NodeDriverType,
 		client.NodePoolType,
 		client.NodeTemplateType,
+		client.NodeTemplateTerraformType,
 		client.NodeType,
 		client.NotifierType,
 		client.PodSecurityPolicyTemplateProjectBindingType,
@@ -151,6 +152,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	Preference(schemas, apiContext)
 	ClusterRegistrationTokens(schemas)
 	NodeTemplates(schemas, apiContext)
+	NodeTemplatesTerraform(schemas, apiContext)
 	LoggingTypes(schemas, apiContext, clusterManager, k8sProxy)
 	Alert(schemas, apiContext)
 	Pipeline(schemas, apiContext, clusterManager)
@@ -336,6 +338,22 @@ func ClusterRegistrationTokens(schemas *types.Schemas) {
 
 func NodeTemplates(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.NodeTemplateType)
+	npl := management.Management.NodePools("").Controller().Lister()
+	f := nodetemplate.Formatter{
+		NodePoolLister: npl,
+	}
+	schema.Formatter = f.Formatter
+	s := &nodeTemplateStore.Store{
+		Store:                 userscope.NewStore(management.Core.Namespaces(""), schema.Store),
+		NodePoolLister:        npl,
+		CloudCredentialLister: management.Core.Secrets(namespace.GlobalNamespace).Controller().Lister(),
+	}
+	schema.Store = s
+	schema.Validator = nodetemplate.Validator
+}
+
+func NodeTemplatesTerraform(schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.NodeTemplateTerraformType)
 	npl := management.Management.NodePools("").Controller().Lister()
 	f := nodetemplate.Formatter{
 		NodePoolLister: npl,

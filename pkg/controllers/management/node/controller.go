@@ -67,6 +67,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		secretStore:               secretStore,
 		nodeClient:                nodeClient,
 		nodeTemplateClient:        management.Management.NodeTemplates(""),
+		nodePool:                  management.Management.NodePools(""),
 		nodeTemplateGenericClient: management.Management.NodeTemplates("").ObjectClient().UnstructuredClient(),
 		configMapGetter:           management.K8sClient.CoreV1(),
 		clusterLister:             management.Management.Clusters("").Controller().Lister(),
@@ -84,6 +85,7 @@ type Lifecycle struct {
 	nodeTemplateGenericClient objectclient.GenericClient
 	nodeClient                v3.NodeInterface
 	nodeTemplateClient        v3.NodeTemplateInterface
+	nodePool                  v3.NodePoolInterface
 	configMapGetter           typedv1.ConfigMapsGetter
 	clusterLister             v3.ClusterLister
 	schemaLister              v3.DynamicSchemaLister
@@ -127,12 +129,14 @@ func (m *Lifecycle) setWaiting(node *v3.Node) {
 }
 
 func (m *Lifecycle) Create(obj *v3.Node) (runtime.Object, error) {
+	logrus.Info("create node")
 	if isCustom(obj) {
 		m.setupCustom(obj)
 		newObj, err := v3.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
 			if err := validateCustomHost(obj); err != nil {
 				return obj, err
 			}
+
 			m.setWaiting(obj)
 			return obj, nil
 		})
@@ -404,8 +408,24 @@ outer:
 
 func (m *Lifecycle) Updated(obj *v3.Node) (runtime.Object, error) {
 	obj, err := m.checkLabels(obj)
+
 	if err != nil {
 		return obj, err
+	}
+
+	for key, value := range obj.Status.NodeLabels {
+		logrus.Infof("%s: %s", key, value)
+	}
+
+	if obj.Spec.NodePoolName == "" && obj.Status.NodeLabels["pool"] != "" {
+		pool, err := m.nodePool.GetNamespaced(obj.Namespace, obj.Status.NodeLabels["pool"], metav1.GetOptions{})
+		if err != nil {
+			return obj, err
+		}
+
+		obj.Spec.NodePoolName = obj.Namespace + ":" + pool.Name
+		delete(obj.Status.NodeLabels, "pool")
+		return m.nodeClient.Update(obj)
 	}
 
 	newObj, err := v3.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {

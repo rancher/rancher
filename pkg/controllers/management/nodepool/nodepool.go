@@ -3,16 +3,22 @@ package nodepool
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
-	"reflect"
+	"github.com/rancher/norman/objectclient"
 
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rke/services"
+	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	tfv1 "github.com/rancher/types/apis/terraformcontroller.cattle.io/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,20 +31,40 @@ var (
 )
 
 type Controller struct {
-	NodePoolController v3.NodePoolController
-	NodePoolLister     v3.NodePoolLister
-	NodePools          v3.NodePoolInterface
-	NodeLister         v3.NodeLister
-	Nodes              v3.NodeInterface
+	NodePoolController      v3.NodePoolController
+	NodePoolLister          v3.NodePoolLister
+	NodePools               v3.NodePoolInterface
+	NodeLister              v3.NodeLister
+	Nodes                   v3.NodeInterface
+	Manager                 *systemaccount.Manager
+	NodeTemplateTerraform   v3.NodeTemplateTerraformInterface
+	Cluster                 v3.ClusterInterface
+	CloudCredential         v1.SecretInterface
+	TerraformModule         tfv1.ModuleInterface
+	TerraformState          tfv1.StateInterface
+	TerraformSecrets        v1.SecretInterface
+	TerraformConfigMaps     v1.ConfigMapInterface
+	nodeTemplateTerraformGC objectclient.GenericClient
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
+	tfClient, _ := tfv1.NewForConfig(management.RESTConfig)
+
 	p := &Controller{
-		NodePoolController: management.Management.NodePools("").Controller(),
-		NodePoolLister:     management.Management.NodePools("").Controller().Lister(),
-		NodePools:          management.Management.NodePools(""),
-		NodeLister:         management.Management.Nodes("").Controller().Lister(),
-		Nodes:              management.Management.Nodes(""),
+		NodePoolController:      management.Management.NodePools("").Controller(),
+		NodePoolLister:          management.Management.NodePools("").Controller().Lister(),
+		NodePools:               management.Management.NodePools(""),
+		NodeLister:              management.Management.Nodes("").Controller().Lister(),
+		Nodes:                   management.Management.Nodes(""),
+		Manager:                 systemaccount.NewManager(management),
+		NodeTemplateTerraform:   management.Management.NodeTemplateTerraforms(""),
+		Cluster:                 management.Management.Clusters(""),
+		CloudCredential:         management.Core.Secrets(namespace.GlobalNamespace),
+		TerraformModule:         tfClient.Modules(terraformControllerNamespace),
+		TerraformState:          tfClient.States(terraformControllerNamespace),
+		TerraformSecrets:        management.Core.Secrets(terraformControllerNamespace),
+		TerraformConfigMaps:     management.Core.ConfigMaps(terraformControllerNamespace),
+		nodeTemplateTerraformGC: management.Management.NodeTemplateTerraforms("").ObjectClient().UnstructuredClient(),
 	}
 
 	// Add handlers
@@ -51,9 +77,18 @@ func (c *Controller) Create(nodePool *v3.NodePool) (runtime.Object, error) {
 }
 
 func (c *Controller) Updated(nodePool *v3.NodePool) (runtime.Object, error) {
+	if nodePool.Spec.NodeTemplateTerraformName != "" {
+		obj, err := v3.NodePoolConditionUpdated.Do(nodePool, func() (runtime.Object, error) {
+			return c.createTerraformObjects(nodePool)
+		})
+
+		return obj.(*v3.NodePool), err
+	}
+
 	obj, err := v3.NodePoolConditionUpdated.Do(nodePool, func() (runtime.Object, error) {
 		return nodePool, c.createNodes(nodePool)
 	})
+
 	return obj.(*v3.NodePool), err
 }
 
@@ -318,4 +353,20 @@ func (c *Controller) updateNodeRoles(existing *v3.Node, nodePool *v3.NodePool, s
 	}
 
 	return c.Nodes.Update(toUpdate)
+}
+
+func (c *Controller) generateNodeCommandRoleFlags(nodePool *v3.NodePool) string {
+	var roles []string
+
+	if nodePool.Spec.ControlPlane {
+		roles = append(roles, "--controlplane")
+	}
+	if nodePool.Spec.Etcd {
+		roles = append(roles, "--etcd")
+	}
+	if nodePool.Spec.Worker {
+		roles = append(roles, "--worker")
+	}
+
+	return strings.Join(roles, " ")
 }
