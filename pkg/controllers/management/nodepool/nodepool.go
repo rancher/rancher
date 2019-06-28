@@ -231,8 +231,9 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (b
 					}
 				} else {
 					c.mutex.Lock()
-					if _, ok := c.syncmap[node.Name]; !ok {
-						c.syncmap[node.Name] = true
+					nodeid := node.Namespace + ":" + node.Name
+					if _, ok := c.syncmap[nodeid]; !ok {
+						c.syncmap[nodeid] = true
 						go c.requeue(nodeNotReadyTimeout, nodePool, node)
 					}
 					c.mutex.Unlock()
@@ -366,7 +367,7 @@ func (c *Controller) requeue(timeout time.Duration, np *v3.NodePool, node *v3.No
 		}
 	}
 	c.mutex.Lock()
-	delete(c.syncmap, node.Name)
+	delete(c.syncmap, node.Namespace+":"+node.Name)
 	c.mutex.Unlock()
 }
 
