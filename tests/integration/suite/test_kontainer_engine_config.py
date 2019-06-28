@@ -80,9 +80,9 @@ def test_rke_config_appears_correctly(admin_mc, remove_resource):
     schema is properly populated"""
     cluster = admin_mc.client.create_cluster(
         name=random_str(), rancherKubernetesEngineConfig={
-            "kubernetesVersion": "some-fake-version",
+            "kubernetesVersion": "v1.12.9-rancher1-1",
         })
     remove_resource(cluster)
 
     k8s_version = cluster.rancherKubernetesEngineConfig.kubernetesVersion
-    assert k8s_version == "some-fake-version"
+    assert k8s_version == "v1.12.9-rancher1-1"

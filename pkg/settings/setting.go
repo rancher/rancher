@@ -30,6 +30,7 @@ var (
 	InstallUUID                     = NewSetting("install-uuid", "")
 	KubernetesVersion               = NewSetting("k8s-version", v3.DefaultK8s)
 	KubernetesVersionToSystemImages = NewSetting("k8s-version-to-images", getSystemImages())
+	KubernetesVersionsCurrent       = NewSetting("k8s-versions-current", getK8sVersionsCurrent())
 	MachineVersion                  = NewSetting("machine-version", "dev")
 	Namespace                       = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PeerServices                    = NewSetting("peer-service", os.Getenv("CATTLE_PEER_SERVICE"))
@@ -149,6 +150,10 @@ func getSystemImages() string {
 		return ""
 	}
 	return string(data)
+}
+
+func getK8sVersionsCurrent() string {
+	return strings.Join(v3.K8sVersionsCurrent, ",")
 }
 
 func GetEnvKey(key string) string {
