@@ -225,7 +225,7 @@ def test_check_enforcement(admin_mc, remove_resource, user_factory):
     # and enforced template
     with pytest.raises(ApiError) as e:
         user_client.create_cluster(name=random_str(),
-                                   clusterTemplateId=cluster_template.id,
+                                   clusterTemplateId=templateId,
                                    clusterTemplateRevisionId=rev.id,
                                    description="cluster from temp")
         assert e.value.error.status == 403
@@ -236,13 +236,20 @@ def test_check_enforcement(admin_mc, remove_resource, user_factory):
     new_members = [{"groupPrincipalId": "*"}]
     client.update(template_reloaded, members=new_members)
 
-    cluster = user_client.create_cluster(name=random_str(),
-                                         clusterTemplateId=cluster_template.id,
-                                         clusterTemplateRevisionId=rev.id,
-                                         description="cluster from temp")
-    remove_resource(cluster)
+    cluster2 = user_client.create_cluster(name=random_str(),
+                                          clusterTemplateId=templateId,
+                                          clusterTemplateRevisionId=rev.id,
+                                          description="cluster from temp")
+    remove_resource(cluster2)
     client.update_by_id_setting(id='cluster-template-enforcement',
                                 value="false")
+
+    # check that user cannot update the enforced flag
+    user_template = create_cluster_template(user_client, remove_resource,
+                                            [])
+    with pytest.raises(ApiError) as e:
+        user_client.update(user_template, enforced="true")
+        assert e.value.error.status == 403
 
 
 def rtb_cb(client, rtb):

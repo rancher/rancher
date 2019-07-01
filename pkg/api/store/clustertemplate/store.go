@@ -9,6 +9,8 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementv3 "github.com/rancher/types/client/management/v3"
 )
 
@@ -16,18 +18,30 @@ const (
 	clusterTemplateLabelName = "io.cattle.field/clusterTemplateId"
 )
 
-func WrapStore(store types.Store) types.Store {
+func WrapStore(store types.Store, users v3.UserInterface, grbLister v3.GlobalRoleBindingLister, grLister v3.GlobalRoleLister) types.Store {
 	storeWrapped := &Store{
-		Store: store,
+		Store:     store,
+		users:     users,
+		grbLister: grbLister,
+		grLister:  grLister,
 	}
 	return storeWrapped
 }
 
 type Store struct {
 	types.Store
+	users     v3.UserInterface
+	grbLister v3.GlobalRoleBindingLister
+	grLister  v3.GlobalRoleLister
 }
 
 func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
+
+	if strings.EqualFold(apiContext.Type, managementv3.ClusterTemplateType) {
+		if err := p.canSetEnforce(apiContext, data, ""); err != nil {
+			return nil, err
+		}
+	}
 
 	if strings.EqualFold(apiContext.Type, managementv3.ClusterTemplateRevisionType) {
 		if err := setLabelsAndOwnerRef(apiContext, data); err != nil {
@@ -39,6 +53,12 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 }
 
 func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
+
+	if strings.EqualFold(apiContext.Type, managementv3.ClusterTemplateType) {
+		if err := p.canSetEnforce(apiContext, data, id); err != nil {
+			return nil, err
+		}
+	}
 
 	if strings.EqualFold(apiContext.Type, managementv3.ClusterTemplateRevisionType) {
 		isUsed, err := isTemplateInUse(apiContext, id)
@@ -156,4 +176,39 @@ func isDefaultTemplateRevision(apiContext *types.APIContext, id string) (bool, e
 	}
 
 	return false, nil
+}
+
+func (p *Store) canSetEnforce(apiContext *types.APIContext, data map[string]interface{}, templateID string) error {
+	//check if turning on enforced flag
+
+	enforcedFlagInData := convert.ToBool(data[managementv3.ClusterTemplateFieldEnforced])
+	enforcedFlagChanged := enforcedFlagInData
+
+	if templateID != "" {
+		var template managementv3.ClusterTemplate
+		if err := access.ByID(apiContext, apiContext.Version, managementv3.ClusterTemplateType, templateID, &template); err != nil {
+			return err
+		}
+		if template.Enforced != enforcedFlagInData {
+			enforcedFlagChanged = true
+		}
+	}
+	if enforcedFlagChanged {
+		//only admin can set the flag
+		ma := gaccess.MemberAccess{
+			Users:     p.users,
+			GrLister:  p.grLister,
+			GrbLister: p.grbLister,
+		}
+		callerID := apiContext.Request.Header.Get(gaccess.ImpersonateUserHeader)
+		isAdmin, err := ma.IsAdmin(callerID)
+		if err != nil {
+			return err
+		}
+		if !isAdmin {
+			return httperror.NewAPIError(httperror.PermissionDenied, fmt.Sprintf("ClusterTemplate's %v field cannot be changed", managementv3.ClusterTemplateFieldEnforced))
+		}
+	}
+
+	return nil
 }
