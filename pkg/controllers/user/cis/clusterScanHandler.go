@@ -157,7 +157,7 @@ func (csh *cisScanHandler) deployApp(clusterName, appName string) error {
 		},
 	}
 
-	_, err = utils.DeployApp(csh.mgmtCtxAppClient, appDeployProjectID, app, false)
+	_, err = utils.DeployApp(csh.mgmtCtxAppClient, appDeployProjectID, app)
 	if err != nil {
 		return err
 	}

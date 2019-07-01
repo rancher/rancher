@@ -2,7 +2,7 @@ package utils
 
 import (
 	"fmt"
-	"time"
+	"reflect"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
@@ -83,7 +83,7 @@ func GetSystemProjectID(cattleProjectsLister v3.ProjectLister) (string, error) {
 	return systemProject.Name, nil
 }
 
-func DeployApp(mgmtAppClient projv3.AppInterface, projectID string, createOrUpdateApp *projv3.App, forceRedeploy bool) (*projv3.App, error) {
+func DeployApp(mgmtAppClient projv3.AppInterface, projectID string, createOrUpdateApp *projv3.App) (*projv3.App, error) {
 	if createOrUpdateApp == nil {
 		return nil, errors.New("cannot deploy a nil App")
 	}
@@ -105,16 +105,11 @@ func DeployApp(mgmtAppClient projv3.AppInterface, projectID string, createOrUpda
 			return nil, errors.Wrapf(err, "failed to create %q App", appName)
 		}
 	} else {
+		if reflect.DeepEqual(createOrUpdateApp.Spec.Answers, app.Spec.Answers) && reflect.DeepEqual(createOrUpdateApp.Spec.ValuesYaml, app.Spec.ValuesYaml) {
+			return app, nil
+		}
 		app = app.DeepCopy()
 		app.Spec.Answers = createOrUpdateApp.Spec.Answers
-
-		// clean up status
-		if forceRedeploy {
-			if app.Spec.Answers == nil {
-				app.Spec.Answers = make(map[string]string, 1)
-			}
-			app.Spec.Answers["redeployTs"] = fmt.Sprintf("%d", time.Now().Unix())
-		}
 
 		if rtn, err = mgmtAppClient.Update(app); err != nil {
 			return nil, errors.Wrapf(err, "failed to update %q App", appName)
