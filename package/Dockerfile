@@ -21,6 +21,11 @@ ENV LOGLEVEL_VERSION v0.1.2
 ENV TINI_VERSION v0.18.0
 ENV TELEMETRY_VERSION v0.5.6
 
+RUN mkdir -p /var/lib/rancher/management-state/local-catalogs/system-library && \
+    mkdir -p /var/lib/rancher/management-state/local-catalogs/library && \
+    git clone -b $CATTLE_SYSTEM_CHART_DEFAULT_BRANCH --single-branch https://github.com/rancher/system-charts /var/lib/rancher/management-state/local-catalogs/system-library && \
+    git clone -b master --single-branch https://github.com/rancher/charts /var/lib/rancher/management-state/local-catalogs/library
+
 
 RUN curl -sLf https://github.com/rancher/machine-package/releases/download/${CATTLE_MACHINE_VERSION}/docker-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin && \
     curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-${ARCH}-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin

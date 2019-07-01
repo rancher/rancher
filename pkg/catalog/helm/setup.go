@@ -19,14 +19,16 @@ import (
 )
 
 const (
-	kindHelmGit  = "helm:git"
-	kindHelmHTTP = "helm:http"
+	KindHelmGit      = "helm:git"
+	KindHelmHTTP     = "helm:http"
+	KindHelmInternal = "helm:internal"
 )
 
 var (
 	validCatalogKind = map[string]bool{
-		kindHelmGit:  true,
-		kindHelmHTTP: true,
+		KindHelmGit:      true,
+		KindHelmHTTP:     true,
+		KindHelmInternal: true,
 	}
 )
 
@@ -56,11 +58,11 @@ func NewForceUpdate(catalog *v3.Catalog) (string, *Helm, error) {
 }
 
 func CatalogSHA256Hash(catalog *v3.Catalog) string {
-	url := catalog.Spec.URL
+	u := catalog.Spec.URL
 	branch := catalog.Spec.Branch
 	username := catalog.Spec.Username
 	password := catalog.Spec.Password
-	hashBytes := sha256.Sum256([]byte(fmt.Sprintf("%s %s %s %s", url, branch, username, password)))
+	hashBytes := sha256.Sum256([]byte(fmt.Sprintf("%s %s %s %s", u, branch, username, password)))
 	return hex.EncodeToString(hashBytes[:])
 }
 
@@ -68,6 +70,10 @@ func newCache(catalog *v3.Catalog) *Helm {
 	hash := CatalogSHA256Hash(catalog)
 	localPath := filepath.Join(CatalogCache, hash)
 	kind := getCatalogKind(catalog, localPath)
+
+	if kind == KindHelmInternal {
+		localPath = filepath.Join(InternalCatalog, catalog.Name)
+	}
 
 	return &Helm{
 		LocalPath:   localPath,
@@ -89,15 +95,15 @@ func getCatalogKind(catalog *v3.Catalog, localPath string) string {
 	}
 
 	if _, err := os.Stat(filepath.Join(localPath, ".git", "HEAD")); !os.IsNotExist(err) {
-		return kindHelmGit
+		return KindHelmGit
 	}
 
 	pathURL := git.FormatURL(catalog.Spec.URL, catalog.Spec.Username, catalog.Spec.Password)
 	if git.IsValid(pathURL) {
-		return kindHelmGit
+		return KindHelmGit
 	}
 
-	return kindHelmHTTP
+	return KindHelmHTTP
 }
 
 func (h *Helm) Update(fetchLatest bool) (string, error) {
@@ -124,13 +130,33 @@ func (h *Helm) update(fetchLatest bool) (string, error) {
 		err    error
 	)
 	switch h.Kind {
-	case kindHelmGit:
+	case KindHelmGit:
 		commit, err = h.updateGit(fetchLatest)
-	case kindHelmHTTP:
+	case KindHelmHTTP:
 		commit, err = h.updateIndex(fetchLatest)
+	case KindHelmInternal:
+		commit, err = h.updateInternal()
 	default:
-		return "", fmt.Errorf("Unknown helm catalog kind [%s] for [%s]", h.Kind, h.url)
+		return "", fmt.Errorf("unknown helm catalog kind [%s] for [%s]", h.Kind, h.url)
 	}
+	return commit, err
+}
+
+func (h *Helm) updateInternal() (string, error) {
+	empty, err := dirEmpty(h.LocalPath)
+	if err != nil {
+		return "", errors.Wrap(err, "empty directory check failed")
+	}
+
+	if empty {
+		return "", errors.New("local catalog directory is empty")
+	}
+
+	commit, err := git.HeadCommit(h.LocalPath)
+	if err != nil {
+		err = errors.Wrap(err, "retrieving head commit failed")
+	}
+
 	return commit, err
 }
 
