@@ -158,6 +158,6 @@ func getCertExpiration(c string) (v3.CertExpiration, error) {
 		return v3.CertExpiration{}, err
 	}
 	return v3.CertExpiration{
-		ExpirationDate: date.String(),
+		ExpirationDate: date.Format(time.RFC3339),
 	}, nil
 }
