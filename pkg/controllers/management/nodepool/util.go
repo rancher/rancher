@@ -1,34 +1,52 @@
 package nodepool
 
-import "regexp"
+import (
+	"strconv"
+
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+
+	"github.com/sirupsen/logrus"
+)
 
 // use pointer to avoid copying large number of structs
-// could also use strings here maybe?
-// type nodes []*v3.Node
 
-type stringSlice []string
-
-// implement sort interface
+type byNodeRequestedHostName []*v3.Node
 
 /*
  Expecting to see strings styled [Prefix] + [some decimal value] which means we can do some specific things
 Inspired by https://github.com/facette/natsort/blob/2cd4dd1e2dcba4d85d6d3ead4adf4cfd2b70caf2/natsort.go
 */
 
-func (s stringSlice) Len() int {
-	return len(s)
+func (s byNodeRequestedHostName) Len() int {
+	return len(s) //returns len of slice of structs
 }
 
-func (s stringSlice) Less(a, b int) bool {
-	return Compare(s[a], s[b])
+func (s byNodeRequestedHostName) Less(a, b int) bool {
+	return Compare(s[a].Spec.RequestedHostname, s[b].Spec.RequestedHostname)
 }
 
-func (s stringSlice) Swap(a, b int) {
+func (s byNodeRequestedHostName) Swap(a, b int) {
 	s[a], s[b] = s[b], s[a]
 }
 
-var chunifyRegexp = regexp.MustCompile(`(\d+|\D+)`)
-
+// Compare returns true if the first string precedes the second one according to natural order
 func Compare(a, b string) bool {
-	return true
+	s1 := nameRegexp.FindStringSubmatch(a)
+	s2 := nameRegexp.FindStringSubmatch(b)
+
+	if len(s1) < 2 || len(s2) < 2 {
+		// fallback onto lexicographical sorting
+		logrus.Warnf("Unable to sort nodes %s  %s naturally, fallback onto lexicographical sort", a, b)
+		return a < b
+	}
+
+	s1Int, aErr := strconv.Atoi(s1[2])
+	s2Int, bErr := strconv.Atoi(s2[2])
+
+	if aErr == nil && bErr == nil {
+		return s1Int < s2Int
+	}
+	// fallback on lexicographical sorting
+	logrus.Warnf("Unable to sort nodes %s  %s naturally, fallback onto lexicographical sort", a, b)
+	return a < b
 }

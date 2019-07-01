@@ -273,12 +273,15 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (b
 	}
 
 	for len(nodes) > quantity {
-		sort.Slice(nodes, func(i, j int) bool {
-			// perform natural sorting
-			// we exclusively sort off kubernetes.io/hostname
-			// fallback to lexographical sorting for other cases
-			return nodes[i].Spec.RequestedHostname < nodes[j].Spec.RequestedHostname
-		})
+
+		sort.Sort(byNodeRequestedHostName(nodes))
+
+		//sort.Slice(nodes, func(i, j int) bool {
+		//	// perform natural sorting
+		//	// we exclusively sort off kubernetes.io/hostname
+		//	// fallback to lexographical sorting for other cases
+		//	return nodes[i].Spec.RequestedHostname < nodes[j].Spec.RequestedHostname
+		//})
 
 		toDelete := nodes[len(nodes)-1]
 
