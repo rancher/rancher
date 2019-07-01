@@ -79,6 +79,7 @@ type KubeDNSOptions struct {
 	ClusterDNSServer       string
 	ReverseCIDRs           []string
 	UpstreamNameservers    []string
+	StubDomains            map[string][]string
 	NodeSelector           map[string]string
 }
 
@@ -257,6 +258,7 @@ func (c *Cluster) deployKubeDNS(ctx context.Context) error {
 		ClusterDNSServer:       c.ClusterDNSServer,
 		UpstreamNameservers:    c.DNS.UpstreamNameservers,
 		ReverseCIDRs:           c.DNS.ReverseCIDRs,
+		StubDomains:            c.DNS.StubDomains,
 		NodeSelector:           c.DNS.NodeSelector,
 	}
 	kubeDNSYaml, err := addons.GetKubeDNSManifest(KubeDNSConfig)

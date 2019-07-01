@@ -2,6 +2,7 @@ package templates
 
 import (
 	"bytes"
+	"encoding/json"
 	"text/template"
 
 	"github.com/rancher/rke/util"
@@ -28,7 +29,7 @@ var VersionedTemplate = map[string]map[string]string{
 
 func CompileTemplateFromMap(tmplt string, configMap interface{}) (string, error) {
 	out := new(bytes.Buffer)
-	t := template.Must(template.New("compiled_template").Parse(tmplt))
+	t := template.Must(template.New("compiled_template").Funcs(template.FuncMap{"GetKubednsStubDomains": GetKubednsStubDomains}).Parse(tmplt))
 	if err := t.Execute(out, configMap); err != nil {
 		return "", err
 	}
@@ -42,4 +43,9 @@ func GetVersionedTemplates(templateName string, k8sVersion string) string {
 		return t
 	}
 	return versionedTemplate["default"]
+}
+
+func GetKubednsStubDomains(stubDomains map[string][]string) string {
+	json, _ := json.Marshal(stubDomains)
+	return string(json)
 }

@@ -297,7 +297,6 @@ spec:
   - name: dns-tcp
     port: 53
     protocol: TCP
-{{- if .UpstreamNameservers }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -305,6 +304,11 @@ metadata:
   name: kube-dns
   namespace: kube-system
 data:
+{{- if .UpstreamNameservers }}
   upstreamNameservers: |
     [{{range $i, $v := .UpstreamNameservers}}{{if $i}}, {{end}}{{printf "%q" .}}{{end}}]
+{{- end }}
+{{- if .StubDomains }}
+  stubDomains: |
+    {{ GetKubednsStubDomains .StubDomains }}
 {{- end }}`
