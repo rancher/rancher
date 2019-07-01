@@ -197,7 +197,7 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (b
 		byName              = map[string]*v3.Node{}
 		changed             = false
 		nodes               []*v3.Node
-		nodeNotReadyTimeout = nodePool.Spec.NodeNotReadyTimeoutSec * time.Second
+		deleteNotReadyAfter = nodePool.Spec.DeleteNotReadyAfterSecs * time.Second
 	)
 
 	allNodes, err := c.nodes(nodePool, simulate)
@@ -221,10 +221,11 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (b
 		}
 		// remove unreachable node with the unreachable taint & status of Ready being Unknown
 		q := getTaint(node.Spec.InternalNodeSpec.Taints, &unReachableTaint)
-		if q != nil && !simulate && nodePool.Spec.SelfHeal {
-			if isNodeReadyUnknown(node) {
+		if q != nil && deleteNotReadyAfter > 0 {
+			changed = true
+			if isNodeReadyUnknown(node) && !simulate {
 				start := q.TimeAdded.Time
-				if time.Since(start) > nodeNotReadyTimeout {
+				if time.Since(start) > deleteNotReadyAfter {
 					err = c.deleteNode(node, 0)
 					if err != nil {
 						return false, err
@@ -234,7 +235,7 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (b
 					nodeid := node.Namespace + ":" + node.Name
 					if _, ok := c.syncmap[nodeid]; !ok {
 						c.syncmap[nodeid] = true
-						go c.requeue(nodeNotReadyTimeout, nodePool, node)
+						go c.requeue(deleteNotReadyAfter, nodePool, node)
 					}
 					c.mutex.Unlock()
 				}
