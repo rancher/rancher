@@ -723,7 +723,11 @@ func ClusterTemplates(schemas *types.Schemas, management *config.ScaledContext) 
 		Store:              schema.Store,
 		NamespaceInterface: management.Core.Namespaces(""),
 	}
-	schema.Store = clustertemplatestore.WrapStore(schema.Store)
+	users := management.Management.Users("")
+	grbLister := management.Management.GlobalRoleBindings("").Controller().Lister()
+	grLister := management.Management.GlobalRoles("").Controller().Lister()
+
+	schema.Store = clustertemplatestore.WrapStore(schema.Store, users, grbLister, grLister)
 
 	schema.Formatter = wrapper.Formatter
 	schema.LinkHandler = wrapper.LinkHandler
@@ -733,7 +737,7 @@ func ClusterTemplates(schemas *types.Schemas, management *config.ScaledContext) 
 		Store:              revisionSchema.Store,
 		NamespaceInterface: management.Core.Namespaces(""),
 	}
-	revisionSchema.Store = clustertemplatestore.WrapStore(revisionSchema.Store)
+	revisionSchema.Store = clustertemplatestore.WrapStore(revisionSchema.Store, users, grbLister, grLister)
 	revisionSchema.CollectionFormatter = wrapper.CollectionFormatter
 	revisionSchema.ActionHandler = wrapper.ClusterTemplateRevisionsActionHandler
 }
