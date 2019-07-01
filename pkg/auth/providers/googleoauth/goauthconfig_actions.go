@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	"github.com/rancher/rancher/pkg/randomtoken"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
 	client "github.com/rancher/types/client/management/v3"
@@ -133,15 +132,14 @@ func (g *googleOauthProvider) formGoogleOAuthRedirectURLFromMap(config map[strin
 }
 
 func (g *googleOauthProvider) getRedirectURL(configFile []byte) (string, error) {
-	oauth2Config, err := google.ConfigFromJSON(configFile, scopes...)
+	oauth2Config, err := google.ConfigFromJSON(configFile)
 	if err != nil {
 		return "", err
 	}
-	state, err := randomtoken.Generate()
-	if err != nil {
-		return "", err
-	}
+	// Removing redirectURL from config because UI will set it
+	oauth2Config.RedirectURL = ""
 	// access type=offline and prompt=consent (approval force), return a refresh token
-	consentPageURL := oauth2Config.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce)
+	// UI will generate and validate the state
+	consentPageURL := oauth2Config.AuthCodeURL("", oauth2.AccessTypeOffline, oauth2.ApprovalForce)
 	return consentPageURL, nil
 }
