@@ -33,6 +33,13 @@ func Test_parsePrefix(t *testing.T) {
 		wantMinLength: 1,
 		wantStart:     1,
 	},
+		{
+			name:          "blah",
+			fullPrefix:    "02Nodepool",
+			wantPrefix:    "02Nodepool",
+			wantMinLength: 1,
+			wantStart:     1,
+		},
 	}
 	for _, tt := range tests {
 
