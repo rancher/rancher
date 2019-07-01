@@ -3,12 +3,15 @@ package nodepool
 import (
 	"context"
 	"fmt"
+	"log"
 	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rke/services"
@@ -274,6 +277,7 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (b
 
 	for len(nodes) > quantity {
 		sort.Slice(nodes, func(i, j int) bool {
+			// perform natural sorting
 			return nodes[i].Spec.RequestedHostname < nodes[j].Spec.RequestedHostname
 		})
 
@@ -390,4 +394,39 @@ func isNodeReadyUnknown(node *v3.Node) bool {
 		}
 	}
 	return false
+}
+
+// naturalSort sorts nodes in natural order as opposed to lexicographical order
+func naturalSort(nodes []*v3.Node) []*v3.Node {
+
+	return nodes
+}
+
+func extractNumberFromString(str string, size int) (num int) {
+
+	strSlice := make([]string, 0)
+	for _, v := range str {
+		if unicode.IsDigit(v) {
+			strSlice = append(strSlice, string(v))
+		}
+	}
+
+	if size == 0 { // default
+		num, err := strconv.Atoi(strings.Join(strSlice, ""))
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		return num
+	} else {
+
+		num, err := strconv.Atoi(strSlice[size-1])
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		return num
+	}
+
 }
