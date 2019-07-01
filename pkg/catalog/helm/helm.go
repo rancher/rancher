@@ -37,10 +37,11 @@ var (
 	httpClient  = &http.Client{
 		Timeout: httpTimeout,
 	}
-	uuid         = settings.InstallUUID.Get()
-	Locker       = locker.New()
-	CatalogCache = filepath.Join("management-state", "catalog-cache")
-	IconCache    = filepath.Join(CatalogCache, ".icon-cache")
+	uuid            = settings.InstallUUID.Get()
+	Locker          = locker.New()
+	CatalogCache    = filepath.Join("management-state", "catalog-cache")
+	IconCache       = filepath.Join(CatalogCache, ".icon-cache")
+	InternalCatalog = filepath.Join("management-state", "local-catalogs")
 )
 
 type Helm struct {

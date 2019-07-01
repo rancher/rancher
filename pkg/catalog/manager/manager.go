@@ -2,11 +2,13 @@ package manager
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/settings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -29,9 +31,14 @@ type Manager struct {
 	ClusterCatalogLister  v3.ClusterCatalogLister
 	appRevisionClient     projectv3.AppRevisionInterface
 	lastUpdateTime        time.Time
+	bundledMode           bool
 }
 
 func New(management *config.ManagementContext) *Manager {
+	var bundledMode bool
+	if strings.ToLower(settings.SystemCatalog.Get()) == "bundled" {
+		bundledMode = true
+	}
 	return &Manager{
 		catalogClient:         management.Management.Catalogs(""),
 		CatalogLister:         management.Management.Catalogs("").Controller().Lister(),
@@ -45,6 +52,7 @@ func New(management *config.ManagementContext) *Manager {
 		clusterCatalogClient:  management.Management.ClusterCatalogs(""),
 		ClusterCatalogLister:  management.Management.ClusterCatalogs("").Controller().Lister(),
 		appRevisionClient:     management.Project.AppRevisions(""),
+		bundledMode:           bundledMode,
 	}
 }
 

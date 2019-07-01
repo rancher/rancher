@@ -67,6 +67,7 @@ var (
 	RotateCertsIfExpiringInDays       = NewSetting("rotate-certs-if-expiring-in-days", "7")  // 7 days
 	ClusterTemplateEnforcement        = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir              = NewSetting("initial-docker-root-dir", "/var/lib/docker")
+	SystemCatalog                     = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
 )
 
 func init() {
