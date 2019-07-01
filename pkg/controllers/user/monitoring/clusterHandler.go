@@ -391,7 +391,7 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 		},
 	}
 
-	_, err = monitoring.DeployApp(ch.app.cattleAppClient, appDeployProjectID, app, false)
+	_, err = monitoring.DeployApp(ch.app.cattleAppClient, appDeployProjectID, app)
 	if err != nil {
 		return nil, err
 	}

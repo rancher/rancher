@@ -2,7 +2,7 @@ package monitoring
 
 import (
 	"fmt"
-	"time"
+	"reflect"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
@@ -84,7 +84,7 @@ func GetSystemProjectID(cattleProjectsClient mgmtv3.ProjectInterface) (string, e
 	return systemProject.Name, nil
 }
 
-func DeployApp(cattleAppClient projectv3.AppInterface, projectID string, createOrUpdateApp *projectv3.App, forceRedeploy bool) (*projectv3.App, error) {
+func DeployApp(cattleAppClient projectv3.AppInterface, projectID string, createOrUpdateApp *projectv3.App) (*projectv3.App, error) {
 	if createOrUpdateApp == nil {
 		return nil, errors.New("cannot deploy a nil App")
 	}
@@ -105,16 +105,11 @@ func DeployApp(cattleAppClient projectv3.AppInterface, projectID string, createO
 			return rtn, errors.Wrapf(err, "failed to create %q App", appName)
 		}
 	} else {
+		if reflect.DeepEqual(createOrUpdateApp.Spec.Answers, app.Spec.Answers) && reflect.DeepEqual(createOrUpdateApp.Spec.ValuesYaml, app.Spec.ValuesYaml) {
+			return app, nil
+		}
 		app = app.DeepCopy()
 		app.Spec.Answers = createOrUpdateApp.Spec.Answers
-
-		// clean up status
-		if forceRedeploy {
-			if app.Spec.Answers == nil {
-				app.Spec.Answers = make(map[string]string, 1)
-			}
-			app.Spec.Answers["redeployTs"] = fmt.Sprintf("%d", time.Now().Unix())
-		}
 
 		if rtn, err = cattleAppClient.Update(app); err != nil {
 			return nil, errors.Wrapf(err, "failed to update %q App", appName)

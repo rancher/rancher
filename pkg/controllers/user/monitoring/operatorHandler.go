@@ -1,7 +1,6 @@
 package monitoring
 
 import (
-	"fmt"
 	"reflect"
 	"strings"
 
@@ -11,7 +10,6 @@ import (
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -211,17 +209,7 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 		},
 	}
 
-	// redeploy operator App forcibly if cannot find the workload
-	var forceRedeploy bool
-	appWorkload, err := app.agentDeploymentClient.GetNamespaced(appTargetNamespace, fmt.Sprintf("prometheus-operator-%s", appName), metav1.GetOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		return errors.Wrapf(err, "failed to get deployment %s/prometheus-operator-%s", appTargetNamespace, appName)
-	}
-	if appWorkload == nil || appWorkload.Name == "" || appWorkload.DeletionTimestamp != nil {
-		forceRedeploy = true
-	}
-
-	_, err = monitoring.DeployApp(app.cattleAppClient, appDeployProjectID, targetApp, forceRedeploy)
+	_, err = monitoring.DeployApp(app.cattleAppClient, appDeployProjectID, targetApp)
 	if err != nil {
 		return errors.Wrap(err, "failed to ensure prometheus operator app")
 	}

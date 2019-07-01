@@ -236,7 +236,7 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 		},
 	}
 
-	deployed, err := monitoring.DeployApp(ph.app.cattleAppClient, appDeployProjectID, app, false)
+	deployed, err := monitoring.DeployApp(ph.app.cattleAppClient, appDeployProjectID, app)
 	if err != nil {
 		return err
 	}
