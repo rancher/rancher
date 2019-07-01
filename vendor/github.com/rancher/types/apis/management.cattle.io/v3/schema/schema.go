@@ -831,8 +831,15 @@ func clusterTemplateTypes(schemas *types.Schemas) *types.Schemas {
 		TypeName("clusterTemplateRevision", v3.ClusterTemplateRevision{}).
 		AddMapperForType(&Version, v3.ClusterTemplate{}, m.Drop{Field: "namespaceId"}, m.DisplayName{}).
 		AddMapperForType(&Version, v3.ClusterTemplateRevision{}, m.Drop{Field: "namespaceId"}).
+		MustImport(&Version, v3.ClusterTemplateQuestionsOutput{}).
 		MustImport(&Version, v3.ClusterTemplate{}).
-		MustImport(&Version, v3.ClusterTemplateRevision{})
+		MustImportAndCustomize(&Version, v3.ClusterTemplateRevision{}, func(schema *types.Schema) {
+			schema.CollectionActions = map[string]types.Action{
+				"listquestions": {
+					Output: "clusterTemplateQuestionsOutput",
+				},
+			}
+		})
 }
 
 func clusterScanTypes(schemas *types.Schemas) *types.Schemas {

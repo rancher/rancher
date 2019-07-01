@@ -1,6 +1,8 @@
 package v3
 
 import (
+	"time"
+
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
 	v1 "k8s.io/api/core/v1"
@@ -152,6 +154,8 @@ type NodePoolSpec struct {
 
 	DisplayName string `json:"displayName"`
 	ClusterName string `json:"clusterName,omitempty" norman:"type=reference[cluster],noupdate,required"`
+
+	DeleteNotReadyAfterSecs time.Duration `json:"deleteNotReadyAfterSecs" norman:"default=0"`
 }
 
 type NodePoolStatus struct {

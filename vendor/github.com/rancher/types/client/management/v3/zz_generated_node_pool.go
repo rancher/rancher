@@ -5,57 +5,59 @@ import (
 )
 
 const (
-	NodePoolType                      = "nodePool"
-	NodePoolFieldAnnotations          = "annotations"
-	NodePoolFieldClusterID            = "clusterId"
-	NodePoolFieldControlPlane         = "controlPlane"
-	NodePoolFieldCreated              = "created"
-	NodePoolFieldCreatorID            = "creatorId"
-	NodePoolFieldDisplayName          = "displayName"
-	NodePoolFieldEtcd                 = "etcd"
-	NodePoolFieldHostnamePrefix       = "hostnamePrefix"
-	NodePoolFieldLabels               = "labels"
-	NodePoolFieldName                 = "name"
-	NodePoolFieldNamespaceId          = "namespaceId"
-	NodePoolFieldNodeAnnotations      = "nodeAnnotations"
-	NodePoolFieldNodeLabels           = "nodeLabels"
-	NodePoolFieldNodeTemplateID       = "nodeTemplateId"
-	NodePoolFieldOwnerReferences      = "ownerReferences"
-	NodePoolFieldQuantity             = "quantity"
-	NodePoolFieldRemoved              = "removed"
-	NodePoolFieldState                = "state"
-	NodePoolFieldStatus               = "status"
-	NodePoolFieldTransitioning        = "transitioning"
-	NodePoolFieldTransitioningMessage = "transitioningMessage"
-	NodePoolFieldUUID                 = "uuid"
-	NodePoolFieldWorker               = "worker"
+	NodePoolType                         = "nodePool"
+	NodePoolFieldAnnotations             = "annotations"
+	NodePoolFieldClusterID               = "clusterId"
+	NodePoolFieldControlPlane            = "controlPlane"
+	NodePoolFieldCreated                 = "created"
+	NodePoolFieldCreatorID               = "creatorId"
+	NodePoolFieldDeleteNotReadyAfterSecs = "deleteNotReadyAfterSecs"
+	NodePoolFieldDisplayName             = "displayName"
+	NodePoolFieldEtcd                    = "etcd"
+	NodePoolFieldHostnamePrefix          = "hostnamePrefix"
+	NodePoolFieldLabels                  = "labels"
+	NodePoolFieldName                    = "name"
+	NodePoolFieldNamespaceId             = "namespaceId"
+	NodePoolFieldNodeAnnotations         = "nodeAnnotations"
+	NodePoolFieldNodeLabels              = "nodeLabels"
+	NodePoolFieldNodeTemplateID          = "nodeTemplateId"
+	NodePoolFieldOwnerReferences         = "ownerReferences"
+	NodePoolFieldQuantity                = "quantity"
+	NodePoolFieldRemoved                 = "removed"
+	NodePoolFieldState                   = "state"
+	NodePoolFieldStatus                  = "status"
+	NodePoolFieldTransitioning           = "transitioning"
+	NodePoolFieldTransitioningMessage    = "transitioningMessage"
+	NodePoolFieldUUID                    = "uuid"
+	NodePoolFieldWorker                  = "worker"
 )
 
 type NodePool struct {
 	types.Resource
-	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	ClusterID            string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
-	ControlPlane         bool              `json:"controlPlane,omitempty" yaml:"controlPlane,omitempty"`
-	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	DisplayName          string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
-	Etcd                 bool              `json:"etcd,omitempty" yaml:"etcd,omitempty"`
-	HostnamePrefix       string            `json:"hostnamePrefix,omitempty" yaml:"hostnamePrefix,omitempty"`
-	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
-	NamespaceId          string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	NodeAnnotations      map[string]string `json:"nodeAnnotations,omitempty" yaml:"nodeAnnotations,omitempty"`
-	NodeLabels           map[string]string `json:"nodeLabels,omitempty" yaml:"nodeLabels,omitempty"`
-	NodeTemplateID       string            `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`
-	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	Quantity             int64             `json:"quantity,omitempty" yaml:"quantity,omitempty"`
-	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	State                string            `json:"state,omitempty" yaml:"state,omitempty"`
-	Status               *NodePoolStatus   `json:"status,omitempty" yaml:"status,omitempty"`
-	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
-	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
-	Worker               bool              `json:"worker,omitempty" yaml:"worker,omitempty"`
+	Annotations             map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	ClusterID               string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	ControlPlane            bool              `json:"controlPlane,omitempty" yaml:"controlPlane,omitempty"`
+	Created                 string            `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID               string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DeleteNotReadyAfterSecs int64             `json:"deleteNotReadyAfterSecs,omitempty" yaml:"deleteNotReadyAfterSecs,omitempty"`
+	DisplayName             string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
+	Etcd                    bool              `json:"etcd,omitempty" yaml:"etcd,omitempty"`
+	HostnamePrefix          string            `json:"hostnamePrefix,omitempty" yaml:"hostnamePrefix,omitempty"`
+	Labels                  map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                    string            `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId             string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	NodeAnnotations         map[string]string `json:"nodeAnnotations,omitempty" yaml:"nodeAnnotations,omitempty"`
+	NodeLabels              map[string]string `json:"nodeLabels,omitempty" yaml:"nodeLabels,omitempty"`
+	NodeTemplateID          string            `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`
+	OwnerReferences         []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Quantity                int64             `json:"quantity,omitempty" yaml:"quantity,omitempty"`
+	Removed                 string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	State                   string            `json:"state,omitempty" yaml:"state,omitempty"`
+	Status                  *NodePoolStatus   `json:"status,omitempty" yaml:"status,omitempty"`
+	Transitioning           string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage    string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                    string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Worker                  bool              `json:"worker,omitempty" yaml:"worker,omitempty"`
 }
 
 type NodePoolCollection struct {
