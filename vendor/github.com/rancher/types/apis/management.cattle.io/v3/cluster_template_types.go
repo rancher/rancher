@@ -45,3 +45,7 @@ type ClusterTemplateRevisionSpec struct {
 	Questions     []Question       `json:"questions,omitempty"`
 	ClusterConfig *ClusterSpecBase `json:"clusterConfig" norman:"required"`
 }
+
+type ClusterTemplateQuestionsOutput struct {
+	Questions []Question `json:"questions,omitempty"`
+}
