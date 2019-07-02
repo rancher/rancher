@@ -83,6 +83,12 @@ def test_create_cluster_with_template(admin_mc, remove_resource):
     k8s_version = cluster.rancherKubernetesEngineConfig.kubernetesVersion
     assert k8s_version != "v1.13.x"
 
+    # edit cluster to remove template must fail
+    with pytest.raises(ApiError) as e:
+        client.update(cluster, name=random_str(), clusterTemplateId=None,
+                      clusterTemplateRevisionId=None)
+        assert e.value.error.status == 422
+
     # delete the cluster template, it should error out
     with pytest.raises(ApiError) as e:
         client.delete(cluster_template)

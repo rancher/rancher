@@ -370,13 +370,13 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	//check if template is passed. if yes, load template data
 	if hasTemplate(data) {
 		if existingCluster[managementv3.ClusterSpecFieldClusterTemplateID] == "" {
-			return nil, fmt.Errorf("this cluster is not created using a template, cannot update it to use a template now")
+			return nil, httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("this cluster is not created using a template, cannot update it to use a template now"))
 		}
 
 		updatedTemplateID := convert.ToString(data[managementv3.ClusterSpecFieldClusterTemplateID])
 		templateID := convert.ToString(existingCluster[managementv3.ClusterSpecFieldClusterTemplateID])
 		if !strings.EqualFold(updatedTemplateID, templateID) {
-			return nil, fmt.Errorf("cannot update cluster, cluster cannot be changed to a new template")
+			return nil, httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("cannot update cluster, cluster cannot be changed to a new template"))
 		}
 
 		clusterTemplateRevision, err := r.validateTemplateInput(data, true)
@@ -389,6 +389,8 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		}
 
 		data = clusterUpdate
+	} else if existingCluster[managementv3.ClusterSpecFieldClusterTemplateID] != nil || existingCluster[managementv3.ClusterSpecFieldClusterTemplateRevisionID] != nil {
+		return nil, httperror.NewFieldAPIError(httperror.MissingRequired, "Cluster Template", "this cluster is created from a cluster template, please pass the template")
 	}
 
 	err = setKubernetesVersion(data)
