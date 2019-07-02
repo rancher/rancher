@@ -140,14 +140,16 @@ func (mock *PodSecurityPolicyTemplateListerMock) ListCalls() []struct {
 }
 
 var (
-	lockPodSecurityPolicyTemplateControllerMockAddClusterScopedHandler sync.RWMutex
-	lockPodSecurityPolicyTemplateControllerMockAddHandler              sync.RWMutex
-	lockPodSecurityPolicyTemplateControllerMockEnqueue                 sync.RWMutex
-	lockPodSecurityPolicyTemplateControllerMockGeneric                 sync.RWMutex
-	lockPodSecurityPolicyTemplateControllerMockInformer                sync.RWMutex
-	lockPodSecurityPolicyTemplateControllerMockLister                  sync.RWMutex
-	lockPodSecurityPolicyTemplateControllerMockStart                   sync.RWMutex
-	lockPodSecurityPolicyTemplateControllerMockSync                    sync.RWMutex
+	lockPodSecurityPolicyTemplateControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockPodSecurityPolicyTemplateControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockPodSecurityPolicyTemplateControllerMockAddFeatureHandler              sync.RWMutex
+	lockPodSecurityPolicyTemplateControllerMockAddHandler                     sync.RWMutex
+	lockPodSecurityPolicyTemplateControllerMockEnqueue                        sync.RWMutex
+	lockPodSecurityPolicyTemplateControllerMockGeneric                        sync.RWMutex
+	lockPodSecurityPolicyTemplateControllerMockInformer                       sync.RWMutex
+	lockPodSecurityPolicyTemplateControllerMockLister                         sync.RWMutex
+	lockPodSecurityPolicyTemplateControllerMockStart                          sync.RWMutex
+	lockPodSecurityPolicyTemplateControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that PodSecurityPolicyTemplateControllerMock does implement PodSecurityPolicyTemplateController.
@@ -160,8 +162,14 @@ var _ v3.PodSecurityPolicyTemplateController = &PodSecurityPolicyTemplateControl
 //
 //         // make and configure a mocked PodSecurityPolicyTemplateController
 //         mockedPodSecurityPolicyTemplateController := &PodSecurityPolicyTemplateControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.PodSecurityPolicyTemplateHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.PodSecurityPolicyTemplateHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.PodSecurityPolicyTemplateHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
 //             },
 //             AddHandlerFunc: func(ctx context.Context, name string, handler v3.PodSecurityPolicyTemplateHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
@@ -191,8 +199,14 @@ var _ v3.PodSecurityPolicyTemplateController = &PodSecurityPolicyTemplateControl
 //
 //     }
 type PodSecurityPolicyTemplateControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.PodSecurityPolicyTemplateHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.PodSecurityPolicyTemplateHandlerFunc)
+
+	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.PodSecurityPolicyTemplateHandlerFunc)
 
 	// AddHandlerFunc mocks the AddHandler method.
 	AddHandlerFunc func(ctx context.Context, name string, handler v3.PodSecurityPolicyTemplateHandlerFunc)
@@ -217,6 +231,19 @@ type PodSecurityPolicyTemplateControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v3.PodSecurityPolicyTemplateHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -227,6 +254,17 @@ type PodSecurityPolicyTemplateControllerMock struct {
 			ClusterName string
 			// Handler is the handler argument value.
 			Handler v3.PodSecurityPolicyTemplateHandlerFunc
+		}
+		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
+		AddFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// Sync is the sync argument value.
+			Sync v3.PodSecurityPolicyTemplateHandlerFunc
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -266,6 +304,53 @@ type PodSecurityPolicyTemplateControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *PodSecurityPolicyTemplateControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.PodSecurityPolicyTemplateHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("PodSecurityPolicyTemplateControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but PodSecurityPolicyTemplateController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Handler     v3.PodSecurityPolicyTemplateHandlerFunc
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockPodSecurityPolicyTemplateControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockPodSecurityPolicyTemplateControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedPodSecurityPolicyTemplateController.AddClusterScopedFeatureHandlerCalls())
+func (mock *PodSecurityPolicyTemplateControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Handler     v3.PodSecurityPolicyTemplateHandlerFunc
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Handler     v3.PodSecurityPolicyTemplateHandlerFunc
+	}
+	lockPodSecurityPolicyTemplateControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockPodSecurityPolicyTemplateControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -308,6 +393,49 @@ func (mock *PodSecurityPolicyTemplateControllerMock) AddClusterScopedHandlerCall
 	lockPodSecurityPolicyTemplateControllerMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
 	lockPodSecurityPolicyTemplateControllerMockAddClusterScopedHandler.RUnlock()
+	return calls
+}
+
+// AddFeatureHandler calls AddFeatureHandlerFunc.
+func (mock *PodSecurityPolicyTemplateControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.PodSecurityPolicyTemplateHandlerFunc) {
+	if mock.AddFeatureHandlerFunc == nil {
+		panic("PodSecurityPolicyTemplateControllerMock.AddFeatureHandlerFunc: method is nil but PodSecurityPolicyTemplateController.AddFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v3.PodSecurityPolicyTemplateHandlerFunc
+	}{
+		Ctx:     ctx,
+		Enabled: enabled,
+		Name:    name,
+		Sync:    sync,
+	}
+	lockPodSecurityPolicyTemplateControllerMockAddFeatureHandler.Lock()
+	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
+	lockPodSecurityPolicyTemplateControllerMockAddFeatureHandler.Unlock()
+	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
+}
+
+// AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
+// Check the length with:
+//     len(mockedPodSecurityPolicyTemplateController.AddFeatureHandlerCalls())
+func (mock *PodSecurityPolicyTemplateControllerMock) AddFeatureHandlerCalls() []struct {
+	Ctx     context.Context
+	Enabled func() bool
+	Name    string
+	Sync    v3.PodSecurityPolicyTemplateHandlerFunc
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v3.PodSecurityPolicyTemplateHandlerFunc
+	}
+	lockPodSecurityPolicyTemplateControllerMockAddFeatureHandler.RLock()
+	calls = mock.calls.AddFeatureHandler
+	lockPodSecurityPolicyTemplateControllerMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
@@ -530,21 +658,25 @@ func (mock *PodSecurityPolicyTemplateControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockPodSecurityPolicyTemplateInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockPodSecurityPolicyTemplateInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockPodSecurityPolicyTemplateInterfaceMockAddHandler                sync.RWMutex
-	lockPodSecurityPolicyTemplateInterfaceMockAddLifecycle              sync.RWMutex
-	lockPodSecurityPolicyTemplateInterfaceMockController                sync.RWMutex
-	lockPodSecurityPolicyTemplateInterfaceMockCreate                    sync.RWMutex
-	lockPodSecurityPolicyTemplateInterfaceMockDelete                    sync.RWMutex
-	lockPodSecurityPolicyTemplateInterfaceMockDeleteCollection          sync.RWMutex
-	lockPodSecurityPolicyTemplateInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockPodSecurityPolicyTemplateInterfaceMockGet                       sync.RWMutex
-	lockPodSecurityPolicyTemplateInterfaceMockGetNamespaced             sync.RWMutex
-	lockPodSecurityPolicyTemplateInterfaceMockList                      sync.RWMutex
-	lockPodSecurityPolicyTemplateInterfaceMockObjectClient              sync.RWMutex
-	lockPodSecurityPolicyTemplateInterfaceMockUpdate                    sync.RWMutex
-	lockPodSecurityPolicyTemplateInterfaceMockWatch                     sync.RWMutex
+	lockPodSecurityPolicyTemplateInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockPodSecurityPolicyTemplateInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockPodSecurityPolicyTemplateInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockPodSecurityPolicyTemplateInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockPodSecurityPolicyTemplateInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockPodSecurityPolicyTemplateInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockPodSecurityPolicyTemplateInterfaceMockAddHandler                       sync.RWMutex
+	lockPodSecurityPolicyTemplateInterfaceMockAddLifecycle                     sync.RWMutex
+	lockPodSecurityPolicyTemplateInterfaceMockController                       sync.RWMutex
+	lockPodSecurityPolicyTemplateInterfaceMockCreate                           sync.RWMutex
+	lockPodSecurityPolicyTemplateInterfaceMockDelete                           sync.RWMutex
+	lockPodSecurityPolicyTemplateInterfaceMockDeleteCollection                 sync.RWMutex
+	lockPodSecurityPolicyTemplateInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockPodSecurityPolicyTemplateInterfaceMockGet                              sync.RWMutex
+	lockPodSecurityPolicyTemplateInterfaceMockGetNamespaced                    sync.RWMutex
+	lockPodSecurityPolicyTemplateInterfaceMockList                             sync.RWMutex
+	lockPodSecurityPolicyTemplateInterfaceMockObjectClient                     sync.RWMutex
+	lockPodSecurityPolicyTemplateInterfaceMockUpdate                           sync.RWMutex
+	lockPodSecurityPolicyTemplateInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that PodSecurityPolicyTemplateInterfaceMock does implement PodSecurityPolicyTemplateInterface.
@@ -557,11 +689,23 @@ var _ v3.PodSecurityPolicyTemplateInterface = &PodSecurityPolicyTemplateInterfac
 //
 //         // make and configure a mocked PodSecurityPolicyTemplateInterface
 //         mockedPodSecurityPolicyTemplateInterface := &PodSecurityPolicyTemplateInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.PodSecurityPolicyTemplateHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.PodSecurityPolicyTemplateLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.PodSecurityPolicyTemplateHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
 //             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v3.PodSecurityPolicyTemplateLifecycle)  {
 // 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.PodSecurityPolicyTemplateHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v3.PodSecurityPolicyTemplateLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
 //             },
 //             AddHandlerFunc: func(ctx context.Context, name string, sync v3.PodSecurityPolicyTemplateHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
@@ -609,11 +753,23 @@ var _ v3.PodSecurityPolicyTemplateInterface = &PodSecurityPolicyTemplateInterfac
 //
 //     }
 type PodSecurityPolicyTemplateInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.PodSecurityPolicyTemplateHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.PodSecurityPolicyTemplateLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.PodSecurityPolicyTemplateHandlerFunc)
 
 	// AddClusterScopedLifecycleFunc mocks the AddClusterScopedLifecycle method.
 	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v3.PodSecurityPolicyTemplateLifecycle)
+
+	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.PodSecurityPolicyTemplateHandlerFunc)
+
+	// AddFeatureLifecycleFunc mocks the AddFeatureLifecycle method.
+	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v3.PodSecurityPolicyTemplateLifecycle)
 
 	// AddHandlerFunc mocks the AddHandler method.
 	AddHandlerFunc func(ctx context.Context, name string, sync v3.PodSecurityPolicyTemplateHandlerFunc)
@@ -656,6 +812,32 @@ type PodSecurityPolicyTemplateInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v3.PodSecurityPolicyTemplateHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.PodSecurityPolicyTemplateLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -675,6 +857,28 @@ type PodSecurityPolicyTemplateInterfaceMock struct {
 			Name string
 			// ClusterName is the clusterName argument value.
 			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.PodSecurityPolicyTemplateLifecycle
+		}
+		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
+		AddFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// Sync is the sync argument value.
+			Sync v3.PodSecurityPolicyTemplateHandlerFunc
+		}
+		// AddFeatureLifecycle holds details about calls to the AddFeatureLifecycle method.
+		AddFeatureLifecycle []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
 			// Lifecycle is the lifecycle argument value.
 			Lifecycle v3.PodSecurityPolicyTemplateLifecycle
 		}
@@ -764,6 +968,100 @@ type PodSecurityPolicyTemplateInterfaceMock struct {
 	}
 }
 
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *PodSecurityPolicyTemplateInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.PodSecurityPolicyTemplateHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("PodSecurityPolicyTemplateInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but PodSecurityPolicyTemplateInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Sync        v3.PodSecurityPolicyTemplateHandlerFunc
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockPodSecurityPolicyTemplateInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockPodSecurityPolicyTemplateInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedPodSecurityPolicyTemplateInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *PodSecurityPolicyTemplateInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Sync        v3.PodSecurityPolicyTemplateHandlerFunc
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Sync        v3.PodSecurityPolicyTemplateHandlerFunc
+	}
+	lockPodSecurityPolicyTemplateInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockPodSecurityPolicyTemplateInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *PodSecurityPolicyTemplateInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.PodSecurityPolicyTemplateLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("PodSecurityPolicyTemplateInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but PodSecurityPolicyTemplateInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Lifecycle   v3.PodSecurityPolicyTemplateLifecycle
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockPodSecurityPolicyTemplateInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockPodSecurityPolicyTemplateInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(ctx, enabled, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedPodSecurityPolicyTemplateInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *PodSecurityPolicyTemplateInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Lifecycle   v3.PodSecurityPolicyTemplateLifecycle
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Lifecycle   v3.PodSecurityPolicyTemplateLifecycle
+	}
+	lockPodSecurityPolicyTemplateInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockPodSecurityPolicyTemplateInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
+}
+
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
 func (mock *PodSecurityPolicyTemplateInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, sync v3.PodSecurityPolicyTemplateHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
@@ -847,6 +1145,92 @@ func (mock *PodSecurityPolicyTemplateInterfaceMock) AddClusterScopedLifecycleCal
 	lockPodSecurityPolicyTemplateInterfaceMockAddClusterScopedLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedLifecycle
 	lockPodSecurityPolicyTemplateInterfaceMockAddClusterScopedLifecycle.RUnlock()
+	return calls
+}
+
+// AddFeatureHandler calls AddFeatureHandlerFunc.
+func (mock *PodSecurityPolicyTemplateInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.PodSecurityPolicyTemplateHandlerFunc) {
+	if mock.AddFeatureHandlerFunc == nil {
+		panic("PodSecurityPolicyTemplateInterfaceMock.AddFeatureHandlerFunc: method is nil but PodSecurityPolicyTemplateInterface.AddFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v3.PodSecurityPolicyTemplateHandlerFunc
+	}{
+		Ctx:     ctx,
+		Enabled: enabled,
+		Name:    name,
+		Sync:    sync,
+	}
+	lockPodSecurityPolicyTemplateInterfaceMockAddFeatureHandler.Lock()
+	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
+	lockPodSecurityPolicyTemplateInterfaceMockAddFeatureHandler.Unlock()
+	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
+}
+
+// AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
+// Check the length with:
+//     len(mockedPodSecurityPolicyTemplateInterface.AddFeatureHandlerCalls())
+func (mock *PodSecurityPolicyTemplateInterfaceMock) AddFeatureHandlerCalls() []struct {
+	Ctx     context.Context
+	Enabled func() bool
+	Name    string
+	Sync    v3.PodSecurityPolicyTemplateHandlerFunc
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v3.PodSecurityPolicyTemplateHandlerFunc
+	}
+	lockPodSecurityPolicyTemplateInterfaceMockAddFeatureHandler.RLock()
+	calls = mock.calls.AddFeatureHandler
+	lockPodSecurityPolicyTemplateInterfaceMockAddFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddFeatureLifecycle calls AddFeatureLifecycleFunc.
+func (mock *PodSecurityPolicyTemplateInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v3.PodSecurityPolicyTemplateLifecycle) {
+	if mock.AddFeatureLifecycleFunc == nil {
+		panic("PodSecurityPolicyTemplateInterfaceMock.AddFeatureLifecycleFunc: method is nil but PodSecurityPolicyTemplateInterface.AddFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Ctx       context.Context
+		Enabled   func() bool
+		Name      string
+		Lifecycle v3.PodSecurityPolicyTemplateLifecycle
+	}{
+		Ctx:       ctx,
+		Enabled:   enabled,
+		Name:      name,
+		Lifecycle: lifecycle,
+	}
+	lockPodSecurityPolicyTemplateInterfaceMockAddFeatureLifecycle.Lock()
+	mock.calls.AddFeatureLifecycle = append(mock.calls.AddFeatureLifecycle, callInfo)
+	lockPodSecurityPolicyTemplateInterfaceMockAddFeatureLifecycle.Unlock()
+	mock.AddFeatureLifecycleFunc(ctx, enabled, name, lifecycle)
+}
+
+// AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
+// Check the length with:
+//     len(mockedPodSecurityPolicyTemplateInterface.AddFeatureLifecycleCalls())
+func (mock *PodSecurityPolicyTemplateInterfaceMock) AddFeatureLifecycleCalls() []struct {
+	Ctx       context.Context
+	Enabled   func() bool
+	Name      string
+	Lifecycle v3.PodSecurityPolicyTemplateLifecycle
+} {
+	var calls []struct {
+		Ctx       context.Context
+		Enabled   func() bool
+		Name      string
+		Lifecycle v3.PodSecurityPolicyTemplateLifecycle
+	}
+	lockPodSecurityPolicyTemplateInterfaceMockAddFeatureLifecycle.RLock()
+	calls = mock.calls.AddFeatureLifecycle
+	lockPodSecurityPolicyTemplateInterfaceMockAddFeatureLifecycle.RUnlock()
 	return calls
 }
 

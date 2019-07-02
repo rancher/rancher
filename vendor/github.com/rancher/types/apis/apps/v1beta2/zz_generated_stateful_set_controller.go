@@ -69,7 +69,9 @@ type StatefulSetController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() StatefulSetLister
 	AddHandler(ctx context.Context, name string, handler StatefulSetHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync StatefulSetHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler StatefulSetHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler StatefulSetHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -88,9 +90,13 @@ type StatefulSetInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() StatefulSetController
 	AddHandler(ctx context.Context, name string, sync StatefulSetHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync StatefulSetHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle StatefulSetLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle StatefulSetLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync StatefulSetHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync StatefulSetHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle StatefulSetLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle StatefulSetLifecycle)
 }
 
 type statefulSetLister struct {
@@ -150,10 +156,39 @@ func (c *statefulSetController) AddHandler(ctx context.Context, name string, han
 	})
 }
 
+func (c *statefulSetController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler StatefulSetHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*v1beta2.StatefulSet); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
 func (c *statefulSetController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler StatefulSetHandlerFunc) {
 	resource.PutClusterScoped(StatefulSetGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*v1beta2.StatefulSet); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *statefulSetController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler StatefulSetHandlerFunc) {
+	resource.PutClusterScoped(StatefulSetGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*v1beta2.StatefulSet); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -258,18 +293,36 @@ func (s *statefulSetClient) AddHandler(ctx context.Context, name string, sync St
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *statefulSetClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync StatefulSetHandlerFunc) {
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
+}
+
 func (s *statefulSetClient) AddLifecycle(ctx context.Context, name string, lifecycle StatefulSetLifecycle) {
 	sync := NewStatefulSetLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *statefulSetClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle StatefulSetLifecycle) {
+	sync := NewStatefulSetLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
 func (s *statefulSetClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync StatefulSetHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *statefulSetClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync StatefulSetHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
+}
+
 func (s *statefulSetClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle StatefulSetLifecycle) {
 	sync := NewStatefulSetLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *statefulSetClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle StatefulSetLifecycle) {
+	sync := NewStatefulSetLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
 type StatefulSetIndexer func(obj *v1beta2.StatefulSet) ([]string, error)

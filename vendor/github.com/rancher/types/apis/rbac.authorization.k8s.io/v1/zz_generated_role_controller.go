@@ -69,7 +69,9 @@ type RoleController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() RoleLister
 	AddHandler(ctx context.Context, name string, handler RoleHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync RoleHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler RoleHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler RoleHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -88,9 +90,13 @@ type RoleInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() RoleController
 	AddHandler(ctx context.Context, name string, sync RoleHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync RoleHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle RoleLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle RoleLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync RoleHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync RoleHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle RoleLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle RoleLifecycle)
 }
 
 type roleLister struct {
@@ -150,10 +156,39 @@ func (c *roleController) AddHandler(ctx context.Context, name string, handler Ro
 	})
 }
 
+func (c *roleController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler RoleHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*v1.Role); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
 func (c *roleController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler RoleHandlerFunc) {
 	resource.PutClusterScoped(RoleGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*v1.Role); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *roleController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler RoleHandlerFunc) {
+	resource.PutClusterScoped(RoleGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*v1.Role); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -258,18 +293,36 @@ func (s *roleClient) AddHandler(ctx context.Context, name string, sync RoleHandl
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *roleClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync RoleHandlerFunc) {
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
+}
+
 func (s *roleClient) AddLifecycle(ctx context.Context, name string, lifecycle RoleLifecycle) {
 	sync := NewRoleLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *roleClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle RoleLifecycle) {
+	sync := NewRoleLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
 func (s *roleClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync RoleHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *roleClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync RoleHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
+}
+
 func (s *roleClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle RoleLifecycle) {
 	sync := NewRoleLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *roleClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle RoleLifecycle) {
+	sync := NewRoleLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
 type RoleIndexer func(obj *v1.Role) ([]string, error)

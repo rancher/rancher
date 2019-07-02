@@ -613,6 +613,12 @@ func globalTypes(schema *types.Schemas) *types.Schemas {
 				f.Required = true
 				return f
 			})
+		}).
+		MustImportAndCustomize(&Version, v3.Feature{}, func(schema *types.Schema) {
+			schema.MustCustomizeField("name", func(f types.Field) types.Field {
+				f.Required = true
+				return f
+			})
 		})
 }
 

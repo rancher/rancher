@@ -140,14 +140,16 @@ func (mock *AuthConfigListerMock) ListCalls() []struct {
 }
 
 var (
-	lockAuthConfigControllerMockAddClusterScopedHandler sync.RWMutex
-	lockAuthConfigControllerMockAddHandler              sync.RWMutex
-	lockAuthConfigControllerMockEnqueue                 sync.RWMutex
-	lockAuthConfigControllerMockGeneric                 sync.RWMutex
-	lockAuthConfigControllerMockInformer                sync.RWMutex
-	lockAuthConfigControllerMockLister                  sync.RWMutex
-	lockAuthConfigControllerMockStart                   sync.RWMutex
-	lockAuthConfigControllerMockSync                    sync.RWMutex
+	lockAuthConfigControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockAuthConfigControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockAuthConfigControllerMockAddFeatureHandler              sync.RWMutex
+	lockAuthConfigControllerMockAddHandler                     sync.RWMutex
+	lockAuthConfigControllerMockEnqueue                        sync.RWMutex
+	lockAuthConfigControllerMockGeneric                        sync.RWMutex
+	lockAuthConfigControllerMockInformer                       sync.RWMutex
+	lockAuthConfigControllerMockLister                         sync.RWMutex
+	lockAuthConfigControllerMockStart                          sync.RWMutex
+	lockAuthConfigControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that AuthConfigControllerMock does implement AuthConfigController.
@@ -160,8 +162,14 @@ var _ v3.AuthConfigController = &AuthConfigControllerMock{}
 //
 //         // make and configure a mocked AuthConfigController
 //         mockedAuthConfigController := &AuthConfigControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.AuthConfigHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.AuthConfigHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.AuthConfigHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
 //             },
 //             AddHandlerFunc: func(ctx context.Context, name string, handler v3.AuthConfigHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
@@ -191,8 +199,14 @@ var _ v3.AuthConfigController = &AuthConfigControllerMock{}
 //
 //     }
 type AuthConfigControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.AuthConfigHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.AuthConfigHandlerFunc)
+
+	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.AuthConfigHandlerFunc)
 
 	// AddHandlerFunc mocks the AddHandler method.
 	AddHandlerFunc func(ctx context.Context, name string, handler v3.AuthConfigHandlerFunc)
@@ -217,6 +231,19 @@ type AuthConfigControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v3.AuthConfigHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -227,6 +254,17 @@ type AuthConfigControllerMock struct {
 			ClusterName string
 			// Handler is the handler argument value.
 			Handler v3.AuthConfigHandlerFunc
+		}
+		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
+		AddFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// Sync is the sync argument value.
+			Sync v3.AuthConfigHandlerFunc
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -266,6 +304,53 @@ type AuthConfigControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *AuthConfigControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.AuthConfigHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("AuthConfigControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but AuthConfigController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Handler     v3.AuthConfigHandlerFunc
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockAuthConfigControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockAuthConfigControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedAuthConfigController.AddClusterScopedFeatureHandlerCalls())
+func (mock *AuthConfigControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Handler     v3.AuthConfigHandlerFunc
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Handler     v3.AuthConfigHandlerFunc
+	}
+	lockAuthConfigControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockAuthConfigControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -308,6 +393,49 @@ func (mock *AuthConfigControllerMock) AddClusterScopedHandlerCalls() []struct {
 	lockAuthConfigControllerMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
 	lockAuthConfigControllerMockAddClusterScopedHandler.RUnlock()
+	return calls
+}
+
+// AddFeatureHandler calls AddFeatureHandlerFunc.
+func (mock *AuthConfigControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.AuthConfigHandlerFunc) {
+	if mock.AddFeatureHandlerFunc == nil {
+		panic("AuthConfigControllerMock.AddFeatureHandlerFunc: method is nil but AuthConfigController.AddFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v3.AuthConfigHandlerFunc
+	}{
+		Ctx:     ctx,
+		Enabled: enabled,
+		Name:    name,
+		Sync:    sync,
+	}
+	lockAuthConfigControllerMockAddFeatureHandler.Lock()
+	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
+	lockAuthConfigControllerMockAddFeatureHandler.Unlock()
+	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
+}
+
+// AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
+// Check the length with:
+//     len(mockedAuthConfigController.AddFeatureHandlerCalls())
+func (mock *AuthConfigControllerMock) AddFeatureHandlerCalls() []struct {
+	Ctx     context.Context
+	Enabled func() bool
+	Name    string
+	Sync    v3.AuthConfigHandlerFunc
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v3.AuthConfigHandlerFunc
+	}
+	lockAuthConfigControllerMockAddFeatureHandler.RLock()
+	calls = mock.calls.AddFeatureHandler
+	lockAuthConfigControllerMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
@@ -530,21 +658,25 @@ func (mock *AuthConfigControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockAuthConfigInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockAuthConfigInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockAuthConfigInterfaceMockAddHandler                sync.RWMutex
-	lockAuthConfigInterfaceMockAddLifecycle              sync.RWMutex
-	lockAuthConfigInterfaceMockController                sync.RWMutex
-	lockAuthConfigInterfaceMockCreate                    sync.RWMutex
-	lockAuthConfigInterfaceMockDelete                    sync.RWMutex
-	lockAuthConfigInterfaceMockDeleteCollection          sync.RWMutex
-	lockAuthConfigInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockAuthConfigInterfaceMockGet                       sync.RWMutex
-	lockAuthConfigInterfaceMockGetNamespaced             sync.RWMutex
-	lockAuthConfigInterfaceMockList                      sync.RWMutex
-	lockAuthConfigInterfaceMockObjectClient              sync.RWMutex
-	lockAuthConfigInterfaceMockUpdate                    sync.RWMutex
-	lockAuthConfigInterfaceMockWatch                     sync.RWMutex
+	lockAuthConfigInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockAuthConfigInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockAuthConfigInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockAuthConfigInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockAuthConfigInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockAuthConfigInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockAuthConfigInterfaceMockAddHandler                       sync.RWMutex
+	lockAuthConfigInterfaceMockAddLifecycle                     sync.RWMutex
+	lockAuthConfigInterfaceMockController                       sync.RWMutex
+	lockAuthConfigInterfaceMockCreate                           sync.RWMutex
+	lockAuthConfigInterfaceMockDelete                           sync.RWMutex
+	lockAuthConfigInterfaceMockDeleteCollection                 sync.RWMutex
+	lockAuthConfigInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockAuthConfigInterfaceMockGet                              sync.RWMutex
+	lockAuthConfigInterfaceMockGetNamespaced                    sync.RWMutex
+	lockAuthConfigInterfaceMockList                             sync.RWMutex
+	lockAuthConfigInterfaceMockObjectClient                     sync.RWMutex
+	lockAuthConfigInterfaceMockUpdate                           sync.RWMutex
+	lockAuthConfigInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that AuthConfigInterfaceMock does implement AuthConfigInterface.
@@ -557,11 +689,23 @@ var _ v3.AuthConfigInterface = &AuthConfigInterfaceMock{}
 //
 //         // make and configure a mocked AuthConfigInterface
 //         mockedAuthConfigInterface := &AuthConfigInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.AuthConfigHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.AuthConfigLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.AuthConfigHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
 //             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v3.AuthConfigLifecycle)  {
 // 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.AuthConfigHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v3.AuthConfigLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
 //             },
 //             AddHandlerFunc: func(ctx context.Context, name string, sync v3.AuthConfigHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
@@ -609,11 +753,23 @@ var _ v3.AuthConfigInterface = &AuthConfigInterfaceMock{}
 //
 //     }
 type AuthConfigInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.AuthConfigHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.AuthConfigLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.AuthConfigHandlerFunc)
 
 	// AddClusterScopedLifecycleFunc mocks the AddClusterScopedLifecycle method.
 	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v3.AuthConfigLifecycle)
+
+	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.AuthConfigHandlerFunc)
+
+	// AddFeatureLifecycleFunc mocks the AddFeatureLifecycle method.
+	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v3.AuthConfigLifecycle)
 
 	// AddHandlerFunc mocks the AddHandler method.
 	AddHandlerFunc func(ctx context.Context, name string, sync v3.AuthConfigHandlerFunc)
@@ -656,6 +812,32 @@ type AuthConfigInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v3.AuthConfigHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.AuthConfigLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -675,6 +857,28 @@ type AuthConfigInterfaceMock struct {
 			Name string
 			// ClusterName is the clusterName argument value.
 			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.AuthConfigLifecycle
+		}
+		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
+		AddFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// Sync is the sync argument value.
+			Sync v3.AuthConfigHandlerFunc
+		}
+		// AddFeatureLifecycle holds details about calls to the AddFeatureLifecycle method.
+		AddFeatureLifecycle []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
 			// Lifecycle is the lifecycle argument value.
 			Lifecycle v3.AuthConfigLifecycle
 		}
@@ -764,6 +968,100 @@ type AuthConfigInterfaceMock struct {
 	}
 }
 
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *AuthConfigInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.AuthConfigHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("AuthConfigInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but AuthConfigInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Sync        v3.AuthConfigHandlerFunc
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockAuthConfigInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockAuthConfigInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedAuthConfigInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *AuthConfigInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Sync        v3.AuthConfigHandlerFunc
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Sync        v3.AuthConfigHandlerFunc
+	}
+	lockAuthConfigInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockAuthConfigInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *AuthConfigInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.AuthConfigLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("AuthConfigInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but AuthConfigInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Lifecycle   v3.AuthConfigLifecycle
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockAuthConfigInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockAuthConfigInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(ctx, enabled, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedAuthConfigInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *AuthConfigInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Lifecycle   v3.AuthConfigLifecycle
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Lifecycle   v3.AuthConfigLifecycle
+	}
+	lockAuthConfigInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockAuthConfigInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
+}
+
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
 func (mock *AuthConfigInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, sync v3.AuthConfigHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
@@ -847,6 +1145,92 @@ func (mock *AuthConfigInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	lockAuthConfigInterfaceMockAddClusterScopedLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedLifecycle
 	lockAuthConfigInterfaceMockAddClusterScopedLifecycle.RUnlock()
+	return calls
+}
+
+// AddFeatureHandler calls AddFeatureHandlerFunc.
+func (mock *AuthConfigInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.AuthConfigHandlerFunc) {
+	if mock.AddFeatureHandlerFunc == nil {
+		panic("AuthConfigInterfaceMock.AddFeatureHandlerFunc: method is nil but AuthConfigInterface.AddFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v3.AuthConfigHandlerFunc
+	}{
+		Ctx:     ctx,
+		Enabled: enabled,
+		Name:    name,
+		Sync:    sync,
+	}
+	lockAuthConfigInterfaceMockAddFeatureHandler.Lock()
+	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
+	lockAuthConfigInterfaceMockAddFeatureHandler.Unlock()
+	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
+}
+
+// AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
+// Check the length with:
+//     len(mockedAuthConfigInterface.AddFeatureHandlerCalls())
+func (mock *AuthConfigInterfaceMock) AddFeatureHandlerCalls() []struct {
+	Ctx     context.Context
+	Enabled func() bool
+	Name    string
+	Sync    v3.AuthConfigHandlerFunc
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v3.AuthConfigHandlerFunc
+	}
+	lockAuthConfigInterfaceMockAddFeatureHandler.RLock()
+	calls = mock.calls.AddFeatureHandler
+	lockAuthConfigInterfaceMockAddFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddFeatureLifecycle calls AddFeatureLifecycleFunc.
+func (mock *AuthConfigInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v3.AuthConfigLifecycle) {
+	if mock.AddFeatureLifecycleFunc == nil {
+		panic("AuthConfigInterfaceMock.AddFeatureLifecycleFunc: method is nil but AuthConfigInterface.AddFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Ctx       context.Context
+		Enabled   func() bool
+		Name      string
+		Lifecycle v3.AuthConfigLifecycle
+	}{
+		Ctx:       ctx,
+		Enabled:   enabled,
+		Name:      name,
+		Lifecycle: lifecycle,
+	}
+	lockAuthConfigInterfaceMockAddFeatureLifecycle.Lock()
+	mock.calls.AddFeatureLifecycle = append(mock.calls.AddFeatureLifecycle, callInfo)
+	lockAuthConfigInterfaceMockAddFeatureLifecycle.Unlock()
+	mock.AddFeatureLifecycleFunc(ctx, enabled, name, lifecycle)
+}
+
+// AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
+// Check the length with:
+//     len(mockedAuthConfigInterface.AddFeatureLifecycleCalls())
+func (mock *AuthConfigInterfaceMock) AddFeatureLifecycleCalls() []struct {
+	Ctx       context.Context
+	Enabled   func() bool
+	Name      string
+	Lifecycle v3.AuthConfigLifecycle
+} {
+	var calls []struct {
+		Ctx       context.Context
+		Enabled   func() bool
+		Name      string
+		Lifecycle v3.AuthConfigLifecycle
+	}
+	lockAuthConfigInterfaceMockAddFeatureLifecycle.RLock()
+	calls = mock.calls.AddFeatureLifecycle
+	lockAuthConfigInterfaceMockAddFeatureLifecycle.RUnlock()
 	return calls
 }
 

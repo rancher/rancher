@@ -68,7 +68,9 @@ type EventController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() EventLister
 	AddHandler(ctx context.Context, name string, handler EventHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync EventHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler EventHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler EventHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -87,9 +89,13 @@ type EventInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() EventController
 	AddHandler(ctx context.Context, name string, sync EventHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync EventHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle EventLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle EventLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync EventHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync EventHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle EventLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle EventLifecycle)
 }
 
 type eventLister struct {
@@ -149,10 +155,39 @@ func (c *eventController) AddHandler(ctx context.Context, name string, handler E
 	})
 }
 
+func (c *eventController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler EventHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*v1.Event); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
 func (c *eventController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler EventHandlerFunc) {
 	resource.PutClusterScoped(EventGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*v1.Event); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *eventController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler EventHandlerFunc) {
+	resource.PutClusterScoped(EventGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*v1.Event); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -257,18 +292,36 @@ func (s *eventClient) AddHandler(ctx context.Context, name string, sync EventHan
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *eventClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync EventHandlerFunc) {
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
+}
+
 func (s *eventClient) AddLifecycle(ctx context.Context, name string, lifecycle EventLifecycle) {
 	sync := NewEventLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *eventClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle EventLifecycle) {
+	sync := NewEventLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
 func (s *eventClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync EventHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *eventClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync EventHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
+}
+
 func (s *eventClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle EventLifecycle) {
 	sync := NewEventLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *eventClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle EventLifecycle) {
+	sync := NewEventLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
 type EventIndexer func(obj *v1.Event) ([]string, error)

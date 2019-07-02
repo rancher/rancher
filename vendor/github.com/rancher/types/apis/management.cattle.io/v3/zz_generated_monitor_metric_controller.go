@@ -68,7 +68,9 @@ type MonitorMetricController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() MonitorMetricLister
 	AddHandler(ctx context.Context, name string, handler MonitorMetricHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync MonitorMetricHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler MonitorMetricHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler MonitorMetricHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -87,9 +89,13 @@ type MonitorMetricInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() MonitorMetricController
 	AddHandler(ctx context.Context, name string, sync MonitorMetricHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync MonitorMetricHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle MonitorMetricLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle MonitorMetricLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync MonitorMetricHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync MonitorMetricHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle MonitorMetricLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle MonitorMetricLifecycle)
 }
 
 type monitorMetricLister struct {
@@ -149,10 +155,39 @@ func (c *monitorMetricController) AddHandler(ctx context.Context, name string, h
 	})
 }
 
+func (c *monitorMetricController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler MonitorMetricHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*MonitorMetric); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
 func (c *monitorMetricController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler MonitorMetricHandlerFunc) {
 	resource.PutClusterScoped(MonitorMetricGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*MonitorMetric); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *monitorMetricController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler MonitorMetricHandlerFunc) {
+	resource.PutClusterScoped(MonitorMetricGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*MonitorMetric); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -257,18 +292,36 @@ func (s *monitorMetricClient) AddHandler(ctx context.Context, name string, sync 
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *monitorMetricClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync MonitorMetricHandlerFunc) {
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
+}
+
 func (s *monitorMetricClient) AddLifecycle(ctx context.Context, name string, lifecycle MonitorMetricLifecycle) {
 	sync := NewMonitorMetricLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *monitorMetricClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle MonitorMetricLifecycle) {
+	sync := NewMonitorMetricLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
 func (s *monitorMetricClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync MonitorMetricHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *monitorMetricClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync MonitorMetricHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
+}
+
 func (s *monitorMetricClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle MonitorMetricLifecycle) {
 	sync := NewMonitorMetricLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *monitorMetricClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle MonitorMetricLifecycle) {
+	sync := NewMonitorMetricLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
 type MonitorMetricIndexer func(obj *MonitorMetric) ([]string, error)

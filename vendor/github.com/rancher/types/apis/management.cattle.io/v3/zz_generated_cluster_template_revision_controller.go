@@ -68,7 +68,9 @@ type ClusterTemplateRevisionController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ClusterTemplateRevisionLister
 	AddHandler(ctx context.Context, name string, handler ClusterTemplateRevisionHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync ClusterTemplateRevisionHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ClusterTemplateRevisionHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterTemplateRevisionHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -87,9 +89,13 @@ type ClusterTemplateRevisionInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterTemplateRevisionController
 	AddHandler(ctx context.Context, name string, sync ClusterTemplateRevisionHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync ClusterTemplateRevisionHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle ClusterTemplateRevisionLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle ClusterTemplateRevisionLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ClusterTemplateRevisionHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync ClusterTemplateRevisionHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterTemplateRevisionLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ClusterTemplateRevisionLifecycle)
 }
 
 type clusterTemplateRevisionLister struct {
@@ -149,10 +155,39 @@ func (c *clusterTemplateRevisionController) AddHandler(ctx context.Context, name
 	})
 }
 
+func (c *clusterTemplateRevisionController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler ClusterTemplateRevisionHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*ClusterTemplateRevision); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
 func (c *clusterTemplateRevisionController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ClusterTemplateRevisionHandlerFunc) {
 	resource.PutClusterScoped(ClusterTemplateRevisionGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*ClusterTemplateRevision); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *clusterTemplateRevisionController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler ClusterTemplateRevisionHandlerFunc) {
+	resource.PutClusterScoped(ClusterTemplateRevisionGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*ClusterTemplateRevision); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -257,18 +292,36 @@ func (s *clusterTemplateRevisionClient) AddHandler(ctx context.Context, name str
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *clusterTemplateRevisionClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync ClusterTemplateRevisionHandlerFunc) {
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
+}
+
 func (s *clusterTemplateRevisionClient) AddLifecycle(ctx context.Context, name string, lifecycle ClusterTemplateRevisionLifecycle) {
 	sync := NewClusterTemplateRevisionLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *clusterTemplateRevisionClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle ClusterTemplateRevisionLifecycle) {
+	sync := NewClusterTemplateRevisionLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
 func (s *clusterTemplateRevisionClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ClusterTemplateRevisionHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *clusterTemplateRevisionClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync ClusterTemplateRevisionHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
+}
+
 func (s *clusterTemplateRevisionClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterTemplateRevisionLifecycle) {
 	sync := NewClusterTemplateRevisionLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *clusterTemplateRevisionClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ClusterTemplateRevisionLifecycle) {
+	sync := NewClusterTemplateRevisionLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
 type ClusterTemplateRevisionIndexer func(obj *ClusterTemplateRevision) ([]string, error)

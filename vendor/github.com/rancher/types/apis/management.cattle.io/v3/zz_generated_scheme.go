@@ -103,6 +103,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ListenConfigList{},
 		&Setting{},
 		&SettingList{},
+		&Feature{},
+		&FeatureList{},
 		&ClusterAlert{},
 		&ClusterAlertList{},
 		&ProjectAlert{},

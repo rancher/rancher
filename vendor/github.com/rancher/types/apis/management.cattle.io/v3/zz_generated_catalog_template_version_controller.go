@@ -68,7 +68,9 @@ type CatalogTemplateVersionController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() CatalogTemplateVersionLister
 	AddHandler(ctx context.Context, name string, handler CatalogTemplateVersionHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync CatalogTemplateVersionHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler CatalogTemplateVersionHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler CatalogTemplateVersionHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -87,9 +89,13 @@ type CatalogTemplateVersionInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() CatalogTemplateVersionController
 	AddHandler(ctx context.Context, name string, sync CatalogTemplateVersionHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync CatalogTemplateVersionHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle CatalogTemplateVersionLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle CatalogTemplateVersionLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync CatalogTemplateVersionHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync CatalogTemplateVersionHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle CatalogTemplateVersionLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle CatalogTemplateVersionLifecycle)
 }
 
 type catalogTemplateVersionLister struct {
@@ -149,10 +155,39 @@ func (c *catalogTemplateVersionController) AddHandler(ctx context.Context, name 
 	})
 }
 
+func (c *catalogTemplateVersionController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler CatalogTemplateVersionHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*CatalogTemplateVersion); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
 func (c *catalogTemplateVersionController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler CatalogTemplateVersionHandlerFunc) {
 	resource.PutClusterScoped(CatalogTemplateVersionGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*CatalogTemplateVersion); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *catalogTemplateVersionController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler CatalogTemplateVersionHandlerFunc) {
+	resource.PutClusterScoped(CatalogTemplateVersionGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*CatalogTemplateVersion); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -257,18 +292,36 @@ func (s *catalogTemplateVersionClient) AddHandler(ctx context.Context, name stri
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *catalogTemplateVersionClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync CatalogTemplateVersionHandlerFunc) {
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
+}
+
 func (s *catalogTemplateVersionClient) AddLifecycle(ctx context.Context, name string, lifecycle CatalogTemplateVersionLifecycle) {
 	sync := NewCatalogTemplateVersionLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *catalogTemplateVersionClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle CatalogTemplateVersionLifecycle) {
+	sync := NewCatalogTemplateVersionLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
 func (s *catalogTemplateVersionClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync CatalogTemplateVersionHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *catalogTemplateVersionClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync CatalogTemplateVersionHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
+}
+
 func (s *catalogTemplateVersionClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle CatalogTemplateVersionLifecycle) {
 	sync := NewCatalogTemplateVersionLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *catalogTemplateVersionClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle CatalogTemplateVersionLifecycle) {
+	sync := NewCatalogTemplateVersionLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
 type CatalogTemplateVersionIndexer func(obj *CatalogTemplateVersion) ([]string, error)

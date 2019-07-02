@@ -17,38 +17,38 @@ import (
 )
 
 var (
-	lockUserListerMockGet  sync.RWMutex
-	lockUserListerMockList sync.RWMutex
+	lockFeatureListerMockGet  sync.RWMutex
+	lockFeatureListerMockList sync.RWMutex
 )
 
-// Ensure, that UserListerMock does implement UserLister.
+// Ensure, that FeatureListerMock does implement FeatureLister.
 // If this is not the case, regenerate this file with moq.
-var _ v3.UserLister = &UserListerMock{}
+var _ v3.FeatureLister = &FeatureListerMock{}
 
-// UserListerMock is a mock implementation of UserLister.
+// FeatureListerMock is a mock implementation of FeatureLister.
 //
-//     func TestSomethingThatUsesUserLister(t *testing.T) {
+//     func TestSomethingThatUsesFeatureLister(t *testing.T) {
 //
-//         // make and configure a mocked UserLister
-//         mockedUserLister := &UserListerMock{
-//             GetFunc: func(namespace string, name string) (*v3.User, error) {
+//         // make and configure a mocked FeatureLister
+//         mockedFeatureLister := &FeatureListerMock{
+//             GetFunc: func(namespace string, name string) (*v3.Feature, error) {
 // 	               panic("mock out the Get method")
 //             },
-//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.User, error) {
+//             ListFunc: func(namespace string, selector labels.Selector) ([]*v3.Feature, error) {
 // 	               panic("mock out the List method")
 //             },
 //         }
 //
-//         // use mockedUserLister in code that requires UserLister
+//         // use mockedFeatureLister in code that requires FeatureLister
 //         // and then make assertions.
 //
 //     }
-type UserListerMock struct {
+type FeatureListerMock struct {
 	// GetFunc mocks the Get method.
-	GetFunc func(namespace string, name string) (*v3.User, error)
+	GetFunc func(namespace string, name string) (*v3.Feature, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(namespace string, selector labels.Selector) ([]*v3.User, error)
+	ListFunc func(namespace string, selector labels.Selector) ([]*v3.Feature, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -70,9 +70,9 @@ type UserListerMock struct {
 }
 
 // Get calls GetFunc.
-func (mock *UserListerMock) Get(namespace string, name string) (*v3.User, error) {
+func (mock *FeatureListerMock) Get(namespace string, name string) (*v3.Feature, error) {
 	if mock.GetFunc == nil {
-		panic("UserListerMock.GetFunc: method is nil but UserLister.Get was just called")
+		panic("FeatureListerMock.GetFunc: method is nil but FeatureLister.Get was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -81,16 +81,16 @@ func (mock *UserListerMock) Get(namespace string, name string) (*v3.User, error)
 		Namespace: namespace,
 		Name:      name,
 	}
-	lockUserListerMockGet.Lock()
+	lockFeatureListerMockGet.Lock()
 	mock.calls.Get = append(mock.calls.Get, callInfo)
-	lockUserListerMockGet.Unlock()
+	lockFeatureListerMockGet.Unlock()
 	return mock.GetFunc(namespace, name)
 }
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedUserLister.GetCalls())
-func (mock *UserListerMock) GetCalls() []struct {
+//     len(mockedFeatureLister.GetCalls())
+func (mock *FeatureListerMock) GetCalls() []struct {
 	Namespace string
 	Name      string
 } {
@@ -98,16 +98,16 @@ func (mock *UserListerMock) GetCalls() []struct {
 		Namespace string
 		Name      string
 	}
-	lockUserListerMockGet.RLock()
+	lockFeatureListerMockGet.RLock()
 	calls = mock.calls.Get
-	lockUserListerMockGet.RUnlock()
+	lockFeatureListerMockGet.RUnlock()
 	return calls
 }
 
 // List calls ListFunc.
-func (mock *UserListerMock) List(namespace string, selector labels.Selector) ([]*v3.User, error) {
+func (mock *FeatureListerMock) List(namespace string, selector labels.Selector) ([]*v3.Feature, error) {
 	if mock.ListFunc == nil {
-		panic("UserListerMock.ListFunc: method is nil but UserLister.List was just called")
+		panic("FeatureListerMock.ListFunc: method is nil but FeatureLister.List was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -116,16 +116,16 @@ func (mock *UserListerMock) List(namespace string, selector labels.Selector) ([]
 		Namespace: namespace,
 		Selector:  selector,
 	}
-	lockUserListerMockList.Lock()
+	lockFeatureListerMockList.Lock()
 	mock.calls.List = append(mock.calls.List, callInfo)
-	lockUserListerMockList.Unlock()
+	lockFeatureListerMockList.Unlock()
 	return mock.ListFunc(namespace, selector)
 }
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedUserLister.ListCalls())
-func (mock *UserListerMock) ListCalls() []struct {
+//     len(mockedFeatureLister.ListCalls())
+func (mock *FeatureListerMock) ListCalls() []struct {
 	Namespace string
 	Selector  labels.Selector
 } {
@@ -133,45 +133,45 @@ func (mock *UserListerMock) ListCalls() []struct {
 		Namespace string
 		Selector  labels.Selector
 	}
-	lockUserListerMockList.RLock()
+	lockFeatureListerMockList.RLock()
 	calls = mock.calls.List
-	lockUserListerMockList.RUnlock()
+	lockFeatureListerMockList.RUnlock()
 	return calls
 }
 
 var (
-	lockUserControllerMockAddClusterScopedFeatureHandler sync.RWMutex
-	lockUserControllerMockAddClusterScopedHandler        sync.RWMutex
-	lockUserControllerMockAddFeatureHandler              sync.RWMutex
-	lockUserControllerMockAddHandler                     sync.RWMutex
-	lockUserControllerMockEnqueue                        sync.RWMutex
-	lockUserControllerMockGeneric                        sync.RWMutex
-	lockUserControllerMockInformer                       sync.RWMutex
-	lockUserControllerMockLister                         sync.RWMutex
-	lockUserControllerMockStart                          sync.RWMutex
-	lockUserControllerMockSync                           sync.RWMutex
+	lockFeatureControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockFeatureControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockFeatureControllerMockAddFeatureHandler              sync.RWMutex
+	lockFeatureControllerMockAddHandler                     sync.RWMutex
+	lockFeatureControllerMockEnqueue                        sync.RWMutex
+	lockFeatureControllerMockGeneric                        sync.RWMutex
+	lockFeatureControllerMockInformer                       sync.RWMutex
+	lockFeatureControllerMockLister                         sync.RWMutex
+	lockFeatureControllerMockStart                          sync.RWMutex
+	lockFeatureControllerMockSync                           sync.RWMutex
 )
 
-// Ensure, that UserControllerMock does implement UserController.
+// Ensure, that FeatureControllerMock does implement FeatureController.
 // If this is not the case, regenerate this file with moq.
-var _ v3.UserController = &UserControllerMock{}
+var _ v3.FeatureController = &FeatureControllerMock{}
 
-// UserControllerMock is a mock implementation of UserController.
+// FeatureControllerMock is a mock implementation of FeatureController.
 //
-//     func TestSomethingThatUsesUserController(t *testing.T) {
+//     func TestSomethingThatUsesFeatureController(t *testing.T) {
 //
-//         // make and configure a mocked UserController
-//         mockedUserController := &UserControllerMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.UserHandlerFunc)  {
+//         // make and configure a mocked FeatureController
+//         mockedFeatureController := &FeatureControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.FeatureHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedFeatureHandler method")
 //             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.UserHandlerFunc)  {
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.FeatureHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.UserHandlerFunc)  {
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.FeatureHandlerFunc)  {
 // 	               panic("mock out the AddFeatureHandler method")
 //             },
-//             AddHandlerFunc: func(ctx context.Context, name string, handler v3.UserHandlerFunc)  {
+//             AddHandlerFunc: func(ctx context.Context, name string, handler v3.FeatureHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
 //             },
 //             EnqueueFunc: func(namespace string, name string)  {
@@ -183,7 +183,7 @@ var _ v3.UserController = &UserControllerMock{}
 //             InformerFunc: func() cache.SharedIndexInformer {
 // 	               panic("mock out the Informer method")
 //             },
-//             ListerFunc: func() v3.UserLister {
+//             ListerFunc: func() v3.FeatureLister {
 // 	               panic("mock out the Lister method")
 //             },
 //             StartFunc: func(ctx context.Context, threadiness int) error {
@@ -194,22 +194,22 @@ var _ v3.UserController = &UserControllerMock{}
 //             },
 //         }
 //
-//         // use mockedUserController in code that requires UserController
+//         // use mockedFeatureController in code that requires FeatureController
 //         // and then make assertions.
 //
 //     }
-type UserControllerMock struct {
+type FeatureControllerMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
-	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.UserHandlerFunc)
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.FeatureHandlerFunc)
 
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
-	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.UserHandlerFunc)
+	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.FeatureHandlerFunc)
 
 	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
-	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.UserHandlerFunc)
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.FeatureHandlerFunc)
 
 	// AddHandlerFunc mocks the AddHandler method.
-	AddHandlerFunc func(ctx context.Context, name string, handler v3.UserHandlerFunc)
+	AddHandlerFunc func(ctx context.Context, name string, handler v3.FeatureHandlerFunc)
 
 	// EnqueueFunc mocks the Enqueue method.
 	EnqueueFunc func(namespace string, name string)
@@ -221,7 +221,7 @@ type UserControllerMock struct {
 	InformerFunc func() cache.SharedIndexInformer
 
 	// ListerFunc mocks the Lister method.
-	ListerFunc func() v3.UserLister
+	ListerFunc func() v3.FeatureLister
 
 	// StartFunc mocks the Start method.
 	StartFunc func(ctx context.Context, threadiness int) error
@@ -242,7 +242,7 @@ type UserControllerMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Handler is the handler argument value.
-			Handler v3.UserHandlerFunc
+			Handler v3.FeatureHandlerFunc
 		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
@@ -253,7 +253,7 @@ type UserControllerMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Handler is the handler argument value.
-			Handler v3.UserHandlerFunc
+			Handler v3.FeatureHandlerFunc
 		}
 		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
 		AddFeatureHandler []struct {
@@ -264,7 +264,7 @@ type UserControllerMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v3.UserHandlerFunc
+			Sync v3.FeatureHandlerFunc
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -273,7 +273,7 @@ type UserControllerMock struct {
 			// Name is the name argument value.
 			Name string
 			// Handler is the handler argument value.
-			Handler v3.UserHandlerFunc
+			Handler v3.FeatureHandlerFunc
 		}
 		// Enqueue holds details about calls to the Enqueue method.
 		Enqueue []struct {
@@ -307,16 +307,16 @@ type UserControllerMock struct {
 }
 
 // AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
-func (mock *UserControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.UserHandlerFunc) {
+func (mock *FeatureControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.FeatureHandlerFunc) {
 	if mock.AddClusterScopedFeatureHandlerFunc == nil {
-		panic("UserControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but UserController.AddClusterScopedFeatureHandler was just called")
+		panic("FeatureControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but FeatureController.AddClusterScopedFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Handler     v3.UserHandlerFunc
+		Handler     v3.FeatureHandlerFunc
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -324,164 +324,164 @@ func (mock *UserControllerMock) AddClusterScopedFeatureHandler(ctx context.Conte
 		ClusterName: clusterName,
 		Handler:     handler,
 	}
-	lockUserControllerMockAddClusterScopedFeatureHandler.Lock()
+	lockFeatureControllerMockAddClusterScopedFeatureHandler.Lock()
 	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
-	lockUserControllerMockAddClusterScopedFeatureHandler.Unlock()
+	lockFeatureControllerMockAddClusterScopedFeatureHandler.Unlock()
 	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, handler)
 }
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedUserController.AddClusterScopedFeatureHandlerCalls())
-func (mock *UserControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+//     len(mockedFeatureController.AddClusterScopedFeatureHandlerCalls())
+func (mock *FeatureControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Handler     v3.UserHandlerFunc
+	Handler     v3.FeatureHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Handler     v3.UserHandlerFunc
+		Handler     v3.FeatureHandlerFunc
 	}
-	lockUserControllerMockAddClusterScopedFeatureHandler.RLock()
+	lockFeatureControllerMockAddClusterScopedFeatureHandler.RLock()
 	calls = mock.calls.AddClusterScopedFeatureHandler
-	lockUserControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	lockFeatureControllerMockAddClusterScopedFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
-func (mock *UserControllerMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, handler v3.UserHandlerFunc) {
+func (mock *FeatureControllerMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, handler v3.FeatureHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
-		panic("UserControllerMock.AddClusterScopedHandlerFunc: method is nil but UserController.AddClusterScopedHandler was just called")
+		panic("FeatureControllerMock.AddClusterScopedHandlerFunc: method is nil but FeatureController.AddClusterScopedHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Handler     v3.UserHandlerFunc
+		Handler     v3.FeatureHandlerFunc
 	}{
 		Ctx:         ctx,
 		Name:        name,
 		ClusterName: clusterName,
 		Handler:     handler,
 	}
-	lockUserControllerMockAddClusterScopedHandler.Lock()
+	lockFeatureControllerMockAddClusterScopedHandler.Lock()
 	mock.calls.AddClusterScopedHandler = append(mock.calls.AddClusterScopedHandler, callInfo)
-	lockUserControllerMockAddClusterScopedHandler.Unlock()
+	lockFeatureControllerMockAddClusterScopedHandler.Unlock()
 	mock.AddClusterScopedHandlerFunc(ctx, name, clusterName, handler)
 }
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedUserController.AddClusterScopedHandlerCalls())
-func (mock *UserControllerMock) AddClusterScopedHandlerCalls() []struct {
+//     len(mockedFeatureController.AddClusterScopedHandlerCalls())
+func (mock *FeatureControllerMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Handler     v3.UserHandlerFunc
+	Handler     v3.FeatureHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Handler     v3.UserHandlerFunc
+		Handler     v3.FeatureHandlerFunc
 	}
-	lockUserControllerMockAddClusterScopedHandler.RLock()
+	lockFeatureControllerMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
-	lockUserControllerMockAddClusterScopedHandler.RUnlock()
+	lockFeatureControllerMockAddClusterScopedHandler.RUnlock()
 	return calls
 }
 
 // AddFeatureHandler calls AddFeatureHandlerFunc.
-func (mock *UserControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.UserHandlerFunc) {
+func (mock *FeatureControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.FeatureHandlerFunc) {
 	if mock.AddFeatureHandlerFunc == nil {
-		panic("UserControllerMock.AddFeatureHandlerFunc: method is nil but UserController.AddFeatureHandler was just called")
+		panic("FeatureControllerMock.AddFeatureHandlerFunc: method is nil but FeatureController.AddFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v3.UserHandlerFunc
+		Sync    v3.FeatureHandlerFunc
 	}{
 		Ctx:     ctx,
 		Enabled: enabled,
 		Name:    name,
 		Sync:    sync,
 	}
-	lockUserControllerMockAddFeatureHandler.Lock()
+	lockFeatureControllerMockAddFeatureHandler.Lock()
 	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
-	lockUserControllerMockAddFeatureHandler.Unlock()
+	lockFeatureControllerMockAddFeatureHandler.Unlock()
 	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
 }
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedUserController.AddFeatureHandlerCalls())
-func (mock *UserControllerMock) AddFeatureHandlerCalls() []struct {
+//     len(mockedFeatureController.AddFeatureHandlerCalls())
+func (mock *FeatureControllerMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
 	Name    string
-	Sync    v3.UserHandlerFunc
+	Sync    v3.FeatureHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v3.UserHandlerFunc
+		Sync    v3.FeatureHandlerFunc
 	}
-	lockUserControllerMockAddFeatureHandler.RLock()
+	lockFeatureControllerMockAddFeatureHandler.RLock()
 	calls = mock.calls.AddFeatureHandler
-	lockUserControllerMockAddFeatureHandler.RUnlock()
+	lockFeatureControllerMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddHandler calls AddHandlerFunc.
-func (mock *UserControllerMock) AddHandler(ctx context.Context, name string, handler v3.UserHandlerFunc) {
+func (mock *FeatureControllerMock) AddHandler(ctx context.Context, name string, handler v3.FeatureHandlerFunc) {
 	if mock.AddHandlerFunc == nil {
-		panic("UserControllerMock.AddHandlerFunc: method is nil but UserController.AddHandler was just called")
+		panic("FeatureControllerMock.AddHandlerFunc: method is nil but FeatureController.AddHandler was just called")
 	}
 	callInfo := struct {
 		Ctx     context.Context
 		Name    string
-		Handler v3.UserHandlerFunc
+		Handler v3.FeatureHandlerFunc
 	}{
 		Ctx:     ctx,
 		Name:    name,
 		Handler: handler,
 	}
-	lockUserControllerMockAddHandler.Lock()
+	lockFeatureControllerMockAddHandler.Lock()
 	mock.calls.AddHandler = append(mock.calls.AddHandler, callInfo)
-	lockUserControllerMockAddHandler.Unlock()
+	lockFeatureControllerMockAddHandler.Unlock()
 	mock.AddHandlerFunc(ctx, name, handler)
 }
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedUserController.AddHandlerCalls())
-func (mock *UserControllerMock) AddHandlerCalls() []struct {
+//     len(mockedFeatureController.AddHandlerCalls())
+func (mock *FeatureControllerMock) AddHandlerCalls() []struct {
 	Ctx     context.Context
 	Name    string
-	Handler v3.UserHandlerFunc
+	Handler v3.FeatureHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Name    string
-		Handler v3.UserHandlerFunc
+		Handler v3.FeatureHandlerFunc
 	}
-	lockUserControllerMockAddHandler.RLock()
+	lockFeatureControllerMockAddHandler.RLock()
 	calls = mock.calls.AddHandler
-	lockUserControllerMockAddHandler.RUnlock()
+	lockFeatureControllerMockAddHandler.RUnlock()
 	return calls
 }
 
 // Enqueue calls EnqueueFunc.
-func (mock *UserControllerMock) Enqueue(namespace string, name string) {
+func (mock *FeatureControllerMock) Enqueue(namespace string, name string) {
 	if mock.EnqueueFunc == nil {
-		panic("UserControllerMock.EnqueueFunc: method is nil but UserController.Enqueue was just called")
+		panic("FeatureControllerMock.EnqueueFunc: method is nil but FeatureController.Enqueue was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -490,16 +490,16 @@ func (mock *UserControllerMock) Enqueue(namespace string, name string) {
 		Namespace: namespace,
 		Name:      name,
 	}
-	lockUserControllerMockEnqueue.Lock()
+	lockFeatureControllerMockEnqueue.Lock()
 	mock.calls.Enqueue = append(mock.calls.Enqueue, callInfo)
-	lockUserControllerMockEnqueue.Unlock()
+	lockFeatureControllerMockEnqueue.Unlock()
 	mock.EnqueueFunc(namespace, name)
 }
 
 // EnqueueCalls gets all the calls that were made to Enqueue.
 // Check the length with:
-//     len(mockedUserController.EnqueueCalls())
-func (mock *UserControllerMock) EnqueueCalls() []struct {
+//     len(mockedFeatureController.EnqueueCalls())
+func (mock *FeatureControllerMock) EnqueueCalls() []struct {
 	Namespace string
 	Name      string
 } {
@@ -507,94 +507,94 @@ func (mock *UserControllerMock) EnqueueCalls() []struct {
 		Namespace string
 		Name      string
 	}
-	lockUserControllerMockEnqueue.RLock()
+	lockFeatureControllerMockEnqueue.RLock()
 	calls = mock.calls.Enqueue
-	lockUserControllerMockEnqueue.RUnlock()
+	lockFeatureControllerMockEnqueue.RUnlock()
 	return calls
 }
 
 // Generic calls GenericFunc.
-func (mock *UserControllerMock) Generic() controller.GenericController {
+func (mock *FeatureControllerMock) Generic() controller.GenericController {
 	if mock.GenericFunc == nil {
-		panic("UserControllerMock.GenericFunc: method is nil but UserController.Generic was just called")
+		panic("FeatureControllerMock.GenericFunc: method is nil but FeatureController.Generic was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockUserControllerMockGeneric.Lock()
+	lockFeatureControllerMockGeneric.Lock()
 	mock.calls.Generic = append(mock.calls.Generic, callInfo)
-	lockUserControllerMockGeneric.Unlock()
+	lockFeatureControllerMockGeneric.Unlock()
 	return mock.GenericFunc()
 }
 
 // GenericCalls gets all the calls that were made to Generic.
 // Check the length with:
-//     len(mockedUserController.GenericCalls())
-func (mock *UserControllerMock) GenericCalls() []struct {
+//     len(mockedFeatureController.GenericCalls())
+func (mock *FeatureControllerMock) GenericCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockUserControllerMockGeneric.RLock()
+	lockFeatureControllerMockGeneric.RLock()
 	calls = mock.calls.Generic
-	lockUserControllerMockGeneric.RUnlock()
+	lockFeatureControllerMockGeneric.RUnlock()
 	return calls
 }
 
 // Informer calls InformerFunc.
-func (mock *UserControllerMock) Informer() cache.SharedIndexInformer {
+func (mock *FeatureControllerMock) Informer() cache.SharedIndexInformer {
 	if mock.InformerFunc == nil {
-		panic("UserControllerMock.InformerFunc: method is nil but UserController.Informer was just called")
+		panic("FeatureControllerMock.InformerFunc: method is nil but FeatureController.Informer was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockUserControllerMockInformer.Lock()
+	lockFeatureControllerMockInformer.Lock()
 	mock.calls.Informer = append(mock.calls.Informer, callInfo)
-	lockUserControllerMockInformer.Unlock()
+	lockFeatureControllerMockInformer.Unlock()
 	return mock.InformerFunc()
 }
 
 // InformerCalls gets all the calls that were made to Informer.
 // Check the length with:
-//     len(mockedUserController.InformerCalls())
-func (mock *UserControllerMock) InformerCalls() []struct {
+//     len(mockedFeatureController.InformerCalls())
+func (mock *FeatureControllerMock) InformerCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockUserControllerMockInformer.RLock()
+	lockFeatureControllerMockInformer.RLock()
 	calls = mock.calls.Informer
-	lockUserControllerMockInformer.RUnlock()
+	lockFeatureControllerMockInformer.RUnlock()
 	return calls
 }
 
 // Lister calls ListerFunc.
-func (mock *UserControllerMock) Lister() v3.UserLister {
+func (mock *FeatureControllerMock) Lister() v3.FeatureLister {
 	if mock.ListerFunc == nil {
-		panic("UserControllerMock.ListerFunc: method is nil but UserController.Lister was just called")
+		panic("FeatureControllerMock.ListerFunc: method is nil but FeatureController.Lister was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockUserControllerMockLister.Lock()
+	lockFeatureControllerMockLister.Lock()
 	mock.calls.Lister = append(mock.calls.Lister, callInfo)
-	lockUserControllerMockLister.Unlock()
+	lockFeatureControllerMockLister.Unlock()
 	return mock.ListerFunc()
 }
 
 // ListerCalls gets all the calls that were made to Lister.
 // Check the length with:
-//     len(mockedUserController.ListerCalls())
-func (mock *UserControllerMock) ListerCalls() []struct {
+//     len(mockedFeatureController.ListerCalls())
+func (mock *FeatureControllerMock) ListerCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockUserControllerMockLister.RLock()
+	lockFeatureControllerMockLister.RLock()
 	calls = mock.calls.Lister
-	lockUserControllerMockLister.RUnlock()
+	lockFeatureControllerMockLister.RUnlock()
 	return calls
 }
 
 // Start calls StartFunc.
-func (mock *UserControllerMock) Start(ctx context.Context, threadiness int) error {
+func (mock *FeatureControllerMock) Start(ctx context.Context, threadiness int) error {
 	if mock.StartFunc == nil {
-		panic("UserControllerMock.StartFunc: method is nil but UserController.Start was just called")
+		panic("FeatureControllerMock.StartFunc: method is nil but FeatureController.Start was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
@@ -603,16 +603,16 @@ func (mock *UserControllerMock) Start(ctx context.Context, threadiness int) erro
 		Ctx:         ctx,
 		Threadiness: threadiness,
 	}
-	lockUserControllerMockStart.Lock()
+	lockFeatureControllerMockStart.Lock()
 	mock.calls.Start = append(mock.calls.Start, callInfo)
-	lockUserControllerMockStart.Unlock()
+	lockFeatureControllerMockStart.Unlock()
 	return mock.StartFunc(ctx, threadiness)
 }
 
 // StartCalls gets all the calls that were made to Start.
 // Check the length with:
-//     len(mockedUserController.StartCalls())
-func (mock *UserControllerMock) StartCalls() []struct {
+//     len(mockedFeatureController.StartCalls())
+func (mock *FeatureControllerMock) StartCalls() []struct {
 	Ctx         context.Context
 	Threadiness int
 } {
@@ -620,103 +620,103 @@ func (mock *UserControllerMock) StartCalls() []struct {
 		Ctx         context.Context
 		Threadiness int
 	}
-	lockUserControllerMockStart.RLock()
+	lockFeatureControllerMockStart.RLock()
 	calls = mock.calls.Start
-	lockUserControllerMockStart.RUnlock()
+	lockFeatureControllerMockStart.RUnlock()
 	return calls
 }
 
 // Sync calls SyncFunc.
-func (mock *UserControllerMock) Sync(ctx context.Context) error {
+func (mock *FeatureControllerMock) Sync(ctx context.Context) error {
 	if mock.SyncFunc == nil {
-		panic("UserControllerMock.SyncFunc: method is nil but UserController.Sync was just called")
+		panic("FeatureControllerMock.SyncFunc: method is nil but FeatureController.Sync was just called")
 	}
 	callInfo := struct {
 		Ctx context.Context
 	}{
 		Ctx: ctx,
 	}
-	lockUserControllerMockSync.Lock()
+	lockFeatureControllerMockSync.Lock()
 	mock.calls.Sync = append(mock.calls.Sync, callInfo)
-	lockUserControllerMockSync.Unlock()
+	lockFeatureControllerMockSync.Unlock()
 	return mock.SyncFunc(ctx)
 }
 
 // SyncCalls gets all the calls that were made to Sync.
 // Check the length with:
-//     len(mockedUserController.SyncCalls())
-func (mock *UserControllerMock) SyncCalls() []struct {
+//     len(mockedFeatureController.SyncCalls())
+func (mock *FeatureControllerMock) SyncCalls() []struct {
 	Ctx context.Context
 } {
 	var calls []struct {
 		Ctx context.Context
 	}
-	lockUserControllerMockSync.RLock()
+	lockFeatureControllerMockSync.RLock()
 	calls = mock.calls.Sync
-	lockUserControllerMockSync.RUnlock()
+	lockFeatureControllerMockSync.RUnlock()
 	return calls
 }
 
 var (
-	lockUserInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
-	lockUserInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
-	lockUserInterfaceMockAddClusterScopedHandler          sync.RWMutex
-	lockUserInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
-	lockUserInterfaceMockAddFeatureHandler                sync.RWMutex
-	lockUserInterfaceMockAddFeatureLifecycle              sync.RWMutex
-	lockUserInterfaceMockAddHandler                       sync.RWMutex
-	lockUserInterfaceMockAddLifecycle                     sync.RWMutex
-	lockUserInterfaceMockController                       sync.RWMutex
-	lockUserInterfaceMockCreate                           sync.RWMutex
-	lockUserInterfaceMockDelete                           sync.RWMutex
-	lockUserInterfaceMockDeleteCollection                 sync.RWMutex
-	lockUserInterfaceMockDeleteNamespaced                 sync.RWMutex
-	lockUserInterfaceMockGet                              sync.RWMutex
-	lockUserInterfaceMockGetNamespaced                    sync.RWMutex
-	lockUserInterfaceMockList                             sync.RWMutex
-	lockUserInterfaceMockObjectClient                     sync.RWMutex
-	lockUserInterfaceMockUpdate                           sync.RWMutex
-	lockUserInterfaceMockWatch                            sync.RWMutex
+	lockFeatureInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockFeatureInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockFeatureInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockFeatureInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockFeatureInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockFeatureInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockFeatureInterfaceMockAddHandler                       sync.RWMutex
+	lockFeatureInterfaceMockAddLifecycle                     sync.RWMutex
+	lockFeatureInterfaceMockController                       sync.RWMutex
+	lockFeatureInterfaceMockCreate                           sync.RWMutex
+	lockFeatureInterfaceMockDelete                           sync.RWMutex
+	lockFeatureInterfaceMockDeleteCollection                 sync.RWMutex
+	lockFeatureInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockFeatureInterfaceMockGet                              sync.RWMutex
+	lockFeatureInterfaceMockGetNamespaced                    sync.RWMutex
+	lockFeatureInterfaceMockList                             sync.RWMutex
+	lockFeatureInterfaceMockObjectClient                     sync.RWMutex
+	lockFeatureInterfaceMockUpdate                           sync.RWMutex
+	lockFeatureInterfaceMockWatch                            sync.RWMutex
 )
 
-// Ensure, that UserInterfaceMock does implement UserInterface.
+// Ensure, that FeatureInterfaceMock does implement FeatureInterface.
 // If this is not the case, regenerate this file with moq.
-var _ v3.UserInterface = &UserInterfaceMock{}
+var _ v3.FeatureInterface = &FeatureInterfaceMock{}
 
-// UserInterfaceMock is a mock implementation of UserInterface.
+// FeatureInterfaceMock is a mock implementation of FeatureInterface.
 //
-//     func TestSomethingThatUsesUserInterface(t *testing.T) {
+//     func TestSomethingThatUsesFeatureInterface(t *testing.T) {
 //
-//         // make and configure a mocked UserInterface
-//         mockedUserInterface := &UserInterfaceMock{
-//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.UserHandlerFunc)  {
+//         // make and configure a mocked FeatureInterface
+//         mockedFeatureInterface := &FeatureInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.FeatureHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedFeatureHandler method")
 //             },
-//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.UserLifecycle)  {
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.FeatureLifecycle)  {
 // 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
 //             },
-//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.UserHandlerFunc)  {
+//             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.FeatureHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
-//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v3.UserLifecycle)  {
+//             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v3.FeatureLifecycle)  {
 // 	               panic("mock out the AddClusterScopedLifecycle method")
 //             },
-//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.UserHandlerFunc)  {
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.FeatureHandlerFunc)  {
 // 	               panic("mock out the AddFeatureHandler method")
 //             },
-//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v3.UserLifecycle)  {
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v3.FeatureLifecycle)  {
 // 	               panic("mock out the AddFeatureLifecycle method")
 //             },
-//             AddHandlerFunc: func(ctx context.Context, name string, sync v3.UserHandlerFunc)  {
+//             AddHandlerFunc: func(ctx context.Context, name string, sync v3.FeatureHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
 //             },
-//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v3.UserLifecycle)  {
+//             AddLifecycleFunc: func(ctx context.Context, name string, lifecycle v3.FeatureLifecycle)  {
 // 	               panic("mock out the AddLifecycle method")
 //             },
-//             ControllerFunc: func() v3.UserController {
+//             ControllerFunc: func() v3.FeatureController {
 // 	               panic("mock out the Controller method")
 //             },
-//             CreateFunc: func(in1 *v3.User) (*v3.User, error) {
+//             CreateFunc: func(in1 *v3.Feature) (*v3.Feature, error) {
 // 	               panic("mock out the Create method")
 //             },
 //             DeleteFunc: func(name string, options *v1.DeleteOptions) error {
@@ -728,19 +728,19 @@ var _ v3.UserInterface = &UserInterfaceMock{}
 //             DeleteNamespacedFunc: func(namespace string, name string, options *v1.DeleteOptions) error {
 // 	               panic("mock out the DeleteNamespaced method")
 //             },
-//             GetFunc: func(name string, opts v1.GetOptions) (*v3.User, error) {
+//             GetFunc: func(name string, opts v1.GetOptions) (*v3.Feature, error) {
 // 	               panic("mock out the Get method")
 //             },
-//             GetNamespacedFunc: func(namespace string, name string, opts v1.GetOptions) (*v3.User, error) {
+//             GetNamespacedFunc: func(namespace string, name string, opts v1.GetOptions) (*v3.Feature, error) {
 // 	               panic("mock out the GetNamespaced method")
 //             },
-//             ListFunc: func(opts v1.ListOptions) (*v3.UserList, error) {
+//             ListFunc: func(opts v1.ListOptions) (*v3.FeatureList, error) {
 // 	               panic("mock out the List method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
 //             },
-//             UpdateFunc: func(in1 *v3.User) (*v3.User, error) {
+//             UpdateFunc: func(in1 *v3.Feature) (*v3.Feature, error) {
 // 	               panic("mock out the Update method")
 //             },
 //             WatchFunc: func(opts v1.ListOptions) (watch.Interface, error) {
@@ -748,40 +748,40 @@ var _ v3.UserInterface = &UserInterfaceMock{}
 //             },
 //         }
 //
-//         // use mockedUserInterface in code that requires UserInterface
+//         // use mockedFeatureInterface in code that requires FeatureInterface
 //         // and then make assertions.
 //
 //     }
-type UserInterfaceMock struct {
+type FeatureInterfaceMock struct {
 	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
-	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.UserHandlerFunc)
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.FeatureHandlerFunc)
 
 	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
-	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.UserLifecycle)
+	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.FeatureLifecycle)
 
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
-	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.UserHandlerFunc)
+	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.FeatureHandlerFunc)
 
 	// AddClusterScopedLifecycleFunc mocks the AddClusterScopedLifecycle method.
-	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v3.UserLifecycle)
+	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v3.FeatureLifecycle)
 
 	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
-	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.UserHandlerFunc)
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.FeatureHandlerFunc)
 
 	// AddFeatureLifecycleFunc mocks the AddFeatureLifecycle method.
-	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v3.UserLifecycle)
+	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v3.FeatureLifecycle)
 
 	// AddHandlerFunc mocks the AddHandler method.
-	AddHandlerFunc func(ctx context.Context, name string, sync v3.UserHandlerFunc)
+	AddHandlerFunc func(ctx context.Context, name string, sync v3.FeatureHandlerFunc)
 
 	// AddLifecycleFunc mocks the AddLifecycle method.
-	AddLifecycleFunc func(ctx context.Context, name string, lifecycle v3.UserLifecycle)
+	AddLifecycleFunc func(ctx context.Context, name string, lifecycle v3.FeatureLifecycle)
 
 	// ControllerFunc mocks the Controller method.
-	ControllerFunc func() v3.UserController
+	ControllerFunc func() v3.FeatureController
 
 	// CreateFunc mocks the Create method.
-	CreateFunc func(in1 *v3.User) (*v3.User, error)
+	CreateFunc func(in1 *v3.Feature) (*v3.Feature, error)
 
 	// DeleteFunc mocks the Delete method.
 	DeleteFunc func(name string, options *v1.DeleteOptions) error
@@ -793,19 +793,19 @@ type UserInterfaceMock struct {
 	DeleteNamespacedFunc func(namespace string, name string, options *v1.DeleteOptions) error
 
 	// GetFunc mocks the Get method.
-	GetFunc func(name string, opts v1.GetOptions) (*v3.User, error)
+	GetFunc func(name string, opts v1.GetOptions) (*v3.Feature, error)
 
 	// GetNamespacedFunc mocks the GetNamespaced method.
-	GetNamespacedFunc func(namespace string, name string, opts v1.GetOptions) (*v3.User, error)
+	GetNamespacedFunc func(namespace string, name string, opts v1.GetOptions) (*v3.Feature, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(opts v1.ListOptions) (*v3.UserList, error)
+	ListFunc func(opts v1.ListOptions) (*v3.FeatureList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
 
 	// UpdateFunc mocks the Update method.
-	UpdateFunc func(in1 *v3.User) (*v3.User, error)
+	UpdateFunc func(in1 *v3.Feature) (*v3.Feature, error)
 
 	// WatchFunc mocks the Watch method.
 	WatchFunc func(opts v1.ListOptions) (watch.Interface, error)
@@ -823,7 +823,7 @@ type UserInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Sync is the sync argument value.
-			Sync v3.UserHandlerFunc
+			Sync v3.FeatureHandlerFunc
 		}
 		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
 		AddClusterScopedFeatureLifecycle []struct {
@@ -836,7 +836,7 @@ type UserInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v3.UserLifecycle
+			Lifecycle v3.FeatureLifecycle
 		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
@@ -847,7 +847,7 @@ type UserInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Sync is the sync argument value.
-			Sync v3.UserHandlerFunc
+			Sync v3.FeatureHandlerFunc
 		}
 		// AddClusterScopedLifecycle holds details about calls to the AddClusterScopedLifecycle method.
 		AddClusterScopedLifecycle []struct {
@@ -858,7 +858,7 @@ type UserInterfaceMock struct {
 			// ClusterName is the clusterName argument value.
 			ClusterName string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v3.UserLifecycle
+			Lifecycle v3.FeatureLifecycle
 		}
 		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
 		AddFeatureHandler []struct {
@@ -869,7 +869,7 @@ type UserInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v3.UserHandlerFunc
+			Sync v3.FeatureHandlerFunc
 		}
 		// AddFeatureLifecycle holds details about calls to the AddFeatureLifecycle method.
 		AddFeatureLifecycle []struct {
@@ -880,7 +880,7 @@ type UserInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v3.UserLifecycle
+			Lifecycle v3.FeatureLifecycle
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -889,7 +889,7 @@ type UserInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Sync is the sync argument value.
-			Sync v3.UserHandlerFunc
+			Sync v3.FeatureHandlerFunc
 		}
 		// AddLifecycle holds details about calls to the AddLifecycle method.
 		AddLifecycle []struct {
@@ -898,7 +898,7 @@ type UserInterfaceMock struct {
 			// Name is the name argument value.
 			Name string
 			// Lifecycle is the lifecycle argument value.
-			Lifecycle v3.UserLifecycle
+			Lifecycle v3.FeatureLifecycle
 		}
 		// Controller holds details about calls to the Controller method.
 		Controller []struct {
@@ -906,7 +906,7 @@ type UserInterfaceMock struct {
 		// Create holds details about calls to the Create method.
 		Create []struct {
 			// In1 is the in1 argument value.
-			In1 *v3.User
+			In1 *v3.Feature
 		}
 		// Delete holds details about calls to the Delete method.
 		Delete []struct {
@@ -958,7 +958,7 @@ type UserInterfaceMock struct {
 		// Update holds details about calls to the Update method.
 		Update []struct {
 			// In1 is the in1 argument value.
-			In1 *v3.User
+			In1 *v3.Feature
 		}
 		// Watch holds details about calls to the Watch method.
 		Watch []struct {
@@ -969,16 +969,16 @@ type UserInterfaceMock struct {
 }
 
 // AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
-func (mock *UserInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.UserHandlerFunc) {
+func (mock *FeatureInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.FeatureHandlerFunc) {
 	if mock.AddClusterScopedFeatureHandlerFunc == nil {
-		panic("UserInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but UserInterface.AddClusterScopedFeatureHandler was just called")
+		panic("FeatureInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but FeatureInterface.AddClusterScopedFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Sync        v3.UserHandlerFunc
+		Sync        v3.FeatureHandlerFunc
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -986,46 +986,46 @@ func (mock *UserInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Contex
 		ClusterName: clusterName,
 		Sync:        sync,
 	}
-	lockUserInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	lockFeatureInterfaceMockAddClusterScopedFeatureHandler.Lock()
 	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
-	lockUserInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	lockFeatureInterfaceMockAddClusterScopedFeatureHandler.Unlock()
 	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, sync)
 }
 
 // AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
 // Check the length with:
-//     len(mockedUserInterface.AddClusterScopedFeatureHandlerCalls())
-func (mock *UserInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+//     len(mockedFeatureInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *FeatureInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Sync        v3.UserHandlerFunc
+	Sync        v3.FeatureHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Sync        v3.UserHandlerFunc
+		Sync        v3.FeatureHandlerFunc
 	}
-	lockUserInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	lockFeatureInterfaceMockAddClusterScopedFeatureHandler.RLock()
 	calls = mock.calls.AddClusterScopedFeatureHandler
-	lockUserInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	lockFeatureInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
-func (mock *UserInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.UserLifecycle) {
+func (mock *FeatureInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.FeatureLifecycle) {
 	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
-		panic("UserInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but UserInterface.AddClusterScopedFeatureLifecycle was just called")
+		panic("FeatureInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but FeatureInterface.AddClusterScopedFeatureLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Lifecycle   v3.UserLifecycle
+		Lifecycle   v3.FeatureLifecycle
 	}{
 		Ctx:         ctx,
 		Enabled:     enabled,
@@ -1033,346 +1033,346 @@ func (mock *UserInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Cont
 		ClusterName: clusterName,
 		Lifecycle:   lifecycle,
 	}
-	lockUserInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	lockFeatureInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
 	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
-	lockUserInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	lockFeatureInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
 	mock.AddClusterScopedFeatureLifecycleFunc(ctx, enabled, name, clusterName, lifecycle)
 }
 
 // AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
 // Check the length with:
-//     len(mockedUserInterface.AddClusterScopedFeatureLifecycleCalls())
-func (mock *UserInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+//     len(mockedFeatureInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *FeatureInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
 	Ctx         context.Context
 	Enabled     func() bool
 	Name        string
 	ClusterName string
-	Lifecycle   v3.UserLifecycle
+	Lifecycle   v3.FeatureLifecycle
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Enabled     func() bool
 		Name        string
 		ClusterName string
-		Lifecycle   v3.UserLifecycle
+		Lifecycle   v3.FeatureLifecycle
 	}
-	lockUserInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	lockFeatureInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedFeatureLifecycle
-	lockUserInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	lockFeatureInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
 	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
-func (mock *UserInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, sync v3.UserHandlerFunc) {
+func (mock *FeatureInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, sync v3.FeatureHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
-		panic("UserInterfaceMock.AddClusterScopedHandlerFunc: method is nil but UserInterface.AddClusterScopedHandler was just called")
+		panic("FeatureInterfaceMock.AddClusterScopedHandlerFunc: method is nil but FeatureInterface.AddClusterScopedHandler was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Sync        v3.UserHandlerFunc
+		Sync        v3.FeatureHandlerFunc
 	}{
 		Ctx:         ctx,
 		Name:        name,
 		ClusterName: clusterName,
 		Sync:        sync,
 	}
-	lockUserInterfaceMockAddClusterScopedHandler.Lock()
+	lockFeatureInterfaceMockAddClusterScopedHandler.Lock()
 	mock.calls.AddClusterScopedHandler = append(mock.calls.AddClusterScopedHandler, callInfo)
-	lockUserInterfaceMockAddClusterScopedHandler.Unlock()
+	lockFeatureInterfaceMockAddClusterScopedHandler.Unlock()
 	mock.AddClusterScopedHandlerFunc(ctx, name, clusterName, sync)
 }
 
 // AddClusterScopedHandlerCalls gets all the calls that were made to AddClusterScopedHandler.
 // Check the length with:
-//     len(mockedUserInterface.AddClusterScopedHandlerCalls())
-func (mock *UserInterfaceMock) AddClusterScopedHandlerCalls() []struct {
+//     len(mockedFeatureInterface.AddClusterScopedHandlerCalls())
+func (mock *FeatureInterfaceMock) AddClusterScopedHandlerCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Sync        v3.UserHandlerFunc
+	Sync        v3.FeatureHandlerFunc
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Sync        v3.UserHandlerFunc
+		Sync        v3.FeatureHandlerFunc
 	}
-	lockUserInterfaceMockAddClusterScopedHandler.RLock()
+	lockFeatureInterfaceMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
-	lockUserInterfaceMockAddClusterScopedHandler.RUnlock()
+	lockFeatureInterfaceMockAddClusterScopedHandler.RUnlock()
 	return calls
 }
 
 // AddClusterScopedLifecycle calls AddClusterScopedLifecycleFunc.
-func (mock *UserInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, name string, clusterName string, lifecycle v3.UserLifecycle) {
+func (mock *FeatureInterfaceMock) AddClusterScopedLifecycle(ctx context.Context, name string, clusterName string, lifecycle v3.FeatureLifecycle) {
 	if mock.AddClusterScopedLifecycleFunc == nil {
-		panic("UserInterfaceMock.AddClusterScopedLifecycleFunc: method is nil but UserInterface.AddClusterScopedLifecycle was just called")
+		panic("FeatureInterfaceMock.AddClusterScopedLifecycleFunc: method is nil but FeatureInterface.AddClusterScopedLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Lifecycle   v3.UserLifecycle
+		Lifecycle   v3.FeatureLifecycle
 	}{
 		Ctx:         ctx,
 		Name:        name,
 		ClusterName: clusterName,
 		Lifecycle:   lifecycle,
 	}
-	lockUserInterfaceMockAddClusterScopedLifecycle.Lock()
+	lockFeatureInterfaceMockAddClusterScopedLifecycle.Lock()
 	mock.calls.AddClusterScopedLifecycle = append(mock.calls.AddClusterScopedLifecycle, callInfo)
-	lockUserInterfaceMockAddClusterScopedLifecycle.Unlock()
+	lockFeatureInterfaceMockAddClusterScopedLifecycle.Unlock()
 	mock.AddClusterScopedLifecycleFunc(ctx, name, clusterName, lifecycle)
 }
 
 // AddClusterScopedLifecycleCalls gets all the calls that were made to AddClusterScopedLifecycle.
 // Check the length with:
-//     len(mockedUserInterface.AddClusterScopedLifecycleCalls())
-func (mock *UserInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
+//     len(mockedFeatureInterface.AddClusterScopedLifecycleCalls())
+func (mock *FeatureInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	Ctx         context.Context
 	Name        string
 	ClusterName string
-	Lifecycle   v3.UserLifecycle
+	Lifecycle   v3.FeatureLifecycle
 } {
 	var calls []struct {
 		Ctx         context.Context
 		Name        string
 		ClusterName string
-		Lifecycle   v3.UserLifecycle
+		Lifecycle   v3.FeatureLifecycle
 	}
-	lockUserInterfaceMockAddClusterScopedLifecycle.RLock()
+	lockFeatureInterfaceMockAddClusterScopedLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedLifecycle
-	lockUserInterfaceMockAddClusterScopedLifecycle.RUnlock()
+	lockFeatureInterfaceMockAddClusterScopedLifecycle.RUnlock()
 	return calls
 }
 
 // AddFeatureHandler calls AddFeatureHandlerFunc.
-func (mock *UserInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.UserHandlerFunc) {
+func (mock *FeatureInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.FeatureHandlerFunc) {
 	if mock.AddFeatureHandlerFunc == nil {
-		panic("UserInterfaceMock.AddFeatureHandlerFunc: method is nil but UserInterface.AddFeatureHandler was just called")
+		panic("FeatureInterfaceMock.AddFeatureHandlerFunc: method is nil but FeatureInterface.AddFeatureHandler was just called")
 	}
 	callInfo := struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v3.UserHandlerFunc
+		Sync    v3.FeatureHandlerFunc
 	}{
 		Ctx:     ctx,
 		Enabled: enabled,
 		Name:    name,
 		Sync:    sync,
 	}
-	lockUserInterfaceMockAddFeatureHandler.Lock()
+	lockFeatureInterfaceMockAddFeatureHandler.Lock()
 	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
-	lockUserInterfaceMockAddFeatureHandler.Unlock()
+	lockFeatureInterfaceMockAddFeatureHandler.Unlock()
 	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
 }
 
 // AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
 // Check the length with:
-//     len(mockedUserInterface.AddFeatureHandlerCalls())
-func (mock *UserInterfaceMock) AddFeatureHandlerCalls() []struct {
+//     len(mockedFeatureInterface.AddFeatureHandlerCalls())
+func (mock *FeatureInterfaceMock) AddFeatureHandlerCalls() []struct {
 	Ctx     context.Context
 	Enabled func() bool
 	Name    string
-	Sync    v3.UserHandlerFunc
+	Sync    v3.FeatureHandlerFunc
 } {
 	var calls []struct {
 		Ctx     context.Context
 		Enabled func() bool
 		Name    string
-		Sync    v3.UserHandlerFunc
+		Sync    v3.FeatureHandlerFunc
 	}
-	lockUserInterfaceMockAddFeatureHandler.RLock()
+	lockFeatureInterfaceMockAddFeatureHandler.RLock()
 	calls = mock.calls.AddFeatureHandler
-	lockUserInterfaceMockAddFeatureHandler.RUnlock()
+	lockFeatureInterfaceMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
 // AddFeatureLifecycle calls AddFeatureLifecycleFunc.
-func (mock *UserInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v3.UserLifecycle) {
+func (mock *FeatureInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v3.FeatureLifecycle) {
 	if mock.AddFeatureLifecycleFunc == nil {
-		panic("UserInterfaceMock.AddFeatureLifecycleFunc: method is nil but UserInterface.AddFeatureLifecycle was just called")
+		panic("FeatureInterfaceMock.AddFeatureLifecycleFunc: method is nil but FeatureInterface.AddFeatureLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx       context.Context
 		Enabled   func() bool
 		Name      string
-		Lifecycle v3.UserLifecycle
+		Lifecycle v3.FeatureLifecycle
 	}{
 		Ctx:       ctx,
 		Enabled:   enabled,
 		Name:      name,
 		Lifecycle: lifecycle,
 	}
-	lockUserInterfaceMockAddFeatureLifecycle.Lock()
+	lockFeatureInterfaceMockAddFeatureLifecycle.Lock()
 	mock.calls.AddFeatureLifecycle = append(mock.calls.AddFeatureLifecycle, callInfo)
-	lockUserInterfaceMockAddFeatureLifecycle.Unlock()
+	lockFeatureInterfaceMockAddFeatureLifecycle.Unlock()
 	mock.AddFeatureLifecycleFunc(ctx, enabled, name, lifecycle)
 }
 
 // AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
 // Check the length with:
-//     len(mockedUserInterface.AddFeatureLifecycleCalls())
-func (mock *UserInterfaceMock) AddFeatureLifecycleCalls() []struct {
+//     len(mockedFeatureInterface.AddFeatureLifecycleCalls())
+func (mock *FeatureInterfaceMock) AddFeatureLifecycleCalls() []struct {
 	Ctx       context.Context
 	Enabled   func() bool
 	Name      string
-	Lifecycle v3.UserLifecycle
+	Lifecycle v3.FeatureLifecycle
 } {
 	var calls []struct {
 		Ctx       context.Context
 		Enabled   func() bool
 		Name      string
-		Lifecycle v3.UserLifecycle
+		Lifecycle v3.FeatureLifecycle
 	}
-	lockUserInterfaceMockAddFeatureLifecycle.RLock()
+	lockFeatureInterfaceMockAddFeatureLifecycle.RLock()
 	calls = mock.calls.AddFeatureLifecycle
-	lockUserInterfaceMockAddFeatureLifecycle.RUnlock()
+	lockFeatureInterfaceMockAddFeatureLifecycle.RUnlock()
 	return calls
 }
 
 // AddHandler calls AddHandlerFunc.
-func (mock *UserInterfaceMock) AddHandler(ctx context.Context, name string, sync v3.UserHandlerFunc) {
+func (mock *FeatureInterfaceMock) AddHandler(ctx context.Context, name string, sync v3.FeatureHandlerFunc) {
 	if mock.AddHandlerFunc == nil {
-		panic("UserInterfaceMock.AddHandlerFunc: method is nil but UserInterface.AddHandler was just called")
+		panic("FeatureInterfaceMock.AddHandlerFunc: method is nil but FeatureInterface.AddHandler was just called")
 	}
 	callInfo := struct {
 		Ctx  context.Context
 		Name string
-		Sync v3.UserHandlerFunc
+		Sync v3.FeatureHandlerFunc
 	}{
 		Ctx:  ctx,
 		Name: name,
 		Sync: sync,
 	}
-	lockUserInterfaceMockAddHandler.Lock()
+	lockFeatureInterfaceMockAddHandler.Lock()
 	mock.calls.AddHandler = append(mock.calls.AddHandler, callInfo)
-	lockUserInterfaceMockAddHandler.Unlock()
+	lockFeatureInterfaceMockAddHandler.Unlock()
 	mock.AddHandlerFunc(ctx, name, sync)
 }
 
 // AddHandlerCalls gets all the calls that were made to AddHandler.
 // Check the length with:
-//     len(mockedUserInterface.AddHandlerCalls())
-func (mock *UserInterfaceMock) AddHandlerCalls() []struct {
+//     len(mockedFeatureInterface.AddHandlerCalls())
+func (mock *FeatureInterfaceMock) AddHandlerCalls() []struct {
 	Ctx  context.Context
 	Name string
-	Sync v3.UserHandlerFunc
+	Sync v3.FeatureHandlerFunc
 } {
 	var calls []struct {
 		Ctx  context.Context
 		Name string
-		Sync v3.UserHandlerFunc
+		Sync v3.FeatureHandlerFunc
 	}
-	lockUserInterfaceMockAddHandler.RLock()
+	lockFeatureInterfaceMockAddHandler.RLock()
 	calls = mock.calls.AddHandler
-	lockUserInterfaceMockAddHandler.RUnlock()
+	lockFeatureInterfaceMockAddHandler.RUnlock()
 	return calls
 }
 
 // AddLifecycle calls AddLifecycleFunc.
-func (mock *UserInterfaceMock) AddLifecycle(ctx context.Context, name string, lifecycle v3.UserLifecycle) {
+func (mock *FeatureInterfaceMock) AddLifecycle(ctx context.Context, name string, lifecycle v3.FeatureLifecycle) {
 	if mock.AddLifecycleFunc == nil {
-		panic("UserInterfaceMock.AddLifecycleFunc: method is nil but UserInterface.AddLifecycle was just called")
+		panic("FeatureInterfaceMock.AddLifecycleFunc: method is nil but FeatureInterface.AddLifecycle was just called")
 	}
 	callInfo := struct {
 		Ctx       context.Context
 		Name      string
-		Lifecycle v3.UserLifecycle
+		Lifecycle v3.FeatureLifecycle
 	}{
 		Ctx:       ctx,
 		Name:      name,
 		Lifecycle: lifecycle,
 	}
-	lockUserInterfaceMockAddLifecycle.Lock()
+	lockFeatureInterfaceMockAddLifecycle.Lock()
 	mock.calls.AddLifecycle = append(mock.calls.AddLifecycle, callInfo)
-	lockUserInterfaceMockAddLifecycle.Unlock()
+	lockFeatureInterfaceMockAddLifecycle.Unlock()
 	mock.AddLifecycleFunc(ctx, name, lifecycle)
 }
 
 // AddLifecycleCalls gets all the calls that were made to AddLifecycle.
 // Check the length with:
-//     len(mockedUserInterface.AddLifecycleCalls())
-func (mock *UserInterfaceMock) AddLifecycleCalls() []struct {
+//     len(mockedFeatureInterface.AddLifecycleCalls())
+func (mock *FeatureInterfaceMock) AddLifecycleCalls() []struct {
 	Ctx       context.Context
 	Name      string
-	Lifecycle v3.UserLifecycle
+	Lifecycle v3.FeatureLifecycle
 } {
 	var calls []struct {
 		Ctx       context.Context
 		Name      string
-		Lifecycle v3.UserLifecycle
+		Lifecycle v3.FeatureLifecycle
 	}
-	lockUserInterfaceMockAddLifecycle.RLock()
+	lockFeatureInterfaceMockAddLifecycle.RLock()
 	calls = mock.calls.AddLifecycle
-	lockUserInterfaceMockAddLifecycle.RUnlock()
+	lockFeatureInterfaceMockAddLifecycle.RUnlock()
 	return calls
 }
 
 // Controller calls ControllerFunc.
-func (mock *UserInterfaceMock) Controller() v3.UserController {
+func (mock *FeatureInterfaceMock) Controller() v3.FeatureController {
 	if mock.ControllerFunc == nil {
-		panic("UserInterfaceMock.ControllerFunc: method is nil but UserInterface.Controller was just called")
+		panic("FeatureInterfaceMock.ControllerFunc: method is nil but FeatureInterface.Controller was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockUserInterfaceMockController.Lock()
+	lockFeatureInterfaceMockController.Lock()
 	mock.calls.Controller = append(mock.calls.Controller, callInfo)
-	lockUserInterfaceMockController.Unlock()
+	lockFeatureInterfaceMockController.Unlock()
 	return mock.ControllerFunc()
 }
 
 // ControllerCalls gets all the calls that were made to Controller.
 // Check the length with:
-//     len(mockedUserInterface.ControllerCalls())
-func (mock *UserInterfaceMock) ControllerCalls() []struct {
+//     len(mockedFeatureInterface.ControllerCalls())
+func (mock *FeatureInterfaceMock) ControllerCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockUserInterfaceMockController.RLock()
+	lockFeatureInterfaceMockController.RLock()
 	calls = mock.calls.Controller
-	lockUserInterfaceMockController.RUnlock()
+	lockFeatureInterfaceMockController.RUnlock()
 	return calls
 }
 
 // Create calls CreateFunc.
-func (mock *UserInterfaceMock) Create(in1 *v3.User) (*v3.User, error) {
+func (mock *FeatureInterfaceMock) Create(in1 *v3.Feature) (*v3.Feature, error) {
 	if mock.CreateFunc == nil {
-		panic("UserInterfaceMock.CreateFunc: method is nil but UserInterface.Create was just called")
+		panic("FeatureInterfaceMock.CreateFunc: method is nil but FeatureInterface.Create was just called")
 	}
 	callInfo := struct {
-		In1 *v3.User
+		In1 *v3.Feature
 	}{
 		In1: in1,
 	}
-	lockUserInterfaceMockCreate.Lock()
+	lockFeatureInterfaceMockCreate.Lock()
 	mock.calls.Create = append(mock.calls.Create, callInfo)
-	lockUserInterfaceMockCreate.Unlock()
+	lockFeatureInterfaceMockCreate.Unlock()
 	return mock.CreateFunc(in1)
 }
 
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
-//     len(mockedUserInterface.CreateCalls())
-func (mock *UserInterfaceMock) CreateCalls() []struct {
-	In1 *v3.User
+//     len(mockedFeatureInterface.CreateCalls())
+func (mock *FeatureInterfaceMock) CreateCalls() []struct {
+	In1 *v3.Feature
 } {
 	var calls []struct {
-		In1 *v3.User
+		In1 *v3.Feature
 	}
-	lockUserInterfaceMockCreate.RLock()
+	lockFeatureInterfaceMockCreate.RLock()
 	calls = mock.calls.Create
-	lockUserInterfaceMockCreate.RUnlock()
+	lockFeatureInterfaceMockCreate.RUnlock()
 	return calls
 }
 
 // Delete calls DeleteFunc.
-func (mock *UserInterfaceMock) Delete(name string, options *v1.DeleteOptions) error {
+func (mock *FeatureInterfaceMock) Delete(name string, options *v1.DeleteOptions) error {
 	if mock.DeleteFunc == nil {
-		panic("UserInterfaceMock.DeleteFunc: method is nil but UserInterface.Delete was just called")
+		panic("FeatureInterfaceMock.DeleteFunc: method is nil but FeatureInterface.Delete was just called")
 	}
 	callInfo := struct {
 		Name    string
@@ -1381,16 +1381,16 @@ func (mock *UserInterfaceMock) Delete(name string, options *v1.DeleteOptions) er
 		Name:    name,
 		Options: options,
 	}
-	lockUserInterfaceMockDelete.Lock()
+	lockFeatureInterfaceMockDelete.Lock()
 	mock.calls.Delete = append(mock.calls.Delete, callInfo)
-	lockUserInterfaceMockDelete.Unlock()
+	lockFeatureInterfaceMockDelete.Unlock()
 	return mock.DeleteFunc(name, options)
 }
 
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
-//     len(mockedUserInterface.DeleteCalls())
-func (mock *UserInterfaceMock) DeleteCalls() []struct {
+//     len(mockedFeatureInterface.DeleteCalls())
+func (mock *FeatureInterfaceMock) DeleteCalls() []struct {
 	Name    string
 	Options *v1.DeleteOptions
 } {
@@ -1398,16 +1398,16 @@ func (mock *UserInterfaceMock) DeleteCalls() []struct {
 		Name    string
 		Options *v1.DeleteOptions
 	}
-	lockUserInterfaceMockDelete.RLock()
+	lockFeatureInterfaceMockDelete.RLock()
 	calls = mock.calls.Delete
-	lockUserInterfaceMockDelete.RUnlock()
+	lockFeatureInterfaceMockDelete.RUnlock()
 	return calls
 }
 
 // DeleteCollection calls DeleteCollectionFunc.
-func (mock *UserInterfaceMock) DeleteCollection(deleteOpts *v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (mock *FeatureInterfaceMock) DeleteCollection(deleteOpts *v1.DeleteOptions, listOpts v1.ListOptions) error {
 	if mock.DeleteCollectionFunc == nil {
-		panic("UserInterfaceMock.DeleteCollectionFunc: method is nil but UserInterface.DeleteCollection was just called")
+		panic("FeatureInterfaceMock.DeleteCollectionFunc: method is nil but FeatureInterface.DeleteCollection was just called")
 	}
 	callInfo := struct {
 		DeleteOpts *v1.DeleteOptions
@@ -1416,16 +1416,16 @@ func (mock *UserInterfaceMock) DeleteCollection(deleteOpts *v1.DeleteOptions, li
 		DeleteOpts: deleteOpts,
 		ListOpts:   listOpts,
 	}
-	lockUserInterfaceMockDeleteCollection.Lock()
+	lockFeatureInterfaceMockDeleteCollection.Lock()
 	mock.calls.DeleteCollection = append(mock.calls.DeleteCollection, callInfo)
-	lockUserInterfaceMockDeleteCollection.Unlock()
+	lockFeatureInterfaceMockDeleteCollection.Unlock()
 	return mock.DeleteCollectionFunc(deleteOpts, listOpts)
 }
 
 // DeleteCollectionCalls gets all the calls that were made to DeleteCollection.
 // Check the length with:
-//     len(mockedUserInterface.DeleteCollectionCalls())
-func (mock *UserInterfaceMock) DeleteCollectionCalls() []struct {
+//     len(mockedFeatureInterface.DeleteCollectionCalls())
+func (mock *FeatureInterfaceMock) DeleteCollectionCalls() []struct {
 	DeleteOpts *v1.DeleteOptions
 	ListOpts   v1.ListOptions
 } {
@@ -1433,16 +1433,16 @@ func (mock *UserInterfaceMock) DeleteCollectionCalls() []struct {
 		DeleteOpts *v1.DeleteOptions
 		ListOpts   v1.ListOptions
 	}
-	lockUserInterfaceMockDeleteCollection.RLock()
+	lockFeatureInterfaceMockDeleteCollection.RLock()
 	calls = mock.calls.DeleteCollection
-	lockUserInterfaceMockDeleteCollection.RUnlock()
+	lockFeatureInterfaceMockDeleteCollection.RUnlock()
 	return calls
 }
 
 // DeleteNamespaced calls DeleteNamespacedFunc.
-func (mock *UserInterfaceMock) DeleteNamespaced(namespace string, name string, options *v1.DeleteOptions) error {
+func (mock *FeatureInterfaceMock) DeleteNamespaced(namespace string, name string, options *v1.DeleteOptions) error {
 	if mock.DeleteNamespacedFunc == nil {
-		panic("UserInterfaceMock.DeleteNamespacedFunc: method is nil but UserInterface.DeleteNamespaced was just called")
+		panic("FeatureInterfaceMock.DeleteNamespacedFunc: method is nil but FeatureInterface.DeleteNamespaced was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -1453,16 +1453,16 @@ func (mock *UserInterfaceMock) DeleteNamespaced(namespace string, name string, o
 		Name:      name,
 		Options:   options,
 	}
-	lockUserInterfaceMockDeleteNamespaced.Lock()
+	lockFeatureInterfaceMockDeleteNamespaced.Lock()
 	mock.calls.DeleteNamespaced = append(mock.calls.DeleteNamespaced, callInfo)
-	lockUserInterfaceMockDeleteNamespaced.Unlock()
+	lockFeatureInterfaceMockDeleteNamespaced.Unlock()
 	return mock.DeleteNamespacedFunc(namespace, name, options)
 }
 
 // DeleteNamespacedCalls gets all the calls that were made to DeleteNamespaced.
 // Check the length with:
-//     len(mockedUserInterface.DeleteNamespacedCalls())
-func (mock *UserInterfaceMock) DeleteNamespacedCalls() []struct {
+//     len(mockedFeatureInterface.DeleteNamespacedCalls())
+func (mock *FeatureInterfaceMock) DeleteNamespacedCalls() []struct {
 	Namespace string
 	Name      string
 	Options   *v1.DeleteOptions
@@ -1472,16 +1472,16 @@ func (mock *UserInterfaceMock) DeleteNamespacedCalls() []struct {
 		Name      string
 		Options   *v1.DeleteOptions
 	}
-	lockUserInterfaceMockDeleteNamespaced.RLock()
+	lockFeatureInterfaceMockDeleteNamespaced.RLock()
 	calls = mock.calls.DeleteNamespaced
-	lockUserInterfaceMockDeleteNamespaced.RUnlock()
+	lockFeatureInterfaceMockDeleteNamespaced.RUnlock()
 	return calls
 }
 
 // Get calls GetFunc.
-func (mock *UserInterfaceMock) Get(name string, opts v1.GetOptions) (*v3.User, error) {
+func (mock *FeatureInterfaceMock) Get(name string, opts v1.GetOptions) (*v3.Feature, error) {
 	if mock.GetFunc == nil {
-		panic("UserInterfaceMock.GetFunc: method is nil but UserInterface.Get was just called")
+		panic("FeatureInterfaceMock.GetFunc: method is nil but FeatureInterface.Get was just called")
 	}
 	callInfo := struct {
 		Name string
@@ -1490,16 +1490,16 @@ func (mock *UserInterfaceMock) Get(name string, opts v1.GetOptions) (*v3.User, e
 		Name: name,
 		Opts: opts,
 	}
-	lockUserInterfaceMockGet.Lock()
+	lockFeatureInterfaceMockGet.Lock()
 	mock.calls.Get = append(mock.calls.Get, callInfo)
-	lockUserInterfaceMockGet.Unlock()
+	lockFeatureInterfaceMockGet.Unlock()
 	return mock.GetFunc(name, opts)
 }
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedUserInterface.GetCalls())
-func (mock *UserInterfaceMock) GetCalls() []struct {
+//     len(mockedFeatureInterface.GetCalls())
+func (mock *FeatureInterfaceMock) GetCalls() []struct {
 	Name string
 	Opts v1.GetOptions
 } {
@@ -1507,16 +1507,16 @@ func (mock *UserInterfaceMock) GetCalls() []struct {
 		Name string
 		Opts v1.GetOptions
 	}
-	lockUserInterfaceMockGet.RLock()
+	lockFeatureInterfaceMockGet.RLock()
 	calls = mock.calls.Get
-	lockUserInterfaceMockGet.RUnlock()
+	lockFeatureInterfaceMockGet.RUnlock()
 	return calls
 }
 
 // GetNamespaced calls GetNamespacedFunc.
-func (mock *UserInterfaceMock) GetNamespaced(namespace string, name string, opts v1.GetOptions) (*v3.User, error) {
+func (mock *FeatureInterfaceMock) GetNamespaced(namespace string, name string, opts v1.GetOptions) (*v3.Feature, error) {
 	if mock.GetNamespacedFunc == nil {
-		panic("UserInterfaceMock.GetNamespacedFunc: method is nil but UserInterface.GetNamespaced was just called")
+		panic("FeatureInterfaceMock.GetNamespacedFunc: method is nil but FeatureInterface.GetNamespaced was just called")
 	}
 	callInfo := struct {
 		Namespace string
@@ -1527,16 +1527,16 @@ func (mock *UserInterfaceMock) GetNamespaced(namespace string, name string, opts
 		Name:      name,
 		Opts:      opts,
 	}
-	lockUserInterfaceMockGetNamespaced.Lock()
+	lockFeatureInterfaceMockGetNamespaced.Lock()
 	mock.calls.GetNamespaced = append(mock.calls.GetNamespaced, callInfo)
-	lockUserInterfaceMockGetNamespaced.Unlock()
+	lockFeatureInterfaceMockGetNamespaced.Unlock()
 	return mock.GetNamespacedFunc(namespace, name, opts)
 }
 
 // GetNamespacedCalls gets all the calls that were made to GetNamespaced.
 // Check the length with:
-//     len(mockedUserInterface.GetNamespacedCalls())
-func (mock *UserInterfaceMock) GetNamespacedCalls() []struct {
+//     len(mockedFeatureInterface.GetNamespacedCalls())
+func (mock *FeatureInterfaceMock) GetNamespacedCalls() []struct {
 	Namespace string
 	Name      string
 	Opts      v1.GetOptions
@@ -1546,195 +1546,195 @@ func (mock *UserInterfaceMock) GetNamespacedCalls() []struct {
 		Name      string
 		Opts      v1.GetOptions
 	}
-	lockUserInterfaceMockGetNamespaced.RLock()
+	lockFeatureInterfaceMockGetNamespaced.RLock()
 	calls = mock.calls.GetNamespaced
-	lockUserInterfaceMockGetNamespaced.RUnlock()
+	lockFeatureInterfaceMockGetNamespaced.RUnlock()
 	return calls
 }
 
 // List calls ListFunc.
-func (mock *UserInterfaceMock) List(opts v1.ListOptions) (*v3.UserList, error) {
+func (mock *FeatureInterfaceMock) List(opts v1.ListOptions) (*v3.FeatureList, error) {
 	if mock.ListFunc == nil {
-		panic("UserInterfaceMock.ListFunc: method is nil but UserInterface.List was just called")
+		panic("FeatureInterfaceMock.ListFunc: method is nil but FeatureInterface.List was just called")
 	}
 	callInfo := struct {
 		Opts v1.ListOptions
 	}{
 		Opts: opts,
 	}
-	lockUserInterfaceMockList.Lock()
+	lockFeatureInterfaceMockList.Lock()
 	mock.calls.List = append(mock.calls.List, callInfo)
-	lockUserInterfaceMockList.Unlock()
+	lockFeatureInterfaceMockList.Unlock()
 	return mock.ListFunc(opts)
 }
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
-//     len(mockedUserInterface.ListCalls())
-func (mock *UserInterfaceMock) ListCalls() []struct {
+//     len(mockedFeatureInterface.ListCalls())
+func (mock *FeatureInterfaceMock) ListCalls() []struct {
 	Opts v1.ListOptions
 } {
 	var calls []struct {
 		Opts v1.ListOptions
 	}
-	lockUserInterfaceMockList.RLock()
+	lockFeatureInterfaceMockList.RLock()
 	calls = mock.calls.List
-	lockUserInterfaceMockList.RUnlock()
+	lockFeatureInterfaceMockList.RUnlock()
 	return calls
 }
 
 // ObjectClient calls ObjectClientFunc.
-func (mock *UserInterfaceMock) ObjectClient() *objectclient.ObjectClient {
+func (mock *FeatureInterfaceMock) ObjectClient() *objectclient.ObjectClient {
 	if mock.ObjectClientFunc == nil {
-		panic("UserInterfaceMock.ObjectClientFunc: method is nil but UserInterface.ObjectClient was just called")
+		panic("FeatureInterfaceMock.ObjectClientFunc: method is nil but FeatureInterface.ObjectClient was just called")
 	}
 	callInfo := struct {
 	}{}
-	lockUserInterfaceMockObjectClient.Lock()
+	lockFeatureInterfaceMockObjectClient.Lock()
 	mock.calls.ObjectClient = append(mock.calls.ObjectClient, callInfo)
-	lockUserInterfaceMockObjectClient.Unlock()
+	lockFeatureInterfaceMockObjectClient.Unlock()
 	return mock.ObjectClientFunc()
 }
 
 // ObjectClientCalls gets all the calls that were made to ObjectClient.
 // Check the length with:
-//     len(mockedUserInterface.ObjectClientCalls())
-func (mock *UserInterfaceMock) ObjectClientCalls() []struct {
+//     len(mockedFeatureInterface.ObjectClientCalls())
+func (mock *FeatureInterfaceMock) ObjectClientCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockUserInterfaceMockObjectClient.RLock()
+	lockFeatureInterfaceMockObjectClient.RLock()
 	calls = mock.calls.ObjectClient
-	lockUserInterfaceMockObjectClient.RUnlock()
+	lockFeatureInterfaceMockObjectClient.RUnlock()
 	return calls
 }
 
 // Update calls UpdateFunc.
-func (mock *UserInterfaceMock) Update(in1 *v3.User) (*v3.User, error) {
+func (mock *FeatureInterfaceMock) Update(in1 *v3.Feature) (*v3.Feature, error) {
 	if mock.UpdateFunc == nil {
-		panic("UserInterfaceMock.UpdateFunc: method is nil but UserInterface.Update was just called")
+		panic("FeatureInterfaceMock.UpdateFunc: method is nil but FeatureInterface.Update was just called")
 	}
 	callInfo := struct {
-		In1 *v3.User
+		In1 *v3.Feature
 	}{
 		In1: in1,
 	}
-	lockUserInterfaceMockUpdate.Lock()
+	lockFeatureInterfaceMockUpdate.Lock()
 	mock.calls.Update = append(mock.calls.Update, callInfo)
-	lockUserInterfaceMockUpdate.Unlock()
+	lockFeatureInterfaceMockUpdate.Unlock()
 	return mock.UpdateFunc(in1)
 }
 
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
-//     len(mockedUserInterface.UpdateCalls())
-func (mock *UserInterfaceMock) UpdateCalls() []struct {
-	In1 *v3.User
+//     len(mockedFeatureInterface.UpdateCalls())
+func (mock *FeatureInterfaceMock) UpdateCalls() []struct {
+	In1 *v3.Feature
 } {
 	var calls []struct {
-		In1 *v3.User
+		In1 *v3.Feature
 	}
-	lockUserInterfaceMockUpdate.RLock()
+	lockFeatureInterfaceMockUpdate.RLock()
 	calls = mock.calls.Update
-	lockUserInterfaceMockUpdate.RUnlock()
+	lockFeatureInterfaceMockUpdate.RUnlock()
 	return calls
 }
 
 // Watch calls WatchFunc.
-func (mock *UserInterfaceMock) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (mock *FeatureInterfaceMock) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	if mock.WatchFunc == nil {
-		panic("UserInterfaceMock.WatchFunc: method is nil but UserInterface.Watch was just called")
+		panic("FeatureInterfaceMock.WatchFunc: method is nil but FeatureInterface.Watch was just called")
 	}
 	callInfo := struct {
 		Opts v1.ListOptions
 	}{
 		Opts: opts,
 	}
-	lockUserInterfaceMockWatch.Lock()
+	lockFeatureInterfaceMockWatch.Lock()
 	mock.calls.Watch = append(mock.calls.Watch, callInfo)
-	lockUserInterfaceMockWatch.Unlock()
+	lockFeatureInterfaceMockWatch.Unlock()
 	return mock.WatchFunc(opts)
 }
 
 // WatchCalls gets all the calls that were made to Watch.
 // Check the length with:
-//     len(mockedUserInterface.WatchCalls())
-func (mock *UserInterfaceMock) WatchCalls() []struct {
+//     len(mockedFeatureInterface.WatchCalls())
+func (mock *FeatureInterfaceMock) WatchCalls() []struct {
 	Opts v1.ListOptions
 } {
 	var calls []struct {
 		Opts v1.ListOptions
 	}
-	lockUserInterfaceMockWatch.RLock()
+	lockFeatureInterfaceMockWatch.RLock()
 	calls = mock.calls.Watch
-	lockUserInterfaceMockWatch.RUnlock()
+	lockFeatureInterfaceMockWatch.RUnlock()
 	return calls
 }
 
 var (
-	lockUsersGetterMockUsers sync.RWMutex
+	lockFeaturesGetterMockFeatures sync.RWMutex
 )
 
-// Ensure, that UsersGetterMock does implement UsersGetter.
+// Ensure, that FeaturesGetterMock does implement FeaturesGetter.
 // If this is not the case, regenerate this file with moq.
-var _ v3.UsersGetter = &UsersGetterMock{}
+var _ v3.FeaturesGetter = &FeaturesGetterMock{}
 
-// UsersGetterMock is a mock implementation of UsersGetter.
+// FeaturesGetterMock is a mock implementation of FeaturesGetter.
 //
-//     func TestSomethingThatUsesUsersGetter(t *testing.T) {
+//     func TestSomethingThatUsesFeaturesGetter(t *testing.T) {
 //
-//         // make and configure a mocked UsersGetter
-//         mockedUsersGetter := &UsersGetterMock{
-//             UsersFunc: func(namespace string) v3.UserInterface {
-// 	               panic("mock out the Users method")
+//         // make and configure a mocked FeaturesGetter
+//         mockedFeaturesGetter := &FeaturesGetterMock{
+//             FeaturesFunc: func(namespace string) v3.FeatureInterface {
+// 	               panic("mock out the Features method")
 //             },
 //         }
 //
-//         // use mockedUsersGetter in code that requires UsersGetter
+//         // use mockedFeaturesGetter in code that requires FeaturesGetter
 //         // and then make assertions.
 //
 //     }
-type UsersGetterMock struct {
-	// UsersFunc mocks the Users method.
-	UsersFunc func(namespace string) v3.UserInterface
+type FeaturesGetterMock struct {
+	// FeaturesFunc mocks the Features method.
+	FeaturesFunc func(namespace string) v3.FeatureInterface
 
 	// calls tracks calls to the methods.
 	calls struct {
-		// Users holds details about calls to the Users method.
-		Users []struct {
+		// Features holds details about calls to the Features method.
+		Features []struct {
 			// Namespace is the namespace argument value.
 			Namespace string
 		}
 	}
 }
 
-// Users calls UsersFunc.
-func (mock *UsersGetterMock) Users(namespace string) v3.UserInterface {
-	if mock.UsersFunc == nil {
-		panic("UsersGetterMock.UsersFunc: method is nil but UsersGetter.Users was just called")
+// Features calls FeaturesFunc.
+func (mock *FeaturesGetterMock) Features(namespace string) v3.FeatureInterface {
+	if mock.FeaturesFunc == nil {
+		panic("FeaturesGetterMock.FeaturesFunc: method is nil but FeaturesGetter.Features was just called")
 	}
 	callInfo := struct {
 		Namespace string
 	}{
 		Namespace: namespace,
 	}
-	lockUsersGetterMockUsers.Lock()
-	mock.calls.Users = append(mock.calls.Users, callInfo)
-	lockUsersGetterMockUsers.Unlock()
-	return mock.UsersFunc(namespace)
+	lockFeaturesGetterMockFeatures.Lock()
+	mock.calls.Features = append(mock.calls.Features, callInfo)
+	lockFeaturesGetterMockFeatures.Unlock()
+	return mock.FeaturesFunc(namespace)
 }
 
-// UsersCalls gets all the calls that were made to Users.
+// FeaturesCalls gets all the calls that were made to Features.
 // Check the length with:
-//     len(mockedUsersGetter.UsersCalls())
-func (mock *UsersGetterMock) UsersCalls() []struct {
+//     len(mockedFeaturesGetter.FeaturesCalls())
+func (mock *FeaturesGetterMock) FeaturesCalls() []struct {
 	Namespace string
 } {
 	var calls []struct {
 		Namespace string
 	}
-	lockUsersGetterMockUsers.RLock()
-	calls = mock.calls.Users
-	lockUsersGetterMockUsers.RUnlock()
+	lockFeaturesGetterMockFeatures.RLock()
+	calls = mock.calls.Features
+	lockFeaturesGetterMockFeatures.RUnlock()
 	return calls
 }

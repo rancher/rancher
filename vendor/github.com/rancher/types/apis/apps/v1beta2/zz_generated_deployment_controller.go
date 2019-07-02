@@ -69,7 +69,9 @@ type DeploymentController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() DeploymentLister
 	AddHandler(ctx context.Context, name string, handler DeploymentHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync DeploymentHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler DeploymentHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler DeploymentHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -88,9 +90,13 @@ type DeploymentInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DeploymentController
 	AddHandler(ctx context.Context, name string, sync DeploymentHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync DeploymentHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle DeploymentLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle DeploymentLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync DeploymentHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync DeploymentHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle DeploymentLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle DeploymentLifecycle)
 }
 
 type deploymentLister struct {
@@ -150,10 +156,39 @@ func (c *deploymentController) AddHandler(ctx context.Context, name string, hand
 	})
 }
 
+func (c *deploymentController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler DeploymentHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*v1beta2.Deployment); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
 func (c *deploymentController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler DeploymentHandlerFunc) {
 	resource.PutClusterScoped(DeploymentGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*v1beta2.Deployment); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *deploymentController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler DeploymentHandlerFunc) {
+	resource.PutClusterScoped(DeploymentGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*v1beta2.Deployment); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -258,18 +293,36 @@ func (s *deploymentClient) AddHandler(ctx context.Context, name string, sync Dep
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *deploymentClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync DeploymentHandlerFunc) {
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
+}
+
 func (s *deploymentClient) AddLifecycle(ctx context.Context, name string, lifecycle DeploymentLifecycle) {
 	sync := NewDeploymentLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *deploymentClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle DeploymentLifecycle) {
+	sync := NewDeploymentLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
 func (s *deploymentClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync DeploymentHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *deploymentClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync DeploymentHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
+}
+
 func (s *deploymentClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle DeploymentLifecycle) {
 	sync := NewDeploymentLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *deploymentClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle DeploymentLifecycle) {
+	sync := NewDeploymentLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
 type DeploymentIndexer func(obj *v1beta2.Deployment) ([]string, error)

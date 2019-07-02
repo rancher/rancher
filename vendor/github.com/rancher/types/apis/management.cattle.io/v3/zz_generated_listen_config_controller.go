@@ -67,7 +67,9 @@ type ListenConfigController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ListenConfigLister
 	AddHandler(ctx context.Context, name string, handler ListenConfigHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync ListenConfigHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ListenConfigHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ListenConfigHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -86,9 +88,13 @@ type ListenConfigInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ListenConfigController
 	AddHandler(ctx context.Context, name string, sync ListenConfigHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync ListenConfigHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle ListenConfigLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle ListenConfigLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ListenConfigHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync ListenConfigHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ListenConfigLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ListenConfigLifecycle)
 }
 
 type listenConfigLister struct {
@@ -148,10 +154,39 @@ func (c *listenConfigController) AddHandler(ctx context.Context, name string, ha
 	})
 }
 
+func (c *listenConfigController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler ListenConfigHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*ListenConfig); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
 func (c *listenConfigController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ListenConfigHandlerFunc) {
 	resource.PutClusterScoped(ListenConfigGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*ListenConfig); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *listenConfigController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler ListenConfigHandlerFunc) {
+	resource.PutClusterScoped(ListenConfigGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*ListenConfig); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -256,18 +291,36 @@ func (s *listenConfigClient) AddHandler(ctx context.Context, name string, sync L
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *listenConfigClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync ListenConfigHandlerFunc) {
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
+}
+
 func (s *listenConfigClient) AddLifecycle(ctx context.Context, name string, lifecycle ListenConfigLifecycle) {
 	sync := NewListenConfigLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *listenConfigClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle ListenConfigLifecycle) {
+	sync := NewListenConfigLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
 func (s *listenConfigClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ListenConfigHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *listenConfigClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync ListenConfigHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
+}
+
 func (s *listenConfigClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ListenConfigLifecycle) {
 	sync := NewListenConfigLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *listenConfigClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ListenConfigLifecycle) {
+	sync := NewListenConfigLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
 type ListenConfigIndexer func(obj *ListenConfig) ([]string, error)

@@ -141,14 +141,16 @@ func (mock *ResourceQuotaListerMock) ListCalls() []struct {
 }
 
 var (
-	lockResourceQuotaControllerMockAddClusterScopedHandler sync.RWMutex
-	lockResourceQuotaControllerMockAddHandler              sync.RWMutex
-	lockResourceQuotaControllerMockEnqueue                 sync.RWMutex
-	lockResourceQuotaControllerMockGeneric                 sync.RWMutex
-	lockResourceQuotaControllerMockInformer                sync.RWMutex
-	lockResourceQuotaControllerMockLister                  sync.RWMutex
-	lockResourceQuotaControllerMockStart                   sync.RWMutex
-	lockResourceQuotaControllerMockSync                    sync.RWMutex
+	lockResourceQuotaControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockResourceQuotaControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockResourceQuotaControllerMockAddFeatureHandler              sync.RWMutex
+	lockResourceQuotaControllerMockAddHandler                     sync.RWMutex
+	lockResourceQuotaControllerMockEnqueue                        sync.RWMutex
+	lockResourceQuotaControllerMockGeneric                        sync.RWMutex
+	lockResourceQuotaControllerMockInformer                       sync.RWMutex
+	lockResourceQuotaControllerMockLister                         sync.RWMutex
+	lockResourceQuotaControllerMockStart                          sync.RWMutex
+	lockResourceQuotaControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that ResourceQuotaControllerMock does implement ResourceQuotaController.
@@ -161,8 +163,14 @@ var _ v1a.ResourceQuotaController = &ResourceQuotaControllerMock{}
 //
 //         // make and configure a mocked ResourceQuotaController
 //         mockedResourceQuotaController := &ResourceQuotaControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1a.ResourceQuotaHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v1a.ResourceQuotaHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v1a.ResourceQuotaHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
 //             },
 //             AddHandlerFunc: func(ctx context.Context, name string, handler v1a.ResourceQuotaHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
@@ -192,8 +200,14 @@ var _ v1a.ResourceQuotaController = &ResourceQuotaControllerMock{}
 //
 //     }
 type ResourceQuotaControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1a.ResourceQuotaHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v1a.ResourceQuotaHandlerFunc)
+
+	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v1a.ResourceQuotaHandlerFunc)
 
 	// AddHandlerFunc mocks the AddHandler method.
 	AddHandlerFunc func(ctx context.Context, name string, handler v1a.ResourceQuotaHandlerFunc)
@@ -218,6 +232,19 @@ type ResourceQuotaControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v1a.ResourceQuotaHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -228,6 +255,17 @@ type ResourceQuotaControllerMock struct {
 			ClusterName string
 			// Handler is the handler argument value.
 			Handler v1a.ResourceQuotaHandlerFunc
+		}
+		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
+		AddFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// Sync is the sync argument value.
+			Sync v1a.ResourceQuotaHandlerFunc
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -267,6 +305,53 @@ type ResourceQuotaControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *ResourceQuotaControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1a.ResourceQuotaHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("ResourceQuotaControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but ResourceQuotaController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Handler     v1a.ResourceQuotaHandlerFunc
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockResourceQuotaControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockResourceQuotaControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedResourceQuotaController.AddClusterScopedFeatureHandlerCalls())
+func (mock *ResourceQuotaControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Handler     v1a.ResourceQuotaHandlerFunc
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Handler     v1a.ResourceQuotaHandlerFunc
+	}
+	lockResourceQuotaControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockResourceQuotaControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -309,6 +394,49 @@ func (mock *ResourceQuotaControllerMock) AddClusterScopedHandlerCalls() []struct
 	lockResourceQuotaControllerMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
 	lockResourceQuotaControllerMockAddClusterScopedHandler.RUnlock()
+	return calls
+}
+
+// AddFeatureHandler calls AddFeatureHandlerFunc.
+func (mock *ResourceQuotaControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v1a.ResourceQuotaHandlerFunc) {
+	if mock.AddFeatureHandlerFunc == nil {
+		panic("ResourceQuotaControllerMock.AddFeatureHandlerFunc: method is nil but ResourceQuotaController.AddFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v1a.ResourceQuotaHandlerFunc
+	}{
+		Ctx:     ctx,
+		Enabled: enabled,
+		Name:    name,
+		Sync:    sync,
+	}
+	lockResourceQuotaControllerMockAddFeatureHandler.Lock()
+	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
+	lockResourceQuotaControllerMockAddFeatureHandler.Unlock()
+	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
+}
+
+// AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
+// Check the length with:
+//     len(mockedResourceQuotaController.AddFeatureHandlerCalls())
+func (mock *ResourceQuotaControllerMock) AddFeatureHandlerCalls() []struct {
+	Ctx     context.Context
+	Enabled func() bool
+	Name    string
+	Sync    v1a.ResourceQuotaHandlerFunc
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v1a.ResourceQuotaHandlerFunc
+	}
+	lockResourceQuotaControllerMockAddFeatureHandler.RLock()
+	calls = mock.calls.AddFeatureHandler
+	lockResourceQuotaControllerMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
@@ -531,21 +659,25 @@ func (mock *ResourceQuotaControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockResourceQuotaInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockResourceQuotaInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockResourceQuotaInterfaceMockAddHandler                sync.RWMutex
-	lockResourceQuotaInterfaceMockAddLifecycle              sync.RWMutex
-	lockResourceQuotaInterfaceMockController                sync.RWMutex
-	lockResourceQuotaInterfaceMockCreate                    sync.RWMutex
-	lockResourceQuotaInterfaceMockDelete                    sync.RWMutex
-	lockResourceQuotaInterfaceMockDeleteCollection          sync.RWMutex
-	lockResourceQuotaInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockResourceQuotaInterfaceMockGet                       sync.RWMutex
-	lockResourceQuotaInterfaceMockGetNamespaced             sync.RWMutex
-	lockResourceQuotaInterfaceMockList                      sync.RWMutex
-	lockResourceQuotaInterfaceMockObjectClient              sync.RWMutex
-	lockResourceQuotaInterfaceMockUpdate                    sync.RWMutex
-	lockResourceQuotaInterfaceMockWatch                     sync.RWMutex
+	lockResourceQuotaInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockResourceQuotaInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockResourceQuotaInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockResourceQuotaInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockResourceQuotaInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockResourceQuotaInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockResourceQuotaInterfaceMockAddHandler                       sync.RWMutex
+	lockResourceQuotaInterfaceMockAddLifecycle                     sync.RWMutex
+	lockResourceQuotaInterfaceMockController                       sync.RWMutex
+	lockResourceQuotaInterfaceMockCreate                           sync.RWMutex
+	lockResourceQuotaInterfaceMockDelete                           sync.RWMutex
+	lockResourceQuotaInterfaceMockDeleteCollection                 sync.RWMutex
+	lockResourceQuotaInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockResourceQuotaInterfaceMockGet                              sync.RWMutex
+	lockResourceQuotaInterfaceMockGetNamespaced                    sync.RWMutex
+	lockResourceQuotaInterfaceMockList                             sync.RWMutex
+	lockResourceQuotaInterfaceMockObjectClient                     sync.RWMutex
+	lockResourceQuotaInterfaceMockUpdate                           sync.RWMutex
+	lockResourceQuotaInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that ResourceQuotaInterfaceMock does implement ResourceQuotaInterface.
@@ -558,11 +690,23 @@ var _ v1a.ResourceQuotaInterface = &ResourceQuotaInterfaceMock{}
 //
 //         // make and configure a mocked ResourceQuotaInterface
 //         mockedResourceQuotaInterface := &ResourceQuotaInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v1a.ResourceQuotaHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1a.ResourceQuotaLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v1a.ResourceQuotaHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
 //             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v1a.ResourceQuotaLifecycle)  {
 // 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v1a.ResourceQuotaHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v1a.ResourceQuotaLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
 //             },
 //             AddHandlerFunc: func(ctx context.Context, name string, sync v1a.ResourceQuotaHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
@@ -610,11 +754,23 @@ var _ v1a.ResourceQuotaInterface = &ResourceQuotaInterfaceMock{}
 //
 //     }
 type ResourceQuotaInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v1a.ResourceQuotaHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1a.ResourceQuotaLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v1a.ResourceQuotaHandlerFunc)
 
 	// AddClusterScopedLifecycleFunc mocks the AddClusterScopedLifecycle method.
 	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v1a.ResourceQuotaLifecycle)
+
+	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v1a.ResourceQuotaHandlerFunc)
+
+	// AddFeatureLifecycleFunc mocks the AddFeatureLifecycle method.
+	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v1a.ResourceQuotaLifecycle)
 
 	// AddHandlerFunc mocks the AddHandler method.
 	AddHandlerFunc func(ctx context.Context, name string, sync v1a.ResourceQuotaHandlerFunc)
@@ -657,6 +813,32 @@ type ResourceQuotaInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v1a.ResourceQuotaHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v1a.ResourceQuotaLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -676,6 +858,28 @@ type ResourceQuotaInterfaceMock struct {
 			Name string
 			// ClusterName is the clusterName argument value.
 			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v1a.ResourceQuotaLifecycle
+		}
+		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
+		AddFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// Sync is the sync argument value.
+			Sync v1a.ResourceQuotaHandlerFunc
+		}
+		// AddFeatureLifecycle holds details about calls to the AddFeatureLifecycle method.
+		AddFeatureLifecycle []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
 			// Lifecycle is the lifecycle argument value.
 			Lifecycle v1a.ResourceQuotaLifecycle
 		}
@@ -765,6 +969,100 @@ type ResourceQuotaInterfaceMock struct {
 	}
 }
 
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *ResourceQuotaInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, sync v1a.ResourceQuotaHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("ResourceQuotaInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but ResourceQuotaInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Sync        v1a.ResourceQuotaHandlerFunc
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockResourceQuotaInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockResourceQuotaInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedResourceQuotaInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *ResourceQuotaInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Sync        v1a.ResourceQuotaHandlerFunc
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Sync        v1a.ResourceQuotaHandlerFunc
+	}
+	lockResourceQuotaInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockResourceQuotaInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *ResourceQuotaInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1a.ResourceQuotaLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("ResourceQuotaInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but ResourceQuotaInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Lifecycle   v1a.ResourceQuotaLifecycle
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockResourceQuotaInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockResourceQuotaInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(ctx, enabled, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedResourceQuotaInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *ResourceQuotaInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Lifecycle   v1a.ResourceQuotaLifecycle
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Lifecycle   v1a.ResourceQuotaLifecycle
+	}
+	lockResourceQuotaInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockResourceQuotaInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
+}
+
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
 func (mock *ResourceQuotaInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, sync v1a.ResourceQuotaHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
@@ -848,6 +1146,92 @@ func (mock *ResourceQuotaInterfaceMock) AddClusterScopedLifecycleCalls() []struc
 	lockResourceQuotaInterfaceMockAddClusterScopedLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedLifecycle
 	lockResourceQuotaInterfaceMockAddClusterScopedLifecycle.RUnlock()
+	return calls
+}
+
+// AddFeatureHandler calls AddFeatureHandlerFunc.
+func (mock *ResourceQuotaInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v1a.ResourceQuotaHandlerFunc) {
+	if mock.AddFeatureHandlerFunc == nil {
+		panic("ResourceQuotaInterfaceMock.AddFeatureHandlerFunc: method is nil but ResourceQuotaInterface.AddFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v1a.ResourceQuotaHandlerFunc
+	}{
+		Ctx:     ctx,
+		Enabled: enabled,
+		Name:    name,
+		Sync:    sync,
+	}
+	lockResourceQuotaInterfaceMockAddFeatureHandler.Lock()
+	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
+	lockResourceQuotaInterfaceMockAddFeatureHandler.Unlock()
+	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
+}
+
+// AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
+// Check the length with:
+//     len(mockedResourceQuotaInterface.AddFeatureHandlerCalls())
+func (mock *ResourceQuotaInterfaceMock) AddFeatureHandlerCalls() []struct {
+	Ctx     context.Context
+	Enabled func() bool
+	Name    string
+	Sync    v1a.ResourceQuotaHandlerFunc
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v1a.ResourceQuotaHandlerFunc
+	}
+	lockResourceQuotaInterfaceMockAddFeatureHandler.RLock()
+	calls = mock.calls.AddFeatureHandler
+	lockResourceQuotaInterfaceMockAddFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddFeatureLifecycle calls AddFeatureLifecycleFunc.
+func (mock *ResourceQuotaInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v1a.ResourceQuotaLifecycle) {
+	if mock.AddFeatureLifecycleFunc == nil {
+		panic("ResourceQuotaInterfaceMock.AddFeatureLifecycleFunc: method is nil but ResourceQuotaInterface.AddFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Ctx       context.Context
+		Enabled   func() bool
+		Name      string
+		Lifecycle v1a.ResourceQuotaLifecycle
+	}{
+		Ctx:       ctx,
+		Enabled:   enabled,
+		Name:      name,
+		Lifecycle: lifecycle,
+	}
+	lockResourceQuotaInterfaceMockAddFeatureLifecycle.Lock()
+	mock.calls.AddFeatureLifecycle = append(mock.calls.AddFeatureLifecycle, callInfo)
+	lockResourceQuotaInterfaceMockAddFeatureLifecycle.Unlock()
+	mock.AddFeatureLifecycleFunc(ctx, enabled, name, lifecycle)
+}
+
+// AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
+// Check the length with:
+//     len(mockedResourceQuotaInterface.AddFeatureLifecycleCalls())
+func (mock *ResourceQuotaInterfaceMock) AddFeatureLifecycleCalls() []struct {
+	Ctx       context.Context
+	Enabled   func() bool
+	Name      string
+	Lifecycle v1a.ResourceQuotaLifecycle
+} {
+	var calls []struct {
+		Ctx       context.Context
+		Enabled   func() bool
+		Name      string
+		Lifecycle v1a.ResourceQuotaLifecycle
+	}
+	lockResourceQuotaInterfaceMockAddFeatureLifecycle.RLock()
+	calls = mock.calls.AddFeatureLifecycle
+	lockResourceQuotaInterfaceMockAddFeatureLifecycle.RUnlock()
 	return calls
 }
 

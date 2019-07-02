@@ -141,14 +141,16 @@ func (mock *ReplicationControllerListerMock) ListCalls() []struct {
 }
 
 var (
-	lockReplicationControllerControllerMockAddClusterScopedHandler sync.RWMutex
-	lockReplicationControllerControllerMockAddHandler              sync.RWMutex
-	lockReplicationControllerControllerMockEnqueue                 sync.RWMutex
-	lockReplicationControllerControllerMockGeneric                 sync.RWMutex
-	lockReplicationControllerControllerMockInformer                sync.RWMutex
-	lockReplicationControllerControllerMockLister                  sync.RWMutex
-	lockReplicationControllerControllerMockStart                   sync.RWMutex
-	lockReplicationControllerControllerMockSync                    sync.RWMutex
+	lockReplicationControllerControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockReplicationControllerControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockReplicationControllerControllerMockAddFeatureHandler              sync.RWMutex
+	lockReplicationControllerControllerMockAddHandler                     sync.RWMutex
+	lockReplicationControllerControllerMockEnqueue                        sync.RWMutex
+	lockReplicationControllerControllerMockGeneric                        sync.RWMutex
+	lockReplicationControllerControllerMockInformer                       sync.RWMutex
+	lockReplicationControllerControllerMockLister                         sync.RWMutex
+	lockReplicationControllerControllerMockStart                          sync.RWMutex
+	lockReplicationControllerControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that ReplicationControllerControllerMock does implement ReplicationControllerController.
@@ -161,8 +163,14 @@ var _ v1a.ReplicationControllerController = &ReplicationControllerControllerMock
 //
 //         // make and configure a mocked ReplicationControllerController
 //         mockedReplicationControllerController := &ReplicationControllerControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1a.ReplicationControllerHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v1a.ReplicationControllerHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v1a.ReplicationControllerHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
 //             },
 //             AddHandlerFunc: func(ctx context.Context, name string, handler v1a.ReplicationControllerHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
@@ -192,8 +200,14 @@ var _ v1a.ReplicationControllerController = &ReplicationControllerControllerMock
 //
 //     }
 type ReplicationControllerControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1a.ReplicationControllerHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v1a.ReplicationControllerHandlerFunc)
+
+	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v1a.ReplicationControllerHandlerFunc)
 
 	// AddHandlerFunc mocks the AddHandler method.
 	AddHandlerFunc func(ctx context.Context, name string, handler v1a.ReplicationControllerHandlerFunc)
@@ -218,6 +232,19 @@ type ReplicationControllerControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v1a.ReplicationControllerHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -228,6 +255,17 @@ type ReplicationControllerControllerMock struct {
 			ClusterName string
 			// Handler is the handler argument value.
 			Handler v1a.ReplicationControllerHandlerFunc
+		}
+		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
+		AddFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// Sync is the sync argument value.
+			Sync v1a.ReplicationControllerHandlerFunc
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -267,6 +305,53 @@ type ReplicationControllerControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *ReplicationControllerControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1a.ReplicationControllerHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("ReplicationControllerControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but ReplicationControllerController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Handler     v1a.ReplicationControllerHandlerFunc
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockReplicationControllerControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockReplicationControllerControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedReplicationControllerController.AddClusterScopedFeatureHandlerCalls())
+func (mock *ReplicationControllerControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Handler     v1a.ReplicationControllerHandlerFunc
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Handler     v1a.ReplicationControllerHandlerFunc
+	}
+	lockReplicationControllerControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockReplicationControllerControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -309,6 +394,49 @@ func (mock *ReplicationControllerControllerMock) AddClusterScopedHandlerCalls() 
 	lockReplicationControllerControllerMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
 	lockReplicationControllerControllerMockAddClusterScopedHandler.RUnlock()
+	return calls
+}
+
+// AddFeatureHandler calls AddFeatureHandlerFunc.
+func (mock *ReplicationControllerControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v1a.ReplicationControllerHandlerFunc) {
+	if mock.AddFeatureHandlerFunc == nil {
+		panic("ReplicationControllerControllerMock.AddFeatureHandlerFunc: method is nil but ReplicationControllerController.AddFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v1a.ReplicationControllerHandlerFunc
+	}{
+		Ctx:     ctx,
+		Enabled: enabled,
+		Name:    name,
+		Sync:    sync,
+	}
+	lockReplicationControllerControllerMockAddFeatureHandler.Lock()
+	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
+	lockReplicationControllerControllerMockAddFeatureHandler.Unlock()
+	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
+}
+
+// AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
+// Check the length with:
+//     len(mockedReplicationControllerController.AddFeatureHandlerCalls())
+func (mock *ReplicationControllerControllerMock) AddFeatureHandlerCalls() []struct {
+	Ctx     context.Context
+	Enabled func() bool
+	Name    string
+	Sync    v1a.ReplicationControllerHandlerFunc
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v1a.ReplicationControllerHandlerFunc
+	}
+	lockReplicationControllerControllerMockAddFeatureHandler.RLock()
+	calls = mock.calls.AddFeatureHandler
+	lockReplicationControllerControllerMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
@@ -531,21 +659,25 @@ func (mock *ReplicationControllerControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockReplicationControllerInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockReplicationControllerInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockReplicationControllerInterfaceMockAddHandler                sync.RWMutex
-	lockReplicationControllerInterfaceMockAddLifecycle              sync.RWMutex
-	lockReplicationControllerInterfaceMockController                sync.RWMutex
-	lockReplicationControllerInterfaceMockCreate                    sync.RWMutex
-	lockReplicationControllerInterfaceMockDelete                    sync.RWMutex
-	lockReplicationControllerInterfaceMockDeleteCollection          sync.RWMutex
-	lockReplicationControllerInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockReplicationControllerInterfaceMockGet                       sync.RWMutex
-	lockReplicationControllerInterfaceMockGetNamespaced             sync.RWMutex
-	lockReplicationControllerInterfaceMockList                      sync.RWMutex
-	lockReplicationControllerInterfaceMockObjectClient              sync.RWMutex
-	lockReplicationControllerInterfaceMockUpdate                    sync.RWMutex
-	lockReplicationControllerInterfaceMockWatch                     sync.RWMutex
+	lockReplicationControllerInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockReplicationControllerInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockReplicationControllerInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockReplicationControllerInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockReplicationControllerInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockReplicationControllerInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockReplicationControllerInterfaceMockAddHandler                       sync.RWMutex
+	lockReplicationControllerInterfaceMockAddLifecycle                     sync.RWMutex
+	lockReplicationControllerInterfaceMockController                       sync.RWMutex
+	lockReplicationControllerInterfaceMockCreate                           sync.RWMutex
+	lockReplicationControllerInterfaceMockDelete                           sync.RWMutex
+	lockReplicationControllerInterfaceMockDeleteCollection                 sync.RWMutex
+	lockReplicationControllerInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockReplicationControllerInterfaceMockGet                              sync.RWMutex
+	lockReplicationControllerInterfaceMockGetNamespaced                    sync.RWMutex
+	lockReplicationControllerInterfaceMockList                             sync.RWMutex
+	lockReplicationControllerInterfaceMockObjectClient                     sync.RWMutex
+	lockReplicationControllerInterfaceMockUpdate                           sync.RWMutex
+	lockReplicationControllerInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that ReplicationControllerInterfaceMock does implement ReplicationControllerInterface.
@@ -558,11 +690,23 @@ var _ v1a.ReplicationControllerInterface = &ReplicationControllerInterfaceMock{}
 //
 //         // make and configure a mocked ReplicationControllerInterface
 //         mockedReplicationControllerInterface := &ReplicationControllerInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v1a.ReplicationControllerHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1a.ReplicationControllerLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v1a.ReplicationControllerHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
 //             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v1a.ReplicationControllerLifecycle)  {
 // 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v1a.ReplicationControllerHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v1a.ReplicationControllerLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
 //             },
 //             AddHandlerFunc: func(ctx context.Context, name string, sync v1a.ReplicationControllerHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
@@ -610,11 +754,23 @@ var _ v1a.ReplicationControllerInterface = &ReplicationControllerInterfaceMock{}
 //
 //     }
 type ReplicationControllerInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v1a.ReplicationControllerHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1a.ReplicationControllerLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v1a.ReplicationControllerHandlerFunc)
 
 	// AddClusterScopedLifecycleFunc mocks the AddClusterScopedLifecycle method.
 	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v1a.ReplicationControllerLifecycle)
+
+	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v1a.ReplicationControllerHandlerFunc)
+
+	// AddFeatureLifecycleFunc mocks the AddFeatureLifecycle method.
+	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v1a.ReplicationControllerLifecycle)
 
 	// AddHandlerFunc mocks the AddHandler method.
 	AddHandlerFunc func(ctx context.Context, name string, sync v1a.ReplicationControllerHandlerFunc)
@@ -657,6 +813,32 @@ type ReplicationControllerInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v1a.ReplicationControllerHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v1a.ReplicationControllerLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -676,6 +858,28 @@ type ReplicationControllerInterfaceMock struct {
 			Name string
 			// ClusterName is the clusterName argument value.
 			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v1a.ReplicationControllerLifecycle
+		}
+		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
+		AddFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// Sync is the sync argument value.
+			Sync v1a.ReplicationControllerHandlerFunc
+		}
+		// AddFeatureLifecycle holds details about calls to the AddFeatureLifecycle method.
+		AddFeatureLifecycle []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
 			// Lifecycle is the lifecycle argument value.
 			Lifecycle v1a.ReplicationControllerLifecycle
 		}
@@ -765,6 +969,100 @@ type ReplicationControllerInterfaceMock struct {
 	}
 }
 
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *ReplicationControllerInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, sync v1a.ReplicationControllerHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("ReplicationControllerInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but ReplicationControllerInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Sync        v1a.ReplicationControllerHandlerFunc
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockReplicationControllerInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockReplicationControllerInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedReplicationControllerInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *ReplicationControllerInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Sync        v1a.ReplicationControllerHandlerFunc
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Sync        v1a.ReplicationControllerHandlerFunc
+	}
+	lockReplicationControllerInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockReplicationControllerInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *ReplicationControllerInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1a.ReplicationControllerLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("ReplicationControllerInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but ReplicationControllerInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Lifecycle   v1a.ReplicationControllerLifecycle
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockReplicationControllerInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockReplicationControllerInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(ctx, enabled, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedReplicationControllerInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *ReplicationControllerInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Lifecycle   v1a.ReplicationControllerLifecycle
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Lifecycle   v1a.ReplicationControllerLifecycle
+	}
+	lockReplicationControllerInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockReplicationControllerInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
+}
+
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
 func (mock *ReplicationControllerInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, sync v1a.ReplicationControllerHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
@@ -848,6 +1146,92 @@ func (mock *ReplicationControllerInterfaceMock) AddClusterScopedLifecycleCalls()
 	lockReplicationControllerInterfaceMockAddClusterScopedLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedLifecycle
 	lockReplicationControllerInterfaceMockAddClusterScopedLifecycle.RUnlock()
+	return calls
+}
+
+// AddFeatureHandler calls AddFeatureHandlerFunc.
+func (mock *ReplicationControllerInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v1a.ReplicationControllerHandlerFunc) {
+	if mock.AddFeatureHandlerFunc == nil {
+		panic("ReplicationControllerInterfaceMock.AddFeatureHandlerFunc: method is nil but ReplicationControllerInterface.AddFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v1a.ReplicationControllerHandlerFunc
+	}{
+		Ctx:     ctx,
+		Enabled: enabled,
+		Name:    name,
+		Sync:    sync,
+	}
+	lockReplicationControllerInterfaceMockAddFeatureHandler.Lock()
+	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
+	lockReplicationControllerInterfaceMockAddFeatureHandler.Unlock()
+	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
+}
+
+// AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
+// Check the length with:
+//     len(mockedReplicationControllerInterface.AddFeatureHandlerCalls())
+func (mock *ReplicationControllerInterfaceMock) AddFeatureHandlerCalls() []struct {
+	Ctx     context.Context
+	Enabled func() bool
+	Name    string
+	Sync    v1a.ReplicationControllerHandlerFunc
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v1a.ReplicationControllerHandlerFunc
+	}
+	lockReplicationControllerInterfaceMockAddFeatureHandler.RLock()
+	calls = mock.calls.AddFeatureHandler
+	lockReplicationControllerInterfaceMockAddFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddFeatureLifecycle calls AddFeatureLifecycleFunc.
+func (mock *ReplicationControllerInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v1a.ReplicationControllerLifecycle) {
+	if mock.AddFeatureLifecycleFunc == nil {
+		panic("ReplicationControllerInterfaceMock.AddFeatureLifecycleFunc: method is nil but ReplicationControllerInterface.AddFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Ctx       context.Context
+		Enabled   func() bool
+		Name      string
+		Lifecycle v1a.ReplicationControllerLifecycle
+	}{
+		Ctx:       ctx,
+		Enabled:   enabled,
+		Name:      name,
+		Lifecycle: lifecycle,
+	}
+	lockReplicationControllerInterfaceMockAddFeatureLifecycle.Lock()
+	mock.calls.AddFeatureLifecycle = append(mock.calls.AddFeatureLifecycle, callInfo)
+	lockReplicationControllerInterfaceMockAddFeatureLifecycle.Unlock()
+	mock.AddFeatureLifecycleFunc(ctx, enabled, name, lifecycle)
+}
+
+// AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
+// Check the length with:
+//     len(mockedReplicationControllerInterface.AddFeatureLifecycleCalls())
+func (mock *ReplicationControllerInterfaceMock) AddFeatureLifecycleCalls() []struct {
+	Ctx       context.Context
+	Enabled   func() bool
+	Name      string
+	Lifecycle v1a.ReplicationControllerLifecycle
+} {
+	var calls []struct {
+		Ctx       context.Context
+		Enabled   func() bool
+		Name      string
+		Lifecycle v1a.ReplicationControllerLifecycle
+	}
+	lockReplicationControllerInterfaceMockAddFeatureLifecycle.RLock()
+	calls = mock.calls.AddFeatureLifecycle
+	lockReplicationControllerInterfaceMockAddFeatureLifecycle.RUnlock()
 	return calls
 }
 

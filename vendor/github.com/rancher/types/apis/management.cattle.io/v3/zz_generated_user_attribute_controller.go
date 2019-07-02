@@ -67,7 +67,9 @@ type UserAttributeController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() UserAttributeLister
 	AddHandler(ctx context.Context, name string, handler UserAttributeHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync UserAttributeHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler UserAttributeHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler UserAttributeHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -86,9 +88,13 @@ type UserAttributeInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() UserAttributeController
 	AddHandler(ctx context.Context, name string, sync UserAttributeHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync UserAttributeHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle UserAttributeLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle UserAttributeLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync UserAttributeHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync UserAttributeHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle UserAttributeLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle UserAttributeLifecycle)
 }
 
 type userAttributeLister struct {
@@ -148,10 +154,39 @@ func (c *userAttributeController) AddHandler(ctx context.Context, name string, h
 	})
 }
 
+func (c *userAttributeController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler UserAttributeHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*UserAttribute); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
 func (c *userAttributeController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler UserAttributeHandlerFunc) {
 	resource.PutClusterScoped(UserAttributeGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*UserAttribute); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *userAttributeController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler UserAttributeHandlerFunc) {
+	resource.PutClusterScoped(UserAttributeGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*UserAttribute); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -256,18 +291,36 @@ func (s *userAttributeClient) AddHandler(ctx context.Context, name string, sync 
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *userAttributeClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync UserAttributeHandlerFunc) {
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
+}
+
 func (s *userAttributeClient) AddLifecycle(ctx context.Context, name string, lifecycle UserAttributeLifecycle) {
 	sync := NewUserAttributeLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *userAttributeClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle UserAttributeLifecycle) {
+	sync := NewUserAttributeLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
 func (s *userAttributeClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync UserAttributeHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *userAttributeClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync UserAttributeHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
+}
+
 func (s *userAttributeClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle UserAttributeLifecycle) {
 	sync := NewUserAttributeLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *userAttributeClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle UserAttributeLifecycle) {
+	sync := NewUserAttributeLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
 type UserAttributeIndexer func(obj *UserAttribute) ([]string, error)
