@@ -23,6 +23,12 @@ func NewSchemaStore() types.Store {
 func (s *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
 	for _, schema := range apiContext.Schemas.SchemasForVersion(*apiContext.Version) {
 		if strings.EqualFold(schema.ID, id) {
+			if schema.Enabled != nil {
+				if !schema.Enabled() {
+					return nil, httperror.NewAPIError(httperror.NotFound, "schema disabled")
+				}
+			}
+
 			schemaData := map[string]interface{}{}
 
 			data, err := json.Marshal(s.modifyForAccessControl(apiContext, *schema))
@@ -76,6 +82,12 @@ func (s *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *ty
 	for _, schema := range schemaMap {
 		if included[schema.ID] {
 			continue
+		}
+
+		if schema.Enabled != nil {
+			if !schema.Enabled() {
+				continue
+			}
 		}
 
 		if schema.CanList(apiContext) == nil || schema.CanGet(apiContext) == nil {

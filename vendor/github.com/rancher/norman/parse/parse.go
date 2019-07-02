@@ -130,6 +130,12 @@ func Parse(rw http.ResponseWriter, req *http.Request, schemas *types.Schemas, ur
 		return result, err
 	}
 
+	if schema := result.Schema; schema.Enabled != nil {
+		if !schema.Enabled() {
+			return result, httperror.NewAPIError(httperror.ActionNotAvailable, "schema disabled "+schema.ID)
+		}
+	}
+
 	result.Type = result.Schema.ID
 
 	if err := ValidateMethod(result); err != nil {
