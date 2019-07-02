@@ -98,11 +98,15 @@ docker pull gcr.io/google_containers/pause-amd64:3.1
 docker tag gcr.io/google_containers/pause-amd64:3.1 rancher/pause:3.1-amd64
 docker pull gcr.io/google_containers/pause-arm64:3.1
 docker tag gcr.io/google_containers/pause-arm64:3.1 rancher/pause:3.1-arm64
+docker pull gcr.io/google_containers/pause-arm:3.1
+docker tag gcr.io/google_containers/pause-arm:3.1 rancher/pause:3.1-arm
 docker push rancher/pause:3.1-amd64
 docker push rancher/pause:3.1-arm64
-docker manifest create rancher/pause:3.1 rancher/pause:3.1-amd64 rancher/pause:3.1-arm64
+docker push rancher/pause:3.1-arm
+docker manifest create rancher/pause:3.1 rancher/pause:3.1-amd64 rancher/pause:3.1-arm64 rancher/pause:3.1-arm
 docker manifest annotate rancher/pause:3.1 rancher/pause:3.1-amd64 --arch amd64
 docker manifest annotate rancher/pause:3.1 rancher/pause:3.1-arm64 --arch arm64
+docker manifest annotate rancher/pause:3.1 rancher/pause:3.1-arm --arch arm
 docker manifest push -p rancher/pause:3.1
 
 #gcr.io/google_containers/metrics-server:v0.3.1
