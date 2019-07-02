@@ -124,7 +124,7 @@ spec:
     spec:
       nodeSelector:
       {{ range $k, $v := .NodeSelector }}
-        {{ $k }}: {{ $v }}
+        {{ $k }}: "{{ $v }}"
       {{ end }}
       affinity:
         podAntiAffinity:
