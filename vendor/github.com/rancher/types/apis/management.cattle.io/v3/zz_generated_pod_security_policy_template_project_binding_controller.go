@@ -68,7 +68,9 @@ type PodSecurityPolicyTemplateProjectBindingController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() PodSecurityPolicyTemplateProjectBindingLister
 	AddHandler(ctx context.Context, name string, handler PodSecurityPolicyTemplateProjectBindingHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync PodSecurityPolicyTemplateProjectBindingHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler PodSecurityPolicyTemplateProjectBindingHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler PodSecurityPolicyTemplateProjectBindingHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -87,9 +89,13 @@ type PodSecurityPolicyTemplateProjectBindingInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PodSecurityPolicyTemplateProjectBindingController
 	AddHandler(ctx context.Context, name string, sync PodSecurityPolicyTemplateProjectBindingHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync PodSecurityPolicyTemplateProjectBindingHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle PodSecurityPolicyTemplateProjectBindingLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle PodSecurityPolicyTemplateProjectBindingLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync PodSecurityPolicyTemplateProjectBindingHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync PodSecurityPolicyTemplateProjectBindingHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PodSecurityPolicyTemplateProjectBindingLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle PodSecurityPolicyTemplateProjectBindingLifecycle)
 }
 
 type podSecurityPolicyTemplateProjectBindingLister struct {
@@ -149,10 +155,39 @@ func (c *podSecurityPolicyTemplateProjectBindingController) AddHandler(ctx conte
 	})
 }
 
+func (c *podSecurityPolicyTemplateProjectBindingController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler PodSecurityPolicyTemplateProjectBindingHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*PodSecurityPolicyTemplateProjectBinding); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
 func (c *podSecurityPolicyTemplateProjectBindingController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler PodSecurityPolicyTemplateProjectBindingHandlerFunc) {
 	resource.PutClusterScoped(PodSecurityPolicyTemplateProjectBindingGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*PodSecurityPolicyTemplateProjectBinding); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *podSecurityPolicyTemplateProjectBindingController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler PodSecurityPolicyTemplateProjectBindingHandlerFunc) {
+	resource.PutClusterScoped(PodSecurityPolicyTemplateProjectBindingGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*PodSecurityPolicyTemplateProjectBinding); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -257,18 +292,36 @@ func (s *podSecurityPolicyTemplateProjectBindingClient) AddHandler(ctx context.C
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *podSecurityPolicyTemplateProjectBindingClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync PodSecurityPolicyTemplateProjectBindingHandlerFunc) {
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
+}
+
 func (s *podSecurityPolicyTemplateProjectBindingClient) AddLifecycle(ctx context.Context, name string, lifecycle PodSecurityPolicyTemplateProjectBindingLifecycle) {
 	sync := NewPodSecurityPolicyTemplateProjectBindingLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *podSecurityPolicyTemplateProjectBindingClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle PodSecurityPolicyTemplateProjectBindingLifecycle) {
+	sync := NewPodSecurityPolicyTemplateProjectBindingLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
 func (s *podSecurityPolicyTemplateProjectBindingClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync PodSecurityPolicyTemplateProjectBindingHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *podSecurityPolicyTemplateProjectBindingClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync PodSecurityPolicyTemplateProjectBindingHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
+}
+
 func (s *podSecurityPolicyTemplateProjectBindingClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PodSecurityPolicyTemplateProjectBindingLifecycle) {
 	sync := NewPodSecurityPolicyTemplateProjectBindingLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *podSecurityPolicyTemplateProjectBindingClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle PodSecurityPolicyTemplateProjectBindingLifecycle) {
+	sync := NewPodSecurityPolicyTemplateProjectBindingLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
 type PodSecurityPolicyTemplateProjectBindingIndexer func(obj *PodSecurityPolicyTemplateProjectBinding) ([]string, error)

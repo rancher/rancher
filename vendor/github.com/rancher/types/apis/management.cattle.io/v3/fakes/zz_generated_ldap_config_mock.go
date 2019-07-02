@@ -140,14 +140,16 @@ func (mock *LdapConfigListerMock) ListCalls() []struct {
 }
 
 var (
-	lockLdapConfigControllerMockAddClusterScopedHandler sync.RWMutex
-	lockLdapConfigControllerMockAddHandler              sync.RWMutex
-	lockLdapConfigControllerMockEnqueue                 sync.RWMutex
-	lockLdapConfigControllerMockGeneric                 sync.RWMutex
-	lockLdapConfigControllerMockInformer                sync.RWMutex
-	lockLdapConfigControllerMockLister                  sync.RWMutex
-	lockLdapConfigControllerMockStart                   sync.RWMutex
-	lockLdapConfigControllerMockSync                    sync.RWMutex
+	lockLdapConfigControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockLdapConfigControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockLdapConfigControllerMockAddFeatureHandler              sync.RWMutex
+	lockLdapConfigControllerMockAddHandler                     sync.RWMutex
+	lockLdapConfigControllerMockEnqueue                        sync.RWMutex
+	lockLdapConfigControllerMockGeneric                        sync.RWMutex
+	lockLdapConfigControllerMockInformer                       sync.RWMutex
+	lockLdapConfigControllerMockLister                         sync.RWMutex
+	lockLdapConfigControllerMockStart                          sync.RWMutex
+	lockLdapConfigControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that LdapConfigControllerMock does implement LdapConfigController.
@@ -160,8 +162,14 @@ var _ v3.LdapConfigController = &LdapConfigControllerMock{}
 //
 //         // make and configure a mocked LdapConfigController
 //         mockedLdapConfigController := &LdapConfigControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.LdapConfigHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.LdapConfigHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.LdapConfigHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
 //             },
 //             AddHandlerFunc: func(ctx context.Context, name string, handler v3.LdapConfigHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
@@ -191,8 +199,14 @@ var _ v3.LdapConfigController = &LdapConfigControllerMock{}
 //
 //     }
 type LdapConfigControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.LdapConfigHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.LdapConfigHandlerFunc)
+
+	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.LdapConfigHandlerFunc)
 
 	// AddHandlerFunc mocks the AddHandler method.
 	AddHandlerFunc func(ctx context.Context, name string, handler v3.LdapConfigHandlerFunc)
@@ -217,6 +231,19 @@ type LdapConfigControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v3.LdapConfigHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -227,6 +254,17 @@ type LdapConfigControllerMock struct {
 			ClusterName string
 			// Handler is the handler argument value.
 			Handler v3.LdapConfigHandlerFunc
+		}
+		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
+		AddFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// Sync is the sync argument value.
+			Sync v3.LdapConfigHandlerFunc
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -266,6 +304,53 @@ type LdapConfigControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *LdapConfigControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.LdapConfigHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("LdapConfigControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but LdapConfigController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Handler     v3.LdapConfigHandlerFunc
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockLdapConfigControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockLdapConfigControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedLdapConfigController.AddClusterScopedFeatureHandlerCalls())
+func (mock *LdapConfigControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Handler     v3.LdapConfigHandlerFunc
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Handler     v3.LdapConfigHandlerFunc
+	}
+	lockLdapConfigControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockLdapConfigControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -308,6 +393,49 @@ func (mock *LdapConfigControllerMock) AddClusterScopedHandlerCalls() []struct {
 	lockLdapConfigControllerMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
 	lockLdapConfigControllerMockAddClusterScopedHandler.RUnlock()
+	return calls
+}
+
+// AddFeatureHandler calls AddFeatureHandlerFunc.
+func (mock *LdapConfigControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.LdapConfigHandlerFunc) {
+	if mock.AddFeatureHandlerFunc == nil {
+		panic("LdapConfigControllerMock.AddFeatureHandlerFunc: method is nil but LdapConfigController.AddFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v3.LdapConfigHandlerFunc
+	}{
+		Ctx:     ctx,
+		Enabled: enabled,
+		Name:    name,
+		Sync:    sync,
+	}
+	lockLdapConfigControllerMockAddFeatureHandler.Lock()
+	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
+	lockLdapConfigControllerMockAddFeatureHandler.Unlock()
+	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
+}
+
+// AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
+// Check the length with:
+//     len(mockedLdapConfigController.AddFeatureHandlerCalls())
+func (mock *LdapConfigControllerMock) AddFeatureHandlerCalls() []struct {
+	Ctx     context.Context
+	Enabled func() bool
+	Name    string
+	Sync    v3.LdapConfigHandlerFunc
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v3.LdapConfigHandlerFunc
+	}
+	lockLdapConfigControllerMockAddFeatureHandler.RLock()
+	calls = mock.calls.AddFeatureHandler
+	lockLdapConfigControllerMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
@@ -530,21 +658,25 @@ func (mock *LdapConfigControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockLdapConfigInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockLdapConfigInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockLdapConfigInterfaceMockAddHandler                sync.RWMutex
-	lockLdapConfigInterfaceMockAddLifecycle              sync.RWMutex
-	lockLdapConfigInterfaceMockController                sync.RWMutex
-	lockLdapConfigInterfaceMockCreate                    sync.RWMutex
-	lockLdapConfigInterfaceMockDelete                    sync.RWMutex
-	lockLdapConfigInterfaceMockDeleteCollection          sync.RWMutex
-	lockLdapConfigInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockLdapConfigInterfaceMockGet                       sync.RWMutex
-	lockLdapConfigInterfaceMockGetNamespaced             sync.RWMutex
-	lockLdapConfigInterfaceMockList                      sync.RWMutex
-	lockLdapConfigInterfaceMockObjectClient              sync.RWMutex
-	lockLdapConfigInterfaceMockUpdate                    sync.RWMutex
-	lockLdapConfigInterfaceMockWatch                     sync.RWMutex
+	lockLdapConfigInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockLdapConfigInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockLdapConfigInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockLdapConfigInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockLdapConfigInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockLdapConfigInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockLdapConfigInterfaceMockAddHandler                       sync.RWMutex
+	lockLdapConfigInterfaceMockAddLifecycle                     sync.RWMutex
+	lockLdapConfigInterfaceMockController                       sync.RWMutex
+	lockLdapConfigInterfaceMockCreate                           sync.RWMutex
+	lockLdapConfigInterfaceMockDelete                           sync.RWMutex
+	lockLdapConfigInterfaceMockDeleteCollection                 sync.RWMutex
+	lockLdapConfigInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockLdapConfigInterfaceMockGet                              sync.RWMutex
+	lockLdapConfigInterfaceMockGetNamespaced                    sync.RWMutex
+	lockLdapConfigInterfaceMockList                             sync.RWMutex
+	lockLdapConfigInterfaceMockObjectClient                     sync.RWMutex
+	lockLdapConfigInterfaceMockUpdate                           sync.RWMutex
+	lockLdapConfigInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that LdapConfigInterfaceMock does implement LdapConfigInterface.
@@ -557,11 +689,23 @@ var _ v3.LdapConfigInterface = &LdapConfigInterfaceMock{}
 //
 //         // make and configure a mocked LdapConfigInterface
 //         mockedLdapConfigInterface := &LdapConfigInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.LdapConfigHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.LdapConfigLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.LdapConfigHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
 //             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v3.LdapConfigLifecycle)  {
 // 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.LdapConfigHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v3.LdapConfigLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
 //             },
 //             AddHandlerFunc: func(ctx context.Context, name string, sync v3.LdapConfigHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
@@ -609,11 +753,23 @@ var _ v3.LdapConfigInterface = &LdapConfigInterfaceMock{}
 //
 //     }
 type LdapConfigInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.LdapConfigHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.LdapConfigLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.LdapConfigHandlerFunc)
 
 	// AddClusterScopedLifecycleFunc mocks the AddClusterScopedLifecycle method.
 	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v3.LdapConfigLifecycle)
+
+	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.LdapConfigHandlerFunc)
+
+	// AddFeatureLifecycleFunc mocks the AddFeatureLifecycle method.
+	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v3.LdapConfigLifecycle)
 
 	// AddHandlerFunc mocks the AddHandler method.
 	AddHandlerFunc func(ctx context.Context, name string, sync v3.LdapConfigHandlerFunc)
@@ -656,6 +812,32 @@ type LdapConfigInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v3.LdapConfigHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.LdapConfigLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -675,6 +857,28 @@ type LdapConfigInterfaceMock struct {
 			Name string
 			// ClusterName is the clusterName argument value.
 			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.LdapConfigLifecycle
+		}
+		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
+		AddFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// Sync is the sync argument value.
+			Sync v3.LdapConfigHandlerFunc
+		}
+		// AddFeatureLifecycle holds details about calls to the AddFeatureLifecycle method.
+		AddFeatureLifecycle []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
 			// Lifecycle is the lifecycle argument value.
 			Lifecycle v3.LdapConfigLifecycle
 		}
@@ -764,6 +968,100 @@ type LdapConfigInterfaceMock struct {
 	}
 }
 
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *LdapConfigInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.LdapConfigHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("LdapConfigInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but LdapConfigInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Sync        v3.LdapConfigHandlerFunc
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockLdapConfigInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockLdapConfigInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedLdapConfigInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *LdapConfigInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Sync        v3.LdapConfigHandlerFunc
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Sync        v3.LdapConfigHandlerFunc
+	}
+	lockLdapConfigInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockLdapConfigInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *LdapConfigInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.LdapConfigLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("LdapConfigInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but LdapConfigInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Lifecycle   v3.LdapConfigLifecycle
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockLdapConfigInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockLdapConfigInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(ctx, enabled, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedLdapConfigInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *LdapConfigInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Lifecycle   v3.LdapConfigLifecycle
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Lifecycle   v3.LdapConfigLifecycle
+	}
+	lockLdapConfigInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockLdapConfigInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
+}
+
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
 func (mock *LdapConfigInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, sync v3.LdapConfigHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
@@ -847,6 +1145,92 @@ func (mock *LdapConfigInterfaceMock) AddClusterScopedLifecycleCalls() []struct {
 	lockLdapConfigInterfaceMockAddClusterScopedLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedLifecycle
 	lockLdapConfigInterfaceMockAddClusterScopedLifecycle.RUnlock()
+	return calls
+}
+
+// AddFeatureHandler calls AddFeatureHandlerFunc.
+func (mock *LdapConfigInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.LdapConfigHandlerFunc) {
+	if mock.AddFeatureHandlerFunc == nil {
+		panic("LdapConfigInterfaceMock.AddFeatureHandlerFunc: method is nil but LdapConfigInterface.AddFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v3.LdapConfigHandlerFunc
+	}{
+		Ctx:     ctx,
+		Enabled: enabled,
+		Name:    name,
+		Sync:    sync,
+	}
+	lockLdapConfigInterfaceMockAddFeatureHandler.Lock()
+	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
+	lockLdapConfigInterfaceMockAddFeatureHandler.Unlock()
+	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
+}
+
+// AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
+// Check the length with:
+//     len(mockedLdapConfigInterface.AddFeatureHandlerCalls())
+func (mock *LdapConfigInterfaceMock) AddFeatureHandlerCalls() []struct {
+	Ctx     context.Context
+	Enabled func() bool
+	Name    string
+	Sync    v3.LdapConfigHandlerFunc
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v3.LdapConfigHandlerFunc
+	}
+	lockLdapConfigInterfaceMockAddFeatureHandler.RLock()
+	calls = mock.calls.AddFeatureHandler
+	lockLdapConfigInterfaceMockAddFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddFeatureLifecycle calls AddFeatureLifecycleFunc.
+func (mock *LdapConfigInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v3.LdapConfigLifecycle) {
+	if mock.AddFeatureLifecycleFunc == nil {
+		panic("LdapConfigInterfaceMock.AddFeatureLifecycleFunc: method is nil but LdapConfigInterface.AddFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Ctx       context.Context
+		Enabled   func() bool
+		Name      string
+		Lifecycle v3.LdapConfigLifecycle
+	}{
+		Ctx:       ctx,
+		Enabled:   enabled,
+		Name:      name,
+		Lifecycle: lifecycle,
+	}
+	lockLdapConfigInterfaceMockAddFeatureLifecycle.Lock()
+	mock.calls.AddFeatureLifecycle = append(mock.calls.AddFeatureLifecycle, callInfo)
+	lockLdapConfigInterfaceMockAddFeatureLifecycle.Unlock()
+	mock.AddFeatureLifecycleFunc(ctx, enabled, name, lifecycle)
+}
+
+// AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
+// Check the length with:
+//     len(mockedLdapConfigInterface.AddFeatureLifecycleCalls())
+func (mock *LdapConfigInterfaceMock) AddFeatureLifecycleCalls() []struct {
+	Ctx       context.Context
+	Enabled   func() bool
+	Name      string
+	Lifecycle v3.LdapConfigLifecycle
+} {
+	var calls []struct {
+		Ctx       context.Context
+		Enabled   func() bool
+		Name      string
+		Lifecycle v3.LdapConfigLifecycle
+	}
+	lockLdapConfigInterfaceMockAddFeatureLifecycle.RLock()
+	calls = mock.calls.AddFeatureLifecycle
+	lockLdapConfigInterfaceMockAddFeatureLifecycle.RUnlock()
 	return calls
 }
 

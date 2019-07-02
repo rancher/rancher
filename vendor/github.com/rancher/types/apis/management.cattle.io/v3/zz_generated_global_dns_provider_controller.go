@@ -68,7 +68,9 @@ type GlobalDNSProviderController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() GlobalDNSProviderLister
 	AddHandler(ctx context.Context, name string, handler GlobalDNSProviderHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync GlobalDNSProviderHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler GlobalDNSProviderHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler GlobalDNSProviderHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -87,9 +89,13 @@ type GlobalDNSProviderInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() GlobalDNSProviderController
 	AddHandler(ctx context.Context, name string, sync GlobalDNSProviderHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync GlobalDNSProviderHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle GlobalDNSProviderLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle GlobalDNSProviderLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync GlobalDNSProviderHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync GlobalDNSProviderHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle GlobalDNSProviderLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle GlobalDNSProviderLifecycle)
 }
 
 type globalDnsProviderLister struct {
@@ -149,10 +155,39 @@ func (c *globalDnsProviderController) AddHandler(ctx context.Context, name strin
 	})
 }
 
+func (c *globalDnsProviderController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler GlobalDNSProviderHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*GlobalDNSProvider); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
 func (c *globalDnsProviderController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler GlobalDNSProviderHandlerFunc) {
 	resource.PutClusterScoped(GlobalDNSProviderGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*GlobalDNSProvider); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *globalDnsProviderController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler GlobalDNSProviderHandlerFunc) {
+	resource.PutClusterScoped(GlobalDNSProviderGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*GlobalDNSProvider); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -257,18 +292,36 @@ func (s *globalDnsProviderClient) AddHandler(ctx context.Context, name string, s
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *globalDnsProviderClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync GlobalDNSProviderHandlerFunc) {
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
+}
+
 func (s *globalDnsProviderClient) AddLifecycle(ctx context.Context, name string, lifecycle GlobalDNSProviderLifecycle) {
 	sync := NewGlobalDNSProviderLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *globalDnsProviderClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle GlobalDNSProviderLifecycle) {
+	sync := NewGlobalDNSProviderLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
 func (s *globalDnsProviderClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync GlobalDNSProviderHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *globalDnsProviderClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync GlobalDNSProviderHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
+}
+
 func (s *globalDnsProviderClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle GlobalDNSProviderLifecycle) {
 	sync := NewGlobalDNSProviderLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *globalDnsProviderClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle GlobalDNSProviderLifecycle) {
+	sync := NewGlobalDNSProviderLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
 type GlobalDNSProviderIndexer func(obj *GlobalDNSProvider) ([]string, error)

@@ -69,7 +69,9 @@ type PrometheusRuleController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() PrometheusRuleLister
 	AddHandler(ctx context.Context, name string, handler PrometheusRuleHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync PrometheusRuleHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler PrometheusRuleHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler PrometheusRuleHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -88,9 +90,13 @@ type PrometheusRuleInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PrometheusRuleController
 	AddHandler(ctx context.Context, name string, sync PrometheusRuleHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync PrometheusRuleHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle PrometheusRuleLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle PrometheusRuleLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync PrometheusRuleHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync PrometheusRuleHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PrometheusRuleLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle PrometheusRuleLifecycle)
 }
 
 type prometheusRuleLister struct {
@@ -150,10 +156,39 @@ func (c *prometheusRuleController) AddHandler(ctx context.Context, name string, 
 	})
 }
 
+func (c *prometheusRuleController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler PrometheusRuleHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*v1.PrometheusRule); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
 func (c *prometheusRuleController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler PrometheusRuleHandlerFunc) {
 	resource.PutClusterScoped(PrometheusRuleGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*v1.PrometheusRule); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *prometheusRuleController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler PrometheusRuleHandlerFunc) {
+	resource.PutClusterScoped(PrometheusRuleGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*v1.PrometheusRule); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -258,18 +293,36 @@ func (s *prometheusRuleClient) AddHandler(ctx context.Context, name string, sync
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *prometheusRuleClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync PrometheusRuleHandlerFunc) {
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
+}
+
 func (s *prometheusRuleClient) AddLifecycle(ctx context.Context, name string, lifecycle PrometheusRuleLifecycle) {
 	sync := NewPrometheusRuleLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *prometheusRuleClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle PrometheusRuleLifecycle) {
+	sync := NewPrometheusRuleLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
 func (s *prometheusRuleClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync PrometheusRuleHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *prometheusRuleClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync PrometheusRuleHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
+}
+
 func (s *prometheusRuleClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle PrometheusRuleLifecycle) {
 	sync := NewPrometheusRuleLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *prometheusRuleClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle PrometheusRuleLifecycle) {
+	sync := NewPrometheusRuleLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
 type PrometheusRuleIndexer func(obj *v1.PrometheusRule) ([]string, error)

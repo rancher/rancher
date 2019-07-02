@@ -141,14 +141,16 @@ func (mock *ComponentStatusListerMock) ListCalls() []struct {
 }
 
 var (
-	lockComponentStatusControllerMockAddClusterScopedHandler sync.RWMutex
-	lockComponentStatusControllerMockAddHandler              sync.RWMutex
-	lockComponentStatusControllerMockEnqueue                 sync.RWMutex
-	lockComponentStatusControllerMockGeneric                 sync.RWMutex
-	lockComponentStatusControllerMockInformer                sync.RWMutex
-	lockComponentStatusControllerMockLister                  sync.RWMutex
-	lockComponentStatusControllerMockStart                   sync.RWMutex
-	lockComponentStatusControllerMockSync                    sync.RWMutex
+	lockComponentStatusControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockComponentStatusControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockComponentStatusControllerMockAddFeatureHandler              sync.RWMutex
+	lockComponentStatusControllerMockAddHandler                     sync.RWMutex
+	lockComponentStatusControllerMockEnqueue                        sync.RWMutex
+	lockComponentStatusControllerMockGeneric                        sync.RWMutex
+	lockComponentStatusControllerMockInformer                       sync.RWMutex
+	lockComponentStatusControllerMockLister                         sync.RWMutex
+	lockComponentStatusControllerMockStart                          sync.RWMutex
+	lockComponentStatusControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that ComponentStatusControllerMock does implement ComponentStatusController.
@@ -161,8 +163,14 @@ var _ v1a.ComponentStatusController = &ComponentStatusControllerMock{}
 //
 //         // make and configure a mocked ComponentStatusController
 //         mockedComponentStatusController := &ComponentStatusControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1a.ComponentStatusHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v1a.ComponentStatusHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v1a.ComponentStatusHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
 //             },
 //             AddHandlerFunc: func(ctx context.Context, name string, handler v1a.ComponentStatusHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
@@ -192,8 +200,14 @@ var _ v1a.ComponentStatusController = &ComponentStatusControllerMock{}
 //
 //     }
 type ComponentStatusControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1a.ComponentStatusHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v1a.ComponentStatusHandlerFunc)
+
+	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v1a.ComponentStatusHandlerFunc)
 
 	// AddHandlerFunc mocks the AddHandler method.
 	AddHandlerFunc func(ctx context.Context, name string, handler v1a.ComponentStatusHandlerFunc)
@@ -218,6 +232,19 @@ type ComponentStatusControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v1a.ComponentStatusHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -228,6 +255,17 @@ type ComponentStatusControllerMock struct {
 			ClusterName string
 			// Handler is the handler argument value.
 			Handler v1a.ComponentStatusHandlerFunc
+		}
+		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
+		AddFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// Sync is the sync argument value.
+			Sync v1a.ComponentStatusHandlerFunc
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -267,6 +305,53 @@ type ComponentStatusControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *ComponentStatusControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1a.ComponentStatusHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("ComponentStatusControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but ComponentStatusController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Handler     v1a.ComponentStatusHandlerFunc
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockComponentStatusControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockComponentStatusControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedComponentStatusController.AddClusterScopedFeatureHandlerCalls())
+func (mock *ComponentStatusControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Handler     v1a.ComponentStatusHandlerFunc
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Handler     v1a.ComponentStatusHandlerFunc
+	}
+	lockComponentStatusControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockComponentStatusControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -309,6 +394,49 @@ func (mock *ComponentStatusControllerMock) AddClusterScopedHandlerCalls() []stru
 	lockComponentStatusControllerMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
 	lockComponentStatusControllerMockAddClusterScopedHandler.RUnlock()
+	return calls
+}
+
+// AddFeatureHandler calls AddFeatureHandlerFunc.
+func (mock *ComponentStatusControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v1a.ComponentStatusHandlerFunc) {
+	if mock.AddFeatureHandlerFunc == nil {
+		panic("ComponentStatusControllerMock.AddFeatureHandlerFunc: method is nil but ComponentStatusController.AddFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v1a.ComponentStatusHandlerFunc
+	}{
+		Ctx:     ctx,
+		Enabled: enabled,
+		Name:    name,
+		Sync:    sync,
+	}
+	lockComponentStatusControllerMockAddFeatureHandler.Lock()
+	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
+	lockComponentStatusControllerMockAddFeatureHandler.Unlock()
+	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
+}
+
+// AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
+// Check the length with:
+//     len(mockedComponentStatusController.AddFeatureHandlerCalls())
+func (mock *ComponentStatusControllerMock) AddFeatureHandlerCalls() []struct {
+	Ctx     context.Context
+	Enabled func() bool
+	Name    string
+	Sync    v1a.ComponentStatusHandlerFunc
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v1a.ComponentStatusHandlerFunc
+	}
+	lockComponentStatusControllerMockAddFeatureHandler.RLock()
+	calls = mock.calls.AddFeatureHandler
+	lockComponentStatusControllerMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
@@ -531,21 +659,25 @@ func (mock *ComponentStatusControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockComponentStatusInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockComponentStatusInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockComponentStatusInterfaceMockAddHandler                sync.RWMutex
-	lockComponentStatusInterfaceMockAddLifecycle              sync.RWMutex
-	lockComponentStatusInterfaceMockController                sync.RWMutex
-	lockComponentStatusInterfaceMockCreate                    sync.RWMutex
-	lockComponentStatusInterfaceMockDelete                    sync.RWMutex
-	lockComponentStatusInterfaceMockDeleteCollection          sync.RWMutex
-	lockComponentStatusInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockComponentStatusInterfaceMockGet                       sync.RWMutex
-	lockComponentStatusInterfaceMockGetNamespaced             sync.RWMutex
-	lockComponentStatusInterfaceMockList                      sync.RWMutex
-	lockComponentStatusInterfaceMockObjectClient              sync.RWMutex
-	lockComponentStatusInterfaceMockUpdate                    sync.RWMutex
-	lockComponentStatusInterfaceMockWatch                     sync.RWMutex
+	lockComponentStatusInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockComponentStatusInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockComponentStatusInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockComponentStatusInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockComponentStatusInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockComponentStatusInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockComponentStatusInterfaceMockAddHandler                       sync.RWMutex
+	lockComponentStatusInterfaceMockAddLifecycle                     sync.RWMutex
+	lockComponentStatusInterfaceMockController                       sync.RWMutex
+	lockComponentStatusInterfaceMockCreate                           sync.RWMutex
+	lockComponentStatusInterfaceMockDelete                           sync.RWMutex
+	lockComponentStatusInterfaceMockDeleteCollection                 sync.RWMutex
+	lockComponentStatusInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockComponentStatusInterfaceMockGet                              sync.RWMutex
+	lockComponentStatusInterfaceMockGetNamespaced                    sync.RWMutex
+	lockComponentStatusInterfaceMockList                             sync.RWMutex
+	lockComponentStatusInterfaceMockObjectClient                     sync.RWMutex
+	lockComponentStatusInterfaceMockUpdate                           sync.RWMutex
+	lockComponentStatusInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that ComponentStatusInterfaceMock does implement ComponentStatusInterface.
@@ -558,11 +690,23 @@ var _ v1a.ComponentStatusInterface = &ComponentStatusInterfaceMock{}
 //
 //         // make and configure a mocked ComponentStatusInterface
 //         mockedComponentStatusInterface := &ComponentStatusInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v1a.ComponentStatusHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1a.ComponentStatusLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v1a.ComponentStatusHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
 //             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v1a.ComponentStatusLifecycle)  {
 // 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v1a.ComponentStatusHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v1a.ComponentStatusLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
 //             },
 //             AddHandlerFunc: func(ctx context.Context, name string, sync v1a.ComponentStatusHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
@@ -610,11 +754,23 @@ var _ v1a.ComponentStatusInterface = &ComponentStatusInterfaceMock{}
 //
 //     }
 type ComponentStatusInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v1a.ComponentStatusHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1a.ComponentStatusLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v1a.ComponentStatusHandlerFunc)
 
 	// AddClusterScopedLifecycleFunc mocks the AddClusterScopedLifecycle method.
 	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v1a.ComponentStatusLifecycle)
+
+	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v1a.ComponentStatusHandlerFunc)
+
+	// AddFeatureLifecycleFunc mocks the AddFeatureLifecycle method.
+	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v1a.ComponentStatusLifecycle)
 
 	// AddHandlerFunc mocks the AddHandler method.
 	AddHandlerFunc func(ctx context.Context, name string, sync v1a.ComponentStatusHandlerFunc)
@@ -657,6 +813,32 @@ type ComponentStatusInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v1a.ComponentStatusHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v1a.ComponentStatusLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -676,6 +858,28 @@ type ComponentStatusInterfaceMock struct {
 			Name string
 			// ClusterName is the clusterName argument value.
 			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v1a.ComponentStatusLifecycle
+		}
+		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
+		AddFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// Sync is the sync argument value.
+			Sync v1a.ComponentStatusHandlerFunc
+		}
+		// AddFeatureLifecycle holds details about calls to the AddFeatureLifecycle method.
+		AddFeatureLifecycle []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
 			// Lifecycle is the lifecycle argument value.
 			Lifecycle v1a.ComponentStatusLifecycle
 		}
@@ -765,6 +969,100 @@ type ComponentStatusInterfaceMock struct {
 	}
 }
 
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *ComponentStatusInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, sync v1a.ComponentStatusHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("ComponentStatusInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but ComponentStatusInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Sync        v1a.ComponentStatusHandlerFunc
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockComponentStatusInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockComponentStatusInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedComponentStatusInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *ComponentStatusInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Sync        v1a.ComponentStatusHandlerFunc
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Sync        v1a.ComponentStatusHandlerFunc
+	}
+	lockComponentStatusInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockComponentStatusInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *ComponentStatusInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1a.ComponentStatusLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("ComponentStatusInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but ComponentStatusInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Lifecycle   v1a.ComponentStatusLifecycle
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockComponentStatusInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockComponentStatusInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(ctx, enabled, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedComponentStatusInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *ComponentStatusInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Lifecycle   v1a.ComponentStatusLifecycle
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Lifecycle   v1a.ComponentStatusLifecycle
+	}
+	lockComponentStatusInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockComponentStatusInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
+}
+
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
 func (mock *ComponentStatusInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, sync v1a.ComponentStatusHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
@@ -848,6 +1146,92 @@ func (mock *ComponentStatusInterfaceMock) AddClusterScopedLifecycleCalls() []str
 	lockComponentStatusInterfaceMockAddClusterScopedLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedLifecycle
 	lockComponentStatusInterfaceMockAddClusterScopedLifecycle.RUnlock()
+	return calls
+}
+
+// AddFeatureHandler calls AddFeatureHandlerFunc.
+func (mock *ComponentStatusInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v1a.ComponentStatusHandlerFunc) {
+	if mock.AddFeatureHandlerFunc == nil {
+		panic("ComponentStatusInterfaceMock.AddFeatureHandlerFunc: method is nil but ComponentStatusInterface.AddFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v1a.ComponentStatusHandlerFunc
+	}{
+		Ctx:     ctx,
+		Enabled: enabled,
+		Name:    name,
+		Sync:    sync,
+	}
+	lockComponentStatusInterfaceMockAddFeatureHandler.Lock()
+	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
+	lockComponentStatusInterfaceMockAddFeatureHandler.Unlock()
+	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
+}
+
+// AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
+// Check the length with:
+//     len(mockedComponentStatusInterface.AddFeatureHandlerCalls())
+func (mock *ComponentStatusInterfaceMock) AddFeatureHandlerCalls() []struct {
+	Ctx     context.Context
+	Enabled func() bool
+	Name    string
+	Sync    v1a.ComponentStatusHandlerFunc
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v1a.ComponentStatusHandlerFunc
+	}
+	lockComponentStatusInterfaceMockAddFeatureHandler.RLock()
+	calls = mock.calls.AddFeatureHandler
+	lockComponentStatusInterfaceMockAddFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddFeatureLifecycle calls AddFeatureLifecycleFunc.
+func (mock *ComponentStatusInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v1a.ComponentStatusLifecycle) {
+	if mock.AddFeatureLifecycleFunc == nil {
+		panic("ComponentStatusInterfaceMock.AddFeatureLifecycleFunc: method is nil but ComponentStatusInterface.AddFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Ctx       context.Context
+		Enabled   func() bool
+		Name      string
+		Lifecycle v1a.ComponentStatusLifecycle
+	}{
+		Ctx:       ctx,
+		Enabled:   enabled,
+		Name:      name,
+		Lifecycle: lifecycle,
+	}
+	lockComponentStatusInterfaceMockAddFeatureLifecycle.Lock()
+	mock.calls.AddFeatureLifecycle = append(mock.calls.AddFeatureLifecycle, callInfo)
+	lockComponentStatusInterfaceMockAddFeatureLifecycle.Unlock()
+	mock.AddFeatureLifecycleFunc(ctx, enabled, name, lifecycle)
+}
+
+// AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
+// Check the length with:
+//     len(mockedComponentStatusInterface.AddFeatureLifecycleCalls())
+func (mock *ComponentStatusInterfaceMock) AddFeatureLifecycleCalls() []struct {
+	Ctx       context.Context
+	Enabled   func() bool
+	Name      string
+	Lifecycle v1a.ComponentStatusLifecycle
+} {
+	var calls []struct {
+		Ctx       context.Context
+		Enabled   func() bool
+		Name      string
+		Lifecycle v1a.ComponentStatusLifecycle
+	}
+	lockComponentStatusInterfaceMockAddFeatureLifecycle.RLock()
+	calls = mock.calls.AddFeatureLifecycle
+	lockComponentStatusInterfaceMockAddFeatureLifecycle.RUnlock()
 	return calls
 }
 

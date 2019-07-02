@@ -68,7 +68,9 @@ type SourceCodeCredentialController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() SourceCodeCredentialLister
 	AddHandler(ctx context.Context, name string, handler SourceCodeCredentialHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync SourceCodeCredentialHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler SourceCodeCredentialHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler SourceCodeCredentialHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -87,9 +89,13 @@ type SourceCodeCredentialInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() SourceCodeCredentialController
 	AddHandler(ctx context.Context, name string, sync SourceCodeCredentialHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync SourceCodeCredentialHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle SourceCodeCredentialLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle SourceCodeCredentialLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync SourceCodeCredentialHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync SourceCodeCredentialHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle SourceCodeCredentialLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle SourceCodeCredentialLifecycle)
 }
 
 type sourceCodeCredentialLister struct {
@@ -149,10 +155,39 @@ func (c *sourceCodeCredentialController) AddHandler(ctx context.Context, name st
 	})
 }
 
+func (c *sourceCodeCredentialController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler SourceCodeCredentialHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*SourceCodeCredential); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
 func (c *sourceCodeCredentialController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler SourceCodeCredentialHandlerFunc) {
 	resource.PutClusterScoped(SourceCodeCredentialGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*SourceCodeCredential); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *sourceCodeCredentialController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler SourceCodeCredentialHandlerFunc) {
+	resource.PutClusterScoped(SourceCodeCredentialGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*SourceCodeCredential); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -257,18 +292,36 @@ func (s *sourceCodeCredentialClient) AddHandler(ctx context.Context, name string
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *sourceCodeCredentialClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync SourceCodeCredentialHandlerFunc) {
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
+}
+
 func (s *sourceCodeCredentialClient) AddLifecycle(ctx context.Context, name string, lifecycle SourceCodeCredentialLifecycle) {
 	sync := NewSourceCodeCredentialLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *sourceCodeCredentialClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle SourceCodeCredentialLifecycle) {
+	sync := NewSourceCodeCredentialLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
 func (s *sourceCodeCredentialClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync SourceCodeCredentialHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *sourceCodeCredentialClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync SourceCodeCredentialHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
+}
+
 func (s *sourceCodeCredentialClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle SourceCodeCredentialLifecycle) {
 	sync := NewSourceCodeCredentialLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *sourceCodeCredentialClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle SourceCodeCredentialLifecycle) {
+	sync := NewSourceCodeCredentialLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
 type SourceCodeCredentialIndexer func(obj *SourceCodeCredential) ([]string, error)

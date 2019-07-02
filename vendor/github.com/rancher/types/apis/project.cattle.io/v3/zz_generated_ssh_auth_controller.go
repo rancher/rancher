@@ -68,7 +68,9 @@ type SSHAuthController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() SSHAuthLister
 	AddHandler(ctx context.Context, name string, handler SSHAuthHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync SSHAuthHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler SSHAuthHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler SSHAuthHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -87,9 +89,13 @@ type SSHAuthInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() SSHAuthController
 	AddHandler(ctx context.Context, name string, sync SSHAuthHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync SSHAuthHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle SSHAuthLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle SSHAuthLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync SSHAuthHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync SSHAuthHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle SSHAuthLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle SSHAuthLifecycle)
 }
 
 type sshAuthLister struct {
@@ -149,10 +155,39 @@ func (c *sshAuthController) AddHandler(ctx context.Context, name string, handler
 	})
 }
 
+func (c *sshAuthController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler SSHAuthHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*SSHAuth); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
 func (c *sshAuthController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler SSHAuthHandlerFunc) {
 	resource.PutClusterScoped(SSHAuthGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*SSHAuth); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *sshAuthController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler SSHAuthHandlerFunc) {
+	resource.PutClusterScoped(SSHAuthGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*SSHAuth); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -257,18 +292,36 @@ func (s *sshAuthClient) AddHandler(ctx context.Context, name string, sync SSHAut
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *sshAuthClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync SSHAuthHandlerFunc) {
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
+}
+
 func (s *sshAuthClient) AddLifecycle(ctx context.Context, name string, lifecycle SSHAuthLifecycle) {
 	sync := NewSSHAuthLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *sshAuthClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle SSHAuthLifecycle) {
+	sync := NewSSHAuthLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
 func (s *sshAuthClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync SSHAuthHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *sshAuthClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync SSHAuthHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
+}
+
 func (s *sshAuthClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle SSHAuthLifecycle) {
 	sync := NewSSHAuthLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *sshAuthClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle SSHAuthLifecycle) {
+	sync := NewSSHAuthLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
 type SSHAuthIndexer func(obj *SSHAuth) ([]string, error)

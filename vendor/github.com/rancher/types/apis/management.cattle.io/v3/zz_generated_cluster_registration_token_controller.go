@@ -68,7 +68,9 @@ type ClusterRegistrationTokenController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ClusterRegistrationTokenLister
 	AddHandler(ctx context.Context, name string, handler ClusterRegistrationTokenHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync ClusterRegistrationTokenHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ClusterRegistrationTokenHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterRegistrationTokenHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -87,9 +89,13 @@ type ClusterRegistrationTokenInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterRegistrationTokenController
 	AddHandler(ctx context.Context, name string, sync ClusterRegistrationTokenHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync ClusterRegistrationTokenHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle ClusterRegistrationTokenLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle ClusterRegistrationTokenLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ClusterRegistrationTokenHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync ClusterRegistrationTokenHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterRegistrationTokenLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ClusterRegistrationTokenLifecycle)
 }
 
 type clusterRegistrationTokenLister struct {
@@ -149,10 +155,39 @@ func (c *clusterRegistrationTokenController) AddHandler(ctx context.Context, nam
 	})
 }
 
+func (c *clusterRegistrationTokenController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler ClusterRegistrationTokenHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*ClusterRegistrationToken); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
 func (c *clusterRegistrationTokenController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ClusterRegistrationTokenHandlerFunc) {
 	resource.PutClusterScoped(ClusterRegistrationTokenGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*ClusterRegistrationToken); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *clusterRegistrationTokenController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler ClusterRegistrationTokenHandlerFunc) {
+	resource.PutClusterScoped(ClusterRegistrationTokenGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*ClusterRegistrationToken); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -257,18 +292,36 @@ func (s *clusterRegistrationTokenClient) AddHandler(ctx context.Context, name st
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *clusterRegistrationTokenClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync ClusterRegistrationTokenHandlerFunc) {
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
+}
+
 func (s *clusterRegistrationTokenClient) AddLifecycle(ctx context.Context, name string, lifecycle ClusterRegistrationTokenLifecycle) {
 	sync := NewClusterRegistrationTokenLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *clusterRegistrationTokenClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle ClusterRegistrationTokenLifecycle) {
+	sync := NewClusterRegistrationTokenLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
 func (s *clusterRegistrationTokenClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ClusterRegistrationTokenHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *clusterRegistrationTokenClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync ClusterRegistrationTokenHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
+}
+
 func (s *clusterRegistrationTokenClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterRegistrationTokenLifecycle) {
 	sync := NewClusterRegistrationTokenLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *clusterRegistrationTokenClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ClusterRegistrationTokenLifecycle) {
+	sync := NewClusterRegistrationTokenLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
 type ClusterRegistrationTokenIndexer func(obj *ClusterRegistrationToken) ([]string, error)

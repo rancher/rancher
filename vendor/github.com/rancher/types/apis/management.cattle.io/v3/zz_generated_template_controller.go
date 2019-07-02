@@ -67,7 +67,9 @@ type TemplateController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() TemplateLister
 	AddHandler(ctx context.Context, name string, handler TemplateHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync TemplateHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler TemplateHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler TemplateHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -86,9 +88,13 @@ type TemplateInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() TemplateController
 	AddHandler(ctx context.Context, name string, sync TemplateHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync TemplateHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle TemplateLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle TemplateLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync TemplateHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync TemplateHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle TemplateLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle TemplateLifecycle)
 }
 
 type templateLister struct {
@@ -148,10 +154,39 @@ func (c *templateController) AddHandler(ctx context.Context, name string, handle
 	})
 }
 
+func (c *templateController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler TemplateHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*Template); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
 func (c *templateController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler TemplateHandlerFunc) {
 	resource.PutClusterScoped(TemplateGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*Template); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *templateController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler TemplateHandlerFunc) {
+	resource.PutClusterScoped(TemplateGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*Template); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -256,18 +291,36 @@ func (s *templateClient) AddHandler(ctx context.Context, name string, sync Templ
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *templateClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync TemplateHandlerFunc) {
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
+}
+
 func (s *templateClient) AddLifecycle(ctx context.Context, name string, lifecycle TemplateLifecycle) {
 	sync := NewTemplateLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *templateClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle TemplateLifecycle) {
+	sync := NewTemplateLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
 func (s *templateClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync TemplateHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *templateClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync TemplateHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
+}
+
 func (s *templateClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle TemplateLifecycle) {
 	sync := NewTemplateLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *templateClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle TemplateLifecycle) {
+	sync := NewTemplateLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
 type TemplateIndexer func(obj *Template) ([]string, error)

@@ -68,7 +68,9 @@ type EtcdBackupController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() EtcdBackupLister
 	AddHandler(ctx context.Context, name string, handler EtcdBackupHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync EtcdBackupHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler EtcdBackupHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler EtcdBackupHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -87,9 +89,13 @@ type EtcdBackupInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() EtcdBackupController
 	AddHandler(ctx context.Context, name string, sync EtcdBackupHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync EtcdBackupHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle EtcdBackupLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle EtcdBackupLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync EtcdBackupHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync EtcdBackupHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle EtcdBackupLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle EtcdBackupLifecycle)
 }
 
 type etcdBackupLister struct {
@@ -149,10 +155,39 @@ func (c *etcdBackupController) AddHandler(ctx context.Context, name string, hand
 	})
 }
 
+func (c *etcdBackupController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler EtcdBackupHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*EtcdBackup); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
 func (c *etcdBackupController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler EtcdBackupHandlerFunc) {
 	resource.PutClusterScoped(EtcdBackupGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*EtcdBackup); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *etcdBackupController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler EtcdBackupHandlerFunc) {
+	resource.PutClusterScoped(EtcdBackupGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*EtcdBackup); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -257,18 +292,36 @@ func (s *etcdBackupClient) AddHandler(ctx context.Context, name string, sync Etc
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *etcdBackupClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync EtcdBackupHandlerFunc) {
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
+}
+
 func (s *etcdBackupClient) AddLifecycle(ctx context.Context, name string, lifecycle EtcdBackupLifecycle) {
 	sync := NewEtcdBackupLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *etcdBackupClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle EtcdBackupLifecycle) {
+	sync := NewEtcdBackupLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
 func (s *etcdBackupClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync EtcdBackupHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *etcdBackupClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync EtcdBackupHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
+}
+
 func (s *etcdBackupClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle EtcdBackupLifecycle) {
 	sync := NewEtcdBackupLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *etcdBackupClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle EtcdBackupLifecycle) {
+	sync := NewEtcdBackupLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
 type EtcdBackupIndexer func(obj *EtcdBackup) ([]string, error)

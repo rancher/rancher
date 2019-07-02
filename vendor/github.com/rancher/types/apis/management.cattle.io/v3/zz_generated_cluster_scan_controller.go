@@ -68,7 +68,9 @@ type ClusterScanController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() ClusterScanLister
 	AddHandler(ctx context.Context, name string, handler ClusterScanHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync ClusterScanHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ClusterScanHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterScanHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -87,9 +89,13 @@ type ClusterScanInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterScanController
 	AddHandler(ctx context.Context, name string, sync ClusterScanHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync ClusterScanHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle ClusterScanLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle ClusterScanLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ClusterScanHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync ClusterScanHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterScanLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ClusterScanLifecycle)
 }
 
 type clusterScanLister struct {
@@ -149,10 +155,39 @@ func (c *clusterScanController) AddHandler(ctx context.Context, name string, han
 	})
 }
 
+func (c *clusterScanController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler ClusterScanHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*ClusterScan); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
 func (c *clusterScanController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ClusterScanHandlerFunc) {
 	resource.PutClusterScoped(ClusterScanGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*ClusterScan); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *clusterScanController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler ClusterScanHandlerFunc) {
+	resource.PutClusterScoped(ClusterScanGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*ClusterScan); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -257,18 +292,36 @@ func (s *clusterScanClient) AddHandler(ctx context.Context, name string, sync Cl
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *clusterScanClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync ClusterScanHandlerFunc) {
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
+}
+
 func (s *clusterScanClient) AddLifecycle(ctx context.Context, name string, lifecycle ClusterScanLifecycle) {
 	sync := NewClusterScanLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *clusterScanClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle ClusterScanLifecycle) {
+	sync := NewClusterScanLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
 func (s *clusterScanClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync ClusterScanHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *clusterScanClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync ClusterScanHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
+}
+
 func (s *clusterScanClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle ClusterScanLifecycle) {
 	sync := NewClusterScanLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *clusterScanClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ClusterScanLifecycle) {
+	sync := NewClusterScanLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
 type ClusterScanIndexer func(obj *ClusterScan) ([]string, error)

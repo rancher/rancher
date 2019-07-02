@@ -140,14 +140,16 @@ func (mock *ProjectAlertGroupListerMock) ListCalls() []struct {
 }
 
 var (
-	lockProjectAlertGroupControllerMockAddClusterScopedHandler sync.RWMutex
-	lockProjectAlertGroupControllerMockAddHandler              sync.RWMutex
-	lockProjectAlertGroupControllerMockEnqueue                 sync.RWMutex
-	lockProjectAlertGroupControllerMockGeneric                 sync.RWMutex
-	lockProjectAlertGroupControllerMockInformer                sync.RWMutex
-	lockProjectAlertGroupControllerMockLister                  sync.RWMutex
-	lockProjectAlertGroupControllerMockStart                   sync.RWMutex
-	lockProjectAlertGroupControllerMockSync                    sync.RWMutex
+	lockProjectAlertGroupControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockProjectAlertGroupControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockProjectAlertGroupControllerMockAddFeatureHandler              sync.RWMutex
+	lockProjectAlertGroupControllerMockAddHandler                     sync.RWMutex
+	lockProjectAlertGroupControllerMockEnqueue                        sync.RWMutex
+	lockProjectAlertGroupControllerMockGeneric                        sync.RWMutex
+	lockProjectAlertGroupControllerMockInformer                       sync.RWMutex
+	lockProjectAlertGroupControllerMockLister                         sync.RWMutex
+	lockProjectAlertGroupControllerMockStart                          sync.RWMutex
+	lockProjectAlertGroupControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that ProjectAlertGroupControllerMock does implement ProjectAlertGroupController.
@@ -160,8 +162,14 @@ var _ v3.ProjectAlertGroupController = &ProjectAlertGroupControllerMock{}
 //
 //         // make and configure a mocked ProjectAlertGroupController
 //         mockedProjectAlertGroupController := &ProjectAlertGroupControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.ProjectAlertGroupHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v3.ProjectAlertGroupHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.ProjectAlertGroupHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
 //             },
 //             AddHandlerFunc: func(ctx context.Context, name string, handler v3.ProjectAlertGroupHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
@@ -191,8 +199,14 @@ var _ v3.ProjectAlertGroupController = &ProjectAlertGroupControllerMock{}
 //
 //     }
 type ProjectAlertGroupControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.ProjectAlertGroupHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v3.ProjectAlertGroupHandlerFunc)
+
+	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.ProjectAlertGroupHandlerFunc)
 
 	// AddHandlerFunc mocks the AddHandler method.
 	AddHandlerFunc func(ctx context.Context, name string, handler v3.ProjectAlertGroupHandlerFunc)
@@ -217,6 +231,19 @@ type ProjectAlertGroupControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v3.ProjectAlertGroupHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -227,6 +254,17 @@ type ProjectAlertGroupControllerMock struct {
 			ClusterName string
 			// Handler is the handler argument value.
 			Handler v3.ProjectAlertGroupHandlerFunc
+		}
+		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
+		AddFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// Sync is the sync argument value.
+			Sync v3.ProjectAlertGroupHandlerFunc
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -266,6 +304,53 @@ type ProjectAlertGroupControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *ProjectAlertGroupControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v3.ProjectAlertGroupHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("ProjectAlertGroupControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but ProjectAlertGroupController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Handler     v3.ProjectAlertGroupHandlerFunc
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockProjectAlertGroupControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockProjectAlertGroupControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedProjectAlertGroupController.AddClusterScopedFeatureHandlerCalls())
+func (mock *ProjectAlertGroupControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Handler     v3.ProjectAlertGroupHandlerFunc
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Handler     v3.ProjectAlertGroupHandlerFunc
+	}
+	lockProjectAlertGroupControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockProjectAlertGroupControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -308,6 +393,49 @@ func (mock *ProjectAlertGroupControllerMock) AddClusterScopedHandlerCalls() []st
 	lockProjectAlertGroupControllerMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
 	lockProjectAlertGroupControllerMockAddClusterScopedHandler.RUnlock()
+	return calls
+}
+
+// AddFeatureHandler calls AddFeatureHandlerFunc.
+func (mock *ProjectAlertGroupControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.ProjectAlertGroupHandlerFunc) {
+	if mock.AddFeatureHandlerFunc == nil {
+		panic("ProjectAlertGroupControllerMock.AddFeatureHandlerFunc: method is nil but ProjectAlertGroupController.AddFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v3.ProjectAlertGroupHandlerFunc
+	}{
+		Ctx:     ctx,
+		Enabled: enabled,
+		Name:    name,
+		Sync:    sync,
+	}
+	lockProjectAlertGroupControllerMockAddFeatureHandler.Lock()
+	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
+	lockProjectAlertGroupControllerMockAddFeatureHandler.Unlock()
+	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
+}
+
+// AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
+// Check the length with:
+//     len(mockedProjectAlertGroupController.AddFeatureHandlerCalls())
+func (mock *ProjectAlertGroupControllerMock) AddFeatureHandlerCalls() []struct {
+	Ctx     context.Context
+	Enabled func() bool
+	Name    string
+	Sync    v3.ProjectAlertGroupHandlerFunc
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v3.ProjectAlertGroupHandlerFunc
+	}
+	lockProjectAlertGroupControllerMockAddFeatureHandler.RLock()
+	calls = mock.calls.AddFeatureHandler
+	lockProjectAlertGroupControllerMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
@@ -530,21 +658,25 @@ func (mock *ProjectAlertGroupControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockProjectAlertGroupInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockProjectAlertGroupInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockProjectAlertGroupInterfaceMockAddHandler                sync.RWMutex
-	lockProjectAlertGroupInterfaceMockAddLifecycle              sync.RWMutex
-	lockProjectAlertGroupInterfaceMockController                sync.RWMutex
-	lockProjectAlertGroupInterfaceMockCreate                    sync.RWMutex
-	lockProjectAlertGroupInterfaceMockDelete                    sync.RWMutex
-	lockProjectAlertGroupInterfaceMockDeleteCollection          sync.RWMutex
-	lockProjectAlertGroupInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockProjectAlertGroupInterfaceMockGet                       sync.RWMutex
-	lockProjectAlertGroupInterfaceMockGetNamespaced             sync.RWMutex
-	lockProjectAlertGroupInterfaceMockList                      sync.RWMutex
-	lockProjectAlertGroupInterfaceMockObjectClient              sync.RWMutex
-	lockProjectAlertGroupInterfaceMockUpdate                    sync.RWMutex
-	lockProjectAlertGroupInterfaceMockWatch                     sync.RWMutex
+	lockProjectAlertGroupInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockProjectAlertGroupInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockProjectAlertGroupInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockProjectAlertGroupInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockProjectAlertGroupInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockProjectAlertGroupInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockProjectAlertGroupInterfaceMockAddHandler                       sync.RWMutex
+	lockProjectAlertGroupInterfaceMockAddLifecycle                     sync.RWMutex
+	lockProjectAlertGroupInterfaceMockController                       sync.RWMutex
+	lockProjectAlertGroupInterfaceMockCreate                           sync.RWMutex
+	lockProjectAlertGroupInterfaceMockDelete                           sync.RWMutex
+	lockProjectAlertGroupInterfaceMockDeleteCollection                 sync.RWMutex
+	lockProjectAlertGroupInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockProjectAlertGroupInterfaceMockGet                              sync.RWMutex
+	lockProjectAlertGroupInterfaceMockGetNamespaced                    sync.RWMutex
+	lockProjectAlertGroupInterfaceMockList                             sync.RWMutex
+	lockProjectAlertGroupInterfaceMockObjectClient                     sync.RWMutex
+	lockProjectAlertGroupInterfaceMockUpdate                           sync.RWMutex
+	lockProjectAlertGroupInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that ProjectAlertGroupInterfaceMock does implement ProjectAlertGroupInterface.
@@ -557,11 +689,23 @@ var _ v3.ProjectAlertGroupInterface = &ProjectAlertGroupInterfaceMock{}
 //
 //         // make and configure a mocked ProjectAlertGroupInterface
 //         mockedProjectAlertGroupInterface := &ProjectAlertGroupInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.ProjectAlertGroupHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.ProjectAlertGroupLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v3.ProjectAlertGroupHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
 //             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v3.ProjectAlertGroupLifecycle)  {
 // 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v3.ProjectAlertGroupHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v3.ProjectAlertGroupLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
 //             },
 //             AddHandlerFunc: func(ctx context.Context, name string, sync v3.ProjectAlertGroupHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
@@ -609,11 +753,23 @@ var _ v3.ProjectAlertGroupInterface = &ProjectAlertGroupInterfaceMock{}
 //
 //     }
 type ProjectAlertGroupInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.ProjectAlertGroupHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.ProjectAlertGroupLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v3.ProjectAlertGroupHandlerFunc)
 
 	// AddClusterScopedLifecycleFunc mocks the AddClusterScopedLifecycle method.
 	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v3.ProjectAlertGroupLifecycle)
+
+	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v3.ProjectAlertGroupHandlerFunc)
+
+	// AddFeatureLifecycleFunc mocks the AddFeatureLifecycle method.
+	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v3.ProjectAlertGroupLifecycle)
 
 	// AddHandlerFunc mocks the AddHandler method.
 	AddHandlerFunc func(ctx context.Context, name string, sync v3.ProjectAlertGroupHandlerFunc)
@@ -656,6 +812,32 @@ type ProjectAlertGroupInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v3.ProjectAlertGroupHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.ProjectAlertGroupLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -675,6 +857,28 @@ type ProjectAlertGroupInterfaceMock struct {
 			Name string
 			// ClusterName is the clusterName argument value.
 			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v3.ProjectAlertGroupLifecycle
+		}
+		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
+		AddFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// Sync is the sync argument value.
+			Sync v3.ProjectAlertGroupHandlerFunc
+		}
+		// AddFeatureLifecycle holds details about calls to the AddFeatureLifecycle method.
+		AddFeatureLifecycle []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
 			// Lifecycle is the lifecycle argument value.
 			Lifecycle v3.ProjectAlertGroupLifecycle
 		}
@@ -764,6 +968,100 @@ type ProjectAlertGroupInterfaceMock struct {
 	}
 }
 
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *ProjectAlertGroupInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, sync v3.ProjectAlertGroupHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("ProjectAlertGroupInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but ProjectAlertGroupInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Sync        v3.ProjectAlertGroupHandlerFunc
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockProjectAlertGroupInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockProjectAlertGroupInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedProjectAlertGroupInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *ProjectAlertGroupInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Sync        v3.ProjectAlertGroupHandlerFunc
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Sync        v3.ProjectAlertGroupHandlerFunc
+	}
+	lockProjectAlertGroupInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockProjectAlertGroupInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *ProjectAlertGroupInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v3.ProjectAlertGroupLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("ProjectAlertGroupInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but ProjectAlertGroupInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Lifecycle   v3.ProjectAlertGroupLifecycle
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockProjectAlertGroupInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockProjectAlertGroupInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(ctx, enabled, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedProjectAlertGroupInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *ProjectAlertGroupInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Lifecycle   v3.ProjectAlertGroupLifecycle
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Lifecycle   v3.ProjectAlertGroupLifecycle
+	}
+	lockProjectAlertGroupInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockProjectAlertGroupInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
+}
+
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
 func (mock *ProjectAlertGroupInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, sync v3.ProjectAlertGroupHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
@@ -847,6 +1145,92 @@ func (mock *ProjectAlertGroupInterfaceMock) AddClusterScopedLifecycleCalls() []s
 	lockProjectAlertGroupInterfaceMockAddClusterScopedLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedLifecycle
 	lockProjectAlertGroupInterfaceMockAddClusterScopedLifecycle.RUnlock()
+	return calls
+}
+
+// AddFeatureHandler calls AddFeatureHandlerFunc.
+func (mock *ProjectAlertGroupInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v3.ProjectAlertGroupHandlerFunc) {
+	if mock.AddFeatureHandlerFunc == nil {
+		panic("ProjectAlertGroupInterfaceMock.AddFeatureHandlerFunc: method is nil but ProjectAlertGroupInterface.AddFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v3.ProjectAlertGroupHandlerFunc
+	}{
+		Ctx:     ctx,
+		Enabled: enabled,
+		Name:    name,
+		Sync:    sync,
+	}
+	lockProjectAlertGroupInterfaceMockAddFeatureHandler.Lock()
+	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
+	lockProjectAlertGroupInterfaceMockAddFeatureHandler.Unlock()
+	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
+}
+
+// AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
+// Check the length with:
+//     len(mockedProjectAlertGroupInterface.AddFeatureHandlerCalls())
+func (mock *ProjectAlertGroupInterfaceMock) AddFeatureHandlerCalls() []struct {
+	Ctx     context.Context
+	Enabled func() bool
+	Name    string
+	Sync    v3.ProjectAlertGroupHandlerFunc
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v3.ProjectAlertGroupHandlerFunc
+	}
+	lockProjectAlertGroupInterfaceMockAddFeatureHandler.RLock()
+	calls = mock.calls.AddFeatureHandler
+	lockProjectAlertGroupInterfaceMockAddFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddFeatureLifecycle calls AddFeatureLifecycleFunc.
+func (mock *ProjectAlertGroupInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v3.ProjectAlertGroupLifecycle) {
+	if mock.AddFeatureLifecycleFunc == nil {
+		panic("ProjectAlertGroupInterfaceMock.AddFeatureLifecycleFunc: method is nil but ProjectAlertGroupInterface.AddFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Ctx       context.Context
+		Enabled   func() bool
+		Name      string
+		Lifecycle v3.ProjectAlertGroupLifecycle
+	}{
+		Ctx:       ctx,
+		Enabled:   enabled,
+		Name:      name,
+		Lifecycle: lifecycle,
+	}
+	lockProjectAlertGroupInterfaceMockAddFeatureLifecycle.Lock()
+	mock.calls.AddFeatureLifecycle = append(mock.calls.AddFeatureLifecycle, callInfo)
+	lockProjectAlertGroupInterfaceMockAddFeatureLifecycle.Unlock()
+	mock.AddFeatureLifecycleFunc(ctx, enabled, name, lifecycle)
+}
+
+// AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
+// Check the length with:
+//     len(mockedProjectAlertGroupInterface.AddFeatureLifecycleCalls())
+func (mock *ProjectAlertGroupInterfaceMock) AddFeatureLifecycleCalls() []struct {
+	Ctx       context.Context
+	Enabled   func() bool
+	Name      string
+	Lifecycle v3.ProjectAlertGroupLifecycle
+} {
+	var calls []struct {
+		Ctx       context.Context
+		Enabled   func() bool
+		Name      string
+		Lifecycle v3.ProjectAlertGroupLifecycle
+	}
+	lockProjectAlertGroupInterfaceMockAddFeatureLifecycle.RLock()
+	calls = mock.calls.AddFeatureLifecycle
+	lockProjectAlertGroupInterfaceMockAddFeatureLifecycle.RUnlock()
 	return calls
 }
 

@@ -68,7 +68,9 @@ type NodePoolController interface {
 	Informer() cache.SharedIndexInformer
 	Lister() NodePoolLister
 	AddHandler(ctx context.Context, name string, handler NodePoolHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync NodePoolHandlerFunc)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler NodePoolHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler NodePoolHandlerFunc)
 	Enqueue(namespace, name string)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
@@ -87,9 +89,13 @@ type NodePoolInterface interface {
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NodePoolController
 	AddHandler(ctx context.Context, name string, sync NodePoolHandlerFunc)
+	AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync NodePoolHandlerFunc)
 	AddLifecycle(ctx context.Context, name string, lifecycle NodePoolLifecycle)
+	AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle NodePoolLifecycle)
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NodePoolHandlerFunc)
+	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync NodePoolHandlerFunc)
 	AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NodePoolLifecycle)
+	AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle NodePoolLifecycle)
 }
 
 type nodePoolLister struct {
@@ -149,10 +155,39 @@ func (c *nodePoolController) AddHandler(ctx context.Context, name string, handle
 	})
 }
 
+func (c *nodePoolController) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, handler NodePoolHandlerFunc) {
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*NodePool); ok {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
 func (c *nodePoolController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler NodePoolHandlerFunc) {
 	resource.PutClusterScoped(NodePoolGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
+			return handler(key, nil)
+		} else if v, ok := obj.(*NodePool); ok && controller.ObjectInCluster(cluster, obj) {
+			return handler(key, v)
+		} else {
+			return nil, nil
+		}
+	})
+}
+
+func (c *nodePoolController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler NodePoolHandlerFunc) {
+	resource.PutClusterScoped(NodePoolGroupVersionResource)
+	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
+		if !enabled() {
+			return nil, nil
+		} else if obj == nil {
 			return handler(key, nil)
 		} else if v, ok := obj.(*NodePool); ok && controller.ObjectInCluster(cluster, obj) {
 			return handler(key, v)
@@ -257,18 +292,36 @@ func (s *nodePoolClient) AddHandler(ctx context.Context, name string, sync NodeP
 	s.Controller().AddHandler(ctx, name, sync)
 }
 
+func (s *nodePoolClient) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync NodePoolHandlerFunc) {
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
+}
+
 func (s *nodePoolClient) AddLifecycle(ctx context.Context, name string, lifecycle NodePoolLifecycle) {
 	sync := NewNodePoolLifecycleAdapter(name, false, s, lifecycle)
 	s.Controller().AddHandler(ctx, name, sync)
+}
+
+func (s *nodePoolClient) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle NodePoolLifecycle) {
+	sync := NewNodePoolLifecycleAdapter(name, false, s, lifecycle)
+	s.Controller().AddFeatureHandler(ctx, enabled, name, sync)
 }
 
 func (s *nodePoolClient) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync NodePoolHandlerFunc) {
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
 }
 
+func (s *nodePoolClient) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync NodePoolHandlerFunc) {
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
+}
+
 func (s *nodePoolClient) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle NodePoolLifecycle) {
 	sync := NewNodePoolLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedHandler(ctx, name, clusterName, sync)
+}
+
+func (s *nodePoolClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle NodePoolLifecycle) {
+	sync := NewNodePoolLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
+	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
 }
 
 type NodePoolIndexer func(obj *NodePool) ([]string, error)

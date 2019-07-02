@@ -141,14 +141,16 @@ func (mock *ServiceAccountListerMock) ListCalls() []struct {
 }
 
 var (
-	lockServiceAccountControllerMockAddClusterScopedHandler sync.RWMutex
-	lockServiceAccountControllerMockAddHandler              sync.RWMutex
-	lockServiceAccountControllerMockEnqueue                 sync.RWMutex
-	lockServiceAccountControllerMockGeneric                 sync.RWMutex
-	lockServiceAccountControllerMockInformer                sync.RWMutex
-	lockServiceAccountControllerMockLister                  sync.RWMutex
-	lockServiceAccountControllerMockStart                   sync.RWMutex
-	lockServiceAccountControllerMockSync                    sync.RWMutex
+	lockServiceAccountControllerMockAddClusterScopedFeatureHandler sync.RWMutex
+	lockServiceAccountControllerMockAddClusterScopedHandler        sync.RWMutex
+	lockServiceAccountControllerMockAddFeatureHandler              sync.RWMutex
+	lockServiceAccountControllerMockAddHandler                     sync.RWMutex
+	lockServiceAccountControllerMockEnqueue                        sync.RWMutex
+	lockServiceAccountControllerMockGeneric                        sync.RWMutex
+	lockServiceAccountControllerMockInformer                       sync.RWMutex
+	lockServiceAccountControllerMockLister                         sync.RWMutex
+	lockServiceAccountControllerMockStart                          sync.RWMutex
+	lockServiceAccountControllerMockSync                           sync.RWMutex
 )
 
 // Ensure, that ServiceAccountControllerMock does implement ServiceAccountController.
@@ -161,8 +163,14 @@ var _ v1a.ServiceAccountController = &ServiceAccountControllerMock{}
 //
 //         // make and configure a mocked ServiceAccountController
 //         mockedServiceAccountController := &ServiceAccountControllerMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1a.ServiceAccountHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, handler v1a.ServiceAccountHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v1a.ServiceAccountHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
 //             },
 //             AddHandlerFunc: func(ctx context.Context, name string, handler v1a.ServiceAccountHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
@@ -192,8 +200,14 @@ var _ v1a.ServiceAccountController = &ServiceAccountControllerMock{}
 //
 //     }
 type ServiceAccountControllerMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1a.ServiceAccountHandlerFunc)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, handler v1a.ServiceAccountHandlerFunc)
+
+	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v1a.ServiceAccountHandlerFunc)
 
 	// AddHandlerFunc mocks the AddHandler method.
 	AddHandlerFunc func(ctx context.Context, name string, handler v1a.ServiceAccountHandlerFunc)
@@ -218,6 +232,19 @@ type ServiceAccountControllerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Handler is the handler argument value.
+			Handler v1a.ServiceAccountHandlerFunc
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -228,6 +255,17 @@ type ServiceAccountControllerMock struct {
 			ClusterName string
 			// Handler is the handler argument value.
 			Handler v1a.ServiceAccountHandlerFunc
+		}
+		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
+		AddFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// Sync is the sync argument value.
+			Sync v1a.ServiceAccountHandlerFunc
 		}
 		// AddHandler holds details about calls to the AddHandler method.
 		AddHandler []struct {
@@ -267,6 +305,53 @@ type ServiceAccountControllerMock struct {
 			Ctx context.Context
 		}
 	}
+}
+
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *ServiceAccountControllerMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, handler v1a.ServiceAccountHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("ServiceAccountControllerMock.AddClusterScopedFeatureHandlerFunc: method is nil but ServiceAccountController.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Handler     v1a.ServiceAccountHandlerFunc
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Handler:     handler,
+	}
+	lockServiceAccountControllerMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockServiceAccountControllerMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, handler)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedServiceAccountController.AddClusterScopedFeatureHandlerCalls())
+func (mock *ServiceAccountControllerMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Handler     v1a.ServiceAccountHandlerFunc
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Handler     v1a.ServiceAccountHandlerFunc
+	}
+	lockServiceAccountControllerMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockServiceAccountControllerMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
 }
 
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
@@ -309,6 +394,49 @@ func (mock *ServiceAccountControllerMock) AddClusterScopedHandlerCalls() []struc
 	lockServiceAccountControllerMockAddClusterScopedHandler.RLock()
 	calls = mock.calls.AddClusterScopedHandler
 	lockServiceAccountControllerMockAddClusterScopedHandler.RUnlock()
+	return calls
+}
+
+// AddFeatureHandler calls AddFeatureHandlerFunc.
+func (mock *ServiceAccountControllerMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v1a.ServiceAccountHandlerFunc) {
+	if mock.AddFeatureHandlerFunc == nil {
+		panic("ServiceAccountControllerMock.AddFeatureHandlerFunc: method is nil but ServiceAccountController.AddFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v1a.ServiceAccountHandlerFunc
+	}{
+		Ctx:     ctx,
+		Enabled: enabled,
+		Name:    name,
+		Sync:    sync,
+	}
+	lockServiceAccountControllerMockAddFeatureHandler.Lock()
+	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
+	lockServiceAccountControllerMockAddFeatureHandler.Unlock()
+	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
+}
+
+// AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
+// Check the length with:
+//     len(mockedServiceAccountController.AddFeatureHandlerCalls())
+func (mock *ServiceAccountControllerMock) AddFeatureHandlerCalls() []struct {
+	Ctx     context.Context
+	Enabled func() bool
+	Name    string
+	Sync    v1a.ServiceAccountHandlerFunc
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v1a.ServiceAccountHandlerFunc
+	}
+	lockServiceAccountControllerMockAddFeatureHandler.RLock()
+	calls = mock.calls.AddFeatureHandler
+	lockServiceAccountControllerMockAddFeatureHandler.RUnlock()
 	return calls
 }
 
@@ -531,21 +659,25 @@ func (mock *ServiceAccountControllerMock) SyncCalls() []struct {
 }
 
 var (
-	lockServiceAccountInterfaceMockAddClusterScopedHandler   sync.RWMutex
-	lockServiceAccountInterfaceMockAddClusterScopedLifecycle sync.RWMutex
-	lockServiceAccountInterfaceMockAddHandler                sync.RWMutex
-	lockServiceAccountInterfaceMockAddLifecycle              sync.RWMutex
-	lockServiceAccountInterfaceMockController                sync.RWMutex
-	lockServiceAccountInterfaceMockCreate                    sync.RWMutex
-	lockServiceAccountInterfaceMockDelete                    sync.RWMutex
-	lockServiceAccountInterfaceMockDeleteCollection          sync.RWMutex
-	lockServiceAccountInterfaceMockDeleteNamespaced          sync.RWMutex
-	lockServiceAccountInterfaceMockGet                       sync.RWMutex
-	lockServiceAccountInterfaceMockGetNamespaced             sync.RWMutex
-	lockServiceAccountInterfaceMockList                      sync.RWMutex
-	lockServiceAccountInterfaceMockObjectClient              sync.RWMutex
-	lockServiceAccountInterfaceMockUpdate                    sync.RWMutex
-	lockServiceAccountInterfaceMockWatch                     sync.RWMutex
+	lockServiceAccountInterfaceMockAddClusterScopedFeatureHandler   sync.RWMutex
+	lockServiceAccountInterfaceMockAddClusterScopedFeatureLifecycle sync.RWMutex
+	lockServiceAccountInterfaceMockAddClusterScopedHandler          sync.RWMutex
+	lockServiceAccountInterfaceMockAddClusterScopedLifecycle        sync.RWMutex
+	lockServiceAccountInterfaceMockAddFeatureHandler                sync.RWMutex
+	lockServiceAccountInterfaceMockAddFeatureLifecycle              sync.RWMutex
+	lockServiceAccountInterfaceMockAddHandler                       sync.RWMutex
+	lockServiceAccountInterfaceMockAddLifecycle                     sync.RWMutex
+	lockServiceAccountInterfaceMockController                       sync.RWMutex
+	lockServiceAccountInterfaceMockCreate                           sync.RWMutex
+	lockServiceAccountInterfaceMockDelete                           sync.RWMutex
+	lockServiceAccountInterfaceMockDeleteCollection                 sync.RWMutex
+	lockServiceAccountInterfaceMockDeleteNamespaced                 sync.RWMutex
+	lockServiceAccountInterfaceMockGet                              sync.RWMutex
+	lockServiceAccountInterfaceMockGetNamespaced                    sync.RWMutex
+	lockServiceAccountInterfaceMockList                             sync.RWMutex
+	lockServiceAccountInterfaceMockObjectClient                     sync.RWMutex
+	lockServiceAccountInterfaceMockUpdate                           sync.RWMutex
+	lockServiceAccountInterfaceMockWatch                            sync.RWMutex
 )
 
 // Ensure, that ServiceAccountInterfaceMock does implement ServiceAccountInterface.
@@ -558,11 +690,23 @@ var _ v1a.ServiceAccountInterface = &ServiceAccountInterfaceMock{}
 //
 //         // make and configure a mocked ServiceAccountInterface
 //         mockedServiceAccountInterface := &ServiceAccountInterfaceMock{
+//             AddClusterScopedFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v1a.ServiceAccountHandlerFunc)  {
+// 	               panic("mock out the AddClusterScopedFeatureHandler method")
+//             },
+//             AddClusterScopedFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1a.ServiceAccountLifecycle)  {
+// 	               panic("mock out the AddClusterScopedFeatureLifecycle method")
+//             },
 //             AddClusterScopedHandlerFunc: func(ctx context.Context, name string, clusterName string, sync v1a.ServiceAccountHandlerFunc)  {
 // 	               panic("mock out the AddClusterScopedHandler method")
 //             },
 //             AddClusterScopedLifecycleFunc: func(ctx context.Context, name string, clusterName string, lifecycle v1a.ServiceAccountLifecycle)  {
 // 	               panic("mock out the AddClusterScopedLifecycle method")
+//             },
+//             AddFeatureHandlerFunc: func(ctx context.Context, enabled func() bool, name string, sync v1a.ServiceAccountHandlerFunc)  {
+// 	               panic("mock out the AddFeatureHandler method")
+//             },
+//             AddFeatureLifecycleFunc: func(ctx context.Context, enabled func() bool, name string, lifecycle v1a.ServiceAccountLifecycle)  {
+// 	               panic("mock out the AddFeatureLifecycle method")
 //             },
 //             AddHandlerFunc: func(ctx context.Context, name string, sync v1a.ServiceAccountHandlerFunc)  {
 // 	               panic("mock out the AddHandler method")
@@ -610,11 +754,23 @@ var _ v1a.ServiceAccountInterface = &ServiceAccountInterfaceMock{}
 //
 //     }
 type ServiceAccountInterfaceMock struct {
+	// AddClusterScopedFeatureHandlerFunc mocks the AddClusterScopedFeatureHandler method.
+	AddClusterScopedFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, sync v1a.ServiceAccountHandlerFunc)
+
+	// AddClusterScopedFeatureLifecycleFunc mocks the AddClusterScopedFeatureLifecycle method.
+	AddClusterScopedFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1a.ServiceAccountLifecycle)
+
 	// AddClusterScopedHandlerFunc mocks the AddClusterScopedHandler method.
 	AddClusterScopedHandlerFunc func(ctx context.Context, name string, clusterName string, sync v1a.ServiceAccountHandlerFunc)
 
 	// AddClusterScopedLifecycleFunc mocks the AddClusterScopedLifecycle method.
 	AddClusterScopedLifecycleFunc func(ctx context.Context, name string, clusterName string, lifecycle v1a.ServiceAccountLifecycle)
+
+	// AddFeatureHandlerFunc mocks the AddFeatureHandler method.
+	AddFeatureHandlerFunc func(ctx context.Context, enabled func() bool, name string, sync v1a.ServiceAccountHandlerFunc)
+
+	// AddFeatureLifecycleFunc mocks the AddFeatureLifecycle method.
+	AddFeatureLifecycleFunc func(ctx context.Context, enabled func() bool, name string, lifecycle v1a.ServiceAccountLifecycle)
 
 	// AddHandlerFunc mocks the AddHandler method.
 	AddHandlerFunc func(ctx context.Context, name string, sync v1a.ServiceAccountHandlerFunc)
@@ -657,6 +813,32 @@ type ServiceAccountInterfaceMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddClusterScopedFeatureHandler holds details about calls to the AddClusterScopedFeatureHandler method.
+		AddClusterScopedFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Sync is the sync argument value.
+			Sync v1a.ServiceAccountHandlerFunc
+		}
+		// AddClusterScopedFeatureLifecycle holds details about calls to the AddClusterScopedFeatureLifecycle method.
+		AddClusterScopedFeatureLifecycle []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// ClusterName is the clusterName argument value.
+			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v1a.ServiceAccountLifecycle
+		}
 		// AddClusterScopedHandler holds details about calls to the AddClusterScopedHandler method.
 		AddClusterScopedHandler []struct {
 			// Ctx is the ctx argument value.
@@ -676,6 +858,28 @@ type ServiceAccountInterfaceMock struct {
 			Name string
 			// ClusterName is the clusterName argument value.
 			ClusterName string
+			// Lifecycle is the lifecycle argument value.
+			Lifecycle v1a.ServiceAccountLifecycle
+		}
+		// AddFeatureHandler holds details about calls to the AddFeatureHandler method.
+		AddFeatureHandler []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
+			// Sync is the sync argument value.
+			Sync v1a.ServiceAccountHandlerFunc
+		}
+		// AddFeatureLifecycle holds details about calls to the AddFeatureLifecycle method.
+		AddFeatureLifecycle []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Enabled is the enabled argument value.
+			Enabled func() bool
+			// Name is the name argument value.
+			Name string
 			// Lifecycle is the lifecycle argument value.
 			Lifecycle v1a.ServiceAccountLifecycle
 		}
@@ -765,6 +969,100 @@ type ServiceAccountInterfaceMock struct {
 	}
 }
 
+// AddClusterScopedFeatureHandler calls AddClusterScopedFeatureHandlerFunc.
+func (mock *ServiceAccountInterfaceMock) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name string, clusterName string, sync v1a.ServiceAccountHandlerFunc) {
+	if mock.AddClusterScopedFeatureHandlerFunc == nil {
+		panic("ServiceAccountInterfaceMock.AddClusterScopedFeatureHandlerFunc: method is nil but ServiceAccountInterface.AddClusterScopedFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Sync        v1a.ServiceAccountHandlerFunc
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Sync:        sync,
+	}
+	lockServiceAccountInterfaceMockAddClusterScopedFeatureHandler.Lock()
+	mock.calls.AddClusterScopedFeatureHandler = append(mock.calls.AddClusterScopedFeatureHandler, callInfo)
+	lockServiceAccountInterfaceMockAddClusterScopedFeatureHandler.Unlock()
+	mock.AddClusterScopedFeatureHandlerFunc(ctx, enabled, name, clusterName, sync)
+}
+
+// AddClusterScopedFeatureHandlerCalls gets all the calls that were made to AddClusterScopedFeatureHandler.
+// Check the length with:
+//     len(mockedServiceAccountInterface.AddClusterScopedFeatureHandlerCalls())
+func (mock *ServiceAccountInterfaceMock) AddClusterScopedFeatureHandlerCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Sync        v1a.ServiceAccountHandlerFunc
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Sync        v1a.ServiceAccountHandlerFunc
+	}
+	lockServiceAccountInterfaceMockAddClusterScopedFeatureHandler.RLock()
+	calls = mock.calls.AddClusterScopedFeatureHandler
+	lockServiceAccountInterfaceMockAddClusterScopedFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddClusterScopedFeatureLifecycle calls AddClusterScopedFeatureLifecycleFunc.
+func (mock *ServiceAccountInterfaceMock) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name string, clusterName string, lifecycle v1a.ServiceAccountLifecycle) {
+	if mock.AddClusterScopedFeatureLifecycleFunc == nil {
+		panic("ServiceAccountInterfaceMock.AddClusterScopedFeatureLifecycleFunc: method is nil but ServiceAccountInterface.AddClusterScopedFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Lifecycle   v1a.ServiceAccountLifecycle
+	}{
+		Ctx:         ctx,
+		Enabled:     enabled,
+		Name:        name,
+		ClusterName: clusterName,
+		Lifecycle:   lifecycle,
+	}
+	lockServiceAccountInterfaceMockAddClusterScopedFeatureLifecycle.Lock()
+	mock.calls.AddClusterScopedFeatureLifecycle = append(mock.calls.AddClusterScopedFeatureLifecycle, callInfo)
+	lockServiceAccountInterfaceMockAddClusterScopedFeatureLifecycle.Unlock()
+	mock.AddClusterScopedFeatureLifecycleFunc(ctx, enabled, name, clusterName, lifecycle)
+}
+
+// AddClusterScopedFeatureLifecycleCalls gets all the calls that were made to AddClusterScopedFeatureLifecycle.
+// Check the length with:
+//     len(mockedServiceAccountInterface.AddClusterScopedFeatureLifecycleCalls())
+func (mock *ServiceAccountInterfaceMock) AddClusterScopedFeatureLifecycleCalls() []struct {
+	Ctx         context.Context
+	Enabled     func() bool
+	Name        string
+	ClusterName string
+	Lifecycle   v1a.ServiceAccountLifecycle
+} {
+	var calls []struct {
+		Ctx         context.Context
+		Enabled     func() bool
+		Name        string
+		ClusterName string
+		Lifecycle   v1a.ServiceAccountLifecycle
+	}
+	lockServiceAccountInterfaceMockAddClusterScopedFeatureLifecycle.RLock()
+	calls = mock.calls.AddClusterScopedFeatureLifecycle
+	lockServiceAccountInterfaceMockAddClusterScopedFeatureLifecycle.RUnlock()
+	return calls
+}
+
 // AddClusterScopedHandler calls AddClusterScopedHandlerFunc.
 func (mock *ServiceAccountInterfaceMock) AddClusterScopedHandler(ctx context.Context, name string, clusterName string, sync v1a.ServiceAccountHandlerFunc) {
 	if mock.AddClusterScopedHandlerFunc == nil {
@@ -848,6 +1146,92 @@ func (mock *ServiceAccountInterfaceMock) AddClusterScopedLifecycleCalls() []stru
 	lockServiceAccountInterfaceMockAddClusterScopedLifecycle.RLock()
 	calls = mock.calls.AddClusterScopedLifecycle
 	lockServiceAccountInterfaceMockAddClusterScopedLifecycle.RUnlock()
+	return calls
+}
+
+// AddFeatureHandler calls AddFeatureHandlerFunc.
+func (mock *ServiceAccountInterfaceMock) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v1a.ServiceAccountHandlerFunc) {
+	if mock.AddFeatureHandlerFunc == nil {
+		panic("ServiceAccountInterfaceMock.AddFeatureHandlerFunc: method is nil but ServiceAccountInterface.AddFeatureHandler was just called")
+	}
+	callInfo := struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v1a.ServiceAccountHandlerFunc
+	}{
+		Ctx:     ctx,
+		Enabled: enabled,
+		Name:    name,
+		Sync:    sync,
+	}
+	lockServiceAccountInterfaceMockAddFeatureHandler.Lock()
+	mock.calls.AddFeatureHandler = append(mock.calls.AddFeatureHandler, callInfo)
+	lockServiceAccountInterfaceMockAddFeatureHandler.Unlock()
+	mock.AddFeatureHandlerFunc(ctx, enabled, name, sync)
+}
+
+// AddFeatureHandlerCalls gets all the calls that were made to AddFeatureHandler.
+// Check the length with:
+//     len(mockedServiceAccountInterface.AddFeatureHandlerCalls())
+func (mock *ServiceAccountInterfaceMock) AddFeatureHandlerCalls() []struct {
+	Ctx     context.Context
+	Enabled func() bool
+	Name    string
+	Sync    v1a.ServiceAccountHandlerFunc
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Enabled func() bool
+		Name    string
+		Sync    v1a.ServiceAccountHandlerFunc
+	}
+	lockServiceAccountInterfaceMockAddFeatureHandler.RLock()
+	calls = mock.calls.AddFeatureHandler
+	lockServiceAccountInterfaceMockAddFeatureHandler.RUnlock()
+	return calls
+}
+
+// AddFeatureLifecycle calls AddFeatureLifecycleFunc.
+func (mock *ServiceAccountInterfaceMock) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v1a.ServiceAccountLifecycle) {
+	if mock.AddFeatureLifecycleFunc == nil {
+		panic("ServiceAccountInterfaceMock.AddFeatureLifecycleFunc: method is nil but ServiceAccountInterface.AddFeatureLifecycle was just called")
+	}
+	callInfo := struct {
+		Ctx       context.Context
+		Enabled   func() bool
+		Name      string
+		Lifecycle v1a.ServiceAccountLifecycle
+	}{
+		Ctx:       ctx,
+		Enabled:   enabled,
+		Name:      name,
+		Lifecycle: lifecycle,
+	}
+	lockServiceAccountInterfaceMockAddFeatureLifecycle.Lock()
+	mock.calls.AddFeatureLifecycle = append(mock.calls.AddFeatureLifecycle, callInfo)
+	lockServiceAccountInterfaceMockAddFeatureLifecycle.Unlock()
+	mock.AddFeatureLifecycleFunc(ctx, enabled, name, lifecycle)
+}
+
+// AddFeatureLifecycleCalls gets all the calls that were made to AddFeatureLifecycle.
+// Check the length with:
+//     len(mockedServiceAccountInterface.AddFeatureLifecycleCalls())
+func (mock *ServiceAccountInterfaceMock) AddFeatureLifecycleCalls() []struct {
+	Ctx       context.Context
+	Enabled   func() bool
+	Name      string
+	Lifecycle v1a.ServiceAccountLifecycle
+} {
+	var calls []struct {
+		Ctx       context.Context
+		Enabled   func() bool
+		Name      string
+		Lifecycle v1a.ServiceAccountLifecycle
+	}
+	lockServiceAccountInterfaceMockAddFeatureLifecycle.RLock()
+	calls = mock.calls.AddFeatureLifecycle
+	lockServiceAccountInterfaceMockAddFeatureLifecycle.RUnlock()
 	return calls
 }
 
