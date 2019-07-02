@@ -188,7 +188,7 @@ spec:
       hostNetwork: true
       nodeSelector:
       {{ range $k, $v := .NodeSelector }}
-        {{ $k }}: {{ $v }}
+        {{ $k }}: "{{ $v }}"
       {{ end }}
       {{if eq .RBACConfig "rbac"}}
       serviceAccountName: nginx-ingress-serviceaccount

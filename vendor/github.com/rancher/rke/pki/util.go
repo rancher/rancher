@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -23,6 +24,12 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/util/cert"
+)
+
+var (
+	oidExtensionExtendedKeyUsage = asn1.ObjectIdentifier{2, 5, 29, 37}
+	oidExtKeyUsageServerAuth     = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 1}
+	oidExtKeyUsageClientAuth     = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 2}
 )
 
 func GenerateSignedCertAndKey(
@@ -79,20 +86,29 @@ func GenerateCertSigningRequestAndKey(
 			return nil, nil, fmt.Errorf("Failed to generate private key for %s certificate: %v", commonName, err)
 		}
 	}
-	usages := []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
+	usages := []asn1.ObjectIdentifier{oidExtKeyUsageClientAuth}
 	if serverCrt {
-		usages = append(usages, x509.ExtKeyUsageServerAuth)
+		usages = append(usages, oidExtKeyUsageServerAuth)
 	}
+	marshalledUsages, err := asn1.Marshal(usages)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error marshalling key usages while generating csr: %v", err)
+	}
+
+	extensions := []pkix.Extension{{
+		Id:       oidExtensionExtendedKeyUsage,
+		Critical: false,
+		Value:    marshalledUsages,
+	}}
 	if altNames == nil {
 		altNames = &cert.AltNames{}
 	}
 	caConfig := cert.Config{
 		CommonName:   commonName,
 		Organization: orgs,
-		Usages:       usages,
 		AltNames:     *altNames,
 	}
-	clientCSR, err := newCertSigningRequest(caConfig, rootKey)
+	clientCSR, err := newCertSigningRequest(caConfig, rootKey, extensions)
 
 	if err != nil {
 		return nil, nil, fmt.Errorf("Failed to generate %s certificate: %v", commonName, err)
@@ -435,12 +451,12 @@ func newSignedCert(cfg cert.Config, key *rsa.PrivateKey, caCert *x509.Certificat
 	return x509.ParseCertificate(certDERBytes)
 }
 
-func newCertSigningRequest(cfg cert.Config, key *rsa.PrivateKey) ([]byte, error) {
+func newCertSigningRequest(cfg cert.Config, key *rsa.PrivateKey, extensions []pkix.Extension) ([]byte, error) {
 	if len(cfg.CommonName) == 0 {
 		return nil, errors.New("must specify a CommonName")
 	}
-	if len(cfg.Usages) == 0 {
-		return nil, errors.New("must specify at least one ExtKeyUsage")
+	if len(extensions) == 0 {
+		return nil, errors.New("must specify at least one Extension")
 	}
 
 	certTmpl := x509.CertificateRequest{
@@ -448,8 +464,9 @@ func newCertSigningRequest(cfg cert.Config, key *rsa.PrivateKey) ([]byte, error)
 			CommonName:   cfg.CommonName,
 			Organization: cfg.Organization,
 		},
-		DNSNames:    cfg.AltNames.DNSNames,
-		IPAddresses: cfg.AltNames.IPs,
+		DNSNames:        cfg.AltNames.DNSNames,
+		IPAddresses:     cfg.AltNames.IPs,
+		ExtraExtensions: extensions,
 	}
 	return x509.CreateCertificateRequest(cryptorand.Reader, &certTmpl, key)
 }
