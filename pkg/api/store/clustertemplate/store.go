@@ -1,29 +1,37 @@
 package clustertemplate
 
 import (
-	"strings"
-
 	"fmt"
+	"strings"
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/norman/types/values"
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
+	rrbac "github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
+	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	managementv3 "github.com/rancher/types/client/management/v3"
+	"github.com/rancher/types/config"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 const (
 	clusterTemplateLabelName = "io.cattle.field/clusterTemplateId"
 )
 
-func WrapStore(store types.Store, users v3.UserInterface, grbLister v3.GlobalRoleBindingLister, grLister v3.GlobalRoleLister) types.Store {
+func WrapStore(store types.Store, mgmt *config.ScaledContext) types.Store {
 	storeWrapped := &Store{
 		Store:     store,
-		users:     users,
-		grbLister: grbLister,
-		grLister:  grLister,
+		users:     mgmt.Management.Users(""),
+		grbLister: mgmt.Management.GlobalRoleBindings("").Controller().Lister(),
+		grLister:  mgmt.Management.GlobalRoles("").Controller().Lister(),
+		rbLister:  mgmt.RBAC.RoleBindings("").Controller().Lister(),
 	}
 	return storeWrapped
 }
@@ -33,6 +41,7 @@ type Store struct {
 	users     v3.UserInterface
 	grbLister v3.GlobalRoleBindingLister
 	grLister  v3.GlobalRoleLister
+	rbLister  rbacv1.RoleBindingLister
 }
 
 func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
@@ -44,6 +53,10 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	}
 
 	if strings.EqualFold(apiContext.Type, managementv3.ClusterTemplateRevisionType) {
+		err := p.checkPermissionToCreateRevision(apiContext, data)
+		if err != nil {
+			return nil, err
+		}
 		if err := setLabelsAndOwnerRef(apiContext, data); err != nil {
 			return nil, err
 		}
@@ -209,6 +222,53 @@ func (p *Store) canSetEnforce(apiContext *types.APIContext, data map[string]inte
 			return httperror.NewAPIError(httperror.PermissionDenied, fmt.Sprintf("ClusterTemplate's %v field cannot be changed", managementv3.ClusterTemplateFieldEnforced))
 		}
 	}
+	return nil
+}
 
+func (p *Store) checkPermissionToCreateRevision(apiContext *types.APIContext, data map[string]interface{}) error {
+	userID := apiContext.Request.Header.Get("Impersonate-User")
+	if userID == "" {
+		return httperror.NewAPIError(httperror.NotFound, "invalid request: userID not found")
+	}
+
+	value, found := values.GetValue(data, managementv3.ClusterTemplateRevisionFieldClusterTemplateID)
+	if !found {
+		return httperror.NewAPIError(httperror.NotFound, "invalid request: clusterTemplateID not found")
+	}
+
+	clusterTemplateID := convert.ToString(value)
+	_, clusterTemplateName := ref.Parse(clusterTemplateID)
+
+	// check if rolebindings of type owner or member exist for this user for this clustertemplate
+	// if yes, then user is allowed to create revision for this template
+	// else not allowed since, either user has no access or only read-only access by either:
+	// 1. being added explicitly as read-only member OR
+	// 2. template is public, which gives everyone read-only access
+	canUpdate := false
+	for _, accessType := range []string{rrbac.OwnerAccess, rrbac.MemberAccess} {
+		rbName, _ := rrbac.GetRoleNameAndVerbs(accessType, clusterTemplateName, rrbac.ClusterTemplateResource)
+		// check if rolebinding with this name exists and has the user (caller of this request) as a subject
+		rb, err := p.rbLister.Get(namespace.GlobalNamespace, rbName)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+		if rb == nil {
+			continue
+		}
+		for _, sub := range rb.Subjects {
+			if sub.Name == userID {
+				// user is either owner or member
+				canUpdate = true
+				break
+			}
+		}
+		if canUpdate {
+			break
+		}
+	}
+
+	if !canUpdate {
+		return httperror.NewAPIError(httperror.PermissionDenied, "read-only member of clustertemplate cannot create revisions for it")
+	}
 	return nil
 }

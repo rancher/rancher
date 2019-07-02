@@ -11,6 +11,12 @@ rb_resource = 'rolebinding'
 def test_create_cluster_template_with_revision(admin_mc, remove_resource):
     cluster_template = create_cluster_template(admin_mc.client,
                                                remove_resource, [])
+    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
+    rb_name = cluster_template.id.split(":")[1] + "-ct-a"
+    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
+                                         admin_mc.user.id, rb_name),
+             timeout=60,
+             fail_handler=fail_handler(rb_resource))
     templateId = cluster_template.id
     _ = \
         create_cluster_template_revision(admin_mc.client, templateId)
@@ -24,6 +30,12 @@ def test_create_cluster_template_with_revision(admin_mc, remove_resource):
 def test_check_default_revision(admin_mc, remove_resource):
     cluster_template = create_cluster_template(admin_mc.client,
                                                remove_resource, [])
+    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
+    rb_name = cluster_template.id.split(":")[1] + "-ct-a"
+    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
+                                         admin_mc.user.id, rb_name),
+             timeout=60,
+             fail_handler=fail_handler(rb_resource))
     templateId = cluster_template.id
     first_revision = \
         create_cluster_template_revision(admin_mc.client, templateId)
@@ -38,6 +50,12 @@ def test_check_default_revision(admin_mc, remove_resource):
 def test_create_cluster_with_template(admin_mc, remove_resource):
     cluster_template = create_cluster_template(admin_mc.client,
                                                remove_resource, [])
+    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
+    rb_name = cluster_template.id.split(":")[1] + "-ct-a"
+    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
+                                         admin_mc.user.id, rb_name),
+             timeout=60,
+             fail_handler=fail_handler(rb_resource))
     templateId = cluster_template.id
 
     template_revision = \
@@ -77,6 +95,12 @@ def test_create_cluster_with_template(admin_mc, remove_resource):
 def test_create_cluster_validations(admin_mc, remove_resource):
     cluster_template = create_cluster_template(admin_mc.client,
                                                remove_resource, [])
+    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
+    rb_name = cluster_template.id.split(":")[1] + "-ct-a"
+    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
+                                         admin_mc.user.id, rb_name),
+             timeout=60,
+             fail_handler=fail_handler(rb_resource))
     templateId = cluster_template.id
     template_revision = \
         create_cluster_template_revision(admin_mc.client, templateId)
@@ -155,9 +179,7 @@ def test_creation_standard_user(admin_mc, remove_resource, user_factory):
                                                [])
     id = cluster_template.id
     rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
-    split = cluster_template.id.split(":")
-    name = split[1]
-    rb_name = name + "-ct-a"
+    rb_name = cluster_template.id.split(":")[1] + "-ct-a"
     wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
                                          user_member.user.id, rb_name),
              timeout=60,
@@ -168,9 +190,7 @@ def test_creation_standard_user(admin_mc, remove_resource, user_factory):
     templateId = cluster_template.id
     template_revision = \
         create_cluster_template_revision(um_client, templateId)
-    split = template_revision.id.split(":")
-    name = split[1]
-    rb_name = name + "-ctr-a"
+    rb_name = template_revision.id.split(":")[1] + "-ctr-a"
     wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
                                          user_member.user.id, rb_name),
              timeout=60,
@@ -182,6 +202,12 @@ def test_creation_standard_user(admin_mc, remove_resource, user_factory):
 def test_check_enforcement(admin_mc, remove_resource, user_factory):
     cluster_template = create_cluster_template(admin_mc.client,
                                                remove_resource, [])
+    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
+    rb_name = cluster_template.id.split(":")[1] + "-ct-a"
+    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
+                                         admin_mc.user.id, rb_name),
+             timeout=60,
+             fail_handler=fail_handler(rb_resource))
     templateId = cluster_template.id
     rev = \
         create_cluster_template_revision(admin_mc.client, templateId)
@@ -250,6 +276,42 @@ def test_check_enforcement(admin_mc, remove_resource, user_factory):
     with pytest.raises(ApiError) as e:
         user_client.update(user_template, enforced="true")
         assert e.value.error.status == 403
+
+
+def test_revision_creation_permission(admin_mc, remove_resource,
+                                      user_factory):
+    user_readonly = user_factory()
+    user_member = user_factory()
+    members = [{"userPrincipalId": "local://" + user_readonly.user.id,
+                "accessType": "read-only"},
+               {"userPrincipalId": "local://" + user_member.user.id,
+                "accessType": "member"}]
+    cluster_template = create_cluster_template(admin_mc.client,
+                                               remove_resource, members)
+    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
+    split = cluster_template.id.split(":")
+    name = split[1]
+    rb_name = name + "-ct-r"
+    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
+                                         user_readonly.user.id, rb_name),
+             timeout=60,
+             fail_handler=fail_handler(rb_resource))
+    rb_name = name + "-ct-u"
+    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
+                                         user_member.user.id, rb_name),
+             timeout=60,
+             fail_handler=fail_handler(rb_resource))
+    templateId = cluster_template.id
+    # user with accessType=member should be able to create revision
+    rev = create_cluster_template_revision(user_member.client, templateId)
+    assert rev is not None
+    # user with read-only accessType should get Forbidden error
+    try:
+        create_cluster_template_revision(user_readonly.client, templateId)
+    except ApiError as e:
+        assert e.error.status == 403
+        assert "read-only member of clustertemplate cannot " \
+               "create revisions for it" in e.error.message
 
 
 def rtb_cb(client, rtb):
