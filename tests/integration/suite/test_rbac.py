@@ -4,6 +4,7 @@ from rancher import ApiError
 import time
 
 from .common import random_str
+from .test_catalog import wait_for_template_to_be_created
 from .conftest import wait_until_available, \
     cluster_and_client, user_project_client, \
     kubernetes_api_client, wait_for, ClusterContext
@@ -396,18 +397,23 @@ def test_appropriate_users_can_see_kontainer_drivers(user_factory):
     assert len(kds) == 0
 
 
-def test_readonly_cannot_perform_app_action(admin_mc, admin_pc, user_factory,
+def test_readonly_cannot_perform_app_action(admin_mc, admin_pc, user_mc,
                                             remove_resource):
+    """Tests that a user with readonly access is not able to upgrade an app
+    """
     client = admin_pc.client
     project = admin_pc.project
 
-    user = user_factory()
+    user = user_mc
     remove_resource(user)
     ns = admin_pc.cluster.client.create_namespace(name=random_str(),
                                                   projectId=project.id)
+    remove_resource(ns)
+
+    wait_for_template_to_be_created(admin_mc.client, "library")
 
     prtb = admin_mc.client.create_project_role_template_binding(
-        name="prtb",
+        name="prtb-" + random_str(),
         userId=user.user.id,
         projectId=project.id,
         roleTemplateId="read-only")
@@ -416,14 +422,12 @@ def test_readonly_cannot_perform_app_action(admin_mc, admin_pc, user_factory,
     wait_until_available(user.client, project)
 
     app = client.create_app(
-        name="testapp",
+        name="app-" + random_str(),
         externalId="catalog://?catalog=library&template=mysql&version=0.3.7&"
                    "namespace=cattle-global-data",
         targetNamespace=ns.name,
         projectId=project.id
     )
-
-    wait_for_workload(client, ns.name, count=1)
 
     with pytest.raises(ApiError) as e:
         user.client.action(obj=app, action_name="upgrade",
@@ -437,18 +441,23 @@ def test_readonly_cannot_perform_app_action(admin_mc, admin_pc, user_factory,
 
 
 def test_member_can_perform_app_action(admin_mc, admin_pc, remove_resource,
-                                       user_factory):
+                                       user_mc):
+    """Tests that a user with member access is able to upgrade an app
+    """
     client = admin_pc.client
     project = admin_pc.project
 
-    user = user_factory()
+    user = user_mc
     remove_resource(user)
 
     ns = admin_pc.cluster.client.create_namespace(name=random_str(),
                                                   projectId=project.id)
+    remove_resource(ns)
+
+    wait_for_template_to_be_created(admin_mc.client, "library")
 
     prtb = admin_mc.client.create_project_role_template_binding(
-        name="test-prtb",
+        name="test-" + random_str(),
         userId=user.user.id,
         projectId=project.id,
         roleTemplateId="project-owner")
@@ -457,19 +466,35 @@ def test_member_can_perform_app_action(admin_mc, admin_pc, remove_resource,
     wait_until_available(user.client, project)
 
     app = client.create_app(
-        name="testapp1",
-        externalId="catalog://?catalog=library&template=mysql&version=0.3.7&"
+        name="test-" + random_str(),
+        externalId="catalog://?catalog=library&template"
+                   "=mysql&version=0.3.7&"
                    "namespace=cattle-global-data",
         targetNamespace=ns.name,
         projectId=project.id
     )
 
-    wait_for_workload(client, ns.name, count=1)
+    # if upgrade is performed prior to installing state,
+    # it may return a modified error
+    def is_installing():
+        current_state = client.reload(app)
+        if current_state.state == "installing":
+            return True
+        return False
+
+    try:
+        wait_for(is_installing)
+    except Exception as e:
+        # a timeout here is okay, the intention of the wait_for is to reach a
+        # steady state, this test is not concerned with whether an app reaches
+        # installing state or not
+        assert "Timeout waiting for condition" in str(e)
 
     user.client.action(
         obj=app,
         action_name="upgrade",
         answers={"asdf": "asdf"})
+
     '''
         TODO: write rollback test, currently blocked by issue #20204
     '''
