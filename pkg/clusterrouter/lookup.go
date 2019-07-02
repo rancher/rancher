@@ -12,11 +12,6 @@ type ClusterLookup interface {
 }
 
 func GetClusterID(req *http.Request) string {
-	clusterID := req.Header.Get("X-API-Cluster-Id")
-	if clusterID != "" {
-		return clusterID
-	}
-
 	parts := strings.Split(req.URL.Path, "/")
 	if len(parts) > 3 && strings.HasPrefix(parts[2], "cluster") {
 		return parts[3]
