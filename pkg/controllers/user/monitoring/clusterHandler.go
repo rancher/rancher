@@ -157,7 +157,7 @@ func (ch *clusterHandler) doSync(cluster *mgmtv3.Cluster) error {
 }
 
 func (ch *clusterHandler) ensureAppProjectName(clusterID, appTargetNamespace string) (string, error) {
-	appDeployProjectID, err := utils.GetSystemProjectID(ch.app.projectLister)
+	appDeployProjectID, err := utils.GetSystemProjectID(clusterID, ch.app.projectLister)
 	if err != nil {
 		return "", err
 	}

@@ -65,9 +65,9 @@ func EnsureAppProjectName(userNSClient v1.NamespaceInterface, ownedProjectID, cl
 	return appProjectName, nil
 }
 
-func GetSystemProjectID(cattleProjectsLister v3.ProjectLister) (string, error) {
+func GetSystemProjectID(clusterName string, cattleProjectsLister v3.ProjectLister) (string, error) {
 	// fetch all system Projects
-	cattleSystemProjects, _ := cattleProjectsLister.List(metav1.NamespaceAll, labels.Set(project.SystemProjectLabel).AsSelector())
+	cattleSystemProjects, _ := cattleProjectsLister.List(clusterName, labels.Set(project.SystemProjectLabel).AsSelector())
 
 	var systemProject *v3.Project
 	for _, p := range cattleSystemProjects {
@@ -145,7 +145,8 @@ func DeleteApp(mgmtAppClient projv3.AppInterface, projectID, appName string) err
 	}
 
 	if app.DeletionTimestamp == nil {
-		if err := mgmtAppClient.DeleteNamespaced(projectID, appName, &metav1.DeleteOptions{}); err != nil {
+		err := mgmtAppClient.DeleteNamespaced(projectID, appName, &metav1.DeleteOptions{})
+		if err != nil && !kerrors.IsNotFound(err) {
 			return errors.Wrapf(err, "failed to delete app %v", appName)
 		}
 	}
