@@ -69,8 +69,10 @@ func (csh *cisScanHandler) Remove(cs *v3.ClusterScan) (runtime.Object, error) {
 		}
 	}
 
-	if err := csh.deleteApp(cs.Name); err != nil {
-		return nil, fmt.Errorf("cisScanHandler: Remove: error deleting app: %v", err)
+	if err := csh.deleteApp(cs.ClusterName, cs.Name); err != nil {
+		if !kerrors.IsNotFound(err) {
+			return nil, fmt.Errorf("cisScanHandler: Remove: error deleting app: %v", err)
+		}
 	}
 
 	cluster, err := csh.clusterLister.Get("", csh.clusterNamespace)
@@ -93,7 +95,7 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 	if !v3.ClusterScanConditionCompleted.IsUnknown(cs) &&
 		v3.ClusterScanConditionCompleted.IsFalse(cs) {
 		// Delete the system helm chart
-		if err := csh.deleteApp(cs.Name); err != nil {
+		if err := csh.deleteApp(cs.ClusterName, cs.Name); err != nil {
 			return nil, fmt.Errorf("cisScanHandler: Updated: error deleting app: %v", err)
 		}
 
@@ -123,7 +125,7 @@ func (csh *cisScanHandler) deployApp(clusterName, appName string) error {
 	if err != nil {
 		return errors.Wrapf(err, "cisScanHandler: deployApp: failed to find cis system catalog %q", appCatalogID)
 	}
-	appDeployProjectID, err := utils.GetSystemProjectID(csh.projectLister)
+	appDeployProjectID, err := utils.GetSystemProjectID(clusterName, csh.projectLister)
 	if err != nil {
 		return err
 	}
@@ -165,8 +167,8 @@ func (csh *cisScanHandler) deployApp(clusterName, appName string) error {
 	return nil
 }
 
-func (csh *cisScanHandler) deleteApp(appName string) error {
-	appDeployProjectID, err := utils.GetSystemProjectID(csh.projectLister)
+func (csh *cisScanHandler) deleteApp(clusterName, appName string) error {
+	appDeployProjectID, err := utils.GetSystemProjectID(clusterName, csh.projectLister)
 	if err != nil {
 		if !kerrors.IsNotFound(err) {
 			return err
