@@ -120,7 +120,10 @@ func syncCatalogs(management *config.ManagementContext) error {
 				return err
 			}
 			desiredDefaultURL := systemLibraryURL
-			desiredDefaultBranch := systemLibraryBranch
+			desiredDefaultBranch := ""
+			if devMode := os.Getenv("CATTLE_DEV_MODE"); devMode != "" {
+				desiredDefaultBranch = "dev"
+			}
 
 			if fromEnvURL := os.Getenv("CATTLE_SYSTEM_CHART_DEFAULT_URL"); fromEnvURL != "" {
 				desiredDefaultURL = fromEnvURL
@@ -128,6 +131,11 @@ func syncCatalogs(management *config.ManagementContext) error {
 
 			if fromEnvBranch := os.Getenv("CATTLE_SYSTEM_CHART_DEFAULT_BRANCH"); fromEnvBranch != "" {
 				desiredDefaultBranch = fromEnvBranch
+			}
+
+			if desiredDefaultBranch == "" {
+				panic(fmt.Errorf("If you are developing, set CATTLE_DEV_MODE environment variable to \"true\"." +
+					"Otherwise, set CATTLE_SYSTEM_CHART_DEFAULT_to desired default branch."))
 			}
 
 			return updateCatalogURL(management.Management.Catalogs(""), desiredDefaultURL, desiredDefaultBranch)
