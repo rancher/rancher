@@ -21,7 +21,7 @@ const (
 	libraryName   = "library"
 
 	systemLibraryURL    = "https://git.rancher.io/system-charts"
-	systemLibraryBranch = "master"
+	systemLibraryBranch = "dev"
 	systemLibraryName   = "system-library"
 	defSystemChartVer   = "management.cattle.io/default-system-chart-version"
 )
