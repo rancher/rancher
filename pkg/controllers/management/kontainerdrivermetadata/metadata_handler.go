@@ -82,6 +82,7 @@ func (m *MetadataController) sync(key string, test *v3.Setting) (runtime.Object,
 		return nil, fmt.Errorf("driverMetadata error getting interval in int %s %v", settings.RkeMetadataRefreshIntervalMins.Get(), err)
 	}
 	if tickerData != nil {
+		m.refresh(url, false)
 		if tickerData.url != url || tickerData.interval != interval {
 			tickerData.cancelFunc()
 
@@ -111,10 +112,6 @@ func (m *MetadataController) initTicker(ctx context.Context) {
 
 func (m *MetadataController) startTicker(ctx context.Context, tickerData *TickerData, init bool) {
 	checkInterval, url := tickerData.interval, tickerData.url
-	// run once, then start ticker if setting values change if not init
-	if !init {
-		m.refresh(url, false)
-	}
 	for range ticker.Context(ctx, checkInterval) {
 		logrus.Infof("driverMetadata: checking rke-metadata-url every %v", checkInterval)
 		m.refresh(url, false)
