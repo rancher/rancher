@@ -80,7 +80,7 @@ func (ct *clusterTemplateController) sync(key string, clusterTemplate *v3.Cluste
 		return clusterTemplate, err
 	}
 	for _, rev := range revisions {
-		ct.managementContext.Management.ClusterTemplateRevisions(namespace.GlobalNamespace).Controller().Enqueue(namespace.GlobalNamespace, rev.Name)
+		ct.managementContext.Management.ClusterTemplateRevisions("").Controller().Enqueue(namespace.GlobalNamespace, rev.Name)
 	}
 	return clusterTemplate, nil
 }

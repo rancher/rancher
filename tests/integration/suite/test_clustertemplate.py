@@ -9,14 +9,8 @@ rb_resource = 'rolebinding'
 
 
 def test_create_cluster_template_with_revision(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc.client,
-                                               remove_resource, [])
-    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
-    rb_name = cluster_template.id.split(":")[1] + "-ct-a"
-    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
-                                         admin_mc.user.id, rb_name),
-             timeout=60,
-             fail_handler=fail_handler(rb_resource))
+    cluster_template = create_cluster_template(admin_mc,
+                                               remove_resource, [], admin_mc)
     templateId = cluster_template.id
     _ = \
         create_cluster_template_revision(admin_mc.client, templateId)
@@ -28,14 +22,8 @@ def test_create_cluster_template_with_revision(admin_mc, remove_resource):
 
 
 def test_check_default_revision(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc.client,
-                                               remove_resource, [])
-    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
-    rb_name = cluster_template.id.split(":")[1] + "-ct-a"
-    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
-                                         admin_mc.user.id, rb_name),
-             timeout=60,
-             fail_handler=fail_handler(rb_resource))
+    cluster_template = create_cluster_template(admin_mc, remove_resource,
+                                               [], admin_mc)
     templateId = cluster_template.id
     first_revision = \
         create_cluster_template_revision(admin_mc.client, templateId)
@@ -48,14 +36,8 @@ def test_check_default_revision(admin_mc, remove_resource):
 
 
 def test_create_cluster_with_template(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc.client,
-                                               remove_resource, [])
-    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
-    rb_name = cluster_template.id.split(":")[1] + "-ct-a"
-    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
-                                         admin_mc.user.id, rb_name),
-             timeout=60,
-             fail_handler=fail_handler(rb_resource))
+    cluster_template = create_cluster_template(admin_mc, remove_resource,
+                                               [], admin_mc)
     templateId = cluster_template.id
 
     template_revision = \
@@ -99,14 +81,8 @@ def test_create_cluster_with_template(admin_mc, remove_resource):
 
 
 def test_create_cluster_validations(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc.client,
-                                               remove_resource, [])
-    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
-    rb_name = cluster_template.id.split(":")[1] + "-ct-a"
-    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
-                                         admin_mc.user.id, rb_name),
-             timeout=60,
-             fail_handler=fail_handler(rb_resource))
+    cluster_template = create_cluster_template(admin_mc, remove_resource,
+                                               [], admin_mc)
     templateId = cluster_template.id
     template_revision = \
         create_cluster_template_revision(admin_mc.client, templateId)
@@ -133,8 +109,8 @@ def test_create_cluster_template_with_members(admin_mc, remove_resource,
     remove_resource(user_not_member)
     members = [{"userPrincipalId": "local://" + user_member.user.id,
                 "accessType": "read-only"}]
-    cluster_template = create_cluster_template(admin_mc.client,
-                                               remove_resource, members)
+    cluster_template = create_cluster_template(admin_mc, remove_resource,
+                                               members, admin_mc)
     time.sleep(30)
     # check who has access to the cluster template
     # admin and user_member should be able to list it
@@ -181,15 +157,10 @@ def test_creation_standard_user(admin_mc, remove_resource, user_factory):
     user_member = user_factory()
     remove_resource(user_member)
     um_client = user_member.client
-    cluster_template = create_cluster_template(um_client, remove_resource,
-                                               [])
+    cluster_template = create_cluster_template(user_member, remove_resource,
+                                               [], admin_mc)
     id = cluster_template.id
     rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
-    rb_name = cluster_template.id.split(":")[1] + "-ct-a"
-    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
-                                         user_member.user.id, rb_name),
-             timeout=60,
-             fail_handler=fail_handler(rb_resource))
     ct = um_client.by_id_cluster_template(id)
     assert ct is not None
 
@@ -206,14 +177,8 @@ def test_creation_standard_user(admin_mc, remove_resource, user_factory):
 
 
 def test_check_enforcement(admin_mc, remove_resource, user_factory):
-    cluster_template = create_cluster_template(admin_mc.client,
-                                               remove_resource, [])
-    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
-    rb_name = cluster_template.id.split(":")[1] + "-ct-a"
-    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
-                                         admin_mc.user.id, rb_name),
-             timeout=60,
-             fail_handler=fail_handler(rb_resource))
+    cluster_template = create_cluster_template(admin_mc, remove_resource,
+                                               [], admin_mc)
     templateId = cluster_template.id
     rev = \
         create_cluster_template_revision(admin_mc.client, templateId)
@@ -277,8 +242,8 @@ def test_check_enforcement(admin_mc, remove_resource, user_factory):
                                 value="false")
 
     # check that user cannot update the enforced flag
-    user_template = create_cluster_template(user_client, remove_resource,
-                                            [])
+    user_template = create_cluster_template(user, remove_resource,
+                                            [], admin_mc)
     with pytest.raises(ApiError) as e:
         user_client.update(user_template, enforced="true")
         assert e.value.error.status == 403
@@ -292,8 +257,8 @@ def test_revision_creation_permission(admin_mc, remove_resource,
                 "accessType": "read-only"},
                {"userPrincipalId": "local://" + user_member.user.id,
                 "accessType": "member"}]
-    cluster_template = create_cluster_template(admin_mc.client,
-                                               remove_resource, members)
+    cluster_template = create_cluster_template(admin_mc, remove_resource,
+                                               members, admin_mc)
     rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
     split = cluster_template.id.split(":")
     name = split[1]
@@ -320,6 +285,43 @@ def test_revision_creation_permission(admin_mc, remove_resource,
                "create revisions for it" in e.error.message
 
 
+def test_updated_members_revision_access(admin_mc, remove_resource,
+                                         user_factory):
+    # create cluster template without members and a revision
+    cluster_template = create_cluster_template(admin_mc, remove_resource,
+                                               [], admin_mc)
+    templateId = cluster_template.id
+    rev = \
+        create_cluster_template_revision(admin_mc.client, templateId)
+
+    # update template to add a user as member
+    user_member = user_factory()
+    members = [{"userPrincipalId": "local://" + user_member.user.id,
+                "accessType": "member"}]
+    admin_mc.client.update(cluster_template, members=members)
+
+    # this member should get access to existing revision "rev"
+    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
+    split = rev.id.split(":")
+    name = split[1]
+    rb_name = name + "-ctr-u"
+    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
+                                         user_member.user.id, rb_name),
+             timeout=60,
+             fail_handler=fail_handler(rb_resource))
+    revision = user_member.client.by_id_cluster_template_revision(rev.id)
+    assert revision is not None
+
+    # remove this user from cluster_template members list
+    admin_mc.client.update(cluster_template, members=[])
+
+    # now this user should not be able to see that revision
+    try:
+        user_member.client.by_id_cluster_template_revision(rev.id)
+    except ApiError as e:
+        assert e.error.status == 403
+
+
 def rtb_cb(client, rtb):
     """Wait for the prtb to have the userId populated"""
     def cb():
@@ -328,15 +330,22 @@ def rtb_cb(client, rtb):
     return cb
 
 
-def create_cluster_template(client, remove_resource, members):
+def create_cluster_template(creator, remove_resource, members, admin_mc):
     template_name = random_str()
 
     cluster_template = \
-        client.create_cluster_template(
+        creator.client.create_cluster_template(
                                          name=template_name,
                                          description="demo template",
                                          members=members)
     remove_resource(cluster_template)
+    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
+    rb_name = cluster_template.id.split(":")[1] + "-ct-a"
+    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
+                                         creator.user.id, rb_name),
+             timeout=60,
+             fail_handler=fail_handler(rb_resource))
+
     return cluster_template
 
 
