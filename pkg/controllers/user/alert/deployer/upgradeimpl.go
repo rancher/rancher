@@ -35,6 +35,7 @@ const (
 
 type alertService struct {
 	clusterName        string
+	clusterLister      v3.ClusterLister
 	apps               projectv3.AppInterface
 	oldClusterAlerts   v3.ClusterAlertInterface
 	oldProjectAlerts   v3.ProjectAlertInterface
@@ -60,6 +61,7 @@ func (l *alertService) Init(ctx context.Context, cluster *config.UserContext) {
 	}
 
 	l.clusterName = cluster.ClusterName
+	l.clusterLister = cluster.Management.Management.Clusters("").Controller().Lister()
 	l.oldClusterAlerts = cluster.Management.Management.ClusterAlerts(cluster.ClusterName)
 	l.oldProjectAlerts = cluster.Management.Management.ProjectAlerts(metav1.NamespaceAll)
 	l.clusterAlertGroups = cluster.Management.Management.ClusterAlertGroups(cluster.ClusterName)
@@ -132,6 +134,15 @@ func (l *alertService) Upgrade(currentVersion string) (string, error) {
 	newApp.Spec.Answers["operator.enabled"] = "false"
 
 	if !reflect.DeepEqual(newApp, app) {
+		// check cluster ready before upgrade, because helm will not retry if got cluster not ready error
+		cluster, err := l.clusterLister.Get(metav1.NamespaceAll, l.clusterName)
+		if err != nil {
+			return "", fmt.Errorf("get cluster %s failed, %v", l.clusterName, err)
+		}
+		if !v3.ClusterConditionReady.IsTrue(cluster) {
+			return "", fmt.Errorf("upgrade system service %s failed, cluster %v not ready", serviceName, l.clusterName)
+		}
+
 		if _, err = l.apps.Update(newApp); err != nil {
 			return "", fmt.Errorf("update app %s:%s failed, %v", app.Namespace, app.Name, err)
 		}
