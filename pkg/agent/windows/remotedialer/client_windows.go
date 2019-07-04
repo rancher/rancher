@@ -45,7 +45,7 @@ func ClientConnectWhileWindows(ctx context.Context, wsURL string, headers http.H
 
 func connectToProxyWhileWindows(rootContext context.Context, proxyURL string, headers http.Header, auth remotedialer.ConnectAuthorizer, dialer *websocket.Dialer, blockingOnConnect func(context.Context) error) error {
 	if dialer == nil {
-		dialer = &websocket.Dialer{}
+		dialer = &websocket.Dialer{HandshakeTimeout: 10 * time.Second}
 	}
 
 	eg, ctx := errgroup.WithContext(rootContext)
