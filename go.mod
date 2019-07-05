@@ -20,8 +20,8 @@ require (
 	github.com/coreos/prometheus-operator v0.25.0
 	github.com/crewjam/saml v0.0.0-20190521120225-344d075952c9
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
-	github.com/docker/distribution v0.0.0-20171023080744-3800056b8832
-	github.com/docker/docker v0.7.3-0.20190327010347-be7ac8be2ae0
+	github.com/docker/distribution v2.7.1-0.20190205005809-0d3efadf0154+incompatible
+	github.com/docker/docker v0.7.3-0.20190808172531-150530564a14
 	github.com/docker/go-connections v0.3.0
 	github.com/docker/machine v0.0.0-20160115011140-7246b2c9650c
 	github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c // indirect
@@ -43,7 +43,6 @@ require (
 	github.com/minio/minio-go v0.0.0-20180613230128-10531abd0af1
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.1.2
-	github.com/morikuni/aec v0.0.0-20170113033406-39771216ff4c // indirect
 	github.com/mrjones/oauth v0.0.0-20180629183705-f4e24b6d100c
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/pborman/uuid v1.2.0
@@ -51,12 +50,12 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.1.0
 	github.com/prometheus/common v0.6.0
-	github.com/rancher/kontainer-driver-metadata v0.0.0-20190821203021-0e9a037895cc
+	github.com/rancher/kontainer-driver-metadata v0.0.0-20190822033834-53da6c8441ed
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20190819182532-d4cdf8e56671
 	github.com/rancher/norman v0.0.0-20190821234528-20a936b685b0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
-	github.com/rancher/rke v0.3.0-rc7.0.20190820205903-6f7f25cbcb67
-	github.com/rancher/types v0.0.0-20190822004959-d8f2cacb8d50
+	github.com/rancher/rke v0.3.0-rc7.0.20190822034040-65df510251ec
+	github.com/rancher/types v0.0.0-20190822030441-376c6f64c718
 	github.com/rancher/wrangler v0.1.5
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect
@@ -77,7 +76,6 @@ require (
 	golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58
-	golang.org/x/sys v0.0.0-20190801041406-cbf593c0f2f3
 	google.golang.org/api v0.2.1-0.20190315042342-d827405e6070
 	google.golang.org/grpc v1.23.0
 	gopkg.in/asn1-ber.v1 v1.0.0-20150924051756-4e86f4367175 // indirect

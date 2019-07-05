@@ -95,11 +95,9 @@ func driverMetadataTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v3.RKEK8sSystemImage{}, m.Drop{Field: "namespaceId"}).
 		AddMapperForType(&Version, v3.RKEK8sServiceOption{}, m.Drop{Field: "namespaceId"}).
 		AddMapperForType(&Version, v3.RKEAddon{}, m.Drop{Field: "namespaceId"}).
-		AddMapperForType(&Version, v3.RKEK8sWindowsSystemImage{}, m.Drop{Field: "namespaceId"}).
 		MustImport(&Version, v3.RKEK8sSystemImage{}).
 		MustImport(&Version, v3.RKEK8sServiceOption{}).
-		MustImport(&Version, v3.RKEAddon{}).
-		MustImport(&Version, v3.RKEK8sWindowsSystemImage{})
+		MustImport(&Version, v3.RKEAddon{})
 }
 
 func catalogTypes(schemas *types.Schemas) *types.Schemas {

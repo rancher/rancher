@@ -108,7 +108,7 @@ func SnapshotSaveEtcdHosts(
 		return err
 	}
 
-	log.Infof(ctx, "Finished saving snapshot [%s] on all etcd hosts", snapshotName)
+	log.Infof(ctx, "Finished saving/uploading snapshot [%s] on all etcd hosts", snapshotName)
 	return nil
 }
 

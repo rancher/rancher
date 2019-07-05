@@ -80,7 +80,7 @@ func initK8sRKESystemImages() {
 				continue
 			}
 		}
-		if curr, ok := maxVersionForMajorK8sVersion[majorVersion]; !ok || k8sVersion > curr {
+		if curr, ok := maxVersionForMajorK8sVersion[majorVersion]; !ok || mVersion.Compare(k8sVersion, curr, ">") {
 			maxVersionForMajorK8sVersion[majorVersion] = k8sVersion
 		}
 	}

@@ -31,6 +31,7 @@ const (
 	RKESystemImagesFieldPodInfraContainer         = "podInfraContainer"
 	RKESystemImagesFieldWeaveCNI                  = "weaveCni"
 	RKESystemImagesFieldWeaveNode                 = "weaveNode"
+	RKESystemImagesFieldWindowsPodInfraContainer  = "podInfraWindowsContainer"
 )
 
 type RKESystemImages struct {
@@ -63,4 +64,5 @@ type RKESystemImages struct {
 	PodInfraContainer         string `json:"podInfraContainer,omitempty" yaml:"podInfraContainer,omitempty"`
 	WeaveCNI                  string `json:"weaveCni,omitempty" yaml:"weaveCni,omitempty"`
 	WeaveNode                 string `json:"weaveNode,omitempty" yaml:"weaveNode,omitempty"`
+	WindowsPodInfraContainer  string `json:"podInfraWindowsContainer,omitempty" yaml:"podInfraWindowsContainer,omitempty"`
 }

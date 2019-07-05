@@ -375,9 +375,9 @@ spec:
         args:
         - --ip-masq
         - --kube-subnet-mgr
-	{{- if .FlannelInterface}}
-	- --iface={{.FlannelInterface}}
-	{{end}}
+        {{- if .FlannelInterface}}
+        - --iface={{.FlannelInterface}}
+        {{end}}
         resources:
           requests:
             cpu: "100m"

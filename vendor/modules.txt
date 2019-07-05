@@ -71,6 +71,8 @@ github.com/beorn7/perks/quantile
 github.com/bep/debounce
 # github.com/blang/semver v0.0.0-20190414102917-ba2c2ddd8906
 github.com/blang/semver
+# github.com/containerd/containerd v1.3.0-beta.0.0.20190808172034-23faecfb66ab
+github.com/containerd/containerd/errdefs
 # github.com/coreos/etcd v3.3.13+incompatible
 github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes
 github.com/coreos/etcd/client
@@ -91,11 +93,11 @@ github.com/crewjam/saml/xmlenc
 github.com/davecgh/go-spew/spew
 # github.com/dgrijalva/jwt-go v3.2.0+incompatible
 github.com/dgrijalva/jwt-go
-# github.com/docker/distribution v0.0.0-20171023080744-3800056b8832
+# github.com/docker/distribution v2.7.1-0.20190205005809-0d3efadf0154+incompatible
 github.com/docker/distribution/reference
 github.com/docker/distribution/digestset
 github.com/docker/distribution/registry/api/errcode
-# github.com/docker/docker v0.7.3-0.20190327010347-be7ac8be2ae0
+# github.com/docker/docker v0.7.3-0.20190808172531-150530564a14
 github.com/docker/docker/pkg/reexec
 github.com/docker/docker/api/types
 github.com/docker/docker/api/types/filters
@@ -113,10 +115,10 @@ github.com/docker/docker/api/types/image
 github.com/docker/docker/api/types/time
 github.com/docker/docker/api/types/volume
 github.com/docker/docker/errdefs
-github.com/docker/docker/pkg/stdcopy
 github.com/docker/docker/api/types/blkiodev
 github.com/docker/docker/api/types/strslice
 github.com/docker/docker/api/types/swarm/runtime
+github.com/docker/docker/pkg/stdcopy
 github.com/docker/docker/pkg/term
 github.com/docker/docker/pkg/term/windows
 # github.com/docker/go-connections v0.3.0
@@ -267,7 +269,7 @@ github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 # github.com/prometheus/procfs v0.0.3
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
-# github.com/rancher/kontainer-driver-metadata v0.0.0-20190821203021-0e9a037895cc
+# github.com/rancher/kontainer-driver-metadata v0.0.0-20190822033834-53da6c8441ed
 github.com/rancher/kontainer-driver-metadata/rke
 github.com/rancher/kontainer-driver-metadata/rke/templates
 # github.com/rancher/kontainer-engine v0.0.4-dev.0.20190819182532-d4cdf8e56671
@@ -331,7 +333,7 @@ github.com/rancher/norman/types/convert/merge
 github.com/rancher/norman/types/factory
 # github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 github.com/rancher/rdns-server/model
-# github.com/rancher/rke v0.3.0-rc7.0.20190820205903-6f7f25cbcb67
+# github.com/rancher/rke v0.3.0-rc7.0.20190822034040-65df510251ec
 github.com/rancher/rke/util
 github.com/rancher/rke/pki/cert
 github.com/rancher/rke/cloudprovider/aws
@@ -341,19 +343,19 @@ github.com/rancher/rke/cluster
 github.com/rancher/rke/pki
 github.com/rancher/rke/k8s
 github.com/rancher/rke/hosts
-github.com/rancher/rke/cloudprovider
-github.com/rancher/rke/docker
 github.com/rancher/rke/metadata
 github.com/rancher/rke/log
 github.com/rancher/rke/cmd
+github.com/rancher/rke/docker
 github.com/rancher/rke/addons
 github.com/rancher/rke/authz
+github.com/rancher/rke/cloudprovider
 github.com/rancher/rke/templates
+github.com/rancher/rke/dind
 github.com/rancher/rke/cloudprovider/custom
 github.com/rancher/rke/cloudprovider/openstack
 github.com/rancher/rke/cloudprovider/vsphere
-github.com/rancher/rke/dind
-# github.com/rancher/types v0.0.0-20190822004959-d8f2cacb8d50
+# github.com/rancher/types v0.0.0-20190822030441-376c6f64c718
 github.com/rancher/types/apis/management.cattle.io/v3
 github.com/rancher/types/client/management/v3
 github.com/rancher/types/config
@@ -482,13 +484,8 @@ golang.org/x/oauth2/jwt
 # golang.org/x/sync v0.0.0-20190423024810-112230192c58
 golang.org/x/sync/errgroup
 # golang.org/x/sys v0.0.0-20190801041406-cbf593c0f2f3
-golang.org/x/sys/windows/svc
-golang.org/x/sys/windows
-golang.org/x/sys/windows/svc/debug
-golang.org/x/sys/windows/svc/eventlog
-golang.org/x/sys/windows/svc/mgr
 golang.org/x/sys/unix
-golang.org/x/sys/windows/registry
+golang.org/x/sys/windows
 golang.org/x/sys/cpu
 # golang.org/x/text v0.3.2
 golang.org/x/text/secure/bidirule

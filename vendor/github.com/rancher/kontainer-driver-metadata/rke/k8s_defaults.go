@@ -37,7 +37,7 @@ type Data struct {
 
 	K8sVersionDockerInfo map[string][]string
 
-	K8sVersionWindowsSystemImages   map[string]v3.WindowsSystemImages
+	// K8sVersionWindowsServiceOptions - service options per windows k8s version
 	K8sVersionWindowsServiceOptions map[string]v3.KubernetesServicesOptions
 }
 
@@ -72,7 +72,6 @@ func init() {
 	DriverData.K8sVersionInfo = loadK8sVersionInfo()
 
 	// init Windows versions
-	DriverData.K8sVersionWindowsSystemImages = loadK8sVersionWindowsSystemimages()
 	DriverData.K8sVersionWindowsServiceOptions = loadK8sVersionWindowsServiceOptions()
 	DriverData.K8sVersionDockerInfo = loadK8sVersionDockerInfo()
 
