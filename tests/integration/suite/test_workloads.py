@@ -115,6 +115,56 @@ def test_workload_ports_change(admin_pc):
     client.delete(ns)
 
 
+def test_workload_probes(admin_pc):
+    client = admin_pc.client
+    ns = admin_pc.cluster.client.create_namespace(
+        name=random_str(),
+        projectId=admin_pc.project.id)
+    # create workload with probes
+    name = random_str()
+    container = {
+            'name': 'one',
+            'image': 'nginx',
+            'livenessProbe': {
+              'failureThreshold': 3,
+              'initialDelaySeconds': 10,
+              'periodSeconds': 2,
+              'successThreshold': 1,
+              'tcp': False,
+              'timeoutSeconds': 2,
+              'host': 'localhost',
+              'path': '/healthcheck',
+              'port': 80,
+              'scheme': 'HTTP',
+            },
+            'readinessProbe': {
+              'failureThreshold': 3,
+              'initialDelaySeconds': 10,
+              'periodSeconds': 2,
+              'successThreshold': 1,
+              'timeoutSeconds': 2,
+              'tcp': True,
+              'host': 'localhost',
+              'port': 80,
+            },
+        }
+    workload = client.create_workload(name=name,
+                                      namespaceId=ns.id,
+                                      scale=1,
+                                      containers=[container])
+    assert workload.containers[0].livenessProbe.host == 'localhost'
+    assert workload.containers[0].readinessProbe.host == 'localhost'
+    container['livenessProbe']['host'] = 'updatedhost'
+    container['readinessProbe']['host'] = 'updatedhost'
+    workload = client.update(workload,
+                             namespaceId=ns.id,
+                             scale=1,
+                             containers=[container])
+    assert workload.containers[0].livenessProbe.host == 'updatedhost'
+    assert workload.containers[0].readinessProbe.host == 'updatedhost'
+    client.delete(ns)
+
+
 def test_statefulset_workload_volumemount_subpath(admin_pc):
     client = admin_pc.client
     # setup
