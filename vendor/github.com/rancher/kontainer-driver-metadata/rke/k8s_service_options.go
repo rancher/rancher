@@ -107,6 +107,8 @@ func getKubeAPIOptions115() map[string]string {
 	return kubeAPIOptions
 }
 
+// getKubeletOptions provides the root options for windows
+// note: please double-check on windows side if changing the following options
 func getKubeletOptions() map[string]string {
 	return map[string]string{
 		"tls-cipher-suites":                 tlsCipherSuites,
@@ -153,6 +155,8 @@ func getKubeControllerOptions() map[string]string {
 	}
 }
 
+// getKubeProxyOptions provides the root options for windows
+// note: please double-check on windows side if changing the following options
 func getKubeProxyOptions() map[string]string {
 	return map[string]string{
 		"v":                    "2",

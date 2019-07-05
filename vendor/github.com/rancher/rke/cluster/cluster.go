@@ -252,7 +252,7 @@ func rebuildLocalAdminConfig(ctx context.Context, kubeCluster *Cluster) error {
 			newConfig = pki.GetKubeConfigX509WithData(kubeURL, kubeCluster.ClusterName, pki.KubeAdminCertName, caData, crtData, keyData)
 		}
 		if err := pki.DeployAdminConfig(ctx, newConfig, kubeCluster.LocalKubeConfigPath); err != nil {
-			return fmt.Errorf("Failed to redeploy local admin config with new host")
+			return fmt.Errorf("Failed to redeploy local admin config with new host: %v", err)
 		}
 		workingConfig = newConfig
 		if _, err := GetK8sVersion(kubeCluster.LocalKubeConfigPath, kubeCluster.K8sWrapTransport); err == nil {
@@ -267,7 +267,7 @@ func rebuildLocalAdminConfig(ctx context.Context, kubeCluster *Cluster) error {
 
 func isLocalConfigWorking(ctx context.Context, localKubeConfigPath string, k8sWrapTransport transport.WrapperFunc) bool {
 	if _, err := GetK8sVersion(localKubeConfigPath, k8sWrapTransport); err != nil {
-		log.Infof(ctx, "[reconcile] Local config is not valid, rebuilding admin config")
+		log.Infof(ctx, "[reconcile] Local config is not valid (error: %v), rebuilding admin config", err)
 		return false
 	}
 	return true

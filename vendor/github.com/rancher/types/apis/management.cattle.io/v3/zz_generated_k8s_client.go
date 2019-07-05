@@ -82,7 +82,6 @@ type Interface interface {
 	RKEK8sSystemImagesGetter
 	RKEK8sServiceOptionsGetter
 	RKEAddonsGetter
-	RKEK8sWindowsSystemImagesGetter
 }
 
 type Clients struct {
@@ -150,7 +149,6 @@ type Clients struct {
 	RKEK8sSystemImage                       RKEK8sSystemImageClient
 	RKEK8sServiceOption                     RKEK8sServiceOptionClient
 	RKEAddon                                RKEAddonClient
-	RKEK8sWindowsSystemImage                RKEK8sWindowsSystemImageClient
 }
 
 type Client struct {
@@ -220,7 +218,6 @@ type Client struct {
 	rkeK8sSystemImageControllers                       map[string]RKEK8sSystemImageController
 	rkeK8sServiceOptionControllers                     map[string]RKEK8sServiceOptionController
 	rkeAddonControllers                                map[string]RKEAddonController
-	rkeK8sWindowsSystemImageControllers                map[string]RKEK8sWindowsSystemImageController
 }
 
 func Factory(ctx context.Context, config rest.Config) (context.Context, controller.Starter, error) {
@@ -442,9 +439,6 @@ func NewClientsFromInterface(iface Interface) *Clients {
 		RKEAddon: &rkeAddonClient2{
 			iface: iface.RKEAddons(""),
 		},
-		RKEK8sWindowsSystemImage: &rkeK8sWindowsSystemImageClient2{
-			iface: iface.RKEK8sWindowsSystemImages(""),
-		},
 	}
 }
 
@@ -523,7 +517,6 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		rkeK8sSystemImageControllers:                       map[string]RKEK8sSystemImageController{},
 		rkeK8sServiceOptionControllers:                     map[string]RKEK8sServiceOptionController{},
 		rkeAddonControllers:                                map[string]RKEAddonController{},
-		rkeK8sWindowsSystemImageControllers:                map[string]RKEK8sWindowsSystemImageController{},
 	}, nil
 }
 
@@ -1339,19 +1332,6 @@ type RKEAddonsGetter interface {
 func (c *Client) RKEAddons(namespace string) RKEAddonInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &RKEAddonResource, RKEAddonGroupVersionKind, rkeAddonFactory{})
 	return &rkeAddonClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
-}
-
-type RKEK8sWindowsSystemImagesGetter interface {
-	RKEK8sWindowsSystemImages(namespace string) RKEK8sWindowsSystemImageInterface
-}
-
-func (c *Client) RKEK8sWindowsSystemImages(namespace string) RKEK8sWindowsSystemImageInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &RKEK8sWindowsSystemImageResource, RKEK8sWindowsSystemImageGroupVersionKind, rkeK8sWindowsSystemImageFactory{})
-	return &rkeK8sWindowsSystemImageClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

@@ -146,6 +146,8 @@ type RKESystemImages struct {
 	IngressBackend string `yaml:"ingress_backend" json:"ingressBackend,omitempty"`
 	// Metrics Server image
 	MetricsServer string `yaml:"metrics_server" json:"metricsServer,omitempty"`
+	// Pod infra container image for Windows
+	WindowsPodInfraContainer string `yaml:"windows_pod_infra_container" json:"podInfraWindowsContainer,omitempty"`
 }
 
 type RKEConfigNode struct {
@@ -203,14 +205,6 @@ type RKEAddon struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Template string `yaml:"template" json:"template,omitempty"`
-}
-
-type RKEK8sWindowsSystemImage struct {
-	types.Namespaced
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	SystemImages WindowsSystemImages `yaml:"windows_system_images" json:"windowsSystemImages,omitempty"`
 }
 
 type K8sVersionInfo struct {

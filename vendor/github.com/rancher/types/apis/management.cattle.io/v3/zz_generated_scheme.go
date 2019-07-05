@@ -157,8 +157,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&RKEK8sServiceOptionList{},
 		&RKEAddon{},
 		&RKEAddonList{},
-		&RKEK8sWindowsSystemImage{},
-		&RKEK8sWindowsSystemImageList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

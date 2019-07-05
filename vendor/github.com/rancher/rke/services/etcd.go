@@ -305,16 +305,16 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 		Image: etcdSnapshotImage,
 		Env:   es.ExtraEnv,
 	}
+	// Configure imageCfg for one time snapshot
 	if once {
-		log.Infof(ctx, "[etcd] Running snapshot save once on host [%s]", etcdHost.Address)
 		imageCfg.Cmd = append(imageCfg.Cmd, "--once")
 		restartPolicy = "no"
+		// Configure imageCfg for rolling snapshots
 	} else if es.BackupConfig == nil {
-		log.Infof(ctx, "[etcd] Running snapshot container [%s] on host [%s]", EtcdSnapshotOnceContainerName, etcdHost.Address)
 		imageCfg.Cmd = append(imageCfg.Cmd, "--retention="+es.Retention)
 		imageCfg.Cmd = append(imageCfg.Cmd, "--creation="+es.Creation)
 	}
-
+	// Configure imageCfg for S3 backups
 	if es.BackupConfig != nil {
 		imageCfg = configS3BackupImgCmd(ctx, imageCfg, es.BackupConfig)
 	}
@@ -327,6 +327,8 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 	}
 
 	if once {
+		log.Infof(ctx, "[etcd] Running snapshot save once on host [%s]", etcdHost.Address)
+		logrus.Debugf("[etcd] Using command [%s] for snapshot save once container [%s] on host [%s]", getSanitizedSnapshotCmd(imageCfg, es.BackupConfig), EtcdSnapshotOnceContainerName, etcdHost.Address)
 		if err := docker.DoRemoveContainer(ctx, etcdHost.DClient, EtcdSnapshotOnceContainerName, etcdHost.Address); err != nil {
 			return err
 		}
@@ -336,16 +338,18 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 		status, _, stderr, err := docker.GetContainerOutput(ctx, etcdHost.DClient, EtcdSnapshotOnceContainerName, etcdHost.Address)
 		if status != 0 || err != nil {
 			if removeErr := docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdSnapshotOnceContainerName); removeErr != nil {
-				log.Warnf(ctx, "Failed to remove container [%s]: %v", removeErr)
+				log.Warnf(ctx, "[etcd] Failed to remove container [%s] on host [%s]: %v", removeErr, etcdHost.Address)
 			}
 			if err != nil {
 				return err
 			}
-			return fmt.Errorf("Failed to take one-time snapshot, exit code [%d]: %v", status, stderr)
+			return fmt.Errorf("[etcd] Failed to take one-time snapshot on host [%s], exit code [%d]: %v", etcdHost.Address, status, stderr)
 		}
 
 		return docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdSnapshotOnceContainerName)
 	}
+	log.Infof(ctx, "[etcd] Running snapshot container [%s] on host [%s]", EtcdSnapshotOnceContainerName, etcdHost.Address)
+	logrus.Debugf("[etcd] Running snapshot container [%s] with command [%s] on host [%s]", EtcdSnapshotContainerName, getSanitizedSnapshotCmd(imageCfg, es.BackupConfig), etcdHost.Address)
 	if err := docker.DoRemoveContainer(ctx, etcdHost.DClient, EtcdSnapshotContainerName, etcdHost.Address); err != nil {
 		return err
 	}
@@ -359,7 +363,7 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 	}
 	time.Sleep(EtcdSnapshotWaitTime * time.Second)
 	if snapshotCont.State.Status == "exited" || snapshotCont.State.Restarting {
-		log.Warnf(ctx, "Etcd rolling snapshot container failed to start correctly")
+		log.Warnf(ctx, "[etcd] etcd rolling snapshot container failed to start correctly")
 		return docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdSnapshotContainerName)
 	}
 	return nil
@@ -594,13 +598,17 @@ func configS3BackupImgCmd(ctx context.Context, imageCfg *container.Config, bc *v
 			"--s3-bucketName=" + bc.S3BackupConfig.BucketName,
 			"--s3-region=" + bc.S3BackupConfig.Region,
 		}...)
+		s3Logline := fmt.Sprintf("[etcd] Snapshot will be uploaded to S3 compatible backend at [%s] in region [%s] to bucket [%s] using accesskey [%s]", bc.S3BackupConfig.Endpoint, bc.S3BackupConfig.Region, bc.S3BackupConfig.BucketName, bc.S3BackupConfig.AccessKey)
 		if bc.S3BackupConfig.CustomCA != "" {
 			caStr := base64.StdEncoding.EncodeToString([]byte(bc.S3BackupConfig.CustomCA))
 			cmd = append(cmd, "--s3-endpoint-ca="+caStr)
+			s3Logline += fmt.Sprintf(" and using endpoint CA [%s]", caStr)
 		}
 		if bc.S3BackupConfig.Folder != "" {
 			cmd = append(cmd, "--s3-folder="+bc.S3BackupConfig.Folder)
+			s3Logline += fmt.Sprintf(" and using folder [%s]", bc.S3BackupConfig.Folder)
 		}
+		log.Infof(ctx, s3Logline)
 	}
 	imageCfg.Cmd = append(imageCfg.Cmd, cmd...)
 	return imageCfg
@@ -720,4 +728,12 @@ func setEtcdPermissions(ctx context.Context, etcdHost *hosts.Host, prsMap map[st
 		Binds: []string{dataBind},
 	}
 	return docker.DoRunOnetimeContainer(ctx, etcdHost.DClient, imageCfg, hostCfg, EtcdPermFixContainerName, etcdHost.Address, ETCDRole, prsMap)
+}
+
+func getSanitizedSnapshotCmd(imageCfg *container.Config, bc *v3.BackupConfig) string {
+	cmd := strings.Join(imageCfg.Cmd, " ")
+	if bc != nil && bc.S3BackupConfig != nil {
+		return strings.Replace(cmd, bc.S3BackupConfig.SecretKey, "***", -1)
+	}
+	return cmd
 }
