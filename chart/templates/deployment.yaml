@@ -2,6 +2,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: {{ template "rancher.fullname" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     app: {{ template "rancher.fullname" . }}
     chart: {{ .Chart.Name }}-{{ .Chart.Version }}
