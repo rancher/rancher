@@ -73,6 +73,7 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	monitoring.Register(ctx, cluster)
 	istio.Register(ctx, cluster)
 	certsexpiration.Register(ctx, cluster)
+	ingresshostgen.Register(ctx, cluster.UserOnlyContext())
 
 	if clusterRec.Spec.LocalClusterAuthEndpoint.Enabled {
 		err := clusterauthtoken.CRDSetup(ctx, cluster.UserOnlyContext())
@@ -109,7 +110,6 @@ func RegisterUserOnly(ctx context.Context, cluster *config.UserOnlyContext) erro
 	dnsrecord.Register(ctx, cluster)
 	externalservice.Register(ctx, cluster)
 	ingress.Register(ctx, cluster)
-	ingresshostgen.Register(ctx, cluster)
 	nslabels.Register(ctx, cluster)
 	targetworkloadservice.Register(ctx, cluster)
 	workload.Register(ctx, cluster)
