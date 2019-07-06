@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rancher/rancher/pkg/api/controllers/dynamiclistener"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	managementapi "github.com/rancher/rancher/pkg/api/server"
@@ -80,6 +81,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, localClusterEnabled boo
 	root.Handle("/v3/settings/cacerts", rawAuthedAPIs).Methods(http.MethodGet)
 	root.Handle("/v3/settings/first-login", rawAuthedAPIs).Methods(http.MethodGet)
 	root.Handle("/v3/settings/ui-pl", rawAuthedAPIs).Methods(http.MethodGet)
+	root.PathPrefix("/metrics").Handler(authedHandler)
 	root.PathPrefix("/v3").Handler(chainGzip.Handler(auditHandler))
 	root.PathPrefix("/hooks").Handler(webhookHandler)
 	root.PathPrefix("/k8s/clusters/").Handler(auditHandler)
@@ -127,6 +129,7 @@ func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.
 	authed.PathPrefix("/v3/token").Handler(tokenAPI)
 	authed.PathPrefix("/k8s/clusters/").Handler(k8sproxy)
 	authed.PathPrefix("/v1-telemetry").Handler(telemetry.NewProxy())
+	authed.PathPrefix("/metrics").Handler(prometheus.Handler())
 	authed.PathPrefix(managementSchema.Version.Path).Handler(managementAPI)
 
 	return authed
