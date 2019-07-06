@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/metrics"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	tpeermanager "github.com/rancher/types/peermanager"
@@ -144,7 +145,14 @@ func (u *userControllersController) amOwner(peers tpeermanager.Peers, cluster *v
 	scaled := int(ck) * len(peers.IDs) / math.MaxUint32
 	logrus.Debugf("%s(%v): (%v * %v) / %v = %v[%v] = %v, self = %v\n", cluster.Name, cluster.UID, ck,
 		uint32(len(peers.IDs)), math.MaxUint32, peers.IDs, scaled, peers.IDs[scaled], peers.SelfID)
-	return peers.IDs[scaled] == peers.SelfID
+
+	isOwner := peers.IDs[scaled] == peers.SelfID
+	if isOwner {
+		metrics.SetClusterOwner(peers.SelfID, cluster.Name)
+	} else {
+		metrics.UnsetClusterOwner(peers.SelfID, cluster.Name)
+	}
+	return isOwner
 }
 
 func (u *userControllersController) cleanFinalizers(key string, cluster *v3.Cluster) error {
