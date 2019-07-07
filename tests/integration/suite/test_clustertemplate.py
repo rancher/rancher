@@ -55,7 +55,6 @@ def test_create_cluster_with_template(admin_mc, remove_resource):
     revId = template_revision.id
     client = admin_mc.client
     cluster = client.create_cluster(name=random_str(),
-                                    clusterTemplateId=cluster_template.id,
                                     clusterTemplateRevisionId=revId,
                                     description="template from cluster",
                                     answers=answers)
@@ -92,7 +91,6 @@ def test_create_cluster_validations(admin_mc, remove_resource):
     rConfig = getRKEConfig()
     with pytest.raises(ApiError) as e:
         client.create_cluster(name=random_str(),
-                              clusterTemplateId=cluster_template.id,
                               clusterTemplateRevisionId=revId,
                               description="template from cluster",
                               rancherKubernetesEngineConfig=rConfig)
@@ -222,7 +220,6 @@ def test_check_enforcement(admin_mc, remove_resource, user_factory):
     # and enforced template
     with pytest.raises(ApiError) as e:
         user_client.create_cluster(name=random_str(),
-                                   clusterTemplateId=templateId,
                                    clusterTemplateRevisionId=rev.id,
                                    description="cluster from temp")
         assert e.value.error.status == 403
@@ -234,7 +231,6 @@ def test_check_enforcement(admin_mc, remove_resource, user_factory):
     client.update(template_reloaded, members=new_members)
 
     cluster2 = user_client.create_cluster(name=random_str(),
-                                          clusterTemplateId=templateId,
                                           clusterTemplateRevisionId=rev.id,
                                           description="cluster from temp")
     remove_resource(cluster2)
