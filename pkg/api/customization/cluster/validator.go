@@ -102,8 +102,8 @@ func (v *Validator) validateEnforcement(request *types.APIContext, data map[stri
 	}
 
 	//enforcement is true, template is a must
-	if spec.ClusterTemplateID == "" || spec.ClusterTemplateRevisionID == "" {
-		return httperror.NewFieldAPIError(httperror.MissingRequired, "", "A clusterTemplate is required to create a cluster")
+	if spec.ClusterTemplateRevisionID == "" {
+		return httperror.NewFieldAPIError(httperror.MissingRequired, "", "A clusterTemplateRevision is required to create a cluster")
 	}
 
 	enforced, err := v.isTemplateEnforced(&spec)
@@ -112,7 +112,7 @@ func (v *Validator) validateEnforcement(request *types.APIContext, data map[stri
 	}
 
 	if !enforced {
-		return httperror.NewFieldAPIError(httperror.PermissionDenied, "", fmt.Sprintf("%v is not a valid clusterTemplate to create a cluster", spec.ClusterTemplateID))
+		return httperror.NewFieldAPIError(httperror.PermissionDenied, "", fmt.Sprintf("%v is not a valid clusterTemplateRevision to create a cluster", spec.ClusterTemplateRevisionID))
 	}
 
 	return nil
@@ -123,7 +123,7 @@ func (v *Validator) checkClusterForEnforcement(spec *mgmtclient.Cluster) bool {
 		return true
 	}
 
-	if spec.ClusterTemplateID != "" || spec.ClusterTemplateRevisionID != "" {
+	if spec.ClusterTemplateRevisionID != "" {
 		return true
 	}
 	return false
@@ -132,13 +132,23 @@ func (v *Validator) checkClusterForEnforcement(spec *mgmtclient.Cluster) bool {
 func (v *Validator) isTemplateEnforced(spec *mgmtclient.Cluster) (bool, error) {
 	//template must be marked as enforced=true  + must be public
 
-	split := strings.SplitN(spec.ClusterTemplateID, ":", 2)
+	split := strings.SplitN(spec.ClusterTemplateRevisionID, ":", 2)
 	if len(split) != 2 {
-		return false, fmt.Errorf("error in splitting clusterTemplate name %v", spec.ClusterTemplateID)
+		return false, fmt.Errorf("error in splitting clusterTemplateRevision name %v", spec.ClusterTemplateRevisionID)
 	}
-	templateName := split[1]
+	revName := split[1]
+	clusterTempRev, err := v.ClusterTemplateRevisionLister.Get(namespace.GlobalNamespace, revName)
+	if err != nil {
+		return false, err
+	}
 
-	clusterTemp, err := v.ClusterTemplateLister.Get(namespace.GlobalNamespace, templateName)
+	templateIDStr := clusterTempRev.Spec.ClusterTemplateName
+	split = strings.Split(templateIDStr, ":")
+	if len(split) != 2 {
+		return false, fmt.Errorf("error in splitting clusterTemplate name %v", templateIDStr)
+	}
+	templateID := split[1]
+	clusterTemp, err := v.ClusterTemplateLister.Get(namespace.GlobalNamespace, templateID)
 	if err != nil {
 		return false, err
 	}

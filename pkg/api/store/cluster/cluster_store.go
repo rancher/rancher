@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementv3 "github.com/rancher/types/client/management/v3"
@@ -165,11 +166,11 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 
 	//check if template is passed. if yes, load template data
 	if hasTemplate(data) {
-		clusterTemplateRevision, err := r.validateTemplateInput(data, false)
+		clusterTemplateRevision, clusterTemplate, err := r.validateTemplateInput(data, false)
 		if err != nil {
 			return nil, err
 		}
-		data, err = loadDataFromTemplate(clusterTemplateRevision, data)
+		data, err = loadDataFromTemplate(clusterTemplateRevision, clusterTemplate, data)
 		if err != nil {
 			return nil, err
 		}
@@ -207,15 +208,16 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	return r.Store.Create(apiContext, schema, data)
 }
 
-func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, data map[string]interface{}) (map[string]interface{}, error) {
+func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, clusterTemplate *v3.ClusterTemplate, data map[string]interface{}) (map[string]interface{}, error) {
 	dataFromTemplate, err := convert.EncodeToMap(clusterTemplateRevision.Spec.ClusterConfig)
 	if err != nil {
 		return nil, err
 	}
 	dataFromTemplate["name"] = convert.ToString(data["name"])
 	dataFromTemplate["description"] = convert.ToString(data[managementv3.ClusterSpecFieldDisplayName])
-	dataFromTemplate["clusterTemplateId"] = convert.ToString(data[managementv3.ClusterSpecFieldClusterTemplateID])
-	dataFromTemplate["clusterTemplateRevisionId"] = convert.ToString(data[managementv3.ClusterSpecFieldClusterTemplateRevisionID])
+	dataFromTemplate[managementv3.ClusterSpecFieldClusterTemplateID] = ref.Ref(clusterTemplate)
+	dataFromTemplate[managementv3.ClusterSpecFieldClusterTemplateRevisionID] = convert.ToString(data[managementv3.ClusterSpecFieldClusterTemplateRevisionID])
+	dataFromTemplate[managementv3.ClusterSpecFieldClusterTemplateAnswers] = data[managementv3.ClusterSpecFieldClusterTemplateAnswers]
 
 	//Add in any answers to the clusterTemplateRevision's Questions[]
 	answers := convert.ToMapInterface(data[managementv3.ClusterSpecFieldClusterTemplateAnswers])
@@ -228,7 +230,7 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, d
 		}
 		val, err := builder.ConvertSimple(question.Type, answer, builder.Create)
 		if err != nil {
-			return nil, err
+			return nil, httperror.WrapAPIError(err, httperror.ServerError, "Error processing clusterTemplate answers")
 		}
 		keyParts := strings.Split(question.Variable, ".")
 		values.PutValue(dataFromTemplate, val, keyParts...)
@@ -237,64 +239,52 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, d
 }
 
 func hasTemplate(data map[string]interface{}) bool {
-	templateID := convert.ToString(data[managementv3.ClusterSpecFieldClusterTemplateID])
-	if templateID != "" {
+	templateRevID := convert.ToString(data[managementv3.ClusterSpecFieldClusterTemplateRevisionID])
+	if templateRevID != "" {
 		return true
 	}
 	return false
 }
 
-func (r *Store) validateTemplateInput(data map[string]interface{}, isUpdate bool) (*v3.ClusterTemplateRevision, error) {
+func (r *Store) validateTemplateInput(data map[string]interface{}, isUpdate bool) (*v3.ClusterTemplateRevision, *v3.ClusterTemplate, error) {
 
 	if !isUpdate {
 		//if data also has rkeconfig, error out on create
 		rkeConfig, ok := values.GetValue(data, "rancherKubernetesEngineConfig")
 		if ok && rkeConfig != nil {
-			return nil, fmt.Errorf("cannot set rancherKubernetesEngineConfig and clusterTemplateId both")
+			return nil, nil, fmt.Errorf("cannot set rancherKubernetesEngineConfig and clusterTemplateRevision both")
 		}
 	}
 
 	var templateID, templateRevID string
-	templateIDStr := convert.ToString(data[managementv3.ClusterSpecFieldClusterTemplateID])
-
-	splitID := strings.Split(templateIDStr, ":")
-	if len(splitID) == 2 {
-		templateID = splitID[1]
-	}
 
 	templateRevIDStr := convert.ToString(data[managementv3.ClusterSpecFieldClusterTemplateRevisionID])
-	if templateRevIDStr == "" {
-		return nil, fmt.Errorf("template revision is not provided")
-	}
-
-	splitID = strings.Split(templateRevIDStr, ":")
+	splitID := strings.Split(templateRevIDStr, ":")
 	if len(splitID) == 2 {
 		templateRevID = splitID[1]
 	}
 
-	clusterTemplate, err := r.ClusterTemplateLister.Get(namespace.GlobalNamespace, templateID)
-	if err != nil {
-		return nil, err
-	}
-
-	if clusterTemplate.Spec.Enabled != nil && !(*clusterTemplate.Spec.Enabled) {
-		return nil, fmt.Errorf("cannot create cluster, cluster template is disabled")
-	}
-
 	clusterTemplateRevision, err := r.ClusterTemplateRevisionLister.Get(namespace.GlobalNamespace, templateRevID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if clusterTemplateRevision.Spec.Enabled != nil && !(*clusterTemplateRevision.Spec.Enabled) {
-		return nil, fmt.Errorf("cannot create cluster, cluster template revision is disabled")
+		return nil, nil, fmt.Errorf("cannot create cluster, clusterTemplateRevision is disabled")
 	}
 
-	if !strings.EqualFold(clusterTemplateRevision.Spec.ClusterTemplateName, templateIDStr) {
-		return nil, fmt.Errorf("cannot create cluster, cluster template revision does not belong to clusterTemplate chosen")
+	templateIDStr := clusterTemplateRevision.Spec.ClusterTemplateName
+	splitID = strings.Split(templateIDStr, ":")
+	if len(splitID) == 2 {
+		templateID = splitID[1]
 	}
 
-	return clusterTemplateRevision, nil
+	clusterTemplate, err := r.ClusterTemplateLister.Get(namespace.GlobalNamespace, templateID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return clusterTemplateRevision, clusterTemplate, nil
 
 }
 
@@ -369,28 +359,29 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 
 	//check if template is passed. if yes, load template data
 	if hasTemplate(data) {
-		if existingCluster[managementv3.ClusterSpecFieldClusterTemplateID] == "" {
-			return nil, httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("this cluster is not created using a template, cannot update it to use a template now"))
+		if existingCluster[managementv3.ClusterSpecFieldClusterTemplateRevisionID] == "" {
+			return nil, httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("this cluster is not created using a clusterTemplate, cannot update it to use a clusterTemplate now"))
 		}
 
-		updatedTemplateID := convert.ToString(data[managementv3.ClusterSpecFieldClusterTemplateID])
-		templateID := convert.ToString(existingCluster[managementv3.ClusterSpecFieldClusterTemplateID])
-		if !strings.EqualFold(updatedTemplateID, templateID) {
-			return nil, httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("cannot update cluster, cluster cannot be changed to a new template"))
-		}
-
-		clusterTemplateRevision, err := r.validateTemplateInput(data, true)
+		clusterTemplateRevision, clusterTemplate, err := r.validateTemplateInput(data, true)
 		if err != nil {
 			return nil, err
 		}
-		clusterUpdate, err := loadDataFromTemplate(clusterTemplateRevision, data)
+
+		updatedTemplateID := clusterTemplate.ObjectMeta.Name
+		templateID := convert.ToString(existingCluster[managementv3.ClusterSpecFieldClusterTemplateID])
+		if !strings.EqualFold(updatedTemplateID, templateID) {
+			return nil, httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("cannot update cluster, cluster cannot be changed to a new clusterTemplate"))
+		}
+
+		clusterUpdate, err := loadDataFromTemplate(clusterTemplateRevision, clusterTemplate, data)
 		if err != nil {
 			return nil, err
 		}
 
 		data = clusterUpdate
-	} else if existingCluster[managementv3.ClusterSpecFieldClusterTemplateID] != nil || existingCluster[managementv3.ClusterSpecFieldClusterTemplateRevisionID] != nil {
-		return nil, httperror.NewFieldAPIError(httperror.MissingRequired, "Cluster Template", "this cluster is created from a cluster template, please pass the template")
+	} else if existingCluster[managementv3.ClusterSpecFieldClusterTemplateRevisionID] != nil {
+		return nil, httperror.NewFieldAPIError(httperror.MissingRequired, "Cluster Template", "this cluster is created from a clusterTemplate, please pass the clusterTemplate")
 	}
 
 	err = setKubernetesVersion(data)
@@ -490,7 +481,7 @@ func setKubernetesVersion(data map[string]interface{}) error {
 			if !strings.Contains(k8sVersionRequested, "-rancher") {
 				translatedVersion, err := getSupportedK8sVersion(k8sVersionRequested)
 				if err != nil {
-					return httperror.WrapAPIError(err, httperror.ServerError, "")
+					return err
 				}
 				if translatedVersion == "" {
 					return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Requested kubernetesVersion %v is not supported currently", k8sVersionRequested))
@@ -507,13 +498,13 @@ func getSupportedK8sVersion(k8sVersionRequest string) (string, error) {
 	supportedVersions := strings.Split(settings.KubernetesVersionsCurrent.Get(), ",")
 	range1, err := semver.ParseRange("=" + k8sVersionRequest)
 	if err != nil {
-		return "", fmt.Errorf("Requested kubernetesVersion %v is not of valid semver [major.minor.patch] format", k8sVersionRequest)
+		return "", httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Requested kubernetesVersion %v is not of valid semver [major.minor.patch] format", k8sVersionRequest))
 	}
 
 	for _, v := range supportedVersions {
 		semv, err := semver.ParseTolerant(strings.Split(v, "-rancher")[0])
 		if err != nil {
-			return "", fmt.Errorf("Semver translation failed for the current K8bernetes Version %v, err: %v", v, err)
+			return "", httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Semver translation failed for the current K8bernetes Version %v, err: %v", v, err))
 		}
 		if range1(semv) {
 			return v, nil

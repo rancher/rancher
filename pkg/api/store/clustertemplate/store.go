@@ -53,6 +53,9 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	}
 
 	if strings.EqualFold(apiContext.Type, managementv3.ClusterTemplateRevisionType) {
+		if data[managementv3.ClusterTemplateRevisionFieldClusterConfig] == nil {
+			return nil, httperror.NewAPIError(httperror.MissingRequired, "ClusterTemplateRevision field ClusterConfig is required")
+		}
 		err := p.checkPermissionToCreateRevision(apiContext, data)
 		if err != nil {
 			return nil, err
