@@ -91,6 +91,10 @@ spec:
         - name: NO_PROXY
           value: {{ .Values.noProxy }}
 {{- end }}
+{{- if .Values.proxyAuthentication}}
+        - name: PROXY_AUTHENTICATION
+          value: "1"
+{{- end }}
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}
@@ -126,6 +130,13 @@ spec:
           subPath: cacerts.pem
           readOnly: true
 {{- end }}
+{{- if .Values.proxyAuthentication }}
+        # Pass CA cert for proxy auth
+        - mountPath: /etc/rancher/ssl/proxy-authentication-ca.pem
+          name: proxy-authentication-ca-volume
+          subPath: proxy-authentication-ca.pem
+          readOnly: true
+{{- end }}
 {{- if gt .Values.auditLog.level 0.0 }}
         - mountPath: /var/log/auditlog
           name: audit-log
@@ -152,6 +163,12 @@ spec:
         secret:
           defaultMode: 0400
           secretName: tls-ca
+{{- end }}
+{{- if .Values.proxyAuthentication }}
+      - name: proxy-authentication-ca-volume
+        secret:
+          defaultMode: 0400
+          secretName: proxy-authentication-ca
 {{- end }}
 {{- if gt .Values.auditLog.level 0.0 }}
   {{- if eq .Values.auditLog.destination "hostPath" }}

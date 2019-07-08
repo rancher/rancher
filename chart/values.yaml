@@ -98,3 +98,7 @@ resources: {}
 # - ingress (default)
 # - external
 tls: ingress
+
+# Allow proxy authentication to Rancher API Server
+# Enable this flag and add the proxy CA, see docs
+proxyAuthentication: false

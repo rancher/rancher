@@ -278,21 +278,30 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 		// User doesn't exist, create user
 		logrus.Infof("Creating user for principal %v", principalName)
 
-		// Create a hash of the principalName to use as the name for the user,
-		// this lets k8s tell us if there are duplicate users with the same name
-		// thus avoiding a race.
-		hasher := sha256.New()
-		hasher.Write([]byte(principalName))
-		sha := base32.StdEncoding.WithPadding(-1).EncodeToString(hasher.Sum(nil))[:10]
-
 		annotations, err := m.createUsersRoleAnnotation()
 		if err != nil {
 			return nil, err
 		}
 
+		var name string
+		if strings.Contains(principalName, "rancher_user://") {
+			// Pre-existing rancher principal from a different cluster, use that locally too
+			name = strings.TrimPrefix(principalName, "rancher_user://")
+			principalName = "local://" + name
+			logrus.Infof("Converting rancher_user %v to local user", name)
+		} else {
+			// Create a hash of the principalName to use as the name for the user,
+			// this lets k8s tell us if there are duplicate users with the same name
+			// thus avoiding a race.
+			hasher := sha256.New()
+			hasher.Write([]byte(principalName))
+			sha := base32.StdEncoding.WithPadding(-1).EncodeToString(hasher.Sum(nil))[:10]
+			name = "u-" + strings.ToLower(sha)
+		}
+
 		user = &v3.User{
 			ObjectMeta: v1.ObjectMeta{
-				Name:        "u-" + strings.ToLower(sha),
+				Name:        name,
 				Labels:      labelSet,
 				Annotations: annotations,
 			},

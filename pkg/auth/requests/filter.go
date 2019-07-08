@@ -21,8 +21,10 @@ func NewAuthenticationFilter(ctx context.Context, managementContext *config.Scal
 		return nil, fmt.Errorf("Failed to build NewAuthenticationFilter, nil ManagementContext")
 	}
 	auth := NewAuthenticator(ctx, managementContext)
+	proxyAuth := NewProxyAuthenticator(ctx, managementContext)
 	return &authHeaderHandler{
 		auth:              auth,
+		proxyAuth:         proxyAuth,
 		next:              next,
 		sar:               sar,
 		userAuthRefresher: providerrefresh.NewUserAuthRefresher(ctx, managementContext),
@@ -31,13 +33,22 @@ func NewAuthenticationFilter(ctx context.Context, managementContext *config.Scal
 
 type authHeaderHandler struct {
 	auth              Authenticator
+	proxyAuth         ProxyAuthenticator
 	next              http.Handler
 	sar               sar.SubjectAccessReview
 	userAuthRefresher providerrefresh.UserAuthRefresher
 }
 
 func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	authed, user, groups, err := h.auth.Authenticate(req)
+	var user string
+	var groups []string
+	var err error
+	var authed bool
+	if len(req.Header.Get("X-Remote-User")) > 0 {
+		authed, user, groups, err = h.proxyAuth.Authenticate(req)
+	} else {
+		authed, user, groups, err = h.auth.Authenticate(req)
+	}
 	if err != nil || !authed {
 		util.ReturnHTTPError(rw, req, 401, err.Error())
 		return
