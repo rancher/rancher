@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/norman/types/definition"
 	"github.com/rancher/norman/types/values"
 	ccluster "github.com/rancher/rancher/pkg/api/customization/cluster"
+	"github.com/rancher/rancher/pkg/api/customization/clustertemplate"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
@@ -403,7 +404,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 
 		data = clusterUpdate
 	} else if existingCluster[managementv3.ClusterSpecFieldClusterTemplateRevisionID] != nil {
-		return nil, httperror.NewFieldAPIError(httperror.MissingRequired, "Cluster Template", "this cluster is created from a clusterTemplate, please pass the clusterTemplate")
+		return nil, httperror.NewFieldAPIError(httperror.MissingRequired, "ClusterTemplateRevision", "this cluster is created from a clusterTemplateRevision, please pass the clusterTemplateRevision")
 	}
 
 	err = setKubernetesVersion(data)
@@ -516,6 +517,10 @@ func setKubernetesVersion(data map[string]interface{}) error {
 }
 
 func getSupportedK8sVersion(k8sVersionRequest string) (string, error) {
+	err := clustertemplate.CheckKubernetesVersionFormat(k8sVersionRequest)
+	if err != nil {
+		return "", err
+	}
 
 	supportedVersions := strings.Split(settings.KubernetesVersionsCurrent.Get(), ",")
 	range1, err := semver.ParseRange("=" + k8sVersionRequest)
