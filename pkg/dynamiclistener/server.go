@@ -13,6 +13,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -448,10 +449,15 @@ func (s *Server) serveHTTPS(config *v3.ListenConfig) error {
 	if err != nil {
 		return fmt.Errorf("Error while configuring TLS ciphers: %s", err)
 	}
+	clientAuthSetting := tls.NoClientCert
+	if pa := os.Getenv("PROXY_AUTHENTICATION"); len(pa) > 0 {
+		clientAuthSetting = tls.RequestClientCert
+	}
 
 	conf := &tls.Config{
 		GetCertificate:           s.getCertificate,
 		PreferServerCipherSuites: true,
+		ClientAuth:               clientAuthSetting,
 		MinVersion:               TLSMinVersion,
 		CipherSuites:             TLSCiphers,
 	}
@@ -572,6 +578,10 @@ func (s *Server) serveACME(config *v3.ListenConfig) error {
 	if err != nil {
 		return fmt.Errorf("Error while configuring TLS ciphers: %s", err)
 	}
+	clientAuthSetting := tls.NoClientCert
+	if pa := os.Getenv("PROXY_AUTHENTICATION"); len(pa) > 0 {
+		clientAuthSetting = tls.RequestClientCert
+	}
 
 	manager := autocert.Manager{
 		Cache:      autocert.DirCache("certs-cache"),
@@ -589,6 +599,7 @@ func (s *Server) serveACME(config *v3.ListenConfig) error {
 		},
 		NextProtos:               []string{"h2", "http/1.1"},
 		PreferServerCipherSuites: true,
+		ClientAuth:               clientAuthSetting,
 		MinVersion:               TLSMinVersion,
 		CipherSuites:             TLSCiphers,
 	}
