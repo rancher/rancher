@@ -471,7 +471,7 @@ func GetJenkinsDeployment(ns string) *appsv1beta2.Deployment {
 										}},
 								}, {
 									Name:  "JAVA_OPTS",
-									Value: "-Xmx300m -Dhudson.slaves.NodeProvisioner.initialDelay=0 -Dhudson.slaves.NodeProvisioner.MARGIN=50 -Dhudson.slaves.NodeProvisioner.MARGIN0=0.85 -Dhudson.model.LoadStatistics.clock=2000 -Dhudson.slaves.NodeProvisioner.recurrencePeriod=2000",
+									Value: "-Xmx300m -Dhudson.slaves.NodeProvisioner.initialDelay=0 -Dhudson.slaves.NodeProvisioner.MARGIN=50 -Dhudson.slaves.NodeProvisioner.MARGIN0=0.85 -Dhudson.model.LoadStatistics.clock=2000 -Dhudson.slaves.NodeProvisioner.recurrencePeriod=2000 -Dhudson.model.UpdateCenter.never=true",
 								}, {
 									Name:  "NAMESPACE",
 									Value: ns,

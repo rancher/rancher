@@ -6,13 +6,14 @@ import (
 	"fmt"
 
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/controller/pipelineexecution"
+	images "github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	rv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
 	v1 "github.com/rancher/types/apis/core/v1"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
-	"k8s.io/api/apps/v1beta2"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -24,6 +25,7 @@ var (
 
 type PipelineService struct {
 	deployments          rv1beta2.DeploymentInterface
+	deploymentLister     rv1beta2.DeploymentLister
 	namespaceLister      v1.NamespaceLister
 	secrets              v1.SecretInterface
 	systemAccountManager *systemaccount.Manager
@@ -35,49 +37,21 @@ func NewService() *PipelineService {
 
 func (l *PipelineService) Init(cluster *config.UserContext) {
 	l.deployments = cluster.Apps.Deployments("")
+	l.deploymentLister = cluster.Apps.Deployments("").Controller().Lister()
 	l.namespaceLister = cluster.Core.Namespaces("").Controller().Lister()
 	l.secrets = cluster.Core.Secrets("")
 	l.systemAccountManager = systemaccount.NewManager(cluster.Management)
 }
 
 func (l *PipelineService) Version() (string, error) {
-	d1, d2, d3 := getDeployments()
-	newJekinsVersion, err := getDefaultVersion(d1)
-	if err != nil {
-		return "", err
-	}
-
-	newRegistryVersion, err := getDefaultVersion(d2)
-	if err != nil {
-		return "", err
-	}
-
-	newMinioVersion, err := getDefaultVersion(d3)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s-%s-%s", newJekinsVersion, newRegistryVersion, newMinioVersion), nil
+	raw := fmt.Sprintf("%s-%s-%s",
+		v3.ToolsSystemImages.PipelineSystemImages.Jenkins,
+		v3.ToolsSystemImages.PipelineSystemImages.Registry,
+		v3.ToolsSystemImages.PipelineSystemImages.Minio)
+	return getDefaultVersion(raw)
 }
 
 func (l *PipelineService) Upgrade(currentVersion string) (newVersion string, err error) {
-	var newJekinsVersion, newRegistryVersion, newMinioVersion string
-
-	d1, d2, d3 := getDeployments()
-	newJekinsVersion, err = getDefaultVersion(d1)
-	if err != nil {
-		return "", err
-	}
-
-	newRegistryVersion, err = getDefaultVersion(d2)
-	if err != nil {
-		return "", err
-	}
-
-	newMinioVersion, err = getDefaultVersion(d3)
-	if err != nil {
-		return "", err
-	}
-
 	set := labels.Set(map[string]string{utils.PipelineNamespaceLabel: "true"})
 	pipelineNamespaces, err := l.namespaceLister.List("", set.AsSelector())
 	if err != nil {
@@ -87,9 +61,12 @@ func (l *PipelineService) Upgrade(currentVersion string) (newVersion string, err
 		if err := l.ensureSecrets(v); err != nil {
 			return "", err
 		}
+		if err := l.upgradeComponents(v.Name); err != nil {
+			return "", err
+		}
 	}
 
-	return fmt.Sprintf("%s-%s-%s", newJekinsVersion, newRegistryVersion, newMinioVersion), nil
+	return l.Version()
 }
 
 func (l *PipelineService) ensureSecrets(namespace *corev1.Namespace) error {
@@ -107,21 +84,42 @@ func (l *PipelineService) ensureSecrets(namespace *corev1.Namespace) error {
 	return nil
 }
 
-func (l *PipelineService) upgradeDeployment(deployment *v1beta2.Deployment) error {
-	if _, err := l.deployments.Update(deployment); err != nil {
+func (l *PipelineService) upgradeComponents(ns string) error {
+	jenkinsDeployment := pipelineexecution.GetJenkinsDeployment(ns)
+	if _, err := l.deployments.Update(jenkinsDeployment); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil
 		}
-		return fmt.Errorf("upgrade system service %s:%s failed, %v", deployment.Namespace, deployment.Name, err)
+		return fmt.Errorf("upgrade system service %s:%s failed, %v", jenkinsDeployment.Namespace, jenkinsDeployment.Name, err)
 	}
-	return nil
-}
 
-func getDeployments() (d1, d2, d3 *v1beta2.Deployment) {
-	d1 = pipelineexecution.GetJenkinsDeployment("")
-	d2 = pipelineexecution.GetRegistryDeployment("")
-	d3 = pipelineexecution.GetMinioDeployment("")
-	return d1, d2, d3
+	//Only update image for Registry and Minio to preserve user customized configurations such as volumes
+	registryDeployment, err := l.deploymentLister.Get(ns, utils.RegistryName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	toUpdateRegistry := registryDeployment.DeepCopy()
+	toUpdateRegistry.Spec.Template.Spec.Containers[0].Image = images.Resolve(v3.ToolsSystemImages.PipelineSystemImages.Registry)
+	if _, err := l.deployments.Update(toUpdateRegistry); err != nil {
+		return err
+	}
+	minioDeployment, err := l.deploymentLister.Get(ns, utils.MinioName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	toUpdateMinio := minioDeployment.DeepCopy()
+	toUpdateMinio.Spec.Template.Spec.Containers[0].Image = images.Resolve(v3.ToolsSystemImages.PipelineSystemImages.Minio)
+	if _, err := l.deployments.Update(toUpdateMinio); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func getDefaultVersion(obj interface{}) (string, error) {

@@ -365,7 +365,7 @@ func (j *Engine) SyncExecution(execution *v3.PipelineExecution) (bool, error) {
 				if err := j.successStep(execution, stage, step, jenkinsStage); err != nil {
 					return false, err
 				}
-			} else if status == "FAILED" && execution.Status.Stages[stage].Steps[step].State != utils.StateFailed {
+			} else if (status == "FAILED" || status == "ABORTED") && execution.Status.Stages[stage].Steps[step].State != utils.StateFailed {
 				updated = true
 				if err := j.failStep(execution, stage, step, jenkinsStage); err != nil {
 					return false, err
