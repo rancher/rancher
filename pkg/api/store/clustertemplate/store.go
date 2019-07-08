@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	"github.com/rancher/rancher/pkg/api/customization/clustertemplate"
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
 	rrbac "github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -17,7 +18,6 @@ import (
 	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	managementv3 "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -60,6 +60,10 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		if err != nil {
 			return nil, err
 		}
+		err = p.checkKubernetesVersionFormat(apiContext, data)
+		if err != nil {
+			return nil, err
+		}
 		if err := setLabelsAndOwnerRef(apiContext, data); err != nil {
 			return nil, err
 		}
@@ -77,6 +81,11 @@ func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	}
 
 	if strings.EqualFold(apiContext.Type, managementv3.ClusterTemplateRevisionType) {
+		err := p.checkKubernetesVersionFormat(apiContext, data)
+		if err != nil {
+			return nil, err
+		}
+
 		isUsed, err := isTemplateInUse(apiContext, id)
 		if err != nil {
 			return nil, err
@@ -274,4 +283,17 @@ func (p *Store) checkPermissionToCreateRevision(apiContext *types.APIContext, da
 		return httperror.NewAPIError(httperror.PermissionDenied, "read-only member of clustertemplate cannot create revisions for it")
 	}
 	return nil
+}
+
+func (p *Store) checkKubernetesVersionFormat(apiContext *types.APIContext, data map[string]interface{}) error {
+	clusterConfig, found := values.GetValue(data, managementv3.ClusterTemplateRevisionFieldClusterConfig)
+	if !found || clusterConfig == nil {
+		return httperror.NewAPIError(httperror.MissingRequired, "ClusterTemplateRevision field ClusterConfig is required")
+	}
+	k8sVersionReq := values.GetValueN(data, managementv3.ClusterTemplateRevisionFieldClusterConfig, "rancherKubernetesEngineConfig", "kubernetesVersion")
+	if k8sVersionReq == nil {
+		return nil
+	}
+	k8sVersion := convert.ToString(k8sVersionReq)
+	return clustertemplate.CheckKubernetesVersionFormat(k8sVersion)
 }

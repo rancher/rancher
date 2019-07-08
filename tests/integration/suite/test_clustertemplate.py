@@ -21,6 +21,24 @@ def test_create_cluster_template_with_revision(admin_mc, remove_resource):
     assert template_reloaded.links.revisions is not None
 
 
+def test_create_template_revision_invalid_k8s(admin_mc, remove_resource):
+    cluster_template = create_cluster_template(admin_mc,
+                                               remove_resource, [], admin_mc)
+    tId = cluster_template.id
+    client = admin_mc.client
+
+    cconfig = {
+        "rancherKubernetesEngineConfig": {
+            "kubernetesVersion": "1.13"
+        }
+    }
+    with pytest.raises(ApiError) as e:
+        client.create_cluster_template_revision(clusterConfig=cconfig,
+                                                clusterTemplateId=tId,
+                                                enabled="true")
+        assert e.value.error.status == 422
+
+
 def test_default_pod_sec(admin_mc, remove_resource):
     cluster_template = create_cluster_template(admin_mc,
                                                remove_resource, [], admin_mc)
