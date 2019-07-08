@@ -800,3 +800,32 @@ func (c CommonController) EnqueueAllWorkloads(namespace string) error {
 	}
 	return nil
 }
+
+func (c CommonController) GetActualFromWorkload(w *Workload) (
+	deploy *corev1beta2.Deployment,
+	rc *corev1.ReplicationController,
+	rs *corev1beta2.ReplicaSet,
+	ds *corev1beta2.DaemonSet,
+	ss *corev1beta2.StatefulSet,
+	job *corebatchv1.Job,
+	cj *corebatchv1beta1.CronJob,
+	err error,
+) {
+	switch w.Kind {
+	case DeploymentType:
+		deploy, err = c.DeploymentLister.Get(w.Namespace, w.Name)
+	case ReplicationControllerType:
+		rc, err = c.ReplicationControllerLister.Get(w.Namespace, w.Name)
+	case ReplicaSetType:
+		rs, err = c.ReplicaSetLister.Get(w.Namespace, w.Name)
+	case DaemonSetType:
+		ds, err = c.DaemonSetLister.Get(w.Namespace, w.Name)
+	case StatefulSetType:
+		ss, err = c.StatefulSetLister.Get(w.Namespace, w.Name)
+	case JobType:
+		job, err = c.JobLister.Get(w.Namespace, w.Name)
+	case CronJobType:
+		cj, err = c.CronJobLister.Get(w.Namespace, w.Name)
+	}
+	return
+}
