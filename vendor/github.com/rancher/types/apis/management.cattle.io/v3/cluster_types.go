@@ -108,7 +108,7 @@ type ClusterSpec struct {
 	AzureKubernetesServiceConfig        *MapStringInterface `json:"azureKubernetesServiceConfig,omitempty"`
 	AmazonElasticContainerServiceConfig *MapStringInterface `json:"amazonElasticContainerServiceConfig,omitempty"`
 	GenericEngineConfig                 *MapStringInterface `json:"genericEngineConfig,omitempty"`
-	ClusterTemplateName                 string              `json:"clusterTemplateName,omitempty" norman:"type=reference[clusterTemplate]"`
+	ClusterTemplateName                 string              `json:"clusterTemplateName,omitempty" norman:"type=reference[clusterTemplate],nocreate,noupdate"`
 	ClusterTemplateRevisionName         string              `json:"clusterTemplateRevisionName,omitempty" norman:"type=reference[clusterTemplateRevision]"`
 	ClusterTemplateAnswers              Answer              `json:"answers,omitempty"`
 }
