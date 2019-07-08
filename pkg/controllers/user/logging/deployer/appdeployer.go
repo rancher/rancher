@@ -152,10 +152,16 @@ func rancherLoggingApp(appCreator, systemProjectID, catalogID, driverDir, docker
 		},
 		Spec: projectv3.AppSpec{
 			Answers: map[string]string{
+				//compatible with old version
 				"fluentd.enabled":              "true",
 				"fluentd.cluster.dockerRoot":   dockerRoot,
 				"log-aggregator.enabled":       "true",
 				"log-aggregator.flexVolumeDir": driverDir,
+
+				//new version
+				"fluentd.fluentd-linux.enabled":                     "true",
+				"log-aggregator.log-aggregator-linux.enabled":       "true",
+				"log-aggregator.log-aggregator-linux.flexVolumeDir": driverDir,
 			},
 			Description:     "Rancher Logging for collect logs",
 			ExternalID:      catalogID,
@@ -187,5 +193,16 @@ func loggingTesterApp(appCreator, systemProjectID, catalogID, clusterConfig, pro
 			ProjectName:     systemProjectID,
 			TargetNamespace: namepspace,
 		},
+	}
+}
+
+func updateInRancherLoggingAppWindowsConfig(app *projectv3.App, enableWindows bool) {
+	if app.Spec.Answers == nil {
+		app.Spec.Answers = make(map[string]string)
+	}
+	if enableWindows {
+		app.Spec.Answers["fluentd.fluentd-windows.enabled"] = "true"
+	} else {
+		app.Spec.Answers["fluentd.fluentd-windows.enabled"] = "false"
 	}
 }
