@@ -2,7 +2,6 @@ package metadata
 
 import (
 	"context"
-	"github.com/sirupsen/logrus"
 	"strings"
 
 	mVersion "github.com/mcuadros/go-version"
@@ -21,7 +20,6 @@ var (
 )
 
 func InitMetadata(ctx context.Context) error {
-	logrus.Infof("calling init")
 	initK8sRKESystemImages()
 	initAddonTemplates()
 	initServiceOptions()
