@@ -1,11 +1,11 @@
 package upgrade
 
 import (
-	"context"
+	"crypto/sha1"
+	"encoding/json"
 	"fmt"
 
 	"github.com/rancher/rancher/pkg/controllers/user/pipeline/controller/pipelineexecution"
-	"github.com/rancher/rancher/pkg/controllers/user/systemimage"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
@@ -19,61 +19,61 @@ import (
 )
 
 var (
-	serviceName = "pipeline"
+	ServiceName = "pipeline"
 )
 
-type pipelineService struct {
+type PipelineService struct {
 	deployments          rv1beta2.DeploymentInterface
 	namespaceLister      v1.NamespaceLister
 	secrets              v1.SecretInterface
 	systemAccountManager *systemaccount.Manager
 }
 
-func init() {
-	systemimage.RegisterSystemService(serviceName, &pipelineService{})
+func NewService() *PipelineService {
+	return &PipelineService{}
 }
 
-func (l *pipelineService) Init(ctx context.Context, cluster *config.UserContext) {
+func (l *PipelineService) Init(cluster *config.UserContext) {
 	l.deployments = cluster.Apps.Deployments("")
 	l.namespaceLister = cluster.Core.Namespaces("").Controller().Lister()
 	l.secrets = cluster.Core.Secrets("")
 	l.systemAccountManager = systemaccount.NewManager(cluster.Management)
 }
 
-func (l *pipelineService) Version() (string, error) {
+func (l *PipelineService) Version() (string, error) {
 	d1, d2, d3 := getDeployments()
-	newJekinsVersion, err := systemimage.DefaultGetVersion(d1)
+	newJekinsVersion, err := getDefaultVersion(d1)
 	if err != nil {
 		return "", err
 	}
 
-	newRegistryVersion, err := systemimage.DefaultGetVersion(d2)
+	newRegistryVersion, err := getDefaultVersion(d2)
 	if err != nil {
 		return "", err
 	}
 
-	newMinioVersion, err := systemimage.DefaultGetVersion(d3)
+	newMinioVersion, err := getDefaultVersion(d3)
 	if err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("%s-%s-%s", newJekinsVersion, newRegistryVersion, newMinioVersion), nil
 }
 
-func (l *pipelineService) Upgrade(currentVersion string) (newVersion string, err error) {
+func (l *PipelineService) Upgrade(currentVersion string) (newVersion string, err error) {
 	var newJekinsVersion, newRegistryVersion, newMinioVersion string
 
 	d1, d2, d3 := getDeployments()
-	newJekinsVersion, err = systemimage.DefaultGetVersion(d1)
+	newJekinsVersion, err = getDefaultVersion(d1)
 	if err != nil {
 		return "", err
 	}
 
-	newRegistryVersion, err = systemimage.DefaultGetVersion(d2)
+	newRegistryVersion, err = getDefaultVersion(d2)
 	if err != nil {
 		return "", err
 	}
 
-	newMinioVersion, err = systemimage.DefaultGetVersion(d3)
+	newMinioVersion, err = getDefaultVersion(d3)
 	if err != nil {
 		return "", err
 	}
@@ -92,7 +92,7 @@ func (l *pipelineService) Upgrade(currentVersion string) (newVersion string, err
 	return fmt.Sprintf("%s-%s-%s", newJekinsVersion, newRegistryVersion, newMinioVersion), nil
 }
 
-func (l *pipelineService) ensureSecrets(namespace *corev1.Namespace) error {
+func (l *PipelineService) ensureSecrets(namespace *corev1.Namespace) error {
 	projectName := namespace.Annotations["field.cattle.io/projectId"]
 	_, projectID := ref.Parse(projectName)
 	ns := namespace.Name
@@ -107,7 +107,7 @@ func (l *pipelineService) ensureSecrets(namespace *corev1.Namespace) error {
 	return nil
 }
 
-func (l *pipelineService) upgradeDeployment(deployment *v1beta2.Deployment) error {
+func (l *PipelineService) upgradeDeployment(deployment *v1beta2.Deployment) error {
 	if _, err := l.deployments.Update(deployment); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil
@@ -122,4 +122,13 @@ func getDeployments() (d1, d2, d3 *v1beta2.Deployment) {
 	d2 = pipelineexecution.GetRegistryDeployment("")
 	d3 = pipelineexecution.GetMinioDeployment("")
 	return d1, d2, d3
+}
+
+func getDefaultVersion(obj interface{}) (string, error) {
+	b, err := json.Marshal(obj)
+	if err != nil {
+		return "", fmt.Errorf("marshal obj failed when get system image version: %v", err)
+	}
+
+	return fmt.Sprintf("%x", sha1.Sum(b))[:7], nil
 }
