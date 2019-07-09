@@ -368,8 +368,9 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 			return nil, err
 		}
 
-		updatedTemplateID := clusterTemplate.ObjectMeta.Name
+		updatedTemplateID := clusterTemplateRevision.Spec.ClusterTemplateName
 		templateID := convert.ToString(existingCluster[managementv3.ClusterSpecFieldClusterTemplateID])
+
 		if !strings.EqualFold(updatedTemplateID, templateID) {
 			return nil, httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("cannot update cluster, cluster cannot be changed to a new clusterTemplate"))
 		}
