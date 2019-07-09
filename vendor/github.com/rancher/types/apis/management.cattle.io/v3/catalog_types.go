@@ -188,6 +188,7 @@ type Question struct {
 	Subquestions      []SubQuestion `json:"subquestions,omitempty" yaml:"subquestions,omitempty"`
 	ShowIf            string        `json:"showIf,omitempty" yaml:"show_if,omitempty"`
 	ShowSubquestionIf string        `json:"showSubquestionIf,omitempty" yaml:"show_subquestion_if,omitempty"`
+	Satisfies         string        `json:"satisfies,omitempty" yaml:"satisfies,omitempty"`
 }
 
 type SubQuestion struct {
@@ -206,6 +207,7 @@ type SubQuestion struct {
 	ValidChars   string   `json:"validChars,omitempty" yaml:"valid_chars,omitempty"`
 	InvalidChars string   `json:"invalidChars,omitempty" yaml:"invalid_chars,omitempty"`
 	ShowIf       string   `json:"showIf,omitempty" yaml:"show_if,omitempty"`
+	Satisfies    string   `json:"satisfies,omitempty" yaml:"satisfies,omitempty"`
 }
 
 // TemplateContent is deprecated

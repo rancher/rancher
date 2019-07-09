@@ -13,6 +13,7 @@ const (
 	SubQuestionFieldMinLength    = "minLength"
 	SubQuestionFieldOptions      = "options"
 	SubQuestionFieldRequired     = "required"
+	SubQuestionFieldSatisfies    = "satisfies"
 	SubQuestionFieldShowIf       = "showIf"
 	SubQuestionFieldType         = "type"
 	SubQuestionFieldValidChars   = "validChars"
@@ -31,6 +32,7 @@ type SubQuestion struct {
 	MinLength    int64    `json:"minLength,omitempty" yaml:"minLength,omitempty"`
 	Options      []string `json:"options,omitempty" yaml:"options,omitempty"`
 	Required     bool     `json:"required,omitempty" yaml:"required,omitempty"`
+	Satisfies    string   `json:"satisfies,omitempty" yaml:"satisfies,omitempty"`
 	ShowIf       string   `json:"showIf,omitempty" yaml:"showIf,omitempty"`
 	Type         string   `json:"type,omitempty" yaml:"type,omitempty"`
 	ValidChars   string   `json:"validChars,omitempty" yaml:"validChars,omitempty"`
