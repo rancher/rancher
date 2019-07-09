@@ -25,7 +25,7 @@ var (
 )
 
 func MetricGarbageCollection(context *config.ScaledContext) {
-	logrus.Infof("MetricGarbageCollector Start")
+	logrus.Debugf("MetricGarbageCollector Start")
 
 	clusterLister := context.Management.Clusters("").Controller().Lister()
 	nodeLister := context.Management.Nodes("").Controller().Lister()
@@ -90,7 +90,7 @@ func MetricGarbageCollection(context *config.ScaledContext) {
 	removedCount := RemoveMetricsForDeletedResource(observedLabelsMap, observedResourceNames)
 	logrus.Debugf("MetricGarbageCollector removed %d metrics", removedCount)
 
-	logrus.Infof("MetricGarbageCollector Finished")
+	logrus.Debugf("MetricGarbageCollector Finished")
 }
 
 func BuildObservedLabelMaps(collectors []interface{}, targetLabel string, observedLabels map[string]map[interface{}][]map[string]string) int {
