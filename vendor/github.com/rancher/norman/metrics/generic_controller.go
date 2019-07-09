@@ -1,8 +1,6 @@
 package metrics
 
 import (
-	"os"
-
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -28,12 +26,6 @@ var (
 		[]string{"name", "handlerName", "key"},
 	)
 )
-
-func init() {
-	if os.Getenv(MetricsGenericControllerEnv) == "true" {
-		genericControllerMetrics = true
-	}
-}
 
 func IncTotalHandlerExecution(controllerName, handlerName string) {
 	if genericControllerMetrics {
