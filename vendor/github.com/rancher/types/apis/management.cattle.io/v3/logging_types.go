@@ -49,6 +49,7 @@ type LoggingTargets struct {
 	KafkaConfig           *KafkaConfig           `json:"kafkaConfig,omitempty"`
 	SyslogConfig          *SyslogConfig          `json:"syslogConfig,omitempty"`
 	FluentForwarderConfig *FluentForwarderConfig `json:"fluentForwarderConfig,omitempty"`
+	CloudWatchConfig      *CloudWatchConfig      `json:"cloudWatchConfig,omitempty"`
 	CustomTargetConfig    *CustomTargetConfig    `json:"customTargetConfig,omitempty"`
 }
 
@@ -163,6 +164,14 @@ type FluentServer struct {
 	Username  string `json:"username,omitempty"`
 	Password  string `json:"password,omitempty" norman:"type=password"`
 	SharedKey string `json:"sharedKey,omitempty" norman:"type=password"`
+}
+
+type CloudWatchConfig struct {
+	Group           string `json:"group,omitempty" norman:"required"`
+	Stream          string `json:"stream,omitempty"`
+	Region          string `json:"region,omitempty" norman:"required"`
+	AccessKeyID     string `json:"accessKeyID,omitempty" norman:"required"`
+	SecretAccessKey string `json:"secretAccessKey,omitempty" norman:"required"`
 }
 
 type CustomTargetConfig struct {
