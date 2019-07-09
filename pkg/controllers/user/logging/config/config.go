@@ -40,6 +40,7 @@ const (
 	Kafka           = "kafka"
 	Syslog          = "syslog"
 	FluentForwarder = "fluentforwarder"
+	CloudWatch      = "cloudwatch"
 	CustomTarget    = "customtarget"
 )
 

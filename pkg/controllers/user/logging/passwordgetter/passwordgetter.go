@@ -67,5 +67,11 @@ func (p *PasswordGetter) GetPasswordFromSecret(loggingTarget *mgmtv3.LoggingTarg
 		loggingTarget.FluentForwarderConfig.FluentServers = newFluentdServers
 	}
 
+	if loggingTarget.CloudWatchConfig != nil && strings.HasPrefix(loggingTarget.CloudWatchConfig.SecretAccessKey, passwordSecretPrefix) {
+		if loggingTarget.CloudWatchConfig.SecretAccessKey, err = passwordutil.GetValueForPasswordField(loggingTarget.CloudWatchConfig.SecretAccessKey, p.secrets); err != nil {
+			return
+		}
+	}
+
 	return
 }

@@ -202,6 +202,19 @@ var MatchTemplate = `
 {{end}}
 {{end}}
 
+{{define "cloudwatch"}}
+{{- if eq .CurrentTarget "cloudwatch" }}
+    @type cloudwatch_logs
+    log_group_name .CloudWatchConfig.Group
+    log_stream_name .CloudWatchConfig.Stream
+    auto_create_stream true
+
+    aws_key_id .CloudWatchConfig.AccessKeyID
+    aws_sec_key .CloudWatchConfig.SecretAccessKey
+    region .CloudWatchConfig.Region
+{{end}}
+{{end}}
+
 {{define "custom"}}
 {{- if eq .CurrentTarget "customtarget"}}
 {{.CustomTargetWrap.Content}} 
