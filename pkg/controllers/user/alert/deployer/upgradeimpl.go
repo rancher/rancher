@@ -1,15 +1,14 @@
 package deployer
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	alertutil "github.com/rancher/rancher/pkg/controllers/user/alert/common"
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
-	"github.com/rancher/rancher/pkg/controllers/user/systemimage"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
@@ -26,16 +25,18 @@ import (
 )
 
 var (
-	serviceName = "alerting"
+	ServiceName             = "alerting"
+	waitCatalogSyncInterval = 60 * time.Second
 )
 
 const (
 	defaultGroupIntervalSeconds = 180
 )
 
-type alertService struct {
+type AlertService struct {
 	clusterName        string
 	clusterLister      v3.ClusterLister
+	catalogLister      v3.CatalogLister
 	apps               projectv3.AppInterface
 	oldClusterAlerts   v3.ClusterAlertInterface
 	oldProjectAlerts   v3.ProjectAlertInterface
@@ -45,14 +46,15 @@ type alertService struct {
 	projectAlertRules  v3.ProjectAlertRuleInterface
 	projectLister      v3.ProjectLister
 	namespaces         v1.NamespaceInterface
+	templateLister     v3.CatalogTemplateLister
 	appDeployer        *appDeployer
 }
 
-func init() {
-	systemimage.RegisterSystemService(serviceName, &alertService{})
+func NewService() *AlertService {
+	return &AlertService{}
 }
 
-func (l *alertService) Init(ctx context.Context, cluster *config.UserContext) {
+func (l *AlertService) Init(cluster *config.UserContext) {
 	ad := &appDeployer{
 		appsGetter:       cluster.Management.Project,
 		namespaces:       cluster.Management.Core.Namespaces(metav1.NamespaceAll),
@@ -62,6 +64,7 @@ func (l *alertService) Init(ctx context.Context, cluster *config.UserContext) {
 
 	l.clusterName = cluster.ClusterName
 	l.clusterLister = cluster.Management.Management.Clusters("").Controller().Lister()
+	l.catalogLister = cluster.Management.Management.Catalogs(metav1.NamespaceAll).Controller().Lister()
 	l.oldClusterAlerts = cluster.Management.Management.ClusterAlerts(cluster.ClusterName)
 	l.oldProjectAlerts = cluster.Management.Management.ProjectAlerts(metav1.NamespaceAll)
 	l.clusterAlertGroups = cluster.Management.Management.ClusterAlertGroups(cluster.ClusterName)
@@ -71,11 +74,12 @@ func (l *alertService) Init(ctx context.Context, cluster *config.UserContext) {
 	l.projectLister = cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister()
 	l.apps = cluster.Management.Project.Apps(metav1.NamespaceAll)
 	l.namespaces = cluster.Core.Namespaces(metav1.NamespaceAll)
+	l.templateLister = cluster.Management.Management.CatalogTemplates(metav1.NamespaceAll).Controller().Lister()
 	l.appDeployer = ad
 
 }
 
-func (l *alertService) Version() (string, error) {
+func (l *AlertService) Version() (string, error) {
 	catalogID := settings.SystemMonitoringCatalogID.Get()
 	templateVersionID, _, err := common.ParseExternalID(catalogID)
 	if err != nil {
@@ -84,10 +88,20 @@ func (l *alertService) Version() (string, error) {
 	return templateVersionID, nil
 }
 
-func (l *alertService) Upgrade(currentVersion string) (string, error) {
-	newCatalogID := settings.SystemMonitoringCatalogID.Get()
+func (l *AlertService) Upgrade(currentVersion string) (string, error) {
+	templateVersionNamespace, systemCatalogName, _, templateName, _, err := common.SplitExternalID(settings.SystemMonitoringCatalogID.Get())
+	if err != nil {
+		return "", err
+	}
 
-	NewVersion, _, err := common.ParseExternalID(newCatalogID)
+	templateID := fmt.Sprintf("%s-%s", systemCatalogName, templateName)
+	template, err := l.templateLister.Get(templateVersionNamespace, templateID)
+	if err != nil {
+		return "", errors.Wrapf(err, "get template %s failed", templateID)
+	}
+	newExternalID := fmt.Sprintf("catalog://?catalog=%s&template=%s&version=%s", systemCatalogName, templateName, template.Spec.DefaultVersion)
+
+	newVersion, _, err := common.ParseExternalID(newExternalID)
 	if err != nil {
 		return "", err
 	}
@@ -125,12 +139,12 @@ func (l *alertService) Upgrade(currentVersion string) (string, error) {
 	app, err := l.apps.GetNamespaced(systemProject.Name, appName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return NewVersion, nil
+			return newVersion, nil
 		}
 		return "", fmt.Errorf("get app %s:%s failed, %v", systemProject.Name, appName, err)
 	}
 	newApp := app.DeepCopy()
-	newApp.Spec.ExternalID = newCatalogID
+	newApp.Spec.ExternalID = newExternalID
 	newApp.Spec.Answers["operator.enabled"] = "false"
 
 	if !reflect.DeepEqual(newApp, app) {
@@ -140,17 +154,26 @@ func (l *alertService) Upgrade(currentVersion string) (string, error) {
 			return "", fmt.Errorf("get cluster %s failed, %v", l.clusterName, err)
 		}
 		if !v3.ClusterConditionReady.IsTrue(cluster) {
-			return "", fmt.Errorf("upgrade system service %s failed, cluster %v not ready", serviceName, l.clusterName)
+			return "", fmt.Errorf("cluster %v not ready", l.clusterName)
+		}
+
+		systemCatalog, err := l.catalogLister.Get(metav1.NamespaceAll, systemCatalogName)
+		if err != nil {
+			return "", fmt.Errorf("get catalog %s failed, %v", systemCatalogName, err)
+		}
+
+		if !v3.CatalogConditionUpgraded.IsTrue(systemCatalog) || !v3.CatalogConditionRefreshed.IsTrue(systemCatalog) || !v3.CatalogConditionDiskCached.IsTrue(systemCatalog) {
+			return "", fmt.Errorf("catalog %v not ready", systemCatalogName)
 		}
 
 		if _, err = l.apps.Update(newApp); err != nil {
 			return "", fmt.Errorf("update app %s:%s failed, %v", app.Namespace, app.Name, err)
 		}
 	}
-	return NewVersion, nil
+	return newVersion, nil
 }
 
-func (l *alertService) migrateLegacyClusterAlert() error {
+func (l *AlertService) migrateLegacyClusterAlert() error {
 	oldClusterAlert, err := l.oldClusterAlerts.List(metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("get old cluster alert failed, %s", err)
@@ -247,7 +270,7 @@ func (l *alertService) migrateLegacyClusterAlert() error {
 	return nil
 }
 
-func (l *alertService) migrateLegacyProjectAlert() error {
+func (l *AlertService) migrateLegacyProjectAlert() error {
 	oldProjectAlert, err := l.oldProjectAlerts.List(metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("get old project alert failed, %s", err)
@@ -351,7 +374,7 @@ func (l *alertService) migrateLegacyProjectAlert() error {
 	return nil
 }
 
-func (l *alertService) removeLegacyAlerting() error {
+func (l *AlertService) removeLegacyAlerting() error {
 	legacyAlertmanagerNamespace := "cattle-alerting"
 
 	if err := l.namespaces.Delete(legacyAlertmanagerNamespace, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
