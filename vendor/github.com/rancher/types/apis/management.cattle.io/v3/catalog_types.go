@@ -144,6 +144,8 @@ type TemplateVersionSpec struct {
 	KubeVersion         string            `json:"kubeVersion,omitempty"`
 	UpgradeVersionLinks map[string]string `json:"upgradeVersionLinks,omitempty"`
 	Digest              string            `json:"digest,omitempty"`
+	RancherMinVersion   string            `json:"rancherMinVersion,omitempty"`
+	RancherMaxVersion   string            `json:"rancherMaxVersion,omitempty"`
 
 	// Deprecated: Do not use
 	Files map[string]string `json:"files,omitempty" norman:"nocreate,noupdate"`
