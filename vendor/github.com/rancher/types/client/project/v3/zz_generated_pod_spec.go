@@ -16,14 +16,11 @@ const (
 	PodSpecFieldHostname                      = "hostname"
 	PodSpecFieldImagePullSecrets              = "imagePullSecrets"
 	PodSpecFieldNodeID                        = "nodeId"
-	PodSpecFieldPriority                      = "priority"
-	PodSpecFieldPriorityClassName             = "priorityClassName"
 	PodSpecFieldReadinessGates                = "readinessGates"
 	PodSpecFieldRestartPolicy                 = "restartPolicy"
 	PodSpecFieldRunAsGroup                    = "runAsGroup"
 	PodSpecFieldRunAsNonRoot                  = "runAsNonRoot"
 	PodSpecFieldRuntimeClassName              = "runtimeClassName"
-	PodSpecFieldSchedulerName                 = "schedulerName"
 	PodSpecFieldScheduling                    = "scheduling"
 	PodSpecFieldServiceAccountName            = "serviceAccountName"
 	PodSpecFieldShareProcessNamespace         = "shareProcessNamespace"
@@ -49,14 +46,11 @@ type PodSpec struct {
 	Hostname                      string                 `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	ImagePullSecrets              []LocalObjectReference `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	NodeID                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
-	Priority                      *int64                 `json:"priority,omitempty" yaml:"priority,omitempty"`
-	PriorityClassName             string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
 	ReadinessGates                []PodReadinessGate     `json:"readinessGates,omitempty" yaml:"readinessGates,omitempty"`
 	RestartPolicy                 string                 `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
 	RunAsGroup                    *int64                 `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	RuntimeClassName              string                 `json:"runtimeClassName,omitempty" yaml:"runtimeClassName,omitempty"`
-	SchedulerName                 string                 `json:"schedulerName,omitempty" yaml:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling            `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	ServiceAccountName            string                 `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
 	ShareProcessNamespace         *bool                  `json:"shareProcessNamespace,omitempty" yaml:"shareProcessNamespace,omitempty"`
