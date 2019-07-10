@@ -28,8 +28,6 @@ const (
 	PodFieldNamespaceId                   = "namespaceId"
 	PodFieldNodeID                        = "nodeId"
 	PodFieldOwnerReferences               = "ownerReferences"
-	PodFieldPriority                      = "priority"
-	PodFieldPriorityClassName             = "priorityClassName"
 	PodFieldProjectID                     = "projectId"
 	PodFieldPublicEndpoints               = "publicEndpoints"
 	PodFieldReadinessGates                = "readinessGates"
@@ -38,7 +36,6 @@ const (
 	PodFieldRunAsGroup                    = "runAsGroup"
 	PodFieldRunAsNonRoot                  = "runAsNonRoot"
 	PodFieldRuntimeClassName              = "runtimeClassName"
-	PodFieldSchedulerName                 = "schedulerName"
 	PodFieldScheduling                    = "scheduling"
 	PodFieldServiceAccountName            = "serviceAccountName"
 	PodFieldShareProcessNamespace         = "shareProcessNamespace"
@@ -80,8 +77,6 @@ type Pod struct {
 	NamespaceId                   string                 `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeID                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	Priority                      *int64                 `json:"priority,omitempty" yaml:"priority,omitempty"`
-	PriorityClassName             string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
 	ProjectID                     string                 `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	PublicEndpoints               []PublicEndpoint       `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
 	ReadinessGates                []PodReadinessGate     `json:"readinessGates,omitempty" yaml:"readinessGates,omitempty"`
@@ -90,7 +85,6 @@ type Pod struct {
 	RunAsGroup                    *int64                 `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	RuntimeClassName              string                 `json:"runtimeClassName,omitempty" yaml:"runtimeClassName,omitempty"`
-	SchedulerName                 string                 `json:"schedulerName,omitempty" yaml:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling            `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	ServiceAccountName            string                 `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
 	ShareProcessNamespace         *bool                  `json:"shareProcessNamespace,omitempty" yaml:"shareProcessNamespace,omitempty"`
