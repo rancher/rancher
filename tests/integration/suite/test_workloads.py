@@ -165,6 +165,38 @@ def test_workload_probes(admin_pc):
     client.delete(ns)
 
 
+def test_workload_scheduling(admin_pc):
+    client = admin_pc.client
+    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                  projectId=admin_pc.
+                                                  project.id)
+    name = random_str()
+    workload = client.create_workload(
+        name=name,
+        namespaceId=ns.id,
+        scale=1,
+        scheduling={
+            "scheduler": "some-scheduler",
+        },
+        containers=[{
+            'name': 'one',
+            'image': 'nginx',
+        }])
+    assert workload.scheduling.scheduler == "some-scheduler"
+    workload = client.update(workload,
+                             namespaceId=ns.id,
+                             scale=1,
+                             scheduling={
+                                 "scheduler": "test-scheduler",
+                             },
+                             containers=[{
+                                 'name': 'one',
+                                 'image': 'nginx',
+                             }]),
+    assert workload[0].scheduling.scheduler == "test-scheduler"
+    client.delete(ns)
+
+
 def test_statefulset_workload_volumemount_subpath(admin_pc):
     client = admin_pc.client
     # setup
