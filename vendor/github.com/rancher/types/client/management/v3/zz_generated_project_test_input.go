@@ -2,6 +2,7 @@ package client
 
 const (
 	ProjectTestInputType                       = "projectTestInput"
+	ProjectTestInputFieldCloudWatchConfig      = "cloudWatchConfig"
 	ProjectTestInputFieldCustomTargetConfig    = "customTargetConfig"
 	ProjectTestInputFieldElasticsearchConfig   = "elasticsearchConfig"
 	ProjectTestInputFieldFluentForwarderConfig = "fluentForwarderConfig"
@@ -13,6 +14,7 @@ const (
 )
 
 type ProjectTestInput struct {
+	CloudWatchConfig      *CloudWatchConfig      `json:"cloudWatchConfig,omitempty" yaml:"cloudWatchConfig,omitempty"`
 	CustomTargetConfig    *CustomTargetConfig    `json:"customTargetConfig,omitempty" yaml:"customTargetConfig,omitempty"`
 	ElasticsearchConfig   *ElasticsearchConfig   `json:"elasticsearchConfig,omitempty" yaml:"elasticsearchConfig,omitempty"`
 	FluentForwarderConfig *FluentForwarderConfig `json:"fluentForwarderConfig,omitempty" yaml:"fluentForwarderConfig,omitempty"`

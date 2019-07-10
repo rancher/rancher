@@ -2,6 +2,7 @@ package client
 
 const (
 	ClusterTestInputType                       = "clusterTestInput"
+	ClusterTestInputFieldCloudWatchConfig      = "cloudWatchConfig"
 	ClusterTestInputFieldClusterName           = "clusterId"
 	ClusterTestInputFieldCustomTargetConfig    = "customTargetConfig"
 	ClusterTestInputFieldElasticsearchConfig   = "elasticsearchConfig"
@@ -13,6 +14,7 @@ const (
 )
 
 type ClusterTestInput struct {
+	CloudWatchConfig      *CloudWatchConfig      `json:"cloudWatchConfig,omitempty" yaml:"cloudWatchConfig,omitempty"`
 	ClusterName           string                 `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	CustomTargetConfig    *CustomTargetConfig    `json:"customTargetConfig,omitempty" yaml:"customTargetConfig,omitempty"`
 	ElasticsearchConfig   *ElasticsearchConfig   `json:"elasticsearchConfig,omitempty" yaml:"elasticsearchConfig,omitempty"`
