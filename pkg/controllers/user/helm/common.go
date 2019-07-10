@@ -198,15 +198,17 @@ func createTempDir(obj *v3.App) (*common.HelmPath, error) {
 		}, nil
 	}
 
-	err := jailer.CreateJail(obj.Name)
+	jailDir := obj.Spec.ProjectName + ":" + obj.Name
+
+	err := jailer.CreateJail(jailDir)
 	if err != nil {
 		return nil, err
 	}
 
 	paths := &common.HelmPath{
-		FullPath:         filepath.Join(jailer.BaseJailPath, obj.Name),
+		FullPath:         filepath.Join(jailer.BaseJailPath, jailDir),
 		InJailPath:       "/",
-		KubeConfigFull:   filepath.Join(jailer.BaseJailPath, obj.Name, ".kubeconfig"),
+		KubeConfigFull:   filepath.Join(jailer.BaseJailPath, jailDir, ".kubeconfig"),
 		KubeConfigInJail: "/.kubeconfig",
 	}
 
