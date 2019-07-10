@@ -16,6 +16,7 @@ var MatchTemplate = `
   {{- template "kafka" . -}}
   {{- template "syslog" . -}}
   {{- template "fluentforwarder" . -}}
+  {{- template "cloudwatch" . -}}
   {{- template "custom" . -}}
   {{- template "buffer" . -}}
   </store>
