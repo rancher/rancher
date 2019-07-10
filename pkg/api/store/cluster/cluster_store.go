@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/norman/types/definition"
 	"github.com/rancher/norman/types/values"
 	ccluster "github.com/rancher/rancher/pkg/api/customization/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -24,6 +25,7 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	managementv3 "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -170,7 +172,8 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		if err != nil {
 			return nil, err
 		}
-		data, err = loadDataFromTemplate(clusterTemplateRevision, clusterTemplate, data)
+		clusterConfigSchema := apiContext.Schemas.Schema(&managementschema.Version, managementv3.ClusterSpecBaseType)
+		data, err = loadDataFromTemplate(clusterTemplateRevision, clusterTemplate, data, clusterConfigSchema)
 		if err != nil {
 			return nil, err
 		}
@@ -208,7 +211,22 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	return r.Store.Create(apiContext, schema, data)
 }
 
-func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, clusterTemplate *v3.ClusterTemplate, data map[string]interface{}) (map[string]interface{}, error) {
+func transposeNameFields(data map[string]interface{}, clusterConfigSchema *types.Schema) map[string]interface{} {
+
+	if clusterConfigSchema != nil {
+		for fieldName, field := range clusterConfigSchema.ResourceFields {
+
+			if definition.IsReferenceType(field.Type) && strings.HasSuffix(fieldName, "Id") {
+				dataKeyName := strings.TrimSuffix(fieldName, "Id") + "Name"
+				data[fieldName] = data[dataKeyName]
+				delete(data, dataKeyName)
+			}
+		}
+	}
+	return data
+}
+
+func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, clusterTemplate *v3.ClusterTemplate, data map[string]interface{}, clusterConfigSchema *types.Schema) (map[string]interface{}, error) {
 	dataFromTemplate, err := convert.EncodeToMap(clusterTemplateRevision.Spec.ClusterConfig)
 	if err != nil {
 		return nil, err
@@ -218,6 +236,8 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 	dataFromTemplate[managementv3.ClusterSpecFieldClusterTemplateID] = ref.Ref(clusterTemplate)
 	dataFromTemplate[managementv3.ClusterSpecFieldClusterTemplateRevisionID] = convert.ToString(data[managementv3.ClusterSpecFieldClusterTemplateRevisionID])
 	dataFromTemplate[managementv3.ClusterSpecFieldClusterTemplateAnswers] = data[managementv3.ClusterSpecFieldClusterTemplateAnswers]
+
+	dataFromTemplate = transposeNameFields(dataFromTemplate, clusterConfigSchema)
 
 	//Add in any answers to the clusterTemplateRevision's Questions[]
 	answers := convert.ToMapInterface(data[managementv3.ClusterSpecFieldClusterTemplateAnswers])
@@ -375,7 +395,8 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 			return nil, httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("cannot update cluster, cluster cannot be changed to a new clusterTemplate"))
 		}
 
-		clusterUpdate, err := loadDataFromTemplate(clusterTemplateRevision, clusterTemplate, data)
+		clusterConfigSchema := apiContext.Schemas.Schema(&managementschema.Version, managementv3.ClusterSpecBaseType)
+		clusterUpdate, err := loadDataFromTemplate(clusterTemplateRevision, clusterTemplate, data, clusterConfigSchema)
 		if err != nil {
 			return nil, err
 		}

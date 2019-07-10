@@ -21,6 +21,40 @@ def test_create_cluster_template_with_revision(admin_mc, remove_resource):
     assert template_reloaded.links.revisions is not None
 
 
+def test_default_pod_sec(admin_mc, remove_resource):
+    cluster_template = create_cluster_template(admin_mc,
+                                               remove_resource, [], admin_mc)
+    tId = cluster_template.id
+    client = admin_mc.client
+    cconfig = {
+        "rancherKubernetesEngineConfig": {
+            "services": {
+                "type": "rkeConfigServices",
+                "kubeApi": {
+                    "alwaysPullImages": "false",
+                    "podSecurityPolicy": "false",
+                    "serviceNodePortRange": "30000-32767",
+                    "type": "kubeAPIService"
+                }
+            }
+        },
+        "defaultPodSecurityPolicyTemplateId": "restricted",
+    }
+    rev = client.create_cluster_template_revision(clusterConfig=cconfig,
+                                                  clusterTemplateId=tId,
+                                                  enabled="true")
+
+    cluster = client.create_cluster(name=random_str(),
+                                    clusterTemplateRevisionId=rev.id)
+
+    remove_resource(cluster)
+    assert cluster.conditions[0].type == 'Pending'
+    assert cluster.conditions[0].status == 'True'
+    assert cluster.defaultPodSecurityPolicyTemplateId == "restricted"
+    client.delete(cluster)
+    wait_for_cluster_to_be_deleted(client, cluster.id)
+
+
 def test_check_default_revision(admin_mc, remove_resource):
     cluster_template = create_cluster_template(admin_mc, remove_resource,
                                                [], admin_mc)
