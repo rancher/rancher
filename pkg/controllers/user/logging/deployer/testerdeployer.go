@@ -112,7 +112,7 @@ func (d *TesterDeployer) deployLoggingTester(systemProjectID, appCreator, level,
 
 	app := loggingTesterApp(appCreator, systemProjectID, catalogID, clusterSecret, projectSecret)
 
-	return d.appDeployer.deploy(app)
+	return d.appDeployer.deploy(app, nil)
 }
 
 func (d *TesterDeployer) isLoggingTesterDeploySuccess() error {
