@@ -3,6 +3,7 @@ package deployer
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
@@ -64,7 +65,7 @@ func (d *AppDeployer) cleanup(appName, appTargetNamespace, projectID string) err
 	return nil
 }
 
-func (d *AppDeployer) deploy(app *projectv3.App) error {
+func (d *AppDeployer) deploy(app *projectv3.App, systemWriteKeys []string) error {
 	if err := d.initNamespace(app.Spec.TargetNamespace); err != nil {
 		return err
 	}
@@ -83,6 +84,23 @@ func (d *AppDeployer) deploy(app *projectv3.App) error {
 		return errors.New("stale app " + app.Namespace + ":" + app.Name + " still on terminating")
 	}
 
+	new := current.DeepCopy()
+	if len(systemWriteKeys) != 0 {
+		if new.Spec.Answers == nil {
+			new.Spec.Answers = make(map[string]string)
+		}
+
+		for _, v := range systemWriteKeys {
+			new.Spec.Answers[v] = app.Spec.Answers[v]
+		}
+	}
+
+	if !reflect.DeepEqual(current.Spec, new.Spec) {
+		_, err = d.AppsGetter.Apps(app.Namespace).Update(new)
+		if err != nil {
+			return errors.Wrapf(err, "failed to update app %s", app.Name)
+		}
+	}
 	return nil
 }
 
@@ -119,7 +137,7 @@ func (d *AppDeployer) isDeploySuccess(targetNamespace string, selector map[strin
 	return fmt.Errorf("timeout check deploy app status, namespace: %s, labels: %v", targetNamespace, selector)
 }
 
-func rancherLoggingApp(appCreator, systemProjectID, catalogID, driverDir string) *projectv3.App {
+func rancherLoggingApp(appCreator, systemProjectID, catalogID, driverDir, dockerRoot string) *projectv3.App {
 	appName := loggingconfig.AppName
 	namepspace := loggingconfig.LoggingNamespace
 	_, systemProjectName := ref.Parse(systemProjectID)
@@ -135,6 +153,7 @@ func rancherLoggingApp(appCreator, systemProjectID, catalogID, driverDir string)
 		Spec: projectv3.AppSpec{
 			Answers: map[string]string{
 				"fluentd.enabled":              "true",
+				"fluentd.cluster.dockerRoot":   dockerRoot,
 				"log-aggregator.enabled":       "true",
 				"log-aggregator.flexVolumeDir": driverDir,
 			},

@@ -19,6 +19,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+var (
+	fluentdSystemWriteKeys = []string{
+		"fluentd.cluster.dockerRoot",
+	}
+)
+
 type Deployer struct {
 	clusterName          string
 	clusterLister        mgmtv3.ClusterLister
@@ -57,6 +63,17 @@ func (d *Deployer) ClusterLoggingSync(key string, obj *mgmtv3.ClusterLogging) (r
 }
 
 func (d *Deployer) ProjectLoggingSync(key string, obj *mgmtv3.ProjectLogging) (runtime.Object, error) {
+	return obj, d.sync()
+}
+
+func (d *Deployer) ClusterSync(key string, obj *mgmtv3.Cluster) (runtime.Object, error) {
+	if obj == nil || obj.DeletionTimestamp != nil {
+		return nil, nil
+	}
+
+	if obj.Name != d.clusterName {
+		return obj, nil
+	}
 	return obj, d.sync()
 }
 
@@ -112,9 +129,9 @@ func (d *Deployer) deployRancherLogging(systemProjectID, appCreator string) erro
 
 	catalogID := loggingconfig.RancherLoggingCatalogID(template.Spec.DefaultVersion)
 
-	app := rancherLoggingApp(appCreator, systemProjectID, catalogID, driverDir)
+	app := rancherLoggingApp(appCreator, systemProjectID, catalogID, driverDir, cluster.Spec.DockerRootDir)
 
-	return d.appDeployer.deploy(app)
+	return d.appDeployer.deploy(app, fluentdSystemWriteKeys)
 }
 
 func (d *Deployer) isRancherLoggingDeploySuccess() error {
