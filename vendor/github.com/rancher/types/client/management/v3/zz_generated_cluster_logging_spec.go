@@ -2,7 +2,7 @@ package client
 
 const (
 	ClusterLoggingSpecType                        = "clusterLoggingSpec"
-	ClusterLoggingSpecFieldCloudWatchConfig       = "cloudWatchConfig"
+	ClusterLoggingSpecFieldCloudWatchConfig       = "cloudwatchConfig"
 	ClusterLoggingSpecFieldClusterID              = "clusterId"
 	ClusterLoggingSpecFieldCustomTargetConfig     = "customTargetConfig"
 	ClusterLoggingSpecFieldDisplayName            = "displayName"
@@ -17,7 +17,7 @@ const (
 )
 
 type ClusterLoggingSpec struct {
-	CloudWatchConfig       *CloudWatchConfig      `json:"cloudWatchConfig,omitempty" yaml:"cloudWatchConfig,omitempty"`
+	CloudWatchConfig       *CloudWatchConfig      `json:"cloudwatchConfig,omitempty" yaml:"cloudwatchConfig,omitempty"`
 	ClusterID              string                 `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	CustomTargetConfig     *CustomTargetConfig    `json:"customTargetConfig,omitempty" yaml:"customTargetConfig,omitempty"`
 	DisplayName            string                 `json:"displayName,omitempty" yaml:"displayName,omitempty"`

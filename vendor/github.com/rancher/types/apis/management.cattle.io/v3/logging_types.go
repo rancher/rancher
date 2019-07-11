@@ -49,7 +49,7 @@ type LoggingTargets struct {
 	KafkaConfig           *KafkaConfig           `json:"kafkaConfig,omitempty"`
 	SyslogConfig          *SyslogConfig          `json:"syslogConfig,omitempty"`
 	FluentForwarderConfig *FluentForwarderConfig `json:"fluentForwarderConfig,omitempty"`
-	CloudWatchConfig      *CloudWatchConfig      `json:"cloudWatchConfig,omitempty"`
+	CloudWatchConfig      *CloudWatchConfig      `json:"cloudwatchConfig,omitempty"`
 	CustomTargetConfig    *CustomTargetConfig    `json:"customTargetConfig,omitempty"`
 }
 
