@@ -920,54 +920,76 @@ func (state state) hasLinuxProfile() bool {
 }
 
 func (d *Driver) ensureLogAnalyticsWorkspaceForMonitoring(ctx context.Context, client *operationalinsights.WorkspacesClient, state state) (workspaceID string, err error) {
-	// log analytics workspaces cannot be created in WCUS region due to capacity limits
-	// so mapped to EUS per discussion with log analytics team
+	// Please keep in sync with
+	// https://github.com/Azure/azure-cli/blob/release/src/azure-cli/azure/cli/command_modules/acs/custom.py#L1996
+
 	locationToOmsRegionCodeMap := map[string]string{
-		"eastus":             "EUS",
-		"westeurope":         "WEU",
-		"southeastasia":      "SEA",
 		"australiasoutheast": "ASE",
-		"usgovvirginia":      "USGV",
-		"westcentralus":      "EUS",
-		"japaneast":          "EJP",
-		"uksouth":            "SUK",
+		"australiaeast":      "EAU",
+		"australiacentral":   "CAU",
 		"canadacentral":      "CCA",
 		"centralindia":       "CIN",
+		"centralus":          "CUS",
+		"eastasia":           "EA",
+		"eastus":             "EUS",
+		"eastus2":            "EUS2",
 		"eastus2euap":        "EAP",
+		"francecentral":      "PAR",
+		"japaneast":          "EJP",
+		"koreacentral":       "SE",
+		"northeurope":        "NEU",
+		"southcentralus":     "SCUS",
+		"southeastasia":      "SEA",
+		"uksouth":            "SUK",
+		"usgovvirginia":      "USGV",
+		"westcentralus":      "EUS",
+		"westeurope":         "WEU",
+		"westus":             "WUS",
+		"westus2":            "WUS2",
 	}
 	regionToOmsRegionMap := map[string]string{
-		"australiaeast":      "australiasoutheast",
+		"australiacentral":   "australiacentral",
+		"australiacentral2":  "australiacentral",
+		"australiaeast":      "australiaeast",
 		"australiasoutheast": "australiasoutheast",
-		"brazilsouth":        "eastus",
+		"brazilsouth":        "southcentralus",
 		"canadacentral":      "canadacentral",
 		"canadaeast":         "canadacentral",
-		"centralus":          "eastus",
-		"eastasia":           "southeastasia",
+		"centralus":          "centralus",
+		"centralindia":       "centralindia",
+		"eastasia":           "eastasia",
 		"eastus":             "eastus",
-		"eastus2":            "eastus",
+		"eastus2":            "eastus2",
+		"francecentral":      "francecentral",
+		"francesouth":        "francecentral",
 		"japaneast":          "japaneast",
 		"japanwest":          "japaneast",
+		"koreacentral":       "koreacentral",
+		"koreasouth":         "koreacentral",
 		"northcentralus":     "eastus",
-		"northeurope":        "westeurope",
-		"southcentralus":     "eastus",
+		"northeurope":        "northeurope",
+		"southafricanorth":   "westeurope",
+		"southafricawest":    "westeurope",
+		"southcentralus":     "southcentralus",
 		"southeastasia":      "southeastasia",
+		"southindia":         "centralindia",
 		"uksouth":            "uksouth",
 		"ukwest":             "uksouth",
 		"westcentralus":      "eastus",
 		"westeurope":         "westeurope",
-		"westus":             "eastus",
-		"westus2":            "eastus",
-		"centralindia":       "centralindia",
-		"southindia":         "centralindia",
 		"westindia":          "centralindia",
-		"koreacentral":       "southeastasia",
-		"koreasouth":         "southeastasia",
-		"francecentral":      "westeurope",
-		"francesouth":        "westeurope",
+		"westus":             "westus",
+		"westus2":            "westus2",
 	}
 
-	workspaceRegion := regionToOmsRegionMap[state.Location]
-	workspaceRegionCode := locationToOmsRegionCodeMap[workspaceRegion]
+	workspaceRegion, ok := regionToOmsRegionMap[state.Location]
+	if !ok {
+		return "", fmt.Errorf("region %s not supported for Log Analytics workspace", state.Location)
+	}
+	workspaceRegionCode, ok := locationToOmsRegionCodeMap[workspaceRegion]
+	if !ok {
+		return "", fmt.Errorf("region %s not supported for Log Analytics workspace", workspaceRegion)
+	}
 
 	workspaceResourceGroup := state.LogAnalyticsWorkspaceResourceGroup
 	if workspaceResourceGroup == "" {
