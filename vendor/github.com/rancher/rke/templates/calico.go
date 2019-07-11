@@ -1601,24 +1601,24 @@ spec:
         # This container performs upgrade from host-local IPAM to calico-ipam.
         # It can be deleted if this is a fresh installation, or if you have already
         # upgraded to use calico-ipam.
-        #- name: upgrade-ipam
-        #  image: calico/cni:v3.7.3
-        #  command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
-        #  env:
-        #    - name: KUBERNETES_NODE_NAME
-        #      valueFrom:
-        #        fieldRef:
-        #          fieldPath: spec.nodeName
-        #    - name: CALICO_NETWORKING_BACKEND
-        #      valueFrom:
-        #        configMapKeyRef:
-        #          name: calico-config
-        #          key: calico_backend
-        #  volumeMounts:
-        #    - mountPath: /var/lib/cni/networks
-        #      name: host-local-net-dir
-        #    - mountPath: /host/opt/cni/bin
-        #      name: cni-bin-dir
+        - name: upgrade-ipam
+          image: {{.CNIImage}}
+          command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
+          env:
+            - name: KUBERNETES_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: CALICO_NETWORKING_BACKEND
+              valueFrom:
+                configMapKeyRef:
+                  name: calico-config
+                  key: calico_backend
+          volumeMounts:
+            - mountPath: /var/lib/cni/networks
+              name: host-local-net-dir
+            - mountPath: /host/opt/cni/bin
+              name: cni-bin-dir
         # This container installs the CNI binaries
         # and CNI network config file on each node.
         - name: install-cni
@@ -1815,7 +1815,7 @@ spec:
 {{end}}
       containers:
         - name: calico-kube-controllers
-          image: calico/kube-controllers:v3.7.3
+          image: {{.ControllersImage}}
           env:
             # Choose which controllers to run.
             - name: ENABLED_CONTROLLERS

@@ -153,13 +153,14 @@ func (c *Cluster) doFlannelDeploy(ctx context.Context) error {
 func (c *Cluster) doCalicoDeploy(ctx context.Context) error {
 	clientConfig := pki.GetConfigPath(pki.KubeNodeCertName)
 	calicoConfig := map[string]interface{}{
-		KubeCfg:       clientConfig,
-		ClusterCIDR:   c.ClusterCIDR,
-		CNIImage:      c.SystemImages.CalicoCNI,
-		NodeImage:     c.SystemImages.CalicoNode,
-		Calicoctl:     c.SystemImages.CalicoCtl,
-		CloudProvider: c.Network.Options[CalicoCloudProvider],
-		RBACConfig:    c.Authorization.Mode,
+		KubeCfg:          clientConfig,
+		ClusterCIDR:      c.ClusterCIDR,
+		CNIImage:         c.SystemImages.CalicoCNI,
+		NodeImage:        c.SystemImages.CalicoNode,
+		Calicoctl:        c.SystemImages.CalicoCtl,
+		ControllersImage: c.SystemImages.CalicoControllers,
+		CloudProvider:    c.Network.Options[CalicoCloudProvider],
+		RBACConfig:       c.Authorization.Mode,
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(calicoConfig)
 	if err != nil {
