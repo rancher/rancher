@@ -7,8 +7,9 @@ import (
 )
 
 func Register(ctx context.Context, cluster *config.UserContext) {
-	for _, v := range systemServices {
-		v.Init(ctx, cluster)
+	sMap := make(map[string]SystemService)
+	for k, v := range systemServices {
+		sMap[k] = v.Init(ctx, cluster)
 	}
 
 	projClient := cluster.Management.Management.Projects("")
@@ -20,6 +21,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		daemonsetLister:  cluster.Apps.DaemonSets("").Controller().Lister(),
 		deployments:      cluster.Apps.Deployments(""),
 		deploymentLister: cluster.Apps.Deployments("").Controller().Lister(),
+		systemServices:   sMap,
 	}
 	projClient.AddClusterScopedHandler(ctx, "system-image-upgrade-controller", cluster.ClusterName, syncer.Sync)
 

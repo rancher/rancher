@@ -41,19 +41,19 @@ func init() {
 	systemimage.RegisterSystemService(serviceName, &loggingService{})
 }
 
-func (l *loggingService) Init(ctx context.Context, cluster *config.UserContext) {
-	ad := &AppDeployer{
-		AppsGetter: cluster.Management.Project,
-		Namespaces: cluster.Core.Namespaces(metav1.NamespaceAll),
+func (l *loggingService) Init(ctx context.Context, cluster *config.UserContext) systemimage.SystemService {
+	return &loggingService{
+		appDeployer: &AppDeployer{
+			AppsGetter: cluster.Management.Project,
+			Namespaces: cluster.Core.Namespaces(metav1.NamespaceAll),
+		},
+		clusterName:    cluster.ClusterName,
+		clusterLister:  cluster.Management.Management.Clusters("").Controller().Lister(),
+		projectLister:  cluster.Management.Management.Projects(metav1.NamespaceAll).Controller().Lister(),
+		templateLister: cluster.Management.Management.CatalogTemplates(metav1.NamespaceAll).Controller().Lister(),
+		daemonsets:     cluster.Apps.DaemonSets(loggingconfig.LoggingNamespace),
+		secrets:        cluster.Core.Secrets(loggingconfig.LoggingNamespace),
 	}
-
-	l.clusterName = cluster.ClusterName
-	l.clusterLister = cluster.Management.Management.Clusters("").Controller().Lister()
-	l.projectLister = cluster.Management.Management.Projects(metav1.NamespaceAll).Controller().Lister()
-	l.templateLister = cluster.Management.Management.CatalogTemplates(metav1.NamespaceAll).Controller().Lister()
-	l.daemonsets = cluster.Apps.DaemonSets(loggingconfig.LoggingNamespace)
-	l.secrets = cluster.Core.Secrets(loggingconfig.LoggingNamespace)
-	l.appDeployer = ad
 }
 
 func (l *loggingService) Version() (string, error) {

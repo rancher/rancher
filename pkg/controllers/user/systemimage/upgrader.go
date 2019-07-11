@@ -13,7 +13,7 @@ import (
 var systemServices = make(map[string]SystemService)
 
 type SystemService interface {
-	Init(ctx context.Context, cluster *config.UserContext)
+	Init(ctx context.Context, cluster *config.UserContext) SystemService
 	Upgrade(currentVersion string) (newVersion string, err error)
 	Version() (string, error)
 }

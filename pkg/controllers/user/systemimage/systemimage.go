@@ -21,6 +21,7 @@ type Syncer struct {
 	deploymentLister v1beta2.DeploymentLister
 	projectLister    v3.ProjectLister
 	projects         v3.ProjectInterface
+	systemServices   map[string]SystemService
 }
 
 func (s *Syncer) Sync(key string, obj *v3.Project) (runtime.Object, error) {
@@ -53,7 +54,7 @@ func (s *Syncer) Sync(key string, obj *v3.Project) (runtime.Object, error) {
 	}
 
 	changed := false
-	for k, v := range systemServices {
+	for k, v := range s.systemServices {
 		oldVersion := versionMap[k]
 		newVersion, err := v.Upgrade(oldVersion)
 		if err != nil {

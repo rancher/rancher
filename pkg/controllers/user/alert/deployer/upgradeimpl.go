@@ -52,27 +52,26 @@ func init() {
 	systemimage.RegisterSystemService(serviceName, &alertService{})
 }
 
-func (l *alertService) Init(ctx context.Context, cluster *config.UserContext) {
-	ad := &appDeployer{
-		appsGetter:       cluster.Management.Project,
-		namespaces:       cluster.Management.Core.Namespaces(metav1.NamespaceAll),
-		secrets:          cluster.Core.Secrets(metav1.NamespaceAll),
-		templateVersions: cluster.Management.Management.CatalogTemplateVersions(namespace.GlobalNamespace),
+func (l *alertService) Init(ctx context.Context, cluster *config.UserContext) systemimage.SystemService {
+	return &alertService{
+		appDeployer: &appDeployer{
+			appsGetter:       cluster.Management.Project,
+			namespaces:       cluster.Management.Core.Namespaces(metav1.NamespaceAll),
+			secrets:          cluster.Core.Secrets(metav1.NamespaceAll),
+			templateVersions: cluster.Management.Management.CatalogTemplateVersions(namespace.GlobalNamespace),
+		},
+		namespaces:         cluster.Core.Namespaces(metav1.NamespaceAll),
+		apps:               cluster.Management.Project.Apps(metav1.NamespaceAll),
+		projectLister:      cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
+		projectAlertRules:  cluster.Management.Management.ProjectAlertRules(metav1.NamespaceAll),
+		clusterAlertRules:  cluster.Management.Management.ClusterAlertRules(cluster.ClusterName),
+		projectAlertGroups: cluster.Management.Management.ProjectAlertGroups(metav1.NamespaceAll),
+		clusterAlertGroups: cluster.Management.Management.ClusterAlertGroups(cluster.ClusterName),
+		oldProjectAlerts:   cluster.Management.Management.ProjectAlerts(metav1.NamespaceAll),
+		oldClusterAlerts:   cluster.Management.Management.ClusterAlerts(cluster.ClusterName),
+		clusterLister:      cluster.Management.Management.Clusters("").Controller().Lister(),
+		clusterName:        cluster.ClusterName,
 	}
-
-	l.clusterName = cluster.ClusterName
-	l.clusterLister = cluster.Management.Management.Clusters("").Controller().Lister()
-	l.oldClusterAlerts = cluster.Management.Management.ClusterAlerts(cluster.ClusterName)
-	l.oldProjectAlerts = cluster.Management.Management.ProjectAlerts(metav1.NamespaceAll)
-	l.clusterAlertGroups = cluster.Management.Management.ClusterAlertGroups(cluster.ClusterName)
-	l.projectAlertGroups = cluster.Management.Management.ProjectAlertGroups(metav1.NamespaceAll)
-	l.clusterAlertRules = cluster.Management.Management.ClusterAlertRules(cluster.ClusterName)
-	l.projectAlertRules = cluster.Management.Management.ProjectAlertRules(metav1.NamespaceAll)
-	l.projectLister = cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister()
-	l.apps = cluster.Management.Project.Apps(metav1.NamespaceAll)
-	l.namespaces = cluster.Core.Namespaces(metav1.NamespaceAll)
-	l.appDeployer = ad
-
 }
 
 func (l *alertService) Version() (string, error) {

@@ -33,11 +33,13 @@ func init() {
 	systemimage.RegisterSystemService(serviceName, &pipelineService{})
 }
 
-func (l *pipelineService) Init(ctx context.Context, cluster *config.UserContext) {
-	l.deployments = cluster.Apps.Deployments("")
-	l.namespaceLister = cluster.Core.Namespaces("").Controller().Lister()
-	l.secrets = cluster.Core.Secrets("")
-	l.systemAccountManager = systemaccount.NewManager(cluster.Management)
+func (l *pipelineService) Init(ctx context.Context, cluster *config.UserContext) systemimage.SystemService {
+	return &pipelineService{
+		deployments:          cluster.Apps.Deployments(""),
+		namespaceLister:      cluster.Core.Namespaces("").Controller().Lister(),
+		secrets:              cluster.Core.Secrets(""),
+		systemAccountManager: systemaccount.NewManager(cluster.Management),
+	}
 }
 
 func (l *pipelineService) Version() (string, error) {
