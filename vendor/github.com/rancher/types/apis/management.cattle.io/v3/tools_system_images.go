@@ -29,7 +29,7 @@ var (
 			KubeApply:     m("rancher/pipeline-tools:v0.1.9"),
 		},
 		LoggingSystemImages: LoggingSystemImages{
-			Fluentd:                       m("rancher/fluentd:v0.1.11"),
+			Fluentd:                       m("nlowe/rancher-fluentd:GH-21368"),
 			FluentdHelper:                 m("rancher/fluentd-helper:v0.1.2"),
 			LogAggregatorFlexVolumeDriver: m("rancher/log-aggregator:v0.1.4"),
 		},

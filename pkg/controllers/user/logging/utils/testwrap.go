@@ -12,10 +12,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/pkg/errors"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config/dialer"
-
-	"github.com/pkg/errors"
 )
 
 const (
@@ -50,6 +49,8 @@ func NewLoggingTargetTestWrap(loggingTargets v3.LoggingTargets) LoggingTargetTes
 		return &kafkaTestWrap{loggingTargets.KafkaConfig}
 	} else if loggingTargets.FluentForwarderConfig != nil {
 		return &fluentForwarderTestWrap{loggingTargets.FluentForwarderConfig}
+	} else if loggingTargets.CloudWatchConfig != nil {
+		return &cloudWatchTestWrap{loggingTargets.CloudWatchConfig}
 	} else if loggingTargets.CustomTargetConfig != nil {
 		return &customTargetTestWrap{loggingTargets.CustomTargetConfig}
 	}

@@ -6,11 +6,10 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/pkg/errors"
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-
-	"github.com/pkg/errors"
 )
 
 type LoggingTargetTemplateWrap struct {
@@ -20,6 +19,7 @@ type LoggingTargetTemplateWrap struct {
 	SyslogTemplateWrap
 	KafkaTemplateWrap
 	FluentForwarderTemplateWrap
+	CloudWatchTemplateWrap
 	CustomTargetWrap
 }
 
@@ -154,6 +154,10 @@ type FluentForwarderTemplateWrap struct {
 	FluentServers  []FluentServer
 }
 
+type CloudWatchTemplateWrap struct {
+	v3.CloudWatchConfig
+}
+
 type FluentServer struct {
 	Host string
 	Port string
@@ -214,6 +218,16 @@ func NewLoggingTargetTemplateWrap(loggingTagets v3.LoggingTargets) (wrapLogging 
 		}
 		wp.FluentForwarderTemplateWrap = *wrap
 		wp.CurrentTarget = loggingconfig.FluentForwarder
+		return wp, nil
+
+	} else if loggingTagets.CloudWatchConfig != nil {
+
+		wrap, err := newCloudWatchTemplateWrap(loggingTagets.CloudWatchConfig)
+		if err != nil {
+			return nil, err
+		}
+		wp.CloudWatchTemplateWrap = *wrap
+		wp.CurrentTarget = loggingconfig.CloudWatch
 		return wp, nil
 
 	} else if loggingTagets.CustomTargetConfig != nil {
@@ -328,6 +342,12 @@ func newFluentForwarderTemplateWrap(fluentForwarderConfig *v3.FluentForwarderCon
 		FluentForwarderConfig: *fluentForwarderConfig,
 		EnableShareKey:        enableShareKey,
 		FluentServers:         fss,
+	}, nil
+}
+
+func newCloudWatchTemplateWrap(cloudWatchConfig *v3.CloudWatchConfig) (*CloudWatchTemplateWrap, error) {
+	return &CloudWatchTemplateWrap{
+		CloudWatchConfig: *cloudWatchConfig,
 	}, nil
 }
 

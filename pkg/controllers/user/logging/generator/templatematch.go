@@ -16,6 +16,7 @@ var MatchTemplate = `
   {{- template "kafka" . -}}
   {{- template "syslog" . -}}
   {{- template "fluentforwarder" . -}}
+  {{- template "cloudwatch" . -}}
   {{- template "custom" . -}}
   {{- template "buffer" . -}}
   </store>
@@ -199,6 +200,19 @@ var MatchTemplate = `
 	  {{end}}
 	</server>
 	{{end}}
+{{end}}
+{{end}}
+
+{{define "cloudwatch"}}
+{{- if eq .CurrentTarget "cloudwatch" }}
+    @type cloudwatch_logs
+    log_group_name {{ .CloudWatchConfig.Group }}
+    log_stream_name {{ .CloudWatchConfig.Stream }}
+    auto_create_stream true
+
+    aws_key_id {{ .CloudWatchConfig.AccessKeyID }}
+    aws_sec_key {{ .CloudWatchConfig.SecretAccessKey }}
+    region {{ .CloudWatchConfig.Region }}
 {{end}}
 {{end}}
 

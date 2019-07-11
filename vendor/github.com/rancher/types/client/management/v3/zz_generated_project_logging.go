@@ -7,6 +7,7 @@ import (
 const (
 	ProjectLoggingType                       = "projectLogging"
 	ProjectLoggingFieldAnnotations           = "annotations"
+	ProjectLoggingFieldCloudWatchConfig      = "cloudWatchConfig"
 	ProjectLoggingFieldCreated               = "created"
 	ProjectLoggingFieldCreatorID             = "creatorId"
 	ProjectLoggingFieldCustomTargetConfig    = "customTargetConfig"
@@ -33,6 +34,7 @@ const (
 type ProjectLogging struct {
 	types.Resource
 	Annotations           map[string]string      `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	CloudWatchConfig      *CloudWatchConfig      `json:"cloudWatchConfig,omitempty" yaml:"cloudWatchConfig,omitempty"`
 	Created               string                 `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID             string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	CustomTargetConfig    *CustomTargetConfig    `json:"customTargetConfig,omitempty" yaml:"customTargetConfig,omitempty"`
