@@ -373,6 +373,57 @@ def test_updated_members_revision_access(admin_mc, remove_resource,
         assert e.error.status == 403
 
 
+def test_permissions_removed_on_downgrading_access(admin_mc, remove_resource,
+                                                   user_factory):
+    user_member = user_factory()
+    remove_resource(user_member)
+    members = [{"userPrincipalId": "local://" + user_member.user.id,
+                "accessType": "member"}]
+    # create cluster template with one member having "member" accessType
+    cluster_template = create_cluster_template(admin_mc, remove_resource,
+                                               members, admin_mc)
+
+    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
+    split = cluster_template.id.split(":")
+    name = split[1]
+    rb_name = name + "-ct-u"
+    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
+                                         user_member.user.id, rb_name),
+             timeout=60,
+             fail_handler=fail_handler(rb_resource))
+
+    # user with accessType=member should be able to update template
+    # so adding new member by the user_member should be allowed
+    new_member = user_factory()
+    remove_resource(new_member)
+    members = [{"userPrincipalId": "local://" + user_member.user.id,
+                "accessType": "member"},
+               {"userPrincipalId": "local://" + new_member.user.id,
+                "accessType": "read-only"}]
+    user_member.client.update(cluster_template, members=members)
+
+    # now change user_member's accessType to read-only
+    members = [{"userPrincipalId": "local://" + user_member.user.id,
+                "accessType": "read-only"},
+               {"userPrincipalId": "local://" + new_member.user.id,
+                "accessType": "read-only"}]
+    admin_mc.client.update(cluster_template, members=members)
+    rb_name = name + "-ct-r"
+    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
+                                         user_member.user.id, rb_name),
+             timeout=60,
+             fail_handler=fail_handler(rb_resource))
+
+    # user_member should not be allowed to update cluster template now
+    # test updating members field by removing new_member
+    members = [{"userPrincipalId": "local://" + user_member.user.id,
+                "accessType": "read-only"}]
+    try:
+        user_member.client.update(cluster_template, members=members)
+    except ApiError as e:
+        assert e.error.status == 403
+
+
 def rtb_cb(client, rtb):
     """Wait for the prtb to have the userId populated"""
     def cb():
