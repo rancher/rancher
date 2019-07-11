@@ -122,6 +122,9 @@ func RemoveEtcdPlane(ctx context.Context, etcdHosts []*hosts.Host, force bool) e
 				if err := docker.DoRemoveContainer(ctx, runHost.DClient, EtcdContainerName, runHost.Address); err != nil {
 					errList = append(errList, err)
 				}
+				if err := docker.DoRemoveContainer(ctx, runHost.DClient, EtcdSnapshotContainerName, runHost.Address); err != nil {
+					errList = append(errList, err)
+				}
 				if !runHost.IsWorker || !runHost.IsControl || force {
 					// remove unschedulable kubelet on etcd host
 					if err := removeKubelet(ctx, runHost); err != nil {
