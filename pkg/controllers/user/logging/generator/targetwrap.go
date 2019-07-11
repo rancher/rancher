@@ -345,9 +345,9 @@ func newFluentForwarderTemplateWrap(fluentForwarderConfig *v3.FluentForwarderCon
 	}, nil
 }
 
-func newCloudWatchTemplateWrap(cloudWatchConfig *v3.CloudWatchConfig) (*CloudWatchTemplateWrap, error) {
+func newCloudWatchTemplateWrap(cloudwatchConfig *v3.CloudWatchConfig) (*CloudWatchTemplateWrap, error) {
 	return &CloudWatchTemplateWrap{
-		CloudWatchConfig: *cloudWatchConfig,
+		CloudWatchConfig: *cloudwatchConfig,
 	}, nil
 }
 

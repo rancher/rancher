@@ -50,7 +50,7 @@ func NewLoggingTargetTestWrap(loggingTargets v3.LoggingTargets) LoggingTargetTes
 	} else if loggingTargets.FluentForwarderConfig != nil {
 		return &fluentForwarderTestWrap{loggingTargets.FluentForwarderConfig}
 	} else if loggingTargets.CloudWatchConfig != nil {
-		return &cloudWatchTestWrap{loggingTargets.CloudWatchConfig}
+		return &cloudwatchTestWrap{loggingTargets.CloudWatchConfig}
 	} else if loggingTargets.CustomTargetConfig != nil {
 		return &customTargetTestWrap{loggingTargets.CustomTargetConfig}
 	}

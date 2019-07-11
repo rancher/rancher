@@ -15,11 +15,11 @@ import (
 
 const testStream = "__rancher_test"
 
-type cloudWatchTestWrap struct {
+type cloudwatchTestWrap struct {
 	*v3.CloudWatchConfig
 }
 
-func (c *cloudWatchTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog bool) error {
+func (c *cloudwatchTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog bool) error {
 	cwl := cloudwatchlogs.New(
 		session.Must(
 			session.NewSession(
@@ -51,7 +51,7 @@ func (c *cloudWatchTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLo
 	return fmt.Errorf("log group '%s' not found in %s", c.Group, c.Region)
 }
 
-func (c *cloudWatchTestWrap) checkGroup(cwl *cloudwatchlogs.CloudWatchLogs) error {
+func (c *cloudwatchTestWrap) checkGroup(cwl *cloudwatchlogs.CloudWatchLogs) error {
 	st, err := c.createTestStreamIfNotExists(cwl)
 	if err != nil {
 		return err
@@ -73,7 +73,7 @@ func (c *cloudWatchTestWrap) checkGroup(cwl *cloudwatchlogs.CloudWatchLogs) erro
 	return nil
 }
 
-func (c *cloudWatchTestWrap) createTestStreamIfNotExists(cwl *cloudwatchlogs.CloudWatchLogs) (*string, error) {
+func (c *cloudwatchTestWrap) createTestStreamIfNotExists(cwl *cloudwatchlogs.CloudWatchLogs) (*string, error) {
 	result, err := cwl.DescribeLogStreams(&cloudwatchlogs.DescribeLogStreamsInput{
 		LogGroupName:        aws.String(c.Group),
 		LogStreamNamePrefix: aws.String(testStream),
