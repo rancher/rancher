@@ -7,7 +7,7 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/util"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -58,7 +58,7 @@ func RemoveControlPlane(ctx context.Context, controlHosts []*hosts.Host, force b
 					errList = append(errList, err)
 				}
 				// force is true in remove, false in reconcile
-				if force {
+				if !runHost.IsWorker || !runHost.IsEtcd || force {
 					if err := removeKubelet(ctx, runHost); err != nil {
 						errList = append(errList, err)
 					}
