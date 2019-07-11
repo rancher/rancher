@@ -76,6 +76,7 @@ func CreateRoleAndRoleBinding(resource, name, apiVersion, creatorID string, apiG
 		}
 	}
 
+	// There will always be a role and rolebinding for owner access (admin)
 	if err := createRoleBindingForMembers(resource, name, OwnerAccess, apiVersion, UID, ownerAccessSubjects, mgmt); err != nil {
 		return err
 	}
@@ -88,7 +89,15 @@ func CreateRoleAndRoleBinding(resource, name, apiVersion, creatorID string, apiG
 		if err := createRoleBindingForMembers(resource, name, ReadOnlyAccess, apiVersion, UID, readOnlyAccessSubjects, mgmt); err != nil {
 			return err
 		}
+	} else {
+		// check if rolebinding for read-only access exists, if it does then delete it, since there are no longer
+		// any read-only members in the spec.
+		roleName, _ := GetRoleNameAndVerbs(ReadOnlyAccess, name, resource)
+		if err := deleteRoleAndRoleBinding(roleName, mgmt); err != nil {
+			return err
+		}
 	}
+
 	if len(memberAccessSubjects) > 0 {
 		if _, err := createRole(resource, name, MemberAccess, apiVersion, apiGroup, UID, mgmt); err != nil {
 			return err
@@ -96,6 +105,11 @@ func CreateRoleAndRoleBinding(resource, name, apiVersion, creatorID string, apiG
 		if err := createRoleBindingForMembers(resource, name, MemberAccess, apiVersion, UID, memberAccessSubjects, mgmt); err != nil {
 			return err
 		}
+	} else {
+		// check if rolebinding for member access (update access type) exists, if it does then delete it,
+		// since there are no longer any members with update access in the spec.
+		roleName, _ := GetRoleNameAndVerbs(MemberAccess, name, resource)
+		return deleteRoleAndRoleBinding(roleName, mgmt)
 	}
 	return nil
 }
@@ -228,6 +242,18 @@ func GetRoleNameAndVerbs(roleAccess string, resourceName string, resourceType st
 	}
 
 	return roleName, verbs
+}
+
+func deleteRoleAndRoleBinding(roleName string, mgmt *config.ManagementContext) error {
+	err := mgmt.RBAC.Roles("").DeleteNamespaced(namespace.GlobalNamespace, roleName, &metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
+		return err
+	}
+	err = mgmt.RBAC.RoleBindings("").DeleteNamespaced(namespace.GlobalNamespace, roleName, &metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
+		return err
+	}
+	return nil
 }
 
 func buildSubjectForMember(member v3.Member, managementContext *config.ManagementContext) (k8srbacv1.Subject, error) {
