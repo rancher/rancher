@@ -10,6 +10,7 @@ istio_crd_url = "https://raw.githubusercontent.com/istio/istio/1.1.5" \
                 "/install/kubernetes/helm/istio-init/files/crd-10.yaml"
 
 
+@pytest.mark.nonparallel
 def test_virtual_service(admin_pc):
     client = admin_pc.client
     ns = admin_pc.cluster.client.create_namespace(
@@ -39,6 +40,7 @@ def test_virtual_service(admin_pc):
     client.delete(ns)
 
 
+@pytest.mark.nonparallel
 def test_destination_rule(admin_pc):
     client = admin_pc.client
     ns = admin_pc.cluster.client.create_namespace(
