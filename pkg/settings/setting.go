@@ -37,7 +37,7 @@ var (
 	PeerServices                      = NewSetting("peer-service", os.Getenv("CATTLE_PEER_SERVICE"))
 	RDNSServerBaseURL                 = NewSetting("rdns-base-url", "https://api.lb.rancher.cloud/v1")
 	RkeVersion                        = NewSetting("rke-version", "")
-	RkeMetadataURL                    = NewSetting("rke-metadata-url", "https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/master/data/data.json")
+	RkeMetadataURL                    = NewSetting("rke-metadata-url", getMetadataURL())
 	RkeMetadataRefreshIntervalMins    = NewSetting("rke-metadata-refresh-interval-minutes", "1440")
 	ServerImage                       = NewSetting("server-image", "rancher/rancher")
 	ServerURL                         = NewSetting("server-url", "")
@@ -143,7 +143,15 @@ func NewSetting(name, def string) Setting {
 	return s
 }
 
-func getK8sVersionsCurrent() string {
+func getMetadataURL() string {
+	data := map[string]interface{}{
+		"url":    "https://github.com/rancher/kontainer-driver-metadata.git",
+		"branch": "master",
+	}
+	ans, err := json.Marshal(data)
+	if err == nil {
+		return string(ans)
+	}
 	return ""
 }
 

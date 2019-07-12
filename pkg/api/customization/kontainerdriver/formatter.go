@@ -26,6 +26,10 @@ func NewFormatter(manangement *config.ScaledContext) types.Formatter {
 	return format.Formatter
 }
 
+func CollectionFormatter(apiContext *types.APIContext, collection *types.GenericCollection) {
+	collection.AddAction(apiContext, "refresh")
+}
+
 const clusterByGenericEngineConfigKey = "genericEngineConfig"
 
 // clusterByKontainerDriver is an indexer function that uses the cluster genericEngineConfig
