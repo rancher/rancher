@@ -65,7 +65,10 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("multiclusterapps", "globaldnses", "globaldnsproviders", "clustertemplates", "clustertemplaterevisions").verbs("create").
 		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
 		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("etcdbackups").verbs("get", "list", "watch")
+		addRule().apiGroups("management.cattle.io").resources("etcdbackups").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("rkek8ssystemimages").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("rkek8sserviceoptions").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("rkeaddons").verbs("get", "list", "watch")
 
 	rb.addRole("User Base", "user-base").addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").

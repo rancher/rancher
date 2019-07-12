@@ -53,6 +53,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
+	md "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/nodeconfig"
@@ -644,11 +645,23 @@ func RoleTemplate(schemas *types.Schemas, management *config.ScaledContext) {
 
 func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.KontainerDriverType)
+	metadataHandler := md.MetadataController{
+		SystemImagesLister:        management.Management.RKEK8sSystemImages("").Controller().Lister(),
+		SystemImages:              management.Management.RKEK8sSystemImages(""),
+		ServiceOptionsLister:      management.Management.RKEK8sServiceOptions("").Controller().Lister(),
+		ServiceOptions:            management.Management.RKEK8sServiceOptions(""),
+		AddonsLister:              management.Management.RKEAddons("").Controller().Lister(),
+		Addons:                    management.Management.RKEAddons(""),
+		WindowsSystemImagesLister: management.Management.RKEK8sWindowsSystemImages("").Controller().Lister(),
+		WindowsSystemImages:       management.Management.RKEK8sWindowsSystemImages(""),
+	}
 	handler := kontainerdriver.ActionHandler{
 		KontainerDrivers:      management.Management.KontainerDrivers(""),
 		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
+		MetadataHandler:       metadataHandler,
 	}
 	schema.ActionHandler = handler.ActionHandler
+	schema.CollectionFormatter = kontainerdriver.CollectionFormatter
 	schema.Formatter = kontainerdriver.NewFormatter(management)
 	schema.Store = kontainerdriver.NewStore(management, schema.Store)
 	schema.Enabled = features.ClusterRandomizer.Enabled
