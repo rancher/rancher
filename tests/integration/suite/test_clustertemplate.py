@@ -332,8 +332,8 @@ def test_revision_creation_permission(admin_mc, remove_resource,
         create_cluster_template_revision(user_readonly.client, templateId)
     except ApiError as e:
         assert e.error.status == 403
-        assert "read-only member of clustertemplate cannot " \
-               "create revisions for it" in e.error.message
+        assert "user does not have permission to update clusterTemplate" \
+               in e.error.message
 
 
 def test_updated_members_revision_access(admin_mc, remove_resource,

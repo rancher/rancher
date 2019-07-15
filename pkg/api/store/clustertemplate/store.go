@@ -11,14 +11,11 @@ import (
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/customization/clustertemplate"
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
-	rrbac "github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
+	mgmtSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	managementv3 "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 const (
@@ -31,7 +28,7 @@ func WrapStore(store types.Store, mgmt *config.ScaledContext) types.Store {
 		users:     mgmt.Management.Users(""),
 		grbLister: mgmt.Management.GlobalRoleBindings("").Controller().Lister(),
 		grLister:  mgmt.Management.GlobalRoles("").Controller().Lister(),
-		rbLister:  mgmt.RBAC.RoleBindings("").Controller().Lister(),
+		ctLister:  mgmt.Management.ClusterTemplates("").Controller().Lister(),
 	}
 	return storeWrapped
 }
@@ -41,7 +38,7 @@ type Store struct {
 	users     v3.UserInterface
 	grbLister v3.GlobalRoleBindingLister
 	grLister  v3.GlobalRoleLister
-	rbLister  rbacv1.RoleBindingLister
+	ctLister  v3.ClusterTemplateLister
 }
 
 func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
@@ -238,11 +235,6 @@ func (p *Store) canSetEnforce(apiContext *types.APIContext, data map[string]inte
 }
 
 func (p *Store) checkPermissionToCreateRevision(apiContext *types.APIContext, data map[string]interface{}) error {
-	userID := apiContext.Request.Header.Get("Impersonate-User")
-	if userID == "" {
-		return httperror.NewAPIError(httperror.NotFound, "invalid request: userID not found")
-	}
-
 	value, found := values.GetValue(data, managementv3.ClusterTemplateRevisionFieldClusterTemplateID)
 	if !found {
 		return httperror.NewAPIError(httperror.NotFound, "invalid request: clusterTemplateID not found")
@@ -250,37 +242,12 @@ func (p *Store) checkPermissionToCreateRevision(apiContext *types.APIContext, da
 
 	clusterTemplateID := convert.ToString(value)
 	_, clusterTemplateName := ref.Parse(clusterTemplateID)
-
-	// check if rolebindings of type owner or member exist for this user for this clustertemplate
-	// if yes, then user is allowed to create revision for this template
-	// else not allowed since, either user has no access or only read-only access by either:
-	// 1. being added explicitly as read-only member OR
-	// 2. template is public, which gives everyone read-only access
-	canUpdate := false
-	for _, accessType := range []string{rrbac.OwnerAccess, rrbac.MemberAccess} {
-		rbName, _ := rrbac.GetRoleNameAndVerbs(accessType, clusterTemplateName, rrbac.ClusterTemplateResource)
-		// check if rolebinding with this name exists and has the user (caller of this request) as a subject
-		rb, err := p.rbLister.Get(namespace.GlobalNamespace, rbName)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-		if rb == nil {
-			continue
-		}
-		for _, sub := range rb.Subjects {
-			if sub.Name == userID {
-				// user is either owner or member
-				canUpdate = true
-				break
-			}
-		}
-		if canUpdate {
-			break
-		}
+	var ctMap map[string]interface{}
+	if err := access.ByID(apiContext, &mgmtSchema.Version, managementv3.ClusterTemplateType, clusterTemplateID, &ctMap); err != nil {
+		return httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("unable to access clusterTemplate by id: %v", err))
 	}
-
-	if !canUpdate {
-		return httperror.NewAPIError(httperror.PermissionDenied, "read-only member of clustertemplate cannot create revisions for it")
+	if err := apiContext.AccessControl.CanDo(v3.ClusterTemplateGroupVersionKind.Group, v3.ClusterTemplateResource.Name, "update", apiContext, ctMap, apiContext.Schema); err != nil {
+		return httperror.NewAPIError(httperror.PermissionDenied, fmt.Sprintf("user does not have permission to update clusterTemplate %s by creating a revision for it", clusterTemplateName))
 	}
 	return nil
 }
