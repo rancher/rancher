@@ -1347,9 +1347,8 @@ metadata:
     metric: fs-usage-percent
     source: rancher-monitoring
 spec:
-  expression: (sum(node_filesystem_size_bytes{device!="rootfs"})
-     - sum(node_filesystem_free_bytes{device!="rootfs"})
-    ) / sum(node_filesystem_size_bytes{device!="rootfs"})
+  expression: sum (container_fs_usage_bytes{device=~"^/dev/.*$",id="/"}) 
+    / sum (container_fs_limit_bytes{device=~"^/dev/.*$",id="/"})
   legendFormat: Disk usage
   description: cluster fs usage percent
 ---
@@ -1365,11 +1364,9 @@ metadata:
     metric: fs-usage-percent
     source: rancher-monitoring
 spec:
-  expression: (sum(node_filesystem_size_bytes{device!="rootfs"})
-    by (instance) - sum(node_filesystem_free_bytes{device!="rootfs"})
-    by (instance)) / sum(node_filesystem_size_bytes{device!="rootfs"})
-    by (instance)
-  legendFormat: '[[instance]]'
+  expression: sum (container_fs_usage_bytes{device=~"^/dev/.*$",id="/"}) by (node)
+    / sum (container_fs_limit_bytes{device=~"^/dev/.*$",id="/"}) by (node)
+  legendFormat: '[[node]]'
   description: cluster fs usage percent
 ---
 kind: MonitorMetric
