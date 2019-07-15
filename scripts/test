@@ -28,6 +28,9 @@ if [ ${ARCH} == arm64 ]; then
     export ETCD_UNSUPPORTED_ARCH=arm64
 fi
 
+mkdir -p /etc/rancher/ssl/
+cp $CWD/$(dirname $0)/../tests/certs/* /etc/rancher/ssl/
+
 echo Starting rancher server
 $(dirname $0)/run &> $CWD/rancherlogs.txt &
 PID=$!

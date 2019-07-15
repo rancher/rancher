@@ -110,6 +110,13 @@ def admin_mc():
 
 
 @pytest.fixture
+def admin_proxy(admin_mc):
+    """Returns a ManagementContext for the default global admin user."""
+    admin_mc.BASE_URL = BASE_URL
+    return admin_mc
+
+
+@pytest.fixture
 def admin_cc(admin_mc):
     """Returns a ClusterContext for the local cluster for the default global
     admin user."""
