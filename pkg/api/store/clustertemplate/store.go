@@ -262,5 +262,27 @@ func (p *Store) checkKubernetesVersionFormat(apiContext *types.APIContext, data 
 		return nil
 	}
 	k8sVersion := convert.ToString(k8sVersionReq)
-	return clustertemplate.CheckKubernetesVersionFormat(k8sVersion)
+	genericPatch, err := clustertemplate.CheckKubernetesVersionFormat(k8sVersion)
+	if err != nil {
+		return err
+	}
+	if genericPatch {
+		//ensure a question is added for "rancherKubernetesEngineConfig.kubernetesVersion"
+		templateQuestions, ok := data[managementv3.ClusterTemplateRevisionFieldQuestions]
+		if !ok {
+			return httperror.NewAPIError(httperror.MissingRequired, fmt.Sprintf("ClusterTemplateRevision must have a Question set for %v", clustertemplate.RKEConfigK8sVersion))
+		}
+		templateQuestionsSlice := convert.ToMapSlice(templateQuestions)
+		var foundQ bool
+		for _, question := range templateQuestionsSlice {
+			if question["variable"] == clustertemplate.RKEConfigK8sVersion {
+				foundQ = true
+				break
+			}
+		}
+		if !foundQ {
+			return httperror.NewAPIError(httperror.MissingRequired, fmt.Sprintf("ClusterTemplateRevision must have a Question set for %v", clustertemplate.RKEConfigK8sVersion))
+		}
+	}
+	return nil
 }

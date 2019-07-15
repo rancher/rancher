@@ -174,7 +174,7 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 			return nil, err
 		}
 		clusterConfigSchema := apiContext.Schemas.Schema(&managementschema.Version, managementv3.ClusterSpecBaseType)
-		data, err = loadDataFromTemplate(clusterTemplateRevision, clusterTemplate, data, clusterConfigSchema)
+		data, err = loadDataFromTemplate(clusterTemplateRevision, clusterTemplate, data, clusterConfigSchema, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -227,7 +227,7 @@ func transposeNameFields(data map[string]interface{}, clusterConfigSchema *types
 	return data
 }
 
-func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, clusterTemplate *v3.ClusterTemplate, data map[string]interface{}, clusterConfigSchema *types.Schema) (map[string]interface{}, error) {
+func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, clusterTemplate *v3.ClusterTemplate, data map[string]interface{}, clusterConfigSchema *types.Schema, existingCluster map[string]interface{}) (map[string]interface{}, error) {
 	dataFromTemplate, err := convert.EncodeToMap(clusterTemplateRevision.Spec.ClusterConfig)
 	if err != nil {
 		return nil, err
@@ -236,18 +236,25 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 	dataFromTemplate["description"] = convert.ToString(data[managementv3.ClusterSpecFieldDisplayName])
 	dataFromTemplate[managementv3.ClusterSpecFieldClusterTemplateID] = ref.Ref(clusterTemplate)
 	dataFromTemplate[managementv3.ClusterSpecFieldClusterTemplateRevisionID] = convert.ToString(data[managementv3.ClusterSpecFieldClusterTemplateRevisionID])
-	dataFromTemplate[managementv3.ClusterSpecFieldClusterTemplateAnswers] = data[managementv3.ClusterSpecFieldClusterTemplateAnswers]
 
 	dataFromTemplate = transposeNameFields(dataFromTemplate, clusterConfigSchema)
 
 	//Add in any answers to the clusterTemplateRevision's Questions[]
-	answers := convert.ToMapInterface(data[managementv3.ClusterSpecFieldClusterTemplateAnswers])
-	allAnswers := convert.ToMapInterface(answers["values"])
+	allAnswers := convert.ToMapInterface(convert.ToMapInterface(data[managementv3.ClusterSpecFieldClusterTemplateAnswers])["values"])
+	existingAnswers := convert.ToMapInterface(convert.ToMapInterface(existingCluster[managementv3.ClusterSpecFieldClusterTemplateAnswers])["values"])
+
+	defaultedAnswers := make(map[string]string)
 
 	for _, question := range clusterTemplateRevision.Spec.Questions {
 		answer, ok := allAnswers[question.Variable]
 		if !ok {
 			answer = question.Default
+			defaultedAnswers[question.Variable] = question.Default
+		}
+		if existingCluster != nil && strings.EqualFold(question.Variable, "rancherKubernetesEngineConfig.kubernetesVersion") {
+			if convert.ToString(answer) == convert.ToString(existingAnswers[question.Variable]) {
+				answer = values.GetValueN(existingCluster, "rancherKubernetesEngineConfig", "kubernetesVersion")
+			}
 		}
 		val, err := builder.ConvertSimple(question.Type, answer, builder.Create)
 		if err != nil {
@@ -256,6 +263,18 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 		keyParts := strings.Split(question.Variable, ".")
 		values.PutValue(dataFromTemplate, val, keyParts...)
 	}
+
+	//save defaultAnswers to answer
+	if allAnswers == nil {
+		allAnswers = make(map[string]interface{})
+	}
+	for key, val := range defaultedAnswers {
+		allAnswers[key] = val
+	}
+
+	finalAnswerMap := make(map[string]interface{})
+	finalAnswerMap["values"] = allAnswers
+	dataFromTemplate[managementv3.ClusterSpecFieldClusterTemplateAnswers] = finalAnswerMap
 	return dataFromTemplate, nil
 }
 
@@ -397,7 +416,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		}
 
 		clusterConfigSchema := apiContext.Schemas.Schema(&managementschema.Version, managementv3.ClusterSpecBaseType)
-		clusterUpdate, err := loadDataFromTemplate(clusterTemplateRevision, clusterTemplate, data, clusterConfigSchema)
+		clusterUpdate, err := loadDataFromTemplate(clusterTemplateRevision, clusterTemplate, data, clusterConfigSchema, existingCluster)
 		if err != nil {
 			return nil, err
 		}
@@ -517,7 +536,7 @@ func setKubernetesVersion(data map[string]interface{}) error {
 }
 
 func getSupportedK8sVersion(k8sVersionRequest string) (string, error) {
-	err := clustertemplate.CheckKubernetesVersionFormat(k8sVersionRequest)
+	_, err := clustertemplate.CheckKubernetesVersionFormat(k8sVersionRequest)
 	if err != nil {
 		return "", err
 	}

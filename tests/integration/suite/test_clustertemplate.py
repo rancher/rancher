@@ -21,7 +21,7 @@ def test_create_cluster_template_with_revision(admin_mc, remove_resource):
     assert template_reloaded.links.revisions is not None
 
 
-def test_create_template_revision_invalid_k8s(admin_mc, remove_resource):
+def test_create_template_revision_k8s_translation(admin_mc, remove_resource):
     cluster_template = create_cluster_template(admin_mc,
                                                remove_resource, [], admin_mc)
     tId = cluster_template.id
@@ -35,6 +35,25 @@ def test_create_template_revision_invalid_k8s(admin_mc, remove_resource):
     with pytest.raises(ApiError) as e:
         client.create_cluster_template_revision(clusterConfig=cconfig,
                                                 clusterTemplateId=tId,
+                                                enabled="true")
+        assert e.value.error.status == 422
+
+    # template k8s question needed if using generic version
+    cconfig = {
+        "rancherKubernetesEngineConfig": {
+            "kubernetesVersion": "1.13.x"
+        }
+    }
+    questions = [{
+                  "variable": "dockerRootDir",
+                  "required": "false",
+                  "type": "string",
+                  "default": "/var/lib/docker"
+                 }]
+    with pytest.raises(ApiError) as e:
+        client.create_cluster_template_revision(clusterConfig=cconfig,
+                                                clusterTemplateId=tId,
+                                                questions=questions,
                                                 enabled="true")
         assert e.value.error.status == 422
 
@@ -479,6 +498,13 @@ def create_cluster_template_revision(client, clusterTemplateId):
                   "required": "false",
                   "type": "boolean",
                   "default": "true"
+                 },
+                 {
+                  "variable":
+                  "rancherKubernetesEngineConfig.kubernetesVersion",
+                  "required": "false",
+                  "type": "string",
+                  "default": "1.13.x"
                  }]
 
     cluster_template_revision = \
@@ -486,7 +512,6 @@ def create_cluster_template_revision(client, clusterTemplateId):
                                         clusterConfig=cluster_config,
                                         clusterTemplateId=clusterTemplateId,
                                         disabled="false",
-                                        kubernetesVersion="v1.13.5-rancher1-3",
                                         questions=questions
                                         )
 
