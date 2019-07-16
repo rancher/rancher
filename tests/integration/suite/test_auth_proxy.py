@@ -1,6 +1,7 @@
 import pytest
 import rancher
 import requests
+from requests.exceptions import SSLError
 from os import path
 
 certs_exist = pytest.mark.skipif(
@@ -10,38 +11,37 @@ certs_exist = pytest.mark.skipif(
 
 
 @certs_exist
-def test_user_proxy(admin_proxy):
+def test_user_proxy(admin_mc):
     headers = {
-        "X-Remote-User": admin_proxy.user.id,
+        "X-Remote-User": admin_mc.user.id,
         "X-Remote-Group": "abc"
     }
     certs = ('/etc/rancher/ssl/client.pem')
-    client = rancher.Client(url=admin_proxy.BASE_URL, verify=False,
+    client = rancher.Client(url=admin_mc.base_url, verify=False,
                             headers=headers, cert=certs)
-    client.list_user(username='admin').data[0]
-    assert True
+    assert client.list_user(username='admin').data[0]['username'] == 'admin'
 
 
 @certs_exist
-def test_user_proxy_invalid_cert(admin_proxy):
+def test_user_proxy_invalid_cert(admin_mc):
     headers = {
-        "X-Remote-User": admin_proxy.user.id,
+        "X-Remote-User": admin_mc.user.id,
         "X-Remote-Group": "abc"
     }
     certs = ('/etc/rancher/ssl/failclient.pem')
     with pytest.raises(requests.exceptions.RequestException) as e:
-        rancher.Client(url=admin_proxy.BASE_URL, verify=False,
+        rancher.Client(url=admin_mc.base_url, verify=False,
                        headers=headers, cert=certs)
-    assert e is not None
+    assert isinstance(e.value, SSLError)
 
 
 @certs_exist
-def test_user_proxy_no_cert(admin_proxy):
+def test_user_proxy_no_cert(admin_mc):
     headers = {
-        "X-Remote-User": admin_proxy.user.id,
+        "X-Remote-User": admin_mc.user.id,
         "X-Remote-Group": "abc"
     }
     with pytest.raises(rancher.ApiError) as e:
-        rancher.Client(url=admin_proxy.BASE_URL, verify=False,
+        rancher.Client(url=admin_mc.base_url, verify=False,
                        headers=headers)
     assert e.value.error.status == '401'

@@ -28,10 +28,9 @@ if [ ${ARCH} == arm64 ]; then
     export ETCD_UNSUPPORTED_ARCH=arm64
 fi
 
-
-if [[ ! -z $DRONE]]; then
+#if [[ ! -z $DRONE]]; then
   ./test-proxy-cert.sh
-fi
+#fi
 
 echo Starting rancher server
 $(dirname $0)/run &> $CWD/rancherlogs.txt &

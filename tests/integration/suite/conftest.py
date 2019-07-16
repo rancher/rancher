@@ -52,6 +52,7 @@ class ManagementContext:
         self.client = client
         self.k8s_client = k8s_client
         self.user = user
+        self.base_url = BASE_URL
 
 
 class ClusterContext:
@@ -107,13 +108,6 @@ def admin_mc():
     k8s_client = kubernetes_api_client(client, 'local')
     admin = client.list_user(username='admin').data[0]
     return ManagementContext(client, k8s_client, user=admin)
-
-
-@pytest.fixture
-def admin_proxy(admin_mc):
-    """Returns a ManagementContext for the default global admin user."""
-    admin_mc.BASE_URL = BASE_URL
-    return admin_mc
 
 
 @pytest.fixture
