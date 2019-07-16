@@ -277,7 +277,7 @@ func NewAPIClient(opts *ClientOpts) (APIBaseClient, error) {
 	result.Ops = &APIOperations{
 		Opts:   opts,
 		Client: client,
-		Dialer: &websocket.Dialer{},
+		Dialer: &websocket.Dialer{HandshakeTimeout: 10 * time.Second},
 		Types:  result.Types,
 	}
 
