@@ -27,14 +27,20 @@ func (a ActionHandler) viewMonitoring(actionName string, action *types.Action, a
 	}
 
 	// need to support `map[string]string` as entry value type in norman Builder.convertMap
-	answers, err := convert.EncodeToMap(monitoring.GetOverwroteAppAnswers(cluster.Annotations))
+	answers, version := monitoring.GetOverwroteAppAnswersAndVersion(cluster.Annotations)
+	encodeAnswers, err := convert.EncodeToMap(answers)
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.ServerError, "failed to parse response")
 	}
-	apiContext.WriteResponse(http.StatusOK, map[string]interface{}{
-		"answers": answers,
+	resp := map[string]interface{}{
+		"answers": encodeAnswers,
 		"type":    "monitoringOutput",
-	})
+	}
+	if version != "" {
+		resp["version"] = version
+	}
+
+	apiContext.WriteResponse(http.StatusOK, resp)
 	return nil
 }
 

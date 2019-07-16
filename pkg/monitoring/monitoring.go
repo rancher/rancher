@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/rancher/norman/types"
+	cutils "github.com/rancher/rancher/pkg/catalog/utils"
+	ns "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -61,6 +63,9 @@ const (
 	CattlePrometheusRuleLabelKey             = "source"
 	CattleAlertingPrometheusRuleLabelValue   = "rancher-alert"
 	CattleMonitoringPrometheusRuleLabelValue = "rancher-monitoring"
+	RancherMonitoringTemplateName            = "system-library-rancher-monitoring"
+
+	monitoringTemplateName = "rancher-monitoring"
 )
 
 var (
@@ -152,7 +157,7 @@ func ProjectPrometheusEndpoint(projectName string) (headlessServiceName, namespa
 	return prometheusHeadlessServiceName, fmt.Sprintf("%s-%s", cattleNamespaceName, projectName), "9090"
 }
 
-/*OverwriteAppAnswers Usage
+/*OverwriteAppAnswersAndCatalogID Usage
 ## special key prefix
 _tpl- [priority low] ->  regex ${value} = ${middle-prefix}#(${root1,root2,...}), then generate ${root*}.${middle-prefix} as prefix-key
 
@@ -195,9 +200,9 @@ grafana.persistence.accessMode       	| ReadWriteOnce
 grafana.persistence.size             	| 50Gi
 
 */
-func OverwriteAppAnswers(rawAnswers map[string]string, annotations map[string]string) map[string]string {
-	overwriteAnswers := GetOverwroteAppAnswers(annotations)
-
+func OverwriteAppAnswersAndCatalogID(rawAnswers map[string]string, annotations map[string]string,
+	catalogTemplateLister mgmtv3.CatalogTemplateLister) (map[string]string, string, error) {
+	overwriteAnswers, version := GetOverwroteAppAnswersAndVersion(annotations)
 	for specialKey, value := range overwriteAnswers {
 		if strings.HasPrefix(specialKey, "_tpl-") {
 			trr := tplRegexp.translate(value)
@@ -220,8 +225,20 @@ func OverwriteAppAnswers(rawAnswers map[string]string, annotations map[string]st
 	for key, value := range overwriteAnswers {
 		rawAnswers[key] = value
 	}
+	catalogID, err := GetMonitoringCatalogID(version, catalogTemplateLister)
 
-	return rawAnswers
+	return rawAnswers, catalogID, err
+}
+
+func GetMonitoringCatalogID(version string, catalogTemplateLister mgmtv3.CatalogTemplateLister) (string, error) {
+	if version == "" {
+		template, err := catalogTemplateLister.Get(ns.GlobalNamespace, RancherMonitoringTemplateName)
+		if err != nil {
+			return "", err
+		}
+		version = template.Spec.DefaultVersion
+	}
+	return fmt.Sprintf(cutils.CatalogExternalIDFormat, cutils.SystemLibraryName, monitoringTemplateName, version), nil
 }
 
 type templateRegexpResult struct {
@@ -259,17 +276,16 @@ func (tr *templateRegexp) translate(value string) *templateRegexpResult {
 	return captures
 }
 
-func GetOverwroteAppAnswers(annotations map[string]string) map[string]string {
+func GetOverwroteAppAnswersAndVersion(annotations map[string]string) (map[string]string, string) {
 	overwritingAppAnswers := annotations[cattleOverwriteAppAnswersAnnotationKey]
 	if len(overwritingAppAnswers) != 0 {
 		var appOverwriteInput mgmtv3.MonitoringInput
 		err := json.Unmarshal([]byte(overwritingAppAnswers), &appOverwriteInput)
 		if err == nil {
-			return appOverwriteInput.Answers
+			return appOverwriteInput.Answers, appOverwriteInput.Version
 		}
-
 		logrus.Errorf("failed to parse app overwrite input from %q, %v", overwritingAppAnswers, err)
 	}
 
-	return map[string]string{}
+	return map[string]string{}, ""
 }

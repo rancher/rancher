@@ -26,6 +26,7 @@ type appHandler struct {
 	agentNamespaceClient        corev1.NamespaceInterface
 	systemAccountManager        *systemaccount.Manager
 	projectLister               mgmtv3.ProjectLister
+	catalogTemplateLister       mgmtv3.CatalogTemplateLister
 }
 
 func (ah *appHandler) withdrawApp(clusterID, appName, appTargetNamespace string) error {
