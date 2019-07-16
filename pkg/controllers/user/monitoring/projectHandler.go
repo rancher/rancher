@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/rancher/pkg/app/utils"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/rancher/pkg/settings"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	k8scorev1 "k8s.io/api/core/v1"
@@ -188,7 +187,10 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 		"prometheus.cluster.alertManagerNamespace": clusterAlertManagerSvcNamespaces,
 	}
 
-	appAnswers := monitoring.OverwriteAppAnswers(optionalAppAnswers, project.Annotations)
+	appAnswers, appCatalogID, err := monitoring.OverwriteAppAnswersAndCatalogID(optionalAppAnswers, project.Annotations, ph.app.catalogTemplateLister)
+	if err != nil {
+		return err
+	}
 
 	// cannot overwrite mustAppAnswers
 	for mustKey, mustVal := range mustAppAnswers {
@@ -209,7 +211,6 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 		return err
 	}
 
-	appCatalogID := settings.SystemMonitoringCatalogID.Get()
 	app := &v3.App{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{creatorIDAnno: creator.Name},

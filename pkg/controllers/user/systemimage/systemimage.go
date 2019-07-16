@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	cutils "github.com/rancher/rancher/pkg/catalog/utils"
 	alerting "github.com/rancher/rancher/pkg/controllers/user/alert/deployer"
 	logging "github.com/rancher/rancher/pkg/controllers/user/logging/deployer"
 	pipeline "github.com/rancher/rancher/pkg/controllers/user/pipeline/upgrade"
@@ -18,7 +19,6 @@ import (
 )
 
 var systemProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/system-project": "true"})
-var systemLibraryName = "system-library"
 
 type Syncer struct {
 	clusterName      string
@@ -44,7 +44,7 @@ func (s *Syncer) SyncCatalog(key string, obj *v3.Catalog) (runtime.Object, error
 		return nil, nil
 	}
 
-	if obj.Name != systemLibraryName {
+	if obj.Name != cutils.SystemLibraryName {
 		return obj, nil
 	}
 

@@ -5,6 +5,11 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
+const (
+	CatalogExternalIDFormat = "catalog://?catalog=%s&template=%s&version=%s"
+	SystemLibraryName       = "system-library"
+)
+
 // Config holds libcompose top level configuration
 type Config struct {
 	Version  string                 `yaml:"version,omitempty"`

@@ -14,7 +14,6 @@ import (
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/pki"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -328,7 +327,10 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 		"prometheus.ruleSelector.matchExpressions[0].values[1]":                             monitoring.CattleMonitoringPrometheusRuleLabelValue,
 	}
 
-	appAnswers := monitoring.OverwriteAppAnswers(optionalAppAnswers, cluster.Annotations)
+	appAnswers, appCatalogID, err := monitoring.OverwriteAppAnswersAndCatalogID(optionalAppAnswers, cluster.Annotations, ch.app.catalogTemplateLister)
+	if err != nil {
+		return nil, err
+	}
 
 	// cannot overwrite mustAppAnswers
 	for mustKey, mustVal := range mustAppAnswers {
@@ -373,7 +375,6 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 		return nil, err
 	}
 
-	appCatalogID := settings.SystemMonitoringCatalogID.Get()
 	app := &v3.App{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{creatorIDAnno: creator.Name},

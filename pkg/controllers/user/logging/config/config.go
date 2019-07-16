@@ -2,14 +2,15 @@ package constant
 
 import (
 	"fmt"
+
+	cutils "github.com/rancher/rancher/pkg/catalog/utils"
 )
 
 const (
-	AppName           = "rancher-logging"
-	TesterAppName     = "rancher-logging-tester"
-	AppInitVersion    = "0.1.1"
-	systemCatalogName = "system-library"
-	templateName      = "rancher-logging"
+	AppName        = "rancher-logging"
+	TesterAppName  = "rancher-logging-tester"
+	AppInitVersion = "0.1.1"
+	templateName   = "rancher-logging"
 )
 
 const (
@@ -79,15 +80,15 @@ func SecretDataKeyCertKey(level, name string) string {
 }
 
 func RancherLoggingTemplateID() string {
-	return fmt.Sprintf("%s-%s", systemCatalogName, templateName)
+	return fmt.Sprintf("%s-%s", cutils.SystemLibraryName, templateName)
 }
 
 func RancherLoggingFullVersion() string {
-	return fmt.Sprintf("%s-%s-%s", systemCatalogName, templateName, AppInitVersion)
+	return fmt.Sprintf("%s-%s-%s", cutils.SystemLibraryName, templateName, AppInitVersion)
 }
 
 func RancherLoggingCatalogID(version string) string {
-	return fmt.Sprintf("catalog://?catalog=%s&template=%s&version=%s", systemCatalogName, templateName, version)
+	return fmt.Sprintf(cutils.CatalogExternalIDFormat, cutils.SystemLibraryName, templateName, version)
 }
 
 func RancherLoggingConfigSecretName() string {

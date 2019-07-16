@@ -39,6 +39,7 @@ func Register(ctx context.Context, agentContext *config.UserContext) {
 		agentNamespaceClient:        agentContext.Core.Namespaces(metav1.NamespaceAll),
 		systemAccountManager:        systemaccount.NewManager(agentContext.Management),
 		projectLister:               mgmtContext.Projects(metav1.NamespaceAll).Controller().Lister(),
+		catalogTemplateLister:       mgmtContext.CatalogTemplates(metav1.NamespaceAll).Controller().Lister(),
 	}
 
 	// operator handler

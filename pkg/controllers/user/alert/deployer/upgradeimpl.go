@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rancher/norman/controller"
+	cutils "github.com/rancher/rancher/pkg/catalog/utils"
 	alertutil "github.com/rancher/rancher/pkg/controllers/user/alert/common"
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
@@ -99,7 +100,7 @@ func (l *AlertService) Upgrade(currentVersion string) (string, error) {
 	if err != nil {
 		return "", errors.Wrapf(err, "get template %s failed", templateID)
 	}
-	newExternalID := fmt.Sprintf("catalog://?catalog=%s&template=%s&version=%s", systemCatalogName, templateName, template.Spec.DefaultVersion)
+	newExternalID := fmt.Sprintf(cutils.CatalogExternalIDFormat, systemCatalogName, templateName, template.Spec.DefaultVersion)
 
 	newVersion, _, err := common.ParseExternalID(newExternalID)
 	if err != nil {
@@ -108,7 +109,7 @@ func (l *AlertService) Upgrade(currentVersion string) (string, error) {
 
 	appName, _ := monitorutil.ClusterAlertManagerInfo()
 	//migrate legacy
-	if !strings.Contains(currentVersion, "system-library-rancher-monitoring") {
+	if !strings.Contains(currentVersion, monitorutil.RancherMonitoringTemplateName) {
 		if err := l.migrateLegacyClusterAlert(); err != nil {
 			return "", err
 		}
