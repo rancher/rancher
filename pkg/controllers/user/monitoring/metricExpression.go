@@ -1243,7 +1243,7 @@ metadata:
     metric: cpu-load-5
     source: rancher-monitoring
 spec:
-  expression: sum(node_load5) / count(node_cpu_seconds_total{mode="system"})
+  expression: sum(node_load5) / sum(machine_cpu_cores)
   legendFormat: Load5
   description: cluster cpu load 5
 ---
@@ -1260,8 +1260,7 @@ metadata:
     metric: cpu-load-5
     source: rancher-monitoring
 spec:
-  expression: sum(node_load5) by (instance) / count(node_cpu_seconds_total{mode="system"})
-    by (instance)
+  expression: sum(node_load5) by (instance) / sum(machine_cpu_cores) by (instance)
   legendFormat: Load5([[instance]])
   description: cluster cpu load 5
 ---
@@ -1278,7 +1277,7 @@ metadata:
     metric: cpu-load-1
     source: rancher-monitoring
 spec:
-  expression: sum(node_load1) / count(node_cpu_seconds_total{mode="system"})
+  expression: sum(node_load1) / sum(machine_cpu_cores)
   legendFormat: Load1
   description: cluster cpu load 1
 ---
@@ -1295,8 +1294,7 @@ metadata:
     metric: cpu-load-1
     source: rancher-monitoring
 spec:
-  expression: sum(node_load1) by (instance) / count(node_cpu_seconds_total{mode="system"})
-    by (instance)
+  expression: sum(node_load1) by (instance) / sum(machine_cpu_cores) by (instance)
   legendFormat: Load1([[instance]])
   description: cluster cpu load 1
 ---
@@ -1347,8 +1345,9 @@ metadata:
     metric: fs-usage-percent
     source: rancher-monitoring
 spec:
-  expression: sum (container_fs_usage_bytes{device=~"^/dev/.*$",id="/"}) 
-    / sum (container_fs_limit_bytes{device=~"^/dev/.*$",id="/"})
+  expression: (sum(node_filesystem_size_bytes{device!~"rootfs|HarddiskVolume.+"})
+     - sum(node_filesystem_free_bytes{device!~"rootfs|HarddiskVolume.+"})
+    ) / sum(node_filesystem_size_bytes{device!~"rootfs|HarddiskVolume.+"})
   legendFormat: Disk usage
   description: cluster fs usage percent
 ---
@@ -1364,9 +1363,11 @@ metadata:
     metric: fs-usage-percent
     source: rancher-monitoring
 spec:
-  expression: sum (container_fs_usage_bytes{device=~"^/dev/.*$",id="/"}) by (node)
-    / sum (container_fs_limit_bytes{device=~"^/dev/.*$",id="/"}) by (node)
-  legendFormat: '[[node]]'
+  expression: (sum(node_filesystem_size_bytes{device!~"rootfs|HarddiskVolume.+"})
+    by (instance) - sum(node_filesystem_free_bytes{device!~"rootfs|HarddiskVolume.+"})
+    by (instance)) / sum(node_filesystem_size_bytes{device!~"rootfs|HarddiskVolume.+"})
+    by (instance)
+  legendFormat: '[[instance]]'
   description: cluster fs usage percent
 ---
 kind: MonitorMetric
@@ -1417,7 +1418,7 @@ metadata:
     metric: cpu-load-15
     source: rancher-monitoring
 spec:
-  expression: sum(node_load15) / count(node_cpu_seconds_total{mode="system"})
+  expression: sum(node_load15) / sum(machine_cpu_cores)
   legendFormat: Load15
   description: cluster cpu load 15
 ---
@@ -1434,8 +1435,7 @@ metadata:
     metric: cpu-load-15
     source: rancher-monitoring
 spec:
-  expression: sum(node_load15) by (instance) / count(node_cpu_seconds_total{mode="system"})
-    by (instance)
+  expression: sum(node_load15) by (instance) / sum(machine_cpu_cores) by (instance)
   legendFormat: Load15([[instance]])
   description: cluster cpu load 15
 ---
@@ -3379,7 +3379,7 @@ metadata:
     metric: disk-io-writes-bytes-sum-rate
     source: rancher-monitoring
 spec:
-  expression: sum(rate(node_disk_written_bytes_total{instance=~"$instance"}[5m]))
+  expression: sum(rate(node_disk_written_bytes_total{instance=~"$instance", device!~"HarddiskVolume.+"}[5m]))
   legendFormat: Write
   description: node disk io writes bytes sum rate
 ---
@@ -3396,7 +3396,7 @@ metadata:
     metric: disk-io-writes-bytes-sum-rate
     source: rancher-monitoring
 spec:
-  expression: sum(rate(node_disk_written_bytes_total{instance=~"$instance"}[5m]))
+  expression: sum(rate(node_disk_written_bytes_total{instance=~"$instance", device!~"HarddiskVolume.+"}[5m]))
     by (device)
   legendFormat: Write([[device]])
   description: node disk io writes bytes sum rate
@@ -3414,7 +3414,7 @@ metadata:
     metric: disk-io-reads-bytes-sum-rate
     source: rancher-monitoring
 spec:
-  expression: sum(rate(node_disk_read_bytes_total{instance=~"$instance"}[5m]))
+  expression: sum(rate(node_disk_read_bytes_total{instance=~"$instance", device!~"HarddiskVolume.+"}[5m]))
   legendFormat: Read
   description: node disk io reads bytes sum rate
 ---
@@ -3431,7 +3431,7 @@ metadata:
     metric: disk-io-reads-bytes-sum-rate
     source: rancher-monitoring
 spec:
-  expression: sum(rate(node_disk_read_bytes_total{instance=~"$instance"}[5m])) by
+  expression: sum(rate(node_disk_read_bytes_total{instance=~"$instance", device!~"HarddiskVolume.+"}[5m])) by
     (device)
   legendFormat: Read([[device]])
   description: node disk io reads bytes sum rate
@@ -3448,9 +3448,9 @@ metadata:
     metric: fs-usage-percent
     source: rancher-monitoring
 spec:
-  expression: (sum(node_filesystem_size_bytes{device!="rootfs",instance=~"$instance"})
-     - sum(node_filesystem_free_bytes{device!="rootfs",instance=~"$instance"})
-    ) / sum(node_filesystem_size_bytes{device!="rootfs",instance=~"$instance"})
+  expression: (sum(node_filesystem_size_bytes{device!~"rootfs|HarddiskVolume.+",instance=~"$instance"})
+     - sum(node_filesystem_free_bytes{device!~"rootfs|HarddiskVolume.+",instance=~"$instance"})
+    ) / sum(node_filesystem_size_bytes{device!~"rootfs|HarddiskVolume.+",instance=~"$instance"})
   legendFormat: Disk usage
   description: node fs usage percent
 ---
@@ -3466,9 +3466,9 @@ metadata:
     metric: fs-usage-percent
     source: rancher-monitoring
 spec:
-  expression: (sum(node_filesystem_size_bytes{device!="rootfs",instance=~"$instance"})
-    by (device) - sum(node_filesystem_free_bytes{device!="rootfs",instance=~"$instance"})
-    by (device)) / sum(node_filesystem_size_bytes{device!="rootfs",instance=~"$instance"})
+  expression: (sum(node_filesystem_size_bytes{device!~"rootfs|HarddiskVolume.+",instance=~"$instance"})
+    by (device) - sum(node_filesystem_free_bytes{device!~"rootfs|HarddiskVolume.+",instance=~"$instance"})
+    by (device)) / sum(node_filesystem_size_bytes{device!~"rootfs|HarddiskVolume.+",instance=~"$instance"})
     by (device)
   legendFormat: '[[device]]'
   description: node fs usage percent
@@ -3556,7 +3556,7 @@ metadata:
     metric: cpu-load-1
     source: rancher-monitoring
 spec:
-  expression: sum(node_load1{instance=~"$instance"}) / count(node_cpu_seconds_total{mode="system",instance=~"$instance"})
+  expression: sum(node_load1{instance=~"$instance"}) / sum(machine_cpu_cores{instance=~"$instance"})
   legendFormat: Load1
   description: node cpu load 1
 ---
@@ -3573,7 +3573,7 @@ metadata:
     metric: cpu-load-1
     source: rancher-monitoring
 spec:
-  expression: sum(node_load1{instance=~"$instance"}) / count(node_cpu_seconds_total{mode="system",instance=~"$instance"})
+  expression: sum(node_load1{instance=~"$instance"}) / sum(machine_cpu_cores{instance=~"$instance"})
   legendFormat: Load1
   description: node cpu load 1
 ---
@@ -3590,7 +3590,7 @@ metadata:
     metric: cpu-load-15
     source: rancher-monitoring
 spec:
-  expression: sum(node_load15{instance=~"$instance"}) / count(node_cpu_seconds_total{mode="system",instance=~"$instance"})
+  expression: sum(node_load15{instance=~"$instance"}) / sum(machine_cpu_cores{instance=~"$instance"})
   legendFormat: Load15
   description: node cpu load 15
 ---
@@ -3607,7 +3607,7 @@ metadata:
     metric: cpu-load-15
     source: rancher-monitoring
 spec:
-  expression: sum(node_load15{instance=~"$instance"}) / count(node_cpu_seconds_total{mode="system",instance=~"$instance"})
+  expression: sum(node_load15{instance=~"$instance"}) / sum(machine_cpu_cores{instance=~"$instance"})
   legendFormat: Load15
   description: node cpu load 15
 ---
@@ -3760,7 +3760,7 @@ metadata:
     metric: cpu-load-5
     source: rancher-monitoring
 spec:
-  expression: sum(node_load5{instance=~"$instance"}) / count(node_cpu_seconds_total{mode="system",instance=~"$instance"})
+  expression: sum(node_load5{instance=~"$instance"}) / sum(machine_cpu_cores{instance=~"$instance"})
   legendFormat: Load5
   description: node cpu load 5
 ---
@@ -3777,7 +3777,7 @@ metadata:
     metric: cpu-load-5
     source: rancher-monitoring
 spec:
-  expression: sum(node_load5{instance=~"$instance"}) / count(node_cpu_seconds_total{mode="system",instance=~"$instance"})
+  expression: sum(node_load5{instance=~"$instance"}) / sum(machine_cpu_cores{instance=~"$instance"})
   legendFormat: Load5
   description: node cpu load 5
 ---
