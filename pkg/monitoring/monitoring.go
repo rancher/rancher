@@ -44,7 +44,7 @@ const (
 	clusterLevelAppName             = "cluster-monitoring"
 	projectLevelAppName             = "project-monitoring"
 	clusterLevelAlertManagerAppName = "cluster-alerting"
-	istioAppName                    = "istio"
+	IstioAppName                    = "cluster-istio"
 
 	// The headless service name of Prometheus
 	alertManagerHeadlessServiceName = "alertmanager-operated"
@@ -52,6 +52,10 @@ const (
 
 	// The service name of istio prometheus
 	istioPrometheusServiceName = "prometheus"
+
+	istioMonitoringTypeClusterMonitoring = "cluster-monitoring"
+	istioMonitoringTypesBuiltIn          = "built-in"
+	istioMonitoringTypesCustom           = "custom"
 
 	//CattlePrometheusRuleLabelKey The label info of PrometheusRule
 	CattlePrometheusRuleLabelKey             = "source"
@@ -113,11 +117,10 @@ func OwnedLabels(appName, appTargetNamespace, appProjectName string, level AppLe
 	}
 }
 
-func IstioMonitoringInfo() (appName, appTargetNamespace string) {
-	return istioAppName, istioNamespaceName
-}
-
-func IstioPrometheusEndpoint() (serviceName, namespace, port string) {
+func IstioPrometheusEndpoint(answers map[string]string) (serviceName, namespace, port string) {
+	if answers["global.monitoring.type"] == istioMonitoringTypeClusterMonitoring {
+		return prometheusHeadlessServiceName, cattleNamespaceName, "9090"
+	}
 	return istioPrometheusServiceName, istioNamespaceName, "9090"
 }
 

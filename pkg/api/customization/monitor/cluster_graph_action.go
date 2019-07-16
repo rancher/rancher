@@ -15,8 +15,10 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
+	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	mgmtclientv3 "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/config/dialer"
@@ -33,12 +35,16 @@ func NewClusterGraphHandler(dialerFactory dialer.Factory, clustermanager *cluste
 	return &ClusterGraphHandler{
 		dialerFactory:  dialerFactory,
 		clustermanager: clustermanager,
+		projectLister:  clustermanager.ScaledContext.Management.Projects(metav1.NamespaceAll).Controller().Lister(),
+		appLister:      clustermanager.ScaledContext.Project.Apps(metav1.NamespaceAll).Controller().Lister(),
 	}
 }
 
 type ClusterGraphHandler struct {
 	dialerFactory  dialer.Factory
 	clustermanager *clustermanager.Manager
+	projectLister  v3.ProjectLister
+	appLister      pv3.AppLister
 }
 
 func (h *ClusterGraphHandler) QuerySeriesAction(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -67,15 +73,25 @@ func (h *ClusterGraphHandler) QuerySeriesAction(actionName string, action *types
 	defer cancel()
 
 	var svcName, svcNamespace, svcPort, token string
+	prometheusName, prometheusNamespace := monitorutil.ClusterMonitoringInfo()
+	token, err = getAuthToken(userContext, prometheusName, prometheusNamespace)
+	if err != nil {
+		return err
+	}
+
 	if inputParser.Input.Filters["resourceType"] == "istiocluster" {
 		inputParser.Input.MetricParams["namespace"] = ".*"
-		svcName, svcNamespace, svcPort = monitorutil.IstioPrometheusEndpoint()
-	} else {
-		prometheusName, prometheusNamespace := monitorutil.ClusterMonitoringInfo()
-		token, err = getAuthToken(userContext, prometheusName, prometheusNamespace)
+
+		project, err := project.GetSystemProject(clusterName, h.projectLister)
 		if err != nil {
 			return err
 		}
+		app, err := h.appLister.Get(project.Name, monitorutil.IstioAppName)
+		if err != nil {
+			return err
+		}
+		svcName, svcNamespace, svcPort = monitorutil.IstioPrometheusEndpoint(app.Spec.Answers)
+	} else {
 		svcName, svcNamespace, svcPort = monitorutil.ClusterPrometheusEndpoint()
 	}
 

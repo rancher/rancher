@@ -13,8 +13,10 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
+	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	mgmtclientv3 "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config/dialer"
 	"github.com/sirupsen/logrus"
@@ -25,12 +27,16 @@ func NewProjectGraphHandler(dialerFactory dialer.Factory, clustermanager *cluste
 	return &ProjectGraphHandler{
 		dialerFactory:  dialerFactory,
 		clustermanager: clustermanager,
+		projectLister:  clustermanager.ScaledContext.Management.Projects(metav1.NamespaceAll).Controller().Lister(),
+		appLister:      clustermanager.ScaledContext.Project.Apps(metav1.NamespaceAll).Controller().Lister(),
 	}
 }
 
 type ProjectGraphHandler struct {
 	dialerFactory  dialer.Factory
 	clustermanager *clustermanager.Manager
+	projectLister  v3.ProjectLister
+	appLister      pv3.AppLister
 }
 
 func (h *ProjectGraphHandler) QuerySeriesAction(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -65,12 +71,25 @@ func (h *ProjectGraphHandler) QuerySeriesAction(actionName string, action *types
 
 	var svcName, svcNamespace, svcPort, token string
 	var queries []*PrometheusQuery
+	prometheusName, prometheusNamespace := monitorutil.ClusterMonitoringInfo()
+	token, err = getAuthToken(userContext, prometheusName, prometheusNamespace)
+	if err != nil {
+		return err
+	}
+
 	if inputParser.Input.Filters["resourceType"] == "istioproject" {
 		if inputParser.Input.MetricParams["namespace"] == "" {
 			return fmt.Errorf("no namespace found")
 		}
-
-		svcName, svcNamespace, svcPort = monitorutil.IstioPrometheusEndpoint()
+		project, err := project.GetSystemProject(clusterName, h.projectLister)
+		if err != nil {
+			return err
+		}
+		app, err := h.appLister.Get(project.Name, monitorutil.IstioAppName)
+		if err != nil {
+			return err
+		}
+		svcName, svcNamespace, svcPort = monitorutil.IstioPrometheusEndpoint(app.Spec.Answers)
 
 		mgmtClient := h.clustermanager.ScaledContext.Management
 		istioGraphs, err := mgmtClient.ClusterMonitorGraphs(clusterName).List(metav1.ListOptions{LabelSelector: "component=istio,level=project"})
@@ -88,11 +107,6 @@ func (h *ProjectGraphHandler) QuerySeriesAction(actionName string, action *types
 			queries = append(queries, metrics2PrometheusQuery(monitorMetrics, inputParser.Start, inputParser.End, inputParser.Step, isInstanceGraph(graph.Spec.GraphType))...)
 		}
 	} else {
-		prometheusName, prometheusNamespace := monitorutil.ClusterMonitoringInfo()
-		token, err = getAuthToken(userContext, prometheusName, prometheusNamespace)
-		if err != nil {
-			return err
-		}
 		svcName, svcNamespace, svcPort = monitorutil.ClusterPrometheusEndpoint()
 
 		var graphs []mgmtclientv3.ProjectMonitorGraph
