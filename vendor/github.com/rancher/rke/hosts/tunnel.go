@@ -3,6 +3,7 @@ package hosts
 import (
 	"context"
 	"fmt"
+	"github.com/rancher/rke/metadata"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -76,9 +77,9 @@ func checkDockerVersion(ctx context.Context, h *Host, clusterVersion string) err
 	}
 
 	if !isvalid && !h.IgnoreDockerVersion {
-		return fmt.Errorf("Unsupported Docker version found [%s], supported versions are %v", info.ServerVersion, docker.K8sDockerVersions[K8sVersion])
+		return fmt.Errorf("Unsupported Docker version found [%s], supported versions are %v", info.ServerVersion, metadata.K8sVersionToDockerVersions[K8sVersion])
 	} else if !isvalid {
-		log.Warnf(ctx, "Unsupported Docker version found [%s], supported versions are %v", info.ServerVersion, docker.K8sDockerVersions[K8sVersion])
+		log.Warnf(ctx, "Unsupported Docker version found [%s], supported versions are %v", info.ServerVersion, metadata.K8sVersionToDockerVersions[K8sVersion])
 	}
 	return nil
 }

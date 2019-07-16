@@ -15,6 +15,7 @@ var (
 	K8sVersionToTemplates       map[string]map[string]string
 	K8sVersionToRKESystemImages map[string]v3.RKESystemImages
 	K8sVersionToServiceOptions  map[string]v3.KubernetesServicesOptions
+	K8sVersionToDockerVersions  map[string][]string
 	K8sVersionsCurrent          []string
 	K8sBadVersions              = map[string]bool{}
 )
@@ -23,6 +24,7 @@ func InitMetadata(ctx context.Context) error {
 	initK8sRKESystemImages()
 	initAddonTemplates()
 	initServiceOptions()
+	initDockerOptions()
 	return nil
 }
 
@@ -34,6 +36,10 @@ func initAddonTemplates() {
 
 func initServiceOptions() {
 	K8sVersionToServiceOptions = interface{}(rke.DriverData.K8sVersionServiceOptions).(map[string]v3.KubernetesServicesOptions)
+}
+
+func initDockerOptions() {
+	K8sVersionToDockerVersions = rke.DriverData.K8sVersionDockerInfo
 }
 
 func initK8sRKESystemImages() {

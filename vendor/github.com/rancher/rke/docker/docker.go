@@ -20,6 +20,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/rancher/rke/log"
+	"github.com/rancher/rke/metadata"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -34,17 +35,6 @@ const (
 	// RetryCount is the amount of retries for Docker operations
 	RetryCount = 3
 )
-
-var K8sDockerVersions = map[string][]string{
-	"1.8":  {"1.11.x", "1.12.x", "1.13.x", "17.03.x"},
-	"1.9":  {"1.11.x", "1.12.x", "1.13.x", "17.03.x", "18.06.x", "18.09.x"},
-	"1.10": {"1.11.x", "1.12.x", "1.13.x", "17.03.x", "18.06.x", "18.09.x"},
-	"1.11": {"1.11.x", "1.12.x", "1.13.x", "17.03.x", "18.06.x", "18.09.x"},
-	"1.12": {"1.11.x", "1.12.x", "1.13.x", "17.03.x", "17.06.x", "17.09.x", "18.06.x", "18.09.x"},
-	"1.13": {"1.11.x", "1.12.x", "1.13.x", "17.03.x", "17.06.x", "17.09.x", "18.06.x", "18.09.x"},
-	"1.14": {"1.13.x", "17.03.x", "17.06.x", "17.09.x", "18.06.x", "18.09.x"},
-	"1.15": {"1.13.x", "17.03.x", "17.06.x", "17.09.x", "18.06.x", "18.09.x"},
-}
 
 type dockerConfig struct {
 	Auths map[string]authConfig `json:"auths,omitempty"`
@@ -533,7 +523,7 @@ func IsSupportedDockerVersion(info types.Info, K8sVersion string) (bool, error) 
 	if err != nil {
 		return false, err
 	}
-	for _, DockerVersion := range K8sDockerVersions[K8sVersion] {
+	for _, DockerVersion := range metadata.K8sVersionToDockerVersions[K8sVersion] {
 		supportedDockerVersion, err := convertToSemver(DockerVersion)
 		if err != nil {
 			return false, err
