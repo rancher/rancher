@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-type ControlPlaneEndpointController struct {
+type ExporterEndpointController struct {
 	Endpoints           v1.EndpointsInterface
 	EndpointLister      v1.EndpointsLister
 	EndpointsController v1.EndpointsController
@@ -20,18 +20,24 @@ type ControlPlaneEndpointController struct {
 	ServiceLister       v1.ServiceLister
 }
 
+const (
+	nodeMetricsWindowsEndpointName = "expose-node-metrics-windows"
+)
+
 var (
 	etcdLabel         = labels.Set(map[string]string{"node-role.kubernetes.io/etcd": "true"}).AsSelector()
 	controlPlaneLabel = labels.Set(map[string]string{"node-role.kubernetes.io/controlplane": "true"}).AsSelector()
 	masterLabel       = labels.Set(map[string]string{"node-role.kubernetes.io/master": "true"}).AsSelector()
+	windowNodeLabel   = labels.Set(map[string]string{"kubernetes.io/os": "windows"}).AsSelector()
 	selectorMap       = map[string][]labels.Selector{
 		"expose-kube-etcd-metrics":      {etcdLabel, masterLabel},
 		"expose-kube-cm-metrics":        {controlPlaneLabel, masterLabel},
 		"expose-kube-scheduler-metrics": {controlPlaneLabel, masterLabel},
+		nodeMetricsWindowsEndpointName:  {windowNodeLabel},
 	}
 )
 
-func (controller *ControlPlaneEndpointController) sync(key string, obj *corev1.Node) (runtime.Object, error) {
+func (controller *ExporterEndpointController) sync(key string, obj *corev1.Node) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		for key := range selectorMap {
 			controller.EndpointsController.Enqueue("cattle-prometheus", key)
@@ -64,7 +70,7 @@ func (controller *ControlPlaneEndpointController) sync(key string, obj *corev1.N
 	return obj, nil
 }
 
-func (controller *ControlPlaneEndpointController) syncEndpoints(key string, obj *corev1.Endpoints) (runtime.Object, error) {
+func (controller *ExporterEndpointController) syncEndpoints(key string, obj *corev1.Endpoints) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return obj, nil
 	}
