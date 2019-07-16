@@ -450,7 +450,7 @@ func (s *Server) serveHTTPS(config *v3.ListenConfig) error {
 		return fmt.Errorf("Error while configuring TLS ciphers: %s", err)
 	}
 	clientAuthSetting := tls.NoClientCert
-	if pa := os.Getenv("PROXY_AUTHENTICATION"); pa == "1" {
+	if pa := os.Getenv("PROXY_AUTHENTICATION"); len(pa) > 0 {
 		clientAuthSetting = tls.RequestClientCert
 	}
 
@@ -579,7 +579,7 @@ func (s *Server) serveACME(config *v3.ListenConfig) error {
 		return fmt.Errorf("Error while configuring TLS ciphers: %s", err)
 	}
 	clientAuthSetting := tls.NoClientCert
-	if pa := os.Getenv("PROXY_AUTHENTICATION"); pa == "1" {
+	if pa := os.Getenv("PROXY_AUTHENTICATION"); len(pa) > 0 {
 		clientAuthSetting = tls.RequestClientCert
 	}
 
