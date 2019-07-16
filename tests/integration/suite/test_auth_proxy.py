@@ -5,7 +5,7 @@ from requests.exceptions import SSLError
 from os import path
 
 certs_exist = pytest.mark.skipif(
-    not path.exists("/etc/rancher/ssl/failclient.pem"),
+    not path.exists("/etc/rancher/ssl/proxy-failclient.pem"),
     reason='Test certs dont exist for proxy'
 )
 
@@ -16,7 +16,7 @@ def test_user_proxy(admin_mc):
         "X-Remote-User": admin_mc.user.id,
         "X-Remote-Group": "abc"
     }
-    certs = ('/etc/rancher/ssl/client.pem')
+    certs = ('/etc/rancher/ssl/proxy-client.pem')
     client = rancher.Client(url=admin_mc.base_url, verify=False,
                             headers=headers, cert=certs)
     assert client.list_user(username='admin').data[0]['username'] == 'admin'
@@ -28,7 +28,7 @@ def test_user_proxy_invalid_cert(admin_mc):
         "X-Remote-User": admin_mc.user.id,
         "X-Remote-Group": "abc"
     }
-    certs = ('/etc/rancher/ssl/failclient.pem')
+    certs = ('/etc/rancher/ssl/proxy-failclient.pem')
     with pytest.raises(requests.exceptions.RequestException) as e:
         rancher.Client(url=admin_mc.base_url, verify=False,
                        headers=headers, cert=certs)
