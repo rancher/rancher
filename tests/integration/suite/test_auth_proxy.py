@@ -20,7 +20,7 @@ def test_user_proxy_invalid_cert(admin_proxy):
         "X-Remote-User": admin_proxy.user.id,
         "X-Remote-Group": "abc"
     }
-    certs = ('/etc/rancher/ssl/badclient.pem')
+    certs = ('/etc/rancher/ssl/failclient.pem')
     with pytest.raises(requests.exceptions.RequestException) as e:
         rancher.Client(url=admin_proxy.BASE_URL, verify=False,
                        headers=headers, cert=certs)
