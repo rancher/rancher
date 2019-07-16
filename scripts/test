@@ -28,7 +28,7 @@ if [ ${ARCH} == arm64 ]; then
     export ETCD_UNSUPPORTED_ARCH=arm64
 fi
 
-if [[ ! -z $DRONE]]; then
+if [ ! -z $DRONE]; then
   ./test-proxy-cert.sh
 fi
 
