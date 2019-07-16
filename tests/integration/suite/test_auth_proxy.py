@@ -1,8 +1,15 @@
 import pytest
 import rancher
 import requests
+from os import path
+
+certs_exist = pytest.mark.skipif(
+    not path.exists("/etc/rancher/ssl/failclient.pem"),
+    reason='Test certs dont exist for proxy'
+)
 
 
+@certs_exist
 def test_user_proxy(admin_proxy):
     headers = {
         "X-Remote-User": admin_proxy.user.id,
@@ -15,6 +22,7 @@ def test_user_proxy(admin_proxy):
     assert True
 
 
+@certs_exist
 def test_user_proxy_invalid_cert(admin_proxy):
     headers = {
         "X-Remote-User": admin_proxy.user.id,
@@ -27,6 +35,7 @@ def test_user_proxy_invalid_cert(admin_proxy):
     assert e is not None
 
 
+@certs_exist
 def test_user_proxy_no_cert(admin_proxy):
     headers = {
         "X-Remote-User": admin_proxy.user.id,
