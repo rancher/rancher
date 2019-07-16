@@ -29,6 +29,7 @@ const (
 	exporterEtcdCertName = "exporter-etcd-cert"
 	etcd                 = "etcd"
 	controlplane         = "controlplane"
+	windowsNode          = "windowsNode"
 	creatorIDAnno        = "field.cattle.io/creatorId"
 )
 
@@ -236,6 +237,9 @@ func (ch *clusterHandler) getExporterEndpoint() (map[string][]string, error) {
 	controlplaneLabels := labels.Set{
 		"node-role.kubernetes.io/controlplane": "true",
 	}
+	windowsNodeLabels := labels.Set{
+		"kubernetes.io/os": "windows",
+	}
 
 	agentNodeLister := ch.app.agentNodeClient.Controller().Lister()
 	etcdNodes, err := agentNodeLister.List(metav1.NamespaceAll, etcdLablels.AsSelector())
@@ -254,6 +258,13 @@ func (ch *clusterHandler) getExporterEndpoint() (map[string][]string, error) {
 		endpointMap[controlplane] = append(endpointMap[controlplane], node.GetNodeInternalAddress(v))
 	}
 
+	windowsNodes, err := agentNodeLister.List(metav1.NamespaceAll, windowsNodeLabels.AsSelector())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get windows nodes")
+	}
+	for _, v := range windowsNodes {
+		endpointMap[windowsNode] = append(endpointMap[windowsNode], node.GetNodeInternalAddress(v))
+	}
 	return endpointMap, nil
 }
 
@@ -366,6 +377,18 @@ func (ch *clusterHandler) deployApp(appName, appTargetNamespace string, appProje
 				key2 := fmt.Sprintf("exporter-kube-controller-manager.endpoints[%d]", k)
 				appAnswers[key1] = v
 				appAnswers[key2] = v
+			}
+		}
+
+		if windowsNodeEndpoints, ok := systemComponentMap[windowsNode]; ok {
+			appAnswers["exporter-node-windows.enabled"] = "true"
+			if port, ok := appAnswers["exporter-node.ports.metrics.port"]; ok {
+				appAnswers["exporter-node-windows.ports.metrics.port"] = port
+			}
+			sort.Strings(windowsNodeEndpoints)
+			for k, v := range windowsNodeEndpoints {
+				key := fmt.Sprintf("exporter-node-windows.endpoints[%d]", k)
+				appAnswers[key] = v
 			}
 		}
 	}

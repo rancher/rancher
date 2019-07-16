@@ -1,10 +1,14 @@
 package monitoring
 
 import (
+	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/monitoring"
+	corev1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	k8scorev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -13,6 +17,7 @@ type clusterMonitoringEnabledHandler struct {
 	clusterName             string
 	cattleClusterController mgmtv3.ClusterController
 	cattleClusterLister     mgmtv3.ClusterLister
+	agentEndpointsLister    corev1.EndpointsLister
 }
 
 // sync will trigger clusterHandler sync loop, if Cluster Monitoring is enabling.
@@ -35,4 +40,33 @@ func (h *clusterMonitoringEnabledHandler) sync(key string, endpoints *k8scorev1.
 	// trigger clusterHandler sync loop
 	h.cattleClusterController.Enqueue(metav1.NamespaceAll, h.clusterName)
 	return endpoints, nil
+}
+
+// sync will trigger clusterHandler sync loop when node updated, if Cluster Monitoring is enabling.
+func (h *clusterMonitoringEnabledHandler) syncWindowsNode(key string, node *k8scorev1.Node) (runtime.Object, error) {
+	_, monitoringNamespace := monitoring.ClusterMonitoringInfo()
+	cluster, err := h.cattleClusterLister.Get(metav1.NamespaceAll, h.clusterName)
+	if err != nil || cluster.DeletionTimestamp != nil {
+		return node, err
+	}
+
+	// only consider enabling monitoring
+	if !cluster.Spec.EnableClusterMonitoring {
+		return node, nil
+	}
+
+	if !windowNodeLabel.Matches(labels.Set(node.Labels)) {
+		return node, nil
+	}
+
+	endpoint, err := h.agentEndpointsLister.Get(monitoringNamespace, nodeMetricsWindowsEndpointName)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, errors.Wrapf(err, "get windows endpoint %s:%s failed", monitoringNamespace, nodeMetricsWindowsEndpointName)
+	}
+	// enqueue to enable windows node exporter
+	if endpoint == nil {
+		h.cattleClusterController.Enqueue(metav1.NamespaceAll, h.clusterName)
+	}
+
+	return node, nil
 }
