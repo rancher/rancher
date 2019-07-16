@@ -65,6 +65,7 @@ def test_hpa(admin_pc):
     )
     assert len(hpas) == 1
     hpa = hpas.data[0]
+    assert hpa.state == "initializing"
     client.delete(hpa)
     client.delete(workload)
     client.delete(ns)
