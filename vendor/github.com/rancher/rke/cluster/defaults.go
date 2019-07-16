@@ -258,6 +258,7 @@ func (c *Cluster) setClusterImageDefaults() error {
 		&c.SystemImages.CalicoNode:                d(imageDefaults.CalicoNode, privRegURL),
 		&c.SystemImages.CalicoCNI:                 d(imageDefaults.CalicoCNI, privRegURL),
 		&c.SystemImages.CalicoCtl:                 d(imageDefaults.CalicoCtl, privRegURL),
+		&c.SystemImages.CalicoControllers:         d(imageDefaults.CalicoControllers, privRegURL),
 		&c.SystemImages.CanalNode:                 d(imageDefaults.CanalNode, privRegURL),
 		&c.SystemImages.CanalCNI:                  d(imageDefaults.CanalCNI, privRegURL),
 		&c.SystemImages.CanalFlannel:              d(imageDefaults.CanalFlannel, privRegURL),
