@@ -76,17 +76,25 @@ func (md *MetadataController) saveSystemImages(K8sVersionRKESystemImages map[str
 	rancherVersion := GetRancherVersion()
 	var deprecated, maxIgnore []string
 	for k8sVersion, systemImages := range K8sVersionRKESystemImages {
-		rancherVersionInfo, ok := K8sVersionInfo[k8sVersion]
-		if ok && toIgnoreForAllK8s(rancherVersionInfo, rancherVersion) {
+		rancherVersionInfo, minorOk := K8sVersionInfo[k8sVersion]
+		if minorOk && toIgnoreForAllK8s(rancherVersionInfo, rancherVersion) {
+			deprecated = append(deprecated, k8sVersion)
+			continue
+		}
+		majorVersion := util.GetTagMajorVersion(k8sVersion)
+		majorVersionInfo, majorOk := K8sVersionInfo[majorVersion]
+		if majorOk && toIgnoreForAllK8s(majorVersionInfo, rancherVersion) {
 			deprecated = append(deprecated, k8sVersion)
 			continue
 		}
 		if err := md.createOrUpdateSystemImageCRD(k8sVersion, systemImages); err != nil {
 			return err
 		}
-		majorVersion := util.GetTagMajorVersion(k8sVersion)
-		majorVersionInfo, ok := K8sVersionInfo[majorVersion]
-		if ok && toIgnoreForK8sCurrent(majorVersionInfo, rancherVersion) {
+		if minorOk && toIgnoreForK8sCurrent(rancherVersionInfo, rancherVersion) {
+			maxIgnore = append(maxIgnore, k8sVersion)
+			continue
+		}
+		if majorOk && toIgnoreForK8sCurrent(majorVersionInfo, rancherVersion) {
 			maxIgnore = append(maxIgnore, k8sVersion)
 			continue
 		}
