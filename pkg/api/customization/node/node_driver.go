@@ -43,6 +43,19 @@ func (h *DriverHandlers) ActionHandler(actionName string, action *types.Action, 
 	case "deactivate":
 		m.Spec.Active = false
 		v3.NodeDriverConditionInactive.Unknown(m)
+		var newConditions []v3.Condition
+		for _, cond := range m.Status.Conditions {
+			// remove downloaded and installed conditions if stuck in unknown,
+			// this allows state to correctly show up as inactive vs downloading/installing
+			if cond.Type == "Downloaded" && cond.Status == "Unknown" {
+				continue
+			}
+			if cond.Type == "Installed" && cond.Status == "Unknown" {
+				continue
+			}
+			newConditions = append(newConditions, cond)
+		}
+		m.Status.Conditions = newConditions
 	}
 
 	_, err = h.NodeDriverClient.Update(m)
