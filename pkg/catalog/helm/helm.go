@@ -15,6 +15,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -32,15 +33,18 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var httpTimeout = time.Second * 30
-var httpClient = &http.Client{
-	Timeout: httpTimeout,
-}
-var uuid = settings.InstallUUID.Get()
-var Locker = locker.New()
-
-var CatalogCache = filepath.Join("management-state", "catalog-cache")
-var IconCache = filepath.Join(CatalogCache, ".icon-cache")
+var (
+	httpTimeout = time.Second * 30
+	httpClient  = &http.Client{
+		Timeout: httpTimeout,
+	}
+	uuid           = settings.InstallUUID.Get()
+	Locker         = locker.New()
+	CatalogCache   = filepath.Join("management-state", "catalog-cache")
+	IconCache      = filepath.Join(CatalogCache, ".icon-cache")
+	controlChars   = regexp.MustCompile("[[:cntrl:]]")
+	controlEncoded = regexp.MustCompile("%[0-1][0-9,a-f,A-F]")
+)
 
 type Helm struct {
 	LocalPath   string
@@ -75,7 +79,7 @@ func (h *Helm) lockAndVerifyCachePath() error {
 }
 
 func (h *Helm) request(pathURL, method string) (*http.Response, error) {
-	baseEndpoint, err := url.Parse(pathURL)
+	baseEndpoint, err := h.validateURL(pathURL)
 	if err != nil {
 		return nil, err
 	}
@@ -88,6 +92,22 @@ func (h *Helm) request(pathURL, method string) (*http.Response, error) {
 		return nil, err
 	}
 	return httpClient.Do(req)
+}
+
+func (h *Helm) validateURL(pathURL string) (*url.URL, error) {
+	// Remove inline control character
+	pathURL = controlChars.ReplaceAllString(pathURL, "")
+	// Remove control characters that have been urlencoded such as %0d, %1B
+	pathURL = controlEncoded.ReplaceAllString(pathURL, "")
+	// Validate scheme
+	parsedURL, err := url.Parse(pathURL)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.HasPrefix(parsedURL.Scheme, "http") {
+		return nil, errors.Errorf("unsupported protocol scheme '%s'", parsedURL.Scheme)
+	}
+	return parsedURL, nil
 }
 
 func (h *Helm) downloadIndex(indexURL string) (*RepoIndex, error) {
