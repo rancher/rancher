@@ -318,6 +318,9 @@ func generateBackupFilename(snapshotName string, backupConfig *v3.BackupConfig) 
 	// s3 backup
 	if backupConfig != nil &&
 		backupConfig.S3BackupConfig != nil {
+		if len(backupConfig.S3BackupConfig.Folder) != 0 {
+			return fmt.Sprintf("https://%s/%s/%s/%s_%s.%s", backupConfig.S3BackupConfig.Endpoint, backupConfig.S3BackupConfig.BucketName, backupConfig.S3BackupConfig.Folder, snapshotName, time.Now().Format(time.RFC3339), compressedExtension)
+		}
 		return fmt.Sprintf("https://%s/%s/%s_%s.%s", backupConfig.S3BackupConfig.Endpoint, backupConfig.S3BackupConfig.BucketName, snapshotName, time.Now().Format(time.RFC3339), compressedExtension)
 	}
 	// local backup
@@ -336,6 +339,7 @@ func (c *Controller) deleteS3Snapshot(b *v3.EtcdBackup) error {
 	endpoint := b.Spec.BackupConfig.S3BackupConfig.Endpoint
 	bucketLookup := getBucketLookupType(endpoint)
 	bucket := b.Spec.BackupConfig.S3BackupConfig.BucketName
+	folder := b.Spec.BackupConfig.S3BackupConfig.Folder
 	// no access credentials, we assume IAM roles
 	if b.Spec.BackupConfig.S3BackupConfig.AccessKey == "" ||
 		b.Spec.BackupConfig.S3BackupConfig.SecretKey == "" {
@@ -379,6 +383,9 @@ func (c *Controller) deleteS3Snapshot(b *v3.EtcdBackup) error {
 		fileName = b.Name
 	}
 
+	if len(folder) != 0 {
+		fileName = fmt.Sprintf("%s/%s", folder, fileName)
+	}
 	return s3Client.RemoveObject(bucket, fileName)
 }
 
