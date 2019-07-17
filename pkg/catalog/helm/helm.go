@@ -15,7 +15,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -38,12 +37,10 @@ var (
 	httpClient  = &http.Client{
 		Timeout: httpTimeout,
 	}
-	uuid           = settings.InstallUUID.Get()
-	Locker         = locker.New()
-	CatalogCache   = filepath.Join("management-state", "catalog-cache")
-	IconCache      = filepath.Join(CatalogCache, ".icon-cache")
-	controlChars   = regexp.MustCompile("[[:cntrl:]]")
-	controlEncoded = regexp.MustCompile("%[0-1][0-9,a-f,A-F]")
+	uuid         = settings.InstallUUID.Get()
+	Locker       = locker.New()
+	CatalogCache = filepath.Join("management-state", "catalog-cache")
+	IconCache    = filepath.Join(CatalogCache, ".icon-cache")
 )
 
 type Helm struct {
@@ -79,7 +76,7 @@ func (h *Helm) lockAndVerifyCachePath() error {
 }
 
 func (h *Helm) request(pathURL, method string) (*http.Response, error) {
-	baseEndpoint, err := h.validateURL(pathURL)
+	baseEndpoint, err := url.Parse(pathURL)
 	if err != nil {
 		return nil, err
 	}
@@ -92,22 +89,6 @@ func (h *Helm) request(pathURL, method string) (*http.Response, error) {
 		return nil, err
 	}
 	return httpClient.Do(req)
-}
-
-func (h *Helm) validateURL(pathURL string) (*url.URL, error) {
-	// Remove inline control character
-	pathURL = controlChars.ReplaceAllString(pathURL, "")
-	// Remove control characters that have been urlencoded such as %0d, %1B
-	pathURL = controlEncoded.ReplaceAllString(pathURL, "")
-	// Validate scheme
-	parsedURL, err := url.Parse(pathURL)
-	if err != nil {
-		return nil, err
-	}
-	if !strings.HasPrefix(parsedURL.Scheme, "http") {
-		return nil, errors.Errorf("unsupported protocol scheme '%s'", parsedURL.Scheme)
-	}
-	return parsedURL, nil
 }
 
 func (h *Helm) downloadIndex(indexURL string) (*RepoIndex, error) {

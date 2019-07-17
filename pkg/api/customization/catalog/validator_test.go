@@ -1,4 +1,4 @@
-package helm
+package catalog
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestHelmSanitizeURL(t *testing.T) {
+func TestValidateURL(t *testing.T) {
 	type args struct {
 		pathURL string
 	}
@@ -43,12 +43,11 @@ func TestHelmSanitizeURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := &Helm{}
-			got, err := h.validateURL(tt.pathURL)
+			got, err := validateURL(tt.pathURL)
 			if tt.wantErr {
 				assert.NotNil(t, err)
 			} else {
-				assert.Equal(t, got.String(), tt.want)
+				assert.Equal(t, got, tt.want)
 
 			}
 		})

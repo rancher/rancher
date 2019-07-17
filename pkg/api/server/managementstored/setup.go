@@ -324,6 +324,7 @@ func Catalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
 	schema.ActionHandler = handler.RefreshActionHandler
 	schema.CollectionFormatter = catalog.CollectionFormatter
 	schema.LinkHandler = handler.ExportYamlHandler
+	schema.Validator = catalog.Validator
 }
 
 func ProjectCatalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
@@ -334,6 +335,7 @@ func ProjectCatalog(schemas *types.Schemas, managementContext *config.ScaledCont
 	}
 	schema.ActionHandler = handler.RefreshProjectCatalogActionHandler
 	schema.CollectionFormatter = catalog.CollectionFormatter
+	schema.Validator = catalog.Validator
 }
 
 func ClusterCatalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
@@ -344,6 +346,7 @@ func ClusterCatalog(schemas *types.Schemas, managementContext *config.ScaledCont
 	}
 	schema.ActionHandler = handler.RefreshClusterCatalogActionHandler
 	schema.CollectionFormatter = catalog.CollectionFormatter
+	schema.Validator = catalog.Validator
 }
 
 func ClusterRegistrationTokens(schemas *types.Schemas) {
