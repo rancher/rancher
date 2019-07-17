@@ -41,7 +41,7 @@ import (
 	sourcecodeproviders "github.com/rancher/rancher/pkg/pipeline/providers"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
-	"github.com/rancher/types/client/management/v3"
+	client "github.com/rancher/types/client/management/v3"
 	projectclient "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
 )
@@ -213,6 +213,7 @@ func Catalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
 	schema.ActionHandler = handler.RefreshActionHandler
 	schema.CollectionFormatter = catalog.CollectionFormatter
 	schema.LinkHandler = handler.ExportYamlHandler
+	schema.Validator = catalog.Validator
 }
 
 func ClusterRegistrationTokens(schemas *types.Schemas) {
