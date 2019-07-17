@@ -1,14 +1,15 @@
 package secret
 
 import (
-	"strings"
-
 	"context"
+	"strings"
 
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/api/store/cert"
+	client "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
 )
 
@@ -57,6 +58,12 @@ func NewNamespacedSecretStore(ctx context.Context, clientGetter proxy.ClientGett
 				parts := strings.Split(convert.ToString(data["type"]), "/")
 				parts[len(parts)-1] = "namespaced" + convert.Capitalize(parts[len(parts)-1])
 				data["type"] = strings.Join(parts, "/")
+				if data["type"] != client.NamespacedCertificateType {
+					return data, nil
+				}
+				if err := cert.AddCertInfo(data); err != nil {
+					return nil, err
+				}
 				return data, nil
 			},
 		},

@@ -1,4 +1,6 @@
 from .common import random_str
+import kubernetes
+from .conftest import kubernetes_api_client, user_project_client
 
 CERT = """-----BEGIN CERTIFICATE-----
 MIIDEDCCAfgCCQC+HwE8rpMN7jANBgkqhkiG9w0BAQUFADBKMQswCQYDVQQGEwJV
@@ -253,3 +255,39 @@ def test_ssh_auth(admin_pc):
     assert cert is not None
 
     client.delete(cert)
+
+
+def test_secret_creation_kubectl(admin_mc, admin_cc, remove_resource):
+    name = random_str()
+    project = admin_mc.client.create_project(name=random_str(),
+                                             clusterId='local')
+    remove_resource(project)
+    namespace_name = random_str()
+    ns = admin_cc.client.create_namespace(name=namespace_name,
+                                          projectId=project.id)
+    remove_resource(ns)
+
+    k8s_client = kubernetes_api_client(admin_mc.client, 'local')
+    secrets_api = kubernetes.client.CoreV1Api(k8s_client)
+
+    secret = kubernetes.client.V1Secret()
+    # Metadata
+    secret.metadata = kubernetes.client.V1ObjectMeta(
+        name=name,
+        namespace=namespace_name)
+    secret.string_data = {'tls.key': KEY, 'tls.crt': CERT}
+    secret.type = "kubernetes.io/tls"
+
+    sec = secrets_api.create_namespaced_secret(namespace=namespace_name,
+                                               body=secret)
+    remove_resource(sec)
+    assert sec is not None
+
+    # now get this through rancher api as namespacedCertificate
+    cert_id = namespace_name+':'+name
+    proj_client = user_project_client(admin_mc, project)
+    cert = proj_client.by_id_namespaced_certificate(cert_id)
+    assert cert is not None
+    assert "RSA" in cert['algorithm']
+    assert cert['expiresAt'] is not None
+    assert cert['issuedAt'] is not None
