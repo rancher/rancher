@@ -3,7 +3,6 @@ package clusterprovisioner
 import (
 	"fmt"
 	"reflect"
-	"strings"
 
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/clusterprovisioninglogger"
@@ -106,7 +105,7 @@ func (p *Provisioner) driverRemove(cluster *v3.Cluster, forceRemove bool) error 
 	return err
 }
 
-func (p *Provisioner) driverRestore(cluster *v3.Cluster, spec v3.ClusterSpec) (string, string, string, error) {
+func (p *Provisioner) driverRestore(cluster *v3.Cluster, spec v3.ClusterSpec, snapshot string) (string, string, string, error) {
 	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, cluster, v3.ClusterConditionUpdated)
 	defer logger.Close()
 
@@ -122,8 +121,6 @@ func (p *Provisioner) driverRestore(cluster *v3.Cluster, spec v3.ClusterSpec) (s
 	if err != nil {
 		return "", "", "", err
 	}
-
-	snapshot := strings.Split(spec.RancherKubernetesEngineConfig.Restore.SnapshotName, ":")[1]
 	return p.engineService.ETCDRestore(ctx, cluster.Name, kontainerDriver, spec, snapshot)
 
 }
