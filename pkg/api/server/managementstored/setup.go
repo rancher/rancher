@@ -217,6 +217,7 @@ func Catalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
 	schema.ActionHandler = handler.RefreshActionHandler
 	schema.CollectionFormatter = catalog.CollectionFormatter
 	schema.LinkHandler = handler.ExportYamlHandler
+	schema.Validator = catalog.Validator
 }
 
 func ClusterRegistrationTokens(schemas *types.Schemas) {
