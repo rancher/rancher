@@ -29,6 +29,7 @@ import (
 
 const (
 	clusterBackupCheckInterval = 5 * time.Minute
+	compressedExtension        = "zip"
 	s3Endpoint                 = "s3.amazonaws.com"
 )
 
@@ -87,7 +88,7 @@ func (c *Controller) Create(b *v3.EtcdBackup) (runtime.Object, error) {
 	}
 
 	if !v3.BackupConditionCreated.IsTrue(b) {
-		b.Spec.Filename = getBackupFilename(b.Name, cluster)
+		b.Spec.Filename = generateBackupFilename(b.Name, cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig)
 		b.Spec.BackupConfig = *cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig
 		v3.BackupConditionCreated.True(b)
 		// we set ConditionCompleted to Unknown to avoid incorrect "active" state
@@ -222,8 +223,9 @@ func (c *Controller) etcdSaveWithBackoff(b *v3.EtcdBackup) (runtime.Object, erro
 			return b, err
 		}
 		var inErr error
+		snapshotName := clusterprovisioner.GetBackupFilename(b)
 		err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-			if inErr = c.backupDriver.ETCDSave(c.ctx, cluster.Name, kontainerDriver, cluster.Spec, b.Name); inErr != nil {
+			if inErr = c.backupDriver.ETCDSave(c.ctx, cluster.Name, kontainerDriver, cluster.Spec, snapshotName); inErr != nil {
 				logrus.Warnf("%v", inErr)
 				return false, nil
 			}
@@ -308,13 +310,19 @@ func NewBackupObject(cluster *v3.Cluster, manual bool) *v3.EtcdBackup {
 	}
 }
 
-func getBackupFilename(snapshotName string, cluster *v3.Cluster) string {
-	if cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig == nil ||
-		cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig == nil {
+func generateBackupFilename(snapshotName string, backupConfig *v3.BackupConfig) string {
+	// no backup config
+	if backupConfig == nil {
 		return ""
 	}
-	target := cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.S3BackupConfig
-	return fmt.Sprintf("https://s3-%s.amazonaws.com/%s/%s", target.Region, target.BucketName, snapshotName)
+	// s3 backup
+	if backupConfig != nil &&
+		backupConfig.S3BackupConfig != nil {
+		return fmt.Sprintf("https://%s/%s/%s_%s.%s", backupConfig.S3BackupConfig.Endpoint, backupConfig.S3BackupConfig.BucketName, snapshotName, time.Now().Format(time.RFC3339), compressedExtension)
+	}
+	// local backup
+	return fmt.Sprintf("%s_%s.%s", snapshotName, time.Now().Format(time.RFC3339), compressedExtension)
+
 }
 
 func (c *Controller) deleteS3Snapshot(b *v3.EtcdBackup) error {
@@ -363,7 +371,15 @@ func (c *Controller) deleteS3Snapshot(b *v3.EtcdBackup) error {
 		return nil
 	}
 
-	return s3Client.RemoveObject(bucket, b.Name)
+	// Extract filename from etcdBackup.Spec.Filename
+	var fileName string
+	fileName, err = clusterprovisioner.GetBackupFilenameFromURL(b.Spec.Filename)
+	if err != nil {
+		logrus.Warningf("Could not get filename from [%s]: %v. Using %s as fallback", b.Spec.Filename, err, b.Name)
+		fileName = b.Name
+	}
+
+	return s3Client.RemoveObject(bucket, fileName)
 }
 
 func (c *Controller) getRecuringBackupsList(cluster *v3.Cluster) ([]*v3.EtcdBackup, error) {

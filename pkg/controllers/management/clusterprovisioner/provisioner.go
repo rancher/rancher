@@ -3,6 +3,8 @@ package clusterprovisioner
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"path"
 	"reflect"
 	"sort"
 	"strings"
@@ -877,7 +879,7 @@ func (p *Provisioner) restoreClusterBackup(cluster *v3.Cluster, spec v3.ClusterS
 		return "", "", "", fmt.Errorf("snapshot [%s] is not a backup of cluster [%s]", backup.Name, cluster.Name)
 	}
 
-	api, token, cert, err = p.driverRestore(cluster, spec)
+	api, token, cert, err = p.driverRestore(cluster, spec, GetBackupFilename(backup))
 	if err != nil {
 		return "", "", "", err
 	}
@@ -893,4 +895,40 @@ func (p *Provisioner) restoreClusterBackup(cluster *v3.Cluster, spec v3.ClusterS
 		}
 	}
 	return api, token, cert, err
+}
+
+func GetBackupFilenameFromURL(URL string) (string, error) {
+	if !isValidURL(URL) {
+		return "", fmt.Errorf("URL is not valid: [%s]", URL)
+	}
+	parsedURL, err := url.Parse(URL)
+	if err != nil {
+		return "", err
+	}
+	if parsedURL.Path == "" {
+		return "", fmt.Errorf("No path found in URL: [%s]", URL)
+	}
+	extractedPath := path.Base(parsedURL.Path)
+	return extractedPath, nil
+}
+
+// isValidURL tests a string to determine if it is a url or not.
+// https://golangcode.com/how-to-check-if-a-string-is-a-url/
+func isValidURL(URL string) bool {
+	_, err := url.ParseRequestURI(URL)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+func GetBackupFilename(backup *v3.EtcdBackup) string {
+	snapshot := backup.Name
+	if filename, err := GetBackupFilenameFromURL(backup.Spec.Filename); err == nil { // s3 file
+		// need to remove extention
+		snapshot = strings.TrimSuffix(filename, path.Ext(filename))
+	} else if len(backup.Spec.Filename) != 0 { // not s3 url
+		snapshot = strings.TrimSuffix(backup.Spec.Filename, path.Ext(backup.Spec.Filename))
+	}
+	return snapshot
 }
