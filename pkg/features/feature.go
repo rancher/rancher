@@ -24,12 +24,14 @@ type feature struct {
 	featuresLister v3.FeatureLister
 }
 
-// InitializeFeatures creates feature provider, updates it with current features, and assigns it to provider
+// InitializeFeatures updates feature default if given valid --features flag and creates/updates necessary features in k8s
 func InitializeFeatures(ctx *config.ScaledContext, featureArgs string) {
+	// applies any default values assigned in --features flag to feature map
 	if err := applyArgumentDefaults(featureArgs); err != nil {
 		logrus.Errorf("failed to apply feature args: %v", err)
 	}
 
+	// creates any features in map that do not exist, updates features with new default value
 	for key, f := range features {
 		f.featuresLister = ctx.Management.Features("").Controller().Lister()
 
@@ -67,6 +69,10 @@ func InitializeFeatures(ctx *config.ScaledContext, featureArgs string) {
 // applyArgumentDefaults reads the features arguments and uses their values to overwrite
 // the corresponding feature default value
 func applyArgumentDefaults(featureArgs string) error {
+	if featureArgs == "" {
+		return nil
+	}
+
 	formattingError := fmt.Errorf("feature argument should be of the form \"features=feature1=bool,feature2=bool\"")
 	args := strings.Split(featureArgs, ",")
 
