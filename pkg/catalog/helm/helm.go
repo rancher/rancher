@@ -32,15 +32,16 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var httpTimeout = time.Second * 30
-var httpClient = &http.Client{
-	Timeout: httpTimeout,
-}
-var uuid = settings.InstallUUID.Get()
-var Locker = locker.New()
-
-var CatalogCache = filepath.Join("management-state", "catalog-cache")
-var IconCache = filepath.Join(CatalogCache, ".icon-cache")
+var (
+	httpTimeout = time.Second * 30
+	httpClient  = &http.Client{
+		Timeout: httpTimeout,
+	}
+	uuid         = settings.InstallUUID.Get()
+	Locker       = locker.New()
+	CatalogCache = filepath.Join("management-state", "catalog-cache")
+	IconCache    = filepath.Join(CatalogCache, ".icon-cache")
+)
 
 type Helm struct {
 	LocalPath   string
