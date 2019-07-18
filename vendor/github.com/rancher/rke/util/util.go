@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"os"
 	"reflect"
 	"strings"
@@ -13,8 +14,6 @@ import (
 
 const (
 	WorkerThreads = 50
-
-	DefaultRKETools = "rancher/rke-tools:v0.1.34"
 )
 
 func StrToSemVer(version string) (*semver.Version, error) {
@@ -84,6 +83,19 @@ func IsFileExists(filePath string) (bool, error) {
 	} else {
 		return false, err
 	}
+}
+
+func GetDefaultRKETools(image string) (string, error) {
+	tag, err := GetImageTagFromImage(image)
+	if err != nil || tag == "" {
+		return "", fmt.Errorf("defaultRKETools: no tag %s", image)
+	}
+	toReplaceTag, err := GetImageTagFromImage(v3.AllK8sVersions[v3.DefaultK8s].Alpine)
+	if err != nil || toReplaceTag == "" {
+		return "", fmt.Errorf("defaultRKETools: no replace tag %s", v3.AllK8sVersions[v3.DefaultK8s].Alpine)
+	}
+	image = strings.Replace(image, tag, toReplaceTag, 1)
+	return image, nil
 }
 
 func GetImageTagFromImage(image string) (string, error) {

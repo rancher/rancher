@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"regexp"
 
 	"github.com/rancher/rke/docker"
@@ -170,7 +171,12 @@ func (c *Cluster) etcdSnapshotChecksum(ctx context.Context, snapshotPath string)
 }
 
 func (c *Cluster) getBackupImage() string {
-	return util.DefaultRKETools
+	rkeToolsImage, err := util.GetDefaultRKETools(c.SystemImages.Alpine)
+	if err != nil {
+		logrus.Errorf("[etcd] error getting backup image %v", err)
+		return ""
+	}
+	return rkeToolsImage
 }
 
 func IsLocalSnapshot(name string) bool {
