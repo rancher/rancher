@@ -288,6 +288,7 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 			"--endpoints=" + etcdHost.InternalAddress + ":2379",
 		},
 		Image: etcdSnapshotImage,
+		Env:   es.ExtraEnv,
 	}
 	if once {
 		log.Infof(ctx, "[etcd] Running snapshot save once on host [%s]", etcdHost.Address)
@@ -370,6 +371,7 @@ func DownloadEtcdSnapshotFromS3(ctx context.Context, etcdHost *hosts.Host, prsMa
 			"--s3-region=" + s3Backend.Region,
 		},
 		Image: etcdSnapshotImage,
+		Env:   es.ExtraEnv,
 	}
 	if s3Backend.CustomCA != "" {
 		caStr := base64.StdEncoding.EncodeToString([]byte(s3Backend.CustomCA))
@@ -402,7 +404,7 @@ func DownloadEtcdSnapshotFromS3(ctx context.Context, etcdHost *hosts.Host, prsMa
 	return docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdDownloadBackupContainerName)
 }
 
-func RestoreEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdRestoreImage, snapshotName, initCluster string) error {
+func RestoreEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdRestoreImage, snapshotName, initCluster string, es v3.ETCDService) error {
 	log.Infof(ctx, "[etcd] Restoring [%s] snapshot on etcd host [%s]", snapshotName, etcdHost.Address)
 	nodeName := pki.GetEtcdCrtName(etcdHost.InternalAddress)
 	snapshotPath := fmt.Sprintf("%s%s", EtcdSnapshotPath, snapshotName)
@@ -427,7 +429,7 @@ func RestoreEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 				"&& rm -rf", EtcdRestorePath,
 			}, " "),
 		},
-		Env:   []string{"ETCDCTL_API=3"},
+		Env:   append([]string{"ETCDCTL_API=3"}, es.ExtraEnv...),
 		Image: etcdRestoreImage,
 	}
 	hostCfg := &container.HostConfig{
@@ -478,6 +480,7 @@ func RunEtcdSnapshotRemove(ctx context.Context, etcdHost *hosts.Host, prsMap map
 			"sh", "-c", fmt.Sprintf("rm -f %s", fullPath),
 		},
 		Image: etcdSnapshotImage,
+		Env:   es.ExtraEnv,
 	}
 	hostCfg := &container.HostConfig{
 		Binds: []string{
@@ -516,7 +519,7 @@ func GetEtcdSnapshotChecksum(ctx context.Context, etcdHost *hosts.Host, prsMap m
 	imageCfg := &container.Config{
 		Cmd: []string{
 			"sh", "-c", strings.Join([]string{
-				"if [ -f ", snapshotPath, " ]; then md5sum ", snapshotPath, " | cut -f1 -d' ' | tr -d '\n'; else echo 'snapshot file does not exist' >&2; fi"}, ""),
+				" if [ -f '", snapshotPath, "' ]; then md5sum '", snapshotPath, "' | cut -f1 -d' ' | tr -d '\n'; else echo 'snapshot file does not exist' >&2; fi"}, ""),
 		},
 		Image: alpineImage,
 	}

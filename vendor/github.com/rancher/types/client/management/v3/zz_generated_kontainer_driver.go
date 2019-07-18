@@ -73,8 +73,6 @@ type KontainerDriverOperations interface {
 	ActionActivate(resource *KontainerDriver) error
 
 	ActionDeactivate(resource *KontainerDriver) error
-
-	CollectionActionRefresh(resource *KontainerDriverCollection) error
 }
 
 func newKontainerDriverClient(apiClient *Client) *KontainerDriverClient {
@@ -135,10 +133,5 @@ func (c *KontainerDriverClient) ActionActivate(resource *KontainerDriver) error 
 
 func (c *KontainerDriverClient) ActionDeactivate(resource *KontainerDriver) error {
 	err := c.apiClient.Ops.DoAction(KontainerDriverType, "deactivate", &resource.Resource, nil, nil)
-	return err
-}
-
-func (c *KontainerDriverClient) CollectionActionRefresh(resource *KontainerDriverCollection) error {
-	err := c.apiClient.Ops.DoCollectionAction(KontainerDriverType, "refresh", &resource.Collection, nil, nil)
 	return err
 }
