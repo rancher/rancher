@@ -54,10 +54,14 @@ func RunEtcdPlane(
 			return err
 		}
 		if *es.Snapshot == true {
-			if err := RunEtcdSnapshotSave(ctx, host, prsMap, util.DefaultRKETools, EtcdSnapshotContainerName, false, es); err != nil {
+			rkeToolsImage, err := util.GetDefaultRKETools(alpineImage)
+			if err != nil {
 				return err
 			}
-			if err := pki.SaveBackupBundleOnHost(ctx, host, util.DefaultRKETools, EtcdSnapshotPath, prsMap); err != nil {
+			if err := RunEtcdSnapshotSave(ctx, host, prsMap, rkeToolsImage, EtcdSnapshotContainerName, false, es); err != nil {
+				return err
+			}
+			if err := pki.SaveBackupBundleOnHost(ctx, host, rkeToolsImage, EtcdSnapshotPath, prsMap); err != nil {
 				return err
 			}
 		} else {
