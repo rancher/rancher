@@ -14,7 +14,7 @@ import (
 const (
 	WorkerThreads = 50
 
-	DefaultRKETools = "rancher/rke-tools:v0.1.34"
+	DefaultRKETools = "rancher/rke-tools:v0.1.35"
 )
 
 func StrToSemVer(version string) (*semver.Version, error) {

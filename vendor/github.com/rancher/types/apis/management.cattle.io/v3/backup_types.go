@@ -22,13 +22,15 @@ type BackupConfig struct {
 	Retention int `yaml:"retention" json:"retention,omitempty" norman:"default=6"`
 	// s3 target
 	S3BackupConfig *S3BackupConfig `yaml:",omitempty" json:"s3BackupConfig"`
+	// Timestamp is appended to snapshot names, defaults to false
+	Timestamp bool `yaml:"timestamp" json:"timestamp,omitempty"`
 }
 
 type S3BackupConfig struct {
 	// Access key ID
 	AccessKey string `yaml:"access_key" json:"accessKey,omitempty"`
 	// Secret access key
-	SecretKey string `yaml:"secret_key" json:"secretKey,omitempty" norman:"type=password" `
+	SecretKey string `yaml:"secret_key" json:"secretKey,omitempty" norman:"required,type=password" `
 	// name of the bucket to use for backup
 	BucketName string `yaml:"bucket_name" json:"bucketName,omitempty"`
 	// AWS Region, AWS spcific

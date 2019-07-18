@@ -6,6 +6,7 @@ const (
 	BackupConfigFieldIntervalHours  = "intervalHours"
 	BackupConfigFieldRetention      = "retention"
 	BackupConfigFieldS3BackupConfig = "s3BackupConfig"
+	BackupConfigFieldTimestamp      = "timestamp"
 )
 
 type BackupConfig struct {
@@ -13,4 +14,5 @@ type BackupConfig struct {
 	IntervalHours  int64           `json:"intervalHours,omitempty" yaml:"intervalHours,omitempty"`
 	Retention      int64           `json:"retention,omitempty" yaml:"retention,omitempty"`
 	S3BackupConfig *S3BackupConfig `json:"s3BackupConfig,omitempty" yaml:"s3BackupConfig,omitempty"`
+	Timestamp      bool            `json:"timestamp,omitempty" yaml:"timestamp,omitempty"`
 }
