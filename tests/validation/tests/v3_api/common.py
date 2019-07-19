@@ -1134,21 +1134,28 @@ def wait_for_mcapp_to_active(client, multiClusterApp,
     return mapp
 
 
-def wait_for_app_to_active(client, app_id,
-                           timeout=DEFAULT_MULTI_CLUSTER_APP_TIMEOUT):
-    app_data = client.list_app(name=app_id).data
+def resolve_node_ip(node):
+    if hasattr(node, 'externalIpAddress'):
+        node_ip = node.externalIpAddress
+    else:
+        node_ip = node.ipAddress
+    return node_ip
+
+
+def validate_app_deletion(client, app_id, timeout=DEFAULT_MULTI_CLUSTER_APP_TIMEOUT):
+    app_data = client.list_app(id=app_id).data
     start = time.time()
-    assert len(app_data) == 1, "Cannot find app"
+    if len(app_data) == 0:
+        return
     application = app_data[0]
-    while application.state != "active":
+    while application.state == "removing":
         if time.time() - start > timeout:
             raise AssertionError(
-                "Timed out waiting for state to get to active")
+                "Timed out waiting for app to delete")
         time.sleep(.5)
-        app = client.list_app(name=app_id).data
-        assert len(app) == 1
-        application = app[0]
-    return application
+        app = client.list_app(id=app_id).data
+        if len(app) == 0:
+            break
 
 
 def validate_response_app_endpoint(p_client, appId):
@@ -1161,18 +1168,34 @@ def validate_response_app_endpoint(p_client, appId):
                 public_endpoint["protocol"].lower() + "://" + \
                 public_endpoint["hostname"]
             print(url)
+            start = time.time()
+            if time.time() - start > 120:
+                assert False, "failed to connect to the app"
+                return
             try:
                 r = requests.head(url)
-                assert r.status_code == 200, \
-                    "Http response is not 200. Failed to launch the app"
+                if r.status_code != 200:
+                    print("status code: ", r.status_code)
+                    time.sleep(10)
+                    validate_response_app_endpoint(p_client, appId)
             except requests.ConnectionError:
                 print("failed to connect")
-                assert False, "failed to connect to the app"
+                time.sleep(10)
+                validate_response_app_endpoint(p_client, appId)
 
 
-def resolve_node_ip(node):
-    if hasattr(node, 'externalIpAddress'):
-        node_ip = node.externalIpAddress
-    else:
-        node_ip = node.ipAddress
-    return node_ip
+def wait_for_app_to_active(client, app_id,
+                           timeout=DEFAULT_MULTI_CLUSTER_APP_TIMEOUT):
+    app_data = client.list_app(id=app_id).data
+    start = time.time()
+    assert len(app_data) >= 1, "Cannot find app"
+    application = app_data[0]
+    while application.state != "active":
+        if time.time() - start > timeout:
+            raise AssertionError(
+                "Timed out waiting for state to get to active")
+        time.sleep(.5)
+        app = client.list_app(id=app_id).data
+        assert len(app) >= 1
+        application = app[0]
+    return application
