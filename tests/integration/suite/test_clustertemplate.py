@@ -132,6 +132,7 @@ def test_create_cluster_with_template(admin_mc, remove_resource):
     remove_resource(cluster)
     assert cluster.conditions[0].type == 'Pending'
     assert cluster.conditions[0].status == 'True'
+    assert cluster.questions is not None
     k8s_version = cluster.rancherKubernetesEngineConfig.kubernetesVersion
     assert k8s_version != "v1.13.x"
 
@@ -229,10 +230,26 @@ def test_creation_standard_user(admin_mc, remove_resource, user_factory):
     user_member = user_factory()
     remove_resource(user_member)
     um_client = user_member.client
+    with pytest.raises(ApiError) as e:
+        um_client.create_cluster_template(name="user template",
+                                          description="user template")
+        assert e.value.error.status == 403
+
+
+def test_user_manage_templates(admin_mc, remove_resource, user_factory):
+    user_member = user_factory()
+    remove_resource(user_member)
+
+    grb = admin_mc.client.create_global_role_binding(
+        userId=user_member.user.id, globalRoleId='clustertemplates-create')
+    remove_resource(grb)
+    wait_until(grb_cb(admin_mc.client, grb), timeout=60)
+
     cluster_template = create_cluster_template(user_member, remove_resource,
                                                [], admin_mc)
     id = cluster_template.id
     rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
+    um_client = user_member.client
     ct = um_client.by_id_cluster_template(id)
     assert ct is not None
 
@@ -290,16 +307,7 @@ def test_check_enforcement(admin_mc, remove_resource, user_factory):
                 "accessKey": "asdfsd"})
     remove_resource(cluster)
 
-    # a user cannot create an rke cluster without a public
-    # and enforced template
-    with pytest.raises(ApiError) as e:
-        user_client.create_cluster(name=random_str(),
-                                   clusterTemplateRevisionId=rev.id,
-                                   description="cluster from temp")
-        assert e.value.error.status == 403
-
-    # a user can create an rke cluster with a public and enforced template
-    client.update(cluster_template, enforced="true")
+    # a user can create an rke cluster with a public template
     template_reloaded = client.by_id_cluster_template(templateId)
     new_members = [{"groupPrincipalId": "*"}]
     client.update(template_reloaded, members=new_members)
@@ -310,13 +318,6 @@ def test_check_enforcement(admin_mc, remove_resource, user_factory):
     remove_resource(cluster2)
     client.update_by_id_setting(id='cluster-template-enforcement',
                                 value="false")
-
-    # check that user cannot update the enforced flag
-    user_template = create_cluster_template(user, remove_resource,
-                                            [], admin_mc)
-    with pytest.raises(ApiError) as e:
-        user_client.update(user_template, enforced="true")
-        assert e.value.error.status == 403
 
 
 def test_revision_creation_permission(admin_mc, remove_resource,
@@ -343,16 +344,25 @@ def test_revision_creation_permission(admin_mc, remove_resource,
              timeout=60,
              fail_handler=fail_handler(rb_resource))
     templateId = cluster_template.id
-    # user with accessType=member should be able to create revision
-    rev = create_cluster_template_revision(user_member.client, templateId)
-    assert rev is not None
+    # user with accessType=member should not be able to create revision
+    # since user does not have 'clustertemplates-create' role
+    try:
+        create_cluster_template_revision(user_member.client, templateId)
+    except ApiError as e:
+        assert e.error.status == 403
+
     # user with read-only accessType should get Forbidden error
     try:
         create_cluster_template_revision(user_readonly.client, templateId)
     except ApiError as e:
         assert e.error.status == 403
-        assert "user does not have permission to update clusterTemplate" \
-               in e.error.message
+
+    # assign 'clustertemplates-create' role to the user with accessType=member
+    # can create revision now
+    grb = admin_mc.client.create_global_role_binding(
+        userId=user_member.user.id, globalRoleId='clustertemplates-create')
+    wait_until(grb_cb(admin_mc.client, grb))
+    _ = create_cluster_template_revision(user_member.client, templateId)
 
 
 def test_updated_members_revision_access(admin_mc, remove_resource,
@@ -448,6 +458,14 @@ def rtb_cb(client, rtb):
     def cb():
         rt = client.reload(rtb)
         return rt.userPrincipalId is not None
+    return cb
+
+
+def grb_cb(client, grb):
+    """Wait for the grb to have the userId populated"""
+    def cb():
+        rt = client.reload(grb)
+        return rt.userId is not None
     return cb
 
 
