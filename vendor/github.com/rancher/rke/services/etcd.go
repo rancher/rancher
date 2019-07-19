@@ -381,6 +381,9 @@ func DownloadEtcdSnapshotFromS3(ctx context.Context, etcdHost *hosts.Host, prsMa
 		caStr := base64.StdEncoding.EncodeToString([]byte(s3Backend.CustomCA))
 		imageCfg.Cmd = append(imageCfg.Cmd, "--s3-endpoint-ca="+caStr)
 	}
+	if s3Backend.Folder != "" {
+		imageCfg.Cmd = append(imageCfg.Cmd, "--s3-folder="+s3Backend.Folder)
+	}
 	hostCfg := &container.HostConfig{
 		Binds: []string{
 			fmt.Sprintf("%s:/backup:z", EtcdSnapshotPath),
@@ -570,6 +573,9 @@ func configS3BackupImgCmd(ctx context.Context, imageCfg *container.Config, bc *v
 		if bc.S3BackupConfig.CustomCA != "" {
 			caStr := base64.StdEncoding.EncodeToString([]byte(bc.S3BackupConfig.CustomCA))
 			cmd = append(cmd, "--s3-endpoint-ca="+caStr)
+		}
+		if bc.S3BackupConfig.Folder != "" {
+			cmd = append(cmd, "--s3-folder="+bc.S3BackupConfig.Folder)
 		}
 	}
 	imageCfg.Cmd = append(imageCfg.Cmd, cmd...)

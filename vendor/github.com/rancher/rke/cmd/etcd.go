@@ -58,6 +58,10 @@ func EtcdCommand() cli.Command {
 			Name:  "region",
 			Usage: "Specify the s3 bucket location (optional)",
 		},
+		cli.StringFlag{
+			Name:  "folder",
+			Usage: "Specify s3 folder name",
+		},
 	}
 	snapshotFlags = append(snapshotFlags, commonFlags...)
 

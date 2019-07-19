@@ -2,7 +2,8 @@ package rke
 
 import (
 	"fmt"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 const (
@@ -12,6 +13,14 @@ const (
 
 func loadK8sVersionServiceOptions() map[string]v3.KubernetesServicesOptions {
 	return map[string]v3.KubernetesServicesOptions{
+
+		"v1.15.0-rancher1-2": {
+			KubeAPI:        getKubeAPIOptions115WithAuthAPI(),
+			Kubelet:        getKubeletOptions115WithAuthWebhook(),
+			KubeController: getKubeControllerOptions(),
+			Kubeproxy:      getKubeProxyOptions(),
+			Scheduler:      getSchedulerOptions(),
+		},
 		"v1.15": {
 			KubeAPI:        getKubeAPIOptions115(),
 			Kubelet:        getKubeletOptions115(),
@@ -26,9 +35,23 @@ func loadK8sVersionServiceOptions() map[string]v3.KubernetesServicesOptions {
 			Kubeproxy:      getKubeProxyOptions(),
 			Scheduler:      getSchedulerOptions(),
 		},
+		"v1.14.4-rancher1-1": {
+			KubeAPI:        getKubeAPIOptions114WithAuthAPI(),
+			Kubelet:        getKubeletOptions114WithAuthWebhook(),
+			KubeController: getKubeControllerOptions(),
+			Kubeproxy:      getKubeProxyOptions(),
+			Scheduler:      getSchedulerOptions(),
+		},
 		"v1.13": {
 			KubeAPI:        getKubeAPIOptions(),
 			Kubelet:        getKubeletOptions(),
+			KubeController: getKubeControllerOptions(),
+			Kubeproxy:      getKubeProxyOptions(),
+			Scheduler:      getSchedulerOptions(),
+		},
+		"v1.13.8-rancher1-1": {
+			KubeAPI:        getKubeAPIOptions113WithAuthAPI(),
+			Kubelet:        getKubeletOptions113WithAuthWebhook(),
 			KubeController: getKubeControllerOptions(),
 			Kubeproxy:      getKubeProxyOptions(),
 			Scheduler:      getSchedulerOptions(),
@@ -90,15 +113,34 @@ func getKubeAPIOptions19() map[string]string {
 	return kubeAPIOptions
 }
 
+func getKubeAPIOptions113WithAuthAPI() map[string]string {
+	kubeAPIOptions := getKubeAPIOptions()
+	kubeAPIOptions["runtime-config"] = "authorization.k8s.io/v1beta1=true"
+	return kubeAPIOptions
+}
+
 func getKubeAPIOptions114() map[string]string {
 	kubeAPIOptions := getKubeAPIOptions()
 	kubeAPIOptions["enable-admission-plugins"] = fmt.Sprintf("%s,%s", enableAdmissionPlugins, "Priority")
 	return kubeAPIOptions
 }
 
+func getKubeAPIOptions114WithAuthAPI() map[string]string {
+	kubeAPIOptions := getKubeAPIOptions()
+	kubeAPIOptions["enable-admission-plugins"] = fmt.Sprintf("%s,%s", enableAdmissionPlugins, "Priority")
+	kubeAPIOptions["runtime-config"] = "authorization.k8s.io/v1beta1=true"
+	return kubeAPIOptions
+}
+
 func getKubeAPIOptions115() map[string]string {
 	kubeAPIOptions := getKubeAPIOptions114()
 	kubeAPIOptions["enable-admission-plugins"] = fmt.Sprintf("%s,%s", kubeAPIOptions["enable-admission-plugins"], "TaintNodesByCondition,PersistentVolumeClaimResize")
+	return kubeAPIOptions
+}
+
+func getKubeAPIOptions115WithAuthAPI() map[string]string {
+	kubeAPIOptions := getKubeAPIOptions115()
+	kubeAPIOptions["runtime-config"] = "authorization.k8s.io/v1beta1=true"
 	return kubeAPIOptions
 }
 
@@ -127,6 +169,24 @@ func getKubeletOptions() map[string]string {
 func getKubeletOptions115() map[string]string {
 	kubeletOptions := getKubeletOptions()
 	delete(kubeletOptions, "allow-privileged")
+	return kubeletOptions
+}
+
+func getKubeletOptions115WithAuthWebhook() map[string]string {
+	kubeletOptions := getKubeletOptions115()
+	kubeletOptions["authorization-mode"] = "Webhook"
+	return kubeletOptions
+}
+
+func getKubeletOptions114WithAuthWebhook() map[string]string {
+	kubeletOptions := getKubeletOptions()
+	kubeletOptions["authorization-mode"] = "Webhook"
+	return kubeletOptions
+}
+
+func getKubeletOptions113WithAuthWebhook() map[string]string {
+	kubeletOptions := getKubeletOptions()
+	kubeletOptions["authorization-mode"] = "Webhook"
 	return kubeletOptions
 }
 
