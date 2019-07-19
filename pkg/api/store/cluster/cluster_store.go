@@ -238,7 +238,7 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 	dataFromTemplate[managementv3.ClusterSpecFieldClusterTemplateRevisionID] = convert.ToString(data[managementv3.ClusterSpecFieldClusterTemplateRevisionID])
 
 	dataFromTemplate = transposeNameFields(dataFromTemplate, clusterConfigSchema)
-
+	var revisionQuestions []map[string]interface{}
 	//Add in any answers to the clusterTemplateRevision's Questions[]
 	allAnswers := convert.ToMapInterface(convert.ToMapInterface(data[managementv3.ClusterSpecFieldClusterTemplateAnswers])["values"])
 	existingAnswers := convert.ToMapInterface(convert.ToMapInterface(existingCluster[managementv3.ClusterSpecFieldClusterTemplateAnswers])["values"])
@@ -262,8 +262,13 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 		}
 		keyParts := strings.Split(question.Variable, ".")
 		values.PutValue(dataFromTemplate, val, keyParts...)
-	}
 
+		questionMap, err := convert.EncodeToMap(question)
+		if err != nil {
+			return nil, httperror.WrapAPIError(err, httperror.ServerError, "Error reading clusterTemplate questions")
+		}
+		revisionQuestions = append(revisionQuestions, questionMap)
+	}
 	//save defaultAnswers to answer
 	if allAnswers == nil {
 		allAnswers = make(map[string]interface{})
@@ -275,6 +280,8 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 	finalAnswerMap := make(map[string]interface{})
 	finalAnswerMap["values"] = allAnswers
 	dataFromTemplate[managementv3.ClusterSpecFieldClusterTemplateAnswers] = finalAnswerMap
+	dataFromTemplate[managementv3.ClusterSpecFieldClusterTemplateQuestions] = revisionQuestions
+
 	return dataFromTemplate, nil
 }
 

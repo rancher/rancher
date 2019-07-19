@@ -10,7 +10,6 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/customization/clustertemplate"
-	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	mgmtSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
@@ -43,12 +42,6 @@ type Store struct {
 
 func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
 
-	if strings.EqualFold(apiContext.Type, managementv3.ClusterTemplateType) {
-		if err := p.canSetEnforce(apiContext, data, ""); err != nil {
-			return nil, err
-		}
-	}
-
 	if strings.EqualFold(apiContext.Type, managementv3.ClusterTemplateRevisionType) {
 		if data[managementv3.ClusterTemplateRevisionFieldClusterConfig] == nil {
 			return nil, httperror.NewAPIError(httperror.MissingRequired, "ClusterTemplateRevision field ClusterConfig is required")
@@ -70,12 +63,6 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 }
 
 func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-
-	if strings.EqualFold(apiContext.Type, managementv3.ClusterTemplateType) {
-		if err := p.canSetEnforce(apiContext, data, id); err != nil {
-			return nil, err
-		}
-	}
 
 	if strings.EqualFold(apiContext.Type, managementv3.ClusterTemplateRevisionType) {
 		err := p.checkKubernetesVersionFormat(apiContext, data)
@@ -198,40 +185,6 @@ func isDefaultTemplateRevision(apiContext *types.APIContext, id string) (bool, e
 	}
 
 	return false, nil
-}
-
-func (p *Store) canSetEnforce(apiContext *types.APIContext, data map[string]interface{}, templateID string) error {
-	//check if turning on enforced flag
-
-	enforcedFlagInData := convert.ToBool(data[managementv3.ClusterTemplateFieldEnforced])
-	enforcedFlagChanged := enforcedFlagInData
-
-	if templateID != "" {
-		var template managementv3.ClusterTemplate
-		if err := access.ByID(apiContext, apiContext.Version, managementv3.ClusterTemplateType, templateID, &template); err != nil {
-			return err
-		}
-		if template.Enforced != enforcedFlagInData {
-			enforcedFlagChanged = true
-		}
-	}
-	if enforcedFlagChanged {
-		//only admin can set the flag
-		ma := gaccess.MemberAccess{
-			Users:     p.users,
-			GrLister:  p.grLister,
-			GrbLister: p.grbLister,
-		}
-		callerID := apiContext.Request.Header.Get(gaccess.ImpersonateUserHeader)
-		isAdmin, err := ma.IsAdmin(callerID)
-		if err != nil {
-			return err
-		}
-		if !isAdmin {
-			return httperror.NewAPIError(httperror.PermissionDenied, fmt.Sprintf("ClusterTemplate's %v field cannot be changed", managementv3.ClusterTemplateFieldEnforced))
-		}
-	}
-	return nil
 }
 
 func (p *Store) checkPermissionToCreateRevision(apiContext *types.APIContext, data map[string]interface{}) error {

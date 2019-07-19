@@ -47,6 +47,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 	rb.addRole("Manage Features", "features-manage").addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch", "update")
 	rb.addRole("Manage PodSecurityPolicy Templates", "podsecuritypolicytemplates-manage").addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("*")
 	rb.addRole("Manage Cluster Scans", "clusterscans-manage").addRule().apiGroups("management.cattle.io").resources("clusterscans").verbs("*")
+	rb.addRole("Create Cluster Templates", "clustertemplates-create").addRule().apiGroups("management.cattle.io").resources("clustertemplates", "clustertemplaterevisions").verbs("create")
 
 	rb.addRole("Admin", "admin").addRule().apiGroups("*").resources("*").verbs("*").
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
@@ -62,7 +63,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("*").
 		addRule().apiGroups("*").resources("secrets").verbs("create").
-		addRule().apiGroups("management.cattle.io").resources("multiclusterapps", "globaldnses", "globaldnsproviders", "clustertemplates", "clustertemplaterevisions").verbs("create").
+		addRule().apiGroups("management.cattle.io").resources("multiclusterapps", "globaldnses", "globaldnsproviders").verbs("create").
 		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
 		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("etcdbackups").verbs("get", "list", "watch").
