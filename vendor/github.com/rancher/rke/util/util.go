@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"github.com/rancher/rke/metadata"
 	"os"
 	"reflect"
 	"strings"
@@ -13,8 +14,6 @@ import (
 
 const (
 	WorkerThreads = 50
-
-	DefaultRKETools = "rancher/rke-tools:v0.1.35"
 )
 
 func StrToSemVer(version string) (*semver.Version, error) {
@@ -84,6 +83,20 @@ func IsFileExists(filePath string) (bool, error) {
 	} else {
 		return false, err
 	}
+}
+
+func GetDefaultRKETools(image string) (string, error) {
+	tag, err := GetImageTagFromImage(image)
+	if err != nil || tag == "" {
+		return "", fmt.Errorf("defaultRKETools: no tag %s", image)
+	}
+	defaultImage := metadata.K8sVersionToRKESystemImages[metadata.DefaultK8sVersion].Alpine
+	toReplaceTag, err := GetImageTagFromImage(defaultImage)
+	if err != nil || toReplaceTag == "" {
+		return "", fmt.Errorf("defaultRKETools: no replace tag %s", defaultImage)
+	}
+	image = strings.Replace(image, tag, toReplaceTag, 1)
+	return image, nil
 }
 
 func GetImageTagFromImage(image string) (string, error) {

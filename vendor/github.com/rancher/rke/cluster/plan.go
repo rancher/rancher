@@ -19,7 +19,7 @@ import (
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/rke/util"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -350,6 +350,11 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string, svcOp
 		"pod-infra-container-image": c.Services.Kubelet.InfraContainerImage,
 		"root-dir":                  path.Join(prefixPath, "/var/lib/kubelet"),
 	}
+
+	if c.DinD {
+		CommandArgs["healthz-bind-address"] = "0.0.0.0"
+	}
+
 	if host.IsControl && !host.IsWorker {
 		CommandArgs["register-with-taints"] = unschedulableControlTaint
 	}
@@ -435,7 +440,7 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string, svcOp
 	Binds = append(Binds, c.Services.Kubelet.ExtraBinds...)
 
 	healthCheck := v3.HealthCheck{
-		URL: services.GetHealthCheckURL(true, services.KubeletPort),
+		URL: services.GetHealthCheckURL(false, services.KubeletPort),
 	}
 	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(c.Services.Kubelet.Image, c.PrivateRegistriesMap)
 
