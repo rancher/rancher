@@ -787,6 +787,9 @@ func kontainerTypes(schemas *types.Schemas) *types.Schemas {
 				"activate":   {},
 				"deactivate": {},
 			}
+			schema.CollectionActions = map[string]types.Action{
+				"refresh": {},
+			}
 		})
 }
 
