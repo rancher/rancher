@@ -236,35 +236,6 @@ def test_creation_standard_user(admin_mc, remove_resource, user_factory):
         assert e.value.error.status == 403
 
 
-def test_user_manage_templates(admin_mc, remove_resource, user_factory):
-    user_member = user_factory()
-    remove_resource(user_member)
-
-    grb = admin_mc.client.create_global_role_binding(
-        userId=user_member.user.id, globalRoleId='clustertemplates-create')
-    remove_resource(grb)
-    wait_until(grb_cb(admin_mc.client, grb), timeout=60)
-
-    cluster_template = create_cluster_template(user_member, remove_resource,
-                                               [], admin_mc)
-    id = cluster_template.id
-    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
-    um_client = user_member.client
-    ct = um_client.by_id_cluster_template(id)
-    assert ct is not None
-
-    templateId = cluster_template.id
-    template_revision = \
-        create_cluster_template_revision(um_client, templateId)
-    rb_name = template_revision.id.split(":")[1] + "-ctr-a"
-    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
-                                         user_member.user.id, rb_name),
-             timeout=60,
-             fail_handler=fail_handler(rb_resource))
-    ctr = um_client.by_id_cluster_template_revision(template_revision.id)
-    assert ctr is not None
-
-
 def test_check_enforcement(admin_mc, remove_resource, user_factory):
     cluster_template = create_cluster_template(admin_mc, remove_resource,
                                                [], admin_mc)
