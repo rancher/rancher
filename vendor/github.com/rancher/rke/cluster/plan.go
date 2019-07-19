@@ -801,6 +801,10 @@ func BuildPortChecksFromPortList(host *hosts.Host, portList []string, proto stri
 }
 
 func (c *Cluster) GetKubernetesServicesOptions() v3.KubernetesServicesOptions {
+	if serviceOptions, ok := metadata.K8sVersionToServiceOptions[c.Version]; ok {
+		return serviceOptions
+	}
+
 	clusterMajorVersion := util.GetTagMajorVersion(c.Version)
 	k8sImageTag, err := util.GetImageTagFromImage(c.SystemImages.Kubernetes)
 	if err != nil {
