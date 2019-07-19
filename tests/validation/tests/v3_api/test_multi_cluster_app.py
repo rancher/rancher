@@ -2,7 +2,10 @@ import pytest
 from .common import * # NOQA
 
 project = {}
-project_detail = {"p1_id": None, "p2_id": None, "p3_id": None, "p_client": None, "namespace": None,
+project_detail = {"p1_id": None, "p2_id": None, "p_client": None, "namespace": None,
+                  "cluster": None, "project": None}
+
+project_detail2 = {"p1_id": None, "p2_id": None, "p3_id": None, "p_client": None, "namespace": None,
                   "cluster": None, "project": None}
 global_client = {"client": None, "cluster_count": False}
 answer_105version = {
@@ -113,6 +116,7 @@ original_rev = "cattle-global-data:library-wordpress-2.1.10"
 new_ver = "cattle-global-data:library-wordpress-2.1.12"
 
 
+@pytest.mark.usefixtures("create_project_client")
 def test_multi_cluster_project_member_create():
     assert_if_valid_cluster_count()
     targets = []
@@ -131,6 +135,7 @@ def test_multi_cluster_project_member_create():
     delete_multi_cluster_app(multiclusterapp)
 
 
+@pytest.mark.usefixtures("create_project_client")
 def test_multi_cluster_deploy_to_single_target():
     assert_if_valid_cluster_count()
     project_id = project_detail["p1_id"]
@@ -148,6 +153,7 @@ def test_multi_cluster_deploy_to_single_target():
     assert len(client.list_multiClusterApp(uuid=uuid, name=name).data[0]["targets"]) == 1, "did not start with 1"
 
 
+@pytest.mark.skip(reason="problem with wordpress update")
 def test_multi_cluster_template_upgrade():
     assert_if_valid_cluster_count()
     targets = []
@@ -171,6 +177,7 @@ def test_multi_cluster_template_upgrade():
     assert original_revId != new_revId, "revisionId did not change"
 
 
+@pytest.mark.skip(reason="problem with wordpress update")
 def test_multi_cluster_template_rollback():
     assert_if_valid_cluster_count()
     targets = []
@@ -199,12 +206,13 @@ def test_multi_cluster_template_rollback():
     assert original_revId == multiclusterapp["status"]["revisionId"], "revisionId did not rollback"
 
 
+@pytest.mark.usefixtures("create_project_client2")
 def test_multi_cluster_multi_targets_one_cluster():
     assert_if_valid_cluster_count()
     targets = []
-    first_id = project_detail["p1_id"]
+    first_id = project_detail2["p1_id"]
     targets.append({"projectId": first_id, "type": "target"})
-    second_id = project_detail["p3_id"]
+    second_id = project_detail2["p3_id"]
     targets.append({"projectId": second_id, "type": "target"})
     client = global_client["client"]
     multiclusterapp = client.create_multiClusterApp(templateVersionId=TEMP_VER,
@@ -217,6 +225,7 @@ def test_multi_cluster_multi_targets_one_cluster():
     assert len(multiclusterapp["targets"]) == 2, "did not add both targets"
 
 
+@pytest.mark.usefixtures("create_project_client")
 def test_multi_cluster_project_member_update():
     assert_if_valid_cluster_count()
     targets = []
@@ -239,6 +248,7 @@ def test_multi_cluster_project_member_update():
     assert str(multiclusterapp['upgradeStrategy']) == str(expected_UPGRADE), "incorrect update strategy"
 
 
+@pytest.mark.usefixtures("create_project_client")
 def test_multi_cluster_project_owner_create():
     assert_if_valid_cluster_count()
     targets = []
@@ -257,6 +267,7 @@ def test_multi_cluster_project_owner_create():
     delete_multi_cluster_app(multiclusterapp)
 
 
+@pytest.mark.usefixtures("create_project_client")
 def test_multi_cluster_project_owner_update():
     assert_if_valid_cluster_count()
     targets = []
@@ -279,6 +290,7 @@ def test_multi_cluster_project_owner_update():
     assert str(multiclusterapp['upgradeStrategy']) == str(expected_UPGRADE), "incorrect update strategy"
 
 
+@pytest.mark.usefixtures("create_project_client")
 def test_multi_cluster_upgrade():
     assert_if_valid_cluster_count()
     targets = []
@@ -297,6 +309,7 @@ def test_multi_cluster_upgrade():
     assert str(multiclusterapp['upgradeStrategy']) == str(expected_UPGRADE), "incorrect update strategy"
 
 
+@pytest.mark.usefixtures("create_project_client")
 def test_multi_cluster_upgrade_and_edit_upgrade():
     assert_if_valid_cluster_count()
     targets = []
@@ -320,6 +333,7 @@ def test_multi_cluster_upgrade_and_edit_upgrade():
     assert str(multiclusterapp['upgradeStrategy']) == str(new_upgrade)
 
 
+@pytest.mark.usefixtures("create_project_client")
 def test_multi_cluster_upgrade_and_add_target():
     assert_if_valid_cluster_count()
     project_id = project_detail["p1_id"]
@@ -348,6 +362,7 @@ def test_multi_cluster_upgrade_and_add_target():
     assert len(multiclusterapp["targets"]) == 2, "did not add target"
 
 
+@pytest.mark.usefixtures("create_project_client")
 def test_multi_cluster_upgrade_and_delete_target():
     assert_if_valid_cluster_count()
     project_id = project_detail["p1_id"]
@@ -375,6 +390,7 @@ def test_multi_cluster_upgrade_and_delete_target():
     assert len(multiclusterapp["targets"]) == 1, "did not delete target"
 
 
+@pytest.mark.usefixtures("create_project_client")
 def test_multi_cluster_upgrade_and_edit_answers():
     assert_if_valid_cluster_count()
     targets = []
@@ -401,6 +417,7 @@ def test_multi_cluster_upgrade_and_edit_answers():
     assert str(val) == str(new_answers["values"])
 
 
+@pytest.mark.usefixtures("create_project_client")
 def test_multi_cluster_add_target():
     assert_if_valid_cluster_count()
     project_id = project_detail["p1_id"]
@@ -423,6 +440,7 @@ def test_multi_cluster_add_target():
     assert len(multiclusterapp["targets"]) == 2, "did not add target"
 
 
+@pytest.mark.usefixtures("create_project_client")
 def test_multi_cluster_delete_target():
     assert_if_valid_cluster_count()
     project_id = project_detail["p1_id"]
@@ -447,6 +465,7 @@ def test_multi_cluster_delete_target():
     assert len(multiclusterapp["targets"]) == 1, "did not delete target"
 
 
+@pytest.mark.usefixtures("create_project_client")
 def test_multi_cluster_role_change():
     assert_if_valid_cluster_count()
     targets = []
@@ -474,6 +493,7 @@ def test_multi_cluster_role_change():
     assert multiclusterapp['roles'] == new_role, "role did not update"
 
 
+@pytest.mark.usefixtures("create_project_client")
 def test_multi_cluster_answers():
     assert_if_valid_cluster_count()
     targets = []
@@ -491,6 +511,7 @@ def test_multi_cluster_answers():
     assert str(values) == str(new_answers["values"])
 
 
+@pytest.mark.usefixtures("create_project_client")
 def test_multi_cluster_edit_answers():
     assert_if_valid_cluster_count()
     targets = []
@@ -510,6 +531,7 @@ def test_multi_cluster_edit_answers():
     assert str(values) == str(new_answers["values"])
 
 
+@pytest.mark.usefixtures("create_project_client")
 def test_multi_cluster_app_delete():
     assert_if_valid_cluster_count()
     targets = []
@@ -532,6 +554,7 @@ def test_multi_cluster_app_delete():
         wait_for_app_to_be_deleted_project(project_client, app_id)
 
 
+@pytest.mark.usefixtures("create_project_client")
 def wait_for_app_to_be_deleted_project(client, app_id, timeout=DEFAULT_MULTI_CLUSTER_APP_TIMEOUT):
     app_data = client.list_app(name=app_id).data
     start = time.time()
@@ -548,6 +571,7 @@ def wait_for_app_to_be_deleted_project(client, app_id, timeout=DEFAULT_MULTI_CLU
             break
 
 
+@pytest.mark.usefixtures("create_project_client")
 def test_multi_cluster_app_edit():
     assert_if_valid_cluster_count()
     client = global_client["client"]
@@ -576,7 +600,7 @@ def test_multi_cluster_app_edit():
     delete_multi_cluster_app(multiclusterapp)
 
 
-@pytest.fixture(scope='module', autouse="True")
+@pytest.fixture(scope='module')
 def create_project_client(request):
     client, clusters = get_admin_client_and_cluster_mcapp()
     if len(clusters) > 1:
@@ -588,7 +612,78 @@ def create_project_client(request):
     p_client1 = get_project_client_for_token(p1, ADMIN_TOKEN)
     p2, ns2 = create_project_and_ns(ADMIN_TOKEN, cluster2, "target_test_2")
     p_client2 = get_project_client_for_token(p2, ADMIN_TOKEN)
-    p3, ns3 = create_project_and_ns(ADMIN_TOKEN, cluster1, "target_test_1")
+    project_detail["p1_id"] = p1.id
+    project_detail["namespace"] = ns1
+    project_detail["p_client"] = p_client1
+    project_detail["cluster"] = cluster1
+    project_detail["project"] = p1
+    project[p1.id] = project_detail
+    project_detail["namespace"] = ns2
+    project_detail["p2_id"] = p2.id
+    project_detail["p_client"] = p_client2
+    project_detail["cluster"] = cluster2
+    project_detail["project"] = p2
+    project[p2.id] = project_detail
+    global_client["client"] = client
+
+
+
+    @pytest.fixture(scope='module')
+    def create_project_client2(request):
+        client, clusters = get_admin_client_and_cluster_mcapp()
+        if len(clusters) > 1:
+            global_client["cluster_count"] = True
+        assert_if_valid_cluster_count()
+        cluster1 = clusters[0]
+        cluster2 = clusters[1]
+        p1, ns1 = create_project_and_ns(ADMIN_TOKEN, cluster1, "test_1")
+        p_client1 = get_project_client_for_token(p1, ADMIN_TOKEN)
+        p2, ns2 = create_project_and_ns(ADMIN_TOKEN, cluster2, "test_2")
+        p_client2 = get_project_client_for_token(p2, ADMIN_TOKEN)
+        p3, ns3 = create_project_and_ns(ADMIN_TOKEN, cluster1, "test_1")
+        p_client3 = get_project_client_for_token(p3, ADMIN_TOKEN)
+        project_detail["p1_id"] = p1.id
+        project_detail["namespace"] = ns1
+        project_detail["p_client"] = p_client1
+        project_detail["cluster"] = cluster1
+        project_detail["project"] = p1
+        project[p1.id] = project_detail
+        project_detail["namespace"] = ns2
+        project_detail["p2_id"] = p2.id
+        project_detail["p_client"] = p_client2
+        project_detail["cluster"] = cluster2
+        project_detail["project"] = p2
+        project[p2.id] = project_detail
+        project_detail["p3_id"] = p3.id
+        project_detail["namespace"] = ns3
+        project_detail["p_client"] = p_client3
+        project_detail["cluster"] = cluster1
+        project_detail["project"] = p3
+        project[p3.id] = project_detail
+        global_client["client"] = client
+
+
+    def fin():
+        client_admin = get_admin_client()
+        client_admin.delete(project[p1.id]["project"])
+        client_admin.delete(project[p2.id]["project"])
+        client_admin.delete(project[p3.id]["project"])
+    request.addfinalizer(fin)
+
+
+@pytest.fixture(scope='module')
+def create_project_client2(request):
+    client, clusters = get_admin_client_and_cluster_mcapp()
+    if len(clusters) > 1:
+        global_client["cluster_count"] = True
+    assert_if_valid_cluster_count()
+    cluster1 = clusters[0]
+    cluster2 = clusters[1]
+    p1, ns1 = create_project_and_ns(ADMIN_TOKEN, cluster1, "test_1")
+    p_client1 = get_project_client_for_token(p1, ADMIN_TOKEN)
+    p2, ns2 = create_project_and_ns(ADMIN_TOKEN, cluster2, "test_2")
+    p_client2 = get_project_client_for_token(p2, ADMIN_TOKEN)
+    p3, ns3 = create_project_and_ns(ADMIN_TOKEN, cluster1, "test_1")
     p_client3 = get_project_client_for_token(p3, ADMIN_TOKEN)
     project_detail["p1_id"] = p1.id
     project_detail["namespace"] = ns1
@@ -610,11 +705,12 @@ def create_project_client(request):
     project[p3.id] = project_detail
     global_client["client"] = client
 
+
     def fin():
         client_admin = get_admin_client()
-        # client_admin.delete(project[p1.id]["project"])
-        # client_admin.delete(project[p2.id]["project"])
-        # client_admin.delete(project[p3.id]["project"])
+        client_admin.delete(project[p1.id]["project"])
+        client_admin.delete(project[p2.id]["project"])
+        client_admin.delete(project[p3.id]["project"])
     request.addfinalizer(fin)
 
 
