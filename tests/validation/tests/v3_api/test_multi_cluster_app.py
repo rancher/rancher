@@ -3,8 +3,6 @@ from .common import * # NOQA
 
 project = {}
 # for 2 proj in 1 cluster
-# project_detail = {"p1_id": None, "p2_id": None, "p3_id": None, "p_client": None, "namespace": None,
-#                   "cluster": None, "project": None}
 project_detail = {"p1_id": None, "p2_id": None, "p_client": None, "namespace": None,
                   "cluster": None, "project": None}
 global_client = {"client": None, "cluster_count": False}
@@ -134,7 +132,7 @@ def test_multi_cluster_project_member_create():
     delete_multi_cluster_app(multiclusterapp)
 
 
-def test_deploy_mca_to_single_target():
+def test_multi_cluster_deploy_to_single_target():
     assert_if_valid_cluster_count()
     project_id = project_detail["p1_id"]
     targets = [{"projectId": project_id, "type": "target"}]
@@ -203,6 +201,21 @@ def test_multi_cluster_template_rollback():
 
 
 def test_multi_cluster_multi_targets_one_cluster():
+    project_detail = {"p1_id": None, "p2_id": None, "p3_id": None, "p_client": None, "namespace": None,
+                      "cluster": None, "project": None}
+    client, clusters = get_admin_client_and_cluster_mcapp()
+    if len(clusters) > 1:
+        global_client["cluster_count"] = True
+    assert_if_valid_cluster_count()
+    cluster1 = clusters[0]
+    p3, ns3 = create_project_and_ns(ADMIN_TOKEN, cluster1, "target_test_1")
+    p_client3 = get_project_client_for_token(p3, ADMIN_TOKEN)
+    project_detail["p3_id"] = p3.id
+    project_detail["namespace"] = ns3
+    project_detail["p_client"] = p_client3
+    project_detail["cluster"] = cluster1
+    project_detail["project"] = p3
+    project[p3.id] = project_detail
     assert_if_valid_cluster_count()
     targets = []
     first_id = project_detail["p1_id"]
@@ -426,7 +439,6 @@ def test_multi_cluster_add_target():
     assert len(multiclusterapp["targets"]) == 2, "did not add target"
 
 
-
 def test_multi_cluster_delete_target():
     assert_if_valid_cluster_count()
     project_id = project_detail["p1_id"]
@@ -590,9 +602,6 @@ def create_project_client(request):
     cluster2 = clusters[1]
     p1, ns1 = create_project_and_ns(ADMIN_TOKEN, cluster1, "target_test_1")
     p_client1 = get_project_client_for_token(p1, ADMIN_TOKEN)
-    # uncomment if using the multiple targets in one cluster test
-    # p3, ns3 = create_project_and_ns(ADMIN_TOKEN, cluster1, "target_test_1")
-    # p_client3 = get_project_client_for_token(p3, ADMIN_TOKEN)
     p2, ns2 = create_project_and_ns(ADMIN_TOKEN, cluster2, "target_test_2")
     p_client2 = get_project_client_for_token(p2, ADMIN_TOKEN)
     project_detail["p1_id"] = p1.id
@@ -607,12 +616,6 @@ def create_project_client(request):
     project_detail["cluster"] = cluster2
     project_detail["project"] = p2
     project[p2.id] = project_detail
-    # project_detail["p3_id"] = p3.id
-    # project_detail["namespace"] = ns3
-    # project_detail["p_client"] = p_client3
-    # project_detail["cluster"] = cluster1
-    # project_detail["project"] = p3
-    # project[p3.id] = project_detail
     global_client["client"] = client
 
     def fin():
