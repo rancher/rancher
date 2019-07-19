@@ -6,6 +6,7 @@ const (
 	ClusterSpecFieldAzureKubernetesServiceConfig        = "azureKubernetesServiceConfig"
 	ClusterSpecFieldClusterTemplateAnswers              = "answers"
 	ClusterSpecFieldClusterTemplateID                   = "clusterTemplateId"
+	ClusterSpecFieldClusterTemplateQuestions            = "questions"
 	ClusterSpecFieldClusterTemplateRevisionID           = "clusterTemplateRevisionId"
 	ClusterSpecFieldDefaultClusterRoleForProjectMembers = "defaultClusterRoleForProjectMembers"
 	ClusterSpecFieldDefaultPodSecurityPolicyTemplateID  = "defaultPodSecurityPolicyTemplateId"
@@ -30,6 +31,7 @@ type ClusterSpec struct {
 	AzureKubernetesServiceConfig        map[string]interface{}         `json:"azureKubernetesServiceConfig,omitempty" yaml:"azureKubernetesServiceConfig,omitempty"`
 	ClusterTemplateAnswers              *Answer                        `json:"answers,omitempty" yaml:"answers,omitempty"`
 	ClusterTemplateID                   string                         `json:"clusterTemplateId,omitempty" yaml:"clusterTemplateId,omitempty"`
+	ClusterTemplateQuestions            []Question                     `json:"questions,omitempty" yaml:"questions,omitempty"`
 	ClusterTemplateRevisionID           string                         `json:"clusterTemplateRevisionId,omitempty" yaml:"clusterTemplateRevisionId,omitempty"`
 	DefaultClusterRoleForProjectMembers string                         `json:"defaultClusterRoleForProjectMembers,omitempty" yaml:"defaultClusterRoleForProjectMembers,omitempty"`
 	DefaultPodSecurityPolicyTemplateID  string                         `json:"defaultPodSecurityPolicyTemplateId,omitempty" yaml:"defaultPodSecurityPolicyTemplateId,omitempty"`
