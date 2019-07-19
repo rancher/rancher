@@ -16,8 +16,6 @@ var (
 	features = make(map[string]*feature)
 
 	// Features, ex.: ClusterRandomName = newFeature("cluster-randomizer", false)
-
-	ClusterRandomizer = newFeature("cluster-randomizer", true)
 )
 
 type feature struct {
