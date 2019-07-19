@@ -1952,6 +1952,13 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		*out = (*in).DeepCopy()
 	}
 	in.ClusterTemplateAnswers.DeepCopyInto(&out.ClusterTemplateAnswers)
+	if in.ClusterTemplateQuestions != nil {
+		in, out := &in.ClusterTemplateQuestions, &out.ClusterTemplateQuestions
+		*out = make([]Question, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	return
 }
 

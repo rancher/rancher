@@ -37,6 +37,8 @@ type S3BackupConfig struct {
 	Endpoint string `yaml:"endpoint" json:"endpoint"`
 	// CustomCA is used to connect to custom s3 endpoints
 	CustomCA string `yaml:"custom_ca" json:"customCa,omitempty"`
+	// Folder to place the files
+	Folder string `yaml:"folder" json:"folder,omitempty"`
 }
 type EtcdBackup struct {
 	types.Namespaced
