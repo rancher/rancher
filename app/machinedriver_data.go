@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"reflect"
+	"runtime"
 	"strings"
 
 	"github.com/rancher/rancher/pkg/api/customization/nodetemplate"
@@ -60,7 +61,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	}
 	if err := addMachineDriver(nodetemplate.Linodedriver, "https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.7/docker-machine-driver-linode_linux-amd64.zip",
 		"https://linode.github.io/rancher-ui-driver-linode/releases/v0.3.0-alpha.1/component.js", "faaf1d7d53b55a369baeeb0855b069921a36131868fe3641eb595ac1ff4cf16f",
-		[]string{"linode.github.io", "api.linode.com"}, true, false, management); err != nil {
+		[]string{"linode.github.io", "api.linode.com"}, isLinux(), false, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver("openstack", "local://", "", "", nil, false, true, management); err != nil {
@@ -156,4 +157,9 @@ func addMachineDriver(name, url, uiURL, checksum string, whitelist []string, act
 	})
 
 	return err
+}
+
+// isLinux returns if the detected OS is linux
+func isLinux() bool {
+	return runtime.GOOS == "linux"
 }
