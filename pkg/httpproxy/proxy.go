@@ -18,6 +18,7 @@ const (
 	Cookie       = "Cookie"
 	APISetCookie = "X-Api-Set-Cookie-Header"
 	APICookie    = "X-Api-Cookie-Header"
+	hostRegex    = "[A-Za-z0-9-]+"
 )
 
 var (
@@ -49,6 +50,13 @@ func (p *proxy) isAllowed(host string) bool {
 		if strings.HasPrefix(valid, "*") && strings.HasSuffix(host, valid[1:]) {
 			return true
 		}
+
+		if strings.Contains(valid, ".%.") || strings.HasPrefix(valid, "%.") {
+			r := constructRegex(valid)
+			if match := r.MatchString(host); match {
+				return true
+			}
+		}
 	}
 
 	return false
@@ -63,7 +71,7 @@ func NewProxy(prefix string, validHosts Supplier) http.Handler {
 	return &httputil.ReverseProxy{
 		Director: func(req *http.Request) {
 			if err := p.proxy(req); err != nil {
-				logrus.Infof("Failed to proxy %v: %v", req, err)
+				logrus.Infof("Failed to proxy: %v", err)
 			}
 		},
 		ModifyResponse: replaceSetCookies,
@@ -100,8 +108,10 @@ func (p *proxy) proxy(req *http.Request) error {
 
 	destURL.RawQuery = req.URL.RawQuery
 
-	if !p.isAllowed(destURL.Host) {
-		return fmt.Errorf("invalid host: %v", destURL.Host)
+	destURLHostname := destURL.Hostname()
+
+	if !p.isAllowed(destURLHostname) {
+		return fmt.Errorf("invalid host: %v", destURLHostname)
 	}
 
 	headerCopy := http.Header{}
@@ -127,7 +137,7 @@ func (p *proxy) proxy(req *http.Request) error {
 		headerCopy[name] = copy
 	}
 
-	req.Host = destURL.Hostname()
+	req.Host = destURLHostname
 	req.URL = destURL
 	req.Header = headerCopy
 
@@ -144,4 +154,21 @@ func replaceCookies(req *http.Request) {
 		req.Header.Set(Cookie, cookie)
 		req.Header.Del(APICookie)
 	}
+}
+
+func constructRegex(host string) *regexp.Regexp {
+	// incoming host "ec2.%.amazonaws.com"
+	// Converted to regex "^ec2\.[A-Za-z0-9-]+\.amazonaws\.com$"
+	parts := strings.Split(host, ".")
+	for i, part := range parts {
+		if part == "%" {
+			parts[i] = hostRegex
+		} else {
+			parts[i] = regexp.QuoteMeta(part)
+		}
+	}
+
+	str := "^" + strings.Join(parts, "\\.") + "$"
+
+	return regexp.MustCompile(str)
 }
