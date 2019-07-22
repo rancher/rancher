@@ -32,8 +32,20 @@ func (t TemplateWrapper) TemplateFormatter(apiContext *types.APIContext, resourc
 	resource.Values["versionLinks"] = t.extractVersionLinks(apiContext, resource)
 
 	//icon
-	delete(resource.Values, "icon")
-	resource.Links["icon"] = apiContext.URLBuilder.Link("icon", resource)
+	ic, ok := resource.Values["icon"]
+	if ok {
+		if strings.HasPrefix(ic.(string), "file:") {
+			delete(resource.Values, "icon")
+			resource.Links["icon"] = apiContext.URLBuilder.Link("icon", resource)
+
+		} else {
+			delete(resource.Values, "icon")
+			resource.Links["icon"] = ic.(string)
+		}
+	} else {
+		delete(resource.Values, "icon")
+		resource.Links["icon"] = apiContext.URLBuilder.Link("icon", resource)
+	}
 
 	val := resource.Values
 	if val[client.CatalogTemplateFieldCatalogID] != nil {
@@ -146,6 +158,9 @@ func (t TemplateWrapper) TemplateIconHandler(apiContext *types.APIContext, next 
 
 		iconReader := bytes.NewReader(iconBytes)
 		apiContext.Response.Header().Set("Cache-Control", "private, max-age=604800")
+		// add security headers (similar to raw.githubusercontent)
+		apiContext.Response.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
+		apiContext.Response.Header().Set("X-Content-Type-Options", "nosniff")
 		http.ServeContent(apiContext.Response, apiContext.Request, template.IconFilename, t, iconReader)
 		return nil
 	default:
