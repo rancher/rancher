@@ -10,45 +10,57 @@ import (
 )
 
 func NewPRTBValidator(management *config.ScaledContext) types.Validator {
-	return newValidator(management, client.ProjectRoleTemplateBindingFieldRoleTemplateID)
+	return newValidator(management, client.ProjectRoleTemplateBindingFieldRoleTemplateID, "project")
 }
 
 func NewCRTBValidator(management *config.ScaledContext) types.Validator {
-	return newValidator(management, client.ClusterRoleTemplateBindingFieldRoleTemplateID)
+	return newValidator(management, client.ClusterRoleTemplateBindingFieldRoleTemplateID, "cluster")
 }
 
-func newValidator(management *config.ScaledContext, field string) types.Validator {
-	validator := &Validator{
+func newValidator(management *config.ScaledContext, field string, context string) types.Validator {
+	validator := &validator{
 		roleTemplateLister: management.Management.RoleTemplates("").Controller().Lister(),
 		field:              field,
+		context:            context,
 	}
 
-	return validator.Validator
+	return validator.validator
 }
 
-type Validator struct {
+type validator struct {
 	roleTemplateLister v3.RoleTemplateLister
 	field              string
+	context            string
 }
 
-func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
-	return v.ValidateRoleTemplateBinding(data[v.field])
+func (v *validator) validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
+	roleTemplate, err := v.validateRoleTemplateBinding(data[v.field])
+	if err != nil {
+		return err
+	}
+
+	if roleTemplate.Context != v.context {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("Cannot edit context [%s] from [%s] context",
+			roleTemplate.Context, v.context))
+	}
+
+	return nil
 }
 
-func (v *Validator) ValidateRoleTemplateBinding(obj interface{}) error {
+func (v *validator) validateRoleTemplateBinding(obj interface{}) (*v3.RoleTemplate, error) {
 	roleTemplateID, ok := obj.(string)
 	if !ok {
-		return httperror.NewAPIError(httperror.MissingRequired, "Request does not have a valid roleTemplateId")
+		return nil, httperror.NewAPIError(httperror.MissingRequired, "Request does not have a valid roleTemplateId")
 	}
 
 	roleTemplate, err := v.roleTemplateLister.Get("", roleTemplateID)
 	if err != nil {
-		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error getting role template: %v", err))
+		return nil, httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error getting role template: %v", err))
 	}
 
 	if roleTemplate.Locked {
-		return httperror.NewAPIError(httperror.InvalidState, "Role is locked and cannot be assigned")
+		return nil, httperror.NewAPIError(httperror.InvalidState, "Role is locked and cannot be assigned")
 	}
 
-	return nil
+	return roleTemplate, nil
 }
