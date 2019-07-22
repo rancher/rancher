@@ -1174,3 +1174,14 @@ def resolve_node_ip(node):
     else:
         node_ip = node.ipAddress
     return node_ip
+
+
+def provision_nfs_server():
+    node = AmazonWebServices().create_node(random_test_name("nfs-server"))
+    node.wait_for_ssh_ready()
+    c_path = os.getcwd()
+    cmd_path = c_path + "/tests/v3_api/scripts/nfs-setup.sh"
+    command = open(cmd_path, 'r').read()
+    node.execute_command(command)
+    return node
+
