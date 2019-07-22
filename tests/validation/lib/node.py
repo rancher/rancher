@@ -136,3 +136,6 @@ class Node(object):
                 "Error:'docker exec' command received this stderr output: "
                 "{0}".format(result[1]))
         return result[0]
+
+    def get_public_ip(self):
+        return self.public_ip_address

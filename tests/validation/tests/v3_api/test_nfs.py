@@ -8,12 +8,12 @@ namespace = {"p_client": None,
              "pv": None,
              "pvc": None}
 
-# this is the IP address of the NFS server
-NFS_SERVER = os.environ.get("RANCHER_NFS_SERVER", "")
 # this is the path to the mounted dir in the NFS server
-NFS_SERVER_MOUNT_PATH = os.environ.get('RANCHER_NFS_SERVER_MOUNT_PATH', "/nfs")
+NFS_SERVER_MOUNT_PATH = "/nfs"
 # this is the path to the mounted dir in the pod(workload)
-MOUNT_PATH = os.environ.get('RANCHER_MOUNT_PATH', "/var/nfs")
+MOUNT_PATH = "/var/nfs"
+# if True then delete the NFS after finishing tests, otherwise False
+DELETE_NFS = eval(os.environ.get('RANCHER_DELETE_NFS', "True"))
 
 
 def test_nfs_wl_deployment():
@@ -156,6 +156,9 @@ def create_project_client(request):
     create_kubeconfig(cluster)
     p, ns = create_project_and_ns(ADMIN_TOKEN, cluster, "project-test-nfs")
     p_client = get_project_client_for_token(p, ADMIN_TOKEN)
+    nfs_node = provision_nfs_server()
+    nfs_ip = nfs_node.get_public_ip()
+    print("the IP of the NFS: ", nfs_ip)
 
     # add  persistent volume to the cluster
     cluster_client = get_cluster_client_for_token(cluster, ADMIN_TOKEN)
@@ -166,7 +169,7 @@ def create_project_client(request):
                  "nfs": {"readOnly": "false",
                          "type": "nfsvolumesource",
                          "path": NFS_SERVER_MOUNT_PATH,
-                         "server": NFS_SERVER
+                         "server": nfs_ip
                          },
                  "capacity": {"storage": "10Gi"}
                  }
@@ -195,4 +198,6 @@ def create_project_client(request):
                                                       ADMIN_TOKEN)
         cluster_client.delete(namespace["project"])
         cluster_client.delete(namespace["pv"])
+        if DELETE_NFS is True:
+            AmazonWebServices().delete_node(nfs_node)
     request.addfinalizer(fin)
