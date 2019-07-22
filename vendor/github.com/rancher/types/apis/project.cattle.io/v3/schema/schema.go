@@ -700,6 +700,7 @@ func ingressTypes(schemas *types.Schemas) *types.Schemas {
 		}{}).
 		MustImportAndCustomize(&Version, v1beta1.Ingress{}, func(schema *types.Schema) {
 			schema.MustCustomizeField("name", func(f types.Field) types.Field {
+				f.Type = "hostname"
 				f.Required = true
 				f.Nullable = false
 				return f
