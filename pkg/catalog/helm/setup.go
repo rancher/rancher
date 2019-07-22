@@ -193,6 +193,21 @@ func (h *Helm) updateGit(fetchLatest bool) (string, error) {
 		}
 		if changed {
 			if err = git.Update(h.LocalPath, commit); err != nil {
+				if h.username != "" && h.password != "" {
+					// the error string contains url which is formed using url.UserInfo.String(),
+					// which escapes the following characters-> '@', '/', '?' and ':'
+					// h.password doesn't escape these characters, so to use strings.Contains(), obtain the escaped password
+					userInfo := url.UserPassword(h.username, h.password)
+					userPwd := strings.SplitN(userInfo.String(), ":", 2)
+					if len(userPwd) != 2 {
+						return "", errors.New("error getting userinfo url")
+					}
+					pwd := userPwd[1]
+					if strings.Contains(err.Error(), pwd) {
+						errStr := strings.Replace(err.Error(), pwd+"@", "***@", 1)
+						err = errors.New(errStr)
+					}
+				}
 				return "", errors.Wrap(err, "Update failed")
 			}
 			logrus.Debugf("Helm updated git repository for catalog [%s]", h.catalogName)
