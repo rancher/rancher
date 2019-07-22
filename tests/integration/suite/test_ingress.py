@@ -47,7 +47,7 @@ def test_ingress(admin_pc, admin_cc_client):
             'image': 'nginx',
         }])
 
-    name = random_str()
+    name = random_str() + "." + random_str()
     ingress = client.create_ingress(name=name,
                                     namespaceId=ns.id,
                                     rules=[{
