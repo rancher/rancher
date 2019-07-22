@@ -34,14 +34,17 @@ type machineDriverCompare struct {
 
 func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver("pinganyunecs", "https://machine-driver.oss-cn-shanghai.aliyuncs.com/pinganyun/v0.2.0/docker-machine-driver-pinganyunecs-linux.tgz",
-		"https://machine-driver.oss-cn-shanghai.aliyuncs.com/pinganyun/v0.1.0/ui/component.js", "b87c8ccb578357b2a26be744d8d05e1dbf2531e91119e03efb7383686f9e56fc", []string{"*.aliyuncs.com"}, false, false, management); err != nil {
+		"https://machine-driver.oss-cn-shanghai.aliyuncs.com/pinganyun/v0.1.0/ui/component.js", "b87c8ccb578357b2a26be744d8d05e1dbf2531e91119e03efb7383686f9e56fc",
+		[]string{"machine-driver.oss-cn-shanghai.aliyuncs.com"}, false, false, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver("aliyunecs", "http://machine-driver.oss-cn-shanghai.aliyuncs.com/aliyun/1.0.2/linux/amd64/docker-machine-driver-aliyunecs.tgz",
 		"", "c31b9da2c977e70c2eeee5279123a95d", []string{"ecs.aliyuncs.com"}, false, false, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(nodetemplate.Amazonec2driver, "local://", "", "", []string{"*.amazonaws.com", "*.amazonaws.com.cn"}, true, true, management); err != nil {
+	if err := addMachineDriver(nodetemplate.Amazonec2driver, "local://", "", "",
+		[]string{"iam.amazonaws.com", "iam.%.amazonaws.com.cn", "ec2.%.amazonaws.com", "ec2.%.amazonaws.com.cn"},
+		true, true, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver(nodetemplate.Azuredriver, "local://", "", "", nil, true, true, management); err != nil {
@@ -67,7 +70,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 		return err
 	}
 	if err := addMachineDriver("otc", "https://github.com/rancher-plugins/docker-machine-driver-otc/releases/download/v2019.5.7/docker-machine-driver-otc",
-		"", "3f793ebb0ebd9477b9166ec542f77e25", []string{"*.otc.t-systems.com"}, false, false, management); err != nil {
+		"", "3f793ebb0ebd9477b9166ec542f77e25", nil, false, false, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver("packet", "https://github.com/packethost/docker-machine-driver-packet/releases/download/v0.1.4/docker-machine-driver-packet_linux-amd64.zip",
