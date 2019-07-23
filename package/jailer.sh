@@ -38,6 +38,14 @@ if [ -d /var/lib/rancher/management-state/bin ] && [ "$(ls -A /var/lib/rancher/m
   )
 fi
 
+if [ -e /etc/ssl/certs/ca-additional.pem ]; then
+  cp /etc/ssl/certs/ca-additional.pem /opt/jail/$NAME/etc/ssl/certs
+fi
+
+if [ -e /etc/rancher/ssl/cacerts.pem ]; then
+  cp /etc/rancher/ssl/cacerts.pem /opt/jail/$NAME/etc/ssl/certs
+fi
+
 # Hard link driver binaries
 cp -r -l /opt/drivers/management-state/bin /opt/jail/$NAME/var/lib/rancher/management-state
 
