@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/signal"
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
+	apiregistrationv1 "github.com/rancher/types/apis/apiregistration.k8s.io/v1"
 	appsv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
 	autoscaling "github.com/rancher/types/apis/autoscaling/v2beta2"
 	batchv1 "github.com/rancher/types/apis/batch/v1"
@@ -179,22 +180,24 @@ type UserContext struct {
 	APIExtClient      clientset.Interface
 	K8sClient         kubernetes.Interface
 
-	Apps         appsv1beta2.Interface
-	Autoscaling  autoscaling.Interface
-	Project      projectv3.Interface
-	Core         corev1.Interface
-	RBAC         rbacv1.Interface
-	Extensions   extv1beta1.Interface
-	BatchV1      batchv1.Interface
-	BatchV1Beta1 batchv1beta1.Interface
-	Networking   knetworkingv1.Interface
-	Monitoring   monitoringv1.Interface
-	Cluster      clusterv3.Interface
-	Istio        istiov1alpha3.Interface
+	APIAggregation apiregistrationv1.Interface
+	Apps           appsv1beta2.Interface
+	Autoscaling    autoscaling.Interface
+	Project        projectv3.Interface
+	Core           corev1.Interface
+	RBAC           rbacv1.Interface
+	Extensions     extv1beta1.Interface
+	BatchV1        batchv1.Interface
+	BatchV1Beta1   batchv1beta1.Interface
+	Networking     knetworkingv1.Interface
+	Monitoring     monitoringv1.Interface
+	Cluster        clusterv3.Interface
+	Istio          istiov1alpha3.Interface
 }
 
 func (w *UserContext) controllers() []controller.Starter {
 	return []controller.Starter{
+		w.APIAggregation,
 		w.Apps,
 		w.Project,
 		w.Core,
@@ -237,21 +240,23 @@ type UserOnlyContext struct {
 	UnversionedClient rest.Interface
 	K8sClient         kubernetes.Interface
 
-	Apps         appsv1beta2.Interface
-	Autoscaling  autoscaling.Interface
-	Project      projectv3.Interface
-	Core         corev1.Interface
-	RBAC         rbacv1.Interface
-	Extensions   extv1beta1.Interface
-	BatchV1      batchv1.Interface
-	BatchV1Beta1 batchv1beta1.Interface
-	Monitoring   monitoringv1.Interface
-	Cluster      clusterv3.Interface
-	Istio        istiov1alpha3.Interface
+	APIRegistration apiregistrationv1.Interface
+	Apps            appsv1beta2.Interface
+	Autoscaling     autoscaling.Interface
+	Project         projectv3.Interface
+	Core            corev1.Interface
+	RBAC            rbacv1.Interface
+	Extensions      extv1beta1.Interface
+	BatchV1         batchv1.Interface
+	BatchV1Beta1    batchv1beta1.Interface
+	Monitoring      monitoringv1.Interface
+	Cluster         clusterv3.Interface
+	Istio           istiov1alpha3.Interface
 }
 
 func (w *UserOnlyContext) controllers() []controller.Starter {
 	return []controller.Starter{
+		w.APIRegistration,
 		w.Apps,
 		w.Project,
 		w.Core,
@@ -407,12 +412,21 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 	}
 
 	context.Monitoring, err = monitoringv1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
 	context.Cluster, err = clusterv3.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
 
 	context.Istio, err = istiov1alpha3.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.APIAggregation, err = apiregistrationv1.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -501,12 +515,21 @@ func NewUserOnlyContext(config rest.Config) (*UserOnlyContext, error) {
 	}
 
 	context.Monitoring, err = monitoringv1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
 	context.Cluster, err = clusterv3.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
 
 	context.Istio, err = istiov1alpha3.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.APIRegistration, err = apiregistrationv1.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}

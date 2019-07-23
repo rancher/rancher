@@ -10,6 +10,7 @@ type Client struct {
 	Namespace        NamespaceOperations
 	PersistentVolume PersistentVolumeOperations
 	StorageClass     StorageClassOperations
+	APIService       APIServiceOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -25,6 +26,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.Namespace = newNamespaceClient(client)
 	client.PersistentVolume = newPersistentVolumeClient(client)
 	client.StorageClass = newStorageClassClient(client)
+	client.APIService = newAPIServiceClient(client)
 
 	return client, nil
 }

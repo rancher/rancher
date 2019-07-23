@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/types/factory"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
 var (
@@ -25,7 +26,8 @@ var (
 		Init(namespaceTypes).
 		Init(persistentVolumeTypes).
 		Init(storageClassTypes).
-		Init(tokens)
+		Init(tokens).
+		Init(apiServiceTypes)
 )
 
 func namespaceTypes(schemas *types.Schemas) *types.Schemas {
@@ -129,4 +131,12 @@ func tokens(schemas *types.Schemas) *types.Schemas {
 			schema.CollectionMethods = []string{}
 			schema.ResourceMethods = []string{}
 		})
+}
+
+func apiServiceTypes(Schemas *types.Schemas) *types.Schemas {
+	return Schemas.
+		AddMapperForType(&Version, apiregistrationv1.APIService{},
+			&m.Embed{Field: "status"},
+		).
+		MustImport(&Version, apiregistrationv1.APIService{})
 }
