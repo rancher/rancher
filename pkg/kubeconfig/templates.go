@@ -16,7 +16,7 @@ clusters:
 {{- end}}
 
 users:
-- name: "{{.User}}"
+- name: "{{.ClusterName}}"
   user:
     token: "{{.Token}}"
 
@@ -24,7 +24,7 @@ contexts:
 {{- range .Nodes}}
 - name: "{{.ClusterName}}"
   context:
-    user: "{{.User}}"
+    user: "{{.ClusterName}}"
     cluster: "{{.ClusterName}}"
 {{- end}}
 
@@ -40,7 +40,7 @@ clusters:
     api-version: v1
 
 users:
-- name: "{{.User}}"
+- name: "{{.ClusterName}}"
   user:
     username: "{{.Username}}"
     password: "{{.Password}}"
@@ -48,7 +48,7 @@ users:
 contexts:
 - name: "{{.ClusterName}}"
   context:
-    user: "{{.User}}"
+    user: "{{.ClusterName}}"
     cluster: "{{.ClusterName}}"
 
 current-context: "{{.ClusterName}}"
