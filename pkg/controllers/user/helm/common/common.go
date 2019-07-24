@@ -179,10 +179,13 @@ func GenerateAnswerSetValues(app *v3.App, tempDir *HelmPath, extraArgs map[strin
 			if _, ok := extraArgs[k]; ok {
 				continue
 			}
-			values = append(values, fmt.Sprintf("%s=%s", k, v))
+			// helm will only accept escaped commas in values
+			escapedValue := fmt.Sprintf("%s=%s", k, escapeCommas(v))
+			values = append(values, escapedValue)
 		}
 		for k, v := range extraArgs {
-			values = append(values, fmt.Sprintf("%s=%s", k, v))
+			escapedValue := fmt.Sprintf("%s=%s", k, escapeCommas(v))
+			values = append(values, escapedValue)
 		}
 		setValues = append(setValues, "--set", strings.Join(values, ","))
 	}
@@ -218,4 +221,17 @@ func JailCommand(cmd *exec.Cmd, jailPath string) (*exec.Cmd, error) {
 	cmd.SysProcAttr.Chroot = jailPath
 	cmd.Env = jailer.WhitelistEnvvars(cmd.Env)
 	return cmd, nil
+}
+
+// escapeCommas will escape the commas in a string, unless helm would identify it as a list
+func escapeCommas(value string) string {
+	if len(value) == 0 {
+		return value
+	}
+	// as far as helm is concerned, an answer starting with '{' is a list
+	// commas in lists are not escaped for users as they are also used as delimiters
+	if strings.HasPrefix(value, "{") {
+		return value
+	}
+	return strings.Replace(value, ",", "\\,", -1)
 }
