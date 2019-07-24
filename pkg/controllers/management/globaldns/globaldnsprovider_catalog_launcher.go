@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/settings"
+	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	pv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -16,6 +17,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/rancher/norman/types/convert"
+	passwordutil "github.com/rancher/rancher/pkg/api/store/password"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -35,6 +37,7 @@ type ProviderCatalogLauncher struct {
 	ProjectLister     v3.ProjectLister
 	appLister         pv3.AppLister
 	userManager       user.Manager
+	secrets           v1.SecretInterface
 }
 
 func newGlobalDNSProviderCatalogLauncher(ctx context.Context, mgmt *config.ManagementContext) *ProviderCatalogLauncher {
@@ -44,6 +47,7 @@ func newGlobalDNSProviderCatalogLauncher(ctx context.Context, mgmt *config.Manag
 		ProjectLister:     mgmt.Management.Projects("").Controller().Lister(),
 		appLister:         mgmt.Project.Apps("").Controller().Lister(),
 		userManager:       mgmt.UserManager,
+		secrets:           mgmt.Core.Secrets(""),
 	}
 	return n
 }
@@ -87,11 +91,18 @@ func (n *ProviderCatalogLauncher) sync(key string, obj *v3.GlobalDNSProvider) (r
 func (n *ProviderCatalogLauncher) handleRoute53Provider(obj *v3.GlobalDNSProvider) (runtime.Object, error) {
 	rancherInstallUUID := settings.InstallUUID.Get()
 	//create external-dns route53 provider
+
+	//read the secret
+	secretKey, err := passwordutil.GetValueForPasswordField(obj.Spec.Route53ProviderConfig.SecretKey, n.secrets)
+	if err != nil {
+		return nil, err
+	}
+
 	answers := map[string]string{
 		"provider":            "aws",
 		"aws.zoneType":        obj.Spec.Route53ProviderConfig.ZoneType,
 		"aws.accessKey":       obj.Spec.Route53ProviderConfig.AccessKey,
-		"aws.secretKey":       obj.Spec.Route53ProviderConfig.SecretKey,
+		"aws.secretKey":       secretKey,
 		"txtOwnerId":          rancherInstallUUID + "_" + obj.Name,
 		"rbac.create":         "true",
 		"policy":              "sync",
@@ -114,10 +125,16 @@ func (n *ProviderCatalogLauncher) handleCloudflareProvider(obj *v3.GlobalDNSProv
 		isProxy = convert.ToString(*obj.Spec.CloudflareProviderConfig.ProxySetting)
 	}
 
+	//read the secret
+	secretAPIKey, err := passwordutil.GetValueForPasswordField(obj.Spec.CloudflareProviderConfig.APIKey, n.secrets)
+	if err != nil {
+		return nil, err
+	}
+
 	//create external-dns route53 provider
 	answers := map[string]string{
 		"provider":           "cloudflare",
-		"cloudflare.apiKey":  obj.Spec.CloudflareProviderConfig.APIKey,
+		"cloudflare.apiKey":  secretAPIKey,
 		"cloudflare.email":   obj.Spec.CloudflareProviderConfig.APIEmail,
 		"txtOwnerId":         rancherInstallUUID + "_" + obj.Name,
 		"rbac.create":        "true",
@@ -134,12 +151,19 @@ func (n *ProviderCatalogLauncher) handleCloudflareProvider(obj *v3.GlobalDNSProv
 
 func (n *ProviderCatalogLauncher) handleAlidnsProvider(obj *v3.GlobalDNSProvider) (runtime.Object, error) {
 	rancherInstallUUID := settings.InstallUUID.Get()
+
+	//read the secret
+	secretKey, err := passwordutil.GetValueForPasswordField(obj.Spec.AlidnsProviderConfig.SecretKey, n.secrets)
+	if err != nil {
+		return nil, err
+	}
+
 	//create external-dns alidns provider
 	answers := map[string]string{
 		"provider":               "alibabacloud",
 		"alibabacloud.zoneType":  "public",
 		"alibabacloud.accessKey": obj.Spec.AlidnsProviderConfig.AccessKey,
-		"alibabacloud.secretKey": obj.Spec.AlidnsProviderConfig.SecretKey,
+		"alibabacloud.secretKey": secretKey,
 		"txtOwnerId":             rancherInstallUUID + "_" + obj.Name,
 		"rbac.create":            "true",
 		"policy":                 "sync",

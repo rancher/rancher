@@ -1,8 +1,11 @@
 from .common import random_str
 from rancher import ApiError
+from kubernetes.client import CustomObjectsApi
+from kubernetes.client import CoreV1Api
 import pytest
 import time
 import kubernetes
+import base64
 
 
 def test_dns_fqdn_unique(admin_mc):
@@ -281,3 +284,53 @@ def test_dns_fqdn_hostname(admin_mc, remove_resource):
     with pytest.raises(ApiError) as e:
         client.create_global_dns(fqdn=fqdn, providerId=provider_name)
         assert e.value.error.status == 422
+
+
+def test_globaldnsprovider_secret(admin_mc, remove_resource):
+    client = admin_mc.client
+    provider_name = random_str()
+    access_key = random_str()
+    secret_key = random_str()
+
+    globaldns_provider = \
+        client.create_global_dns_provider(
+            name=provider_name,
+            rootDomain="example.com",
+            route53ProviderConfig={
+                'accessKey': access_key,
+                'secretKey': secret_key})
+
+    # Test password not present in api
+    assert globaldns_provider is not None
+    assert globaldns_provider.route53ProviderConfig.get('secretKey') is None
+
+    crdClient, k8sclient = getClients(admin_mc)
+    ns, name = globaldns_provider["id"].split(":")
+    # Test password is in k8s secret after creation
+    verifyGDNSPassword(crdClient, k8sclient, ns, name, secret_key)
+
+    # Test updating password
+    newSecretPassword = random_str()
+    _ = client.update(globaldns_provider, route53ProviderConfig={
+                                    'accessKey': access_key,
+                                    'secretKey': newSecretPassword})
+    verifyGDNSPassword(crdClient, k8sclient, ns, name, newSecretPassword)
+
+
+def getClients(admin_mc):
+    return CustomObjectsApi(admin_mc.k8s_client), \
+        CoreV1Api(admin_mc.k8s_client)
+
+
+def verifyGDNSPassword(crdClient, k8sclient, ns, name, secretPassword):
+    k8es = crdClient.get_namespaced_custom_object(
+            "management.cattle.io", "v3", ns, 'globaldnsproviders', name)
+
+    secretName = k8es['spec']['route53ProviderConfig']['secretKey']
+    ns, name = secretName.split(":")
+    assert ns is not None
+    assert name is not None
+
+    secret = k8sclient.read_namespaced_secret(name, ns)
+    assert base64.b64decode(secret.data[name]).\
+        decode("utf-8") == secretPassword
