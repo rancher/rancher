@@ -64,6 +64,7 @@ func SetPasswordStore(schemas *types.Schemas, secretStore v1.SecretInterface, ns
 	pwdTypes := []string{
 		"clusterlogging",
 		"projectlogging",
+		"globaldnsprovider",
 	}
 
 	for _, storeType := range pwdTypes {
