@@ -21,6 +21,7 @@ const (
 
 var projectManagmentPlaneResources = map[string]string{
 	"apps":                        "project.cattle.io",
+	"apprevisions":                "project.cattle.io",
 	"catalogtemplates":            "management.cattle.io",
 	"catalogtemplateversions":     "management.cattle.io",
 	"pipelines":                   "project.cattle.io",
