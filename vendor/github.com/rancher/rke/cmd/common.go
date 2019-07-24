@@ -116,6 +116,7 @@ func setS3OptionsFromCLI(c *cli.Context) *v3.S3BackupConfig {
 	accessKey := c.String("access-key")
 	secretKey := c.String("secret-key")
 	endpointCA := c.String("s3-endpoint-ca")
+	folder := c.String("folder")
 	var s3BackupBackend = &v3.S3BackupConfig{}
 	if len(endpoint) != 0 {
 		s3BackupBackend.Endpoint = endpoint
@@ -139,6 +140,9 @@ func setS3OptionsFromCLI(c *cli.Context) *v3.S3BackupConfig {
 		} else {
 			s3BackupBackend.CustomCA = caStr
 		}
+	}
+	if len(folder) != 0 {
+		s3BackupBackend.Folder = folder
 	}
 	return s3BackupBackend
 }
