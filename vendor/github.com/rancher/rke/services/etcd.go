@@ -516,7 +516,7 @@ func GetEtcdSnapshotChecksum(ctx context.Context, etcdHost *hosts.Host, prsMap m
 	imageCfg := &container.Config{
 		Cmd: []string{
 			"sh", "-c", strings.Join([]string{
-				"if [ -f ", snapshotPath, " ]; then md5sum ", snapshotPath, " | cut -f1 -d' ' | tr -d '\n'; else echo 'snapshot file does not exist' >&2; fi"}, ""),
+				" if [ -f '", snapshotPath, "' ]; then md5sum '", snapshotPath, "' | cut -f1 -d' ' | tr -d '\n'; else echo 'snapshot file does not exist' >&2; fi"}, ""),
 		},
 		Image: alpineImage,
 	}
