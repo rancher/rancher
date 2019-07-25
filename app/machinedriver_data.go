@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 
@@ -61,9 +62,12 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver("exoscale", "local://", "", "", []string{"api.exoscale.ch"}, false, true, management); err != nil {
 		return err
 	}
+	linodeBuiltin := true
+	if dl := os.Getenv("CATTLE_DEV_MODE"); dl != "" {
+		linodeBuiltin = false
+	}
 	if err := addMachineDriver(nodetemplate.Linodedriver, "https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.7/docker-machine-driver-linode_linux-amd64.zip",
-		"https://linode.github.io/rancher-ui-driver-linode/releases/v0.3.0-alpha.1/component.js", "faaf1d7d53b55a369baeeb0855b069921a36131868fe3641eb595ac1ff4cf16f",
-		[]string{"linode.github.io", "api.linode.com"}, false, false, management); err != nil {
+		"/assets/rancher-ui-driver-linode/component.js", "faaf1d7d53b55a369baeeb0855b069921a36131868fe3641eb595ac1ff4cf16f", []string{"api.linode.com"}, linodeBuiltin, linodeBuiltin, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver("openstack", "local://", "", "", nil, false, true, management); err != nil {
