@@ -3,11 +3,12 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"github.com/rancher/rke/metadata"
 	"net"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/rancher/rke/metadata"
 
 	"github.com/docker/docker/api/types"
 	"github.com/rancher/rke/authz"
@@ -315,6 +316,9 @@ func ApplyAuthzResources(ctx context.Context, rkeConfig v3.RancherKubernetesEngi
 	if kubeCluster.Authorization.Mode == services.RBACAuthorizationMode {
 		if err := authz.ApplySystemNodeClusterRoleBinding(ctx, kubeCluster.LocalKubeConfigPath, kubeCluster.K8sWrapTransport); err != nil {
 			return fmt.Errorf("Failed to apply the ClusterRoleBinding needed for node authorization: %v", err)
+		}
+		if err := authz.ApplyKubeAPIClusterRole(ctx, kubeCluster.LocalKubeConfigPath, kubeCluster.K8sWrapTransport); err != nil {
+			return fmt.Errorf("Failed to apply the ClusterRole and Binding needed for node kubeapi proxy: %v", err)
 		}
 	}
 	if kubeCluster.Authorization.Mode == services.RBACAuthorizationMode && kubeCluster.Services.KubeAPI.PodSecurityPolicy {
