@@ -2,13 +2,24 @@ package tls
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
+	"math"
+	"math/big"
+	"time"
 
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/cert"
+)
+
+const (
+	RancherCommonName = "cattle-ca"
+	RancherOrg        = "the-ranch"
 )
 
 type Storage interface {
@@ -46,10 +57,7 @@ func SetupListenConfig(storage Storage, noCACerts bool, lc *v3.ListenConfig) err
 			return err
 		}
 
-		caCert, err := cert.NewSelfSignedCACert(cert.Config{
-			CommonName:   "cattle-ca",
-			Organization: []string{"the-ranch"},
-		}, caKey)
+		caCert, err := newRancherCA(caKey)
 		if err != nil {
 			return err
 		}
@@ -89,4 +97,29 @@ func SetupListenConfig(storage Storage, noCACerts bool, lc *v3.ListenConfig) err
 	lc.ResourceVersion = existing.ResourceVersion
 	_, err = storage.Update(lc)
 	return err
+}
+
+func newRancherCA(key *rsa.PrivateKey) (*x509.Certificate, error) {
+	now := time.Now()
+	sn, err := rand.Int(rand.Reader, new(big.Int).SetInt64(math.MaxInt64))
+	if err != nil {
+		return nil, err
+	}
+	caCert := &x509.Certificate{
+		Subject: pkix.Name{
+			CommonName:   RancherCommonName,
+			Organization: []string{RancherOrg},
+		},
+		SerialNumber:          sn,
+		NotBefore:             now.UTC(),
+		NotAfter:              now.Add(time.Hour * 24 * 365 * 10).UTC(), // 10 years
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+	certBytes, err := x509.CreateCertificate(rand.Reader, caCert, caCert, key.Public(), key)
+	if err != nil {
+		return nil, err
+	}
+	return x509.ParseCertificate(certBytes)
 }
