@@ -3,6 +3,7 @@ package util
 import (
 	"fmt"
 	"github.com/rancher/rke/metadata"
+	"net/url"
 	"os"
 	"reflect"
 	"strings"
@@ -107,4 +108,29 @@ func GetImageTagFromImage(image string) (string, error) {
 	imageTag := parsedImage.(ref.Tagged).Tag()
 	logrus.Debugf("Extracted version [%s] from image [%s]", imageTag, image)
 	return imageTag, nil
+}
+
+func StripPasswordFromURL(URL string) (string, error) {
+	u, err := url.Parse(URL)
+	if err != nil {
+		return "", err
+	}
+	_, passSet := u.User.Password()
+	if passSet {
+		return strings.Replace(u.String(), u.User.String()+"@", u.User.Username()+":***@", 1), nil
+	}
+	return u.String(), nil
+}
+
+// GetEnvVar will lookup a given environment variable by key and return the key and value (to show what case got matched) with uppercase key being preferred
+func GetEnvVar(key string) (string, string, bool) {
+	// Uppercase (has precedence over lowercase)
+	if value, ok := os.LookupEnv(strings.ToUpper(key)); ok {
+		return strings.ToUpper(key), value, true
+	}
+	// Lowercase
+	if value, ok := os.LookupEnv(strings.ToLower(key)); ok {
+		return strings.ToLower(key), value, true
+	}
+	return "", "", false
 }
