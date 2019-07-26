@@ -92,10 +92,14 @@ func (n *ProviderCatalogLauncher) handleRoute53Provider(obj *v3.GlobalDNSProvide
 	rancherInstallUUID := settings.InstallUUID.Get()
 	//create external-dns route53 provider
 
-	//read the secret
-	secretKey, err := passwordutil.GetValueForPasswordField(obj.Spec.Route53ProviderConfig.SecretKey, n.secrets)
-	if err != nil {
-		return nil, err
+	secretKey := obj.Spec.Route53ProviderConfig.SecretKey
+	//read the secret if found
+	var err error
+	if strings.HasPrefix(obj.Spec.Route53ProviderConfig.SecretKey, namespace.GlobalNamespace) {
+		secretKey, err = passwordutil.GetValueForPasswordField(obj.Spec.Route53ProviderConfig.SecretKey, n.secrets)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	answers := map[string]string{
@@ -125,10 +129,14 @@ func (n *ProviderCatalogLauncher) handleCloudflareProvider(obj *v3.GlobalDNSProv
 		isProxy = convert.ToString(*obj.Spec.CloudflareProviderConfig.ProxySetting)
 	}
 
-	//read the secret
-	secretAPIKey, err := passwordutil.GetValueForPasswordField(obj.Spec.CloudflareProviderConfig.APIKey, n.secrets)
-	if err != nil {
-		return nil, err
+	secretAPIKey := obj.Spec.CloudflareProviderConfig.APIKey
+	//read the secret if found
+	var err error
+	if strings.HasPrefix(obj.Spec.CloudflareProviderConfig.APIKey, namespace.GlobalNamespace) {
+		secretAPIKey, err = passwordutil.GetValueForPasswordField(obj.Spec.CloudflareProviderConfig.APIKey, n.secrets)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	//create external-dns route53 provider
@@ -152,10 +160,14 @@ func (n *ProviderCatalogLauncher) handleCloudflareProvider(obj *v3.GlobalDNSProv
 func (n *ProviderCatalogLauncher) handleAlidnsProvider(obj *v3.GlobalDNSProvider) (runtime.Object, error) {
 	rancherInstallUUID := settings.InstallUUID.Get()
 
-	//read the secret
-	secretKey, err := passwordutil.GetValueForPasswordField(obj.Spec.AlidnsProviderConfig.SecretKey, n.secrets)
-	if err != nil {
-		return nil, err
+	secretKey := obj.Spec.AlidnsProviderConfig.SecretKey
+	//read the secret if found
+	var err error
+	if strings.HasPrefix(obj.Spec.AlidnsProviderConfig.SecretKey, namespace.GlobalNamespace) {
+		secretKey, err = passwordutil.GetValueForPasswordField(obj.Spec.AlidnsProviderConfig.SecretKey, n.secrets)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	//create external-dns alidns provider

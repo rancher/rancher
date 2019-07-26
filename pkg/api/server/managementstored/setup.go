@@ -193,6 +193,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	setupScopedTypes(schemas)
 	setupPasswordTypes(ctx, schemas, apiContext)
 	multiclusterapp.SetMemberStore(ctx, schemas.Schema(&managementschema.Version, client.MultiClusterAppType), apiContext)
+	GlobalDNSProvidersPwdWrap(schemas, apiContext, localClusterEnabled)
 
 	return nil
 }
@@ -742,6 +743,11 @@ func GlobalDNSProviders(schemas *types.Schemas, management *config.ScaledContext
 		schema.CollectionMethods = []string{}
 		schema.ResourceMethods = []string{}
 	}
+}
+
+func GlobalDNSProvidersPwdWrap(schemas *types.Schemas, management *config.ScaledContext, localClusterEnabled bool) {
+	schema := schemas.Schema(&managementschema.Version, client.GlobalDNSProviderType)
+	schema.Store = globaldnsAPIStore.ProviderPwdWrap(schema.Store)
 }
 
 func ClusterTemplates(schemas *types.Schemas, management *config.ScaledContext) {

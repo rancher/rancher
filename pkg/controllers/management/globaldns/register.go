@@ -17,4 +17,9 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		management.Management.GlobalDNSProviders("").AddHandler(ctx, GlobaldnsProviderCatalogLauncher, cp.sync)
 	}
 
+	sp := newProviderSecretSyncer(ctx, management)
+	if sp != nil {
+		management.Core.Secrets("").AddHandler(ctx, GlobaldnsProviderSecretSyncer, sp.sync)
+	}
+
 }
