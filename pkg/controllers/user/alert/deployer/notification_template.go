@@ -105,7 +105,11 @@ Project Name: {{ .Labels.project_name}}{{ end }}
 {{- if .Labels.pod_name }}
 Pod Name: {{ .Labels.pod_name}}{{ else if .Labels.pod -}}Pod Name: {{ .Labels.pod}}{{ end }}
 Expression: {{ .Labels.expression}}
+{{- if .Labels.threshold_value }}
 Description: Threshold Crossed: datapoint value {{ .Annotations.current_value}} was {{ .Labels.comparison}} to the threshold ({{ .Labels.threshold_value}}) for ({{ .Labels.duration}})
+{{- else}}
+Description: The configured event happened for ({{ .Labels.duration}}): expression matched, datapoint value is {{ .Annotations.current_value}}
+{{ end -}}
 {{ end -}}
 {{- if .Labels.logs }}
 Logs: {{ .Labels.logs}}
@@ -177,7 +181,11 @@ Pod Name: {{.Labels.pod_name}}{{ else if .Labels.pod -}}Pod Name: {{.Labels.pod}
 Namespace: {{.Labels.namespace}}<br>
 {{ end -}}
 Expression: {{.Labels.expression}}<br>
+{{- if .Labels.threshold_value }}
 Description: Threshold Crossed: datapoint value {{ .Annotations.current_value}} was {{ .Labels.comparison}} to the threshold ({{ .Labels.threshold_value}}) for ({{ .Labels.duration}})<br>
+{{- else}}
+Description: The configured event happened for ({{ .Labels.duration}}): expression matched, datapoint value is {{ .Annotations.current_value}}<br>
+{{ end -}}
 {{ end -}}
 {{- if .Labels.logs }}
 Logs: {{ .Labels.logs}}

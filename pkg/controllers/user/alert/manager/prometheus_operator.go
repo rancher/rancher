@@ -20,6 +20,7 @@ import (
 )
 
 var (
+	ComparisonHasValue       = "has-value"
 	ComparisonEqual          = "equal"
 	ComparisonNotEqual       = "not-equal"
 	ComparisonGreaterThan    = "greater-than"
@@ -30,6 +31,7 @@ var (
 
 var (
 	comparisonMap = map[string]string{
+		ComparisonHasValue:       "",
 		ComparisonEqual:          "==",
 		ComparisonNotEqual:       "!=",
 		ComparisonGreaterThan:    ">",
@@ -175,7 +177,7 @@ func Metric2Rule(groupID, ruleID, serverity, displayName, clusterName, projectNa
 }
 
 func getExpr(expr, comparison string, thresholdValue float64) string {
-	if comparison != "" {
+	if comparison != ComparisonHasValue {
 		return fmt.Sprintf("%s%s%v", expr, comparisonMap[comparison], thresholdValue)
 	}
 	return expr
