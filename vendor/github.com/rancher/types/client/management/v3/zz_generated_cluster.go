@@ -54,6 +54,7 @@ const (
 	ClusterFieldTransitioningMessage                 = "transitioningMessage"
 	ClusterFieldUUID                                 = "uuid"
 	ClusterFieldVersion                              = "version"
+	ClusterFieldWindowsPreferedCluster               = "windowsPreferedCluster"
 )
 
 type Cluster struct {
@@ -106,6 +107,7 @@ type Cluster struct {
 	TransitioningMessage                 string                         `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                                 string                         `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Version                              *Info                          `json:"version,omitempty" yaml:"version,omitempty"`
+	WindowsPreferedCluster               bool                           `json:"windowsPreferedCluster,omitempty" yaml:"windowsPreferedCluster,omitempty"`
 }
 
 type ClusterCollection struct {

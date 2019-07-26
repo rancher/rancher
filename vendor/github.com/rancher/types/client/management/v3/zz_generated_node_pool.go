@@ -20,6 +20,7 @@ const (
 	NodePoolFieldNamespaceId             = "namespaceId"
 	NodePoolFieldNodeAnnotations         = "nodeAnnotations"
 	NodePoolFieldNodeLabels              = "nodeLabels"
+	NodePoolFieldNodeTaints              = "nodeTaints"
 	NodePoolFieldNodeTemplateID          = "nodeTemplateId"
 	NodePoolFieldOwnerReferences         = "ownerReferences"
 	NodePoolFieldQuantity                = "quantity"
@@ -48,6 +49,7 @@ type NodePool struct {
 	NamespaceId             string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeAnnotations         map[string]string `json:"nodeAnnotations,omitempty" yaml:"nodeAnnotations,omitempty"`
 	NodeLabels              map[string]string `json:"nodeLabels,omitempty" yaml:"nodeLabels,omitempty"`
+	NodeTaints              []Taint           `json:"nodeTaints,omitempty" yaml:"nodeTaints,omitempty"`
 	NodeTemplateID          string            `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`
 	OwnerReferences         []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Quantity                int64             `json:"quantity,omitempty" yaml:"quantity,omitempty"`
