@@ -501,9 +501,16 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 		obj.Status.NodeConfig.Role = []string{"worker"}
 	}
 
-	if len(template.Spec.NodeTaints) > 0 {
-		obj.Spec.DesiredNodeTaints = append(obj.Spec.DesiredNodeTaints, template.Spec.NodeTaints...)
-		obj.Spec.UpdateTaintsFromAPI = &falseValue
+	templateSet := taints.GetKeyEffectTaintSet(template.Spec.NodeTaints)
+	nodeSet := taints.GetKeyEffectTaintSet(obj.Spec.DesiredNodeTaints)
+
+	for key, ti := range templateSet {
+		// the desired node taints is set by the node pool already. so we don't need to set it by template because
+		// the taints from node pool should override the taints from template.
+		if _, ok := nodeSet[key]; !ok {
+			obj.Spec.DesiredNodeTaints = append(obj.Spec.DesiredNodeTaints, template.Spec.NodeTaints[ti])
+			obj.Spec.UpdateTaintsFromAPI = &falseValue
+		}
 	}
 
 	return obj, nil
