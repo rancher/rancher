@@ -2,11 +2,13 @@ package nodesyncer
 
 import (
 	"reflect"
+	"strings"
 
 	"github.com/pkg/errors"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/taints"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -41,14 +43,24 @@ func (n *nodesSyncer) syncTaints(key string, obj *v3.Node) (runtime.Object, erro
 			taintList = append(taintList, taintStr)
 		}
 		newNode.Spec.Taints = taintList
-		if _, err := n.nodeClient.Update(newNode); err != nil {
+		if _, err := n.nodeClient.Update(newNode); err != nil && !isDuplicate(err) {
 			return obj, errors.Wrapf(err, "failed to update corev1.Node %s from v3.Node %s in node taint controller", node.Name, obj.Name)
-		}
-		if !reflect.DeepEqual(newObj.Spec.DesiredNodeTaints, newObj.Spec.InternalNodeSpec.Taints) {
+		} else if isDuplicate(err) {
+			// If the node has duplicated taints, we should skip the error and set desired taints to nil and stop trying again.
+			// The taints will be duplicated if they have same key and effect in k8s version >= 1.14, and same key only in version k8s <=1.13
+			logrus.Errorf("failed to update corev1.Node %s from v3.Node %s in node taint controller, error: %s", node.Name, obj.Name, err.Error())
+		} else if !reflect.DeepEqual(newObj.Spec.DesiredNodeTaints, newObj.Spec.InternalNodeSpec.Taints) {
 			newObj.Spec.InternalNodeSpec.Taints = taintList
 		}
 	}
 	newObj.Spec.DesiredNodeTaints = nil
 	newObj.Spec.UpdateTaintsFromAPI = nil
 	return n.machines.Update(newObj)
+}
+
+func isDuplicate(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "taints must be unique by key and effect pair")
 }

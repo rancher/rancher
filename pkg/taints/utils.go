@@ -13,6 +13,10 @@ func GetTaintsString(taint v1.Taint) string {
 	return fmt.Sprintf("%s=%s:%s", taint.Key, taint.Value, taint.Effect)
 }
 
+func GetKeyEffectString(taint v1.Taint) string {
+	return fmt.Sprintf("%s:%s", taint.Key, taint.Effect)
+}
+
 func GetTaintFromString(taintStr string) *v1.Taint {
 	taintStruct := strings.Split(taintStr, "=")
 	if len(taintStruct) != 2 {
@@ -38,6 +42,14 @@ func GetTaintSet(taints []v1.Taint) map[string]int {
 	rtn := map[string]int{}
 	for i, taint := range taints {
 		rtn[GetTaintsString(taint)] = i
+	}
+	return rtn
+}
+
+func GetKeyEffectTaintSet(taints []v1.Taint) map[string]int {
+	rtn := map[string]int{}
+	for i, taint := range taints {
+		rtn[GetKeyEffectString(taint)] = i
 	}
 	return rtn
 }

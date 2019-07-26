@@ -66,6 +66,9 @@ func (n nodeStore) List(apiContext *types.APIContext, schema *types.Schema, opt 
 }
 
 func (n nodeStore) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
+	if err := n.validateDesiredTaints(data); err != nil {
+		return nil, err
+	}
 	format(data)
 	nodePoolID := n.getNodePoolID(apiContext, schema, data, "")
 	if nodePoolID != "" {
@@ -77,6 +80,9 @@ func (n nodeStore) Create(apiContext *types.APIContext, schema *types.Schema, da
 }
 
 func (n nodeStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
+	if err := n.validateDesiredTaints(data); err != nil {
+		return nil, err
+	}
 	format(data)
 	return n.Store.Update(apiContext, schema, data, id)
 }
@@ -137,5 +143,24 @@ func (n nodeStore) validateHostname(schema *types.Schema, data map[string]interf
 		}
 	}
 
+	return nil
+}
+
+func (n nodeStore) validateDesiredTaints(data map[string]interface{}) error {
+	taints, ok := values.GetSlice(data, "taints")
+	if !ok {
+		return nil
+	}
+	uniqueSet := map[string]struct{}{}
+	for _, taint := range taints {
+		// key and effect is required field in API, so we can safely assume that key and effect exist.
+		key, _ := values.GetValue(taint, "key")
+		effect, _ := values.GetValue(taint, "effect")
+		uniqueKey := fmt.Sprintf("%v:%v", key, effect)
+		if _, ok := uniqueSet[uniqueKey]; ok {
+			return httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("invalid taints, duplicated key %s and effect %s", key, effect))
+		}
+		uniqueSet[uniqueKey] = struct{}{}
+	}
 	return nil
 }
