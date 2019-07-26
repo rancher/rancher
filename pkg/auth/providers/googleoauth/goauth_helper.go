@@ -161,7 +161,7 @@ func (g *googleOauthProvider) paginateResults(adminSvc *admin.Service, hostedDom
 	switch accountType {
 	case userType:
 		// in case of list users call, using the searchKey itself as query searches all attributes for the search key
-		userListCall := adminSvc.Users.List().Domain(hostedDomain).Query(searchKey)
+		userListCall := adminSvc.Users.List().MaxResults(2).Domain(hostedDomain).Query(searchKey)
 		if viewPublic {
 			userListCall.ViewType(domainPublicViewType)
 		}
@@ -177,7 +177,7 @@ func (g *googleOauthProvider) paginateResults(adminSvc *admin.Service, hostedDom
 			userListCall.PageToken(res.NextPageToken)
 		}
 	case groupType:
-		groupListCall := adminSvc.Groups.List().Domain(hostedDomain)
+		groupListCall := adminSvc.Groups.List().MaxResults(2).Domain(hostedDomain)
 		if memberKey != "" {
 			groupListCall.UserKey(memberKey)
 		} else if searchKey != "" {
