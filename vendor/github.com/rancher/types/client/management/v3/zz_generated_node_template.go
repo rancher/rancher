@@ -24,6 +24,7 @@ const (
 	NodeTemplateFieldEngineStorageDriver      = "engineStorageDriver"
 	NodeTemplateFieldLabels                   = "labels"
 	NodeTemplateFieldName                     = "name"
+	NodeTemplateFieldNodeTaints               = "nodeTaints"
 	NodeTemplateFieldOwnerReferences          = "ownerReferences"
 	NodeTemplateFieldRemoved                  = "removed"
 	NodeTemplateFieldState                    = "state"
@@ -54,6 +55,7 @@ type NodeTemplate struct {
 	EngineStorageDriver      string              `json:"engineStorageDriver,omitempty" yaml:"engineStorageDriver,omitempty"`
 	Labels                   map[string]string   `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                     string              `json:"name,omitempty" yaml:"name,omitempty"`
+	NodeTaints               []Taint             `json:"nodeTaints,omitempty" yaml:"nodeTaints,omitempty"`
 	OwnerReferences          []OwnerReference    `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Removed                  string              `json:"removed,omitempty" yaml:"removed,omitempty"`
 	State                    string              `json:"state,omitempty" yaml:"state,omitempty"`

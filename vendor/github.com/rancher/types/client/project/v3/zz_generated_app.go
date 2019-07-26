@@ -28,10 +28,12 @@ const (
 	AppFieldRemoved              = "removed"
 	AppFieldState                = "state"
 	AppFieldTargetNamespace      = "targetNamespace"
+	AppFieldTimeout              = "timeout"
 	AppFieldTransitioning        = "transitioning"
 	AppFieldTransitioningMessage = "transitioningMessage"
 	AppFieldUUID                 = "uuid"
 	AppFieldValuesYaml           = "valuesYaml"
+	AppFieldWait                 = "wait"
 )
 
 type App struct {
@@ -58,10 +60,12 @@ type App struct {
 	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	State                string            `json:"state,omitempty" yaml:"state,omitempty"`
 	TargetNamespace      string            `json:"targetNamespace,omitempty" yaml:"targetNamespace,omitempty"`
+	Timeout              int64             `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	ValuesYaml           string            `json:"valuesYaml,omitempty" yaml:"valuesYaml,omitempty"`
+	Wait                 bool              `json:"wait,omitempty" yaml:"wait,omitempty"`
 }
 
 type AppCollection struct {

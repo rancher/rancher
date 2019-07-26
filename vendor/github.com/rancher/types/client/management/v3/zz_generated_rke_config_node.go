@@ -15,6 +15,7 @@ const (
 	RKEConfigNodeFieldSSHCertPath      = "sshCertPath"
 	RKEConfigNodeFieldSSHKey           = "sshKey"
 	RKEConfigNodeFieldSSHKeyPath       = "sshKeyPath"
+	RKEConfigNodeFieldTaints           = "taints"
 	RKEConfigNodeFieldUser             = "user"
 )
 
@@ -32,5 +33,6 @@ type RKEConfigNode struct {
 	SSHCertPath      string            `json:"sshCertPath,omitempty" yaml:"sshCertPath,omitempty"`
 	SSHKey           string            `json:"sshKey,omitempty" yaml:"sshKey,omitempty"`
 	SSHKeyPath       string            `json:"sshKeyPath,omitempty" yaml:"sshKeyPath,omitempty"`
+	Taints           []Taint           `json:"taints,omitempty" yaml:"taints,omitempty"`
 	User             string            `json:"user,omitempty" yaml:"user,omitempty"`
 }

@@ -8,6 +8,7 @@ const (
 	CustomConfigFieldLabel           = "label"
 	CustomConfigFieldSSHCert         = "sshCert"
 	CustomConfigFieldSSHKey          = "sshKey"
+	CustomConfigFieldTaints          = "taints"
 	CustomConfigFieldUser            = "user"
 )
 
@@ -18,5 +19,6 @@ type CustomConfig struct {
 	Label           map[string]string `json:"label,omitempty" yaml:"label,omitempty"`
 	SSHCert         string            `json:"sshCert,omitempty" yaml:"sshCert,omitempty"`
 	SSHKey          string            `json:"sshKey,omitempty" yaml:"sshKey,omitempty"`
+	Taints          []string          `json:"taints,omitempty" yaml:"taints,omitempty"`
 	User            string            `json:"user,omitempty" yaml:"user,omitempty"`
 }

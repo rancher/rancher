@@ -9,6 +9,7 @@ const (
 	NodeSpecFieldDescription              = "description"
 	NodeSpecFieldDesiredNodeAnnotations   = "desiredNodeAnnotations"
 	NodeSpecFieldDesiredNodeLabels        = "desiredNodeLabels"
+	NodeSpecFieldDesiredNodeTaints        = "desiredNodeTaints"
 	NodeSpecFieldDesiredNodeUnschedulable = "desiredNodeUnschedulable"
 	NodeSpecFieldDisplayName              = "displayName"
 	NodeSpecFieldEtcd                     = "etcd"
@@ -21,6 +22,7 @@ const (
 	NodeSpecFieldRequestedHostname        = "requestedHostname"
 	NodeSpecFieldTaints                   = "taints"
 	NodeSpecFieldUnschedulable            = "unschedulable"
+	NodeSpecFieldUpdateTaintsFromAPI      = "updateTaintsFromAPI"
 	NodeSpecFieldWorker                   = "worker"
 )
 
@@ -32,6 +34,7 @@ type NodeSpec struct {
 	Description              string            `json:"description,omitempty" yaml:"description,omitempty"`
 	DesiredNodeAnnotations   map[string]string `json:"desiredNodeAnnotations,omitempty" yaml:"desiredNodeAnnotations,omitempty"`
 	DesiredNodeLabels        map[string]string `json:"desiredNodeLabels,omitempty" yaml:"desiredNodeLabels,omitempty"`
+	DesiredNodeTaints        []Taint           `json:"desiredNodeTaints,omitempty" yaml:"desiredNodeTaints,omitempty"`
 	DesiredNodeUnschedulable string            `json:"desiredNodeUnschedulable,omitempty" yaml:"desiredNodeUnschedulable,omitempty"`
 	DisplayName              string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	Etcd                     bool              `json:"etcd,omitempty" yaml:"etcd,omitempty"`
@@ -44,5 +47,6 @@ type NodeSpec struct {
 	RequestedHostname        string            `json:"requestedHostname,omitempty" yaml:"requestedHostname,omitempty"`
 	Taints                   []Taint           `json:"taints,omitempty" yaml:"taints,omitempty"`
 	Unschedulable            bool              `json:"unschedulable,omitempty" yaml:"unschedulable,omitempty"`
+	UpdateTaintsFromAPI      *bool             `json:"updateTaintsFromAPI,omitempty" yaml:"updateTaintsFromAPI,omitempty"`
 	Worker                   bool              `json:"worker,omitempty" yaml:"worker,omitempty"`
 }
