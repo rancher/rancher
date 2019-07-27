@@ -108,7 +108,7 @@ func (m *Lifecycle) setupCustom(obj *v3.Node) {
 		Labels:           obj.Spec.CustomConfig.Label,
 		Port:             "22",
 		Role:             roles(obj),
-		Taints:           taints.GetTaintsFromStrings(obj.Spec.CustomConfig.Taints),
+		Taints:           taints.GetRKETaintsFromStrings(obj.Spec.CustomConfig.Taints),
 	}
 
 	if obj.Status.NodeConfig.User == "" {
@@ -122,7 +122,7 @@ func (m *Lifecycle) setupCustom(obj *v3.Node) {
 		},
 	}
 
-	obj.Spec.DesiredNodeTaints = obj.Status.NodeConfig.Taints
+	obj.Spec.DesiredNodeTaints = taints.GetTaintsFromStrings(obj.Spec.CustomConfig.Taints)
 	obj.Spec.UpdateTaintsFromAPI = &falseValue
 }
 

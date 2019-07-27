@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 )
@@ -67,4 +68,18 @@ func GetToDiffTaints(current, desired []v1.Taint) (toAdd map[int]v1.Taint, toDel
 		}
 	}
 	return toAdd, toDel
+}
+
+func GetRKETaintsFromStrings(sources []string) []v3.RKETaint {
+	rtn := make([]v3.RKETaint, len(sources))
+	for i, source := range sources {
+		t := GetTaintFromString(source)
+		rtn[i] = v3.RKETaint{
+			Key:       t.Key,
+			Value:     t.Value,
+			Effect:    t.Effect,
+			TimeAdded: t.TimeAdded,
+		}
+	}
+	return rtn
 }

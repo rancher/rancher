@@ -129,7 +129,7 @@ func (t *Authorizer) Authorize(req *http.Request) (*Client, bool, error) {
 			node = node.DeepCopy()
 			node.Status.NodeConfig.Address = input.Node.CustomConfig.Address
 			node.Status.NodeConfig.InternalAddress = input.Node.CustomConfig.InternalAddress
-			node.Status.NodeConfig.Taints = taints.GetTaintsFromStrings(input.Node.CustomConfig.Taints)
+			node.Status.NodeConfig.Taints = taints.GetRKETaintsFromStrings(input.Node.CustomConfig.Taints)
 		}
 		return &Client{
 			Cluster: cluster,
