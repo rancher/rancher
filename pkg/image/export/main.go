@@ -41,6 +41,9 @@ var (
 		"linux":   "rancher-images.txt",
 		"windows": "rancher-windows-images.txt",
 	}
+	requiredImagesNotInSystemCharts = []string{
+		"busybox",
+	}
 )
 
 func main() {
@@ -53,6 +56,7 @@ func main() {
 	}
 
 	images = append(images, os.Args[2:]...)
+	images = append(images, requiredImagesNotInSystemCharts...)
 
 	if err := run(images...); err != nil {
 		log.Fatal(err)

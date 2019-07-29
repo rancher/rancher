@@ -24,6 +24,7 @@ auditLog:
 addLocal: "auto"
 
 # Image for collecting rancher audit logs.
+# Important: update pkg/image/export/main.go when this default image is changed, so that it's reflected accordingly in rancher-images.txt generated for air-gapped setups.
 busyboxImage: busybox
 
 # Add debug flag to Rancher server
