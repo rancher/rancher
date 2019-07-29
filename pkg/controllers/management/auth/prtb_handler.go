@@ -42,6 +42,11 @@ var prtbClusterManagmentPlaneResources = []string{
 	"catalogtemplateversions",
 }
 
+var projectScopedAdminRoles = map[string]bool{
+	"project-owner": true,
+	"admin":         true,
+}
+
 type prtbLifecycle struct {
 	mgr           *manager
 	projectLister v3.ProjectLister
@@ -158,7 +163,11 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 	}
 
 	roleName := strings.ToLower(fmt.Sprintf("%v-clustermember", clusterName))
-	isOwnerRole := binding.RoleTemplateName == "project-owner"
+	// if roletemplate is not builtin, check if it's inherited/cloned
+	isOwnerRole, err := p.mgr.checkReferencedRoles(binding.RoleTemplateName)
+	if err != nil {
+		return err
+	}
 	var projectRoleName string
 	if isOwnerRole {
 		projectRoleName = strings.ToLower(fmt.Sprintf("%v-projectowner", projectName))

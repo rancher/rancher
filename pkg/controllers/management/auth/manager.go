@@ -762,3 +762,28 @@ func buildRule(resource string, verbs map[string]bool) v1.PolicyRule {
 		APIGroups: []string{"*"},
 	}
 }
+
+func (m *manager) checkReferencedRoles(roleTemplateName string) (bool, error) {
+	roleTemplate, err := m.rtLister.Get("", roleTemplateName)
+	if err != nil {
+		return false, err
+	}
+
+	if projectScopedAdminRoles[roleTemplate.Name] || roleTemplate.Administrative {
+		return true, nil
+	}
+	isOwnerRole := false
+	if len(roleTemplate.RoleTemplateNames) > 0 {
+		// get referenced roletemplate
+		for _, rtName := range roleTemplate.RoleTemplateNames {
+			isOwnerRole, err = m.checkReferencedRoles(rtName)
+			if err != nil {
+				return false, err
+			}
+			if isOwnerRole {
+				return true, nil
+			}
+		}
+	}
+	return isOwnerRole, nil
+}
