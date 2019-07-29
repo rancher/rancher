@@ -42,7 +42,7 @@ func DeployStateOnPlaneHost(ctx context.Context, host *hosts.Host, stateDownload
 		return err
 	}
 	containerEnv := []string{ClusterStateEnv + "=" + clusterState}
-	ClusterStateFilePath := path.Join(host.PrefixPath, TempCertPath, ClusterStateFile)
+	ClusterStateFilePath := path.Join(TempCertPath, ClusterStateFile)
 	imageCfg := &container.Config{
 		Image: stateDownloaderImage,
 		Cmd: []string{
