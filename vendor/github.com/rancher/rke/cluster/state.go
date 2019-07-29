@@ -202,7 +202,7 @@ func getStateFromNodes(ctx context.Context, uniqueHosts []*hosts.Host, alpineIma
 	var err error
 
 	for _, host := range uniqueHosts {
-		filePath := path.Join(host.PrefixPath, pki.TempCertPath, pki.ClusterStateFile)
+		filePath := path.Join(pki.TempCertPath, pki.ClusterStateFile)
 		clusterFile, err = pki.FetchFileFromHost(ctx, filePath, alpineImage, host, prsMap, pki.StateDeployerContainerName, "state")
 		if err == nil {
 			break
