@@ -125,8 +125,11 @@ func (c *crtbLifecycle) reconcilBindings(binding *v3.ClusterRoleTemplateBinding)
 	if cluster == nil {
 		return errors.Errorf("cannot create binding because cluster %v was not found", clusterName)
 	}
-
-	isOwnerRole := binding.RoleTemplateName == "cluster-owner"
+	// if roletemplate is not builtin, check if it's inherited/cloned
+	isOwnerRole, err := c.mgr.checkReferencedRoles(binding.RoleTemplateName)
+	if err != nil {
+		return err
+	}
 	var clusterRoleName string
 	if isOwnerRole {
 		clusterRoleName = strings.ToLower(fmt.Sprintf("%v-clusterowner", clusterName))
