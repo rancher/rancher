@@ -130,9 +130,6 @@ func (t TemplateWrapper) TemplateIconHandler(apiContext *types.APIContext, next 
 
 		iconReader := bytes.NewReader(iconBytes)
 		apiContext.Response.Header().Set("Cache-Control", "private, max-age=604800")
-		// add security headers (similar to raw.githubusercontent)
-		apiContext.Response.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
-		apiContext.Response.Header().Set("X-Content-Type-Options", "nosniff")
 		http.ServeContent(apiContext.Response, apiContext.Request, template.IconFilename, t, iconReader)
 		return nil
 	default:
