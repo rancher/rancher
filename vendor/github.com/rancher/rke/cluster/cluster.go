@@ -14,7 +14,7 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
@@ -288,6 +288,9 @@ func ApplyAuthzResources(ctx context.Context, rkeConfig v3.RancherKubernetesEngi
 	if kubeCluster.Authorization.Mode == services.RBACAuthorizationMode {
 		if err := authz.ApplySystemNodeClusterRoleBinding(ctx, kubeCluster.LocalKubeConfigPath, kubeCluster.K8sWrapTransport); err != nil {
 			return fmt.Errorf("Failed to apply the ClusterRoleBinding needed for node authorization: %v", err)
+		}
+		if err := authz.ApplyKubeAPIClusterRole(ctx, kubeCluster.LocalKubeConfigPath, kubeCluster.K8sWrapTransport); err != nil {
+			return fmt.Errorf("Failed to apply the ClusterRole and Binding needed for node kubeapi proxy: %v", err)
 		}
 	}
 	if kubeCluster.Authorization.Mode == services.RBACAuthorizationMode && kubeCluster.Services.KubeAPI.PodSecurityPolicy {
