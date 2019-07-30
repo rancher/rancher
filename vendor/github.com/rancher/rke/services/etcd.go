@@ -31,6 +31,7 @@ const (
 	EtcdInitWaitTime                = 10
 	EtcdSnapshotWaitTime            = 5
 	EtcdSnapshotCompressedExtension = "zip"
+	EtcdPermFixContainerName        = "etcd-fix-perm"
 )
 
 func RunEtcdPlane(
@@ -48,7 +49,13 @@ func RunEtcdPlane(
 		if updateWorkersOnly {
 			continue
 		}
+
 		etcdProcess := etcdNodePlanMap[host.Address].Processes[EtcdContainerName]
+
+		// need to run this first to set proper ownership and permissions on etcd data dir
+		if err := setEtcdPermissions(ctx, host, prsMap, alpineImage, etcdProcess); err != nil {
+			return err
+		}
 		imageCfg, hostCfg, _ := GetProcessConfig(etcdProcess)
 		if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, EtcdContainerName, host.Address, ETCDRole, prsMap); err != nil {
 			return err
@@ -221,6 +228,11 @@ func RemoveEtcdMember(ctx context.Context, etcdHost *hosts.Host, etcdHosts []*ho
 
 func ReloadEtcdCluster(ctx context.Context, readyEtcdHosts []*hosts.Host, newHost *hosts.Host, localConnDialerFactory hosts.DialerFactory, cert, key []byte, prsMap map[string]v3.PrivateRegistry, etcdNodePlanMap map[string]v3.RKEConfigNodePlan, alpineImage string) error {
 	imageCfg, hostCfg, _ := GetProcessConfig(etcdNodePlanMap[newHost.Address].Processes[EtcdContainerName])
+
+	if err := setEtcdPermissions(ctx, newHost, prsMap, alpineImage, etcdNodePlanMap[newHost.Address].Processes[EtcdContainerName]); err != nil {
+		return err
+	}
+
 	if err := docker.DoRunContainer(ctx, newHost.DClient, imageCfg, hostCfg, EtcdContainerName, newHost.Address, ETCDRole, prsMap); err != nil {
 		return err
 	}
@@ -671,4 +683,29 @@ func DownloadEtcdSnapshotFromBackupServer(ctx context.Context, etcdHost *hosts.H
 		return fmt.Errorf("Failed to download etcd snapshot from backup server [%s], exit code [%d]: %v", backupServer.Address, status, stderr)
 	}
 	return docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdDownloadBackupContainerName)
+}
+
+func setEtcdPermissions(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, alpineImage string, process v3.Process) error {
+	var dataBind string
+
+	cmd := fmt.Sprintf("chmod 700 %s", EtcdDataDir)
+	if len(process.User) != 0 {
+		cmd = fmt.Sprintf("chmod 700 %s ; chown -R %s %s", EtcdDataDir, process.User, EtcdDataDir)
+	}
+	imageCfg := &container.Config{
+		Cmd: []string{
+			"sh", "-c",
+			cmd,
+		},
+		Image: alpineImage,
+	}
+	for _, bind := range process.Binds {
+		if strings.Contains(bind, "/var/lib/etcd") {
+			dataBind = bind
+		}
+	}
+	hostCfg := &container.HostConfig{
+		Binds: []string{dataBind},
+	}
+	return docker.DoRunOnetimeContainer(ctx, etcdHost.DClient, imageCfg, hostCfg, EtcdPermFixContainerName, etcdHost.Address, ETCDRole, prsMap)
 }

@@ -32,6 +32,14 @@ func DeployCertificatesOnPlaneHost(ctx context.Context, host *hosts.Host, rkeCon
 	if forceDeploy {
 		env = append(env, "FORCE_DEPLOY=true")
 	}
+	if host.IsEtcd &&
+		rkeConfig.Services.Etcd.UID != 0 &&
+		rkeConfig.Services.Etcd.GID != 0 {
+		env = append(env,
+			[]string{fmt.Sprintf("ETCD_UID=%d", rkeConfig.Services.Etcd.UID),
+				fmt.Sprintf("ETCD_GID=%d", rkeConfig.Services.Etcd.GID)}...)
+	}
+
 	return doRunDeployer(ctx, host, env, certDownloaderImage, prsMap)
 }
 

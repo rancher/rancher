@@ -10,11 +10,13 @@ const (
 	ETCDServiceFieldExtraArgs    = "extraArgs"
 	ETCDServiceFieldExtraBinds   = "extraBinds"
 	ETCDServiceFieldExtraEnv     = "extraEnv"
+	ETCDServiceFieldGID          = "gid"
 	ETCDServiceFieldImage        = "image"
 	ETCDServiceFieldKey          = "key"
 	ETCDServiceFieldPath         = "path"
 	ETCDServiceFieldRetention    = "retention"
 	ETCDServiceFieldSnapshot     = "snapshot"
+	ETCDServiceFieldUID          = "uid"
 )
 
 type ETCDService struct {
@@ -26,9 +28,11 @@ type ETCDService struct {
 	ExtraArgs    map[string]string `json:"extraArgs,omitempty" yaml:"extraArgs,omitempty"`
 	ExtraBinds   []string          `json:"extraBinds,omitempty" yaml:"extraBinds,omitempty"`
 	ExtraEnv     []string          `json:"extraEnv,omitempty" yaml:"extraEnv,omitempty"`
+	GID          int64             `json:"gid,omitempty" yaml:"gid,omitempty"`
 	Image        string            `json:"image,omitempty" yaml:"image,omitempty"`
 	Key          string            `json:"key,omitempty" yaml:"key,omitempty"`
 	Path         string            `json:"path,omitempty" yaml:"path,omitempty"`
 	Retention    string            `json:"retention,omitempty" yaml:"retention,omitempty"`
 	Snapshot     *bool             `json:"snapshot,omitempty" yaml:"snapshot,omitempty"`
+	UID          int64             `json:"uid,omitempty" yaml:"uid,omitempty"`
 }

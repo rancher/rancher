@@ -770,12 +770,16 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, pr
 	Env = append(Env, fmt.Sprintf("ETCD_UNSUPPORTED_ARCH=%s", architecture))
 
 	Env = append(Env, c.Services.Etcd.ExtraEnv...)
-
+	var user string
+	if c.Services.Etcd.UID != 0 && c.Services.Etcd.GID != 0 {
+		user = fmt.Sprintf("%d:%d", c.Services.Etcd.UID, c.Services.Etcd.UID)
+	}
 	return v3.Process{
 		Name:                    services.EtcdContainerName,
 		Args:                    args,
 		Binds:                   getUniqStringList(Binds),
 		Env:                     Env,
+		User:                    user,
 		NetworkMode:             "host",
 		RestartPolicy:           "always",
 		Image:                   c.Services.Etcd.Image,
