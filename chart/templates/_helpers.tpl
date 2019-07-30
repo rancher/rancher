@@ -21,5 +21,5 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this 
 
 # Render Values in configurationSnippet
 {{- define "configurationSnippet" -}}
-  {{- tpl (.Values.ingress.configurationSnippet) . -}}
+  {{- tpl (.Values.ingress.configurationSnippet) . | nindent 6 -}}
 {{- end -}}
