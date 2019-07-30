@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -38,7 +38,7 @@ const (
 	KubeAPIPort        = 6443
 	SchedulerPort      = 10251
 	KubeControllerPort = 10252
-	KubeletPort        = 10250
+	KubeletPort        = 10248
 	KubeproxyPort      = 10256
 )
 
