@@ -407,6 +407,11 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 		"volume-plugin-dir":                 "/var/lib/kubelet/volumeplugins",
 		"v":                                 "2",
 	}
+
+	if c.DinD {
+		CommandArgs["healthz-bind-address"] = "0.0.0.0"
+	}
+
 	if host.IsControl && !host.IsWorker {
 		CommandArgs["register-with-taints"] = unschedulableControlTaint
 	}
@@ -492,7 +497,7 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 	Binds = append(Binds, c.Services.Kubelet.ExtraBinds...)
 
 	healthCheck := v3.HealthCheck{
-		URL: services.GetHealthCheckURL(true, services.KubeletPort),
+		URL: services.GetHealthCheckURL(false, services.KubeletPort),
 	}
 	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(c.Services.Kubelet.Image, c.PrivateRegistriesMap)
 
