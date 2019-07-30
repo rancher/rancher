@@ -130,6 +130,7 @@ spec:
       - name: cattle-credentials
         secret:
           secretName: cattle-credentials-{{.TokenKey}}
+          defaultMode: 320
 
 ---
 
@@ -209,6 +210,7 @@ spec:
       - name: cattle-credentials
         secret:
           secretName: cattle-credentials-{{.TokenKey}}
+          defaultMode: 320
       - hostPath:
           path: /etc/docker/certs.d
           type: DirectoryOrCreate
