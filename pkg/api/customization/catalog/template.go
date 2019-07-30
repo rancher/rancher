@@ -32,8 +32,20 @@ func (t TemplateWrapper) TemplateFormatter(apiContext *types.APIContext, resourc
 	resource.Values["versionLinks"] = t.extractVersionLinks(apiContext, resource)
 
 	//icon
-	delete(resource.Values, "icon")
-	resource.Links["icon"] = apiContext.URLBuilder.Link("icon", resource)
+	ic, ok := resource.Values["icon"]
+	if ok {
+		if strings.HasPrefix(ic.(string), "file:") {
+			delete(resource.Values, "icon")
+			resource.Links["icon"] = apiContext.URLBuilder.Link("icon", resource)
+
+		} else {
+			delete(resource.Values, "icon")
+			resource.Links["icon"] = ic.(string)
+		}
+	} else {
+		delete(resource.Values, "icon")
+		resource.Links["icon"] = apiContext.URLBuilder.Link("icon", resource)
+	}
 
 	val := resource.Values
 	if val[client.CatalogTemplateFieldCatalogID] != nil {
