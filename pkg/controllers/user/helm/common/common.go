@@ -119,12 +119,14 @@ func GenerateRandomPort() string {
 func InstallCharts(tempDirs *HelmPath, port string, obj *v3.App) error {
 	logrus.Debugf("InstallCharts - helm path info %+v\n", tempDirs)
 	extraArgs := GetExtraArgs(obj)
+	timeoutArgs := getTimeoutArgs(obj)
 	setValues, err := GenerateAnswerSetValues(obj, tempDirs, extraArgs)
 	if err != nil {
 		return err
 	}
 	commands := make([]string, 0)
-	commands = append([]string{"upgrade", "--install", "--namespace", obj.Spec.TargetNamespace, obj.Name}, setValues...)
+	commands = append([]string{"upgrade", "--install", "--namespace", obj.Spec.TargetNamespace, obj.Name}, timeoutArgs...)
+	commands = append(commands, setValues...)
 	commands = append(commands, tempDirs.AppDirInJail)
 
 	if v3.AppConditionForceUpgrade.IsUnknown(obj) {
@@ -158,6 +160,18 @@ func InstallCharts(tempDirs *HelmPath, port string, obj *v3.App) error {
 		return errors.Errorf("failed to install app %s. %s", obj.Name, stderrBuf.String())
 	}
 	return nil
+}
+
+// getTimeoutArgs generates the appropriate arguments for helm depending on the app's timeout and wait fields
+func getTimeoutArgs(app *v3.App) []string {
+	var timeoutArgs []string
+
+	if app.Spec.Wait {
+		timeoutArgs = append(timeoutArgs, "--wait")
+	}
+	timeoutArgs = append(timeoutArgs, "--timeout", strconv.Itoa(app.Spec.Timeout))
+
+	return timeoutArgs
 }
 
 func GenerateAnswerSetValues(app *v3.App, tempDir *HelmPath, extraArgs map[string]string) ([]string, error) {

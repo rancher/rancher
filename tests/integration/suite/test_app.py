@@ -222,6 +222,50 @@ def test_app_namespace_annotation(admin_pc, admin_mc):
     assert 'cattle.io/appIds' not in ns.annotations
 
 
+def test_helm_timeout(admin_pc, admin_mc, remove_resource):
+    """Test helm timeout flag. This test asserts timeout flag is properly being
+    passed to helm.
+    """
+    client = admin_pc.client
+    ns = admin_pc.cluster.client.create_namespace(name="ns-" + random_str(),
+                                                  projectId=admin_pc.
+                                                  project.id)
+    remove_resource(ns)
+
+    wait_for_template_to_be_created(admin_mc.client, "library")
+
+    # timeout of one second is not sufficient for installing mysql and should
+    # result in failure
+    app1 = client.create_app(
+        name="app-" + random_str(),
+        externalId="catalog://?catalog=library&template=mysql&version=0.3.7&"
+                   "namespace=cattle-global-data",
+        targetNamespace=ns.name,
+        projectId=admin_pc.project.id,
+        wait=True,
+        timeout=1,
+    )
+    remove_resource(app1)
+
+    assert app1.timeout == 1
+    assert app1.wait
+
+    wait_for_workload(client, ns.name, count=1)
+
+    def wait_for_transition_error(app):
+        def transition_error():
+            test_app = client.reload(app)
+            if test_app.transitioning != "error":
+                return False
+            return test_app
+
+        return wait_for(transition_error, timeout=15, fail_handler=lambda:
+                        "expected transitioning to fail")
+
+    app1 = wait_for_transition_error(app1)
+    assert "timed out waiting for the condition" in app1.transitioningMessage
+
+
 def wait_for_app_annotation(admin_pc, ns, app_name, timeout=60):
     start = time.time()
     interval = 0.5
