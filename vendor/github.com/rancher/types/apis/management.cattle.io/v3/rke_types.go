@@ -247,6 +247,11 @@ type ETCDService struct {
 	Key string `yaml:"key" json:"key,omitempty"`
 	// External etcd prefix
 	Path string `yaml:"path" json:"path,omitempty"`
+	// UID to run etcd container as
+	UID int `yaml:"uid" json:"uid,omitempty"`
+	// GID to run etcd container as
+	GID int `yaml:"gid" json:"gid,omitempty"`
+
 	// Etcd Recurring snapshot Service, used by rke only
 	Snapshot *bool `yaml:"snapshot" json:"snapshot,omitempty" norman:"default=false"`
 	// Etcd snapshot Retention period
@@ -415,6 +420,8 @@ type Process struct {
 	Labels map[string]string `json:"labels,omitempty"`
 	// Process docker publish container's port to host
 	Publish []string `json:"publish,omitempty"`
+	// docker will run the container with this user
+	User string `json:"user,omitempty"`
 }
 
 type HealthCheck struct {

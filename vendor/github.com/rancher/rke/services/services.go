@@ -95,6 +95,7 @@ func GetProcessConfig(process v3.Process) (*container.Config, *container.HostCon
 		Env:        process.Env,
 		Image:      process.Image,
 		Labels:     process.Labels,
+		User:       process.User,
 	}
 	// var pidMode container.PidMode
 	// pidMode = process.PidMode
