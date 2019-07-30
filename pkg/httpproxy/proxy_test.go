@@ -17,9 +17,11 @@ func TestReplaceSetCookies(t *testing.T) {
 		},
 	}
 
-	replaceSetCookies(DummyRequest)
+	setModifiedHeaders(DummyRequest)
 	assert.Equal(t, []string{"test1=abc", "test2=def", "test3=ghi"}, DummyRequest.Header[APISetCookie])
 	assert.Equal(t, 0, len(DummyRequest.Header[SetCookie]))
+	assert.Equal(t, []string{"default-src 'none'; style-src 'unsafe-inline'; sandbox"}, DummyRequest.Header[CSP])
+	assert.Equal(t, []string{"nosniff"}, DummyRequest.Header[XContentType])
 
 	DummyRequest = &http.Response{
 		Header: map[string][]string{
@@ -28,10 +30,12 @@ func TestReplaceSetCookies(t *testing.T) {
 		},
 	}
 
-	replaceSetCookies(DummyRequest)
+	setModifiedHeaders(DummyRequest)
 	// Should delete original api set cookie
 	assert.Equal(t, []string{"test1=abc", "test2=def", "test3=ghi"}, DummyRequest.Header[APISetCookie])
 	assert.Equal(t, 0, len(DummyRequest.Header[SetCookie]))
+	assert.Equal(t, []string{"default-src 'none'; style-src 'unsafe-inline'; sandbox"}, DummyRequest.Header[CSP])
+	assert.Equal(t, []string{"nosniff"}, DummyRequest.Header[XContentType])
 }
 
 // ReplaceCookie should delete  current cookie and replace it with api cookie if available
