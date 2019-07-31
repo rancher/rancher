@@ -176,7 +176,7 @@ func FetchCertificatesFromHost(ctx context.Context, extraHosts []*hosts.Host, ho
 
 	for _, etcdHost := range extraHosts {
 		// Fetch etcd certificates
-		crtList[GetEtcdCrtName(etcdHost.InternalAddress)] = false
+		crtList[GetCrtNameForAddress(etcdHost.InternalAddress, EtcdCertName)] = false
 	}
 
 	for certName, config := range crtList {
