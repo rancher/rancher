@@ -66,18 +66,11 @@ func GenerateRKENodeCerts(ctx context.Context, rkeConfig v3.RancherKubernetesEng
 	for _, node := range rkeConfig.Nodes {
 		if node.Address == nodeAddress {
 			for _, role := range node.Role {
-				switch role {
-				case controlRole:
-					keys := getControlCertKeys()
-					crtKeys = append(crtKeys, keys...)
+				if role == controlRole {
 					removeCAKey = false
-				case workerRole:
-					keys := getWorkerCertKeys()
-					crtKeys = append(crtKeys, keys...)
-				case etcdRole:
-					keys := getEtcdCertKeys(rkeConfig.Nodes, etcdRole)
-					crtKeys = append(crtKeys, keys...)
 				}
+				keys := getCertKeys(rkeConfig.Nodes, role)
+				crtKeys = append(crtKeys, keys...)
 			}
 			break
 		}
@@ -112,7 +105,7 @@ func RegenerateEtcdCertificate(
 	if err != nil {
 		return nil, err
 	}
-	etcdName := GetEtcdCrtName(etcdHost.InternalAddress)
+	etcdName := GetCrtNameForAddress(etcdHost.InternalAddress, EtcdCertName)
 	crtMap[etcdName] = ToCertObject(etcdName, "", "", etcdCrt, etcdKey, nil)
 	log.Infof(ctx, "[certificates] Successfully generated new etcd-%s certificate and key", etcdHost.InternalAddress)
 	return crtMap, nil
