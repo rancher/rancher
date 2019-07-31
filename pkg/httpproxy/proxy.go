@@ -23,6 +23,8 @@ const (
 	APISetCookie = "X-Api-Set-Cookie-Header"
 	APICookie    = "X-Api-Cookie-Header"
 	hostRegex    = "[A-Za-z0-9-]+"
+	CSP          = "Content-Security-Policy"
+	XContentType = "X-Content-Type-Options"
 )
 
 var (
@@ -83,17 +85,21 @@ func NewProxy(prefix string, validHosts Supplier, scaledContext *config.ScaledCo
 				logrus.Infof("Failed to proxy: %v", err)
 			}
 		},
-		ModifyResponse: replaceSetCookies,
+		ModifyResponse: setModifiedHeaders,
 	}
 }
 
-func replaceSetCookies(res *http.Response) error {
+func setModifiedHeaders(res *http.Response) error {
+	// replace set cookies
 	res.Header.Del(APISetCookie)
 	// There may be multiple set cookies
 	for _, setCookie := range res.Header[SetCookie] {
 		res.Header.Add(APISetCookie, setCookie)
 	}
 	res.Header.Del(SetCookie)
+	// add security headers (similar to raw.githubusercontent)
+	res.Header.Set(CSP, "default-src 'none'; style-src 'unsafe-inline'; sandbox")
+	res.Header.Set(XContentType, "nosniff")
 	return nil
 }
 
