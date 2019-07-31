@@ -323,8 +323,7 @@ def create_secret(keyvaluepair, singlenamespace=False,
         ns = namespace["ns"]
 
     if not singlenamespace:
-        secret = p_client.create_secret(name=name, namespaceId='NULL',
-                                        data=keyvaluepair)
+        secret = p_client.create_secret(name=name, data=keyvaluepair)
         assert secret['baseType'] == "secret"
     else:
         secret = p_client.create_namespaced_secret(name=name,
