@@ -24,6 +24,7 @@ def test_websocket(admin_mc):
     client._session.headers["Connection"] = "upgrade"
     client._session.headers["Upgrade"] = "websocket"
     client._session.headers["Origin"] = "badStuff"
+    client._session.headers["User-Agent"] = "Mozilla"
     # do something with client now that we have a "websocket"
 
     with pytest.raises(rancher.ApiError) as e:
