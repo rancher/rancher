@@ -14,13 +14,18 @@ import (
 	"google.golang.org/api/googleapi"
 )
 
-func (g *googleOauthProvider) getUserInfoAndGroups(adminSvc *admin.Service, gOAuthToken *oauth2.Token, config *v3.GoogleOauthConfig) (v3.Principal, []v3.Principal, error) {
+func (g *googleOauthProvider) getUserInfoAndGroups(adminSvc *admin.Service, gOAuthToken *oauth2.Token, config *v3.GoogleOauthConfig, testAndEnableAction bool) (v3.Principal, []v3.Principal, error) {
 	var userPrincipal v3.Principal
 	var groupPrincipals []v3.Principal
 	// use the access token to make requests, get user info
 	user, err := g.goauthClient.getUser(gOAuthToken.AccessToken, config)
 	if err != nil {
 		return userPrincipal, groupPrincipals, err
+	}
+	if testAndEnableAction {
+		if user.HostedDomain != config.Hostname {
+			return userPrincipal, groupPrincipals, fmt.Errorf("invalid hostname provided")
+		}
 	}
 	userPrincipal = g.toPrincipal(userType, *user, nil)
 	userPrincipal.Me = true
