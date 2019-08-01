@@ -11,9 +11,9 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/templatecontent"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
-	"github.com/rancher/types/client/management/v3"
+	client "github.com/rancher/types/client/management/v3"
 )
 
 func TemplateFormatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -21,7 +21,7 @@ func TemplateFormatter(apiContext *types.APIContext, resource *types.RawResource
 	resource.Values["versionLinks"] = extractVersionLinks(apiContext, resource)
 
 	//icon
-	ic, ok := resource.Values["icon"]
+	ic, ok := resource.Values["iconFilename"]
 	if ok {
 		if strings.HasPrefix(ic.(string), "file:") {
 			delete(resource.Values, "icon")

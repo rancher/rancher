@@ -20,7 +20,7 @@ import (
 
 	"github.com/blang/semver"
 	"github.com/pkg/errors"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
@@ -305,8 +305,7 @@ func Icon(versions ChartVersions) (string, string, error) {
 		return "", "", err
 	}
 
-	parts := strings.Split(url, "/")
-	iconFilename := parts[len(parts)-1]
+	iconFilename := url
 	iconData := base64.StdEncoding.EncodeToString(body)
 
 	return iconData, iconFilename, nil
