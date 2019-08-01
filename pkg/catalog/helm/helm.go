@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"io"
 	"io/ioutil"
-	"mime"
 	"net"
 	"net/http"
 	"net/url"
@@ -527,53 +526,7 @@ func (h *Helm) iconFromFile(iconURL, versionDir string) ([]byte, string, string,
 	return iconBytes, cacheFile, iconURL, nil
 }
 
-func (h *Helm) iconFromHTTP(iconURL string) ([]byte, string, string, error) {
-	if iconBytes, cacheFile, iconURL, err := h.loadCachedIcon(iconURL); err == nil {
-		logrus.Debugf("Helm found cached icon %s for %s", cacheFile, iconURL)
-		return iconBytes, cacheFile, iconURL, nil
-	}
-
-	resp, err := httpClient.Get(iconURL)
-	if err != nil {
-		return nil, "", "", errors.Errorf("Icon URL fetch [%s] error [%s]", iconURL, err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, "", "", errors.Errorf("Icon URL fetch [%s] with code [%d]", iconURL, resp.StatusCode)
-	}
-	iconBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, "", "", err
-	}
-
-	// some iconURLs may not have an extension or the wrong extension, so try to auto-discover
-	// but some sites such as raw.github.com may not provide the mediaType, so we will attempt
-	// to use mediaType for extension, but if value is text/plain use file extension of URL
-	contentType := resp.Header.Get("Content-Type")
-	mediaType, _, _ := mime.ParseMediaType(contentType)
-	if mediaType != "text/plain" && !strings.HasPrefix(mediaType, "image/") {
-		return nil, "", "", errors.Errorf("Icon URL [%s] not image media [%s]", iconURL, mediaType)
-	}
-
-	var extension string
-	if mediaType != "text/plain" {
-		if extensions, _ := mime.ExtensionsByType(contentType); len(extensions) > 0 {
-			extension = extensions[0]
-		}
-	}
-
-	cacheFile, err := h.cacheIcon(iconURL, extension, iconBytes)
-	if err != nil {
-		return nil, "", "", err
-	}
-
-	return iconBytes, cacheFile, iconURL, nil
-}
-
 func (h *Helm) fetchIcon(iconURL, versionDir string) ([]byte, string, string, error) {
-	if strings.HasPrefix(iconURL, "http:") || strings.HasPrefix(iconURL, "https:") {
-		return h.iconFromHTTP(iconURL)
-	}
 	if strings.HasPrefix(iconURL, "file:") {
 		return h.iconFromFile(iconURL, versionDir)
 	}
