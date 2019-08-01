@@ -168,12 +168,10 @@ func validateIngressOptions(c *Cluster) error {
 
 func ValidateHostCount(c *Cluster) error {
 	if len(c.EtcdHosts) == 0 && len(c.Services.Etcd.ExternalURLs) == 0 {
-		if len(c.InactiveHosts) > 0 {
-			failedEtcdHosts := []string{}
-			for _, host := range c.InactiveHosts {
-				if host.IsEtcd {
-					failedEtcdHosts = append(failedEtcdHosts, host.Address)
-				}
+		failedEtcdHosts := []string{}
+		for _, host := range c.InactiveHosts {
+			if host.IsEtcd {
+				failedEtcdHosts = append(failedEtcdHosts, host.Address)
 			}
 			return fmt.Errorf("Cluster must have at least one etcd plane host: failed to connect to the following etcd host(s) %v", failedEtcdHosts)
 		}
