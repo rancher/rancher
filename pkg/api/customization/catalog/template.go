@@ -112,7 +112,7 @@ func (t TemplateWrapper) TemplateIconHandler(apiContext *types.APIContext, next 
 		if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, template); err != nil {
 			return err
 		}
-		if template.Icon == "" {
+		if template.Icon == "" || strings.HasPrefix(template.Icon, "http:") || strings.HasPrefix(template.Icon, "https:") {
 			http.Error(apiContext.Response, "", http.StatusNoContent)
 			return nil
 		}
@@ -158,6 +158,9 @@ func (t TemplateWrapper) TemplateIconHandler(apiContext *types.APIContext, next 
 
 		iconReader := bytes.NewReader(iconBytes)
 		apiContext.Response.Header().Set("Cache-Control", "private, max-age=604800")
+		// add security headers (similar to raw.githubusercontent)
+		apiContext.Response.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
+		apiContext.Response.Header().Set("X-Content-Type-Options", "nosniff")
 		http.ServeContent(apiContext.Response, apiContext.Request, template.IconFilename, t, iconReader)
 		return nil
 	default:
