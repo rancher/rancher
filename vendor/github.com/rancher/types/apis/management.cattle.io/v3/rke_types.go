@@ -174,7 +174,7 @@ type RKEConfigNode struct {
 	// Node Labels
 	Labels map[string]string `yaml:"labels" json:"labels,omitempty"`
 	// Node Taints
-	Taints []v1.Taint `yaml:"taints" json:"taints,omitempty"`
+	Taints []RKETaint `yaml:"taints" json:"taints,omitempty"`
 }
 
 type RKEK8sSystemImage struct {
@@ -386,7 +386,7 @@ type RKEConfigNodePlan struct {
 	// Node Labels
 	Labels map[string]string `json:"labels,omitempty"`
 	// Node Taints
-	Taints []v1.Taint `json:"taints,omitempty"`
+	Taints []RKETaint `json:"taints,omitempty"`
 }
 
 type Process struct {
@@ -759,4 +759,11 @@ type DNSConfig struct {
 	StubDomains map[string][]string `yaml:"stubdomains" json:"stubdomains,omitempty"`
 	// NodeSelector key pair
 	NodeSelector map[string]string `yaml:"node_selector" json:"nodeSelector,omitempty"`
+}
+
+type RKETaint struct {
+	Key       string         `json:"key,omitempty" yaml:"key"`
+	Value     string         `json:"value,omitempty" yaml:"value"`
+	Effect    v1.TaintEffect `json:"effect,omitempty" yaml:"effect"`
+	TimeAdded *metav1.Time   `json:"timeAdded,omitempty" yaml:"timeAdded,omitempty"`
 }
