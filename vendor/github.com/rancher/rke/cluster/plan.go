@@ -123,25 +123,24 @@ func (c *Cluster) BuildKubeAPIProcess(host *hosts.Host, prefixPath string, svcOp
 	}
 
 	CommandArgs := map[string]string{
-		"client-ca-file":                pki.GetCertPath(pki.CACertName),
-		"cloud-provider":                c.CloudProvider.Name,
-		"etcd-cafile":                   etcdCAClientCert,
-		"etcd-certfile":                 etcdClientCert,
-		"etcd-keyfile":                  etcdClientKey,
-		"etcd-prefix":                   etcdPathPrefix,
-		"etcd-servers":                  etcdConnectionString,
-		"kubelet-client-certificate":    pki.GetCertPath(pki.KubeAPICertName),
-		"kubelet-client-key":            pki.GetKeyPath(pki.KubeAPICertName),
-		"kubelet-certificate-authority": pki.GetCertPath(pki.CACertName),
-		"proxy-client-cert-file":        pki.GetCertPath(pki.APIProxyClientCertName),
-		"proxy-client-key-file":         pki.GetKeyPath(pki.APIProxyClientCertName),
-		"requestheader-allowed-names":   pki.APIProxyClientCertName,
-		"requestheader-client-ca-file":  pki.GetCertPath(pki.RequestHeaderCACertName),
-		"service-account-key-file":      pki.GetKeyPath(pki.ServiceAccountTokenKeyName),
-		"service-cluster-ip-range":      c.Services.KubeAPI.ServiceClusterIPRange,
-		"service-node-port-range":       c.Services.KubeAPI.ServiceNodePortRange,
-		"tls-cert-file":                 pki.GetCertPath(pki.KubeAPICertName),
-		"tls-private-key-file":          pki.GetKeyPath(pki.KubeAPICertName),
+		"client-ca-file":               pki.GetCertPath(pki.CACertName),
+		"cloud-provider":               c.CloudProvider.Name,
+		"etcd-cafile":                  etcdCAClientCert,
+		"etcd-certfile":                etcdClientCert,
+		"etcd-keyfile":                 etcdClientKey,
+		"etcd-prefix":                  etcdPathPrefix,
+		"etcd-servers":                 etcdConnectionString,
+		"kubelet-client-certificate":   pki.GetCertPath(pki.KubeAPICertName),
+		"kubelet-client-key":           pki.GetKeyPath(pki.KubeAPICertName),
+		"proxy-client-cert-file":       pki.GetCertPath(pki.APIProxyClientCertName),
+		"proxy-client-key-file":        pki.GetKeyPath(pki.APIProxyClientCertName),
+		"requestheader-allowed-names":  pki.APIProxyClientCertName,
+		"requestheader-client-ca-file": pki.GetCertPath(pki.RequestHeaderCACertName),
+		"service-account-key-file":     pki.GetKeyPath(pki.ServiceAccountTokenKeyName),
+		"service-cluster-ip-range":     c.Services.KubeAPI.ServiceClusterIPRange,
+		"service-node-port-range":      c.Services.KubeAPI.ServiceNodePortRange,
+		"tls-cert-file":                pki.GetCertPath(pki.KubeAPICertName),
+		"tls-private-key-file":         pki.GetKeyPath(pki.KubeAPICertName),
 	}
 	if len(c.CloudProvider.Name) > 0 {
 		CommandArgs["cloud-config"] = cloudConfigFileName
@@ -348,8 +347,6 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string, svcOp
 		"fail-swap-on":              strconv.FormatBool(c.Services.Kubelet.FailSwapOn),
 		"hostname-override":         host.HostnameOverride,
 		"kubeconfig":                pki.GetConfigPath(pki.KubeNodeCertName),
-		"tls-cert-file":             pki.GetCertPath(pki.GetCrtNameForAddress(host.InternalAddress, pki.KubeletCertName)),
-		"tls-private-key-file":      pki.GetCertPath(fmt.Sprintf("%s-key", pki.GetCrtNameForAddress(host.InternalAddress, pki.KubeletCertName))),
 		"pod-infra-container-image": c.Services.Kubelet.InfraContainerImage,
 		"root-dir":                  path.Join(prefixPath, "/var/lib/kubelet"),
 	}
@@ -662,7 +659,7 @@ func (c *Cluster) BuildSidecarProcess() v3.Process {
 }
 
 func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, prefixPath string) v3.Process {
-	nodeName := pki.GetCrtNameForAddress(host.InternalAddress, pki.EtcdCertName)
+	nodeName := pki.GetEtcdCrtName(host.InternalAddress)
 	initCluster := ""
 	architecture := "amd64"
 	if len(etcdHosts) == 0 {
