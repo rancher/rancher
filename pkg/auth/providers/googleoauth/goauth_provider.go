@@ -107,7 +107,7 @@ func (g *googleOauthProvider) loginUser(c context.Context, googleOAuthCredential
 	if err != nil {
 		return userPrincipal, groupPrincipals, "", err
 	}
-	userPrincipal, groupPrincipals, err = g.getUserInfoAndGroups(adminSvc, gOAuthToken, config)
+	userPrincipal, groupPrincipals, err = g.getUserInfoAndGroups(adminSvc, gOAuthToken, config, testAndEnableAction)
 	if err != nil {
 		return userPrincipal, groupPrincipals, "", err
 	}
