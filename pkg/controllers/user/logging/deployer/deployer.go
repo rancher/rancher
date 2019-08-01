@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	v1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -80,7 +81,7 @@ func (d *Deployer) ClusterSync(key string, obj *mgmtv3.Cluster) (runtime.Object,
 	if obj.Name != d.clusterName {
 		return obj, nil
 	}
-	return obj, nil
+	return obj, d.sync()
 }
 
 func (d *Deployer) NodeSync(key string, obj *corev1.Node) (runtime.Object, error) {
@@ -129,6 +130,11 @@ func (d *Deployer) deployRancherLogging(systemProjectID, appCreator string) erro
 		return errors.Wrapf(err, "get dockerRootDir from cluster %s failed", d.clusterName)
 	}
 
+	dockerRootDir := cluster.Spec.DockerRootDir
+	if dockerRootDir == "" {
+		dockerRootDir = settings.InitialDockerRootDir.Get()
+	}
+
 	driverDir := getDriverDir(cluster.Status.Driver)
 
 	templateVersionID := loggingconfig.RancherLoggingTemplateID()
@@ -139,7 +145,7 @@ func (d *Deployer) deployRancherLogging(systemProjectID, appCreator string) erro
 
 	catalogID := loggingconfig.RancherLoggingCatalogID(template.Spec.DefaultVersion)
 
-	app := rancherLoggingApp(appCreator, systemProjectID, catalogID, driverDir, cluster.Spec.DockerRootDir)
+	app := rancherLoggingApp(appCreator, systemProjectID, catalogID, driverDir, dockerRootDir)
 
 	windowsNodes, err := d.nodeLister.List(metav1.NamespaceAll, windowNodeLabel)
 	if err != nil {
