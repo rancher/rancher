@@ -35,6 +35,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/servicemonitor"
 	"github.com/rancher/rancher/pkg/controllers/user/systemimage"
 	"github.com/rancher/rancher/pkg/controllers/user/targetworkloadservice"
+	"github.com/rancher/rancher/pkg/controllers/user/windows"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
 	pkgmonitoring "github.com/rancher/rancher/pkg/monitoring"
 	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -69,6 +70,7 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	istio.Register(ctx, cluster)
 	certsexpiration.Register(ctx, cluster)
 	ingresshostgen.Register(ctx, cluster.UserOnlyContext())
+	windows.Register(ctx, clusterRec, cluster)
 
 	if clusterRec.Spec.LocalClusterAuthEndpoint.Enabled {
 		err := clusterauthtoken.CRDSetup(ctx, cluster.UserOnlyContext())
