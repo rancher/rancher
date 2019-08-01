@@ -79,6 +79,7 @@ def create_rke_cluster_config(aws_nodes):
 
     f = open(clusterfilepath, "w")
     f.write(rkeconfig)
+    f.close()
     return clusterfilepath
 
 
