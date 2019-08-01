@@ -24,22 +24,21 @@ const (
 	ctrbMGMTController        = "mgmt-auth-crtb-controller"
 )
 
-var clusterManagmentPlaneResources = []string{
-	"catalogtemplates",
-	"catalogtemplateversions",
-	"clusteralertrules",
-	"clusteralertgroups",
-	"clustercatalogs",
-	"clusterevents",
-	"clusterloggings",
-	"clustermonitorgraphs",
-	"clusterregistrationtokens",
-	"clusterroletemplatebindings",
-	"nodes",
-	"nodepools",
-	"notifiers",
-	"podsecuritypolicytemplateprojectbindings",
-	"projects",
+var clusterManagmentPlaneResources = map[string]string{
+	"catalogtemplates":                         "management.cattle.io",
+	"catalogtemplateversions":                  "management.cattle.io",
+	"clusteralertrules":                        "management.cattle.io",
+	"clusteralertgroups":                       "management.cattle.io",
+	"clustercatalogs":                          "management.cattle.io",
+	"clusterloggings":                          "management.cattle.io",
+	"clustermonitorgraphs":                     "management.cattle.io",
+	"clusterregistrationtokens":                "management.cattle.io",
+	"clusterroletemplatebindings":              "management.cattle.io",
+	"nodes":                                    "management.cattle.io",
+	"nodepools":                                "management.cattle.io",
+	"notifiers":                                "management.cattle.io",
+	"podsecuritypolicytemplateprojectbindings": "management.cattle.io",
+	"projects":                                 "management.cattle.io",
 }
 
 type crtbLifecycle struct {

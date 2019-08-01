@@ -401,7 +401,7 @@ func (m *manager) reconcileMembershipBindingForDelete(namespace, roleToKeep, rtb
 // Certain resources (projects, machines, prtbs, crtbs, clusterevents, etc) exist in the mangement plane but are scoped to clusters or
 // projects. They need special RBAC handling because the need to be authorized just inside of the namespace that backs the project
 // or cluster they belong to.
-func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resources []string, subject v1.Subject, binding interface{}) error {
+func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resources map[string]string, subject v1.Subject, binding interface{}) error {
 	bindingMeta, err := meta.Accessor(binding)
 	if err != nil {
 		return err
@@ -421,8 +421,8 @@ func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resour
 	roleBindings := m.mgmt.RBAC.RoleBindings(namespace)
 	for _, role := range roles {
 		resourceToVerbs := map[string]map[string]bool{}
-		for _, resource := range resources {
-			verbs, err := m.checkForManagementPlaneRules(role, resource)
+		for resource, apiGroup := range resources {
+			verbs, err := m.checkForManagementPlaneRules(role, resource, apiGroup)
 			if err != nil {
 				return err
 			}
@@ -474,7 +474,7 @@ func (m *manager) grantManagementPlanePrivileges(roleTemplateName string, resour
 // grantManagementClusterScopedPrivilegesInProjectNamespace ensures that rolebindings for roles like cluster-owner (that should be able to fully
 // manage all projects in a cluster) grant proper permissions to project-scoped resources. Specifically, this satisfies the use case that
 // a cluster owner should be able to manage the members of all projects in their cluster
-func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleTemplateName, projectNamespace string, resources []string,
+func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleTemplateName, projectNamespace string, resources map[string]string,
 	subject v1.Subject, binding *v3.ClusterRoleTemplateBinding) error {
 	roles, err := m.gatherAndDedupeRoles(roleTemplateName)
 	if err != nil {
@@ -485,14 +485,14 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 	roleBindings := m.mgmt.RBAC.RoleBindings(projectNamespace)
 	for _, role := range roles {
 		resourceToVerbs := map[string]map[string]bool{}
-		for _, resource := range resources {
+		for resource, apiGroup := range resources {
 			// Adding this check, because we want cluster-owners to have access to catalogtemplates/versions of all projects, but no other cluster roles
 			// need to access catalogtemplates of projects they do not belong to
 			if !role.Administrative && commonClusterAndProjectMgmtPlaneResources[resource] {
 				continue
 
 			}
-			verbs, err := m.checkForManagementPlaneRules(role, resource)
+			verbs, err := m.checkForManagementPlaneRules(role, resource, apiGroup)
 			if err != nil {
 				return err
 			}
@@ -539,7 +539,7 @@ func (m *manager) grantManagementClusterScopedPrivilegesInProjectNamespace(roleT
 
 // grantManagementProjectScopedPrivilegesInClusterNamespace ensures that project roles grant permissions to certain cluster-scoped
 // resources(notifier, clusterpipelines). These resources exists in cluster namespace but need to be shared between projects.
-func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleTemplateName, clusterNamespace string, resources []string,
+func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleTemplateName, clusterNamespace string, resources map[string]string,
 	subject v1.Subject, binding *v3.ProjectRoleTemplateBinding) error {
 	roles, err := m.gatherAndDedupeRoles(roleTemplateName)
 	if err != nil {
@@ -550,8 +550,8 @@ func (m *manager) grantManagementProjectScopedPrivilegesInClusterNamespace(roleT
 	roleBindings := m.mgmt.RBAC.RoleBindings(clusterNamespace)
 	for _, role := range roles {
 		resourceToVerbs := map[string]map[string]bool{}
-		for _, resource := range resources {
-			verbs, err := m.checkForManagementPlaneRules(role, resource)
+		for resource, apiGroup := range resources {
+			verbs, err := m.checkForManagementPlaneRules(role, resource, apiGroup)
 			if err != nil {
 				return err
 			}
@@ -651,7 +651,7 @@ func (m *manager) reconcileDesiredMGMTPlaneRoleBindings(currentRBs, desiredRBs m
 }
 
 // If the roleTemplate has rules granting access to a management plane resource, return the verbs for those rules
-func (m *manager) checkForManagementPlaneRules(role *v3.RoleTemplate, managementPlaneResource string) (map[string]bool, error) {
+func (m *manager) checkForManagementPlaneRules(role *v3.RoleTemplate, managementPlaneResource string, apiGroup string) (map[string]bool, error) {
 	var rules []v1.PolicyRule
 	if role.External {
 		externalRole, err := m.crLister.Get("", role.Name)
@@ -669,13 +669,24 @@ func (m *manager) checkForManagementPlaneRules(role *v3.RoleTemplate, management
 	verbs := map[string]bool{}
 	for _, rule := range rules {
 		if (slice.ContainsString(rule.Resources, managementPlaneResource) || slice.ContainsString(rule.Resources, "*")) && len(rule.ResourceNames) == 0 {
-			for _, v := range rule.Verbs {
-				verbs[v] = true
+			if checkGroup(apiGroup, rule) {
+				for _, v := range rule.Verbs {
+					verbs[v] = true
+				}
 			}
 		}
 	}
 
 	return verbs, nil
+}
+
+func checkGroup(apiGroup string, rule v1.PolicyRule) bool {
+	for _, rg := range rule.APIGroups {
+		if rg == apiGroup || rg == "*" {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs map[string]map[string]bool, rt *v3.RoleTemplate) error {
