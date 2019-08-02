@@ -530,6 +530,9 @@ func (h *Helm) fetchIcon(iconURL, versionDir string) ([]byte, string, string, er
 	if strings.HasPrefix(iconURL, "file:") {
 		return h.iconFromFile(iconURL, versionDir)
 	}
+	if strings.HasPrefix(iconURL, "http:") || strings.HasPrefix(iconURL, "https:") {
+		return nil, "", iconURL, nil
+	}
 	return nil, "", "", errors.Errorf("unknown file type [%s]", iconURL)
 }
 
