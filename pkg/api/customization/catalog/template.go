@@ -23,13 +23,12 @@ func TemplateFormatter(apiContext *types.APIContext, resource *types.RawResource
 	//icon
 	ic, ok := resource.Values["iconFilename"]
 	if ok {
-		if strings.HasPrefix(ic.(string), "file:") {
-			delete(resource.Values, "icon")
-			resource.Links["icon"] = apiContext.URLBuilder.Link("icon", resource)
-
-		} else {
+		if strings.HasPrefix(ic.(string), "http:") || strings.HasPrefix(ic.(string), "https:") {
 			delete(resource.Values, "icon")
 			resource.Links["icon"] = ic.(string)
+		} else {
+			delete(resource.Values, "icon")
+			resource.Links["icon"] = apiContext.URLBuilder.Link("icon", resource)
 		}
 	} else {
 		delete(resource.Values, "icon")
