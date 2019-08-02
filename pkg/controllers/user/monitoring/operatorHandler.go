@@ -170,6 +170,7 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 	mustAppAnswers := map[string]string{
 		"operator.apiGroup":     monitoring.APIVersion.Group,
 		"operator.nameOverride": "prometheus-operator",
+		"operator-init.enabled": "true",
 	}
 
 	// take operator answers from overwrite answers
