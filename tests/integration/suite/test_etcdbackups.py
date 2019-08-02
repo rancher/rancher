@@ -5,7 +5,7 @@ import kubernetes
 role_template = "backups-manage"
 
 
-def test_access_to_etcd_backups(admin_mc, user_factory, remove_resource):
+def test_backups_manage_role(admin_mc, user_factory, remove_resource):
     client = admin_mc.client
     restricted_user = user_factory(globalRoleId='user-base')
 
@@ -22,6 +22,13 @@ def test_access_to_etcd_backups(admin_mc, user_factory, remove_resource):
     role = rbac.read_namespaced_role(role_template, "local")
     assert role is not None
     assert "etcdbackups" in role.rules[0].resources
+
+
+def test_standard_users_cannot_access_backups(admin_mc, user_factory):
+    client = admin_mc.client
+    user_role = client.by_id_global_role("user")
+    for r in user_role['rules']:
+        assert "etcdbackups" not in r['resources']
 
 
 def crtb_cb(client, crtb):

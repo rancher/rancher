@@ -31,6 +31,15 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 		return apiContext.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", apiContext, cluster, apiContext.Schema) == nil
 	}
 
+	canBackupEtcd := func() bool {
+		etcdBackupSchema := types.Schema{ID: mgmtclient.EtcdBackupType}
+		// pkg/rbac/access_control.go:55 canAccess checks for the object's ID or namespace. The ns for etcdbackup will be the clusterID
+		backupMap := map[string]interface{}{
+			"namespaceId": apiContext.ID,
+		}
+		return apiContext.AccessControl.CanDo(v3.EtcdBackupGroupVersionKind.Group, v3.EtcdBackupResource.Name, "create", apiContext, backupMap, &etcdBackupSchema) == nil
+	}
+
 	switch actionName {
 	case v3.ClusterActionGenerateKubeconfig:
 		return a.GenerateKubeconfigActionHandler(actionName, action, apiContext)
@@ -42,32 +51,32 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 		return a.viewMonitoring(actionName, action, apiContext)
 	case v3.ClusterActionEditMonitoring:
 		if !canUpdateCluster() {
-			return httperror.NewAPIError(httperror.Unauthorized, "can not access")
+			return httperror.NewAPIError(httperror.PermissionDenied, "can not access")
 		}
 		return a.editMonitoring(actionName, action, apiContext)
 	case v3.ClusterActionEnableMonitoring:
 		if !canUpdateCluster() {
-			return httperror.NewAPIError(httperror.Unauthorized, "can not access")
+			return httperror.NewAPIError(httperror.PermissionDenied, "can not access")
 		}
 		return a.enableMonitoring(actionName, action, apiContext)
 	case v3.ClusterActionDisableMonitoring:
 		if !canUpdateCluster() {
-			return httperror.NewAPIError(httperror.Unauthorized, "can not access")
+			return httperror.NewAPIError(httperror.PermissionDenied, "can not access")
 		}
 		return a.disableMonitoring(actionName, action, apiContext)
 	case v3.ClusterActionBackupEtcd:
-		if !canUpdateCluster() {
-			return httperror.NewAPIError(httperror.Unauthorized, "can not backup etcd")
+		if !canBackupEtcd() {
+			return httperror.NewAPIError(httperror.PermissionDenied, "can not backup etcd")
 		}
 		return a.BackupEtcdHandler(actionName, action, apiContext)
 	case v3.ClusterActionRestoreFromEtcdBackup:
 		if !canUpdateCluster() {
-			return httperror.NewAPIError(httperror.Unauthorized, "can not restore etcd backup")
+			return httperror.NewAPIError(httperror.PermissionDenied, "can not restore etcd backup")
 		}
 		return a.RestoreFromEtcdBackupHandler(actionName, action, apiContext)
 	case v3.ClusterActionRotateCertificates:
 		if !canUpdateCluster() {
-			return httperror.NewAPIError(httperror.Unauthorized, "can not rotate certificates")
+			return httperror.NewAPIError(httperror.PermissionDenied, "can not rotate certificates")
 		}
 		return a.RotateCertificates(actionName, action, apiContext)
 	case v3.ClusterActionRunCISScan:
