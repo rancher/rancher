@@ -59,6 +59,10 @@ func (t TemplateWrapper) TemplateIconHandler(apiContext *types.APIContext, next 
 		if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, template); err != nil {
 			return err
 		}
+		if strings.HasPrefix(template.IconFilename, "http:") || strings.HasPrefix(template.IconFilename, "https:") {
+			http.Error(apiContext.Response, "", http.StatusNoContent)
+			return nil
+		}
 
 		data, err := templatecontent.GetTemplateFromTag(template.Icon, t.TemplateContentClient)
 		if err != nil {

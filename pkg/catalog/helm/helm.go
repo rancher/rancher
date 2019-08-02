@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
@@ -288,25 +289,14 @@ func Icon(versions ChartVersions) (string, string, error) {
 	if err == nil {
 		return data, file, nil
 	}
-
 	if len(versions) == 0 || versions[0].Icon == "" {
 		return "", "", nil
 	}
 
 	url := versions[0].Icon
-
-	resp, err := httpClient.Get(url)
-	if err != nil {
-		return "", "", errors.Errorf("Error in HTTP GET of [%s], error: %s", url, err)
+	if url == "" {
+		return "", "", fmt.Errorf("no icon for for this chart")
 	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", "", err
-	}
-
-	iconFilename := url
-	iconData := base64.StdEncoding.EncodeToString(body)
-
-	return iconData, iconFilename, nil
+	// don't fetch external icons
+	return "", url, nil
 }
