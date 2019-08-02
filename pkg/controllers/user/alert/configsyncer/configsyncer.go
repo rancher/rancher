@@ -259,9 +259,7 @@ func (d *ConfigSyncer) addProjectAlert2Operator(clusterDisplayName string, proje
 		}
 		sort.Strings(groupIDs)
 
-		var enabled bool
 		for _, groupID := range groupIDs {
-			enabled = true
 			alertRules := groupRules[groupID]
 			ruleGroup := d.operatorCRDManager.GetRuleGroup(groupID)
 			for _, alertRule := range alertRules {
@@ -271,15 +269,16 @@ func (d *ConfigSyncer) addProjectAlert2Operator(clusterDisplayName string, proje
 					d.operatorCRDManager.AddRule(ruleGroup, promRule)
 				}
 			}
-			d.operatorCRDManager.AddRuleGroup(promRule, *ruleGroup)
+
+			if len(ruleGroup.Rules) > 0 {
+				d.operatorCRDManager.AddRuleGroup(promRule, *ruleGroup)
+			}
 		}
 
-		if !enabled {
-			continue
-		}
-
-		if err := d.operatorCRDManager.SyncPrometheusRule(promRule); err != nil {
-			return err
+		if len(promRule.Spec.Groups) > 0 {
+			if err := d.operatorCRDManager.SyncPrometheusRule(promRule); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -287,12 +286,10 @@ func (d *ConfigSyncer) addProjectAlert2Operator(clusterDisplayName string, proje
 }
 
 func (d *ConfigSyncer) addClusterAlert2Operator(clusterDisplayName string, groupRules map[string][]*v3.ClusterAlertRule, keys []string) error {
-	var enabled bool
 	_, namespace := monitorutil.ClusterMonitoringInfo()
 	promRule := d.operatorCRDManager.GetDefaultPrometheusRule(namespace, d.clusterName)
 
 	for _, groupID := range keys {
-		enabled = true
 		ruleGroup := d.operatorCRDManager.GetRuleGroup(groupID)
 		alertRules := groupRules[groupID]
 		for _, alertRule := range alertRules {
@@ -302,14 +299,16 @@ func (d *ConfigSyncer) addClusterAlert2Operator(clusterDisplayName string, group
 				d.operatorCRDManager.AddRule(ruleGroup, promRule)
 			}
 		}
-		d.operatorCRDManager.AddRuleGroup(promRule, *ruleGroup)
+		if len(ruleGroup.Rules) > 0 {
+			d.operatorCRDManager.AddRuleGroup(promRule, *ruleGroup)
+		}
 	}
 
-	if !enabled {
-		return nil
+	if len(promRule.Spec.Groups) > 0 {
+		return d.operatorCRDManager.SyncPrometheusRule(promRule)
 	}
 
-	return d.operatorCRDManager.SyncPrometheusRule(promRule)
+	return nil
 }
 
 func (d *ConfigSyncer) addProjectAlert2Config(config *alertconfig.Config, projectGroups map[string]map[string][]*v3.ProjectAlertRule, keys []string, alertGroups map[string]*v3.ProjectAlertGroup, notifiers []*v3.Notifier) error {
