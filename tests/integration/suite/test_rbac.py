@@ -145,6 +145,87 @@ def test_project_owner(admin_cc, admin_mc, user_mc, remove_resource):
     assert response.status.allowed is True
 
 
+def test_api_group_in_role_template(admin_mc, admin_pc, user_mc,
+                                    remove_resource):
+    """Test that a role moved into a cluster namespace is translated as
+    intended and respects apiGroups
+    """
+    # If the admin can't see any nodes this test will fail
+    if len(admin_mc.client.list_node().data) == 0:
+        pytest.skip("no nodes in the cluster")
+
+    # Validate the standard user can not see any nodes
+    assert len(user_mc.client.list_node().data) == 0
+
+    rt_dict = {
+        "administrative": False,
+        "clusterCreatorDefault": False,
+        "context": "cluster",
+        "external": False,
+        "hidden": False,
+        "locked": False,
+        "name": random_str(),
+        "projectCreatorDefault": False,
+        "rules": [{
+            "apiGroups": [
+                "management.cattle.io"
+            ],
+            "resources": ["nodes",
+                          "nodepools"
+                          ],
+            "type": "/v3/schemas/policyRule",
+            "verbs": ["get",
+                      "list",
+                      "watch"
+                      ]
+        },
+            {
+            "apiGroups": [
+                "scheduling.k8s.io"
+            ],
+            "resources": [
+                "*"
+            ],
+            "type": "/v3/schemas/policyRule",
+            "verbs": [
+                "*"
+            ]
+        }
+        ],
+    }
+
+    rt = admin_mc.client.create_role_template(rt_dict)
+    remove_resource(rt)
+
+    def _wait_role_template():
+        return admin_mc.client.by_id_role_template(rt.id) is not None
+
+    wait_for(_wait_role_template,
+             fail_handler=lambda: "role template is missing")
+
+    crtb_client = admin_mc.client.create_cluster_role_template_binding
+
+    crtb = crtb_client(userPrincipalId=user_mc.user.principalIds[0],
+                       roleTemplateId=rt.id,
+                       clusterId='local')
+    remove_resource(crtb)
+
+    def _wait_on_user():
+        return len(user_mc.client.list_node().data) > 0
+
+    wait_for(_wait_on_user, fail_handler=lambda: "User could never see nodes")
+
+    # With the new binding user should be able to see nodes
+    assert len(user_mc.client.list_node().data) > 0
+
+    # The binding does not allow delete permissions
+    with pytest.raises(ApiError) as e:
+        user_mc.client.delete(user_mc.client.list_node().data[0])
+
+    assert e.value.error.status == 403
+    assert 'cannot delete resource "nodes"' in e.value.error.message
+
+
 def test_removing_user_from_cluster(admin_pc, admin_mc, user_mc, admin_cc,
                                     remove_resource):
     """Test that a user added to a project in a cluster is able to see that
@@ -526,7 +607,7 @@ def test_readonly_cannot_edit_secret(admin_mc, user_mc, admin_pc,
             name="test-" + random_str(),
             stringData={
                 'abc': '123'
-             }
+            }
         )
     assert e.value.error.status == 403
 
@@ -639,7 +720,7 @@ def test_member_can_edit_secret(admin_mc, admin_pc, remove_resource,
 
     proj_user_client.update_by_id_secret(id=secret.id, stringData={
         'asd': 'fgh'
-     })
+    })
 
     def try_create_ns_secret():
         try:
