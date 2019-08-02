@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
 	namespacecustom "github.com/rancher/rancher/pkg/api/customization/namespace"
+	"github.com/rancher/rancher/pkg/api/customization/persistentvolumeclaim"
 	sec "github.com/rancher/rancher/pkg/api/customization/secret"
 	"github.com/rancher/rancher/pkg/api/customization/yaml"
 	"github.com/rancher/rancher/pkg/api/store/apiservice"
@@ -19,6 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/store/projectsetter"
 	"github.com/rancher/rancher/pkg/api/store/secret"
 	"github.com/rancher/rancher/pkg/api/store/service"
+	"github.com/rancher/rancher/pkg/api/store/storageclass"
 	"github.com/rancher/rancher/pkg/api/store/workload"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	clusterschema "github.com/rancher/types/apis/cluster.cattle.io/v3/schema"
@@ -67,6 +69,8 @@ func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clus
 	Istio(schemas)
 
 	SetProjectID(schemas, clusterManager, k8sProxy)
+	StorageClass(schemas)
+	PersistentVolumeClaim(clusterManager, schemas)
 
 	return nil
 }
@@ -93,6 +97,20 @@ func SetProjectID(schemas *types.Schemas, clusterManager *clustermanager.Manager
 		schema.Formatter = yaml.NewFormatter(schema.Formatter)
 		schema.LinkHandler = yaml.NewLinkHandler(k8sProxy, clusterManager, schema.LinkHandler)
 	}
+}
+
+func StorageClass(schemas *types.Schemas) {
+	storageClassSchema := schemas.Schema(&clusterschema.Version, "storageClass")
+	storageClassSchema.Store = storageclass.Wrap(storageClassSchema.Store)
+}
+
+func PersistentVolumeClaim(cmanager *clustermanager.Manager, schemas *types.Schemas) {
+	pvcSchema := schemas.Schema(&schema.Version, "persistentVolumeClaim")
+
+	v := persistentvolumeclaim.Validator{
+		ClusterManager: cmanager,
+	}
+	pvcSchema.Validator = v.Validator
 }
 
 func Namespace(schemas *types.Schemas, manager *clustermanager.Manager) {
