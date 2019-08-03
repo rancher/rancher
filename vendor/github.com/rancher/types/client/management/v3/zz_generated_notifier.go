@@ -14,6 +14,7 @@ const (
 	NotifierFieldLabels               = "labels"
 	NotifierFieldName                 = "name"
 	NotifierFieldNamespaceId          = "namespaceId"
+	NotifierFieldOpsgenieConfig       = "opsgenieConfig"
 	NotifierFieldOwnerReferences      = "ownerReferences"
 	NotifierFieldPagerdutyConfig      = "pagerdutyConfig"
 	NotifierFieldRemoved              = "removed"
@@ -39,6 +40,7 @@ type Notifier struct {
 	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId          string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	OpsgenieConfig       *OpsgenieConfig   `json:"opsgenieConfig,omitempty" yaml:"opsgenieConfig,omitempty"`
 	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PagerdutyConfig      *PagerdutyConfig  `json:"pagerdutyConfig,omitempty" yaml:"pagerdutyConfig,omitempty"`
 	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`

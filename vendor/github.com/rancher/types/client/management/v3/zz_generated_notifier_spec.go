@@ -5,6 +5,7 @@ const (
 	NotifierSpecFieldClusterID       = "clusterId"
 	NotifierSpecFieldDescription     = "description"
 	NotifierSpecFieldDisplayName     = "displayName"
+	NotifierSpecFieldOpsgenieConfig  = "opsgenieConfig"
 	NotifierSpecFieldPagerdutyConfig = "pagerdutyConfig"
 	NotifierSpecFieldSMTPConfig      = "smtpConfig"
 	NotifierSpecFieldSendResolved    = "sendResolved"
@@ -17,6 +18,7 @@ type NotifierSpec struct {
 	ClusterID       string           `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Description     string           `json:"description,omitempty" yaml:"description,omitempty"`
 	DisplayName     string           `json:"displayName,omitempty" yaml:"displayName,omitempty"`
+	OpsgenieConfig  *OpsgenieConfig  `json:"opsgenieConfig,omitempty" yaml:"opsgenieConfig,omitempty"`
 	PagerdutyConfig *PagerdutyConfig `json:"pagerdutyConfig,omitempty" yaml:"pagerdutyConfig,omitempty"`
 	SMTPConfig      *SMTPConfig      `json:"smtpConfig,omitempty" yaml:"smtpConfig,omitempty"`
 	SendResolved    bool             `json:"sendResolved,omitempty" yaml:"sendResolved,omitempty"`

@@ -80,8 +80,8 @@ var (
 		MessageFormat: `text`,
 	}
 
-	// DefaultOpsGenieConfig defines default values for OpsGenie configurations.
-	DefaultOpsGenieConfig = OpsGenieConfig{
+	// DefaultOpsgenieConfig defines default values for Opsgenie configurations.
+	DefaultOpsgenieConfig = OpsgenieConfig{
 		NotifierConfig: NotifierConfig{
 			VSendResolved: true,
 		},
@@ -336,14 +336,14 @@ func (c *WebhookConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return checkOverflow(c.XXX, "webhook config")
 }
 
-// OpsGenieConfig configures notifications via OpsGenie.
-type OpsGenieConfig struct {
+// OpsgenieConfig configures notifications via Opsgenie.
+type OpsgenieConfig struct {
 	NotifierConfig `yaml:",inline" json:",inline"`
 
 	HTTPConfig *HTTPClientConfig `yaml:"http_config,omitempty" json:"http_config,omitempty"`
 
 	APIKey      Secret            `yaml:"api_key,omitempty" json:"api_key,omitempty"`
-	APIHost     string            `yaml:"api_host,omitempty" json:"api_host,omitempty"`
+	APIURL      string            `yaml:"api_url,omitempty" json:"api_url,omitempty"`
 	Message     string            `yaml:"message,omitempty" json:"message,omitempty"`
 	Description string            `yaml:"description,omitempty" json:"description,omitempty"`
 	Source      string            `yaml:"source,omitempty" json:"source,omitempty"`
@@ -351,22 +351,39 @@ type OpsGenieConfig struct {
 	Teams       string            `yaml:"teams,omitempty" json:"teams,omitempty"`
 	Tags        string            `yaml:"tags,omitempty" json:"tags,omitempty"`
 	Note        string            `yaml:"note,omitempty" json:"note,omitempty"`
+	Priority    string            `yaml:"priority,omitempty" json:"priority,omitempty"`
 
 	// Catches all undefined fields and must be empty after parsing.
 	XXX map[string]interface{} `yaml:",inline" json:"-"`
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (c *OpsGenieConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	*c = DefaultOpsGenieConfig
-	type plain OpsGenieConfig
+func (c *OpsgenieConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	*c = DefaultOpsgenieConfig
+	type plain OpsgenieConfig
 	if err := unmarshal((*plain)(c)); err != nil {
 		return err
 	}
 	if c.APIKey == "" {
-		return fmt.Errorf("missing API key in OpsGenie config")
+		return fmt.Errorf("missing API key in Opsgenie config")
 	}
 	return checkOverflow(c.XXX, "opsgenie config")
+}
+
+var opsgenieURLForRegion = map[string]string{
+	"us": "https://api.opsgenie.com/",
+	"eu": "https://api.eu.opsgenie.com/",
+}
+
+// OpsgenieURLForRegion gets the URL of an opsgenie region
+// returns URL of reqion US if not found.
+func OpsgenieURLForRegion(region string) string {
+	url, exists := opsgenieURLForRegion[strings.ToLower(region)]
+	if !exists {
+		return opsgenieURLForRegion["us"]
+	}
+	return url
+
 }
 
 // VictorOpsConfig configures notifications via VictorOps.

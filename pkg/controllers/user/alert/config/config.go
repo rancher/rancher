@@ -203,15 +203,15 @@ func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 				wcc.APIURL = c.Global.WechatURL
 			}
 		}
-		for _, ogc := range rcv.OpsGenieConfigs {
-			if ogc.APIHost == "" {
-				if c.Global.OpsGenieAPIHost == "" {
-					return fmt.Errorf("no global OpsGenie URL set")
+		for _, ogc := range rcv.OpsgenieConfigs {
+			if ogc.APIURL == "" {
+				if c.Global.OpsgenieAPIURL == "" {
+					return fmt.Errorf("no global Opsgenie URL set")
 				}
-				ogc.APIHost = c.Global.OpsGenieAPIHost
+				ogc.APIURL = c.Global.OpsgenieAPIURL
 			}
-			if !strings.HasSuffix(ogc.APIHost, "/") {
-				ogc.APIHost += "/"
+			if !strings.HasSuffix(ogc.APIURL, "/") {
+				ogc.APIURL += "/"
 			}
 		}
 		for _, voc := range rcv.VictorOpsConfigs {
@@ -279,7 +279,7 @@ var DefaultGlobalConfig = GlobalConfig{
 	PagerdutyURL:    "https://events.pagerduty.com/v2/enqueue",
 	WechatURL:       "https://qyapi.weixin.qq.com/cgi-bin/",
 	HipchatURL:      "https://api.hipchat.com/",
-	OpsGenieAPIHost: "https://api.opsgenie.com/",
+	OpsgenieAPIURL:  "https://api.opsgenie.com/",
 	VictorOpsAPIURL: "https://alert.victorops.com/integrations/generic/20131114/alert/",
 }
 
@@ -302,7 +302,7 @@ type GlobalConfig struct {
 	PagerdutyURL     string `yaml:"pagerduty_url,omitempty" json:"pagerduty_url,omitempty"`
 	HipchatURL       string `yaml:"hipchat_url,omitempty" json:"hipchat_url,omitempty"`
 	HipchatAuthToken Secret `yaml:"hipchat_auth_token,omitempty" json:"hipchat_auth_token,omitempty"`
-	OpsGenieAPIHost  string `yaml:"opsgenie_api_host,omitempty" json:"opsgenie_api_host,omitempty"`
+	OpsgenieAPIURL   string `yaml:"opsgenie_api_url,omitempty" json:"opsgenie_api_url,omitempty"`
 	VictorOpsAPIURL  string `yaml:"victorops_api_url,omitempty" json:"victorops_api_url,omitempty"`
 	VictorOpsAPIKey  Secret `yaml:"victorops_api_key,omitempty" json:"victorops_api_key,omitempty"`
 	WechatURL        string `yaml:"wechat_url,omitempty" json:"wechat_url,omitempty"`
@@ -438,7 +438,7 @@ type Receiver struct {
 	HipchatConfigs   []*HipchatConfig   `yaml:"hipchat_configs,omitempty" json:"hipchat_configs,omitempty"`
 	SlackConfigs     []*SlackConfig     `yaml:"slack_configs,omitempty" json:"slack_configs,omitempty"`
 	WebhookConfigs   []*WebhookConfig   `yaml:"webhook_configs,omitempty" json:"webhook_configs,omitempty"`
-	OpsGenieConfigs  []*OpsGenieConfig  `yaml:"opsgenie_configs,omitempty" json:"opsgenie_configs,omitempty"`
+	OpsgenieConfigs  []*OpsgenieConfig  `yaml:"opsgenie_configs,omitempty" json:"opsgenie_configs,omitempty"`
 	PushoverConfigs  []*PushoverConfig  `yaml:"pushover_configs,omitempty" json:"pushover_configs,omitempty"`
 	VictorOpsConfigs []*VictorOpsConfig `yaml:"victorops_configs,omitempty" json:"victorops_configs,omitempty"`
 	WechatConfigs    []*WechatConfig    `yaml:"wechat_configs,omitempty" json:"wechat_configs,omitempty"`

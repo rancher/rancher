@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/prometheus/common/model"
+	alertconfig "github.com/rancher/rancher/pkg/controllers/user/alert/config"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -127,6 +128,66 @@ func TestAddProjectAlert2Config(t *testing.T) {
 
 }
 
+func TestAddRecipients(t *testing.T) {
+	var (
+		addRecipientsTests = []struct {
+			caseName   string
+			notifiers  []*v3.Notifier
+			recipients []v3.Recipient
+			verify     func(*testing.T, *alertconfig.Receiver)
+		}{
+			{
+				caseName:   "slack recipient",
+				notifiers:  []*v3.Notifier{slackNotifier},
+				recipients: []v3.Recipient{slackRecipient},
+				verify: func(t *testing.T, receiver *alertconfig.Receiver) {
+					if len(receiver.SlackConfigs) != 1 {
+						t.Errorf("slackConfigs: expected 1 - actual %v", len(receiver.SlackConfigs))
+					}
+				},
+			},
+			{
+				caseName:   "opsgenie recipient",
+				notifiers:  []*v3.Notifier{opsgenieNotifier},
+				recipients: []v3.Recipient{opsgenieRecipient},
+				verify: func(t *testing.T, receiver *alertconfig.Receiver) {
+					if len(receiver.OpsgenieConfigs) != 1 {
+						t.Errorf("opsgenieConfigs: expected 1 - actual %v", len(receiver.OpsgenieConfigs))
+					}
+					opsgenieConfig := receiver.OpsgenieConfigs[0]
+					if opsgenieConfig.APIURL != "https://api.opsgenie.com/" {
+						t.Errorf("opsgenieConfigs: expected https://api.opsgenie.com/ - actual %v", opsgenieConfig.APIURL)
+					}
+				},
+			},
+			{
+				caseName:   "opsgenie EU recipient",
+				notifiers:  []*v3.Notifier{opsgenieEUNotifier},
+				recipients: []v3.Recipient{opsgenieRecipient},
+				verify: func(t *testing.T, receiver *alertconfig.Receiver) {
+					if len(receiver.OpsgenieConfigs) != 1 {
+						t.Errorf("opsgenieConfigs: expected 1 - actual %v", len(receiver.OpsgenieConfigs))
+					}
+					opsgenieConfig := receiver.OpsgenieConfigs[0]
+					if opsgenieConfig.APIURL != "https://api.eu.opsgenie.com/" {
+						t.Errorf("opsgenieConfigs: expected https://api.eu.opsgenie.com/ - actual %v", opsgenieConfig.APIURL)
+					}
+				},
+			},
+		}
+	)
+	for _, tt := range addRecipientsTests {
+		t.Run(tt.caseName, func(t *testing.T) {
+			receiver := &alertconfig.Receiver{Name: groupID}
+			configSyncer := ConfigSyncer{
+				clusterName: clusterName,
+			}
+			configSyncer.addRecipients(tt.notifiers, receiver, tt.recipients)
+			tt.verify(t, receiver)
+		})
+	}
+}
+
 var (
 	clusterName = "testCluster"
 	projectName = "testProject"
@@ -186,31 +247,64 @@ var (
 var (
 	defaultChannel = "testChannel"
 	slack          = "slack"
+	opsgenie       = "opsgenie"
 	namespace      = "cattle-alerting"
-	notifiers      = []*v3.Notifier{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      slack,
-				Namespace: namespace,
-			},
-			Spec: v3.NotifierSpec{
-				ClusterName: clusterName,
-				DisplayName: displayName,
-				SlackConfig: &v3.SlackConfig{
-					DefaultRecipient: defaultChannel,
-					URL:              "www.slack.com",
-				},
+	slackNotifier  = &v3.Notifier{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      slack,
+			Namespace: namespace,
+		},
+		Spec: v3.NotifierSpec{
+			ClusterName: clusterName,
+			DisplayName: displayName,
+			SlackConfig: &v3.SlackConfig{
+				DefaultRecipient: defaultChannel,
+				URL:              "www.slack.com",
 			},
 		},
 	}
+	opsgenieNotifier = &v3.Notifier{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      opsgenie,
+			Namespace: namespace,
+		},
+		Spec: v3.NotifierSpec{
+			ClusterName: clusterName,
+			DisplayName: displayName,
+			OpsgenieConfig: &v3.OpsgenieConfig{
+				APIKey:           "test-api-key",
+				DefaultRecipient: "test-team",
+			},
+		},
+	}
+	opsgenieEUNotifier = &v3.Notifier{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      opsgenie,
+			Namespace: namespace,
+		},
+		Spec: v3.NotifierSpec{
+			ClusterName: clusterName,
+			DisplayName: displayName,
+			OpsgenieConfig: &v3.OpsgenieConfig{
+				APIKey:           "test-api-key",
+				Region:           "eu",
+				DefaultRecipient: "test-team",
+			},
+		},
+	}
+	notifiers = []*v3.Notifier{slackNotifier}
 
-	recipients = []v3.Recipient{
-		{
-			Recipient:    defaultChannel,
-			NotifierName: clusterName + ":" + slack,
-			NotifierType: slack,
-		},
+	slackRecipient = v3.Recipient{
+		Recipient:    defaultChannel,
+		NotifierName: clusterName + ":" + slack,
+		NotifierType: slack,
 	}
+	opsgenieRecipient = v3.Recipient{
+		Recipient:    defaultChannel,
+		NotifierName: clusterName + ":" + opsgenie,
+		NotifierType: opsgenie,
+	}
+	recipients = []v3.Recipient{slackRecipient}
 )
 
 // event

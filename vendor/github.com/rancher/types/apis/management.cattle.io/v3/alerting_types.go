@@ -268,6 +268,7 @@ type NotifierSpec struct {
 	PagerdutyConfig *PagerdutyConfig `json:"pagerdutyConfig,omitempty"`
 	WebhookConfig   *WebhookConfig   `json:"webhookConfig,omitempty"`
 	WechatConfig    *WechatConfig    `json:"wechatConfig,omitempty"`
+	OpsgenieConfig  *OpsgenieConfig  `json:"opsgenieConfig,omitempty"`
 }
 
 type Notification struct {
@@ -277,6 +278,7 @@ type Notification struct {
 	PagerdutyConfig *PagerdutyConfig `json:"pagerdutyConfig,omitempty"`
 	WebhookConfig   *WebhookConfig   `json:"webhookConfig,omitempty"`
 	WechatConfig    *WechatConfig    `json:"wechatConfig,omitempty"`
+	OpsgenieConfig  *OpsgenieConfig  `json:"opsgenieConfig,omitempty"`
 }
 
 type SMTPConfig struct {
@@ -311,6 +313,14 @@ type WechatConfig struct {
 	Agent            string `json:"agent,omitempty" norman:"required"`
 	Corp             string `json:"corp,omitempty" norman:"required"`
 	RecipientType    string `json:"recipientType,omitempty" norman:"required,options=tag|party|user,default=party"`
+	*HTTPClientConfig
+}
+
+type OpsgenieConfig struct {
+	APIKey           string `json:"api_key,omitempty" norman:"required"`
+	Region           string `json:"region,omitempty" norman:"required,options=us|eu,default=us"`
+	DefaultRecipient string `json:"defaultRecipient,omitempty" norman:"required"`
+	Tags             string `json:"tags,omitempty" norman:"required"`
 	*HTTPClientConfig
 }
 

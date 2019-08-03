@@ -586,6 +586,38 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 				}
 				receiver.EmailConfigs = append(receiver.EmailConfigs, email)
 				receiverExist = true
+			} else if notifier.Spec.OpsgenieConfig != nil {
+				opsgenie := &alertconfig.OpsgenieConfig{
+					NotifierConfig: alertconfig.NotifierConfig{
+						VSendResolved: true,
+					},
+					APIKey:      alertconfig.Secret(notifier.Spec.OpsgenieConfig.APIKey),
+					APIURL:      alertconfig.OpsgenieURLForRegion(notifier.Spec.OpsgenieConfig.Region),
+					Message:     `{{ template "rancher.title" . }}`,
+					Description: `{{ template "opsgenie.default.description" . }}`,
+					Source:      `{{ template "opsgenie.default.source" . }}`,
+					Details:     nil,
+					Teams:       notifier.Spec.OpsgenieConfig.DefaultRecipient,
+					Tags:        notifier.Spec.OpsgenieConfig.Tags,
+					Priority:    `{{ if eq (index .Alerts 0).Labels.severity "critical" }}P1{{ else if eq (index .Alerts 0).Labels.severity "warning" }}P2{{ else }}P3{{ end }}`,
+				}
+				if r.Recipient != "" {
+					opsgenie.Teams = r.Recipient
+				}
+
+				if notifier.Spec.OpsgenieConfig.HTTPClientConfig != nil {
+					url, err := toAlertManagerURL(notifier.Spec.OpsgenieConfig.HTTPClientConfig.ProxyURL)
+					if err != nil {
+						logrus.Errorf("Failed to parse opsgenie proxy url %s, %v", notifier.Spec.OpsgenieConfig.HTTPClientConfig.ProxyURL, err)
+						continue
+					}
+					opsgenie.HTTPConfig = &alertconfig.HTTPClientConfig{
+						ProxyURL: *url,
+					}
+				}
+				receiver.OpsgenieConfigs = append(receiver.OpsgenieConfigs, opsgenie)
+				receiverExist = true
+
 			}
 
 		}
