@@ -3,9 +3,12 @@ package catalog
 import (
 	"bytes"
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/rancher/norman/types/convert"
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
@@ -14,9 +17,54 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	client "github.com/rancher/types/client/management/v3"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TemplateFormatter(apiContext *types.APIContext, resource *types.RawResource) {
+func checkUpgrade(t TemplateWrapper, templateVersionName string) (string, error) {
+	templateVersion, err := t.TemplateVersion.Get(templateVersionName, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	id := strings.Split(templateVersion.Name, "-")[1]
+	tag := templateVersion.Spec.Files[id+"/Chart.yaml"]
+	data, err := templatecontent.GetTemplateFromTag(tag, t.TemplateContentClient)
+	if err != nil {
+		return "", err
+	}
+	resp := findIconURL(data)
+	if resp == "" {
+		return "", fmt.Errorf("icon not found")
+	}
+	return resp, nil
+}
+
+func findIconURL(s string) string {
+	i := strings.Index(s, "icon:")
+	if i < 0 {
+		return ""
+	}
+	s = s[i:]
+	target := strings.Split(s, "\n")[0]
+	i = strings.Index(target, "http")
+	if i < 0 {
+		return ""
+	}
+	target = target[i:]
+	return target
+}
+
+// indexInterfaceSlice takes a list of interfaces, returns the first, asserts its a map[string]interface{}
+// and uses the provided index to retrieve the value
+func indexInterfaceSlice(value interface{}, key string) string {
+	v := convert.Singular(value)
+	if v != nil {
+		v2 := v.(map[string]interface{})
+		return v2[key].(string)
+	}
+	return ""
+}
+
+func (t TemplateWrapper) TemplateFormatter(apiContext *types.APIContext, resource *types.RawResource) {
 	// version links
 	resource.Values["versionLinks"] = extractVersionLinks(apiContext, resource)
 
@@ -27,8 +75,23 @@ func TemplateFormatter(apiContext *types.APIContext, resource *types.RawResource
 			delete(resource.Values, "icon")
 			resource.Links["icon"] = ic.(string)
 		} else {
-			delete(resource.Values, "icon")
-			resource.Links["icon"] = apiContext.URLBuilder.Link("icon", resource)
+			// before marking an icon as from file, ensure this is not a chart from an upgrade
+			// if so, use the url in the chart.yaml
+			ver, ok := resource.Values["versions"]
+			if ok {
+				v := indexInterfaceSlice(ver, "version")
+				res, err := checkUpgrade(t, resource.ID+"-"+v)
+				if err == nil {
+					delete(resource.Values, "icon")
+					resource.Links["icon"] = res
+				} else { //this is chart with a bundled icon
+					delete(resource.Values, "icon")
+					resource.Links["icon"] = apiContext.URLBuilder.Link("icon", resource)
+				}
+			} else { //if no versions are found, fallback to hosting the icon
+				delete(resource.Values, "icon")
+				resource.Links["icon"] = apiContext.URLBuilder.Link("icon", resource)
+			}
 		}
 	} else {
 		delete(resource.Values, "icon")
@@ -49,6 +112,7 @@ func TemplateFormatter(apiContext *types.APIContext, resource *types.RawResource
 
 type TemplateWrapper struct {
 	TemplateContentClient v3.TemplateContentInterface
+	TemplateVersion       v3.TemplateVersionInterface
 }
 
 func (t TemplateWrapper) TemplateIconHandler(apiContext *types.APIContext, next types.RequestHandler) error {

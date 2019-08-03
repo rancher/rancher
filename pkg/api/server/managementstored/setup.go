@@ -182,10 +182,12 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 
 func Templates(schemas *types.Schemas, managementContext *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.TemplateType)
-	schema.Formatter = catalog.TemplateFormatter
+
 	wrapper := catalog.TemplateWrapper{
 		TemplateContentClient: managementContext.Management.TemplateContents(""),
+		TemplateVersion:       managementContext.Management.TemplateVersions(""),
 	}
+	schema.Formatter = wrapper.TemplateFormatter
 	schema.LinkHandler = wrapper.TemplateIconHandler
 }
 
