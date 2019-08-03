@@ -184,8 +184,9 @@ func Templates(schemas *types.Schemas, managementContext *config.ScaledContext) 
 	schema := schemas.Schema(&managementschema.Version, client.TemplateType)
 
 	wrapper := catalog.TemplateWrapper{
-		TemplateContentClient: managementContext.Management.TemplateContents(""),
-		TemplateVersion:       managementContext.Management.TemplateVersions(""),
+		TemplateContentClients: managementContext.Management.TemplateContents(""),
+		TemplateVersions:       managementContext.Management.TemplateVersions("").Controller().Lister(),
+		TemplateClients:        managementContext.Management.Templates(""),
 	}
 	schema.Formatter = wrapper.TemplateFormatter
 	schema.LinkHandler = wrapper.TemplateIconHandler

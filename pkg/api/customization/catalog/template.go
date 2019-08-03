@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/rancher/norman/types/convert"
 
 	"github.com/rancher/norman/api/access"
@@ -20,14 +22,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func checkUpgrade(t TemplateWrapper, templateVersionName string) (string, error) {
-	templateVersion, err := t.TemplateVersion.Get(templateVersionName, metav1.GetOptions{})
+func getChartIconURL(t TemplateWrapper, templateVersionName string) (string, error) {
+	templateVersion, err := t.TemplateVersions.Get("", templateVersionName)
 	if err != nil {
 		return "", err
 	}
 	id := strings.Split(templateVersion.Name, "-")[1]
 	tag := templateVersion.Spec.Files[id+"/Chart.yaml"]
-	data, err := templatecontent.GetTemplateFromTag(tag, t.TemplateContentClient)
+	data, err := templatecontent.GetTemplateFromTag(tag, t.TemplateContentClients)
 	if err != nil {
 		return "", err
 	}
@@ -58,8 +60,10 @@ func findIconURL(s string) string {
 func indexInterfaceSlice(value interface{}, key string) string {
 	v := convert.Singular(value)
 	if v != nil {
-		v2 := v.(map[string]interface{})
-		return v2[key].(string)
+		v2, ok := v.(map[string]interface{})
+		if ok {
+			return v2[key].(string)
+		}
 	}
 	return ""
 }
@@ -69,10 +73,10 @@ func (t TemplateWrapper) TemplateFormatter(apiContext *types.APIContext, resourc
 	resource.Values["versionLinks"] = extractVersionLinks(apiContext, resource)
 
 	//icon
+	delete(resource.Values, "icon")
 	ic, ok := resource.Values["iconFilename"]
 	if ok {
 		if strings.HasPrefix(ic.(string), "http:") || strings.HasPrefix(ic.(string), "https:") {
-			delete(resource.Values, "icon")
 			resource.Links["icon"] = ic.(string)
 		} else {
 			// before marking an icon as from file, ensure this is not a chart from an upgrade
@@ -80,21 +84,29 @@ func (t TemplateWrapper) TemplateFormatter(apiContext *types.APIContext, resourc
 			ver, ok := resource.Values["versions"]
 			if ok {
 				v := indexInterfaceSlice(ver, "version")
-				res, err := checkUpgrade(t, resource.ID+"-"+v)
+				res, err := getChartIconURL(t, resource.ID+"-"+v)
 				if err == nil {
-					delete(resource.Values, "icon")
 					resource.Links["icon"] = res
+					// also update the template itself
+					template, err := t.TemplateClients.Get(resource.ID, metav1.GetOptions{})
+					if err != nil {
+						logrus.Warnf("unable to get template %s", err)
+					} else {
+						template = template.DeepCopy()
+						template.Spec.IconFilename = res
+						_, err = t.TemplateClients.Update(template)
+						if err != nil {
+							logrus.Warnf("unable to update template icon %s", template.Name)
+						}
+					}
 				} else { //this is chart with a bundled icon
-					delete(resource.Values, "icon")
 					resource.Links["icon"] = apiContext.URLBuilder.Link("icon", resource)
 				}
 			} else { //if no versions are found, fallback to hosting the icon
-				delete(resource.Values, "icon")
 				resource.Links["icon"] = apiContext.URLBuilder.Link("icon", resource)
 			}
 		}
 	} else {
-		delete(resource.Values, "icon")
 		resource.Links["icon"] = apiContext.URLBuilder.Link("icon", resource)
 	}
 
@@ -111,8 +123,9 @@ func (t TemplateWrapper) TemplateFormatter(apiContext *types.APIContext, resourc
 }
 
 type TemplateWrapper struct {
-	TemplateContentClient v3.TemplateContentInterface
-	TemplateVersion       v3.TemplateVersionInterface
+	TemplateContentClients v3.TemplateContentInterface
+	TemplateVersions       v3.TemplateVersionLister
+	TemplateClients        v3.TemplateInterface
 }
 
 func (t TemplateWrapper) TemplateIconHandler(apiContext *types.APIContext, next types.RequestHandler) error {
@@ -127,7 +140,7 @@ func (t TemplateWrapper) TemplateIconHandler(apiContext *types.APIContext, next 
 			return nil
 		}
 
-		data, err := templatecontent.GetTemplateFromTag(template.Icon, t.TemplateContentClient)
+		data, err := templatecontent.GetTemplateFromTag(template.Icon, t.TemplateContentClients)
 		if err != nil {
 			return err
 		}
