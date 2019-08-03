@@ -89,6 +89,13 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 		return err
 	}
 
+	// setting kubeapi proxy cluster role separetly because system template
+	// isn't being executed in HA rancher server upgrade
+	err = cd.setKubeapiProxyClusterRole(cluster)
+	if err != nil {
+		return err
+	}
+
 	return cd.setNetworkPolicyAnn(cluster)
 }
 
@@ -186,4 +193,21 @@ func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage string) ([]byte
 	err = systemtemplate.SystemTemplate(buf, agentImage, token, url)
 
 	return buf.Bytes(), err
+}
+
+func (cd *clusterDeploy) setKubeapiProxyClusterRole(cluster *v3.Cluster) error {
+	kubeConfig, err := cd.getKubeConfig(cluster)
+	if err != nil {
+		return err
+	}
+	for i := 0; i < 3; i++ {
+		// This will fail almost always the first time because when we create the namespace in the file
+		// it won't have privileges.  Just stupidly try 3 times
+		_, err := kubectl.Apply([]byte(systemtemplate.KubeapiProxytemplate), kubeConfig)
+		if err == nil {
+			break
+		}
+		time.Sleep(2 * time.Second)
+	}
+	return err
 }
