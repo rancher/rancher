@@ -31,8 +31,6 @@ var FilterTemplate = `
 {{define "filter-container"}}
 <filter  {{ .ContainerLogSourceTag }}.**>
   @type  kubernetes_metadata
-  merge_json_log  true
-  preserve_json_log  true
 </filter>
 {{end}}
 
