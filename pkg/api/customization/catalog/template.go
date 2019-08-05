@@ -5,20 +5,20 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
-	"github.com/rancher/norman/types/convert"
-
+	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/templatecontent"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	client "github.com/rancher/types/client/management/v3"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -27,8 +27,15 @@ func getChartIconURL(t TemplateWrapper, templateVersionName string) (string, err
 	if err != nil {
 		return "", err
 	}
-	id := strings.Split(templateVersion.Name, "-")[1]
-	tag := templateVersion.Spec.Files[id+"/Chart.yaml"]
+	idStruct, err := url.Parse(templateVersion.Spec.ExternalID)
+	if err != nil {
+		return "", errors.WithMessage(err, "failed to parse external ID")
+	}
+	id := idStruct.Query().Get("template")
+	tag, ok := templateVersion.Spec.Files[id+"/Chart.yaml"]
+	if !ok {
+		return "", fmt.Errorf("unable to get chart data from template version for %s", id)
+	}
 	data, err := templatecontent.GetTemplateFromTag(tag, t.TemplateContentClients)
 	if err != nil {
 		return "", err
