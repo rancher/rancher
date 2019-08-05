@@ -322,6 +322,10 @@ var (
 )
 
 func initWindows() {
+	// maxWindowsK8sVersion defines the max k8s versions we build for Windows
+	// we stopped building Windows images at 1.13.9
+	// we use v1.13.6 as max version because 1.13.5-rancher1 is higher/bigger than 1.13.5 and we dont use any versions between 1.13.5 and 1.13.9
+	maxWindowsK8sVersion := "v1.13.6"
 	badVersions := map[string]bool{
 		"v1.8.11-rancher2-1": true,
 		"v1.8.11-rancher1":   true,
@@ -338,6 +342,9 @@ func initWindows() {
 		if badVersions[version] {
 			continue
 		}
+		if version > maxWindowsK8sVersion {
+			continue
+		}
 
 		images, ok := allK8sWindowsVersions[version]
 		if !ok {
@@ -347,7 +354,9 @@ func initWindows() {
 		K8sVersionWindowsSystemImages[version] = images
 	}
 
-	if _, ok := K8sVersionWindowsSystemImages[DefaultK8s]; !ok {
-		panic("Default K8s version " + DefaultK8s + " is not found in k8sVersionsCurrent list")
+	if maxWindowsK8sVersion > DefaultK8s {
+		if _, ok := K8sVersionWindowsSystemImages[DefaultK8s]; !ok {
+			panic("Default K8s version " + DefaultK8s + " is not found in k8sVersionsCurrent list")
+		}
 	}
 }
