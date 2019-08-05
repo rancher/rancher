@@ -1,3 +1,17 @@
+# Validation scripts for Rancher
+
+Validation tests are run in a similar way to integration tests.
+
+From tests/validation dir:
+
+* Setup virtualenv and enter it
+* `pip install -r requirements_v3api.txt`
+* Export any needed environment vars, many of these like `CATTLE_TEST_URL` are required. See below for more info.
+
+Now run a test:
+* File: `pytest -v -s tests/v3_api/test_app.py`
+* Single test:`pytest -k test_tiller`
+
 # General Notes about this framework current status:
 
 ## ENV Variables:
