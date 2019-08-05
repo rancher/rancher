@@ -495,9 +495,20 @@ def test_member_can_perform_app_action(admin_mc, admin_pc, remove_resource,
         action_name="upgrade",
         answers={"asdf": "asdf"})
 
-    '''
-        TODO: write rollback test, currently blocked by issue #20204
-    '''
+    def _app_revisions_exist():
+        a = admin_pc.client.reload(app)
+        return len(a.revision().data) > 0
+
+    wait_for(_app_revisions_exist, fail_handler=lambda: 'no revisions exist')
+    proj_user_client = user_project_client(user_mc, project)
+    app = proj_user_client.reload(app)
+    revID = app.revision().data[0]['id']
+    revID = revID.split(":")[1] if ":" in revID else revID
+    user.client.action(
+        obj=app,
+        action_name="rollback",
+        revisionId=revID
+    )
 
 
 def test_readonly_cannot_edit_secret(admin_mc, user_mc, admin_pc,
