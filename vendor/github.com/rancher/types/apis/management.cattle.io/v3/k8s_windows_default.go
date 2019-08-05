@@ -285,12 +285,6 @@ var (
 			FlannelCNIBinaries: m("rancher/flannel-cni:v0.0.1-nanoserver-1803"),
 			KubeletPause:       m("rancher/kubelet-pause:v0.0.1-nanoserver-1803"),
 		},
-		"v1.12.10-rancher1-1": {
-			NginxProxy:         m("rancher/nginx-proxy:v0.0.1-nanoserver-1803"),
-			KubernetesBinaries: m("rancher/hyperkube:v1.12.10-nanoserver-1803"),
-			FlannelCNIBinaries: m("rancher/flannel-cni:v0.0.1-nanoserver-1803"),
-			KubeletPause:       m("rancher/kubelet-pause:v0.0.1-nanoserver-1803"),
-		},
 		"v1.13.1-rancher1-2": {
 			NginxProxy:         m("rancher/nginx-proxy:v0.0.1-nanoserver-1803"),
 			KubernetesBinaries: m("rancher/hyperkube:v1.13.1-nanoserver-1803"),
@@ -345,14 +339,6 @@ var (
 			CanalCNIBinaries:   m("rancher/canal-cni:v0.0.1-nanoserver-1803"),
 			KubeletPause:       m("rancher/kubelet-pause:v0.0.1-nanoserver-1803"),
 		},
-		"v1.13.8-rancher1-1": {
-			NginxProxy:         m("rancher/nginx-proxy:v0.0.1-nanoserver-1803"),
-			KubernetesBinaries: m("rancher/hyperkube:v1.13.8-nanoserver-1803"),
-			FlannelCNIBinaries: m("rancher/flannel-cni:v0.0.1-nanoserver-1803"),
-			CalicoCNIBinaries:  m("rancher/calico-cni:v0.0.1-nanoserver-1803"),
-			CanalCNIBinaries:   m("rancher/canal-cni:v0.0.1-nanoserver-1803"),
-			KubeletPause:       m("rancher/kubelet-pause:v0.0.1-nanoserver-1803"),
-		},
 		"v1.14.1-rancher1-1": {
 			NginxProxy:         m("rancher/nginx-proxy:v0.0.1-nanoserver-1803"),
 			KubernetesBinaries: m("rancher/hyperkube:v1.14.1-nanoserver-1803"),
@@ -377,21 +363,7 @@ var (
 			CanalCNIBinaries:   m("rancher/canal-cni:v0.0.1-nanoserver-1803"),
 			KubeletPause:       m("rancher/kubelet-pause:v0.0.1-nanoserver-1803"),
 		},
-		"v1.14.4-rancher1-1": {
-			NginxProxy:         m("rancher/nginx-proxy:v0.0.1-nanoserver-1803"),
-			KubernetesBinaries: m("rancher/hyperkube:v1.14.4-nanoserver-1803"),
-			FlannelCNIBinaries: m("rancher/flannel-cni:v0.0.1-nanoserver-1803"),
-			CalicoCNIBinaries:  m("rancher/calico-cni:v0.0.1-nanoserver-1803"),
-			CanalCNIBinaries:   m("rancher/canal-cni:v0.0.1-nanoserver-1803"),
-			KubeletPause:       m("rancher/kubelet-pause:v0.0.1-nanoserver-1803"),
-		},
 		"v1.15.0-rancher1-1": {
-			// NginxProxy image is replaced by host running nginx, fixed rancher#16074
-			KubernetesBinaries: m("rancher/hyperkube:v1.15.0-rancher1"),
-			FlannelCNIBinaries: m("rancher/flannel-cni:v0.3.0-rancher4"),
-			KubeletPause:       m("rancher/kubelet-pause:v0.1.2"),
-		},
-		"v1.15.0-rancher1-2": {
 			// NginxProxy image is replaced by host running nginx, fixed rancher#16074
 			KubernetesBinaries: m("rancher/hyperkube:v1.15.0-rancher1"),
 			FlannelCNIBinaries: m("rancher/flannel-cni:v0.3.0-rancher4"),
@@ -417,16 +389,23 @@ func initWindows() {
 		if badVersions[version] {
 			continue
 		}
+		// we stopped building Windows images at 1.12.10 (earliest previous version was 1.12.9), 1.13.9 (earliest previous version is 1.13.7), 1.14.5 (earliest previous version is 1.14.3) and 1.15.2 (earliest previous version was 1.15.0)
+		// existing images are still checked
+		if (version > "v1.12.10" && version < "v1.12.99") || (version > "v1.13.8" && version < "v1.13.99") || (version > "v1.14.4" && version < "v1.14.99") || version > "v1.15.1" {
+			continue
+		}
 
 		images, ok := allK8sWindowsVersions[version]
 		if !ok {
-			panic("K8s version " + " is not found in AllK8sWindowsVersions map")
+			panic("K8s version " + version + " is not found in AllK8sWindowsVersions map")
 		}
 
 		K8sVersionWindowsSystemImages[version] = images
 	}
 
-	if _, ok := K8sVersionWindowsSystemImages[DefaultK8s]; !ok {
-		panic("Default K8s version " + DefaultK8s + " is not found in k8sVersionsCurrent list")
+	if DefaultK8s < "v1.12.10" || (DefaultK8s > "v1.13.0" && DefaultK8s < "v1.13.8") || (DefaultK8s > "v1.14.0" && DefaultK8s < "v1.14.4") || (DefaultK8s > "v1.14.99" && DefaultK8s < "v1.15.1") {
+		if _, ok := K8sVersionWindowsSystemImages[DefaultK8s]; !ok {
+			panic("Default K8s version " + DefaultK8s + " is not found in k8sVersionsCurrent list")
+		}
 	}
 }
