@@ -251,6 +251,8 @@ steps:
   commands:
   - dapper chart/ci
   privileged: true
+  settings:
+    custom_dns: 1.1.1.1
   volumes:
   - name: docker
     path: /var/run/docker.sock
