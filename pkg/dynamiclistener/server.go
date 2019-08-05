@@ -13,7 +13,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -137,7 +136,18 @@ func (s *Server) updateIPs(savedIPs map[string]bool) map[string]bool {
 	}
 	s.Unlock()
 
-	if !reflect.DeepEqual(certs, cfg.GeneratedCerts) {
+	// Ensure that the saved config has all the certs generated on this instance of the server and that their values
+	// match. The value of the cert on the saved config will be set to match the value in s.certs
+	update := false
+	for k, v := range certs {
+		v1, ok := cfg.GeneratedCerts[k]
+		if !ok || v1 != v {
+			update = true
+			break
+		}
+	}
+
+	if update {
 		cfg = cfg.DeepCopy()
 		cfg.GeneratedCerts = certs
 		cfg, err = s.listenConfigStorage.Update(cfg)
