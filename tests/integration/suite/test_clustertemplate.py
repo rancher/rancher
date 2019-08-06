@@ -424,6 +424,61 @@ def test_permissions_removed_on_downgrading_access(admin_mc, remove_resource,
         assert e.error.status == 403
 
 
+def test_required_template_question(admin_mc, remove_resource):
+    cluster_template = create_cluster_template(admin_mc,
+                                               remove_resource, [], admin_mc)
+    tId = cluster_template.id
+    client = admin_mc.client
+
+    cconfig = {
+        "rancherKubernetesEngineConfig": {
+            "services": {
+                "type": "rkeConfigServices",
+                "kubeApi": {
+                    "alwaysPullImages": "false",
+                    "podSecurityPolicy": "false",
+                    "serviceNodePortRange": "30000-32767",
+                    "type": "kubeAPIService"
+                }
+            }
+        },
+        "defaultPodSecurityPolicyTemplateId": "restricted",
+    }
+    questions = [{
+                  "variable": "dockerRootDir",
+                  "required": "true",
+                  "type": "string",
+                  "default": ""
+                 },
+                 {
+                  "variable":
+                  "rancherKubernetesEngineConfig.ignoreDockerVersion",
+                  "required": "false",
+                  "type": "boolean",
+                  "default": "true"
+                 }]
+
+    rev = client.create_cluster_template_revision(clusterConfig=cconfig,
+                                                  clusterTemplateId=tId,
+                                                  questions=questions,
+                                                  enabled="true")
+
+    # creating a cluster with this template with no answer should fail
+    answers = {
+                "values": {
+                    "rancherKubernetesEngineConfig.ignoreDockerVersion":
+                    "false"
+                }
+              }
+
+    with pytest.raises(ApiError) as e:
+        client.create_cluster(name=random_str(),
+                              clusterTemplateRevisionId=rev.id,
+                              description="template from cluster",
+                              answers=answers)
+        assert e.value.error.status == 422
+
+
 def rtb_cb(client, rtb):
     """Wait for the prtb to have the userId populated"""
     def cb():

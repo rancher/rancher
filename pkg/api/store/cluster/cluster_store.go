@@ -248,6 +248,9 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 	for _, question := range clusterTemplateRevision.Spec.Questions {
 		answer, ok := allAnswers[question.Variable]
 		if !ok {
+			if question.Required && question.Default == "" {
+				return nil, httperror.WrapAPIError(err, httperror.MissingRequired, fmt.Sprintf("Missing answer for a required clusterTemplate question: %v", question.Variable))
+			}
 			answer = question.Default
 			defaultedAnswers[question.Variable] = question.Default
 		}
