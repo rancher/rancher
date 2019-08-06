@@ -26,6 +26,7 @@ import (
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	projectSchema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
+	storagev1 "github.com/rancher/types/apis/storage.k8s.io/v1"
 	"github.com/rancher/types/config/dialer"
 	"github.com/rancher/types/peermanager"
 	"github.com/rancher/types/user"
@@ -59,6 +60,7 @@ type ScaledContext struct {
 	Project    projectv3.Interface
 	RBAC       rbacv1.Interface
 	Core       corev1.Interface
+	Storage    storagev1.Interface
 }
 
 func (c *ScaledContext) controllers() []controller.Starter {
@@ -115,7 +117,6 @@ func NewScaledContext(config rest.Config) (*ScaledContext, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	dynamicConfig := config
 	if dynamicConfig.NegotiatedSerializer == nil {
 		dynamicConfig.NegotiatedSerializer = dynamic.NegotiatedSerializer
@@ -193,6 +194,7 @@ type UserContext struct {
 	Monitoring     monitoringv1.Interface
 	Cluster        clusterv3.Interface
 	Istio          istiov1alpha3.Interface
+	Storage        storagev1.Interface
 }
 
 func (w *UserContext) controllers() []controller.Starter {
@@ -208,6 +210,7 @@ func (w *UserContext) controllers() []controller.Starter {
 		w.Networking,
 		w.Monitoring,
 		w.Cluster,
+		w.Storage,
 	}
 }
 
@@ -230,6 +233,7 @@ func (w *UserContext) UserOnlyContext() *UserOnlyContext {
 		Monitoring:   w.Monitoring,
 		Cluster:      w.Cluster,
 		Istio:        w.Istio,
+		Storage:      w.Storage,
 	}
 }
 
@@ -252,6 +256,7 @@ type UserOnlyContext struct {
 	Monitoring      monitoringv1.Interface
 	Cluster         clusterv3.Interface
 	Istio           istiov1alpha3.Interface
+	Storage         storagev1.Interface
 }
 
 func (w *UserOnlyContext) controllers() []controller.Starter {
@@ -265,6 +270,7 @@ func (w *UserOnlyContext) controllers() []controller.Starter {
 		w.BatchV1,
 		w.BatchV1Beta1,
 		w.Monitoring,
+		w.Storage,
 	}
 }
 
@@ -381,6 +387,11 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		return nil, err
 	}
 
+	context.Storage, err = storagev1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
 	context.RBAC, err = rbacv1.NewForConfig(config)
 	if err != nil {
 		return nil, err
@@ -485,6 +496,11 @@ func NewUserOnlyContext(config rest.Config) (*UserOnlyContext, error) {
 	}
 
 	context.Project, err = projectv3.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Storage, err = storagev1.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
