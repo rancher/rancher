@@ -279,9 +279,7 @@ func (c *Controller) createOrCheckNodes(nodePool *v3.NodePool, simulate bool) (b
 	}
 
 	for len(nodes) > quantity {
-		sort.Slice(nodes, func(i, j int) bool {
-			return nodes[i].Spec.RequestedHostname < nodes[j].Spec.RequestedHostname
-		})
+		sort.Sort(byHostname(nodes))
 
 		toDelete := nodes[len(nodes)-1]
 
