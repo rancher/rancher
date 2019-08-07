@@ -259,8 +259,9 @@ func (c *client) getGithubRepos(githubAccessToken string) ([]v3.SourceCodeReposi
 	if err != nil {
 		return nil, err
 	}
+	defer closeResponses(responses)
+
 	for _, response := range responses {
-		defer response.Body.Close()
 		b, err := ioutil.ReadAll(response.Body)
 		if err != nil {
 			return nil, err
@@ -417,27 +418,37 @@ func (c *client) GetBranches(repoURL string, accessToken string) ([]string, erro
 
 	url := fmt.Sprintf("%s/repos/%s/%s/branches", c.API, owner, repo)
 
-	resp, err := getFromGithub(url, accessToken)
+	responses, err := paginateGithub(accessToken, url)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-	branches := []github.Branch{}
+	defer closeResponses(responses)
 
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+	var branches []github.Branch
+	for _, response := range responses {
+		b, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			return nil, err
+		}
+		var branchesObj []github.Branch
+		if err := json.Unmarshal(b, &branchesObj); err != nil {
+			return nil, err
+		}
+		branches = append(branches, branchesObj...)
 	}
 
-	if err := json.Unmarshal(b, &branches); err != nil {
-		return nil, err
-	}
-	result := []string{}
+	var result []string
 	for _, b := range branches {
 		result = append(result, b.GetName())
 	}
 
 	return result, nil
+}
+
+func closeResponses(responses []*http.Response) {
+	for _, response := range responses {
+		response.Body.Close()
+	}
 }
 
 func (c *client) GetHeadInfo(repoURL string, branch string, accessToken string) (*model.BuildInfo, error) {

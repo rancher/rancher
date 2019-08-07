@@ -257,19 +257,21 @@ func (c *client) GetBranches(repoURL string, accessToken string) ([]string, erro
 		return nil, err
 	}
 
-	url := fmt.Sprintf("%s/repositories/%s/%s/refs/branches", apiEndpoint, owner, repo)
-
-	b, err := getFromBitbucket(url, accessToken)
-	if err != nil {
-		return nil, err
-	}
-	var branches PaginatedBranches
-	if err := json.Unmarshal(b, &branches); err != nil {
-		return nil, err
-	}
-	result := []string{}
-	for _, b := range branches.Values {
-		result = append(result, b.Name)
+	nexturl := fmt.Sprintf("%s/repositories/%s/%s/refs/branches", apiEndpoint, owner, repo)
+	var result []string
+	for nexturl != "" {
+		b, err := getFromBitbucket(nexturl, accessToken)
+		if err != nil {
+			return nil, err
+		}
+		var pageBranches PaginatedBranches
+		if err := json.Unmarshal(b, &pageBranches); err != nil {
+			return nil, err
+		}
+		for _, branch := range pageBranches.Values {
+			result = append(result, branch.Name)
+		}
+		nexturl = pageBranches.Next
 	}
 
 	return result, nil
