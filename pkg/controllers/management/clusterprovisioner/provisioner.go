@@ -86,7 +86,9 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	rkeDriver.DataStore = NewDataStore(mgmt.RKEAddons("").Controller().Lister(),
 		mgmt.RKEAddons(""),
 		mgmt.RKEK8sServiceOptions("").Controller().Lister(),
-		mgmt.RKEK8sServiceOptions(""))
+		mgmt.RKEK8sServiceOptions(""),
+		mgmt.RKEK8sSystemImages("").Controller().Lister(),
+		mgmt.RKEK8sSystemImages(""))
 }
 
 func (p *Provisioner) Remove(cluster *v3.Cluster) (runtime.Object, error) {

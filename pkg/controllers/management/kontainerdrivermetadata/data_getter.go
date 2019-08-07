@@ -1,16 +1,15 @@
 package kontainerdrivermetadata
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/rancher/rancher/pkg/settings"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rke/util"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -45,41 +44,21 @@ func GetRKEWindowsSystemImages(k8sVersion string, sysImageLister v3.RKEK8sWindow
 	return sysImage.SystemImages, err
 }
 
-func GetRKEAddonTemplate(k8sVersion string, addonName string, addonLister v3.RKEAddonLister, addons v3.RKEAddonInterface) (string, error) {
-	names := []string{
-		fmt.Sprintf("%s-%s", strings.ToLower(addonName), k8sVersion),
-		fmt.Sprintf("%s-%s", strings.ToLower(addonName), util.GetTagMajorVersion(k8sVersion)),
-		fmt.Sprintf("%s-%s", strings.ToLower(addonName), "default"),
-	}
-
-	for _, name := range names {
-		addon, err := addonLister.Get(namespace.GlobalNamespace, name)
+func GetRKEAddonTemplate(addonName string, addonLister v3.RKEAddonLister, addons v3.RKEAddonInterface) (string, error) {
+	addon, err := addonLister.Get(namespace.GlobalNamespace, addonName)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return "", err
+		}
+		addon, err = addons.GetNamespaced(namespace.GlobalNamespace, addonName, metav1.GetOptions{})
 		if err != nil {
-			if !errors.IsNotFound(err) {
-				return "", err
-			}
-			continue
+			return "", err
 		}
-		if addon.Labels[sendRKELabel] == "false" {
-			return "", nil
-		}
-		return addon.Template, err
 	}
-
-	for _, name := range names {
-		addon, err := addons.GetNamespaced(namespace.GlobalNamespace, name, metav1.GetOptions{})
-		if err != nil {
-			if !errors.IsNotFound(err) {
-				return "", err
-			}
-			continue
-		}
-		if addon.Labels[sendRKELabel] == "false" {
-			return "", nil
-		}
-		return addon.Template, err
+	if addon.Labels[sendRKELabel] == "false" {
+		return "", nil
 	}
-	return "", nil
+	return addon.Template, err
 }
 
 func GetRKEK8sServiceOptions(k8sVersion string, svcOptionLister v3.RKEK8sServiceOptionLister, svcOptions v3.RKEK8sServiceOptionInterface) (*v3.KubernetesServicesOptions, error) {
