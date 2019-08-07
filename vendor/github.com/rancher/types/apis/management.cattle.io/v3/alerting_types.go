@@ -203,8 +203,8 @@ type MetricRule struct {
 	Expression     string  `json:"expression,omitempty" norman:"required"`
 	Description    string  `json:"description,omitempty"`
 	Duration       string  `json:"duration,omitempty" norman:"required"`
-	Comparison     string  `json:"comparison,omitempty" norman:"type=enum,options=equal|not-equal|greater-than|less-than|greater-or-equal|less-or-equal,default=equal"`
-	ThresholdValue float64 `json:"thresholdValue,omitempty" norman:"required,type=float"`
+	Comparison     string  `json:"comparison,omitempty" norman:"type=enum,options=equal|not-equal|greater-than|less-than|greater-or-equal|less-or-equal|has-value,default=equal"`
+	ThresholdValue float64 `json:"thresholdValue,omitempty" norman:"type=float"`
 }
 
 type TimingField struct {
