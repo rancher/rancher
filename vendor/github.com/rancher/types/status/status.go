@@ -74,7 +74,6 @@ var reverseErrorMap = map[string]bool{
 	"KernelHasNoDeadlock": true,
 	"Unschedulable":       true,
 	"ReplicaFailure":      true,
-	"ScalingLimited":      true,
 }
 
 // True ==
