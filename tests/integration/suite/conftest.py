@@ -52,6 +52,7 @@ class ManagementContext:
         self.client = client
         self.k8s_client = k8s_client
         self.user = user
+        self.base_url = BASE_URL
 
 
 class ClusterContext:

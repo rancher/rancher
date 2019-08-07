@@ -28,6 +28,10 @@ if [ ${ARCH} == arm64 ]; then
     export ETCD_UNSUPPORTED_ARCH=arm64
 fi
 
+if [ ! -z $DAPPER_SOURCE ]; then
+  ./test-proxy-cert.sh
+fi
+
 echo Starting rancher server
 $(dirname $0)/run &> $CWD/rancherlogs.txt &
 PID=$!
