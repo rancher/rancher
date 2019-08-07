@@ -46,6 +46,21 @@ func (g *googleOauthProvider) getUserInfoAndGroups(adminSvc *admin.Service, gOAu
 			return userPrincipal, groupPrincipals, err
 		}
 	}
+	if config.NestedGroupMembershipEnabled {
+		groupMap := make(map[string]bool)
+		var nestedGroupPrincipals []v3.Principal
+		for _, principal := range groupPrincipals {
+			principals, err := g.gatherParentGroups(principal, adminSvc, config, user.HostedDomain, groupMap)
+			if err != nil {
+				return userPrincipal, groupPrincipals, err
+			}
+			if len(principals) > 0 {
+				nestedGroupPrincipals = append(nestedGroupPrincipals, principals...)
+			}
+		}
+		groupPrincipals = append(groupPrincipals, nestedGroupPrincipals...)
+	}
+
 	logrus.Debugf("[Google OAuth] loginuser: Retrieved user's groups using admin directory")
 	return userPrincipal, groupPrincipals, nil
 }
@@ -203,6 +218,39 @@ func (g *googleOauthProvider) paginateResults(adminSvc *admin.Service, hostedDom
 	default:
 		return nil, nil, fmt.Errorf("paginateResults: Invalid principal type")
 	}
+}
+
+func (g *googleOauthProvider) gatherParentGroups(groupPrincipal v3.Principal, adminSvc *admin.Service, config *v3.GoogleOauthConfig, hostedDomain string, groupMap map[string]bool) ([]v3.Principal, error) {
+	var principals []v3.Principal
+	if groupMap[groupPrincipal.ObjectMeta.Name] {
+		return principals, nil
+	}
+	groupMap[groupPrincipal.ObjectMeta.Name] = true
+	parts := strings.SplitN(groupPrincipal.ObjectMeta.Name, ":", 2)
+	if len(parts) != 2 {
+		return principals, fmt.Errorf("error while gathering parent groups: invalid id %v", groupPrincipal.ObjectMeta.Name)
+	}
+	groupID := strings.TrimPrefix(parts[1], "//")
+	groups, err := g.getGroupsUserBelongsTo(adminSvc, groupID, hostedDomain, config)
+	if err != nil {
+		return principals, err
+	}
+
+	for _, group := range groups {
+		if groupMap[group.ObjectMeta.Name] {
+			continue
+		} else {
+			principals = append(principals, group)
+			nestedGroupPrincipals, err := g.gatherParentGroups(group, adminSvc, config, hostedDomain, groupMap)
+			if err != nil {
+				return principals, err
+			}
+			if len(nestedGroupPrincipals) > 0 {
+				principals = append(principals, nestedGroupPrincipals...)
+			}
+		}
+	}
+	return principals, nil
 }
 
 func (g *googleOauthProvider) getdirectoryServiceFromStoredToken(storedOauthToken string, config *v3.GoogleOauthConfig) (*admin.Service, error) {
