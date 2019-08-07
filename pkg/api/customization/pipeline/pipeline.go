@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	client "github.com/rancher/types/client/project/v3"
-	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -56,7 +55,7 @@ func (h *Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHa
 	} else if apiContext.Link == linkConfigs {
 		return h.getPipelineConfigJSON(apiContext)
 	} else if apiContext.Link == linkBranches {
-		return h.getValidBranches(apiContext)
+		return h.getBranches(apiContext)
 	}
 
 	return httperror.NewAPIError(httperror.NotFound, "Link not found")
@@ -234,7 +233,7 @@ func (h *Handler) getBuildInfoByBranch(pipeline *v3.Pipeline, branch string) (*m
 
 }
 
-func (h *Handler) getValidBranches(apiContext *types.APIContext) error {
+func (h *Handler) getBranches(apiContext *types.APIContext) error {
 	ns, name := ref.Parse(apiContext.ID)
 	pipeline, err := h.PipelineLister.Get(ns, name)
 	if err != nil {
@@ -265,29 +264,11 @@ func (h *Handler) getValidBranches(apiContext *types.APIContext) error {
 		return err
 	}
 
-	validBranches := map[string]bool{}
-
 	branches, err := remote.GetBranches(pipeline.Spec.RepositoryURL, accessKey)
 	if err != nil {
 		return err
 	}
-	for _, b := range branches {
-		content, err := remote.GetPipelineFileInRepo(pipeline.Spec.RepositoryURL, b, accessKey)
-		if err != nil {
-			return err
-		}
-		logrus.Debugf("get content in branch %s:%v", b, string(content))
-		if content != nil {
-			validBranches[b] = true
-		}
-	}
-
-	result := []string{}
-	for b := range validBranches {
-		result = append(result, b)
-	}
-
-	bytes, err := json.Marshal(result)
+	bytes, err := json.Marshal(branches)
 	if err != nil {
 		return err
 	}
