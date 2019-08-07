@@ -727,6 +727,9 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 			"logAnalyticsWorkspaceResourceID": to.StringPtr(logAnalyticsWorkspaceResourceID),
 		}
 	}
+	if !driverState.hasHTTPApplicationRoutingSupport() {
+		delete(addonProfiles, "httpApplicationRouting")
+	}
 
 	var vmNetSubnetID *string
 	var networkProfile *containerservice.NetworkProfile
@@ -919,6 +922,11 @@ func (state state) hasLinuxProfile() bool {
 	return state.LinuxAdminUsername != "" && (state.LinuxSSHPublicKeyContents != "")
 }
 
+func (state state) hasHTTPApplicationRoutingSupport() bool {
+	// HttpApplicationRouting is not supported in azure china cloud
+	return !strings.HasPrefix(state.Location, "china")
+}
+
 func (d *Driver) ensureLogAnalyticsWorkspaceForMonitoring(ctx context.Context, client *operationalinsights.WorkspacesClient, state state) (workspaceID string, err error) {
 	// Please keep in sync with
 	// https://github.com/Azure/azure-cli/blob/release/src/azure-cli/azure/cli/command_modules/acs/custom.py#L1996
@@ -946,6 +954,11 @@ func (d *Driver) ensureLogAnalyticsWorkspaceForMonitoring(ctx context.Context, c
 		"westeurope":         "WEU",
 		"westus":             "WUS",
 		"westus2":            "WUS2",
+		// mapping for azure china cloud
+		"chinaeast":   "EAST2",
+		"chinaeast2":  "EAST2",
+		"chinanorth":  "EAST2",
+		"chinanorth2": "EAST2",
 	}
 	regionToOmsRegionMap := map[string]string{
 		"australiacentral":   "australiacentral",
@@ -980,6 +993,11 @@ func (d *Driver) ensureLogAnalyticsWorkspaceForMonitoring(ctx context.Context, c
 		"westindia":          "centralindia",
 		"westus":             "westus",
 		"westus2":            "westus2",
+		// mapping for azure china cloud
+		"chinaeast":   "chinaeast2",
+		"chinaeast2":  "chinaeast2",
+		"chinanorth":  "chinaeast2",
+		"chinanorth2": "chinaeast2",
 	}
 
 	workspaceRegion, ok := regionToOmsRegionMap[state.Location]
