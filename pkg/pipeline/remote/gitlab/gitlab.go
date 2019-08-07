@@ -293,22 +293,26 @@ func (c *client) GetBranches(repoURL string, accessToken string) ([]string, erro
 	}
 	url := fmt.Sprintf(c.API+"/projects/%s/repository/branches", project)
 
-	resp, err := getFromGitlab(accessToken, url)
+	responses, err := paginateGitlab(accessToken, url)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-	branches := []gitlab.Branch{}
+	defer closeResponses(responses)
 
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+	var branches []gitlab.Branch
+	for _, response := range responses {
+		b, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			return nil, err
+		}
+		var branchesObj []gitlab.Branch
+		if err := json.Unmarshal(b, &branchesObj); err != nil {
+			return nil, err
+		}
+		branches = append(branches, branchesObj...)
 	}
 
-	if err := json.Unmarshal(b, &branches); err != nil {
-		return nil, err
-	}
-	result := []string{}
+	var result []string
 	for _, branch := range branches {
 		result = append(result, branch.Name)
 	}
@@ -531,8 +535,9 @@ func (c *client) getGitlabRepos(gitlabAccessToken string) ([]v3.SourceCodeReposi
 	if err != nil {
 		return nil, err
 	}
+	defer closeResponses(responses)
+
 	for _, response := range responses {
-		defer response.Body.Close()
 		b, err := ioutil.ReadAll(response.Body)
 		if err != nil {
 			return nil, err
@@ -596,4 +601,10 @@ func getProjectNameFromURL(repoURL string) (string, error) {
 	project := strings.TrimPrefix(u.Path, "/")
 	project = strings.TrimSuffix(project, ".git")
 	return url.QueryEscape(project), nil
+}
+
+func closeResponses(responses []*http.Response) {
+	for _, response := range responses {
+		response.Body.Close()
+	}
 }
