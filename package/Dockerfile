@@ -21,7 +21,7 @@ ENV CATTLE_MACHINE_VERSION v0.15.0-rancher9-1
 ENV LOGLEVEL_VERSION v0.1.2
 ENV TINI_VERSION v0.18.0
 ENV TELEMETRY_VERSION v0.5.6
-ENV DOCKER_MACHINE_LINODE_VERSION v0.1.7
+ENV DOCKER_MACHINE_LINODE_VERSION v0.1.8
 ENV LINODE_UI_DRIVER_VERSION v0.3.0
 
 RUN curl -sLf https://github.com/rancher/machine-package/releases/download/${CATTLE_MACHINE_VERSION}/docker-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin && \

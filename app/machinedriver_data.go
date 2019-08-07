@@ -66,8 +66,8 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if dl := os.Getenv("CATTLE_DEV_MODE"); dl != "" {
 		linodeBuiltin = false
 	}
-	if err := addMachineDriver(nodetemplate.Linodedriver, "https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.7/docker-machine-driver-linode_linux-amd64.zip",
-		"/assets/rancher-ui-driver-linode/component.js", "faaf1d7d53b55a369baeeb0855b069921a36131868fe3641eb595ac1ff4cf16f", []string{"api.linode.com"}, linodeBuiltin, linodeBuiltin, management); err != nil {
+	if err := addMachineDriver(nodetemplate.Linodedriver, "https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.8/docker-machine-driver-linode_linux-amd64.zip",
+		"/assets/rancher-ui-driver-linode/component.js", "b31b6a504c59ee758d2dda83029fe4a85b3f5601e22dfa58700a5e6c8f450dc7", []string{"api.linode.com"}, linodeBuiltin, linodeBuiltin, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver("openstack", "local://", "", "", nil, false, true, management); err != nil {
