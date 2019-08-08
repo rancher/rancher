@@ -28,10 +28,14 @@ type WorkloadTolerationHandler struct {
 }
 
 func (w *WorkloadTolerationHandler) sync(key string, obj *util.Workload) error {
-	if obj == nil {
+	if obj == nil || obj.TemplateSpec == nil {
 		return nil
 	}
-	if !canDeployedIntoLinuxNode(obj) {
+	if !canDeployedIntoLinuxNode(obj.TemplateSpec.Spec) {
+		return nil
+	}
+	// if the workload is controlled by other resources, we should not update the toleration.
+	if len(obj.OwnerReferences) > 0 {
 		return nil
 	}
 	dp, rc, rs, ds, ss, job, cj, err := w.workloadController.GetActualFromWorkload(obj)
@@ -106,15 +110,15 @@ func (w *WorkloadTolerationHandler) sync(key string, obj *util.Workload) error {
 	return nil
 }
 
-func canDeployedIntoLinuxNode(obj *util.Workload) bool {
+func canDeployedIntoLinuxNode(podSpec v1.PodSpec) bool {
 	var targetSelectors []labels.Selector
-	if obj.TemplateSpec.Spec.NodeSelector != nil {
-		targetSelectors = append(targetSelectors, labels.Set(obj.TemplateSpec.Spec.NodeSelector).AsSelector())
+	if podSpec.NodeSelector != nil {
+		targetSelectors = append(targetSelectors, labels.Set(podSpec.NodeSelector).AsSelector())
 	}
-	if obj.TemplateSpec.Spec.Affinity != nil &&
-		obj.TemplateSpec.Spec.Affinity.NodeAffinity != nil &&
-		obj.TemplateSpec.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-		for _, terms := range obj.TemplateSpec.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+	if podSpec.Affinity != nil &&
+		podSpec.Affinity.NodeAffinity != nil &&
+		podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		for _, terms := range podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
 			for _, req := range terms.MatchExpressions {
 				selector, err := helper.NodeSelectorRequirementsAsSelector([]v1.NodeSelectorRequirement{req})
 				if err != nil {

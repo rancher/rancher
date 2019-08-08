@@ -829,3 +829,28 @@ func (c CommonController) GetActualFromWorkload(w *Workload) (
 	}
 	return
 }
+
+func (c CommonController) GetWorkloadByOwnerReferences(ns string, owners []metav1.OwnerReference) (*Workload, error) {
+	var workloadID string
+	for _, owner := range owners {
+		if _, ok := WorkloadKinds[owner.Kind]; ok {
+			workloadID = getWorkloadID(strings.ToLower(owner.Kind), ns, owner.Name)
+			break
+		}
+	}
+	if workloadID == "" {
+		return nil, nil
+	}
+	workload, err := c.GetByWorkloadID(workloadID)
+	if err != nil {
+		return nil, err
+	}
+	if len(workload.OwnerReferences) == 0 {
+		return workload, nil
+	}
+	nextWorkload, err := c.GetWorkloadByOwnerReferences(ns, workload.OwnerReferences)
+	if err != nil {
+		return workload, nil
+	}
+	return nextWorkload, nil
+}

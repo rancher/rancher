@@ -18,5 +18,12 @@ func Register(ctx context.Context, cluster *v3.Cluster, userContext *config.User
 	}
 	userContext.Management.Management.Nodes(clusterName).AddClusterScopedHandler(ctx, "linux-node-taints-handler", clusterName, node.sync)
 	workload := &WorkloadTolerationHandler{}
-	workload.workloadController = util.NewWorkloadController(ctx, userContext.UserOnlyContext(), workload.sync)
+	workloadController := util.NewWorkloadController(ctx, userContext.UserOnlyContext(), workload.sync)
+	workload.workloadController = workloadController
+
+	pod := &podRedeployController{
+		workloadHandler: workloadController,
+		podClient:       userContext.Core.Pods(""),
+	}
+	userContext.Core.Pods("").AddHandler(ctx, "linux-pod-redeployer", pod.sync)
 }

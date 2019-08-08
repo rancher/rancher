@@ -102,7 +102,7 @@ func Test_canDeploy(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		assert.Equalf(t, canDeployedIntoLinuxNode(c.target), c.canDeploy, "failed to tell which workload wants to be deployed into linux, test case: %s", c.name)
+		assert.Equalf(t, canDeployedIntoLinuxNode(c.target.TemplateSpec.Spec), c.canDeploy, "failed to tell which workload wants to be deployed into linux, test case: %s", c.name)
 	}
 }
 
