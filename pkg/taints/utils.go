@@ -7,6 +7,24 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
+)
+
+var (
+	HostOSLabels = map[string]labels.Set{
+		"beta.kubernetes.io/os": labels.Set(map[string]string{
+			"beta.kubernetes.io/os": "linux",
+		}),
+		"kubernetes.io/os": labels.Set(map[string]string{
+			"kubernetes.io/os": "linux",
+		}),
+	}
+	NodeTaint = v1.Taint{
+		Key:    "cattle.io/os",
+		Value:  "linux",
+		Effect: v1.TaintEffectNoSchedule,
+	}
 )
 
 func GetTaintsString(taint v1.Taint) string {
@@ -94,4 +112,46 @@ func GetRKETaintsFromStrings(sources []string) []v3.RKETaint {
 		}
 	}
 	return rtn
+}
+
+func GetSelectorByNodeSelectorTerms(terms []v1.NodeSelectorTerm) map[string][]labels.Selector {
+	rtn := map[string][]labels.Selector{}
+	for _, term := range terms {
+		for _, req := range term.MatchExpressions {
+			selector, err := helper.NodeSelectorRequirementsAsSelector([]v1.NodeSelectorRequirement{req})
+			if err != nil {
+				logrus.Warnf("failed to create selector from workload node affinity, error: %s", err.Error())
+				continue
+			}
+			rtn[req.Key] = append(rtn[req.Key], selector)
+		}
+	}
+	return rtn
+}
+
+func CanDeployToLinuxHost(selectorMap map[string][]labels.Selector) bool {
+	for key, selectors := range selectorMap {
+		hostOSLabel, ok := HostOSLabels[key]
+		if !ok || len(selectors) == 0 {
+			continue
+		}
+		result := true
+		// all the selector with same key should match our host labels
+		for _, selector := range selectors {
+			result = result && selector.Matches(hostOSLabel)
+		}
+		if result {
+			return true
+		}
+	}
+	return false
+}
+
+func GetTolerationByTaint(taint v1.Taint) v1.Toleration {
+	return v1.Toleration{
+		Key:      taint.Key,
+		Value:    taint.Value,
+		Operator: v1.TolerationOpEqual,
+		Effect:   taint.Effect,
+	}
 }

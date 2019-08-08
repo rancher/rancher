@@ -15,11 +15,13 @@ import (
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/customization/workload"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/taints"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	managementv3 "github.com/rancher/types/client/management/v3"
 	projectclient "github.com/rancher/types/client/project/v3"
+	mapper "github.com/rancher/types/mapper"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -67,7 +69,9 @@ func (s *CustomizeStore) Create(apiContext *types.APIContext, schema *types.Sche
 	if err := setPorts(convert.ToString(data["name"]), data); err != nil {
 		return nil, err
 	}
-	setScheduling(apiContext, data)
+	if err := setScheduling(apiContext, data); err != nil {
+		return data, err
+	}
 	setStrategy(data)
 
 	err := s.validateStatefulSetVolume(schema, data)
@@ -82,7 +86,9 @@ func (s *CustomizeStore) Update(apiContext *types.APIContext, schema *types.Sche
 	if err := setPorts(splitted[1], data); err != nil {
 		return nil, err
 	}
-	setScheduling(apiContext, data)
+	if err := setScheduling(apiContext, data); err != nil {
+		return data, err
+	}
 	setStrategy(data)
 	if err := setSecrets(apiContext, data, splitted[0], false); err != nil {
 		return nil, err
@@ -139,7 +145,7 @@ func (s *CustomizeStore) ByID(apiContext *types.APIContext, schema *types.Schema
 	return s.Store.ByID(apiContext, schema, shortID)
 }
 
-func setScheduling(apiContext *types.APIContext, data map[string]interface{}) {
+func setScheduling(apiContext *types.APIContext, data map[string]interface{}) error {
 	if _, ok := values.GetValue(data, "scheduling", "node"); ok {
 		if nodeID := convert.ToString(values.GetValueN(data, "scheduling", "node", "nodeId")); nodeID != "" {
 			nodeName := getNodeName(apiContext, nodeID)
@@ -150,7 +156,25 @@ func setScheduling(apiContext *types.APIContext, data map[string]interface{}) {
 		} else {
 			values.PutValue(data, "", "nodeId")
 		}
+
+		if requireRules, ok := values.GetStringSlice(data, "scheduling", "node", "requireAll"); ok {
+			if schedulingRuleFoundLinux(requireRules) {
+				clusterName := clusterName(apiContext)
+				var cluster managementv3.Cluster
+				if err := access.ByID(apiContext, &managementschema.Version, "cluster", clusterName, &cluster); err != nil {
+					return err
+				}
+				if !cluster.WindowsPreferedCluster || tolerationExists(data) {
+					return nil
+				}
+				if err := setToleration(data); err != nil {
+					return err
+				}
+			}
+		}
 	}
+
+	return nil
 }
 
 func setStrategy(data map[string]interface{}) {
@@ -409,4 +433,51 @@ func imageUpdated(apiContext *types.APIContext, data map[string]interface{}) (bo
 		}
 	}
 	return false, nil
+}
+
+func tolerationExists(workload map[string]interface{}) bool {
+	tolerations, ok := values.GetSlice(workload, "scheduling", "tolerate")
+	if !ok {
+		return false
+	}
+	for _, toleration := range tolerations {
+		if toleration["key"] == taints.NodeTaint.Key &&
+			toleration["effect"] == string(taints.NodeTaint.Effect) &&
+			toleration["operator"] == taints.NodeTaint.Value &&
+			toleration["value"] == string(corev1.TolerationOpEqual) {
+			return true
+		}
+	}
+	return false
+}
+
+func setToleration(workload map[string]interface{}) error {
+	toleration, err := convert.EncodeToMap(taints.GetTolerationByTaint(taints.NodeTaint))
+	if err != nil {
+		return err
+	}
+	tolerations, _ := values.GetSlice(workload, "scheduling", "tolerate")
+	tolerations = append(tolerations, toleration)
+	values.PutValue(workload, tolerations, "scheduling", "tolerate")
+	return nil
+}
+
+func clusterName(apiContext *types.APIContext) string {
+	clusterID := apiContext.SubContext["/v3/schemas/cluster"]
+	if clusterID == "" {
+		projectID, ok := apiContext.SubContext["/v3/schemas/project"]
+		if ok {
+			parts := strings.SplitN(projectID, ":", 2)
+			if len(parts) == 2 {
+				clusterID = parts[0]
+			}
+		}
+	}
+	return clusterID
+}
+
+func schedulingRuleFoundLinux(rules []string) bool {
+	terms := mapper.StringsToNodeSelectorTerm(rules)
+	selectors := taints.GetSelectorByNodeSelectorTerms(terms)
+	return taints.CanDeployToLinuxHost(selectors)
 }

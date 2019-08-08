@@ -3,22 +3,11 @@ package windows
 import (
 	"github.com/pkg/errors"
 	util "github.com/rancher/rancher/pkg/controllers/user/workload"
-	"github.com/sirupsen/logrus"
+	"github.com/rancher/rancher/pkg/taints"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
-)
-
-var (
-	HostOSLabels = []labels.Set{
-		labels.Set(map[string]string{
-			"beta.kubernetes.io/os": "linux",
-		}),
-		labels.Set(map[string]string{
-			"kubernetes.io/os": "linux",
-		}),
-	}
 )
 
 // WorkloadTolerationHandler add toleration to the workload with the node selector indicates that
@@ -48,7 +37,7 @@ func (w *WorkloadTolerationHandler) sync(key string, obj *util.Workload) error {
 			return nil
 		}
 		newObj := dp.DeepCopy()
-		newObj.Spec.Template.Spec.Tolerations = append(newObj.Spec.Template.Spec.Tolerations, newOSTolerations())
+		newObj.Spec.Template.Spec.Tolerations = append(newObj.Spec.Template.Spec.Tolerations, taints.GetTolerationByTaint(taints.NodeTaint))
 		if _, err := w.workloadController.Deployments.Update(newObj); err != nil {
 			return errors.Wrapf(err, "failed to update workload %s with os toleration", obj.Name)
 		}
@@ -57,7 +46,7 @@ func (w *WorkloadTolerationHandler) sync(key string, obj *util.Workload) error {
 			return nil
 		}
 		newObj := rc.DeepCopy()
-		newObj.Spec.Template.Spec.Tolerations = append(newObj.Spec.Template.Spec.Tolerations, newOSTolerations())
+		newObj.Spec.Template.Spec.Tolerations = append(newObj.Spec.Template.Spec.Tolerations, taints.GetTolerationByTaint(taints.NodeTaint))
 		if _, err := w.workloadController.ReplicationControllers.Update(newObj); err != nil {
 			return errors.Wrapf(err, "failed to update workload %s with os toleration", obj.Name)
 		}
@@ -66,7 +55,7 @@ func (w *WorkloadTolerationHandler) sync(key string, obj *util.Workload) error {
 			return nil
 		}
 		newObj := rs.DeepCopy()
-		newObj.Spec.Template.Spec.Tolerations = append(newObj.Spec.Template.Spec.Tolerations, newOSTolerations())
+		newObj.Spec.Template.Spec.Tolerations = append(newObj.Spec.Template.Spec.Tolerations, taints.GetTolerationByTaint(taints.NodeTaint))
 		if _, err := w.workloadController.ReplicaSets.Update(newObj); err != nil {
 			return errors.Wrapf(err, "failed to update workload %s with os toleration", obj.Name)
 		}
@@ -75,7 +64,7 @@ func (w *WorkloadTolerationHandler) sync(key string, obj *util.Workload) error {
 			return nil
 		}
 		newObj := ds.DeepCopy()
-		newObj.Spec.Template.Spec.Tolerations = append(newObj.Spec.Template.Spec.Tolerations, newOSTolerations())
+		newObj.Spec.Template.Spec.Tolerations = append(newObj.Spec.Template.Spec.Tolerations, taints.GetTolerationByTaint(taints.NodeTaint))
 		if _, err := w.workloadController.DaemonSets.Update(newObj); err != nil {
 			return errors.Wrapf(err, "failed to update workload %s with os toleration", obj.Name)
 		}
@@ -84,7 +73,7 @@ func (w *WorkloadTolerationHandler) sync(key string, obj *util.Workload) error {
 			return nil
 		}
 		newObj := ss.DeepCopy()
-		newObj.Spec.Template.Spec.Tolerations = append(newObj.Spec.Template.Spec.Tolerations, newOSTolerations())
+		newObj.Spec.Template.Spec.Tolerations = append(newObj.Spec.Template.Spec.Tolerations, taints.GetTolerationByTaint(taints.NodeTaint))
 		if _, err := w.workloadController.StatefulSets.Update(newObj); err != nil {
 			return errors.Wrapf(err, "failed to update workload %s with os toleration", obj.Name)
 		}
@@ -93,7 +82,7 @@ func (w *WorkloadTolerationHandler) sync(key string, obj *util.Workload) error {
 			return nil
 		}
 		newObj := job.DeepCopy()
-		newObj.Spec.Template.Spec.Tolerations = append(newObj.Spec.Template.Spec.Tolerations, newOSTolerations())
+		newObj.Spec.Template.Spec.Tolerations = append(newObj.Spec.Template.Spec.Tolerations, taints.GetTolerationByTaint(taints.NodeTaint))
 		if _, err := w.workloadController.Jobs.Update(newObj); err != nil {
 			return errors.Wrapf(err, "failed to update workload %s with os toleration", obj.Name)
 		}
@@ -102,7 +91,7 @@ func (w *WorkloadTolerationHandler) sync(key string, obj *util.Workload) error {
 			return nil
 		}
 		newObj := cj.DeepCopy()
-		newObj.Spec.JobTemplate.Spec.Template.Spec.Tolerations = append(newObj.Spec.JobTemplate.Spec.Template.Spec.Tolerations, newOSTolerations())
+		newObj.Spec.JobTemplate.Spec.Template.Spec.Tolerations = append(newObj.Spec.JobTemplate.Spec.Template.Spec.Tolerations, taints.GetTolerationByTaint(taints.NodeTaint))
 		if _, err := w.workloadController.CronJobs.Update(newObj); err != nil {
 			return errors.Wrapf(err, "failed to update workload %s with os toleration", obj.Name)
 		}
@@ -111,45 +100,20 @@ func (w *WorkloadTolerationHandler) sync(key string, obj *util.Workload) error {
 }
 
 func canDeployedIntoLinuxNode(podSpec v1.PodSpec) bool {
-	var targetSelectors []labels.Selector
-	if podSpec.NodeSelector != nil {
-		targetSelectors = append(targetSelectors, labels.Set(podSpec.NodeSelector).AsSelector())
-	}
+	targetSelectors := map[string][]labels.Selector{}
 	if podSpec.Affinity != nil &&
 		podSpec.Affinity.NodeAffinity != nil &&
 		podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-		for _, terms := range podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
-			for _, req := range terms.MatchExpressions {
-				selector, err := helper.NodeSelectorRequirementsAsSelector([]v1.NodeSelectorRequirement{req})
-				if err != nil {
-					logrus.Warnf("failed to create selector from workload node affinity, error: %s", err.Error())
-					continue
-				}
-				targetSelectors = append(targetSelectors, selector)
-			}
-		}
+		targetSelectors = taints.GetSelectorByNodeSelectorTerms(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms)
 	}
 
-	for _, selector := range targetSelectors {
-		for _, hostOSLabel := range HostOSLabels {
-			if selector.Matches(hostOSLabel) {
-				return true
-			}
-		}
+	for key, value := range podSpec.NodeSelector {
+		targetSelectors[key] = append(targetSelectors[key], labels.Set(map[string]string{key: value}).AsSelector())
 	}
 
-	return false
+	return taints.CanDeployToLinuxHost(targetSelectors)
 }
 
 func tolerationExists(tolerations []v1.Toleration) bool {
-	return helper.TolerationsTolerateTaint(tolerations, &nodeTaint)
-}
-
-func newOSTolerations() v1.Toleration {
-	return v1.Toleration{
-		Key:      nodeTaint.Key,
-		Value:    nodeTaint.Value,
-		Operator: v1.TolerationOpEqual,
-		Effect:   nodeTaint.Effect,
-	}
+	return helper.TolerationsTolerateTaint(tolerations, &taints.NodeTaint)
 }

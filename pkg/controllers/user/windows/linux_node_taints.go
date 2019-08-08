@@ -5,17 +5,8 @@ import (
 
 	"github.com/rancher/rancher/pkg/taints"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-)
-
-var (
-	nodeTaint = v1.Taint{
-		Key:    "cattle.io/os",
-		Value:  "linux",
-		Effect: v1.TaintEffectNoSchedule,
-	}
 )
 
 // NodeTaintsController This controller will only run on the cluster with windowsPreferred is true.
@@ -29,7 +20,7 @@ func (n *NodeTaintsController) sync(key string, obj *v3.Node) (runtime.Object, e
 		return obj, nil
 	}
 	found := false
-	for _, hostOSLabel := range HostOSLabels {
+	for _, hostOSLabel := range taints.HostOSLabels {
 		if hostOSLabel.AsSelector().Matches(labels.Set(obj.Status.NodeLabels)) {
 			found = true
 			break
@@ -46,13 +37,13 @@ func (n *NodeTaintsController) sync(key string, obj *v3.Node) (runtime.Object, e
 
 	taintSet := taints.GetTaintSet(obj.Spec.InternalNodeSpec.Taints)
 	// taint exists on nodes
-	if _, ok := taintSet[taints.GetTaintsString(nodeTaint)]; ok {
+	if _, ok := taintSet[taints.GetTaintsString(taints.NodeTaint)]; ok {
 		return obj, nil
 	}
 
 	newObj := obj.DeepCopy()
 	newObj.Spec.DesiredNodeTaints = append(newObj.Spec.DesiredNodeTaints, newObj.Spec.InternalNodeSpec.Taints...)
-	newObj.Spec.DesiredNodeTaints = append(newObj.Spec.DesiredNodeTaints, nodeTaint)
+	newObj.Spec.DesiredNodeTaints = append(newObj.Spec.DesiredNodeTaints, taints.NodeTaint)
 	falseValue := false
 	newObj.Spec.UpdateTaintsFromAPI = &falseValue
 	if _, err := n.nodeClient.Update(newObj); err != nil {

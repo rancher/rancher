@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/rancher/rancher/pkg/taints"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
@@ -36,7 +37,7 @@ func Test_nodeController(t *testing.T) {
 					Namespace: "local",
 				},
 				Status: v3.NodeStatus{
-					NodeLabels: HostOSLabels[0],
+					NodeLabels: taints.HostOSLabels["beta.kubernetes.io/os"],
 				},
 			},
 			shouldCall: true,
@@ -64,12 +65,12 @@ func Test_nodeController(t *testing.T) {
 				Spec: v3.NodeSpec{
 					InternalNodeSpec: v1.NodeSpec{
 						Taints: []v1.Taint{
-							nodeTaint,
+							taints.NodeTaint,
 						},
 					},
 				},
 				Status: v3.NodeStatus{
-					NodeLabels: HostOSLabels[0],
+					NodeLabels: taints.HostOSLabels["beta.kubernetes.io/os"],
 				},
 			},
 			shouldCall: false,
@@ -86,7 +87,7 @@ func Test_nodeController(t *testing.T) {
 					UpdateTaintsFromAPI: &falseValue,
 				},
 				Status: v3.NodeStatus{
-					NodeLabels: HostOSLabels[0],
+					NodeLabels: taints.HostOSLabels["beta.kubernetes.io/os"],
 				},
 			},
 			shouldCall: false,

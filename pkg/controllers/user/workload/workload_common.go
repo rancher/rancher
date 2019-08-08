@@ -849,8 +849,8 @@ func (c CommonController) GetWorkloadByOwnerReferences(ns string, owners []metav
 		return workload, nil
 	}
 	nextWorkload, err := c.GetWorkloadByOwnerReferences(ns, workload.OwnerReferences)
-	if err != nil {
-		return workload, nil
+	if nextWorkload == nil {
+		return workload, err
 	}
 	return nextWorkload, nil
 }

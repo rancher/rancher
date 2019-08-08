@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	util "github.com/rancher/rancher/pkg/controllers/user/workload"
+	"github.com/rancher/rancher/pkg/taints"
 	typesv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
 	v1beta2fakes "github.com/rancher/types/apis/apps/v1beta2/fakes"
 	typesbatchv1 "github.com/rancher/types/apis/batch/v1"
@@ -394,8 +395,8 @@ func validateUpdate(c workloadTestCase, in1 runtime.Object) error {
 		return fmt.Errorf("workload %s should be get in update function", c.reference.workload.Key)
 	}
 	podSpec := getPodSpec(in1)
-	if !helper.TolerationsTolerateTaint(podSpec.Tolerations, &nodeTaint) {
-		return fmt.Errorf("workload %s should have toleration for taint %+v", c.reference.workload.Key, nodeTaint)
+	if !helper.TolerationsTolerateTaint(podSpec.Tolerations, &taints.NodeTaint) {
+		return fmt.Errorf("workload %s should have toleration for taint %+v", c.reference.workload.Key, taints.NodeTaint)
 	}
 	return nil
 }
