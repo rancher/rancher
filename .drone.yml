@@ -353,7 +353,7 @@ steps:
         - tag
 
   - name: docker-publish-head-agent
-    image: plugins/docker
+    image: plugins/docker:windows-1809-amd64
     settings:
       build_args:
         - SERVERCORE_VERSION=1809
@@ -380,7 +380,7 @@ steps:
         - push
 
   - name: docker-publish-agent
-    image: plugins/docker
+    image: plugins/docker:windows-1809-amd64
     settings:
       build_args:
         - SERVERCORE_VERSION=1809
