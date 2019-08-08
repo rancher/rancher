@@ -22,6 +22,10 @@ type AKSVersionHandler struct {
 }
 
 type regionCapabilitiesRequestBody struct {
+	// BaseURL specifies the Azure Resource management endpoint, it defaults "https://management.azure.com/".
+	BaseURL string `json:"baseUrl"`
+	// AuthBaseURL specifies the Azure OAuth 2.0 authentication endpoint, it defaults "https://login.microsoftonline.com/".
+	AuthBaseURL string `json:"authBaseUrl"`
 	// credentials
 	ClientID       string `json:"clientId"`
 	ClientSecret   string `json:"clientSecret"`
@@ -57,14 +61,23 @@ func (g *AKSVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 	subscriptionID := body.SubscriptionID
 	tenantID := body.TenantID
 
-	oAuthConfig, err := adal.NewOAuthConfig(azure.PublicCloud.ActiveDirectoryEndpoint, tenantID)
+	baseURL := body.BaseURL
+	authBaseURL := body.AuthBaseURL
+	if baseURL == "" {
+		baseURL = azure.PublicCloud.ResourceManagerEndpoint
+	}
+	if authBaseURL == "" {
+		authBaseURL = azure.PublicCloud.ActiveDirectoryEndpoint
+	}
+
+	oAuthConfig, err := adal.NewOAuthConfig(authBaseURL, tenantID)
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
 		handleErr(writer, fmt.Errorf("failed to configure azure oaith: %v", err))
 		return
 	}
 
-	spToken, err := adal.NewServicePrincipalToken(*oAuthConfig, clientID, clientSecret, azure.PublicCloud.ResourceManagerEndpoint)
+	spToken, err := adal.NewServicePrincipalToken(*oAuthConfig, clientID, clientSecret, baseURL)
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
 		handleErr(writer, fmt.Errorf("failed to create token: %v", err))
@@ -73,7 +86,7 @@ func (g *AKSVersionHandler) ServeHTTP(writer http.ResponseWriter, req *http.Requ
 
 	authorizer := autorest.NewBearerAuthorizer(spToken)
 
-	client := containerservice.NewContainerServicesClient(subscriptionID)
+	client := containerservice.NewContainerServicesClientWithBaseURI(baseURL, subscriptionID)
 	client.Authorizer = authorizer
 
 	orchestrators, err := client.ListOrchestrators(context.Background(), region, "managedClusters")
