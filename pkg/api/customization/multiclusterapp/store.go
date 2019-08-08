@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
-	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/catalog/catutils"
 	"github.com/rancher/rancher/pkg/namespace"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	client "github.com/rancher/types/client/management/v3"
@@ -182,7 +182,7 @@ func (s *Store) validateRancherVersion(data map[string]interface{}) error {
 		return err
 	}
 
-	return catUtil.ValidateRancherVersion(template)
+	return catutils.ValidateRancherVersion(template)
 }
 
 func checkDuplicateTargets(data map[string]interface{}) error {

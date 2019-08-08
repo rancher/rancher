@@ -15,7 +15,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
-	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/catalog/catutils"
 	"github.com/rancher/rancher/pkg/namespace"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
@@ -286,5 +286,5 @@ func (w Wrapper) validateRancherVersion(tempVersion string) error {
 		return err
 	}
 
-	return catUtil.ValidateRancherVersion(template)
+	return catutils.ValidateRancherVersion(template)
 }

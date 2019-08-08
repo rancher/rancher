@@ -5,7 +5,7 @@ import (
 	"reflect"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/catalog/catutils"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -176,7 +176,7 @@ func (m *Manager) createTemplateVersions(catalogName string, versionsSpec []v3.T
 }
 
 func showUpgradeLinks(version, upgradeVersion string) bool {
-	if !utils.VersionGreaterThan(upgradeVersion, version) {
+	if !catutils.VersionGreaterThan(upgradeVersion, version) {
 		return false
 	}
 	return true

@@ -6,7 +6,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	pv3app "github.com/rancher/rancher/pkg/api/customization/app"
-	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/catalog/catutils"
 	hcommon "github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -81,5 +81,5 @@ func (s *Store) validateRancherVersion(data map[string]interface{}) error {
 		return err
 	}
 
-	return catUtil.ValidateRancherVersion(template)
+	return catutils.ValidateRancherVersion(template)
 }

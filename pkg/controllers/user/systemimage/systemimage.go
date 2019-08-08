@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	cutils "github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/catalog/catutils"
 	alerting "github.com/rancher/rancher/pkg/controllers/user/alert/deployer"
 	logging "github.com/rancher/rancher/pkg/controllers/user/logging/deployer"
 	pipeline "github.com/rancher/rancher/pkg/controllers/user/pipeline/upgrade"
@@ -44,7 +44,7 @@ func (s *Syncer) SyncCatalog(key string, obj *v3.Catalog) (runtime.Object, error
 		return nil, nil
 	}
 
-	if obj.Name != cutils.SystemLibraryName {
+	if obj.Name != catutils.SystemLibraryName {
 		return obj, nil
 	}
 

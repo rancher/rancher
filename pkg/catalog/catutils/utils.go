@@ -1,4 +1,4 @@
-package utils
+package catutils
 
 import (
 	"github.com/sirupsen/logrus"

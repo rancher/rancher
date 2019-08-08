@@ -11,7 +11,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
-	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/catalog/catutils"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	hcommon "github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	"github.com/rancher/rancher/pkg/ref"
@@ -254,5 +254,5 @@ func (w Wrapper) validateRancherVersion(externalID string) error {
 	if err != nil {
 		return err
 	}
-	return catUtil.ValidateRancherVersion(template)
+	return catutils.ValidateRancherVersion(template)
 }

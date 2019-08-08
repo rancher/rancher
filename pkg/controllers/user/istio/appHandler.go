@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	cutils "github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/catalog/catutils"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -51,7 +51,7 @@ func isIstioApp(obj *v3.App) bool {
 
 	template := values.Query().Get("template")
 
-	if catalog == cutils.SystemLibraryName && template == istioTemplateName {
+	if catalog == catutils.SystemLibraryName && template == istioTemplateName {
 		return true
 	}
 	return false

@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/rancher/pkg/catalog/catutils"
 	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
-	cutils "github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/namespace"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	client "github.com/rancher/types/client/management/v3"
@@ -142,7 +142,7 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 			}
 
 			if catalogType == client.CatalogType {
-				v.ExternalID = fmt.Sprintf(cutils.CatalogExternalIDFormat, catalog.Name, template.Spec.FolderName, v.Version)
+				v.ExternalID = fmt.Sprintf(catutils.CatalogExternalIDFormat, catalog.Name, template.Spec.FolderName, v.Version)
 			} else {
 				v.ExternalID = fmt.Sprintf("catalog://?catalog=%s/%s&type=%s&template=%s&version=%s", templateNamespace, catalog.Name, catalogType, template.Spec.FolderName, v.Version)
 			}

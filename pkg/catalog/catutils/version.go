@@ -1,4 +1,4 @@
-package utils
+package catutils
 
 import (
 	"strings"
@@ -6,7 +6,7 @@ import (
 	"github.com/blang/semver"
 	mVersion "github.com/mcuadros/go-version"
 	"github.com/rancher/norman/httperror"
-	"github.com/rancher/rancher/pkg/catalog/utils/version"
+	"github.com/rancher/rancher/pkg/catalog/catutils/version"
 	"github.com/rancher/rancher/pkg/settings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )

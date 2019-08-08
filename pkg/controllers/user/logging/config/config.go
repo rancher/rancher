@@ -3,7 +3,7 @@ package constant
 import (
 	"fmt"
 
-	cutils "github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/catalog/catutils"
 )
 
 const (
@@ -80,15 +80,15 @@ func SecretDataKeyCertKey(level, name string) string {
 }
 
 func RancherLoggingTemplateID() string {
-	return fmt.Sprintf("%s-%s", cutils.SystemLibraryName, templateName)
+	return fmt.Sprintf("%s-%s", catutils.SystemLibraryName, templateName)
 }
 
 func RancherLoggingFullVersion() string {
-	return fmt.Sprintf("%s-%s-%s", cutils.SystemLibraryName, templateName, AppInitVersion)
+	return fmt.Sprintf("%s-%s-%s", catutils.SystemLibraryName, templateName, AppInitVersion)
 }
 
 func RancherLoggingCatalogID(version string) string {
-	return fmt.Sprintf(cutils.CatalogExternalIDFormat, cutils.SystemLibraryName, templateName, version)
+	return fmt.Sprintf(catutils.CatalogExternalIDFormat, catutils.SystemLibraryName, templateName, version)
 }
 
 func RancherLoggingConfigSecretName() string {

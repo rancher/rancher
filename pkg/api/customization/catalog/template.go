@@ -11,8 +11,8 @@ import (
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/catalog/catutils"
 	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
-	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
 	hcommon "github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
@@ -179,7 +179,7 @@ func (t TemplateWrapper) templateVersionForRancherVersion(apiContext *types.APIC
 		}
 	}
 
-	if !catUtil.ReleaseServerVersion(rancherVersion) {
+	if !catutils.ReleaseServerVersion(rancherVersion) {
 		return true
 	}
 
@@ -193,7 +193,7 @@ func (t TemplateWrapper) templateVersionForRancherVersion(apiContext *types.APIC
 		return true
 	}
 
-	err = catUtil.ValidateRancherVersion(template)
+	err = catutils.ValidateRancherVersion(template)
 	if err != nil {
 		return false
 	}

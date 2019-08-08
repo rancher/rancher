@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/rancher/norman/types"
-	cutils "github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/catalog/catutils"
 	ns "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -238,7 +238,7 @@ func GetMonitoringCatalogID(version string, catalogTemplateLister mgmtv3.Catalog
 		}
 		version = template.Spec.DefaultVersion
 	}
-	return fmt.Sprintf(cutils.CatalogExternalIDFormat, cutils.SystemLibraryName, monitoringTemplateName, version), nil
+	return fmt.Sprintf(catutils.CatalogExternalIDFormat, catutils.SystemLibraryName, monitoringTemplateName, version), nil
 }
 
 type templateRegexpResult struct {

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/rancher/norman/controller"
-	cutils "github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/catalog/catutils"
 	alertutil "github.com/rancher/rancher/pkg/controllers/user/alert/common"
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
@@ -100,7 +100,7 @@ func (l *AlertService) Upgrade(currentVersion string) (string, error) {
 	if err != nil {
 		return "", errors.Wrapf(err, "get template %s failed", templateID)
 	}
-	newExternalID := fmt.Sprintf(cutils.CatalogExternalIDFormat, systemCatalogName, templateName, template.Spec.DefaultVersion)
+	newExternalID := fmt.Sprintf(catutils.CatalogExternalIDFormat, systemCatalogName, templateName, template.Spec.DefaultVersion)
 
 	newVersion, _, err := common.ParseExternalID(newExternalID)
 	if err != nil {

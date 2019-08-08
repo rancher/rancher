@@ -3,7 +3,7 @@ package common
 import (
 	"net/url"
 
-	cutils "github.com/rancher/rancher/pkg/catalog/utils"
+	"github.com/rancher/rancher/pkg/catalog/catutils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
@@ -26,7 +26,7 @@ func injectDefaultRegistry(obj *v3.App) map[string]string {
 		return nil
 	}
 
-	if values.Query().Get("catalog") != cutils.SystemLibraryName {
+	if values.Query().Get("catalog") != catutils.SystemLibraryName {
 		return nil
 	}
 
