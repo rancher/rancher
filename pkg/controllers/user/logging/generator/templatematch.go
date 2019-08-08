@@ -163,7 +163,11 @@ var MatchTemplate = `
 	{{- if .FluentForwarderConfig.EnableTLS }}
 	transport tls    
 	tls_allow_self_signed_cert true
+	{{- if .FluentForwarderConfig.SSLVerify }}
 	tls_verify_hostname true
+	{{else }}
+	tls_verify_hostname false
+	{{end }}
 	{{end}}
 	{{- if .FluentForwarderConfig.Certificate }}
 	tls_cert_path {{.CertFilePrefix}}_ca.pem
