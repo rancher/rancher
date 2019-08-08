@@ -474,6 +474,28 @@ Resources:
       ToPort: 443
       FromPort: 443
 
+  NodeSecurityGroupFromControlPlaneOn80Ingress:
+    Type: AWS::EC2::SecurityGroupIngress
+    DependsOn: NodeSecurityGroup
+    Properties:
+      Description: Allow pods to receive communication from cluster control plane via HTTP service proxy on port 80
+      GroupId: !Ref NodeSecurityGroup
+      SourceSecurityGroupId: !Ref ClusterControlPlaneSecurityGroup
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+
+  ControlPlaneEgressToNodeSecurityGroupOn80:
+    Type: AWS::EC2::SecurityGroupEgress
+    DependsOn: NodeSecurityGroup
+    Properties:
+      Description: Allow the cluster control plane to communicate with pods via HTTP service proxy on port 80
+      GroupId: !Ref ClusterControlPlaneSecurityGroup
+      DestinationSecurityGroupId: !Ref NodeSecurityGroup
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+
   NodeGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
