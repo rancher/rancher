@@ -24,8 +24,8 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 	resource.Links["shell"] = shellLink
 	resource.AddAction(request, v3.ClusterActionGenerateKubeconfig)
 	resource.AddAction(request, v3.ClusterActionImportYaml)
-	resource.AddAction(request, v3.ClusterActionExportYaml)
 	if _, ok := resource.Values["rancherKubernetesEngineConfig"]; ok {
+		resource.AddAction(request, v3.ClusterActionExportYaml)
 		resource.AddAction(request, v3.ClusterActionRotateCertificates)
 		if _, ok := values.GetValue(resource.Values, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig"); ok {
 			resource.AddAction(request, v3.ClusterActionBackupEtcd)

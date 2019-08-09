@@ -86,6 +86,11 @@ func (a ActionHandler) ExportYamlHandler(actionName string, action *types.Action
 	if err != nil {
 		return err
 	}
+
+	if cluster.Status.Driver != v3.ClusterDriverRKE {
+		return fmt.Errorf("cluster %v does not support being exported", cluster.Name)
+	}
+
 	topkey := compose.Config{}
 	topkey.Version = "v3"
 	c := mgmtclient.Cluster{}
@@ -128,6 +133,7 @@ func (a ActionHandler) ExportYamlHandler(actionName string, action *types.Action
 		delete(m["nodePools"].(map[string]interface{})[name].(map[string]interface{}), "actions")
 		delete(m["nodePools"].(map[string]interface{})[name].(map[string]interface{}), "links")
 	}
+
 	data, err := json.Marshal(m)
 	if err != nil {
 		return err
