@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -17,6 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/settings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
 	"github.com/rancher/types/apis/management.cattle.io/v3public/schema"
@@ -103,6 +105,11 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	responseType := generic.ResponseType
 	description := generic.Description
 	ttl := generic.TTLMillis
+
+	authTimeout := settings.AuthUserSessionTTLMinutes.Get()
+	if minutes, err := strconv.ParseInt(authTimeout, 10, 64); err == nil {
+		ttl = minutes * 60 * 1000
+	}
 
 	var input interface{}
 	var providerName string
