@@ -401,12 +401,14 @@ func (g *googleOauthProvider) getDirectoryService(ctx context.Context, userEmail
 		// using JWTConfigFromJSON method
 		config, err := google.JWTConfigFromJSON(jsonCredentials, admin.AdminDirectoryUserReadonlyScope, admin.AdminDirectoryGroupReadonlyScope)
 		if err != nil {
-			return nil, err
+			logrus.Errorf("[Google OAuth] error unmarshaling service account creds: %v", err)
+			return nil, fmt.Errorf("invalid Service Account Credentials provided")
 		}
 		config.Subject = userEmail
 		srv, err := admin.NewService(ctx, option.WithTokenSource(config.TokenSource(ctx)))
 		if err != nil {
-			return nil, err
+			logrus.Errorf("[Google OAuth] error generating tokenSource for service account creds: %v", err)
+			return nil, fmt.Errorf("invalid Service Account Credentials provided")
 		}
 		return srv, nil
 	}
