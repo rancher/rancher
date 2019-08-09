@@ -37,8 +37,8 @@ def test_generic_initial_defaults(admin_mc):
 
 def test_generic_initial_conditions(admin_mc, remove_resource):
     cluster = admin_mc.client.create_cluster(
-            name=random_str(), amazonElasticContainerServiceConfig={
-                "accessKey": "asdfsd"})
+        name=random_str(), amazonElasticContainerServiceConfig={
+            "accessKey": "asdfsd"})
     remove_resource(cluster)
 
     assert len(cluster.conditions) == 3
@@ -50,12 +50,14 @@ def test_generic_initial_conditions(admin_mc, remove_resource):
 
     assert cluster.conditions[2].type == 'Waiting'
     assert cluster.conditions[2].status == 'Unknown'
+
+    assert 'exportYaml' not in cluster.actions
 
 
 def test_rke_initial_conditions(admin_mc, remove_resource):
     cluster = admin_mc.client.create_cluster(
-            name=random_str(), rancherKubernetesEngineConfig={
-                "accessKey": "asdfsd"})
+        name=random_str(), rancherKubernetesEngineConfig={
+            "accessKey": "asdfsd"})
     remove_resource(cluster)
 
     assert len(cluster.conditions) == 3
@@ -67,6 +69,8 @@ def test_rke_initial_conditions(admin_mc, remove_resource):
 
     assert cluster.conditions[2].type == 'Waiting'
     assert cluster.conditions[2].status == 'Unknown'
+
+    assert 'exportYaml' in cluster.actions
 
 
 def test_import_initial_conditions(admin_mc, remove_resource):
