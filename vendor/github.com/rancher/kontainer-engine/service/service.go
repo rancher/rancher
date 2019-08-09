@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"os/user"
@@ -24,7 +25,6 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
-	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 var (
@@ -397,8 +397,21 @@ type RunningDriver struct {
 }
 
 func (r *RunningDriver) Start() (string, error) {
-	port := rand.Intn(1000) + 10*1000 // KontainerDriver port range 10,000 - 11,000
-	listenAddress := fmt.Sprintf("%v%v", ListenAddress, port)
+	ephemeralListenAddress := fmt.Sprintf("%s0", ListenAddress)
+	p, err := net.Listen("tcp", ephemeralListenAddress) // passing this port will cause go to provide open ephemeral port
+	if err != nil {
+		return "", fmt.Errorf("failed retrieving port for driver: %v", err)
+	}
+
+	listenAddress := p.Addr().String()
+	if err := p.Close(); err != nil {
+		return "", fmt.Errorf("failed to close port before starting driver: %v", err)
+	}
+
+	port, err := portOnly(listenAddress)
+	if err != nil {
+		return "", err
+	}
 
 	if r.Builtin {
 		driver := Drivers[r.Name]
@@ -428,7 +441,7 @@ func (r *RunningDriver) Start() (string, error) {
 		var processContext context.Context
 		processContext, r.cancel = context.WithCancel(context.Background())
 
-		cmd := exec.CommandContext(processContext, r.Path, strconv.Itoa(port))
+		cmd := exec.CommandContext(processContext, r.Path, port)
 
 		if os.Getenv("CATTLE_DEV_MODE") == "" {
 			cred, err := getUserCred()
@@ -453,12 +466,33 @@ func (r *RunningDriver) Start() (string, error) {
 
 		time.Sleep(5 * time.Second)
 
-		r.listenAddress = fmt.Sprintf("127.0.0.1:%v", port)
+		r.listenAddress = listenAddress
 	}
 
 	logrus.Infof("kontainerdriver %v listening on address %v", r.Name, r.listenAddress)
 
 	return r.listenAddress, nil
+}
+
+// portOnly attempts to return port fragment of address
+func portOnly(address string) (string, error) {
+	portParseErr := fmt.Errorf("failed to parse port from address [%s]", address)
+
+	_, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return "", errors.Wrap(err, portParseErr.Error())
+	}
+
+	portNum, err := strconv.Atoi(port)
+	if err != nil {
+		return "", portParseErr
+	}
+
+	if portNum < 1 || portNum > 65535 {
+		return "", errors.Wrap(fmt.Errorf(fmt.Sprintf("invalid port [%s], port range is between 1 and 65535", port)), portParseErr.Error())
+	}
+
+	return port, nil
 }
 
 func (r *RunningDriver) Stop() {
