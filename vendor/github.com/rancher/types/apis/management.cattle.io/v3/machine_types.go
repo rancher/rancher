@@ -157,7 +157,7 @@ type NodePoolSpec struct {
 	DisplayName string `json:"displayName"`
 	ClusterName string `json:"clusterName,omitempty" norman:"type=reference[cluster],noupdate,required"`
 
-	DeleteNotReadyAfterSecs time.Duration `json:"deleteNotReadyAfterSecs" norman:"default=0,max=9223372036854775807,min=0"`
+	DeleteNotReadyAfterSecs time.Duration `json:"deleteNotReadyAfterSecs" norman:"default=0,max=31540000,min=0"`
 }
 
 type NodePoolStatus struct {
