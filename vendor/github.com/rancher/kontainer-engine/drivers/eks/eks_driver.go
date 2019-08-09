@@ -127,6 +127,7 @@ type state struct {
 
 	MinimumASGSize int64
 	MaximumASGSize int64
+	DesiredASGSize int64
 	NodeVolumeSize *int64
 
 	UserData string
@@ -201,6 +202,13 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 	driverFlag.Options["maximum-nodes"] = &types.Flag{
 		Type:  types.IntType,
 		Usage: "The maximum number of worker nodes",
+		Default: &types.Default{
+			DefaultInt: 3,
+		},
+	}
+	driverFlag.Options["desired-nodes"] = &types.Flag{
+		Type:  types.IntType,
+		Usage: "The desired number of worker nodes",
 		Default: &types.Default{
 			DefaultInt: 3,
 		},
@@ -312,6 +320,7 @@ func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state.InstanceType = options.GetValueFromDriverOptions(driverOptions, types.StringType, "instance-type", "instanceType").(string)
 	state.MinimumASGSize = options.GetValueFromDriverOptions(driverOptions, types.IntType, "minimum-nodes", "minimumNodes").(int64)
 	state.MaximumASGSize = options.GetValueFromDriverOptions(driverOptions, types.IntType, "maximum-nodes", "maximumNodes").(int64)
+	state.DesiredASGSize = options.GetValueFromDriverOptions(driverOptions, types.IntType, "desired-nodes", "desiredNodes").(int64)
 	state.NodeVolumeSize, _ = options.GetValueFromDriverOptions(driverOptions, types.IntPointerType, "node-volume-size", "nodeVolumeSize").(*int64)
 	state.VirtualNetwork = options.GetValueFromDriverOptions(driverOptions, types.StringType, "virtual-network", "virtualNetwork").(string)
 	state.Subnets = options.GetValueFromDriverOptions(driverOptions, types.StringSliceType, "subnets").(*types.StringSlice).Value
@@ -363,8 +372,20 @@ func (state *state) validate() error {
 		return fmt.Errorf("maximum nodes must be greater than 0")
 	}
 
+	if state.DesiredASGSize < 1 {
+		return fmt.Errorf("desired nodes must be greater than 0")
+	}
+
 	if state.MaximumASGSize < state.MinimumASGSize {
 		return fmt.Errorf("maximum nodes cannot be less than minimum nodes")
+	}
+
+	if state.DesiredASGSize < state.MinimumASGSize {
+		return fmt.Errorf("desired nodes cannot be less than minimum nodes")
+	}
+
+	if state.DesiredASGSize > state.MaximumASGSize {
+		return fmt.Errorf("desired nodes cannot be greater than maximum nodes")
 	}
 
 	if state.NodeVolumeSize != nil && *state.NodeVolumeSize < 1 {
@@ -665,6 +686,8 @@ func (d *Driver) Create(ctx context.Context, options *types.DriverOptions, _ *ty
 				int(state.MinimumASGSize)))},
 			{ParameterKey: aws.String("NodeAutoScalingGroupMaxSize"), ParameterValue: aws.String(strconv.Itoa(
 				int(state.MaximumASGSize)))},
+			{ParameterKey: aws.String("NodeAutoScalingGroupDesiredCapacity"), ParameterValue: aws.String(strconv.Itoa(
+				int(state.DesiredASGSize)))},
 			{ParameterKey: aws.String("NodeVolumeSize"), ParameterValue: aws.String(strconv.Itoa(
 				int(volumeSize)))},
 			{ParameterKey: aws.String("NodeInstanceType"), ParameterValue: aws.String(state.InstanceType)},
