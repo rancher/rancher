@@ -866,7 +866,7 @@ func (d *Driver) waitForClusterReady(svc *eks.EKS, state state) (*eks.DescribeCl
 	var err error
 
 	status := ""
-	for status != "ACTIVE" {
+	for status != eks.ClusterStatusActive {
 		time.Sleep(30 * time.Second)
 
 		logrus.Infof("Waiting for cluster to finish provisioning")
@@ -887,6 +887,12 @@ func (d *Driver) waitForClusterReady(svc *eks.EKS, state state) (*eks.DescribeCl
 		}
 
 		status = *cluster.Cluster.Status
+
+		if status == eks.ClusterStatusFailed {
+			return nil, fmt.Errorf("creation failed for cluster named %q with ARN %q",
+				aws.StringValue(cluster.Cluster.Name),
+				aws.StringValue(cluster.Cluster.Arn))
+		}
 	}
 
 	return cluster, nil
