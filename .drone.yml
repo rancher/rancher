@@ -429,6 +429,114 @@ trigger:
       - promote
 ---
 kind: pipeline
+name: default-windows-1903
+
+platform:
+  os: windows
+  arch: amd64
+  version: 1903
+
+steps:
+  - name: build
+    pull: always
+    image: maiwj/dapper:windows-1903
+    commands:
+      - dapper.exe -f Dockerfile-windows.dapper -d ci
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      event:
+        - push
+        - pull_request
+        - tag
+
+  - name: stage-binaries
+    image: maiwj/dapper:windows-1903
+    commands:
+      - "cp -r ./bin/* ./package/windows/"
+    when:
+      event:
+        - push
+        - tag
+
+  - name: docker-publish-head-agent
+    image: plugins/docker:windows-1903-amd64
+    settings:
+      build_args:
+        - SERVERCORE_VERSION=1903
+        - ARCH=amd64
+        - VERSION=${DRONE_BRANCH/release\//}-head
+      context: package/windows
+      custom_dns: 1.1.1.1
+      dockerfile: package/windows/Dockerfile.agent
+      password:
+        from_secret: docker_password
+      repo: rancher/rancher-agent
+      tag: ${DRONE_BRANCH/release\//}-head-windows-1903
+      username:
+        from_secret: docker_username
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      ref:
+        include:
+        - "refs/heads/master"
+        - "refs/heads/release/v*"
+      event:
+        - push
+
+  - name: docker-publish-agent
+    image: plugins/docker:windows-1903-amd64
+    settings:
+      build_args:
+        - SERVERCORE_VERSION=1903
+        - ARCH=amd64
+        - "VERSION=${DRONE_TAG}"
+      context: package/windows
+      custom_dns: 1.1.1.1
+      dockerfile: package/windows/Dockerfile.agent
+      password:
+        from_secret: docker_password
+      repo: rancher/rancher-agent
+      tag: "${DRONE_TAG}-windows-1903"
+      username:
+        from_secret: docker_username
+    volumes:
+      - name: docker_pipe
+        path: \\\\.\\pipe\\docker_engine
+    when:
+      event:
+        - tag
+
+  - name: slack_notify
+    image: plugins/slack
+    settings:
+      template: "Build {{build.link}} failed to publish an image/artifact.\n"
+      username: Drone_Publish
+      webhook:
+        from_secret: slack_webhook
+    when:
+      event:
+        exclude:
+          - pull_request
+      instance:
+        - drone-publish.rancher.io
+      status:
+        - failure
+
+volumes:
+  - name: docker_pipe
+    host:
+      path: \\\\.\\pipe\\docker_engine
+
+trigger:
+  event:
+    exclude:
+      - promote
+---
+kind: pipeline
 name: manifest
 
 steps:
