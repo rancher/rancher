@@ -17,8 +17,8 @@ import (
 
 func SetUpAuthentication(ctx context.Context, kubeCluster, currentCluster *Cluster, fullState *FullState) error {
 	if kubeCluster.AuthnStrategies[AuthnX509Provider] {
-		compareCerts(ctx, kubeCluster, currentCluster)
 		kubeCluster.Certificates = fullState.DesiredState.CertificatesBundle
+		compareCerts(ctx, kubeCluster, currentCluster)
 		return nil
 	}
 	return nil

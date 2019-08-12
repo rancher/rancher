@@ -6,11 +6,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func UpdateRoleBindingFromYaml(k8sClient *kubernetes.Clientset, roleBindingYaml string) error {
+func UpdateRoleBindingFromYaml(k8sClient *kubernetes.Clientset, roleBindingYaml, namespace string) error {
 	roleBinding := rbacv1.RoleBinding{}
 	if err := decodeYamlResource(&roleBinding, roleBindingYaml); err != nil {
 		return err
 	}
+	roleBinding.Namespace = namespace
 	return retryTo(updateRoleBinding, k8sClient, roleBinding, DefaultRetries, DefaultSleepSeconds)
 }
 
@@ -27,11 +28,12 @@ func updateRoleBinding(k8sClient *kubernetes.Clientset, rb interface{}) error {
 	return nil
 }
 
-func UpdateRoleFromYaml(k8sClient *kubernetes.Clientset, roleYaml string) error {
+func UpdateRoleFromYaml(k8sClient *kubernetes.Clientset, roleYaml, namespace string) error {
 	role := rbacv1.Role{}
 	if err := decodeYamlResource(&role, roleYaml); err != nil {
 		return err
 	}
+	role.Namespace = namespace
 	return retryTo(updateRole, k8sClient, role, DefaultRetries, DefaultSleepSeconds)
 }
 
