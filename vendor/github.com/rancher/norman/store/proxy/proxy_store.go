@@ -20,6 +20,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -459,12 +460,12 @@ func (s *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 	}
 
 	namespace, name := splitID(id)
-
-	prop := metav1.DeletePropagationBackground
+	options, err := getDeleteOption(apiContext.Request)
+	if err != nil {
+		return nil, err
+	}
 	req := s.common(namespace, k8sClient.Delete()).
-		Body(&metav1.DeleteOptions{
-			PropagationPolicy: &prop,
-		}).
+		Body(options).
 		Name(name)
 
 	err = s.doAuthed(apiContext, req).Error()
@@ -507,6 +508,18 @@ func splitID(id string) (string, string) {
 	}
 
 	return namespace, id
+}
+
+func getDeleteOption(req *http.Request) (*metav1.DeleteOptions, error) {
+	options := &metav1.DeleteOptions{}
+	if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), metainternalversion.SchemeGroupVersion, options); err != nil {
+		return nil, err
+	}
+	prop := metav1.DeletePropagationBackground
+	if options.PropagationPolicy == nil {
+		options.PropagationPolicy = &prop
+	}
+	return options, nil
 }
 
 func (s *Store) common(namespace string, req *rest.Request) *rest.Request {
