@@ -19,8 +19,11 @@ mkdir -p /opt/jail/$NAME/management-state/bin
 mkdir -p /opt/jail/$NAME/tmp
 
 # Copy over required files to the jail
+if [[ -d /lib64 ]]; then 
+  cp -r /lib64 /opt/jail/$NAME
+fi
+
 cp -r /lib /opt/jail/$NAME
-cp -r /lib64 /opt/jail/$NAME
 cp -r /usr/lib /opt/jail/$NAME/usr
 cp /etc/ssl/certs/ca-certificates.crt /opt/jail/$NAME/etc/ssl/certs
 cp /etc/resolv.conf /opt/jail/$NAME/etc/
