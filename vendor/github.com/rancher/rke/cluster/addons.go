@@ -13,8 +13,10 @@ import (
 	"strings"
 
 	"github.com/rancher/rke/addons"
+	"github.com/rancher/rke/authz"
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
+	"github.com/rancher/rke/services"
 	"github.com/rancher/rke/util"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
@@ -489,6 +491,12 @@ func (c *Cluster) deployIngress(ctx context.Context, data map[string]interface{}
 	}
 	if err := c.doAddonDeploy(ctx, ingressYaml, IngressAddonResourceName, false); err != nil {
 		return err
+	}
+	// ingress runs in it's own namespace, so it needs it's own role/rolebinding for PSP
+	if c.Authorization.Mode == services.RBACAuthorizationMode && c.Services.KubeAPI.PodSecurityPolicy {
+		if err := authz.ApplyDefaultPodSecurityPolicyRole(ctx, c.LocalKubeConfigPath, NginxIngressAddonAppName, c.K8sWrapTransport); err != nil {
+			return fmt.Errorf("Failed to apply default PodSecurityPolicy ClusterRole and ClusterRoleBinding: %v", err)
+		}
 	}
 	log.Infof(ctx, "[ingress] ingress controller %s deployed successfully", c.Ingress.Provider)
 	return nil

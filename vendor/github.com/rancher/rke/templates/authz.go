@@ -11,6 +11,9 @@ rules:
   resources:
   - nodes/metrics
   - nodes/proxy
+  - nodes/stats
+  - nodes/log
+  - nodes/spec
   verbs: ["get", "list", "watch", "create"]`
 	KubeAPIClusterRoleBinding = `
 apiVersion: rbac.authorization.k8s.io/v1
@@ -69,7 +72,6 @@ apiVersion: extensions/v1beta1
 kind: PodSecurityPolicy
 metadata:
   name: default-psp
-  namespace: kube-system
   annotations:
     seccomp.security.alpha.kubernetes.io/allowedProfileNames: '*'
 spec:
@@ -99,7 +101,6 @@ kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: default-psp-role
-  namespace: kube-system
 rules:
 - apiGroups: ['extensions']
   resources: ['podsecuritypolicies']
@@ -112,7 +113,6 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: default-psp-rolebinding
-  namespace: kube-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

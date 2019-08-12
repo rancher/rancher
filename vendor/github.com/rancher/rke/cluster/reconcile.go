@@ -366,11 +366,18 @@ func checkCertificateChanges(ctx context.Context, currentCluster, kubeCluster *C
 }
 
 func isEtcdPlaneReplaced(ctx context.Context, currentCluster, kubeCluster *Cluster) bool {
-	etcdToDeleteInactive := hosts.GetToDeleteHosts(currentCluster.EtcdHosts, kubeCluster.EtcdHosts, kubeCluster.InactiveHosts, true)
+	numCurrentEtcdHosts := len(currentCluster.EtcdHosts)
+	// We had and have no etcd hosts, nothing was replaced
+	if numCurrentEtcdHosts == 0 && len(kubeCluster.EtcdHosts) == 0 {
+		return false
+	}
+
 	// old etcd nodes are down, we added new ones
-	if len(etcdToDeleteInactive) == len(currentCluster.EtcdHosts) {
+	numEtcdToDeleteInactive := len(hosts.GetToDeleteHosts(currentCluster.EtcdHosts, kubeCluster.EtcdHosts, kubeCluster.InactiveHosts, true))
+	if numEtcdToDeleteInactive == numCurrentEtcdHosts {
 		return true
 	}
+
 	// one or more etcd nodes are removed from cluster.yaml and replaced
 	if len(hosts.GetHostListIntersect(kubeCluster.EtcdHosts, currentCluster.EtcdHosts)) == 0 {
 		return true
