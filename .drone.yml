@@ -658,6 +658,7 @@ depends_on:
 - default-linux-amd64
 - default-linux-arm64
 - default-windows-1809
+- default-windows-1903
 ---
 kind: pipeline
 name: publish
