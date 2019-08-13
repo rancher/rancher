@@ -22,7 +22,7 @@ ENV LOGLEVEL_VERSION v0.1.2
 ENV TINI_VERSION v0.18.0
 ENV TELEMETRY_VERSION v0.5.6
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.7
-ENV LINODE_UI_DRIVER_VERSION v0.3.0-alpha.1
+ENV LINODE_UI_DRIVER_VERSION v0.3.0
 
 RUN curl -sLf https://github.com/rancher/machine-package/releases/download/${CATTLE_MACHINE_VERSION}/docker-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin && \
     curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-${ARCH}-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin && \
