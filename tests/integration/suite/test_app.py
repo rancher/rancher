@@ -523,7 +523,15 @@ def test_app_rollback_validation(admin_mc, admin_pc, custom_catalog,
     remove_resource(app1)
     wait_for_workload(admin_pc.client, ns.name, count=1)
 
+    def _app_revision():
+        app = admin_pc.client.reload(app1)
+        return app.appRevisionId is not None
+
+    wait_for(_app_revision, fail_handler=lambda: 'app has no revision')
+
     app1 = admin_pc.client.reload(app1)
+
+    assert app1.appRevisionId is not None, 'app has no revision'
 
     original_rev = app1.appRevisionId
 
@@ -559,7 +567,7 @@ def test_app_rollback_validation(admin_mc, admin_pc, custom_catalog,
 
     # Rollback requires a max of 2.2.0 so an error should be returned
     with pytest.raises(ApiError) as e:
-        app1 = client.action(**rollback_dict)
+        client.action(**rollback_dict)
     assert e.value.error.status == 422
     assert e.value.error.message == 'rancher max version exceeded'
 
@@ -567,9 +575,11 @@ def test_app_rollback_validation(admin_mc, admin_pc, custom_catalog,
 
     # Second try requires a min of 2.0.0 so an error should be returned
     with pytest.raises(ApiError) as e:
-        app1 = client.action(**rollback_dict)
+        client.action(**rollback_dict)
+
+    msg = e.value.error
+    assert e.value.error.message == 'rancher min version not met', msg
     assert e.value.error.status == 422
-    assert e.value.error.message == 'rancher min version not met'
 
 
 def wait_for_workload(client, ns, timeout=60, count=0):
