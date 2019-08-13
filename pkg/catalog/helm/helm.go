@@ -74,7 +74,7 @@ func (h *Helm) lockAndVerifyCachePath() error {
 	return nil
 }
 
-func (h *Helm) request(pathURL, method string) (*http.Response, error) {
+func (h *Helm) request(pathURL string) (*http.Response, error) {
 	baseEndpoint, err := url.Parse(pathURL)
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func (h *Helm) request(pathURL, method string) (*http.Response, error) {
 	if len(h.username) > 0 && len(h.password) > 0 {
 		baseEndpoint.User = url.UserPassword(h.username, h.password)
 	}
-	req, err := http.NewRequest(method, baseEndpoint.String(), nil)
+	req, err := http.NewRequest(http.MethodGet, baseEndpoint.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func (h *Helm) request(pathURL, method string) (*http.Response, error) {
 func (h *Helm) downloadIndex(indexURL string) (*RepoIndex, error) {
 	indexURL = strings.TrimSuffix(indexURL, "/")
 	indexURL = indexURL + "/index.yaml"
-	resp, err := h.request(indexURL, "GET")
+	resp, err := h.request(indexURL)
 	if err != nil {
 		if e, ok := err.(net.Error); ok && e.Timeout() {
 			return nil, errors.Errorf("Timeout in HTTP GET to [%s], did not respond in %s", indexURL, httpTimeout)
@@ -171,7 +171,7 @@ func (h *Helm) fetchTgz(url string) ([]v3.File, error) {
 	var files []v3.File
 
 	logrus.Debugf("Helm fetching file %s", url)
-	resp, err := h.request(url, "GET")
+	resp, err := h.request(url)
 	if err != nil {
 		return nil, errors.Errorf("Error in HTTP GET of [%s], error: %s", url, err)
 	}
