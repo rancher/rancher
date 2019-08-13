@@ -45,6 +45,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/store/noopwatching"
 	passwordStore "github.com/rancher/rancher/pkg/api/store/password"
 	"github.com/rancher/rancher/pkg/api/store/preference"
+	rtStore "github.com/rancher/rancher/pkg/api/store/roletemplate"
 	"github.com/rancher/rancher/pkg/api/store/scoped"
 	settingstore "github.com/rancher/rancher/pkg/api/store/setting"
 	"github.com/rancher/rancher/pkg/api/store/userscope"
@@ -643,7 +644,9 @@ func RoleTemplate(schemas *types.Schemas, management *config.ScaledContext) {
 		RoleTemplateLister: management.Management.RoleTemplates("").Controller().Lister(),
 	}
 	schema := schemas.Schema(&managementschema.Version, client.RoleTemplateType)
+	schema.Formatter = rt.Formatter
 	schema.Validator = rt.Validator
+	schema.Store = rtStore.Wrap(schema.Store, management.Management.RoleTemplates("").Controller().Lister())
 }
 
 func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {

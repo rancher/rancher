@@ -8,6 +8,8 @@ import (
 	"github.com/rancher/norman/types/convert"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	client "github.com/rancher/types/client/management/v3"
+	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 type Wrapper struct {
@@ -48,4 +50,22 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 
 	}
 	return nil
+}
+
+func (w Wrapper) Formatter(apiContext *types.APIContext, resource *types.RawResource) {
+	roleTemplates, err := w.RoleTemplateLister.List("", labels.Everything())
+	if err != nil {
+		logrus.Warnf("[roletemplate formatter] Failed to list roletemplates. Error: %v", err)
+		return
+	}
+
+	for _, rt := range roleTemplates {
+		for _, parent := range rt.RoleTemplateNames {
+			if parent == resource.ID {
+				// if another roletemplate inherits from current roletemplate, disable remove
+				delete(resource.Links, "remove")
+				return
+			}
+		}
+	}
 }
