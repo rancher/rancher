@@ -34,8 +34,8 @@ type machineDriverCompare struct {
 }
 
 func addMachineDrivers(management *config.ManagementContext) error {
-	if err := addMachineDriver("pinganyunecs", "https://machine-driver.oss-cn-shanghai.aliyuncs.com/pinganyun/v0.2.0/docker-machine-driver-pinganyunecs-linux.tgz",
-		"https://machine-driver.oss-cn-shanghai.aliyuncs.com/pinganyun/v0.1.0/ui/component.js", "b87c8ccb578357b2a26be744d8d05e1dbf2531e91119e03efb7383686f9e56fc",
+	if err := addMachineDriver("pinganyunecs", "https://machine-driver.oss-cn-shanghai.aliyuncs.com/pinganyun/v0.3.0/linux/amd64/docker-machine-driver-pinganyunecs-linux.tgz",
+		"https://machine-driver.oss-cn-shanghai.aliyuncs.com/pinganyun/v0.3.0/ui/component.js", "f84ccec11c2c1970d76d30150916933efe8ca49fe4c422c8954fc37f71273bb5",
 		[]string{"machine-driver.oss-cn-shanghai.aliyuncs.com"}, false, false, management); err != nil {
 		return err
 	}
