@@ -13,6 +13,7 @@ import (
 	appsv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
 
 	"github.com/pkg/errors"
@@ -139,6 +140,9 @@ func (l *LoggingService) Upgrade(currentVersion string) (string, error) {
 	newApp.Spec.ExternalID = newCatalogID
 
 	if !reflect.DeepEqual(newApp, app) {
+		// add force upgrade to handle chart compatibility in different version
+		projectv3.AppConditionForceUpgrade.Unknown(newApp)
+
 		if _, err = l.appDeployer.AppsGetter.Apps(metav1.NamespaceAll).Update(newApp); err != nil {
 			return "", errors.Wrapf(err, "update app %s:%s failed", app.Namespace, app.Name)
 		}
