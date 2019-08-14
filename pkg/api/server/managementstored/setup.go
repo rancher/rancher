@@ -230,9 +230,7 @@ func setupScopedTypes(schemas *types.Schemas) {
 
 func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler) {
 	schema := schemas.Schema(&managementschema.Version, client.ClusterType)
-	clusterFormatter := ccluster.Formatter{
-		KontainerDriverLister: managementContext.Management.KontainerDrivers("").Controller().Lister(),
-	}
+	clusterFormatter := ccluster.NewFormatter(schemas, managementContext)
 	schema.Formatter = clusterFormatter.Formatter
 	schema.CollectionFormatter = clusterFormatter.CollectionFormatter
 	clusterStore := cluster.GetClusterStore(schema, managementContext, clusterManager, k8sProxy)

@@ -93,9 +93,11 @@ func (t *transformer) transposeGenericConfigToDynamicField(data map[string]inter
 }
 
 func GetClusterStore(schema *types.Schema, mgmt *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler) *Store {
+
 	transformer := transformer{
 		KontainerDriverLister: mgmt.Management.KontainerDrivers("").Controller().Lister(),
 	}
+
 	t := &transform.Store{
 		Store:       schema.Store,
 		Transformer: transformer.TransformerFunc,
