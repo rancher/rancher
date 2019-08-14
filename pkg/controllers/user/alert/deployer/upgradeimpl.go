@@ -167,6 +167,9 @@ func (l *AlertService) Upgrade(currentVersion string) (string, error) {
 			return "", fmt.Errorf("catalog %v not ready", systemCatalogName)
 		}
 
+		// add force upgrade to handle chart compatibility in different version
+		projectv3.AppConditionForceUpgrade.Unknown(newApp)
+
 		if _, err = l.apps.Update(newApp); err != nil {
 			return "", fmt.Errorf("update app %s:%s failed, %v", app.Namespace, app.Name, err)
 		}
