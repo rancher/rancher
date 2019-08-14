@@ -497,10 +497,9 @@ func RestartClusterPods(ctx context.Context, kubeCluster *Cluster) error {
 		return fmt.Errorf("Failed to initialize new kubernetes client: %v", err)
 	}
 	labelsList := []string{
-		fmt.Sprintf("%s=%s", KubeAppLabel, CalicoNetworkPlugin),
 		fmt.Sprintf("%s=%s", KubeAppLabel, FlannelNetworkPlugin),
 		fmt.Sprintf("%s=%s", KubeAppLabel, CanalNetworkPlugin),
-		fmt.Sprintf("%s=%s", NameLabel, WeaveNetowrkAppName),
+		fmt.Sprintf("%s=%s", NameLabel, WeaveNetworkAppName),
 		fmt.Sprintf("%s=%s", AppLabel, NginxIngressAddonAppName),
 		fmt.Sprintf("%s=%s", KubeAppLabel, DefaultMonitoringProvider),
 		fmt.Sprintf("%s=%s", KubeAppLabel, KubeDNSAddonAppName),
@@ -508,6 +507,9 @@ func RestartClusterPods(ctx context.Context, kubeCluster *Cluster) error {
 		fmt.Sprintf("%s=%s", KubeAppLabel, CoreDNSAutoscalerAppName),
 		fmt.Sprintf("%s=%s", AppLabel, KubeAPIAuthAppName),
 		fmt.Sprintf("%s=%s", AppLabel, CattleClusterAgentAppName),
+	}
+	for _, calicoLabel := range CalicoNetworkLabels {
+		labelsList = append(labelsList, fmt.Sprintf("%s=%s", KubeAppLabel, calicoLabel))
 	}
 	var errgrp errgroup.Group
 	labelQueue := util.GetObjectQueue(labelsList)

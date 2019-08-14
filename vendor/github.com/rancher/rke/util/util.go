@@ -2,11 +2,12 @@ package util
 
 import (
 	"fmt"
-	"github.com/rancher/rke/metadata"
 	"net/url"
 	"os"
 	"reflect"
 	"strings"
+
+	"github.com/rancher/rke/metadata"
 
 	"github.com/coreos/go-semver/semver"
 	ref "github.com/docker/distribution/reference"
@@ -87,6 +88,10 @@ func IsFileExists(filePath string) (bool, error) {
 }
 
 func GetDefaultRKETools(image string) (string, error) {
+	// don't override tag of custom system images
+	if !strings.Contains(image, "rancher/rke-tools") {
+		return image, nil
+	}
 	tag, err := GetImageTagFromImage(image)
 	if err != nil || tag == "" {
 		return "", fmt.Errorf("defaultRKETools: no tag %s", image)
