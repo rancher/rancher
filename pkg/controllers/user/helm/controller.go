@@ -332,8 +332,8 @@ func (l *Lifecycle) createAppRevision(obj *v3.App, template, notes string, faile
 	if failed {
 		release.Labels[failedLabel] = "true"
 	}
+	release.Spec.ProjectName = obj.Spec.ProjectName
 	release.Status.Answers = obj.Spec.Answers
-	release.Status.ProjectName = projectName
 	release.Status.ExternalID = obj.Spec.ExternalID
 	release.Status.ValuesYaml = obj.Spec.ValuesYaml
 	release.Status.Files = obj.Spec.Files

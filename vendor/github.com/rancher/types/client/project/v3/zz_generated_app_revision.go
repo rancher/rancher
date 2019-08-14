@@ -13,6 +13,7 @@ const (
 	AppRevisionFieldName                 = "name"
 	AppRevisionFieldNamespaceId          = "namespaceId"
 	AppRevisionFieldOwnerReferences      = "ownerReferences"
+	AppRevisionFieldProjectID            = "projectId"
 	AppRevisionFieldRemoved              = "removed"
 	AppRevisionFieldState                = "state"
 	AppRevisionFieldStatus               = "status"
@@ -30,6 +31,7 @@ type AppRevision struct {
 	Name                 string             `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId          string             `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	OwnerReferences      []OwnerReference   `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	ProjectID            string             `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Removed              string             `json:"removed,omitempty" yaml:"removed,omitempty"`
 	State                string             `json:"state,omitempty" yaml:"state,omitempty"`
 	Status               *AppRevisionStatus `json:"status,omitempty" yaml:"status,omitempty"`

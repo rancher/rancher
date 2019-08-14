@@ -289,7 +289,7 @@ type SMTPConfig struct {
 }
 
 type SlackConfig struct {
-	DefaultRecipient string `json:"defaultRecipient,omitempty" norman:"required"`
+	DefaultRecipient string `json:"defaultRecipient,omitempty"`
 	URL              string `json:"url,omitempty" norman:"required"`
 	*HTTPClientConfig
 }

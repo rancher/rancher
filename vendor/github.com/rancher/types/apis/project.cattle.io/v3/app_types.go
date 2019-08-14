@@ -71,7 +71,9 @@ type AppRevision struct {
 	Status AppRevisionStatus `json:"status,omitempty"`
 }
 
-type AppRevisionSpec struct{}
+type AppRevisionSpec struct {
+	ProjectName string `json:"projectName,omitempty" norman:"type=reference[/v3/schemas/project]"`
+}
 
 type AppRevisionStatus struct {
 	ProjectName string            `json:"projectName,omitempty" norman:"type=reference[/v3/schemas/project]"`
