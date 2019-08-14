@@ -479,6 +479,77 @@ def test_required_template_question(admin_mc, remove_resource):
         assert e.value.error.status == 422
 
 
+def test_secret_template_answers(admin_mc, remove_resource):
+    cluster_template = create_cluster_template(admin_mc,
+                                               remove_resource, [], admin_mc)
+    tId = cluster_template.id
+    client = admin_mc.client
+
+    cconfig = {
+        "rancherKubernetesEngineConfig": {
+            "services": {
+                "type": "rkeConfigServices",
+                "kubeApi": {
+                    "alwaysPullImages": "false",
+                    "podSecurityPolicy": "false",
+                    "serviceNodePortRange": "30000-32767",
+                    "type": "kubeAPIService"
+                }
+            }
+        },
+        "defaultPodSecurityPolicyTemplateId": "restricted",
+    }
+    azureClientId = "rancherKubernetesEngineConfig.cloudProvider.\
+azureCloudProvider.aadClientId"
+    azureClientSecret = "rancherKubernetesEngineConfig.cloudProvider.\
+azureCloudProvider.aadClientSecret"
+
+    questions = [{
+                  "variable": "dockerRootDir",
+                  "required": "true",
+                  "type": "string",
+                  "default": ""
+                 },
+                 {
+                  "variable": azureClientId,
+                  "required": "true",
+                  "type": "string",
+                  "default": "abcdClientId"
+                 },
+                 {
+                  "variable": azureClientSecret,
+                  "required": "true",
+                  "type": "string",
+                  "default": ""
+                 }]
+
+    rev = client.create_cluster_template_revision(clusterConfig=cconfig,
+                                                  clusterTemplateId=tId,
+                                                  questions=questions,
+                                                  enabled="true")
+
+    # creating a cluster with this template
+    answers = {
+                "values": {
+                    "dockerRootDir": "/var/lib/docker123",
+                    azureClientId: "abcdClientId",
+                    azureClientSecret: "abcdClientSecret"
+                }
+              }
+
+    cluster = client.create_cluster(name=random_str(),
+                                    clusterTemplateRevisionId=rev.id,
+                                    description="template from cluster",
+                                    answers=answers)
+    remove_resource(cluster)
+    assert cluster.conditions[0].type == 'Pending'
+    assert cluster.conditions[0].status == 'True'
+    assert cluster.answers.values[azureClientId] is not None
+    assert azureClientSecret not in cluster.answers.values
+    client.delete(cluster)
+    wait_for_cluster_to_be_deleted(client, cluster.id)
+
+
 def rtb_cb(client, rtb):
     """Wait for the prtb to have the userId populated"""
     def cb():
