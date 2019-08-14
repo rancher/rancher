@@ -52,8 +52,10 @@ const (
 	// FlannelBackendVxLanNetworkIdentify should be greater than or equal to 4096 if using VxLan mode in the cluster with Windows nodes
 	FlannelBackendVxLanNetworkIdentify = "flannel_backend_vni"
 
-	CalicoNetworkPlugin = "calico"
-	CalicoCloudProvider = "calico_cloud_provider"
+	CalicoNetworkPlugin   = "calico"
+	CalicoNodeLabel       = "calico-node"
+	CalicoControllerLabel = "calico-kube-controllers"
+	CalicoCloudProvider   = "calico_cloud_provider"
 
 	CanalNetworkPlugin      = "canal"
 	CanalIface              = "canal_iface"
@@ -64,7 +66,7 @@ const (
 	CanalFlannelBackendVxLanNetworkIdentify = "canal_flannel_backend_vni"
 
 	WeaveNetworkPlugin  = "weave"
-	WeaveNetowrkAppName = "weave-net"
+	WeaveNetworkAppName = "weave-net"
 	// List of map keys to be used with network templates
 
 	// EtcdEndpoints is the server address for Etcd, used by calico
@@ -122,6 +124,8 @@ var WorkerPortList = []string{
 var EtcdClientPortList = []string{
 	EtcdPort1,
 }
+
+var CalicoNetworkLabels = []string{CalicoNodeLabel, CalicoControllerLabel}
 
 func (c *Cluster) deployNetworkPlugin(ctx context.Context, data map[string]interface{}) error {
 	log.Infof(ctx, "[network] Setting up network plugin: %s", c.Network.Plugin)
