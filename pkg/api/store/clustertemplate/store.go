@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/customization/clustertemplate"
+	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	mgmtSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
@@ -41,6 +42,11 @@ type Store struct {
 }
 
 func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
+	if strings.EqualFold(apiContext.Type, managementv3.ClusterTemplateType) {
+		if err := p.checkMembersAccessType(data); err != nil {
+			return nil, err
+		}
+	}
 
 	if strings.EqualFold(apiContext.Type, managementv3.ClusterTemplateRevisionType) {
 		if data[managementv3.ClusterTemplateRevisionFieldClusterConfig] == nil {
@@ -63,6 +69,11 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 }
 
 func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
+	if strings.EqualFold(apiContext.Type, managementv3.ClusterTemplateType) {
+		if err := p.checkMembersAccessType(data); err != nil {
+			return nil, err
+		}
+	}
 
 	if strings.EqualFold(apiContext.Type, managementv3.ClusterTemplateRevisionType) {
 		err := p.checkKubernetesVersionFormat(apiContext, data)
@@ -235,6 +246,17 @@ func (p *Store) checkKubernetesVersionFormat(apiContext *types.APIContext, data 
 		}
 		if !foundQ {
 			return httperror.NewAPIError(httperror.MissingRequired, fmt.Sprintf("ClusterTemplateRevision must have a Question set for %v", clustertemplate.RKEConfigK8sVersion))
+		}
+	}
+	return nil
+}
+
+func (p *Store) checkMembersAccessType(data map[string]interface{}) error {
+	members := convert.ToMapSlice(data[managementv3.ClusterTemplateFieldMembers])
+	for _, m := range members {
+		accessType := convert.ToString(m[managementv3.MemberFieldAccessType])
+		if accessType != globalnamespacerbac.OwnerAccess && accessType != globalnamespacerbac.ReadOnlyAccess {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, "Invalid accessType provided while sharing cluster template")
 		}
 	}
 	return nil
