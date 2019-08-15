@@ -36,6 +36,25 @@ var FilterTemplate = `
 </filter>
 {{end}}
 
+{{define "filter-concat"}}
+{{- if .EnableMultiLineFilter}}
+<filter {{ .ContainerLogSourceTag }}.**>
+  @type concat
+  key log
+  stream_identity_key tag
+{{- if .MultiLineStartRegexp}}
+  multiline_start_regexp {{ (print "/" .MultiLineStartRegexp "/") | escapeString}}
+{{end}}
+{{- if .ContinuousLineRegexp}}
+  continuous_line_regexp {{ (print "/" .ContinuousLineRegexp "/") | escapeString}}
+{{end}}
+{{- if .MultiLineEndRegexp}}
+  multiline_end_regexp {{ (print "/" .MultiLineEndRegexp "/") | escapeString}}
+{{end}}
+</filter>
+{{end}}
+{{end}}
+
 {{define "filter-custom-tags"}}
 <filter {{ .ContainerLogSourceTag }}.**>
   @type record_transformer

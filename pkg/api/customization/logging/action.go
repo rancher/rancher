@@ -66,7 +66,7 @@ func CollectionFormatter(apiContext *types.APIContext, resource *types.GenericCo
 func (h *Handler) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	var target mgmtv3.LoggingTargets
 	var clusterName, projectID, level, containerLogSourceTag string
-	var outputTags map[string]string
+	var loggingCommonField mgmtv3.LoggingCommonField
 
 	switch apiContext.Type {
 	case mgmtv3client.ClusterLoggingType:
@@ -84,7 +84,7 @@ func (h *Handler) ActionHandler(actionName string, action *types.Action, apiCont
 		clusterName = input.ClusterName
 		level = loggingconfig.ClusterLevel
 		containerLogSourceTag = level
-		outputTags = input.OutputTags
+		loggingCommonField = input.LoggingCommonField
 
 	case mgmtv3client.ProjectLoggingType:
 		var input mgmtv3.ProjectTestInput
@@ -102,10 +102,10 @@ func (h *Handler) ActionHandler(actionName string, action *types.Action, apiCont
 		clusterName, _ = ref.Parse(input.ProjectName)
 		level = loggingconfig.ProjectLevel
 		containerLogSourceTag = projectID
-		outputTags = input.OutputTags
+		loggingCommonField = input.LoggingCommonField
 	}
 
-	if err := validate(level, containerLogSourceTag, target, outputTags); err != nil {
+	if err := validate(level, containerLogSourceTag, target, loggingCommonField); err != nil {
 		return err
 	}
 

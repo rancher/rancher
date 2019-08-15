@@ -8,6 +8,7 @@ var Template = `
 {{end }}
 {{- template "source-container" . -}}
 {{- template "filter-container" . -}}
+{{- template "filter-concat" . -}}
 {{- template "filter-custom-tags" . -}}
 {{- template "filter-prometheus" . -}}
 {{- template "filter-exclude-system-component" . -}}
@@ -23,6 +24,7 @@ var Template = `
 {{end }}
 {{- template "source-container" $store -}}
 {{- template "filter-container" $store -}}
+{{- template "filter-concat" $store -}}
 {{- template "filter-custom-tags" $store -}}
 {{- template "filter-project-namespace" $store -}}
 {{- template "filter-prometheus" $store -}}

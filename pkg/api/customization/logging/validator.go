@@ -18,7 +18,7 @@ func ClusterLoggingValidator(resquest *types.APIContext, schema *types.Schema, d
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("%v", err))
 	}
 
-	return validate(loggingconfig.ClusterLevel, "cluster", spec.LoggingTargets, spec.OutputTags)
+	return validate(loggingconfig.ClusterLevel, "cluster", spec.LoggingTargets, spec.LoggingCommonField)
 }
 
 func ProjectLoggingValidator(resquest *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
@@ -27,10 +27,10 @@ func ProjectLoggingValidator(resquest *types.APIContext, schema *types.Schema, d
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("%v", err))
 	}
 
-	return validate(loggingconfig.ProjectLevel, spec.ProjectName, spec.LoggingTargets, spec.OutputTags)
+	return validate(loggingconfig.ProjectLevel, spec.ProjectName, spec.LoggingTargets, spec.LoggingCommonField)
 }
 
-func validate(level, containerLogSourceTag string, loggingTargets v3.LoggingTargets, outputTags map[string]string) error {
+func validate(level, containerLogSourceTag string, loggingTargets v3.LoggingTargets, loggingCommonField v3.LoggingCommonField) error {
 	if loggingTargets.KafkaConfig != nil {
 		if err := validateKafka(loggingTargets.KafkaConfig); err != nil {
 			return err
@@ -46,10 +46,6 @@ func validate(level, containerLogSourceTag string, loggingTargets v3.LoggingTarg
 		return nil
 	}
 
-	loggingCommomFileds := v3.LoggingCommonField{
-		OutputTags: outputTags,
-	}
-
 	if loggingTargets.FluentForwarderConfig != nil && wrapTarget.EnableShareKey {
 		wrapTarget.EnableShareKey = false //skip generate precan configure included ruby code
 	}
@@ -59,13 +55,13 @@ func validate(level, containerLogSourceTag string, loggingTargets v3.LoggingTarg
 		wrap = generator.ProjectLoggingTemplateWrap{
 			ContainerLogSourceTag:     containerLogSourceTag,
 			LoggingTargetTemplateWrap: *wrapTarget,
-			LoggingCommonField:        loggingCommomFileds,
+			LoggingCommonField:        loggingCommonField,
 		}
 	} else {
 		wrap = generator.ClusterLoggingTemplateWrap{
 			ContainerLogSourceTag:     containerLogSourceTag,
 			LoggingTargetTemplateWrap: *wrapTarget,
-			LoggingCommonField:        loggingCommomFileds,
+			LoggingCommonField:        loggingCommonField,
 		}
 	}
 
@@ -77,6 +73,12 @@ func validate(level, containerLogSourceTag string, loggingTargets v3.LoggingTarg
 
 	if err = generator.ValidateCustomTags(wrap); err != nil {
 		return err
+	}
+
+	if loggingCommonField.EnableMultiLineFilter {
+		if err = generator.ValidateMultiLineFilter(wrap); err != nil {
+			return err
+		}
 	}
 
 	return generator.ValidateCustomTarget(wrap)
