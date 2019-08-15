@@ -3,7 +3,6 @@ package generator
 import (
 	"fmt"
 	"regexp"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/vmware/kube-fluentd-operator/config-reloader/fluentd"
@@ -124,16 +123,5 @@ func filterRubyCode(s string) error {
 }
 
 func escapeString(postDoc string) string {
-	var escapeReplacer = strings.NewReplacer(
-		"\t", `\\t`,
-		"\n", `\\n`,
-		"\r", `\\r`,
-		"\f", `\\f`,
-		"\b", `\\b`,
-		"\"", `\\\"`,
-		"\\", `\\\\`,
-	)
-
-	escapeString := escapeReplacer.Replace(postDoc)
-	return fmt.Sprintf(`"%s"`, escapeString)
+	return fmt.Sprintf("%q", postDoc)
 }

@@ -186,14 +186,14 @@ func TestEscapeString(t *testing.T) {
 	testDate := map[string]string{
 		//before: after
 		"test":     `"test"`,
-		"\"test\"": `"\\\"test\\\""`,
-		"\ttest":   `"\\ttest"`,
-		"\rtest":   `"\\rtest"`,
-		"\ntest":   `"\\ntest"`,
-		"\btest":   `"\\btest"`,
-		"\ftest":   `"\\ftest"`,
-		"\r\ntest": `"\\r\\ntest"`,
-		"\\test":   `"\\\\test"`,
+		"\"test\"": `"\"test\""`,
+		"\ttest":   `"\ttest"`,
+		"\rtest":   `"\rtest"`,
+		"\ntest":   `"\ntest"`,
+		"\btest":   `"\btest"`,
+		"\ftest":   `"\ftest"`,
+		"\r\ntest": `"\r\ntest"`,
+		"\\test":   `"\\test"`,
 	}
 
 	for before, after := range testDate {
