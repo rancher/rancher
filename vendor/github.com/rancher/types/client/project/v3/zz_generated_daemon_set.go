@@ -16,6 +16,7 @@ const (
 	DaemonSetFieldDNSPolicy                     = "dnsPolicy"
 	DaemonSetFieldDaemonSetConfig               = "daemonSetConfig"
 	DaemonSetFieldDaemonSetStatus               = "daemonSetStatus"
+	DaemonSetFieldEnableServiceLinks            = "enableServiceLinks"
 	DaemonSetFieldFsgid                         = "fsgid"
 	DaemonSetFieldGids                          = "gids"
 	DaemonSetFieldHostAliases                   = "hostAliases"
@@ -67,6 +68,7 @@ type DaemonSet struct {
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	DaemonSetConfig               *DaemonSetConfig       `json:"daemonSetConfig,omitempty" yaml:"daemonSetConfig,omitempty"`
 	DaemonSetStatus               *DaemonSetStatus       `json:"daemonSetStatus,omitempty" yaml:"daemonSetStatus,omitempty"`
+	EnableServiceLinks            *bool                  `json:"enableServiceLinks,omitempty" yaml:"enableServiceLinks,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty" yaml:"gids,omitempty"`
 	HostAliases                   []HostAlias            `json:"hostAliases,omitempty" yaml:"hostAliases,omitempty"`

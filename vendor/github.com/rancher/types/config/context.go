@@ -6,7 +6,6 @@ import (
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient/dynamic"
 	"github.com/rancher/norman/restwatch"
-	"github.com/rancher/norman/signal"
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
 	apiregistrationv1 "github.com/rancher/types/apis/apiregistration.k8s.io/v1"
@@ -348,13 +347,6 @@ func (c *ManagementContext) Start(ctx context.Context) error {
 	return controller.SyncThenStart(ctx, 50, c.controllers()...)
 }
 
-func (c *ManagementContext) StartAndWait() error {
-	ctx := signal.SigTermCancelContext(context.Background())
-	c.Start(ctx)
-	<-ctx.Done()
-	return ctx.Err()
-}
-
 func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterName string) (*UserContext, error) {
 	var err error
 	context := &UserContext{
@@ -467,13 +459,6 @@ func (w *UserContext) Start(ctx context.Context) error {
 	return controller.SyncThenStart(ctx, 5, controllers...)
 }
 
-func (w *UserContext) StartAndWait(ctx context.Context) error {
-	ctx = signal.SigTermCancelContext(ctx)
-	w.Start(ctx)
-	<-ctx.Done()
-	return ctx.Err()
-}
-
 func NewUserOnlyContext(config rest.Config) (*UserOnlyContext, error) {
 	var err error
 	context := &UserOnlyContext{
@@ -571,11 +556,4 @@ func NewUserOnlyContext(config rest.Config) (*UserOnlyContext, error) {
 func (w *UserOnlyContext) Start(ctx context.Context) error {
 	logrus.Info("Starting workload controllers")
 	return controller.SyncThenStart(ctx, 5, w.controllers()...)
-}
-
-func (w *UserOnlyContext) StartAndWait(ctx context.Context) error {
-	ctx = signal.SigTermCancelContext(ctx)
-	w.Start(ctx)
-	<-ctx.Done()
-	return ctx.Err()
 }

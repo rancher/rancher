@@ -3,6 +3,7 @@ package client
 const (
 	PodSecurityPolicySpecType                                 = "podSecurityPolicySpec"
 	PodSecurityPolicySpecFieldAllowPrivilegeEscalation        = "allowPrivilegeEscalation"
+	PodSecurityPolicySpecFieldAllowedCSIDrivers               = "allowedCSIDrivers"
 	PodSecurityPolicySpecFieldAllowedCapabilities             = "allowedCapabilities"
 	PodSecurityPolicySpecFieldAllowedFlexVolumes              = "allowedFlexVolumes"
 	PodSecurityPolicySpecFieldAllowedHostPaths                = "allowedHostPaths"
@@ -19,6 +20,7 @@ const (
 	PodSecurityPolicySpecFieldPrivileged                      = "privileged"
 	PodSecurityPolicySpecFieldReadOnlyRootFilesystem          = "readOnlyRootFilesystem"
 	PodSecurityPolicySpecFieldRequiredDropCapabilities        = "requiredDropCapabilities"
+	PodSecurityPolicySpecFieldRunAsGroup                      = "runAsGroup"
 	PodSecurityPolicySpecFieldRunAsUser                       = "runAsUser"
 	PodSecurityPolicySpecFieldSELinux                         = "seLinux"
 	PodSecurityPolicySpecFieldSupplementalGroups              = "supplementalGroups"
@@ -27,6 +29,7 @@ const (
 
 type PodSecurityPolicySpec struct {
 	AllowPrivilegeEscalation        *bool                              `json:"allowPrivilegeEscalation,omitempty" yaml:"allowPrivilegeEscalation,omitempty"`
+	AllowedCSIDrivers               []AllowedCSIDriver                 `json:"allowedCSIDrivers,omitempty" yaml:"allowedCSIDrivers,omitempty"`
 	AllowedCapabilities             []string                           `json:"allowedCapabilities,omitempty" yaml:"allowedCapabilities,omitempty"`
 	AllowedFlexVolumes              []AllowedFlexVolume                `json:"allowedFlexVolumes,omitempty" yaml:"allowedFlexVolumes,omitempty"`
 	AllowedHostPaths                []AllowedHostPath                  `json:"allowedHostPaths,omitempty" yaml:"allowedHostPaths,omitempty"`
@@ -43,6 +46,7 @@ type PodSecurityPolicySpec struct {
 	Privileged                      bool                               `json:"privileged,omitempty" yaml:"privileged,omitempty"`
 	ReadOnlyRootFilesystem          bool                               `json:"readOnlyRootFilesystem,omitempty" yaml:"readOnlyRootFilesystem,omitempty"`
 	RequiredDropCapabilities        []string                           `json:"requiredDropCapabilities,omitempty" yaml:"requiredDropCapabilities,omitempty"`
+	RunAsGroup                      *RunAsGroupStrategyOptions         `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsUser                       *RunAsUserStrategyOptions          `json:"runAsUser,omitempty" yaml:"runAsUser,omitempty"`
 	SELinux                         *SELinuxStrategyOptions            `json:"seLinux,omitempty" yaml:"seLinux,omitempty"`
 	SupplementalGroups              *SupplementalGroupsStrategyOptions `json:"supplementalGroups,omitempty" yaml:"supplementalGroups,omitempty"`

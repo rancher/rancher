@@ -10,15 +10,19 @@ const (
 	ClusterLoggingFieldAppliedSpec            = "appliedSpec"
 	ClusterLoggingFieldClusterID              = "clusterId"
 	ClusterLoggingFieldConditions             = "conditions"
+	ClusterLoggingFieldContinuousLineRegexp   = "continuousLineRegexp"
 	ClusterLoggingFieldCreated                = "created"
 	ClusterLoggingFieldCreatorID              = "creatorId"
 	ClusterLoggingFieldCustomTargetConfig     = "customTargetConfig"
 	ClusterLoggingFieldElasticsearchConfig    = "elasticsearchConfig"
+	ClusterLoggingFieldEnableMultiLineFilter  = "enableMultiLineFilter"
 	ClusterLoggingFieldFailedSpec             = "failedSpec"
 	ClusterLoggingFieldFluentForwarderConfig  = "fluentForwarderConfig"
 	ClusterLoggingFieldIncludeSystemComponent = "includeSystemComponent"
 	ClusterLoggingFieldKafkaConfig            = "kafkaConfig"
 	ClusterLoggingFieldLabels                 = "labels"
+	ClusterLoggingFieldMultiLineEndRegexp     = "multiLineEndRegexp"
+	ClusterLoggingFieldMultiLineStartRegexp   = "multiLineStartRegexp"
 	ClusterLoggingFieldName                   = "name"
 	ClusterLoggingFieldNamespaceId            = "namespaceId"
 	ClusterLoggingFieldOutputFlushInterval    = "outputFlushInterval"
@@ -39,15 +43,19 @@ type ClusterLogging struct {
 	AppliedSpec            *ClusterLoggingSpec    `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
 	ClusterID              string                 `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Conditions             []LoggingCondition     `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	ContinuousLineRegexp   string                 `json:"continuousLineRegexp,omitempty" yaml:"continuousLineRegexp,omitempty"`
 	Created                string                 `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID              string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	CustomTargetConfig     *CustomTargetConfig    `json:"customTargetConfig,omitempty" yaml:"customTargetConfig,omitempty"`
 	ElasticsearchConfig    *ElasticsearchConfig   `json:"elasticsearchConfig,omitempty" yaml:"elasticsearchConfig,omitempty"`
+	EnableMultiLineFilter  bool                   `json:"enableMultiLineFilter,omitempty" yaml:"enableMultiLineFilter,omitempty"`
 	FailedSpec             *ClusterLoggingSpec    `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`
 	FluentForwarderConfig  *FluentForwarderConfig `json:"fluentForwarderConfig,omitempty" yaml:"fluentForwarderConfig,omitempty"`
 	IncludeSystemComponent *bool                  `json:"includeSystemComponent,omitempty" yaml:"includeSystemComponent,omitempty"`
 	KafkaConfig            *KafkaConfig           `json:"kafkaConfig,omitempty" yaml:"kafkaConfig,omitempty"`
 	Labels                 map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
+	MultiLineEndRegexp     string                 `json:"multiLineEndRegexp,omitempty" yaml:"multiLineEndRegexp,omitempty"`
+	MultiLineStartRegexp   string                 `json:"multiLineStartRegexp,omitempty" yaml:"multiLineStartRegexp,omitempty"`
 	Name                   string                 `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId            string                 `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	OutputFlushInterval    int64                  `json:"outputFlushInterval,omitempty" yaml:"outputFlushInterval,omitempty"`
