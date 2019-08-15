@@ -4,17 +4,17 @@ import v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 
 func loadRancherDefaultK8sVersions() map[string]string {
 	return map[string]string{
-		"2.3": "v1.15.0-rancher1-2",
+		"2.3": "v1.15.2-rancher1-1",
 		// rancher will use default if its version is absent
-		"default": "v1.15.0-rancher1-2",
+		"default": "v1.15.2-rancher1-1",
 	}
 }
 
 func loadRKEDefaultK8sVersions() map[string]string {
 	return map[string]string{
-		"0.3": "v1.15.0-rancher1-2",
+		"0.3": "v1.15.2-rancher1-1",
 		// rke will use default if its version is absent
-		"default": "v1.15.0-rancher1-2",
+		"default": "v1.15.2-rancher1-1",
 	}
 }
 
