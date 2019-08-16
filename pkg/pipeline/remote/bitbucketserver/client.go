@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mrjones/oauth"
 	"github.com/pkg/errors"
@@ -520,6 +521,7 @@ func (c *client) doRequestToBitbucket(method string, url string, accessToken str
 	if err != nil {
 		return nil, err
 	}
+	client.Timeout = 30 * time.Second
 	q := req.URL.Query()
 	if method == http.MethodGet {
 		q.Set("limit", maxPerPage)
