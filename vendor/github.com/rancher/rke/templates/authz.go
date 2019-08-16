@@ -11,6 +11,9 @@ rules:
   resources:
   - nodes/metrics
   - nodes/proxy
+  - nodes/stats
+  - nodes/log
+  - nodes/spec
   verbs: ["get", "list", "watch", "create"]`
 	KubeAPIClusterRoleBinding = `
 apiVersion: rbac.authorization.k8s.io/v1
