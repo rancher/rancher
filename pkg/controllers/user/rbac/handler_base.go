@@ -118,10 +118,12 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	rti := workload.Management.Management.RoleTemplates("")
 	rtSync := v3.NewRoleTemplateLifecycleAdapter("cluster-roletemplate-sync_"+workload.ClusterName, true, rti, newRTLifecycle(r))
 	workload.Management.Management.RoleTemplates("").AddHandler(ctx, "cluster-roletemplate-sync", rtSync)
+	workload.Management.Management.RoleTemplates("").AddHandler(ctx, "legacy-rt-cleaner", newLegacyRTCleaner(r).sync)
 
 	grbi := workload.Management.Management.GlobalRoleBindings("")
 	grbSync := v3.NewGlobalRoleBindingLifecycleAdapter("grb-sync_"+workload.ClusterName, true, grbi, newGlobalRoleBindingHandler(workload))
 	workload.Management.Management.GlobalRoleBindings("").AddHandler(ctx, "grb-sync", grbSync)
+	workload.Management.Management.GlobalRoleBindings("").AddHandler(ctx, "legacy-grb-cleaner", newLegacyGRBCleaner(r).sync)
 }
 
 type manager struct {
