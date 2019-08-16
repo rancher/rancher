@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/rancher/norman/controller"
+	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
 	nsutil "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -77,6 +78,9 @@ func (h *Helm) lockAndVerifyCachePath() error {
 func (h *Helm) request(pathURL string) (*http.Response, error) {
 	baseEndpoint, err := url.Parse(pathURL)
 	if err != nil {
+		return nil, err
+	}
+	if err := catUtil.ValidateURL(pathURL); err != nil {
 		return nil, err
 	}
 

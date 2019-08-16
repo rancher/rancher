@@ -7,9 +7,13 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	catUtil "github.com/rancher/rancher/pkg/catalog/utils"
 )
 
 func Clone(path, url, branch string) error {
+	if err := catUtil.ValidateURL(url); err != nil {
+		return err
+	}
 	return runcmd("git", "clone", "-b", branch, "--single-branch", url, path)
 }
 
@@ -27,6 +31,9 @@ func HeadCommit(path string) (string, error) {
 }
 
 func RemoteBranchHeadCommit(url, branch string) (string, error) {
+	if err := catUtil.ValidateURL(url); err != nil {
+		return "", err
+	}
 	cmd := exec.Command("git", "ls-remote", url, branch)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -37,6 +44,9 @@ func RemoteBranchHeadCommit(url, branch string) (string, error) {
 }
 
 func IsValid(url string) bool {
+	if err := catUtil.ValidateURL(url); err != nil {
+		return false
+	}
 	err := runcmd("git", "ls-remote", url)
 	return err == nil
 }
