@@ -2,7 +2,10 @@ package kontainerdrivermetadata
 
 import (
 	"fmt"
+	"sort"
 	"strings"
+
+	"github.com/rancher/norman/types/convert"
 
 	"github.com/rancher/rancher/pkg/settings"
 
@@ -120,21 +123,30 @@ func GetRKEK8sServiceOptions(k8sVersion string, svcOptionLister v3.RKEK8sService
 	return k8sSvcOption, nil
 }
 
-func GetK8sVersionInfo(rancherVersion string, rkeSysImages map[string]v3.RKESystemImages,
+func GetK8sVersionInfo(rkeSysImages map[string]v3.RKESystemImages,
 	winSysImages map[string]v3.WindowsSystemImages, svcOptions map[string]v3.KubernetesServicesOptions,
 	rancherVersions map[string]v3.K8sVersionInfo) (map[string]v3.RKESystemImages, map[string]v3.WindowsSystemImages, map[string]v3.KubernetesServicesOptions) {
 
+	rancherVersion := GetRancherVersion()
 	k8sVersionRKESystemImages := map[string]v3.RKESystemImages{}
 	k8sVersionWinSystemImages := map[string]v3.WindowsSystemImages{}
 	k8sVersionSvcOptions := map[string]v3.KubernetesServicesOptions{}
 
 	maxVersionForMajorK8sVersion := map[string]string{}
 	for k8sVersion := range rkeSysImages {
-		if rancherVersionInfo, ok := rancherVersions[k8sVersion]; ok && toIgnoreForAllK8s(rancherVersionInfo, rancherVersion) {
+		rancherVersionInfo, minorOk := rancherVersions[k8sVersion]
+		if minorOk && toIgnoreForAllK8s(rancherVersionInfo, rancherVersion) {
 			continue
 		}
 		majorVersion := util.GetTagMajorVersion(k8sVersion)
-		if majorVersionInfo, ok := rancherVersions[majorVersion]; ok && toIgnoreForK8sCurrent(majorVersionInfo, rancherVersion) {
+		majorVersionInfo, majorOk := rancherVersions[majorVersion]
+		if majorOk && toIgnoreForAllK8s(majorVersionInfo, rancherVersion) {
+			continue
+		}
+		if minorOk && toIgnoreForK8sCurrent(rancherVersionInfo, rancherVersion) {
+			continue
+		}
+		if majorOk && toIgnoreForK8sCurrent(majorVersionInfo, rancherVersion) {
 			continue
 		}
 		if curr, ok := maxVersionForMajorK8sVersion[majorVersion]; !ok || k8sVersion > curr {
@@ -187,4 +199,55 @@ func GetRancherVersion() string {
 		return rancherVersion[1:]
 	}
 	return rancherVersion
+}
+
+func GetTargetImages(rkeSystemImages map[string]v3.RKESystemImages, winSystemImages map[string]v3.WindowsSystemImages, svcOptions map[string]v3.KubernetesServicesOptions,
+	k8sVersionInfo map[string]v3.K8sVersionInfo) ([]string, []string, error) {
+
+	k8sVersionToRKESystemImages, k8sVersionToWindowsSystemImages, _ := GetK8sVersionInfo(rkeSystemImages, winSystemImages, svcOptions, k8sVersionInfo)
+
+	targetImages, err := collectionImages(k8sVersionToRKESystemImages, v3.ToolsSystemImages)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	targetWindowsImages, err := collectionImages(k8sVersionToWindowsSystemImages)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return targetImages, targetWindowsImages, nil
+}
+
+func collectionImages(objs ...interface{}) ([]string, error) {
+	images := map[string]bool{}
+
+	for _, obj := range objs {
+		data := map[string]interface{}{}
+		if err := convert.ToObj(obj, &data); err != nil {
+			return nil, err
+		}
+		findStrings(data, images)
+	}
+
+	var result []string
+	for k := range images {
+		result = append(result, k)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i] < result[j]
+	})
+
+	return result, nil
+}
+
+func findStrings(obj map[string]interface{}, found map[string]bool) {
+	for _, v := range obj {
+		switch t := v.(type) {
+		case string:
+			found[t] = true
+		case map[string]interface{}:
+			findStrings(t, found)
+		}
+	}
 }

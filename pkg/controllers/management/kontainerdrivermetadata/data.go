@@ -48,6 +48,10 @@ func (md *MetadataController) createOrUpdateMetadata(data Data) error {
 	if err := md.saveWindowsInfo(data.K8sVersionWindowsSystemImages, data.K8sVersionWindowsServiceOptions); err != nil {
 		return err
 	}
+	if err := md.saveRancherImages(data.K8sVersionRKESystemImages, data.K8sVersionWindowsSystemImages,
+		data.K8sVersionServiceOptions, data.K8sVersionInfo); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -423,6 +427,20 @@ func updateSettings(maxVersionForMajorK8sVersion map[string]string, rancherVersi
 	sort.Strings(keys)
 
 	return SaveSettings(k8sVersionRKESystemImages, k8sVersionSvcOptions, DefaultK8sVersions, rancherVersion, keys)
+}
+
+func (md *MetadataController) saveRancherImages(rkeSystemImages map[string]v3.RKESystemImages, winSystemImages map[string]v3.WindowsSystemImages,
+	svcOptions map[string]v3.KubernetesServicesOptions, k8sVersionInfo map[string]v3.K8sVersionInfo) error {
+
+	targetImages, targetWindowsImages, err := GetTargetImages(rkeSystemImages, winSystemImages, svcOptions, k8sVersionInfo)
+	if err != nil {
+		return err
+	}
+
+	logrus.Infof("targetimgs %s", strings.Join(targetImages, "\n"))
+	logrus.Infof("targetWinImgs %s", strings.Join(targetWindowsImages, "\n"))
+
+	return nil
 }
 
 func SaveSettings(k8sCurrVersions map[string]interface{},
