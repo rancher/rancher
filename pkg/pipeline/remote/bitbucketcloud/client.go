@@ -402,7 +402,7 @@ func doRequestToBitbucket(method string, url string, accessToken string, header 
 		return nil, err
 	}
 	client := &http.Client{
-		Timeout: 15 * time.Second,
+		Timeout: 30 * time.Second,
 	}
 	q := req.URL.Query()
 	//set to max 100 per page to reduce query time

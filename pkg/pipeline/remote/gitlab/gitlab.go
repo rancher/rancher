@@ -293,18 +293,13 @@ func (c *client) GetBranches(repoURL string, accessToken string) ([]string, erro
 	}
 	url := fmt.Sprintf(c.API+"/projects/%s/repository/branches", project)
 
-	responses, err := paginateGitlab(accessToken, url)
+	responseBodies, err := paginateGitlab(accessToken, url)
 	if err != nil {
 		return nil, err
 	}
-	defer closeResponses(responses)
 
 	var branches []gitlab.Branch
-	for _, response := range responses {
-		b, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			return nil, err
-		}
+	for _, b := range responseBodies {
 		var branchesObj []gitlab.Branch
 		if err := json.Unmarshal(b, &branchesObj); err != nil {
 			return nil, err
@@ -436,7 +431,7 @@ func doRequestToGitlab(method string, url string, gitlabAccessToken string, opt 
 		return nil, err
 	}
 	client := &http.Client{
-		Timeout: 15 * time.Second,
+		Timeout: 30 * time.Second,
 	}
 	//set to max 100 per page to reduce query time
 	if method == http.MethodGet {
@@ -474,25 +469,25 @@ func doRequestToGitlab(method string, url string, gitlabAccessToken string, opt 
 	return resp, nil
 }
 
-func paginateGitlab(gitlabAccessToken string, url string) ([]*http.Response, error) {
-	var responses []*http.Response
-
-	response, err := getFromGitlab(gitlabAccessToken, url)
-	if err != nil {
-		return responses, err
-	}
-	responses = append(responses, response)
-	nextURL := nextGitlabPage(response)
+func paginateGitlab(gitlabAccessToken string, url string) ([][]byte, error) {
+	var responseBodies [][]byte
+	var nextURL = url
 	for nextURL != "" {
-		response, err = getFromGitlab(gitlabAccessToken, nextURL)
+		response, err := getFromGitlab(gitlabAccessToken, nextURL)
 		if err != nil {
-			return responses, err
+			return nil, err
 		}
-		responses = append(responses, response)
+		body, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			response.Body.Close()
+			return nil, err
+		}
+		response.Body.Close()
+		responseBodies = append(responseBodies, body)
 		nextURL = nextGitlabPage(response)
 	}
 
-	return responses, nil
+	return responseBodies, nil
 }
 
 func nextGitlabPage(response *http.Response) string {
@@ -531,17 +526,12 @@ func convertAccount(gitlabAccount *gitlab.User) *v3.SourceCodeCredential {
 func (c *client) getGitlabRepos(gitlabAccessToken string) ([]v3.SourceCodeRepository, error) {
 	url := c.API + "/projects?membership=true"
 	var repos []gitlab.Project
-	responses, err := paginateGitlab(gitlabAccessToken, url)
+	responseBodies, err := paginateGitlab(gitlabAccessToken, url)
 	if err != nil {
 		return nil, err
 	}
-	defer closeResponses(responses)
 
-	for _, response := range responses {
-		b, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			return nil, err
-		}
+	for _, b := range responseBodies {
 		var reposObj []gitlab.Project
 		if err := json.Unmarshal(b, &reposObj); err != nil {
 			return nil, err

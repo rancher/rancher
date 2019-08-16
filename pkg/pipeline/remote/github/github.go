@@ -255,17 +255,12 @@ func convertAccount(gitaccount *github.User) *v3.SourceCodeCredential {
 func (c *client) getGithubRepos(githubAccessToken string) ([]v3.SourceCodeRepository, error) {
 	url := c.API + "/user/repos"
 	var repos []github.Repository
-	responses, err := paginateGithub(githubAccessToken, url)
+	responseBodies, err := paginateGithub(githubAccessToken, url)
 	if err != nil {
 		return nil, err
 	}
-	defer closeResponses(responses)
 
-	for _, response := range responses {
-		b, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			return nil, err
-		}
+	for _, b := range responseBodies {
 		var reposObj []github.Repository
 		if err := json.Unmarshal(b, &reposObj); err != nil {
 			return nil, err
@@ -418,18 +413,13 @@ func (c *client) GetBranches(repoURL string, accessToken string) ([]string, erro
 
 	url := fmt.Sprintf("%s/repos/%s/%s/branches", c.API, owner, repo)
 
-	responses, err := paginateGithub(accessToken, url)
+	responseBodies, err := paginateGithub(accessToken, url)
 	if err != nil {
 		return nil, err
 	}
-	defer closeResponses(responses)
 
 	var branches []github.Branch
-	for _, response := range responses {
-		b, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			return nil, err
-		}
+	for _, b := range responseBodies {
 		var branchesObj []github.Branch
 		if err := json.Unmarshal(b, &branchesObj); err != nil {
 			return nil, err
@@ -506,25 +496,25 @@ func convertRepos(repos []github.Repository) []v3.SourceCodeRepository {
 	return result
 }
 
-func paginateGithub(githubAccessToken string, url string) ([]*http.Response, error) {
-	var responses []*http.Response
-
-	response, err := getFromGithub(url, githubAccessToken)
-	if err != nil {
-		return responses, err
-	}
-	responses = append(responses, response)
-	nextURL := nextGithubPage(response)
+func paginateGithub(githubAccessToken string, url string) ([][]byte, error) {
+	var responseBodies [][]byte
+	var nextURL = url
 	for nextURL != "" {
-		response, err = getFromGithub(nextURL, githubAccessToken)
+		response, err := getFromGithub(nextURL, githubAccessToken)
 		if err != nil {
-			return responses, err
+			return nil, err
 		}
-		responses = append(responses, response)
+		body, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			response.Body.Close()
+			return nil, err
+		}
+		response.Body.Close()
+		responseBodies = append(responseBodies, body)
 		nextURL = nextGithubPage(response)
 	}
 
-	return responses, nil
+	return responseBodies, nil
 }
 
 func getFromGithub(url string, accessToken string) (*http.Response, error) {
@@ -538,7 +528,7 @@ func doRequestToGithub(method string, url string, accessToken string, body io.Re
 		return nil, err
 	}
 	client := &http.Client{
-		Timeout: 15 * time.Second,
+		Timeout: 30 * time.Second,
 	}
 	//set to max 100 per page to reduce query time
 	if method == http.MethodGet {
