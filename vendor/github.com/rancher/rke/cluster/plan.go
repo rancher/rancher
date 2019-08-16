@@ -154,7 +154,7 @@ func (c *Cluster) BuildKubeAPIProcess(prefixPath string) v3.Process {
 	if len(c.CloudProvider.Name) > 0 {
 		c.Services.KubeAPI.ExtraEnv = append(
 			c.Services.KubeAPI.ExtraEnv,
-			fmt.Sprintf("%s=%s", CloudConfigSumEnv, getCloudConfigChecksum(c.CloudProvider)))
+			fmt.Sprintf("%s=%s", CloudConfigSumEnv, getCloudConfigChecksum(c.CloudConfigFile)))
 	}
 	// check if our version has specific options for this component
 	serviceOptions := c.GetKubernetesServicesOptions()
@@ -236,16 +236,16 @@ func (c *Cluster) BuildKubeControllerProcess(prefixPath string) v3.Process {
 	}
 
 	CommandArgs := map[string]string{
-		"address":                     "0.0.0.0",
-		"cloud-provider":              c.CloudProvider.Name,
-		"allow-untagged-cloud":        "true",
-		"configure-cloud-routes":      "false",
-		"leader-elect":                "true",
-		"kubeconfig":                  pki.GetConfigPath(pki.KubeControllerCertName),
-		"enable-hostpath-provisioner": "false",
-		"node-monitor-grace-period":   "40s",
-		"pod-eviction-timeout":        "5m0s",
-		"v": "2",
+		"address":                          "0.0.0.0",
+		"cloud-provider":                   c.CloudProvider.Name,
+		"allow-untagged-cloud":             "true",
+		"configure-cloud-routes":           "false",
+		"leader-elect":                     "true",
+		"kubeconfig":                       pki.GetConfigPath(pki.KubeControllerCertName),
+		"enable-hostpath-provisioner":      "false",
+		"node-monitor-grace-period":        "40s",
+		"pod-eviction-timeout":             "5m0s",
+		"v":                                "2",
 		"allocate-node-cidrs":              "true",
 		"cluster-cidr":                     c.ClusterCIDR,
 		"service-cluster-ip-range":         c.Services.KubeController.ServiceClusterIPRange,
@@ -258,7 +258,7 @@ func (c *Cluster) BuildKubeControllerProcess(prefixPath string) v3.Process {
 	if len(c.CloudProvider.Name) > 0 {
 		c.Services.KubeController.ExtraEnv = append(
 			c.Services.KubeController.ExtraEnv,
-			fmt.Sprintf("%s=%s", CloudConfigSumEnv, getCloudConfigChecksum(c.CloudProvider)))
+			fmt.Sprintf("%s=%s", CloudConfigSumEnv, getCloudConfigChecksum(c.CloudConfigFile)))
 	}
 	// check if our version has specific options for this component
 	serviceOptions := c.GetKubernetesServicesOptions()
@@ -363,7 +363,7 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string) v3.Pr
 	if len(c.CloudProvider.Name) > 0 {
 		c.Services.Kubelet.ExtraEnv = append(
 			c.Services.Kubelet.ExtraEnv,
-			fmt.Sprintf("%s=%s", CloudConfigSumEnv, getCloudConfigChecksum(c.CloudProvider)))
+			fmt.Sprintf("%s=%s", CloudConfigSumEnv, getCloudConfigChecksum(c.CloudConfigFile)))
 	}
 	if len(c.PrivateRegistriesMap) > 0 {
 		kubeletDcokerConfig, _ := docker.GetKubeletDockerConfig(c.PrivateRegistriesMap)
@@ -461,8 +461,8 @@ func (c *Cluster) BuildKubeProxyProcess(host *hosts.Host, prefixPath string) v3.
 	}
 
 	CommandArgs := map[string]string{
-		"cluster-cidr": c.ClusterCIDR,
-		"v":            "2",
+		"cluster-cidr":         c.ClusterCIDR,
+		"v":                    "2",
 		"healthz-bind-address": "0.0.0.0",
 		"hostname-override":    host.HostnameOverride,
 		"kubeconfig":           pki.GetConfigPath(pki.KubeProxyCertName),
@@ -506,17 +506,17 @@ func (c *Cluster) BuildKubeProxyProcess(host *hosts.Host, prefixPath string) v3.
 	}
 	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(c.Services.Kubeproxy.Image, c.PrivateRegistriesMap)
 	return v3.Process{
-		Name:          services.KubeproxyContainerName,
-		Command:       Command,
-		VolumesFrom:   VolumesFrom,
-		Binds:         getUniqStringList(Binds),
-		Env:           c.Services.Kubeproxy.ExtraEnv,
-		NetworkMode:   "host",
-		RestartPolicy: "always",
-		PidMode:       "host",
-		Privileged:    true,
-		HealthCheck:   healthCheck,
-		Image:         c.Services.Kubeproxy.Image,
+		Name:                    services.KubeproxyContainerName,
+		Command:                 Command,
+		VolumesFrom:             VolumesFrom,
+		Binds:                   getUniqStringList(Binds),
+		Env:                     c.Services.Kubeproxy.ExtraEnv,
+		NetworkMode:             "host",
+		RestartPolicy:           "always",
+		PidMode:                 "host",
+		Privileged:              true,
+		HealthCheck:             healthCheck,
+		Image:                   c.Services.Kubeproxy.Image,
 		ImageRegistryAuthConfig: registryAuthConfig,
 		Labels: map[string]string{
 			ContainerNameLabel: services.KubeproxyContainerName,
@@ -539,12 +539,12 @@ func (c *Cluster) BuildProxyProcess() v3.Process {
 		Name: services.NginxProxyContainerName,
 		Env:  Env,
 		// we do this to force container update when CP hosts change.
-		Args:          Env,
-		Command:       []string{"nginx-proxy"},
-		NetworkMode:   "host",
-		RestartPolicy: "always",
-		HealthCheck:   v3.HealthCheck{},
-		Image:         c.SystemImages.NginxProxy,
+		Args:                    Env,
+		Command:                 []string{"nginx-proxy"},
+		NetworkMode:             "host",
+		RestartPolicy:           "always",
+		HealthCheck:             v3.HealthCheck{},
+		Image:                   c.SystemImages.NginxProxy,
 		ImageRegistryAuthConfig: registryAuthConfig,
 		Labels: map[string]string{
 			ContainerNameLabel: services.NginxProxyContainerName,
@@ -754,8 +754,8 @@ func (c *Cluster) GetKubernetesServicesOptions() v3.KubernetesServicesOptions {
 	return v3.KubernetesServicesOptions{}
 }
 
-func getCloudConfigChecksum(config v3.CloudProvider) string {
-	configByteSum := md5.Sum([]byte(fmt.Sprintf("%s", config)))
+func getCloudConfigChecksum(config string) string {
+	configByteSum := md5.Sum([]byte(config))
 	return fmt.Sprintf("%x", configByteSum)
 }
 
