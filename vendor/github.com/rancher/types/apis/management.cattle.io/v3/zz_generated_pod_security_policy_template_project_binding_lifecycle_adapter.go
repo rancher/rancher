@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *podSecurityPolicyTemplateProjectBindingLifecycleAdapter) Updated(obj ru
 }
 
 func NewPodSecurityPolicyTemplateProjectBindingLifecycleAdapter(name string, clusterScoped bool, client PodSecurityPolicyTemplateProjectBindingInterface, l PodSecurityPolicyTemplateProjectBindingLifecycle) PodSecurityPolicyTemplateProjectBindingHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(PodSecurityPolicyTemplateProjectBindingGroupVersionResource)
+	}
 	adapter := &podSecurityPolicyTemplateProjectBindingLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *PodSecurityPolicyTemplateProjectBinding) (runtime.Object, error) {

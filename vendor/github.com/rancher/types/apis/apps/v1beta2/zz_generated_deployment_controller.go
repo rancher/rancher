@@ -151,7 +151,6 @@ func (c *deploymentController) AddHandler(ctx context.Context, name string, hand
 }
 
 func (c *deploymentController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler DeploymentHandlerFunc) {
-	resource.PutClusterScoped(DeploymentGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *ldapConfigLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object
 }
 
 func NewLdapConfigLifecycleAdapter(name string, clusterScoped bool, client LdapConfigInterface, l LdapConfigLifecycle) LdapConfigHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(LdapConfigGroupVersionResource)
+	}
 	adapter := &ldapConfigLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *LdapConfig) (runtime.Object, error) {

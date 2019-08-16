@@ -150,7 +150,6 @@ func (c *eventController) AddHandler(ctx context.Context, name string, handler E
 }
 
 func (c *eventController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler EventHandlerFunc) {
-	resource.PutClusterScoped(EventGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

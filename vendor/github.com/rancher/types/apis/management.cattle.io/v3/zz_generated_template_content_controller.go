@@ -149,7 +149,6 @@ func (c *templateContentController) AddHandler(ctx context.Context, name string,
 }
 
 func (c *templateContentController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler TemplateContentHandlerFunc) {
-	resource.PutClusterScoped(TemplateContentGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

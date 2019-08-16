@@ -2,6 +2,7 @@ package v1beta2
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/api/apps/v1beta2"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -51,6 +52,9 @@ func (w *statefulSetLifecycleAdapter) Updated(obj runtime.Object) (runtime.Objec
 }
 
 func NewStatefulSetLifecycleAdapter(name string, clusterScoped bool, client StatefulSetInterface, l StatefulSetLifecycle) StatefulSetHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(StatefulSetGroupVersionResource)
+	}
 	adapter := &statefulSetLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1beta2.StatefulSet) (runtime.Object, error) {

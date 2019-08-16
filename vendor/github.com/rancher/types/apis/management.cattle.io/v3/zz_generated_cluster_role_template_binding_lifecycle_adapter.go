@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *clusterRoleTemplateBindingLifecycleAdapter) Updated(obj runtime.Object)
 }
 
 func NewClusterRoleTemplateBindingLifecycleAdapter(name string, clusterScoped bool, client ClusterRoleTemplateBindingInterface, l ClusterRoleTemplateBindingLifecycle) ClusterRoleTemplateBindingHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(ClusterRoleTemplateBindingGroupVersionResource)
+	}
 	adapter := &clusterRoleTemplateBindingLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *ClusterRoleTemplateBinding) (runtime.Object, error) {

@@ -151,7 +151,6 @@ func (c *roleController) AddHandler(ctx context.Context, name string, handler Ro
 }
 
 func (c *roleController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler RoleHandlerFunc) {
-	resource.PutClusterScoped(RoleGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

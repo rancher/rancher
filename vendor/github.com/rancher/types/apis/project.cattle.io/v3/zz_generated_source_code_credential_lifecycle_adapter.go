@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *sourceCodeCredentialLifecycleAdapter) Updated(obj runtime.Object) (runt
 }
 
 func NewSourceCodeCredentialLifecycleAdapter(name string, clusterScoped bool, client SourceCodeCredentialInterface, l SourceCodeCredentialLifecycle) SourceCodeCredentialHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(SourceCodeCredentialGroupVersionResource)
+	}
 	adapter := &sourceCodeCredentialLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *SourceCodeCredential) (runtime.Object, error) {

@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *globalDnsLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object,
 }
 
 func NewGlobalDNSLifecycleAdapter(name string, clusterScoped bool, client GlobalDNSInterface, l GlobalDNSLifecycle) GlobalDNSHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(GlobalDNSGroupVersionResource)
+	}
 	adapter := &globalDnsLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *GlobalDNS) (runtime.Object, error) {

@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *nodeDriverLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object
 }
 
 func NewNodeDriverLifecycleAdapter(name string, clusterScoped bool, client NodeDriverInterface, l NodeDriverLifecycle) NodeDriverHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(NodeDriverGroupVersionResource)
+	}
 	adapter := &nodeDriverLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *NodeDriver) (runtime.Object, error) {

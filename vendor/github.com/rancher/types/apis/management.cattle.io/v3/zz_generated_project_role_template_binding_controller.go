@@ -150,7 +150,6 @@ func (c *projectRoleTemplateBindingController) AddHandler(ctx context.Context, n
 }
 
 func (c *projectRoleTemplateBindingController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ProjectRoleTemplateBindingHandlerFunc) {
-	resource.PutClusterScoped(ProjectRoleTemplateBindingGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

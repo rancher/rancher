@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *pipelineLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, 
 }
 
 func NewPipelineLifecycleAdapter(name string, clusterScoped bool, client PipelineInterface, l PipelineLifecycle) PipelineHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(PipelineGroupVersionResource)
+	}
 	adapter := &pipelineLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *Pipeline) (runtime.Object, error) {

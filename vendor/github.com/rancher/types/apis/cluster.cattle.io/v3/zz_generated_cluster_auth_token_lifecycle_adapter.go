@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *clusterAuthTokenLifecycleAdapter) Updated(obj runtime.Object) (runtime.
 }
 
 func NewClusterAuthTokenLifecycleAdapter(name string, clusterScoped bool, client ClusterAuthTokenInterface, l ClusterAuthTokenLifecycle) ClusterAuthTokenHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(ClusterAuthTokenGroupVersionResource)
+	}
 	adapter := &clusterAuthTokenLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *ClusterAuthToken) (runtime.Object, error) {

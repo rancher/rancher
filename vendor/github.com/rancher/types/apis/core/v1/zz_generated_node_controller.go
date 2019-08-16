@@ -150,7 +150,6 @@ func (c *nodeController) AddHandler(ctx context.Context, name string, handler No
 }
 
 func (c *nodeController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler NodeHandlerFunc) {
-	resource.PutClusterScoped(NodeGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
