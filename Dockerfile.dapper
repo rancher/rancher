@@ -24,7 +24,7 @@ RUN curl -sLf https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VE
     curl -sLf https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/tiller > /usr/bin/tiller && \
     chmod +x /usr/bin/helm /usr/bin/tiller && \
     helm init -c && \
-    helm plugin install https://github.com/lrills/helm-unittest
+    helm plugin install https://github.com/rancher/helm-unittest
 
 RUN wget -O - ${!DOCKER_URL} > /usr/bin/docker && chmod +x /usr/bin/docker
 
