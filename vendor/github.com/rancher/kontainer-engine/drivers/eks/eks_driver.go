@@ -274,7 +274,7 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 	driverFlag.Options["kubernetes-version"] = &types.Flag{
 		Type:    types.StringType,
 		Usage:   "The kubernetes master version",
-		Default: &types.Default{DefaultString: "1.10"},
+		Default: &types.Default{DefaultString: "1.13"},
 	}
 
 	return &driverFlag, nil
@@ -288,7 +288,7 @@ func (d *Driver) GetDriverUpdateOptions(ctx context.Context) (*types.DriverFlags
 	driverFlag.Options["kubernetes-version"] = &types.Flag{
 		Type:    types.StringType,
 		Usage:   "The kubernetes version to update",
-		Default: &types.Default{DefaultString: "1.10"},
+		Default: &types.Default{DefaultString: "1.13"},
 	}
 	driverFlag.Options["access-key"] = &types.Flag{
 		Type:  types.StringType,
