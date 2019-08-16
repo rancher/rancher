@@ -1,6 +1,6 @@
 import pytest
 from rancher import ApiError
-from kubernetes.client import CoreV1Api
+from kubernetes.client import CoreV1Api, CustomObjectsApi
 from .conftest import wait_for
 
 
@@ -109,4 +109,30 @@ def key_secret_creation(k8sclient):
     for s in secrets.items:
         if s.metadata.name == "pingconfig-spkey":
             return True
+    return False
+
+
+def test_auth_label(admin_mc, user_factory):
+    user = user_factory()
+    k8s_client = CustomObjectsApi(admin_mc.k8s_client)
+    user_token = wait_for(
+        lambda: user_token_creation(k8s_client, user.user.id),
+        timeout=30,
+        fail_handler=lambda: "failed to find token for factory user login"
+    )
+    label_name = "authn.management.cattle.io/kind"
+    assert user_token["metadata"]["labels"][label_name] == "session"
+
+
+def user_token_creation(k8s_client, user_id):
+    tokens = k8s_client.list_cluster_custom_object(
+        "management.cattle.io",
+        "v3",
+        "tokens"
+    )
+    user_token = [
+        token for token in tokens["items"] if token['userId'] == user_id
+    ]
+    if len(user_token) > 0:
+        return user_token[0]
     return False

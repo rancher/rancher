@@ -29,7 +29,7 @@ func (s *ShellLinkHandler) LinkHandler(apiContext *types.APIContext, next types.
 	userManager := context.Management.UserManager
 
 	userID := userManager.GetUser(apiContext)
-	token, err := userManager.EnsureToken("kubectl-shell-"+userID, "Access to kubectl shell in the browser", userID)
+	token, err := userManager.EnsureToken("kubectl-shell-"+userID, "Access to kubectl shell in the browser", "kubectl-shell", userID)
 	if err != nil {
 		return err
 	}

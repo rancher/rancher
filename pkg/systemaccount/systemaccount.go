@@ -147,7 +147,7 @@ func (s *Manager) GetOrCreateProjectSystemToken(projectName string) (string, err
 	if err != nil {
 		return "", err
 	}
-	return s.userManager.EnsureToken(projectName+"-pipeline", "Pipeline token for project "+projectName, user.Name)
+	return s.userManager.EnsureToken(projectName+"-pipeline", "Pipeline token for project "+projectName, "pipeline", user.Name)
 }
 
 func (s *Manager) RemoveSystemAccount(userID string) error {

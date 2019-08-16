@@ -87,12 +87,12 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 
 func (a ActionHandler) getClusterToken(clusterID string, apiContext *types.APIContext) (string, error) {
 	userName := a.UserMgr.GetUser(apiContext)
-	return a.UserMgr.EnsureClusterToken(clusterID, fmt.Sprintf("kubeconfig-%s.%s", userName, clusterID), "Kubeconfig token", userName)
+	return a.UserMgr.EnsureClusterToken(clusterID, fmt.Sprintf("kubeconfig-%s.%s", userName, clusterID), "Kubeconfig token", "kubeconfig", userName)
 }
 
 func (a ActionHandler) getToken(apiContext *types.APIContext) (string, error) {
 	userName := a.UserMgr.GetUser(apiContext)
-	return a.UserMgr.EnsureToken("kubeconfig-"+userName, "Kubeconfig token", userName)
+	return a.UserMgr.EnsureToken("kubeconfig-"+userName, "Kubeconfig token", "kubeconfig", userName)
 }
 
 func (a ActionHandler) getKubeConfig(apiContext *types.APIContext, cluster *mgmtclient.Cluster) (*clientcmdapi.Config, error) {

@@ -188,11 +188,11 @@ func (m *userManager) CheckAccess(accessMode string, allowedPrincipalIDs []strin
 	return false, errors.Errorf("Unsupported accessMode: %v", accessMode)
 }
 
-func (m *userManager) EnsureToken(tokenName, description, userName string) (string, error) {
-	return m.EnsureClusterToken("", tokenName, description, userName)
+func (m *userManager) EnsureToken(tokenName, description, kind, userName string) (string, error) {
+	return m.EnsureClusterToken("", tokenName, description, kind, userName)
 }
 
-func (m *userManager) EnsureClusterToken(clusterName, tokenName, description, userName string) (string, error) {
+func (m *userManager) EnsureClusterToken(clusterName, tokenName, description, kind, userName string) (string, error) {
 	if strings.HasPrefix(tokenName, "token-") {
 		return "", errors.New("token names can't start with token-")
 	}
@@ -212,7 +212,8 @@ func (m *userManager) EnsureClusterToken(clusterName, tokenName, description, us
 			ObjectMeta: v1.ObjectMeta{
 				Name: tokenName,
 				Labels: map[string]string{
-					tokens.UserIDLabel: userName,
+					tokens.UserIDLabel:    userName,
+					tokens.TokenKindLabel: kind,
 				},
 			},
 			TTLMillis:    0,

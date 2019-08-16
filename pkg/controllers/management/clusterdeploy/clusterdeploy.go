@@ -195,7 +195,7 @@ func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Confi
 		return nil, err
 	}
 
-	token, err := cd.userManager.EnsureToken("agent-"+user.Name, "token for agent deployment", user.Name)
+	token, err := cd.userManager.EnsureToken("agent-"+user.Name, "token for agent deployment", "agent", user.Name)
 	if err != nil {
 		return nil, err
 	}
