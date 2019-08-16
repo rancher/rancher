@@ -77,7 +77,7 @@ func (l Lifecycle) Create(obj *v3.ComposeConfig) (*v3.ComposeConfig, error) {
 	if err != nil {
 		return obj, err
 	}
-	token, err := l.UserManager.EnsureToken(composeTokenPrefix+user.Name, description, user.Name)
+	token, err := l.UserManager.EnsureToken(composeTokenPrefix+user.Name, description, "compose", user.Name)
 	if err != nil {
 		return obj, err
 	}

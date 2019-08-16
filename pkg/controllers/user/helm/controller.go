@@ -365,7 +365,7 @@ func (l *Lifecycle) writeKubeConfig(obj *v3.App, kubePath string, remove bool) e
 	} else if errors.IsNotFound(err) && remove {
 		token, err = l.SystemAccountManager.GetOrCreateProjectSystemToken(obj.Namespace)
 	} else if err == nil {
-		token, err = l.UserManager.EnsureToken(helmTokenPrefix+user.Name, description, user.Name)
+		token, err = l.UserManager.EnsureToken(helmTokenPrefix+user.Name, description, "helm", user.Name)
 	}
 	if err != nil {
 		return err
