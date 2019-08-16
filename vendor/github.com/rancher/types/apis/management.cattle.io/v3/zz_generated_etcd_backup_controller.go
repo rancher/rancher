@@ -150,7 +150,6 @@ func (c *etcdBackupController) AddHandler(ctx context.Context, name string, hand
 }
 
 func (c *etcdBackupController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler EtcdBackupHandlerFunc) {
-	resource.PutClusterScoped(EtcdBackupGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

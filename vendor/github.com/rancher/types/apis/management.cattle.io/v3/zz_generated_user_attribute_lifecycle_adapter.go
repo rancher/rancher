@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *userAttributeLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obj
 }
 
 func NewUserAttributeLifecycleAdapter(name string, clusterScoped bool, client UserAttributeInterface, l UserAttributeLifecycle) UserAttributeHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(UserAttributeGroupVersionResource)
+	}
 	adapter := &userAttributeLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *UserAttribute) (runtime.Object, error) {

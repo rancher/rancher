@@ -149,7 +149,6 @@ func (c *ldapConfigController) AddHandler(ctx context.Context, name string, hand
 }
 
 func (c *ldapConfigController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler LdapConfigHandlerFunc) {
-	resource.PutClusterScoped(LdapConfigGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

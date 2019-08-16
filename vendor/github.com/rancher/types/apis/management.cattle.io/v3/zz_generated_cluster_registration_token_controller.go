@@ -150,7 +150,6 @@ func (c *clusterRegistrationTokenController) AddHandler(ctx context.Context, nam
 }
 
 func (c *clusterRegistrationTokenController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ClusterRegistrationTokenHandlerFunc) {
-	resource.PutClusterScoped(ClusterRegistrationTokenGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

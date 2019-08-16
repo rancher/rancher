@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *composeConfigLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obj
 }
 
 func NewComposeConfigLifecycleAdapter(name string, clusterScoped bool, client ComposeConfigInterface, l ComposeConfigLifecycle) ComposeConfigHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(ComposeConfigGroupVersionResource)
+	}
 	adapter := &composeConfigLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *ComposeConfig) (runtime.Object, error) {

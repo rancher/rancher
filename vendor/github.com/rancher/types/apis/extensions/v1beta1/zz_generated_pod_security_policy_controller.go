@@ -150,7 +150,6 @@ func (c *podSecurityPolicyController) AddHandler(ctx context.Context, name strin
 }
 
 func (c *podSecurityPolicyController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler PodSecurityPolicyHandlerFunc) {
-	resource.PutClusterScoped(PodSecurityPolicyGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

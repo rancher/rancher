@@ -149,7 +149,6 @@ func (c *dynamicSchemaController) AddHandler(ctx context.Context, name string, h
 }
 
 func (c *dynamicSchemaController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler DynamicSchemaHandlerFunc) {
-	resource.PutClusterScoped(DynamicSchemaGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

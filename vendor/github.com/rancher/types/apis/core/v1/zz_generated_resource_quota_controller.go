@@ -151,7 +151,6 @@ func (c *resourceQuotaController) AddHandler(ctx context.Context, name string, h
 }
 
 func (c *resourceQuotaController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ResourceQuotaHandlerFunc) {
-	resource.PutClusterScoped(ResourceQuotaGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

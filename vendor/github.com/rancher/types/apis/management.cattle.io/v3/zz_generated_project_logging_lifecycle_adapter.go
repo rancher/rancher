@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *projectLoggingLifecycleAdapter) Updated(obj runtime.Object) (runtime.Ob
 }
 
 func NewProjectLoggingLifecycleAdapter(name string, clusterScoped bool, client ProjectLoggingInterface, l ProjectLoggingLifecycle) ProjectLoggingHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(ProjectLoggingGroupVersionResource)
+	}
 	adapter := &projectLoggingLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *ProjectLogging) (runtime.Object, error) {

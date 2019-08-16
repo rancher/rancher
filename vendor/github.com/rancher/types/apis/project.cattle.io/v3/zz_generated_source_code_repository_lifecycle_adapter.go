@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *sourceCodeRepositoryLifecycleAdapter) Updated(obj runtime.Object) (runt
 }
 
 func NewSourceCodeRepositoryLifecycleAdapter(name string, clusterScoped bool, client SourceCodeRepositoryInterface, l SourceCodeRepositoryLifecycle) SourceCodeRepositoryHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(SourceCodeRepositoryGroupVersionResource)
+	}
 	adapter := &sourceCodeRepositoryLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *SourceCodeRepository) (runtime.Object, error) {

@@ -151,7 +151,6 @@ func (c *jobController) AddHandler(ctx context.Context, name string, handler Job
 }
 
 func (c *jobController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler JobHandlerFunc) {
-	resource.PutClusterScoped(JobGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

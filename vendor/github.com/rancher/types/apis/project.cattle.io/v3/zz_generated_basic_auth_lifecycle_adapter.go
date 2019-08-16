@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *basicAuthLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object,
 }
 
 func NewBasicAuthLifecycleAdapter(name string, clusterScoped bool, client BasicAuthInterface, l BasicAuthLifecycle) BasicAuthHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(BasicAuthGroupVersionResource)
+	}
 	adapter := &basicAuthLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *BasicAuth) (runtime.Object, error) {

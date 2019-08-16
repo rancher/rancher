@@ -151,7 +151,6 @@ func (c *persistentVolumeClaimController) AddHandler(ctx context.Context, name s
 }
 
 func (c *persistentVolumeClaimController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler PersistentVolumeClaimHandlerFunc) {
-	resource.PutClusterScoped(PersistentVolumeClaimGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

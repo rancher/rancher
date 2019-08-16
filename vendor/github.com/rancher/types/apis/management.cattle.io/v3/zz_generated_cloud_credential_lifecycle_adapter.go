@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *cloudCredentialLifecycleAdapter) Updated(obj runtime.Object) (runtime.O
 }
 
 func NewCloudCredentialLifecycleAdapter(name string, clusterScoped bool, client CloudCredentialInterface, l CloudCredentialLifecycle) CloudCredentialHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(CloudCredentialGroupVersionResource)
+	}
 	adapter := &cloudCredentialLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *CloudCredential) (runtime.Object, error) {

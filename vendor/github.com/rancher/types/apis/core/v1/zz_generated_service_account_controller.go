@@ -151,7 +151,6 @@ func (c *serviceAccountController) AddHandler(ctx context.Context, name string, 
 }
 
 func (c *serviceAccountController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ServiceAccountHandlerFunc) {
-	resource.PutClusterScoped(ServiceAccountGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

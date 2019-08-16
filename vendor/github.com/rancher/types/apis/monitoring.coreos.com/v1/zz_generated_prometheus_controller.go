@@ -151,7 +151,6 @@ func (c *prometheusController) AddHandler(ctx context.Context, name string, hand
 }
 
 func (c *prometheusController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler PrometheusHandlerFunc) {
-	resource.PutClusterScoped(PrometheusGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

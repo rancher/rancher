@@ -151,7 +151,6 @@ func (c *statefulSetController) AddHandler(ctx context.Context, name string, han
 }
 
 func (c *statefulSetController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler StatefulSetHandlerFunc) {
-	resource.PutClusterScoped(StatefulSetGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)

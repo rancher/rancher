@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *multiClusterAppLifecycleAdapter) Updated(obj runtime.Object) (runtime.O
 }
 
 func NewMultiClusterAppLifecycleAdapter(name string, clusterScoped bool, client MultiClusterAppInterface, l MultiClusterAppLifecycle) MultiClusterAppHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(MultiClusterAppGroupVersionResource)
+	}
 	adapter := &multiClusterAppLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *MultiClusterApp) (runtime.Object, error) {

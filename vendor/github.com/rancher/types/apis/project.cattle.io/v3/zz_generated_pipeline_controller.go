@@ -150,7 +150,6 @@ func (c *pipelineController) AddHandler(ctx context.Context, name string, handle
 }
 
 func (c *pipelineController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler PipelineHandlerFunc) {
-	resource.PutClusterScoped(PipelineGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
