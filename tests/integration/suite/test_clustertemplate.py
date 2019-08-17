@@ -51,7 +51,8 @@ def test_create_template_revision_k8s_translation(admin_mc, remove_resource):
                   "default": "/var/lib/docker"
                  }]
     with pytest.raises(ApiError) as e:
-        client.create_cluster_template_revision(clusterConfig=cconfig,
+        client.create_cluster_template_revision(name=random_str(),
+                                                clusterConfig=cconfig,
                                                 clusterTemplateId=tId,
                                                 questions=questions,
                                                 enabled="true")
@@ -77,7 +78,8 @@ def test_default_pod_sec(admin_mc, remove_resource):
         },
         "defaultPodSecurityPolicyTemplateId": "restricted",
     }
-    rev = client.create_cluster_template_revision(clusterConfig=cconfig,
+    rev = client.create_cluster_template_revision(name=random_str(),
+                                                  clusterConfig=cconfig,
                                                   clusterTemplateId=tId,
                                                   enabled="true")
 
@@ -458,7 +460,8 @@ def test_required_template_question(admin_mc, remove_resource):
                   "default": "true"
                  }]
 
-    rev = client.create_cluster_template_revision(clusterConfig=cconfig,
+    rev = client.create_cluster_template_revision(name=random_str(),
+                                                  clusterConfig=cconfig,
                                                   clusterTemplateId=tId,
                                                   questions=questions,
                                                   enabled="true")
@@ -622,8 +625,11 @@ def create_cluster_template_revision(client, clusterTemplateId):
                   "default": "1.13.x"
                  }]
 
+    revision_name = random_str()
+
     cluster_template_revision = \
         client.create_cluster_template_revision(
+                                        name=revision_name,
                                         clusterConfig=cluster_config,
                                         clusterTemplateId=clusterTemplateId,
                                         disabled="false",
