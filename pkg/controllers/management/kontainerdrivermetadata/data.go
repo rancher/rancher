@@ -489,9 +489,22 @@ func SaveSettings(k8sCurrVersions map[string]interface{},
 	if err := settings.KubernetesVersionToServiceOptions.Set(k8sSvcOptionData); err != nil {
 		return err
 	}
-	defaultK8sVersion, ok := rancherDefaultK8sVersions[rancherVersion]
-	if !ok || defaultK8sVersion == "" {
-		defaultK8sVersion = rancherDefaultK8sVersions["default"]
+	defaultK8sVersionRange, ok := rancherDefaultK8sVersions[rancherVersion]
+	if !ok || defaultK8sVersionRange == "" {
+		defaultK8sVersionRange = rancherDefaultK8sVersions["default"]
+	}
+	// get matching default k8s from k8s curr
+	toMatch := util.GetTagMajorVersion(defaultK8sVersionRange)
+	defaultK8sVersion := ""
+	for k8sCurr := range k8sCurrVersions {
+		toTest := util.GetTagMajorVersion(k8sCurr)
+		if toTest == toMatch {
+			defaultK8sVersion = k8sCurr
+			break
+		}
+	}
+	if defaultK8sVersion == "" {
+		return fmt.Errorf("unable to find default k8s version in current k8s %s %v", defaultK8sVersionRange, versions)
 	}
 	if err := settings.KubernetesVersion.Set(defaultK8sVersion); err != nil {
 		return err
