@@ -252,7 +252,7 @@ type LoadBalancerCapabilities struct {
 
 type IngressCapabilities struct {
 	IngressProvider      string `json:"ingressProvider,omitempty"`
-	CustomDefaultBackend bool   `json:"customDefaultBackend,omitempty"`
+	CustomDefaultBackend *bool  `json:"customDefaultBackend,omitempty"`
 }
 
 type MonitoringInput struct {

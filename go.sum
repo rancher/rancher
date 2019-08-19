@@ -268,6 +268,7 @@ github.com/rancher/kontainer-driver-metadata v0.0.0-20190819174335-6eb94126a98c 
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190819174335-6eb94126a98c/go.mod h1:VDixap7YjDnNwlfxL4gl890ThOVinEZE3qyAaG0xcQE=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20190819182532-d4cdf8e56671 h1:JIgjMy2Nb/H+89T2S7TePqiGyxeE4J1g5tGtb9+hqsQ=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20190819182532-d4cdf8e56671/go.mod h1:NHG6mh7mpbYOVbhw5f2eNPYWgMFZImfILcDL+U29kUI=
+github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009 h1:Xsxh7fX3+2wAUJtPy8g2lZh0cYuyifqhBL0vxCIYojs=
 github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009/go.mod h1:wpITyDPTi/Na5h73XkbuEf2AP9fbgrIGqqxVzFhYD6U=
 github.com/rancher/norman v0.0.0-20190819172543-9c5479f6e5ca h1:XxMfVvMNcu2UENix8eMTSjKpTeWlJOBwr/NO7/9i6jk=
 github.com/rancher/norman v0.0.0-20190819172543-9c5479f6e5ca/go.mod h1:KwP6RD4rVMdK8XK0wqZaptrhTn/TO4kXU3doh4iatQU=
@@ -282,8 +283,8 @@ github.com/rancher/rke v0.3.0-rc6.0.20190819180243-f8bac2c059d0/go.mod h1:IyunvV
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/types v0.0.0-20190819173748-96e6d6f30265/go.mod h1:ROyypICT7xxMhVRplyFnEIaXHw2nMVHfCZ8Y3261qmw=
-github.com/rancher/types v0.0.0-20190819184610-eb94f3aba63f h1:TNmaKJf28fKAqjU2tZM+SjinZSxZ1WeSUkcG2GQ/8vg=
-github.com/rancher/types v0.0.0-20190819184610-eb94f3aba63f/go.mod h1:ROyypICT7xxMhVRplyFnEIaXHw2nMVHfCZ8Y3261qmw=
+github.com/rancher/types v0.0.0-20190820171829-3ae227679970 h1:E6nYRUJu3tAsp7DWze+WN9hxS0rLgGrngg+Uevd6jbs=
+github.com/rancher/types v0.0.0-20190820171829-3ae227679970/go.mod h1:ROyypICT7xxMhVRplyFnEIaXHw2nMVHfCZ8Y3261qmw=
 github.com/rancher/wrangler v0.1.5 h1:HiXOeP6Kci2DK+e04D1g6INT77xAYpAr54zmTTe0Spk=
 github.com/rancher/wrangler v0.1.5/go.mod h1:EYP7cqpg42YqElaCm+U9ieSrGQKAXxUH5xsr+XGpWyE=
 github.com/robfig/cron v1.1.0 h1:jk4/Hud3TTdcrJgUOBgsqrZBarcxl6ADIjSC2iniwLY=
@@ -424,6 +425,7 @@ golang.org/x/tools v0.0.0-20190311212946-11955173bddd/go.mod h1:LCzVGOaR6xXOjkQ3
 golang.org/x/tools v0.0.0-20190312170243-e65039ee4138/go.mod h1:LCzVGOaR6xXOjkQ3onu1FJEFr0SW1gC7cKk1uF8kGRs=
 golang.org/x/tools v0.0.0-20190328211700-ab21143f2384/go.mod h1:LCzVGOaR6xXOjkQ3onu1FJEFr0SW1gC7cKk1uF8kGRs=
 golang.org/x/tools v0.0.0-20190524140312-2c0ae7006135/go.mod h1:RgjU9mgBXZiqYHBnxXauZ1Gv1EHHAz9KjViQ78xBX0Q=
+golang.org/x/tools v0.0.0-20190606124116-d0a3d012864b h1:mSUCVIwDx4hfXJfWsOPfdzEHxzb2Xjl6BQ8YgPnazQA=
 golang.org/x/tools v0.0.0-20190606124116-d0a3d012864b/go.mod h1:/rFqwRUd4F7ZHNgwSSTFct+R/Kf4OFW1sUzUTQQTgfc=
 google.golang.org/api v0.0.0-20180910000450-7ca32eb868bf/go.mod h1:4mhQ8q/RsB7i+udVvVy5NUi08OU8ZlA0gRVgrF7VFY0=
 google.golang.org/api v0.0.0-20181220000619-583d854617af/go.mod h1:4mhQ8q/RsB7i+udVvVy5NUi08OU8ZlA0gRVgrF7VFY0=
@@ -496,6 +498,7 @@ k8s.io/cloud-provider v0.0.0-20190805190417-1c521de1d7ab h1:1+18lZobnXacONIAsOtp
 k8s.io/cloud-provider v0.0.0-20190805190417-1c521de1d7ab/go.mod h1:LlIffnLBu+GG7d4ppPzC8UnA1Ex8S+ntmSRVsnr7Xy4=
 k8s.io/code-generator v0.0.0-20190311093542-50b561225d70/go.mod h1:MYiN+ZJZ9HkETbgVZdWw2AsuAi9PZ4V80cwfuf2axe8=
 k8s.io/gengo v0.0.0-20190128074634-0689ccc1d7d6/go.mod h1:ezvh/TsK7cY6rbqRK0oQQ8IAqLxYwwyPxAX1Pzy0ii0=
+k8s.io/gengo v0.0.0-20190327210449-e17681d19d3a h1:QoHVuRquf80YZ+/bovwxoMO3Q/A3nt3yTgS0/0nejuk=
 k8s.io/gengo v0.0.0-20190327210449-e17681d19d3a/go.mod h1:ezvh/TsK7cY6rbqRK0oQQ8IAqLxYwwyPxAX1Pzy0ii0=
 k8s.io/klog v0.0.0-20181102134211-b9b56d5dfc92/go.mod h1:Gq+BEi5rUBO/HRz0bTSXDUcqjScdoY3a9IHpCEIOOfk=
 k8s.io/klog v0.3.0 h1:0VPpR+sizsiivjIfIAQH/rl8tan6jvWkS7lU+0di3lE=
