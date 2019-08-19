@@ -55,7 +55,7 @@ require (
 	github.com/rancher/norman v0.0.0-20190821234528-20a936b685b0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/rke v0.3.0-rc7.0.20190827012814-16a1a5e2508b
-	github.com/rancher/types v0.0.0-20190826213409-c0775cc536a2
+	github.com/rancher/types v0.0.0-20190826224219-2c26850836ac
 	github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect
