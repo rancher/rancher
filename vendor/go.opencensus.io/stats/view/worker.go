@@ -17,11 +17,8 @@ package view
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
-	"go.opencensus.io/metric/metricdata"
-	"go.opencensus.io/metric/metricproducer"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/internal"
 	"go.opencensus.io/tag"
@@ -46,7 +43,6 @@ type worker struct {
 	timer      *time.Ticker
 	c          chan command
 	quit, done chan bool
-	mu         sync.RWMutex
 }
 
 var defaultWorker *worker
@@ -106,7 +102,7 @@ func RetrieveData(viewName string) ([]*Row, error) {
 	return resp.rows, resp.err
 }
 
-func record(tags *tag.Map, ms interface{}, attachments map[string]interface{}) {
+func record(tags *tag.Map, ms interface{}, attachments map[string]string) {
 	req := &recordReq{
 		tm:          tags,
 		ms:          ms.([]stats.Measurement),
@@ -147,9 +143,6 @@ func newWorker() *worker {
 }
 
 func (w *worker) start() {
-	prodMgr := metricproducer.GlobalManager()
-	prodMgr.AddProducer(w)
-
 	for {
 		select {
 		case cmd := <-w.c:
@@ -166,9 +159,6 @@ func (w *worker) start() {
 }
 
 func (w *worker) stop() {
-	prodMgr := metricproducer.GlobalManager()
-	prodMgr.DeleteProducer(w)
-
 	w.quit <- true
 	<-w.done
 }
@@ -186,8 +176,6 @@ func (w *worker) getMeasureRef(name string) *measureRef {
 }
 
 func (w *worker) tryRegisterView(v *View) (*viewInternal, error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
 	vi, err := newViewInternal(v)
 	if err != nil {
 		return nil, err
@@ -205,12 +193,6 @@ func (w *worker) tryRegisterView(v *View) (*viewInternal, error) {
 	ref := w.getMeasureRef(vi.view.Measure.Name())
 	ref.views[vi] = struct{}{}
 	return vi, nil
-}
-
-func (w *worker) unregisterView(viewName string) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	delete(w.views, viewName)
 }
 
 func (w *worker) reportView(v *viewInternal, now time.Time) {
@@ -236,46 +218,7 @@ func (w *worker) reportView(v *viewInternal, now time.Time) {
 }
 
 func (w *worker) reportUsage(now time.Time) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
 	for _, v := range w.views {
 		w.reportView(v, now)
 	}
-}
-
-func (w *worker) toMetric(v *viewInternal, now time.Time) *metricdata.Metric {
-	if !v.isSubscribed() {
-		return nil
-	}
-
-	_, ok := w.startTimes[v]
-	if !ok {
-		w.startTimes[v] = now
-	}
-
-	var startTime time.Time
-	if v.metricDescriptor.Type == metricdata.TypeGaugeInt64 ||
-		v.metricDescriptor.Type == metricdata.TypeGaugeFloat64 {
-		startTime = time.Time{}
-	} else {
-		startTime = w.startTimes[v]
-	}
-
-	return viewToMetric(v, now, startTime)
-}
-
-// Read reads all view data and returns them as metrics.
-// It is typically invoked by metric reader to export stats in metric format.
-func (w *worker) Read() []*metricdata.Metric {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	now := time.Now()
-	metrics := make([]*metricdata.Metric, 0, len(w.views))
-	for _, v := range w.views {
-		metric := w.toMetric(v, now)
-		if metric != nil {
-			metrics = append(metrics, metric)
-		}
-	}
-	return metrics
 }

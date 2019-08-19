@@ -15,6 +15,7 @@ const (
 	PodFieldDNSConfig                     = "dnsConfig"
 	PodFieldDNSPolicy                     = "dnsPolicy"
 	PodFieldDescription                   = "description"
+	PodFieldEnableServiceLinks            = "enableServiceLinks"
 	PodFieldFsgid                         = "fsgid"
 	PodFieldGids                          = "gids"
 	PodFieldHostAliases                   = "hostAliases"
@@ -64,6 +65,7 @@ type Pod struct {
 	DNSConfig                     *PodDNSConfig          `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	Description                   string                 `json:"description,omitempty" yaml:"description,omitempty"`
+	EnableServiceLinks            *bool                  `json:"enableServiceLinks,omitempty" yaml:"enableServiceLinks,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty" yaml:"gids,omitempty"`
 	HostAliases                   []HostAlias            `json:"hostAliases,omitempty" yaml:"hostAliases,omitempty"`

@@ -3,12 +3,14 @@ package authz
 import (
 	"context"
 
+	"k8s.io/client-go/transport"
+
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/templates"
 )
 
-func ApplyDefaultPodSecurityPolicy(ctx context.Context, kubeConfigPath string, k8sWrapTransport k8s.WrapTransport) error {
+func ApplyDefaultPodSecurityPolicy(ctx context.Context, kubeConfigPath string, k8sWrapTransport transport.WrapperFunc) error {
 	log.Infof(ctx, "[authz] Applying default PodSecurityPolicy")
 	k8sClient, err := k8s.NewClient(kubeConfigPath, k8sWrapTransport)
 	if err != nil {
@@ -21,7 +23,7 @@ func ApplyDefaultPodSecurityPolicy(ctx context.Context, kubeConfigPath string, k
 	return nil
 }
 
-func ApplyDefaultPodSecurityPolicyRole(ctx context.Context, kubeConfigPath, namespace string, k8sWrapTransport k8s.WrapTransport) error {
+func ApplyDefaultPodSecurityPolicyRole(ctx context.Context, kubeConfigPath, namespace string, k8sWrapTransport transport.WrapperFunc) error {
 	log.Infof(ctx, "[authz] Applying default PodSecurityPolicy Role and RoleBinding in %s", namespace)
 	k8sClient, err := k8s.NewClient(kubeConfigPath, k8sWrapTransport)
 	if err != nil {

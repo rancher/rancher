@@ -63,6 +63,10 @@ func (l Links) FilterByRel(r string) Links {
 // String returns the string representation of multiple Links
 // for use in HTTP responses etc
 func (l Links) String() string {
+	if l == nil {
+		return fmt.Sprint(nil)
+	}
+
 	var strs []string
 	for _, link := range l {
 		strs = append(strs, link.String())
@@ -74,7 +78,7 @@ func (l Links) String() string {
 //   <url>; rel="foo", <url>; rel="bar"; wat="dis"
 // returning a slice of Link structs
 func Parse(raw string) Links {
-	links := make(Links, 0)
+	var links Links
 
 	// One chunk: <url>; rel="foo"
 	for _, chunk := range strings.Split(raw, ",") {
@@ -104,13 +108,14 @@ func Parse(raw string) Links {
 			// Special case for rel
 			if strings.ToLower(key) == "rel" {
 				link.Rel = val
+			} else {
+				link.Params[key] = val
 			}
-
-			link.Params[key] = val
-
 		}
 
-		links = append(links, link)
+		if link.URL != "" {
+			links = append(links, link)
+		}
 	}
 
 	return links
@@ -131,6 +136,9 @@ func ParseMultiple(headers []string) Links {
 func parseParam(raw string) (key, val string) {
 
 	parts := strings.SplitN(raw, "=", 2)
+	if len(parts) == 1 {
+		return parts[0], ""
+	}
 	if len(parts) != 2 {
 		return "", ""
 	}

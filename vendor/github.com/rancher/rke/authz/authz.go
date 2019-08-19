@@ -6,9 +6,10 @@ import (
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/templates"
+	"k8s.io/client-go/transport"
 )
 
-func ApplyJobDeployerServiceAccount(ctx context.Context, kubeConfigPath string, k8sWrapTransport k8s.WrapTransport) error {
+func ApplyJobDeployerServiceAccount(ctx context.Context, kubeConfigPath string, k8sWrapTransport transport.WrapperFunc) error {
 	log.Infof(ctx, "[authz] Creating rke-job-deployer ServiceAccount")
 	k8sClient, err := k8s.NewClient(kubeConfigPath, k8sWrapTransport)
 	if err != nil {
@@ -24,7 +25,7 @@ func ApplyJobDeployerServiceAccount(ctx context.Context, kubeConfigPath string, 
 	return nil
 }
 
-func ApplySystemNodeClusterRoleBinding(ctx context.Context, kubeConfigPath string, k8sWrapTransport k8s.WrapTransport) error {
+func ApplySystemNodeClusterRoleBinding(ctx context.Context, kubeConfigPath string, k8sWrapTransport transport.WrapperFunc) error {
 	log.Infof(ctx, "[authz] Creating system:node ClusterRoleBinding")
 	k8sClient, err := k8s.NewClient(kubeConfigPath, k8sWrapTransport)
 	if err != nil {
@@ -37,7 +38,7 @@ func ApplySystemNodeClusterRoleBinding(ctx context.Context, kubeConfigPath strin
 	return nil
 }
 
-func ApplyKubeAPIClusterRole(ctx context.Context, kubeConfigPath string, k8sWrapTransport k8s.WrapTransport) error {
+func ApplyKubeAPIClusterRole(ctx context.Context, kubeConfigPath string, k8sWrapTransport transport.WrapperFunc) error {
 	log.Infof(ctx, "[authz] Creating kube-apiserver proxy ClusterRole and ClusterRoleBinding")
 	k8sClient, err := k8s.NewClient(kubeConfigPath, k8sWrapTransport)
 	if err != nil {

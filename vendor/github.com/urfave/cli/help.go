@@ -30,8 +30,9 @@ AUTHOR{{with $length := len .Authors}}{{if ne 1 $length}}S{{end}}{{end}}:
 
 COMMANDS:{{range .VisibleCategories}}{{if .Name}}
 
-   {{.Name}}:{{end}}{{range .VisibleCommands}}
-     {{join .Names ", "}}{{"\t"}}{{.Usage}}{{end}}{{end}}{{end}}{{if .VisibleFlags}}
+   {{.Name}}:{{range .VisibleCommands}}
+     {{join .Names ", "}}{{"\t"}}{{.Usage}}{{end}}{{else}}{{range .VisibleCommands}}
+   {{join .Names ", "}}{{"\t"}}{{.Usage}}{{end}}{{end}}{{end}}{{end}}{{if .VisibleFlags}}
 
 GLOBAL OPTIONS:
    {{range $index, $option := .VisibleFlags}}{{if $index}}
@@ -71,9 +72,11 @@ USAGE:
    {{if .UsageText}}{{.UsageText}}{{else}}{{.HelpName}} command{{if .VisibleFlags}} [command options]{{end}} {{if .ArgsUsage}}{{.ArgsUsage}}{{else}}[arguments...]{{end}}{{end}}
 
 COMMANDS:{{range .VisibleCategories}}{{if .Name}}
-   {{.Name}}:{{end}}{{range .VisibleCommands}}
-     {{join .Names ", "}}{{"\t"}}{{.Usage}}{{end}}
-{{end}}{{if .VisibleFlags}}
+
+   {{.Name}}:{{range .VisibleCommands}}
+     {{join .Names ", "}}{{"\t"}}{{.Usage}}{{end}}{{else}}{{range .VisibleCommands}}
+   {{join .Names ", "}}{{"\t"}}{{.Usage}}{{end}}{{end}}{{end}}{{if .VisibleFlags}}
+
 OPTIONS:
    {{range .VisibleFlags}}{{.}}
    {{end}}{{end}}
@@ -158,8 +161,14 @@ func DefaultAppComplete(c *Context) {
 		if command.Hidden {
 			continue
 		}
-		for _, name := range command.Names() {
-			fmt.Fprintln(c.App.Writer, name)
+		if os.Getenv("_CLI_ZSH_AUTOCOMPLETE_HACK") == "1" {
+			for _, name := range command.Names() {
+				fmt.Fprintf(c.App.Writer, "%s:%s\n", name, command.Usage)
+			}
+		} else {
+			for _, name := range command.Names() {
+				fmt.Fprintf(c.App.Writer, "%s\n", name)
+			}
 		}
 	}
 }
@@ -231,10 +240,8 @@ func printHelpCustom(out io.Writer, templ string, data interface{}, customFunc m
 	funcMap := template.FuncMap{
 		"join": strings.Join,
 	}
-	if customFunc != nil {
-		for key, value := range customFunc {
-			funcMap[key] = value
-		}
+	for key, value := range customFunc {
+		funcMap[key] = value
 	}
 
 	w := tabwriter.NewWriter(out, 1, 8, 2, ' ', 0)

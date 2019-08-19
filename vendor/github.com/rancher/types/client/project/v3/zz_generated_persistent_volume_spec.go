@@ -48,7 +48,7 @@ type PersistentVolumeSpec struct {
 	FlexVolume                    *FlexPersistentVolumeSource       `json:"flexVolume,omitempty" yaml:"flexVolume,omitempty"`
 	Flocker                       *FlockerVolumeSource              `json:"flocker,omitempty" yaml:"flocker,omitempty"`
 	GCEPersistentDisk             *GCEPersistentDiskVolumeSource    `json:"gcePersistentDisk,omitempty" yaml:"gcePersistentDisk,omitempty"`
-	Glusterfs                     *GlusterfsVolumeSource            `json:"glusterfs,omitempty" yaml:"glusterfs,omitempty"`
+	Glusterfs                     *GlusterfsPersistentVolumeSource  `json:"glusterfs,omitempty" yaml:"glusterfs,omitempty"`
 	HostPath                      *HostPathVolumeSource             `json:"hostPath,omitempty" yaml:"hostPath,omitempty"`
 	ISCSI                         *ISCSIPersistentVolumeSource      `json:"iscsi,omitempty" yaml:"iscsi,omitempty"`
 	Local                         *LocalVolumeSource                `json:"local,omitempty" yaml:"local,omitempty"`

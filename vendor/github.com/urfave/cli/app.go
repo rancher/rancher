@@ -228,6 +228,12 @@ func (a *App) Run(arguments []string) (err error) {
 		return nil
 	}
 
+	cerr := checkRequiredFlags(a.Flags, context)
+	if cerr != nil {
+		ShowAppHelp(context)
+		return cerr
+	}
+
 	if a.After != nil {
 		defer func() {
 			if afterErr := a.After(context); afterErr != nil {
@@ -352,6 +358,12 @@ func (a *App) RunAsSubcommand(ctx *Context) (err error) {
 		}
 	}
 
+	cerr := checkRequiredFlags(a.Flags, context)
+	if cerr != nil {
+		ShowSubcommandHelp(context)
+		return cerr
+	}
+
 	if a.After != nil {
 		defer func() {
 			afterErr := a.After(context)
@@ -453,7 +465,6 @@ func (a *App) hasFlag(flag Flag) bool {
 }
 
 func (a *App) errWriter() io.Writer {
-
 	// When the app ErrWriter is nil use the package level one.
 	if a.ErrWriter == nil {
 		return ErrWriter
@@ -496,11 +507,12 @@ func (a Author) String() string {
 // it's an ActionFunc or a func with the legacy signature for Action, the func
 // is run!
 func HandleAction(action interface{}, context *Context) (err error) {
-	if a, ok := action.(ActionFunc); ok {
+	switch a := action.(type) {
+	case ActionFunc:
 		return a(context)
-	} else if a, ok := action.(func(*Context) error); ok {
+	case func(*Context) error:
 		return a(context)
-	} else if a, ok := action.(func(*Context)); ok { // deprecated function signature
+	case func(*Context): // deprecated function signature
 		a(context)
 		return nil
 	}

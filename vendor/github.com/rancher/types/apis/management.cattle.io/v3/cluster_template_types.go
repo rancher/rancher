@@ -37,6 +37,7 @@ type ClusterTemplateRevision struct {
 }
 
 type ClusterTemplateRevisionSpec struct {
+	DisplayName         string `json:"displayName" norman:"required"`
 	Enabled             *bool  `json:"enabled,omitempty" norman:"default=true"`
 	ClusterTemplateName string `json:"clusterTemplateName,omitempty" norman:"type=reference[clusterTemplate],required,noupdate"`
 

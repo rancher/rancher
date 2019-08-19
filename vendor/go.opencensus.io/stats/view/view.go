@@ -24,8 +24,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.opencensus.io/metric/metricdata"
+	"go.opencensus.io/exemplar"
+
 	"go.opencensus.io/stats"
+	"go.opencensus.io/stats/internal"
 	"go.opencensus.io/tag"
 )
 
@@ -68,9 +70,6 @@ func (v *View) same(other *View) bool {
 		v.Measure.Name() == other.Measure.Name()
 }
 
-// ErrNegativeBucketBounds error returned if histogram contains negative bounds.
-//
-// Deprecated: this should not be public.
 var ErrNegativeBucketBounds = errors.New("negative bucket bounds not supported")
 
 // canonicalize canonicalizes v by setting explicit
@@ -117,17 +116,15 @@ func dropZeroBounds(bounds ...float64) []float64 {
 
 // viewInternal is the internal representation of a View.
 type viewInternal struct {
-	view             *View  // view is the canonicalized View definition associated with this view.
-	subscribed       uint32 // 1 if someone is subscribed and data need to be exported, use atomic to access
-	collector        *collector
-	metricDescriptor *metricdata.Descriptor
+	view       *View  // view is the canonicalized View definition associated with this view.
+	subscribed uint32 // 1 if someone is subscribed and data need to be exported, use atomic to access
+	collector  *collector
 }
 
 func newViewInternal(v *View) (*viewInternal, error) {
 	return &viewInternal{
-		view:             v,
-		collector:        &collector{make(map[string]AggregationData), v.Aggregation},
-		metricDescriptor: viewToMetricDescriptor(v),
+		view:      v,
+		collector: &collector{make(map[string]AggregationData), v.Aggregation},
 	}, nil
 }
 
@@ -153,12 +150,12 @@ func (v *viewInternal) collectedRows() []*Row {
 	return v.collector.collectedRows(v.view.TagKeys)
 }
 
-func (v *viewInternal) addSample(m *tag.Map, val float64, attachments map[string]interface{}, t time.Time) {
+func (v *viewInternal) addSample(m *tag.Map, e *exemplar.Exemplar) {
 	if !v.isSubscribed() {
 		return
 	}
 	sig := string(encodeWithKeys(m, v.view.TagKeys))
-	v.collector.addSample(sig, val, attachments, t)
+	v.collector.addSample(sig, e)
 }
 
 // A Data is a set of rows about usage of the single measure associated
@@ -198,23 +195,11 @@ func (r *Row) Equal(other *Row) bool {
 	return reflect.DeepEqual(r.Tags, other.Tags) && r.Data.equal(other.Data)
 }
 
-const maxNameLength = 255
-
-// Returns true if the given string contains only printable characters.
-func isPrintable(str string) bool {
-	for _, r := range str {
-		if !(r >= ' ' && r <= '~') {
-			return false
-		}
-	}
-	return true
-}
-
 func checkViewName(name string) error {
-	if len(name) > maxNameLength {
-		return fmt.Errorf("view name cannot be larger than %v", maxNameLength)
+	if len(name) > internal.MaxNameLength {
+		return fmt.Errorf("view name cannot be larger than %v", internal.MaxNameLength)
 	}
-	if !isPrintable(name) {
+	if !internal.IsPrintable(name) {
 		return fmt.Errorf("view name needs to be an ASCII string")
 	}
 	return nil

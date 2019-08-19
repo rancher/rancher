@@ -5,6 +5,7 @@ const (
 	VolumeFieldAWSElasticBlockStore  = "awsElasticBlockStore"
 	VolumeFieldAzureDisk             = "azureDisk"
 	VolumeFieldAzureFile             = "azureFile"
+	VolumeFieldCSI                   = "csi"
 	VolumeFieldCephFS                = "cephfs"
 	VolumeFieldCinder                = "cinder"
 	VolumeFieldConfigMap             = "configMap"
@@ -36,6 +37,7 @@ type Volume struct {
 	AWSElasticBlockStore  *AWSElasticBlockStoreVolumeSource  `json:"awsElasticBlockStore,omitempty" yaml:"awsElasticBlockStore,omitempty"`
 	AzureDisk             *AzureDiskVolumeSource             `json:"azureDisk,omitempty" yaml:"azureDisk,omitempty"`
 	AzureFile             *AzureFileVolumeSource             `json:"azureFile,omitempty" yaml:"azureFile,omitempty"`
+	CSI                   *CSIVolumeSource                   `json:"csi,omitempty" yaml:"csi,omitempty"`
 	CephFS                *CephFSVolumeSource                `json:"cephfs,omitempty" yaml:"cephfs,omitempty"`
 	Cinder                *CinderVolumeSource                `json:"cinder,omitempty" yaml:"cinder,omitempty"`
 	ConfigMap             *ConfigMapVolumeSource             `json:"configMap,omitempty" yaml:"configMap,omitempty"`

@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/client-go/transport"
+
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
@@ -130,7 +132,7 @@ func GetStateFromKubernetes(ctx context.Context, kubeCluster *Cluster) (*Cluster
 	}
 }
 
-func GetK8sVersion(localConfigPath string, k8sWrapTransport k8s.WrapTransport) (string, error) {
+func GetK8sVersion(localConfigPath string, k8sWrapTransport transport.WrapperFunc) (string, error) {
 	logrus.Debugf("[version] Using %s to connect to Kubernetes cluster..", localConfigPath)
 	k8sClient, err := k8s.NewClient(localConfigPath, k8sWrapTransport)
 	if err != nil {

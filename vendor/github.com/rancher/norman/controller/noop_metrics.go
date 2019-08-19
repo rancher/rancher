@@ -22,15 +22,51 @@ func (noopWorkqueueMetricsProvider) NewAddsMetric(name string) workqueue.Counter
 	return noopMetric{}
 }
 
-func (noopWorkqueueMetricsProvider) NewLatencyMetric(name string) workqueue.SummaryMetric {
+func (noopWorkqueueMetricsProvider) NewLatencyMetric(name string) workqueue.HistogramMetric {
 	return noopMetric{}
 }
 
-func (noopWorkqueueMetricsProvider) NewWorkDurationMetric(name string) workqueue.SummaryMetric {
+func (noopWorkqueueMetricsProvider) NewWorkDurationMetric(name string) workqueue.HistogramMetric {
 	return noopMetric{}
 }
 
 func (noopWorkqueueMetricsProvider) NewRetriesMetric(name string) workqueue.CounterMetric {
+	return noopMetric{}
+}
+
+func (noopWorkqueueMetricsProvider) NewDeprecatedAddsMetric(name string) workqueue.CounterMetric {
+	return noopMetric{}
+}
+
+func (noopWorkqueueMetricsProvider) NewDeprecatedLatencyMetric(name string) workqueue.SummaryMetric {
+	return noopMetric{}
+}
+
+func (noopWorkqueueMetricsProvider) NewDeprecatedWorkDurationMetric(name string) workqueue.SummaryMetric {
+	return noopMetric{}
+}
+
+func (noopWorkqueueMetricsProvider) NewDeprecatedUnfinishedWorkSecondsMetric(name string) workqueue.SettableGaugeMetric {
+	return noopMetric{}
+}
+
+func (noopWorkqueueMetricsProvider) NewDeprecatedLongestRunningProcessorMicrosecondsMetric(name string) workqueue.SettableGaugeMetric {
+	return noopMetric{}
+}
+
+func (noopWorkqueueMetricsProvider) NewDeprecatedRetriesMetric(name string) workqueue.CounterMetric {
+	return noopMetric{}
+}
+
+func (noopWorkqueueMetricsProvider) NewDeprecatedDepthMetric(name string) workqueue.GaugeMetric {
+	return noopMetric{}
+}
+
+func (noopWorkqueueMetricsProvider) NewUnfinishedWorkSecondsMetric(name string) workqueue.SettableGaugeMetric {
+	return noopMetric{}
+}
+
+func (noopWorkqueueMetricsProvider) NewLongestRunningProcessorSecondsMetric(name string) workqueue.SettableGaugeMetric {
 	return noopMetric{}
 }
 

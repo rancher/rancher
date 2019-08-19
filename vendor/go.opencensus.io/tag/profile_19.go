@@ -25,7 +25,7 @@ func do(ctx context.Context, f func(ctx context.Context)) {
 	m := FromContext(ctx)
 	keyvals := make([]string, 0, 2*len(m.m))
 	for k, v := range m.m {
-		keyvals = append(keyvals, k.Name(), v.value)
+		keyvals = append(keyvals, k.Name(), v)
 	}
 	pprof.Do(ctx, pprof.Labels(keyvals...), f)
 }

@@ -135,10 +135,6 @@ func (r *SchemaURL) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &v); err != nil {
 		return err
 	}
-	return r.fromMap(v)
-}
-
-func (r *SchemaURL) fromMap(v map[string]interface{}) error {
 	if v == nil {
 		return nil
 	}
@@ -205,8 +201,8 @@ func (r *SchemaURL) fromMap(v map[string]interface{}) error {
 
 type SchemaProps struct {
 	ID                   string            `json:"id,omitempty"`
-	Ref                  Ref               `json:"-"`
-	Schema               SchemaURL         `json:"-"`
+	Ref                  Ref               `json:"-,omitempty"`
+	Schema               SchemaURL         `json:"-,omitempty"`
 	Description          string            `json:"description,omitempty"`
 	Type                 StringOrArray     `json:"type,omitempty"`
 	Format               string            `json:"format,omitempty"`
@@ -273,7 +269,7 @@ func (s Schema) JSONLookup(token string) (interface{}, error) {
 	}
 
 	r, _, err := jsonpointer.GetForToken(s.SchemaProps, token)
-	if r != nil || (err != nil && !strings.HasPrefix(err.Error(), "object has no field")) {
+	if r != nil || err != nil {
 		return r, err
 	}
 	r, _, err = jsonpointer.GetForToken(s.SwaggerSchemaProps, token)
@@ -586,26 +582,24 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON marshal this from JSON
 func (s *Schema) UnmarshalJSON(data []byte) error {
-	props := struct {
-		SchemaProps
-		SwaggerSchemaProps
-	}{}
-	if err := json.Unmarshal(data, &props); err != nil {
+	var sch Schema
+	if err := json.Unmarshal(data, &sch.SchemaProps); err != nil {
 		return err
 	}
-
-	sch := Schema{
-		SchemaProps:        props.SchemaProps,
-		SwaggerSchemaProps: props.SwaggerSchemaProps,
+	if err := json.Unmarshal(data, &sch.Ref); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, &sch.Schema); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, &sch.SwaggerSchemaProps); err != nil {
+		return err
 	}
 
 	var d map[string]interface{}
 	if err := json.Unmarshal(data, &d); err != nil {
 		return err
 	}
-
-	sch.Ref.fromMap(d)
-	sch.Schema.fromMap(d)
 
 	delete(d, "$ref")
 	delete(d, "$schema")
