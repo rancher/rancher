@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	rkecluster "github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/pki"
+	"github.com/rancher/rke/pki/cert"
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -18,7 +19,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/util/cert"
 )
 
 type Controller struct {

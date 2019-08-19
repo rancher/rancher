@@ -371,7 +371,7 @@ func bootstrapAdmin(management *config.ManagementContext) (string, error) {
 		adminName = admins.Items[0].Name
 	}
 
-	if _, err := management.K8sClient.Core().ConfigMaps(cattleNamespace).Get(bootstrapAdminConfig, v1.GetOptions{}); err != nil {
+	if _, err := management.K8sClient.CoreV1().ConfigMaps(cattleNamespace).Get(bootstrapAdminConfig, v1.GetOptions{}); err != nil {
 		if !apierrors.IsNotFound(err) {
 			logrus.Warnf("Unable to determine if admin user already created: %v", err)
 			return "", nil
@@ -433,7 +433,7 @@ func bootstrapAdmin(management *config.ManagementContext) (string, error) {
 		},
 	}
 
-	_, err = management.K8sClient.Core().ConfigMaps(cattleNamespace).Create(&adminConfigMap)
+	_, err = management.K8sClient.CoreV1().ConfigMaps(cattleNamespace).Create(&adminConfigMap)
 	if err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			logrus.Warnf("Error creating admin config map: %v", err)

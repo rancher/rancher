@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/randomtoken"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rke/pki"
+	"github.com/rancher/rke/pki/cert"
 	mv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
@@ -30,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 

@@ -12,8 +12,7 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
 	clientcache "k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/quota"
+	"k8s.io/kubernetes/pkg/quota/v1"
 )
 
 /*
@@ -57,7 +56,7 @@ func (c *calculateLimitController) calculateProjectResourceQuota(projectID strin
 	if err != nil {
 		return err
 	}
-	nssResourceList := api.ResourceList{}
+	nssResourceList := corev1.ResourceList{}
 	for _, n := range namespaces {
 		ns := n.(*corev1.Namespace)
 		if ns.DeletionTimestamp != nil {
