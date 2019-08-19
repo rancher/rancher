@@ -1,5 +1,10 @@
 package v3
 
+import (
+	"strconv"
+	"strings"
+)
+
 var (
 	// K8sVersionWindowsSystemImages is dynamically populated on initWindows() with the latest versions
 	K8sVersionWindowsSystemImages map[string]WindowsSystemImages
@@ -294,6 +299,14 @@ var (
 			CanalCNIBinaries:   m("rancher/canal-cni:v0.0.1-nanoserver-1803"),
 			KubeletPause:       m("rancher/kubelet-pause:v0.0.1-nanoserver-1803"),
 		},
+		"v1.12.7-rancher1-4": {
+			NginxProxy:         m("rancher/nginx-proxy:v0.0.1-nanoserver-1803"),
+			KubernetesBinaries: m("rancher/hyperkube:v1.12.7-nanoserver-1803"),
+			FlannelCNIBinaries: m("rancher/flannel-cni:v0.0.1-nanoserver-1803"),
+			CalicoCNIBinaries:  m("rancher/calico-cni:v0.0.1-nanoserver-1803"),
+			CanalCNIBinaries:   m("rancher/canal-cni:v0.0.1-nanoserver-1803"),
+			KubeletPause:       m("rancher/kubelet-pause:v0.0.1-nanoserver-1803"),
+		},
 		"v1.13.1-rancher1-1": {
 			NginxProxy:         m("rancher/nginx-proxy:v0.0.1-nanoserver-1803"),
 			KubernetesBinaries: m("rancher/hyperkube:v1.13.1-nanoserver-1803"),
@@ -322,10 +335,6 @@ var (
 )
 
 func initWindows() {
-	// maxWindowsK8sVersion defines the max k8s versions we build for Windows
-	// we stopped building Windows images at 1.13.9
-	// we use v1.13.6 as max version because 1.13.5-rancher1 is higher/bigger than 1.13.5 and we dont use any versions between 1.13.5 and 1.13.9
-	maxWindowsK8sVersion := "v1.13.6"
 	badVersions := map[string]bool{
 		"v1.8.11-rancher2-1": true,
 		"v1.8.11-rancher1":   true,
@@ -342,21 +351,77 @@ func initWindows() {
 		if badVersions[version] {
 			continue
 		}
-		if version > maxWindowsK8sVersion {
+		if shouldIgnoreVersion(version) {
 			continue
 		}
 
 		images, ok := allK8sWindowsVersions[version]
 		if !ok {
-			panic("K8s version " + " is not found in AllK8sWindowsVersions map")
+			panic("K8s version " + version + " is not found in AllK8sWindowsVersions map")
 		}
 
 		K8sVersionWindowsSystemImages[version] = images
 	}
+}
 
-	if maxWindowsK8sVersion > DefaultK8s {
-		if _, ok := K8sVersionWindowsSystemImages[DefaultK8s]; !ok {
-			panic("Default K8s version " + DefaultK8s + " is not found in k8sVersionsCurrent list")
+func shouldIgnoreVersion(version string) bool {
+	versionParts := strings.Split(version, ".")
+	minor := versionParts[1]
+	minorInt, err := strconv.Atoi(minor)
+	if err != nil {
+		panic("Can't convert string " + minor + " to int")
+	}
+	// For Rancher 2.1.x, we ignore anything below 12
+	if minorInt < 12 {
+		return true
+	}
+
+	// For Rancher 2.1.x, we stopped building Windows images at 1.12.10, so we ignore checking anything above 1.12.7 (which was the last release before 1.12.10)
+	if minor == "12" {
+		patchParts := strings.Split(versionParts[2], "-")
+		patch, err := strconv.Atoi(patchParts[0])
+		if err != nil {
+			panic("Can't convert string " + patchParts[0] + " to int")
+		}
+		if patch > 7 {
+			return true
 		}
 	}
+	// For Rancher 2.1.x, we stopped building Windows images at 1.13.9, so we ignore checking anything above 1.13.5 (which was the last release before 1.13.9)
+	if minor == "13" {
+		patchParts := strings.Split(versionParts[2], "-")
+		patch, err := strconv.Atoi(patchParts[0])
+		if err != nil {
+			panic("Can't convert string " + patchParts[0] + " to int")
+		}
+		if patch > 5 {
+			return true
+		}
+	}
+	// For Rancher 2.1.x, we stopped building Windows images at 1.14.5, so we ignore checking anything above 1.14.3 (which was the last release before 1.14.3)
+	if minor == "14" {
+		patchParts := strings.Split(versionParts[2], "-")
+		patch, err := strconv.Atoi(patchParts[0])
+		if err != nil {
+			panic("Can't convert string " + patchParts[0] + " to int")
+		}
+		if patch > 3 {
+			return true
+		}
+	}
+	// For Rancher 2.1.x, we stopped building Windows images at 1.15.0, so we ignore checking anything above 1.15.0
+	if minor == "15" {
+		patchParts := strings.Split(versionParts[2], "-")
+		patch, err := strconv.Atoi(patchParts[0])
+		if err != nil {
+			panic("Can't convert string " + patchParts[0] + " to int")
+		}
+		if patch > 0 {
+			return true
+		}
+	}
+	if minorInt > 15 {
+		return true
+	}
+	return false
 }
