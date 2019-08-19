@@ -317,10 +317,15 @@ def test_revision_creation_permission(admin_mc, remove_resource,
     templateId = cluster_template.id
     # user with accessType=member should not be able to create revision
     # since user does not have 'clustertemplates-create' role
+    errorMessage = "You must have the `Create Cluster Templates` global role \
+in order to create cluster templates or revisions. These \
+permissions can be granted by an administrator."
+
     try:
         create_cluster_template_revision(user_member.client, templateId)
     except ApiError as e:
         assert e.error.status == 403
+        assert e.error.message == errorMessage
 
     # user with read-only accessType should get Forbidden error
     try:
