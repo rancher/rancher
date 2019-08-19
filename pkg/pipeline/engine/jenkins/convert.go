@@ -253,6 +253,11 @@ func (c *jenkinsPipelineConverter) configPublishCatalogContainer(container *v1.C
 	for k, v := range envs {
 		container.Env = append(container.Env, v1.EnvVar{Name: k, Value: v})
 	}
+	var customEnvs []string
+	for k := range step.Env {
+		customEnvs = append(customEnvs, k)
+	}
+	container.Env = append(container.Env, v1.EnvVar{Name: "CICD_SUBSTITUTE_VARS", Value: strings.Join(customEnvs, ",")})
 	return injectResources(container, utils.PipelineToolsCPULimitDefault, utils.PipelineToolsCPURequestDefault, utils.PipelineToolsMemoryLimitDefault, utils.PipelineToolsMemoryRequestDefault)
 }
 
