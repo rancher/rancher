@@ -123,6 +123,11 @@ func (l *AlertService) Upgrade(currentVersion string) (string, error) {
 		}
 	}
 
+	//remove finalizer from legacy ProjectAlert
+	if err := l.removeFinalizerFromLegacyAlerting(); err != nil {
+		return "", err
+	}
+
 	//upgrade old app
 	defaultSystemProjects, err := l.projectLister.List(metav1.NamespaceAll, labels.Set(systemProjectLabel).AsSelector())
 	if err != nil {
@@ -384,5 +389,24 @@ func (l *AlertService) removeLegacyAlerting() error {
 	if err := l.namespaces.Delete(legacyAlertmanagerNamespace, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 		return errors.Wrap(err, "failed to remove legacy alerting namespace when upgrade")
 	}
+	return nil
+}
+
+func (l *AlertService) removeFinalizerFromLegacyAlerting() error {
+	oldProjectAlert, err := l.oldProjectAlerts.List(metav1.ListOptions{})
+	if err != nil {
+		return errors.Wrap(err, "list legacy projectAlerts failed")
+	}
+
+	for _, v := range oldProjectAlert.Items {
+		newObj := v.DeepCopy()
+		newObj.SetFinalizers([]string{})
+		if !reflect.DeepEqual(newObj, v) {
+			if _, err = l.oldProjectAlerts.Update(newObj); err != nil {
+				return errors.Wrapf(err, "remove finalizer from legacy projectAlert %s:%s failed", newObj.Namespace, newObj.Name)
+			}
+		}
+	}
+
 	return nil
 }
