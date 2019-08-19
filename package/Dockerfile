@@ -5,9 +5,8 @@ RUN apt-get update && apt-get install -y git curl ca-certificates unzip xz-utils
     chown -R rancher /var/lib/rancher /var/lib/cattle /usr/local/bin
 RUN mkdir /root/.kube && \
     ln -s /usr/bin/k3s /usr/bin/kubectl && \
-    mkdir -p /etc/rancher/k3s && \
-    ln -s /root/.kube/k3s.yaml /etc/rancher/k3s/k3s.yaml && \
-    ln -s /root/.kube/k3s.yaml /root/.kube/config && \
+    ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/k3s.yaml  && \
+    ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/config && \
     ln -s /usr/bin/rancher /usr/bin/reset-password && \
     ln -s /usr/bin/rancher /usr/bin/ensure-default-admin && \
     rm -f /bin/sh && ln -s /bin/bash /bin/sh
