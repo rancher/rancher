@@ -3,7 +3,8 @@ from rancher import ApiError
 
 systemProjectLabel = "authz.management.cattle.io/system-project"
 defaultProjectLabel = "authz.management.cattle.io/default-project"
-initial_system_namespaces = set(["kube-system",
+initial_system_namespaces = set(["kube-node-lease",
+                                 "kube-system",
                                  "cattle-system",
                                  "kube-public",
                                  "cattle-global-data"])

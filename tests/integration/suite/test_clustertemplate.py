@@ -526,7 +526,8 @@ azureCloudProvider.aadClientSecret"
                   "default": ""
                  }]
 
-    rev = client.create_cluster_template_revision(clusterConfig=cconfig,
+    rev = client.create_cluster_template_revision(name=random_str(),
+                                                  clusterConfig=cconfig,
                                                   clusterTemplateId=tId,
                                                   questions=questions,
                                                   enabled="true")
