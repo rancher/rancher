@@ -7,8 +7,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/rancher/norman/name"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/wrangler/pkg/name"
 )
 
 const (

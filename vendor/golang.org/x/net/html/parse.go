@@ -209,27 +209,6 @@ loop:
 	p.oe = p.oe[:i+1]
 }
 
-// generateAllImpliedEndTags pops nodes off the stack of open elements as long as
-// the top node has a tag name of caption, colgroup, dd, div, dt, li, optgroup, option, p, rb,
-// rp, rt, rtc, span, tbody, td, tfoot, th, thead or tr.
-func (p *parser) generateAllImpliedEndTags() {
-	var i int
-	for i = len(p.oe) - 1; i >= 0; i-- {
-		n := p.oe[i]
-		if n.Type == ElementNode {
-			switch n.DataAtom {
-			// TODO: remove this divergence from the HTML5 spec
-			case a.Caption, a.Colgroup, a.Dd, a.Div, a.Dt, a.Li, a.Optgroup, a.Option, a.P, a.Rb,
-				a.Rp, a.Rt, a.Rtc, a.Span, a.Tbody, a.Td, a.Tfoot, a.Th, a.Thead, a.Tr:
-				continue
-			}
-		}
-		break
-	}
-
-	p.oe = p.oe[:i+1]
-}
-
 // addChild adds a child node n to the top element, and pushes n onto the stack
 // of open elements if it is an element node.
 func (p *parser) addChild(n *Node) {
@@ -276,7 +255,7 @@ func (p *parser) fosterParent(n *Node) {
 		}
 	}
 
-	if template != nil && (table == nil || j < i) {
+	if template != nil && (table == nil || j > i) {
 		template.AppendChild(n)
 		return
 	}
@@ -460,9 +439,6 @@ func (p *parser) resetInsertionMode() {
 		case a.Select:
 			if !last {
 				for ancestor, first := n, p.oe[0]; ancestor != first; {
-					if ancestor == first {
-						break
-					}
 					ancestor = p.oe[p.oe.index(ancestor)-1]
 					switch ancestor.DataAtom {
 					case a.Template:
@@ -491,6 +467,10 @@ func (p *parser) resetInsertionMode() {
 		case a.Table:
 			p.im = inTableIM
 		case a.Template:
+			// TODO: remove this divergence from the HTML5 spec.
+			if n.Namespace != "" {
+				continue
+			}
 			p.im = p.templateStack.top()
 		case a.Head:
 			// TODO: remove this divergence from the HTML5 spec.
@@ -650,7 +630,16 @@ func inHeadIM(p *parser) bool {
 			p.oe.pop()
 			p.acknowledgeSelfClosingTag()
 			return true
-		case a.Script, a.Title, a.Noscript, a.Noframes, a.Style:
+		case a.Noscript:
+			p.addElement()
+			if p.scripting {
+				p.setOriginalIM()
+				p.im = textIM
+			} else {
+				p.im = inHeadNoscriptIM
+			}
+			return true
+		case a.Script, a.Title, a.Noframes, a.Style:
 			p.addElement()
 			p.setOriginalIM()
 			p.im = textIM
@@ -679,11 +668,16 @@ func inHeadIM(p *parser) bool {
 			if !p.oe.contains(a.Template) {
 				return true
 			}
-			p.generateAllImpliedEndTags()
-			if n := p.oe.top(); n.DataAtom != a.Template {
-				return true
+			// TODO: remove this divergence from the HTML5 spec.
+			//
+			// See https://bugs.chromium.org/p/chromium/issues/detail?id=829668
+			p.generateImpliedEndTags()
+			for i := len(p.oe) - 1; i >= 0; i-- {
+				if n := p.oe[i]; n.Namespace == "" && n.DataAtom == a.Template {
+					p.oe = p.oe[:i]
+					break
+				}
 			}
-			p.popUntil(defaultScope, a.Template)
 			p.clearActiveFormattingElements()
 			p.templateStack.pop()
 			p.resetInsertionMode()
@@ -704,6 +698,49 @@ func inHeadIM(p *parser) bool {
 	}
 
 	p.parseImpliedToken(EndTagToken, a.Head, a.Head.String())
+	return false
+}
+
+// 12.2.6.4.5.
+func inHeadNoscriptIM(p *parser) bool {
+	switch p.tok.Type {
+	case DoctypeToken:
+		// Ignore the token.
+		return true
+	case StartTagToken:
+		switch p.tok.DataAtom {
+		case a.Html:
+			return inBodyIM(p)
+		case a.Basefont, a.Bgsound, a.Link, a.Meta, a.Noframes, a.Style:
+			return inHeadIM(p)
+		case a.Head, a.Noscript:
+			// Ignore the token.
+			return true
+		}
+	case EndTagToken:
+		switch p.tok.DataAtom {
+		case a.Noscript, a.Br:
+		default:
+			// Ignore the token.
+			return true
+		}
+	case TextToken:
+		s := strings.TrimLeft(p.tok.Data, whitespace)
+		if len(s) == 0 {
+			// It was all whitespace.
+			return inHeadIM(p)
+		}
+	case CommentToken:
+		return inHeadIM(p)
+	}
+	p.oe.pop()
+	if p.top().DataAtom != a.Head {
+		panic("html: the new current node will be a head element.")
+	}
+	p.im = inHeadIM
+	if p.tok.DataAtom == a.Noscript {
+		return true
+	}
 	return false
 }
 
@@ -860,9 +897,13 @@ func inBodyIM(p *parser) bool {
 			// The newline, if any, will be dealt with by the TextToken case.
 			p.framesetOK = false
 		case a.Form:
-			if p.oe.contains(a.Template) || p.form == nil {
-				p.popUntil(buttonScope, a.P)
-				p.addElement()
+			if p.form != nil && !p.oe.contains(a.Template) {
+				// Ignore the token
+				return true
+			}
+			p.popUntil(buttonScope, a.P)
+			p.addElement()
+			if !p.oe.contains(a.Template) {
 				p.form = p.top()
 			}
 		case a.Li:
@@ -912,7 +953,7 @@ func inBodyIM(p *parser) bool {
 		case a.A:
 			for i := len(p.afe) - 1; i >= 0 && p.afe[i].Type != scopeMarkerNode; i-- {
 				if n := p.afe[i]; n.Type == ElementNode && n.DataAtom == a.A {
-					p.inBodyEndTagFormatting(a.A)
+					p.inBodyEndTagFormatting(a.A, "a")
 					p.oe.remove(n)
 					p.afe.remove(n)
 					break
@@ -926,7 +967,7 @@ func inBodyIM(p *parser) bool {
 		case a.Nobr:
 			p.reconstructActiveFormattingElements()
 			if p.elementInScope(defaultScope, a.Nobr) {
-				p.inBodyEndTagFormatting(a.Nobr)
+				p.inBodyEndTagFormatting(a.Nobr, "nobr")
 				p.reconstructActiveFormattingElements()
 			}
 			p.addFormattingElement()
@@ -996,6 +1037,14 @@ func inBodyIM(p *parser) bool {
 			p.acknowledgeSelfClosingTag()
 			p.popUntil(buttonScope, a.P)
 			p.parseImpliedToken(StartTagToken, a.Form, a.Form.String())
+			if p.form == nil {
+				// NOTE: The 'isindex' element has been removed,
+				// and the 'template' element has not been designed to be
+				// collaborative with the index element.
+				//
+				// Ignore the token.
+				return true
+			}
 			if action != "" {
 				p.form.Attr = []Attribute{{Key: "action", Val: action}}
 			}
@@ -1070,13 +1119,7 @@ func inBodyIM(p *parser) bool {
 				p.acknowledgeSelfClosingTag()
 			}
 			return true
-		case a.Frame:
-			// TODO: remove this divergence from the HTML5 spec.
-			if p.oe.contains(a.Template) {
-				p.addElement()
-				return true
-			}
-		case a.Caption, a.Col, a.Colgroup, a.Head, a.Tbody, a.Td, a.Tfoot, a.Th, a.Thead, a.Tr:
+		case a.Caption, a.Col, a.Colgroup, a.Frame, a.Head, a.Tbody, a.Td, a.Tfoot, a.Th, a.Thead, a.Tr:
 			// Ignore the token.
 		default:
 			p.reconstructActiveFormattingElements()
@@ -1098,12 +1141,13 @@ func inBodyIM(p *parser) bool {
 			p.popUntil(defaultScope, p.tok.DataAtom)
 		case a.Form:
 			if p.oe.contains(a.Template) {
-				if !p.oe.contains(a.Form) {
+				i := p.indexOfElementInScope(defaultScope, a.Form)
+				if i == -1 {
 					// Ignore the token.
 					return true
 				}
 				p.generateImpliedEndTags()
-				if p.tok.DataAtom == a.Form {
+				if p.oe[i].DataAtom != a.Form {
 					// Ignore the token.
 					return true
 				}
@@ -1131,7 +1175,7 @@ func inBodyIM(p *parser) bool {
 		case a.H1, a.H2, a.H3, a.H4, a.H5, a.H6:
 			p.popUntil(defaultScope, a.H1, a.H2, a.H3, a.H4, a.H5, a.H6)
 		case a.A, a.B, a.Big, a.Code, a.Em, a.Font, a.I, a.Nobr, a.S, a.Small, a.Strike, a.Strong, a.Tt, a.U:
-			p.inBodyEndTagFormatting(p.tok.DataAtom)
+			p.inBodyEndTagFormatting(p.tok.DataAtom, p.tok.Data)
 		case a.Applet, a.Marquee, a.Object:
 			if p.popUntil(defaultScope, p.tok.DataAtom) {
 				p.clearActiveFormattingElements()
@@ -1142,7 +1186,7 @@ func inBodyIM(p *parser) bool {
 		case a.Template:
 			return inHeadIM(p)
 		default:
-			p.inBodyEndTagOther(p.tok.DataAtom)
+			p.inBodyEndTagOther(p.tok.DataAtom, p.tok.Data)
 		}
 	case CommentToken:
 		p.addChild(&Node{
@@ -1169,7 +1213,7 @@ func inBodyIM(p *parser) bool {
 	return true
 }
 
-func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom) {
+func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom, tagName string) {
 	// This is the "adoption agency" algorithm, described at
 	// https://html.spec.whatwg.org/multipage/syntax.html#adoptionAgency
 
@@ -1191,7 +1235,7 @@ func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom) {
 			}
 		}
 		if formattingElement == nil {
-			p.inBodyEndTagOther(tagAtom)
+			p.inBodyEndTagOther(tagAtom, tagName)
 			return
 		}
 		feIndex := p.oe.index(formattingElement)
@@ -1269,12 +1313,6 @@ func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom) {
 		switch commonAncestor.DataAtom {
 		case a.Table, a.Tbody, a.Tfoot, a.Thead, a.Tr:
 			p.fosterParent(lastNode)
-		case a.Template:
-			// TODO: remove namespace checking
-			if commonAncestor.Namespace == "html" {
-				commonAncestor = commonAncestor.LastChild
-			}
-			fallthrough
 		default:
 			commonAncestor.AppendChild(lastNode)
 		}
@@ -1302,9 +1340,17 @@ func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom) {
 // inBodyEndTagOther performs the "any other end tag" algorithm for inBodyIM.
 // "Any other end tag" handling from 12.2.6.5 The rules for parsing tokens in foreign content
 // https://html.spec.whatwg.org/multipage/syntax.html#parsing-main-inforeign
-func (p *parser) inBodyEndTagOther(tagAtom a.Atom) {
+func (p *parser) inBodyEndTagOther(tagAtom a.Atom, tagName string) {
 	for i := len(p.oe) - 1; i >= 0; i-- {
-		if p.oe[i].DataAtom == tagAtom {
+		// Two element nodes have the same tag if they have the same Data (a
+		// string-typed field). As an optimization, for common HTML tags, each
+		// Data string is assigned a unique, non-zero DataAtom (a uint32-typed
+		// field), since integer comparison is faster than string comparison.
+		// Uncommon (custom) tags get a zero DataAtom.
+		//
+		// The if condition here is equivalent to (p.oe[i].Data == tagName).
+		if (p.oe[i].DataAtom == tagAtom) &&
+			((tagAtom != 0) || (p.oe[i].Data == tagName)) {
 			p.oe = p.oe[:i]
 			break
 		}
@@ -1346,9 +1392,6 @@ func textIM(p *parser) bool {
 // Section 12.2.6.4.9.
 func inTableIM(p *parser) bool {
 	switch p.tok.Type {
-	case ErrorToken:
-		// Stop parsing.
-		return true
 	case TextToken:
 		p.tok.Data = strings.Replace(p.tok.Data, "\x00", "", -1)
 		switch p.oe.top().DataAtom {
@@ -1443,6 +1486,8 @@ func inTableIM(p *parser) bool {
 	case DoctypeToken:
 		// Ignore the token.
 		return true
+	case ErrorToken:
+		return inBodyIM(p)
 	}
 
 	p.fosterParenting = true
@@ -1545,6 +1590,8 @@ func inColumnGroupIM(p *parser) bool {
 		case a.Template:
 			return inHeadIM(p)
 		}
+	case ErrorToken:
+		return inBodyIM(p)
 	}
 	if p.oe.top().DataAtom != a.Colgroup {
 		return true
@@ -1697,8 +1744,9 @@ func inCellIM(p *parser) bool {
 				return true
 			}
 			// Close the cell and reprocess.
-			p.popUntil(tableScope, a.Td, a.Th)
-			p.clearActiveFormattingElements()
+			if p.popUntil(tableScope, a.Td, a.Th) {
+				p.clearActiveFormattingElements()
+			}
 			p.im = inRowIM
 			return false
 		}
@@ -1709,9 +1757,6 @@ func inCellIM(p *parser) bool {
 // Section 12.2.6.4.16.
 func inSelectIM(p *parser) bool {
 	switch p.tok.Type {
-	case ErrorToken:
-		// Stop parsing.
-		return true
 	case TextToken:
 		p.addText(strings.Replace(p.tok.Data, "\x00", "", -1))
 	case StartTagToken:
@@ -1732,8 +1777,12 @@ func inSelectIM(p *parser) bool {
 			}
 			p.addElement()
 		case a.Select:
-			p.tok.Type = EndTagToken
-			return false
+			if p.popUntil(selectScope, a.Select) {
+				p.resetInsertionMode()
+			} else {
+				// Ignore the token.
+				return true
+			}
 		case a.Input, a.Keygen, a.Textarea:
 			if p.elementInScope(selectScope, a.Select) {
 				p.parseImpliedToken(EndTagToken, a.Select, a.Select.String())
@@ -1763,6 +1812,9 @@ func inSelectIM(p *parser) bool {
 		case a.Select:
 			if p.popUntil(selectScope, a.Select) {
 				p.resetInsertionMode()
+			} else {
+				// Ignore the token.
+				return true
 			}
 		case a.Template:
 			return inHeadIM(p)
@@ -1775,6 +1827,8 @@ func inSelectIM(p *parser) bool {
 	case DoctypeToken:
 		// Ignore the token.
 		return true
+	case ErrorToken:
+		return inBodyIM(p)
 	}
 
 	return true
@@ -1786,13 +1840,22 @@ func inSelectInTableIM(p *parser) bool {
 	case StartTagToken, EndTagToken:
 		switch p.tok.DataAtom {
 		case a.Caption, a.Table, a.Tbody, a.Tfoot, a.Thead, a.Tr, a.Td, a.Th:
-			if p.tok.Type == StartTagToken || p.elementInScope(tableScope, p.tok.DataAtom) {
-				p.parseImpliedToken(EndTagToken, a.Select, a.Select.String())
-				return false
-			} else {
+			if p.tok.Type == EndTagToken && !p.elementInScope(tableScope, p.tok.DataAtom) {
 				// Ignore the token.
 				return true
 			}
+			// This is like p.popUntil(selectScope, a.Select), but it also
+			// matches <math select>, not just <select>. Matching the MathML
+			// tag is arguably incorrect (conceptually), but it mimics what
+			// Chromium does.
+			for i := len(p.oe) - 1; i >= 0; i-- {
+				if n := p.oe[i]; n.DataAtom == a.Select {
+					p.oe = p.oe[:i]
+					break
+				}
+			}
+			p.resetInsertionMode()
+			return false
 		}
 	}
 	return inSelectIM(p)
@@ -1841,15 +1904,26 @@ func inTemplateIM(p *parser) bool {
 			// Ignore the token.
 			return true
 		}
+	case ErrorToken:
+		if !p.oe.contains(a.Template) {
+			// Ignore the token.
+			return true
+		}
+		// TODO: remove this divergence from the HTML5 spec.
+		//
+		// See https://bugs.chromium.org/p/chromium/issues/detail?id=829668
+		p.generateImpliedEndTags()
+		for i := len(p.oe) - 1; i >= 0; i-- {
+			if n := p.oe[i]; n.Namespace == "" && n.DataAtom == a.Template {
+				p.oe = p.oe[:i]
+				break
+			}
+		}
+		p.clearActiveFormattingElements()
+		p.templateStack.pop()
+		p.resetInsertionMode()
+		return false
 	}
-	if !p.oe.contains(a.Template) {
-		// Ignore the token.
-		return true
-	}
-	p.popUntil(defaultScope, a.Template)
-	p.clearActiveFormattingElements()
-	p.templateStack.pop()
-	p.resetInsertionMode()
 	return false
 }
 
@@ -1923,11 +1997,6 @@ func inFramesetIM(p *parser) bool {
 			p.acknowledgeSelfClosingTag()
 		case a.Noframes:
 			return inHeadIM(p)
-		case a.Template:
-			// TODO: remove this divergence from the HTML5 spec.
-			//
-			// See https://bugs.chromium.org/p/chromium/issues/detail?id=829668
-			return inTemplateIM(p)
 		}
 	case EndTagToken:
 		switch p.tok.DataAtom {
@@ -2220,8 +2289,44 @@ func (p *parser) parse() error {
 }
 
 // Parse returns the parse tree for the HTML from the given Reader.
+//
+// It implements the HTML5 parsing algorithm
+// (https://html.spec.whatwg.org/multipage/syntax.html#tree-construction),
+// which is very complicated. The resultant tree can contain implicitly created
+// nodes that have no explicit <tag> listed in r's data, and nodes' parents can
+// differ from the nesting implied by a naive processing of start and end
+// <tag>s. Conversely, explicit <tag>s in r's data can be silently dropped,
+// with no corresponding node in the resulting tree.
+//
 // The input is assumed to be UTF-8 encoded.
 func Parse(r io.Reader) (*Node, error) {
+	return ParseWithOptions(r)
+}
+
+// ParseFragment parses a fragment of HTML and returns the nodes that were
+// found. If the fragment is the InnerHTML for an existing element, pass that
+// element in context.
+//
+// It has the same intricacies as Parse.
+func ParseFragment(r io.Reader, context *Node) ([]*Node, error) {
+	return ParseFragmentWithOptions(r, context)
+}
+
+// ParseOption configures a parser.
+type ParseOption func(p *parser)
+
+// ParseOptionEnableScripting configures the scripting flag.
+// https://html.spec.whatwg.org/multipage/webappapis.html#enabling-and-disabling-scripting
+//
+// By default, scripting is enabled.
+func ParseOptionEnableScripting(enable bool) ParseOption {
+	return func(p *parser) {
+		p.scripting = enable
+	}
+}
+
+// ParseWithOptions is like Parse, with options.
+func ParseWithOptions(r io.Reader, opts ...ParseOption) (*Node, error) {
 	p := &parser{
 		tokenizer: NewTokenizer(r),
 		doc: &Node{
@@ -2231,6 +2336,11 @@ func Parse(r io.Reader) (*Node, error) {
 		framesetOK: true,
 		im:         initialIM,
 	}
+
+	for _, f := range opts {
+		f(p)
+	}
+
 	err := p.parse()
 	if err != nil {
 		return nil, err
@@ -2238,10 +2348,8 @@ func Parse(r io.Reader) (*Node, error) {
 	return p.doc, nil
 }
 
-// ParseFragment parses a fragment of HTML and returns the nodes that were
-// found. If the fragment is the InnerHTML for an existing element, pass that
-// element in context.
-func ParseFragment(r io.Reader, context *Node) ([]*Node, error) {
+// ParseFragmentWithOptions is like ParseFragment, with options.
+func ParseFragmentWithOptions(r io.Reader, context *Node, opts ...ParseOption) ([]*Node, error) {
 	contextTag := ""
 	if context != nil {
 		if context.Type != ElementNode {
@@ -2263,6 +2371,10 @@ func ParseFragment(r io.Reader, context *Node) ([]*Node, error) {
 		scripting: true,
 		fragment:  true,
 		context:   context,
+	}
+
+	for _, f := range opts {
+		f(p)
 	}
 
 	root := &Node{

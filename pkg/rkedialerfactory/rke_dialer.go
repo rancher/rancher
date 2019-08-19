@@ -5,12 +5,13 @@ import (
 	"net"
 	"strings"
 
+	"k8s.io/client-go/transport"
+
 	"net/http"
 
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rke/hosts"
-	"github.com/rancher/rke/k8s"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config/dialer"
 )
@@ -36,7 +37,7 @@ func (t *RKEDialerFactory) Build(h *hosts.Host) (func(network, address string) (
 	return t.Factory.NodeDialer(parts[0], parts[1])
 }
 
-func (t *RKEDialerFactory) WrapTransport(config *v3.RancherKubernetesEngineConfig) k8s.WrapTransport {
+func (t *RKEDialerFactory) WrapTransport(config *v3.RancherKubernetesEngineConfig) transport.WrapperFunc {
 	translateAddress := map[string]string{}
 
 	for _, node := range config.Nodes {

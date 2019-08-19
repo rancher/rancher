@@ -9,10 +9,9 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-func convertResourceListToLimit(rList api.ResourceList) (*v3.ResourceQuotaLimit, error) {
+func convertResourceListToLimit(rList corev1.ResourceList) (*v3.ResourceQuotaLimit, error) {
 	converted, err := convert.EncodeToMap(rList)
 	if err != nil {
 		return nil, err

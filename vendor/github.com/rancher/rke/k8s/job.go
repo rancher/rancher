@@ -2,14 +2,13 @@ package k8s
 
 import (
 	"fmt"
-
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/transport"
 )
 
 type JobStatus struct {
@@ -17,7 +16,7 @@ type JobStatus struct {
 	Created   bool
 }
 
-func ApplyK8sSystemJob(jobYaml, kubeConfigPath string, k8sWrapTransport WrapTransport, timeout int, addonUpdated bool) error {
+func ApplyK8sSystemJob(jobYaml, kubeConfigPath string, k8sWrapTransport transport.WrapperFunc, timeout int, addonUpdated bool) error {
 	job := v1.Job{}
 	if err := decodeYamlResource(&job, jobYaml); err != nil {
 		return err

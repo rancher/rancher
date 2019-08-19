@@ -7,9 +7,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/rancher/norman/name"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/definition"
+	"github.com/rancher/wrangler/pkg/name"
 )
 
 type SchemaCollection struct {

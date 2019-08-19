@@ -16,9 +16,9 @@ import (
 	_ "github.com/rancher/norman/controller"
 	"github.com/rancher/norman/pkg/dump"
 	"github.com/rancher/norman/pkg/kwrapper/k8s"
-	"github.com/rancher/norman/signal"
 	"github.com/rancher/rancher/app"
 	"github.com/rancher/rancher/pkg/logserver"
+	"github.com/rancher/wrangler/pkg/signals"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -200,7 +200,7 @@ func run(cfg app.Config) error {
 	logrus.Infof("Rancher version %s is starting", VERSION)
 	logrus.Infof("Rancher arguments %+v", cfg)
 	dump.GoroutineDumpOn(syscall.SIGUSR1, syscall.SIGILL)
-	ctx := signal.SigTermCancelContext(context.Background())
+	ctx := signals.SetupSignalHandler(context.Background())
 
 	migrateETCDlocal()
 

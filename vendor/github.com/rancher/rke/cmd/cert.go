@@ -8,13 +8,37 @@ import (
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
+	"github.com/rancher/rke/pki/cert"
 	"github.com/rancher/rke/services"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/urfave/cli"
-	"k8s.io/client-go/util/cert"
 )
 
 func CertificateCommand() cli.Command {
+	rotateFlags := []cli.Flag{
+		cli.StringFlag{
+			Name:   "config",
+			Usage:  "Specify an alternate cluster YAML file",
+			Value:  pki.ClusterConfig,
+			EnvVar: "RKE_CONFIG",
+		},
+		cli.StringSliceFlag{
+			Name: "service",
+			Usage: fmt.Sprintf("Specify a k8s service to rotate certs, (allowed values: %s, %s, %s, %s, %s, %s)",
+				services.KubeAPIContainerName,
+				services.KubeControllerContainerName,
+				services.SchedulerContainerName,
+				services.KubeletContainerName,
+				services.KubeproxyContainerName,
+				services.EtcdContainerName,
+			),
+		},
+		cli.BoolFlag{
+			Name:  "rotate-ca",
+			Usage: "Rotate all certificates including CA certs",
+		},
+	}
+	rotateFlags = append(rotateFlags, commonFlags...)
 	return cli.Command{
 		Name:  "cert",
 		Usage: "Certificates management for RKE cluster",
@@ -23,29 +47,7 @@ func CertificateCommand() cli.Command {
 				Name:   "rotate",
 				Usage:  "Rotate RKE cluster certificates",
 				Action: rotateRKECertificatesFromCli,
-				Flags: []cli.Flag{
-					cli.StringFlag{
-						Name:   "config",
-						Usage:  "Specify an alternate cluster YAML file",
-						Value:  pki.ClusterConfig,
-						EnvVar: "RKE_CONFIG",
-					},
-					cli.StringSliceFlag{
-						Name: "service",
-						Usage: fmt.Sprintf("Specify a k8s service to rotate certs, (allowed values: %s, %s, %s, %s, %s, %s)",
-							services.KubeAPIContainerName,
-							services.KubeControllerContainerName,
-							services.SchedulerContainerName,
-							services.KubeletContainerName,
-							services.KubeproxyContainerName,
-							services.EtcdContainerName,
-						),
-					},
-					cli.BoolFlag{
-						Name:  "rotate-ca",
-						Usage: "Rotate all certificates including CA certs",
-					},
-				},
+				Flags:  rotateFlags,
 			},
 			cli.Command{
 				Name:   "generate-csr",

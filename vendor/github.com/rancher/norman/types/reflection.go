@@ -17,8 +17,9 @@ var (
 	namespacedType = reflect.TypeOf(Namespaced{})
 	resourceType   = reflect.TypeOf(Resource{})
 	blacklistNames = map[string]bool{
-		"links":   true,
-		"actions": true,
+		"links":         true,
+		"actions":       true,
+		"managedFields": true,
 	}
 )
 

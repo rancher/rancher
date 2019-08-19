@@ -16,6 +16,7 @@ const (
 	DeploymentFieldDNSPolicy                     = "dnsPolicy"
 	DeploymentFieldDeploymentConfig              = "deploymentConfig"
 	DeploymentFieldDeploymentStatus              = "deploymentStatus"
+	DeploymentFieldEnableServiceLinks            = "enableServiceLinks"
 	DeploymentFieldFsgid                         = "fsgid"
 	DeploymentFieldGids                          = "gids"
 	DeploymentFieldHostAliases                   = "hostAliases"
@@ -69,6 +70,7 @@ type Deployment struct {
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	DeploymentConfig              *DeploymentConfig      `json:"deploymentConfig,omitempty" yaml:"deploymentConfig,omitempty"`
 	DeploymentStatus              *DeploymentStatus      `json:"deploymentStatus,omitempty" yaml:"deploymentStatus,omitempty"`
+	EnableServiceLinks            *bool                  `json:"enableServiceLinks,omitempty" yaml:"enableServiceLinks,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty" yaml:"gids,omitempty"`
 	HostAliases                   []HostAlias            `json:"hostAliases,omitempty" yaml:"hostAliases,omitempty"`

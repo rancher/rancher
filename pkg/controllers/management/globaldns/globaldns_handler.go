@@ -43,7 +43,7 @@ func newGlobalDNSController(ctx context.Context, mgmt *config.ManagementContext)
 	n := &GDController{
 		globalDNSs:        mgmt.Management.GlobalDNSs(namespace.GlobalNamespace),
 		globalDNSLister:   mgmt.Management.GlobalDNSs(namespace.GlobalNamespace).Controller().Lister(),
-		ingresses:         mgmt.K8sClient.Extensions().Ingresses(namespace.GlobalNamespace),
+		ingresses:         mgmt.K8sClient.ExtensionsV1beta1().Ingresses(namespace.GlobalNamespace),
 		managementContext: mgmt,
 		prtbLister:        mgmt.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
 		rtLister:          mgmt.Management.RoleTemplates("").Controller().Lister(),

@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 
-	"github.com/rancher/norman/leader"
 	"github.com/rancher/norman/pkg/k8scheck"
 	"github.com/rancher/rancher/pkg/audit"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
@@ -23,6 +22,7 @@ import (
 	"github.com/rancher/rancher/server"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/rancher/wrangler/pkg/leader"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
 )

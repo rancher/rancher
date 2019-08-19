@@ -867,7 +867,7 @@ func clusterTemplateTypes(schemas *types.Schemas) *types.Schemas {
 		TypeName("clusterTemplate", v3.ClusterTemplate{}).
 		TypeName("clusterTemplateRevision", v3.ClusterTemplateRevision{}).
 		AddMapperForType(&Version, v3.ClusterTemplate{}, m.Drop{Field: "namespaceId"}, m.DisplayName{}).
-		AddMapperForType(&Version, v3.ClusterTemplateRevision{}, m.Drop{Field: "namespaceId"}).
+		AddMapperForType(&Version, v3.ClusterTemplateRevision{}, m.Drop{Field: "namespaceId"}, m.DisplayName{}).
 		MustImport(&Version, v3.ClusterTemplateQuestionsOutput{}).
 		MustImport(&Version, v3.ClusterTemplate{}).
 		MustImportAndCustomize(&Version, v3.ClusterTemplateRevision{}, func(schema *types.Schema) {

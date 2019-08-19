@@ -12,10 +12,10 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/user/nslabels"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
+	"github.com/rancher/rke/pki/cert"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/util/cert"
 )
 
 func getProjectID(ns *corev1.Namespace) string {

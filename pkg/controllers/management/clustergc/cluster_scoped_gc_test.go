@@ -133,6 +133,6 @@ func (mockDynamicResourceInterface) Watch(opts metav1.ListOptions) (watch.Interf
 	panic("implement me")
 }
 
-func (mockDynamicResourceInterface) Patch(name string, pt types.PatchType, data []byte, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (mockDynamicResourceInterface) Patch(name string, pt types.PatchType, data []byte, options metav1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	panic("implement me")
 }

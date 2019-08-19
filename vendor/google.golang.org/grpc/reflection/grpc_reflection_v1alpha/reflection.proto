@@ -72,21 +72,21 @@ message ExtensionRequest {
 message ServerReflectionResponse {
   string valid_host = 1;
   ServerReflectionRequest original_request = 2;
-  // The server set one of the following fields according to the message_request
-  // in the request.
+  // The server sets one of the following fields according to the
+  // message_request in the request.
   oneof message_response {
     // This message is used to answer file_by_filename, file_containing_symbol,
-    // file_containing_extension requests with transitive dependencies. As
-    // the repeated label is not allowed in oneof fields, we use a
+    // file_containing_extension requests with transitive dependencies.
+    // As the repeated label is not allowed in oneof fields, we use a
     // FileDescriptorResponse message to encapsulate the repeated fields.
     // The reflection service is allowed to avoid sending FileDescriptorProtos
     // that were previously sent in response to earlier requests in the stream.
     FileDescriptorResponse file_descriptor_response = 4;
 
-    // This message is used to answer all_extension_numbers_of_type requst.
+    // This message is used to answer all_extension_numbers_of_type requests.
     ExtensionNumberResponse all_extension_numbers_response = 5;
 
-    // This message is used to answer list_services request.
+    // This message is used to answer list_services requests.
     ListServiceResponse list_services_response = 6;
 
     // This message is used when an error occurs.

@@ -22,6 +22,7 @@ items:
       template:
         metadata:
           annotations:
+            scheduler.alpha.kubernetes.io/critical-pod: ''
             scheduler.alpha.kubernetes.io/tolerations: >-
               [{"key":"dedicated","operator":"Equal","value":"master","effect":"NoSchedule"}]
           labels:

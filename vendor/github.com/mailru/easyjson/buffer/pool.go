@@ -179,25 +179,18 @@ func (b *Buffer) DumpTo(w io.Writer) (written int, err error) {
 }
 
 // BuildBytes creates a single byte slice with all the contents of the buffer. Data is
-// copied if it does not fit in a single chunk. You can optionally provide one byte
-// slice as argument that it will try to reuse.
-func (b *Buffer) BuildBytes(reuse ...[]byte) []byte {
+// copied if it does not fit in a single chunk.
+func (b *Buffer) BuildBytes() []byte {
 	if len(b.bufs) == 0 {
+
 		ret := b.Buf
 		b.toPool = nil
 		b.Buf = nil
+
 		return ret
 	}
 
-	var ret []byte
-	size := b.Size()
-
-	// If we got a buffer as argument and it is big enought, reuse it.
-	if len(reuse) == 1 && cap(reuse[0]) >= size {
-		ret = reuse[0][:0]
-	} else {
-		ret = make([]byte, 0, size)
-	}
+	ret := make([]byte, 0, b.Size())
 	for _, buf := range b.bufs {
 		ret = append(ret, buf...)
 		putBuf(buf)
@@ -205,62 +198,6 @@ func (b *Buffer) BuildBytes(reuse ...[]byte) []byte {
 
 	ret = append(ret, b.Buf...)
 	putBuf(b.toPool)
-
-	b.bufs = nil
-	b.toPool = nil
-	b.Buf = nil
-
-	return ret
-}
-
-type readCloser struct {
-	offset int
-	bufs   [][]byte
-}
-
-func (r *readCloser) Read(p []byte) (n int, err error) {
-	for _, buf := range r.bufs {
-		// Copy as much as we can.
-		x := copy(p[n:], buf[r.offset:])
-		n += x // Increment how much we filled.
-
-		// Did we empty the whole buffer?
-		if r.offset+x == len(buf) {
-			// On to the next buffer.
-			r.offset = 0
-			r.bufs = r.bufs[1:]
-
-			// We can release this buffer.
-			putBuf(buf)
-		} else {
-			r.offset += x
-		}
-
-		if n == len(p) {
-			break
-		}
-	}
-	// No buffers left or nothing read?
-	if len(r.bufs) == 0 {
-		err = io.EOF
-	}
-	return
-}
-
-func (r *readCloser) Close() error {
-	// Release all remaining buffers.
-	for _, buf := range r.bufs {
-		putBuf(buf)
-	}
-	// In case Close gets called multiple times.
-	r.bufs = nil
-
-	return nil
-}
-
-// ReadCloser creates an io.ReadCloser with all the contents of the buffer.
-func (b *Buffer) ReadCloser() io.ReadCloser {
-	ret := &readCloser{0, append(b.bufs, b.Buf)}
 
 	b.bufs = nil
 	b.toPool = nil

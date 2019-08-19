@@ -2,6 +2,7 @@ package addons
 
 import (
 	"fmt"
+	"k8s.io/client-go/transport"
 	"strconv"
 
 	"github.com/rancher/rke/k8s"
@@ -27,7 +28,7 @@ func getAddonJob(addonName, nodeName, image string, isDelete bool) (string, erro
 	return templates.CompileTemplateFromMap(templates.AddonJobTemplate, jobConfig)
 }
 
-func AddonJobExists(addonJobName, kubeConfigPath string, k8sWrapTransport k8s.WrapTransport) (bool, error) {
+func AddonJobExists(addonJobName, kubeConfigPath string, k8sWrapTransport transport.WrapperFunc) (bool, error) {
 	k8sClient, err := k8s.NewClient(kubeConfigPath, k8sWrapTransport)
 	if err != nil {
 		return false, err

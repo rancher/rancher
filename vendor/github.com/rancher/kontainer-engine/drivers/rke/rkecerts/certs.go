@@ -8,7 +8,7 @@ import (
 	"io"
 
 	"github.com/rancher/rke/pki"
-	"k8s.io/client-go/util/cert"
+	"github.com/rancher/rke/pki/cert"
 )
 
 type savedCertificatePKI struct {

@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/norman/types"
 	clusterController "github.com/rancher/rancher/pkg/controllers/user"
 	"github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/rke/pki/cert"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/config/dialer"
@@ -27,7 +28,6 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/client-go/util/cert"
 )
 
 type Manager struct {

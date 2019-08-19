@@ -34,7 +34,6 @@ const (
 	HostAttribute       = "http.host"
 	MethodAttribute     = "http.method"
 	PathAttribute       = "http.path"
-	URLAttribute        = "http.url"
 	UserAgentAttribute  = "http.user_agent"
 	StatusCodeAttribute = "http.status_code"
 )
@@ -94,8 +93,7 @@ func (t *traceTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// span.End() will be invoked after
 	// a read from resp.Body returns io.EOF or when
 	// resp.Body.Close() is invoked.
-	bt := &bodyTracker{rc: resp.Body, span: span}
-	resp.Body = wrappedBody(bt, resp.Body)
+	resp.Body = &bodyTracker{rc: resp.Body, span: span}
 	return resp, err
 }
 
@@ -151,21 +149,12 @@ func spanNameFromURL(req *http.Request) string {
 }
 
 func requestAttrs(r *http.Request) []trace.Attribute {
-	userAgent := r.UserAgent()
-
-	attrs := make([]trace.Attribute, 0, 5)
-	attrs = append(attrs,
+	return []trace.Attribute{
 		trace.StringAttribute(PathAttribute, r.URL.Path),
-		trace.StringAttribute(URLAttribute, r.URL.String()),
 		trace.StringAttribute(HostAttribute, r.Host),
 		trace.StringAttribute(MethodAttribute, r.Method),
-	)
-
-	if userAgent != "" {
-		attrs = append(attrs, trace.StringAttribute(UserAgentAttribute, userAgent))
+		trace.StringAttribute(UserAgentAttribute, r.UserAgent()),
 	}
-
-	return attrs
 }
 
 func responseAttrs(resp *http.Response) []trace.Attribute {

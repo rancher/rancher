@@ -8,10 +8,10 @@ import (
 
 	"github.com/rancher/norman/types/convert"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/cache"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/quota"
+	"k8s.io/kubernetes/pkg/quota/v1"
 )
 
 var (

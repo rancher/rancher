@@ -17,7 +17,6 @@ package spec
 import (
 	"encoding/json"
 
-	"github.com/go-openapi/jsonpointer"
 	"github.com/go-openapi/swag"
 )
 
@@ -35,19 +34,6 @@ type ResponseProps struct {
 type Response struct {
 	Refable
 	ResponseProps
-	VendorExtensible
-}
-
-// JSONLookup look up a value by the json property name
-func (p Response) JSONLookup(token string) (interface{}, error) {
-	if ex, ok := p.Extensions[token]; ok {
-		return &ex, nil
-	}
-	if token == "$ref" {
-		return &p.Ref, nil
-	}
-	r, _, err := jsonpointer.GetForToken(p.ResponseProps, token)
-	return r, err
 }
 
 // UnmarshalJSON hydrates this items instance with the data from JSON
@@ -56,9 +42,6 @@ func (r *Response) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	if err := json.Unmarshal(data, &r.Refable); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &r.VendorExtensible); err != nil {
 		return err
 	}
 	return nil
@@ -74,11 +57,7 @@ func (r Response) MarshalJSON() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	b3, err := json.Marshal(r.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-	return swag.ConcatJSON(b1, b2, b3), nil
+	return swag.ConcatJSON(b1, b2), nil
 }
 
 // NewResponse creates a new response instance

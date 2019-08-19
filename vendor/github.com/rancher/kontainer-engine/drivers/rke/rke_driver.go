@@ -18,13 +18,13 @@ import (
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/cmd"
 	"github.com/rancher/rke/hosts"
-	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/transport"
 )
 
 const (
@@ -35,7 +35,7 @@ const (
 
 // Driver is the struct of rke driver
 
-type WrapTransportFactory func(config *v3.RancherKubernetesEngineConfig) k8s.WrapTransport
+type WrapTransportFactory func(config *v3.RancherKubernetesEngineConfig) transport.WrapperFunc
 
 type Driver struct {
 	DockerDialer         hosts.DialerFactory
@@ -70,18 +70,18 @@ func NewDriver() types.Driver {
 	return d
 }
 
-func (d *Driver) wrapTransport(config *v3.RancherKubernetesEngineConfig) k8s.WrapTransport {
+func (d *Driver) wrapTransport(config *v3.RancherKubernetesEngineConfig) transport.WrapperFunc {
 	if d.WrapTransportFactory == nil {
 		return nil
 	}
 
-	return k8s.WrapTransport(func(rt http.RoundTripper) http.RoundTripper {
+	return func(rt http.RoundTripper) http.RoundTripper {
 		fn := d.WrapTransportFactory(config)
 		if fn == nil {
 			return rt
 		}
 		return fn(rt)
-	})
+	}
 
 }
 

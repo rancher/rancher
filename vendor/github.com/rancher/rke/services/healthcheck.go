@@ -14,8 +14,8 @@ import (
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
+	"github.com/rancher/rke/pki/cert"
 	"github.com/sirupsen/logrus"
-	"k8s.io/client-go/util/cert"
 )
 
 const (

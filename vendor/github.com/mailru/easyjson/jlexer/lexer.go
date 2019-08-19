@@ -5,14 +5,12 @@
 package jlexer
 
 import (
-	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"strconv"
-	"unicode"
-	"unicode/utf16"
 	"unicode/utf8"
+	"unsafe"
 )
 
 // tokenKind determines type of a token.
@@ -47,13 +45,11 @@ type Lexer struct {
 	firstElement bool // Whether current element is the first in array or an object.
 	wantSep      byte // A comma or a colon character, which need to occur before a token.
 
-	UseMultipleErrors bool          // If we want to use multiple errors.
-	fatalError        error         // Fatal error occurred during lexing. It is usually a syntax error.
-	multipleErrors    []*LexerError // Semantic errors occurred during lexing. Marshalling will be continued after finding this errors.
+	err error // Error encountered during lexing, if any.
 }
 
-// FetchToken scans the input for the next token.
-func (r *Lexer) FetchToken() {
+// fetchToken scans the input for the next token.
+func (r *Lexer) fetchToken() {
 	r.token.kind = tokenUndef
 	r.start = r.pos
 
@@ -151,7 +147,7 @@ func (r *Lexer) FetchToken() {
 			return
 		}
 	}
-	r.fatalError = io.EOF
+	r.err = io.EOF
 	return
 }
 
@@ -201,6 +197,17 @@ func (r *Lexer) fetchFalse() {
 		r.pos -= 5
 		r.errSyntax()
 	}
+}
+
+// bytesToStr creates a string pointing at the slice to avoid copying.
+//
+// Warning: the string returned by the function should be used with care, as the whole input data
+// chunk may be either blocked from being freed by GC because of a single string or the buffer.Data
+// may be garbage-collected even when the string exists.
+func bytesToStr(data []byte) string {
+	h := (*reflect.SliceHeader)(unsafe.Pointer(&data))
+	shdr := reflect.StringHeader{h.Data, h.Len}
+	return *(*string)(unsafe.Pointer(&shdr))
 }
 
 // fetchNumber scans a number literal token.
@@ -258,33 +265,6 @@ func findStringLen(data []byte) (hasEscapes bool, length int) {
 	return false, len(data)
 }
 
-// getu4 decodes \uXXXX from the beginning of s, returning the hex value,
-// or it returns -1.
-func getu4(s []byte) rune {
-	if len(s) < 6 || s[0] != '\\' || s[1] != 'u' {
-		return -1
-	}
-	var val rune
-	for i := 2; i < len(s) && i < 6; i++ {
-		var v byte
-		c := s[i]
-		switch c {
-		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-			v = c - '0'
-		case 'a', 'b', 'c', 'd', 'e', 'f':
-			v = c - 'a' + 10
-		case 'A', 'B', 'C', 'D', 'E', 'F':
-			v = c - 'A' + 10
-		default:
-			return -1
-		}
-
-		val <<= 4
-		val |= rune(v)
-	}
-	return val
-}
-
 // processEscape processes a single escape sequence and returns number of bytes processed.
 func (r *Lexer) processEscape(data []byte) (int, error) {
 	if len(data) < 2 {
@@ -312,28 +292,39 @@ func (r *Lexer) processEscape(data []byte) (int, error) {
 		r.token.byteValue = append(r.token.byteValue, '\t')
 		return 2, nil
 	case 'u':
-		rr := getu4(data)
-		if rr < 0 {
-			return 0, errors.New("syntax error")
-		}
-
-		read := 6
-		if utf16.IsSurrogate(rr) {
-			rr1 := getu4(data[read:])
-			if dec := utf16.DecodeRune(rr, rr1); dec != unicode.ReplacementChar {
-				read += 6
-				rr = dec
-			} else {
-				rr = unicode.ReplacementChar
-			}
-		}
-		var d [4]byte
-		s := utf8.EncodeRune(d[:], rr)
-		r.token.byteValue = append(r.token.byteValue, d[:s]...)
-		return read, nil
+	default:
+		return 0, fmt.Errorf("syntax error")
 	}
 
-	return 0, errors.New("syntax error")
+	var val rune
+
+	for i := 2; i < len(data) && i < 6; i++ {
+		var v byte
+		c = data[i]
+		switch c {
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			v = c - '0'
+		case 'a', 'b', 'c', 'd', 'e', 'f':
+			v = c - 'a' + 10
+		case 'A', 'B', 'C', 'D', 'E', 'F':
+			v = c - 'A' + 10
+		default:
+			return 0, fmt.Errorf("syntax error")
+		}
+
+		val <<= 4
+		val |= rune(v)
+	}
+
+	l := utf8.RuneLen(val)
+	if l == -1 {
+		return 0, fmt.Errorf("invalid unicode escape")
+	}
+
+	var d [4]byte
+	utf8.EncodeRune(d[:], val)
+	r.token.byteValue = append(r.token.byteValue, d[:l]...)
+	return 6, nil
 }
 
 // fetchString scans a string literal token.
@@ -377,11 +368,11 @@ func (r *Lexer) fetchString() {
 
 // scanToken scans the next token if no token is currently available in the lexer.
 func (r *Lexer) scanToken() {
-	if r.token.kind != tokenUndef || r.fatalError != nil {
+	if r.token.kind != tokenUndef || r.err != nil {
 		return
 	}
 
-	r.FetchToken()
+	r.fetchToken()
 }
 
 // consume resets the current token to allow scanning the next one.
@@ -392,20 +383,20 @@ func (r *Lexer) consume() {
 
 // Ok returns true if no error (including io.EOF) was encountered during scanning.
 func (r *Lexer) Ok() bool {
-	return r.fatalError == nil
+	return r.err == nil
 }
 
 const maxErrorContextLen = 13
 
 func (r *Lexer) errParse(what string) {
-	if r.fatalError == nil {
+	if r.err == nil {
 		var str string
 		if len(r.Data)-r.pos <= maxErrorContextLen {
 			str = string(r.Data)
 		} else {
 			str = string(r.Data[r.pos:r.pos+maxErrorContextLen-3]) + "..."
 		}
-		r.fatalError = &LexerError{
+		r.err = &LexerError{
 			Reason: what,
 			Offset: r.pos,
 			Data:   str,
@@ -418,64 +409,36 @@ func (r *Lexer) errSyntax() {
 }
 
 func (r *Lexer) errInvalidToken(expected string) {
-	if r.fatalError != nil {
-		return
-	}
-	if r.UseMultipleErrors {
-		r.pos = r.start
-		r.consume()
-		r.SkipRecursive()
-		switch expected {
-		case "[":
-			r.token.delimValue = ']'
-			r.token.kind = tokenDelim
-		case "{":
-			r.token.delimValue = '}'
-			r.token.kind = tokenDelim
+	if r.err == nil {
+		var str string
+		if len(r.token.byteValue) <= maxErrorContextLen {
+			str = string(r.token.byteValue)
+		} else {
+			str = string(r.token.byteValue[:maxErrorContextLen-3]) + "..."
 		}
-		r.addNonfatalError(&LexerError{
+		r.err = &LexerError{
 			Reason: fmt.Sprintf("expected %s", expected),
-			Offset: r.start,
-			Data:   string(r.Data[r.start:r.pos]),
-		})
-		return
+			Offset: r.pos,
+			Data:   str,
+		}
 	}
-
-	var str string
-	if len(r.token.byteValue) <= maxErrorContextLen {
-		str = string(r.token.byteValue)
-	} else {
-		str = string(r.token.byteValue[:maxErrorContextLen-3]) + "..."
-	}
-	r.fatalError = &LexerError{
-		Reason: fmt.Sprintf("expected %s", expected),
-		Offset: r.pos,
-		Data:   str,
-	}
-}
-
-func (r *Lexer) GetPos() int {
-	return r.pos
 }
 
 // Delim consumes a token and verifies that it is the given delimiter.
 func (r *Lexer) Delim(c byte) {
 	if r.token.kind == tokenUndef && r.Ok() {
-		r.FetchToken()
+		r.fetchToken()
 	}
-
 	if !r.Ok() || r.token.delimValue != c {
-		r.consume() // errInvalidToken can change token if UseMultipleErrors is enabled.
 		r.errInvalidToken(string([]byte{c}))
-	} else {
-		r.consume()
 	}
+	r.consume()
 }
 
 // IsDelim returns true if there was no scanning error and next token is the given delimiter.
 func (r *Lexer) IsDelim(c byte) bool {
 	if r.token.kind == tokenUndef && r.Ok() {
-		r.FetchToken()
+		r.fetchToken()
 	}
 	return !r.Ok() || r.token.delimValue == c
 }
@@ -483,7 +446,7 @@ func (r *Lexer) IsDelim(c byte) bool {
 // Null verifies that the next token is null and consumes it.
 func (r *Lexer) Null() {
 	if r.token.kind == tokenUndef && r.Ok() {
-		r.FetchToken()
+		r.fetchToken()
 	}
 	if !r.Ok() || r.token.kind != tokenNull {
 		r.errInvalidToken("null")
@@ -494,7 +457,7 @@ func (r *Lexer) Null() {
 // IsNull returns true if the next token is a null keyword.
 func (r *Lexer) IsNull() bool {
 	if r.token.kind == tokenUndef && r.Ok() {
-		r.FetchToken()
+		r.fetchToken()
 	}
 	return r.Ok() && r.token.kind == tokenNull
 }
@@ -502,7 +465,7 @@ func (r *Lexer) IsNull() bool {
 // Skip skips a single token.
 func (r *Lexer) Skip() {
 	if r.token.kind == tokenUndef && r.Ok() {
-		r.FetchToken()
+		r.fetchToken()
 	}
 	r.consume()
 }
@@ -513,6 +476,7 @@ func (r *Lexer) Skip() {
 // Note: no syntax validation is performed on the skipped data.
 func (r *Lexer) SkipRecursive() {
 	r.scanToken()
+
 	var start, end byte
 
 	if r.token.delimValue == '{' {
@@ -541,7 +505,7 @@ func (r *Lexer) SkipRecursive() {
 				return
 			}
 		case c == '\\' && inQuotes:
-			wasEscape = !wasEscape
+			wasEscape = true
 			continue
 		case c == '"' && inQuotes:
 			inQuotes = wasEscape
@@ -551,11 +515,7 @@ func (r *Lexer) SkipRecursive() {
 		wasEscape = false
 	}
 	r.pos = len(r.Data)
-	r.fatalError = &LexerError{
-		Reason: "EOF reached while skipping array/object or token",
-		Offset: r.pos,
-		Data:   string(r.Data[r.pos:]),
-	}
+	r.err = io.EOF
 }
 
 // Raw fetches the next item recursively as a data slice
@@ -567,107 +527,48 @@ func (r *Lexer) Raw() []byte {
 	return r.Data[r.start:r.pos]
 }
 
-// IsStart returns whether the lexer is positioned at the start
-// of an input string.
-func (r *Lexer) IsStart() bool {
-	return r.pos == 0
-}
-
-// Consumed reads all remaining bytes from the input, publishing an error if
-// there is anything but whitespace remaining.
-func (r *Lexer) Consumed() {
-	if r.pos > len(r.Data) || !r.Ok() {
-		return
-	}
-
-	for _, c := range r.Data[r.pos:] {
-		if c != ' ' && c != '\t' && c != '\r' && c != '\n' {
-			r.AddError(&LexerError{
-				Reason: "invalid character '" + string(c) + "' after top-level value",
-				Offset: r.pos,
-				Data:   string(r.Data[r.pos:]),
-			})
-			return
-		}
-
-		r.pos++
-		r.start++
-	}
-}
-
-func (r *Lexer) unsafeString() (string, []byte) {
-	if r.token.kind == tokenUndef && r.Ok() {
-		r.FetchToken()
-	}
-	if !r.Ok() || r.token.kind != tokenString {
-		r.errInvalidToken("string")
-		return "", nil
-	}
-	bytes := r.token.byteValue
-	ret := bytesToStr(r.token.byteValue)
-	r.consume()
-	return ret, bytes
-}
-
 // UnsafeString returns the string value if the token is a string literal.
 //
 // Warning: returned string may point to the input buffer, so the string should not outlive
 // the input buffer. Intended pattern of usage is as an argument to a switch statement.
 func (r *Lexer) UnsafeString() string {
-	ret, _ := r.unsafeString()
-	return ret
-}
+	if r.token.kind == tokenUndef && r.Ok() {
+		r.fetchToken()
+	}
+	if !r.Ok() || r.token.kind != tokenString {
+		r.errInvalidToken("string")
+		return ""
+	}
 
-// UnsafeBytes returns the byte slice if the token is a string literal.
-func (r *Lexer) UnsafeBytes() []byte {
-	_, ret := r.unsafeString()
+	ret := bytesToStr(r.token.byteValue)
+	r.consume()
 	return ret
 }
 
 // String reads a string literal.
 func (r *Lexer) String() string {
 	if r.token.kind == tokenUndef && r.Ok() {
-		r.FetchToken()
+		r.fetchToken()
 	}
 	if !r.Ok() || r.token.kind != tokenString {
 		r.errInvalidToken("string")
 		return ""
+
 	}
 	ret := string(r.token.byteValue)
 	r.consume()
 	return ret
 }
 
-// Bytes reads a string literal and base64 decodes it into a byte slice.
-func (r *Lexer) Bytes() []byte {
-	if r.token.kind == tokenUndef && r.Ok() {
-		r.FetchToken()
-	}
-	if !r.Ok() || r.token.kind != tokenString {
-		r.errInvalidToken("string")
-		return nil
-	}
-	ret := make([]byte, base64.StdEncoding.DecodedLen(len(r.token.byteValue)))
-	len, err := base64.StdEncoding.Decode(ret, r.token.byteValue)
-	if err != nil {
-		r.fatalError = &LexerError{
-			Reason: err.Error(),
-		}
-		return nil
-	}
-
-	r.consume()
-	return ret[:len]
-}
-
 // Bool reads a true or false boolean keyword.
 func (r *Lexer) Bool() bool {
 	if r.token.kind == tokenUndef && r.Ok() {
-		r.FetchToken()
+		r.fetchToken()
 	}
 	if !r.Ok() || r.token.kind != tokenBool {
 		r.errInvalidToken("bool")
 		return false
+
 	}
 	ret := r.token.boolValue
 	r.consume()
@@ -676,11 +577,12 @@ func (r *Lexer) Bool() bool {
 
 func (r *Lexer) number() string {
 	if r.token.kind == tokenUndef && r.Ok() {
-		r.FetchToken()
+		r.fetchToken()
 	}
 	if !r.Ok() || r.token.kind != tokenNumber {
 		r.errInvalidToken("number")
 		return ""
+
 	}
 	ret := bytesToStr(r.token.byteValue)
 	r.consume()
@@ -695,11 +597,9 @@ func (r *Lexer) Uint8() uint8 {
 
 	n, err := strconv.ParseUint(s, 10, 8)
 	if err != nil {
-		r.addNonfatalError(&LexerError{
-			Offset: r.start,
+		r.err = &LexerError{
 			Reason: err.Error(),
-			Data:   s,
-		})
+		}
 	}
 	return uint8(n)
 }
@@ -712,11 +612,9 @@ func (r *Lexer) Uint16() uint16 {
 
 	n, err := strconv.ParseUint(s, 10, 16)
 	if err != nil {
-		r.addNonfatalError(&LexerError{
-			Offset: r.start,
+		r.err = &LexerError{
 			Reason: err.Error(),
-			Data:   s,
-		})
+		}
 	}
 	return uint16(n)
 }
@@ -729,11 +627,9 @@ func (r *Lexer) Uint32() uint32 {
 
 	n, err := strconv.ParseUint(s, 10, 32)
 	if err != nil {
-		r.addNonfatalError(&LexerError{
-			Offset: r.start,
+		r.err = &LexerError{
 			Reason: err.Error(),
-			Data:   s,
-		})
+		}
 	}
 	return uint32(n)
 }
@@ -746,11 +642,9 @@ func (r *Lexer) Uint64() uint64 {
 
 	n, err := strconv.ParseUint(s, 10, 64)
 	if err != nil {
-		r.addNonfatalError(&LexerError{
-			Offset: r.start,
+		r.err = &LexerError{
 			Reason: err.Error(),
-			Data:   s,
-		})
+		}
 	}
 	return n
 }
@@ -767,11 +661,9 @@ func (r *Lexer) Int8() int8 {
 
 	n, err := strconv.ParseInt(s, 10, 8)
 	if err != nil {
-		r.addNonfatalError(&LexerError{
-			Offset: r.start,
+		r.err = &LexerError{
 			Reason: err.Error(),
-			Data:   s,
-		})
+		}
 	}
 	return int8(n)
 }
@@ -784,11 +676,9 @@ func (r *Lexer) Int16() int16 {
 
 	n, err := strconv.ParseInt(s, 10, 16)
 	if err != nil {
-		r.addNonfatalError(&LexerError{
-			Offset: r.start,
+		r.err = &LexerError{
 			Reason: err.Error(),
-			Data:   s,
-		})
+		}
 	}
 	return int16(n)
 }
@@ -801,11 +691,9 @@ func (r *Lexer) Int32() int32 {
 
 	n, err := strconv.ParseInt(s, 10, 32)
 	if err != nil {
-		r.addNonfatalError(&LexerError{
-			Offset: r.start,
+		r.err = &LexerError{
 			Reason: err.Error(),
-			Data:   s,
-		})
+		}
 	}
 	return int32(n)
 }
@@ -818,11 +706,9 @@ func (r *Lexer) Int64() int64 {
 
 	n, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
-		r.addNonfatalError(&LexerError{
-			Offset: r.start,
+		r.err = &LexerError{
 			Reason: err.Error(),
-			Data:   s,
-		})
+		}
 	}
 	return n
 }
@@ -832,69 +718,61 @@ func (r *Lexer) Int() int {
 }
 
 func (r *Lexer) Uint8Str() uint8 {
-	s, b := r.unsafeString()
+	s := r.UnsafeString()
 	if !r.Ok() {
 		return 0
 	}
 
 	n, err := strconv.ParseUint(s, 10, 8)
 	if err != nil {
-		r.addNonfatalError(&LexerError{
-			Offset: r.start,
+		r.err = &LexerError{
 			Reason: err.Error(),
-			Data:   string(b),
-		})
+		}
 	}
 	return uint8(n)
 }
 
 func (r *Lexer) Uint16Str() uint16 {
-	s, b := r.unsafeString()
+	s := r.UnsafeString()
 	if !r.Ok() {
 		return 0
 	}
 
 	n, err := strconv.ParseUint(s, 10, 16)
 	if err != nil {
-		r.addNonfatalError(&LexerError{
-			Offset: r.start,
+		r.err = &LexerError{
 			Reason: err.Error(),
-			Data:   string(b),
-		})
+		}
 	}
 	return uint16(n)
 }
 
 func (r *Lexer) Uint32Str() uint32 {
-	s, b := r.unsafeString()
+	s := r.UnsafeString()
 	if !r.Ok() {
 		return 0
 	}
 
 	n, err := strconv.ParseUint(s, 10, 32)
 	if err != nil {
-		r.addNonfatalError(&LexerError{
-			Offset: r.start,
+		r.err = &LexerError{
 			Reason: err.Error(),
-			Data:   string(b),
-		})
+		}
 	}
 	return uint32(n)
 }
 
 func (r *Lexer) Uint64Str() uint64 {
-	s, b := r.unsafeString()
+	s := r.UnsafeString()
 	if !r.Ok() {
 		return 0
 	}
 
 	n, err := strconv.ParseUint(s, 10, 64)
 	if err != nil {
-		r.addNonfatalError(&LexerError{
-			Offset: r.start,
+		r.err = &LexerError{
 			Reason: err.Error(),
-			Data:   string(b),
-		})
+		}
 	}
 	return n
 }
@@ -904,69 +782,61 @@ func (r *Lexer) UintStr() uint {
 }
 
 func (r *Lexer) Int8Str() int8 {
-	s, b := r.unsafeString()
+	s := r.UnsafeString()
 	if !r.Ok() {
 		return 0
 	}
 
 	n, err := strconv.ParseInt(s, 10, 8)
 	if err != nil {
-		r.addNonfatalError(&LexerError{
-			Offset: r.start,
+		r.err = &LexerError{
 			Reason: err.Error(),
-			Data:   string(b),
-		})
+		}
 	}
 	return int8(n)
 }
 
 func (r *Lexer) Int16Str() int16 {
-	s, b := r.unsafeString()
+	s := r.UnsafeString()
 	if !r.Ok() {
 		return 0
 	}
 
 	n, err := strconv.ParseInt(s, 10, 16)
 	if err != nil {
-		r.addNonfatalError(&LexerError{
-			Offset: r.start,
+		r.err = &LexerError{
 			Reason: err.Error(),
-			Data:   string(b),
-		})
+		}
 	}
 	return int16(n)
 }
 
 func (r *Lexer) Int32Str() int32 {
-	s, b := r.unsafeString()
+	s := r.UnsafeString()
 	if !r.Ok() {
 		return 0
 	}
 
 	n, err := strconv.ParseInt(s, 10, 32)
 	if err != nil {
-		r.addNonfatalError(&LexerError{
-			Offset: r.start,
+		r.err = &LexerError{
 			Reason: err.Error(),
-			Data:   string(b),
-		})
+		}
 	}
 	return int32(n)
 }
 
 func (r *Lexer) Int64Str() int64 {
-	s, b := r.unsafeString()
+	s := r.UnsafeString()
 	if !r.Ok() {
 		return 0
 	}
 
 	n, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
-		r.addNonfatalError(&LexerError{
-			Offset: r.start,
+		r.err = &LexerError{
 			Reason: err.Error(),
-			Data:   string(b),
-		})
+		}
 	}
 	return n
 }
@@ -983,11 +853,9 @@ func (r *Lexer) Float32() float32 {
 
 	n, err := strconv.ParseFloat(s, 32)
 	if err != nil {
-		r.addNonfatalError(&LexerError{
-			Offset: r.start,
+		r.err = &LexerError{
 			Reason: err.Error(),
-			Data:   s,
-		})
+		}
 	}
 	return float32(n)
 }
@@ -1000,53 +868,27 @@ func (r *Lexer) Float64() float64 {
 
 	n, err := strconv.ParseFloat(s, 64)
 	if err != nil {
-		r.addNonfatalError(&LexerError{
-			Offset: r.start,
+		r.err = &LexerError{
 			Reason: err.Error(),
-			Data:   s,
-		})
+		}
 	}
 	return n
 }
 
 func (r *Lexer) Error() error {
-	return r.fatalError
+	return r.err
 }
 
 func (r *Lexer) AddError(e error) {
-	if r.fatalError == nil {
-		r.fatalError = e
+	if r.err == nil {
+		r.err = e
 	}
-}
-
-func (r *Lexer) AddNonFatalError(e error) {
-	r.addNonfatalError(&LexerError{
-		Offset: r.start,
-		Data:   string(r.Data[r.start:r.pos]),
-		Reason: e.Error(),
-	})
-}
-
-func (r *Lexer) addNonfatalError(err *LexerError) {
-	if r.UseMultipleErrors {
-		// We don't want to add errors with the same offset.
-		if len(r.multipleErrors) != 0 && r.multipleErrors[len(r.multipleErrors)-1].Offset == err.Offset {
-			return
-		}
-		r.multipleErrors = append(r.multipleErrors, err)
-		return
-	}
-	r.fatalError = err
-}
-
-func (r *Lexer) GetNonFatalErrors() []*LexerError {
-	return r.multipleErrors
 }
 
 // Interface fetches an interface{} analogous to the 'encoding/json' package.
 func (r *Lexer) Interface() interface{} {
 	if r.token.kind == tokenUndef && r.Ok() {
-		r.FetchToken()
+		r.fetchToken()
 	}
 
 	if !r.Ok() {

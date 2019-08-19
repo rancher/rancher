@@ -239,7 +239,7 @@ func (c *C) logValue(label string, value interface{}) {
 	}
 }
 
-func (c *C) logMultiLine(s string) {
+func formatMultiLine(s string, quote bool) []byte {
 	b := make([]byte, 0, len(s)*2)
 	i := 0
 	n := len(s)
@@ -249,14 +249,23 @@ func (c *C) logMultiLine(s string) {
 			j++
 		}
 		b = append(b, "...     "...)
-		b = strconv.AppendQuote(b, s[i:j])
-		if j < n {
+		if quote {
+			b = strconv.AppendQuote(b, s[i:j])
+		} else {
+			b = append(b, s[i:j]...)
+			b = bytes.TrimSpace(b)
+		}
+		if quote && j < n {
 			b = append(b, " +"...)
 		}
 		b = append(b, '\n')
 		i = j
 	}
-	c.writeLog(b)
+	return b
+}
+
+func (c *C) logMultiLine(s string) {
+	c.writeLog(formatMultiLine(s, true))
 }
 
 func isMultiLine(s string) bool {

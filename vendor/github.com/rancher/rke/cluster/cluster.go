@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/rke/metadata"
+	"github.com/rancher/rke/pki/cert"
 
 	"github.com/docker/docker/api/types"
 	"github.com/rancher/rke/authz"
@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
+	"github.com/rancher/rke/metadata"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/rke/util"
@@ -26,7 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/cert"
+	"k8s.io/client-go/transport"
 )
 
 type Cluster struct {
@@ -46,7 +47,7 @@ type Cluster struct {
 	EtcdReadyHosts                   []*hosts.Host
 	ForceDeployCerts                 bool
 	InactiveHosts                    []*hosts.Host
-	K8sWrapTransport                 k8s.WrapTransport
+	K8sWrapTransport                 transport.WrapperFunc
 	KubeClient                       *kubernetes.Clientset
 	KubernetesServiceIP              net.IP
 	LocalKubeConfigPath              string
@@ -264,7 +265,7 @@ func rebuildLocalAdminConfig(ctx context.Context, kubeCluster *Cluster) error {
 	return nil
 }
 
-func isLocalConfigWorking(ctx context.Context, localKubeConfigPath string, k8sWrapTransport k8s.WrapTransport) bool {
+func isLocalConfigWorking(ctx context.Context, localKubeConfigPath string, k8sWrapTransport transport.WrapperFunc) bool {
 	if _, err := GetK8sVersion(localKubeConfigPath, k8sWrapTransport); err != nil {
 		log.Infof(ctx, "[reconcile] Local config is not valid, rebuilding admin config")
 		return false

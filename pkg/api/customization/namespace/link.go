@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/resourcelink"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	printers2 "k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	printers2 "k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/kubernetes/pkg/printers"
 )
 

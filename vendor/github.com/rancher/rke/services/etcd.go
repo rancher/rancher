@@ -1,14 +1,13 @@
 package services
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"path"
 	"path/filepath"
 	"strings"
 	"time"
-
-	"context"
 
 	etcdclient "github.com/coreos/etcd/client"
 	"github.com/docker/docker/api/types/container"
@@ -17,11 +16,11 @@ import (
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
+	"github.com/rancher/rke/pki/cert"
 	"github.com/rancher/rke/util"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
-	"k8s.io/client-go/util/cert"
 )
 
 const (
