@@ -646,5 +646,5 @@ func toAlertManagerURL(urlStr string) (*alertconfig.URL, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &alertconfig.URL{url}, nil
+	return &alertconfig.URL{URL: url}, nil
 }
