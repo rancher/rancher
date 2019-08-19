@@ -65,7 +65,16 @@ func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		}
 	}
 
-	return p.Store.Create(apiContext, schema, data)
+	result, err := p.Store.Create(apiContext, schema, data)
+	if err != nil {
+		if apiError, ok := err.(*httperror.APIError); ok {
+			if apiError.Code.Status == httperror.PermissionDenied.Status {
+				return result, httperror.WrapAPIError(err, httperror.PermissionDenied, "You must have the `Create Cluster Templates` global role in order to create cluster templates or revisions. These permissions can be granted by an administrator.")
+			}
+		}
+	}
+
+	return result, err
 }
 
 func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
@@ -90,7 +99,17 @@ func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		}
 	}
 
-	return p.Store.Update(apiContext, schema, data, id)
+	result, err := p.Store.Update(apiContext, schema, data, id)
+
+	if err != nil {
+		if apiError, ok := err.(*httperror.APIError); ok {
+			if apiError.Code.Status == httperror.PermissionDenied.Status {
+				return result, httperror.WrapAPIError(err, httperror.PermissionDenied, "You do not have permissions to create or edit the cluster templates or revisions. These permissions can be granted by an administrator.")
+			}
+		}
+	}
+
+	return result, err
 }
 
 func (p *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
@@ -114,7 +133,17 @@ func (p *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 		}
 	}
 
-	return p.Store.Delete(apiContext, schema, id)
+	result, err := p.Store.Delete(apiContext, schema, id)
+
+	if err != nil {
+		if apiError, ok := err.(*httperror.APIError); ok {
+			if apiError.Code.Status == httperror.PermissionDenied.Status {
+				return result, httperror.WrapAPIError(err, httperror.PermissionDenied, "You do not have permissions to delete the cluster templates or revisions. These permissions can be granted by an administrator.")
+			}
+		}
+	}
+
+	return result, err
 }
 
 func setLabelsAndOwnerRef(apiContext *types.APIContext, data map[string]interface{}) error {
