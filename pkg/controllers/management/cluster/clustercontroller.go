@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 
 	errorsutil "github.com/pkg/errors"
 	"github.com/rancher/kontainer-engine/service"
@@ -127,7 +128,7 @@ func (c *controller) RKECapabilities(capabilities v3.Capabilities, rkeConfig v3.
 		}
 	}
 
-	ingressController := c.IngressCapability(true, NginxIngressProvider, false)
+	ingressController := c.IngressCapability(true, rkeConfig.Ingress.Provider)
 	capabilities.IngressCapabilities = []v3.IngressCapabilities{ingressController}
 	if rkeConfig.Services.KubeAPI.ServiceNodePortRange != "" {
 		capabilities.NodePortRange = rkeConfig.Services.KubeAPI.ServiceNodePortRange
@@ -148,10 +149,13 @@ func (c *controller) L4Capability(enabled bool, providerName string, protocols [
 	return l4lb
 }
 
-func (c *controller) IngressCapability(httpLBEnabled bool, providerName string, customDefaultBackend bool) v3.IngressCapabilities {
+func (c *controller) IngressCapability(httpLBEnabled bool, providerName string) v3.IngressCapabilities {
+	customDefaultBackendDisabled := false
 	ing := v3.IngressCapabilities{
-		IngressProvider:      providerName,
-		CustomDefaultBackend: customDefaultBackend,
+		IngressProvider: providerName,
+	}
+	if strings.EqualFold(providerName, NginxIngressProvider) {
+		ing.CustomDefaultBackend = &customDefaultBackendDisabled
 	}
 	return ing
 }
@@ -161,7 +165,7 @@ func toCapabilities(k8sCapabilities *types.K8SCapabilities) v3.Capabilities {
 
 	for _, controller := range k8sCapabilities.IngressControllers {
 		controllers = append(controllers, v3.IngressCapabilities{
-			CustomDefaultBackend: controller.CustomDefaultBackend,
+			CustomDefaultBackend: &controller.CustomDefaultBackend,
 			IngressProvider:      controller.IngressProvider,
 		})
 	}

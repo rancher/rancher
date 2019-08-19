@@ -70,3 +70,39 @@ func TestLoadBalancerCapability(t *testing.T) {
 		assert.Equal(t, expectedLB, caps.LoadBalancerCapabilities.Enabled)
 	}
 }
+
+func TestIngressCapability(t *testing.T) {
+	c := initializeController()
+	rkeSpec := v3.ClusterSpec{
+		ClusterSpecBase: v3.ClusterSpecBase{
+			RancherKubernetesEngineConfig: &v3.RancherKubernetesEngineConfig{
+				Ingress: v3.IngressConfig{
+					Provider: NginxIngressProvider,
+				},
+			},
+		},
+	}
+	testClusters := []v3.Cluster{
+		{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clusterWithNginx",
+			},
+			Spec: rkeSpec,
+		},
+		{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clusterWithoutNginx",
+			},
+			Spec: rkeSpec,
+		},
+	}
+	// don't set nginx as the ingress provider for second cluster
+	testClusters[1].Spec.RancherKubernetesEngineConfig.Ingress.Provider = ""
+
+	for _, testCluster := range testClusters {
+		caps := v3.Capabilities{}
+		caps, err := c.RKECapabilities(caps, *testCluster.Spec.RancherKubernetesEngineConfig, testCluster.Name)
+		assert.Nil(t, err)
+		assert.Equal(t, testCluster.Spec.RancherKubernetesEngineConfig.Ingress.Provider, caps.IngressCapabilities[0].IngressProvider)
+	}
+}
