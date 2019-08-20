@@ -8,6 +8,7 @@ import (
 	"net"
 	"reflect"
 	"sort"
+	"strings"
 
 	workloadUtil "github.com/rancher/rancher/pkg/controllers/user/workload"
 	nodehelper "github.com/rancher/rancher/pkg/node"
@@ -22,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 const (
@@ -249,15 +251,15 @@ func isMachineReady(machine *managementv3.Node) bool {
 }
 
 func getAllNodesPublicEndpointIP(machineLister managementv3.NodeLister, clusterName string) (string, error) {
-	var addresses []net.IP
+	var addresses []string
 	machines, err := machineLister.List(clusterName, labels.NewSelector())
 	if err != nil {
 		return "", err
 	}
 	for _, machine := range machines {
 		if machine.Spec.Worker && isMachineReady(machine) {
-			nodePublicIP := net.ParseIP(nodehelper.GetEndpointNodeIP(machine))
-			if nodePublicIP.String() != "" {
+			nodePublicIP := getEndpointNodeAddress(machine)
+			if nodePublicIP != "" {
 				addresses = append(addresses, nodePublicIP)
 			}
 		}
@@ -267,10 +269,9 @@ func getAllNodesPublicEndpointIP(machineLister managementv3.NodeLister, clusterN
 	}
 
 	sort.Slice(addresses, func(i, j int) bool {
-		return bytes.Compare(addresses[i], addresses[j]) < 0
+		return strings.Compare(addresses[i], addresses[j]) < 0
 	})
-
-	return addresses[0].String(), nil
+	return addresses[0], nil
 }
 
 func convertIngressToServicePublicEndpointsMap(obj *extensionsv1beta1.Ingress, allNodes bool) map[string][]v3.PublicEndpoint {
@@ -343,4 +344,19 @@ func convertIngressToPublicEndpoints(obj *extensionsv1beta1.Ingress, isRKE bool)
 		eps = append(eps, v...)
 	}
 	return eps
+}
+
+func getEndpointNodeAddress(machine *managementv3.Node) string {
+	endpointAddress := nodehelper.GetEndpointNodeIP(machine)
+	if endpointAddress == "" {
+		return ""
+	}
+	publicIP := net.ParseIP(endpointAddress)
+	if publicIP != nil && publicIP.String() != "" {
+		return publicIP.String()
+	}
+	if errs := validation.IsDNS1123Label(endpointAddress); errs != nil {
+		return ""
+	}
+	return endpointAddress
 }
