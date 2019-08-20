@@ -72,6 +72,9 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	ingresshostgen.Register(ctx, cluster.UserOnlyContext())
 	windows.Register(ctx, clusterRec, cluster)
 
+	// register controller for API
+	cluster.APIAggregation.APIServices("").Controller()
+
 	if clusterRec.Spec.LocalClusterAuthEndpoint.Enabled {
 		err := clusterauthtoken.CRDSetup(ctx, cluster.UserOnlyContext())
 		if err != nil {
