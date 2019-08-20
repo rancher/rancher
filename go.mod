@@ -53,7 +53,7 @@ require (
 	github.com/prometheus/common v0.6.0
 	github.com/rancher/kontainer-driver-metadata v0.0.0-20190819174335-6eb94126a98c
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20190819182532-d4cdf8e56671
-	github.com/rancher/norman v0.0.0-20190819214003-cbc49d7ce77d
+	github.com/rancher/norman v0.0.0-20190819234253-61e72a6bdb94
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/rke v0.3.0-rc6.0.20190819180243-f8bac2c059d0
 	github.com/rancher/types v0.0.0-20190819184610-eb94f3aba63f
