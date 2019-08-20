@@ -3,12 +3,12 @@ package rke
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/blang/semver"
+	"github.com/rancher/kontainer-driver-metadata/rke/templates"
 	"os"
 	"strings"
 
-	"github.com/rancher/kontainer-driver-metadata/rke/templates"
-
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/image"
 )
 
@@ -58,27 +58,65 @@ func init() {
 		}
 	}
 
-	DriverData.K8sVersionServiceOptions = loadK8sVersionServiceOptions()
+	DriverData.RKEDefaultK8sVersions = loadRKEDefaultK8sVersions()
+	DriverData.RancherDefaultK8sVersions = loadRancherDefaultK8sVersions()
 
-	DriverData.K8sVersionInfo = loadK8sVersionInfo()
+	validateDefaultPresent(DriverData.RKEDefaultK8sVersions)
+	validateDefaultPresent(DriverData.RancherDefaultK8sVersions)
 
 	DriverData.K8sVersionedTemplates = templates.LoadK8sVersionedTemplates()
 
-	DriverData.RKEDefaultK8sVersions = loadRKEDefaultK8sVersions()
+	validateTemplateMatch()
 
-	for _, defaultK8s := range DriverData.RKEDefaultK8sVersions {
-		if _, ok := DriverData.K8sVersionRKESystemImages[defaultK8s]; !ok {
-			panic(fmt.Sprintf("Default K8s version %v is not found in the K8sVersionToRKESystemImages", defaultK8s))
-		}
-	}
+	DriverData.K8sVersionServiceOptions = loadK8sVersionServiceOptions()
+
+	DriverData.K8sVersionInfo = loadK8sVersionInfo()
 
 	// init Windows versions
 	DriverData.K8sVersionWindowsSystemImages = loadK8sVersionWindowsSystemimages()
 	DriverData.K8sVersionWindowsServiceOptions = loadK8sVersionWindowsServiceOptions()
 	DriverData.K8sVersionDockerInfo = loadK8sVersionDockerInfo()
 
-	DriverData.RancherDefaultK8sVersions = loadRancherDefaultK8sVersions()
+}
 
+func validateDefaultPresent(versions map[string]string) {
+	for _, defaultK8s := range versions {
+		if _, ok := DriverData.K8sVersionRKESystemImages[defaultK8s]; !ok {
+			panic(fmt.Sprintf("Default K8s version %v is not found in the K8sVersionToRKESystemImages", defaultK8s))
+		}
+	}
+}
+
+func validateTemplateMatch() {
+	for k8sVersion := range DriverData.K8sVersionRKESystemImages {
+		toMatch, err := semver.Make(k8sVersion[1:])
+		if err != nil {
+			panic(fmt.Sprintf("k8sVersion not sem-ver %s %v", k8sVersion, err))
+		}
+		for plugin, pluginData := range DriverData.K8sVersionedTemplates {
+			if plugin == templates.TemplateKeys {
+				continue
+			}
+			matchedRange := ""
+			for toTestRange := range pluginData {
+				testRange, err := semver.ParseRange(toTestRange)
+				if err != nil {
+					panic(fmt.Sprintf("range for %s not sem-ver %v %v", plugin, testRange, err))
+				}
+				if testRange(toMatch) {
+					// only one range should be matched
+					if matchedRange != "" {
+						panic(fmt.Sprintf("k8sVersion %s for plugin %s passing range %s, conflict range matching with %s",
+							k8sVersion, plugin, toTestRange, matchedRange))
+					}
+					matchedRange = toTestRange
+				}
+			}
+			if matchedRange == "" {
+				panic(fmt.Sprintf("no template found for k8sVersion %s plugin %s", k8sVersion, plugin))
+			}
+		}
+	}
 }
 
 func GenerateData() {

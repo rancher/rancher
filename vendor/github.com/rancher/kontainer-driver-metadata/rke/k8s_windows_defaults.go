@@ -312,9 +312,19 @@ func loadK8sVersionWindowsSystemimages() map[string]v3.WindowsSystemImages {
 			FlannelCNIBinaries: m("rancher/flannel-cni:v0.3.0-rancher4"),
 			KubeletPause:       m("rancher/kubelet-pause:v0.1.2"),
 		},
+		"v1.14.5-rancher1-1": {
+			KubernetesBinaries: m("rancher/hyperkube:v1.14.5-rancher1"),
+			FlannelCNIBinaries: m("rancher/flannel-cni:v0.3.0-rancher4"),
+			KubeletPause:       m("rancher/kubelet-pause:v0.1.2"),
+		},
 		"v1.15.0-rancher1-1": {
 			// NginxProxy image is replaced by host running nginx, fixed rancher#16074
 			KubernetesBinaries: m("rancher/hyperkube:v1.15.0-rancher1"),
+			FlannelCNIBinaries: m("rancher/flannel-cni:v0.3.0-rancher4"),
+			KubeletPause:       m("rancher/kubelet-pause:v0.1.2"),
+		},
+		"v1.15.2-rancher1-1": {
+			KubernetesBinaries: m("rancher/hyperkube:v1.15.2-rancher1"),
 			FlannelCNIBinaries: m("rancher/flannel-cni:v0.3.0-rancher4"),
 			KubeletPause:       m("rancher/kubelet-pause:v0.1.2"),
 		},

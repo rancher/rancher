@@ -15,7 +15,7 @@ require (
 	github.com/aws/aws-sdk-go v1.16.19
 	github.com/beevik/etree v0.0.0-20171015221209-af219c0c7ea1 // indirect
 	github.com/bep/debounce v1.2.0
-	github.com/blang/semver v3.5.1+incompatible
+	github.com/blang/semver v0.0.0-20190414102917-ba2c2ddd8906
 	github.com/coreos/etcd v3.3.13+incompatible
 	github.com/coreos/prometheus-operator v0.25.0
 	github.com/crewjam/saml v0.0.0-20190521120225-344d075952c9
@@ -51,11 +51,11 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.1.0
 	github.com/prometheus/common v0.6.0
-	github.com/rancher/kontainer-driver-metadata v0.0.0-20190819174335-6eb94126a98c
+	github.com/rancher/kontainer-driver-metadata v0.0.0-20190820205038-bc5bddb6f8f3
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20190819182532-d4cdf8e56671
 	github.com/rancher/norman v0.0.0-20190819234253-61e72a6bdb94
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
-	github.com/rancher/rke v0.3.0-rc6.0.20190819180243-f8bac2c059d0
+	github.com/rancher/rke v0.3.0-rc7.0.20190820205903-6f7f25cbcb67
 	github.com/rancher/types v0.0.0-20190820171829-3ae227679970
 	github.com/rancher/wrangler v0.1.5
 	github.com/robfig/cron v1.1.0

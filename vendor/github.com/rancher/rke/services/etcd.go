@@ -478,28 +478,41 @@ func RestoreEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 		// printing the restore container's logs
 		return fmt.Errorf("Failed to run etcd restore container, exit status is: %d, container logs: %s", status, containerLog)
 	}
-	return docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdRestoreContainerName)
+	if err := docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdRestoreContainerName); err != nil {
+		return err
+	}
+	return RunEtcdSnapshotRemove(ctx, etcdHost, prsMap, etcdRestoreImage, snapshotName, true, es)
 }
 
-func RunEtcdSnapshotRemove(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdSnapshotImage string, name string, once bool, es v3.ETCDService) error {
+func RunEtcdSnapshotRemove(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdSnapshotImage string, name string, cleanupRestore bool, es v3.ETCDService) error {
 	log.Infof(ctx, "[etcd] Removing snapshot [%s] from host [%s]", name, etcdHost.Address)
-	fullPath := fmt.Sprintf("/backup/%s{,.%s}", name, EtcdSnapshotCompressedExtension)
+
+	compressedPath := fmt.Sprintf("/backup/%s.%s", name, EtcdSnapshotCompressedExtension)
+	uncompressedPath := fmt.Sprintf("/backup/%s", name)
 	// Make sure we have a safe path to remove
-	safePath, err := filepath.Match("/backup/*", fullPath)
-	if err != nil {
-		return fmt.Errorf("failed to validate snapshot name: %v", err)
-	}
-	if !safePath {
-		return fmt.Errorf("malformed snapshot path: %v", fullPath)
+	for _, p := range []string{compressedPath, uncompressedPath} {
+		if safePath, err := filepath.Match("/backup/*", p); err != nil || !safePath {
+			return fmt.Errorf("invalid or malformed snapshot path [%s]: %v", p, err)
+		}
 	}
 
 	imageCfg := &container.Config{
-		Cmd: []string{
-			"sh", "-c", fmt.Sprintf("rm -f %s", fullPath),
-		},
 		Image: etcdSnapshotImage,
 		Env:   es.ExtraEnv,
 	}
+	if cleanupRestore {
+		// Since we have to support compressed and uncompressed versions of snapshots.
+		// We can't remove the uncompressed snapshot unless we are sure the compressed
+		// is there, hence the complex check. The || true is to get a 0 exist status even if -f is false.
+		imageCfg.Cmd = []string{
+			"sh", "-c", fmt.Sprintf("[ -f %s ] && rm -f %s || true", compressedPath, uncompressedPath),
+		}
+	} else {
+		imageCfg.Cmd = []string{
+			"sh", "-c", fmt.Sprintf("rm -f %s %s", compressedPath, uncompressedPath),
+		}
+	}
+
 	hostCfg := &container.HostConfig{
 		Binds: []string{
 			fmt.Sprintf("%s:/backup:z", EtcdSnapshotPath),
