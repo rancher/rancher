@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	v3client "github.com/rancher/types/client/management/v3"
 )
 
@@ -31,6 +32,13 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 		delete(resource.Links, "update")
 	} else if slice.ContainsString(ReadOnlySettings, resource.ID) {
 		delete(resource.Links, "update")
+	} else {
+		setting := map[string]interface{}{
+			"id": apiContext.ID,
+		}
+		if err := apiContext.AccessControl.CanDo(v3.SettingGroupVersionKind.Group, v3.SettingResource.Name, "update", apiContext, setting, apiContext.Schema); err != nil {
+			delete(resource.Links, "update")
+		}
 	}
 }
 
