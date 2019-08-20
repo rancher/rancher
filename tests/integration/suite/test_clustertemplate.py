@@ -331,13 +331,6 @@ def test_revision_creation_permission(admin_mc, remove_resource,
     except ApiError as e:
         assert e.error.status == 403
 
-    # assign 'clustertemplates-create' role to the user with accessType=owner
-    # can create revision now
-    grb = admin_mc.client.create_global_role_binding(
-        userId=user_owner.user.id, globalRoleId='clustertemplates-create')
-    wait_until(grb_cb(admin_mc.client, grb))
-    _ = create_cluster_template_revision(user_owner.client, templateId)
-
 
 def test_updated_members_revision_access(admin_mc, remove_resource,
                                          user_factory):
