@@ -3,8 +3,9 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"regexp"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
@@ -141,7 +142,7 @@ func (c *Cluster) RestoreEtcdSnapshot(ctx context.Context, snapshotPath string) 
 func (c *Cluster) RemoveEtcdSnapshot(ctx context.Context, snapshotName string) error {
 	backupImage := c.getBackupImage()
 	for _, host := range c.EtcdHosts {
-		if err := services.RunEtcdSnapshotRemove(ctx, host, c.PrivateRegistriesMap, backupImage, snapshotName, true, c.Services.Etcd); err != nil {
+		if err := services.RunEtcdSnapshotRemove(ctx, host, c.PrivateRegistriesMap, backupImage, snapshotName, false, c.Services.Etcd); err != nil {
 			return err
 		}
 	}

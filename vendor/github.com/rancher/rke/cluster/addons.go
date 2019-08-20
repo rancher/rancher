@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	rkeData "github.com/rancher/kontainer-driver-metadata/rke/templates"
+	"github.com/rancher/rke/templates"
 	"os"
 	"os/exec"
 	"time"
@@ -263,7 +265,11 @@ func (c *Cluster) deployKubeDNS(ctx context.Context, data map[string]interface{}
 		StubDomains:            c.DNS.StubDomains,
 		NodeSelector:           c.DNS.NodeSelector,
 	}
-	kubeDNSYaml, err := addons.GetKubeDNSManifest(KubeDNSConfig, data)
+	tmplt, err := templates.GetVersionedTemplates(rkeData.KubeDNS, data, c.Version)
+	if err != nil {
+		return err
+	}
+	kubeDNSYaml, err := templates.CompileTemplateFromMap(tmplt, KubeDNSConfig)
 	if err != nil {
 		return err
 	}
@@ -286,7 +292,11 @@ func (c *Cluster) deployCoreDNS(ctx context.Context, data map[string]interface{}
 		ReverseCIDRs:           c.DNS.ReverseCIDRs,
 		NodeSelector:           c.DNS.NodeSelector,
 	}
-	coreDNSYaml, err := addons.GetCoreDNSManifest(CoreDNSConfig, data)
+	tmplt, err := templates.GetVersionedTemplates(rkeData.CoreDNS, data, c.Version)
+	if err != nil {
+		return err
+	}
+	coreDNSYaml, err := templates.CompileTemplateFromMap(tmplt, CoreDNSConfig)
 	if err != nil {
 		return err
 	}
@@ -325,7 +335,11 @@ func (c *Cluster) deployMetricServer(ctx context.Context, data map[string]interf
 		Options:            c.Monitoring.Options,
 		Version:            util.GetTagMajorVersion(versionTag),
 	}
-	metricsYaml, err := addons.GetMetricsServerManifest(MetricsServerConfig, data)
+	tmplt, err := templates.GetVersionedTemplates(rkeData.MetricsServer, data, c.Version)
+	if err != nil {
+		return err
+	}
+	metricsYaml, err := templates.CompileTemplateFromMap(tmplt, MetricsServerConfig)
 	if err != nil {
 		return err
 	}
@@ -483,9 +497,12 @@ func (c *Cluster) deployIngress(ctx context.Context, data map[string]interface{}
 			ingressConfig.AlpineImage = c.SystemImages.Alpine
 		}
 	}
-
+	tmplt, err := templates.GetVersionedTemplates(rkeData.NginxIngress, data, c.Version)
+	if err != nil {
+		return err
+	}
 	// Currently only deploying nginx ingress controller
-	ingressYaml, err := addons.GetNginxIngressManifest(ingressConfig, data)
+	ingressYaml, err := templates.CompileTemplateFromMap(tmplt, ingressConfig)
 	if err != nil {
 		return err
 	}

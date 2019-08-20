@@ -69,7 +69,7 @@ github.com/beevik/etree
 github.com/beorn7/perks/quantile
 # github.com/bep/debounce v1.2.0
 github.com/bep/debounce
-# github.com/blang/semver v3.5.1+incompatible
+# github.com/blang/semver v0.0.0-20190414102917-ba2c2ddd8906
 github.com/blang/semver
 # github.com/coreos/etcd v3.3.13+incompatible
 github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes
@@ -267,7 +267,7 @@ github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 # github.com/prometheus/procfs v0.0.3
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
-# github.com/rancher/kontainer-driver-metadata v0.0.0-20190819174335-6eb94126a98c
+# github.com/rancher/kontainer-driver-metadata v0.0.0-20190820205038-bc5bddb6f8f3
 github.com/rancher/kontainer-driver-metadata/rke
 github.com/rancher/kontainer-driver-metadata/rke/templates
 # github.com/rancher/kontainer-engine v0.0.4-dev.0.20190819182532-d4cdf8e56671
@@ -331,7 +331,7 @@ github.com/rancher/norman/types/convert/merge
 github.com/rancher/norman/types/factory
 # github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 github.com/rancher/rdns-server/model
-# github.com/rancher/rke v0.3.0-rc6.0.20190819180243-f8bac2c059d0
+# github.com/rancher/rke v0.3.0-rc7.0.20190820205903-6f7f25cbcb67
 github.com/rancher/rke/util
 github.com/rancher/rke/pki/cert
 github.com/rancher/rke/cloudprovider/aws
