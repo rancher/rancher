@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -15,8 +14,8 @@ import (
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"gopkg.in/yaml.v2"
 
-	"github.com/rancher/norman/types/convert"
 	libhelm "github.com/rancher/rancher/pkg/catalog/helm"
+	img "github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/types/image"
 )
 
@@ -68,14 +67,19 @@ func run(images ...string) error {
 	if !ok {
 		return fmt.Errorf("no tag %s", tag)
 	}
-	rancherVersion := kd.GetRancherVersion()
+	rancherVersion := tag
+	if strings.HasPrefix(rancherVersion, "dev") || strings.HasPrefix(rancherVersion, "master") {
+		rancherVersion = kd.RancherVersionDev
+	}
+	if strings.HasPrefix(rancherVersion, "v") {
+		rancherVersion = rancherVersion[1:]
+	}
 	k8sVersionToRKESystemImages, _ := kd.GetK8sVersionInfo(rancherVersion,
-		metadata.DriverData.K8sVersionRKESystemImages,
-		metadata.DriverData.K8sVersionServiceOptions,
+		metadata.DriverData.K8sVersionRKESystemImages, metadata.DriverData.K8sVersionServiceOptions,
 		metadata.DriverData.K8sVersionInfo)
 	k8sVersionToWindowsSystemImages := pickWindowsImages(k8sVersionToRKESystemImages)
 
-	targetImages, err := collectionImages(k8sVersionToRKESystemImages, v3.ToolsSystemImages)
+	targetImages, err := img.CollectionImages(k8sVersionToRKESystemImages, v3.ToolsSystemImages)
 	if err != nil {
 		return err
 	}
@@ -84,7 +88,7 @@ func run(images ...string) error {
 		targetImages = append(targetImages, image.Mirror(i))
 	}
 
-	targetWindowsImages, err := collectionImages(k8sVersionToWindowsSystemImages)
+	targetWindowsImages, err := img.CollectionImages(k8sVersionToWindowsSystemImages)
 	if err != nil {
 		return err
 	}
@@ -210,39 +214,6 @@ func mirrorScript(arch string, targetImages []string) error {
 	}
 
 	return nil
-}
-
-func collectionImages(objs ...interface{}) ([]string, error) {
-	images := map[string]bool{}
-
-	for _, obj := range objs {
-		data := map[string]interface{}{}
-		if err := convert.ToObj(obj, &data); err != nil {
-			return nil, err
-		}
-		findStrings(data, images)
-	}
-
-	var result []string
-	for k := range images {
-		result = append(result, k)
-	}
-	sort.Slice(result, func(i, j int) bool {
-		return result[i] < result[j]
-	})
-
-	return result, nil
-}
-
-func findStrings(obj map[string]interface{}, found map[string]bool) {
-	for _, v := range obj {
-		switch t := v.(type) {
-		case string:
-			found[t] = true
-		case map[string]interface{}:
-			findStrings(t, found)
-		}
-	}
 }
 
 func getImagesFromCharts(path string) ([]string, error) {
