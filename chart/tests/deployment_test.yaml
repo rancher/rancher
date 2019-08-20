@@ -16,15 +16,21 @@ tests:
       content: "--add-local=auto"
 - it: should add CATTLE_SYSTEM_DEFAULT_REGISTRY to env and maintain default vars
   set:
+    systemDefaultRegistry: "registry.example.com"
     extraEnv:
-    - name: CATTLE_SYSTEM_DEFAULT_REGISTRY
-      value: registry.example.com
+    - name: CATTLE_TLS_MIN_VERSION
+      value: "1.0"
   asserts:
   - contains:
       path: spec.template.spec.containers[0].env
       content:
         name: CATTLE_SYSTEM_DEFAULT_REGISTRY
-        value: registry.example.com
+        value: "registry.example.com"
+  - contains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: CATTLE_TLS_MIN_VERSION
+        value: "1.0"
   - contains:
       path: spec.template.spec.containers[0].env
       content:

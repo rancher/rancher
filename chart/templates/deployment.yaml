@@ -91,6 +91,10 @@ spec:
         - name: NO_PROXY
           value: {{ .Values.noProxy }}
 {{- end }}
+{{- if .Values.systemDefaultRegistry }}
+        - name: CATTLE_SYSTEM_DEFAULT_REGISTRY
+          value: {{ .Values.systemDefaultRegistry }}
+{{- end }}
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}
