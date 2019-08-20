@@ -1,5 +1,7 @@
 import pytest
 from rancher import ApiError
+from .common import random_str
+from .conftest import wait_until
 
 
 # cacerts is readOnly, and should not be able to be set through the API
@@ -85,3 +87,21 @@ def test_update_nonexisting(admin_mc, remove_resource):
 
     assert e.value.error.status == 404
     assert e.value.error.code == "NotFound"
+
+
+def test_update_link(admin_mc, user_factory, remove_resource):
+    client = admin_mc.client
+    setting = client.create_setting(name=random_str(), value="a")
+    remove_resource(setting)
+    wait_until(lambda: client.reload(setting) is not None)
+
+    # admin should see update link
+    setting = client.reload(setting)
+    assert 'update' in setting.links
+
+    # create standard user
+    user = user_factory()
+
+    # this user should not be able to see update link
+    setting = user.client.reload(setting)
+    assert 'update' not in setting.links
