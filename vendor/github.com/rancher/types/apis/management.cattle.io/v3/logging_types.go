@@ -38,9 +38,13 @@ type ProjectLogging struct {
 }
 
 type LoggingCommonField struct {
-	DisplayName         string            `json:"displayName,omitempty"`
-	OutputFlushInterval int               `json:"outputFlushInterval,omitempty" norman:"default=60"`
-	OutputTags          map[string]string `json:"outputTags,omitempty"`
+	DisplayName           string            `json:"displayName,omitempty"`
+	OutputFlushInterval   int               `json:"outputFlushInterval,omitempty" norman:"default=60"`
+	OutputTags            map[string]string `json:"outputTags,omitempty"`
+	EnableMultiLineFilter bool              `json:"enableMultiLineFilter,omitempty"`
+	MultiLineStartRegexp  string            `json:"multiLineStartRegexp,omitempty"`
+	ContinuousLineRegexp  string            `json:"continuousLineRegexp,omitempty"`
+	MultiLineEndRegexp    string            `json:"multiLineEndRegexp,omitempty"`
 }
 
 type LoggingTargets struct {
@@ -187,12 +191,12 @@ type LoggingSystemImages struct {
 
 type ClusterTestInput struct {
 	ClusterName string `json:"clusterId" norman:"required,type=reference[cluster]"`
+	LoggingCommonField
 	LoggingTargets
-	OutputTags map[string]string `json:"outputTags,omitempty"`
 }
 
 type ProjectTestInput struct {
 	ProjectName string `json:"projectId" norman:"required,type=reference[project]"`
+	LoggingCommonField
 	LoggingTargets
-	OutputTags map[string]string `json:"outputTags,omitempty"`
 }
