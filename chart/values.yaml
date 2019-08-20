@@ -32,8 +32,8 @@ debug: false
 
 # Extra environment variables passed to the rancher pods.
 # extraEnv:
-# - name: CATTLE_SYSTEM_DEFAULT_REGISTRY
-#   value: "registry.example.com"
+# - name: CATTLE_TLS_MIN_VERSION
+#   value: "1.0"
 
 # Fully qualified name to reach your Rancher server
 # hostname: rancher.my.org
@@ -99,3 +99,5 @@ resources: {}
 # - ingress (default)
 # - external
 tls: ingress
+
+systemDefaultRegistry: ""
