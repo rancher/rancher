@@ -13,8 +13,10 @@ import (
 )
 
 const (
-	clusterOwnerRole  = "cluster-owner"
-	projectMemberRole = "project-member"
+	clusterOwnerRole           = "cluster-owner"
+	projectMemberRole          = "project-member"
+	ClusterSystemAccountPrefix = "System account for Cluster "
+	ProjectSystemAccountPrefix = "System account for Project "
 )
 
 func NewManager(management *config.ManagementContext) *Manager {
@@ -74,7 +76,7 @@ func (s *Manager) CreateSystemAccount(cluster *v3.Cluster) error {
 }
 
 func (s *Manager) GetSystemUser(clusterName string) (*v3.User, error) {
-	return s.userManager.EnsureUser(fmt.Sprintf("system://%s", clusterName), "System account for Cluster "+clusterName)
+	return s.userManager.EnsureUser(fmt.Sprintf("system://%s", clusterName), ClusterSystemAccountPrefix+clusterName)
 }
 
 func (s *Manager) GetOrCreateSystemClusterToken(clusterName string) (string, error) {
@@ -139,7 +141,7 @@ func (s *Manager) GetOrCreateProjectSystemAccount(projectID string) error {
 }
 
 func (s *Manager) GetProjectSystemUser(projectName string) (*v3.User, error) {
-	return s.userManager.EnsureUser(fmt.Sprintf("system://%s", projectName), "System account for Project "+projectName)
+	return s.userManager.EnsureUser(fmt.Sprintf("system://%s", projectName), ProjectSystemAccountPrefix+projectName)
 }
 
 func (s *Manager) GetOrCreateProjectSystemToken(projectName string) (string, error) {
