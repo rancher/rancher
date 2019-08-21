@@ -62,7 +62,6 @@ func init() {
 	DriverData.RancherDefaultK8sVersions = loadRancherDefaultK8sVersions()
 
 	validateDefaultPresent(DriverData.RKEDefaultK8sVersions)
-	validateDefaultPresent(DriverData.RancherDefaultK8sVersions)
 
 	DriverData.K8sVersionedTemplates = templates.LoadK8sVersionedTemplates()
 
