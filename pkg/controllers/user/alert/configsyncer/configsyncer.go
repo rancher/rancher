@@ -455,11 +455,14 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 				logrus.Debugf("Can not find the notifier %s", r.NotifierName)
 				continue
 			}
-
+			commonNotifierConfig := alertconfig.NotifierConfig{
+				VSendResolved: notifier.Spec.SendResolved,
+			}
 			if notifier.Spec.PagerdutyConfig != nil {
 				pagerduty := &alertconfig.PagerdutyConfig{
-					ServiceKey:  alertconfig.Secret(notifier.Spec.PagerdutyConfig.ServiceKey),
-					Description: `{{ template "rancher.title" . }}`,
+					NotifierConfig: commonNotifierConfig,
+					ServiceKey:     alertconfig.Secret(notifier.Spec.PagerdutyConfig.ServiceKey),
+					Description:    `{{ template "rancher.title" . }}`,
 				}
 
 				if notifier.Spec.PagerdutyConfig.HTTPClientConfig != nil {
@@ -480,10 +483,11 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 
 			} else if notifier.Spec.WechatConfig != nil {
 				wechat := &alertconfig.WechatConfig{
-					APISecret: alertconfig.Secret(notifier.Spec.WechatConfig.Secret),
-					AgentID:   notifier.Spec.WechatConfig.Agent,
-					CorpID:    notifier.Spec.WechatConfig.Corp,
-					Message:   `{{ template "wechat.text" . }}`,
+					NotifierConfig: commonNotifierConfig,
+					APISecret:      alertconfig.Secret(notifier.Spec.WechatConfig.Secret),
+					AgentID:        notifier.Spec.WechatConfig.Agent,
+					CorpID:         notifier.Spec.WechatConfig.Corp,
+					Message:        `{{ template "wechat.text" . }}`,
 				}
 
 				recipient := notifier.Spec.WechatConfig.DefaultRecipient
@@ -516,7 +520,8 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 
 			} else if notifier.Spec.WebhookConfig != nil {
 				webhook := &alertconfig.WebhookConfig{
-					URL: notifier.Spec.WebhookConfig.URL,
+					NotifierConfig: commonNotifierConfig,
+					URL:            notifier.Spec.WebhookConfig.URL,
 				}
 				if r.Recipient != "" {
 					webhook.URL = r.Recipient
@@ -537,12 +542,13 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 				receiverExist = true
 			} else if notifier.Spec.SlackConfig != nil {
 				slack := &alertconfig.SlackConfig{
-					APIURL:    alertconfig.Secret(notifier.Spec.SlackConfig.URL),
-					Channel:   notifier.Spec.SlackConfig.DefaultRecipient,
-					Text:      `{{ template "slack.text" . }}`,
-					Title:     `{{ template "rancher.title" . }}`,
-					TitleLink: "",
-					Color:     `{{ if eq (index .Alerts 0).Labels.severity "critical" }}danger{{ else if eq (index .Alerts 0).Labels.severity "warning" }}warning{{ else }}good{{ end }}`,
+					NotifierConfig: commonNotifierConfig,
+					APIURL:         alertconfig.Secret(notifier.Spec.SlackConfig.URL),
+					Channel:        notifier.Spec.SlackConfig.DefaultRecipient,
+					Text:           `{{ template "slack.text" . }}`,
+					Title:          `{{ template "rancher.title" . }}`,
+					TitleLink:      "",
+					Color:          `{{ if eq (index .Alerts 0).Labels.severity "critical" }}danger{{ else if eq (index .Alerts 0).Labels.severity "warning" }}warning{{ else }}good{{ end }}`,
 				}
 				if r.Recipient != "" {
 					slack.Channel = r.Recipient
@@ -565,14 +571,15 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 				header := map[string]string{}
 				header["Subject"] = `{{ template "rancher.title" . }}`
 				email := &alertconfig.EmailConfig{
-					Smarthost:    notifier.Spec.SMTPConfig.Host + ":" + strconv.Itoa(notifier.Spec.SMTPConfig.Port),
-					AuthPassword: alertconfig.Secret(notifier.Spec.SMTPConfig.Password),
-					AuthUsername: notifier.Spec.SMTPConfig.Username,
-					RequireTLS:   &notifier.Spec.SMTPConfig.TLS,
-					To:           notifier.Spec.SMTPConfig.DefaultRecipient,
-					Headers:      header,
-					From:         notifier.Spec.SMTPConfig.Sender,
-					HTML:         `{{ template "email.text" . }}`,
+					NotifierConfig: commonNotifierConfig,
+					Smarthost:      notifier.Spec.SMTPConfig.Host + ":" + strconv.Itoa(notifier.Spec.SMTPConfig.Port),
+					AuthPassword:   alertconfig.Secret(notifier.Spec.SMTPConfig.Password),
+					AuthUsername:   notifier.Spec.SMTPConfig.Username,
+					RequireTLS:     &notifier.Spec.SMTPConfig.TLS,
+					To:             notifier.Spec.SMTPConfig.DefaultRecipient,
+					Headers:        header,
+					From:           notifier.Spec.SMTPConfig.Sender,
+					HTML:           `{{ template "email.text" . }}`,
 				}
 				if r.Recipient != "" {
 					email.To = r.Recipient
