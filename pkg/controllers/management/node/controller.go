@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
+	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
 	"github.com/rancher/rancher/pkg/encryptedstore"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -329,8 +330,26 @@ func aliasToPath(driver string, config map[string]interface{}, ns string) error 
 				hasher.Reset()
 				hasher.Write([]byte(fileContents))
 				sha := base32.StdEncoding.WithPadding(-1).EncodeToString(hasher.Sum(nil))[:10]
-				fullPath := path.Join(baseDir, sha)
-				err := ioutil.WriteFile(fullPath, []byte(fileContents), 0600)
+				fileName := driverField
+				if ok := nodedriver.SSHKeyFields[schemaField]; ok {
+					fileName = "id_rsa"
+				}
+
+				fileDir := path.Join(baseDir, sha)
+
+				// Delete the fileDir path if it's not a directory
+				if info, err := os.Stat(fileDir); err == nil && !info.IsDir() {
+					if err := os.Remove(fileDir); err != nil {
+						return err
+					}
+				}
+
+				err := os.MkdirAll(fileDir, 0755)
+				if err != nil {
+					return err
+				}
+				fullPath := path.Join(fileDir, fileName)
+				err = ioutil.WriteFile(fullPath, []byte(fileContents), 0600)
 				if err != nil {
 					return err
 				}
@@ -338,7 +357,7 @@ func aliasToPath(driver string, config map[string]interface{}, ns string) error 
 				if devMode {
 					config[driverField] = fullPath
 				} else {
-					config[driverField] = path.Join("/", sha)
+					config[driverField] = path.Join("/", sha, fileName)
 				}
 			}
 		}
