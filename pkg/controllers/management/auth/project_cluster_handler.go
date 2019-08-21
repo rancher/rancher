@@ -4,17 +4,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
 	systemimage "github.com/rancher/rancher/pkg/controllers/user/systemimage"
 	"github.com/rancher/rancher/pkg/project"
+	"github.com/rancher/rancher/pkg/systemaccount"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	rrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+
 	v12 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,14 +50,15 @@ var systemProjects = map[string]bool{
 
 func newPandCLifecycles(management *config.ManagementContext) (*projectLifecycle, *clusterLifecycle) {
 	m := &mgr{
-		mgmt:               management,
-		nsLister:           management.Core.Namespaces("").Controller().Lister(),
-		prtbLister:         management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
-		crtbLister:         management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
-		crtbClient:         management.Management.ClusterRoleTemplateBindings(""),
-		projectLister:      management.Management.Projects("").Controller().Lister(),
-		roleTemplateLister: management.Management.RoleTemplates("").Controller().Lister(),
-		clusterRoleClient:  management.RBAC.ClusterRoles(""),
+		mgmt:                 management,
+		nsLister:             management.Core.Namespaces("").Controller().Lister(),
+		prtbLister:           management.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
+		crtbLister:           management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
+		crtbClient:           management.Management.ClusterRoleTemplateBindings(""),
+		projectLister:        management.Management.Projects("").Controller().Lister(),
+		roleTemplateLister:   management.Management.RoleTemplates("").Controller().Lister(),
+		clusterRoleClient:    management.RBAC.ClusterRoles(""),
+		systemAccountManager: systemaccount.NewManager(management),
 	}
 	p := &projectLifecycle{
 		mgr: m,
@@ -71,6 +75,16 @@ type projectLifecycle struct {
 
 func (l *projectLifecycle) sync(key string, orig *v3.Project) (runtime.Object, error) {
 	if orig == nil || orig.DeletionTimestamp != nil {
+		projectID := ""
+		splits := strings.Split(key, "/")
+		if len(splits) == 2 {
+			projectID = splits[1]
+		}
+		// remove the system account created for this project
+		logrus.Debugf("Deleting system user for project %v", projectID)
+		if err := l.mgr.systemAccountManager.RemoveSystemAccount(projectID); err != nil {
+			return nil, err
+		}
 		return nil, nil
 	}
 
@@ -209,11 +223,12 @@ type mgr struct {
 	nsLister      corev1.NamespaceLister
 	projectLister v3.ProjectLister
 
-	prtbLister         v3.ProjectRoleTemplateBindingLister
-	crtbLister         v3.ClusterRoleTemplateBindingLister
-	crtbClient         v3.ClusterRoleTemplateBindingInterface
-	roleTemplateLister v3.RoleTemplateLister
-	clusterRoleClient  rrbacv1.ClusterRoleInterface
+	prtbLister           v3.ProjectRoleTemplateBindingLister
+	crtbLister           v3.ClusterRoleTemplateBindingLister
+	crtbClient           v3.ClusterRoleTemplateBindingInterface
+	roleTemplateLister   v3.RoleTemplateLister
+	clusterRoleClient    rrbacv1.ClusterRoleInterface
+	systemAccountManager *systemaccount.Manager
 }
 
 func (m *mgr) createDefaultProject(obj runtime.Object) (runtime.Object, error) {

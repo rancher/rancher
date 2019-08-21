@@ -144,6 +144,7 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 		cronTime := settings.AuthUserInfoResyncCron.Get()
 		maxAge := settings.AuthUserInfoMaxAgeSeconds.Get()
 		providerrefresh.StartRefreshDaemon(ctx, scaledContext, management, cronTime, maxAge)
+		cleanupOrphanedSystemUsers(management)
 		logrus.Infof("Rancher startup complete")
 
 		<-ctx.Done()

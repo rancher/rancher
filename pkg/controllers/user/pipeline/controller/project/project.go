@@ -61,10 +61,6 @@ func (l *Syncer) Sync(key string, obj *v3.Project) (runtime.Object, error) {
 		if len(splits) == 2 {
 			projectID = splits[1]
 		}
-		// remove the system account created for this project
-		if err := l.systemAccountManager.RemoveSystemAccount(projectID); err != nil {
-			return nil, err
-		}
 		return nil, l.cleanInternalRegistryEntry(projectID)
 	}
 
