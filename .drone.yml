@@ -82,7 +82,7 @@ steps:
   settings:
     build_args:
     - ARCH=amd64
-    - VERSION=${DRONE_BRANCH/release\//}-head
+    - "VERSION=${DRONE_TAG}"
     context: package/
     custom_dns: 1.1.1.1
     dockerfile: package/Dockerfile
