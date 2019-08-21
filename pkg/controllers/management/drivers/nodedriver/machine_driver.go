@@ -38,7 +38,7 @@ var (
 		"otc":          map[string]string{"privateKeyFile": "privateKeyFile"},
 		"packet":       map[string]string{"userdata": "userdata"},
 	}
-	sshKeyFields = map[string]bool{
+	SSHKeyFields = map[string]bool{
 		"sshKeyContents": true,
 		"sshKey":         true,
 		"privateKeyFile": true,
@@ -110,7 +110,7 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 		}
 		userCredFields, pwdFields, defaults := getCredFields(obj.Annotations)
 		for name, field := range existingSchema.Spec.ResourceFields {
-			if _, ok := sshKeyFields[name]; ok {
+			if _, ok := SSHKeyFields[name]; ok {
 				if field.Type != "password" {
 					forceUpdate = true
 					break
@@ -203,7 +203,7 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 			}
 		}
 
-		if field.Type == "password" && !sshKeyFields[name] || userCredFields[name] {
+		if field.Type == "password" && !SSHKeyFields[name] || userCredFields[name] {
 			credField := field
 			credField.Required = true
 			if val, ok := defaults[name]; ok {
@@ -212,7 +212,7 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 			credFields[name] = credField
 		}
 
-		if _, ok := sshKeyFields[name]; ok {
+		if _, ok := SSHKeyFields[name]; ok {
 			field.Type = "password"
 		}
 
