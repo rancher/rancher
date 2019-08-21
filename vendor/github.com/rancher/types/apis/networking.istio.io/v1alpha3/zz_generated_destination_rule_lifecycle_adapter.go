@@ -3,6 +3,7 @@ package v1alpha3
 import (
 	"github.com/knative/pkg/apis/istio/v1alpha3"
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -51,6 +52,9 @@ func (w *destinationRuleLifecycleAdapter) Updated(obj runtime.Object) (runtime.O
 }
 
 func NewDestinationRuleLifecycleAdapter(name string, clusterScoped bool, client DestinationRuleInterface, l DestinationRuleLifecycle) DestinationRuleHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(DestinationRuleGroupVersionResource)
+	}
 	adapter := &destinationRuleLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1alpha3.DestinationRule) (runtime.Object, error) {

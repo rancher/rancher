@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *catalogTemplateLifecycleAdapter) Updated(obj runtime.Object) (runtime.O
 }
 
 func NewCatalogTemplateLifecycleAdapter(name string, clusterScoped bool, client CatalogTemplateInterface, l CatalogTemplateLifecycle) CatalogTemplateHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(CatalogTemplateGroupVersionResource)
+	}
 	adapter := &catalogTemplateLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *CatalogTemplate) (runtime.Object, error) {

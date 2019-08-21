@@ -3,6 +3,7 @@ package v1alpha3
 import (
 	"github.com/knative/pkg/apis/istio/v1alpha3"
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -51,6 +52,9 @@ func (w *virtualServiceLifecycleAdapter) Updated(obj runtime.Object) (runtime.Ob
 }
 
 func NewVirtualServiceLifecycleAdapter(name string, clusterScoped bool, client VirtualServiceInterface, l VirtualServiceLifecycle) VirtualServiceHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(VirtualServiceGroupVersionResource)
+	}
 	adapter := &virtualServiceLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1alpha3.VirtualService) (runtime.Object, error) {

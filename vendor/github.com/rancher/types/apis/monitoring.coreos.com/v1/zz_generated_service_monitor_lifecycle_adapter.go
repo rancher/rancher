@@ -3,6 +3,7 @@ package v1
 import (
 	v1 "github.com/coreos/prometheus-operator/pkg/client/monitoring/v1"
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -51,6 +52,9 @@ func (w *serviceMonitorLifecycleAdapter) Updated(obj runtime.Object) (runtime.Ob
 }
 
 func NewServiceMonitorLifecycleAdapter(name string, clusterScoped bool, client ServiceMonitorInterface, l ServiceMonitorLifecycle) ServiceMonitorHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(ServiceMonitorGroupVersionResource)
+	}
 	adapter := &serviceMonitorLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1.ServiceMonitor) (runtime.Object, error) {

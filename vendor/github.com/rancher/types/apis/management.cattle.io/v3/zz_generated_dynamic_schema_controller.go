@@ -169,7 +169,6 @@ func (c *dynamicSchemaController) AddFeatureHandler(ctx context.Context, enabled
 }
 
 func (c *dynamicSchemaController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler DynamicSchemaHandlerFunc) {
-	resource.PutClusterScoped(DynamicSchemaGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -182,7 +181,6 @@ func (c *dynamicSchemaController) AddClusterScopedHandler(ctx context.Context, n
 }
 
 func (c *dynamicSchemaController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler DynamicSchemaHandlerFunc) {
-	resource.PutClusterScoped(DynamicSchemaGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil

@@ -170,7 +170,6 @@ func (c *rkeAddonController) AddFeatureHandler(ctx context.Context, enabled func
 }
 
 func (c *rkeAddonController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler RKEAddonHandlerFunc) {
-	resource.PutClusterScoped(RKEAddonGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -183,7 +182,6 @@ func (c *rkeAddonController) AddClusterScopedHandler(ctx context.Context, name, 
 }
 
 func (c *rkeAddonController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler RKEAddonHandlerFunc) {
-	resource.PutClusterScoped(RKEAddonGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil

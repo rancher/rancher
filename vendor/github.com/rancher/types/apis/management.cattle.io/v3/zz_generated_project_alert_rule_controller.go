@@ -170,7 +170,6 @@ func (c *projectAlertRuleController) AddFeatureHandler(ctx context.Context, enab
 }
 
 func (c *projectAlertRuleController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ProjectAlertRuleHandlerFunc) {
-	resource.PutClusterScoped(ProjectAlertRuleGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -183,7 +182,6 @@ func (c *projectAlertRuleController) AddClusterScopedHandler(ctx context.Context
 }
 
 func (c *projectAlertRuleController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler ProjectAlertRuleHandlerFunc) {
-	resource.PutClusterScoped(ProjectAlertRuleGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil

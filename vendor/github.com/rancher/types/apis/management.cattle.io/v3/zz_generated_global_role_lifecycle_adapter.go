@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *globalRoleLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object
 }
 
 func NewGlobalRoleLifecycleAdapter(name string, clusterScoped bool, client GlobalRoleInterface, l GlobalRoleLifecycle) GlobalRoleHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(GlobalRoleGroupVersionResource)
+	}
 	adapter := &globalRoleLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *GlobalRole) (runtime.Object, error) {

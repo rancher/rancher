@@ -170,7 +170,6 @@ func (c *clusterTemplateRevisionController) AddFeatureHandler(ctx context.Contex
 }
 
 func (c *clusterTemplateRevisionController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ClusterTemplateRevisionHandlerFunc) {
-	resource.PutClusterScoped(ClusterTemplateRevisionGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -183,7 +182,6 @@ func (c *clusterTemplateRevisionController) AddClusterScopedHandler(ctx context.
 }
 
 func (c *clusterTemplateRevisionController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler ClusterTemplateRevisionHandlerFunc) {
-	resource.PutClusterScoped(ClusterTemplateRevisionGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil

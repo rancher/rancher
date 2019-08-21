@@ -2,6 +2,7 @@ package v1
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -51,6 +52,9 @@ func (w *configMapLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object,
 }
 
 func NewConfigMapLifecycleAdapter(name string, clusterScoped bool, client ConfigMapInterface, l ConfigMapLifecycle) ConfigMapHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(ConfigMapGroupVersionResource)
+	}
 	adapter := &configMapLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1.ConfigMap) (runtime.Object, error) {

@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *tokenLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, err
 }
 
 func NewTokenLifecycleAdapter(name string, clusterScoped bool, client TokenInterface, l TokenLifecycle) TokenHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(TokenGroupVersionResource)
+	}
 	adapter := &tokenLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *Token) (runtime.Object, error) {

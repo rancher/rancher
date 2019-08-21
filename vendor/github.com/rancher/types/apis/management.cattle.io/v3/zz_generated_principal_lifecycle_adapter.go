@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *principalLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object,
 }
 
 func NewPrincipalLifecycleAdapter(name string, clusterScoped bool, client PrincipalInterface, l PrincipalLifecycle) PrincipalHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(PrincipalGroupVersionResource)
+	}
 	adapter := &principalLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *Principal) (runtime.Object, error) {

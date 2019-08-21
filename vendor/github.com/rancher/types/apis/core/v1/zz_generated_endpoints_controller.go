@@ -171,7 +171,6 @@ func (c *endpointsController) AddFeatureHandler(ctx context.Context, enabled fun
 }
 
 func (c *endpointsController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler EndpointsHandlerFunc) {
-	resource.PutClusterScoped(EndpointsGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -184,7 +183,6 @@ func (c *endpointsController) AddClusterScopedHandler(ctx context.Context, name,
 }
 
 func (c *endpointsController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler EndpointsHandlerFunc) {
-	resource.PutClusterScoped(EndpointsGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil

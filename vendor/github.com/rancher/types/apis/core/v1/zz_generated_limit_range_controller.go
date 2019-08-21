@@ -171,7 +171,6 @@ func (c *limitRangeController) AddFeatureHandler(ctx context.Context, enabled fu
 }
 
 func (c *limitRangeController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler LimitRangeHandlerFunc) {
-	resource.PutClusterScoped(LimitRangeGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -184,7 +183,6 @@ func (c *limitRangeController) AddClusterScopedHandler(ctx context.Context, name
 }
 
 func (c *limitRangeController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler LimitRangeHandlerFunc) {
-	resource.PutClusterScoped(LimitRangeGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil

@@ -2,6 +2,7 @@ package v3public
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *authProviderLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obje
 }
 
 func NewAuthProviderLifecycleAdapter(name string, clusterScoped bool, client AuthProviderInterface, l AuthProviderLifecycle) AuthProviderHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(AuthProviderGroupVersionResource)
+	}
 	adapter := &authProviderLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *AuthProvider) (runtime.Object, error) {

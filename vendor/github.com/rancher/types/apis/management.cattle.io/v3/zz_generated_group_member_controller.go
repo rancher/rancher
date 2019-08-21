@@ -169,7 +169,6 @@ func (c *groupMemberController) AddFeatureHandler(ctx context.Context, enabled f
 }
 
 func (c *groupMemberController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler GroupMemberHandlerFunc) {
-	resource.PutClusterScoped(GroupMemberGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -182,7 +181,6 @@ func (c *groupMemberController) AddClusterScopedHandler(ctx context.Context, nam
 }
 
 func (c *groupMemberController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler GroupMemberHandlerFunc) {
-	resource.PutClusterScoped(GroupMemberGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil

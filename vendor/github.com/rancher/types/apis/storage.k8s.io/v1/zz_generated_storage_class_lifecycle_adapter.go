@@ -2,6 +2,7 @@ package v1
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	v1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -51,6 +52,9 @@ func (w *storageClassLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obje
 }
 
 func NewStorageClassLifecycleAdapter(name string, clusterScoped bool, client StorageClassInterface, l StorageClassLifecycle) StorageClassHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(StorageClassGroupVersionResource)
+	}
 	adapter := &storageClassLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1.StorageClass) (runtime.Object, error) {

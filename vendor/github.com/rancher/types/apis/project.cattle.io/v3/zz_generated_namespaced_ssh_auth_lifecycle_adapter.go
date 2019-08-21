@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *namespacedSshAuthLifecycleAdapter) Updated(obj runtime.Object) (runtime
 }
 
 func NewNamespacedSSHAuthLifecycleAdapter(name string, clusterScoped bool, client NamespacedSSHAuthInterface, l NamespacedSSHAuthLifecycle) NamespacedSSHAuthHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(NamespacedSSHAuthGroupVersionResource)
+	}
 	adapter := &namespacedSshAuthLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *NamespacedSSHAuth) (runtime.Object, error) {

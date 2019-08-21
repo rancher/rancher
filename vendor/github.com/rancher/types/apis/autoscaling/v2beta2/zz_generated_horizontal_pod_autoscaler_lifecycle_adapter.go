@@ -2,6 +2,7 @@ package v2beta2
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/api/autoscaling/v2beta2"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -51,6 +52,9 @@ func (w *horizontalPodAutoscalerLifecycleAdapter) Updated(obj runtime.Object) (r
 }
 
 func NewHorizontalPodAutoscalerLifecycleAdapter(name string, clusterScoped bool, client HorizontalPodAutoscalerInterface, l HorizontalPodAutoscalerLifecycle) HorizontalPodAutoscalerHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(HorizontalPodAutoscalerGroupVersionResource)
+	}
 	adapter := &horizontalPodAutoscalerLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v2beta2.HorizontalPodAutoscaler) (runtime.Object, error) {

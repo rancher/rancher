@@ -171,7 +171,6 @@ func (c *daemonSetController) AddFeatureHandler(ctx context.Context, enabled fun
 }
 
 func (c *daemonSetController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler DaemonSetHandlerFunc) {
-	resource.PutClusterScoped(DaemonSetGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -184,7 +183,6 @@ func (c *daemonSetController) AddClusterScopedHandler(ctx context.Context, name,
 }
 
 func (c *daemonSetController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler DaemonSetHandlerFunc) {
-	resource.PutClusterScoped(DaemonSetGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil

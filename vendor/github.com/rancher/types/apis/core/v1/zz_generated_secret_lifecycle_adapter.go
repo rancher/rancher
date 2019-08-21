@@ -2,6 +2,7 @@ package v1
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -51,6 +52,9 @@ func (w *secretLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, er
 }
 
 func NewSecretLifecycleAdapter(name string, clusterScoped bool, client SecretInterface, l SecretLifecycle) SecretHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(SecretGroupVersionResource)
+	}
 	adapter := &secretLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1.Secret) (runtime.Object, error) {

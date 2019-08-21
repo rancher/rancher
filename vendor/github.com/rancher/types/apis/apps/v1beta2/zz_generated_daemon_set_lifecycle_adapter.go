@@ -2,6 +2,7 @@ package v1beta2
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/api/apps/v1beta2"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -51,6 +52,9 @@ func (w *daemonSetLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object,
 }
 
 func NewDaemonSetLifecycleAdapter(name string, clusterScoped bool, client DaemonSetInterface, l DaemonSetLifecycle) DaemonSetHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(DaemonSetGroupVersionResource)
+	}
 	adapter := &daemonSetLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1beta2.DaemonSet) (runtime.Object, error) {

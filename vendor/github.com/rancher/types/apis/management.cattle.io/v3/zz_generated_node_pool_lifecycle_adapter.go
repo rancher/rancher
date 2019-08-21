@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *nodePoolLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, 
 }
 
 func NewNodePoolLifecycleAdapter(name string, clusterScoped bool, client NodePoolInterface, l NodePoolLifecycle) NodePoolHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(NodePoolGroupVersionResource)
+	}
 	adapter := &nodePoolLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *NodePool) (runtime.Object, error) {

@@ -124,13 +124,17 @@ type RKESystemImages struct {
 	CalicoControllers string `yaml:"calico_controllers" json:"calicoControllers,omitempty"`
 	// Calicoctl image
 	CalicoCtl string `yaml:"calico_ctl" json:"calicoCtl,omitempty"`
+	//CalicoFlexVol image
+	CalicoFlexVol string `yaml:"calico_flexvol" json:"calicoFlexVol,omitempty"`
 	// Canal Node Image
 	CanalNode string `yaml:"canal_node" json:"canalNode,omitempty"`
 	// Canal CNI image
 	CanalCNI string `yaml:"canal_cni" json:"canalCni,omitempty"`
 	//CanalFlannel image
 	CanalFlannel string `yaml:"canal_flannel" json:"canalFlannel,omitempty"`
-	// Weave Node image
+	//CanalFlexVol image
+	CanalFlexVol string `yaml:"canal_flexvol" json:"canalFlexVol,omitempty"`
+	//Weave Node image
 	WeaveNode string `yaml:"weave_node" json:"weaveNode,omitempty"`
 	// Weave CNI image
 	WeaveCNI string `yaml:"weave_cni" json:"weaveCni,omitempty"`

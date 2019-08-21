@@ -171,7 +171,6 @@ func (c *resourceQuotaController) AddFeatureHandler(ctx context.Context, enabled
 }
 
 func (c *resourceQuotaController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ResourceQuotaHandlerFunc) {
-	resource.PutClusterScoped(ResourceQuotaGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -184,7 +183,6 @@ func (c *resourceQuotaController) AddClusterScopedHandler(ctx context.Context, n
 }
 
 func (c *resourceQuotaController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler ResourceQuotaHandlerFunc) {
-	resource.PutClusterScoped(ResourceQuotaGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil

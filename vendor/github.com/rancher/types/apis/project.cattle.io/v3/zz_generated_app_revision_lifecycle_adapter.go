@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *appRevisionLifecycleAdapter) Updated(obj runtime.Object) (runtime.Objec
 }
 
 func NewAppRevisionLifecycleAdapter(name string, clusterScoped bool, client AppRevisionInterface, l AppRevisionLifecycle) AppRevisionHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(AppRevisionGroupVersionResource)
+	}
 	adapter := &appRevisionLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *AppRevision) (runtime.Object, error) {

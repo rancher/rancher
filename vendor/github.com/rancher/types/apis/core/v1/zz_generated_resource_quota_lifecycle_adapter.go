@@ -2,6 +2,7 @@ package v1
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -51,6 +52,9 @@ func (w *resourceQuotaLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obj
 }
 
 func NewResourceQuotaLifecycleAdapter(name string, clusterScoped bool, client ResourceQuotaInterface, l ResourceQuotaLifecycle) ResourceQuotaHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(ResourceQuotaGroupVersionResource)
+	}
 	adapter := &resourceQuotaLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1.ResourceQuota) (runtime.Object, error) {

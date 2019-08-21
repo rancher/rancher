@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *groupMemberLifecycleAdapter) Updated(obj runtime.Object) (runtime.Objec
 }
 
 func NewGroupMemberLifecycleAdapter(name string, clusterScoped bool, client GroupMemberInterface, l GroupMemberLifecycle) GroupMemberHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(GroupMemberGroupVersionResource)
+	}
 	adapter := &groupMemberLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *GroupMember) (runtime.Object, error) {

@@ -170,7 +170,6 @@ func (c *rkeK8sWindowsSystemImageController) AddFeatureHandler(ctx context.Conte
 }
 
 func (c *rkeK8sWindowsSystemImageController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler RKEK8sWindowsSystemImageHandlerFunc) {
-	resource.PutClusterScoped(RKEK8sWindowsSystemImageGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -183,7 +182,6 @@ func (c *rkeK8sWindowsSystemImageController) AddClusterScopedHandler(ctx context
 }
 
 func (c *rkeK8sWindowsSystemImageController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler RKEK8sWindowsSystemImageHandlerFunc) {
-	resource.PutClusterScoped(RKEK8sWindowsSystemImageGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil

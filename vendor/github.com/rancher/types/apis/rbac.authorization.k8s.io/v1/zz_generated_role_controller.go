@@ -171,7 +171,6 @@ func (c *roleController) AddFeatureHandler(ctx context.Context, enabled func() b
 }
 
 func (c *roleController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler RoleHandlerFunc) {
-	resource.PutClusterScoped(RoleGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -184,7 +183,6 @@ func (c *roleController) AddClusterScopedHandler(ctx context.Context, name, clus
 }
 
 func (c *roleController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler RoleHandlerFunc) {
-	resource.PutClusterScoped(RoleGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil

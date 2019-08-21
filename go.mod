@@ -53,10 +53,10 @@ require (
 	github.com/prometheus/common v0.6.0
 	github.com/rancher/kontainer-driver-metadata v0.0.0-20190820205038-bc5bddb6f8f3
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20190819182532-d4cdf8e56671
-	github.com/rancher/norman v0.0.0-20190819234253-61e72a6bdb94
+	github.com/rancher/norman v0.0.0-20190821234528-20a936b685b0
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/rke v0.3.0-rc7.0.20190820205903-6f7f25cbcb67
-	github.com/rancher/types v0.0.0-20190820171829-3ae227679970
+	github.com/rancher/types v0.0.0-20190822004959-d8f2cacb8d50
 	github.com/rancher/wrangler v0.1.5
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect

@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *kontainerDriverLifecycleAdapter) Updated(obj runtime.Object) (runtime.O
 }
 
 func NewKontainerDriverLifecycleAdapter(name string, clusterScoped bool, client KontainerDriverInterface, l KontainerDriverLifecycle) KontainerDriverHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(KontainerDriverGroupVersionResource)
+	}
 	adapter := &kontainerDriverLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *KontainerDriver) (runtime.Object, error) {

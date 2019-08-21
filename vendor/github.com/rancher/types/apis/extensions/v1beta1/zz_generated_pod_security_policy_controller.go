@@ -170,7 +170,6 @@ func (c *podSecurityPolicyController) AddFeatureHandler(ctx context.Context, ena
 }
 
 func (c *podSecurityPolicyController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler PodSecurityPolicyHandlerFunc) {
-	resource.PutClusterScoped(PodSecurityPolicyGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -183,7 +182,6 @@ func (c *podSecurityPolicyController) AddClusterScopedHandler(ctx context.Contex
 }
 
 func (c *podSecurityPolicyController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler PodSecurityPolicyHandlerFunc) {
-	resource.PutClusterScoped(PodSecurityPolicyGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil
