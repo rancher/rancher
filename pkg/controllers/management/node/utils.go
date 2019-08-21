@@ -192,12 +192,12 @@ func (m *Lifecycle) reportStatus(stdoutReader io.Reader, stderrReader io.Reader,
 		if strings.Contains(msg, "To see how to connect") {
 			continue
 		}
-		logrus.Infof("stdout: %s", msg)
+		logrus.Debugf("stdout: %s", msg)
 		_, err := filterDockerMessage(msg, node)
 		if err != nil {
 			return node, err
 		}
-		logrus.Info(msg)
+		logrus.Infof("[node-controller-docker-machine] %v", msg)
 		v3.NodeConditionProvisioned.Message(node, msg)
 		// ignore update errors
 		if newObj, err := m.nodeClient.Update(node); err == nil {
@@ -263,9 +263,21 @@ func deleteNode(nodeDir string, node *v3.Node) error {
 	if err != nil {
 		return err
 	}
-
-	if err := command.Start(); err != nil {
+	stdoutReader, stderrReader, err := startReturnOutput(command)
+	if err != nil {
 		return err
+	}
+	defer stdoutReader.Close()
+	defer stderrReader.Close()
+	scanner := bufio.NewScanner(stdoutReader)
+	for scanner.Scan() {
+		msg := scanner.Text()
+		logrus.Infof("[node-controller-docker-machine] %v", msg)
+	}
+	scanner = bufio.NewScanner(stderrReader)
+	for scanner.Scan() {
+		msg := scanner.Text()
+		logrus.Warnf("[node-controller-docker-machine] %v", msg)
 	}
 
 	return command.Wait()
