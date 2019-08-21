@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *rkeK8sWindowsSystemImageLifecycleAdapter) Updated(obj runtime.Object) (
 }
 
 func NewRKEK8sWindowsSystemImageLifecycleAdapter(name string, clusterScoped bool, client RKEK8sWindowsSystemImageInterface, l RKEK8sWindowsSystemImageLifecycle) RKEK8sWindowsSystemImageHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(RKEK8sWindowsSystemImageGroupVersionResource)
+	}
 	adapter := &rkeK8sWindowsSystemImageLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *RKEK8sWindowsSystemImage) (runtime.Object, error) {

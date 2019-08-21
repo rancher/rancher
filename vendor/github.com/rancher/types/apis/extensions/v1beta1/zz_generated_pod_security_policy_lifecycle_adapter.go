@@ -2,6 +2,7 @@ package v1beta1
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -51,6 +52,9 @@ func (w *podSecurityPolicyLifecycleAdapter) Updated(obj runtime.Object) (runtime
 }
 
 func NewPodSecurityPolicyLifecycleAdapter(name string, clusterScoped bool, client PodSecurityPolicyInterface, l PodSecurityPolicyLifecycle) PodSecurityPolicyHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(PodSecurityPolicyGroupVersionResource)
+	}
 	adapter := &podSecurityPolicyLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1beta1.PodSecurityPolicy) (runtime.Object, error) {

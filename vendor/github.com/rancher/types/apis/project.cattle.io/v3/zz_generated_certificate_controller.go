@@ -170,7 +170,6 @@ func (c *certificateController) AddFeatureHandler(ctx context.Context, enabled f
 }
 
 func (c *certificateController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler CertificateHandlerFunc) {
-	resource.PutClusterScoped(CertificateGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -183,7 +182,6 @@ func (c *certificateController) AddClusterScopedHandler(ctx context.Context, nam
 }
 
 func (c *certificateController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler CertificateHandlerFunc) {
-	resource.PutClusterScoped(CertificateGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil

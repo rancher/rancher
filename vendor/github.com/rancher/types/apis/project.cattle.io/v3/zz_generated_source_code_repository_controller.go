@@ -170,7 +170,6 @@ func (c *sourceCodeRepositoryController) AddFeatureHandler(ctx context.Context, 
 }
 
 func (c *sourceCodeRepositoryController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler SourceCodeRepositoryHandlerFunc) {
-	resource.PutClusterScoped(SourceCodeRepositoryGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -183,7 +182,6 @@ func (c *sourceCodeRepositoryController) AddClusterScopedHandler(ctx context.Con
 }
 
 func (c *sourceCodeRepositoryController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler SourceCodeRepositoryHandlerFunc) {
-	resource.PutClusterScoped(SourceCodeRepositoryGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil

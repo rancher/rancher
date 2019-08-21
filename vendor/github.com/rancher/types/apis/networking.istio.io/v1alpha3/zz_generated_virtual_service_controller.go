@@ -171,7 +171,6 @@ func (c *virtualServiceController) AddFeatureHandler(ctx context.Context, enable
 }
 
 func (c *virtualServiceController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler VirtualServiceHandlerFunc) {
-	resource.PutClusterScoped(VirtualServiceGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -184,7 +183,6 @@ func (c *virtualServiceController) AddClusterScopedHandler(ctx context.Context, 
 }
 
 func (c *virtualServiceController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler VirtualServiceHandlerFunc) {
-	resource.PutClusterScoped(VirtualServiceGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil

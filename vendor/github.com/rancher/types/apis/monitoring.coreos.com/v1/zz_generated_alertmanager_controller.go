@@ -171,7 +171,6 @@ func (c *alertmanagerController) AddFeatureHandler(ctx context.Context, enabled 
 }
 
 func (c *alertmanagerController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler AlertmanagerHandlerFunc) {
-	resource.PutClusterScoped(AlertmanagerGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -184,7 +183,6 @@ func (c *alertmanagerController) AddClusterScopedHandler(ctx context.Context, na
 }
 
 func (c *alertmanagerController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler AlertmanagerHandlerFunc) {
-	resource.PutClusterScoped(AlertmanagerGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil

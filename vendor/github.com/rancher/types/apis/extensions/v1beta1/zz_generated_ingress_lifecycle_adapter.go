@@ -2,6 +2,7 @@ package v1beta1
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -51,6 +52,9 @@ func (w *ingressLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, e
 }
 
 func NewIngressLifecycleAdapter(name string, clusterScoped bool, client IngressInterface, l IngressLifecycle) IngressHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(IngressGroupVersionResource)
+	}
 	adapter := &ingressLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1beta1.Ingress) (runtime.Object, error) {

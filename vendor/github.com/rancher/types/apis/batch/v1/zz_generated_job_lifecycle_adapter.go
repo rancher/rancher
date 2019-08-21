@@ -2,6 +2,7 @@ package v1
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	v1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -51,6 +52,9 @@ func (w *jobLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error
 }
 
 func NewJobLifecycleAdapter(name string, clusterScoped bool, client JobInterface, l JobLifecycle) JobHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(JobGroupVersionResource)
+	}
 	adapter := &jobLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1.Job) (runtime.Object, error) {

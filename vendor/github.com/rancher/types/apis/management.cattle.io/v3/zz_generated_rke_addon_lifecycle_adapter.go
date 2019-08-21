@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *rkeAddonLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, 
 }
 
 func NewRKEAddonLifecycleAdapter(name string, clusterScoped bool, client RKEAddonInterface, l RKEAddonLifecycle) RKEAddonHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(RKEAddonGroupVersionResource)
+	}
 	adapter := &rkeAddonLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *RKEAddon) (runtime.Object, error) {

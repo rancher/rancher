@@ -170,7 +170,6 @@ func (c *clusterAuthTokenController) AddFeatureHandler(ctx context.Context, enab
 }
 
 func (c *clusterAuthTokenController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ClusterAuthTokenHandlerFunc) {
-	resource.PutClusterScoped(ClusterAuthTokenGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -183,7 +182,6 @@ func (c *clusterAuthTokenController) AddClusterScopedHandler(ctx context.Context
 }
 
 func (c *clusterAuthTokenController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler ClusterAuthTokenHandlerFunc) {
-	resource.PutClusterScoped(ClusterAuthTokenGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil

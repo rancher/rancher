@@ -3,6 +3,7 @@ package v1
 import (
 	v1 "github.com/coreos/prometheus-operator/pkg/client/monitoring/v1"
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -51,6 +52,9 @@ func (w *alertmanagerLifecycleAdapter) Updated(obj runtime.Object) (runtime.Obje
 }
 
 func NewAlertmanagerLifecycleAdapter(name string, clusterScoped bool, client AlertmanagerInterface, l AlertmanagerLifecycle) AlertmanagerHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(AlertmanagerGroupVersionResource)
+	}
 	adapter := &alertmanagerLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1.Alertmanager) (runtime.Object, error) {

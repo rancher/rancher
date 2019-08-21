@@ -2,6 +2,7 @@ package v1
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
@@ -51,6 +52,9 @@ func (w *apiServiceLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object
 }
 
 func NewAPIServiceLifecycleAdapter(name string, clusterScoped bool, client APIServiceInterface, l APIServiceLifecycle) APIServiceHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(APIServiceGroupVersionResource)
+	}
 	adapter := &apiServiceLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1.APIService) (runtime.Object, error) {

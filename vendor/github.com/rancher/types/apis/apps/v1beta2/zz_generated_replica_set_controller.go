@@ -171,7 +171,6 @@ func (c *replicaSetController) AddFeatureHandler(ctx context.Context, enabled fu
 }
 
 func (c *replicaSetController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler ReplicaSetHandlerFunc) {
-	resource.PutClusterScoped(ReplicaSetGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -184,7 +183,6 @@ func (c *replicaSetController) AddClusterScopedHandler(ctx context.Context, name
 }
 
 func (c *replicaSetController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler ReplicaSetHandlerFunc) {
-	resource.PutClusterScoped(ReplicaSetGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil

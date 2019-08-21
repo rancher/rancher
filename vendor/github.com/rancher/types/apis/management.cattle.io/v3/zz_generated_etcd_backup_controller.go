@@ -170,7 +170,6 @@ func (c *etcdBackupController) AddFeatureHandler(ctx context.Context, enabled fu
 }
 
 func (c *etcdBackupController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler EtcdBackupHandlerFunc) {
-	resource.PutClusterScoped(EtcdBackupGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -183,7 +182,6 @@ func (c *etcdBackupController) AddClusterScopedHandler(ctx context.Context, name
 }
 
 func (c *etcdBackupController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler EtcdBackupHandlerFunc) {
-	resource.PutClusterScoped(EtcdBackupGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil

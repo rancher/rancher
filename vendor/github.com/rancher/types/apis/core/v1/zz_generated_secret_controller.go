@@ -171,7 +171,6 @@ func (c *secretController) AddFeatureHandler(ctx context.Context, enabled func()
 }
 
 func (c *secretController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler SecretHandlerFunc) {
-	resource.PutClusterScoped(SecretGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -184,7 +183,6 @@ func (c *secretController) AddClusterScopedHandler(ctx context.Context, name, cl
 }
 
 func (c *secretController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler SecretHandlerFunc) {
-	resource.PutClusterScoped(SecretGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil

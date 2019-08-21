@@ -170,7 +170,6 @@ func (c *rkeK8sServiceOptionController) AddFeatureHandler(ctx context.Context, e
 }
 
 func (c *rkeK8sServiceOptionController) AddClusterScopedHandler(ctx context.Context, name, cluster string, handler RKEK8sServiceOptionHandlerFunc) {
-	resource.PutClusterScoped(RKEK8sServiceOptionGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if obj == nil {
 			return handler(key, nil)
@@ -183,7 +182,6 @@ func (c *rkeK8sServiceOptionController) AddClusterScopedHandler(ctx context.Cont
 }
 
 func (c *rkeK8sServiceOptionController) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, cluster string, handler RKEK8sServiceOptionHandlerFunc) {
-	resource.PutClusterScoped(RKEK8sServiceOptionGroupVersionResource)
 	c.GenericController.AddHandler(ctx, name, func(key string, obj interface{}) (interface{}, error) {
 		if !enabled() {
 			return nil, nil

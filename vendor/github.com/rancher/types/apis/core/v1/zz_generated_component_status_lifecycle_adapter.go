@@ -2,6 +2,7 @@ package v1
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -51,6 +52,9 @@ func (w *componentStatusLifecycleAdapter) Updated(obj runtime.Object) (runtime.O
 }
 
 func NewComponentStatusLifecycleAdapter(name string, clusterScoped bool, client ComponentStatusInterface, l ComponentStatusLifecycle) ComponentStatusHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(ComponentStatusGroupVersionResource)
+	}
 	adapter := &componentStatusLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1.ComponentStatus) (runtime.Object, error) {

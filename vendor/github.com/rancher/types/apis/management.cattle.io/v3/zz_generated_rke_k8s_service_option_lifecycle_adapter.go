@@ -2,6 +2,7 @@ package v3
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,6 +51,9 @@ func (w *rkeK8sServiceOptionLifecycleAdapter) Updated(obj runtime.Object) (runti
 }
 
 func NewRKEK8sServiceOptionLifecycleAdapter(name string, clusterScoped bool, client RKEK8sServiceOptionInterface, l RKEK8sServiceOptionLifecycle) RKEK8sServiceOptionHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(RKEK8sServiceOptionGroupVersionResource)
+	}
 	adapter := &rkeK8sServiceOptionLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *RKEK8sServiceOption) (runtime.Object, error) {

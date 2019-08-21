@@ -2,6 +2,7 @@ package v1beta1
 
 import (
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/norman/resource"
 	"k8s.io/api/batch/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -51,6 +52,9 @@ func (w *cronJobLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, e
 }
 
 func NewCronJobLifecycleAdapter(name string, clusterScoped bool, client CronJobInterface, l CronJobLifecycle) CronJobHandlerFunc {
+	if clusterScoped {
+		resource.PutClusterScoped(CronJobGroupVersionResource)
+	}
 	adapter := &cronJobLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
 	return func(key string, obj *v1beta1.CronJob) (runtime.Object, error) {
