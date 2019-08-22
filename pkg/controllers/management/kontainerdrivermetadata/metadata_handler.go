@@ -49,7 +49,13 @@ type TickerData struct {
 	interval   time.Duration
 }
 
+const (
+	rkeMetadataURL      = "rke-metadata-url"
+	rkeMetadataInterval = "rke-metadata-refresh-interval-minutes"
+)
+
 var tickerData *TickerData
+var prevURL string
 
 func Register(ctx context.Context, management *config.ManagementContext) {
 	mgmt := management.Management
@@ -64,55 +70,97 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		ctx:                  ctx,
 	}
 
-	// load values on startup and start ticker
-	url, interval, err := GetSettingValues()
-	if err == nil {
-		if err := m.Refresh(url, true); err != nil {
-			logrus.Errorf("driverMetadata failed to refresh %v", err)
-		}
-		m.initTicker(ctx, interval)
-	}
-
 	mgmt.Settings("").AddHandler(ctx, "rke-metadata-handler", m.sync)
 }
 
-func (m *MetadataController) sync(key string, test *v3.Setting) (runtime.Object, error) {
-	if test == nil || (test.Name != "rke-metadata-url" && test.Name != "rke-metadata-refresh-interval-minutes") {
+func (m *MetadataController) sync(key string, setting *v3.Setting) (runtime.Object, error) {
+	if setting == nil || (setting.Name != rkeMetadataURL && setting.Name != rkeMetadataInterval) {
 		return nil, nil
 	}
-	url, interval, err := GetSettingValues()
+
+	var interval time.Duration
+	if tickerData == nil {
+		if err := m.initAndStartTicker(); err != nil {
+			return nil, err
+		}
+		logrus.Infof("driverMetadata initialized successfully")
+		return setting, nil
+	}
+
+	if setting.Name == rkeMetadataURL {
+		currURL := settings.RkeMetadataURL.Get()
+		if currURL != prevURL {
+			if err := m.refresh(); err != nil {
+				return nil, err
+			}
+			prevURL = currURL
+		}
+		return setting, nil
+	}
+
+	interval, err := getTimeSetting()
 	if err != nil {
-		return nil, fmt.Errorf("driverMetadata error getting settings %v", err)
-	}
-	if tickerData != nil {
-		if err := m.Refresh(url, false); err != nil {
-			return nil, fmt.Errorf("driverMetadata failed to refresh %v", err)
+		if err.Error() != "refresh disabled" {
+			return nil, err
 		}
-		if tickerData.interval != interval {
+	}
+
+	if tickerData.interval != interval {
+
+		// don't refresh/sync if time is set to negative/zero
+		if interval == 0 {
+			logrus.Debugf("driverMetadata: canceled counter")
 			tickerData.cancelFunc()
-
-			logrus.Infof("driverMetadata: starting new %v", interval.Minutes())
-			cctx, cancel := context.WithCancel(m.ctx)
-			tickerData.interval = interval
-			tickerData.cancelFunc = cancel
-
-			go m.startTicker(cctx, tickerData, false)
+			tickerData.interval = 0
+			return setting, nil
 		}
+
+		// refresh for valid interval change
+		if err := m.refresh(); err != nil {
+			return nil, err
+		}
+
+		tickerData.cancelFunc()
+
+		logrus.Infof("driverMetadata: starting new counter every %v", interval)
+		cctx, cancel := context.WithCancel(m.ctx)
+		tickerData.interval = interval
+		tickerData.cancelFunc = cancel
+
+		go m.startTicker(cctx, tickerData)
 	}
-	return test, nil
+
+	return setting, nil
 }
 
-func (m *MetadataController) initTicker(ctx context.Context, interval time.Duration) {
-	cctx, cancel := context.WithCancel(ctx)
+func (m *MetadataController) initAndStartTicker() error {
+	urlData, err := getURLSetting()
+	if err != nil {
+		return err
+	}
+	// ignore error and proceed because init
+	url, _ := generateURL(urlData)
+	if err := m.Refresh(url, true); err != nil {
+		return err
+	}
+	interval, err := getTimeSetting()
+	if err != nil {
+		if err.Error() == "refresh disabled" {
+			return nil
+		}
+		return err
+	}
+	cctx, cancel := context.WithCancel(m.ctx)
 	tickerData = &TickerData{cancelFunc: cancel, interval: interval}
-	go m.startTicker(cctx, tickerData, true)
+	go m.startTicker(cctx, tickerData)
+	return nil
 }
 
-func (m *MetadataController) startTicker(ctx context.Context, tickerData *TickerData, init bool) {
+func (m *MetadataController) startTicker(ctx context.Context, tickerData *TickerData) {
 	checkInterval := tickerData.interval
 	for range ticker.Context(ctx, checkInterval) {
 		logrus.Infof("driverMetadata: checking rke-metadata-url every %v", checkInterval)
-		url, _, err := GetSettingValues()
+		url, err := GetURLSettingValue()
 		if err != nil {
 			logrus.Errorf("driverMetadata: error getting settings %v", err)
 		}
@@ -142,32 +190,66 @@ func (m *MetadataController) Refresh(url string, init bool) error {
 	return nil
 }
 
-func GetSettingValues() (string, time.Duration, error) {
-	t := fmt.Sprintf("%sm", settings.RkeMetadataRefreshIntervalMins.Get())
-	checkInterval, err := time.ParseDuration(t)
+func (m *MetadataController) refresh() error {
+	url, err := GetURLSettingValue()
 	if err != nil {
-		return "", 0, err
+		return err
 	}
-	urlData := map[string]interface{}{}
-	if err := json.Unmarshal([]byte(settings.RkeMetadataURL.Get()), &urlData); err != nil {
-		return "", 0, fmt.Errorf("unmarshal err %v", err)
+	if err := m.Refresh(url, false); err != nil {
+		return fmt.Errorf("driverMetadata failed to refresh %v", err)
 	}
-	url, ok := urlData["url"]
-	if !ok {
-		return "", 0, fmt.Errorf("url not present in settings %s", settings.RkeMetadataURL.Get())
-	}
-	branch, ok := urlData["branch"]
-	if !ok {
-		return convert.ToString(urlData["url"]), checkInterval, nil
-	}
-	latestURL, err := generateURL(convert.ToString(url), convert.ToString(branch))
-	if err != nil {
-		return "", 0, err
-	}
-	return latestURL, checkInterval, nil
+	return nil
 }
 
-func generateURL(url, branch string) (string, error) {
+func getURLSetting() (map[string]interface{}, error) {
+	urlData := map[string]interface{}{}
+	if err := json.Unmarshal([]byte(settings.RkeMetadataURL.Get()), &urlData); err != nil {
+		return nil, fmt.Errorf("unmarshal err %v", err)
+	}
+	if _, ok := urlData["url"]; !ok {
+		return nil, fmt.Errorf("url not present in settings %s", settings.RkeMetadataURL.Get())
+	}
+	return urlData, nil
+}
+
+func generateURL(urlData map[string]interface{}) (string, error) {
+	branch, ok := urlData["branch"]
+	if !ok {
+		return convert.ToString(urlData["url"]), nil
+	}
+	latestURL, err := generateURLHelper(convert.ToString(convert.ToString(urlData["url"])), convert.ToString(branch))
+	if err != nil {
+		return "", err
+	}
+	return latestURL, nil
+}
+
+func getTimeSetting() (time.Duration, error) {
+	mins := settings.RkeMetadataRefreshIntervalMins.Get()
+	if strings.HasPrefix(mins, "-") || strings.HasPrefix(mins, "0") {
+		return 0, fmt.Errorf("refresh disabled")
+	}
+	t := fmt.Sprintf("%sm", mins)
+	checkInterval, err := time.ParseDuration(t)
+	if err != nil {
+		return 0, err
+	}
+	return checkInterval, nil
+}
+
+func GetURLSettingValue() (string, error) {
+	urlData, err := getURLSetting()
+	if err != nil {
+		return "", err
+	}
+	url, err := generateURL(urlData)
+	if err != nil {
+		return "", err
+	}
+	return url, nil
+}
+
+func generateURLHelper(url, branch string) (string, error) {
 	latestCommit, err := git.RemoteBranchHeadCommit(url, branch)
 	if err != nil {
 		return "", err
