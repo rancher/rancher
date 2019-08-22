@@ -53,7 +53,7 @@ func (a ActionHandler) deactivate(apiContext *types.APIContext) error {
 
 func (a ActionHandler) refresh(apiContext *types.APIContext) error {
 	response := map[string]interface{}{}
-	url, _, err := kd.GetSettingValues()
+	url, err := kd.GetURLSettingValue()
 	if err != nil {
 		response["message"] = fmt.Sprintf("failed to get settings %v", err)
 		apiContext.WriteResponse(http.StatusInternalServerError, response)
