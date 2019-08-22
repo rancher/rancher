@@ -69,10 +69,11 @@ func run(images ...string) error {
 		return fmt.Errorf("no tag %s", tag)
 	}
 	rancherVersion := kd.GetRancherVersion()
-	k8sVersionToRKESystemImages, k8sVersionToWindowsSystemImages, _ := kd.GetK8sVersionInfo(rancherVersion,
-		metadata.DriverData.K8sVersionRKESystemImages, metadata.DriverData.K8sVersionWindowsSystemImages,
+	k8sVersionToRKESystemImages, _ := kd.GetK8sVersionInfo(rancherVersion,
+		metadata.DriverData.K8sVersionRKESystemImages,
 		metadata.DriverData.K8sVersionServiceOptions,
 		metadata.DriverData.K8sVersionInfo)
+	k8sVersionToWindowsSystemImages := pickWindowsImages(k8sVersionToRKESystemImages)
 
 	targetImages, err := collectionImages(k8sVersionToRKESystemImages, v3.ToolsSystemImages)
 	if err != nil {
@@ -337,6 +338,20 @@ func walkthroughMap(inputMap map[interface{}]interface{}, walkFunc func(map[inte
 			walkthroughMap(v, walkFunc)
 		}
 	}
+}
+
+func pickWindowsImages(versionToImages map[string]v3.RKESystemImages) map[string]v3.RKESystemImages {
+	ret := make(map[string]v3.RKESystemImages)
+	for version, images := range versionToImages {
+		ret[version] = v3.RKESystemImages{
+			Kubernetes:                images.Kubernetes,
+			WindowsPodInfraContainer:  images.WindowsPodInfraContainer,
+			NginxProxy:                images.NginxProxy,
+			KubernetesServicesSidecar: images.KubernetesServicesSidecar,
+			CertDownloader:            images.CertDownloader,
+		}
+	}
+	return ret
 }
 
 func getWindowsAgentImage() string {

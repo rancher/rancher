@@ -1,4 +1,5 @@
-#Requires -Version 5.0
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
 
-Invoke-Expression -Command "$PSScriptRoot\ci.ps1"
+Import-Module -WarningAction Ignore -Name "$PSScriptRoot\utils.psm1"
+
+Invoke-Script -File "$PSScriptRoot\ci.ps1"

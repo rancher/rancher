@@ -1,4 +1,6 @@
-#Requires -Version 5.0
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
 
-Invoke-Expression -Command "$PSScriptRoot\build-agent.ps1"
+Import-Module -WarningAction Ignore -Name "$PSScriptRoot\utils.psm1"
+
+Log-Info "Running: build-agent"
+Invoke-Script -File "$PSScriptRoot\build-agent.ps1"

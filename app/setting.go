@@ -22,9 +22,8 @@ func addK8sVersionData() error {
 	rancherVersion := kd.GetRancherVersion()
 	k8sCurrVersions := map[string]interface{}{}
 
-	k8sVersionToRKESystemImages, _, k8sVersionToSvcOptions := kd.GetK8sVersionInfo(rancherVersion,
+	k8sVersionToRKESystemImages, k8sVersionToSvcOptions := kd.GetK8sVersionInfo(rancherVersion,
 		metadata.DriverData.K8sVersionRKESystemImages,
-		metadata.DriverData.K8sVersionWindowsSystemImages,
 		metadata.DriverData.K8sVersionServiceOptions,
 		metadata.DriverData.K8sVersionInfo)
 

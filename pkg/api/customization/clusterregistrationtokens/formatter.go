@@ -15,18 +15,13 @@ const (
 	insecureCommandFormat = "curl --insecure -sfL %s | kubectl apply -f -"
 	nodeCommandFormat     = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s --server %s --token %s%s"
 
-	windowsNodeCommandFormat = `PowerShell -Sta -NoLogo -NonInteractive -Command "& {docker run --rm -v C:/:C:/host --isolation hyperv %s -server %s -token %s%s; Out-String -InputObject $? | Select-String -AllMatches -Pattern 'True' | ForEach-Object {& c:/etc/rancher/run.ps1;}}"`
+	windowsNodeCommandFormat = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:/:c:/host %s bootstrap --server %s --token %s%s | iex}"`
 )
 
 func Formatter(request *types.APIContext, resource *types.RawResource) {
-	var (
-		caNonWindows = ""
-		caWindows    = ""
-	)
 	ca := systemtemplate.CAChecksum()
 	if ca != "" {
-		caNonWindows = " --ca-checksum " + ca
-		caWindows = " -caChecksum " + ca
+		ca = " --ca-checksum " + ca
 	}
 
 	token, _ := resource.Values["token"].(string)
@@ -38,14 +33,14 @@ func Formatter(request *types.APIContext, resource *types.RawResource) {
 			image.Resolve(settings.AgentImage.Get()),
 			getRootURL(request),
 			token,
-			caNonWindows)
+			ca)
 		resource.Values["token"] = token
 		resource.Values["manifestUrl"] = url
 		resource.Values["windowsNodeCommand"] = fmt.Sprintf(windowsNodeCommandFormat,
 			image.Resolve(settings.AgentImage.Get()),
 			getRootURL(request),
 			token,
-			caWindows)
+			ca)
 	}
 }
 

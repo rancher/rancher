@@ -1,54 +1,78 @@
 ARG SERVERCORE_VERSION
 
-FROM mcr.microsoft.com/powershell:nanoserver-${SERVERCORE_VERSION}
-SHELL ["pwsh", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
-
+FROM mcr.microsoft.com/windows/servercore:${SERVERCORE_VERSION} AS builder
 ARG ARCH=amd64
-RUN $URL = 'http://nginx.org/download/nginx-1.15.9.zip'; \
-    $SRC_PATH = ('{0}\nginx.zip' -f $env:ProgramFiles); \
-    $DST_PATH = ('{0}\nginx' -f $env:ProgramFiles); \
+SHELL ["powershell", "-NoLogo", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+# download docker
+RUN $URL = 'https://github.com/StefanScherer/docker-cli-builder/releases/download/18.09.6/docker.exe'; \
     \
-    $null = New-Item -Type Directory -Path $DST_PATH -ErrorAction Ignore; \
-    \
-    Write-Host ('Downloading Nginx from {0}...'  -f $URL); \
-    \
+    Write-Host ('Downloading Docker from {0} ...' -f $URL); \
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-    Invoke-WebRequest -UseBasicParsing -OutFile $SRC_PATH -Uri $URL; \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\docker.exe -Uri $URL; \
+    \
+    Write-Host 'Complete.'
+# download wins
+RUN $URL = 'https://github.com/thxCode/wins/releases/download/v0.0.11/wins.exe'; \
+    \
+    Write-Host ('Downloading Wins from {0} ...' -f $URL); \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\wins.exe -Uri $URL; \
+    \
+    Write-Host 'Complete.'
+# downlaod kubelet
+RUN if (-not (Get-Command Expand-7Zip -ErrorAction Ignore)) { \
+       Install-PackageProvider -Name NuGet -Force -Verbose; \
+       Install-Module -Name 7Zip4Powershell -Repository PSGallery -Force -Verbose; \
+       if(-not $?) { \
+            Write-Error "Failed to install package"; \
+            Exit 1; \
+       } \
+    }
+RUN $URL = 'https://dl.k8s.io/v1.14.3/kubernetes-client-windows-amd64.tar.gz'; \
+    \
+    function Expand-GZip ($inFile, $outFile) { \
+        $input = New-Object System.IO.FileStream $inFile, ([IO.FileMode]::Open), ([IO.FileAccess]::Read), ([IO.FileShare]::Read); \
+        $output = New-Object System.IO.FileStream $outFile, ([IO.FileMode]::Create), ([IO.FileAccess]::Write), ([IO.FileShare]::None); \
+        $gzipStream = New-Object System.IO.Compression.GzipStream $input, ([IO.Compression.CompressionMode]::Decompress); \
+        try { \
+            if (!$input -or !$output -or !$gzipStream) { \
+                Write-Error "Failed to Unzip the archive"; \
+                Exit 1; \
+            } \
+            $buffer = New-Object byte[](1024); \
+            while ($true) { \
+                $read = $gzipstream.Read($buffer, 0, 1024); \
+                if ($read -le 0 ) { \
+                    break; \
+                } \
+                $output.Write($buffer, 0, $read); \
+            } \
+        } finally { \
+            $gzipStream.Close(); \
+            $output.Close(); \
+            $input.Close(); \
+        } \
+    }; \
+    \
+    Write-Host ('Downloading Kubernetes from {0} ...' -f $URL); \
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\kubernetes.tar.gz -Uri $URL; \
     \
     Write-Host 'Expanding ...'; \
+    Expand-GZip c:\kubernetes.tar.gz c:\kubernetes.tar; \
+    Expand-7Zip c:\kubernetes.tar c:\; \
     \
-    Expand-Archive -Force -Path $SRC_PATH -DestinationPath $DST_PATH; \
-    \
-    Write-Host 'Cleaning ...'; \
-    \
-    Copy-Item -Force -Path ('{0}\nginx-1.15.9\nginx.exe' -f $DST_PATH) -Destination ('{0}\nginx.exe' -f $DST_PATH); \
-    Remove-Item -Force -Recurse -Path @($SRC_PATH, ('{0}\nginx-1.15.9' -f $DST_PATH)); \
-    \
-    Write-Host 'Complete.';
-RUN $URL = 'https://github.com/Microsoft/K8s-Storage-Plugins/releases/download/v0.0.2/flexvolume-windows.zip'; \
-    $SRC_PATH = ('{0}\flexvolume.zip' -f $env:ProgramFiles); \
-    $DST_PATH = ('{0}\kubelet\volumeplugins' -f $env:ProgramFiles); \
-    \
-    $null = New-Item -Type Directory -Path $DST_PATH -ErrorAction Ignore; \
-    \
-    Write-Host ('Downloading Volume Plugins from {0} ...' -f $URL); \
-    \
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-    Invoke-WebRequest -UseBasicParsing -OutFile $SRC_PATH -Uri $URL; \
-    \
-    Write-Host 'Expanding ...'; \
-    \
-    Expand-Archive -Force -Path $SRC_PATH -DestinationPath $DST_PATH; \
-    \
-    Write-Host 'Cleaning ...'; \
-    \
-    Remove-Item -Force -Recurse -Path $SRC_PATH; \
-    \
-    Write-Host 'Complete.';
+    Write-Host 'Complete.'
+# Need to support loglevel & kube-prompt
 
+FROM mcr.microsoft.com/powershell:nanoserver-${SERVERCORE_VERSION}
+USER ContainerAdministrator
+COPY --from=builder /Windows/System32/certoc.exe /Windows/System32/netapi32.dll /Windows/System32/
+COPY --from=builder /wins.exe /docker.exe /kubernetes/client/bin/kubectl.exe /Windows/
 ARG VERSION=dev
+LABEL io.cattle.agent true
+ENV DOCKER_API_VERSION 1.24
 ENV AGENT_IMAGE rancher/rancher-agent:${VERSION}
-
-COPY ["agent.exe", "*.ps1", "*.psm1", "C:/Program Files/rancher/"]
-WORKDIR "C:\\Program Files\\rancher"
-ENTRYPOINT ["pwsh", "-NoLogo", "-NonInteractive", "-File", "./start.ps1"]
+ENV SSL_CERT_DIR C:\\etc\\kubernetes\\ssl\\certs
+COPY agent.exe *.ps1 *.psm1 /etc/rancher/
+ENTRYPOINT ["pwsh", "-NoLogo", "-NonInteractive", "-File", "c:/etc/rancher/entrypoint.ps1"]
