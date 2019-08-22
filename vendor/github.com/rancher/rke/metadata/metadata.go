@@ -30,7 +30,7 @@ func InitMetadata(ctx context.Context) error {
 	return nil
 }
 
-const RKEVersionDev = "0.2.3"
+const RKEVersionDev = "v0.2.3"
 
 func initAddonTemplates() {
 	K8sVersionToTemplates = rke.DriverData.K8sVersionedTemplates
@@ -53,7 +53,7 @@ func initK8sRKESystemImages() {
 		RKEVersion = RKEVersionDev
 	}
 	DefaultK8sVersion = rkeData.RKEDefaultK8sVersions["default"]
-	if defaultK8sVersion, ok := rkeData.RKEDefaultK8sVersions[RKEVersion]; ok {
+	if defaultK8sVersion, ok := rkeData.RKEDefaultK8sVersions[RKEVersion[1:]]; ok {
 		DefaultK8sVersion = defaultK8sVersion
 	}
 	maxVersionForMajorK8sVersion := map[string]string{}
