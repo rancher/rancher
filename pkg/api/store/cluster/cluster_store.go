@@ -22,6 +22,7 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
+	"github.com/rancher/rancher/pkg/controllers/management/etcdbackup"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
@@ -36,6 +37,7 @@ import (
 const (
 	DefaultBackupIntervalHours = 12
 	DefaultBackupRetention     = 6
+	s3TransportTimeout         = 10
 )
 
 type Store struct {
@@ -210,7 +212,9 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	if err = setInitialConditions(data); err != nil {
 		return nil, err
 	}
-
+	if err := validateS3Credentials(data); err != nil {
+		return nil, err
+	}
 	return r.Store.Create(apiContext, schema, data)
 }
 
@@ -455,6 +459,9 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	setBackupConfigSecretKeyIfNotExists(existingCluster, data)
 	setPrivateRegistryPasswordIfNotExists(existingCluster, data)
 	setCloudProviderPasswordFieldsIfNotExists(existingCluster, data)
+	if err := validateUpdatedS3Credentials(existingCluster, data); err != nil {
+		return nil, err
+	}
 
 	return r.Store.Update(apiContext, schema, data, id)
 }
@@ -631,6 +638,56 @@ func setBackupConfigSecretKeyIfNotExists(oldData, newData map[string]interface{}
 	if oldSecretKey != "" {
 		values.PutValue(newData, oldSecretKey, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig", "secretKey")
 	}
+}
+
+func validateUpdatedS3Credentials(oldData, newData map[string]interface{}) error {
+	newConfig := convert.ToMapInterface(values.GetValueN(newData, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig"))
+	if newConfig == nil {
+		return nil
+	}
+
+	oldConfig := convert.ToMapInterface(values.GetValueN(oldData, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig"))
+	if oldConfig == nil {
+		return validateS3Credentials(newData)
+	}
+	// remove "type" since it's added to the object by API, and it's not present in newConfig yet.
+	delete(oldConfig, "type")
+	if !reflect.DeepEqual(newConfig, oldConfig) {
+		return validateS3Credentials(newData)
+	}
+	return nil
+}
+
+func validateS3Credentials(data map[string]interface{}) error {
+	s3BackupConfig := values.GetValueN(data, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig")
+	if s3BackupConfig == nil {
+		return nil
+	}
+	configMap := convert.ToMapInterface(s3BackupConfig)
+	sbc := &v3.S3BackupConfig{
+		AccessKey: convert.ToString(configMap["accessKey"]),
+		SecretKey: convert.ToString(configMap["secretKey"]),
+		Endpoint:  convert.ToString(configMap["endpoint"]),
+		Region:    convert.ToString(configMap["region"]),
+		CustomCA:  convert.ToString(configMap["customCa"]),
+	}
+
+	bucket := convert.ToString(configMap["bucketName"])
+	if bucket == "" {
+		return fmt.Errorf("Empty bucket name")
+	}
+	s3Client, err := etcdbackup.GetS3Client(sbc, s3TransportTimeout)
+	if err != nil {
+		return err
+	}
+	exists, err := s3Client.BucketExists(bucket)
+	if err != nil {
+		return fmt.Errorf("Unable to validate S3 backup target configration: %v", err)
+	}
+	if !exists {
+		return fmt.Errorf("Unable to validate S3 backup target configration: bucket [%v] not found", bucket)
+	}
+	return nil
 }
 
 func setPrivateRegistryPasswordIfNotExists(oldData, newData map[string]interface{}) {
