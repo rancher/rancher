@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -31,6 +32,7 @@ const (
 	clusterBackupCheckInterval = 5 * time.Minute
 	compressedExtension        = "zip"
 	s3Endpoint                 = "s3.amazonaws.com"
+	defaultTransportTimeout    = 30
 )
 
 type Controller struct {
@@ -332,38 +334,12 @@ func (c *Controller) deleteS3Snapshot(b *v3.EtcdBackup) error {
 	if b.Spec.BackupConfig.S3BackupConfig == nil {
 		return fmt.Errorf("Can't find S3 backup target configuration")
 	}
-	var err error
-	var s3Client = &minio.Client{}
-	var creds *credentials.Credentials
-	var tr = &http.Transport{}
-	endpoint := b.Spec.BackupConfig.S3BackupConfig.Endpoint
-	bucketLookup := getBucketLookupType(endpoint)
 	bucket := b.Spec.BackupConfig.S3BackupConfig.BucketName
 	folder := b.Spec.BackupConfig.S3BackupConfig.Folder
-	// no access credentials, we assume IAM roles
-	if b.Spec.BackupConfig.S3BackupConfig.AccessKey == "" ||
-		b.Spec.BackupConfig.S3BackupConfig.SecretKey == "" {
-		creds = credentials.NewIAM("")
-		if b.Spec.BackupConfig.S3BackupConfig.Endpoint == "" {
-			endpoint = s3Endpoint
-		}
-	} else {
-		accessKey := b.Spec.BackupConfig.S3BackupConfig.AccessKey
-		secretKey := b.Spec.BackupConfig.S3BackupConfig.SecretKey
-		creds = credentials.NewStatic(accessKey, secretKey, "", credentials.SignatureDefault)
-	}
-	s3Client, err = minio.NewWithOptions(endpoint, &minio.Options{
-		Creds:        creds,
-		Region:       b.Spec.BackupConfig.S3BackupConfig.Region,
-		Secure:       true,
-		BucketLookup: bucketLookup,
-	})
+
+	s3Client, err := GetS3Client(b.Spec.BackupConfig.S3BackupConfig, defaultTransportTimeout)
 	if err != nil {
 		return err
-	}
-	if b.Spec.BackupConfig.S3BackupConfig.CustomCA != "" {
-		tr = getCustomCATransport(b.Spec.BackupConfig.S3BackupConfig.CustomCA)
-		s3Client.SetCustomTransport(tr)
 	}
 
 	bucketExists, err := s3Client.BucketExists(bucket)
@@ -387,6 +363,48 @@ func (c *Controller) deleteS3Snapshot(b *v3.EtcdBackup) error {
 		fileName = fmt.Sprintf("%s/%s", folder, fileName)
 	}
 	return s3Client.RemoveObject(bucket, fileName)
+}
+
+func GetS3Client(sbc *v3.S3BackupConfig, timeout int) (*minio.Client, error) {
+	if sbc == nil {
+		return nil, fmt.Errorf("Can't find S3 backup target configuration")
+	}
+	var s3Client = &minio.Client{}
+	var creds *credentials.Credentials
+	var tr = minio.DefaultTransport
+	tr.(*http.Transport).DialContext = (&net.Dialer{
+		Timeout:   time.Duration(timeout) * time.Second,
+		KeepAlive: 30 * time.Second,
+	}).DialContext
+	endpoint := sbc.Endpoint
+	// no access credentials, we assume IAM roles
+	if sbc.AccessKey == "" ||
+		sbc.SecretKey == "" {
+		creds = credentials.NewIAM("")
+		if sbc.Endpoint == "" {
+			endpoint = s3Endpoint
+		}
+	} else {
+		accessKey := sbc.AccessKey
+		secretKey := sbc.SecretKey
+		creds = credentials.NewStatic(accessKey, secretKey, "", credentials.SignatureDefault)
+	}
+
+	bucketLookup := getBucketLookupType(endpoint)
+	s3Client, err := minio.NewWithOptions(endpoint, &minio.Options{
+		Creds:        creds,
+		Region:       sbc.Region,
+		Secure:       true,
+		BucketLookup: bucketLookup,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if sbc.CustomCA != "" {
+		tr = getCustomCATransport(tr, sbc.CustomCA)
+		s3Client.SetCustomTransport(tr)
+	}
+	return s3Client, nil
 }
 
 func (c *Controller) getRecuringBackupsList(cluster *v3.Cluster) ([]*v3.EtcdBackup, error) {
@@ -470,13 +488,11 @@ func isRecurringBackupEnabled(rkeConfig *v3.RancherKubernetesEngineConfig) bool 
 	return isBackupSet(rkeConfig) && rkeConfig.Services.Etcd.BackupConfig.Enabled != nil && *rkeConfig.Services.Etcd.BackupConfig.Enabled
 }
 
-func getCustomCATransport(ca string) *http.Transport {
+func getCustomCATransport(tr http.RoundTripper, ca string) http.RoundTripper {
 	certPool := x509.NewCertPool()
 	certPool.AppendCertsFromPEM([]byte(ca))
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			RootCAs: certPool,
-		},
+	tr.(*http.Transport).TLSClientConfig = &tls.Config{
+		RootCAs: certPool,
 	}
 	return tr
 }
