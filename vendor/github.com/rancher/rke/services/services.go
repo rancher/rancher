@@ -81,6 +81,14 @@ func runSidekick(ctx context.Context, host *hosts.Host, prsMap map[string]v3.Pri
 	if _, err := docker.CreateContainer(ctx, host.DClient, host.Address, SidekickContainerName, imageCfg, hostCfg); err != nil {
 		return err
 	}
+	if host.DockerInfo.OSType == "windows" {
+		// windows dockerfile VOLUME declaration must to satisfy one of them:
+		//  - a non-existing or empty directory
+		//  - a drive other than C:
+		// so we could use a script to **start** the container to put expected resources into the "shared" directory,
+		// like the action of `/usr/bin/sidecar.ps1` for windows rke-tools container
+		return docker.StartContainer(ctx, host.DClient, host.Address, SidekickContainerName)
+	}
 	return nil
 }
 

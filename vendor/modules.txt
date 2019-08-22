@@ -333,7 +333,7 @@ github.com/rancher/norman/types/convert/merge
 github.com/rancher/norman/types/factory
 # github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 github.com/rancher/rdns-server/model
-# github.com/rancher/rke v0.3.0-rc7.0.20190822034040-65df510251ec
+# github.com/rancher/rke v0.3.0-rc7.0.20190822035031-277797df0f39
 github.com/rancher/rke/util
 github.com/rancher/rke/pki/cert
 github.com/rancher/rke/cloudprovider/aws

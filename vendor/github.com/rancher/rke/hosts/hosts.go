@@ -52,12 +52,14 @@ const (
 	LogCleanerContainerName = "rke-log-cleaner"
 	RKELogsPath             = "/var/lib/rancher/rke/log"
 
-	B2DOS            = "Boot2Docker"
-	B2DPrefixPath    = "/mnt/sda1/rke"
-	ROS              = "RancherOS"
-	ROSPrefixPath    = "/opt/rke"
-	CoreOS           = "CoreOS"
-	CoreOSPrefixPath = "/opt/rke"
+	B2DOS             = "Boot2Docker"
+	B2DPrefixPath     = "/mnt/sda1/rke"
+	ROS               = "RancherOS"
+	ROSPrefixPath     = "/opt/rke"
+	CoreOS            = "CoreOS"
+	CoreOSPrefixPath  = "/opt/rke"
+	WindowsOS         = "Windows"
+	WindowsPrefixPath = "c:/"
 )
 
 func (h *Host) CleanUpAll(ctx context.Context, cleanerImage string, prsMap map[string]v3.PrivateRegistry, externalEtcd bool) error {
@@ -314,6 +316,8 @@ func GetPrefixPath(osType, ClusterPrefixPath string) string {
 		prefixPath = ROSPrefixPath
 	case strings.Contains(osType, CoreOS):
 		prefixPath = CoreOSPrefixPath
+	case strings.Contains(osType, WindowsOS):
+		prefixPath = WindowsPrefixPath
 	default:
 		prefixPath = ClusterPrefixPath
 	}

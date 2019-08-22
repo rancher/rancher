@@ -38,13 +38,8 @@ github.com/bep/debounce v1.2.0/go.mod h1:H8yggRPQKLUhUoqrJC1bO2xNya7vanpDl7xR3IS
 github.com/blang/semver v0.0.0-20190414102917-ba2c2ddd8906 h1:KGe2go3VELJLcQfKBUlviUzERqg79dO6VYzCvQxF01w=
 github.com/blang/semver v0.0.0-20190414102917-ba2c2ddd8906/go.mod h1:kRBLl5iJ+tD4TcOOxsy/0fnwebNt5EWlYSAyrTnjyyk=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
-github.com/containerd/cgroups v0.0.0-20190717030353-c4b9ac5c7601/go.mod h1:X9rLEHIqSf/wfK8NsPqxJmeZgW4pcfzdXITDrUSJ6uI=
 github.com/containerd/containerd v1.3.0-beta.0.0.20190808172034-23faecfb66ab h1:lLoKpH/jolCo6LOWonSg8psTvcGAF7qklWRhcfvVsqc=
 github.com/containerd/containerd v1.3.0-beta.0.0.20190808172034-23faecfb66ab/go.mod h1:bC6axHOhabU15QhwfG7w5PipXdVtMXFTttgp+kVtyUA=
-github.com/containerd/continuity v0.0.0-20190815185530-f2a389ac0a02/go.mod h1:GL3xCUCBDV3CZiTSEKksMWbLE66hEyuu9qyDOOqM47Y=
-github.com/containerd/fifo v0.0.0-20190816180239-bda0ff6ed73c/go.mod h1:ODA38xgv3Kuk8dQz2ZQXpnv/UZZUHUCL7pnLehbXgQI=
-github.com/containerd/ttrpc v0.0.0-20190613183316-1fb3814edf44/go.mod h1:PvCDdDGpgqzQIzDW1TphrGLssLDZp2GuS+X5DkEJB8o=
-github.com/containerd/typeurl v0.0.0-20190515163108-7312978f2987/go.mod h1:Cm3kwCdlkCfMSHURc+r6fwoGH6/F1hH3S4sg0rLFWPc=
 github.com/coreos/bbolt v1.3.3 h1:n6AiVyVRKQFNb6mJlwESEvvLoDyiTzXX7ORAUlkeBdY=
 github.com/coreos/bbolt v1.3.3/go.mod h1:iRUV2dpdMOn7Bo10OQBFzIJO9kkE559Wcmn+qkEiiKk=
 github.com/coreos/etcd v0.0.0-20180109221743-52f73c5a6cb0/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=
@@ -75,7 +70,6 @@ github.com/docker/docker v0.7.3-0.20190808172531-150530564a14 h1:ZkcBCvSGEg1Er3X
 github.com/docker/docker v0.7.3-0.20190808172531-150530564a14/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/go-connections v0.3.0 h1:3lOnM9cSzgGwx8VfK/NGOW5fLQ0GjIlCkaktF+n1M6o=
 github.com/docker/go-connections v0.3.0/go.mod h1:Gbd7IOopHjR8Iph03tsViu4nIes5XhDvyHbTtUxmeec=
-github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c/go.mod h1:Uw6UezgYA44ePAFQYUehOuCzmy5zmg/+nl2ZfMWGkpA=
 github.com/docker/go-units v0.3.2 h1:Kjm80apys7gTtfVmCvVY8gwu10uofaFSrmAKOVrtueE=
 github.com/docker/go-units v0.3.2/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
 github.com/docker/machine v0.0.0-20160115011140-7246b2c9650c h1:cs2xeXzwLsT+3aTpGdGfhYxARehi+eAq6Y5jgrEZML0=
@@ -111,8 +105,6 @@ github.com/go-openapi/spec v0.0.0-20160808142527-6aced65f8501/go.mod h1:J8+jY1nA
 github.com/go-openapi/swag v0.0.0-20160704191624-1d0bd113de87 h1:zP3nY8Tk2E6RTkqGYrarZXuzh+ffyLDljLxCy1iJw80=
 github.com/go-openapi/swag v0.0.0-20160704191624-1d0bd113de87/go.mod h1:DXUve3Dpr1UfpPtxFw+EFuQ41HhCWZfha5jSVRG7C7I=
 github.com/go-stack/stack v1.8.0/go.mod h1:v0f6uXyyMGvRgIKkXu+yp6POWl0qKG85gN/melR3HDY=
-github.com/godbus/dbus v4.1.0+incompatible/go.mod h1:/YcGZj5zSblfDWMMoOzV4fas9FZnQYTkDnsGvmh2Grw=
-github.com/gogo/googleapis v1.2.0/go.mod h1:Njal3psf3qN6dwBtQfUmBZh2ybovJ0tlu3o/AC7HYjU=
 github.com/gogo/protobuf v1.1.1/go.mod h1:r8qH/GZQm5c6nD/R0oafs1akxWv10x8SbQlK7atdtwQ=
 github.com/gogo/protobuf v1.2.1 h1:/s5zKNz0uPFCZ5hddgPdo2TK2TVrUNMn0OOX8/aZMTE=
 github.com/gogo/protobuf v1.2.1/go.mod h1:hp+jE20tsWTFYpLwKvXlhS1hjn+gTNwPg2I6zVXpSg4=
@@ -245,8 +237,6 @@ github.com/opencontainers/go-digest v1.0.0-rc1 h1:WzifXhOVOEOuFYOJAW6aQqW0TooG2i
 github.com/opencontainers/go-digest v1.0.0-rc1/go.mod h1:cMLVZDEM3+U2I4VmLI6N8jQYUd2OVphdqWwCJHrFt2s=
 github.com/opencontainers/image-spec v0.0.0-20170929214853-7c889fafd04a h1:gDx6uvy7IWqeR40GKGYEJEzAmpn0aZpR11A5PlMt+S4=
 github.com/opencontainers/image-spec v0.0.0-20170929214853-7c889fafd04a/go.mod h1:BtxoFyWECRxE4U/7sNtV5W15zMzWCbyJoFRP3s7yZA0=
-github.com/opencontainers/runc v0.1.1/go.mod h1:qT5XzbpPznkRYVz/mWwUaVBUv2rmF59PVA73FjuZG0U=
-github.com/opencontainers/runtime-spec v0.1.2-0.20190207185410-29686dbc5559/go.mod h1:jwyrGlmzljRJv/Fgzds9SsS/C5hL+LL3ko9hs6T5lQ0=
 github.com/openzipkin/zipkin-go v0.1.1/go.mod h1:NtoC/o8u3JlF1lSlyPNswIbeQH9bJTmOf0Erfk+hxe8=
 github.com/openzipkin/zipkin-go v0.1.3/go.mod h1:NtoC/o8u3JlF1lSlyPNswIbeQH9bJTmOf0Erfk+hxe8=
 github.com/pborman/uuid v1.2.0 h1:J7Q5mO4ysT1dv8hyrUGHb9+ooztCXu1D8MY8DZYsu3g=
@@ -282,8 +272,6 @@ github.com/prometheus/procfs v0.0.3 h1:CTwfnzjQ+8dS6MhHHu4YswVAD99sL2wjPqP+VkURm
 github.com/prometheus/procfs v0.0.3/go.mod h1:4A/X28fw3Fc593LaREMrKMqOKvUAntwMDaekg4FpcdQ=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190819174335-6eb94126a98c h1:Of+EnlLZ33fmeZgQhr/Pb80iMaR9L8mQ2xvhzQk4o4w=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190819174335-6eb94126a98c/go.mod h1:VDixap7YjDnNwlfxL4gl890ThOVinEZE3qyAaG0xcQE=
-github.com/rancher/kontainer-driver-metadata v0.0.0-20190820205038-bc5bddb6f8f3 h1:yYv/SgEx+Ect+fgbkn3sBuyrNoKJl8zng+Srkso3Abs=
-github.com/rancher/kontainer-driver-metadata v0.0.0-20190820205038-bc5bddb6f8f3/go.mod h1:OzsWMa07Dy8piosorsGDPbRcJeNIp2f+pksv/qt+fSk=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190822033834-53da6c8441ed h1:7+QZ69GEo50fDd+/AKEFL/dPZSCLOVtLVOdZvi4DNEY=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190822033834-53da6c8441ed/go.mod h1:KCr66cmkx3e0eesKeX8XfD7JwWVNSrkWVqSDqSaycnA=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20190819182532-d4cdf8e56671 h1:JIgjMy2Nb/H+89T2S7TePqiGyxeE4J1g5tGtb9+hqsQ=
@@ -299,8 +287,8 @@ github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a h1:6xqYlVz4uAX
 github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a/go.mod h1:YW8wJ/coee2n9ed937uPBWQArBaVlxs+5wkkS9KiyDc=
 github.com/rancher/rke v0.3.0-rc6.0.20190819180243-f8bac2c059d0 h1:XYyvskgyYvU89CgHEl0XK3GDom+heEgl2s28jv/f6PM=
 github.com/rancher/rke v0.3.0-rc6.0.20190819180243-f8bac2c059d0/go.mod h1:IyunvVrNJZLg3m5faCvG4LNAyf03vuAShBi9q9mcPGc=
-github.com/rancher/rke v0.3.0-rc7.0.20190822034040-65df510251ec h1:wmg/YZHlhcjvICSD3sjArOJUrPGK7bWAivohDosxl+Y=
-github.com/rancher/rke v0.3.0-rc7.0.20190822034040-65df510251ec/go.mod h1:emEtY1ESyFOSECZiwFkEY2x89fLVMJE/M4pQ67nQ7WU=
+github.com/rancher/rke v0.3.0-rc7.0.20190822035031-277797df0f39 h1:NvUb29Z5GtfiwNuqRKmMWDjCdqEzWaEH45gAlA+Ng8w=
+github.com/rancher/rke v0.3.0-rc7.0.20190822035031-277797df0f39/go.mod h1:KA/0dpytc3Yae59gEn0/Hz2UN8h/r6itMC5ugsDvWNY=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/types v0.0.0-20190819173748-96e6d6f30265/go.mod h1:ROyypICT7xxMhVRplyFnEIaXHw2nMVHfCZ8Y3261qmw=
@@ -340,7 +328,6 @@ github.com/stretchr/testify v0.0.0-20151208002404-e3a8ff8ce365/go.mod h1:a8OnRci
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/stretchr/testify v1.3.0 h1:TivCn/peBQ7UY8ooIcPgZFpTNSz0Q2U6UrFlUfqbe0Q=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
-github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2/go.mod h1:hkRG7XYTFWNJGYcbNJQlaLq0fg1yr4J4t/NcTQtrfww=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5 h1:LnC5Kc/wtumK+WB441p7ynQJzVuNRJiqddSIE3IlSEQ=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
 github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80 h1:nrZ3ySNYwJbSpD6ce9duiP+QkD3JuLCcWkdaehUS/3Y=
