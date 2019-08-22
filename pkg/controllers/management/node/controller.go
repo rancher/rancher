@@ -512,6 +512,7 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 			obj.Spec.UpdateTaintsFromAPI = &falseValue
 		}
 	}
+	obj.Status.NodeConfig.Taints = taints.GetRKETaintsFromTaints(obj.Spec.DesiredNodeTaints)
 
 	return obj, nil
 }

@@ -95,3 +95,16 @@ func GetRKETaintsFromStrings(sources []string) []v3.RKETaint {
 	}
 	return rtn
 }
+
+func GetRKETaintsFromTaints(sources []v1.Taint) []v3.RKETaint {
+	rtn := make([]v3.RKETaint, len(sources))
+	for i, source := range sources {
+		rtn[i] = v3.RKETaint{
+			Key:       source.Key,
+			Effect:    source.Effect,
+			Value:     source.Value,
+			TimeAdded: source.TimeAdded,
+		}
+	}
+	return rtn
+}
