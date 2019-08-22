@@ -95,11 +95,27 @@ func doRunDeployer(ctx context.Context, host *hosts.Host, containerEnv []string,
 		Cmd:   []string{"cert-deployer"},
 		Env:   containerEnv,
 	}
+	if host.DockerInfo.OSType == "windows" { // compatible with Windows
+		imageCfg = &container.Config{
+			Image: certDownloaderImage,
+			Cmd: []string{
+				"pwsh", "-NoLogo", "-NonInteractive", "-File", "c:/usr/bin/cert-deployer.ps1",
+			},
+			Env: containerEnv,
+		}
+	}
 	hostCfg := &container.HostConfig{
 		Binds: []string{
 			fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(host.PrefixPath, "/etc/kubernetes")),
 		},
 		Privileged: true,
+	}
+	if host.DockerInfo.OSType == "windows" { // compatible with Windows
+		hostCfg = &container.HostConfig{
+			Binds: []string{
+				fmt.Sprintf("%s:c:/etc/kubernetes", path.Join(host.PrefixPath, "/etc/kubernetes")),
+			},
+		}
 	}
 	_, err = docker.CreateContainer(ctx, host.DClient, host.Address, CrtDownloaderContainer, imageCfg, hostCfg)
 	if err != nil {
