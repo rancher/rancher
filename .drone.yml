@@ -78,7 +78,10 @@ steps:
     - push
 
 - name: docker-mirror-istio
-  image: plugins/docker
+  image: docker
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
   environment:
     PASSWORD:
       from_secret: docker_password
