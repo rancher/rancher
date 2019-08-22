@@ -394,7 +394,7 @@ github.com/rancher/types/apis/apps/v1beta2/fakes
 github.com/rancher/types/apis/batch/v1/fakes
 github.com/rancher/types/apis/batch/v1beta1/fakes
 github.com/rancher/types/status
-# github.com/rancher/wrangler v0.1.5
+# github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95
 github.com/rancher/wrangler/pkg/signals
 github.com/rancher/wrangler/pkg/leader
 github.com/rancher/wrangler/pkg/name
