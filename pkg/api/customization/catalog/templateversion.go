@@ -18,7 +18,7 @@ import (
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	client "github.com/rancher/types/client/management/v3"
 	"github.com/sirupsen/logrus"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 )
 
 type TemplateVerionFormatterWrapper struct {
@@ -84,8 +84,11 @@ func (t TemplateVerionFormatterWrapper) TemplateVersionFormatter(apiContext *typ
 		VersionURLs: versionURLs,
 	}, nil)
 	if err != nil {
-		logrus.Errorf("Failed to load chart: %s", err)
+		logrus.Errorf("failed to load chart: %s", err)
 		return
+	}
+	if len(files) == 0 {
+		logrus.Errorf("no files were found for this chart")
 	}
 
 	for name, content := range files {

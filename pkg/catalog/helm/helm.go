@@ -296,11 +296,12 @@ func (h *Helm) LoadChart(templateVersion *v3.TemplateVersionSpec, filters []stri
 
 func (h *Helm) fetchAndCacheURLs(versionPath, versionName string, versionURLs, filters []string) (map[string]string, error) {
 	filemap := map[string]string{}
-	if err := os.MkdirAll(versionPath, 0755); err != nil {
-		return nil, err
-	}
 	files, err := h.fetchURLs(versionURLs)
 	if err != nil {
+		return nil, err
+	}
+	// existence of this file indicates the cache exists
+	if err := os.MkdirAll(versionPath, 0755); err != nil {
 		return nil, err
 	}
 	for _, file := range files {
