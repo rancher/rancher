@@ -107,7 +107,7 @@ func (md *MetadataController) saveSystemImages(K8sVersionRKESystemImages map[str
 			maxIgnore = append(maxIgnore, k8sVersion)
 			continue
 		}
-		if curr, ok := maxVersionForMajorK8sVersion[majorVersion]; !ok || k8sVersion > curr {
+		if curr, ok := maxVersionForMajorK8sVersion[majorVersion]; !ok || mVersion.Compare(k8sVersion, curr, ">") {
 			maxVersionForMajorK8sVersion[majorVersion] = k8sVersion
 		}
 	}

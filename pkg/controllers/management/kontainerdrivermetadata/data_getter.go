@@ -3,6 +3,7 @@ package kontainerdrivermetadata
 import (
 	"strings"
 
+	mVersion "github.com/mcuadros/go-version"
 	"github.com/rancher/rancher/pkg/settings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 
@@ -116,7 +117,7 @@ func GetK8sVersionInfo(rancherVersion string, rkeSysImages map[string]v3.RKESyst
 		if majorVersionInfo, ok := rancherVersions[majorVersion]; ok && toIgnoreForK8sCurrent(majorVersionInfo, rancherVersion) {
 			continue
 		}
-		if curr, ok := maxVersionForMajorK8sVersion[majorVersion]; !ok || k8sVersion > curr {
+		if curr, ok := maxVersionForMajorK8sVersion[majorVersion]; !ok || mVersion.Compare(k8sVersion, curr, ">") {
 			maxVersionForMajorK8sVersion[majorVersion] = k8sVersion
 		}
 	}
