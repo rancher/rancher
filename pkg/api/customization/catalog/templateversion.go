@@ -89,6 +89,7 @@ func (t TemplateVerionFormatterWrapper) TemplateVersionFormatter(apiContext *typ
 	}
 	if len(files) == 0 {
 		logrus.Errorf("no files were found for this chart")
+		return
 	}
 
 	for name, content := range files {

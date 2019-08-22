@@ -144,3 +144,16 @@ def check_subject_in_rb(rbac, ns, subject_id, name):
                 if rb.subjects[i].name == subject_id:
                     return True
     return False
+
+
+def wait_for_atleast_workload(pclient, nsid, timeout=60, count=0):
+    start = time.time()
+    interval = 0.5
+    workloads = pclient.list_workload(namespaceId=nsid)
+    while len(workloads.data) < count:
+        if time.time() - start > timeout:
+            raise Exception('Timeout waiting for workload service')
+        time.sleep(interval)
+        interval *= 2
+        workloads = pclient.list_workload(namespaceId=nsid)
+    return workloads
