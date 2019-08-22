@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 function mirror_image {
   image_src="${1}"
