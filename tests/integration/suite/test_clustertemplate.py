@@ -636,6 +636,34 @@ def test_create_cluster_with_invalid_revision(admin_mc, remove_resource):
         assert e.value.error.status == 422
 
 
+def test_disable_template_revision(admin_mc, remove_resource):
+    cluster_template = create_cluster_template(admin_mc,
+                                               remove_resource, [], admin_mc)
+    tId = cluster_template.id
+    client = admin_mc.client
+    rev = \
+        create_cluster_template_revision(admin_mc.client, tId)
+
+    # creating a cluster with this template
+    cluster = client.create_cluster(name=random_str(),
+                                    clusterTemplateRevisionId=rev.id,
+                                    description="template from cluster")
+    remove_resource(cluster)
+    assert cluster.conditions[0].type == 'Pending'
+    assert cluster.conditions[0].status == 'True'
+
+    # disable the revision
+    client.action(obj=rev, action_name="disable")
+
+    with pytest.raises(ApiError) as e:
+        client.create_cluster(name=random_str(),
+                              clusterTemplateRevisionId=rev.id)
+        assert e.value.error.status == 500
+
+    client.delete(cluster)
+    wait_for_cluster_to_be_deleted(client, cluster.id)
+
+
 def rtb_cb(client, rtb):
     """Wait for the prtb to have the userId populated"""
     def cb():

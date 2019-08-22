@@ -778,6 +778,7 @@ func ClusterTemplates(schemas *types.Schemas, management *config.ScaledContext) 
 		NamespaceInterface: management.Core.Namespaces(""),
 	}
 	revisionSchema.Store = clustertemplatestore.WrapStore(revisionSchema.Store, management)
+	revisionSchema.Formatter = wrapper.RevisionFormatter
 	revisionSchema.CollectionFormatter = wrapper.CollectionFormatter
 	revisionSchema.ActionHandler = wrapper.ClusterTemplateRevisionsActionHandler
 }
