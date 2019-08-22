@@ -10,7 +10,7 @@ import (
 )
 
 func runKubelet(ctx context.Context, host *hosts.Host, df hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, kubeletProcess v3.Process, certMap map[string]pki.CertificatePKI, alpineImage string) error {
-	imageCfg, hostCfg, healthCheckURL := GetProcessConfig(kubeletProcess)
+	imageCfg, hostCfg, healthCheckURL := GetProcessConfig(kubeletProcess, host)
 	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, KubeletContainerName, host.Address, WorkerRole, prsMap); err != nil {
 		return err
 	}

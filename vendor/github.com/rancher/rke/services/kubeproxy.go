@@ -9,7 +9,7 @@ import (
 )
 
 func runKubeproxy(ctx context.Context, host *hosts.Host, df hosts.DialerFactory, prsMap map[string]v3.PrivateRegistry, kubeProxyProcess v3.Process, alpineImage string) error {
-	imageCfg, hostCfg, healthCheckURL := GetProcessConfig(kubeProxyProcess)
+	imageCfg, hostCfg, healthCheckURL := GetProcessConfig(kubeProxyProcess, host)
 	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, KubeproxyContainerName, host.Address, WorkerRole, prsMap); err != nil {
 		return err
 	}

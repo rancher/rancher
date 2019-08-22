@@ -506,7 +506,8 @@ func IsContainerUpgradable(ctx context.Context, dClient *client.Client, imageCfg
 		!sliceEqualsIgnoreOrder(containerInspect.Config.Entrypoint, imageCfg.Entrypoint) ||
 		!sliceEqualsIgnoreOrder(containerInspect.Config.Cmd, imageCfg.Cmd) ||
 		!isContainerEnvChanged(containerInspect.Config.Env, imageCfg.Env, imageInspect.Config.Env) ||
-		!sliceEqualsIgnoreOrder(containerInspect.HostConfig.Binds, hostCfg.Binds) {
+		!sliceEqualsIgnoreOrder(containerInspect.HostConfig.Binds, hostCfg.Binds) ||
+		!sliceEqualsIgnoreOrder(containerInspect.HostConfig.SecurityOpt, hostCfg.SecurityOpt) {
 		logrus.Debugf("[%s] Container [%s] is eligible for upgrade on host [%s]", plane, containerName, hostname)
 		return true, nil
 	}
@@ -515,7 +516,11 @@ func IsContainerUpgradable(ctx context.Context, dClient *client.Client, imageCfg
 }
 
 func sliceEqualsIgnoreOrder(left, right []string) bool {
-	return sets.NewString(left...).Equal(sets.NewString(right...))
+	if equal := sets.NewString(left...).Equal(sets.NewString(right...)); !equal {
+		logrus.Debugf("slice is not equal, showing data in new value which is not in old value: %v", sets.NewString(right...).Difference(sets.NewString(left...)))
+		return false
+	}
+	return true
 }
 
 func IsSupportedDockerVersion(info types.Info, K8sVersion string) (bool, error) {

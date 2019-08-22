@@ -47,6 +47,9 @@ const (
 	KubeproxyPort      = 10256
 
 	WorkerThreads = util.WorkerThreads
+
+	ContainerNameLabel = "io.rancher.rke.container.name"
+	MCSLabel           = "label=level:s0:c1000,c1001"
 )
 
 type RestartFunc func(context.Context, *hosts.Host) error
@@ -56,7 +59,7 @@ func runSidekick(ctx context.Context, host *hosts.Host, prsMap map[string]v3.Pri
 	if err != nil {
 		return err
 	}
-	imageCfg, hostCfg, _ := GetProcessConfig(sidecarProcess)
+	imageCfg, hostCfg, _ := GetProcessConfig(sidecarProcess, host)
 	isUpgradable := false
 	if isRunning {
 		isUpgradable, err = docker.IsContainerUpgradable(ctx, host.DClient, imageCfg, hostCfg, SidekickContainerName, host.Address, SidekickServiceName)
@@ -96,7 +99,7 @@ func removeSidekick(ctx context.Context, host *hosts.Host) error {
 	return docker.DoRemoveContainer(ctx, host.DClient, SidekickContainerName, host.Address)
 }
 
-func GetProcessConfig(process v3.Process) (*container.Config, *container.HostConfig, string) {
+func GetProcessConfig(process v3.Process, host *hosts.Host) (*container.Config, *container.HostConfig, string) {
 	imageCfg := &container.Config{
 		Entrypoint: process.Command,
 		Cmd:        process.Args,
@@ -118,6 +121,26 @@ func GetProcessConfig(process v3.Process) (*container.Config, *container.HostCon
 	}
 	if len(process.RestartPolicy) > 0 {
 		hostCfg.RestartPolicy = container.RestartPolicy{Name: process.RestartPolicy}
+	}
+	for _, securityOpt := range host.DockerInfo.SecurityOptions {
+		// If Docker is configured with selinux-enabled:true, we need to specify MCS label to allow files from service-sidekick to be shared between containers
+		if securityOpt == "selinux" {
+			logrus.Debugf("Found selinux in DockerInfo.SecurityOptions on host [%s]", host.Address)
+			// Check for containers having the sidekick container
+			for _, volumeFrom := range hostCfg.VolumesFrom {
+				if volumeFrom == SidekickContainerName {
+					logrus.Debugf("Found [%s] in VolumesFrom on host [%s], applying MCSLabel [%s]", SidekickContainerName, host.Address, MCSLabel)
+					hostCfg.SecurityOpt = []string{MCSLabel}
+				}
+			}
+			// Check for sidekick container itself
+			if value, ok := imageCfg.Labels[ContainerNameLabel]; ok {
+				if value == SidekickContainerName {
+					logrus.Debugf("Found [%s=%s] in Labels on host [%s], applying MCSLabel [%s]", ContainerNameLabel, SidekickContainerName, host.Address, MCSLabel)
+					hostCfg.SecurityOpt = []string{MCSLabel}
+				}
+			}
+		}
 	}
 	return imageCfg, hostCfg, process.HealthCheck.URL
 }
