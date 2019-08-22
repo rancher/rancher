@@ -395,6 +395,8 @@ func (m *MCAppManager) createApp(mcapp *v3.MultiClusterApp, answerMap map[string
 				ExternalID:          externalID,
 				MultiClusterAppName: mcapp.Name,
 				Answers:             getAnswerMap(answerMap, projectName),
+				Wait:                mcapp.Spec.Wait,
+				Timeout:             mcapp.Spec.Timeout,
 			},
 		}
 		// Now create the App instance
