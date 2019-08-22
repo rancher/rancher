@@ -56,7 +56,7 @@ require (
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/rke v0.3.0-rc7.0.20190822035031-277797df0f39
 	github.com/rancher/types v0.0.0-20190822030441-376c6f64c718
-	github.com/rancher/wrangler v0.1.5
+	github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect
 	github.com/satori/go.uuid v1.2.0
