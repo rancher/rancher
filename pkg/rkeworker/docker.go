@@ -106,7 +106,9 @@ func runProcess(ctx context.Context, name string, p v3.Process, start, forceRest
 		return nil
 	}
 
-	config, hostConfig, _ := services.GetProcessConfig(p)
+	// Host is used to determine if selinux is enabled in the Docker daemon, but this is not needed for workers as the components sharing files in service-sidekick all run as privileged
+	emptyHost := hosts.Host{}
+	config, hostConfig, _ := services.GetProcessConfig(p, &emptyHost)
 	if config.Labels == nil {
 		config.Labels = map[string]string{}
 	}
