@@ -15,10 +15,18 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	"github.com/rancher/rancher/pkg/namespace"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	client "github.com/rancher/types/client/management/v3"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	enableRevisionAction  = "enable"
+	disableRevisionAction = "disable"
 )
 
 type Wrapper struct {
@@ -31,6 +39,17 @@ type Wrapper struct {
 
 func (w Wrapper) Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.Links["revisions"] = apiContext.URLBuilder.Link("revisions", resource)
+}
+
+func (w Wrapper) RevisionFormatter(apiContext *types.APIContext, resource *types.RawResource) {
+
+	if err := apiContext.AccessControl.CanDo(v3.ClusterTemplateRevisionGroupVersionKind.Group, v3.ClusterTemplateRevisionResource.Name, "update", apiContext, resource.Values, apiContext.Schema); err == nil {
+		if convert.ToBool(resource.Values["enabled"]) {
+			resource.AddAction(apiContext, disableRevisionAction)
+		} else {
+			resource.AddAction(apiContext, enableRevisionAction)
+		}
+	}
 }
 
 func (w Wrapper) CollectionFormatter(request *types.APIContext, collection *types.GenericCollection) {
@@ -70,10 +89,89 @@ func (w Wrapper) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 }
 
 func (w Wrapper) ClusterTemplateRevisionsActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	if actionName != "listquestions" {
-		return httperror.NewAPIError(httperror.NotFound, "not found")
+
+	canUpdateClusterTemplateRevision := func() bool {
+		revision := map[string]interface{}{
+			"id": apiContext.ID,
+		}
+
+		return apiContext.AccessControl.CanDo(v3.ClusterTemplateRevisionGroupVersionKind.Group, v3.ClusterTemplateRevisionResource.Name, "update", apiContext, revision, apiContext.Schema) == nil
 	}
 
+	switch actionName {
+	case "disable":
+		if !canUpdateClusterTemplateRevision() {
+			return httperror.NewAPIError(httperror.PermissionDenied, "can not access clusterTemplateRevision")
+		}
+		return w.updateEnabledFlagOnRevision(apiContext, false)
+	case "enable":
+		if !canUpdateClusterTemplateRevision() {
+			return httperror.NewAPIError(httperror.PermissionDenied, "can not access clusterTemplateRevision")
+		}
+		return w.updateEnabledFlagOnRevision(apiContext, true)
+	case "listquestions":
+		return w.listRevisionQuestions(actionName, action, apiContext)
+
+	}
+	return httperror.NewAPIError(httperror.NotFound, "not found")
+}
+
+func (w Wrapper) updateEnabledFlagOnRevision(apiContext *types.APIContext, enabledFlag bool) error {
+
+	revision, err := w.loadRevision(apiContext)
+	if err != nil {
+		return httperror.WrapAPIError(err, httperror.ServerError, "failed to load clusterTemplateRevision")
+	}
+
+	if enabledFlag == *revision.Spec.Enabled {
+		apiContext.WriteResponse(http.StatusNoContent, map[string]interface{}{})
+		return nil
+	}
+	revisionCopy := revision.DeepCopy()
+	revisionCopy.Spec.Enabled = &enabledFlag
+	_, err = w.ClusterTemplateRevisions.Update(revisionCopy)
+
+	if err != nil {
+		//if conflict update, retry by loading from the store
+		if apierrors.IsConflict(err) {
+			revisionFromStore, err := w.ClusterTemplateRevisions.GetNamespaced(namespace.GlobalNamespace, revision.ObjectMeta.Name, v1.GetOptions{})
+			if err != nil {
+				return httperror.WrapAPIError(err, httperror.ServerError, "failed to load clusterTemplateRevision from store")
+			}
+			revisionStoreCopy := revisionFromStore.DeepCopy()
+			revisionStoreCopy.Spec.Enabled = &enabledFlag
+
+			_, err = w.ClusterTemplateRevisions.Update(revisionStoreCopy)
+			if err != nil {
+				return httperror.WrapAPIError(err, httperror.ServerError, fmt.Sprintf("failed to set enabled flag to %v on clusterTemplateRevision", enabledFlag))
+			}
+		}
+		return httperror.WrapAPIError(err, httperror.ServerError, fmt.Sprintf("failed to set enabled flag to %v on clusterTemplateRevision", enabledFlag))
+	}
+
+	apiContext.WriteResponse(http.StatusNoContent, map[string]interface{}{})
+	return nil
+}
+
+func (w Wrapper) loadRevision(apiContext *types.APIContext) (*v3.ClusterTemplateRevision, error) {
+	//load the templaterevision
+	split := strings.SplitN(apiContext.ID, ":", 2)
+	if len(split) != 2 {
+		return nil, httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("error in splitting clusterTemplateRevision name %v", apiContext.ID))
+	}
+	revisionName := split[1]
+
+	revision, err := w.ClusterTemplateRevisionLister.Get(namespace.GlobalNamespace, revisionName)
+	if err != nil {
+		return nil, httperror.WrapAPIError(err, httperror.NotFound, "clusterTemplateRevision is not found")
+	}
+	if revision.DeletionTimestamp != nil {
+		return nil, httperror.NewAPIError(httperror.InvalidType, "clusterTemplateRevision is marked for deletion")
+	}
+	return revision, nil
+}
+
+func (w Wrapper) listRevisionQuestions(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	questionsOutput := v3.ClusterTemplateQuestionsOutput{}
 
 	if len(w.ClusterTemplateQuestions) == 0 {
