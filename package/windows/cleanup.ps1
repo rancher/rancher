@@ -1,7 +1,6 @@
-#Requires -Version 5.0
-
-param (
-)
+<#
+    clean all windows settings
+#>
 
 $ErrorActionPreference = 'Stop'
 $WarningPreference = 'SilentlyContinue'
@@ -9,136 +8,145 @@ $VerbosePreference = 'SilentlyContinue'
 $DebugPreference = 'SilentlyContinue'
 $InformationPreference = 'SilentlyContinue'
 
-#########################################################################
-## START main definition
+Import-Module -WarningAction Ignore -Name "$PSScriptRoot\utils.psm1"
 
-$RancherDir = "C:\etc\rancher"
-$KubeDir = "C:\etc\kubernetes"
-$CNIDir = "C:\etc\cni"
-$NginxConfigDir = "C:\etc\nginx"
+function Get-VmComputeNativeMethods()
+{
+    $ret = 'VmCompute.PrivatePInvoke.NativeMethods' -as [type]
+    if (-not $ret) {
+        $signature = @'
+[DllImport("vmcompute.dll")]
+public static extern void HNSCall([MarshalAs(UnmanagedType.LPWStr)] string method, [MarshalAs(UnmanagedType.LPWStr)] string path, [MarshalAs(UnmanagedType.LPWStr)] string request, [MarshalAs(UnmanagedType.LPWStr)] out string response);
+'@
+        $ret = Add-Type -MemberDefinition $signature -Namespace VmCompute.PrivatePInvoke -Name "NativeMethods" -PassThru
+    }
+    return $ret
+}
 
-Import-Module "$RancherDir\hns.psm1" -Force
-
-function get-env-var {
-    param(
-        [parameter(Mandatory = $true)] [string]$Key
+function Invoke-HNSRequest
+{
+    param
+    (
+        [ValidateSet('GET', 'POST', 'DELETE')]
+        [parameter(Mandatory = $true)] [string] $Method,
+        [ValidateSet('networks', 'endpoints', 'activities', 'policylists', 'endpointstats', 'plugins')]
+        [parameter(Mandatory = $true)] [string] $Type,
+        [parameter(Mandatory = $false)] [string] $Action,
+        [parameter(Mandatory = $false)] [string] $Data = "",
+        [parameter(Mandatory = $false)] [Guid] $Id = [Guid]::Empty
     )
 
-    $val = [Environment]::GetEnvironmentVariable($Key, [EnvironmentVariableTarget]::Process)
-    if ($val) {
-        return $val
+    $hnsPath = "/$Type"
+    if ($id -ne [Guid]::Empty) {
+        $hnsPath += "/$id"
+    }
+    if ($Action) {
+        $hnsPath += "/$Action"
     }
 
-    return [Environment]::GetEnvironmentVariable($Key, [EnvironmentVariableTarget]::Machine)
-}
+    $response = ""
+    $hnsApi = Get-VmComputeNativeMethods
+    $hnsApi::HNSCall($Method, $hnsPath, "$Data", [ref]$response)
 
-## END main definition
-#########################################################################
-## START main execution
-
-trap {
-    Write-Host -NoNewline -ForegroundColor DarkRed "ERRO"
-    Write-Host -NoNewline -ForegroundColor Gray "[0000] "
-    Write-Host -ForegroundColor Gray $_
-
-    popd
-
-    exit 1
-}
-
-
-# check powershell #
-if ($PSVersionTable.PSVersion.Major -lt 5) {
-    throw "PowerShell version 5 or higher is required"
-}
-
-# check identity #
-$currentPrincipal = new-object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
-if (-not $currentPrincipal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    throw "You need elevated Administrator privileges in order to run this script, start Windows PowerShell by using the Run as Administrator option"
-}
-
-try {
-    $svcAgent = Get-Service -Name "rancher-agent" -ErrorAction Ignore
-    if ($svcAgent) {
-        if ($svcAgent.Status -eq "Running") {
-            $svcAgent | Stop-Service -Force -ErrorAction Ignore
-        }
-
-        pushd $RancherDir
-        .\agent.exe --unregister-service *>$null
-        popd
-    }
-} catch { }
-
-try {
-    # flanneld #
-    $process = Get-Process -Name "flanneld*" -ErrorAction Ignore
-    if ($process) {
-        $process | Stop-Process -Force | Out-Null
-    }
-
-    # kubelet #
-    $process = Get-Process -Name "kubelet*" -ErrorAction Ignore
-    if ($process) {
-        $process | Stop-Process -Force | Out-Null
-    }
-
-    # kube-proxy #
-    $process = Get-Process -Name "kube-proxy*" -ErrorAction Ignore
-    if ($process) {
-        $process | Stop-Process -Force | Out-Null
-    }
-
-    # controlplanes proxy #
-    $process = Get-Process -Name "nginx*" -ErrorAction Ignore
-    if ($process) {
-        $process | Stop-Process -Force | Out-Null
-    }
-
-    # docker stop #
-    docker ps -q | % { docker stop $_ *>$null } *>$null
-
-    # clean up rancher parts #
-    docker rm kubernetes-binaries *>$null
-    docker rm cni-binaries *>$null
-} catch { }
-
-try {
-    $networkName = get-env-var "KUBE_NETWORK"
-    if ($networkName) {
-        $null = Clean-HNSNetworks -Names @{
-            $networkName = $True
+    $output = @()
+    if ($response) {
+        try {
+            $output = ($response | ConvertFrom-Json)
+            if ($output.Error) {
+                Log-Error $output;
+            } else {
+                $output = $output.Output;
+            }
+        } catch {
+            Log-Error $_.Exception.Message
         }
     }
 
-    # restore repair #
-    if (Test-Path "$RancherDir\GetGcePdName.dll") {
-        Remove-Module GetGcePdName -Force -ErrorAction Ignore
+    return $output;
+}
+
+Log-Info "Start cleanning ..."
+
+# check identity
+if (-not (Is-Administrator))
+{
+    Log-Fatal "You need elevated Administrator privileges in order to run this script, start Windows PowerShell by using the Run as Administrator option"
+}
+
+# clean up docker conatiner: docker rm -fv $(docker ps -qa)
+$containers = $(docker.exe ps -aq)
+if ($containers)
+{
+    Log-Info "Cleaning up docker containers ..."
+    $errMsg = $($containers | ForEach-Object {docker.exe rm -f $_})
+    if (-not $?) {
+        Log-Warn "Could not remove docker containers: $errMsg"
     }
 
-    # rancher #
-    Remove-Item -Path "$CNIDir\*" -Recurse -Force -ErrorAction Ignore
-    Remove-Item -Path "$KubeDir\*" -Recurse -Force -ErrorAction Ignore
-    Remove-Item -Path "$RancherDir\*" -Recurse -Force -ErrorAction Ignore
-    Remove-Item -Path "$NginxConfigDir\*" -Recurse -Force -ErrorAction Ignore
+    # wati a while for rancher-wins to clean up processes
+    Start-Sleep -Seconds 10
+}
 
-    # component produces #
-    # cni
-    Remove-Item -Path "C:\etc\kube-flannel\*" -Recurse -Force -ErrorAction Ignore
-    Remove-Item -Path "C:\run\flannel\*" -Recurse -Force -ErrorAction Ignore
-    Remove-NetFirewallRule -Name 'OverlayTraffic4789UDP' -ErrorAction Ignore
+# clean up kubernetes components processes
+Get-Process -ErrorAction Ignore -Name "rancher-wins-*" | ForEach-Object {
+    Log-Info "Stopping process $($_.Name) ..."
+    $_ | Stop-Process -ErrorAction Ignore -Force
+}
 
-    # logs
-    Remove-Item -Path "C:\var\log\*" -Recurse -Force -ErrorAction Ignore
+# clean up firewall rules
+Get-NetFirewallRule -PolicyStore ActiveStore -Name "rancher-wins-*" -ErrorAction Ignore | ForEach-Object {
+    Log-Info "Cleaning up firewall rule $($_.Name) ..."
+    $_ | Remove-NetFirewallRule -ErrorAction Ignore | Out-Null
+}
 
-    # kuberentes
-    Remove-Item -Path "C:\var\lib\rancher\*" -Recurse -Force -ErrorAction Ignore
-    Remove-Item -Path "C:\var\lib\kubelet\*" -Recurse -Force -ErrorAction Ignore
-    Remove-Item -Path "C:\var\lib\cni\*" -Recurse -Force -ErrorAction Ignore
-    Remove-Item -Path "C:\var\lib\etcd\*" -Recurse -Force -ErrorAction Ignore
-    Remove-NetFirewallRule -Name @('Kubelet10250TCP', 'KubeProxy10256TCP') -ErrorAction Ignore
-} catch { }
+# clean up rancher-wins service
+Get-Service -Name "rancher-wins" -ErrorAction Ignore | Where-Object {$_.Status -eq "Running"} | ForEach-Object {
+    Log-Info "Stopping rancher-wins service ..."
+    $_ | Stop-Service -Force -ErrorAction Ignore
 
-## END main execution
-#########################################################################
+    Log-Info "Unregistering rancher-wins service ..."
+    Push-Location c:\etc\rancher
+    $errMsg = $(.\wins.exe srv app run --unregister)
+    if (-not $?) {
+        Log-Warn "Could not unregister: $errMsg"
+    }
+    Pop-Location
+}
+
+# clean up network settings
+try {
+    Invoke-HNSRequest -Method "GET" -Type "networks" | Where-Object {@('cbr0', 'vxlan0') -contains $_.Name} | ForEach-Object {
+        Log-Info "Cleaning up HNSNetwork $($_.Name) ..."
+        Invoke-HNSRequest -Method "DELETE" -Type "networks" -Id $_.Id
+    }
+
+    Invoke-HNSRequest -Method "GET" -Type "policylists" | ForEach-Object {
+        Log-Info "Cleaning up HNSPolicyList $($_.Id) ..."
+        Invoke-HNSRequest -Method "DELETE" -Type "policylists" -Id $_.Id
+    }
+} catch {
+    throw $_
+    Log-Warn "Could not clean: $($_.Exception.Message)"
+}
+
+# clean up data
+Get-Item -ErrorAction Ignore -Path @(
+    "c:\run\*"
+    "c:\opt\*"
+    "c:\etc\rancher\*"
+    "c:\etc\nginx\*"
+    "c:\etc\cni\*"
+    "c:\etc\kubernetes\*"
+    "c:\var\run\*"
+    "c:\var\log\*"
+    "c:\var\lib\*"
+) | ForEach-Object {
+    Log-Info "Cleaning up data $($_.FullName) ..."
+    try {
+        $_ | Remove-Item -ErrorAction Ignore -Recurse -Force | Out-Null
+    } catch {
+        Log-Warn "Could not clean: $($_.Exception.Message)"
+    }
+}
+
+Log-Info "Finished!!!"

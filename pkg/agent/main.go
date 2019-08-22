@@ -1,5 +1,3 @@
-// +build !windows
-
 package main
 
 import (
@@ -17,6 +15,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/mattn/go-colorable"
 	"github.com/rancher/norman/pkg/remotedialer"
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/cluster"
@@ -36,6 +35,7 @@ const (
 )
 
 func main() {
+	logrus.SetOutput(colorable.NewColorableStdout())
 	logserver.StartServerWithDefaults()
 	if os.Getenv("CATTLE_DEBUG") == "true" || os.Getenv("RANCHER_DEBUG") == "true" {
 		logrus.SetLevel(logrus.DebugLevel)
@@ -211,6 +211,8 @@ func run() error {
 				return true
 			case "unix":
 				return address == "/var/run/docker.sock"
+			case "npipe":
+				return address == "//./pipe/docker_engine"
 			}
 			return false
 		}, onConnect)

@@ -5,39 +5,11 @@ ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
 
 RUN pushd c:\; \
-    $URL = 'https://github.com/dscharrer/innoextract/releases/download/1.7/innoextract-1.7-windows.zip'; \
-    \
-    Write-Host ('Downloading innoextract from {0} ...' -f $URL); \
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-    Invoke-WebRequest -UseBasicParsing -OutFile c:\innoextract.zip -Uri $URL; \
-    \
-    Write-Host 'Expanding ...'; \
-    Expand-Archive -Path c:\innoextract.zip -DestinationPath c:\innoextract\.; \
-    \
-    Write-Host 'Cleaning ...'; \
-    Remove-Item -Force -Recurse -Path c:\innoextract.zip; \
-    \
-    Write-Host 'Updating PATH ...'; \
-    [Environment]::SetEnvironmentVariable('PATH', ('c:\innoextract\;{0}' -f $env:PATH), [EnvironmentVariableTarget]::Machine); \
-    \
-    Write-Host 'Complete.'; \
-    popd;
-
-RUN pushd c:\; \
-    $URL = 'https://github.com/docker/toolbox/releases/download/v18.09.3/DockerToolbox-18.09.3.exe'; \
+    $URL = 'https://github.com/StefanScherer/docker-cli-builder/releases/download/18.09.6/docker.exe'; \
     \
     Write-Host ('Downloading docker from {0} ...' -f $URL); \
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-    Invoke-WebRequest -UseBasicParsing -OutFile c:\dockertoolbox.exe -Uri $URL; \
-    \
-    Write-Host 'Expanding ...'; \
-    innoextract c:\dockertoolbox.exe; \
-    \
-    Write-Host 'Cleaning ...'; \
-    Remove-Item -Force -Recurse -Path @('c:\dockertoolbox.exe', 'c:\app\*') -Exclude @('docker.exe'); \
-    \
-    Write-Host 'Updating PATH ...'; \
-    [Environment]::SetEnvironmentVariable('PATH', ('c:\app\;{0}' -f $env:PATH), [EnvironmentVariableTarget]::Machine); \
+    Invoke-WebRequest -UseBasicParsing -OutFile c:\Windows\docker.exe -Uri $URL; \
     \
     Write-Host 'Complete.'; \
     popd;

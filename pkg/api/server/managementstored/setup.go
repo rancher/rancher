@@ -120,7 +120,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.RKEK8sSystemImageType,
 		client.RKEK8sServiceOptionType,
 		client.RKEAddonType,
-		client.RKEK8sWindowsSystemImageType,
 		client.RoleTemplateType,
 		client.SettingType,
 		client.TemplateType,
@@ -650,14 +649,12 @@ func RoleTemplate(schemas *types.Schemas, management *config.ScaledContext) {
 func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.KontainerDriverType)
 	metadataHandler := md.MetadataController{
-		SystemImagesLister:        management.Management.RKEK8sSystemImages("").Controller().Lister(),
-		SystemImages:              management.Management.RKEK8sSystemImages(""),
-		ServiceOptionsLister:      management.Management.RKEK8sServiceOptions("").Controller().Lister(),
-		ServiceOptions:            management.Management.RKEK8sServiceOptions(""),
-		AddonsLister:              management.Management.RKEAddons("").Controller().Lister(),
-		Addons:                    management.Management.RKEAddons(""),
-		WindowsSystemImagesLister: management.Management.RKEK8sWindowsSystemImages("").Controller().Lister(),
-		WindowsSystemImages:       management.Management.RKEK8sWindowsSystemImages(""),
+		SystemImagesLister:   management.Management.RKEK8sSystemImages("").Controller().Lister(),
+		SystemImages:         management.Management.RKEK8sSystemImages(""),
+		ServiceOptionsLister: management.Management.RKEK8sServiceOptions("").Controller().Lister(),
+		ServiceOptions:       management.Management.RKEK8sServiceOptions(""),
+		AddonsLister:         management.Management.RKEAddons("").Controller().Lister(),
+		Addons:               management.Management.RKEAddons(""),
 	}
 	handler := kontainerdriver.ActionHandler{
 		KontainerDrivers:      management.Management.KontainerDrivers(""),

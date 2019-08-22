@@ -1,7 +1,8 @@
-#Requires -Version 5.0
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
 
-Invoke-Expression -Command "$PSScriptRoot\version.ps1"
+Import-Module -WarningAction Ignore -Name "$PSScriptRoot\utils.psm1"
+
+Invoke-Script -File "$PSScriptRoot\version.ps1"
 
 $DIR_PATH = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $SRC_PATH = (Resolve-Path "$DIR_PATH\..\..").Path
@@ -53,4 +54,4 @@ if ($RELEASE_ID -eq $HOST_RELEASE_ID) {
 }
 
 # $AGENT_IMAGE | Out-File -Encoding ascii -Force -FilePath "$SRC_PATH\dist\images"
-Write-Host "Built $AGENT_IMAGE`n"
+Log-Info "Built $AGENT_IMAGE`n"

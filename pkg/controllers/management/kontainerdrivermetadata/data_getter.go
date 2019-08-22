@@ -29,21 +29,6 @@ func GetRKESystemImages(k8sVersion string, sysImageLister v3.RKEK8sSystemImageLi
 	return sysImage.SystemImages, err
 }
 
-func GetRKEWindowsSystemImages(k8sVersion string, sysImageLister v3.RKEK8sWindowsSystemImageLister, sysImages v3.RKEK8sWindowsSystemImageInterface) (v3.WindowsSystemImages, error) {
-	name := getWindowsName(k8sVersion)
-	sysImage, err := sysImageLister.Get(namespace.GlobalNamespace, name)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return v3.WindowsSystemImages{}, err
-		}
-		sysImage, err = sysImages.GetNamespaced(namespace.GlobalNamespace, name, metav1.GetOptions{})
-		if err != nil {
-			return v3.WindowsSystemImages{}, err
-		}
-	}
-	return sysImage.SystemImages, err
-}
-
 func GetRKEAddonTemplate(addonName string, addonLister v3.RKEAddonLister, addons v3.RKEAddonInterface) (string, error) {
 	addon, err := addonLister.Get(namespace.GlobalNamespace, addonName)
 	if err != nil {
@@ -99,12 +84,10 @@ func GetRKEK8sServiceOptions(k8sVersion string, svcOptionLister v3.RKEK8sService
 	return k8sSvcOption, nil
 }
 
-func GetK8sVersionInfo(rancherVersion string, rkeSysImages map[string]v3.RKESystemImages,
-	winSysImages map[string]v3.WindowsSystemImages, svcOptions map[string]v3.KubernetesServicesOptions,
-	rancherVersions map[string]v3.K8sVersionInfo) (map[string]v3.RKESystemImages, map[string]v3.WindowsSystemImages, map[string]v3.KubernetesServicesOptions) {
+func GetK8sVersionInfo(rancherVersion string, rkeSysImages map[string]v3.RKESystemImages, svcOptions map[string]v3.KubernetesServicesOptions,
+	rancherVersions map[string]v3.K8sVersionInfo) (map[string]v3.RKESystemImages, map[string]v3.KubernetesServicesOptions) {
 
 	k8sVersionRKESystemImages := map[string]v3.RKESystemImages{}
-	k8sVersionWinSystemImages := map[string]v3.WindowsSystemImages{}
 	k8sVersionSvcOptions := map[string]v3.KubernetesServicesOptions{}
 
 	maxVersionForMajorK8sVersion := map[string]string{}
@@ -122,10 +105,9 @@ func GetK8sVersionInfo(rancherVersion string, rkeSysImages map[string]v3.RKESyst
 	}
 	for majorVersion, k8sVersion := range maxVersionForMajorK8sVersion {
 		k8sVersionRKESystemImages[k8sVersion] = rkeSysImages[k8sVersion]
-		k8sVersionWinSystemImages[k8sVersion] = winSysImages[k8sVersion]
 		k8sVersionSvcOptions[k8sVersion] = svcOptions[majorVersion]
 	}
-	return k8sVersionRKESystemImages, k8sVersionWinSystemImages, k8sVersionSvcOptions
+	return k8sVersionRKESystemImages, k8sVersionSvcOptions
 }
 
 func GetRKEK8sServiceOptionsWindows(k8sVersion string, svcOptionLister v3.RKEK8sServiceOptionLister, svcOptions v3.RKEK8sServiceOptionInterface) (*v3.KubernetesServicesOptions, error) {
@@ -142,6 +124,10 @@ func GetRKEK8sServiceOptionsWindows(k8sVersion string, svcOptionLister v3.RKEK8s
 			}
 			continue
 		}
+		if obj.Labels[sendRKELabel] == "false" {
+			logrus.Infof("Windows svcOption false k8sVersion %s", k8sVersion)
+			return k8sSvcOption, nil
+		}
 		return &obj.ServiceOptions, nil
 	}
 	for _, name := range names {
@@ -151,6 +137,10 @@ func GetRKEK8sServiceOptionsWindows(k8sVersion string, svcOptionLister v3.RKEK8s
 				return k8sSvcOption, err
 			}
 			continue
+		}
+		if obj.Labels[sendRKELabel] == "false" {
+			logrus.Infof("Windows svcOption false k8sVersion %s", k8sVersion)
+			return k8sSvcOption, nil
 		}
 		return &obj.ServiceOptions, nil
 	}

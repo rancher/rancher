@@ -24,15 +24,13 @@ import (
 )
 
 type MetadataController struct {
-	SystemImagesLister        v3.RKEK8sSystemImageLister
-	SystemImages              v3.RKEK8sSystemImageInterface
-	ServiceOptionsLister      v3.RKEK8sServiceOptionLister
-	ServiceOptions            v3.RKEK8sServiceOptionInterface
-	AddonsLister              v3.RKEAddonLister
-	Addons                    v3.RKEAddonInterface
-	WindowsSystemImagesLister v3.RKEK8sWindowsSystemImageLister
-	WindowsSystemImages       v3.RKEK8sWindowsSystemImageInterface
-	ctx                       context.Context
+	SystemImagesLister   v3.RKEK8sSystemImageLister
+	SystemImages         v3.RKEK8sSystemImageInterface
+	ServiceOptionsLister v3.RKEK8sServiceOptionLister
+	ServiceOptions       v3.RKEK8sServiceOptionInterface
+	AddonsLister         v3.RKEAddonLister
+	Addons               v3.RKEAddonInterface
+	ctx                  context.Context
 }
 
 type Data struct {
@@ -43,7 +41,6 @@ type Data struct {
 	K8sVersionInfo            map[string]v3.K8sVersionInfo
 	RancherDefaultK8sVersions map[string]string
 
-	K8sVersionWindowsSystemImages   map[string]v3.WindowsSystemImages
 	K8sVersionWindowsServiceOptions map[string]v3.KubernetesServicesOptions
 }
 
@@ -58,15 +55,13 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	mgmt := management.Management
 
 	m := &MetadataController{
-		SystemImagesLister:        mgmt.RKEK8sSystemImages("").Controller().Lister(),
-		SystemImages:              mgmt.RKEK8sSystemImages(""),
-		ServiceOptionsLister:      mgmt.RKEK8sServiceOptions("").Controller().Lister(),
-		ServiceOptions:            mgmt.RKEK8sServiceOptions(""),
-		AddonsLister:              mgmt.RKEAddons("").Controller().Lister(),
-		Addons:                    mgmt.RKEAddons(""),
-		WindowsSystemImagesLister: mgmt.RKEK8sWindowsSystemImages("").Controller().Lister(),
-		WindowsSystemImages:       mgmt.RKEK8sWindowsSystemImages(""),
-		ctx:                       ctx,
+		SystemImagesLister:   mgmt.RKEK8sSystemImages("").Controller().Lister(),
+		SystemImages:         mgmt.RKEK8sSystemImages(""),
+		ServiceOptionsLister: mgmt.RKEK8sServiceOptions("").Controller().Lister(),
+		ServiceOptions:       mgmt.RKEK8sServiceOptions(""),
+		AddonsLister:         mgmt.RKEAddons("").Controller().Lister(),
+		Addons:               mgmt.RKEAddons(""),
+		ctx:                  ctx,
 	}
 
 	// load values on startup and start ticker

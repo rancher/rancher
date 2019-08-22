@@ -244,6 +244,97 @@ spec:
   updateStrategy:
     type: RollingUpdate
 
+---
+
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+    name: cattle-node-agent-windows
+    namespace: cattle-system
+spec:
+  selector:
+    matchLabels:
+      app: cattle-agent-windows
+  template:
+    metadata:
+      labels:
+        app: cattle-agent-windows
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: beta.kubernetes.io/os
+                  operator: NotIn
+                  values:
+                    - linux
+      serviceAccountName: cattle
+      tolerations:
+      - effect: NoExecute
+        key: "node-role.kubernetes.io/etcd"
+        value: "true"
+      - effect: NoSchedule
+        key: "node-role.kubernetes.io/controlplane"
+        value: "true"
+      containers:
+      - name: agent
+        image: {{.AgentImage}}
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: CATTLE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: CATTLE_SERVER
+          value: "{{.URLPlain}}"
+        - name: CATTLE_CA_CHECKSUM
+          value: "{{.CAChecksum}}"
+        - name: CATTLE_CLUSTER
+          value: "false"
+        - name: CATTLE_K8S_MANAGED
+          value: "true"
+        - name: CATTLE_AGENT_CONNECT
+          value: "true"
+        volumeMounts:
+        - name: cattle-credentials
+          mountPath: c:/cattle-credentials
+          readOnly: true
+        - name: k8s-ssl
+          mountPath: c:/etc/kubernetes
+        - name: run
+          mountPath: c:/run
+        - name: docker-certs
+          mountPath: c:/etc/docker/certs.d
+        - name: docker-pipe
+          mountPath: \\.\pipe\docker_engine
+        - name: wins-pipe
+          mountPath: \\.\pipe\rancher_wins
+      volumes:
+      - name: k8s-ssl
+        hostPath:
+          path: c:/etc/kubernetes
+          type: DirectoryOrCreate
+      - name: run
+        hostPath:
+          path: c:/run
+          type: DirectoryOrCreate
+      - name: cattle-credentials
+        secret:
+          secretName: cattle-credentials-{{.TokenKey}}
+      - name: docker-certs
+        hostPath:
+          path: c:/ProgramData/docker/certs.d
+          type: DirectoryOrCreate
+      - name: docker-pipe
+        hostPath:
+          path: \\.\pipe\docker_engine
+      - name: wins-pipe
+        hostPath:
+          path: \\.\pipe\rancher_wins
+  updateStrategy:
+    type: RollingUpdate
+
 {{- if .AuthImage}}
 
 ---

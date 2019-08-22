@@ -27,13 +27,12 @@ import (
 )
 
 const (
-	APIVersion                = "management.cattle.io/v3"
-	RancherVersionDev         = "2.3"
-	sendRKELabel              = "io.cattle.rke_store"
-	rkeSystemImageKind        = "RkeK8sSystemImage"
-	rkeServiceOptionKind      = "RkeK8sServiceOption"
-	rkeAddonKind              = "RkeAddon"
-	rkeWindowsSystemImageKind = "RkeK8sWindowsSystemImage"
+	APIVersion           = "management.cattle.io/v3"
+	RancherVersionDev    = "2.3"
+	sendRKELabel         = "io.cattle.rke_store"
+	rkeSystemImageKind   = "RkeK8sSystemImage"
+	rkeServiceOptionKind = "RkeK8sServiceOption"
+	rkeAddonKind         = "RkeAddon"
 )
 
 var existLabel = map[string]string{sendRKELabel: "false"}
@@ -49,9 +48,6 @@ func (md *MetadataController) createOrUpdateMetadata(data Data) error {
 	if err := md.saveAddons(data.K8sVersionedTemplates); err != nil {
 		return err
 	}
-	if err := md.saveWindowsInfo(data.K8sVersionWindowsSystemImages, data.K8sVersionWindowsServiceOptions); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -64,9 +60,6 @@ func (md *MetadataController) createOrUpdateMetadataDefaults() error {
 		return err
 	}
 	if err := md.saveAddons(rke.DriverData.K8sVersionedTemplates); err != nil {
-		return err
-	}
-	if err := md.saveWindowsInfo(rke.DriverData.K8sVersionWindowsSystemImages, rke.DriverData.K8sVersionWindowsServiceOptions); err != nil {
 		return err
 	}
 	return nil
@@ -154,21 +147,6 @@ func (md *MetadataController) saveAddons(K8sVersionedTemplates map[string]map[st
 	return nil
 }
 
-func (md *MetadataController) saveWindowsInfo(K8sVersionWindowsSystemImages map[string]v3.WindowsSystemImages,
-	K8sVersionWindowsServiceOptions map[string]v3.KubernetesServicesOptions) error {
-	for k8sVersion, sysImages := range K8sVersionWindowsSystemImages {
-		if err := md.createOrUpdateWindowsSystemImageCRD(k8sVersion, sysImages, true); err != nil {
-			return err
-		}
-	}
-	for k8sVersion, serviceOptions := range K8sVersionWindowsServiceOptions {
-		if err := md.createOrUpdateWindowsServiceOptionCRD(k8sVersion, serviceOptions); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (md *MetadataController) createOrUpdateSystemImageCRD(k8sVersion string, systemImages v3.RKESystemImages, pluginsMap map[string]string) error {
 	sysImage, err := md.getRKESystemImage(k8sVersion)
 	if err != nil {
@@ -202,40 +180,6 @@ func (md *MetadataController) createOrUpdateSystemImageCRD(k8sVersion string, sy
 		sysImageCopy.Labels[k] = v
 	}
 	if _, err := md.SystemImages.Update(sysImageCopy); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (md *MetadataController) createOrUpdateWindowsSystemImageCRD(k8sVersion string, systemImages v3.WindowsSystemImages, windows bool) error {
-	sysImage, err := md.getRKEWindowsSystemImage(k8sVersion)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return err
-		}
-		sysImage = &v3.RKEK8sWindowsSystemImage{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      getWindowsName(k8sVersion),
-				Namespace: namespace.GlobalNamespace,
-			},
-			SystemImages: systemImages,
-			TypeMeta: metav1.TypeMeta{
-				Kind:       rkeWindowsSystemImageKind,
-				APIVersion: APIVersion,
-			},
-		}
-		if _, err := md.WindowsSystemImages.Create(sysImage); err != nil && !errors.IsAlreadyExists(err) {
-			return err
-		}
-		return nil
-
-	}
-	if reflect.DeepEqual(sysImage.SystemImages, systemImages) {
-		return nil
-	}
-	sysImageCopy := sysImage.DeepCopy()
-	sysImageCopy.SystemImages = systemImages
-	if _, err := md.WindowsSystemImages.Update(sysImageCopy); err != nil {
 		return err
 	}
 	return nil
@@ -435,10 +379,6 @@ func (md *MetadataController) getRKEWindowsServiceOption(k8sVersion string) (*v3
 
 func (md *MetadataController) getRKESystemImage(k8sVersion string) (*v3.RKEK8sSystemImage, error) {
 	return md.SystemImagesLister.Get(namespace.GlobalNamespace, k8sVersion)
-}
-
-func (md *MetadataController) getRKEWindowsSystemImage(k8sVersion string) (*v3.RKEK8sWindowsSystemImage, error) {
-	return md.WindowsSystemImagesLister.Get(namespace.GlobalNamespace, getWindowsName(k8sVersion))
 }
 
 func getWindowsName(str string) string {

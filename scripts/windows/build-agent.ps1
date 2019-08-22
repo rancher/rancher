@@ -1,13 +1,14 @@
-#Requires -Version 5.0
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
 
-Invoke-Expression -Command "$PSScriptRoot\version.ps1"
+Import-Module -WarningAction Ignore -Name "$PSScriptRoot\utils.psm1"
+
+Invoke-Script -File "$PSScriptRoot\version.ps1"
 
 $DIR_PATH = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $SRC_PATH = (Resolve-Path "$DIR_PATH\..\..").Path
 cd $SRC_PATH
 
-$null = New-Item -Type Directory -Path bin -ErrorAction Ignore
+$null = New-Item -Force -ItemType Directory -Path bin -ErrorAction Ignore
 $env:GOARCH=$env:ARCH
 $env:GOOS='windows'
 $env:CGO_ENABLED=0
