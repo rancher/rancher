@@ -201,7 +201,7 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 				nc.Processes = enhanceWindowsProcesses(tempNode.Processes)
 			} else {
 				b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, rkehosts.B2DOS)
-				nc.Processes = augmentProcesses(token, tempNode.Processes, false, b2d)
+				nc.Processes = augmentProcesses(token, tempNode.Processes, true, b2d)
 			}
 			nc.Files = tempNode.Files
 			return nc, nil
