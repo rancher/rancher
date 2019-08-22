@@ -55,7 +55,7 @@ func RunEtcdPlane(
 		if err := setEtcdPermissions(ctx, host, prsMap, alpineImage, etcdProcess); err != nil {
 			return err
 		}
-		imageCfg, hostCfg, _ := GetProcessConfig(etcdProcess)
+		imageCfg, hostCfg, _ := GetProcessConfig(etcdProcess, host)
 		if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, EtcdContainerName, host.Address, ETCDRole, prsMap); err != nil {
 			return err
 		}
@@ -84,7 +84,7 @@ func RunEtcdPlane(
 	clientkey := cert.EncodePrivateKeyPEM(certMap[pki.KubeNodeCertName].Key)
 	var healthy bool
 	for _, host := range etcdHosts {
-		_, _, healthCheckURL := GetProcessConfig(etcdNodePlanMap[host.Address].Processes[EtcdContainerName])
+		_, _, healthCheckURL := GetProcessConfig(etcdNodePlanMap[host.Address].Processes[EtcdContainerName], host)
 		if healthy = isEtcdHealthy(ctx, localConnDialerFactory, host, clientCert, clientkey, healthCheckURL); healthy {
 			break
 		}
@@ -226,7 +226,7 @@ func RemoveEtcdMember(ctx context.Context, etcdHost *hosts.Host, etcdHosts []*ho
 }
 
 func ReloadEtcdCluster(ctx context.Context, readyEtcdHosts []*hosts.Host, newHost *hosts.Host, localConnDialerFactory hosts.DialerFactory, cert, key []byte, prsMap map[string]v3.PrivateRegistry, etcdNodePlanMap map[string]v3.RKEConfigNodePlan, alpineImage string) error {
-	imageCfg, hostCfg, _ := GetProcessConfig(etcdNodePlanMap[newHost.Address].Processes[EtcdContainerName])
+	imageCfg, hostCfg, _ := GetProcessConfig(etcdNodePlanMap[newHost.Address].Processes[EtcdContainerName], newHost)
 
 	if err := setEtcdPermissions(ctx, newHost, prsMap, alpineImage, etcdNodePlanMap[newHost.Address].Processes[EtcdContainerName]); err != nil {
 		return err
@@ -241,7 +241,7 @@ func ReloadEtcdCluster(ctx context.Context, readyEtcdHosts []*hosts.Host, newHos
 	time.Sleep(EtcdInitWaitTime * time.Second)
 	var healthy bool
 	for _, host := range readyEtcdHosts {
-		_, _, healthCheckURL := GetProcessConfig(etcdNodePlanMap[host.Address].Processes[EtcdContainerName])
+		_, _, healthCheckURL := GetProcessConfig(etcdNodePlanMap[host.Address].Processes[EtcdContainerName], host)
 		if healthy = isEtcdHealthy(ctx, localConnDialerFactory, host, cert, key, healthCheckURL); healthy {
 			break
 		}
@@ -348,8 +348,8 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 
 		return docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdSnapshotOnceContainerName)
 	}
-	log.Infof(ctx, "[etcd] Running snapshot container [%s] on host [%s]", EtcdSnapshotOnceContainerName, etcdHost.Address)
-	logrus.Debugf("[etcd] Running snapshot container [%s] with command [%s] on host [%s]", EtcdSnapshotContainerName, getSanitizedSnapshotCmd(imageCfg, es.BackupConfig), etcdHost.Address)
+	log.Infof(ctx, "[etcd] Running rolling snapshot container [%s] on host [%s]", EtcdSnapshotOnceContainerName, etcdHost.Address)
+	logrus.Debugf("[etcd] Using command [%s] for rolling snapshot container [%s] on host [%s]", getSanitizedSnapshotCmd(imageCfg, es.BackupConfig), EtcdSnapshotContainerName, etcdHost.Address)
 	if err := docker.DoRemoveContainer(ctx, etcdHost.DClient, EtcdSnapshotContainerName, etcdHost.Address); err != nil {
 		return err
 	}

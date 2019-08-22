@@ -14,7 +14,7 @@ const (
 )
 
 func runNginxProxy(ctx context.Context, host *hosts.Host, prsMap map[string]v3.PrivateRegistry, proxyProcess v3.Process, alpineImage string) error {
-	imageCfg, hostCfg, _ := GetProcessConfig(proxyProcess)
+	imageCfg, hostCfg, _ := GetProcessConfig(proxyProcess, host)
 	if err := docker.DoRunContainer(ctx, host.DClient, imageCfg, hostCfg, NginxProxyContainerName, host.Address, WorkerRole, prsMap); err != nil {
 		return err
 	}

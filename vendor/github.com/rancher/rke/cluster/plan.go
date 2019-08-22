@@ -36,7 +36,6 @@ const (
 	NetworkConfigurationEnv = "RKE_NETWORK_CONFIGURATION"
 
 	EtcdPathPrefix       = "/registry"
-	ContainerNameLabel   = "io.rancher.rke.container.name"
 	CloudConfigSumEnv    = "RKE_CLOUD_CONFIG_CHECKSUM"
 	CloudProviderNameEnv = "RKE_CLOUD_PROVIDER_NAME"
 
@@ -279,7 +278,7 @@ func (c *Cluster) BuildKubeAPIProcess(host *hosts.Host, prefixPath string, svcOp
 		HealthCheck:             healthCheck,
 		ImageRegistryAuthConfig: registryAuthConfig,
 		Labels: map[string]string{
-			ContainerNameLabel: services.KubeAPIContainerName,
+			services.ContainerNameLabel: services.KubeAPIContainerName,
 		},
 	}
 }
@@ -370,7 +369,7 @@ func (c *Cluster) BuildKubeControllerProcess(host *hosts.Host, prefixPath string
 		HealthCheck:             healthCheck,
 		ImageRegistryAuthConfig: registryAuthConfig,
 		Labels: map[string]string{
-			ContainerNameLabel: services.KubeControllerContainerName,
+			services.ContainerNameLabel: services.KubeControllerContainerName,
 		},
 	}
 }
@@ -553,7 +552,7 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string, svcOp
 		HealthCheck:             healthCheck,
 		ImageRegistryAuthConfig: registryAuthConfig,
 		Labels: map[string]string{
-			ContainerNameLabel: services.KubeletContainerName,
+			services.ContainerNameLabel: services.KubeletContainerName,
 		},
 	}
 }
@@ -662,7 +661,7 @@ func (c *Cluster) BuildKubeProxyProcess(host *hosts.Host, prefixPath string, svc
 		Image:                   c.Services.Kubeproxy.Image,
 		ImageRegistryAuthConfig: registryAuthConfig,
 		Labels: map[string]string{
-			ContainerNameLabel: services.KubeproxyContainerName,
+			services.ContainerNameLabel: services.KubeproxyContainerName,
 		},
 	}
 }
@@ -718,7 +717,7 @@ func (c *Cluster) BuildProxyProcess(host *hosts.Host, prefixPath string) v3.Proc
 		Image:                   c.SystemImages.NginxProxy,
 		ImageRegistryAuthConfig: registryAuthConfig,
 		Labels: map[string]string{
-			ContainerNameLabel: services.NginxProxyContainerName,
+			services.ContainerNameLabel: services.NginxProxyContainerName,
 		},
 	}
 }
@@ -791,7 +790,7 @@ func (c *Cluster) BuildSchedulerProcess(host *hosts.Host, prefixPath string, svc
 		HealthCheck:             healthCheck,
 		ImageRegistryAuthConfig: registryAuthConfig,
 		Labels: map[string]string{
-			ContainerNameLabel: services.SchedulerContainerName,
+			services.ContainerNameLabel: services.SchedulerContainerName,
 		},
 	}
 }
@@ -856,7 +855,7 @@ func (c *Cluster) BuildSidecarProcess(host *hosts.Host, prefixPath string) v3.Pr
 		HealthCheck:             v3.HealthCheck{},
 		ImageRegistryAuthConfig: registryAuthConfig,
 		Labels: map[string]string{
-			ContainerNameLabel: services.SidekickContainerName,
+			services.ContainerNameLabel: services.SidekickContainerName,
 		},
 		Command: Command,
 	}
@@ -990,7 +989,7 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, pr
 		HealthCheck:             healthCheck,
 		ImageRegistryAuthConfig: registryAuthConfig,
 		Labels: map[string]string{
-			ContainerNameLabel: services.EtcdContainerName,
+			services.ContainerNameLabel: services.EtcdContainerName,
 		},
 	}
 }
