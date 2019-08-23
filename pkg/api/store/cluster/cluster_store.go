@@ -291,6 +291,12 @@ func loadDataFromTemplate(clusterTemplateRevision *v3.ClusterTemplateRevision, c
 	dataFromTemplate[managementv3.ClusterSpecFieldClusterTemplateAnswers] = finalAnswerMap
 	dataFromTemplate[managementv3.ClusterSpecFieldClusterTemplateQuestions] = revisionQuestions
 
+	//validate that the data loaded is valid clusterSpec
+	var spec v3.ClusterSpec
+	if err := convert.ToObj(dataFromTemplate, &spec); err != nil {
+		return nil, httperror.WrapAPIError(err, httperror.InvalidBodyContent, "Invalid clusterTemplate, cannot convert to cluster spec")
+	}
+
 	return dataFromTemplate, nil
 }
 
