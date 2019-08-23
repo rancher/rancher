@@ -293,6 +293,8 @@ github.com/rancher/rke v0.3.0-rc7.0.20190822204504-ac16bd8b3396 h1:9dkuyr88IEvMO
 github.com/rancher/rke v0.3.0-rc7.0.20190822204504-ac16bd8b3396/go.mod h1:KA/0dpytc3Yae59gEn0/Hz2UN8h/r6itMC5ugsDvWNY=
 github.com/rancher/rke v0.3.0-rc7.0.20190823041024-e9ecef797dbf h1:pSLNogLmg2tfVJ6PVBRJ22saIZG3O+FyE+hqh7hWKDU=
 github.com/rancher/rke v0.3.0-rc7.0.20190823041024-e9ecef797dbf/go.mod h1:2nX9caQzt1vyTBxLVVlBOVI1nRARj8jnr2oQjzQLwDE=
+github.com/rancher/rke v0.3.0-rc7.0.20190823165049-c5fefd5c7717 h1:mTehZzH4lYNYL1XIdCHtBJUXx8ZMOA72IzUMazdWy/g=
+github.com/rancher/rke v0.3.0-rc7.0.20190823165049-c5fefd5c7717/go.mod h1:2nX9caQzt1vyTBxLVVlBOVI1nRARj8jnr2oQjzQLwDE=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/types v0.0.0-20190819173748-96e6d6f30265/go.mod h1:ROyypICT7xxMhVRplyFnEIaXHw2nMVHfCZ8Y3261qmw=
