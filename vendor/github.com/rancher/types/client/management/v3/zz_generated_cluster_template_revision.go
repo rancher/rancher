@@ -54,6 +54,10 @@ type ClusterTemplateRevisionOperations interface {
 	ByID(id string) (*ClusterTemplateRevision, error)
 	Delete(container *ClusterTemplateRevision) error
 
+	ActionDisable(resource *ClusterTemplateRevision) error
+
+	ActionEnable(resource *ClusterTemplateRevision) error
+
 	CollectionActionListquestions(resource *ClusterTemplateRevisionCollection) (*ClusterTemplateQuestionsOutput, error)
 }
 
@@ -106,6 +110,16 @@ func (c *ClusterTemplateRevisionClient) ByID(id string) (*ClusterTemplateRevisio
 
 func (c *ClusterTemplateRevisionClient) Delete(container *ClusterTemplateRevision) error {
 	return c.apiClient.Ops.DoResourceDelete(ClusterTemplateRevisionType, &container.Resource)
+}
+
+func (c *ClusterTemplateRevisionClient) ActionDisable(resource *ClusterTemplateRevision) error {
+	err := c.apiClient.Ops.DoAction(ClusterTemplateRevisionType, "disable", &resource.Resource, nil, nil)
+	return err
+}
+
+func (c *ClusterTemplateRevisionClient) ActionEnable(resource *ClusterTemplateRevision) error {
+	err := c.apiClient.Ops.DoAction(ClusterTemplateRevisionType, "enable", &resource.Resource, nil, nil)
+	return err
 }
 
 func (c *ClusterTemplateRevisionClient) CollectionActionListquestions(resource *ClusterTemplateRevisionCollection) (*ClusterTemplateQuestionsOutput, error) {

@@ -28,6 +28,8 @@ type MultiClusterApp struct {
 type MultiClusterAppSpec struct {
 	TemplateVersionName  string          `json:"templateVersionName,omitempty" norman:"type=reference[templateVersion],required"`
 	Answers              []Answer        `json:"answers,omitempty"`
+	Wait                 bool            `json:"wait,omitempty"`
+	Timeout              int             `json:"timeout,omitempty" norman:"min=1,default=300"`
 	Targets              []Target        `json:"targets,omitempty" norman:"required,noupdate"`
 	Members              []Member        `json:"members,omitempty"`
 	Roles                []string        `json:"roles,omitempty" norman:"type=array[reference[roleTemplate]],required"`

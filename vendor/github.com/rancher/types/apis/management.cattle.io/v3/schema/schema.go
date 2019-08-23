@@ -869,12 +869,17 @@ func clusterTemplateTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.ClusterTemplateQuestionsOutput{}).
 		MustImport(&Version, v3.ClusterTemplate{}).
 		MustImportAndCustomize(&Version, v3.ClusterTemplateRevision{}, func(schema *types.Schema) {
+			schema.ResourceActions = map[string]types.Action{
+				"disable": {},
+				"enable":  {},
+			}
 			schema.CollectionActions = map[string]types.Action{
 				"listquestions": {
 					Output: "clusterTemplateQuestionsOutput",
 				},
 			}
 		})
+
 }
 
 func clusterScanTypes(schemas *types.Schemas) *types.Schemas {

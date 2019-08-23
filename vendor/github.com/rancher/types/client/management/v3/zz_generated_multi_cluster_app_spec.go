@@ -8,7 +8,9 @@ const (
 	MultiClusterAppSpecFieldRoles                = "roles"
 	MultiClusterAppSpecFieldTargets              = "targets"
 	MultiClusterAppSpecFieldTemplateVersionID    = "templateVersionId"
+	MultiClusterAppSpecFieldTimeout              = "timeout"
 	MultiClusterAppSpecFieldUpgradeStrategy      = "upgradeStrategy"
+	MultiClusterAppSpecFieldWait                 = "wait"
 )
 
 type MultiClusterAppSpec struct {
@@ -18,5 +20,7 @@ type MultiClusterAppSpec struct {
 	Roles                []string         `json:"roles,omitempty" yaml:"roles,omitempty"`
 	Targets              []Target         `json:"targets,omitempty" yaml:"targets,omitempty"`
 	TemplateVersionID    string           `json:"templateVersionId,omitempty" yaml:"templateVersionId,omitempty"`
+	Timeout              int64            `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 	UpgradeStrategy      *UpgradeStrategy `json:"upgradeStrategy,omitempty" yaml:"upgradeStrategy,omitempty"`
+	Wait                 bool             `json:"wait,omitempty" yaml:"wait,omitempty"`
 }
