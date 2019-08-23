@@ -96,6 +96,7 @@ const (
 	NodeImage          = "NodeImage"
 	ControllersImage   = "ControllersImage"
 	CanalFlannelImg    = "CanalFlannelImg"
+	FlexVolImg         = "FlexVolImg"
 	WeaveLoopbackImage = "WeaveLoopbackImage"
 
 	Calicoctl = "Calicoctl"
@@ -178,6 +179,7 @@ func (c *Cluster) doFlannelDeploy(ctx context.Context, data map[string]interface
 
 func (c *Cluster) doCalicoDeploy(ctx context.Context, data map[string]interface{}) error {
 	clientConfig := pki.GetConfigPath(pki.KubeNodeCertName)
+
 	calicoConfig := map[string]interface{}{
 		KubeCfg:          clientConfig,
 		ClusterCIDR:      c.ClusterCIDR,
@@ -186,6 +188,7 @@ func (c *Cluster) doCalicoDeploy(ctx context.Context, data map[string]interface{
 		Calicoctl:        c.SystemImages.CalicoCtl,
 		ControllersImage: c.SystemImages.CalicoControllers,
 		CloudProvider:    c.Network.Options[CalicoCloudProvider],
+		FlexVolImg:       c.SystemImages.CalicoFlexVol,
 		RBACConfig:       c.Authorization.Mode,
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(calicoConfig, data)
@@ -218,6 +221,7 @@ func (c *Cluster) doCanalDeploy(ctx context.Context, data map[string]interface{}
 		CanalFlannelImg: c.SystemImages.CanalFlannel,
 		RBACConfig:      c.Authorization.Mode,
 		CanalInterface:  c.Network.Options[CanalIface],
+		FlexVolImg:      c.SystemImages.CanalFlexVol,
 		FlannelBackend: map[string]interface{}{
 			"Type": c.Network.Options[CanalFlannelBackendType],
 			"VNI":  flannelVni,

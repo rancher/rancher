@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/rancher/rke/metadata"
+	"k8s.io/api/core/v1"
 	"strings"
 
 	"github.com/rancher/rke/log"
@@ -163,6 +164,15 @@ func validateIngressOptions(c *Cluster) error {
 	if c.Ingress.Provider != DefaultIngressController && c.Ingress.Provider != "none" {
 		return fmt.Errorf("Ingress controller %s is incorrect", c.Ingress.Provider)
 	}
+
+	if c.Ingress.DNSPolicy != "" &&
+		!(c.Ingress.DNSPolicy == string(v1.DNSClusterFirst) ||
+			c.Ingress.DNSPolicy == string(v1.DNSClusterFirstWithHostNet) ||
+			c.Ingress.DNSPolicy == string(v1.DNSNone) ||
+			c.Ingress.DNSPolicy == string(v1.DNSDefault)) {
+		return fmt.Errorf("DNSPolicy %s was not a valid DNS Policy", c.Ingress.DNSPolicy)
+	}
+
 	return nil
 }
 
