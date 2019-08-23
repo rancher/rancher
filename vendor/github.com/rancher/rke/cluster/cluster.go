@@ -363,6 +363,9 @@ func (c *Cluster) SyncLabelsAndTaints(ctx context.Context, currentCluster *Clust
 		}
 	}
 
+	// sync node taints. Add or remove taints from hosts
+	syncTaints(ctx, currentCluster, c)
+
 	if len(c.ControlPlaneHosts) > 0 {
 		log.Infof(ctx, "[sync] Syncing nodes Labels and Taints")
 		k8sClient, err := k8s.NewClient(c.LocalKubeConfigPath, c.K8sWrapTransport)

@@ -89,7 +89,7 @@ metadata:
   name: metrics-server
   namespace: kube-system
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: metrics-server
@@ -116,6 +116,11 @@ spec:
                   values:
                     - windows
       serviceAccountName: metrics-server
+      tolerations:
+      - effect: NoExecute
+        operator: Exists
+      - effect: NoSchedule
+        operator: Exists
       containers:
       - name: metrics-server
         image: {{ .MetricsServerImage }}

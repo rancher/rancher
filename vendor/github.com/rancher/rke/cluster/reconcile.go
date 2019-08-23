@@ -21,6 +21,9 @@ const (
 	unschedulableEtcdTaint    = "node-role.kubernetes.io/etcd=true:NoExecute"
 	unschedulableControlTaint = "node-role.kubernetes.io/controlplane=true:NoSchedule"
 
+	unschedulableEtcdTaintKey    = "node-role.kubernetes.io/etcd=:NoExecute"
+	unschedulableControlTaintKey = "node-role.kubernetes.io/controlplane=:NoSchedule"
+
 	EtcdPlaneNodesReplacedErr = "Etcd plane nodes are replaced. Stopping provisioning. Please restore your cluster from backup."
 )
 
@@ -404,4 +407,75 @@ func isEtcdPlaneReplaced(ctx context.Context, currentCluster, kubeCluster *Clust
 		return true
 	}
 	return false
+}
+
+func syncTaints(ctx context.Context, currentCluster, kubeCluster *Cluster) {
+	var currentHosts, expectedHosts []*hosts.Host
+	var currentTaints, expectedTaints map[string]map[string]string
+	// handling taints in configuration
+	if currentCluster != nil {
+		currentHosts = hosts.GetUniqueHostList(currentCluster.EtcdHosts, currentCluster.ControlPlaneHosts, currentCluster.WorkerHosts)
+		currentTaints = getHostsTaintsMap(currentHosts)
+	}
+	expectedHosts = hosts.GetUniqueHostList(kubeCluster.EtcdHosts, kubeCluster.ControlPlaneHosts, kubeCluster.WorkerHosts)
+	expectedTaints = getHostsTaintsMap(expectedHosts)
+
+	for _, host := range expectedHosts {
+		var toAddTaints, toDelTaints []string
+		currentSet := currentTaints[host.Address]
+		expectedSet := expectedTaints[host.Address]
+		for key, expected := range expectedSet {
+			current, ok := currentSet[key]
+			// create or update taints in host.
+			// by deleting the old taint and creating the new taint to do the update logic.
+			if expected != current {
+				toAddTaints = append(toAddTaints, expected)
+				if ok { // if found but the values are different, the current taint will be deleted.
+					toDelTaints = append(toDelTaints, current)
+				}
+			}
+		}
+		for key, current := range currentSet {
+			_, ok := expectedSet[key]
+			if !ok { // remove the taints which can't be found in the expected taints
+				toDelTaints = append(toDelTaints, current)
+			}
+		}
+		host.ToAddTaints = append(host.ToAddTaints, toAddTaints...)
+		host.ToDelTaints = append(host.ToDelTaints, toDelTaints...)
+	}
+}
+
+//getHostsTaintsMap return the taint set with unique key & effect for each host
+func getHostsTaintsMap(list []*hosts.Host) map[string]map[string]string {
+	rtn := make(map[string]map[string]string)
+	for _, item := range list {
+		set := make(map[string]string)
+		for _, taint := range item.RKEConfigNode.Taints {
+			key := getTaintKey(taint)
+			value := getTaintValue(taint)
+			if key == unschedulableEtcdTaintKey ||
+				key == unschedulableControlTaintKey {
+				logrus.Warnf("taint %s is reserved, ignore this taint", value)
+				continue
+			}
+			if _, ok := set[key]; ok {
+				logrus.Warnf("duplicated taint %s in host %s, ignore this taint", value, item.Address)
+				continue
+			}
+			set[key] = value
+		}
+		if len(set) > 0 {
+			rtn[item.Address] = set
+		}
+	}
+	return rtn
+}
+
+func getTaintKey(taint v3.RKETaint) string {
+	return fmt.Sprintf("%s=:%s", taint.Key, taint.Effect)
+}
+
+func getTaintValue(taint v3.RKETaint) string {
+	return fmt.Sprintf("%s=%s:%s", taint.Key, taint.Value, taint.Effect)
 }

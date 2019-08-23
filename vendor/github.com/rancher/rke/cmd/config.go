@@ -416,7 +416,7 @@ func generateSystemImagesList(version string, all bool) error {
 	}
 	if all {
 		for version, rkeSystemImages := range currentVersionImages {
-			logrus.Infof("Generating images list for version [%s]:", version)
+			logrus.Debugf("Generating images list for version [%s]:", version)
 			uniqueImages := getUniqueSystemImageList(rkeSystemImages)
 			for _, image := range uniqueImages {
 				if image == "" {
@@ -437,7 +437,7 @@ func generateSystemImagesList(version string, all bool) error {
 	if rkeSystemImages == (v3.RKESystemImages{}) {
 		return fmt.Errorf("k8s version is not supported, supported versions are: %v", allVersions)
 	}
-	logrus.Infof("Generating images list for version [%s]:", version)
+	logrus.Debugf("Generating images list for version [%s]:", version)
 	uniqueImages := getUniqueSystemImageList(rkeSystemImages)
 	for _, image := range uniqueImages {
 		if image == "" {
