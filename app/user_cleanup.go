@@ -1,6 +1,8 @@
 package app
 
 import (
+	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -22,7 +24,7 @@ type userCleanup struct {
 	projectLister v3.ProjectLister
 }
 
-func cleanupOrphanedSystemUsers(management *config.ManagementContext) {
+func cleanupOrphanedSystemUsers(ctx context.Context, management *config.ManagementContext) {
 	u := userCleanup{
 		users:         management.Management.Users(""),
 		userLister:    management.Management.Users("").Controller().Lister(),
@@ -30,40 +32,44 @@ func cleanupOrphanedSystemUsers(management *config.ManagementContext) {
 		projectLister: management.Management.Projects("").Controller().Lister(),
 	}
 
-	go wait.PollImmediate(time.Hour*24, 0, func() (bool, error) {
-		logrus.Debugf("Starting orphaned system users cleanup with exponentialBackoff")
-		steps := 5
-		backOffDuration := time.Minute * 10
-		factor := 2
-		var err error
-		for steps > 0 {
-			err = u.cleanup()
-			if err != nil {
-				time.Sleep(backOffDuration)
-				backOffDuration = time.Duration(factor) * backOffDuration
-			} else {
-				break
+	cleanupCtx, cleanupCancel := context.WithCancel(ctx)
+	go func(context.Context, context.CancelFunc) {
+		wait.PollImmediate(time.Hour*24, 0, func() (bool, error) {
+			logrus.Debugf("Starting orphaned system users cleanup with exponentialBackoff")
+			steps := 5
+			backOffDuration := time.Minute * 10
+			factor := 2
+			var err error
+			for steps > 0 {
+				err = u.cleanup()
+				if err != nil {
+					time.Sleep(backOffDuration)
+					backOffDuration = time.Duration(factor) * backOffDuration
+				} else {
+					break
+				}
+				steps--
 			}
-			steps--
-		}
-		if err != nil {
-			// returning false, nil because PollImmediate terminates on error
-			return false, nil
-		}
-		return true, nil
-	})
+			if err != nil {
+				// returning false & nil because PollImmediate terminates on error
+				logrus.Error(err)
+				return false, nil
+			}
+			// no error returned, user cleanup done, calling the child context's cancelfunc to terminate child context
+			cleanupCancel()
+			return true, nil
+		})
+	}(cleanupCtx, cleanupCancel)
 }
 
 func (u *userCleanup) cleanup() error {
 	users, err := u.userLister.List("", labels.Everything())
 	if err != nil {
-		logrus.Errorf("Error listing users during system account users cleanup: %v", err)
-		return err
+		return fmt.Errorf("error listing users during system account users cleanup: %v", err)
 	}
 	clusters, err := u.clusterLister.List("", labels.Everything())
 	if err != nil {
-		logrus.Errorf("Error listing clusters during system account users cleanup: %v", err)
-		return err
+		return fmt.Errorf("error listing clusters during system account users cleanup: %v", err)
 	}
 	var returnErr error
 	for _, user := range users {
@@ -111,8 +117,7 @@ func (u *userCleanup) checkClusterOrProjectExistsForSystemUser(user *v3.User, cl
 		for _, cluster := range clusters {
 			project, err := u.projectLister.Get(cluster.Name, projectID)
 			if err != nil && !errors.IsNotFound(err) {
-				logrus.Errorf("Error finding project %v during system account users cleanup: %v", projectID, err)
-				return err
+				return fmt.Errorf("error finding project %v during system account users cleanup: %v", projectID, err)
 			} else if err == nil && project != nil {
 				projectExists = true
 				break
