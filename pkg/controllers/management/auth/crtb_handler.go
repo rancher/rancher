@@ -51,7 +51,7 @@ func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 	if err != nil {
 		return nil, err
 	}
-	err = c.reconcilBindings(obj)
+	err = c.reconcileBindings(obj)
 
 	return obj, err
 }
@@ -61,7 +61,7 @@ func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Obj
 	if err != nil {
 		return nil, err
 	}
-	err = c.reconcilBindings(obj)
+	err = c.reconcileBindings(obj)
 	return obj, err
 }
 
@@ -111,7 +111,7 @@ func (c *crtbLifecycle) reconcileSubject(binding *v3.ClusterRoleTemplateBinding)
 // - ensure the subject can see the cluster in the mgmt API
 // - if the subject was granted owner permissions for the clsuter, ensure they can create/update/delete the cluster
 // - if the subject was granted privileges to mgmt plane resources that are scoped to the cluster, enforce those rules in the cluster's mgmt plane namespace
-func (c *crtbLifecycle) reconcilBindings(binding *v3.ClusterRoleTemplateBinding) error {
+func (c *crtbLifecycle) reconcileBindings(binding *v3.ClusterRoleTemplateBinding) error {
 	if binding.UserName == "" && binding.GroupPrincipalName == "" && binding.GroupName == "" {
 		return nil
 	}
