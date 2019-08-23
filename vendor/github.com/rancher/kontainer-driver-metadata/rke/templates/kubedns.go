@@ -25,6 +25,11 @@ spec:
                   values:
                     - windows
       serviceAccountName: kube-dns-autoscaler
+      tolerations:
+      - effect: NoExecute
+        operator: Exists
+      - effect: NoSchedule
+        operator: Exists
       containers:
       - name: autoscaler
         image: {{.KubeDNSAutoScalerImage}}
@@ -148,6 +153,10 @@ spec:
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
+      - effect: NoExecute
+        operator: Exists
+      - effect: NoSchedule
+        operator: Exists
       volumes:
       - name: kube-dns-config
         configMap:

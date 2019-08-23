@@ -159,7 +159,7 @@ subjects:
     namespace: ingress-nginx
 {{ end }}
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: nginx-ingress-controller
@@ -193,6 +193,11 @@ spec:
       {{if eq .RBACConfig "rbac"}}
       serviceAccountName: nginx-ingress-serviceaccount
       {{ end }}
+      tolerations:
+      - effect: NoExecute
+        operator: Exists
+      - effect: NoSchedule
+        operator: Exists
       {{- if ne .AlpineImage ""}}
       initContainers:
       - command:
@@ -261,7 +266,7 @@ spec:
             successThreshold: 1
             timeoutSeconds: 1
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: default-http-backend
@@ -270,6 +275,9 @@ metadata:
   namespace: ingress-nginx
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app: default-http-backend
   template:
     metadata:
       labels:
@@ -285,6 +293,11 @@ spec:
                   values:
                     - windows
       terminationGracePeriodSeconds: 60
+      tolerations:
+      - effect: NoExecute
+        operator: Exists
+      - effect: NoSchedule
+        operator: Exists
       containers:
       - name: default-http-backend
         # Any image is permissable as long as:
