@@ -186,6 +186,9 @@ spec:
                   values:
                     - windows
       hostNetwork: true
+      {{if .DNSPolicy}}
+      dnsPolicy: {{.DNSPolicy}}
+      {{end}}
       nodeSelector:
       {{ range $k, $v := .NodeSelector }}
         {{ $k }}: "{{ $v }}"

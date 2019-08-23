@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rancher/rke/metadata"
+
 	"github.com/rancher/rke/cloudprovider"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/k8s"
 	"github.com/rancher/rke/log"
-	"github.com/rancher/rke/metadata"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/rke/templates"
 	"github.com/rancher/rke/util"
@@ -259,9 +260,11 @@ func (c *Cluster) setClusterImageDefaults() error {
 		&c.SystemImages.CalicoCNI:                 d(imageDefaults.CalicoCNI, privRegURL),
 		&c.SystemImages.CalicoCtl:                 d(imageDefaults.CalicoCtl, privRegURL),
 		&c.SystemImages.CalicoControllers:         d(imageDefaults.CalicoControllers, privRegURL),
+		&c.SystemImages.CalicoFlexVol:             d(imageDefaults.CalicoFlexVol, privRegURL),
 		&c.SystemImages.CanalNode:                 d(imageDefaults.CanalNode, privRegURL),
 		&c.SystemImages.CanalCNI:                  d(imageDefaults.CanalCNI, privRegURL),
 		&c.SystemImages.CanalFlannel:              d(imageDefaults.CanalFlannel, privRegURL),
+		&c.SystemImages.CanalFlexVol:              d(imageDefaults.CanalFlexVol, privRegURL),
 		&c.SystemImages.WeaveNode:                 d(imageDefaults.WeaveNode, privRegURL),
 		&c.SystemImages.WeaveCNI:                  d(imageDefaults.WeaveCNI, privRegURL),
 		&c.SystemImages.Ingress:                   d(imageDefaults.Ingress, privRegURL),

@@ -50,6 +50,7 @@ type ingressOptions struct {
 	Options        map[string]string
 	NodeSelector   map[string]string
 	ExtraArgs      map[string]string
+	DNSPolicy      string
 	AlpineImage    string
 	IngressImage   string
 	IngressBackend string
@@ -485,6 +486,7 @@ func (c *Cluster) deployIngress(ctx context.Context, data map[string]interface{}
 		Options:        c.Ingress.Options,
 		NodeSelector:   c.Ingress.NodeSelector,
 		ExtraArgs:      c.Ingress.ExtraArgs,
+		DNSPolicy:      c.Ingress.DNSPolicy,
 		IngressImage:   c.SystemImages.Ingress,
 		IngressBackend: c.SystemImages.IngressBackend,
 	}
