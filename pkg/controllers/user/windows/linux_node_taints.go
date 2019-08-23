@@ -16,6 +16,14 @@ var (
 		Value:  "linux",
 		Effect: v1.TaintEffectNoSchedule,
 	}
+	HostOSLabels = []labels.Set{
+		labels.Set(map[string]string{
+			"beta.kubernetes.io/os": "linux",
+		}),
+		labels.Set(map[string]string{
+			"kubernetes.io/os": "linux",
+		}),
+	}
 )
 
 // NodeTaintsController This controller will only run on the cluster with windowsPreferred is true.
