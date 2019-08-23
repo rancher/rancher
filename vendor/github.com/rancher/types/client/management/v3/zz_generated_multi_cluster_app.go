@@ -21,10 +21,12 @@ const (
 	MultiClusterAppFieldStatus               = "status"
 	MultiClusterAppFieldTargets              = "targets"
 	MultiClusterAppFieldTemplateVersionID    = "templateVersionId"
+	MultiClusterAppFieldTimeout              = "timeout"
 	MultiClusterAppFieldTransitioning        = "transitioning"
 	MultiClusterAppFieldTransitioningMessage = "transitioningMessage"
 	MultiClusterAppFieldUUID                 = "uuid"
 	MultiClusterAppFieldUpgradeStrategy      = "upgradeStrategy"
+	MultiClusterAppFieldWait                 = "wait"
 )
 
 type MultiClusterApp struct {
@@ -44,10 +46,12 @@ type MultiClusterApp struct {
 	Status               *MultiClusterAppStatus `json:"status,omitempty" yaml:"status,omitempty"`
 	Targets              []Target               `json:"targets,omitempty" yaml:"targets,omitempty"`
 	TemplateVersionID    string                 `json:"templateVersionId,omitempty" yaml:"templateVersionId,omitempty"`
+	Timeout              int64                  `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 	Transitioning        string                 `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string                 `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                 string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	UpgradeStrategy      *UpgradeStrategy       `json:"upgradeStrategy,omitempty" yaml:"upgradeStrategy,omitempty"`
+	Wait                 bool                   `json:"wait,omitempty" yaml:"wait,omitempty"`
 }
 
 type MultiClusterAppCollection struct {
