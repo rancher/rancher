@@ -226,6 +226,29 @@ Import-Module -Name DLLPATH -ErrorAction Ignore
     Add-Content -Path `$profilePath -Value `$appendProfile.replace('DLLPATH', "c:\run\GetGcePdName.dll") -ErrorAction Ignore
 }
 
+# clean up the stale HNS network if required
+try
+{
+    # warm up HNS network
+    1..5 | ForEach-Object { Invoke-HNSRequest -Method "GET" -Type "networks" | Out-Null }
+
+    # remove the HNS networks
+    Invoke-HNSRequest -Method "GET" -Type "networks" | Where-Object {@('cbr0', 'vxlan0') -contains `$_.Name} | ForEach-Object {
+        Log-Info "Cleaning up stale HNSNetwork `$(`$_.Name) ..."
+        Invoke-HNSRequest -Method "DELETE" -Type "networks" -Id `$_.Id
+    }
+
+    # remove the HNS policies
+    Invoke-HNSRequest -Method "GET" -Type "policylists" | Where-Object {-not [string]::IsNullOrEmpty(`$_.Id)} | ForEach-Object {
+        Log-Info "Cleaning up HNSPolicyList `$(`$_.Id) ..."
+        Invoke-HNSRequest -Method "DELETE" -Type "policylists" -Id `$_.Id
+    }
+}
+catch
+{
+    Log-Warn "Could not clean: `$(`$_.Exception.Message)"
+}
+
 # register wins
 Start-Process -NoNewWindow -Wait ``
     -FilePath "c:\etc\rancher\wins.exe" ``
