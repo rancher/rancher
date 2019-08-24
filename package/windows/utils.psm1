@@ -101,6 +101,61 @@ function Get-Env
     return ""
 }
 
+function Get-VmComputeNativeMethods()
+{
+    $ret = 'VmCompute.PrivatePInvoke.NativeMethods' -as [type]
+    if (-not $ret) {
+        $signature = @'
+[DllImport("vmcompute.dll")]
+public static extern void HNSCall([MarshalAs(UnmanagedType.LPWStr)] string method, [MarshalAs(UnmanagedType.LPWStr)] string path, [MarshalAs(UnmanagedType.LPWStr)] string request, [MarshalAs(UnmanagedType.LPWStr)] out string response);
+'@
+        $ret = Add-Type -MemberDefinition $signature -Namespace VmCompute.PrivatePInvoke -Name "NativeMethods" -PassThru
+    }
+    return $ret
+}
+
+function Invoke-HNSRequest
+{
+    param
+    (
+        [ValidateSet('GET', 'POST', 'DELETE')]
+        [parameter(Mandatory = $true)] [string] $Method,
+        [ValidateSet('networks', 'endpoints', 'activities', 'policylists', 'endpointstats', 'plugins')]
+        [parameter(Mandatory = $true)] [string] $Type,
+        [parameter(Mandatory = $false)] [string] $Action,
+        [parameter(Mandatory = $false)] [string] $Data = "",
+        [parameter(Mandatory = $false)] [Guid] $Id = [Guid]::Empty
+    )
+
+    $hnsPath = "/$Type"
+    if ($id -ne [Guid]::Empty) {
+        $hnsPath += "/$id"
+    }
+    if ($Action) {
+        $hnsPath += "/$Action"
+    }
+
+    $response = ""
+    $hnsApi = Get-VmComputeNativeMethods
+    $hnsApi::HNSCall($Method, $hnsPath, "$Data", [ref]$response)
+
+    $output = @()
+    if ($response) {
+        try {
+            $output = ($response | ConvertFrom-Json)
+            if ($output.Error) {
+                Log-Error $output;
+            } else {
+                $output = $output.Output;
+            }
+        } catch {
+            Log-Error $_.Exception.Message
+        }
+    }
+
+    return $output;
+}
+
 Export-ModuleMember -Function Log-Info
 Export-ModuleMember -Function Log-Warn
 Export-ModuleMember -Function Log-Error
@@ -109,4 +164,6 @@ Export-ModuleMember -Function Is-Administrator
 Export-ModuleMember -Function ConvertTo-JsonObj
 Export-ModuleMember -Function Set-Env
 Export-ModuleMember -Function Get-Env
+Export-ModuleMember -Function Get-VmComputeNativeMethods
+Export-ModuleMember -Function Invoke-HNSRequest
 
