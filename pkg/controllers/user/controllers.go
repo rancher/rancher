@@ -70,6 +70,7 @@ func Register(ctx context.Context, cluster *config.UserContext, clusterRec *mana
 	istio.Register(ctx, cluster)
 	certsexpiration.Register(ctx, cluster)
 	ingresshostgen.Register(ctx, cluster.UserOnlyContext())
+	ingress.Register(ctx, cluster.UserOnlyContext())
 	windows.Register(ctx, clusterRec, cluster)
 
 	// register controller for API
@@ -110,7 +111,6 @@ func RegisterUserOnly(ctx context.Context, cluster *config.UserOnlyContext) erro
 
 	dnsrecord.Register(ctx, cluster)
 	externalservice.Register(ctx, cluster)
-	ingress.Register(ctx, cluster)
 	nslabels.Register(ctx, cluster)
 	targetworkloadservice.Register(ctx, cluster)
 	workload.Register(ctx, cluster)
