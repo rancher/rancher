@@ -291,12 +291,47 @@ func (p *Provisioner) update(cluster *v3.Cluster, create bool) (*v3.Cluster, err
 	if err != nil {
 		return cluster, err
 	}
+	setClusterConditions(cluster)
+	if cluster.Spec.RancherKubernetesEngineConfig == nil {
+		// taints cluster capabilities is only for RKE provisioned cluster
+		return cluster, nil
+	}
+	taintSupport := cluster.Status.Capabilities.TaintSupport
+	if taintSupport == nil || !*taintSupport {
+		backoff := wait.Backoff{
+			Duration: 1 * time.Second,
+			Factor:   2,
+			Steps:    3,
+		}
+		if err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+			supportsTaints := true
+			clusterToUpdate := cluster.DeepCopy()
+			setClusterConditions(clusterToUpdate)
+			clusterToUpdate.Status.Capabilities.TaintSupport = &supportsTaints
+			cluster, err = p.Clusters.Update(clusterToUpdate)
+			if err != nil {
+				if !apierrors.IsConflict(err) {
+					return false, err
+				}
+				cluster, err = p.Clusters.Get(cluster.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				return false, nil
+			}
+			return true, nil
+		}); err != nil {
+			return cluster, err
+		}
+	}
+	return cluster, nil
+}
 
+func setClusterConditions(cluster *v3.Cluster) {
 	v3.ClusterConditionProvisioned.True(cluster)
 	v3.ClusterConditionProvisioned.Message(cluster, "")
 	v3.ClusterConditionProvisioned.Reason(cluster, "")
 	v3.ClusterConditionPending.True(cluster)
-	return cluster, nil
 }
 
 func (p *Provisioner) machineChanged(key string, machine *v3.Node) (runtime.Object, error) {
