@@ -560,6 +560,10 @@ func resetRkeConfigFlags(cluster *v3.Cluster) {
 			cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.RotateCertificates = nil
 			cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Restore = v3.RestoreConfig{}
 		}
+		if cluster.Status.Capabilities.TaintSupport == nil || !*cluster.Status.Capabilities.TaintSupport {
+			supportsTaints := true
+			cluster.Status.Capabilities.TaintSupport = &supportsTaints
+		}
 	}
 }
 
