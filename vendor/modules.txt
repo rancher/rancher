@@ -355,7 +355,7 @@ github.com/rancher/rke/dind
 github.com/rancher/rke/cloudprovider/custom
 github.com/rancher/rke/cloudprovider/openstack
 github.com/rancher/rke/cloudprovider/vsphere
-# github.com/rancher/types v0.0.0-20190823205914-444dc01b3d86
+# github.com/rancher/types v0.0.0-20190823205914-444dc01b3d86 => /Users/rajashree/go-work/src/github.com/rancher/types
 github.com/rancher/types/apis/management.cattle.io/v3
 github.com/rancher/types/client/management/v3
 github.com/rancher/types/config
