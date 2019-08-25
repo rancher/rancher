@@ -580,6 +580,11 @@ func (in *Capabilities) DeepCopyInto(out *Capabilities) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.TaintSupport != nil {
+		in, out := &in.TaintSupport, &out.TaintSupport
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
