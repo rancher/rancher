@@ -64,6 +64,11 @@ func (c *controller) capsSync(key string, cluster *v3.Cluster) (runtime.Object, 
 	capabilities.NodePortRange = DefaultNodePortRange
 
 	if cluster.Spec.RancherKubernetesEngineConfig != nil {
+		// taint support capability is set in provisioner and update cluster is called, so we should retain the capability here
+		if cluster.Status.Capabilities.TaintSupport != nil && *cluster.Status.Capabilities.TaintSupport {
+			supportsTaints := true
+			capabilities.TaintSupport = &supportsTaints
+		}
 		if capabilities, err = c.RKECapabilities(capabilities, *cluster.Spec.RancherKubernetesEngineConfig, cluster.Name); err != nil {
 			return nil, err
 		}
