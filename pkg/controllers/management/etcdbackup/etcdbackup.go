@@ -317,16 +317,20 @@ func generateBackupFilename(snapshotName string, backupConfig *v3.BackupConfig) 
 	if backupConfig == nil {
 		return ""
 	}
+	filename := fmt.Sprintf("%s_%s.%s", snapshotName, time.Now().Format(time.RFC3339), compressedExtension)
+	if backupConfig.SafeTimestamp {
+		filename = strings.ReplaceAll(filename, ":", "-")
+	}
 	// s3 backup
 	if backupConfig != nil &&
 		backupConfig.S3BackupConfig != nil {
 		if len(backupConfig.S3BackupConfig.Folder) != 0 {
-			return fmt.Sprintf("https://%s/%s/%s/%s_%s.%s", backupConfig.S3BackupConfig.Endpoint, backupConfig.S3BackupConfig.BucketName, backupConfig.S3BackupConfig.Folder, snapshotName, time.Now().Format(time.RFC3339), compressedExtension)
+			return fmt.Sprintf("https://%s/%s/%s/%s", backupConfig.S3BackupConfig.Endpoint, backupConfig.S3BackupConfig.BucketName, backupConfig.S3BackupConfig.Folder, filename)
 		}
-		return fmt.Sprintf("https://%s/%s/%s_%s.%s", backupConfig.S3BackupConfig.Endpoint, backupConfig.S3BackupConfig.BucketName, snapshotName, time.Now().Format(time.RFC3339), compressedExtension)
+		return fmt.Sprintf("https://%s/%s/%s", backupConfig.S3BackupConfig.Endpoint, backupConfig.S3BackupConfig.BucketName, filename)
 	}
 	// local backup
-	return fmt.Sprintf("%s_%s.%s", snapshotName, time.Now().Format(time.RFC3339), compressedExtension)
+	return filename
 
 }
 
