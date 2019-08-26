@@ -10,7 +10,6 @@ import (
 const (
 	BackupConditionCreated   condition.Cond = "Created"
 	BackupConditionCompleted condition.Cond = "Completed"
-	BackupConditionRestored  condition.Cond = "Restored"
 )
 
 type BackupConfig struct {
@@ -22,6 +21,8 @@ type BackupConfig struct {
 	Retention int `yaml:"retention" json:"retention,omitempty" norman:"default=6"`
 	// s3 target
 	S3BackupConfig *S3BackupConfig `yaml:",omitempty" json:"s3BackupConfig"`
+	// replace special characters in snapshot names
+	SafeTimestamp bool `yaml:"safe_timestamp" json:"safeTimestamp,omitempty"`
 }
 
 type S3BackupConfig struct {
@@ -54,13 +55,13 @@ type EtcdBackup struct {
 
 type EtcdBackupSpec struct {
 	// cluster ID
-	ClusterID string `json:"clusterId,omitempty" norman:"required,type=reference[cluster]"`
+	ClusterID string `json:"clusterId,omitempty" norman:"required,type=reference[cluster],noupdate"`
 	// manual backup flag
 	Manual bool `yaml:"manual" json:"manual,omitempty"`
 	// actual file name on the target
-	Filename string `yaml:"filename" json:"filename,omitempty"`
+	Filename string `yaml:"filename" json:"filename,omitempty" norman:"noupdate"`
 	// backupConfig
-	BackupConfig BackupConfig `yaml:",omitempty" json:"backupConfig,omitempty"`
+	BackupConfig BackupConfig `yaml:",omitempty" json:"backupConfig,omitempty" norman:"noupdate"`
 }
 
 type EtcdBackupStatus struct {
