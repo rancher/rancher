@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/clusterscan"
 	"github.com/rancher/rancher/pkg/api/customization/clustertemplate"
 	"github.com/rancher/rancher/pkg/api/customization/cred"
+	"github.com/rancher/rancher/pkg/api/customization/etcdbackup"
 	"github.com/rancher/rancher/pkg/api/customization/feature"
 	"github.com/rancher/rancher/pkg/api/customization/globaldns"
 	"github.com/rancher/rancher/pkg/api/customization/globalresource"
@@ -178,6 +179,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	ClusterTemplates(schemas, apiContext)
 	ClusterScans(schemas, apiContext, clusterManager)
 	SystemImages(schemas, apiContext)
+	EtcdBackups(schemas, apiContext)
 
 	if err := NodeTypes(schemas, apiContext); err != nil {
 		return err
@@ -800,4 +802,9 @@ func SystemImages(schemas *types.Schemas, management *config.ScaledContext) {
 		Store:              schema.Store,
 		NamespaceInterface: management.Core.Namespaces(""),
 	}
+}
+
+func EtcdBackups(schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.EtcdBackupType)
+	schema.Formatter = etcdbackup.Formatter
 }
