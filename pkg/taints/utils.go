@@ -54,17 +54,6 @@ func GetKeyEffectTaintSet(taints []v1.Taint) map[string]int {
 	return rtn
 }
 
-func GetTaintsFromStrings(sources []string) []v1.Taint {
-	var rtn []v1.Taint
-	for _, taintStr := range sources {
-		taint := GetTaintFromString(taintStr)
-		if taint != nil {
-			rtn = append(rtn, *taint)
-		}
-	}
-	return rtn
-}
-
 func GetToDiffTaints(current, desired []v1.Taint) (toAdd map[int]v1.Taint, toDel map[int]v1.Taint) {
 	toAdd, toDel = map[int]v1.Taint{}, map[int]v1.Taint{}
 	currentSet := GetTaintSet(current)

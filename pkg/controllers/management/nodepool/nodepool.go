@@ -124,11 +124,6 @@ func (c *Controller) createNode(name string, nodePool *v3.NodePool, simulate boo
 		},
 	}
 
-	if len(nodePool.Spec.NodeTaints) > 0 {
-		newNode.Spec.DesiredNodeTaints = append(newNode.Spec.DesiredNodeTaints, nodePool.Spec.NodeTaints...)
-		newNode.Spec.UpdateTaintsFromAPI = &falseValue
-	}
-
 	if simulate {
 		return newNode, nil
 	}

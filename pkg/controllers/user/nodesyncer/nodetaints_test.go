@@ -169,9 +169,6 @@ func getNodeInterfaceUpdateFunc(t *testing.T, cases []*syncTaintsTestCase) func(
 		if !ok {
 			return nil, httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("node %s not found", in1.Name))
 		}
-		if !c.nodeShouldUpdate {
-			return nil, fmt.Errorf("test case %s should not get into node update function", c.name)
-		}
 		toAdd, toDel := taints.GetToDiffTaints(in1.Spec.Taints, c.machine.Spec.DesiredNodeTaints)
 		if len(toAdd) != 0 || len(toDel) != 0 {
 			return nil, fmt.Errorf("test case %s failed, node taints are different from machine taints", c.name)
