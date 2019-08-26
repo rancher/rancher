@@ -132,11 +132,16 @@ func (a *AggregateStore) Create(apiContext *types.APIContext, schema *types.Sche
 
 func store(registries map[string]projectclient.RegistryCredential, domainToCreds map[string][]corev1.LocalObjectReference, name string) {
 	for registry := range registries {
+		rd, err := GetRegistryDomain(registry)
+		if err != nil {
+			logrus.Errorf("unable to get domain for registry=%v err=%v", registry, err)
+			continue
+		}
 		secretRef := corev1.LocalObjectReference{Name: name}
-		if _, ok := domainToCreds[registry]; ok {
-			domainToCreds[registry] = append(domainToCreds[registry], secretRef)
+		if _, ok := domainToCreds[rd]; ok {
+			domainToCreds[rd] = append(domainToCreds[rd], secretRef)
 		} else {
-			domainToCreds[registry] = []corev1.LocalObjectReference{secretRef}
+			domainToCreds[rd] = []corev1.LocalObjectReference{secretRef}
 		}
 	}
 }
