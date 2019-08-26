@@ -10,7 +10,6 @@ import (
 const (
 	BackupConditionCreated   condition.Cond = "Created"
 	BackupConditionCompleted condition.Cond = "Completed"
-	BackupConditionRestored  condition.Cond = "Restored"
 )
 
 type BackupConfig struct {
