@@ -81,7 +81,19 @@ func (h *Helm) request(pathURL string) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := catUtil.ValidateURL(pathURL); err != nil {
+	if !baseEndpoint.IsAbs() {
+		helmURLstring := h.url
+		if !strings.HasSuffix(helmURLstring, "/") {
+			helmURLstring = helmURLstring + "/"
+		}
+		helmURL, err := url.Parse(helmURLstring)
+		if err != nil {
+			return nil, err
+		}
+		baseEndpoint = helmURL.ResolveReference(baseEndpoint)
+	}
+
+	if err := catUtil.ValidateURL(baseEndpoint.String()); err != nil {
 		return nil, err
 	}
 
@@ -172,13 +184,19 @@ func (h *Helm) LoadIndex() (*RepoIndex, error) {
 	return helmRepoIndex, yaml.Unmarshal(body, helmRepoIndex.IndexFile)
 }
 
-func (h *Helm) fetchTgz(url string) ([]v3.File, error) {
+func (h *Helm) fetchTgz(helmURL string) ([]v3.File, error) {
 	var files []v3.File
+	logrus.Debugf("Helm fetching file %s", helmURL)
 
-	logrus.Debugf("Helm fetching file %s", url)
-	resp, err := h.request(url)
-	if err != nil {
-		return nil, errors.Errorf("Error in HTTP GET of [%s], error: %s", url, err)
+	resp, err := h.request(helmURL)
+	if err != nil || resp.StatusCode > 400 {
+		if e, ok := err.(net.Error); ok && e.Timeout() {
+			return nil, errors.Errorf("Timeout in HTTP GET to [%s], did not respond in %s", helmURL, httpTimeout)
+		}
+		if err == nil {
+			return nil, errors.Errorf("Error in HTTP GET of [%s], received: %s", helmURL, resp.Status)
+		}
+		return nil, errors.Errorf("Error in HTTP GET of [%s], error: %s", helmURL, err)
 	}
 	defer resp.Body.Close()
 
@@ -296,11 +314,12 @@ func (h *Helm) LoadChart(templateVersion *v3.TemplateVersionSpec, filters []stri
 
 func (h *Helm) fetchAndCacheURLs(versionPath, versionName string, versionURLs, filters []string) (map[string]string, error) {
 	filemap := map[string]string{}
-	if err := os.MkdirAll(versionPath, 0755); err != nil {
-		return nil, err
-	}
 	files, err := h.fetchURLs(versionURLs)
 	if err != nil {
+		return nil, err
+	}
+	// existence of this file indicates the cache exists
+	if err := os.MkdirAll(versionPath, 0755); err != nil {
 		return nil, err
 	}
 	for _, file := range files {

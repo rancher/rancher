@@ -3,7 +3,7 @@ import time
 from rancher import ApiError
 
 from .common import wait_for_template_to_be_created, \
-    wait_for_template_to_be_deleted, random_str
+    wait_for_template_to_be_deleted, random_str, wait_for_atleast_workload
 from .conftest import set_server_version
 
 
@@ -79,7 +79,7 @@ def test_global_catalog_template_access(admin_mc, user_factory,
     existing = client.list_template(catalogId="library").data
     templates = []
     for t in existing:
-        templates.append("library-"+t.name)
+        templates.append("library-" + t.name)
 
     url = "https://github.com/mrajashree/charts.git"
     catalog = client.create_catalog(name=name,
@@ -104,7 +104,7 @@ def test_global_catalog_template_access(admin_mc, user_factory,
     # Now list all templates of this catalog
     new_templates = client.list_template(catalogId=name).data
     for t in new_templates:
-        templates.append(name+"-"+t.name)
+        templates.append(name + "-" + t.name)
 
     all_templates = existing + new_templates
     # User should be able to list all these templates
@@ -183,3 +183,36 @@ def test_template_version_links(admin_mc, admin_pc, custom_catalog,
     assert len(templates.data[0]['versionLinks']) == 2
     assert '1.6.0' in templates.data[0]['versionLinks']
     assert '1.6.2' in templates.data[0]['versionLinks']
+
+
+def test_relative_paths(admin_mc, admin_pc, remove_resource):
+    """ This test adds a catalog's index.yaml with a relative chart url
+    and ensures that rancher can resolve the relative url"""
+
+    client = admin_mc.client
+    catalogname = "cat-" + random_str()
+    url = "https://raw.githubusercontent.com/daxmc99/chart-test/master"
+    catalog = client.create_catalog(catalogName=catalogname, branch="master",
+                                    url=url)
+    remove_resource(catalog)
+
+    catalog = client.reload(catalog)
+    assert catalog['url'] == url
+
+    # now deploy the app in the catalog to ensure we can resolve the tarball
+    ns = admin_pc.cluster.client.create_namespace(
+        catalogName="ns-" + random_str(),
+        projectId=admin_pc.project.id)
+    remove_resource(ns)
+
+    wait_for_template_to_be_created(client, catalog.id)
+    mysqlha = admin_pc.client.create_app(name="app-" + random_str(),
+                                         externalId="catalog://?catalog=" +
+                                                    catalog.id +
+                                                    "&template=mysqlha"
+                                                    "&version=0.8.0",
+                                         targetNamespace=ns.name,
+                                         projectId=admin_pc.project.id)
+    remove_resource(mysqlha)
+    wait_for_atleast_workload(pclient=admin_pc.client, nsid=ns.id, timeout=60,
+                              count=1)
