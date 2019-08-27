@@ -294,6 +294,9 @@ if ($CATTLE_CA_CHECKSUM)
     $CATTLE_SERVER_HOSTNAME = ([System.Uri]"$server").Host
     $CATTLE_SERVER_HOSTNAME_WITH_PORT = ([System.Uri]"$server").Authority
 
+    # windows path could not allow colons
+    $CATTLE_SERVER_HOSTNAME_WITH_PORT = $CATTLE_SERVER_HOSTNAME_WITH_PORT -replace ":", ""
+
     $dockerCertsPath = "c:\etc\docker\certs.d\$CATTLE_SERVER_HOSTNAME_WITH_PORT"
     New-Item -Force -ItemType Directory -Path $dockerCertsPath -ErrorAction Ignore | Out-Null
     Copy-Item -Force -Path "$sslCertDir\serverca" -Destination "$dockerCertsPath\ca.crt" -ErrorAction Ignore
