@@ -1,6 +1,8 @@
 package node
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base32"
@@ -372,6 +374,20 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 	}
 
 	drun := clusterregistrationtokens.NodeCommand(token)
+
+	// validate first
+	validateArgs := buildAgentCommand(obj, strings.Replace(drun, "sudo docker run -d", "sudo docker run", 1)+" --validate")
+	validateCmd, err := buildCommand(nodeDir, obj, validateArgs)
+	if err != nil {
+		return err
+	}
+
+	stdoutBuf := &bytes.Buffer{}
+	validateCmd.Stdout = stdoutBuf
+	if err := validateCmd.Run(); err != nil {
+		return errors.New(filterErrorMsg(stdoutBuf))
+	}
+
 	args := buildAgentCommand(obj, drun)
 	cmd, err := buildCommand(nodeDir, obj, args)
 	if err != nil {
@@ -383,6 +399,17 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 	}
 
 	return nil
+}
+
+func filterErrorMsg(buf *bytes.Buffer) string {
+	s := bufio.NewScanner(buf)
+	errorMessage := ""
+	for s.Scan() {
+		if strings.Contains(s.Text(), "ERROR") {
+			errorMessage += s.Text() + "; "
+		}
+	}
+	return errorMessage
 }
 
 func (m *Lifecycle) ready(obj *v3.Node) (*v3.Node, error) {
@@ -456,7 +483,38 @@ func (m *Lifecycle) Updated(obj *v3.Node) (runtime.Object, error) {
 		}
 		return obj, err
 	})
-	return newObj.(*v3.Node), err
+
+	if err != nil {
+		return newObj.(*v3.Node), err
+	}
+
+	updateObj, err := m.nodeClient.Update(newObj.(*v3.Node))
+	if err != nil {
+		return newObj.(*v3.Node), err
+	}
+
+	newObjTwo, err := v3.NodeConditionAgentDeployed.Once(updateObj, func() (runtime.Object, error) {
+		if updateObj.Status.NodeTemplateSpec == nil {
+			m.setWaiting(updateObj)
+			return updateObj, nil
+		}
+
+		config, err := nodeconfig.NewNodeConfig(m.secretStore, updateObj)
+		if err != nil {
+			return updateObj, err
+		}
+		defer config.Cleanup()
+
+		if err := config.Restore(); err != nil {
+			return updateObj, err
+		}
+		if err := m.deployAgent(config.Dir(), updateObj); err != nil {
+			return updateObj, err
+		}
+		return updateObj, nil
+	})
+
+	return newObjTwo.(*v3.Node), err
 }
 
 func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, obj *v3.Node) (*v3.Node, error) {
