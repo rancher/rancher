@@ -41,6 +41,10 @@ func main() {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
+	if os.Getenv("CATTLE_VALIDATE") == "true" {
+		return
+	}
+
 	var err error
 
 	if os.Getenv("CLUSTER_CLEANUP") == "true" {

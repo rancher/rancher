@@ -134,6 +134,7 @@ export CATTLE_TOKEN
 export CATTLE_NODE_LABEL
 export CATTLE_WRITE_CERT_ONLY
 export CATTLE_NODE_TAINTS
+export CATTLE_VALIDATE
 
 while true; do
     case "$1" in
@@ -152,6 +153,7 @@ while true; do
         -l | --label)            shift; CATTLE_NODE_LABEL+=",$1"    ;;
         -o | --only-write-certs)        CATTLE_WRITE_CERT_ONLY=true ;;
         --taints)                shift; CATTLE_NODE_TAINTS+=",$1"   ;;
+        -v | --validate)         shift; CATTLE_VALIDATE=true        ;;
         *) break;
     esac
     shift

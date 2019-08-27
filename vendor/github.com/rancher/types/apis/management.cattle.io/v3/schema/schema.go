@@ -76,9 +76,7 @@ func schemaTypes(schemas *types.Schemas) *types.Schemas {
 func credTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		AddMapperForType(&Version, v3.CloudCredential{},
-			&m.DisplayName{},
 			&mapper.CredentialMapper{},
-			&m.AnnotationField{Field: "name"},
 			&m.Drop{Field: "namespaceId"}).
 		MustImport(&Version, v3.CloudCredential{})
 }
@@ -330,8 +328,11 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Move{From: "nodeLabels", To: "labels"},
 			&m.Move{From: "nodeAnnotations", To: "annotations"},
 			&m.Drop{Field: "desiredNodeTaints"},
-			&m.Drop{Field: "metadataUpdate"},
+			&m.Drop{Field: "desiredNodeLabels"},
+			&m.Drop{Field: "desiredNodeAnnotations"},
 			&m.Drop{Field: "updateTaintsFromAPI"},
+			&m.Drop{Field: "currentNodeLabels"},
+			&m.Drop{Field: "currentNodeAnnotations"},
 			&m.Drop{Field: "desiredNodeUnschedulable"},
 			&m.Drop{Field: "nodeDrainInput"},
 			&m.AnnotationField{Field: "publicEndpoints", List: true},
@@ -340,24 +341,13 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 		AddMapperForType(&Version, v3.NodeDriver{}, m.DisplayName{}).
 		AddMapperForType(&Version, v3.NodeTemplate{}, m.DisplayName{}).
 		MustImport(&Version, v3.PublicEndpoint{}).
-		MustImportAndCustomize(&Version, v3.NodePool{}, func(schema *types.Schema) {
-			schema.ResourceFields["driver"] = types.Field{
-				Type:     "string",
-				CodeName: "Driver",
-				Create:   false,
-				Update:   false,
-			}
-		}).
+		MustImport(&Version, v3.NodePool{}).
 		MustImport(&Version, v3.NodeDrainInput{}).
 		MustImportAndCustomize(&Version, v3.Node{}, func(schema *types.Schema) {
 			labelField := schema.ResourceFields["labels"]
 			labelField.Create = true
 			labelField.Update = true
 			schema.ResourceFields["labels"] = labelField
-			annotationField := schema.ResourceFields["annotations"]
-			annotationField.Create = true
-			annotationField.Update = true
-			schema.ResourceFields["annotations"] = annotationField
 			unschedulable := schema.ResourceFields["unschedulable"]
 			unschedulable.Create = false
 			unschedulable.Update = false

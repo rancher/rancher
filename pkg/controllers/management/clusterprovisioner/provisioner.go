@@ -847,6 +847,10 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) ([]v3.RKEConfigNode,
 			continue
 		}
 
+		if !v3.NodeConditionAgentDeployed.IsTrue(machine) && !isCustom(machine) {
+			continue
+		}
+
 		if slice.ContainsString(machine.Status.NodeConfig.Role, services.ETCDRole) {
 			etcd = true
 		}
@@ -879,6 +883,10 @@ func (p *Provisioner) reconcileRKENodes(clusterName string) ([]v3.RKEConfigNode,
 	})
 
 	return nodes, nil
+}
+
+func isCustom(obj *v3.Node) bool {
+	return obj.Spec.CustomConfig != nil && obj.Spec.CustomConfig.Address != ""
 }
 
 func (p *Provisioner) recordFailure(cluster *v3.Cluster, spec v3.ClusterSpec, err error) (*v3.Cluster, error) {
