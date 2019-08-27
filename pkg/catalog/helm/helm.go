@@ -141,8 +141,7 @@ func (h *Helm) downloadIndex(indexURL string) (*RepoIndex, error) {
 	}
 	err = yaml.Unmarshal(body, helmRepoIndex.IndexFile)
 	if err != nil {
-		logrus.Debugf("Error while parsing response from [%s], error: %s. Response: %s", indexURL, err, body)
-		return nil, errors.Errorf("Error while parsing response from [%s], error: %s", indexURL, err)
+		return nil, errors.Errorf("error unmarshalling response from [%s]", indexURL)
 	}
 	return helmRepoIndex, nil
 }
