@@ -90,7 +90,7 @@ func validateDefaultPresent(versions map[string]string) {
 func validateTemplateMatch() {
 	TemplateData = map[string]map[string]string{}
 	for k8sVersion := range DriverData.K8sVersionRKESystemImages {
-		toMatch, err := semver.Make(strings.Split(k8sVersion[1:], "-rancher")[0])
+		toMatch, err := semver.Make(k8sVersion[1:])
 		if err != nil {
 			panic(fmt.Sprintf("k8sVersion not sem-ver %s %v", k8sVersion, err))
 		}
