@@ -194,6 +194,8 @@ github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0
 github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de h1:9TO3cAIGXtEhnIaL+V+BEER86oLrvS+kWobKpbJuye0=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de/go.mod h1:zAbeS9B/r2mtpb6U+EI2rYA5OAXxsYw6wTamcNW+zcE=
+github.com/luthermonson/types v0.0.0-20190827220737-fd7416efc303 h1:s7r9I55t9KW095bX0OQh2i15rANDU0DHmb+ZM+QpwhQ=
+github.com/luthermonson/types v0.0.0-20190827220737-fd7416efc303/go.mod h1:9L7VLTwNVt7vJYwP/7xrQ4tWghDQ+zl9//RTqRjGxes=
 github.com/mailru/easyjson v0.0.0-20160728113105-d5b7844b561a h1:TpvdAwDAt1K4ANVOfcihouRdvP+MgAfDWwBuct4l6ZY=
 github.com/mailru/easyjson v0.0.0-20160728113105-d5b7844b561a/go.mod h1:C1wdFJiN94OJF2b5HbByQZoLdCWB1Yqtg26g4irojpc=
 github.com/maruel/panicparse v0.0.0-20171209025017-c0182c169410 h1:1ROIrlLvFoHKX+i48KdRauq21irSOXPyfQw4T/PrINY=
@@ -272,8 +274,6 @@ github.com/prometheus/procfs v0.0.3 h1:CTwfnzjQ+8dS6MhHHu4YswVAD99sL2wjPqP+VkURm
 github.com/prometheus/procfs v0.0.3/go.mod h1:4A/X28fw3Fc593LaREMrKMqOKvUAntwMDaekg4FpcdQ=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190819174335-6eb94126a98c h1:Of+EnlLZ33fmeZgQhr/Pb80iMaR9L8mQ2xvhzQk4o4w=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190819174335-6eb94126a98c/go.mod h1:VDixap7YjDnNwlfxL4gl890ThOVinEZE3qyAaG0xcQE=
-github.com/rancher/kontainer-driver-metadata v0.0.0-20190823210613-624182a785ce h1:4onzkfpjfusENeAFn7NhUSCdmBkFez3dRAaqDQGV8ng=
-github.com/rancher/kontainer-driver-metadata v0.0.0-20190823210613-624182a785ce/go.mod h1:dHvhyuoiwrjqQCFD586g0cZ9NJJXEKeAtQi8RX96U8E=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190826223322-3e1df77e6153 h1:MzkL/BHjjoCYmTyP5GfJW0Bn1bsGKOF70//wDoNwPiI=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190826223322-3e1df77e6153/go.mod h1:dHvhyuoiwrjqQCFD586g0cZ9NJJXEKeAtQi8RX96U8E=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20190819182532-d4cdf8e56671 h1:JIgjMy2Nb/H+89T2S7TePqiGyxeE4J1g5tGtb9+hqsQ=
@@ -289,17 +289,10 @@ github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a h1:6xqYlVz4uAX
 github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a/go.mod h1:YW8wJ/coee2n9ed937uPBWQArBaVlxs+5wkkS9KiyDc=
 github.com/rancher/rke v0.3.0-rc6.0.20190819180243-f8bac2c059d0 h1:XYyvskgyYvU89CgHEl0XK3GDom+heEgl2s28jv/f6PM=
 github.com/rancher/rke v0.3.0-rc6.0.20190819180243-f8bac2c059d0/go.mod h1:IyunvVrNJZLg3m5faCvG4LNAyf03vuAShBi9q9mcPGc=
-github.com/rancher/rke v0.3.0-rc7.0.20190823230452-85c21bc905f4 h1:ZvmZ92yGrsR5zOP0ZLvG2X7Mu35qvGb9dwQTo48w1gc=
-github.com/rancher/rke v0.3.0-rc7.0.20190823230452-85c21bc905f4/go.mod h1:efAMOSPSiSKcj6Aj2N4RlmUJvc09xE6dUYjBuZEtnnE=
 github.com/rancher/rke v0.3.0-rc7.0.20190827012814-16a1a5e2508b h1:7XHuDK929QB00oHzUWUEwYwfWSUjzYkEG/KOlIAj3Qw=
 github.com/rancher/rke v0.3.0-rc7.0.20190827012814-16a1a5e2508b/go.mod h1:Ca4LQql2fWwYp8noKlGYY2cLDpbKOWCIknL/8CxhzkY=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
-github.com/rancher/types v0.0.0-20190819173748-96e6d6f30265/go.mod h1:ROyypICT7xxMhVRplyFnEIaXHw2nMVHfCZ8Y3261qmw=
-github.com/rancher/types v0.0.0-20190822170951-b99efa820bc3/go.mod h1:9L7VLTwNVt7vJYwP/7xrQ4tWghDQ+zl9//RTqRjGxes=
-github.com/rancher/types v0.0.0-20190823205914-444dc01b3d86/go.mod h1:9L7VLTwNVt7vJYwP/7xrQ4tWghDQ+zl9//RTqRjGxes=
-github.com/rancher/types v0.0.0-20190826213409-c0775cc536a2 h1:MXhRZ/Dr9hRllb6MSGD1HG8Nzf0Sbl4MTgeSh9rCiiM=
-github.com/rancher/types v0.0.0-20190826213409-c0775cc536a2/go.mod h1:9L7VLTwNVt7vJYwP/7xrQ4tWghDQ+zl9//RTqRjGxes=
 github.com/rancher/wrangler v0.1.5 h1:HiXOeP6Kci2DK+e04D1g6INT77xAYpAr54zmTTe0Spk=
 github.com/rancher/wrangler v0.1.5/go.mod h1:EYP7cqpg42YqElaCm+U9ieSrGQKAXxUH5xsr+XGpWyE=
 github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95 h1:/yghR1MGJk6l6CVxJSx9JGBFP1D6NchJ74wJz7JwxC4=

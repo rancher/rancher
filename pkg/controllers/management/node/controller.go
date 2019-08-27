@@ -378,7 +378,11 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 
 	// validate first
 	validateArgs := buildAgentCommand(obj, strings.Replace(drun, "sudo docker run -d", "sudo docker run", 1)+" --validate")
-	validateCmd := buildCommand(nodeDir, validateArgs)
+	validateCmd, err := buildCommand(nodeDir, obj, validateArgs)
+	if err != nil {
+		return err
+	}
+
 	stdoutBuf := &bytes.Buffer{}
 	validateCmd.Stdout = stdoutBuf
 	if err := validateCmd.Run(); err != nil {
