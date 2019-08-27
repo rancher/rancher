@@ -94,7 +94,7 @@ rules:
 
 ---
 
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cattle-cluster-agent
@@ -160,7 +160,7 @@ spec:
 
 ---
 
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
     name: cattle-node-agent
@@ -246,7 +246,7 @@ spec:
 
 ---
 
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
     name: cattle-node-agent-windows
@@ -339,7 +339,7 @@ spec:
 
 ---
 
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
     name: kube-api-auth
@@ -390,7 +390,7 @@ spec:
 `
 
 var AuthDaemonSet = `
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
     name: kube-api-auth
