@@ -215,6 +215,17 @@ func (m *nodesSyncer) syncLabels(key string, obj *v3.Node) (runtime.Object, erro
 }
 
 func (m *nodesSyncer) reconcileAll() error {
+	// skip reconcile if we are restoring from backup,
+	// this is needed to avoid adding/deleting replaced nodes that might be in the
+	// snapshots before the cluster restore/reconcile is complete
+	if m.clusterNamespace != "local" { // we don't check for local cluster
+		if restoring, err := m.isClusterRestoring(); restoring {
+			return nil
+		} else if err != nil {
+			return err
+		}
+	}
+
 	nodes, err := m.nodeLister.List("", labels.NewSelector())
 	if err != nil {
 		return err
@@ -648,4 +659,16 @@ func addMapForInit(data1 map[corev1.ResourceName]resource.Quantity, data2 map[co
 			data2[name] = *quantity.Copy()
 		}
 	}
+}
+
+func (m *nodesSyncer) isClusterRestoring() (bool, error) {
+	cluster, err := m.clusterLister.Get("", m.clusterNamespace)
+	if err != nil {
+		return false, err
+	}
+	if cluster.Spec.RancherKubernetesEngineConfig != nil &&
+		cluster.Spec.RancherKubernetesEngineConfig.Restore.Restore {
+		return true, nil
+	}
+	return false, nil
 }
