@@ -2,14 +2,12 @@ package systemtemplate
 
 import (
 	"crypto/md5"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"text/template"
-
 	"io"
-
-	"crypto/sha256"
 	"strings"
+	"text/template"
 
 	"github.com/rancher/rancher/pkg/settings"
 )
@@ -19,16 +17,17 @@ var (
 )
 
 type context struct {
-	CAChecksum string
-	AgentImage string
-	AuthImage  string
-	TokenKey   string
-	Token      string
-	URL        string
-	URLPlain   string
+	CAChecksum       string
+	AgentImage       string
+	AuthImage        string
+	TokenKey         string
+	Token            string
+	URL              string
+	URLPlain         string
+	IsWindowsCluster bool
 }
 
-func SystemTemplate(resp io.Writer, agentImage, authImage, token, url string) error {
+func SystemTemplate(resp io.Writer, agentImage, authImage, token, url string, isWindowsCluster bool) error {
 	d := md5.Sum([]byte(token))
 	tokenKey := hex.EncodeToString(d[:])[:7]
 
@@ -37,13 +36,14 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, token, url string) er
 	}
 
 	context := &context{
-		CAChecksum: CAChecksum(),
-		AgentImage: agentImage,
-		AuthImage:  authImage,
-		TokenKey:   tokenKey,
-		Token:      base64.StdEncoding.EncodeToString([]byte(token)),
-		URL:        base64.StdEncoding.EncodeToString([]byte(url)),
-		URLPlain:   url,
+		CAChecksum:       CAChecksum(),
+		AgentImage:       agentImage,
+		AuthImage:        authImage,
+		TokenKey:         tokenKey,
+		Token:            base64.StdEncoding.EncodeToString([]byte(token)),
+		URL:              base64.StdEncoding.EncodeToString([]byte(url)),
+		URLPlain:         url,
+		IsWindowsCluster: isWindowsCluster,
 	}
 
 	return t.Execute(resp, context)

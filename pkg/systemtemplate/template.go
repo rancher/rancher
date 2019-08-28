@@ -244,6 +244,8 @@ spec:
   updateStrategy:
     type: RollingUpdate
 
+{{- if .IsWindowsCluster}}
+
 ---
 
 apiVersion: extensions/v1beta1
@@ -334,6 +336,7 @@ spec:
           path: \\.\pipe\rancher_wins
   updateStrategy:
     type: RollingUpdate
+{{- end }}
 
 {{- if .AuthImage}}
 
