@@ -115,8 +115,8 @@ Log-Info "Detecting host DISK reservation ..."
 try
 {
     `$diskAvaliableGB = `$(Get-WmiObject -Class Win32_LogicalDisk | Where-Object {`$_.DeviceID -eq "C:"} | Select-Object -ExpandProperty Size)/1GB
-    if (`$diskAvaliableGB -lt 31.9) {
-        Log-Fatal "The DISK resource could not satisfy the default reservation for both Windows system and Kuberentes components, please increase the DISK resource to more than 32 GB"
+    if (`$diskAvaliableGB -lt 29.5) {
+        Log-Fatal "The DISK resource could not satisfy the default reservation for both Windows system and Kuberentes components, please increase the DISK resource to more than 30 GB"
     } elseif (`$diskAvaliableGB -lt 49.5) {
         Log-Warn "The DISK resource only satisfy the lowest limit of running Kubernetes components"
         Log-Warn "Please increase the DISK resource to more than 50 GB if could not schedual Pods in this Node"
