@@ -218,7 +218,7 @@ func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage stri
 	}
 
 	buf := &bytes.Buffer{}
-	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, token, url)
+	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, token, url, cluster.Spec.WindowsPreferedCluster)
 
 	return buf.Bytes(), err
 }
