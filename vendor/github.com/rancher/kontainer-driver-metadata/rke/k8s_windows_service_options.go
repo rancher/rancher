@@ -38,7 +38,7 @@ func getWindowsKubeletOptions() map[string]string {
 	// increase image pulling deadline
 	kubeletOptions["image-pull-progress-deadline"] = "30m"
 	// enable some windows features
-	kubeletOptions["feature-gates"] = "HyperVContainer=true,WinDSR=true,WinOverlay=true,WindowsGMSA=true"
+	kubeletOptions["feature-gates"] = "HyperVContainer=true,WindowsGMSA=true"
 
 	return kubeletOptions
 }
@@ -57,8 +57,10 @@ func getWindowsKubeProxyOptions() map[string]string {
 
 	// use kernelspace proxy mode
 	kubeProxyOptions["proxy-mode"] = "kernelspace"
-	// enable some windows features
-	kubeProxyOptions["feature-gates"] = "HyperVContainer=true,WinDSR=true,WinOverlay=true,WindowsGMSA=true"
+	// enable Windows Overlay support
+	kubeProxyOptions["feature-gates"] = "WinOverlay=true"
+	// disable Windows DSR support explicitly
+	kubeProxyOptions["enable-dsr"] = "false"
 
 	return kubeProxyOptions
 }
