@@ -270,6 +270,8 @@ github.com/prometheus/procfs v0.0.0-20190117184657-bf6a532e95b1/go.mod h1:c3At6R
 github.com/prometheus/procfs v0.0.2/go.mod h1:TjEm7ze935MbeOT/UhFTIMYKhuLP4wbCsTZCD3I8kEA=
 github.com/prometheus/procfs v0.0.3 h1:CTwfnzjQ+8dS6MhHHu4YswVAD99sL2wjPqP+VkURmKE=
 github.com/prometheus/procfs v0.0.3/go.mod h1:4A/X28fw3Fc593LaREMrKMqOKvUAntwMDaekg4FpcdQ=
+github.com/rancher/client-go v1.14.5-rancher.1 h1:3lriccMjs8HpK4H3OyHo1a0GIvr0lO/sEJSupl3QTz8=
+github.com/rancher/client-go v1.14.5-rancher.1/go.mod h1:N4rIJ5TXwpEuCvEf9SJLCX2CqgSTIIyCK8zIV34IZhE=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190819174335-6eb94126a98c h1:Of+EnlLZ33fmeZgQhr/Pb80iMaR9L8mQ2xvhzQk4o4w=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190819174335-6eb94126a98c/go.mod h1:VDixap7YjDnNwlfxL4gl890ThOVinEZE3qyAaG0xcQE=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190823210613-624182a785ce h1:4onzkfpjfusENeAFn7NhUSCdmBkFez3dRAaqDQGV8ng=
