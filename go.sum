@@ -274,6 +274,8 @@ github.com/rancher/kontainer-driver-metadata v0.0.0-20190819174335-6eb94126a98c 
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190819174335-6eb94126a98c/go.mod h1:VDixap7YjDnNwlfxL4gl890ThOVinEZE3qyAaG0xcQE=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190826223322-3e1df77e6153 h1:MzkL/BHjjoCYmTyP5GfJW0Bn1bsGKOF70//wDoNwPiI=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190826223322-3e1df77e6153/go.mod h1:dHvhyuoiwrjqQCFD586g0cZ9NJJXEKeAtQi8RX96U8E=
+github.com/rancher/kontainer-driver-metadata v0.0.0-20190828225135-38a0f0beda18 h1:Muzkw/vWJaqXLvxJvI7C/ZkQ5n/8ypvGVpvZwnR/YIQ=
+github.com/rancher/kontainer-driver-metadata v0.0.0-20190828225135-38a0f0beda18/go.mod h1:dHvhyuoiwrjqQCFD586g0cZ9NJJXEKeAtQi8RX96U8E=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20190819182532-d4cdf8e56671 h1:JIgjMy2Nb/H+89T2S7TePqiGyxeE4J1g5tGtb9+hqsQ=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20190819182532-d4cdf8e56671/go.mod h1:NHG6mh7mpbYOVbhw5f2eNPYWgMFZImfILcDL+U29kUI=
 github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009 h1:Xsxh7fX3+2wAUJtPy8g2lZh0cYuyifqhBL0vxCIYojs=
@@ -289,6 +291,8 @@ github.com/rancher/rke v0.3.0-rc6.0.20190819180243-f8bac2c059d0 h1:XYyvskgyYvU89
 github.com/rancher/rke v0.3.0-rc6.0.20190819180243-f8bac2c059d0/go.mod h1:IyunvVrNJZLg3m5faCvG4LNAyf03vuAShBi9q9mcPGc=
 github.com/rancher/rke v0.3.0-rc7.0.20190827012814-16a1a5e2508b h1:7XHuDK929QB00oHzUWUEwYwfWSUjzYkEG/KOlIAj3Qw=
 github.com/rancher/rke v0.3.0-rc7.0.20190827012814-16a1a5e2508b/go.mod h1:Ca4LQql2fWwYp8noKlGYY2cLDpbKOWCIknL/8CxhzkY=
+github.com/rancher/rke v0.3.0-rc8.0.20190828231723-e31b8b0bf57f h1:R78nd+yLQXglaujK46gBpYg4iT8FiD6QTBkjr8xbnYI=
+github.com/rancher/rke v0.3.0-rc8.0.20190828231723-e31b8b0bf57f/go.mod h1:VUpGJYSmz8o0yuQsYP00sbFvRCms7FL5/Y1fYF40mSM=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/types v0.0.0-20190819173748-96e6d6f30265/go.mod h1:ROyypICT7xxMhVRplyFnEIaXHw2nMVHfCZ8Y3261qmw=

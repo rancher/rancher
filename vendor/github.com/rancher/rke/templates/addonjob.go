@@ -19,13 +19,17 @@ spec:
     metadata:
        name: rke-deploy
     spec:
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                  - key: beta.kubernetes.io/os
+                    operator: NotIn
+                    values:
+                      - windows
         tolerations:
-        - key: node-role.kubernetes.io/controlplane
-          operator: Exists
-          effect: NoSchedule
-        - key: node-role.kubernetes.io/etcd
-          operator: Exists
-          effect: NoExecute
+        - operator: Exists
         hostNetwork: true
         serviceAccountName: rke-job-deployer
         nodeName: {{$nodeName}}
