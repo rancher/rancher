@@ -268,7 +268,7 @@ func (g *genericController) processNextWorkItem() bool {
 		return true
 	}
 
-	if err := filterConflictsError(err); err != nil {
+	if err = filterConflictsError(err); err != nil {
 		logrus.Errorf("%v %v %v", g.name, key, err)
 	}
 
@@ -302,9 +302,9 @@ func filterConflictsError(err error) error {
 
 	if errs, ok := errors2.Cause(err).(*types.MultiErrors); ok {
 		var newErrors []error
-		for _, err := range errs.Errors {
-			if !ignoreError(err, true) {
-				newErrors = append(newErrors, err)
+		for _, newError := range errs.Errors {
+			if !ignoreError(newError, true) {
+				newErrors = append(newErrors, newError)
 			}
 		}
 		return types.NewErrors(newErrors...)
@@ -345,7 +345,8 @@ func (g *genericController) syncHandler(key interface{}) (err error) {
 
 		logrus.Debugf("%s calling handler %s %s", g.name, handler.name, s)
 		metrics.IncTotalHandlerExecution(g.name, handler.name)
-		if newObj, err := handler.handler(s, obj); err != nil {
+		var newObj interface{}
+		if newObj, err = handler.handler(s, obj); err != nil {
 			if !ignoreError(err, false) {
 				metrics.IncTotalHandlerFailure(g.name, handler.name, s)
 			}
