@@ -3,7 +3,7 @@ package v1beta1
 import (
 	"github.com/rancher/norman/lifecycle"
 	"github.com/rancher/norman/resource"
-	"k8s.io/api/extensions/v1beta1"
+	"k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 

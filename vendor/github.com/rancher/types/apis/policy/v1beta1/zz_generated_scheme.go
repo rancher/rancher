@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	GroupName = "extensions"
+	GroupName = "policy"
 	Version   = "v1beta1"
 )
 
@@ -34,7 +34,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO this gets cleaned up when the types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
 
-		&IngressList{},
+		&PodSecurityPolicyList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

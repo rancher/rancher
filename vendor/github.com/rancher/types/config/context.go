@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/types"
 	apiregistrationv1 "github.com/rancher/types/apis/apiregistration.k8s.io/v1"
-	appsv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
+	appsv1 "github.com/rancher/types/apis/apps/v1"
 	autoscaling "github.com/rancher/types/apis/autoscaling/v2beta2"
 	batchv1 "github.com/rancher/types/apis/batch/v1"
 	batchv1beta1 "github.com/rancher/types/apis/batch/v1beta1"
@@ -22,6 +22,7 @@ import (
 	monitoringv1 "github.com/rancher/types/apis/monitoring.coreos.com/v1"
 	istiov1alpha3 "github.com/rancher/types/apis/networking.istio.io/v1alpha3"
 	knetworkingv1 "github.com/rancher/types/apis/networking.k8s.io/v1"
+	policyv1beta1 "github.com/rancher/types/apis/policy/v1beta1"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	projectSchema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
@@ -181,7 +182,7 @@ type UserContext struct {
 	K8sClient         kubernetes.Interface
 
 	APIAggregation apiregistrationv1.Interface
-	Apps           appsv1beta2.Interface
+	Apps           appsv1.Interface
 	Autoscaling    autoscaling.Interface
 	Project        projectv3.Interface
 	Core           corev1.Interface
@@ -194,6 +195,7 @@ type UserContext struct {
 	Cluster        clusterv3.Interface
 	Istio          istiov1alpha3.Interface
 	Storage        storagev1.Interface
+	Policy         policyv1beta1.Interface
 }
 
 func (w *UserContext) controllers() []controller.Starter {
@@ -210,6 +212,7 @@ func (w *UserContext) controllers() []controller.Starter {
 		w.Monitoring,
 		w.Cluster,
 		w.Storage,
+		w.Policy,
 	}
 }
 
@@ -233,6 +236,7 @@ func (w *UserContext) UserOnlyContext() *UserOnlyContext {
 		Cluster:      w.Cluster,
 		Istio:        w.Istio,
 		Storage:      w.Storage,
+		Policy:       w.Policy,
 	}
 }
 
@@ -244,7 +248,7 @@ type UserOnlyContext struct {
 	K8sClient         kubernetes.Interface
 
 	APIRegistration apiregistrationv1.Interface
-	Apps            appsv1beta2.Interface
+	Apps            appsv1.Interface
 	Autoscaling     autoscaling.Interface
 	Project         projectv3.Interface
 	Core            corev1.Interface
@@ -256,6 +260,7 @@ type UserOnlyContext struct {
 	Cluster         clusterv3.Interface
 	Istio           istiov1alpha3.Interface
 	Storage         storagev1.Interface
+	Policy          policyv1beta1.Interface
 }
 
 func (w *UserOnlyContext) controllers() []controller.Starter {
@@ -270,6 +275,7 @@ func (w *UserOnlyContext) controllers() []controller.Starter {
 		w.BatchV1Beta1,
 		w.Monitoring,
 		w.Storage,
+		w.Policy,
 	}
 }
 
@@ -364,7 +370,7 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		return nil, err
 	}
 
-	context.Apps, err = appsv1beta2.NewForConfig(config)
+	context.Apps, err = appsv1.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -395,6 +401,11 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 	}
 
 	context.Extensions, err = extv1beta1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Policy, err = policyv1beta1.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -470,7 +481,7 @@ func NewUserOnlyContext(config rest.Config) (*UserOnlyContext, error) {
 		return nil, err
 	}
 
-	context.Apps, err = appsv1beta2.NewForConfig(config)
+	context.Apps, err = appsv1.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -496,6 +507,11 @@ func NewUserOnlyContext(config rest.Config) (*UserOnlyContext, error) {
 	}
 
 	context.Extensions, err = extv1beta1.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	context.Policy, err = policyv1beta1.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}

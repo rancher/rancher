@@ -1,16 +1,16 @@
-package v1beta2
+package v1
 
 import (
 	"github.com/rancher/norman/lifecycle"
 	"github.com/rancher/norman/resource"
-	"k8s.io/api/apps/v1beta2"
+	v1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type DeploymentLifecycle interface {
-	Create(obj *v1beta2.Deployment) (runtime.Object, error)
-	Remove(obj *v1beta2.Deployment) (runtime.Object, error)
-	Updated(obj *v1beta2.Deployment) (runtime.Object, error)
+	Create(obj *v1.Deployment) (runtime.Object, error)
+	Remove(obj *v1.Deployment) (runtime.Object, error)
+	Updated(obj *v1.Deployment) (runtime.Object, error)
 }
 
 type deploymentLifecycleAdapter struct {
@@ -28,7 +28,7 @@ func (w *deploymentLifecycleAdapter) HasFinalize() bool {
 }
 
 func (w *deploymentLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
-	o, err := w.lifecycle.Create(obj.(*v1beta2.Deployment))
+	o, err := w.lifecycle.Create(obj.(*v1.Deployment))
 	if o == nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func (w *deploymentLifecycleAdapter) Create(obj runtime.Object) (runtime.Object,
 }
 
 func (w *deploymentLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
-	o, err := w.lifecycle.Remove(obj.(*v1beta2.Deployment))
+	o, err := w.lifecycle.Remove(obj.(*v1.Deployment))
 	if o == nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func (w *deploymentLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Objec
 }
 
 func (w *deploymentLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
-	o, err := w.lifecycle.Updated(obj.(*v1beta2.Deployment))
+	o, err := w.lifecycle.Updated(obj.(*v1.Deployment))
 	if o == nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func NewDeploymentLifecycleAdapter(name string, clusterScoped bool, client Deplo
 	}
 	adapter := &deploymentLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1beta2.Deployment) (runtime.Object, error) {
+	return func(key string, obj *v1.Deployment) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
 		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
