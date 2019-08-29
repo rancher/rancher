@@ -262,6 +262,7 @@ type NotifierSpec struct {
 
 	DisplayName     string           `json:"displayName,omitempty" norman:"required"`
 	Description     string           `json:"description,omitempty"`
+	SendResolved    bool             `json:"sendResolved,omitempty"`
 	SMTPConfig      *SMTPConfig      `json:"smtpConfig,omitempty"`
 	SlackConfig     *SlackConfig     `json:"slackConfig,omitempty"`
 	PagerdutyConfig *PagerdutyConfig `json:"pagerdutyConfig,omitempty"`
