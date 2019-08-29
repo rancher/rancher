@@ -241,6 +241,12 @@ spec:
                   values:
                     - windows
       hostNetwork: true
+{{if .NodeSelector}}
+      nodeSelector:
+      {{ range $k, $v := .NodeSelector }}
+        {{ $k }}: "{{ $v }}"
+      {{ end }}
+{{end}}
       serviceAccountName: canal
       tolerations:
         # Tolerate this effect so the pods will be schedulable at all times
@@ -835,6 +841,12 @@ spec:
                   values:
                     - windows
       hostNetwork: true
+{{if .NodeSelector}}
+      nodeSelector:
+      {{ range $k, $v := .NodeSelector }}
+        {{ $k }}: "{{ $v }}"
+      {{ end }}
+{{end}}
       tolerations:
         # Make sure canal gets scheduled on all nodes.
         - effect: NoSchedule
@@ -1436,6 +1448,12 @@ spec:
                   values:
                     - windows
       hostNetwork: true
+{{if .NodeSelector}}
+      nodeSelector:
+      {{ range $k, $v := .NodeSelector }}
+        {{ $k }}: "{{ $v }}"
+      {{ end }}
+{{end}}
       tolerations:
         # Make sure canal gets scheduled on all nodes.
         - effect: NoSchedule
@@ -2154,6 +2172,12 @@ spec:
                   values:
                     - windows
       hostNetwork: true
+{{if .NodeSelector}}
+      nodeSelector:
+      {{ range $k, $v := .NodeSelector }}
+        {{ $k }}: "{{ $v }}"
+      {{ end }}
+{{end}}
       tolerations:
         # Tolerate this effect so the pods will be schedulable at all times
         - effect: NoSchedule

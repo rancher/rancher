@@ -186,10 +186,15 @@ spec:
                   values:
                     - windows
       hostNetwork: true
+      {{if .DNSPolicy}}
+      dnsPolicy: {{.DNSPolicy}}
+      {{end}}
+{{if .NodeSelector}}
       nodeSelector:
       {{ range $k, $v := .NodeSelector }}
         {{ $k }}: "{{ $v }}"
       {{ end }}
+{{end}}
       {{if eq .RBACConfig "rbac"}}
       serviceAccountName: nginx-ingress-serviceaccount
       {{ end }}
@@ -523,14 +528,18 @@ spec:
                   operator: NotIn
                   values:
                     - windows
+                - key: node-role.kubernetes.io/worker
+                  operator: Exists
       hostNetwork: true
       {{if .DNSPolicy}}
       dnsPolicy: {{.DNSPolicy}}
       {{end}}
+{{if .NodeSelector}}
       nodeSelector:
       {{ range $k, $v := .NodeSelector }}
         {{ $k }}: "{{ $v }}"
       {{ end }}
+{{end}}
       {{if eq .RBACConfig "rbac"}}
       serviceAccountName: nginx-ingress-serviceaccount
       {{ end }}

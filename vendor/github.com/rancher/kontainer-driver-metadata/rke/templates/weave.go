@@ -37,6 +37,12 @@ items:
                       operator: NotIn
                       values:
                         - windows
+{{if .NodeSelector}}
+          nodeSelector:
+            {{ range $k, $v := .NodeSelector }}
+              {{ $k }}: "{{ $v }}"
+            {{ end }}
+{{end}}
           containers:
             - name: weave
               command:
