@@ -18,7 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/pipeline/remote"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/types/apis/apps/v1beta2"
+	appsv1 "github.com/rancher/types/apis/apps/v1"
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config/dialer"
@@ -40,7 +40,7 @@ type Engine struct {
 	HTTPClient       *http.Client
 	ServiceLister    v1.ServiceLister
 	PodLister        v1.PodLister
-	DeploymentLister v1beta2.DeploymentLister
+	DeploymentLister appsv1.DeploymentLister
 
 	Secrets                    v1.SecretInterface
 	SecretLister               v1.SecretLister

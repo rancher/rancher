@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
 	"github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/rancher/pkg/ticker"
-	"github.com/rancher/types/apis/apps/v1beta2"
+	appsv1 "github.com/rancher/types/apis/apps/v1"
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -43,10 +43,10 @@ type WorkloadWatcher struct {
 	projectLister               v3.ProjectLister
 	namespaceIndexer            cache.Indexer
 	replicationControllerLister v1.ReplicationControllerLister
-	replicaSetLister            v1beta2.ReplicaSetLister
-	daemonsetLister             v1beta2.DaemonSetLister
-	deploymentLister            v1beta2.DeploymentLister
-	statefulsetLister           v1beta2.StatefulSetLister
+	replicaSetLister            appsv1.ReplicaSetLister
+	daemonsetLister             appsv1.DaemonSetLister
+	deploymentLister            appsv1.DeploymentLister
+	statefulsetLister           appsv1.StatefulSetLister
 }
 
 func StartWorkloadWatcher(ctx context.Context, cluster *config.UserContext, manager *manager.AlertManager) {

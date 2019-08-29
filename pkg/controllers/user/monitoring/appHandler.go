@@ -3,7 +3,7 @@ package monitoring
 import (
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/systemaccount"
-	appsv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
+	appsv1 "github.com/rancher/types/apis/apps/v1"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
@@ -17,9 +17,9 @@ type appHandler struct {
 	cattleClusterGraphClient    mgmtv3.ClusterMonitorGraphInterface
 	cattleProjectGraphClient    mgmtv3.ProjectMonitorGraphInterface
 	cattleMonitorMetricClient   mgmtv3.MonitorMetricInterface
-	agentDeploymentClient       appsv1beta2.DeploymentInterface
-	agentStatefulSetClient      appsv1beta2.StatefulSetInterface
-	agentDaemonSetClient        appsv1beta2.DaemonSetInterface
+	agentDeploymentClient       appsv1.DeploymentInterface
+	agentStatefulSetClient      appsv1.StatefulSetInterface
+	agentDaemonSetClient        appsv1.DaemonSetInterface
 	agentServiceAccountClient   corev1.ServiceAccountInterface
 	agentSecretClient           corev1.SecretInterface
 	agentNodeClient             corev1.NodeInterface

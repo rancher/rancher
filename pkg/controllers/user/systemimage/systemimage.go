@@ -9,7 +9,7 @@ import (
 	logging "github.com/rancher/rancher/pkg/controllers/user/logging/deployer"
 	pipeline "github.com/rancher/rancher/pkg/controllers/user/pipeline/upgrade"
 	"github.com/rancher/rancher/pkg/project"
-	"github.com/rancher/types/apis/apps/v1beta2"
+	appsv1 "github.com/rancher/types/apis/apps/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 
@@ -22,10 +22,10 @@ var systemProjectLabels = labels.Set(map[string]string{"authz.management.cattle.
 
 type Syncer struct {
 	clusterName      string
-	daemonsets       v1beta2.DaemonSetInterface
-	daemonsetLister  v1beta2.DaemonSetLister
-	deployments      v1beta2.DeploymentInterface
-	deploymentLister v1beta2.DeploymentLister
+	daemonsets       appsv1.DaemonSetInterface
+	daemonsetLister  appsv1.DaemonSetLister
+	deployments      appsv1.DeploymentInterface
+	deploymentLister appsv1.DeploymentLister
 	projectLister    v3.ProjectLister
 	projects         v3.ProjectInterface
 	userContext      *config.UserContext
