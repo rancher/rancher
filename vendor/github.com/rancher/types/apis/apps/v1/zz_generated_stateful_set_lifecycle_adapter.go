@@ -1,16 +1,16 @@
-package v1beta2
+package v1
 
 import (
 	"github.com/rancher/norman/lifecycle"
 	"github.com/rancher/norman/resource"
-	"k8s.io/api/apps/v1beta2"
+	v1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type StatefulSetLifecycle interface {
-	Create(obj *v1beta2.StatefulSet) (runtime.Object, error)
-	Remove(obj *v1beta2.StatefulSet) (runtime.Object, error)
-	Updated(obj *v1beta2.StatefulSet) (runtime.Object, error)
+	Create(obj *v1.StatefulSet) (runtime.Object, error)
+	Remove(obj *v1.StatefulSet) (runtime.Object, error)
+	Updated(obj *v1.StatefulSet) (runtime.Object, error)
 }
 
 type statefulSetLifecycleAdapter struct {
@@ -28,7 +28,7 @@ func (w *statefulSetLifecycleAdapter) HasFinalize() bool {
 }
 
 func (w *statefulSetLifecycleAdapter) Create(obj runtime.Object) (runtime.Object, error) {
-	o, err := w.lifecycle.Create(obj.(*v1beta2.StatefulSet))
+	o, err := w.lifecycle.Create(obj.(*v1.StatefulSet))
 	if o == nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func (w *statefulSetLifecycleAdapter) Create(obj runtime.Object) (runtime.Object
 }
 
 func (w *statefulSetLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Object, error) {
-	o, err := w.lifecycle.Remove(obj.(*v1beta2.StatefulSet))
+	o, err := w.lifecycle.Remove(obj.(*v1.StatefulSet))
 	if o == nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func (w *statefulSetLifecycleAdapter) Finalize(obj runtime.Object) (runtime.Obje
 }
 
 func (w *statefulSetLifecycleAdapter) Updated(obj runtime.Object) (runtime.Object, error) {
-	o, err := w.lifecycle.Updated(obj.(*v1beta2.StatefulSet))
+	o, err := w.lifecycle.Updated(obj.(*v1.StatefulSet))
 	if o == nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func NewStatefulSetLifecycleAdapter(name string, clusterScoped bool, client Stat
 	}
 	adapter := &statefulSetLifecycleAdapter{lifecycle: l}
 	syncFn := lifecycle.NewObjectLifecycleAdapter(name, clusterScoped, adapter, client.ObjectClient())
-	return func(key string, obj *v1beta2.StatefulSet) (runtime.Object, error) {
+	return func(key string, obj *v1.StatefulSet) (runtime.Object, error) {
 		newObj, err := syncFn(key, obj)
 		if o, ok := newObj.(runtime.Object); ok {
 			return o, err
