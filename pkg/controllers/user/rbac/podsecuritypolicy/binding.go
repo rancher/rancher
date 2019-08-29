@@ -7,13 +7,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	v1 "github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/apis/extensions/v1beta1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/apis/policy/v1beta1"
 	v12 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	v13 "k8s.io/api/core/v1"
-	v1beta13 "k8s.io/api/extensions/v1beta1"
+	v1beta13 "k8s.io/api/policy/v1beta1"
 	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +34,8 @@ func RegisterBindings(ctx context.Context, context *config.UserContext) {
 	namespaceInformer.AddIndexers(namespaceIndexers)
 
 	lifecycle := &lifecycle{
-		policyLister:         context.Extensions.PodSecurityPolicies("").Controller().Lister(),
-		policies:             context.Extensions.PodSecurityPolicies(""),
+		policyLister:         context.Policy.PodSecurityPolicies("").Controller().Lister(),
+		policies:             context.Policy.PodSecurityPolicies(""),
 		psptLister:           context.Management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
 		clusterRoleLister:    context.RBAC.ClusterRoles("").Controller().Lister(),
 		clusterRoles:         context.RBAC.ClusterRoles(""),

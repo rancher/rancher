@@ -10,7 +10,7 @@ import (
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/settings"
-	appsv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
+	appsv1 "github.com/rancher/types/apis/apps/v1"
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
@@ -34,7 +34,7 @@ type LoggingService struct {
 	catalogLister  v3.CatalogLister
 	projectLister  v3.ProjectLister
 	templateLister v3.CatalogTemplateLister
-	daemonsets     appsv1beta2.DaemonSetInterface
+	daemonsets     appsv1.DaemonSetInterface
 	secrets        v1.SecretInterface
 	appDeployer    *AppDeployer
 }

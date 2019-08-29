@@ -21,7 +21,7 @@ import (
 	"github.com/rancher/rke/pki/cert"
 	mv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
-	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -424,14 +424,14 @@ func getJenkinsService(ns string) *corev1.Service {
 	}
 }
 
-func GetJenkinsDeployment(ns string) *appsv1beta2.Deployment {
+func GetJenkinsDeployment(ns string) *appsv1.Deployment {
 	replicas := int32(1)
-	return &appsv1beta2.Deployment{
+	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      utils.JenkinsName,
 		},
-		Spec: appsv1beta2.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{utils.LabelKeyApp: utils.JenkinsName},
@@ -561,14 +561,14 @@ func getRegistryService(ns string) *corev1.Service {
 	}
 }
 
-func GetRegistryDeployment(ns string) *appsv1beta2.Deployment {
+func GetRegistryDeployment(ns string) *appsv1.Deployment {
 	replicas := int32(1)
-	return &appsv1beta2.Deployment{
+	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      utils.RegistryName,
 		},
-		Spec: appsv1beta2.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{utils.LabelKeyApp: utils.RegistryName},
@@ -757,13 +757,13 @@ func (l *Lifecycle) getAvailablePort() (string, error) {
 
 }
 
-func getProxyDaemonset() *appsv1beta2.DaemonSet {
-	return &appsv1beta2.DaemonSet{
+func getProxyDaemonset() *appsv1.DaemonSet {
+	return &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: utils.PipelineNamespace,
 			Name:      utils.RegistryProxyName,
 		},
-		Spec: appsv1beta2.DaemonSetSpec{
+		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{utils.LabelKeyApp: utils.RegistryProxyName},
 			},
@@ -841,14 +841,14 @@ func getMinioService(ns string) *corev1.Service {
 	}
 }
 
-func GetMinioDeployment(ns string) *appsv1beta2.Deployment {
+func GetMinioDeployment(ns string) *appsv1.Deployment {
 	replicas := int32(1)
-	return &appsv1beta2.Deployment{
+	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      utils.MinioName,
 		},
-		Spec: appsv1beta2.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{utils.LabelKeyApp: utils.MinioName},

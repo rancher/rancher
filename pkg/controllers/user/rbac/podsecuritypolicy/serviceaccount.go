@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	v13 "github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/apis/extensions/v1beta1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/apis/policy/v1beta1"
 	v12 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -51,13 +51,13 @@ func RegisterServiceAccount(ctx context.Context, context *config.UserContext) {
 		roleBindings:       context.RBAC.RoleBindings(""),
 		roleBindingIndexer: roleBindingInformer.GetIndexer(),
 
-		policies:      context.Extensions.PodSecurityPolicies(""),
+		policies:      context.Policy.PodSecurityPolicies(""),
 		psptpbIndexer: psptpbInformer.GetIndexer(),
 
 		clusterLister:     context.Management.Management.Clusters("").Controller().Lister(),
 		psptLister:        context.Management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
 		templateLister:    context.Management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
-		policyLister:      context.Extensions.PodSecurityPolicies("").Controller().Lister(),
+		policyLister:      context.Policy.PodSecurityPolicies("").Controller().Lister(),
 		roleBindingLister: context.RBAC.RoleBindings("").Controller().Lister(),
 		roleLister:        context.RBAC.ClusterRoles("").Controller().Lister(),
 		namespaceLister:   context.Core.Namespaces("").Controller().Lister(),

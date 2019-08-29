@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/systemaccount"
-	rv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
+	appsv1 "github.com/rancher/types/apis/apps/v1"
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -24,8 +24,8 @@ var (
 )
 
 type PipelineService struct {
-	deployments          rv1beta2.DeploymentInterface
-	deploymentLister     rv1beta2.DeploymentLister
+	deployments          appsv1.DeploymentInterface
+	deploymentLister     appsv1.DeploymentLister
 	namespaceLister      v1.NamespaceLister
 	secrets              v1.SecretInterface
 	systemAccountManager *systemaccount.Manager

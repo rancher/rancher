@@ -8,12 +8,12 @@ import (
 	"strings"
 
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/types/apis/apps/v1beta2"
+	appsv1 "github.com/rancher/types/apis/apps/v1"
 	batchv1 "github.com/rancher/types/apis/batch/v1"
 	"github.com/rancher/types/apis/batch/v1beta1"
 	v1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/config"
-	corev1beta2 "k8s.io/api/apps/v1beta2"
+	k8sappv1 "k8s.io/api/apps/v1"
 	corebatchv1 "k8s.io/api/batch/v1"
 	corebatchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -75,18 +75,18 @@ type Status struct {
 }
 
 type CommonController struct {
-	DeploymentLister            v1beta2.DeploymentLister
+	DeploymentLister            appsv1.DeploymentLister
 	ReplicationControllerLister v1.ReplicationControllerLister
-	ReplicaSetLister            v1beta2.ReplicaSetLister
-	DaemonSetLister             v1beta2.DaemonSetLister
-	StatefulSetLister           v1beta2.StatefulSetLister
+	ReplicaSetLister            appsv1.ReplicaSetLister
+	DaemonSetLister             appsv1.DaemonSetLister
+	StatefulSetLister           appsv1.StatefulSetLister
 	JobLister                   batchv1.JobLister
 	CronJobLister               v1beta1.CronJobLister
-	Deployments                 v1beta2.DeploymentInterface
+	Deployments                 appsv1.DeploymentInterface
 	ReplicationControllers      v1.ReplicationControllerInterface
-	ReplicaSets                 v1beta2.ReplicaSetInterface
-	DaemonSets                  v1beta2.DaemonSetInterface
-	StatefulSets                v1beta2.StatefulSetInterface
+	ReplicaSets                 appsv1.ReplicaSetInterface
+	DaemonSets                  appsv1.DaemonSetInterface
+	StatefulSets                appsv1.StatefulSetInterface
 	Jobs                        batchv1.JobInterface
 	CronJobs                    v1beta1.CronJobInterface
 	Sync                        func(key string, w *Workload) error
@@ -122,7 +122,7 @@ func NewWorkloadController(ctx context.Context, workload *config.UserOnlyContext
 	return c
 }
 
-func (c *CommonController) syncDeployments(key string, obj *corev1beta2.Deployment) (runtime.Object, error) {
+func (c *CommonController) syncDeployments(key string, obj *k8sappv1.Deployment) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -146,7 +146,7 @@ func (c *CommonController) syncReplicationControllers(key string, obj *corev1.Re
 	return nil, c.Sync(key, w)
 }
 
-func (c *CommonController) syncReplicaSet(key string, obj *corev1beta2.ReplicaSet) (runtime.Object, error) {
+func (c *CommonController) syncReplicaSet(key string, obj *k8sappv1.ReplicaSet) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -157,7 +157,7 @@ func (c *CommonController) syncReplicaSet(key string, obj *corev1beta2.ReplicaSe
 	return nil, c.Sync(key, w)
 }
 
-func (c *CommonController) syncDaemonSet(key string, obj *corev1beta2.DaemonSet) (runtime.Object, error) {
+func (c *CommonController) syncDaemonSet(key string, obj *k8sappv1.DaemonSet) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -168,7 +168,7 @@ func (c *CommonController) syncDaemonSet(key string, obj *corev1beta2.DaemonSet)
 	return nil, c.Sync(key, w)
 }
 
-func (c *CommonController) syncStatefulSet(key string, obj *corev1beta2.StatefulSet) (runtime.Object, error) {
+func (c *CommonController) syncStatefulSet(key string, obj *k8sappv1.StatefulSet) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -802,11 +802,11 @@ func (c CommonController) EnqueueAllWorkloads(namespace string) error {
 }
 
 func (c CommonController) GetActualFromWorkload(w *Workload) (
-	deploy *corev1beta2.Deployment,
+	deploy *k8sappv1.Deployment,
 	rc *corev1.ReplicationController,
-	rs *corev1beta2.ReplicaSet,
-	ds *corev1beta2.DaemonSet,
-	ss *corev1beta2.StatefulSet,
+	rs *k8sappv1.ReplicaSet,
+	ds *k8sappv1.DaemonSet,
+	ss *k8sappv1.StatefulSet,
 	job *corebatchv1.Job,
 	cj *corebatchv1beta1.CronJob,
 	err error,

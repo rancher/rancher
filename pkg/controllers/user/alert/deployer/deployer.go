@@ -15,7 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
-	appsv1beta2 "github.com/rancher/types/apis/apps/v1beta2"
+	appsv1 "github.com/rancher/types/apis/apps/v1"
 	v1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
@@ -53,9 +53,9 @@ type appDeployer struct {
 	namespaces           v1.NamespaceInterface
 	secrets              v1.SecretInterface
 	templateVersions     mgmtv3.CatalogTemplateVersionInterface
-	statefulsets         appsv1beta2.StatefulSetInterface
+	statefulsets         appsv1.StatefulSetInterface
 	systemAccountManager *systemaccount.Manager
-	deployments          appsv1beta2.DeploymentInterface
+	deployments          appsv1.DeploymentInterface
 }
 
 type operaterDeployer struct {
@@ -64,7 +64,7 @@ type operaterDeployer struct {
 	appsGetter       projectv3.AppsGetter
 	rbacs            rbacv1.Interface
 	cores            v1.Interface
-	apps             appsv1beta2.Interface
+	apps             appsv1.Interface
 }
 
 func NewDeployer(cluster *config.UserContext, manager *manager.AlertManager) *Deployer {
