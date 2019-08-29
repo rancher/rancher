@@ -64,10 +64,11 @@ var (
 	AuthUserSessionTTLMinutes         = NewSetting("auth-user-session-ttl-minutes", "960")   // 16 hours
 	AuthUserInfoMaxAgeSeconds         = NewSetting("auth-user-info-max-age-seconds", "3600") // 1 hour
 	APIUIVersion                      = NewSetting("api-ui-version", "1.1.6")                // Please update the CATTLE_API_UI_VERSION in package/Dockerfile when updating the version here.
-	RotateCertsIfExpiringInDays       = NewSetting("rotate-certs-if-expiring-in-days", "7")  // 7 days
 	ClusterTemplateEnforcement        = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir              = NewSetting("initial-docker-root-dir", "/var/lib/docker")
-	SystemCatalog                     = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
+	SystemCatalog                     = NewSetting("system-catalog", "external")             // Options are 'external' or 'bundled'
+	RotateCertsIfExpiringInDays       = NewSetting("rotate-certs-if-expiring-in-days", "10") // 7 days
+	TestCertExpirationSetting         = NewSetting("test-cert-expiration-setting", "60")
 )
 
 func init() {

@@ -3,14 +3,18 @@ package dynamiclistener
 import (
 	"context"
 	"crypto/md5"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
+	"math"
+	"math/big"
 	"net"
 	"net/http"
 	"reflect"
@@ -24,11 +28,10 @@ import (
 	"github.com/rancher/norman/types/set"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rke/pki/cert"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/acme/autocert"
-
-	"github.com/rancher/rke/pki/cert"
 )
 
 const (
@@ -371,10 +374,12 @@ func (s *Server) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, e
 		rotateBeforeStr := settings.RotateCertsIfExpiringInDays.Get()
 		rotateBefore, err := strconv.ParseInt(rotateBeforeStr, 10, 64)
 		if err != nil {
-			rotateBefore = 7
+			//rotateBefore = 7
+			rotateBefore = 10
 			logrus.Errorf("Error in converting rotate cert setting: %v", err)
 		}
-		if expiryTime.Sub(currentTime) > (time.Hour * 24 * time.Duration(rotateBefore)) {
+		//if expiryTime.Sub(currentTime) > (time.Hour * 24 * time.Duration(rotateBefore)) {
+		if expiryTime.Sub(currentTime) > (time.Minute * time.Duration(rotateBefore)) {
 			return serverNameCert, nil
 		}
 		logrus.Infof("Rancher server cert expires at %v, generating new cert", expiryTime)
@@ -405,7 +410,8 @@ func (s *Server) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, e
 		return nil, err
 	}
 
-	cert, err := cert.NewSignedCert(cfg, key, s.activeCA, s.activeCAKey)
+	//cert, err := cert.NewSignedCert(cfg, key, s.activeCA, s.activeCAKey)
+	cert, err := NewSignedCert(cfg, key, s.activeCA, s.activeCAKey)
 	if err != nil {
 		return nil, err
 	}
@@ -707,4 +713,41 @@ func getKeysFromMap(input map[string]uint16) []string {
 		keys = append(keys, key)
 	}
 	return keys
+}
+
+func NewSignedCert(cfg cert.Config, key *rsa.PrivateKey, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, error) {
+	serial, err := rand.Int(rand.Reader, new(big.Int).SetInt64(math.MaxInt64))
+	if err != nil {
+		return nil, err
+	}
+	if len(cfg.CommonName) == 0 {
+		return nil, errors.New("must specify a CommonName")
+	}
+	if len(cfg.Usages) == 0 {
+		return nil, errors.New("must specify at least one ExtKeyUsage")
+	}
+	expirationSettingStr := settings.TestCertExpirationSetting.Get()
+	expirationSetting, err := strconv.ParseInt(expirationSettingStr, 10, 64)
+	if err != nil {
+		logrus.Errorf("Error in parsing string: %v", err)
+	}
+
+	certTmpl := x509.Certificate{
+		Subject: pkix.Name{
+			CommonName:   cfg.CommonName,
+			Organization: cfg.Organization,
+		},
+		DNSNames:     cfg.AltNames.DNSNames,
+		IPAddresses:  cfg.AltNames.IPs,
+		SerialNumber: serial,
+		NotBefore:    caCert.NotBefore,
+		NotAfter:     time.Now().Add(time.Minute * time.Duration(expirationSetting)).UTC(),
+		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  cfg.Usages,
+	}
+	certDERBytes, err := x509.CreateCertificate(rand.Reader, &certTmpl, caCert, key.Public(), caKey)
+	if err != nil {
+		return nil, err
+	}
+	return x509.ParseCertificate(certDERBytes)
 }
