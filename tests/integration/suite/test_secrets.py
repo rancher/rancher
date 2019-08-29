@@ -153,6 +153,7 @@ def test_docker_credential(admin_pc):
     assert cert.name == name
     assert cert.registries['index.docker.io'].username == 'foo'
     assert 'password' in cert.registries['index.docker.io']
+    assert 'auth' in cert.registries['index.docker.io']
     assert cert.namespaceId is None
     assert 'namespace' not in cert
     assert cert.projectId == admin_pc.project.id
