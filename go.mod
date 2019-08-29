@@ -34,7 +34,7 @@ require (
 	github.com/google/go-github v0.0.0-20170719170300-e062a8cd852f
 	github.com/google/go-querystring v0.0.0-20170111101155-53e6ce116135
 	github.com/gorilla/mux v1.6.1
-	github.com/gorilla/websocket v1.4.0
+	github.com/gorilla/websocket v1.4.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.0.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
@@ -52,7 +52,7 @@ require (
 	github.com/prometheus/common v0.6.0
 	github.com/rancher/kontainer-driver-metadata v0.0.0-20190829181508-f5abbfa5182e
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20190819182532-d4cdf8e56671
-	github.com/rancher/norman v0.0.0-20190821234528-20a936b685b0
+	github.com/rancher/norman v0.0.0-20190829223613-7317090b9b71
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/rke v0.3.0-rc8.0.20190829182957-a569f2e81c34
 	github.com/rancher/types v0.0.0-20190827214052-704648244586
