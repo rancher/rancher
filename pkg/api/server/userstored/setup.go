@@ -3,6 +3,7 @@ package userstored
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
@@ -13,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/store/apiservice"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/crd"
+	"github.com/rancher/rancher/pkg/api/store/hpa"
 	"github.com/rancher/rancher/pkg/api/store/ingress"
 	"github.com/rancher/rancher/pkg/api/store/namespace"
 	"github.com/rancher/rancher/pkg/api/store/nocondition"
@@ -169,4 +171,5 @@ func HPA(schemas *types.Schemas, manager *clustermanager.Manager) {
 	schema := schemas.Schema(&schema.Version, client.HorizontalPodAutoscalerType)
 	schema.Store = apiservice.NewAPIServicFilterStoreFunc(manager, "autoscaling/v2beta2")(schema.Store)
 	schema.Store = nocondition.NewWrapper("initializing", "")(schema.Store)
+	schema.Store = hpa.NewIgnoreTransitioningErrorStore(schema.Store, 60*time.Second, "initializing")
 }
