@@ -105,6 +105,12 @@ spec:
                   operator: NotIn
                   values:
                     - windows
+{{if .NodeSelector}}
+      nodeSelector:
+      {{ range $k, $v := .NodeSelector }}
+        {{ $k }}: "{{ $v }}"
+      {{ end }}
+{{end}}
       serviceAccountName: flannel
       containers:
       - name: kube-flannel
@@ -362,6 +368,12 @@ spec:
                   values:
                     - windows
       hostNetwork: true
+{{if .NodeSelector}}
+      nodeSelector:
+      {{ range $k, $v := .NodeSelector }}
+        {{ $k }}: "{{ $v }}"
+      {{ end }}
+{{end}}
       tolerations:
       - operator: Exists
       {{- if eq .RBACConfig "rbac"}}
@@ -606,6 +618,12 @@ spec:
                   values:
                     - windows
       hostNetwork: true
+{{if .NodeSelector}}
+      nodeSelector:
+      {{ range $k, $v := .NodeSelector }}
+        {{ $k }}: "{{ $v }}"
+      {{ end }}
+{{end}}
       tolerations:
       - operator: Exists
       {{- if eq .RBACConfig "rbac"}}

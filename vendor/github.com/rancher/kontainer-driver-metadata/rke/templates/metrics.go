@@ -115,6 +115,14 @@ spec:
                   operator: NotIn
                   values:
                     - windows
+                - key: node-role.kubernetes.io/worker
+                  operator: Exists
+{{if .NodeSelector}}
+      nodeSelector:
+      {{ range $k, $v := .NodeSelector }}
+        {{ $k }}: "{{ $v }}"
+      {{ end }}
+{{end}}
       serviceAccountName: metrics-server
       tolerations:
       - effect: NoExecute

@@ -59,6 +59,7 @@ type ingressOptions struct {
 type MetricsServerOptions struct {
 	RBACConfig         string
 	Options            map[string]string
+	NodeSelector       map[string]string
 	MetricsServerImage string
 	Version            string
 }
@@ -334,6 +335,7 @@ func (c *Cluster) deployMetricServer(ctx context.Context, data map[string]interf
 		MetricsServerImage: c.SystemImages.MetricsServer,
 		RBACConfig:         c.Authorization.Mode,
 		Options:            c.Monitoring.Options,
+		NodeSelector:       c.Monitoring.NodeSelector,
 		Version:            util.GetTagMajorVersion(versionTag),
 	}
 	tmplt, err := templates.GetVersionedTemplates(rkeData.MetricsServer, data, c.Version)
