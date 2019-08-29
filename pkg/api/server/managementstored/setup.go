@@ -35,6 +35,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/cluster"
 	globaldnsAPIStore "github.com/rancher/rancher/pkg/api/store/globaldns"
+	grbstore "github.com/rancher/rancher/pkg/api/store/globalrolebindings"
 	nodeStore "github.com/rancher/rancher/pkg/api/store/node"
 	nodeTemplateStore "github.com/rancher/rancher/pkg/api/store/nodetemplate"
 	"github.com/rancher/rancher/pkg/api/store/noopwatching"
@@ -153,6 +154,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	ProjectRoleTemplateBinding(schemas, apiContext)
 	TemplateContent(schemas)
 	PodSecurityPolicyTemplate(schemas, apiContext)
+	GlobalRoleBindings(schemas, apiContext)
 	RoleTemplate(schemas, apiContext)
 	MultiClusterApps(schemas, apiContext)
 	GlobalDNSs(schemas, apiContext, localClusterEnabled)
@@ -598,6 +600,11 @@ func ClusterRoleTemplateBinding(schemas *types.Schemas, management *config.Scale
 func ProjectRoleTemplateBinding(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.ProjectRoleTemplateBindingType)
 	schema.Validator = roletemplatebinding.NewPRTBValidator(management)
+}
+
+func GlobalRoleBindings(schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.GlobalRoleBindingType)
+	schema.Store = grbstore.Wrap(schema.Store, management.Management.GlobalRoleBindings("").Controller().Lister())
 }
 
 func RoleTemplate(schemas *types.Schemas, management *config.ScaledContext) {
