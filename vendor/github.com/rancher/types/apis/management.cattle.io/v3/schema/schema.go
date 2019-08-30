@@ -348,6 +348,10 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 			labelField.Create = true
 			labelField.Update = true
 			schema.ResourceFields["labels"] = labelField
+			annotationField := schema.ResourceFields["annotations"]
+			annotationField.Create = true
+			annotationField.Update = true
+			schema.ResourceFields["annotations"] = annotationField
 			unschedulable := schema.ResourceFields["unschedulable"]
 			unschedulable.Create = false
 			unschedulable.Update = false
