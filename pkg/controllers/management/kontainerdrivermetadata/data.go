@@ -71,18 +71,19 @@ func (md *MetadataController) saveSystemImages(K8sVersionRKESystemImages map[str
 	ServiceOptions map[string]v3.KubernetesServicesOptions,
 	DefaultK8sVersions map[string]string) error {
 	maxVersionForMajorK8sVersion := map[string]string{}
+	deprecatedMap := map[string]bool{}
 	rancherVersion := GetRancherVersion()
-	var deprecated, maxIgnore []string
+	var maxIgnore []string
 	for k8sVersion, systemImages := range K8sVersionRKESystemImages {
 		rancherVersionInfo, minorOk := K8sVersionInfo[k8sVersion]
 		if minorOk && toIgnoreForAllK8s(rancherVersionInfo, rancherVersion) {
-			deprecated = append(deprecated, k8sVersion)
+			deprecatedMap[k8sVersion] = true
 			continue
 		}
 		majorVersion := util.GetTagMajorVersion(k8sVersion)
 		majorVersionInfo, majorOk := K8sVersionInfo[majorVersion]
 		if majorOk && toIgnoreForAllK8s(majorVersionInfo, rancherVersion) {
-			deprecated = append(deprecated, k8sVersion)
+			deprecatedMap[k8sVersion] = true
 			continue
 		}
 		pluginsMap, err := getPluginMap(k8sVersion, AddonsData)
@@ -104,8 +105,8 @@ func (md *MetadataController) saveSystemImages(K8sVersionRKESystemImages map[str
 			maxVersionForMajorK8sVersion[majorVersion] = k8sVersion
 		}
 	}
-	logrus.Debugf("driverMetadata deprecated %v max incompatible versions %v", deprecated, maxIgnore)
-	return updateSettings(maxVersionForMajorK8sVersion, rancherVersion, ServiceOptions, DefaultK8sVersions)
+	logrus.Debugf("driverMetadata deprecated %v max incompatible versions %v", deprecatedMap, maxIgnore)
+	return updateSettings(maxVersionForMajorK8sVersion, rancherVersion, ServiceOptions, DefaultK8sVersions, deprecatedMap)
 }
 
 func toIgnoreForAllK8s(rancherVersionInfo v3.K8sVersionInfo, rancherVersion string) bool {
@@ -386,27 +387,32 @@ func getWindowsName(str string) string {
 }
 
 func updateSettings(maxVersionForMajorK8sVersion map[string]string, rancherVersion string,
-	K8sVersionServiceOptions map[string]v3.KubernetesServicesOptions, DefaultK8sVersions map[string]string) error {
+	K8sVersionServiceOptions map[string]v3.KubernetesServicesOptions, DefaultK8sVersions map[string]string, deprecated map[string]bool) error {
 	k8sVersionRKESystemImages := map[string]interface{}{}
 	k8sVersionSvcOptions := map[string]v3.KubernetesServicesOptions{}
 
 	for majorVersion, k8sVersion := range maxVersionForMajorK8sVersion {
-		k8sVersionRKESystemImages[k8sVersion] = nil
-		k8sVersionSvcOptions[k8sVersion] = K8sVersionServiceOptions[majorVersion]
+		if !deprecated[k8sVersion] {
+			k8sVersionRKESystemImages[k8sVersion] = nil
+			k8sVersionSvcOptions[k8sVersion] = K8sVersionServiceOptions[majorVersion]
+		}
 	}
 
 	var keys []string
 	for k := range maxVersionForMajorK8sVersion {
-		keys = append(keys, k)
+		if !deprecated[k] {
+			keys = append(keys, k)
+		}
 	}
 	sort.Strings(keys)
 
-	return SaveSettings(k8sVersionRKESystemImages, k8sVersionSvcOptions, DefaultK8sVersions, rancherVersion, keys)
+	return SaveSettings(k8sVersionRKESystemImages, k8sVersionSvcOptions, DefaultK8sVersions, rancherVersion, keys, deprecated)
 }
 
 func SaveSettings(k8sCurrVersions map[string]interface{},
 	k8sVersionSvcOptions map[string]v3.KubernetesServicesOptions, rancherDefaultK8sVersions map[string]string,
-	rancherVersion string, maxVersions []string) error {
+	rancherVersion string, maxVersions []string, deprecated map[string]bool) error {
+
 	k8sCurrVersionData, err := marshal(k8sCurrVersions)
 	if err != nil {
 		return err
@@ -463,6 +469,13 @@ func SaveSettings(k8sCurrVersions map[string]interface{},
 		}
 	}
 
+	deprecatedData, err := marshal(deprecated)
+	if err != nil {
+		return err
+	}
+	if err := settings.KubernetesVersionsDeprecated.Set(deprecatedData); err != nil {
+		return err
+	}
 	return nil
 }
 
