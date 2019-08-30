@@ -26,6 +26,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/monitor"
 	"github.com/rancher/rancher/pkg/api/customization/multiclusterapp"
 	"github.com/rancher/rancher/pkg/api/customization/node"
+	"github.com/rancher/rancher/pkg/api/customization/nodepool"
 	"github.com/rancher/rancher/pkg/api/customization/nodetemplate"
 	"github.com/rancher/rancher/pkg/api/customization/pipeline"
 	"github.com/rancher/rancher/pkg/api/customization/podsecuritypolicytemplate"
@@ -453,6 +454,13 @@ func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
 	schema.LinkHandler = machineHandler.LinkHandler
 	actionWrapper := node.ActionWrapper{}
 	schema.ActionHandler = actionWrapper.ActionHandler
+
+	schema = schemas.Schema(&managementschema.Version, client.NodePoolType)
+	ntl := management.Management.NodeTemplates("").Controller().Lister()
+	f := &nodepool.Formatter{
+		NodeTemplateLister: ntl,
+	}
+	schema.Formatter = f.Formatter
 	return nil
 }
 

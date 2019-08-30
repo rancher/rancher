@@ -12,7 +12,7 @@ import time
 def test_node_fields(admin_mc):
     cclient = admin_mc.client
     fields = {
-        'annotations': 'r',
+        'annotations': 'cru',
         'labels': 'cru',
         'nodeTaints': 'r',
         'namespaceId': 'cr',
