@@ -32,6 +32,7 @@ var (
 	KubernetesVersionToServiceOptions = NewSetting("k8s-version-to-service-options", "")
 	KubernetesVersionToSystemImages   = NewSetting("k8s-version-to-images", "")
 	KubernetesVersionsCurrent         = NewSetting("k8s-versions-current", "")
+	KubernetesVersionsDeprecated      = NewSetting("k8s-versions-deprecated", "")
 	MachineVersion                    = NewSetting("machine-version", "dev")
 	Namespace                         = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PeerServices                      = NewSetting("peer-service", os.Getenv("CATTLE_PEER_SERVICE"))

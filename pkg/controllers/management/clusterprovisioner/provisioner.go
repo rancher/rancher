@@ -724,6 +724,9 @@ func (p *Provisioner) validateDriver(cluster *v3.Cluster) (string, error) {
 func (p *Provisioner) getSystemImages(spec v3.ClusterSpec) (*v3.RKESystemImages, error) {
 	// fetch system images from settings
 	version := spec.RancherKubernetesEngineConfig.Version
+	if isDeprecated(version) {
+		return nil, fmt.Errorf("failed to find system images for version %s, it is deprecated", version)
+	}
 	systemImages, err := kd.GetRKESystemImages(version, p.RKESystemImagesLister, p.RKESystemImages)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find system images for version %s: %v", version, err)
@@ -947,4 +950,9 @@ func GetBackupFilename(backup *v3.EtcdBackup) string {
 		snapshot = strings.TrimSuffix(backup.Spec.Filename, path.Ext(backup.Spec.Filename))
 	}
 	return snapshot
+}
+
+func isDeprecated(version string) bool {
+	deprecatedVersions := convert.ToMapInterface(settings.KubernetesVersionsDeprecated.Get())
+	return convert.ToBool(deprecatedVersions[version])
 }
