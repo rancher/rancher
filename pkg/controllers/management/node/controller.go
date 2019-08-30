@@ -537,7 +537,7 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 		// the expect taints are based on the node pool. so we don't need to set taints with same key and effect by template because
 		// the taints from node pool should override the taints from template.
 		if _, ok := nodeSet[key]; !ok {
-			expectTaints = append(obj.Spec.DesiredNodeTaints, template.Spec.NodeTaints[ti])
+			expectTaints = append(expectTaints, template.Spec.NodeTaints[ti])
 		}
 	}
 	obj.Status.NodeConfig.Taints = taints.GetRKETaintsFromTaints(expectTaints)

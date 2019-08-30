@@ -15,12 +15,14 @@ import (
 	"github.com/rancher/rancher/pkg/rkeworker"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
+	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/tunnelserver"
 	rkehosts "github.com/rancher/rke/hosts"
 	rkeservices "github.com/rancher/rke/services"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
 )
 
 var (
@@ -146,6 +148,7 @@ func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.C
 		if tempNode.Address == node.Status.NodeConfig.Address {
 			b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, rkehosts.B2DOS)
 			nc.Processes = augmentProcesses(token, tempNode.Processes, false, b2d)
+			nc.Processes = appendTaintsToKubeletArgs(tempNode.Processes, node.Status.NodeConfig.Taints)
 			return nc, nil
 		}
 	}
@@ -203,6 +206,7 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 				b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, rkehosts.B2DOS)
 				nc.Processes = augmentProcesses(token, tempNode.Processes, true, b2d)
 			}
+			nc.Processes = appendTaintsToKubeletArgs(tempNode.Processes, node.Status.NodeConfig.Taints)
 			nc.Files = tempNode.Files
 			return nc, nil
 		}
@@ -290,4 +294,30 @@ func enhanceWindowsProcesses(processes map[string]v3.Process) map[string]v3.Proc
 	}
 
 	return newProcesses
+}
+
+func appendTaintsToKubeletArgs(processes map[string]v3.Process, nodeConfigTaints []v3.RKETaint) map[string]v3.Process {
+	if kubelet, ok := processes["kubelet"]; ok && len(nodeConfigTaints) != 0 {
+		initialTaints := taints.GetTaintsFromStrings(taints.GetStringsFromRKETaint(nodeConfigTaints))
+		var currentTaints []v1.Taint
+		foundArgs := ""
+		for i, arg := range kubelet.Command {
+			if strings.HasPrefix(arg, "--register-with-taints=") {
+				foundArgs = strings.TrimPrefix(arg, "--register-with-taints=")
+				kubelet.Command = append(kubelet.Command[:i], kubelet.Command[i+1:]...)
+				break
+			}
+		}
+		if foundArgs != "" {
+			currentTaints = taints.GetTaintsFromStrings(strings.Split(foundArgs, ","))
+		}
+
+		// The initial taints are from node pool and node template. They should override the taints from kubelet args.
+		mergedTaints := taints.MergeTaints(currentTaints, initialTaints)
+
+		taintArgs := fmt.Sprintf("--register-with-taints=%s", strings.Join(taints.GetStringsFromTaint(mergedTaints), ","))
+		kubelet.Command = append(kubelet.Command, taintArgs)
+		processes["kubelet"] = kubelet
+	}
+	return processes
 }
