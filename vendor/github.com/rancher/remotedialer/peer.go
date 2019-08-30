@@ -79,7 +79,6 @@ func (p *peer) start(ctx context.Context, s *Server) {
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
 		},
-		HandshakeTimeout: 10 * time.Second,
 	}
 
 outer:
@@ -107,7 +106,7 @@ outer:
 		}
 
 		s.sessions.addListener(session)
-		_, err = session.Serve()
+		_, err = session.Serve(context.Background())
 		s.sessions.removeListener(session)
 		session.Close()
 
