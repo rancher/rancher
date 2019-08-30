@@ -277,12 +277,26 @@ def test_kontainer_driver_links(admin_mc):
     client = admin_mc.client
     lister = client.list_kontainerDriver()
     assert 'rancher-images' in lister.links
+    assert 'rancher-windows-images' in lister.links
     token = 'Bearer '+client.token
     url = BASE_URL + "/kontainerdrivers/rancher-images"
+    images = get_images(url, token)
+    assert "hyperkube" in images
+    assert "rke-tools" in images
+    assert "kubelet-pause" not in images
+    # test windows link
+    url = BASE_URL + "/kontainerdrivers/rancher-windows-images"
+    images = get_images(url, token)
+    assert "hyperkube" in images
+    assert "rke-tools" in images
+    assert "kubelet-pause" in images
+
+
+def get_images(url, token):
     data = requests.get(
-            url=url,
-            verify=False,
-            headers={'Accept': '*/*', 'Authorization': token})
+        url=url,
+        verify=False,
+        headers={'Accept': '*/*', 'Authorization': token})
     assert data is not None
     content = data.content.splitlines()
     assert len(content) > 0
@@ -292,8 +306,9 @@ def test_kontainer_driver_links(admin_mc):
             test["hyperkube"] = True
         elif "rancher/rke-tools" in str(line):
             test["rke-tools"] = True
-    assert "hyperkube" in test
-    assert "rke-tools" in test
+        elif "rancher/kubelet-pause" in str(line):
+            test["kubelet-pause"] = True
+    return test
 
 
 def verify_driver_in_types(client, kd):
