@@ -7,6 +7,7 @@ flask==1.0.2
 pytest==4.4.1
 pytest-repeat==0.8.0
 pytest-xdist==1.28.0
+pytest-json-report==1.1.0
 pyyaml==5.1
 netaddr==0.7.19
 requests==2.21.0

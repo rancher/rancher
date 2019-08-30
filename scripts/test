@@ -18,6 +18,12 @@ cleanup()
     echo '***RANCHER LOGS***'
     cat $CWD/rancherlogs.txt
     echo '***END RANCHER LOGS***'
+    echo '***PYTEST OUTPUT***'
+    cat $CWD/results1.json
+    echo -e '\n'
+    cat $CWD/results2.json
+    echo -e '\n'
+    echo '***END PYTEST OUTPUT***'
     return $EXIT
 }
 
@@ -40,5 +46,5 @@ done
 echo Running tests
 
 cd $(dirname $0)/../tests/integration
-tox -- -m "not nonparallel" -n $(nproc)
-tox -- -m nonparallel
+tox -- -m "not nonparallel" -n $(nproc) --json-report --json-report-file=$CWD/results1.json
+tox -- -m nonparallel --json-report --json-report-file=$CWD/results2.json
