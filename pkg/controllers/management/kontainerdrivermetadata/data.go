@@ -26,6 +26,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type OSType int
+
+const (
+	Linux OSType = iota
+	Windows
+)
+
 const (
 	APIVersion           = "management.cattle.io/v3"
 	RancherVersionDev    = "2.3"
@@ -44,7 +51,7 @@ func (md *MetadataController) createOrUpdateMetadata(data Data) error {
 		data.K8sVersionInfo, data.K8sVersionServiceOptions, data.K8sVersionWindowsServiceOptions, data.RancherDefaultK8sVersions); err != nil {
 		return err
 	}
-	if err := md.saveServiceOptions(data.K8sVersionServiceOptions); err != nil {
+	if err := md.saveAllServiceOptions(data.K8sVersionServiceOptions, data.K8sVersionWindowsServiceOptions); err != nil {
 		return err
 	}
 	if err := md.saveAddons(data.K8sVersionedTemplates); err != nil {
@@ -58,7 +65,7 @@ func (md *MetadataController) createOrUpdateMetadataDefaults() error {
 		rke.DriverData.K8sVersionInfo, rke.DriverData.K8sVersionServiceOptions, rke.DriverData.K8sVersionWindowsServiceOptions, rke.DriverData.RancherDefaultK8sVersions); err != nil {
 		return err
 	}
-	if err := md.saveServiceOptions(rke.DriverData.K8sVersionServiceOptions); err != nil {
+	if err := md.saveAllServiceOptions(rke.DriverData.K8sVersionServiceOptions, rke.DriverData.K8sVersionWindowsServiceOptions); err != nil {
 		return err
 	}
 	if err := md.saveAddons(rke.DriverData.K8sVersionedTemplates); err != nil {
@@ -131,10 +138,22 @@ func toIgnoreForK8sCurrent(majorVersionInfo v3.K8sVersionInfo, rancherVersion st
 	return false
 }
 
-func (md *MetadataController) saveServiceOptions(K8sVersionServiceOptions map[string]v3.KubernetesServicesOptions) error {
-	rkeDataKeys := getRKEVendorOptions()
+func (md *MetadataController) saveAllServiceOptions(linuxSvcOptions map[string]v3.KubernetesServicesOptions, windowsSvcOptions map[string]v3.KubernetesServicesOptions) error {
+	// save linux options
+	if err := md.saveServiceOptions(linuxSvcOptions, Linux); err != nil {
+		return err
+	}
+	// save windows options
+	if err := md.saveServiceOptions(windowsSvcOptions, Windows); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (md *MetadataController) saveServiceOptions(K8sVersionServiceOptions map[string]v3.KubernetesServicesOptions, osType OSType) error {
+	rkeDataKeys := getRKEVendorOptions(osType)
 	for k8sVersion, serviceOptions := range K8sVersionServiceOptions {
-		if err := md.createOrUpdateServiceOptionCRD(k8sVersion, serviceOptions, rkeDataKeys); err != nil {
+		if err := md.createOrUpdateServiceOptionCRD(k8sVersion, serviceOptions, rkeDataKeys, osType); err != nil {
 			return err
 		}
 	}
@@ -189,8 +208,8 @@ func (md *MetadataController) createOrUpdateSystemImageCRD(k8sVersion string, sy
 	return nil
 }
 
-func (md *MetadataController) createOrUpdateServiceOptionCRD(k8sVersion string, serviceOptions v3.KubernetesServicesOptions, rkeDataKeys map[string]bool) error {
-	svcOption, err := md.getRKEServiceOption(k8sVersion)
+func (md *MetadataController) createOrUpdateServiceOptionCRD(k8sVersion string, serviceOptions v3.KubernetesServicesOptions, rkeDataKeys map[string]bool, osType OSType) error {
+	svcOption, err := md.getRKEServiceOption(k8sVersion, osType)
 	_, exists := rkeDataKeys[k8sVersion]
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -198,7 +217,7 @@ func (md *MetadataController) createOrUpdateServiceOptionCRD(k8sVersion string, 
 		}
 		svcOption = &v3.RKEK8sServiceOption{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      k8sVersion,
+				Name:      getVersionNameWithOsType(k8sVersion, osType),
 				Namespace: namespace.GlobalNamespace,
 			},
 			ServiceOptions: serviceOptions,
@@ -224,41 +243,6 @@ func (md *MetadataController) createOrUpdateServiceOptionCRD(k8sVersion string, 
 		svcOptionCopy.ServiceOptions = serviceOptions
 	}
 	updateLabel(svcOptionCopy.Labels, exists)
-	if svcOptionCopy != nil {
-		if _, err := md.ServiceOptions.Update(svcOptionCopy); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (md *MetadataController) createOrUpdateWindowsServiceOptionCRD(k8sVersion string, serviceOptions v3.KubernetesServicesOptions) error {
-	svcOption, err := md.getRKEWindowsServiceOption(k8sVersion)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return err
-		}
-		svcOption = &v3.RKEK8sServiceOption{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      getWindowsName(k8sVersion),
-				Namespace: namespace.GlobalNamespace,
-			},
-			ServiceOptions: serviceOptions,
-			TypeMeta: metav1.TypeMeta{
-				Kind:       rkeServiceOptionKind,
-				APIVersion: APIVersion,
-			},
-		}
-		if _, err := md.ServiceOptions.Create(svcOption); err != nil && !errors.IsAlreadyExists(err) {
-			return err
-		}
-		return nil
-	}
-	if reflect.DeepEqual(svcOption.ServiceOptions, serviceOptions) {
-		return nil
-	}
-	svcOptionCopy := svcOption.DeepCopy()
-	svcOptionCopy.ServiceOptions = serviceOptions
 	if svcOptionCopy != nil {
 		if _, err := md.ServiceOptions.Update(svcOptionCopy); err != nil {
 			return err
@@ -367,9 +351,14 @@ func getRKEVendorData() map[string]bool {
 	return keys
 }
 
-func getRKEVendorOptions() map[string]bool {
+func getRKEVendorOptions(osType OSType) map[string]bool {
+	options := rke.DriverData.K8sVersionServiceOptions
+	if osType == Windows {
+		options = rke.DriverData.K8sVersionWindowsServiceOptions
+	}
+
 	keys := map[string]bool{}
-	for k8sVersion := range rke.DriverData.K8sVersionServiceOptions {
+	for k8sVersion := range options {
 		keys[k8sVersion] = true
 	}
 	return keys
@@ -379,16 +368,19 @@ func (md *MetadataController) getRKEAddon(name string) (*v3.RKEAddon, error) {
 	return md.AddonsLister.Get(namespace.GlobalNamespace, name)
 }
 
-func (md *MetadataController) getRKEServiceOption(k8sVersion string) (*v3.RKEK8sServiceOption, error) {
-	return md.ServiceOptionsLister.Get(namespace.GlobalNamespace, k8sVersion)
-}
-
-func (md *MetadataController) getRKEWindowsServiceOption(k8sVersion string) (*v3.RKEK8sServiceOption, error) {
-	return md.ServiceOptionsLister.Get(namespace.GlobalNamespace, getWindowsName(k8sVersion))
+func (md *MetadataController) getRKEServiceOption(k8sVersion string, osType OSType) (*v3.RKEK8sServiceOption, error) {
+	return md.ServiceOptionsLister.Get(namespace.GlobalNamespace, getVersionNameWithOsType(k8sVersion, osType))
 }
 
 func (md *MetadataController) getRKESystemImage(k8sVersion string) (*v3.RKEK8sSystemImage, error) {
 	return md.SystemImagesLister.Get(namespace.GlobalNamespace, k8sVersion)
+}
+
+func getVersionNameWithOsType(str string, osType OSType) string {
+	if osType == Windows {
+		return getWindowsName(str)
+	}
+	return str
 }
 
 func getWindowsName(str string) string {
