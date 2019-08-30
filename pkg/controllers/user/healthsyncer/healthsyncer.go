@@ -65,7 +65,7 @@ func (h *HealthSyncer) syncHealth(ctx context.Context, syncHealth time.Duration)
 
 func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
 	// Prior to k8s v1.14, we only needed to list the ComponentStatuses from the user cluster.
-	// As of k8s v1.14, kubeapi returns a successfull ComponentStatuses response even if etcd is not available.
+	// As of k8s v1.14, kubeapi returns a successful ComponentStatuses response even if etcd is not available.
 	// To work around this, now we try to get a namespace from the API, even if not found, it means the API is up.
 	if _, err := h.namespaces.Get("kube-system", metav1.GetOptions{}); err != nil && !apierrors.IsNotFound(err) {
 		return condition.Error("ComponentStatsFetchingFailure", errors.Wrap(err, "Failed to communicate with API server"))
