@@ -6,12 +6,14 @@ import (
 	"strconv"
 	"strings"
 
+	mVersion "github.com/mcuadros/go-version"
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rke/util"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
@@ -102,6 +104,10 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 		case linuxImages:
 			rkeSysImgCopy.WindowsPodInfraContainer = ""
 		case windowsImages:
+			majorVersion := util.GetTagMajorVersion(k8sVersion)
+			if mVersion.Compare(majorVersion, "v1.13", "<=") {
+				continue
+			}
 			windowsSysImages := v3.RKESystemImages{
 				Kubernetes:                rkeSysImg.Kubernetes,
 				WindowsPodInfraContainer:  rkeSysImg.WindowsPodInfraContainer,
