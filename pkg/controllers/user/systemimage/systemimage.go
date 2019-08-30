@@ -9,7 +9,6 @@ import (
 	logging "github.com/rancher/rancher/pkg/controllers/user/logging/deployer"
 	pipeline "github.com/rancher/rancher/pkg/controllers/user/pipeline/upgrade"
 	"github.com/rancher/rancher/pkg/project"
-	appsv1 "github.com/rancher/types/apis/apps/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 
@@ -21,15 +20,11 @@ import (
 var systemProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/system-project": "true"})
 
 type Syncer struct {
-	clusterName      string
-	daemonsets       appsv1.DaemonSetInterface
-	daemonsetLister  appsv1.DaemonSetLister
-	deployments      appsv1.DeploymentInterface
-	deploymentLister appsv1.DeploymentLister
-	projectLister    v3.ProjectLister
-	projects         v3.ProjectInterface
-	userContext      *config.UserContext
-	systemSercices   map[string]SystemService
+	clusterName    string
+	projectLister  v3.ProjectLister
+	projects       v3.ProjectInterface
+	userContext    *config.UserContext
+	systemServices map[string]SystemService
 }
 
 func (s *Syncer) SyncProject(key string, obj *v3.Project) (runtime.Object, error) {
@@ -77,7 +72,7 @@ func (s *Syncer) Sync() error {
 	}
 
 	changed := false
-	for k, v := range s.systemSercices {
+	for k, v := range s.systemServices {
 		oldVersion := versionMap[k]
 		newVersion, err := v.Upgrade(oldVersion)
 		if err != nil {
