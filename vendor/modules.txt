@@ -179,9 +179,7 @@ github.com/google/uuid
 github.com/googleapis/gnostic/OpenAPIv2
 github.com/googleapis/gnostic/compiler
 github.com/googleapis/gnostic/extensions
-# github.com/gorilla/context v1.1.1
-github.com/gorilla/context
-# github.com/gorilla/mux v1.6.1
+# github.com/gorilla/mux v1.7.3
 github.com/gorilla/mux
 # github.com/gorilla/websocket v1.4.1
 github.com/gorilla/websocket
@@ -293,7 +291,6 @@ github.com/rancher/norman/pkg/dump
 github.com/rancher/norman/pkg/kwrapper/k8s
 github.com/rancher/norman/objectclient
 github.com/rancher/norman/pkg/k8scheck
-github.com/rancher/norman/pkg/remotedialer
 github.com/rancher/norman/types/slice
 github.com/rancher/norman/api
 github.com/rancher/norman/types
@@ -333,6 +330,8 @@ github.com/rancher/norman/types/convert/merge
 github.com/rancher/norman/types/factory
 # github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 github.com/rancher/rdns-server/model
+# github.com/rancher/remotedialer v0.2.2
+github.com/rancher/remotedialer
 # github.com/rancher/rke v0.3.0-rc8.0.20190829204247-798632b3a44d
 github.com/rancher/rke/util
 github.com/rancher/rke/pki/cert
