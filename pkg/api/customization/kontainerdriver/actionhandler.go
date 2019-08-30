@@ -15,6 +15,11 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
+const (
+	linuxImages   = "rancher-images"
+	windowsImages = "rancher-windows-images"
+)
+
 type ActionHandler struct {
 	KontainerDrivers      v3.KontainerDriverInterface
 	KontainerDriverLister v3.KontainerDriverLister
@@ -84,12 +89,29 @@ func (a ActionHandler) setDriverActiveStatus(apiContext *types.APIContext, statu
 func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) error {
 	k8sCurr := strings.Split(settings.KubernetesVersionsCurrent.Get(), ",")
 	rkeSysImages := map[string]v3.RKESystemImages{}
+	if apiContext.ID != linuxImages && apiContext.ID != windowsImages {
+		return httperror.NewAPIError(httperror.NotFound, "link does not exist")
+	}
 	for _, k8sVersion := range k8sCurr {
 		rkeSysImg, err := kd.GetRKESystemImages(k8sVersion, lh.SysImageLister, lh.SysImages)
 		if err != nil {
 			return err
 		}
-		rkeSysImages[k8sVersion] = rkeSysImg
+		rkeSysImgCopy := rkeSysImg.DeepCopy()
+		switch apiContext.ID {
+		case linuxImages:
+			rkeSysImgCopy.WindowsPodInfraContainer = ""
+		case windowsImages:
+			windowsSysImages := v3.RKESystemImages{
+				Kubernetes:                rkeSysImg.Kubernetes,
+				WindowsPodInfraContainer:  rkeSysImg.WindowsPodInfraContainer,
+				NginxProxy:                rkeSysImg.NginxProxy,
+				KubernetesServicesSidecar: rkeSysImg.KubernetesServicesSidecar,
+				CertDownloader:            rkeSysImg.CertDownloader,
+			}
+			rkeSysImgCopy = &windowsSysImages
+		}
+		rkeSysImages[k8sVersion] = *rkeSysImgCopy
 	}
 
 	targetImages, err := image.CollectionImages(rkeSysImages)
@@ -100,7 +122,7 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 	b := []byte(strings.Join(targetImages, "\n"))
 	apiContext.Response.Header().Set("Content-Length", strconv.Itoa(len(b)))
 	apiContext.Response.Header().Set("Content-Type", "application/octet-stream")
-	apiContext.Response.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.txt", "rancher-images"))
+	apiContext.Response.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.txt", apiContext.ID))
 	apiContext.Response.Header().Set("Cache-Control", "private")
 	apiContext.Response.Header().Set("Pragma", "private")
 	apiContext.Response.Header().Set("Expires", "Wed 24 Feb 1982 18:42:00 GMT")
@@ -110,7 +132,7 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 }
 
 func (lh ListHandler) ListHandler(request *types.APIContext, next types.RequestHandler) error {
-	if request.ID == "rancher-images" {
+	if request.ID == linuxImages || request.ID == windowsImages {
 		return lh.LinkHandler(request, next)
 	}
 	return handler.ListHandler(request, next)
