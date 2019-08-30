@@ -11,9 +11,9 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/rancher/norman/pkg/remotedialer"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/taints"
+	"github.com/rancher/remotedialer"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	client "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"

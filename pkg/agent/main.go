@@ -16,12 +16,12 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/mattn/go-colorable"
-	"github.com/rancher/norman/pkg/remotedialer"
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/cluster"
 	"github.com/rancher/rancher/pkg/agent/node"
 	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
+	"github.com/rancher/remotedialer"
 	"github.com/sirupsen/logrus"
 )
 
