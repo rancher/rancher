@@ -16,11 +16,7 @@ func clientDial(dialer Dialer, conn *connection, message *message) {
 	)
 
 	if dialer == nil {
-		netDialer := &net.Dialer{
-			Timeout:   time.Duration(message.deadline) * time.Millisecond,
-			KeepAlive: 30 * time.Second,
-		}
-		netConn, err = netDialer.Dial(message.proto, message.address)
+		netConn, err = net.DialTimeout(message.proto, message.address, time.Duration(message.deadline)*time.Millisecond)
 	} else {
 		netConn, err = dialer(message.proto, message.address)
 	}

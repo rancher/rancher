@@ -144,9 +144,12 @@ github.com/gorilla/context v1.1.1 h1:AWwleXJkX/nhcU9bZSnZoi3h/qGYqQAGhq6zZe/aQW8
 github.com/gorilla/context v1.1.1/go.mod h1:kBGZzfjB9CEq2AlWe17Uuf7NDRt0dE0s8S51q0aT7Yg=
 github.com/gorilla/mux v1.6.1 h1:KOwqsTYZdeuMacU7CxjMNYEKeBvLbxW+psodrbcEa3A=
 github.com/gorilla/mux v1.6.1/go.mod h1:1lud6UwP+6orDFRuTfBEV8e9/aOM/c4fVVCaMa2zaAs=
+github.com/gorilla/mux v1.7.3 h1:gnP5JzjVOuiZD07fKKToCAOjS0yOpj/qPETTXCCS6hw=
+github.com/gorilla/mux v1.7.3/go.mod h1:1lud6UwP+6orDFRuTfBEV8e9/aOM/c4fVVCaMa2zaAs=
 github.com/gorilla/websocket v0.0.0-20150714140627-6eb6ad425a89/go.mod h1:E7qHFY5m1UJ88s3WnNqhKjPHQ0heANvMoAMk2YaljkQ=
 github.com/gorilla/websocket v1.2.0 h1:VJtLvh6VQym50czpZzx07z/kw9EgAxI3x1ZB8taTMQQ=
 github.com/gorilla/websocket v1.2.0/go.mod h1:E7qHFY5m1UJ88s3WnNqhKjPHQ0heANvMoAMk2YaljkQ=
+github.com/gorilla/websocket v1.4.0/go.mod h1:E7qHFY5m1UJ88s3WnNqhKjPHQ0heANvMoAMk2YaljkQ=
 github.com/gorilla/websocket v1.4.1 h1:q7AeDBpnBk8AogcD4DSag/Ukw/KV+YhzLj2bP5HvKCM=
 github.com/gorilla/websocket v1.4.1/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/gotestyourself/gotestyourself v2.2.0+incompatible h1:AQwinXlbQR2HvPjQZOmDhRqsv5mZf+Jb1RnSLxcqZcI=
@@ -288,10 +291,17 @@ github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e h1:j6+HqCET/NLPBtew2m5
 github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e/go.mod h1:XbYHTPaXuw8ZY9bylhYKQh/nJxDaTKk3YhAxPl4Qy/k=
 github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a h1:6xqYlVz4uAXBa/AuNAG0bhMusIXVh74dc1bbYOAe+HY=
 github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a/go.mod h1:YW8wJ/coee2n9ed937uPBWQArBaVlxs+5wkkS9KiyDc=
+github.com/rancher/remotedialer v0.2.2 h1:R0DNjBqLzLrhZTS+kbYi8E6qBmIOrzPwqoo1L7o3+aE=
+github.com/rancher/remotedialer v0.2.2/go.mod h1:tkU8ZvrR5lRgaKWaX71nAy6daeqvPFx/lJEnbW7tXSI=
 github.com/rancher/rke v0.3.0-rc6.0.20190819180243-f8bac2c059d0 h1:XYyvskgyYvU89CgHEl0XK3GDom+heEgl2s28jv/f6PM=
 github.com/rancher/rke v0.3.0-rc6.0.20190819180243-f8bac2c059d0/go.mod h1:IyunvVrNJZLg3m5faCvG4LNAyf03vuAShBi9q9mcPGc=
+<<<<<<< HEAD
 github.com/rancher/rke v0.3.0-rc8.0.20190903201334-c69d97196214 h1:8MLUjbWFj5UqTvnVxk+Frr3Yh6e2P5PhHeptYmzPkTU=
 github.com/rancher/rke v0.3.0-rc8.0.20190903201334-c69d97196214/go.mod h1:3GzSO9jAHq0o1xFG+0ARsti8JIopG5Wd0sjwdzX6B7I=
+=======
+github.com/rancher/rke v0.3.0-rc8.0.20190830174211-32bf922fc5ac h1:mPFsxGdRgkHjgtYyr+Qu1PC0KMV/VNHrwgQooJIC90M=
+github.com/rancher/rke v0.3.0-rc8.0.20190830174211-32bf922fc5ac/go.mod h1:VFuSAh+Ooe1YgfKO9hOo7IGpRGGLMJvdlRf77Jdgs84=
+>>>>>>> Vendor remotedialer
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
