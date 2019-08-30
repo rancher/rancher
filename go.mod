@@ -55,7 +55,7 @@ require (
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20190819182532-d4cdf8e56671
 	github.com/rancher/norman v0.0.0-20190829223613-7317090b9b71
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
-	github.com/rancher/rke v0.3.0-rc8.0.20190829204247-798632b3a44d
+	github.com/rancher/rke v0.3.0-rc8.0.20190830174211-32bf922fc5ac
 	github.com/rancher/types v0.0.0-20190829235015-3aced2bfa27e
 	github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95
 	github.com/robfig/cron v1.1.0
