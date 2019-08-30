@@ -213,20 +213,14 @@ func (md *MetadataController) createOrUpdateServiceOptionCRD(k8sVersion string, 
 		return nil
 	}
 	var svcOptionCopy *v3.RKEK8sServiceOption
-	if reflect.DeepEqual(svcOption.ServiceOptions, serviceOptions) {
-		if reflect.DeepEqual(svcOption.Labels, existLabel) && exists {
-			return nil
-		}
-		svcOptionCopy = svcOption.DeepCopy()
-		if exists {
-			svcOptionCopy.Labels = existLabel
-		} else {
-			delete(svcOptionCopy.Labels, sendRKELabel)
-		}
-	} else {
-		svcOptionCopy = svcOption.DeepCopy()
+	if reflect.DeepEqual(svcOption.ServiceOptions, serviceOptions) && labelEqual(svcOption.Labels, exists) {
+		return nil
+	}
+	svcOptionCopy = svcOption.DeepCopy()
+	if !exists {
 		svcOptionCopy.ServiceOptions = serviceOptions
 	}
+	updateLabel(svcOptionCopy.Labels, exists)
 	if svcOptionCopy != nil {
 		if _, err := md.ServiceOptions.Update(svcOptionCopy); err != nil {
 			return err
@@ -297,17 +291,14 @@ func (md *MetadataController) createOrUpdateAddonCRD(addonName, template string,
 		return nil
 	}
 	var addonCopy *v3.RKEAddon
-	if reflect.DeepEqual(addon.Template, template) {
-		if reflect.DeepEqual(addon.Labels, existLabel) && exists {
-			return nil
-		}
-		addonCopy = addon.DeepCopy()
-		if exists {
-			addonCopy.Labels = existLabel
-		} else {
-			delete(addonCopy.Labels, sendRKELabel)
-		}
+	if reflect.DeepEqual(addon.Template, template) && labelEqual(addon.Labels, exists) {
+		return nil
 	}
+	addonCopy = addon.DeepCopy()
+	if !exists {
+		addonCopy.Template = template
+	}
+	updateLabel(addonCopy.Labels, exists)
 	if addonCopy != nil {
 		if _, err := md.Addons.Update(addonCopy); err != nil {
 			return err
@@ -485,4 +476,21 @@ func marshal(data interface{}) (string, error) {
 		return "", err
 	}
 	return string(b), nil
+}
+
+func labelEqual(labels map[string]string, exists bool) bool {
+	toSendValue := "true"
+	if exists {
+		toSendValue = "false"
+	}
+	return toSendValue == labels[sendRKELabel]
+}
+
+func updateLabel(labels map[string]string, exists bool) {
+	if exists {
+		labels[sendRKELabel] = "false"
+	} else {
+		delete(labels, sendRKELabel)
+	}
+
 }
