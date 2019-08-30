@@ -63,10 +63,19 @@ func (a *rkeStore) GetAddonTemplates(k8sVersion string) map[string]interface{} {
 	return data
 }
 
-func (a *rkeStore) GetServiceOptions(k8sVersion string) *v3.KubernetesServicesOptions {
-	svcOptions, err := kd.GetRKEK8sServiceOptions(k8sVersion, a.SvcOptionLister, a.SvcOptions)
+func (a *rkeStore) GetServiceOptions(k8sVersion string) map[string]*v3.KubernetesServicesOptions {
+	linuxSvcOptions, err := kd.GetRKEK8sServiceOptions(k8sVersion, a.SvcOptionLister, a.SvcOptions, kd.Linux)
 	if err != nil {
-		logrus.Errorf("getK8sServiceOptions: k8sVersion %s [%v]", k8sVersion, err)
+		logrus.Errorf("getLinuxK8sServiceOptions: k8sVersion %s [%v]", k8sVersion, err)
 	}
-	return svcOptions
+
+	windowsSvcOptions, err := kd.GetRKEK8sServiceOptions(k8sVersion, a.SvcOptionLister, a.SvcOptions, kd.Windows)
+	if err != nil {
+		logrus.Errorf("getWindowsK8sServiceOptions: k8sVersion %s [%v]", k8sVersion, err)
+	}
+
+	return map[string]*v3.KubernetesServicesOptions{
+		"k8s-service-options":         linuxSvcOptions,
+		"k8s-windows-service-options": windowsSvcOptions,
+	}
 }

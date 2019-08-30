@@ -74,25 +74,26 @@ func run(images ...string) error {
 	if strings.HasPrefix(rancherVersion, "v") {
 		rancherVersion = rancherVersion[1:]
 	}
-	k8sVersionToRKESystemImages, _ := kd.GetK8sVersionInfo(rancherVersion,
-		metadata.DriverData.K8sVersionRKESystemImages, metadata.DriverData.K8sVersionServiceOptions,
-		metadata.DriverData.K8sVersionInfo)
-	k8sVersionToWindowsSystemImages := pickWindowsImages(k8sVersionToRKESystemImages)
+	linuxInfo, windowsInfo := kd.GetK8sVersionInfo(
+		rancherVersion,
+		metadata.DriverData.K8sVersionRKESystemImages,
+		metadata.DriverData.K8sVersionServiceOptions,
+		metadata.DriverData.K8sVersionWindowsServiceOptions,
+		metadata.DriverData.K8sVersionInfo,
+	)
 
-	targetImages, err := img.CollectionImages(k8sVersionToRKESystemImages, v3.ToolsSystemImages)
+	targetImages, err := img.CollectionImages(linuxInfo.RKESystemImages, v3.ToolsSystemImages)
 	if err != nil {
 		return err
 	}
-
 	for _, i := range images {
 		targetImages = append(targetImages, image.Mirror(i))
 	}
 
-	targetWindowsImages, err := img.CollectionImages(k8sVersionToWindowsSystemImages)
+	targetWindowsImages, err := img.CollectionImages(windowsInfo.RKESystemImages)
 	if err != nil {
 		return err
 	}
-
 	if agentImage := getWindowsAgentImage(); agentImage != "" {
 		targetWindowsImages = append(targetWindowsImages, image.Mirror(agentImage))
 	}
@@ -309,20 +310,6 @@ func walkthroughMap(inputMap map[interface{}]interface{}, walkFunc func(map[inte
 			walkthroughMap(v, walkFunc)
 		}
 	}
-}
-
-func pickWindowsImages(versionToImages map[string]v3.RKESystemImages) map[string]v3.RKESystemImages {
-	ret := make(map[string]v3.RKESystemImages)
-	for version, images := range versionToImages {
-		ret[version] = v3.RKESystemImages{
-			Kubernetes:                images.Kubernetes,
-			WindowsPodInfraContainer:  images.WindowsPodInfraContainer,
-			NginxProxy:                images.NginxProxy,
-			KubernetesServicesSidecar: images.KubernetesServicesSidecar,
-			CertDownloader:            images.CertDownloader,
-		}
-	}
-	return ret
 }
 
 func getWindowsAgentImage() string {
