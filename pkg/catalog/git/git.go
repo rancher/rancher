@@ -2,6 +2,7 @@ package git
 
 import (
 	"bytes"
+	"fmt"
 	"net/url"
 	"os/exec"
 	"strings"
@@ -70,4 +71,11 @@ func FormatURL(pathURL, username, password string) string {
 		}
 	}
 	return pathURL
+}
+
+func CloneWithDepth(path, url, branch string, depth int) error {
+	if err := catUtil.ValidateURL(url); err != nil {
+		return err
+	}
+	return runcmd("git", "clone", "-b", branch, "--single-branch", fmt.Sprintf("--depth=%v", depth), url, path)
 }

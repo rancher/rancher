@@ -3,6 +3,8 @@ package app
 import (
 	"fmt"
 
+	"github.com/rancher/rancher/pkg/settings"
+
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -28,7 +30,7 @@ func addCattleGlobalNamespace(management *config.ManagementContext) error {
 	}
 
 	logrus.Debugf("calling sync for driver metadata")
-	management.Management.Settings("").Controller().Enqueue("", "rke-metadata-url")
+	management.Management.Settings("").Controller().Enqueue("", settings.RkeMetadataConfig.Name)
 
 	return nil
 }
