@@ -51,7 +51,10 @@ type Driver struct {
 type Store interface {
 	// Add methods here to get rke driver specific data
 	GetAddonTemplates(k8sVersion string) map[string]interface{}
-	GetServiceOptions(k8sVersion string) *v3.KubernetesServicesOptions
+	// GetServiceOptions returns the combined result of service options:
+	// - `k8s-service-options` corresponds to linux options
+	// - `k8s-windows-service-options` corresponds to windows options
+	GetServiceOptions(k8sVersion string) map[string]*v3.KubernetesServicesOptions
 }
 
 func NewDriver() types.Driver {
@@ -176,9 +179,11 @@ func (d *Driver) Create(ctx context.Context, opts *types.DriverOptions, info *ty
 
 func getData(s Store, k8sVersion string) map[string]interface{} {
 	data := s.GetAddonTemplates(k8sVersion)
-	data2 := s.GetServiceOptions(k8sVersion)
-	if data2 != nil {
-		data["k8s-service-options"] = data2
+	serviceOptions := s.GetServiceOptions(k8sVersion)
+	for key, opts := range serviceOptions {
+		if opts != nil {
+			data[key] = opts
+		}
 	}
 	return data
 }
