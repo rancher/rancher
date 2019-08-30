@@ -54,7 +54,7 @@ This repo is a meta-repo used for packaging and contains the majority of rancher
 * https://github.com/rancher/rke
 * https://github.com/rancher/ui
 
-Rancher also includes other open source llbraries and projects.  Please [go here](https://github.com/rancher/rancher/blob/master/vendor.conf) to view the entire list.
+Rancher also includes other open source libraries and projects, [see go.mod](https://github.com/rancher/rancher/blob/master/go.mod) for the full list.
 
 ## Support, Discussion, and Community
 If you need any help with Rancher or RancherOS, please join us at either our [Rancher forums](http://forums.rancher.com/), [#rancher IRC channel](http://webchat.freenode.net/?channels=rancher) or [Slack](https://slack.rancher.io/) where most of our team hangs out at.
