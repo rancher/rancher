@@ -205,7 +205,7 @@ func run() error {
 			wsURL += "/register"
 		}
 		logrus.Infof("Connecting to %s with token %s", wsURL, token)
-		remotedialer.ClientConnect(wsURL, http.Header(headers), nil, func(proto, address string) bool {
+		remotedialer.ClientConnect(context.Background(), wsURL, http.Header(headers), nil, func(proto, address string) bool {
 			switch proto {
 			case "tcp":
 				return true

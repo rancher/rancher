@@ -295,13 +295,8 @@ github.com/rancher/remotedialer v0.2.2 h1:R0DNjBqLzLrhZTS+kbYi8E6qBmIOrzPwqoo1L7
 github.com/rancher/remotedialer v0.2.2/go.mod h1:tkU8ZvrR5lRgaKWaX71nAy6daeqvPFx/lJEnbW7tXSI=
 github.com/rancher/rke v0.3.0-rc6.0.20190819180243-f8bac2c059d0 h1:XYyvskgyYvU89CgHEl0XK3GDom+heEgl2s28jv/f6PM=
 github.com/rancher/rke v0.3.0-rc6.0.20190819180243-f8bac2c059d0/go.mod h1:IyunvVrNJZLg3m5faCvG4LNAyf03vuAShBi9q9mcPGc=
-<<<<<<< HEAD
 github.com/rancher/rke v0.3.0-rc8.0.20190903201334-c69d97196214 h1:8MLUjbWFj5UqTvnVxk+Frr3Yh6e2P5PhHeptYmzPkTU=
 github.com/rancher/rke v0.3.0-rc8.0.20190903201334-c69d97196214/go.mod h1:3GzSO9jAHq0o1xFG+0ARsti8JIopG5Wd0sjwdzX6B7I=
-=======
-github.com/rancher/rke v0.3.0-rc8.0.20190830174211-32bf922fc5ac h1:mPFsxGdRgkHjgtYyr+Qu1PC0KMV/VNHrwgQooJIC90M=
-github.com/rancher/rke v0.3.0-rc8.0.20190830174211-32bf922fc5ac/go.mod h1:VFuSAh+Ooe1YgfKO9hOo7IGpRGGLMJvdlRf77Jdgs84=
->>>>>>> Vendor remotedialer
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
