@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/dind"
 	"github.com/rancher/rke/hosts"
@@ -205,6 +207,7 @@ func checkAllIncluded(cluster *cluster.Cluster) error {
 }
 
 func clusterUpFromCli(ctx *cli.Context) error {
+	logrus.Infof("Running RKE version: %v", ctx.App.Version)
 	if ctx.Bool("local") {
 		return clusterUpLocal(ctx)
 	}

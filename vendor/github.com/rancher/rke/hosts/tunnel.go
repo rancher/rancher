@@ -36,7 +36,6 @@ func (h *Host) TunnelUp(ctx context.Context, dialerFactory DialerFactory, cluste
 	// set Docker client
 	logrus.Debugf("Connecting to Docker API for host [%s]", h.Address)
 	h.DClient, err = client.NewClientWithOpts(
-		client.WithHost("unix:///var/run/docker.sock"),
 		client.WithVersion(DockerAPIVersion),
 		client.WithHTTPClient(httpClient))
 	if err != nil {

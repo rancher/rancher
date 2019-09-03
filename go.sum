@@ -1,8 +1,6 @@
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 cloud.google.com/go v0.34.0 h1:eOI3/cP2VTU6uZLDYAoic+eyzzB9YyGmJ7eIjl8rOPg=
 cloud.google.com/go v0.34.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
-git.apache.org/thrift.git v0.0.0-20180902110319-2566ecd5d999/go.mod h1:fPE2ZNJGynbRyZ4dJvy6G277gSllfV2HJqblrnkyeyg=
-git.apache.org/thrift.git v0.12.0/go.mod h1:fPE2ZNJGynbRyZ4dJvy6G277gSllfV2HJqblrnkyeyg=
 github.com/Azure/azure-sdk-for-go v19.1.0+incompatible h1:ysqLW+tqZjJWOTE74heH/pDRbr4vlN3yV+dqQYgpyxw=
 github.com/Azure/azure-sdk-for-go v19.1.0+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
 github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 h1:w+iIsaOQNcT7OZ575w+acHgRric5iCyQh+xv+KJ4HB8=
@@ -25,6 +23,7 @@ github.com/PuerkitoBio/urlesc v0.0.0-20160726150825-5bd2802263f2 h1:JCHLVE3B+kJd
 github.com/PuerkitoBio/urlesc v0.0.0-20160726150825-5bd2802263f2/go.mod h1:uGdkoq3SwY9Y+13GIhn11/XLaGBb4BfwItxLd5jeuXE=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
+github.com/apache/thrift v0.12.0/go.mod h1:cp2SuWMxlEZw2r+iP2GNCdIi4C1qmUzdZFSVb+bacwQ=
 github.com/aws/aws-sdk-go v1.16.19 h1:eQypou1JciH0C87wYbj9uii0YVG3hS0S4UY78oWmUvM=
 github.com/aws/aws-sdk-go v1.16.19/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/beevik/etree v0.0.0-20171015221209-af219c0c7ea1 h1:6fqkBkx5cRbd8Pq0UEMxyteIAPoE1KiPptnx1yEzJLU=
@@ -152,7 +151,7 @@ github.com/gorilla/websocket v1.4.1 h1:q7AeDBpnBk8AogcD4DSag/Ukw/KV+YhzLj2bP5HvK
 github.com/gorilla/websocket v1.4.1/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/gotestyourself/gotestyourself v2.2.0+incompatible h1:AQwinXlbQR2HvPjQZOmDhRqsv5mZf+Jb1RnSLxcqZcI=
 github.com/gotestyourself/gotestyourself v2.2.0+incompatible/go.mod h1:zZKM6oeNM8k+FRljX1mnzVYeS8wiGgQyvST1/GafPbY=
-github.com/grpc-ecosystem/go-grpc-middleware v1.0.0 h1:BWIsLfhgKhV5g/oF34aRjniBHLTZe5DNekSjbAjIS6c=
+github.com/grpc-ecosystem/go-grpc-middleware v1.0.0 h1:Iju5GlWwrvL6UBg4zJJt3btmonfrMlCDdsejg4CZE7c=
 github.com/grpc-ecosystem/go-grpc-middleware v1.0.0/go.mod h1:FiyG127CGDf3tlThmgyCl78X/SZQqEOJBCDaAfeWzPs=
 github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 h1:Ovs26xHkKqVztRpIrF/92BcuyuQ/YW4NSIpoGtfXNho=
 github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0/go.mod h1:8NvIoxWQoOIhqOTXgfV/d3M/q6VIi02HzZEHgUlZvzk=
@@ -274,8 +273,8 @@ github.com/rancher/client-go v1.14.5-rancher.1 h1:3lriccMjs8HpK4H3OyHo1a0GIvr0lO
 github.com/rancher/client-go v1.14.5-rancher.1/go.mod h1:N4rIJ5TXwpEuCvEf9SJLCX2CqgSTIIyCK8zIV34IZhE=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190819174335-6eb94126a98c h1:Of+EnlLZ33fmeZgQhr/Pb80iMaR9L8mQ2xvhzQk4o4w=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190819174335-6eb94126a98c/go.mod h1:VDixap7YjDnNwlfxL4gl890ThOVinEZE3qyAaG0xcQE=
-github.com/rancher/kontainer-driver-metadata v0.0.0-20190829181508-f5abbfa5182e h1:IH/kDn1QKwfqVhqRfbNwmjcj4rUMpHUpjKPRjunlo9Q=
-github.com/rancher/kontainer-driver-metadata v0.0.0-20190829181508-f5abbfa5182e/go.mod h1:dHvhyuoiwrjqQCFD586g0cZ9NJJXEKeAtQi8RX96U8E=
+github.com/rancher/kontainer-driver-metadata v0.0.0-20190903162452-89591483cc05 h1:NlEoZblGZspgjohSjvvNpFWLSvCA4lpFVBghwOMSnnY=
+github.com/rancher/kontainer-driver-metadata v0.0.0-20190903162452-89591483cc05/go.mod h1:dHvhyuoiwrjqQCFD586g0cZ9NJJXEKeAtQi8RX96U8E=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20190819182532-d4cdf8e56671 h1:JIgjMy2Nb/H+89T2S7TePqiGyxeE4J1g5tGtb9+hqsQ=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20190819182532-d4cdf8e56671/go.mod h1:NHG6mh7mpbYOVbhw5f2eNPYWgMFZImfILcDL+U29kUI=
 github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009 h1:Xsxh7fX3+2wAUJtPy8g2lZh0cYuyifqhBL0vxCIYojs=
@@ -291,10 +290,8 @@ github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a h1:6xqYlVz4uAX
 github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a/go.mod h1:YW8wJ/coee2n9ed937uPBWQArBaVlxs+5wkkS9KiyDc=
 github.com/rancher/rke v0.3.0-rc6.0.20190819180243-f8bac2c059d0 h1:XYyvskgyYvU89CgHEl0XK3GDom+heEgl2s28jv/f6PM=
 github.com/rancher/rke v0.3.0-rc6.0.20190819180243-f8bac2c059d0/go.mod h1:IyunvVrNJZLg3m5faCvG4LNAyf03vuAShBi9q9mcPGc=
-github.com/rancher/rke v0.3.0-rc8.0.20190829204247-798632b3a44d h1:mGrLxg5zLyEVSAMmDLnqCoSdn20NyWHBWJj8cB1EtEw=
-github.com/rancher/rke v0.3.0-rc8.0.20190829204247-798632b3a44d/go.mod h1:VFuSAh+Ooe1YgfKO9hOo7IGpRGGLMJvdlRf77Jdgs84=
-github.com/rancher/rke v0.3.0-rc8.0.20190830174211-32bf922fc5ac h1:mPFsxGdRgkHjgtYyr+Qu1PC0KMV/VNHrwgQooJIC90M=
-github.com/rancher/rke v0.3.0-rc8.0.20190830174211-32bf922fc5ac/go.mod h1:VFuSAh+Ooe1YgfKO9hOo7IGpRGGLMJvdlRf77Jdgs84=
+github.com/rancher/rke v0.3.0-rc8.0.20190903201334-c69d97196214 h1:8MLUjbWFj5UqTvnVxk+Frr3Yh6e2P5PhHeptYmzPkTU=
+github.com/rancher/rke v0.3.0-rc8.0.20190903201334-c69d97196214/go.mod h1:3GzSO9jAHq0o1xFG+0ARsti8JIopG5Wd0sjwdzX6B7I=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
@@ -302,8 +299,6 @@ github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1
 github.com/rancher/types v0.0.0-20190819173748-96e6d6f30265/go.mod h1:ROyypICT7xxMhVRplyFnEIaXHw2nMVHfCZ8Y3261qmw=
 github.com/rancher/types v0.0.0-20190822170951-b99efa820bc3/go.mod h1:9L7VLTwNVt7vJYwP/7xrQ4tWghDQ+zl9//RTqRjGxes=
 github.com/rancher/types v0.0.0-20190827214052-704648244586/go.mod h1:9L7VLTwNVt7vJYwP/7xrQ4tWghDQ+zl9//RTqRjGxes=
-github.com/rancher/types v0.0.0-20190829235015-3aced2bfa27e h1:kAcwk3EvvYxvKHVpod4JWkh77z0HxUEuvGPV7pG6NSo=
-github.com/rancher/types v0.0.0-20190829235015-3aced2bfa27e/go.mod h1:9L7VLTwNVt7vJYwP/7xrQ4tWghDQ+zl9//RTqRjGxes=
 github.com/rancher/types v0.0.0-20190830223007-e70505280772 h1:NLx69aTYYlbrSrOupUXzIiRaiSZ5ayRvXDVogjPs7Nk=
 github.com/rancher/types v0.0.0-20190830223007-e70505280772/go.mod h1:9L7VLTwNVt7vJYwP/7xrQ4tWghDQ+zl9//RTqRjGxes=
 github.com/rancher/wrangler v0.1.5 h1:HiXOeP6Kci2DK+e04D1g6INT77xAYpAr54zmTTe0Spk=
@@ -514,10 +509,6 @@ k8s.io/apiserver v0.0.0-20190805183321-97412272efd4 h1:ksS+yGTpslrNYhM0Ao+iyb+hM
 k8s.io/apiserver v0.0.0-20190805183321-97412272efd4/go.mod h1:6bqaTSOSJavUIXUtfaR9Os9JtTCm8ZqH2SUl2S60C4w=
 k8s.io/cli-runtime v0.0.0-20190805185326-9eaa1a86d213 h1:HQgo8RuHxfEjAPZkUCaDHWp6kUZ6XvNVTuQxtNW4XnI=
 k8s.io/cli-runtime v0.0.0-20190805185326-9eaa1a86d213/go.mod h1:qWnH3/b8sp/l7EvlDh7ulDU3UWA4P4N1NFbEEP791tM=
-k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible h1:U5Bt+dab9K8qaUmXINrkXO135kA11/i5Kg1RUydgaMQ=
-k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible/go.mod h1:7vJpHMYJwNQCWgzmNV+VYUl1zCObLyodBc8nIyt8L5s=
-k8s.io/client-go v11.0.1-0.20190805182715-88a2adca7e76+incompatible h1:++I4KHzXuLVOcIGYPxi2dvBcvTnx8ObI2TNY358hTRo=
-k8s.io/client-go v11.0.1-0.20190805182715-88a2adca7e76+incompatible/go.mod h1:7vJpHMYJwNQCWgzmNV+VYUl1zCObLyodBc8nIyt8L5s=
 k8s.io/cloud-provider v0.0.0-20190805190417-1c521de1d7ab h1:1+18lZobnXacONIAsOtpQ+KxjcxLG+52zAqRiE1Bchw=
 k8s.io/cloud-provider v0.0.0-20190805190417-1c521de1d7ab/go.mod h1:LlIffnLBu+GG7d4ppPzC8UnA1Ex8S+ntmSRVsnr7Xy4=
 k8s.io/code-generator v0.0.0-20190311093542-50b561225d70/go.mod h1:MYiN+ZJZ9HkETbgVZdWw2AsuAi9PZ4V80cwfuf2axe8=
