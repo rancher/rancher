@@ -149,7 +149,7 @@ func createRole(resourceType, resourceName, roleAccess, apiVersion string, apiGr
 			return nil, err
 		}
 	} else if role != nil {
-		if !reflect.DeepEqual(newRole, role) {
+		if !reflect.DeepEqual(newRole.Rules, role.Rules) {
 			toUpdate := newRole.DeepCopy()
 			updated, err := mgmt.RBAC.Roles("").Update(toUpdate)
 			if err != nil {
@@ -200,7 +200,7 @@ func createRoleBinding(resourceType, resourceName, roleName, apiVersion string, 
 			return err
 		}
 	} else if roleBinding != nil {
-		if !reflect.DeepEqual(roleBinding, newRoleBinding) {
+		if !reflect.DeepEqual(roleBinding.Subjects, newRoleBinding.Subjects) {
 			toUpdate := newRoleBinding.DeepCopy()
 			_, err := mgmt.RBAC.RoleBindings("").Update(toUpdate)
 			if err != nil {
