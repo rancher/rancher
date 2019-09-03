@@ -297,6 +297,8 @@ spec:
                   operator: NotIn
                   values:
                     - windows
+                - key: node-role.kubernetes.io/worker
+                  operator: Exists
       terminationGracePeriodSeconds: 60
       tolerations:
       - effect: NoExecute

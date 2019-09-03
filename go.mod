@@ -3,6 +3,7 @@ module github.com/rancher/rancher
 go 1.12
 
 replace (
+	git.apache.org/thrift.git => github.com/apache/thrift v0.12.0
 	github.com/crewjam/saml => github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009
@@ -51,11 +52,11 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.1.0
 	github.com/prometheus/common v0.6.0
-	github.com/rancher/kontainer-driver-metadata v0.0.0-20190829181508-f5abbfa5182e
+	github.com/rancher/kontainer-driver-metadata v0.0.0-20190903162452-89591483cc05
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20190819182532-d4cdf8e56671
 	github.com/rancher/norman v0.0.0-20190829223613-7317090b9b71
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
-	github.com/rancher/rke v0.3.0-rc8.0.20190830174211-32bf922fc5ac
+	github.com/rancher/rke v0.3.0-rc8.0.20190903201334-c69d97196214
 	github.com/rancher/types v0.0.0-20190830223007-e70505280772
 	github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95
 	github.com/robfig/cron v1.1.0

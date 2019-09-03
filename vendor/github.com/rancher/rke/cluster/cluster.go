@@ -354,7 +354,7 @@ func (c *Cluster) SyncLabelsAndTaints(ctx context.Context, currentCluster *Clust
 	if currentCluster != nil {
 		cpToDelete := hosts.GetToDeleteHosts(currentCluster.ControlPlaneHosts, c.ControlPlaneHosts, c.InactiveHosts, false)
 		if len(cpToDelete) == len(currentCluster.ControlPlaneHosts) {
-			log.Infof(ctx, "[sync] Cleaning left control plane nodes from reconcilation")
+			log.Infof(ctx, "[sync] Cleaning left control plane nodes from reconciliation")
 			for _, toDeleteHost := range cpToDelete {
 				if err := cleanControlNode(ctx, c, currentCluster, toDeleteHost); err != nil {
 					return err
