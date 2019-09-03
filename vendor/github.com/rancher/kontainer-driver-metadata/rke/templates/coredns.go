@@ -125,6 +125,9 @@ spec:
           operator: Exists
       nodeSelector:
         beta.kubernetes.io/os: linux
+      {{ range $k, $v := .NodeSelector }}
+        {{ $k }}: "{{ $v }}"
+      {{ end }}
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -132,9 +135,6 @@ spec:
               - matchExpressions:
                 - key: node-role.kubernetes.io/worker
                   operator: Exists
-      {{ range $k, $v := .NodeSelector }}
-        {{ $k }}: "{{ $v }}"
-      {{ end }}
       containers:
       - name: coredns
         image: {{.CoreDNSImage}}
