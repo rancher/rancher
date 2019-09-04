@@ -148,7 +148,7 @@ func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.C
 		if tempNode.Address == node.Status.NodeConfig.Address {
 			b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, rkehosts.B2DOS)
 			nc.Processes = augmentProcesses(token, tempNode.Processes, false, b2d)
-			nc.Processes = appendTaintsToKubeletArgs(tempNode.Processes, node.Status.NodeConfig.Taints)
+			nc.Processes = appendTaintsToKubeletArgs(nc.Processes, node.Status.NodeConfig.Taints)
 			return nc, nil
 		}
 	}
@@ -206,7 +206,7 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 				b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, rkehosts.B2DOS)
 				nc.Processes = augmentProcesses(token, tempNode.Processes, true, b2d)
 			}
-			nc.Processes = appendTaintsToKubeletArgs(tempNode.Processes, node.Status.NodeConfig.Taints)
+			nc.Processes = appendTaintsToKubeletArgs(nc.Processes, node.Status.NodeConfig.Taints)
 			nc.Files = tempNode.Files
 			return nc, nil
 		}
