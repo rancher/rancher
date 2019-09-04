@@ -55,10 +55,7 @@ var (
 	UIKubernetesDefaultVersion        = NewSetting("ui-k8s-default-version-range", "<=1.14.x")
 	WhitelistDomain                   = NewSetting("whitelist-domain", "forums.rancher.com")
 	WhitelistEnvironmentVars          = NewSetting("whitelist-envvars", "HTTP_PROXY,HTTPS_PROXY,NO_PROXY")
-	SystemMonitoringCatalogID         = NewSetting("system-monitoring-catalog-id", "catalog://?catalog=system-library&template=rancher-monitoring&version=0.0.3")
-	SystemLoggingCatalogID            = NewSetting("system-logging-catalog-id", "catalog://?catalog=system-library&template=rancher-logging&version=0.1.1")
 	SystemExternalDNSCatalogID        = NewSetting("system-externaldns-catalog-id", "catalog://?catalog=system-library&template=rancher-external-dns&version=0.0.2")
-	SystemGlobalIstioCatalogID        = NewSetting("system-global-istio-catalog-id", "catalog://?catalog=system-library&template=rancher-istio&version=0.0.1")
 	SystemCISBenchmarkCatalogID       = NewSetting("system-cis-benchmark-catalog-id", "catalog://?catalog=system-library&template=rancher-cis-benchmark&version=0.1.0")
 	AuthUserInfoResyncCron            = NewSetting("auth-user-info-resync-cron", "0 0 * * *")
 	AuthUserSessionTTLMinutes         = NewSetting("auth-user-session-ttl-minutes", "960")   // 16 hours

@@ -1,10 +1,12 @@
 package utils
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/blang/semver"
 	mVersion "github.com/mcuadros/go-version"
+	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/rancher/pkg/catalog/utils/version"
 	"github.com/rancher/rancher/pkg/settings"
@@ -89,4 +91,38 @@ func ReleaseServerVersion(serverVersion string) bool {
 		return false
 	}
 	return true
+}
+
+func LatestAvailableTemplateVersion(template *v3.CatalogTemplate) (*v3.TemplateVersionSpec, error) {
+	versions := template.DeepCopy().Spec.Versions
+	if len(versions) == 0 {
+		return nil, errors.New("empty catalog template version list")
+	}
+
+	sort.Slice(versions, func(i, j int) bool {
+		val1, err := semver.ParseTolerant(versions[i].Version)
+		if err != nil {
+			return false
+		}
+
+		val2, err := semver.ParseTolerant(versions[j].Version)
+		if err != nil {
+			return false
+		}
+
+		return val2.LT(val1)
+	})
+
+	for _, templateVersion := range versions {
+		catalogTemplateVersion := &v3.CatalogTemplateVersion{
+			TemplateVersion: v3.TemplateVersion{
+				Spec: templateVersion,
+			},
+		}
+		if err := ValidateRancherVersion(catalogTemplateVersion); err == nil {
+			return &templateVersion, nil
+		}
+	}
+
+	return nil, errors.Errorf("template %s allowed rancher version not match current server", template.Name)
 }

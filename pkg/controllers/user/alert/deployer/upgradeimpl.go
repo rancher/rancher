@@ -7,13 +7,12 @@ import (
 	"time"
 
 	"github.com/rancher/norman/controller"
-	cutils "github.com/rancher/rancher/pkg/catalog/utils"
+	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
 	alertutil "github.com/rancher/rancher/pkg/controllers/user/alert/common"
 	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/rancher/pkg/settings"
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
@@ -23,6 +22,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+)
+
+const (
+	initVersion = "initializing"
 )
 
 var (
@@ -48,7 +51,6 @@ type AlertService struct {
 	projectLister      v3.ProjectLister
 	namespaces         v1.NamespaceInterface
 	templateLister     v3.CatalogTemplateLister
-	appDeployer        *appDeployer
 }
 
 func NewService() *AlertService {
@@ -56,13 +58,6 @@ func NewService() *AlertService {
 }
 
 func (l *AlertService) Init(cluster *config.UserContext) {
-	ad := &appDeployer{
-		appsGetter:       cluster.Management.Project,
-		namespaces:       cluster.Management.Core.Namespaces(metav1.NamespaceAll),
-		secrets:          cluster.Core.Secrets(metav1.NamespaceAll),
-		templateVersions: cluster.Management.Management.CatalogTemplateVersions(namespace.GlobalNamespace),
-	}
-
 	l.clusterName = cluster.ClusterName
 	l.clusterLister = cluster.Management.Management.Clusters("").Controller().Lister()
 	l.catalogLister = cluster.Management.Management.Catalogs(metav1.NamespaceAll).Controller().Lister()
@@ -76,31 +71,26 @@ func (l *AlertService) Init(cluster *config.UserContext) {
 	l.apps = cluster.Management.Project.Apps(metav1.NamespaceAll)
 	l.namespaces = cluster.Core.Namespaces(metav1.NamespaceAll)
 	l.templateLister = cluster.Management.Management.CatalogTemplates(metav1.NamespaceAll).Controller().Lister()
-	l.appDeployer = ad
 
 }
 
 func (l *AlertService) Version() (string, error) {
-	catalogID := settings.SystemMonitoringCatalogID.Get()
-	templateVersionID, _, err := common.ParseExternalID(catalogID)
-	if err != nil {
-		return "", fmt.Errorf("get system monitor catalog version failed, %v", err)
-	}
-	return templateVersionID, nil
+	return fmt.Sprintf("%s-%s", monitorutil.RancherMonitoringTemplateName, initVersion), nil
 }
 
 func (l *AlertService) Upgrade(currentVersion string) (string, error) {
-	templateVersionNamespace, systemCatalogName, _, templateName, _, err := common.SplitExternalID(settings.SystemMonitoringCatalogID.Get())
+	template, err := l.templateLister.Get(namespace.GlobalNamespace, monitorutil.RancherMonitoringTemplateName)
+	if err != nil {
+		return "", fmt.Errorf("get template %s:%s failed, %v", namespace.GlobalNamespace, monitorutil.RancherMonitoringTemplateName, err)
+	}
+
+	templateVersion, err := versionutil.LatestAvailableTemplateVersion(template)
 	if err != nil {
 		return "", err
 	}
 
-	templateID := fmt.Sprintf("%s-%s", systemCatalogName, templateName)
-	template, err := l.templateLister.Get(templateVersionNamespace, templateID)
-	if err != nil {
-		return "", errors.Wrapf(err, "get template %s failed", templateID)
-	}
-	newExternalID := fmt.Sprintf(cutils.CatalogExternalIDFormat, systemCatalogName, templateName, template.Spec.DefaultVersion)
+	systemCatalogName := template.Spec.CatalogID
+	newExternalID := templateVersion.ExternalID
 
 	newVersion, _, err := common.ParseExternalID(newExternalID)
 	if err != nil {

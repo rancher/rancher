@@ -6,20 +6,18 @@ import (
 	"time"
 
 	"github.com/rancher/norman/controller"
+	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
 	alertutil "github.com/rancher/rancher/pkg/controllers/user/alert/common"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
-	"github.com/rancher/rancher/pkg/controllers/user/helm/common"
 	monitorutil "github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/namespace"
 	projectutil "github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	appsv1 "github.com/rancher/types/apis/apps/v1"
 	v1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
-	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 
 	"golang.org/x/sync/errgroup"
@@ -45,26 +43,16 @@ type Deployer struct {
 	projectLister           mgmtv3.ProjectLister
 	clusters                mgmtv3.ClusterInterface
 	appDeployer             *appDeployer
-	operaterDeployer        *operaterDeployer
 }
 
 type appDeployer struct {
 	appsGetter           projectv3.AppsGetter
 	namespaces           v1.NamespaceInterface
 	secrets              v1.SecretInterface
-	templateVersions     mgmtv3.CatalogTemplateVersionInterface
+	templateLister       mgmtv3.CatalogTemplateLister
 	statefulsets         appsv1.StatefulSetInterface
 	systemAccountManager *systemaccount.Manager
 	deployments          appsv1.DeploymentInterface
-}
-
-type operaterDeployer struct {
-	templateVersions mgmtv3.CatalogTemplateVersionInterface
-	projectsGetter   mgmtv3.ProjectsGetter
-	appsGetter       projectv3.AppsGetter
-	rbacs            rbacv1.Interface
-	cores            v1.Interface
-	apps             appsv1.Interface
 }
 
 func NewDeployer(cluster *config.UserContext, manager *manager.AlertManager) *Deployer {
@@ -73,18 +61,10 @@ func NewDeployer(cluster *config.UserContext, manager *manager.AlertManager) *De
 		appsGetter:           appsgetter,
 		namespaces:           cluster.Core.Namespaces(metav1.NamespaceAll),
 		secrets:              cluster.Core.Secrets(metav1.NamespaceAll),
-		templateVersions:     cluster.Management.Management.CatalogTemplateVersions(namespace.GlobalNamespace),
+		templateLister:       cluster.Management.Management.CatalogTemplates(namespace.GlobalNamespace).Controller().Lister(),
 		statefulsets:         cluster.Apps.StatefulSets(metav1.NamespaceAll),
 		systemAccountManager: systemaccount.NewManager(cluster.Management),
 		deployments:          cluster.Apps.Deployments(metav1.NamespaceAll),
-	}
-
-	op := &operaterDeployer{
-		templateVersions: cluster.Management.Management.CatalogTemplateVersions(namespace.GlobalNamespace),
-		projectsGetter:   cluster.Management.Management,
-		appsGetter:       appsgetter,
-		rbacs:            cluster.RBAC,
-		cores:            cluster.Core,
 	}
 
 	return &Deployer{
@@ -96,7 +76,6 @@ func NewDeployer(cluster *config.UserContext, manager *manager.AlertManager) *De
 		projectLister:           cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
 		clusters:                cluster.Management.Management.Clusters(metav1.NamespaceAll),
 		appDeployer:             ad,
-		operaterDeployer:        op,
 	}
 }
 
@@ -310,13 +289,13 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 		return true, nil
 	}
 
-	catalogID := settings.SystemMonitoringCatalogID.Get()
-	templateVersionID, templateVersionNamespace, err := common.ParseExternalID(catalogID)
+	template, err := d.templateLister.Get(namespace.GlobalNamespace, monitorutil.RancherMonitoringTemplateName)
 	if err != nil {
-		return false, fmt.Errorf("failed to parse catalog ID %q, %v", catalogID, err)
+		return false, fmt.Errorf("get template %s:%s failed, %v", namespace.GlobalNamespace, monitorutil.RancherMonitoringTemplateName, err)
 	}
-	if _, err := d.templateVersions.GetNamespaced(templateVersionNamespace, templateVersionID, metav1.GetOptions{}); err != nil {
-		return false, fmt.Errorf("failed to find catalog by ID %q, %v", catalogID, err)
+	templateVersion, err := versionutil.LatestAvailableTemplateVersion(template)
+	if err != nil {
+		return false, err
 	}
 
 	creator, err := d.systemAccountManager.GetSystemUser(clusterName)
@@ -343,7 +322,7 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 				"operator.enabled":                    "false",
 			},
 			Description:     "Alertmanager for Rancher Monitoring",
-			ExternalID:      catalogID,
+			ExternalID:      templateVersion.ExternalID,
 			ProjectName:     systemProjectID,
 			TargetNamespace: appTargetNamespace,
 		},

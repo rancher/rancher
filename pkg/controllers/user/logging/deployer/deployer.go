@@ -2,6 +2,7 @@ package deployer
 
 import (
 	"github.com/rancher/norman/controller"
+	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/configsyncer"
 	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
@@ -143,9 +144,12 @@ func (d *Deployer) deployRancherLogging(systemProjectID, appCreator string) erro
 		return errors.Wrapf(err, "failed to find template by ID %s", templateVersionID)
 	}
 
-	catalogID := loggingconfig.RancherLoggingCatalogID(template.Spec.DefaultVersion)
+	templateVersion, err := versionutil.LatestAvailableTemplateVersion(template)
+	if err != nil {
+		return err
+	}
 
-	app := rancherLoggingApp(appCreator, systemProjectID, catalogID, driverDir, dockerRootDir)
+	app := rancherLoggingApp(appCreator, systemProjectID, templateVersion.ExternalID, driverDir, dockerRootDir)
 
 	windowsNodes, err := d.nodeLister.List(metav1.NamespaceAll, windowNodeLabel)
 	if err != nil {
