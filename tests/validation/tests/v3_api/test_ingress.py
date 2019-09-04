@@ -336,3 +336,81 @@ def create_project_client(request):
         client = get_admin_client()
         client.delete(namespace["project"])
     request.addfinalizer(fin)
+
+
+def test_ingress_using_multiple_manual_xip_hosts():
+    p_client = namespace["p_client"]
+    ns = namespace["ns"]
+    cluster = namespace["cluster"]
+
+
+    nodes = get_schedulable_nodes(cluster)
+    random_node_index = 0
+    any_one_node_ip = nodes[random_node_index].ipAddress
+
+    name = random_str()
+    workload1 = p_client.create_workload(
+        name=name,
+        namespaceId=ns.id,
+        scale=1,
+        containers=[{
+            'name': 'one',
+            'image': 'nginx',
+        }])
+    workload1 = p_client.wait_success(workload1)
+    workload1_host = "one.%s.%s.xip.io" % (name, any_one_node_ip)
+
+    name = random_str()
+    workload2 = p_client.create_workload(
+        name=name,
+        namespaceId=ns.id,
+        scale=1,
+        containers=[{
+            'name': 'two',
+            'image': 'nginx',
+        }])
+    workload2 = p_client.wait_success(workload2)
+    workload2_host = "two.%s.%s.xip.io" % (name, any_one_node_ip)
+
+    print (workload1_host)
+    print (workload2_host)
+
+    name = random_str()
+    ingress = p_client.create_ingress(name=name,
+                                        namespaceId=ns.id,
+                                        rules=[{
+                                            'host': workload1_host,
+                                            'paths': [
+                                                {
+                                                    'path': '/',
+                                                    'targetPort': 80,
+                                                    'workloadIds':
+                                                        [workload1.id],
+                                                },
+                                            ]},
+                                            {
+                                                'host': workload2_host,
+                                                'paths': [
+                                                    {
+                                                        'path': '/',
+                                                        'targetPort': 80,
+                                                        'workloadIds':
+                                                            [workload2.id],
+                                                    }
+                                                ]},
+                                        ])
+    ingress = p_client.wait_success(ingress)
+    print (ingress)
+
+    assert len(ingress.rules) == 2
+    assert ingress.rules[0].host == workload1_host
+    path1 = ingress.rules[0].paths[0]
+    assert path1.path == '/'
+    assert path1.targetPort == 80
+    assert path1.workloadIds[0] == workload1.id
+
+    assert ingress.rules[1].host == workload2_host
+    path2 = ingress.rules[1].paths[0]
+    assert path2.path == '/'
+    assert path2.targetPort == 80
+    assert path2.workloadIds[0] == workload2.id
