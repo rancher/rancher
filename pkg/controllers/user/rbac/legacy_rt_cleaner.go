@@ -2,9 +2,9 @@ package rbac
 
 import (
 	"strings"
-	"time"
 
 	"github.com/rancher/norman/lifecycle"
+	"github.com/rancher/rancher/pkg/api/store/roletemplate"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -23,23 +23,26 @@ func (p *rtCleaner) sync(key string, obj *v3.RoleTemplate) (runtime.Object, erro
 	if key == "" || obj == nil {
 		return nil, nil
 	}
-	if obj.DeletionTimestamp == nil || len(obj.Finalizers) == 0 {
-		return nil, nil
+	if obj.Annotations[roletemplate.RTVersion] == "true" {
+		return obj, nil
 	}
-	if time.Since(obj.DeletionTimestamp.Time) < 1*time.Hour {
-		return nil, nil
-	}
-	obj, err := p.removeStuckFinalizer(obj)
+
+	obj, err := p.removeFinalizerFromNonExistentCluster(obj)
 	if err != nil && !errors.IsNotFound(err) {
 		return nil, err
 	}
-	return obj, nil
-
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+		obj.SetAnnotations(annotations)
+	}
+	obj.Annotations[roletemplate.RTVersion] = "true"
+	return p.m.workload.Management.Management.RoleTemplates("").Update(obj)
 }
 
-func (p *rtCleaner) removeStuckFinalizer(obj *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+func (p *rtCleaner) removeFinalizerFromNonExistentCluster(obj *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 	obj = obj.DeepCopy()
-	modified := false
+
 	md, err := meta.Accessor(obj)
 	if err != nil {
 		return obj, err
@@ -49,15 +52,14 @@ func (p *rtCleaner) removeStuckFinalizer(obj *v3.RoleTemplate) (*v3.RoleTemplate
 	for i := len(finalizers) - 1; i >= 0; i-- {
 		f := finalizers[i]
 		if strings.HasPrefix(f, lifecycle.ScopedFinalizerKey) {
-			finalizers = append(finalizers[:i], finalizers[i+1:]...)
-			modified = true
+			s := strings.Split(f, "_")
+			// if cluster was not reported, its a deleted cluster and will cause the finalizer to hang in the future
+			if _, err = p.m.clusterLister.Get("", s[1]); errors.IsNotFound(err) {
+				finalizers = append(finalizers[:i], finalizers[i+1:]...)
+			}
 		}
 	}
 
-	if modified {
-		md.SetFinalizers(finalizers)
-		obj, e := p.m.workload.Management.Management.RoleTemplates("").Update(obj)
-		return obj, e
-	}
+	md.SetFinalizers(finalizers)
 	return obj, nil
 }
