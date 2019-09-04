@@ -480,7 +480,8 @@ func (l *Lifecycle) doNotify(obj *v3.PipelineExecution) (runtime.Object, error) 
 		message = obj.Spec.PipelineConfig.Notification.Message
 	}
 	var g errgroup.Group
-	for _, toSendRecipient := range toSendRecipients {
+	for i := range toSendRecipients {
+		toSendRecipient := toSendRecipients[i]
 		notifierMessage := &notifiers.Message{
 			Content: message,
 		}
