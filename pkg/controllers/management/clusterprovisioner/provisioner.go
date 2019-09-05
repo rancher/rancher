@@ -439,20 +439,20 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 	}
 
 	logrus.Infof("Provisioning cluster [%s]", cluster.Name)
-
+	var updateTriggered bool
 	if create {
 		logrus.Infof("Creating cluster [%s]", cluster.Name)
 		apiEndpoint, serviceAccountToken, caCert, err = p.driverCreate(cluster, *spec)
 		if err != nil && err.Error() == "cluster already exists" {
 			logrus.Infof("Create done, Updating cluster [%s]", cluster.Name)
-			apiEndpoint, serviceAccountToken, caCert, err = p.driverUpdate(cluster, *spec)
+			apiEndpoint, serviceAccountToken, caCert, updateTriggered, err = p.driverUpdate(cluster, *spec)
 		}
 	} else if spec.RancherKubernetesEngineConfig != nil && spec.RancherKubernetesEngineConfig.Restore.Restore {
 		logrus.Infof("Restoring cluster [%s] from backup", cluster.Name)
 		apiEndpoint, serviceAccountToken, caCert, err = p.restoreClusterBackup(cluster, *spec)
 	} else if spec.RancherKubernetesEngineConfig != nil && spec.RancherKubernetesEngineConfig.RotateCertificates != nil {
 		logrus.Infof("Rotating certificates for cluster [%s]", cluster.Name)
-		apiEndpoint, serviceAccountToken, caCert, err = p.driverUpdate(cluster, *spec)
+		apiEndpoint, serviceAccountToken, caCert, updateTriggered, err = p.driverUpdate(cluster, *spec)
 	} else {
 		logrus.Infof("Updating cluster [%s]", cluster.Name)
 
@@ -463,7 +463,7 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 			return cluster, fmt.Errorf("Failed to update cluster [%s]: %v", cluster.Name, err)
 		}
 
-		apiEndpoint, serviceAccountToken, caCert, err = p.driverUpdate(cluster, *spec)
+		apiEndpoint, serviceAccountToken, caCert, updateTriggered, err = p.driverUpdate(cluster, *spec)
 	}
 	// at this point we know the cluster has been modified in driverCreate/Update so reload
 	if newCluster, reloadErr := p.Clusters.Get(cluster.Name, metav1.GetOptions{}); reloadErr == nil {
@@ -504,7 +504,7 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 		cluster.Status.APIEndpoint = apiEndpoint
 		cluster.Status.ServiceAccountToken = serviceAccountToken
 		cluster.Status.CACert = caCert
-		resetRkeConfigFlags(cluster)
+		resetRkeConfigFlags(cluster, updateTriggered)
 
 		if cluster, err = p.Clusters.Update(cluster); err == nil {
 			saved = true
@@ -552,13 +552,16 @@ func (p *Provisioner) setGenericConfigs(cluster *v3.Cluster) {
 	}
 }
 
-func resetRkeConfigFlags(cluster *v3.Cluster) {
+func resetRkeConfigFlags(cluster *v3.Cluster, updateTriggered bool) {
 	if cluster.Spec.RancherKubernetesEngineConfig != nil {
 		cluster.Spec.RancherKubernetesEngineConfig.RotateCertificates = nil
 		cluster.Spec.RancherKubernetesEngineConfig.Restore = v3.RestoreConfig{}
 		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
 			cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.RotateCertificates = nil
 			cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Restore = v3.RestoreConfig{}
+		}
+		if !updateTriggered {
+			return
 		}
 		if cluster.Status.Capabilities.TaintSupport == nil || !*cluster.Status.Capabilities.TaintSupport {
 			supportsTaints := true
@@ -910,7 +913,7 @@ func (p *Provisioner) restoreClusterBackup(cluster *v3.Cluster, spec v3.ClusterS
 
 		if !reflect.DeepEqual(s3Config, appliedS3Conf) {
 			logrus.Infof("updated spec during restore detected for cluster [%s], update is required", cluster.Name)
-			api, token, cert, err = p.driverUpdate(cluster, spec)
+			api, token, cert, _, err = p.driverUpdate(cluster, spec)
 		}
 	}
 	return api, token, cert, err

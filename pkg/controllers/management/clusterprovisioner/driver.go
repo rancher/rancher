@@ -49,7 +49,7 @@ func (p *Provisioner) getKontainerDriver(spec v3.ClusterSpec) (*v3.KontainerDriv
 	return nil, fmt.Errorf("no kontainer driver for cluster %v", spec.DisplayName)
 }
 
-func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v3.ClusterSpec) (api string, token string, cert string, err error) {
+func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v3.ClusterSpec) (api string, token string, cert string, updateTriggered bool, err error) {
 	ctx, logger := clusterprovisioninglogger.NewLogger(p.Clusters, cluster, v3.ClusterConditionUpdated)
 	defer logger.Close()
 
@@ -58,7 +58,7 @@ func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 
 	if spec.RancherKubernetesEngineConfig != nil && cluster.Status.APIEndpoint != "" && cluster.Status.ServiceAccountToken != "" &&
 		reflect.DeepEqual(applied.RancherKubernetesEngineConfig, spec.RancherKubernetesEngineConfig) {
-		return cluster.Status.APIEndpoint, cluster.Status.ServiceAccountToken, cluster.Status.CACert, nil
+		return cluster.Status.APIEndpoint, cluster.Status.ServiceAccountToken, cluster.Status.CACert, false, nil
 	}
 
 	if spec.RancherKubernetesEngineConfig != nil && spec.RancherKubernetesEngineConfig.Services.Etcd.Snapshot == nil &&
@@ -73,10 +73,11 @@ func (p *Provisioner) driverUpdate(cluster *v3.Cluster, spec v3.ClusterSpec) (ap
 
 	kontainerDriver, err := p.getKontainerDriver(spec)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", false, err
 	}
 
-	return p.engineService.Update(ctx, cluster.Name, kontainerDriver, spec)
+	api, token, cert, err = p.engineService.Update(ctx, cluster.Name, kontainerDriver, spec)
+	return api, token, cert, true, err
 }
 
 func (p *Provisioner) driverRemove(cluster *v3.Cluster, forceRemove bool) error {
