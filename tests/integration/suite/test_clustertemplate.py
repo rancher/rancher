@@ -318,22 +318,15 @@ def test_revision_creation_permission(admin_mc, remove_resource,
              timeout=60,
              fail_handler=fail_handler(rb_resource))
     templateId = cluster_template.id
-    # user with accessType=owner should not be able to create revision
-    # since user does not have 'clustertemplates-create' role
-    errorMessage = "You must have the `Create Cluster Templates` global role \
-in order to create cluster templates or revisions. These \
-permissions can be granted by an administrator."
+    # user with accessType=owner should be able to create revision
+    # since a standard user can add revisions to template shared
+    # with owner access
 
-    try:
-        create_cluster_template_revision(user_owner.client, templateId)
-    except ApiError as e:
-        assert e.error.status == 403
-        assert e.error.message == errorMessage
+    create_cluster_template_revision(user_owner.client, templateId)
 
     # user with read-only accessType should get Forbidden error
-    try:
+    with pytest.raises(ApiError) as e:
         create_cluster_template_revision(user_readonly.client, templateId)
-    except ApiError as e:
         assert e.error.status == 403
 
 
