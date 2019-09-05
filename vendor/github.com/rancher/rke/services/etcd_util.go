@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"net"
 	"net/http"
 	"strings"
@@ -124,10 +123,6 @@ func GetEtcdConnString(hosts []*hosts.Host, hostAddress string) string {
 		}
 		connHosts = append(connHosts, "https://"+host.InternalAddress+":2379")
 	}
-	rand.Seed(time.Now().UnixNano())
-	rand.Shuffle(len(connHosts), func(i, j int) {
-		connHosts[i], connHosts[j] = connHosts[j], connHosts[i]
-	})
 	if containsHostAddress {
 		connHosts = append([]string{"https://" + hostAddress + ":2379"}, connHosts...)
 	}
