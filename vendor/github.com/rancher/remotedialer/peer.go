@@ -79,6 +79,7 @@ func (p *peer) start(ctx context.Context, s *Server) {
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
 		},
+		HandshakeTimeout: HandshakeTimeOut,
 	}
 
 outer:
