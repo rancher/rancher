@@ -21,8 +21,8 @@ func (*rke) GenerateCerts(config *v3.RancherKubernetesEngineConfig) (map[string]
 	return pki.GenerateRKECerts(context.Background(), *config, "", "")
 }
 
-func (*rke) GeneratePlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, dockerInfo map[string]types.Info) (v3.RKEPlan, error) {
-	return cluster.GeneratePlan(ctx, rkeConfig.DeepCopy(), dockerInfo)
+func (*rke) GeneratePlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, dockerInfo map[string]types.Info, data map[string]interface{}) (v3.RKEPlan, error) {
+	return cluster.GeneratePlan(ctx, rkeConfig.DeepCopy(), dockerInfo, data)
 }
 
 func GetDockerInfo(node *v3.Node) (map[string]types.Info, error) {
