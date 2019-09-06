@@ -92,7 +92,7 @@ func getNodePlan(cluster *v3.Cluster, node *v3.Node) (*v3.RKEConfigNodePlan, err
 		return nil, err
 	}
 
-	plan, err := librke.New().GeneratePlan(context.Background(), cluster.Status.AppliedSpec.RancherKubernetesEngineConfig, dockerInfo)
+	plan, err := librke.New().GeneratePlan(context.Background(), cluster.Status.AppliedSpec.RancherKubernetesEngineConfig, dockerInfo, map[string]interface{}{})
 	if err != nil {
 		return nil, err
 	}

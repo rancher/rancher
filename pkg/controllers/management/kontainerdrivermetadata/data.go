@@ -30,6 +30,8 @@ const (
 	APIVersion           = "management.cattle.io/v3"
 	RancherVersionDev    = "2.3"
 	sendRKELabel         = "io.cattle.rke_store"
+	svcOptionLinuxKey    = "service-option-linux-key"
+	svcOptionWindowsKey  = "service-option-windows-key"
 	rkeSystemImageKind   = "RkeK8sSystemImage"
 	rkeServiceOptionKind = "RkeK8sServiceOption"
 	rkeAddonKind         = "RkeAddon"
@@ -39,7 +41,7 @@ var existLabel = map[string]string{sendRKELabel: "false"}
 
 func (md *MetadataController) createOrUpdateMetadata(data Data) error {
 	if err := md.saveSystemImages(data.K8sVersionRKESystemImages, data.K8sVersionedTemplates,
-		data.K8sVersionInfo, data.K8sVersionServiceOptions, data.RancherDefaultK8sVersions); err != nil {
+		data.K8sVersionInfo, data.K8sVersionServiceOptions, data.K8sVersionWindowsServiceOptions, data.RancherDefaultK8sVersions); err != nil {
 		return err
 	}
 	if err := md.saveServiceOptions(data.K8sVersionServiceOptions); err != nil {
@@ -53,7 +55,7 @@ func (md *MetadataController) createOrUpdateMetadata(data Data) error {
 
 func (md *MetadataController) createOrUpdateMetadataDefaults() error {
 	if err := md.saveSystemImages(rke.DriverData.K8sVersionRKESystemImages, rke.DriverData.K8sVersionedTemplates,
-		rke.DriverData.K8sVersionInfo, rke.DriverData.K8sVersionServiceOptions, rke.DriverData.RancherDefaultK8sVersions); err != nil {
+		rke.DriverData.K8sVersionInfo, rke.DriverData.K8sVersionServiceOptions, rke.DriverData.K8sVersionWindowsServiceOptions, rke.DriverData.RancherDefaultK8sVersions); err != nil {
 		return err
 	}
 	if err := md.saveServiceOptions(rke.DriverData.K8sVersionServiceOptions); err != nil {
@@ -69,6 +71,7 @@ func (md *MetadataController) saveSystemImages(K8sVersionRKESystemImages map[str
 	AddonsData map[string]map[string]string,
 	K8sVersionInfo map[string]v3.K8sVersionInfo,
 	ServiceOptions map[string]v3.KubernetesServicesOptions,
+	ServiceOptionsWindows map[string]v3.KubernetesServicesOptions,
 	DefaultK8sVersions map[string]string) error {
 	maxVersionForMajorK8sVersion := map[string]string{}
 	deprecatedMap := map[string]bool{}
@@ -86,11 +89,11 @@ func (md *MetadataController) saveSystemImages(K8sVersionRKESystemImages map[str
 			deprecatedMap[k8sVersion] = true
 			continue
 		}
-		pluginsMap, err := getPluginMap(k8sVersion, AddonsData)
+		labelsMap, err := getLabelMap(k8sVersion, AddonsData, ServiceOptions, ServiceOptionsWindows)
 		if err != nil {
 			return err
 		}
-		if err := md.createOrUpdateSystemImageCRD(k8sVersion, systemImages, pluginsMap); err != nil {
+		if err := md.createOrUpdateSystemImageCRD(k8sVersion, systemImages, labelsMap); err != nil {
 			return err
 		}
 		if minorOk && toIgnoreForK8sCurrent(rancherVersionInfo, rancherVersion) {
@@ -307,12 +310,13 @@ func (md *MetadataController) createOrUpdateAddonCRD(addonName, template string,
 	return nil
 }
 
-func getPluginMap(k8sVersion string, data map[string]map[string]string) (map[string]string, error) {
+func getLabelMap(k8sVersion string, data map[string]map[string]string,
+	svcOption map[string]v3.KubernetesServicesOptions, svcOptionWindows map[string]v3.KubernetesServicesOptions) (map[string]string, error) {
 	toMatch, err := semver.Make(k8sVersion[1:])
 	if err != nil {
 		return nil, fmt.Errorf("k8sVersion not sem-ver %s %v", k8sVersion, err)
 	}
-	templateMap := map[string]string{}
+	labelMap := map[string]string{}
 	for addon, addonData := range data {
 		if addon == templates.TemplateKeys {
 			continue
@@ -325,7 +329,7 @@ func getPluginMap(k8sVersion string, data map[string]map[string]string) (map[str
 				continue
 			}
 			if testRange(toMatch) {
-				templateMap[addon] = key
+				labelMap[addon] = key
 				found = true
 				break
 			}
@@ -334,7 +338,21 @@ func getPluginMap(k8sVersion string, data map[string]map[string]string) (map[str
 			return nil, fmt.Errorf("no template found for k8sVersion %s plugin %s", k8sVersion, addon)
 		}
 	}
-	return templateMap, nil
+	// store service options
+	majorKey := util.GetTagMajorVersion(k8sVersion)
+	if _, ok := svcOption[k8sVersion]; ok {
+		labelMap[svcOptionLinuxKey] = getVersionNameWithOsType(k8sVersion, Linux)
+	} else if _, ok := svcOption[majorKey]; ok {
+		labelMap[svcOptionLinuxKey] = getVersionNameWithOsType(majorKey, Linux)
+	}
+
+	if _, ok := svcOptionWindows[k8sVersion]; ok {
+		labelMap[svcOptionWindowsKey] = getVersionNameWithOsType(k8sVersion, Windows)
+	} else if _, ok := svcOptionWindows[majorKey]; ok {
+		labelMap[svcOptionWindowsKey] = getVersionNameWithOsType(majorKey, Windows)
+	}
+
+	return labelMap, nil
 }
 
 func getRKEVendorData() map[string]bool {
