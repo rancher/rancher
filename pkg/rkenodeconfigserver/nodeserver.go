@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
+	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/librke"
 	"github.com/rancher/rancher/pkg/rkeworker"
@@ -35,6 +36,8 @@ type RKENodeConfigServer struct {
 	systemAccountManager *systemaccount.Manager
 	serviceOptionsLister v3.RKEK8sServiceOptionLister
 	serviceOptions       v3.RKEK8sServiceOptionInterface
+	sysImagesLister      v3.RKEK8sSystemImageLister
+	sysImages            v3.RKEK8sSystemImageInterface
 }
 
 func Handler(auth *tunnelserver.Authorizer, scaledContext *config.ScaledContext) http.Handler {
@@ -44,6 +47,8 @@ func Handler(auth *tunnelserver.Authorizer, scaledContext *config.ScaledContext)
 		systemAccountManager: systemaccount.NewManagerFromScale(scaledContext),
 		serviceOptionsLister: scaledContext.Management.RKEK8sServiceOptions("").Controller().Lister(),
 		serviceOptions:       scaledContext.Management.RKEK8sServiceOptions(""),
+		sysImagesLister:      scaledContext.Management.RKEK8sSystemImages("").Controller().Lister(),
+		sysImages:            scaledContext.Management.RKEK8sSystemImages(""),
 	}
 }
 
@@ -131,8 +136,11 @@ func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.C
 	if err != nil {
 		return nil, err
 	}
-
-	plan, err := librke.New().GeneratePlan(ctx, rkeConfig, infos)
+	svcOptions, err := n.getServiceOptions(cluster.Spec.RancherKubernetesEngineConfig.Version)
+	if err != nil {
+		return nil, err
+	}
+	plan, err := librke.New().GeneratePlan(ctx, rkeConfig, infos, svcOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +193,11 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 	rkeConfig := spec.RancherKubernetesEngineConfig
 	filterHostForSpec(rkeConfig, node)
 	logrus.Debugf("The number of nodes sent to the plan: %v", len(rkeConfig.Nodes))
-	plan, err := librke.New().GeneratePlan(ctx, rkeConfig, infos)
+	svcOptions, err := n.getServiceOptions(cluster.Spec.RancherKubernetesEngineConfig.Version)
+	if err != nil {
+		return nil, err
+	}
+	plan, err := librke.New().GeneratePlan(ctx, rkeConfig, infos, svcOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -320,4 +332,25 @@ func appendTaintsToKubeletArgs(processes map[string]v3.Process, nodeConfigTaints
 		processes["kubelet"] = kubelet
 	}
 	return processes
+}
+
+func (n *RKENodeConfigServer) getServiceOptions(k8sVersion string) (map[string]interface{}, error) {
+	data := map[string]interface{}{}
+	svcOptions, err := kd.GetRKEK8sServiceOptions(k8sVersion, n.serviceOptionsLister, n.serviceOptions, n.sysImagesLister, n.sysImages, kd.Linux)
+	if err != nil {
+		logrus.Errorf("getK8sServiceOptions: k8sVersion %s [%v]", k8sVersion, err)
+		return data, err
+	}
+	if svcOptions != nil {
+		data["k8s-service-options"] = svcOptions
+	}
+	svcOptionsWindows, err := kd.GetRKEK8sServiceOptions(k8sVersion, n.serviceOptionsLister, n.serviceOptions, n.sysImagesLister, n.sysImages, kd.Windows)
+	if err != nil {
+		logrus.Errorf("getK8sServiceOptionsWindows: k8sVersion %s [%v]", k8sVersion, err)
+		return data, err
+	}
+	if svcOptionsWindows != nil {
+		data["k8s-windows-service-options"] = svcOptionsWindows
+	}
+	return data, nil
 }
