@@ -4,7 +4,6 @@ RUN apt-get update && apt-get install -y git curl ca-certificates unzip xz-utils
     mkdir -p /var/lib/rancher/etcd /var/lib/cattle /opt/jail /opt/drivers/management-state/bin && \
     chown -R rancher /var/lib/rancher /var/lib/cattle /usr/local/bin
 RUN mkdir /root/.kube && \
-    ln -s /usr/bin/k3s /usr/bin/kubectl && \
     ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/k3s.yaml  && \
     ln -s /etc/rancher/k3s/k3s.yaml /root/.kube/config && \
     ln -s /usr/bin/rancher /usr/bin/reset-password && \
@@ -24,6 +23,7 @@ ENV CATTLE_ETCD_VERSION v3.3.14
 ENV LOGLEVEL_VERSION v0.1.2
 ENV TINI_VERSION v0.18.0
 ENV TELEMETRY_VERSION v0.5.7
+ENV KUBECTL_VERSION v1.14.5
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.8
 ENV LINODE_UI_DRIVER_VERSION v0.3.0
 
@@ -62,7 +62,8 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     curl -sLf ${!K3S_URL} > /usr/bin/k3s && \
     curl -sfL ${!ETCD_URL} | tar xvzf - --strip-components=1 -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcd && \
     curl -sLf https://github.com/rancher/telemetry/releases/download/${TELEMETRY_VERSION}/telemetry-${ARCH} > /usr/bin/telemetry && \
-    chmod +x /usr/bin/helm /usr/bin/tini /usr/bin/telemetry /usr/bin/tiller /usr/bin/k3s
+    curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
+    chmod +x /usr/bin/helm /usr/bin/tini /usr/bin/telemetry /usr/bin/tiller /usr/bin/k3s /usr/bin/kubectl
 
 ENV CATTLE_UI_PATH /usr/share/rancher/ui
 ENV CATTLE_UI_VERSION 2.3.4
