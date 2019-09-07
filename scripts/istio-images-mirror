@@ -8,3 +8,5 @@ istio/proxyv2 rancher/istio-proxyv2 1.2.5
 istio/proxy_init rancher/istio-proxy_init 1.2.5
 istio/node-agent-k8s rancher/istio-node-agent-k8s 1.2.5
 coredns/coredns rancher/coredns-coredns 1.1.2
+quay.io/coreos/prometheus-operator rancher/coreos-prometheus-operator v0.32.0
+quay.io/coreos/prometheus-config-reloader rancher/coreos-prometheus-config-reloader v0.32.0
