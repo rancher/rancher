@@ -201,7 +201,8 @@ func FetchCertificatesFromHost(ctx context.Context, extraHosts []*hosts.Host, ho
 		// Return error if the certificate file is not found but only if its not etcd or request header certificate
 		if err != nil && !strings.HasPrefix(certName, "kube-etcd") &&
 			certName != RequestHeaderCACertName &&
-			certName != APIProxyClientCertName {
+			certName != APIProxyClientCertName &&
+			certName != KubeAdminCertName {
 			// IsErrNotFound doesn't catch this because it's a custom error
 			if isFileNotFoundErr(err) {
 				return nil, fmt.Errorf("Certificate %s is not found", GetCertTempPath(certName))
@@ -212,7 +213,8 @@ func FetchCertificatesFromHost(ctx context.Context, extraHosts []*hosts.Host, ho
 		// If I can't find an etcd or request header ca I will not fail and will create it later.
 		if crt == "" && (strings.HasPrefix(certName, "kube-etcd") ||
 			certName == RequestHeaderCACertName ||
-			certName == APIProxyClientCertName) {
+			certName == APIProxyClientCertName ||
+			certName == KubeAdminCertName) {
 			tmpCerts[certName] = CertificatePKI{}
 			continue
 		}
