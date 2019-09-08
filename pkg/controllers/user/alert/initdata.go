@@ -138,6 +138,7 @@ func initClusterPreCanAlerts(clusterAlertGroups v3.ClusterAlertGroupInterface, c
 		logrus.Warnf("Failed to create precan rules for %s: %v", name, err)
 	}
 
+	inherited := false
 	name = "etcd-system-service"
 	rule = &v3.ClusterAlertRule{
 		ObjectMeta: metav1.ObjectMeta{
@@ -149,7 +150,12 @@ func initClusterPreCanAlerts(clusterAlertGroups v3.ClusterAlertGroupInterface, c
 			CommonRuleField: v3.CommonRuleField{
 				Severity:    SeverityCritical,
 				DisplayName: "Etcd is unavailable",
-				TimingField: defaultTimingField,
+				Inherited:   &inherited,
+				TimingField: v3.TimingField{
+					GroupWaitSeconds:      600,
+					GroupIntervalSeconds:  180,
+					RepeatIntervalSeconds: 3600,
+				},
 			},
 			SystemServiceRule: &v3.SystemServiceRule{
 				Condition: "etcd",
