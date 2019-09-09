@@ -3,6 +3,7 @@ package generator
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -83,6 +84,7 @@ func GenerateProjectConfig(projectLoggings []*mgmtv3.ProjectLogging, namespaces 
 			continue
 		}
 
+		sort.Strings(grepNamespace)
 		formatgrepNamespace := fmt.Sprintf("(%s)", strings.Join(grepNamespace, "|"))
 		isSystemProject := v.Spec.ProjectName == systemProjectID
 		wpl, err := newWrapProjectLogging(v.Spec, formatgrepNamespace, certDir, isSystemProject)
