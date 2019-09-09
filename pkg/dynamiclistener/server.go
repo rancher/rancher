@@ -130,20 +130,9 @@ func (s *Server) updateIPs(savedIPs map[string]bool) map[string]bool {
 		return savedIPs
 	}
 
-	certs := map[string]string{}
-	s.Lock()
-	for key, cert := range s.certs {
-		certs[key] = certToString(cert)
-	}
-	s.Unlock()
-
-	if !reflect.DeepEqual(certs, cfg.GeneratedCerts) {
-		cfg = cfg.DeepCopy()
-		cfg.GeneratedCerts = certs
-		cfg, err = s.listenConfigStorage.Update(cfg)
-		if err != nil {
-			return savedIPs
-		}
+	err = s.reconcileCerts(cfg)
+	if err != nil {
+		return savedIPs
 	}
 
 	allIPs := map[string]bool{}
@@ -171,6 +160,47 @@ func (s *Server) updateIPs(savedIPs map[string]bool) map[string]bool {
 	}
 
 	return allIPs
+}
+
+// reconcileCerts ensures that certs on this server and in the store match
+func (s *Server) reconcileCerts(cfg *v3.ListenConfig) error {
+	certs := map[string]string{}
+	s.Lock()
+	for key, cert := range s.certs {
+		certs[key] = certToString(cert)
+	}
+	s.Unlock()
+
+	if reflect.DeepEqual(certs, cfg.GeneratedCerts) {
+		return nil
+	}
+	// Ensure that the saved config has all the certs generated on this instance of the server
+	// and that their values match.
+	cfg = cfg.DeepCopy()
+	if cfg.GeneratedCerts == nil {
+		cfg.GeneratedCerts = make(map[string]string)
+	}
+	for k, v := range certs {
+		v1, ok := cfg.GeneratedCerts[k]
+		if !ok || v1 != v {
+			cfg.GeneratedCerts[k] = v
+		}
+	}
+	cfg, err := s.listenConfigStorage.Update(cfg)
+	if err != nil {
+		return err
+	}
+	// We also need to pull certs generated elsewhere, as its possible they are differing
+	// only due to non-local updates
+	for key, certString := range cfg.GeneratedCerts {
+		if s.certs[key] == nil {
+			cert := stringToCert(certString)
+			if cert != nil {
+				s.certs[key] = cert
+			}
+		}
+	}
+	return nil
 }
 
 func (s *Server) start(ctx context.Context) {
