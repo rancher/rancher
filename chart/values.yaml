@@ -46,6 +46,7 @@ imagePullSecrets: []
 ### ingress ###
 # Readme for details and instruction on adding tls secrets.
 ingress:
+  enabled: true
   extraAnnotations:
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
@@ -58,6 +59,11 @@ ingress:
   tls:
     # options: rancher, letsEncrypt, secret
     source: rancher
+
+### service ###
+# Define service type. to have the option to use LoadBalancer, NodePort or ClusterIP (default)
+service:
+  type: ClusterIP
 
 ### LetsEncrypt config ###
 # ProTip: The production environment only allows you to register a name 5 times a week.
