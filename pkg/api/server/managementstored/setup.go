@@ -38,6 +38,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/secret"
 	"github.com/rancher/rancher/pkg/api/customization/setting"
 	appStore "github.com/rancher/rancher/pkg/api/store/app"
+	catalogStore "github.com/rancher/rancher/pkg/api/store/catalog"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/cluster"
 	clustertemplatestore "github.com/rancher/rancher/pkg/api/store/clustertemplate"
@@ -332,6 +333,7 @@ func Catalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
 	schema.CollectionFormatter = catalog.CollectionFormatter
 	schema.LinkHandler = handler.ExportYamlHandler
 	schema.Validator = catalog.Validator
+	schema.Store = catalogStore.Wrap(schema.Store)
 }
 
 func ProjectCatalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
@@ -343,6 +345,7 @@ func ProjectCatalog(schemas *types.Schemas, managementContext *config.ScaledCont
 	schema.ActionHandler = handler.RefreshProjectCatalogActionHandler
 	schema.CollectionFormatter = catalog.CollectionFormatter
 	schema.Validator = catalog.Validator
+	schema.Store = catalogStore.Wrap(schema.Store)
 }
 
 func ClusterCatalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
@@ -354,6 +357,7 @@ func ClusterCatalog(schemas *types.Schemas, managementContext *config.ScaledCont
 	schema.ActionHandler = handler.RefreshClusterCatalogActionHandler
 	schema.CollectionFormatter = catalog.CollectionFormatter
 	schema.Validator = catalog.Validator
+	schema.Store = catalogStore.Wrap(schema.Store)
 }
 
 func ClusterRegistrationTokens(schemas *types.Schemas) {

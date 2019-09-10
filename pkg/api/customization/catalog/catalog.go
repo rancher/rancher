@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
@@ -12,15 +13,29 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/rancher/pkg/settings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	client "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/compose"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	SystemLibraryURL            = "https://git.rancher.io/system-charts"
+	SystemCatalogName           = "system-library"
+	embededSystemCatalogSetting = "system-catalog"
+)
+
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "refresh")
 	resource.Links["exportYaml"] = apiContext.URLBuilder.Link("exportYaml", resource)
+	if resource.Values["url"] == SystemLibraryURL && resource.Values["name"] == SystemCatalogName {
+		delete(resource.Links, "remove")
+
+		if strings.ToLower(settings.SystemCatalog.Get()) == "bundled" {
+			delete(resource.Links, "update")
+		}
+	}
 }
 
 func CollectionFormatter(request *types.APIContext, collection *types.GenericCollection) {
