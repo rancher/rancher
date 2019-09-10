@@ -694,6 +694,7 @@ func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 	lh := kontainerdriver.ListHandler{
 		SysImageLister: management.Management.RKEK8sSystemImages("").Controller().Lister(),
 		SysImages:      management.Management.RKEK8sSystemImages(""),
+		CatalogLister:  management.Management.Catalogs("").Controller().Lister(),
 	}
 	schema.ActionHandler = handler.ActionHandler
 	schema.CollectionFormatter = kontainerdriver.CollectionFormatter
