@@ -6,21 +6,42 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/api/customization/nodetemplate"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	Amazonec2driver    = "amazonec2"
+	Azuredriver        = "azure"
+	DigitalOceandriver = "digitalocean"
+	ExoscaleDriver     = "exoscale"
+	Linodedriver       = "linode"
+	OTCDriver          = "otc"
+	OpenstackDriver    = "openstack"
+	PacketDriver       = "packet"
+	RackspaceDriver    = "rackspace"
+	SoftLayerDriver    = "softlayer"
+	Vmwaredriver       = "vmwarevsphere"
+)
+
 var driverData = map[string]map[string][]string{
-	nodetemplate.Amazonec2driver: {"cred": []string{"accessKey"}},
-	nodetemplate.Azuredriver:     {"cred": []string{"clientId", "subscriptionId"}},
-	nodetemplate.Linodedriver:    {"password": []string{"token"}},
-	nodetemplate.Vmwaredriver:    {"cred": []string{"username", "vcenter", "vcenterPort"}},
+	Amazonec2driver:    {"publicCredentialFields": []string{"accessKey"}, "privateCredentialFields": []string{"secretKey"}},
+	Azuredriver:        {"publicCredentialFields": []string{"clientId", "subscriptionId"}, "privateCredentialFields": []string{"clientSecret"}},
+	DigitalOceandriver: {"privateCredentialFields": []string{"accessToken"}},
+	ExoscaleDriver:     {"privateCredentialFields": []string{"apiSecretKey"}},
+	Linodedriver:       {"privateCredentialFields": []string{"token"}, "passwordFields": []string{"rootPass"}},
+	OTCDriver:          {"privateCredentialFields": []string{"accessKeySecret"}},
+	OpenstackDriver:    {"privateCredentialFields": []string{"password"}},
+	PacketDriver:       {"privateCredentialFields": []string{"apiKey"}},
+	RackspaceDriver:    {"privateCredentialFields": []string{"apiKey"}},
+	SoftLayerDriver:    {"privateCredentialFields": []string{"apiKey"}},
+	Vmwaredriver:       {"publicCredentialFields": []string{"username", "vcenter", "vcenterPort"}, "privateCredentialFields": []string{"password"}},
 }
+
 var driverDefaults = map[string]map[string]string{
-	nodetemplate.Vmwaredriver: {"vcenterPort": "443"},
+	Vmwaredriver: {"vcenterPort": "443"},
 }
 
 type machineDriverCompare struct {
@@ -43,12 +64,12 @@ func addMachineDrivers(management *config.ManagementContext) error {
 		"", "c31b9da2c977e70c2eeee5279123a95d", []string{"ecs.aliyuncs.com"}, false, false, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(nodetemplate.Amazonec2driver, "local://", "", "",
+	if err := addMachineDriver(Amazonec2driver, "local://", "", "",
 		[]string{"iam.amazonaws.com", "iam.%.amazonaws.com.cn", "ec2.%.amazonaws.com", "ec2.%.amazonaws.com.cn"},
 		true, true, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(nodetemplate.Azuredriver, "local://", "", "", nil, true, true, management); err != nil {
+	if err := addMachineDriver(Azuredriver, "local://", "", "", nil, true, true, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver("cloudca", "https://github.com/cloud-ca/docker-machine-driver-cloudca/files/2446837/docker-machine-driver-cloudca_v2.0.0_linux-amd64.zip",
@@ -56,38 +77,38 @@ func addMachineDrivers(management *config.ManagementContext) error {
 		[]string{"objects-east.cloud.ca"}, false, false, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(nodetemplate.DigitalOceandriver, "local://", "", "", []string{"api.digitalocean.com"}, true, true, management); err != nil {
+	if err := addMachineDriver(DigitalOceandriver, "local://", "", "", []string{"api.digitalocean.com"}, true, true, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("exoscale", "local://", "", "", []string{"api.exoscale.ch"}, false, true, management); err != nil {
+	if err := addMachineDriver(ExoscaleDriver, "local://", "", "", []string{"api.exoscale.ch"}, false, true, management); err != nil {
 		return err
 	}
 	linodeBuiltin := true
 	if dl := os.Getenv("CATTLE_DEV_MODE"); dl != "" {
 		linodeBuiltin = false
 	}
-	if err := addMachineDriver(nodetemplate.Linodedriver, "https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.8/docker-machine-driver-linode_linux-amd64.zip",
+	if err := addMachineDriver(Linodedriver, "https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.8/docker-machine-driver-linode_linux-amd64.zip",
 		"/assets/rancher-ui-driver-linode/component.js", "b31b6a504c59ee758d2dda83029fe4a85b3f5601e22dfa58700a5e6c8f450dc7", []string{"api.linode.com"}, linodeBuiltin, linodeBuiltin, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("openstack", "local://", "", "", nil, false, true, management); err != nil {
+	if err := addMachineDriver(OpenstackDriver, "local://", "", "", nil, false, true, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("otc", "https://github.com/rancher-plugins/docker-machine-driver-otc/releases/download/v2019.5.7/docker-machine-driver-otc",
+	if err := addMachineDriver(OTCDriver, "https://github.com/rancher-plugins/docker-machine-driver-otc/releases/download/v2019.5.7/docker-machine-driver-otc",
 		"", "3f793ebb0ebd9477b9166ec542f77e25", nil, false, false, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("packet", "https://github.com/packethost/docker-machine-driver-packet/releases/download/v0.1.4/docker-machine-driver-packet_linux-amd64.zip",
+	if err := addMachineDriver(PacketDriver, "https://github.com/packethost/docker-machine-driver-packet/releases/download/v0.1.4/docker-machine-driver-packet_linux-amd64.zip",
 		"", "2cd0b9614ab448b61b1bf73ef4738ab5", []string{"api.packet.net"}, false, false, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("rackspace", "local://", "", "", nil, false, true, management); err != nil {
+	if err := addMachineDriver(RackspaceDriver, "local://", "", "", nil, false, true, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver("softlayer", "local://", "", "", nil, false, true, management); err != nil {
+	if err := addMachineDriver(SoftLayerDriver, "local://", "", "", nil, false, true, management); err != nil {
 		return err
 	}
-	return addMachineDriver(nodetemplate.Vmwaredriver, "local://", "", "", nil, true, true, management)
+	return addMachineDriver(Vmwaredriver, "local://", "", "", nil, true, true, management)
 }
 
 func addMachineDriver(name, url, uiURL, checksum string, whitelist []string, active, builtin bool, management *config.ManagementContext) error {
