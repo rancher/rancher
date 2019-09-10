@@ -442,6 +442,8 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 	var updateTriggered bool
 	if create {
 		logrus.Infof("Creating cluster [%s]", cluster.Name)
+		// setting updateTriggered to true since rke up will be called on cluster create
+		updateTriggered = true
 		apiEndpoint, serviceAccountToken, caCert, err = p.driverCreate(cluster, *spec)
 		if err != nil && err.Error() == "cluster already exists" {
 			logrus.Infof("Create done, Updating cluster [%s]", cluster.Name)
