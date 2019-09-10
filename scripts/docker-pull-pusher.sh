@@ -15,8 +15,11 @@ if [ -p /dev/stdin ]; then
   echo "Data was piped to this script!"
   # If we want to read the input line by line
   while IFS= read -r line; do
-          echo "Line: ${line}"
-          mirror_image ${line}
+    if [ "${line%${line#?}}"x = '#x' ]; then
+      echo "Skipping Comment"
+    else
+      mirror_image "${line}"
+    fi
   done
 else
   echo "No input was found on stdin, skipping!"
@@ -27,7 +30,11 @@ else
           while IFS= read -r line
           do
             echo "Line: ${line}"
-            mirror_image ${line}
+            if [ "${line%${line#?}}"x = '#x' ]; then
+              echo "Skipping Comment"
+            else
+              mirror_image "${line}"
+            fi
           done < "${input}"
   else
           echo "No input given!"
