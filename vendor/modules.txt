@@ -223,7 +223,7 @@ github.com/mattn/go-isatty
 github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/mcuadros/go-version v0.0.0-20180611085657-6d5863ca60fa
 github.com/mcuadros/go-version
-# github.com/minio/minio-go v0.0.0-20180613230128-10531abd0af1
+# github.com/minio/minio-go v0.0.0-20190523192347-c6c2912aa552
 github.com/minio/minio-go
 github.com/minio/minio-go/pkg/credentials
 github.com/minio/minio-go/pkg/encrypt
@@ -465,6 +465,7 @@ golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/context
 golang.org/x/net/http/httpguts
+golang.org/x/net/publicsuffix
 golang.org/x/net/idna
 golang.org/x/net/http2/hpack
 golang.org/x/net/proxy
@@ -571,6 +572,8 @@ gopkg.in/asn1-ber.v1
 gopkg.in/check.v1
 # gopkg.in/inf.v0 v0.9.1
 gopkg.in/inf.v0
+# gopkg.in/ini.v1 v1.46.0
+gopkg.in/ini.v1
 # gopkg.in/ldap.v2 v2.5.0
 gopkg.in/ldap.v2
 # gopkg.in/natefinch/lumberjack.v2 v2.0.0

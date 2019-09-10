@@ -1,6 +1,6 @@
 /*
- * Minio Go Library for Amazon S3 Compatible Cloud Storage
- * Copyright 2015-2017 Minio, Inc.
+ * MinIO Go Library for Amazon S3 Compatible Cloud Storage
+ * Copyright 2015-2017 MinIO, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -192,17 +192,15 @@ func (c Client) listObjectsV2Query(bucketName, objectPrefix, continuationToken s
 	// Always set list-type in ListObjects V2
 	urlValues.Set("list-type", "2")
 
-	// Set object prefix.
-	if objectPrefix != "" {
-		urlValues.Set("prefix", objectPrefix)
-	}
+	// Set object prefix, prefix value to be set to empty is okay.
+	urlValues.Set("prefix", objectPrefix)
+
+	// Set delimiter, delimiter value to be set to empty is okay.
+	urlValues.Set("delimiter", delimiter)
+
 	// Set continuation token
 	if continuationToken != "" {
 		urlValues.Set("continuation-token", continuationToken)
-	}
-	// Set delimiter.
-	if delimiter != "" {
-		urlValues.Set("delimiter", delimiter)
 	}
 
 	// Fetch owner when listing
@@ -380,17 +378,16 @@ func (c Client) listObjectsQuery(bucketName, objectPrefix, objectMarker, delimit
 	// Get resources properly escaped and lined up before
 	// using them in http request.
 	urlValues := make(url.Values)
-	// Set object prefix.
-	if objectPrefix != "" {
-		urlValues.Set("prefix", objectPrefix)
-	}
+
+	// Set object prefix, prefix value to be set to empty is okay.
+	urlValues.Set("prefix", objectPrefix)
+
+	// Set delimiter, delimiter value to be set to empty is okay.
+	urlValues.Set("delimiter", delimiter)
+
 	// Set object marker.
 	if objectMarker != "" {
 		urlValues.Set("marker", objectMarker)
-	}
-	// Set delimiter.
-	if delimiter != "" {
-		urlValues.Set("delimiter", delimiter)
 	}
 
 	// maxkeys should default to 1000 or less.
@@ -563,14 +560,12 @@ func (c Client) listMultipartUploadsQuery(bucketName, keyMarker, uploadIDMarker,
 	if uploadIDMarker != "" {
 		urlValues.Set("upload-id-marker", uploadIDMarker)
 	}
-	// Set prefix marker.
-	if prefix != "" {
-		urlValues.Set("prefix", prefix)
-	}
-	// Set delimiter.
-	if delimiter != "" {
-		urlValues.Set("delimiter", delimiter)
-	}
+
+	// Set object prefix, prefix value to be set to empty is okay.
+	urlValues.Set("prefix", prefix)
+
+	// Set delimiter, delimiter value to be set to empty is okay.
+	urlValues.Set("delimiter", delimiter)
 
 	// maxUploads should be 1000 or less.
 	if maxUploads == 0 || maxUploads > 1000 {
@@ -633,30 +628,27 @@ func (c Client) listObjectParts(bucketName, objectName, uploadID string) (partsI
 	return partsInfo, nil
 }
 
-// findUploadID lists all incomplete uploads and finds the uploadID of the matching object name.
-func (c Client) findUploadID(bucketName, objectName string) (uploadID string, err error) {
+// findUploadIDs lists all incomplete uploads and find the uploadIDs of the matching object name.
+func (c Client) findUploadIDs(bucketName, objectName string) ([]string, error) {
+	var uploadIDs []string
 	// Make list incomplete uploads recursive.
 	isRecursive := true
 	// Turn off size aggregation of individual parts, in this request.
 	isAggregateSize := false
-	// latestUpload to track the latest multipart info for objectName.
-	var latestUpload ObjectMultipartInfo
 	// Create done channel to cleanup the routine.
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 	// List all incomplete uploads.
 	for mpUpload := range c.listIncompleteUploads(bucketName, objectName, isRecursive, isAggregateSize, doneCh) {
 		if mpUpload.Err != nil {
-			return "", mpUpload.Err
+			return nil, mpUpload.Err
 		}
 		if objectName == mpUpload.Key {
-			if mpUpload.Initiated.Sub(latestUpload.Initiated) > 0 {
-				latestUpload = mpUpload
-			}
+			uploadIDs = append(uploadIDs, mpUpload.UploadID)
 		}
 	}
 	// Return the latest upload id.
-	return latestUpload.UploadID, nil
+	return uploadIDs, nil
 }
 
 // getTotalMultipartSize - calculate total uploaded size for the a given multipart object.
