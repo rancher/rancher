@@ -292,12 +292,11 @@ func generateImages(inputMap map[interface{}]interface{}, output map[string]stru
 		return
 	}
 	repo, repoOk := r.(string)
-	tag, tagOk := t.(string)
-	if !repoOk || !tagOk {
+	if !repoOk {
 		return
 	}
 
-	output[fmt.Sprintf("%s:%s", repo, tag)] = struct{}{}
+	output[fmt.Sprintf("%s:%v", repo, t)] = struct{}{}
 
 	return
 }
