@@ -1,6 +1,6 @@
 /*
- * Minio Go Library for Amazon S3 Compatible Cloud Storage
- * Copyright 2015-2017 Minio, Inc.
+ * MinIO Go Library for Amazon S3 Compatible Cloud Storage
+ * Copyright 2015-2017 MinIO, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -233,18 +233,20 @@ func (c Client) RemoveIncompleteUpload(bucketName, objectName string) error {
 	if err := s3utils.CheckValidObjectName(objectName); err != nil {
 		return err
 	}
-	// Find multipart upload id of the object to be aborted.
-	uploadID, err := c.findUploadID(bucketName, objectName)
+	// Find multipart upload ids of the object to be aborted.
+	uploadIDs, err := c.findUploadIDs(bucketName, objectName)
 	if err != nil {
 		return err
 	}
-	if uploadID != "" {
-		// Upload id found, abort the incomplete multipart upload.
+
+	for _, uploadID := range uploadIDs {
+		// abort incomplete multipart upload, based on the upload id passed.
 		err := c.abortMultipartUpload(context.Background(), bucketName, objectName, uploadID)
 		if err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 

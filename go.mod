@@ -42,8 +42,7 @@ require (
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
 	github.com/mattn/go-colorable v0.1.0
 	github.com/mcuadros/go-version v0.0.0-20180611085657-6d5863ca60fa
-	github.com/minio/minio-go v0.0.0-20180613230128-10531abd0af1
-	github.com/mitchellh/go-homedir v1.1.0 // indirect
+	github.com/minio/minio-go v0.0.0-20190523192347-c6c2912aa552
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/mrjones/oauth v0.0.0-20180629183705-f4e24b6d100c
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
