@@ -3,6 +3,7 @@ package kontainerdriver
 import (
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -10,11 +11,14 @@ import (
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
+	"github.com/rancher/rancher/pkg/catalog/utils"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/util"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	img "github.com/rancher/types/image"
 )
 
 const (
@@ -31,6 +35,7 @@ type ActionHandler struct {
 type ListHandler struct {
 	SysImageLister v3.RKEK8sSystemImageLister
 	SysImages      v3.RKEK8sSystemImageInterface
+	CatalogLister  v3.CatalogLister
 }
 
 func (a ActionHandler) ActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -103,6 +108,9 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 		switch apiContext.ID {
 		case linuxImages:
 			rkeSysImgCopy.WindowsPodInfraContainer = ""
+			// removing weave images since it's not supported
+			rkeSysImgCopy.WeaveNode = ""
+			rkeSysImgCopy.WeaveCNI = ""
 		case windowsImages:
 			majorVersion := util.GetTagMajorVersion(k8sVersion)
 			if mVersion.Compare(majorVersion, "v1.13", "<=") {
@@ -120,10 +128,30 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 		rkeSysImages[k8sVersion] = *rkeSysImgCopy
 	}
 
-	targetImages, err := image.CollectionImages(rkeSysImages)
-	if err != nil {
-		return err
+	var targetImages []string
+	switch apiContext.ID {
+	case linuxImages:
+		// get system charts images
+		systemCatalog, err := lh.CatalogLister.Get("", utils.SystemLibraryName)
+		if err != nil {
+			return httperror.WrapAPIError(err, httperror.ServerError, "error getting system catalog")
+		}
+		systemCatalogHash := helmlib.CatalogSHA256Hash(systemCatalog)
+		systemCatalogChartPath := filepath.Join(helmlib.CatalogCache, systemCatalogHash)
+		targetImages, err = image.GetLinuxImages(systemCatalogChartPath, []string{}, rkeSysImages)
+		if err != nil {
+			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for linux platform")
+		}
+	case windowsImages:
+		var err error
+		targetImages, err = image.GetWindowsImages(rkeSysImages)
+		if err != nil {
+			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for windows platform")
+		}
 	}
+
+	agentImage := settings.AgentImage.Get()
+	targetImages = append(targetImages, img.Mirror(agentImage))
 
 	b := []byte(strings.Join(targetImages, "\n"))
 	apiContext.Response.Header().Set("Content-Length", strconv.Itoa(len(b)))
@@ -133,7 +161,7 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 	apiContext.Response.Header().Set("Pragma", "private")
 	apiContext.Response.Header().Set("Expires", "Wed 24 Feb 1982 18:42:00 GMT")
 	apiContext.Response.WriteHeader(http.StatusOK)
-	_, err = apiContext.Response.Write(b)
+	_, err := apiContext.Response.Write(b)
 	return err
 }
 
