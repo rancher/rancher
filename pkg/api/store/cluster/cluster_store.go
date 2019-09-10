@@ -677,7 +677,10 @@ func validateS3Credentials(data map[string]interface{}) error {
 		Region:    convert.ToString(configMap["region"]),
 		CustomCA:  convert.ToString(configMap["customCa"]),
 	}
-
+	// skip if we don't have credentials defined.
+	if sbc.AccessKey == "" && sbc.SecretKey == "" {
+		return nil
+	}
 	bucket := convert.ToString(configMap["bucketName"])
 	if bucket == "" {
 		return fmt.Errorf("Empty bucket name")
