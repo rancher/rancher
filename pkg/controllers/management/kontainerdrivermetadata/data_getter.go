@@ -94,8 +94,7 @@ func GetRKEK8sServiceOptions(k8sVersion string, svcOptionLister v3.RKEK8sService
 	if !ok {
 		return k8sSvcOption, fmt.Errorf("getSvcOptions: no service-option key present for %s", k8sVersion)
 	}
-	name := getVersionNameWithOsType(val, osType)
-	return getRKEServiceOption(name, svcOptionLister, svcOptions)
+	return getRKEServiceOption(val, svcOptionLister, svcOptions)
 }
 
 func GetK8sVersionInfo(
