@@ -1,14 +1,12 @@
 package deployer
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"time"
 
 	loggingconfig "github.com/rancher/rancher/pkg/controllers/user/logging/config"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/rancher/pkg/ticker"
 	v1 "github.com/rancher/types/apis/core/v1"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 
@@ -16,7 +14,6 @@ import (
 	k8scorev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -33,7 +30,7 @@ const (
 type AppDeployer struct {
 	AppsGetter projectv3.AppsGetter
 	Namespaces v1.NamespaceInterface
-	Pods       v1.PodInterface
+	PodLister  v1.PodLister
 }
 
 func (d *AppDeployer) initNamespace(name string) error {
@@ -105,36 +102,33 @@ func (d *AppDeployer) deploy(app *projectv3.App, systemWriteKeys []string) error
 }
 
 func (d *AppDeployer) isDeploySuccess(targetNamespace string, selector map[string]string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), waitTimeout)
-	defer cancel()
+	timeout := time.After(waitTimeout)
+	timeoutErr := fmt.Errorf("timeout checking app status, app deployed namespace: %s, labels: %+v", targetNamespace, selector)
 
-	var err error
-	for range ticker.Context(ctx, checkInterval) {
-		var pods *v1.PodList
+	ticker := time.NewTicker(checkInterval)
+	defer ticker.Stop()
 
-		opt := metav1.ListOptions{
-			LabelSelector: labels.Set(selector).String(),
-			FieldSelector: fields.Set{"metadata.namespace": targetNamespace}.String(),
-		}
-		pods, err = d.Pods.List(opt)
-		if err != nil {
-			return errors.Wrap(err, "list pods failed in check app deploy")
-		}
-
-		if len(pods.Items) == 0 {
-			continue
-		}
-
-		for _, pod := range pods.Items {
-			switch pod.Status.Phase {
-			case k8scorev1.PodFailed:
-				return errors.New("get failed status from pod, please the check logs for " + pod.Namespace + ":" + pod.Name)
-			case k8scorev1.PodRunning, k8scorev1.PodSucceeded:
-				return nil
+	for {
+		select {
+		case <-ticker.C:
+			pods, err := d.PodLister.List(targetNamespace, labels.Set(selector).AsSelector())
+			if err != nil {
+				return errors.Wrap(err, "list pods failed in check app deploy")
 			}
+
+			for _, pod := range pods {
+				switch pod.Status.Phase {
+				case k8scorev1.PodFailed:
+					return errors.New("get failed status from pod, please the check logs for " + pod.Namespace + ":" + pod.Name)
+				case k8scorev1.PodRunning, k8scorev1.PodSucceeded:
+					return nil
+				}
+			}
+
+		case <-timeout:
+			return timeoutErr
 		}
 	}
-	return fmt.Errorf("timeout check deploy app status, namespace: %s, labels: %v", targetNamespace, selector)
 }
 
 func rancherLoggingApp(appCreator, systemProjectID, catalogID, driverDir, dockerRoot string) *projectv3.App {
