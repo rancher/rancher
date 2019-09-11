@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/store/crd"
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/store/subtype"
+	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/api/customization/alert"
 	"github.com/rancher/rancher/pkg/api/customization/app"
@@ -35,6 +36,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/store/userscope"
 	"github.com/rancher/rancher/pkg/auth/principals"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	"github.com/rancher/rancher/pkg/nodeconfig"
@@ -115,6 +117,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	Setting(schemas)
 	Preference(schemas, apiContext)
 	ClusterRegistrationTokens(schemas)
+	Tokens(ctx, schemas, apiContext)
 	NodeTemplates(schemas, apiContext)
 	LoggingTypes(schemas)
 	Alert(schemas, apiContext)
@@ -225,6 +228,16 @@ func ClusterRegistrationTokens(schemas *types.Schemas) {
 		Store: schema.Store,
 	}
 	schema.Formatter = clusterregistrationtokens.Formatter
+}
+
+func Tokens(ctx context.Context, schemas *types.Schemas, mgmt *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.TokenType)
+	manager := tokens.NewManager(ctx, mgmt)
+
+	schema.Store = &transform.Store{
+		Store:             schema.Store,
+		StreamTransformer: manager.TokenStreamTransformer,
+	}
 }
 
 func NodeTemplates(schemas *types.Schemas, management *config.ScaledContext) {

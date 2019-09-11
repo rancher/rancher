@@ -11,6 +11,7 @@ import (
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/auth/util"
 	"github.com/rancher/rancher/pkg/randomtoken"
 	"github.com/rancher/types/apis/core/v1"
@@ -160,7 +161,7 @@ func (m *Manager) getToken(tokenAuthValue string) (*v3.Token, int, error) {
 		if apierrors.IsNotFound(err) {
 			lookupUsingClient = true
 		} else {
-			return nil, 0, fmt.Errorf("failed to retrieve auth token from cache, error: %v", err)
+			return nil, 404, fmt.Errorf("failed to retrieve auth token from cache, error: %v", err)
 		}
 	} else if len(objs) == 0 {
 		lookupUsingClient = true
@@ -177,7 +178,7 @@ func (m *Manager) getToken(tokenAuthValue string) (*v3.Token, int, error) {
 	}
 
 	if storedToken.Token != tokenKey || storedToken.ObjectMeta.Name != tokenName {
-		return nil, 0, fmt.Errorf("Invalid auth token value")
+		return nil, 422, fmt.Errorf("Invalid auth token value")
 	}
 
 	if IsExpired(*storedToken) {
@@ -699,4 +700,33 @@ func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal v3.Princi
 	request.WriteResponse(http.StatusOK, nil)
 
 	return nil
+}
+
+// TokenStreamTransformer only filters out data for tokens that do not belong to the user
+func (m *Manager) TokenStreamTransformer(
+	apiContext *types.APIContext,
+	schema *types.Schema,
+	data chan map[string]interface{},
+	opt *types.QueryOptions) (chan map[string]interface{}, error) {
+	logrus.Debug("TokenStreamTransformer called")
+	tokenAuthValue := GetTokenAuthFromRequest(apiContext.Request)
+	if tokenAuthValue == "" {
+		// no cookie or auth header, cannot authenticate
+		return nil, httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "[TokenStreamTransformer] failed: No valid token cookie or auth header")
+	}
+
+	storedToken, code, err := m.getToken(tokenAuthValue)
+	if err != nil {
+		return nil, httperror.NewAPIErrorLong(code, http.StatusText(code), fmt.Sprintf("[TokenStreamTransformer] failed: %s", err.Error()))
+	}
+
+	userID := storedToken.UserID
+
+	return convert.Chan(data, func(data map[string]interface{}) map[string]interface{} {
+		labels, _ := data["labels"].(map[string]interface{})
+		if labels[UserIDLabel] != userID {
+			return nil
+		}
+		return data
+	}), nil
 }
