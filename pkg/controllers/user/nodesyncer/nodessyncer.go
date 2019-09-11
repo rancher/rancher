@@ -121,6 +121,10 @@ func (n *nodeSyncer) needUpdate(key string, node *corev1.Node) (bool, error) {
 		return true, nil
 	}
 	if existing.Annotations[annotationName] == "" {
+		existing = existing.DeepCopy()
+		if existing.Annotations == nil {
+			existing.Annotations = make(map[string]string)
+		}
 		existing.Annotations[annotationName] = "true"
 		if _, err = n.nodesSyncer.machines.Update(existing); err != nil {
 			return false, err
