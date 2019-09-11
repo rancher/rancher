@@ -31,6 +31,7 @@ const (
 	ClusterActionRestoreFromEtcdBackup = "restoreFromEtcdBackup"
 	ClusterActionRotateCertificates    = "rotateCertificates"
 	ClusterActionRunCISScan            = "runSecurityScan"
+	ClusterActionSaveAsTemplate        = "saveAsTemplate"
 
 	// ClusterConditionReady Cluster ready to serve API (healthy when true, unhealthy when false)
 	ClusterConditionReady          condition.Cond = "Ready"
@@ -242,6 +243,7 @@ type Capabilities struct {
 	NodePoolScalingSupported bool                     `json:"nodePoolScalingSupported,omitempty"`
 	NodePortRange            string                   `json:"nodePortRange,omitempty"`
 	TaintSupport             *bool                    `json:"taintSupport,omitempty"`
+	PspEnabled               bool                     `json:"pspEnabled,omitempty"`
 }
 
 type LoadBalancerCapabilities struct {
@@ -287,4 +289,9 @@ type LocalClusterAuthEndpoint struct {
 
 type CertExpiration struct {
 	ExpirationDate string `json:"expirationDate,omitempty"`
+}
+
+type SaveAsTemplateInput struct {
+	ClusterTemplateName         string `json:"clusterTemplateName,omitempty"`
+	ClusterTemplateRevisionName string `json:"clusterTemplateRevisionName,omitempty"`
 }

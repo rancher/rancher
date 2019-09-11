@@ -33,6 +33,7 @@ replace (
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.0.0-20190918163543-cfa506e53441
 	k8s.io/metrics => k8s.io/metrics v0.0.0-20190918162108-227c654b2546
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.0.0-20190918161442-d4c9c65c82af
+
 )
 
 require (
@@ -79,7 +80,7 @@ require (
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6
 	github.com/rancher/rke v0.3.2
-	github.com/rancher/types v0.0.0-20191023170600-1563e7864c02
+	github.com/rancher/types v0.0.0-20191029163455-5809c05fa11a
 	github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect
