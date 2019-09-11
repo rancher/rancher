@@ -319,5 +319,6 @@ type CloudCredential struct {
 }
 
 type CloudCredentialSpec struct {
+	DisplayName string `json:"displayName"`
 	Description string `json:"description,omitempty"`
 }
