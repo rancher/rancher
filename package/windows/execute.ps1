@@ -331,9 +331,6 @@ Set-Env -Key "CATTLE_NODE_LABEL" -Value $($CATTLE_NODE_LABEL -join ",")
 Set-Env -Key "CATTLE_NODE_TAINTS" -Value $($CATTLE_NODE_TAINTS -join ",")
 
 # upgrade wins.exe
-wins.exe cli app upgrade
-if (-not $?) {
-    exit 1
-}
+Transfer-File -Src c:\Windows\wins.exe -Dst c:\etc\rancher\wins\wins.exe
 
 Start-Process -NoNewWindow -Wait -FilePath "c:\etc\rancher\agent.exe"

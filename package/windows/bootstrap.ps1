@@ -15,11 +15,14 @@ try
 {
     New-Item -Force -ItemType Directory -Path @(
         "c:\host\opt"
+        "c:\host\opt\bin"
         "c:\host\opt\cni"
         "c:\host\opt\cni\bin"
         "c:\host\etc"
         "c:\host\etc\rancher"
+        "c:\host\etc\rancher\wins"
         "c:\host\etc\kubernetes"
+        "c:\host\etc\kubernetes\bin"
         "c:\host\etc\cni"
         "c:\host\etc\cni\net.d"
         "c:\host\etc\nginx"
@@ -38,6 +41,7 @@ try
         "c:\host\var\lib\kubelet"
         "c:\host\var\lib\kubelet\volumeplugins"
         "c:\host\run"
+        "c:\host\ProgramData\docker\certs.d"
     ) | Out-Null
 } catch { }
 
@@ -51,14 +55,6 @@ try
         "c:\Windows\wins.exe"
     )
 } catch { }
-
-$processWhitePaths = @(
-    "--wl-process-path c:\etc\wmi-exporter\wmi-exporter.exe"
-    "--wl-process-path c:\etc\kubernetes\bin\kube-proxy.exe"
-    "--wl-process-path c:\etc\kubernetes\bin\kubelet.exe"
-    "--wl-process-path c:\etc\nginx\nginx.exe"
-    "--wl-process-path c:\opt\bin\flanneld.exe"
-)
 
 $verfication = @"
 Log-Info "Detecting running permission ..."
@@ -249,10 +245,23 @@ catch
     Log-Warn "Could not clean: `$(`$_.Exception.Message)"
 }
 
+# output wins config
+@{
+    whiteList = @{
+        processPaths = @(
+            "c:\etc\wmi-exporter\wmi-exporter.exe"
+            "c:\etc\kubernetes\bin\kube-proxy.exe"
+            "c:\etc\kubernetes\bin\kubelet.exe"
+            "c:\etc\nginx\nginx.exe"
+            "c:\opt\bin\flanneld.exe"
+        )
+    }
+} | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Encoding utf8 -Force -FilePath "c:\etc\rancher\wins\config"
+
 # register wins
 Start-Process -NoNewWindow -Wait ``
     -FilePath "c:\etc\rancher\wins.exe" ``
-    -ArgumentList "srv app run --register $($processWhitePaths -join ' ')"
+    -ArgumentList "srv app run --register"
 
 # start wins
 Start-Service -Name "rancher-wins" -ErrorAction Ignore
@@ -260,7 +269,7 @@ Start-Service -Name "rancher-wins" -ErrorAction Ignore
 # run agent
 Start-Process -NoNewWindow -Wait ``
     -FilePath "docker.exe" ``
-    -ArgumentList "run -d --restart=unless-stopped -v //./pipe/docker_engine://./pipe/docker_engine -v c:/etc/kubernetes:c:/etc/kubernetes -v //./pipe/rancher_wins://./pipe/rancher_wins $($env:AGENT_IMAGE) execute $($args -join " ")"
+    -ArgumentList "run -d --restart=unless-stopped -v //./pipe/docker_engine://./pipe/docker_engine -v c:/ProgramData/docker/certs.d:c:/etc/docker/certs.d -v c:/etc/kubernetes:c:/etc/kubernetes -v //./pipe/rancher_wins://./pipe/rancher_wins -v c:/etc/rancher/wins:c:/etc/rancher/wins $($env:AGENT_IMAGE) execute $($args -join " ")"
 "@
 
 Write-Output -InputObject "c:\etc\rancher\bootstrap.ps1"
