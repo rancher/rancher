@@ -13,7 +13,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -88,6 +87,7 @@ type Server struct {
 	handler             http.Handler
 	httpPort, httpsPort int
 	certs               map[string]*tls.Certificate
+	certKey             string
 	ips                 *lru.Cache
 
 	listeners    []net.Listener
@@ -130,7 +130,7 @@ func (s *Server) updateIPs(savedIPs map[string]bool) map[string]bool {
 		return savedIPs
 	}
 
-	err = s.reconcileCerts(cfg)
+	err = s.reconcileGeneratedCert(cfg)
 	if err != nil {
 		return savedIPs
 	}
@@ -162,43 +162,27 @@ func (s *Server) updateIPs(savedIPs map[string]bool) map[string]bool {
 	return allIPs
 }
 
-// reconcileCerts ensures that certs on this server and in the store match
-func (s *Server) reconcileCerts(cfg *v3.ListenConfig) error {
-	certs := map[string]string{}
-	s.Lock()
-	for key, cert := range s.certs {
-		certs[key] = certToString(cert)
-	}
+func (s *Server) reconcileGeneratedCert(cfg *v3.ListenConfig) error {
+	s.Lock() // avoid concurrent map read/writes
+	localCert := s.certs[s.certKey]
 	s.Unlock()
-
-	if reflect.DeepEqual(certs, cfg.GeneratedCerts) {
+	if localCert == nil {
 		return nil
 	}
-	// Ensure that the saved config has all the certs generated on this instance of the server
-	// and that their values match.
 	cfg = cfg.DeepCopy()
+	lc := certToString(localCert)
+	storedCert, ok := cfg.GeneratedCerts[s.certKey]
+	// Ensure that the saved config has our cert and that the values match
+	if ok && storedCert == lc {
+		return nil
+	}
 	if cfg.GeneratedCerts == nil {
 		cfg.GeneratedCerts = make(map[string]string)
 	}
-	for k, v := range certs {
-		v1, ok := cfg.GeneratedCerts[k]
-		if !ok || v1 != v {
-			cfg.GeneratedCerts[k] = v
-		}
-	}
-	cfg, err := s.listenConfigStorage.Update(cfg)
+	cfg.GeneratedCerts[s.certKey] = lc
+	_, err := s.listenConfigStorage.Update(cfg)
 	if err != nil {
 		return err
-	}
-	// We also need to pull certs generated elsewhere, as its possible they are differing
-	// only due to non-local updates
-	for key, certString := range cfg.GeneratedCerts {
-		if s.certs[key] == nil {
-			cert := stringToCert(certString)
-			if cert != nil {
-				s.certs[key] = cert
-			}
-		}
 	}
 	return nil
 }
@@ -378,18 +362,18 @@ func (s *Server) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, e
 		return s.activeCert, nil
 	}
 
-	mapKey := hello.ServerName
+	s.certKey = hello.ServerName
 	cn := hello.ServerName
 	dnsNames := []string{cn}
 	ipBased := false
 	var ips []net.IP
 
 	if cn == "" {
-		mapKey = s.ipMapKey()
+		s.certKey = s.ipMapKey()
 		ipBased = true
 	}
 
-	serverNameCert, ok := s.certs[mapKey]
+	serverNameCert, ok := s.certs[s.certKey]
 	if ok {
 		// check expiry time
 		certParsed, err := x509.ParseCertificate(serverNameCert.Certificate[0])
@@ -447,7 +431,21 @@ func (s *Server) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, e
 		PrivateKey: key,
 	}
 
-	s.certs[mapKey] = tlsCert
+	s.certs[s.certKey] = tlsCert
+
+	lcStore, err := s.listenConfigStorage.Get("", s.activeConfig.Name)
+	if err != nil {
+		logrus.Errorf("Failed to get listenConfig: %v", err)
+		return tlsCert, nil
+	}
+	lcStore.GeneratedCerts[s.certKey] = certToString(tlsCert)
+	lcStore, err = s.listenConfigStorage.Update(lcStore)
+	if err != nil {
+		// Cert will get saved later in reconcileGeneratedCert so don't error out entirely
+		logrus.Errorf("Failed to save generated cert in listenConfig: %v", err)
+		return tlsCert, nil
+	}
+
 	return tlsCert, nil
 }
 
