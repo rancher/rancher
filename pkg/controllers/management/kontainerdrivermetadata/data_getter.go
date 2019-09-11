@@ -63,9 +63,9 @@ func getRKEServiceOption(name string, svcOptionLister v3.RKEK8sServiceOptionList
 		}
 	}
 	if svcOption.Labels[sendRKELabel] == "false" {
-		logrus.Infof("svcOption False %s", name)
 		return k8sSvcOption, nil
 	}
+	logrus.Debugf("getRKEServiceOption: sending svcOption %s", name)
 	return &svcOption.ServiceOptions, nil
 }
 
