@@ -7,6 +7,10 @@ import (
 func loadK8sVersionWindowsServiceOptions() map[string]v3.KubernetesServicesOptions {
 	// since 1.14, windows has been supported
 	return map[string]v3.KubernetesServicesOptions{
+		"v1.16": {
+			Kubelet:   getWindowsKubeletOptions116(),
+			Kubeproxy: getWindowsKubeProxyOptions(),
+		},
 		"v1.15": {
 			Kubelet:   getWindowsKubeletOptions115(),
 			Kubeproxy: getWindowsKubeProxyOptions(),
@@ -44,6 +48,15 @@ func getWindowsKubeletOptions() map[string]string {
 }
 
 func getWindowsKubeletOptions115() map[string]string {
+	kubeletOptions := getWindowsKubeletOptions()
+
+	// doesn't support `allow-privileged`
+	delete(kubeletOptions, "allow-privileged")
+
+	return kubeletOptions
+}
+
+func getWindowsKubeletOptions116() map[string]string {
 	kubeletOptions := getWindowsKubeletOptions()
 
 	// doesn't support `allow-privileged`
