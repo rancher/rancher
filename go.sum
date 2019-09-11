@@ -271,6 +271,8 @@ github.com/rancher/client-go v1.14.5-rancher.1 h1:3lriccMjs8HpK4H3OyHo1a0GIvr0lO
 github.com/rancher/client-go v1.14.5-rancher.1/go.mod h1:N4rIJ5TXwpEuCvEf9SJLCX2CqgSTIIyCK8zIV34IZhE=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190910205335-4cf9a4fac46a h1:+RwE0OhSR2bgySTq8wgso+r+QFc2veWfFnCriB0CO6M=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190910205335-4cf9a4fac46a/go.mod h1:dHvhyuoiwrjqQCFD586g0cZ9NJJXEKeAtQi8RX96U8E=
+github.com/rancher/kontainer-driver-metadata v0.0.0-20190911170536-f9acf8fc853c h1:NuDSdAaMqU7KTMQ6pzyMG4EQefhvAUlvudIjDcCIVWM=
+github.com/rancher/kontainer-driver-metadata v0.0.0-20190911170536-f9acf8fc853c/go.mod h1:dHvhyuoiwrjqQCFD586g0cZ9NJJXEKeAtQi8RX96U8E=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20190910222534-16cb401112b7 h1:3mUEUTM0/hHozPUf0RfUgmwUmxBbdpzmPZriVe7hZ7w=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20190910222534-16cb401112b7/go.mod h1:3lpmRi6KzIKEOyLuwqrToRhK0L0Z7/PdNS08Bfi7fQg=
 github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009 h1:Xsxh7fX3+2wAUJtPy8g2lZh0cYuyifqhBL0vxCIYojs=
@@ -286,6 +288,8 @@ github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6 h1:iTE16wwm
 github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6/go.mod h1:tkU8ZvrR5lRgaKWaX71nAy6daeqvPFx/lJEnbW7tXSI=
 github.com/rancher/rke v0.3.0-rc10.0.20190910214044-f622c8b94257 h1:p/D7pgWXqYALqsSEDRRhcmZ0TrGpKeeRb3QcffVF60w=
 github.com/rancher/rke v0.3.0-rc10.0.20190910214044-f622c8b94257/go.mod h1:uN+JmaUWrx1h4W8hA5W6u8jLaE76oS/ZnlCaIRouObA=
+github.com/rancher/rke v0.3.0-rc10.0.20190911171719-24fe45b11310 h1:GOal1SyiRpKNX1FtB5juNMZ9CJ1+acXzLlfqCfgSSGc=
+github.com/rancher/rke v0.3.0-rc10.0.20190911171719-24fe45b11310/go.mod h1:BxEK15qqmDb5zsHrFX9j2O84zSxFujMNkScz3QjUHgA=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
