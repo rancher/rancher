@@ -281,7 +281,7 @@ func initClusterPreCanAlerts(clusterAlertGroups v3.ClusterAlertGroupInterface, c
 			},
 			MetricRule: &v3.MetricRule{
 				Description: "Device on node is running full within the next 24 hours",
-				Expression:  `predict_linear(node_filesystem_files_free{mountpoint!~"^/etc/(?:resolv.conf|hosts|hostname)$"}[6h], 3600 * 24) < 0`,
+				Expression:  `predict_linear(node_filesystem_free_bytes{mountpoint!~"^/etc/(?:resolv.conf|hosts|hostname)$"}[6h], 3600 * 24) < 0`,
 				Comparison:  manager.ComparisonHasValue,
 				Duration:    "10m",
 			},
