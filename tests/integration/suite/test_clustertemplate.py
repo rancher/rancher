@@ -1,6 +1,6 @@
 from .common import random_str, check_subject_in_rb
 from rancher import ApiError
-from .conftest import wait_until, wait_for
+from .conftest import wait_until, wait_for, DEFAULT_TIMEOUT
 import pytest
 import time
 import kubernetes
@@ -83,9 +83,8 @@ def test_default_pod_sec(admin_mc, remove_resource):
                                                   clusterTemplateId=tId,
                                                   enabled="true")
 
-    cluster = client.create_cluster(name=random_str(),
-                                    clusterTemplateRevisionId=rev.id)
-
+    cluster = wait_for_cluster_create(client, name=random_str(),
+                                      clusterTemplateRevisionId=rev.id)
     remove_resource(cluster)
     assert cluster.conditions[0].type == 'Pending'
     assert cluster.conditions[0].status == 'True'
@@ -127,10 +126,11 @@ def test_create_cluster_with_template(admin_mc, remove_resource):
 
     revId = template_revision.id
     client = admin_mc.client
-    cluster = client.create_cluster(name=random_str(),
-                                    clusterTemplateRevisionId=revId,
-                                    description="template from cluster",
-                                    answers=answers)
+
+    cluster = wait_for_cluster_create(client, name=random_str(),
+                                      clusterTemplateRevisionId=revId,
+                                      description="template from cluster",
+                                      answers=answers)
     remove_resource(cluster)
     assert cluster.conditions[0].type == 'Pending'
     assert cluster.conditions[0].status == 'True'
@@ -166,12 +166,14 @@ def test_create_cluster_validations(admin_mc, remove_resource):
     revId = template_revision.id
     client = admin_mc.client
     rConfig = getRKEConfig()
-    with pytest.raises(ApiError) as e:
-        client.create_cluster(name=random_str(),
-                              clusterTemplateRevisionId=revId,
-                              description="template from cluster",
-                              rancherKubernetesEngineConfig=rConfig)
-        assert e.value.error.status == 500
+    try:
+        wait_for_cluster_create(client, name=random_str(),
+                                clusterTemplateRevisionId=revId,
+                                description="template from cluster",
+                                rancherKubernetesEngineConfig=rConfig)
+
+    except ApiError as e:
+        assert e.error.status == 500
 
 
 @pytest.mark.nonparallel
@@ -286,9 +288,9 @@ def test_check_enforcement(admin_mc, remove_resource, user_factory):
     new_members = [{"groupPrincipalId": "*", "accessType": "read-only"}]
     client.update(template_reloaded, members=new_members)
 
-    cluster2 = user_client.create_cluster(name=random_str(),
-                                          clusterTemplateRevisionId=rev.id,
-                                          description="cluster from temp")
+    cluster2 = wait_for_cluster_create(user_client, name=random_str(),
+                                       clusterTemplateRevisionId=rev.id,
+                                       description="template from cluster")
     remove_resource(cluster2)
     client.update_by_id_setting(id='cluster-template-enforcement',
                                 value="false")
@@ -466,12 +468,13 @@ def test_required_template_question(admin_mc, remove_resource):
                 }
               }
 
-    with pytest.raises(ApiError) as e:
-        client.create_cluster(name=random_str(),
-                              clusterTemplateRevisionId=rev.id,
-                              description="template from cluster",
-                              answers=answers)
-        assert e.value.error.status == 422
+    try:
+        wait_for_cluster_create(client, name=random_str(),
+                                clusterTemplateRevisionId=rev.id,
+                                description="template from cluster",
+                                answers=answers)
+    except ApiError as e:
+        assert e.error.status == 422
 
 
 def test_secret_template_answers(admin_mc, remove_resource):
@@ -533,10 +536,11 @@ azureCloudProvider.aadClientSecret"
                 }
               }
 
-    cluster = client.create_cluster(name=random_str(),
-                                    clusterTemplateRevisionId=rev.id,
-                                    description="template from cluster",
-                                    answers=answers)
+    cluster = wait_for_cluster_create(client, name=random_str(),
+                                      clusterTemplateRevisionId=rev.id,
+                                      description="template from cluster",
+                                      answers=answers)
+
     remove_resource(cluster)
     assert cluster.conditions[0].type == 'Pending'
     assert cluster.conditions[0].status == 'True'
@@ -622,11 +626,12 @@ def test_create_cluster_with_invalid_revision(admin_mc, remove_resource):
                                                   enabled="true")
 
     # creating a cluster with this template
-    with pytest.raises(ApiError) as e:
-        client.create_cluster(name=random_str(),
-                              clusterTemplateRevisionId=rev.id,
-                              description="template from cluster")
-        assert e.value.error.status == 422
+    try:
+        wait_for_cluster_create(client, name=random_str(),
+                                clusterTemplateRevisionId=rev.id,
+                                description="template from cluster")
+    except ApiError as e:
+        assert e.error.status == 422
 
 
 def test_disable_template_revision(admin_mc, remove_resource):
@@ -638,9 +643,9 @@ def test_disable_template_revision(admin_mc, remove_resource):
         create_cluster_template_revision(admin_mc.client, tId)
 
     # creating a cluster with this template
-    cluster = client.create_cluster(name=random_str(),
-                                    clusterTemplateRevisionId=rev.id,
-                                    description="template from cluster")
+    cluster = wait_for_cluster_create(client, name=random_str(),
+                                      clusterTemplateRevisionId=rev.id,
+                                      description="template from cluster")
     remove_resource(cluster)
     assert cluster.conditions[0].type == 'Pending'
     assert cluster.conditions[0].status == 'True'
@@ -648,10 +653,11 @@ def test_disable_template_revision(admin_mc, remove_resource):
     # disable the revision
     client.action(obj=rev, action_name="disable")
 
-    with pytest.raises(ApiError) as e:
-        client.create_cluster(name=random_str(),
-                              clusterTemplateRevisionId=rev.id)
-        assert e.value.error.status == 500
+    try:
+        wait_for_cluster_create(client, name=random_str(),
+                                clusterTemplateRevisionId=rev.id)
+    except ApiError as e:
+        assert e.error.status == 500
 
     client.delete(cluster)
     wait_for_cluster_to_be_deleted(client, cluster.id)
@@ -829,3 +835,20 @@ def wait_for_default_revision(client, templateId, revisionId, timeout=60):
 
 def fail_handler(resource):
     return "failed waiting for clustertemplate" + resource + " to get updated"
+
+
+def wait_for_cluster_create(client, **kwargs):
+    timeout = DEFAULT_TIMEOUT
+    interval = 0.5
+    start = time.time()
+    while True:
+        try:
+            return client.create_cluster(kwargs)
+        except ApiError as e:
+            if e.error.status != 404:
+                raise e
+            if time.time() - start > timeout:
+                exception_msg = 'Timeout waiting for condition.'
+                raise Exception(exception_msg)
+            time.sleep(interval)
+            interval *= 2
