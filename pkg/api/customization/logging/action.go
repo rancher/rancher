@@ -153,9 +153,9 @@ func (h *Handler) dryRunLoggingTarget(apiContext *types.APIContext, level, clust
 		return err
 	}
 
-	pods := context.Core.Pods(loggingconfig.LoggingNamespace)
+	podLister := context.Core.Pods(loggingconfig.LoggingNamespace).Controller().Lister()
 	namespaces := context.Core.Namespaces(metav1.NamespaceAll)
-	testerDeployer := deployer.NewTesterDeployer(context.Management, h.appsGetter, h.projectLister, pods, h.projectLoggingLister, namespaces, h.templateLister)
+	testerDeployer := deployer.NewTesterDeployer(context.Management, h.appsGetter, h.projectLister, podLister, h.projectLoggingLister, namespaces, h.templateLister)
 	configGenerator := configsyncer.NewConfigGenerator(metav1.NamespaceAll, h.projectLoggingLister, namespaces.Controller().Lister())
 
 	var dryRunConfigBuf []byte

@@ -50,7 +50,7 @@ func NewDeployer(cluster *config.UserContext, secretSyncer *configsyncer.SecretM
 	appDeployer := &AppDeployer{
 		AppsGetter: appsgetter,
 		Namespaces: cluster.Core.Namespaces(metav1.NamespaceAll),
-		Pods:       cluster.Core.Pods(metav1.NamespaceAll),
+		PodLister:  cluster.Core.Pods(metav1.NamespaceAll).Controller().Lister(),
 	}
 
 	return &Deployer{
