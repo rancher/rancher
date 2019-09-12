@@ -176,15 +176,6 @@ type CustomTargetConfig struct {
 	ClientKey   string `json:"clientKey,omitempty"`
 }
 
-type LoggingSystemImages struct {
-	Fluentd                       string `json:"fluentd,omitempty"`
-	FluentdHelper                 string `json:"fluentdHelper,omitempty"`
-	Elaticsearch                  string `json:"elaticsearch,omitempty"`
-	Kibana                        string `json:"kibana,omitempty"`
-	Busybox                       string `json:"busybox,omitempty"`
-	LogAggregatorFlexVolumeDriver string `json:"logAggregatorFlexVolumeDriver,omitempty"`
-}
-
 type ClusterTestInput struct {
 	ClusterName string `json:"clusterId" norman:"required,type=reference[cluster]"`
 	LoggingTargets
