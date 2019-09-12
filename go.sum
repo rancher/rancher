@@ -273,6 +273,8 @@ github.com/rancher/kontainer-driver-metadata v0.0.0-20190910205335-4cf9a4fac46a 
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190910205335-4cf9a4fac46a/go.mod h1:dHvhyuoiwrjqQCFD586g0cZ9NJJXEKeAtQi8RX96U8E=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190911170536-f9acf8fc853c h1:NuDSdAaMqU7KTMQ6pzyMG4EQefhvAUlvudIjDcCIVWM=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190911170536-f9acf8fc853c/go.mod h1:dHvhyuoiwrjqQCFD586g0cZ9NJJXEKeAtQi8RX96U8E=
+github.com/rancher/kontainer-driver-metadata v0.0.0-20190912200414-5d4dbdabee60 h1:N31FJ4fx02LlXY59prf9oQd3pBuNvcPNVu08ZMZEutM=
+github.com/rancher/kontainer-driver-metadata v0.0.0-20190912200414-5d4dbdabee60/go.mod h1:dHvhyuoiwrjqQCFD586g0cZ9NJJXEKeAtQi8RX96U8E=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20190910222534-16cb401112b7 h1:3mUEUTM0/hHozPUf0RfUgmwUmxBbdpzmPZriVe7hZ7w=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20190910222534-16cb401112b7/go.mod h1:3lpmRi6KzIKEOyLuwqrToRhK0L0Z7/PdNS08Bfi7fQg=
 github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009 h1:Xsxh7fX3+2wAUJtPy8g2lZh0cYuyifqhBL0vxCIYojs=
