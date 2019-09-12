@@ -95,6 +95,10 @@ spec:
         - name: CATTLE_SYSTEM_DEFAULT_REGISTRY
           value: {{ .Values.systemDefaultRegistry }}
 {{- end }}
+{{- if .Values.useBundledSystemChart }}
+        - name: CATTLE_SYSTEM_CATALOG
+          value: bundled
+{{- end }}
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}
