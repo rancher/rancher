@@ -144,6 +144,129 @@ def test_project_owner(admin_cc, admin_mc, user_mc, remove_resource):
     assert response.status.allowed is True
 
 
+def test_user_cluster_role_bindings(admin_mc, user_factory):
+    """
+    Test that when a user is given various cluster roles (crtbs) like
+    owner or member, they are given correct roleBindings.
+    Then ensure those roleBindings are removed if crtb is deleted.
+    """
+
+    cases = {
+        "cluster-member": ["cluster-member"],
+        "cluster-owner": ["cluster-owner"],
+        "nodes-view": ["nodes-view"]
+    }
+
+    user1 = user_factory()
+
+    for rtName, roleBindings in cases.items():
+        crtb = admin_mc.client.create_cluster_role_template_binding(
+            name="crtb-" + random_str(),
+            userId=user1.user.id,
+            clusterId="local",
+            roleTemplateId=rtName)
+        wait_until_available(admin_mc.client, crtb)
+
+        k8s_client = kubernetes_api_client(admin_mc.client, 'local')
+        rbac = kubernetes.client.RbacAuthorizationV1Api(api_client=k8s_client)
+
+        # first test that they are there
+        rbs = rbac.list_namespaced_role_binding('local')
+        rb_dict = {}
+        for rb in rbs.items:
+            if rb.subjects[0].name == user1.user.id:
+                rb_dict[rb.role_ref.name] = rb
+        for roleBinding in roleBindings:
+            assert roleBinding in rb_dict
+
+        #  Now test that they are gone
+        admin_mc.client.delete(crtb)
+
+        def check_rbs_removed():
+            all_removed = True
+            rbs = rbac.list_namespaced_role_binding('local')
+            rb_dict = {}
+            for rb in rbs.items:
+                if rb.subjects[0].name == user1.user.id:
+                    rb_dict[rb.role_ref.name] = rb
+            for roleBinding in roleBindings:
+                if roleBinding in rb_dict:
+                    all_removed = False
+            return all_removed
+
+        def fail_handler():
+            return "not all cluster role bindings were deleted"
+
+        wait_for(check_rbs_removed, fail_handler=fail_handler, timeout=15)
+
+
+def test_user_project_role_bindings(admin_pc, admin_mc, user_factory,
+                                    remove_resource):
+    """
+    Test that when a user is given various project roles (prtbs) like
+    owner or member in a namespace, they are given correct roleBindings.
+    Then ensure those roleBindings are removed if prtb is deleted.
+    """
+
+    cases = {
+        "read-only": ["view", "read-only"],
+        "project-member": ["edit", "project-member"],
+        "project-owner": ["admin", "project-owner"],
+        "secrets-view": ["secrets-view"],
+    }
+
+    project = admin_pc.project
+    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                  projectId=project.id)
+    remove_resource(ns)
+    c_client = cluster_and_client('local', admin_mc.client)[1]
+    ns = wait_until_available(c_client, ns)
+    ns = c_client.wait_success(ns)
+    assert ns.state == 'active'
+
+    user1 = user_factory()
+
+    for rtName, roleBindings in cases.items():
+        prtb = admin_mc.client.create_project_role_template_binding(
+            name="prtb-" + random_str(),
+            userId=user1.user.id,
+            projectId=project.id,
+            roleTemplateId=rtName)
+        wait_until_available(admin_mc.client, prtb)
+
+        k8s_client = kubernetes_api_client(admin_mc.client, 'local')
+        rbac = kubernetes.client.RbacAuthorizationV1Api(api_client=k8s_client)
+
+        # first test that they are there
+        rbs = rbac.list_namespaced_role_binding(ns.name)
+        rb_dict = {}
+        for rb in rbs.items:
+            if rb.subjects[0].name == user1.user.id:
+                rb_dict[rb.role_ref.name] = rb
+        for roleBinding in roleBindings:
+            assert roleBinding in rb_dict
+
+        #  Now test that they are gone
+        admin_mc.client.delete(prtb)
+
+        def check_rbs_removed():
+            all_removed = True
+            rbs = rbac.list_namespaced_role_binding(ns.name)
+            rb_dict = {}
+            for rb in rbs.items:
+                if rb.subjects[0].name == user1.user.id:
+                    rb_dict[rb.role_ref.name] = rb
+            for roleBinding in roleBindings:
+                if roleBinding in rb_dict:
+                    all_removed = False
+            return all_removed
+
+        def fail_handler():
+            return "not all project role bindings were deleted"
+
+        wait_for(check_rbs_removed, fail_handler=fail_handler, timeout=15)
+
+
 def test_api_group_in_role_template(admin_mc, admin_pc, user_mc,
                                     remove_resource):
     """Test that a role moved into a cluster namespace is translated as
@@ -562,6 +685,7 @@ def test_member_can_perform_app_action(admin_mc, admin_pc, remove_resource,
             return True
         return False
 
+    installed = True
     try:
         wait_for(is_installing)
     except Exception as e:
@@ -569,11 +693,15 @@ def test_member_can_perform_app_action(admin_mc, admin_pc, remove_resource,
         # steady state, this test is not concerned with whether an app reaches
         # installing state or not
         assert "Timeout waiting for condition" in str(e)
+        installed = False
 
     user.client.action(
         obj=app,
         action_name="upgrade",
         answers={"asdf": "asdf"})
+
+    if not installed:
+        return  # don't attempt to test revisions if app is not in steady state
 
     def _app_revisions_exist():
         a = admin_pc.client.reload(app)
