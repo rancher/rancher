@@ -271,13 +271,8 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 func Templates(ctx context.Context, schemas *types.Schemas, managementContext *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.TemplateType)
 	schema.Scope = types.NamespaceScope
-	schema.Store = proxy.NewProxyStore(ctx, managementContext.ClientGetter,
-		config.ManagementStorageContext,
-		[]string{"apis"},
-		"management.cattle.io",
-		"v3",
-		"CatalogTemplate",
-		"catalogtemplates")
+	schema.Store = catalog.GetTemplateStore(ctx, managementContext)
+
 	wrapper := catalog.TemplateWrapper{
 		CatalogLister:                managementContext.Management.Catalogs("").Controller().Lister(),
 		ClusterCatalogLister:         managementContext.Management.ClusterCatalogs("").Controller().Lister(),
