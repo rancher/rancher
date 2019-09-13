@@ -335,7 +335,6 @@ const (
 	linuxLoadScript = `#!/bin/bash
 images="rancher-images.tar.gz"
 list="rancher-images.txt"
-
 usage () {
     echo "USAGE: $0 [--images rancher-images.tar.gz] --registry my.registry.com:5000"
     echo "  [-l|--image-list path] text file with list of images. 1 per line."
@@ -344,7 +343,6 @@ usage () {
     echo "  [-h|--help] Usage message"
 }
 
-POSITIONAL=()
 while [[ $# -gt 0 ]]; do
     key="$1"
     case $key in
@@ -373,7 +371,6 @@ while [[ $# -gt 0 ]]; do
         ;;
     esac
 done
-
 if [[ -z $reg ]]; then
     usage
     exit 1
@@ -383,19 +380,19 @@ if [[ $help ]]; then
     exit 0
 fi
 
-set -e
-
 docker load --input ${images}
 
-while IFS= read -r i; do 
+while IFS= read -r i; do
     [ -z "${i}" ] && continue
     echo "Tagging ${reg}/${i}"
     case $i in
     */*)
-        [ $(docker tag "${i}" "${reg}/${i}") ] && [ $(docker push "${reg}/${i}") ]
+        docker tag "${i}" "${reg}/${i}"
+        docker push "${reg}/${i}"
         ;;
     *)
-        [ $(docker tag "${i}" "${reg}/rancher/${i}") ] && [ $(docker push "${reg}/rancher/${i}") ]
+        docker tag "${i}" "${reg}/rancher/${i}"
+        docker push "${reg}/rancher/${i}"
         ;;
     esac
 done < "${list}"
@@ -444,7 +441,7 @@ fi
 set -e
 
 pulled=""
-while IFS= read -r i; do 
+while IFS= read -r i; do
     [ -z "${i}" ] && continue
     if [ $(docker pull --quiet "${i}") ]; then
         echo "Image pull success: ${i}"
