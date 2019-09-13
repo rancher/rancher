@@ -317,11 +317,6 @@ type WechatConfig struct {
 type NotifierStatus struct {
 }
 
-type AlertSystemImages struct {
-	AlertManager       string `json:"alertManager,omitempty"`
-	AlertManagerHelper string `json:"alertManagerHelper,omitempty"`
-}
-
 // HTTPClientConfig configures an HTTP client.
 type HTTPClientConfig struct {
 	// HTTP proxy server to use to connect to the targets.
