@@ -56,6 +56,7 @@ var amiForRegionAndVersion = map[string]map[string]string{
 		"eu-west-2":      "ami-010d34c5744286662",
 		"eu-west-3":      "ami-04fada31d8c50b7a8",
 		"eu-north-1":     "ami-0a4a5386eb62c775e",
+		"me-south-1":     "ami-0b7e753bbd3a0ae24",
 	},
 	"1.13": map[string]string{
 		"us-east-2":      "ami-0355b5edf93d47112",
