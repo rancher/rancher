@@ -177,13 +177,6 @@ def test_template_version_links(admin_mc, admin_pc, custom_catalog,
 
     assert len(templates.data[0]['versionLinks']) == 0
 
-    # If no rancher version is set get back both versions
-    templates = client.list_template(catalogId=c_name)
-
-    assert len(templates.data[0]['versionLinks']) == 2
-    assert '1.6.0' in templates.data[0]['versionLinks']
-    assert '1.6.2' in templates.data[0]['versionLinks']
-
 
 def test_relative_paths(admin_mc, admin_pc, remove_resource):
     """ This test adds a catalog's index.yaml with a relative chart url
