@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -11,6 +12,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
+	"github.com/rancher/rancher/pkg/librke"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	v1 "github.com/rancher/types/apis/core/v1"
@@ -32,10 +34,10 @@ const (
 
 var apiUpdateMap = map[string]string{apiUpdate: "true"}
 
-type NodeSyncer struct {
+type nodeSyncer struct {
 	machines         v3.NodeInterface
 	clusterNamespace string
-	nodesSyncer      *NodesSyncer
+	nodesSyncer      *nodesSyncer
 }
 
 type PodsStatsSyncer struct {
@@ -44,7 +46,7 @@ type PodsStatsSyncer struct {
 	machinesClient   v3.NodeInterface
 }
 
-type NodesSyncer struct {
+type nodesSyncer struct {
 	machines         v3.NodeInterface
 	machineLister    v3.NodeLister
 	nodeLister       v1.NodeLister
@@ -67,8 +69,10 @@ type NodeDrain struct {
 	nodesToContext       map[string]context.CancelFunc
 }
 
+type canChangeValuePolicy func(key string) bool
+
 func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
-	m := &NodesSyncer{
+	m := &nodesSyncer{
 		clusterNamespace: cluster.ClusterName,
 		machines:         cluster.Management.Management.Nodes(cluster.ClusterName),
 		machineLister:    cluster.Management.Management.Nodes(cluster.ClusterName).Controller().Lister(),
@@ -78,7 +82,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 		clusterLister:    cluster.Management.Management.Clusters("").Controller().Lister(),
 	}
 
-	n := &NodeSyncer{
+	n := &nodeSyncer{
 		clusterNamespace: cluster.ClusterName,
 		machines:         cluster.Management.Management.Nodes(cluster.ClusterName),
 		nodesSyncer:      m,
@@ -104,7 +108,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "drainNodeSyncer", d.drainNode)
 }
 
-func (n *NodeSyncer) sync(key string, node *corev1.Node) (runtime.Object, error) {
+func (n *nodeSyncer) sync(key string, node *corev1.Node) (runtime.Object, error) {
 	needUpdate, err := n.needUpdate(key, node)
 	if err != nil {
 		return nil, err
@@ -116,7 +120,7 @@ func (n *NodeSyncer) sync(key string, node *corev1.Node) (runtime.Object, error)
 	return nil, nil
 }
 
-func (n *NodeSyncer) needUpdate(key string, node *corev1.Node) (bool, error) {
+func (n *nodeSyncer) needUpdate(key string, node *corev1.Node) (bool, error) {
 	if node == nil || node.DeletionTimestamp != nil {
 		return true, nil
 	}
@@ -143,19 +147,58 @@ func (n *NodeSyncer) needUpdate(key string, node *corev1.Node) (bool, error) {
 	return true, nil
 }
 
-func (m *NodesSyncer) sync(key string, machine *v3.Node) (runtime.Object, error) {
+func (m *nodesSyncer) sync(key string, machine *v3.Node) (runtime.Object, error) {
 	if key == fmt.Sprintf("%s/%s", m.clusterNamespace, AllNodeKey) {
 		return nil, m.reconcileAll()
 	}
 	return nil, nil
 }
 
-func (m *NodesSyncer) syncLabels(key string, obj *v3.Node) (runtime.Object, error) {
-	if obj == nil {
-		return nil, nil
+func (m *nodesSyncer) updateNodeAndNode(node *corev1.Node, obj *v3.Node) (*corev1.Node, *v3.Node, error) {
+	node, err := m.nodeClient.Update(node)
+	if err != nil {
+		// Return v3.Node is nil because it hasn't been persisted and therefor out of sync with cache
+		// so we don't want to return it from the handler
+		return node, nil, err
 	}
 
-	if obj.Spec.DesiredNodeAnnotations == nil && obj.Spec.DesiredNodeLabels == nil {
+	obj, err = m.machines.Update(obj)
+	if err != nil {
+		// Same logic as above, but more so that we don't know the state of this object
+		return node, nil, err
+	}
+
+	return node, obj, nil
+}
+
+func (m *nodesSyncer) updateLabels(node *corev1.Node, obj *v3.Node, nodePlan v3.RKEConfigNodePlan) (*corev1.Node, *v3.Node, error) {
+	finalMap, changed := computeDelta(node.Labels, nodePlan.Labels, obj.Spec.MetadataUpdate.Labels, onlyKubeLabels)
+	if !changed {
+		return node, obj, nil
+	}
+
+	node, obj = node.DeepCopy(), obj.DeepCopy()
+	node.Labels = finalMap
+	obj.Spec.MetadataUpdate.Labels = v3.MapDelta{}
+
+	return m.updateNodeAndNode(node, obj)
+}
+
+func (m *nodesSyncer) updateAnnotations(node *corev1.Node, obj *v3.Node, nodePlan v3.RKEConfigNodePlan) (*corev1.Node, *v3.Node, error) {
+	finalMap, changed := computeDelta(node.Annotations, nodePlan.Annotations, obj.Spec.MetadataUpdate.Annotations, nil)
+	if !changed {
+		return node, obj, nil
+	}
+
+	node, obj = node.DeepCopy(), obj.DeepCopy()
+	node.Annotations = finalMap
+	obj.Spec.MetadataUpdate.Labels = v3.MapDelta{}
+
+	return m.updateNodeAndNode(node, obj)
+}
+
+func (m *nodesSyncer) syncLabels(key string, obj *v3.Node) (runtime.Object, error) {
+	if obj == nil {
 		return nil, nil
 	}
 
@@ -164,57 +207,91 @@ func (m *NodesSyncer) syncLabels(key string, obj *v3.Node) (runtime.Object, erro
 		return nil, err
 	}
 
-	updateLabels := false
-	updateAnnotations := false
-
-	// set annotations
-	if obj.Spec.DesiredNodeAnnotations != nil && !reflect.DeepEqual(node.Annotations, obj.Spec.DesiredNodeAnnotations) {
-		// check sync from node controller and labels.go has finished if not set by api
-		if reflect.DeepEqual(obj.Spec.CurrentNodeAnnotations, apiUpdateMap) {
-			updateAnnotations = true
-		} else {
-			updateAnnotations = reflect.DeepEqual(node.Annotations, obj.Status.NodeAnnotations) && reflect.DeepEqual(node.Annotations, obj.Spec.CurrentNodeAnnotations)
-		}
+	nodePlan, err := m.getNodePlan(obj)
+	if err != nil {
+		return obj, err
 	}
 
-	// set labels
-	if obj.Spec.DesiredNodeLabels != nil && !reflect.DeepEqual(node.Labels, obj.Spec.DesiredNodeLabels) {
-		// check sync from node controller and labels.go has finished if not set by api
-		if reflect.DeepEqual(obj.Spec.CurrentNodeLabels, apiUpdateMap) {
-			updateLabels = true
-		} else {
-			updateLabels = reflect.DeepEqual(node.Labels, obj.Status.NodeLabels) && reflect.DeepEqual(node.Labels, obj.Spec.CurrentNodeLabels)
-		}
+	node, obj, err = m.updateLabels(node, obj, nodePlan)
+	if err != nil {
+		return obj, err
 	}
 
-	if updateLabels || updateAnnotations {
-		toUpdate := node.DeepCopy()
-		if updateLabels {
-			toUpdate.Labels = obj.Spec.DesiredNodeLabels
-		}
-		if updateAnnotations {
-			toUpdate.Annotations = obj.Spec.DesiredNodeAnnotations
-		}
-		logrus.Infof("Updating node %v with labels %v and annotations %v", toUpdate.Name, toUpdate.Labels, toUpdate.Annotations)
-		if _, err := m.nodeClient.Update(toUpdate); err != nil {
-			return nil, err
-		}
-	}
-
-	// in the end we reset all desired fields
-	if obj.Spec.DesiredNodeAnnotations != nil || obj.Spec.DesiredNodeLabels != nil {
-		machine := obj.DeepCopy()
-		machine.Spec.DesiredNodeAnnotations = nil
-		machine.Spec.DesiredNodeLabels = nil
-		machine.Spec.CurrentNodeAnnotations = nil
-		machine.Spec.CurrentNodeLabels = nil
-		return m.machines.Update(machine)
-	}
-
-	return nil, nil
+	_, obj, err = m.updateAnnotations(node, obj, nodePlan)
+	return obj, err
 }
 
-func (m *NodesSyncer) reconcileAll() error {
+func onlyKubeLabels(key string) bool {
+	return strings.Contains(key, "kubernetes.io")
+}
+
+// computeDelta will return the final updated map to apply and a boolean indicating whether there are changes to be applied.
+// If the boolean is false, the caller need not take any action as the data is already in sync.
+func computeDelta(currentState map[string]string, planValues map[string]string, delta v3.MapDelta, canChangeValue canChangeValuePolicy) (map[string]string, bool) {
+	result := map[string]string{}
+	changed := false
+
+	// copy map
+	for k, v := range currentState {
+		result[k] = v
+	}
+
+	for k, v := range planValues {
+		currentValue, ok := result[k]
+		// if the key is missing or the value is allowed to be changed
+		if !ok || (currentValue != v && canChangeValue(k)) {
+			result[k] = v
+			changed = true
+		}
+	}
+
+	for k, v := range delta.Add {
+		if result[k] != v {
+			changed = true
+			result[k] = v
+		}
+	}
+
+	for k := range delta.Delete {
+		if _, ok := result[k]; ok {
+			delete(result, k)
+			changed = true
+		}
+	}
+
+	return result, changed
+}
+
+func (m *nodesSyncer) getNodePlan(node *v3.Node) (v3.RKEConfigNodePlan, error) {
+	cluster, err := m.clusterLister.Get("", node.Namespace)
+	if err != nil {
+		return v3.RKEConfigNodePlan{}, err
+	}
+
+	if cluster.Status.Driver != v3.ClusterDriverRKE || cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
+		return v3.RKEConfigNodePlan{}, nil
+	}
+
+	dockerInfo, err := librke.GetDockerInfo(node)
+	if err != nil {
+		return v3.RKEConfigNodePlan{}, err
+	}
+
+	plan, err := librke.New().GeneratePlan(context.Background(), cluster.Status.AppliedSpec.RancherKubernetesEngineConfig, dockerInfo)
+	if err != nil {
+		return v3.RKEConfigNodePlan{}, err
+	}
+
+	for _, nodePlan := range plan.Nodes {
+		if nodePlan.Address == node.Status.NodeConfig.Address {
+			return nodePlan, nil
+		}
+	}
+
+	return v3.RKEConfigNodePlan{}, nil
+}
+
+func (m *nodesSyncer) reconcileAll() error {
 	nodes, err := m.nodeLister.List("", labels.NewSelector())
 	if err != nil {
 		return err
@@ -274,14 +351,14 @@ func (m *NodesSyncer) reconcileAll() error {
 	return nil
 }
 
-func (m *NodesSyncer) reconcileNodeForNode(machine *v3.Node, node *corev1.Node, pods map[string][]*corev1.Pod) error {
+func (m *nodesSyncer) reconcileNodeForNode(machine *v3.Node, node *corev1.Node, pods map[string][]*corev1.Pod) error {
 	if machine == nil {
 		return m.createNode(node, pods)
 	}
 	return m.updateNode(machine, node, pods)
 }
 
-func (m *NodesSyncer) removeNode(machine *v3.Node) error {
+func (m *nodesSyncer) removeNode(machine *v3.Node) error {
 	if machine.Annotations == nil {
 		return nil
 	}
@@ -298,7 +375,7 @@ func (m *NodesSyncer) removeNode(machine *v3.Node) error {
 	return nil
 }
 
-func (m *NodesSyncer) updateNode(existing *v3.Node, node *corev1.Node, pods map[string][]*corev1.Pod) error {
+func (m *nodesSyncer) updateNode(existing *v3.Node, node *corev1.Node, pods map[string][]*corev1.Pod) error {
 	toUpdate, err := m.convertNodeToNode(node, existing, pods)
 	if err != nil {
 		return err
@@ -316,7 +393,7 @@ func (m *NodesSyncer) updateNode(existing *v3.Node, node *corev1.Node, pods map[
 	return nil
 }
 
-func (m *NodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Pod) error {
+func (m *nodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Pod) error {
 	// do not create machine for rke cluster
 	cluster, err := m.clusterLister.Get("", m.clusterNamespace)
 	if err != nil {
@@ -351,7 +428,7 @@ func (m *NodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Po
 	return nil
 }
 
-func (m *NodesSyncer) getMachineForNode(node *corev1.Node, cache bool) (*v3.Node, error) {
+func (m *nodesSyncer) getMachineForNode(node *corev1.Node, cache bool) (*v3.Node, error) {
 	if cache {
 		return nodehelper.GetMachineForNode(node, m.clusterNamespace, m.machineLister)
 	}
@@ -490,7 +567,7 @@ func statusEqualTest(proposed, existing corev1.NodeStatus) bool {
 	return true
 }
 
-func (m *NodesSyncer) convertNodeToNode(node *corev1.Node, existing *v3.Node, pods map[string][]*corev1.Pod) (*v3.Node, error) {
+func (m *nodesSyncer) convertNodeToNode(node *corev1.Node, existing *v3.Node, pods map[string][]*corev1.Pod) (*v3.Node, error) {
 	var machine *v3.Node
 	if existing == nil {
 		machine = &v3.Node{
@@ -555,7 +632,7 @@ func (m *NodesSyncer) convertNodeToNode(node *corev1.Node, existing *v3.Node, po
 	return machine, nil
 }
 
-func (m *NodesSyncer) getNonTerminatedPods() (map[string][]*corev1.Pod, error) {
+func (m *nodesSyncer) getNonTerminatedPods() (map[string][]*corev1.Pod, error) {
 	pods := make(map[string][]*corev1.Pod)
 	fromCache, err := m.podLister.List("", labels.NewSelector())
 	if err != nil {
