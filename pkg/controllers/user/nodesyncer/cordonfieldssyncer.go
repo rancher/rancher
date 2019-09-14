@@ -26,7 +26,7 @@ const (
 var nodeMapLock = sync.Mutex{}
 var toIgnoreErrs = []string{"--ignore-daemonsets", "--delete-local-data", "--force", "did not complete within"}
 
-func (m *NodesSyncer) syncCordonFields(key string, obj *v3.Node) (runtime.Object, error) {
+func (m *nodesSyncer) syncCordonFields(key string, obj *v3.Node) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil || obj.Spec.DesiredNodeUnschedulable == "" {
 		return nil, nil
 	}
