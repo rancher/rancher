@@ -273,12 +273,7 @@ spec:
                     - linux
       serviceAccountName: cattle
       tolerations:
-      - effect: NoExecute
-        key: "node-role.kubernetes.io/etcd"
-        value: "true"
-      - effect: NoSchedule
-        key: "node-role.kubernetes.io/controlplane"
-        value: "true"
+      - operator: Exists
       containers:
       - name: agent
         image: {{.AgentImage}}
