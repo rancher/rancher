@@ -61,7 +61,7 @@ func (c *Controller) add(dynamicSchema *v3.DynamicSchema) error {
 		field.Default = nil
 
 		switch field.Type {
-		case "string":
+		case "string", "password":
 			field.Default = defMap["stringValue"]
 		case "int":
 			field.Default = defMap["intValue"]
