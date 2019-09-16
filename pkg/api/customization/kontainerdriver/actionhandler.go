@@ -128,23 +128,23 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 		rkeSysImages[k8sVersion] = *rkeSysImgCopy
 	}
 
+	// get system charts path
+	systemCatalog, err := lh.CatalogLister.Get("", utils.SystemLibraryName)
+	if err != nil {
+		return httperror.WrapAPIError(err, httperror.ServerError, "error getting system catalog")
+	}
+	systemCatalogHash := helmlib.CatalogSHA256Hash(systemCatalog)
+	systemCatalogChartPath := filepath.Join(helmlib.CatalogCache, systemCatalogHash)
+
 	var targetImages []string
 	switch apiContext.ID {
 	case linuxImages:
-		// get system charts images
-		systemCatalog, err := lh.CatalogLister.Get("", utils.SystemLibraryName)
-		if err != nil {
-			return httperror.WrapAPIError(err, httperror.ServerError, "error getting system catalog")
-		}
-		systemCatalogHash := helmlib.CatalogSHA256Hash(systemCatalog)
-		systemCatalogChartPath := filepath.Join(helmlib.CatalogCache, systemCatalogHash)
-		targetImages, err = image.GetLinuxImages(systemCatalogChartPath, []string{}, rkeSysImages)
+		targetImages, err = image.GetImages(systemCatalogChartPath, []string{}, rkeSysImages, image.Linux)
 		if err != nil {
 			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for linux platform")
 		}
 	case windowsImages:
-		var err error
-		targetImages, err = image.GetWindowsImages(rkeSysImages)
+		targetImages, err = image.GetImages(systemCatalogChartPath, []string{}, rkeSysImages, image.Windows)
 		if err != nil {
 			return httperror.WrapAPIError(err, httperror.ServerError, "error getting image list for windows platform")
 		}
@@ -161,7 +161,7 @@ func (lh ListHandler) LinkHandler(apiContext *types.APIContext, next types.Reque
 	apiContext.Response.Header().Set("Pragma", "private")
 	apiContext.Response.Header().Set("Expires", "Wed 24 Feb 1982 18:42:00 GMT")
 	apiContext.Response.WriteHeader(http.StatusOK)
-	_, err := apiContext.Response.Write(b)
+	_, err = apiContext.Response.Write(b)
 	return err
 }
 
