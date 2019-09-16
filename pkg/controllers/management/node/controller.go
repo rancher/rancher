@@ -435,11 +435,6 @@ outer:
 }
 
 func (m *Lifecycle) Updated(obj *v3.Node) (runtime.Object, error) {
-	obj, err := m.checkLabels(obj)
-	if err != nil {
-		return obj, err
-	}
-
 	newObj, err := v3.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {
 		if obj.Status.NodeTemplateSpec == nil {
 			m.setWaiting(obj)
