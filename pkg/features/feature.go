@@ -16,6 +16,8 @@ var (
 	features = make(map[string]*feature)
 
 	// Features, ex.: ClusterRandomName = newFeature("cluster-randomizer", false)
+
+	UnsupportedStorageDrivers = newFeature("unsupported-storage-drivers", false)
 )
 
 type feature struct {
