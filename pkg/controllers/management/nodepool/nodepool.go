@@ -309,6 +309,10 @@ func needRoleUpdate(node *v3.Node, nodePool *v3.NodePool) bool {
 	}
 
 	nodeRolesMap := map[string]bool{}
+	nodeRolesMap[services.ETCDRole] = false
+	nodeRolesMap[services.ControlRole] = false
+	nodeRolesMap[services.WorkerRole] = false
+
 	for _, role := range node.Status.NodeConfig.Role {
 		switch r := role; r {
 		case services.ETCDRole:
@@ -319,12 +323,16 @@ func needRoleUpdate(node *v3.Node, nodePool *v3.NodePool) bool {
 			nodeRolesMap[services.WorkerRole] = true
 		}
 	}
-
 	poolRolesMap := map[string]bool{}
 	poolRolesMap[services.ETCDRole] = nodePool.Spec.Etcd
 	poolRolesMap[services.ControlRole] = nodePool.Spec.ControlPlane
 	poolRolesMap[services.WorkerRole] = nodePool.Spec.Worker
-	return !reflect.DeepEqual(nodeRolesMap, poolRolesMap)
+
+	r := !reflect.DeepEqual(nodeRolesMap, poolRolesMap)
+	if r {
+		logrus.Debugf("updating machine [%s] roles: nodepoolRoles: {%+v} node roles: {%+v}", node.Name, poolRolesMap, nodeRolesMap)
+	}
+	return r
 }
 
 func (c *Controller) updateNodeRoles(existing *v3.Node, nodePool *v3.NodePool, simulate bool) (*v3.Node, error) {
@@ -345,7 +353,6 @@ func (c *Controller) updateNodeRoles(existing *v3.Node, nodePool *v3.NodePool, s
 	if simulate {
 		return toUpdate, nil
 	}
-
 	return c.Nodes.Update(toUpdate)
 }
 
