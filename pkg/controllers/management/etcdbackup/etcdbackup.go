@@ -114,21 +114,6 @@ func (c *Controller) Remove(b *v3.EtcdBackup) (runtime.Object, error) {
 	if err := c.etcdRemoveSnapshotWithBackoff(b); err != nil {
 		logrus.Warnf("giving up on deleting backup [%s]: %v", b.Name, err)
 	}
-	if b.Spec.BackupConfig.S3BackupConfig == nil {
-		return b, nil
-	}
-	// try to remove from s3 for 3 times, then give up. if we don't we get stuck forever
-	var delErr error
-	for i := 0; i < 3; i++ {
-		if delErr = c.deleteS3Snapshot(b); delErr == nil {
-			break
-		}
-		logrus.Warnf("failed to delete backup from s3: %v", delErr)
-		time.Sleep(5 * time.Second)
-	}
-	if delErr != nil {
-		logrus.Warnf("giving up on deleting backup [%s] from s3: %v", b.Name, delErr)
-	}
 	return b, nil
 }
 
@@ -329,41 +314,6 @@ func generateBackupFilename(snapshotName string, backupConfig *v3.BackupConfig) 
 	// local backup
 	return filename
 
-}
-
-func (c *Controller) deleteS3Snapshot(b *v3.EtcdBackup) error {
-	if b.Spec.BackupConfig.S3BackupConfig == nil {
-		return fmt.Errorf("Can't find S3 backup target configuration")
-	}
-	bucket := b.Spec.BackupConfig.S3BackupConfig.BucketName
-	folder := b.Spec.BackupConfig.S3BackupConfig.Folder
-
-	s3Client, err := GetS3Client(b.Spec.BackupConfig.S3BackupConfig, defaultTransportTimeout)
-	if err != nil {
-		return err
-	}
-
-	bucketExists, err := s3Client.BucketExists(bucket)
-	if err != nil {
-		return fmt.Errorf("can't access bucket: %v", err)
-	}
-	if !bucketExists {
-		logrus.Errorf("bucket %s doesn't exist", bucket)
-		return nil
-	}
-
-	// Extract filename from etcdBackup.Spec.Filename
-	var fileName string
-	fileName, err = clusterprovisioner.GetBackupFilenameFromURL(b.Spec.Filename)
-	if err != nil {
-		logrus.Warningf("Could not get filename from [%s]: %v. Using %s as fallback", b.Spec.Filename, err, b.Name)
-		fileName = b.Name
-	}
-
-	if len(folder) != 0 {
-		fileName = fmt.Sprintf("%s/%s", folder, fileName)
-	}
-	return s3Client.RemoveObject(bucket, fileName)
 }
 
 func GetS3Client(sbc *v3.S3BackupConfig, timeout int) (*minio.Client, error) {
