@@ -14,11 +14,11 @@ type CredentialMapper struct {
 
 func (s CredentialMapper) FromInternal(data map[string]interface{}) {
 	formatData(data)
-	name := convert.ToString(values.GetValueN(data, "field.cattle.io/name"))
+	name := convert.ToString(values.GetValueN(data, "annotations", "field.cattle.io/name"))
 	if name == "" {
 		id := convert.ToString(values.GetValueN(data, "id"))
 		if id != "" {
-			data["field.cattle.io/name"] = id
+			values.PutValue(data, id, "annotations", "field.cattle.io/name")
 		}
 	}
 	delete(data, "data")
