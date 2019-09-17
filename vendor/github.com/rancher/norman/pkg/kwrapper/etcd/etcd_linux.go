@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -65,6 +66,8 @@ func runEtcd(ctx context.Context, args []string) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Pdeathsig: syscall.SIGKILL,
 	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
 	logrus.Info("Running ", strings.Join(args, " "))
 	cmd.Run()
