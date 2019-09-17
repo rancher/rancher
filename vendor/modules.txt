@@ -300,6 +300,7 @@ github.com/rancher/norman/httperror
 github.com/rancher/norman/parse
 github.com/rancher/norman/types/values
 github.com/rancher/norman/store/transform
+github.com/rancher/norman/store/proxy
 github.com/rancher/norman/condition
 github.com/rancher/norman/urlbuilder
 github.com/rancher/norman/types/set
@@ -307,7 +308,6 @@ github.com/rancher/norman/api/handler
 github.com/rancher/norman/api/builtin
 github.com/rancher/norman/pkg/subscribe
 github.com/rancher/norman/store/crd
-github.com/rancher/norman/store/proxy
 github.com/rancher/norman/store/subtype
 github.com/rancher/norman/parse/builder
 github.com/rancher/norman/types/definition
@@ -324,9 +324,9 @@ github.com/rancher/norman/api/writer
 github.com/rancher/norman/httperror/handler
 github.com/rancher/norman/store/wrapper
 github.com/rancher/norman/types/mapper
-github.com/rancher/norman/store/schema
 github.com/rancher/norman/pkg/broadcast
 github.com/rancher/norman/types/convert/merge
+github.com/rancher/norman/store/schema
 github.com/rancher/norman/types/factory
 # github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 github.com/rancher/rdns-server/model
@@ -354,7 +354,7 @@ github.com/rancher/rke/dind
 github.com/rancher/rke/cloudprovider/custom
 github.com/rancher/rke/cloudprovider/openstack
 github.com/rancher/rke/cloudprovider/vsphere
-# github.com/rancher/types v0.0.0-20190916163052-4cf2c20529fd
+# github.com/rancher/types v0.0.0-20190917010329-2e67c63d1b67
 github.com/rancher/types/apis/management.cattle.io/v3
 github.com/rancher/types/client/management/v3
 github.com/rancher/types/config
@@ -658,13 +658,13 @@ k8s.io/apimachinery/pkg/util/naming
 k8s.io/apimachinery/pkg/util/rand
 k8s.io/apimachinery/pkg/util/clock
 k8s.io/apimachinery/pkg/util/diff
+k8s.io/apimachinery/pkg/apis/meta/internalversion
 k8s.io/apimachinery/pkg/apis/meta/v1beta1
 k8s.io/apimachinery/pkg/runtime/serializer
 k8s.io/apimachinery/pkg/util/httpstream
 k8s.io/apimachinery/pkg/util/remotecommand
 k8s.io/apimachinery/pkg/api/validation
 k8s.io/apimachinery/pkg/apis/meta/v1/validation
-k8s.io/apimachinery/pkg/apis/meta/internalversion
 k8s.io/apimachinery/third_party/forked/golang/netutil
 k8s.io/apimachinery/pkg/runtime/serializer/versioning
 k8s.io/apimachinery/pkg/runtime/serializer/recognizer
