@@ -60,7 +60,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
     curl -sLf ${!HELM_URL} > /usr/bin/helm && \
     curl -sLf ${!TILLER_URL} > /usr/bin/tiller && \
     curl -sLf ${!K3S_URL} > /usr/bin/k3s && \
-    curl -sfL ${!ETCD_URL} | tar xvzf - --strip-components=1 -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcd && \
+    curl -sfL ${!ETCD_URL} | tar xvzf - --strip-components=1 -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcd etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
     curl -sLf https://github.com/rancher/telemetry/releases/download/${TELEMETRY_VERSION}/telemetry-${ARCH} > /usr/bin/telemetry && \
     curl -sLf https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
     chmod +x /usr/bin/helm /usr/bin/tini /usr/bin/telemetry /usr/bin/tiller /usr/bin/k3s /usr/bin/kubectl
@@ -106,6 +106,7 @@ RUN chmod +x /usr/bin/entrypoint.sh
 ENV CATTLE_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}
 ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/rancher
 ENV ETCD_UNSUPPORTED_ARCH=${ARCH}
+ENV ETCDCTL_API=3
 
 ENV SSL_CERT_DIR /etc/rancher/ssl
 VOLUME /var/lib/rancher
