@@ -494,7 +494,7 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string, svcOp
 	}
 	if host.DockerInfo.OSType == "windows" { // compatible with Windows
 		Binds = []string{
-			// put the cloud provider configuration to the host
+			// put the execution binaries and cloud provider configuration to the host
 			fmt.Sprintf("%s:c:/host/etc/kubernetes", path.Join(prefixPath, "/etc/kubernetes")),
 			// put the flexvolume plugins or private registry docker configuration to the host
 			fmt.Sprintf("%s:c:/host/var/lib/kubelet", path.Join(prefixPath, "/var/lib/kubelet")),
@@ -600,7 +600,7 @@ func (c *Cluster) BuildKubeProxyProcess(host *hosts.Host, prefixPath string, svc
 	}
 	if host.DockerInfo.OSType == "windows" { // compatible with Windows
 		Binds = []string{
-			// put the cloud provider configuration to the host
+			// put the execution binaries to the host
 			fmt.Sprintf("%s:c:/host/etc/kubernetes", path.Join(prefixPath, "/etc/kubernetes")),
 			// exchange resources with other components
 			fmt.Sprintf("%s:c:/host/run", path.Join(prefixPath, "/run")),
@@ -685,7 +685,7 @@ func (c *Cluster) BuildProxyProcess(host *hosts.Host, prefixPath string) v3.Proc
 	Binds := []string{}
 	if host.DockerInfo.OSType == "windows" { // compatible with Windows
 		Binds = []string{
-			// generate the configuration to the host
+			// put the execution binaries and generate the configuration to the host
 			fmt.Sprintf("%s:c:/host/etc/nginx", path.Join(prefixPath, "/etc/nginx")),
 			// exchange resources with other components
 			fmt.Sprintf("%s:c:/host/run", path.Join(prefixPath, "/run")),
@@ -812,8 +812,8 @@ func (c *Cluster) BuildSidecarProcess(host *hosts.Host, prefixPath string) v3.Pr
 	Binds := []string{}
 	if host.DockerInfo.OSType == "windows" { // compatible with Windows
 		Binds = []string{
-			// put the cni binaries to the host
-			fmt.Sprintf("%s:c:/host/opt/cni/bin", path.Join(prefixPath, "/opt/cni/bin")),
+			// put the execution binaries and the cni binaries to the host
+			fmt.Sprintf("%s:c:/host/opt", path.Join(prefixPath, "/opt")),
 			// put the cni configuration to the host
 			fmt.Sprintf("%s:c:/host/etc/cni/net.d", path.Join(prefixPath, "/etc/cni/net.d")),
 			// put the cni network component configuration to the host
@@ -828,10 +828,15 @@ func (c *Cluster) BuildSidecarProcess(host *hosts.Host, prefixPath string) v3.Pr
 		RestartPolicy = "always"
 	}
 
+	NetworkMode := "none"
+	if host.DockerInfo.OSType == "windows" { // compatible with Windows
+		NetworkMode = ""
+	}
+
 	registryAuthConfig, _, _ := docker.GetImageRegistryConfig(c.SystemImages.KubernetesServicesSidecar, c.PrivateRegistriesMap)
 	return v3.Process{
 		Name:                    services.SidekickContainerName,
-		NetworkMode:             "none",
+		NetworkMode:             NetworkMode,
 		RestartPolicy:           RestartPolicy,
 		Binds:                   getUniqStringList(Binds),
 		Env:                     getUniqStringList(Env),
