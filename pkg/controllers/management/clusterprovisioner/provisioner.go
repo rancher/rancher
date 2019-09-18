@@ -2,6 +2,7 @@ package clusterprovisioner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"path"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/pkg/errors"
 	"github.com/rancher/kontainer-engine/drivers/rke"
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/norman/controller"
@@ -729,7 +731,11 @@ func (p *Provisioner) validateDriver(cluster *v3.Cluster) (string, error) {
 func (p *Provisioner) getSystemImages(spec v3.ClusterSpec) (*v3.RKESystemImages, error) {
 	// fetch system images from settings
 	version := spec.RancherKubernetesEngineConfig.Version
-	if isDeprecated(version) {
+	isDeprecated, err := isDeprecated(version)
+	if err != nil {
+		return nil, err
+	}
+	if isDeprecated {
 		return nil, fmt.Errorf("failed to find system images for version %s, it is deprecated", version)
 	}
 	systemImages, err := kd.GetRKESystemImages(version, p.RKESystemImagesLister, p.RKESystemImages)
@@ -957,7 +963,10 @@ func GetBackupFilename(backup *v3.EtcdBackup) string {
 	return snapshot
 }
 
-func isDeprecated(version string) bool {
-	deprecatedVersions := convert.ToMapInterface(settings.KubernetesVersionsDeprecated.Get())
-	return convert.ToBool(deprecatedVersions[version])
+func isDeprecated(version string) (bool, error) {
+	deprecatedVersions := make(map[string]bool)
+	if err := json.Unmarshal([]byte(settings.KubernetesVersionsDeprecated.Get()), &deprecatedVersions); err != nil {
+		return false, errors.Wrapf(err, "Error reading the setting %v", settings.KubernetesVersionsDeprecated.Name)
+	}
+	return convert.ToBool(deprecatedVersions[version]), nil
 }
