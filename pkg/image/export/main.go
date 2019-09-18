@@ -397,16 +397,18 @@ if [[ $help ]]; then
     exit 0
 fi
 
-set -e
-
 pulled=""
 while IFS= read -r i; do
     [ -z "${i}" ] && continue
-    if [ $(docker pull --quiet "${i}") ]; then
+    if docker pull "${i}" > /dev/null 2>&1; then
         echo "Image pull success: ${i}"
         pulled="${pulled} ${i}"
     else
-        echo "Image pull failed: ${i}"
+        if docker inspect "${i}" > /dev/null 2>&1; then
+            pulled="${pulled} ${i}"		
+        else
+            echo "Image pull failed: ${i}"
+        fi
     fi
 done < "${list}"
 
