@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	testRancherVersion    = "v1.15.3-rancher3-1"
+	testRancherVersion    = "v1.15.4-rancher1-1"
 	testSystemChartBranch = "dev"
 	testSystemChartCommit = "7c183b98ceb8a7a50892cdb9a991fe627a782fe6"
 )
