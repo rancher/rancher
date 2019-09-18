@@ -91,7 +91,12 @@ func GetRKEK8sServiceOptions(k8sVersion string, svcOptionLister v3.RKEK8sService
 		key = svcOptionWindowsKey
 	}
 	val, ok := sysImage.Labels[key]
-	if !ok {
+	// It's possible that we have a k8s version with no windows svcOptions. In this case, we just warn and return nil.
+	// if we have in fact windows nodes trying to use that version, the error will show in reknodeconfig server.
+	if !ok && osType == Windows {
+		logrus.Debugf("getSvcOptions: no service-option key present for %s", k8sVersion)
+		return k8sSvcOption, nil
+	} else if !ok {
 		return k8sSvcOption, fmt.Errorf("getSvcOptions: no service-option key present for %s", k8sVersion)
 	}
 	return getRKEServiceOption(val, svcOptionLister, svcOptions)

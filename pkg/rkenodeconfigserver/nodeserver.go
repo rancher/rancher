@@ -136,10 +136,12 @@ func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.C
 	if err != nil {
 		return nil, err
 	}
-	svcOptions, err := n.getServiceOptions(cluster.Spec.RancherKubernetesEngineConfig.Version)
+	hostAddress := node.Status.NodeConfig.Address
+	svcOptions, err := n.getServiceOptions(cluster.Spec.RancherKubernetesEngineConfig.Version, infos[hostAddress].OSType)
 	if err != nil {
 		return nil, err
 	}
+
 	plan, err := librke.New().GeneratePlan(ctx, rkeConfig, infos, svcOptions)
 	if err != nil {
 		return nil, err
@@ -193,7 +195,7 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 	rkeConfig := spec.RancherKubernetesEngineConfig
 	filterHostForSpec(rkeConfig, node)
 	logrus.Debugf("The number of nodes sent to the plan: %v", len(rkeConfig.Nodes))
-	svcOptions, err := n.getServiceOptions(cluster.Spec.RancherKubernetesEngineConfig.Version)
+	svcOptions, err := n.getServiceOptions(cluster.Spec.RancherKubernetesEngineConfig.Version, hostDockerInfo.OSType)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +336,7 @@ func appendTaintsToKubeletArgs(processes map[string]v3.Process, nodeConfigTaints
 	return processes
 }
 
-func (n *RKENodeConfigServer) getServiceOptions(k8sVersion string) (map[string]interface{}, error) {
+func (n *RKENodeConfigServer) getServiceOptions(k8sVersion string, osType string) (map[string]interface{}, error) {
 	data := map[string]interface{}{}
 	svcOptions, err := kd.GetRKEK8sServiceOptions(k8sVersion, n.serviceOptionsLister, n.serviceOptions, n.sysImagesLister, n.sysImages, kd.Linux)
 	if err != nil {
@@ -344,13 +346,15 @@ func (n *RKENodeConfigServer) getServiceOptions(k8sVersion string) (map[string]i
 	if svcOptions != nil {
 		data["k8s-service-options"] = svcOptions
 	}
-	svcOptionsWindows, err := kd.GetRKEK8sServiceOptions(k8sVersion, n.serviceOptionsLister, n.serviceOptions, n.sysImagesLister, n.sysImages, kd.Windows)
-	if err != nil {
-		logrus.Errorf("getK8sServiceOptionsWindows: k8sVersion %s [%v]", k8sVersion, err)
-		return data, err
-	}
-	if svcOptionsWindows != nil {
-		data["k8s-windows-service-options"] = svcOptionsWindows
+	if osType == "windows" {
+		svcOptionsWindows, err := kd.GetRKEK8sServiceOptions(k8sVersion, n.serviceOptionsLister, n.serviceOptions, n.sysImagesLister, n.sysImages, kd.Windows)
+		if err != nil {
+			logrus.Errorf("getK8sServiceOptionsWindows: k8sVersion %s [%v]", k8sVersion, err)
+			return data, err
+		}
+		if svcOptionsWindows != nil {
+			data["k8s-windows-service-options"] = svcOptionsWindows
+		}
 	}
 	return data, nil
 }
