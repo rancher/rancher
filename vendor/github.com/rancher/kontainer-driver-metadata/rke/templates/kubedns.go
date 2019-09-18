@@ -377,7 +377,7 @@ spec:
           - --target=Deployment/kube-dns
           # When cluster is using large nodes(with more cores), "coresPerReplica" should dominate.
           # If using small nodes, "nodesPerReplica" should dominate.
-          - --default-params={"linear":{"coresPerReplica":128,"nodesPerReplica":4,"min":1}}
+          - --default-params={"linear":{"coresPerReplica":128,"nodesPerReplica":4,"min":1,"preventSinglePointFailure":true}}
           - --logtostderr=true
           - --v=2
 ---
@@ -402,7 +402,7 @@ rules:
   - apiGroups: [""]
     resources: ["replicationcontrollers/scale"]
     verbs: ["get", "update"]
-  - apiGroups: ["extensions"]
+  - apiGroups: ["extensions","apps"]
     resources: ["deployments/scale", "replicasets/scale"]
     verbs: ["get", "update"]
   - apiGroups: [""]
