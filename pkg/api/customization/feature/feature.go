@@ -35,3 +35,12 @@ func Validator(request *types.APIContext, schema *types.Schema, data map[string]
 
 	return nil
 }
+
+func Formatter(request *types.APIContext, resource *types.RawResource) {
+	if request.Method == http.MethodGet {
+		if resource.Values["value"] == nil {
+			// if value is nil, then this ensure default value will be used
+			resource.Values["value"] = resource.Values["default"]
+		}
+	}
+}
