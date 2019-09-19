@@ -663,6 +663,37 @@ def test_disable_template_revision(admin_mc, remove_resource):
     wait_for_cluster_to_be_deleted(client, cluster.id)
 
 
+def test_template_delete_by_members(admin_mc, remove_resource,
+                                    user_factory):
+    user_owner = user_factory()
+    members = [{"userPrincipalId": "local://" + user_owner.user.id,
+                "accessType": "owner"}]
+    cluster_template = create_cluster_template(admin_mc, remove_resource,
+                                               members, admin_mc)
+    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
+    split = cluster_template.id.split(":")
+    name = split[1]
+    rb_name = name + "-ct-a"
+    wait_for(lambda: check_subject_in_rb(rbac, 'cattle-global-data',
+                                         user_owner.user.id, rb_name),
+             timeout=60,
+             fail_handler=fail_handler(rb_resource))
+    templateId = cluster_template.id
+    rev = create_cluster_template_revision(user_owner.client, templateId)
+    cluster = wait_for_cluster_create(admin_mc.client, name=random_str(),
+                                      clusterTemplateRevisionId=rev.id,
+                                      description="template from cluster")
+    remove_resource(cluster)
+    assert cluster.conditions[0].type == 'Pending'
+    assert cluster.conditions[0].status == 'True'
+
+    # user with accessType=owner should not be able to delete this
+    # template since a cluster exists
+    with pytest.raises(ApiError) as e:
+        user_owner.client.delete(cluster_template)
+        assert e.value.error.status == 403
+
+
 def rtb_cb(client, rtb):
     """Wait for the prtb to have the userId populated"""
     def cb():
