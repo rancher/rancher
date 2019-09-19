@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	PingWaitDuration  = time.Duration(10 * time.Second)
+	PingWaitDuration  = time.Duration(60 * time.Second)
 	PingWriteInterval = time.Duration(5 * time.Second)
 	MaxRead           = 8192
 )
