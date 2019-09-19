@@ -15,13 +15,22 @@ import (
 )
 
 const (
-	testRancherVersion    = "v1.15.4-rancher1-1"
 	testSystemChartBranch = "dev"
 	testSystemChartCommit = "7c183b98ceb8a7a50892cdb9a991fe627a782fe6"
 )
 
 func TestFetchImagesFromCharts(t *testing.T) {
 	systemChartPath := cloneTestSystemChart(t)
+
+	bothImages := []string{
+		"rancher/fluentd:v0.1.16",
+	}
+	linuxImagesOnly := []string{
+		"rancher/prom-alertmanager:v0.17.0",
+	}
+	windowsImagesOnly := []string{
+		"rancher/wmi_exporter-package:v0.0.2",
+	}
 
 	testCases := []struct {
 		caseName               string
@@ -34,27 +43,21 @@ func TestFetchImagesFromCharts(t *testing.T) {
 			caseName:    "fetch linux images from charts",
 			inputPath:   systemChartPath,
 			inputOsType: Linux,
-			outputShouldContain: []string{
-				"rancher/prom-alertmanager:v0.17.0",
-				"rancher/configmap-reload:v0.3.0-rancher2", // both windows and linux
-				"rancher/fluentd:v0.1.16",                  // both windows and linux
-			},
-			outputShouldNotContain: []string{
-				"rancher/wmi_exporter-package:v0.0.2",
-			},
+			outputShouldContain: flatStringSlice(
+				bothImages,
+				linuxImagesOnly,
+			),
+			outputShouldNotContain: windowsImagesOnly,
 		},
 		{
 			caseName:    "fetch windows images from charts",
 			inputPath:   systemChartPath,
 			inputOsType: Windows,
-			outputShouldContain: []string{
-				"rancher/wmi_exporter-package:v0.0.2",
-				"rancher/configmap-reload:v0.3.0-rancher2", // both windows and linux
-				"rancher/fluentd:v0.1.16",                  // both windows and linux
-			},
-			outputShouldNotContain: []string{
-				"rancher/prom-alertmanager:v0.17.0",
-			},
+			outputShouldContain: flatStringSlice(
+				bothImages,
+				windowsImagesOnly,
+			),
+			outputShouldNotContain: linuxImagesOnly,
 		},
 	}
 
@@ -76,7 +79,17 @@ func TestFetchImagesFromCharts(t *testing.T) {
 func TestFetchImagesFromSystem(t *testing.T) {
 	linuxInfo, windowsInfo := getTestK8sVersionInfo()
 	toolsSystemImages := v3.ToolsSystemImages
-	rkeSystemImages := getTestRKESystemImages()
+
+	bothImages := []string{
+		selectFirstEntry(linuxInfo.RKESystemImages).NginxProxy,
+	}
+	linuxImagesOnly := []string{
+		selectFirstEntry(linuxInfo.RKESystemImages).CoreDNS,
+		toolsSystemImages.PipelineSystemImages.Jenkins, // from tools
+	}
+	windowsImagesOnly := []string{
+		selectFirstEntry(windowsInfo.RKESystemImages).WindowsPodInfraContainer,
+	}
 
 	testCases := []struct {
 		caseName               string
@@ -89,26 +102,21 @@ func TestFetchImagesFromSystem(t *testing.T) {
 			caseName:             "fetch linux images from system images",
 			inputRkeSystemImages: linuxInfo.RKESystemImages,
 			inputOsType:          Linux,
-			outputShouldContain: []string{
-				toolsSystemImages.PipelineSystemImages.Jenkins,
-				toolsSystemImages.PipelineSystemImages.JenkinsJnlp,
-			},
-			outputShouldNotContain: []string{
-				rkeSystemImages.WindowsPodInfraContainer,
-			},
+			outputShouldContain: flatStringSlice(
+				bothImages,
+				linuxImagesOnly,
+			),
+			outputShouldNotContain: windowsImagesOnly,
 		},
 		{
 			caseName:             "fetch windows images from system images",
 			inputRkeSystemImages: windowsInfo.RKESystemImages,
 			inputOsType:          Windows,
-			outputShouldContain: []string{
-				rkeSystemImages.WindowsPodInfraContainer,
-				rkeSystemImages.NginxProxy,
-			},
-			outputShouldNotContain: []string{
-				toolsSystemImages.PipelineSystemImages.Jenkins,
-				toolsSystemImages.PipelineSystemImages.JenkinsJnlp,
-			},
+			outputShouldContain: flatStringSlice(
+				bothImages,
+				windowsImagesOnly,
+			),
+			outputShouldNotContain: linuxImagesOnly,
 		},
 	}
 
@@ -172,7 +180,22 @@ func TestGetImages(t *testing.T) {
 	systemChartPath := cloneTestSystemChart(t)
 	linuxInfo, windowsInfo := getTestK8sVersionInfo()
 	toolsSystemImages := v3.ToolsSystemImages
-	rkeSystemImages := getTestRKESystemImages()
+
+	bothImages := []string{
+		selectFirstEntry(linuxInfo.RKESystemImages).NginxProxy, // from system
+		"rancher/fluentd:v0.1.16",                              // from chart
+	}
+	linuxImagesOnly := append(
+		getRequirementImages(Linux),                         // from requirement
+		selectFirstEntry(linuxInfo.RKESystemImages).CoreDNS, // from system
+		"rancher/prom-alertmanager:v0.17.0",                 // from chart
+		toolsSystemImages.PipelineSystemImages.Jenkins,      // from tools
+	)
+	windowsImagesOnly := append(
+		getRequirementImages(Windows),                                          // from requirement
+		selectFirstEntry(windowsInfo.RKESystemImages).WindowsPodInfraContainer, // from system
+		"rancher/wmi_exporter-package:v0.0.2",                                  // from chart
+	)
 
 	testCases := []struct {
 		caseName               string
@@ -184,7 +207,7 @@ func TestGetImages(t *testing.T) {
 		outputShouldNotContain []string
 	}{
 		{
-			caseName:             "linux",
+			caseName:             "get linux images",
 			inputSystemChartPath: systemChartPath,
 			inputImagesFromArgs: []string{
 				"rancher/rancher:master-head",
@@ -193,37 +216,24 @@ func TestGetImages(t *testing.T) {
 			inputRkeSystemImages: linuxInfo.RKESystemImages,
 			inputOsType:          Linux,
 			outputShouldContain: flatStringSlice(
-				[]string{
-					toolsSystemImages.PipelineSystemImages.Jenkins,
-					toolsSystemImages.PipelineSystemImages.JenkinsJnlp,
-				},
-				getRequirementImages(Linux),
+				linuxImagesOnly,
+				bothImages,
 			),
-			outputShouldNotContain: []string{
-				rkeSystemImages.WindowsPodInfraContainer,
-				"rancher/wmi_exporter-package:v0.0.2",
-			},
+			outputShouldNotContain: windowsImagesOnly,
 		},
 		{
-			caseName:             "windows",
+			caseName:             "get windows images",
 			inputSystemChartPath: systemChartPath,
 			inputImagesFromArgs: []string{
 				"rancher/rancher-agent:master-head",
 			},
 			inputRkeSystemImages: windowsInfo.RKESystemImages,
 			inputOsType:          Windows,
-			outputShouldContain: []string{
-				rkeSystemImages.WindowsPodInfraContainer,
-				rkeSystemImages.NginxProxy,
-				"rancher/wmi_exporter-package:v0.0.2",
-			},
-			outputShouldNotContain: flatStringSlice(
-				[]string{
-					toolsSystemImages.PipelineSystemImages.Jenkins,
-					toolsSystemImages.PipelineSystemImages.JenkinsJnlp,
-				},
-				getRequirementImages(Windows),
+			outputShouldContain: flatStringSlice(
+				windowsImagesOnly,
+				bothImages,
 			),
+			outputShouldNotContain: linuxImagesOnly,
 		},
 	}
 
@@ -244,16 +254,12 @@ func TestGetImages(t *testing.T) {
 
 func getTestK8sVersionInfo() (linuxInfo, windowsInfo *kd.VersionInfo) {
 	return kd.GetK8sVersionInfo(
-		testRancherVersion,
+		kd.RancherVersionDev,
 		metadata.DriverData.K8sVersionRKESystemImages,
 		metadata.DriverData.K8sVersionServiceOptions,
 		metadata.DriverData.K8sVersionWindowsServiceOptions,
 		metadata.DriverData.K8sVersionInfo,
 	)
-}
-
-func getTestRKESystemImages() v3.RKESystemImages {
-	return metadata.DriverData.K8sVersionRKESystemImages[testRancherVersion]
 }
 
 func cloneTestSystemChart(t *testing.T) string {
@@ -299,4 +305,11 @@ func flatStringSlice(slices ...[]string) []string {
 		ret = append(ret, s...)
 	}
 	return ret
+}
+
+func selectFirstEntry(rkeSystemImages map[string]v3.RKESystemImages) v3.RKESystemImages {
+	for _, rkeSystemImage := range rkeSystemImages {
+		return rkeSystemImage
+	}
+	return v3.RKESystemImages{}
 }
