@@ -511,6 +511,7 @@ func Setting(schemas *types.Schemas) {
 func Feature(schemas *types.Schemas) {
 	schema := schemas.Schema(&managementschema.Version, client.FeatureType)
 	schema.Validator = feature.Validator
+	schema.Formatter = feature.Formatter
 	schema.Store = featStore.New(schema.Store)
 }
 
