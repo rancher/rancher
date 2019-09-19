@@ -98,7 +98,7 @@ func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 			return nil, err
 		}
 		if isUsed {
-			return nil, httperror.NewAPIError(httperror.PermissionDenied, fmt.Sprintf("Cannot update the %v until Clusters are referring it", apiContext.Type))
+			return nil, httperror.NewAPIError(httperror.InvalidAction, fmt.Sprintf("Cannot update the %v until Clusters are referring it", apiContext.Type))
 		}
 	}
 
@@ -122,7 +122,7 @@ func (p *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 		return nil, err
 	}
 	if isUsed {
-		return nil, httperror.NewAPIError(httperror.PermissionDenied, fmt.Sprintf("Cannot delete the %v until Clusters referring it are removed", apiContext.Type))
+		return nil, httperror.NewAPIError(httperror.InvalidAction, fmt.Sprintf("Cannot delete the %v until Clusters referring it are removed", apiContext.Type))
 	}
 
 	//check if template.DefaultRevisionId is set, if yes error out if the revision is being deleted.
