@@ -173,7 +173,7 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 
 	//check if template is passed. if yes, load template data
 	if hasTemplate(data) {
-		clusterTemplateRevision, clusterTemplate, err := r.validateTemplateInput(data, false)
+		clusterTemplateRevision, clusterTemplate, err := r.validateTemplateInput(apiContext, data, false)
 		if err != nil {
 			return nil, err
 		}
@@ -308,7 +308,7 @@ func hasTemplate(data map[string]interface{}) bool {
 	return false
 }
 
-func (r *Store) validateTemplateInput(data map[string]interface{}, isUpdate bool) (*v3.ClusterTemplateRevision, *v3.ClusterTemplate, error) {
+func (r *Store) validateTemplateInput(apiContext *types.APIContext, data map[string]interface{}, isUpdate bool) (*v3.ClusterTemplateRevision, *v3.ClusterTemplate, error) {
 
 	if !isUpdate {
 		//if data also has rkeconfig, error out on create
@@ -321,6 +321,21 @@ func (r *Store) validateTemplateInput(data map[string]interface{}, isUpdate bool
 	var templateID, templateRevID string
 
 	templateRevIDStr := convert.ToString(data[managementv3.ClusterSpecFieldClusterTemplateRevisionID])
+	var clusterTemplateRev managementv3.ClusterTemplateRevision
+
+	//access check.
+	if err := access.ByID(apiContext, apiContext.Version, managementv3.ClusterTemplateRevisionType, templateRevIDStr, &clusterTemplateRev); err != nil {
+		logrus.Infof("Access Check to ClusterTemplateREVision failed %v", err)
+		if apiError, ok := err.(*httperror.APIError); ok {
+			if apiError.Code.Status == httperror.PermissionDenied.Status {
+				logrus.Infof("Throwing out 404 ClusterTemplateREVision access failed!!")
+				return nil, nil, httperror.NewAPIError(httperror.NotFound, "The clusterTemplateRevision is not found")
+			}
+		}
+		logrus.Infof("Throwing out ClusterTemplateREVision access failed %v", err)
+		return nil, nil, err
+	}
+
 	splitID := strings.Split(templateRevIDStr, ":")
 	if len(splitID) == 2 {
 		templateRevID = splitID[1]
@@ -425,7 +440,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 			return nil, httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("this cluster is not created using a clusterTemplate, cannot update it to use a clusterTemplate now"))
 		}
 
-		clusterTemplateRevision, clusterTemplate, err := r.validateTemplateInput(data, true)
+		clusterTemplateRevision, clusterTemplate, err := r.validateTemplateInput(apiContext, data, true)
 		if err != nil {
 			return nil, err
 		}
