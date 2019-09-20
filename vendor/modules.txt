@@ -332,7 +332,7 @@ github.com/rancher/norman/types/factory
 github.com/rancher/rdns-server/model
 # github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6
 github.com/rancher/remotedialer
-# github.com/rancher/rke v0.3.0-rc10.0.20190918214525-a31f707eb5f6
+# github.com/rancher/rke v0.3.0-rc10.0.20190920161630-14827e2cdfac
 github.com/rancher/rke/util
 github.com/rancher/rke/pki/cert
 github.com/rancher/rke/cloudprovider/aws
