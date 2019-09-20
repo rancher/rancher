@@ -18,6 +18,8 @@ const (
 	WorkerThreads = 50
 )
 
+var proxyEnvVars = [3]string{"HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY"}
+
 func StrToSemVer(version string) (*semver.Version, error) {
 	v, err := semver.NewVersion(strings.TrimPrefix(version, "v"))
 	if err != nil {
@@ -138,4 +140,24 @@ func GetEnvVar(key string) (string, string, bool) {
 		return strings.ToLower(key), value, true
 	}
 	return "", "", false
+}
+
+func PrintProxyEnvVars() {
+	// Print proxy related environment variables
+	for _, proxyEnvVar := range proxyEnvVars {
+		var err error
+		// Lookup environment variable
+		if key, value, ok := GetEnvVar(proxyEnvVar); ok {
+			// If it can contain a password, strip it (HTTP_PROXY or HTTPS_PROXY)
+			if strings.HasPrefix(strings.ToUpper(proxyEnvVar), "HTTP") {
+				value, err = StripPasswordFromURL(value)
+				if err != nil {
+					// Don't error out of provisioning when parsing of environment variable fails
+					logrus.Warnf("Error parsing proxy environment variable %s", key)
+					continue
+				}
+			}
+			logrus.Infof("Using proxy environment variable %s with value [%s]", key, value)
+		}
+	}
 }

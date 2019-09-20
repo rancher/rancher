@@ -310,6 +310,8 @@ func ApplyAuthzResources(ctx context.Context, rkeConfig v3.RancherKubernetesEngi
 	if len(kubeCluster.ControlPlaneHosts) == 0 {
 		return nil
 	}
+	// Print proxy environment variables as we are directly contacting the cluster
+	util.PrintProxyEnvVars()
 	if err := authz.ApplyJobDeployerServiceAccount(ctx, kubeCluster.LocalKubeConfigPath, kubeCluster.K8sWrapTransport); err != nil {
 		return fmt.Errorf("Failed to apply the ServiceAccount needed for job execution: %v", err)
 	}
