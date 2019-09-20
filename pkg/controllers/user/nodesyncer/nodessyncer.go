@@ -206,6 +206,10 @@ func (m *nodesSyncer) syncLabels(key string, obj *v3.Node) (runtime.Object, erro
 		return nil, nil
 	}
 
+	if obj.Status.NodeConfig == nil {
+		return nil, nil
+	}
+
 	node, err := nodehelper.GetNodeForMachine(obj, m.nodeLister)
 	if err != nil || node == nil {
 		return nil, err
