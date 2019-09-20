@@ -239,8 +239,8 @@ push_manifest () {
     done
 
     echo "Preparing manifest $1, list[${arch_list[@]}]"
-    docker manifest create "$1" "${manifest_list[@]}"
-    docker manifest push "$1"
+    docker manifest create "$1" "${manifest_list[@]}" --amend
+    docker manifest push "$1" --purge
 }
 
 while [[ $# -gt 0 ]]; do
