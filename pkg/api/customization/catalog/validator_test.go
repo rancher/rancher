@@ -13,33 +13,33 @@ func TestValidateURL(t *testing.T) {
 	tests := []struct {
 		name    string
 		pathURL string
-		wantErr bool
+		want    string
 	}{
 		{
 			name:    "Remove control characters",
 			pathURL: "http://example.com/1\r2\n345\b67\t",
-			wantErr: true,
+			want:    "http://example.com/1234567",
 		},
 		{
 			name:    "Remove urlEncoded control characters",
 			pathURL: "https://example.com/12%003%1F45%0A%0a6",
-			wantErr: true,
+			want:    "https://example.com/123456",
 		},
 		{
 			name:    "Remove all control characters, allow uppercase scheme",
 			pathURL: "https://www.example%0D.com/Hello\r\nWorld",
-			wantErr: true,
+			want:    "https://www.example.com/HelloWorld",
 		},
 		{
 			name:    "Allow git protocol",
 			pathURL: "git://www.example.com",
-			wantErr: false,
+			want:    "git://www.example.com",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotErr := validateURL(tt.pathURL)
-			assert.Equal(t, gotErr != nil, tt.wantErr)
+			got := sanitizeURL(tt.pathURL)
+			assert.Equal(t, got, tt.want)
 		})
 	}
 }
