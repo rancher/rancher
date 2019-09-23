@@ -481,6 +481,8 @@ func generateSystemImagesList(version string, all bool) error {
 }
 
 func getUniqueSystemImageList(rkeSystemImages v3.RKESystemImages) []string {
+	// windows image not relevant for rke cli
+	rkeSystemImages.WindowsPodInfraContainer = ""
 	imagesReflect := reflect.ValueOf(rkeSystemImages)
 	images := make([]string, imagesReflect.NumField())
 	for i := 0; i < imagesReflect.NumField(); i++ {
