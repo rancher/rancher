@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -9,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/blang/semver"
+	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse/builder"
@@ -557,19 +559,38 @@ func setKubernetesVersion(data map[string]interface{}) error {
 			//if k8s version is already of rancher version form, noop
 			//if k8s version is of form 1.14.x, figure out the latest
 			k8sVersionRequested := convert.ToString(k8sVersion)
-			if !strings.Contains(k8sVersionRequested, "-rancher") {
-				translatedVersion, err := getSupportedK8sVersion(k8sVersionRequested)
+			if strings.Contains(k8sVersionRequested, "-rancher") {
+				deprecated, err := isDeprecated(k8sVersionRequested)
 				if err != nil {
 					return err
 				}
-				if translatedVersion == "" {
-					return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Requested kubernetesVersion %v is not supported currently", k8sVersionRequested))
+				if deprecated {
+					return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Requested kubernetesVersion %v is deprecated", k8sVersionRequested))
 				}
-				values.PutValue(data, translatedVersion, "rancherKubernetesEngineConfig", "kubernetesVersion")
+				return nil
 			}
+			translatedVersion, err := getSupportedK8sVersion(k8sVersionRequested)
+			if err != nil {
+				return err
+			}
+			if translatedVersion == "" {
+				return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Requested kubernetesVersion %v is not supported currently", k8sVersionRequested))
+			}
+			values.PutValue(data, translatedVersion, "rancherKubernetesEngineConfig", "kubernetesVersion")
 		}
 	}
 	return nil
+}
+
+func isDeprecated(version string) (bool, error) {
+	deprecatedVersions := make(map[string]bool)
+	deprecatedVersionSetting := settings.KubernetesVersionsDeprecated.Get()
+	if deprecatedVersionSetting != "" {
+		if err := json.Unmarshal([]byte(deprecatedVersionSetting), &deprecatedVersions); err != nil {
+			return false, errors.Wrapf(err, "Error reading the setting %v", settings.KubernetesVersionsDeprecated.Name)
+		}
+	}
+	return convert.ToBool(deprecatedVersions[version]), nil
 }
 
 func getSupportedK8sVersion(k8sVersionRequest string) (string, error) {
