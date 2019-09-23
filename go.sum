@@ -193,6 +193,8 @@ github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de h1:9TO3cAIGXtEhn
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de/go.mod h1:zAbeS9B/r2mtpb6U+EI2rYA5OAXxsYw6wTamcNW+zcE=
 github.com/luthermonson/types v0.0.0-20190827220737-fd7416efc303 h1:s7r9I55t9KW095bX0OQh2i15rANDU0DHmb+ZM+QpwhQ=
 github.com/luthermonson/types v0.0.0-20190827220737-fd7416efc303/go.mod h1:9L7VLTwNVt7vJYwP/7xrQ4tWghDQ+zl9//RTqRjGxes=
+github.com/luthermonson/types v0.0.0-20190923212044-8c55fbd71866 h1:/vZxONLKRqd3KCg9oljKFU4r9YU4AyCOykdQKEsV90o=
+github.com/luthermonson/types v0.0.0-20190923212044-8c55fbd71866/go.mod h1:9L7VLTwNVt7vJYwP/7xrQ4tWghDQ+zl9//RTqRjGxes=
 github.com/mailru/easyjson v0.0.0-20160728113105-d5b7844b561a h1:TpvdAwDAt1K4ANVOfcihouRdvP+MgAfDWwBuct4l6ZY=
 github.com/mailru/easyjson v0.0.0-20160728113105-d5b7844b561a/go.mod h1:C1wdFJiN94OJF2b5HbByQZoLdCWB1Yqtg26g4irojpc=
 github.com/maruel/panicparse v0.0.0-20171209025017-c0182c169410 h1:1ROIrlLvFoHKX+i48KdRauq21irSOXPyfQw4T/PrINY=

@@ -20,13 +20,13 @@ type Interface interface {
 	RESTClient() rest.Interface
 	controller.Starter
 
-	IngressesGetter
+	PodSecurityPoliciesGetter
 }
 
 type Clients struct {
 	Interface Interface
 
-	Ingress IngressClient
+	PodSecurityPolicy PodSecurityPolicyClient
 }
 
 type Client struct {
@@ -34,7 +34,7 @@ type Client struct {
 	restClient rest.Interface
 	starters   []controller.Starter
 
-	ingressControllers map[string]IngressController
+	podSecurityPolicyControllers map[string]PodSecurityPolicyController
 }
 
 func Factory(ctx context.Context, config rest.Config) (context.Context, controller.Starter, error) {
@@ -70,8 +70,8 @@ func NewClientsFromInterface(iface Interface) *Clients {
 	return &Clients{
 		Interface: iface,
 
-		Ingress: &ingressClient2{
-			iface: iface.Ingresses(""),
+		PodSecurityPolicy: &podSecurityPolicyClient2{
+			iface: iface.PodSecurityPolicies(""),
 		},
 	}
 }
@@ -89,7 +89,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 	return &Client{
 		restClient: restClient,
 
-		ingressControllers: map[string]IngressController{},
+		podSecurityPolicyControllers: map[string]PodSecurityPolicyController{},
 	}, nil
 }
 
@@ -105,13 +105,13 @@ func (c *Client) Start(ctx context.Context, threadiness int) error {
 	return controller.Start(ctx, threadiness, c.starters...)
 }
 
-type IngressesGetter interface {
-	Ingresses(namespace string) IngressInterface
+type PodSecurityPoliciesGetter interface {
+	PodSecurityPolicies(namespace string) PodSecurityPolicyInterface
 }
 
-func (c *Client) Ingresses(namespace string) IngressInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &IngressResource, IngressGroupVersionKind, ingressFactory{})
-	return &ingressClient{
+func (c *Client) PodSecurityPolicies(namespace string) PodSecurityPolicyInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &PodSecurityPolicyResource, PodSecurityPolicyGroupVersionKind, podSecurityPolicyFactory{})
+	return &podSecurityPolicyClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

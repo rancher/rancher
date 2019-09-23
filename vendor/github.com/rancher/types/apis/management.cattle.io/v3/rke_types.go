@@ -147,7 +147,7 @@ type RKESystemImages struct {
 	// Metrics Server image
 	MetricsServer string `yaml:"metrics_server" json:"metricsServer,omitempty"`
 	// Pod infra container image for Windows
-	WindowsPodInfraContainer string `yaml:"windows_pod_infra_container" json:"podInfraWindowsContainer,omitempty"`
+	WindowsPodInfraContainer string `yaml:"windows_pod_infra_container" json:"windowsPodInfraContainer,omitempty"`
 }
 
 type RKEConfigNode struct {
@@ -329,6 +329,8 @@ type NetworkConfig struct {
 	FlannelNetworkProvider *FlannelNetworkProvider `yaml:"flannel_network_provider,omitempty" json:"flannelNetworkProvider,omitempty"`
 	// WeaveNetworkProvider
 	WeaveNetworkProvider *WeaveNetworkProvider `yaml:"weave_network_provider,omitempty" json:"weaveNetworkProvider,omitempty"`
+	// NodeSelector key pair
+	NodeSelector map[string]string `yaml:"node_selector" json:"nodeSelector,omitempty"`
 }
 
 type AuthWebhookConfig struct {
@@ -735,6 +737,8 @@ type MonitoringConfig struct {
 	Provider string `yaml:"provider" json:"provider,omitempty" norman:"default=metrics-server"`
 	// Metrics server options
 	Options map[string]string `yaml:"options" json:"options,omitempty"`
+	// NodeSelector key pair
+	NodeSelector map[string]string `yaml:"node_selector" json:"nodeSelector,omitempty"`
 }
 
 type RestoreConfig struct {

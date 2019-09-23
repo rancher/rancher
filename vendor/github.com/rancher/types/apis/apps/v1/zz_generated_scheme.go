@@ -1,4 +1,4 @@
-package v1beta2
+package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -8,7 +8,7 @@ import (
 
 const (
 	GroupName = "apps"
-	Version   = "v1beta2"
+	Version   = "v1"
 )
 
 // SchemeGroupVersion is group version used to register these objects

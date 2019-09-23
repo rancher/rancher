@@ -262,6 +262,7 @@ type NotifierSpec struct {
 
 	DisplayName     string           `json:"displayName,omitempty" norman:"required"`
 	Description     string           `json:"description,omitempty"`
+	SendResolved    bool             `json:"sendResolved,omitempty"`
 	SMTPConfig      *SMTPConfig      `json:"smtpConfig,omitempty"`
 	SlackConfig     *SlackConfig     `json:"slackConfig,omitempty"`
 	PagerdutyConfig *PagerdutyConfig `json:"pagerdutyConfig,omitempty"`
@@ -314,11 +315,6 @@ type WechatConfig struct {
 }
 
 type NotifierStatus struct {
-}
-
-type AlertSystemImages struct {
-	AlertManager       string `json:"alertManager,omitempty"`
-	AlertManagerHelper string `json:"alertManagerHelper,omitempty"`
 }
 
 // HTTPClientConfig configures an HTTP client.
