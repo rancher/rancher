@@ -2,19 +2,12 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
-	"path/filepath"
 	"strings"
-
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 
 	metadata "github.com/rancher/kontainer-driver-metadata/rke"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
-	"gopkg.in/yaml.v2"
-
-	libhelm "github.com/rancher/rancher/pkg/catalog/helm"
 	img "github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/types/image"
 )
@@ -24,7 +17,7 @@ var (
 		"linux-save":     linuxSaveScript,
 		"linux-load":     linuxLoadScript,
 		"linux-mirror":   linuxMirrorScript,
-		"windows-save":   windowsSaveScirpt,
+		"windows-save":   windowsSaveScript,
 		"windows-load":   windowsLoadScript,
 		"windows-mirror": windowsMirrorScript,
 	}
@@ -40,29 +33,19 @@ var (
 		"linux":   "rancher-images.txt",
 		"windows": "rancher-windows-images.txt",
 	}
-	requiredImagesNotInSystemCharts = []string{
-		"busybox",
-	}
 )
 
 func main() {
 	if len(os.Args) < 2 {
 		log.Fatal("system charts path is required, please set it as the first parameter")
 	}
-	images, err := getImagesFromCharts(os.Args[1])
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	images = append(images, os.Args[2:]...)
-	images = append(images, requiredImagesNotInSystemCharts...)
-
-	if err := run(images...); err != nil {
+	if err := run(os.Args[1], os.Args[2:]); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(images ...string) error {
+func run(systemChartPath string, imagesFromArgs []string) error {
 	tag, ok := os.LookupEnv("TAG")
 	if !ok {
 		return fmt.Errorf("no tag %s", tag)
@@ -74,27 +57,22 @@ func run(images ...string) error {
 	if strings.HasPrefix(rancherVersion, "v") {
 		rancherVersion = rancherVersion[1:]
 	}
-	k8sVersionToRKESystemImages, _ := kd.GetK8sVersionInfo(rancherVersion,
-		metadata.DriverData.K8sVersionRKESystemImages, metadata.DriverData.K8sVersionServiceOptions,
-		metadata.DriverData.K8sVersionInfo)
-	k8sVersionToWindowsSystemImages := pickWindowsImages(k8sVersionToRKESystemImages)
+	linuxInfo, windowsInfo := kd.GetK8sVersionInfo(
+		rancherVersion,
+		metadata.DriverData.K8sVersionRKESystemImages,
+		metadata.DriverData.K8sVersionServiceOptions,
+		metadata.DriverData.K8sVersionWindowsServiceOptions,
+		metadata.DriverData.K8sVersionInfo,
+	)
 
-	targetImages, err := img.CollectionImages(k8sVersionToRKESystemImages, v3.ToolsSystemImages)
+	targetImages, err := img.GetImages(systemChartPath, imagesFromArgs, linuxInfo.RKESystemImages, img.Linux)
 	if err != nil {
 		return err
 	}
 
-	for _, i := range images {
-		targetImages = append(targetImages, image.Mirror(i))
-	}
-
-	targetWindowsImages, err := img.CollectionImages(k8sVersionToWindowsSystemImages)
+	targetWindowsImages, err := img.GetImages(systemChartPath, []string{getWindowsAgentImage()}, windowsInfo.RKESystemImages, img.Windows)
 	if err != nil {
 		return err
-	}
-
-	if agentImage := getWindowsAgentImage(); agentImage != "" {
-		targetWindowsImages = append(targetWindowsImages, image.Mirror(agentImage))
 	}
 
 	for arch, images := range map[string][]string{
@@ -216,115 +194,6 @@ func mirrorScript(arch string, targetImages []string) error {
 	return nil
 }
 
-func getImagesFromCharts(path string) ([]string, error) {
-	var images []string
-	imageMap := map[string]struct{}{}
-	chartVersion, err := getChartAndVersion(path)
-	if err != nil {
-		return nil, err
-	}
-	if err := filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
-		return walkFunc(imageMap, chartVersion, path, p, info, err)
-	}); err != nil {
-		return images, err
-	}
-	for value := range imageMap {
-		images = append(images, value)
-	}
-	return images, nil
-}
-
-func getChartAndVersion(path string) (map[string]string, error) {
-	rtn := map[string]string{}
-	helm := libhelm.Helm{
-		LocalPath: path,
-		IconPath:  path,
-		Hash:      "",
-	}
-	index, err := helm.LoadIndex()
-	if err != nil {
-		return nil, err
-	}
-	for k, versions := range index.IndexFile.Entries {
-		// because versions is sorted in reverse order, the first one will be the latest version
-		if len(versions) > 0 {
-			rtn[k] = versions[0].Dir
-		}
-	}
-
-	return rtn, nil
-}
-
-func walkFunc(images map[string]struct{}, versions map[string]string, basePath, path string, info os.FileInfo, err error) error {
-	relPath, err := filepath.Rel(basePath, path)
-	if err != nil {
-		return err
-	}
-	var found bool
-	for _, v := range versions {
-		if strings.HasPrefix(relPath, v) {
-			found = true
-			break
-		}
-	}
-	if !found || info.Name() != "values.yaml" {
-		return nil
-	}
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	dataInterface := map[interface{}]interface{}{}
-	if err := yaml.Unmarshal(data, &dataInterface); err != nil {
-		return err
-	}
-
-	walkthroughMap(dataInterface, func(inputMap map[interface{}]interface{}) {
-		generateImages(inputMap, images)
-	})
-	return nil
-}
-
-func generateImages(inputMap map[interface{}]interface{}, output map[string]struct{}) {
-	r, repoOk := inputMap["repository"]
-	t, tagOk := inputMap["tag"]
-	if !repoOk || !tagOk {
-		return
-	}
-	repo, repoOk := r.(string)
-	tag, tagOk := t.(string)
-	if !repoOk || !tagOk {
-		return
-	}
-
-	output[fmt.Sprintf("%s:%s", repo, tag)] = struct{}{}
-
-	return
-}
-
-func walkthroughMap(inputMap map[interface{}]interface{}, walkFunc func(map[interface{}]interface{})) {
-	walkFunc(inputMap)
-	for _, value := range inputMap {
-		if v, ok := value.(map[interface{}]interface{}); ok {
-			walkthroughMap(v, walkFunc)
-		}
-	}
-}
-
-func pickWindowsImages(versionToImages map[string]v3.RKESystemImages) map[string]v3.RKESystemImages {
-	ret := make(map[string]v3.RKESystemImages)
-	for version, images := range versionToImages {
-		ret[version] = v3.RKESystemImages{
-			Kubernetes:                images.Kubernetes,
-			WindowsPodInfraContainer:  images.WindowsPodInfraContainer,
-			NginxProxy:                images.NginxProxy,
-			KubernetesServicesSidecar: images.KubernetesServicesSidecar,
-			CertDownloader:            images.CertDownloader,
-		}
-	}
-	return ret
-}
-
 func getWindowsAgentImage() string {
 	tag, ok := os.LookupEnv("TAG")
 	if !ok {
@@ -349,16 +218,31 @@ const (
 	linuxLoadScript = `#!/bin/bash
 images="rancher-images.tar.gz"
 list="rancher-images.txt"
-
+windows_image_list=""
+windows_versions="1903"
 usage () {
     echo "USAGE: $0 [--images rancher-images.tar.gz] --registry my.registry.com:5000"
-    echo "  [-l|--image-list path] text file with list of images. 1 per line."
+    echo "  [-l|--image-list path] text file with list of images; one image per line."
     echo "  [-i|--images path] tar.gz generated by docker save."
     echo "  [-r|--registry registry:port] target private registry:port."
+    echo "  [--windows-image-list path] text file with list of images used in Windows. Windows image mirroring is skipped when this is empty"
+    echo "  [--windows-versions version] Comma separated Windows versions. e.g., \"1809,1903\". (Default \"1903\")"
     echo "  [-h|--help] Usage message"
 }
 
-POSITIONAL=()
+push_manifest () {
+    export DOCKER_CLI_EXPERIMENTAL=enabled
+    manifest_list=()
+    for i in "${arch_list[@]}"
+    do
+        manifest_list+=("$1-${i}")
+    done
+
+    echo "Preparing manifest $1, list[${arch_list[@]}]"
+    docker manifest create "$1" "${manifest_list[@]}" --amend
+    docker manifest push "$1" --purge
+}
+
 while [[ $# -gt 0 ]]; do
     key="$1"
     case $key in
@@ -377,6 +261,16 @@ while [[ $# -gt 0 ]]; do
         shift # past argument
         shift # past value
         ;;
+        --windows-image-list)
+        windows_image_list="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        --windows-versions)
+        windows_versions="$2"
+        shift # past argument
+        shift # past value
+        ;;
         -h|--help)
         help="true"
         shift
@@ -387,7 +281,6 @@ while [[ $# -gt 0 ]]; do
         ;;
     esac
 done
-
 if [[ -z $reg ]]; then
     usage
     exit 1
@@ -397,22 +290,71 @@ if [[ $help ]]; then
     exit 0
 fi
 
-set -e
-
 docker load --input ${images}
 
-while IFS= read -r i; do 
+linux_images=()
+while IFS= read -r i; do
     [ -z "${i}" ] && continue
-    echo "Tagging ${reg}/${i}"
+    linux_images+=("${i}");
+done < "${list}"
+
+arch_list=()
+if [[ -n "${windows_image_list}" ]]; then
+    IFS=',' read -r -a versions <<< "$windows_versions"
+    for version in "${versions[@]}"
+    do
+        arch_list+=("windows-${version}")
+    done
+
+    windows_images=()
+    while IFS= read -r i; do
+        [ -z "${i}" ] && continue
+        windows_images+=("${i}")
+    done < "${windows_image_list}"
+
+    # use manifest to publish images only used in Windows
+    for i in "${windows_images[@]}"; do
+        if [[ ! " ${linux_images[@]}" =~ " ${i}" ]]; then
+            case $i in
+            */*)
+                image_name="${reg}/${i}"
+                ;;
+            *)
+                image_name="${reg}/rancher/${i}"
+                ;;
+            esac
+            push_manifest "${image_name}"
+        fi
+    done
+fi
+
+
+arch_list+=("linux-amd64")
+for i in "${linux_images[@]}"; do
+    [ -z "${i}" ] && continue
+    arch_suffix=""
+    use_manifest=false
+    if [[ (-n "${windows_image_list}") && " ${windows_images[@]}" =~ " ${i}" ]]; then
+        # use manifest to publish images when it is used both in Linux and Windows
+        use_manifest=true
+        arch_suffix="-linux-amd64"
+    fi
     case $i in
     */*)
-        [ $(docker tag "${i}" "${reg}/${i}") ] && [ $(docker push "${reg}/${i}") ]
+        image_name="${reg}/${i}"
         ;;
     *)
-        [ $(docker tag "${i}" "${reg}/rancher/${i}") ] && [ $(docker push "${reg}/rancher/${i}") ]
+        image_name="${reg}/rancher/${i}"
         ;;
     esac
-done < "${list}"
+
+    docker tag "${i}" "${image_name}${arch_suffix}"
+    docker push "${image_name}${arch_suffix}"
+
+    if $use_manifest; then
+        push_manifest "${image_name}"
+    fi
+done
 `
 	linuxSaveScript = `#!/bin/bash
 list="rancher-images.txt"
@@ -420,7 +362,7 @@ images="rancher-images.tar.gz"
 
 usage () {
     echo "USAGE: $0 [--image-list rancher-images.txt] [--images rancher-images.tar.gz]"
-    echo "  [-l|--image-list path] text file with list of images. 1 per line."
+    echo "  [-l|--image-list path] text file with list of images; one image per line."
     echo "  [-i|--images path] tar.gz generated by docker save."
     echo "  [-h|--help] Usage message"
 }
@@ -455,16 +397,18 @@ if [[ $help ]]; then
     exit 0
 fi
 
-set -e
-
 pulled=""
-while IFS= read -r i; do 
+while IFS= read -r i; do
     [ -z "${i}" ] && continue
-    if [ $(docker pull --quiet "${i}") ]; then
+    if docker pull "${i}" > /dev/null 2>&1; then
         echo "Image pull success: ${i}"
         pulled="${pulled} ${i}"
     else
-        echo "Image pull failed: ${i}"
+        if docker inspect "${i}" > /dev/null 2>&1; then
+            pulled="${pulled} ${i}"		
+        else
+            echo "Image pull failed: ${i}"
+        fi
     fi
 done < "${list}"
 
@@ -472,48 +416,200 @@ echo "Creating ${images} with $(echo ${pulled} | wc -w | tr -d '[:space:]') imag
 docker save $(echo ${pulled}) | gzip --stdout > ${images}
 `
 	linuxMirrorScript = "#!/bin/sh\nset -e -x\n\n"
-	windowsLoadScript = `<#
-    .PARAMETER  registry
-    target private registry:port.
-    .PARAMETER image-list
-    text file with list of images. 1 per line. default is %s
-    .PARAMETER images
-    tar.gz generated by docker save. default is rancher-windows-images.tar.gz
-#>
-param(
-    [PARAMETER(Mandatory=$true,Position=0,HelpMessage="target private registry:port.")][string]$registry,
-    [string]${image-list}="%s",
-    [string]$images="rancher-windows-images.tar.gz"
-)
+	windowsLoadScript = `$ErrorActionPreference = 'Stop'
 
-$content=Get-Content -path ${image-list}
+$script_name = $MyInvocation.InvocationName
+$image_list = "rancher-windows-images.txt"
+$images = "rancher-windows-images.tar.gz"
+$os_release_id = $(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\' | Select-Object -ExpandProperty ReleaseId)
+$registry = $null
+$help = $false
 
-docker load --input ${images}
-
-foreach ($item in $content) {
-    docker tag $item $Registry/$item
-    docker push $Registry/$item
+function usage {
+    echo "USAGE: $script_name [--images rancher-windows-images.tar.gz] --registry my.registry.com:5000"
+    echo "  [-l|--image-list path] text file with list of images; one image per line."
+    echo "  [-i|--images path] tar.gz generated by docker save."
+    echo "  [-r|--registry registry:port] target private registry:port."
+    echo "  [-o|--os-release-id (1809|1903|...)] release id of OS, gets detected automatically if not passed."
+    echo "  [-h|--help] Usage message."
 }
+
+# parse arguments
+$vals = $null
+for ($i = $args.Length; $i -ge 0; $i--)
+{
+    $arg = $args[$i]
+    switch -regex ($arg)
+    {
+        '^(-i|--images)$' {
+            $images = ($vals | Select-Object -First 1)
+            $vals = $null
+        }
+        '^(-l|--image-list)$' {
+            $image_list = ($vals | Select-Object -First 1)
+            $vals = $null
+        }
+        '^(-r|--registry)$' {
+            $registry = ($vals | Select-Object -First 1)
+            $vals = $null
+        }
+        '^(-o|--os-release-id)$' {
+            $os_release_id = ($vals | Select-Object -First 1)
+            $vals = $null
+        }
+        '^(-h|--help)$' {
+            $help = $true
+            $vals = $null
+        }
+        default {
+            if ($vals) {
+                $vals = ,$arg + $vals
+            } else {
+                $vals = @($arg)
+            }
+        }
+    }
+}
+
+if ($help)
+{
+    usage
+    exit 0
+}
+
+if (-not $registry)
+{
+	echo "Registry address is required"
+    usage
+    exit 1
+}
+
+if (-not (Test-Path $images))
+{
+	echo "Could not find '$images'"
+    usage
+	exit 1
+}
+
+docker load --input $images
+if (-not $?)
+{
+	echo "Could not load '$images'"
+    exit 1
+}
+
+if (-not (Test-Path $image_list))
+{
+	exit 0
+}
+
+Get-Content -Force -Path $image_list | ForEach-Object {
+    if ($_) {
+        $fullname_image = ('{0}-windows-{1}' -f $_, $os_release_id)
+		echo "Tagging $registry/$fullname_image"
+	
+		switch -regex ($fullname_image)
+		{
+			'.+/.+' {
+				docker tag $fullname_image $registry/$fullname_image
+                if ($?) {
+                    docker push $registry/$fullname_image
+                }
+			}
+			default {
+				docker tag $fullname_image $registry/rancher/$fullname_image
+				if ($?) {
+                    docker push $registry/rancher/$fullname_image
+                }
+			}
+		}
+    }
+}
+
 `
-	windowsSaveScirpt = `#Requires -Version 5.0
-<#
-	.PARAMETER image-list
-	text file with list of images. 1 per line.
-	.PARAMETER images
-	tar.gz generated by docker save.
-#>
-param(
-	[string]${image-list}="rancher-windows-images.txt",
-	[string]$images="rancher-windows-images.tar.gz"
-)
+	windowsSaveScript = `$ErrorActionPreference = 'Stop'
 
-$content=Get-Content -path ${image-list}
+$script_name = $MyInvocation.InvocationName
+$image_list = "rancher-windows-images.txt"
+$images = "rancher-windows-images.tar.gz"
+$os_release_id = $(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\' | Select-Object -ExpandProperty ReleaseId)
+$help = $false
 
-foreach ($item in $content) {
-	docker pull $item
+function usage {
+    echo "USAGE: $script_name [--image-list rancher-windows-images.txt] [--images rancher-windows-images.tar.gz]"
+    echo "  [-l|--image-list path] text file with list of images; one image per line."
+    echo "  [-i|--images path] tar.gz generated by docker save."
+    echo "  [-o|--os-release-id (1809|1903|...)] release id of OS, gets detected automatically if not passed."
+    echo "  [-h|--help] Usage message."
 }
 
-docker save $($content) -o $images
+# parse arguments
+$vals = $null
+for ($i = $args.Length; $i -ge 0; $i--)
+{
+    $arg = $args[$i]
+    switch -regex ($arg)
+    {
+        '^(-l|--image-list)$' {
+            $image_list = ($vals | Select-Object -First 1)
+            $vals = $null
+        }
+        '^(-i|--images)$' {
+            $images = ($vals | Select-Object -First 1)
+            $vals = $null
+        }
+        '^(-o|--os-release-id)$' {
+            $os_release_id = ($vals | Select-Object -First 1)
+            $vals = $null
+        }
+        '^(-h|--help)$' {
+            $help = $true
+            $vals = $null
+        }
+        default {
+            if ($vals) {
+                $vals = ,$arg + $vals
+            } else {
+                $vals = @($arg)
+            }
+        }
+    }
+}
+
+if ($help)
+{
+    usage
+    exit 0
+}
+
+if (-not (Test-Path $image_list))
+{
+	echo "Could not find '$image_list' file"
+    usage
+	exit 1
+}
+
+$fullname_images = @()
+Get-Content -Force -Path $image_list | ForEach-Object {
+    if ($_) {
+        $fullname_image = ('{0}-windows-{1}' -f $_, $os_release_id)
+		echo "Pulling $fullname_image"
+		
+		docker pull $fullname_image
+		if ($?) {
+			$fullname_images += @($fullname_image)
+		}
+    }
+}
+
+if (-not $fullname_images)
+{
+    echo "Could not save empty images to host"
+    echo "Please verify the images of '$image_list' existing or not"
+	exit 1
+}
+docker save $($fullname_images) -o $images
+
 `
 	windowsMirrorScript = ``
 )

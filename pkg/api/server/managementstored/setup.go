@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/norman/store/crd"
 	"github.com/rancher/norman/store/proxy"
 	"github.com/rancher/norman/store/subtype"
+	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/api/customization/alert"
 	"github.com/rancher/rancher/pkg/api/customization/app"
@@ -26,6 +27,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/monitor"
 	"github.com/rancher/rancher/pkg/api/customization/multiclusterapp"
 	"github.com/rancher/rancher/pkg/api/customization/node"
+	"github.com/rancher/rancher/pkg/api/customization/nodepool"
 	"github.com/rancher/rancher/pkg/api/customization/nodetemplate"
 	"github.com/rancher/rancher/pkg/api/customization/pipeline"
 	"github.com/rancher/rancher/pkg/api/customization/podsecuritypolicytemplate"
@@ -36,11 +38,13 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/secret"
 	"github.com/rancher/rancher/pkg/api/customization/setting"
 	appStore "github.com/rancher/rancher/pkg/api/store/app"
+	catalogStore "github.com/rancher/rancher/pkg/api/store/catalog"
 	"github.com/rancher/rancher/pkg/api/store/cert"
 	"github.com/rancher/rancher/pkg/api/store/cluster"
 	clustertemplatestore "github.com/rancher/rancher/pkg/api/store/clustertemplate"
 	featStore "github.com/rancher/rancher/pkg/api/store/feature"
 	globaldnsAPIStore "github.com/rancher/rancher/pkg/api/store/globaldns"
+	grbstore "github.com/rancher/rancher/pkg/api/store/globalrolebindings"
 	nodeStore "github.com/rancher/rancher/pkg/api/store/node"
 	nodeTemplateStore "github.com/rancher/rancher/pkg/api/store/nodetemplate"
 	"github.com/rancher/rancher/pkg/api/store/noopwatching"
@@ -53,6 +57,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/principals"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"
 	md "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
@@ -162,6 +167,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	Feature(schemas)
 	Preference(schemas, apiContext)
 	ClusterRegistrationTokens(schemas)
+	Tokens(ctx, schemas, apiContext)
 	NodeTemplates(schemas, apiContext)
 	LoggingTypes(schemas, apiContext, clusterManager, k8sProxy)
 	Alert(schemas, apiContext)
@@ -170,6 +176,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	ProjectRoleTemplateBinding(schemas, apiContext)
 	TemplateContent(schemas)
 	PodSecurityPolicyTemplate(schemas, apiContext)
+	GlobalRoleBindings(schemas, apiContext)
 	RoleTemplate(schemas, apiContext)
 	MultiClusterApps(schemas, apiContext)
 	GlobalDNSs(schemas, apiContext, localClusterEnabled)
@@ -265,13 +272,8 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 func Templates(ctx context.Context, schemas *types.Schemas, managementContext *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.TemplateType)
 	schema.Scope = types.NamespaceScope
-	schema.Store = proxy.NewProxyStore(ctx, managementContext.ClientGetter,
-		config.ManagementStorageContext,
-		[]string{"apis"},
-		"management.cattle.io",
-		"v3",
-		"CatalogTemplate",
-		"catalogtemplates")
+	schema.Store = catalog.GetTemplateStore(ctx, managementContext)
+
 	wrapper := catalog.TemplateWrapper{
 		CatalogLister:                managementContext.Management.Catalogs("").Controller().Lister(),
 		ClusterCatalogLister:         managementContext.Management.ClusterCatalogs("").Controller().Lister(),
@@ -326,6 +328,7 @@ func Catalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
 	schema.CollectionFormatter = catalog.CollectionFormatter
 	schema.LinkHandler = handler.ExportYamlHandler
 	schema.Validator = catalog.Validator
+	schema.Store = catalogStore.Wrap(schema.Store)
 }
 
 func ProjectCatalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
@@ -337,6 +340,7 @@ func ProjectCatalog(schemas *types.Schemas, managementContext *config.ScaledCont
 	schema.ActionHandler = handler.RefreshProjectCatalogActionHandler
 	schema.CollectionFormatter = catalog.CollectionFormatter
 	schema.Validator = catalog.Validator
+	schema.Store = catalogStore.Wrap(schema.Store)
 }
 
 func ClusterCatalog(schemas *types.Schemas, managementContext *config.ScaledContext) {
@@ -348,6 +352,7 @@ func ClusterCatalog(schemas *types.Schemas, managementContext *config.ScaledCont
 	schema.ActionHandler = handler.RefreshClusterCatalogActionHandler
 	schema.CollectionFormatter = catalog.CollectionFormatter
 	schema.Validator = catalog.Validator
+	schema.Store = catalogStore.Wrap(schema.Store)
 }
 
 func ClusterRegistrationTokens(schemas *types.Schemas) {
@@ -356,6 +361,16 @@ func ClusterRegistrationTokens(schemas *types.Schemas) {
 		Store: schema.Store,
 	}
 	schema.Formatter = clusterregistrationtokens.Formatter
+}
+
+func Tokens(ctx context.Context, schemas *types.Schemas, mgmt *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.TokenType)
+	manager := tokens.NewManager(ctx, mgmt)
+
+	schema.Store = &transform.Store{
+		Store:             schema.Store,
+		StreamTransformer: manager.TokenStreamTransformer,
+	}
 }
 
 func NodeTemplates(schemas *types.Schemas, management *config.ScaledContext) {
@@ -453,6 +468,13 @@ func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
 	schema.LinkHandler = machineHandler.LinkHandler
 	actionWrapper := node.ActionWrapper{}
 	schema.ActionHandler = actionWrapper.ActionHandler
+
+	schema = schemas.Schema(&managementschema.Version, client.NodePoolType)
+	ntl := management.Management.NodeTemplates("").Controller().Lister()
+	f := &nodepool.Formatter{
+		NodeTemplateLister: ntl,
+	}
+	schema.Formatter = f.Formatter
 	return nil
 }
 
@@ -489,6 +511,7 @@ func Setting(schemas *types.Schemas) {
 func Feature(schemas *types.Schemas) {
 	schema := schemas.Schema(&managementschema.Version, client.FeatureType)
 	schema.Validator = feature.Validator
+	schema.Formatter = feature.Formatter
 	schema.Store = featStore.New(schema.Store)
 }
 
@@ -638,6 +661,11 @@ func ProjectRoleTemplateBinding(schemas *types.Schemas, management *config.Scale
 	schema.Validator = roletemplatebinding.NewPRTBValidator(management)
 }
 
+func GlobalRoleBindings(schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.GlobalRoleBindingType)
+	schema.Store = grbstore.Wrap(schema.Store, management.Management.GlobalRoleBindings("").Controller().Lister())
+}
+
 func RoleTemplate(schemas *types.Schemas, management *config.ScaledContext) {
 	rt := roletemplate.Wrapper{
 		RoleTemplateLister: management.Management.RoleTemplates("").Controller().Lister(),
@@ -666,6 +694,7 @@ func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 	lh := kontainerdriver.ListHandler{
 		SysImageLister: management.Management.RKEK8sSystemImages("").Controller().Lister(),
 		SysImages:      management.Management.RKEK8sSystemImages(""),
+		CatalogLister:  management.Management.Catalogs("").Controller().Lister(),
 	}
 	schema.ActionHandler = handler.ActionHandler
 	schema.CollectionFormatter = kontainerdriver.CollectionFormatter

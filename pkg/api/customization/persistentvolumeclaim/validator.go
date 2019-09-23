@@ -22,6 +22,10 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 	}
 
 	storageClassID, _ := data["storageClassId"].(string)
+	if storageClassID == "" {
+		return nil
+	}
+
 	storageClass, err := c.Storage.StorageClasses("").Get(storageClassID, v1.GetOptions{})
 	if err != nil {
 		return err

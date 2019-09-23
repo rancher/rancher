@@ -13,6 +13,7 @@ const (
 	NodePoolFieldCreatorID               = "creatorId"
 	NodePoolFieldDeleteNotReadyAfterSecs = "deleteNotReadyAfterSecs"
 	NodePoolFieldDisplayName             = "displayName"
+	NodePoolFieldDriver                  = "driver"
 	NodePoolFieldEtcd                    = "etcd"
 	NodePoolFieldHostnamePrefix          = "hostnamePrefix"
 	NodePoolFieldLabels                  = "labels"
@@ -42,6 +43,7 @@ type NodePool struct {
 	CreatorID               string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	DeleteNotReadyAfterSecs int64             `json:"deleteNotReadyAfterSecs,omitempty" yaml:"deleteNotReadyAfterSecs,omitempty"`
 	DisplayName             string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
+	Driver                  string            `json:"driver,omitempty" yaml:"driver,omitempty"`
 	Etcd                    bool              `json:"etcd,omitempty" yaml:"etcd,omitempty"`
 	HostnamePrefix          string            `json:"hostnamePrefix,omitempty" yaml:"hostnamePrefix,omitempty"`
 	Labels                  map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`

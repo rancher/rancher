@@ -10,17 +10,20 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
+	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/librke"
 	"github.com/rancher/rancher/pkg/rkeworker"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
+	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/tunnelserver"
 	rkehosts "github.com/rancher/rke/hosts"
 	rkeservices "github.com/rancher/rke/services"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
 )
 
 var (
@@ -33,6 +36,8 @@ type RKENodeConfigServer struct {
 	systemAccountManager *systemaccount.Manager
 	serviceOptionsLister v3.RKEK8sServiceOptionLister
 	serviceOptions       v3.RKEK8sServiceOptionInterface
+	sysImagesLister      v3.RKEK8sSystemImageLister
+	sysImages            v3.RKEK8sSystemImageInterface
 }
 
 func Handler(auth *tunnelserver.Authorizer, scaledContext *config.ScaledContext) http.Handler {
@@ -42,6 +47,8 @@ func Handler(auth *tunnelserver.Authorizer, scaledContext *config.ScaledContext)
 		systemAccountManager: systemaccount.NewManagerFromScale(scaledContext),
 		serviceOptionsLister: scaledContext.Management.RKEK8sServiceOptions("").Controller().Lister(),
 		serviceOptions:       scaledContext.Management.RKEK8sServiceOptions(""),
+		sysImagesLister:      scaledContext.Management.RKEK8sSystemImages("").Controller().Lister(),
+		sysImages:            scaledContext.Management.RKEK8sSystemImages(""),
 	}
 }
 
@@ -129,8 +136,13 @@ func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.C
 	if err != nil {
 		return nil, err
 	}
+	hostAddress := node.Status.NodeConfig.Address
+	svcOptions, err := n.getServiceOptions(cluster.Spec.RancherKubernetesEngineConfig.Version, infos[hostAddress].OSType)
+	if err != nil {
+		return nil, err
+	}
 
-	plan, err := librke.New().GeneratePlan(ctx, rkeConfig, infos)
+	plan, err := librke.New().GeneratePlan(ctx, rkeConfig, infos, svcOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -146,6 +158,7 @@ func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.C
 		if tempNode.Address == node.Status.NodeConfig.Address {
 			b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, rkehosts.B2DOS)
 			nc.Processes = augmentProcesses(token, tempNode.Processes, false, b2d)
+			nc.Processes = appendTaintsToKubeletArgs(nc.Processes, node.Status.NodeConfig.Taints)
 			return nc, nil
 		}
 	}
@@ -182,7 +195,11 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 	rkeConfig := spec.RancherKubernetesEngineConfig
 	filterHostForSpec(rkeConfig, node)
 	logrus.Debugf("The number of nodes sent to the plan: %v", len(rkeConfig.Nodes))
-	plan, err := librke.New().GeneratePlan(ctx, rkeConfig, infos)
+	svcOptions, err := n.getServiceOptions(cluster.Spec.RancherKubernetesEngineConfig.Version, hostDockerInfo.OSType)
+	if err != nil {
+		return nil, err
+	}
+	plan, err := librke.New().GeneratePlan(ctx, rkeConfig, infos, svcOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -203,6 +220,7 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 				b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, rkehosts.B2DOS)
 				nc.Processes = augmentProcesses(token, tempNode.Processes, true, b2d)
 			}
+			nc.Processes = appendTaintsToKubeletArgs(nc.Processes, node.Status.NodeConfig.Taints)
 			nc.Files = tempNode.Files
 			return nc, nil
 		}
@@ -290,4 +308,53 @@ func enhanceWindowsProcesses(processes map[string]v3.Process) map[string]v3.Proc
 	}
 
 	return newProcesses
+}
+
+func appendTaintsToKubeletArgs(processes map[string]v3.Process, nodeConfigTaints []v3.RKETaint) map[string]v3.Process {
+	if kubelet, ok := processes["kubelet"]; ok && len(nodeConfigTaints) != 0 {
+		initialTaints := taints.GetTaintsFromStrings(taints.GetStringsFromRKETaint(nodeConfigTaints))
+		var currentTaints []v1.Taint
+		foundArgs := ""
+		for i, arg := range kubelet.Command {
+			if strings.HasPrefix(arg, "--register-with-taints=") {
+				foundArgs = strings.TrimPrefix(arg, "--register-with-taints=")
+				kubelet.Command = append(kubelet.Command[:i], kubelet.Command[i+1:]...)
+				break
+			}
+		}
+		if foundArgs != "" {
+			currentTaints = taints.GetTaintsFromStrings(strings.Split(foundArgs, ","))
+		}
+
+		// The initial taints are from node pool and node template. They should override the taints from kubelet args.
+		mergedTaints := taints.MergeTaints(currentTaints, initialTaints)
+
+		taintArgs := fmt.Sprintf("--register-with-taints=%s", strings.Join(taints.GetStringsFromTaint(mergedTaints), ","))
+		kubelet.Command = append(kubelet.Command, taintArgs)
+		processes["kubelet"] = kubelet
+	}
+	return processes
+}
+
+func (n *RKENodeConfigServer) getServiceOptions(k8sVersion string, osType string) (map[string]interface{}, error) {
+	data := map[string]interface{}{}
+	svcOptions, err := kd.GetRKEK8sServiceOptions(k8sVersion, n.serviceOptionsLister, n.serviceOptions, n.sysImagesLister, n.sysImages, kd.Linux)
+	if err != nil {
+		logrus.Errorf("getK8sServiceOptions: k8sVersion %s [%v]", k8sVersion, err)
+		return data, err
+	}
+	if svcOptions != nil {
+		data["k8s-service-options"] = svcOptions
+	}
+	if osType == "windows" {
+		svcOptionsWindows, err := kd.GetRKEK8sServiceOptions(k8sVersion, n.serviceOptionsLister, n.serviceOptions, n.sysImagesLister, n.sysImages, kd.Windows)
+		if err != nil {
+			logrus.Errorf("getK8sServiceOptionsWindows: k8sVersion %s [%v]", k8sVersion, err)
+			return data, err
+		}
+		if svcOptionsWindows != nil {
+			data["k8s-windows-service-options"] = svcOptionsWindows
+		}
+	}
+	return data, nil
 }

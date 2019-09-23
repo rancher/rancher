@@ -24,6 +24,7 @@ import (
 const (
 	RKEContainerNameLabel  = "io.rancher.rke.container.name"
 	CattleProcessNameLabel = "io.cattle.process.name"
+	ShareMntContainerName  = "share-mnt"
 )
 
 type NodeConfig struct {
@@ -42,7 +43,7 @@ func runProcess(ctx context.Context, name string, p v3.Process, start, forceRest
 
 	args := filters.NewArgs()
 	args.Add("label", RKEContainerNameLabel+"="+name)
-	// to handle upgrades of old container
+	// to handle upgrades of containers created in v2.0.x
 	oldArgs := filters.NewArgs()
 	oldArgs.Add("label", CattleProcessNameLabel+"="+name)
 
@@ -82,7 +83,6 @@ func runProcess(ctx context.Context, name string, p v3.Process, start, forceRest
 			}
 		}
 	}
-
 	for i := 1; i < len(matchedContainers); i++ {
 		if err := remove(ctx, c, matchedContainers[i].ID); err != nil {
 			return err
@@ -90,17 +90,30 @@ func runProcess(ctx context.Context, name string, p v3.Process, start, forceRest
 	}
 
 	if len(matchedContainers) > 0 {
-		if strings.Contains(name, "share-mnt") {
-			inspect, err := c.ContainerInspect(ctx, matchedContainers[0].ID)
-			if err != nil {
-				return err
-			}
+		inspect, err := c.ContainerInspect(ctx, matchedContainers[0].ID)
+		if err != nil {
+			return err
+		}
+
+		// share-mnt does not need to be in running state/does not have to be restarted if it ran successfully
+		if strings.Contains(name, ShareMntContainerName) {
 			if inspect.State != nil && inspect.State.Status == "exited" && inspect.State.ExitCode == 0 {
 				return nil
 			}
 		}
+		// ignore service-sidekick if it is present (other containers just use the volumes)
+		if strings.Contains(name, services.SidekickContainerName) {
+			return nil
+		}
+
+		// if container is running, no need to start and run log linker
+		if inspect.State != nil && inspect.State.Status == "running" {
+			return nil
+		}
+
 		c.ContainerStart(ctx, matchedContainers[0].ID, types.ContainerStartOptions{})
-		if !strings.Contains(name, "share-mnt") {
+		// Both ShareMntContainerName & services.SidekickContainerName are caught before here, we just never need to run it for those containers
+		if !strings.Contains(name, ShareMntContainerName) && !strings.Contains(name, services.SidekickContainerName) {
 			runLogLinker(ctx, c, name, p)
 		}
 		return nil
@@ -134,7 +147,7 @@ func runProcess(ctx context.Context, name string, p v3.Process, start, forceRest
 		if err := c.ContainerStart(ctx, newContainer.ID, types.ContainerStartOptions{}); err != nil {
 			return err
 		}
-		if !strings.Contains(name, "share-mnt") {
+		if !strings.Contains(name, ShareMntContainerName) {
 			return runLogLinker(ctx, c, name, p)
 		}
 		return nil
@@ -289,7 +302,7 @@ func changed(ctx context.Context, c *client.Client, expectedProcess v3.Process, 
 		left := reflect.ValueOf(actualProcess).Field(i).Interface()
 		right := reflect.ValueOf(expectedProcess).Field(i).Interface()
 		if !reflect.DeepEqual(left, right) {
-			logrus.Infof("For process %s, %s has changed from %v to %v", expectedProcess.Name, f.Name, right, left)
+			logrus.Infof("For process %s, %s has changed from %v to %v", expectedProcess.Name, f.Name, left, right)
 			changed = true
 		}
 	}

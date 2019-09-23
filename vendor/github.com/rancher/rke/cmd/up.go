@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/dind"
 	"github.com/rancher/rke/hosts"
@@ -86,10 +88,10 @@ func ClusterUp(ctx context.Context, dialersOptions hosts.DialersOptions, flags c
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
-	svcOptions, _ := data["k8s-service-options"].(*v3.KubernetesServicesOptions)
+	svcOptionsData := cluster.GetServiceOptionData(data)
 	// check if rotate certificates is triggered
 	if kubeCluster.RancherKubernetesEngineConfig.RotateCertificates != nil {
-		return rebuildClusterWithRotatedCertificates(ctx, dialersOptions, flags, svcOptions)
+		return rebuildClusterWithRotatedCertificates(ctx, dialersOptions, flags, svcOptionsData)
 	}
 
 	log.Infof(ctx, "Building Kubernetes cluster")
@@ -130,7 +132,7 @@ func ClusterUp(ctx context.Context, dialersOptions hosts.DialersOptions, flags c
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
 
-	err = cluster.ReconcileCluster(ctx, kubeCluster, currentCluster, flags, svcOptions)
+	err = cluster.ReconcileCluster(ctx, kubeCluster, currentCluster, flags, svcOptionsData)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
@@ -143,7 +145,7 @@ func ClusterUp(ctx context.Context, dialersOptions hosts.DialersOptions, flags c
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
 
-	err = kubeCluster.DeployControlPlane(ctx, svcOptions)
+	err = kubeCluster.DeployControlPlane(ctx, svcOptionsData)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
@@ -164,7 +166,7 @@ func ClusterUp(ctx context.Context, dialersOptions hosts.DialersOptions, flags c
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
 
-	err = kubeCluster.DeployWorkerPlane(ctx, svcOptions)
+	err = kubeCluster.DeployWorkerPlane(ctx, svcOptionsData)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
@@ -205,6 +207,7 @@ func checkAllIncluded(cluster *cluster.Cluster) error {
 }
 
 func clusterUpFromCli(ctx *cli.Context) error {
+	logrus.Infof("Running RKE version: %v", ctx.App.Version)
 	if ctx.Bool("local") {
 		return clusterUpLocal(ctx)
 	}

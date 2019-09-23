@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
@@ -71,6 +73,7 @@ func CertificateCommand() cli.Command {
 }
 
 func rotateRKECertificatesFromCli(ctx *cli.Context) error {
+	logrus.Infof("Running RKE version: %v", ctx.App.Version)
 	k8sComponents := ctx.StringSlice("service")
 	rotateCACerts := ctx.Bool("rotate-ca")
 	clusterFile, filePath, err := resolveClusterFile(ctx)
@@ -101,6 +104,7 @@ func rotateRKECertificatesFromCli(ctx *cli.Context) error {
 }
 
 func generateCSRFromCli(ctx *cli.Context) error {
+	logrus.Infof("Running RKE version: %v", ctx.App.Version)
 	clusterFile, filePath, err := resolveClusterFile(ctx)
 	if err != nil {
 		return fmt.Errorf("Failed to resolve cluster file: %v", err)
@@ -128,7 +132,7 @@ func showRKECertificatesFromCli(ctx *cli.Context) error {
 
 func rebuildClusterWithRotatedCertificates(ctx context.Context,
 	dialersOptions hosts.DialersOptions,
-	flags cluster.ExternalFlags, svcOptions *v3.KubernetesServicesOptions) (string, string, string, string, map[string]pki.CertificatePKI, error) {
+	flags cluster.ExternalFlags, svcOptionData map[string]*v3.KubernetesServicesOptions) (string, string, string, string, map[string]pki.CertificatePKI, error) {
 	var APIURL, caCrt, clientCert, clientKey string
 	log.Infof(ctx, "Rebuilding Kubernetes cluster with rotated certificates")
 	clusterState, err := cluster.ReadStateFile(ctx, cluster.GetStateFilePath(flags.ClusterFilePath, flags.ConfigDir))
@@ -181,7 +185,7 @@ func rebuildClusterWithRotatedCertificates(ctx context.Context,
 	}
 	if isLegacyKubeAPI {
 		log.Infof(ctx, "[controlplane] Redeploying controlplane to update kubeapi parameters")
-		if err := kubeCluster.DeployControlPlane(ctx, svcOptions); err != nil {
+		if err := kubeCluster.DeployControlPlane(ctx, svcOptionData); err != nil {
 			return APIURL, caCrt, clientCert, clientKey, nil, err
 		}
 	}

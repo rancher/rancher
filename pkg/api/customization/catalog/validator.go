@@ -28,6 +28,7 @@ func Validator(request *types.APIContext, schema *types.Schema, data map[string]
 	} else if request.Method == http.MethodPost {
 		return httperror.NewAPIError(httperror.MissingRequired, "Catalog URL not specified")
 	}
+
 	return nil
 }
 

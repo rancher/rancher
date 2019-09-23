@@ -3,13 +3,26 @@ package alert
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+
 	"github.com/rancher/rancher/pkg/controllers/user/alert/common"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
+	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+)
+
+const (
+	nodeAlertGroupName = "node-alert"
+)
+
+var (
+	windowNodeLabel = labels.Set(map[string]string{"kubernetes.io/os": "windows"}).AsSelector()
 )
 
 func initClusterPreCanAlerts(clusterAlertGroups v3.ClusterAlertGroupInterface, clusterAlertRules v3.ClusterAlertRuleInterface, clusterName string) {
@@ -125,6 +138,7 @@ func initClusterPreCanAlerts(clusterAlertGroups v3.ClusterAlertGroupInterface, c
 		logrus.Warnf("Failed to create precan rules for %s: %v", name, err)
 	}
 
+	inherited := false
 	name = "etcd-system-service"
 	rule = &v3.ClusterAlertRule{
 		ObjectMeta: metav1.ObjectMeta{
@@ -136,7 +150,12 @@ func initClusterPreCanAlerts(clusterAlertGroups v3.ClusterAlertGroupInterface, c
 			CommonRuleField: v3.CommonRuleField{
 				Severity:    SeverityCritical,
 				DisplayName: "Etcd is unavailable",
-				TimingField: defaultTimingField,
+				Inherited:   &inherited,
+				TimingField: v3.TimingField{
+					GroupWaitSeconds:      600,
+					GroupIntervalSeconds:  180,
+					RepeatIntervalSeconds: 3600,
+				},
 			},
 			SystemServiceRule: &v3.SystemServiceRule{
 				Condition: "etcd",
@@ -225,7 +244,7 @@ func initClusterPreCanAlerts(clusterAlertGroups v3.ClusterAlertGroupInterface, c
 		logrus.Warnf("Failed to create precan rules for %s: %v", name, err)
 	}
 
-	name = "node-alert"
+	name = nodeAlertGroupName
 	group = &v3.ClusterAlertGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -261,11 +280,10 @@ func initClusterPreCanAlerts(clusterAlertGroups v3.ClusterAlertGroupInterface, c
 				TimingField: defaultTimingField,
 			},
 			MetricRule: &v3.MetricRule{
-				Description:    "Device on node is running full within the next 24 hours",
-				Expression:     `predict_linear(node_filesystem_files_free{mountpoint!~"^/etc/(?:resolv.conf|hosts|hostname)$"}[6h], 3600 * 24)`,
-				Comparison:     manager.ComparisonLessOrEqual,
-				Duration:       "10m",
-				ThresholdValue: 1,
+				Description: "Device on node is running full within the next 24 hours",
+				Expression:  `predict_linear(node_filesystem_free_bytes{mountpoint!~"^/etc/(?:resolv.conf|hosts|hostname)$"}[6h], 3600 * 24) < 0`,
+				Comparison:  manager.ComparisonHasValue,
+				Duration:    "10m",
 			},
 		},
 		Status: v3.AlertStatus{
@@ -292,7 +310,7 @@ func initClusterPreCanAlerts(clusterAlertGroups v3.ClusterAlertGroupInterface, c
 			},
 			MetricRule: &v3.MetricRule{
 				Description:    "Node memory utilization is over 80%",
-				Expression:     `1 - sum(node_memory_MemAvailable_bytes) by (instance) / sum(node_memory_MemTotal_bytes) by (instance)`,
+				Expression:     `(1 - sum(node_memory_MemAvailable_bytes) by (instance) / sum(node_memory_MemTotal_bytes) by (instance)) * 100`,
 				Comparison:     manager.ComparisonGreaterOrEqual,
 				Duration:       "3m",
 				ThresholdValue: 80,
@@ -322,7 +340,7 @@ func initClusterPreCanAlerts(clusterAlertGroups v3.ClusterAlertGroupInterface, c
 			},
 			MetricRule: &v3.MetricRule{
 				Description:    "The cpu load is higher than 100",
-				Expression:     `sum(node_load1) by (instance) / count(node_cpu_seconds_total{mode="system"}) by (instance) * 100`,
+				Expression:     `sum(node_load1) by (node)  / sum(machine_cpu_cores) by (node) * 100`,
 				Comparison:     manager.ComparisonGreaterThan,
 				Duration:       "3m",
 				ThresholdValue: 100,
@@ -497,4 +515,66 @@ func getCommonRuleField(groupID, displayName, severity string) v3.CommonRuleFiel
 		Severity:    severity,
 		TimingField: defaultTimingField,
 	}
+}
+
+type windowsNodeSyner struct {
+	clusterName       string
+	clusterAlertRules v3.ClusterAlertRuleInterface
+	nodeLister        v1.NodeLister
+}
+
+func (l *windowsNodeSyner) Sync(key string, obj *corev1.Node) (runtime.Object, error) {
+	windowsNodes, err := l.nodeLister.List(metav1.NamespaceAll, windowNodeLabel)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list nodes")
+	}
+
+	if len(windowsNodes) != 0 {
+		return obj, l.initClusterWindowsAlert()
+	}
+
+	return obj, nil
+}
+
+func (l *windowsNodeSyner) initClusterWindowsAlert() error {
+	groupName := common.GetGroupID(l.clusterName, nodeAlertGroupName)
+	name := "windows-node-disk-running-full"
+
+	exsitWindowsAlert, err := l.clusterAlertRules.Controller().Lister().Get(l.clusterName, name)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return errors.Wrapf(err, "Failed to get alert rules %s", name)
+	}
+
+	if exsitWindowsAlert != nil {
+		return nil
+	}
+
+	rule := &v3.ClusterAlertRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v3.ClusterAlertRuleSpec{
+			ClusterName: l.clusterName,
+			GroupName:   groupName,
+			CommonRuleField: v3.CommonRuleField{
+				Severity:    SeverityCritical,
+				DisplayName: "Windows node disk is running full within 24 hours",
+				TimingField: defaultTimingField,
+			},
+			MetricRule: &v3.MetricRule{
+				Description: "Device on node is running full within the next 24 hours",
+				Expression:  `predict_linear(node_filesystem_free_bytes{job=~"expose-node-metrics-windows", device!~"HarddiskVolume.+"}[6h], 3600 * 24) < 0`,
+				Comparison:  manager.ComparisonHasValue,
+				Duration:    "10m",
+			},
+		},
+		Status: v3.AlertStatus{
+			AlertState: "active",
+		},
+	}
+
+	if _, err := l.clusterAlertRules.Create(rule); err != nil && !apierrors.IsAlreadyExists(err) {
+		return errors.Wrapf(err, "Failed to create precan rules %s", name)
+	}
+	return nil
 }

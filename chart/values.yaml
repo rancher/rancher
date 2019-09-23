@@ -101,3 +101,6 @@ resources: {}
 tls: ingress
 
 systemDefaultRegistry: ""
+
+# Set to use the packaged system charts
+useBundledSystemChart: false

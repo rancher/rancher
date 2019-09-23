@@ -16,6 +16,7 @@ import (
 	mgmtSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	managementv3 "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 const (
@@ -24,21 +25,23 @@ const (
 
 func WrapStore(store types.Store, mgmt *config.ScaledContext) types.Store {
 	storeWrapped := &Store{
-		Store:     store,
-		users:     mgmt.Management.Users(""),
-		grbLister: mgmt.Management.GlobalRoleBindings("").Controller().Lister(),
-		grLister:  mgmt.Management.GlobalRoles("").Controller().Lister(),
-		ctLister:  mgmt.Management.ClusterTemplates("").Controller().Lister(),
+		Store:         store,
+		users:         mgmt.Management.Users(""),
+		grbLister:     mgmt.Management.GlobalRoleBindings("").Controller().Lister(),
+		grLister:      mgmt.Management.GlobalRoles("").Controller().Lister(),
+		ctLister:      mgmt.Management.ClusterTemplates("").Controller().Lister(),
+		clusterLister: mgmt.Management.Clusters("").Controller().Lister(),
 	}
 	return storeWrapped
 }
 
 type Store struct {
 	types.Store
-	users     v3.UserInterface
-	grbLister v3.GlobalRoleBindingLister
-	grLister  v3.GlobalRoleLister
-	ctLister  v3.ClusterTemplateLister
+	users         v3.UserInterface
+	grbLister     v3.GlobalRoleBindingLister
+	grLister      v3.GlobalRoleLister
+	ctLister      v3.ClusterTemplateLister
+	clusterLister v3.ClusterLister
 }
 
 func (p *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
@@ -90,12 +93,12 @@ func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 			return nil, err
 		}
 
-		isUsed, err := isTemplateInUse(apiContext, id)
+		isUsed, err := p.isTemplateInUse(apiContext, id)
 		if err != nil {
 			return nil, err
 		}
 		if isUsed {
-			return nil, httperror.NewAPIError(httperror.PermissionDenied, fmt.Sprintf("Cannot update the %v until Clusters are referring it", apiContext.Type))
+			return nil, httperror.NewAPIError(httperror.InvalidAction, fmt.Sprintf("Cannot update the %v until Clusters are referring it", apiContext.Type))
 		}
 	}
 
@@ -114,12 +117,12 @@ func (p *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 
 func (p *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
 
-	isUsed, err := isTemplateInUse(apiContext, id)
+	isUsed, err := p.isTemplateInUse(apiContext, id)
 	if err != nil {
 		return nil, err
 	}
 	if isUsed {
-		return nil, httperror.NewAPIError(httperror.PermissionDenied, fmt.Sprintf("Cannot delete the %v until Clusters referring it are removed", apiContext.Type))
+		return nil, httperror.NewAPIError(httperror.InvalidAction, fmt.Sprintf("Cannot delete the %v until Clusters referring it are removed", apiContext.Type))
 	}
 
 	//check if template.DefaultRevisionId is set, if yes error out if the revision is being deleted.
@@ -178,29 +181,29 @@ func setLabelsAndOwnerRef(apiContext *types.APIContext, data map[string]interfac
 	return nil
 }
 
-func isTemplateInUse(apiContext *types.APIContext, id string) (bool, error) {
+func (p *Store) isTemplateInUse(apiContext *types.APIContext, id string) (bool, error) {
 
 	/*check if there are any clusters referencing this template or templateRevision */
-
-	var clusters []managementv3.Cluster
+	var clusters []*v3.Cluster
 	var field string
 
-	switch apiContext.Type {
-	case managementv3.ClusterTemplateType:
-		field = managementv3.ClusterSpecFieldClusterTemplateID
-	case managementv3.ClusterTemplateRevisionType:
-		field = managementv3.ClusterSpecFieldClusterTemplateRevisionID
-	}
-
-	conditions := []*types.QueryCondition{
-		types.NewConditionFromString(field, types.ModifierEQ, []string{id}...),
-	}
-
-	if err := access.List(apiContext, apiContext.Version, managementv3.ClusterType, &types.QueryOptions{Conditions: conditions}, &clusters); err != nil {
+	clusters, err := p.clusterLister.List("", labels.NewSelector())
+	if err != nil {
 		return false, err
 	}
 
-	if len(clusters) > 0 {
+	for _, cluster := range clusters {
+		switch apiContext.Type {
+		case managementv3.ClusterTemplateType:
+			field = cluster.Spec.ClusterTemplateName
+		case managementv3.ClusterTemplateRevisionType:
+			field = cluster.Spec.ClusterTemplateRevisionName
+		default:
+			break
+		}
+		if field != id {
+			continue
+		}
 		return true, nil
 	}
 

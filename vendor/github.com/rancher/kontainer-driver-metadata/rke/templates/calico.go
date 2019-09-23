@@ -183,6 +183,12 @@ spec:
                   values:
                     - windows
       hostNetwork: true
+{{if .NodeSelector}}
+      nodeSelector:
+      {{ range $k, $v := .NodeSelector }}
+        {{ $k }}: "{{ $v }}"
+      {{ end }}
+{{end}}
       tolerations:
         # Make sure calico/node gets scheduled on all nodes.
         - effect: NoSchedule
@@ -743,6 +749,12 @@ spec:
                   values:
                     - windows
       hostNetwork: true
+{{if .NodeSelector}}
+      nodeSelector:
+      {{ range $k, $v := .NodeSelector }}
+        {{ $k }}: "{{ $v }}"
+      {{ end }}
+{{end}}
       tolerations:
         # Make sure calico-node gets scheduled on all nodes.
         - effect: NoSchedule
@@ -1591,6 +1603,9 @@ spec:
     spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
+      {{ range $k, $v := .NodeSelector }}
+        {{ $k }}: "{{ $v }}"
+      {{ end }}
       hostNetwork: true
       tolerations:
         # Make sure calico-node gets scheduled on all nodes.
@@ -2350,6 +2365,9 @@ spec:
     spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
+      {{ range $k, $v := .NodeSelector }}
+        {{ $k }}: "{{ $v }}"
+      {{ end }}
       hostNetwork: true
       tolerations:
         # Make sure calico-node gets scheduled on all nodes.

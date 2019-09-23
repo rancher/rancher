@@ -7,12 +7,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	v12 "github.com/rancher/types/apis/core/v1"
-	"github.com/rancher/types/apis/extensions/v1beta1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/apis/policy/v1beta1"
 	v1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
-	v1beta13 "k8s.io/api/extensions/v1beta1"
+	v1beta13 "k8s.io/api/policy/v1beta1"
 	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,11 +37,11 @@ func RegisterCluster(ctx context.Context, context *config.UserContext) {
 
 	m := &clusterManager{
 		clusterName: context.ClusterName,
-		policies:    context.Extensions.PodSecurityPolicies(""),
+		policies:    context.Policy.PodSecurityPolicies(""),
 
 		clusters:                  context.Management.Management.Clusters(""),
 		templateLister:            context.Management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
-		policyLister:              context.Extensions.PodSecurityPolicies("").Controller().Lister(),
+		policyLister:              context.Policy.PodSecurityPolicies("").Controller().Lister(),
 		clusterRoleLister:         context.RBAC.ClusterRoles("").Controller().Lister(),
 		clusterRoles:              context.RBAC.ClusterRoles(""),
 		serviceAccountLister:      context.Core.ServiceAccounts("").Controller().Lister(),

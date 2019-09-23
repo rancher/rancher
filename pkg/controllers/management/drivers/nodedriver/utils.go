@@ -14,26 +14,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	// secretFields lists all the hard-coded fields that should hidden as password
-	secretFields = map[string]struct{}{
-		// ec2
-		"secretKey": {},
-		// digitalOcean
-		"accessToken": {},
-		// azure
-		"clientSecret": {},
-		// packet, rackspace, softlayer
-		"apiKey": {},
-		// vSphere, openstack, vmwarevcloudair
-		"password": {},
-		// exoscale
-		"apiSecretKey": {},
-		// otc
-		"accessKeySecret": {},
-	}
-)
-
 func FlagToField(flag cli.Flag) (string, v3.Field, error) {
 	field := v3.Field{
 		Create: true,
@@ -48,9 +28,6 @@ func FlagToField(flag cli.Flag) (string, v3.Field, error) {
 
 	switch v := flag.(type) {
 	case *cli.StringFlag:
-		if isPassword(name) {
-			field.Type = "password"
-		}
 		field.Description = v.Usage
 		field.Default.StringValue = v.Value
 	case *cli.IntFlag:
@@ -74,11 +51,6 @@ func FlagToField(flag cli.Flag) (string, v3.Field, error) {
 	}
 
 	return name, field, nil
-}
-
-func isPassword(key string) bool {
-	_, ok := secretFields[key]
-	return ok
 }
 
 func ToLowerCamelCase(nodeFlagName string) (string, error) {

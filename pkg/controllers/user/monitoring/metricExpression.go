@@ -1243,8 +1243,8 @@ metadata:
     metric: cpu-load-5
     source: rancher-monitoring
 spec:
-  expression: sum(node_load5) / sum(machine_cpu_cores)
-  legendFormat: Load5
+  expression: sum(node_load5) by (instance)
+  legendFormat: Load5([[instance]])
   description: cluster cpu load 5
 ---
 kind: MonitorMetric
@@ -1260,7 +1260,7 @@ metadata:
     metric: cpu-load-5
     source: rancher-monitoring
 spec:
-  expression: sum(node_load5) by (instance) / sum(machine_cpu_cores) by (instance)
+  expression: sum(node_load5) by (instance)
   legendFormat: Load5([[instance]])
   description: cluster cpu load 5
 ---
@@ -1277,8 +1277,8 @@ metadata:
     metric: cpu-load-1
     source: rancher-monitoring
 spec:
-  expression: sum(node_load1) / sum(machine_cpu_cores)
-  legendFormat: Load1
+  expression: sum(node_load1) by (instance)
+  legendFormat: Load1([[instance]])
   description: cluster cpu load 1
 ---
 kind: MonitorMetric
@@ -1294,7 +1294,7 @@ metadata:
     metric: cpu-load-1
     source: rancher-monitoring
 spec:
-  expression: sum(node_load1) by (instance) / sum(machine_cpu_cores) by (instance)
+  expression: sum(node_load1) by (instance)
   legendFormat: Load1([[instance]])
   description: cluster cpu load 1
 ---
@@ -1418,8 +1418,8 @@ metadata:
     metric: cpu-load-15
     source: rancher-monitoring
 spec:
-  expression: sum(node_load15) / sum(machine_cpu_cores)
-  legendFormat: Load15
+  expression: sum(node_load15) by (instance) 
+  legendFormat: Load15([[instance]])
   description: cluster cpu load 15
 ---
 kind: MonitorMetric
@@ -1435,7 +1435,7 @@ metadata:
     metric: cpu-load-15
     source: rancher-monitoring
 spec:
-  expression: sum(node_load15) by (instance) / sum(machine_cpu_cores) by (instance)
+  expression: sum(node_load15) by (instance)
   legendFormat: Load15([[instance]])
   description: cluster cpu load 15
 ---
@@ -3556,7 +3556,7 @@ metadata:
     metric: cpu-load-1
     source: rancher-monitoring
 spec:
-  expression: sum(node_load1{instance=~"$instance"}) / sum(machine_cpu_cores{instance=~"$instance"})
+  expression: sum(node_load1{instance=~"$instance"})
   legendFormat: Load1
   description: node cpu load 1
 ---
@@ -3573,7 +3573,7 @@ metadata:
     metric: cpu-load-1
     source: rancher-monitoring
 spec:
-  expression: sum(node_load1{instance=~"$instance"}) / sum(machine_cpu_cores{instance=~"$instance"})
+  expression: sum(node_load1{instance=~"$instance"})
   legendFormat: Load1
   description: node cpu load 1
 ---
@@ -3590,7 +3590,7 @@ metadata:
     metric: cpu-load-15
     source: rancher-monitoring
 spec:
-  expression: sum(node_load15{instance=~"$instance"}) / sum(machine_cpu_cores{instance=~"$instance"})
+  expression: sum(node_load15{instance=~"$instance"})
   legendFormat: Load15
   description: node cpu load 15
 ---
@@ -3607,7 +3607,7 @@ metadata:
     metric: cpu-load-15
     source: rancher-monitoring
 spec:
-  expression: sum(node_load15{instance=~"$instance"}) / sum(machine_cpu_cores{instance=~"$instance"})
+  expression: sum(node_load15{instance=~"$instance"})
   legendFormat: Load15
   description: node cpu load 15
 ---
@@ -3760,7 +3760,7 @@ metadata:
     metric: cpu-load-5
     source: rancher-monitoring
 spec:
-  expression: sum(node_load5{instance=~"$instance"}) / sum(machine_cpu_cores{instance=~"$instance"})
+  expression: sum(node_load5{instance=~"$instance"})
   legendFormat: Load5
   description: node cpu load 5
 ---
@@ -3777,7 +3777,7 @@ metadata:
     metric: cpu-load-5
     source: rancher-monitoring
 spec:
-  expression: sum(node_load5{instance=~"$instance"}) / sum(machine_cpu_cores{instance=~"$instance"})
+  expression: sum(node_load5{instance=~"$instance"})
   legendFormat: Load5
   description: node cpu load 5
 ---

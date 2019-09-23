@@ -68,7 +68,7 @@ subjects:
   name: rke-job-deployer`
 
 	DefaultPodSecurityPolicy = `
-apiVersion: extensions/v1beta1
+apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
   name: default-psp

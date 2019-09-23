@@ -198,25 +198,39 @@ func FetchCertificatesFromHost(ctx context.Context, extraHosts []*hosts.Host, ho
 	for certName, config := range crtList {
 		certificate := CertificatePKI{}
 		crt, err := FetchFileFromHost(ctx, GetCertTempPath(certName), image, host, prsMap, CertFetcherContainer, "certificates")
-		// I will only exit with an error if it's not a not-found-error and this is not an etcd certificate
-		if err != nil && !strings.HasPrefix(certName, "kube-etcd") {
+		// Return error if the certificate file is not found but only if its not etcd or request header certificate
+		if err != nil && !strings.HasPrefix(certName, "kube-etcd") &&
+			certName != RequestHeaderCACertName &&
+			certName != APIProxyClientCertName &&
+			certName != KubeAdminCertName {
 			// IsErrNotFound doesn't catch this because it's a custom error
 			if isFileNotFoundErr(err) {
-				return nil, nil
+				return nil, fmt.Errorf("Certificate %s is not found", GetCertTempPath(certName))
 			}
 			return nil, err
 
 		}
-		// If I can't find an etcd I will not fail and will create it later.
-		if crt == "" && strings.HasPrefix(certName, "kube-etcd") {
+		// If I can't find an etcd or request header ca I will not fail and will create it later.
+		if crt == "" && (strings.HasPrefix(certName, "kube-etcd") ||
+			certName == RequestHeaderCACertName ||
+			certName == APIProxyClientCertName ||
+			certName == KubeAdminCertName) {
 			tmpCerts[certName] = CertificatePKI{}
 			continue
 		}
 		key, err := FetchFileFromHost(ctx, GetKeyTempPath(certName), image, host, prsMap, CertFetcherContainer, "certificate")
-
+		if err != nil {
+			if isFileNotFoundErr(err) {
+				return nil, fmt.Errorf("Key %s is not found", GetKeyTempPath(certName))
+			}
+			return nil, err
+		}
 		if config {
 			config, err := FetchFileFromHost(ctx, GetConfigTempPath(certName), image, host, prsMap, CertFetcherContainer, "certificate")
 			if err != nil {
+				if isFileNotFoundErr(err) {
+					return nil, fmt.Errorf("Config %s is not found", GetConfigTempPath(certName))
+				}
 				return nil, err
 			}
 			certificate.Config = config

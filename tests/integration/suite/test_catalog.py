@@ -177,13 +177,6 @@ def test_template_version_links(admin_mc, admin_pc, custom_catalog,
 
     assert len(templates.data[0]['versionLinks']) == 0
 
-    # If no rancher version is set get back both versions
-    templates = client.list_template(catalogId=c_name)
-
-    assert len(templates.data[0]['versionLinks']) == 2
-    assert '1.6.0' in templates.data[0]['versionLinks']
-    assert '1.6.2' in templates.data[0]['versionLinks']
-
 
 def test_relative_paths(admin_mc, admin_pc, remove_resource):
     """ This test adds a catalog's index.yaml with a relative chart url
@@ -216,3 +209,62 @@ def test_relative_paths(admin_mc, admin_pc, remove_resource):
     remove_resource(mysqlha)
     wait_for_atleast_workload(pclient=admin_pc.client, nsid=ns.id, timeout=60,
                               count=1)
+
+
+def test_cannot_delete_system_catalog(admin_mc):
+    """This test asserts that the system catalog cannot be delete"""
+    client = admin_mc.client
+
+    system_catalog = client.by_id_catalog("system-library")
+
+    with pytest.raises(ApiError) as e:
+        client.delete(system_catalog)
+
+    assert e.value.error.status == 422
+    assert e.value.error.message == 'not allowed to delete system-library' \
+                                    ' catalog'
+
+
+def test_system_catalog_missing_remove_link(admin_mc):
+    """This test asserts that the remove link is missing from system-catalog's
+    links"""
+    client = admin_mc.client
+
+    system_catalog = client.by_id_catalog("system-library")
+
+    assert "remove" not in system_catalog.links
+
+
+def test_cannot_update_system_if_embedded(admin_mc):
+    """This test asserts that the system catalog cannot be updated if
+    system-catalog setting is set to 'bundled'"""
+    client = admin_mc.client
+
+    system_catalog_setting = client.by_id_setting("system-catalog")
+    # this could potentially interfere with other tests if they were to rely
+    # on system-catalog setting
+    client.update_by_id_setting(id=system_catalog_setting.id, value="bundled")
+
+    system_catalog = client.by_id_catalog("system-library")
+
+    with pytest.raises(ApiError) as e:
+        client.update_by_id_catalog(id=system_catalog.id, branch="asd")
+
+    assert e.value.error.status == 422
+    assert e.value.error.message == 'not allowed to edit system-library' \
+                                    ' catalog'
+
+
+def test_embedded_system_catalog_missing_edit_link(admin_mc):
+    """This test asserts that the system catalog is missing the 'update' link
+    if system-catalog setting is set to 'bundled'"""
+    client = admin_mc.client
+
+    system_catalog_setting = client.by_id_setting("system-catalog")
+    # this could potentially interfere with other tests if they were to rely
+    # on system-catalog setting
+    client.update_by_id_setting(id=system_catalog_setting.id, value="bundled")
+
+    system_catalog = client.by_id_catalog("system-library")
+
+    assert "update" not in system_catalog.links

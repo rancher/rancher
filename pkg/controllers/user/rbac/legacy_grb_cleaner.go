@@ -2,9 +2,9 @@ package rbac
 
 import (
 	"strings"
-	"time"
 
 	"github.com/rancher/norman/lifecycle"
+	grbstore "github.com/rancher/rancher/pkg/api/store/globalrolebindings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -19,27 +19,31 @@ func newLegacyGRBCleaner(m *manager) *grbCleaner {
 	return &grbCleaner{m: m}
 }
 
+// this function addresses issues with grb not being cleaned up that was an issue from v2.2.3 - v2.2.8
+// it works on previously created objects outside of the timeline of normal sync handlers to correct issues with finalizers not be removed on deletion and finalizers not being dropped on cluster deletion
 func (p *grbCleaner) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object, error) {
 	if key == "" || obj == nil {
 		return nil, nil
 	}
-	if obj.DeletionTimestamp == nil || len(obj.Finalizers) == 0 {
-		return nil, nil
+	if obj.Annotations[grbstore.GrbVersion] == "true" {
+		return obj, nil
 	}
-	if time.Since(obj.DeletionTimestamp.Time) < 1*time.Hour {
-		return nil, nil
-	}
-	obj, err := p.removeStuckFinalizer(obj)
+	obj, err := p.removeFinalizerFromNonExistentCluster(obj)
 	if err != nil && !errors.IsNotFound(err) {
-		return nil, err
+		return obj, err
 	}
-	return obj, nil
-
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+		obj.SetAnnotations(annotations)
+	}
+	obj.Annotations[grbstore.GrbVersion] = "true"
+	return p.m.workload.Management.Management.GlobalRoleBindings("").Update(obj)
 }
 
-func (p *grbCleaner) removeStuckFinalizer(obj *v3.GlobalRoleBinding) (*v3.GlobalRoleBinding, error) {
+func (p *grbCleaner) removeFinalizerFromNonExistentCluster(obj *v3.GlobalRoleBinding) (*v3.GlobalRoleBinding, error) {
 	obj = obj.DeepCopy()
-	modified := false
+
 	md, err := meta.Accessor(obj)
 	if err != nil {
 		return obj, err
@@ -49,15 +53,14 @@ func (p *grbCleaner) removeStuckFinalizer(obj *v3.GlobalRoleBinding) (*v3.Global
 	for i := len(finalizers) - 1; i >= 0; i-- {
 		f := finalizers[i]
 		if strings.HasPrefix(f, lifecycle.ScopedFinalizerKey) {
-			finalizers = append(finalizers[:i], finalizers[i+1:]...)
-			modified = true
+			s := strings.Split(f, "_")
+			// if cluster was not reported, its a deleted cluster and will cause the finalizer to hang in the future
+			if _, err = p.m.clusterLister.Get("", s[1]); errors.IsNotFound(err) {
+				finalizers = append(finalizers[:i], finalizers[i+1:]...)
+			}
 		}
 	}
 
-	if modified {
-		md.SetFinalizers(finalizers)
-		obj, e := p.m.workload.Management.Management.GlobalRoleBindings("").Update(obj)
-		return obj, e
-	}
+	md.SetFinalizers(finalizers)
 	return obj, nil
 }

@@ -1,6 +1,6 @@
 /*
- * Minio Go Library for Amazon S3 Compatible Cloud Storage
- * Copyright 2015-2017 Minio, Inc.
+ * MinIO Go Library for Amazon S3 Compatible Cloud Storage
+ * Copyright 2015-2017 MinIO, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ func (o GetObjectOptions) Header() http.Header {
 	for k, v := range o.headers {
 		headers.Set(k, v)
 	}
-	if o.ServerSideEncryption != nil && o.ServerSideEncryption.Type() != encrypt.S3 {
+	if o.ServerSideEncryption != nil && o.ServerSideEncryption.Type() == encrypt.SSEC {
 		o.ServerSideEncryption.Marshal(headers)
 	}
 	return headers

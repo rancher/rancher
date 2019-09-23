@@ -8,6 +8,7 @@ import (
 
 	"github.com/rancher/norman/types"
 	cutils "github.com/rancher/rancher/pkg/catalog/utils"
+	versionutil "github.com/rancher/rancher/pkg/catalog/utils"
 	ns "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -236,7 +237,12 @@ func GetMonitoringCatalogID(version string, catalogTemplateLister mgmtv3.Catalog
 		if err != nil {
 			return "", err
 		}
-		version = template.Spec.DefaultVersion
+
+		templateVersion, err := versionutil.LatestAvailableTemplateVersion(template)
+		if err != nil {
+			return "", err
+		}
+		version = templateVersion.Version
 	}
 	return fmt.Sprintf(cutils.CatalogExternalIDFormat, cutils.SystemLibraryName, monitoringTemplateName, version), nil
 }

@@ -6,12 +6,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	v1beta12 "github.com/rancher/types/apis/extensions/v1beta1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v1beta12 "github.com/rancher/types/apis/policy/v1beta1"
 	v12 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/extensions/v1beta1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbac "k8s.io/api/rbac/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
@@ -25,7 +25,7 @@ const clusterRoleByPSPTNameIndex = "podsecuritypolicy.rbac.user.cattle.io/pspt-n
 func RegisterTemplate(ctx context.Context, context *config.UserContext) {
 	logrus.Infof("registering podsecuritypolicy template handler for cluster %v", context.ClusterName)
 
-	policyInformer := context.Extensions.PodSecurityPolicies("").Controller().Informer()
+	policyInformer := context.Policy.PodSecurityPolicies("").Controller().Informer()
 	policyIndexers := map[string]cache.IndexFunc{
 		policyByPSPTParentAnnotationIndex: policyByPSPTParentAnnotation,
 	}
@@ -38,8 +38,8 @@ func RegisterTemplate(ctx context.Context, context *config.UserContext) {
 	clusterRoleInformer.AddIndexers(clusterRoleIndexer)
 
 	lfc := &Lifecycle{
-		policies:          context.Extensions.PodSecurityPolicies(""),
-		policyLister:      context.Extensions.PodSecurityPolicies("").Controller().Lister(),
+		policies:          context.Policy.PodSecurityPolicies(""),
+		policyLister:      context.Policy.PodSecurityPolicies("").Controller().Lister(),
 		clusterRoles:      context.RBAC.ClusterRoles(""),
 		clusterRoleLister: context.RBAC.ClusterRoles("").Controller().Lister(),
 
@@ -73,7 +73,7 @@ func (l *Lifecycle) Updated(obj *v3.PodSecurityPolicyTemplate) (runtime.Object, 
 	}
 
 	for _, rawPolicy := range policies {
-		policy := rawPolicy.(*v1beta1.PodSecurityPolicy)
+		policy := rawPolicy.(*policyv1beta1.PodSecurityPolicy)
 
 		if policy.Annotations[podSecurityPolicyTemplateVersionAnnotation] != obj.ResourceVersion {
 			newPolicy := policy.DeepCopy()
@@ -97,7 +97,7 @@ func (l *Lifecycle) Remove(obj *v3.PodSecurityPolicyTemplate) (runtime.Object, e
 	}
 
 	for _, rawPolicy := range policies {
-		policy := rawPolicy.(*v1beta1.PodSecurityPolicy)
+		policy := rawPolicy.(*policyv1beta1.PodSecurityPolicy)
 		err = l.policies.Delete(policy.Name, &v1.DeleteOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("error deleting policy: %v", err)
@@ -121,7 +121,7 @@ func (l *Lifecycle) Remove(obj *v3.PodSecurityPolicyTemplate) (runtime.Object, e
 }
 
 func policyByPSPTParentAnnotation(obj interface{}) ([]string, error) {
-	policy, ok := obj.(*v1beta1.PodSecurityPolicy)
+	policy, ok := obj.(*policyv1beta1.PodSecurityPolicy)
 	if !ok || policy.Annotations[podSecurityPolicyTemplateParentAnnotation] == "" {
 		return []string{}, nil
 	}

@@ -75,6 +75,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		secretStore:               secretStore,
 		nodeClient:                nodeClient,
 		nodeTemplateClient:        management.Management.NodeTemplates(""),
+		nodePoolLister:            management.Management.NodePools("").Controller().Lister(),
 		nodeTemplateGenericClient: management.Management.NodeTemplates("").ObjectClient().UnstructuredClient(),
 		configMapGetter:           management.K8sClient.CoreV1(),
 		clusterLister:             management.Management.Clusters("").Controller().Lister(),
@@ -92,6 +93,7 @@ type Lifecycle struct {
 	nodeTemplateGenericClient objectclient.GenericClient
 	nodeClient                v3.NodeInterface
 	nodeTemplateClient        v3.NodeTemplateInterface
+	nodePoolLister            v3.NodePoolLister
 	configMapGetter           typedv1.ConfigMapsGetter
 	clusterLister             v3.ClusterLister
 	schemaLister              v3.DynamicSchemaLister
@@ -124,9 +126,6 @@ func (m *Lifecycle) setupCustom(obj *v3.Node) {
 			Address: obj.Status.NodeConfig.Address,
 		},
 	}
-
-	obj.Spec.DesiredNodeTaints = taints.GetTaintsFromStrings(obj.Spec.CustomConfig.Taints)
-	obj.Spec.UpdateTaintsFromAPI = &falseValue
 }
 
 func isCustom(obj *v3.Node) bool {
@@ -211,6 +210,11 @@ func (m *Lifecycle) Create(obj *v3.Node) (runtime.Object, error) {
 func (m *Lifecycle) getNodeTemplate(nodeTemplateName string) (*v3.NodeTemplate, error) {
 	ns, n := ref.Parse(nodeTemplateName)
 	return m.nodeTemplateClient.GetNamespaced(ns, n, metav1.GetOptions{})
+}
+
+func (m *Lifecycle) getNodePool(nodePoolName string) (*v3.NodePool, error) {
+	ns, p := ref.Parse(nodePoolName)
+	return m.nodePoolLister.Get(ns, p)
 }
 
 func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
@@ -458,11 +462,6 @@ outer:
 }
 
 func (m *Lifecycle) Updated(obj *v3.Node) (runtime.Object, error) {
-	obj, err := m.checkLabels(obj)
-	if err != nil {
-		return obj, err
-	}
-
 	newObj, err := v3.NodeConditionProvisioned.Once(obj, func() (runtime.Object, error) {
 		if obj.Status.NodeTemplateSpec == nil {
 			m.setWaiting(obj)
@@ -557,6 +556,11 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 		return obj, err
 	}
 
+	pool, err := m.getNodePool(obj.Spec.NodePoolName)
+	if err != nil {
+		return obj, err
+	}
+
 	obj.Status.NodeConfig = &v3.RKEConfigNode{
 		NodeName:         obj.Namespace + ":" + obj.Name,
 		Address:          ip,
@@ -579,17 +583,17 @@ func (m *Lifecycle) saveConfig(config *nodeconfig.NodeConfig, nodeDir string, ob
 	}
 
 	templateSet := taints.GetKeyEffectTaintSet(template.Spec.NodeTaints)
-	nodeSet := taints.GetKeyEffectTaintSet(obj.Spec.DesiredNodeTaints)
+	nodeSet := taints.GetKeyEffectTaintSet(pool.Spec.NodeTaints)
+	expectTaints := pool.Spec.NodeTaints
 
 	for key, ti := range templateSet {
-		// the desired node taints is set by the node pool already. so we don't need to set it by template because
+		// the expect taints are based on the node pool. so we don't need to set taints with same key and effect by template because
 		// the taints from node pool should override the taints from template.
 		if _, ok := nodeSet[key]; !ok {
-			obj.Spec.DesiredNodeTaints = append(obj.Spec.DesiredNodeTaints, template.Spec.NodeTaints[ti])
-			obj.Spec.UpdateTaintsFromAPI = &falseValue
+			expectTaints = append(expectTaints, template.Spec.NodeTaints[ti])
 		}
 	}
-	obj.Status.NodeConfig.Taints = taints.GetRKETaintsFromTaints(obj.Spec.DesiredNodeTaints)
+	obj.Status.NodeConfig.Taints = taints.GetRKETaintsFromTaints(expectTaints)
 
 	return obj, nil
 }

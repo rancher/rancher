@@ -14,11 +14,15 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	appsv1 "github.com/rancher/types/apis/apps/v1"
 	"github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	projectschema "github.com/rancher/types/apis/project.cattle.io/v3/schema"
 	projectclient "github.com/rancher/types/client/project/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	k8sappsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sschema "k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const (
@@ -139,6 +143,36 @@ func (a ActionWrapper) rollbackDeployment(apiContext *types.APIContext, clusterC
 	if currRevision == "1" {
 		httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("No revision for rolling back %s", deployment.ID))
 	}
+	// if deployment's apiversion is apps/v1, we update the object, so getting it from etcd instead of cache
+	depl, err := clusterContext.Apps.Deployments(namespace).Get(name, v1.GetOptions{})
+	if err != nil {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error getting deployment %v: %v", name, err))
+	}
+	deploymentVersion, err := k8sschema.ParseGroupVersion(depl.APIVersion)
+	if err != nil {
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error parsing api version for deployment %v: %v", name, err))
+	}
+	if deploymentVersion == k8sappsv1.SchemeGroupVersion {
+		// DeploymentRollback & RollbackTo are deprecated in apps/v1
+		// only way to rollback is update deployment podSpec with replicaSet podSpec
+		split := strings.SplitN(rollbackInput.ReplicaSetID, ":", 3)
+		if len(split) != 3 || split[0] != appsv1.ReplicaSetResource.SingularName {
+			return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Invalid ReplicaSet %s", rollbackInput.ReplicaSetID))
+		}
+		replicaNamespace, replicaName := split[1], split[2]
+		rs, err := clusterContext.Apps.ReplicaSets("").Controller().Lister().Get(replicaNamespace, replicaName)
+		if err != nil {
+			return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("ReplicaSet %s doesn't exist for deployment %s", rollbackInput.ReplicaSetID, deployment.ID))
+		}
+		toUpdateDepl := depl.DeepCopy()
+		toUpdateDepl.Spec.Template.Spec = rs.Spec.Template.Spec
+		_, err = clusterContext.Apps.Deployments("").Update(toUpdateDepl)
+		if err != nil {
+			return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error updating workload %s by %s : %s", deployment.ID, actionName, err.Error()))
+		}
+		return nil
+	}
+
 	revision := fetchRevisionFor(apiContext, rollbackInput, namespace, name, currRevision)
 	logrus.Debugf("rollbackInput %v", revision)
 	if revision == "" {

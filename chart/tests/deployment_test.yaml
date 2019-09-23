@@ -108,3 +108,12 @@ tests:
   - contains:
       path: spec.template.spec.containers[0].args
       content: "--no-cacerts"
+- it: should add CATTLE_SYSTEM_CATALOG to env
+  set:
+    useBundledSystemChart: true
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: CATTLE_SYSTEM_CATALOG
+        value: "bundled"

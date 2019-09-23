@@ -28,7 +28,7 @@ func Test_injectDefaultRegistry(t *testing.T) {
 		{
 			app: &v3.App{
 				Spec: v3.AppSpec{
-					ExternalID: settings.SystemMonitoringCatalogID.Get(),
+					ExternalID: settings.SystemExternalDNSCatalogID.Get(),
 				},
 			},
 			want: true,

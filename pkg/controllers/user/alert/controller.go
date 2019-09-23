@@ -85,6 +85,14 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	statesyncer.StartStateSyncer(ctx, cluster, alertmanager)
 	initClusterPreCanAlerts(clusterAlertGroups, clusterAlertRules, cluster.ClusterName)
 
+	nodeSyncer := &windowsNodeSyner{
+		clusterName:       cluster.ClusterName,
+		clusterAlertRules: clusterAlertRules,
+		nodeLister:        cluster.Core.Nodes(metav1.NamespaceAll).Controller().Lister(),
+	}
+	nodes := cluster.Core.Nodes(metav1.NamespaceAll)
+	nodes.AddHandler(ctx, "init-windows-alert", nodeSyncer.Sync)
+
 	watcher.StartEventWatcher(ctx, cluster, alertmanager)
 	watcher.StartSysComponentWatcher(ctx, cluster, alertmanager)
 	watcher.StartPodWatcher(ctx, cluster, alertmanager)

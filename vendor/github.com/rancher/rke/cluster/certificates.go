@@ -184,6 +184,12 @@ func RotateRKECertificates(ctx context.Context, c *Cluster, flags ExternalFlags,
 		if c.Certificates[pki.ServiceAccountTokenKeyName].Key != nil {
 			serviceAccountTokenKey = string(cert.EncodePrivateKeyPEM(c.Certificates[pki.ServiceAccountTokenKeyName].Key))
 		}
+		// check for legacy clusters prior to requestheaderca
+		if c.Certificates[pki.RequestHeaderCACertName].Certificate == nil {
+			if err := pki.GenerateRKERequestHeaderCACert(ctx, c.Certificates, flags.ClusterFilePath, flags.ConfigDir); err != nil {
+				return err
+			}
+		}
 		if err := pki.GenerateRKEServicesCerts(ctx, c.Certificates, c.RancherKubernetesEngineConfig, flags.ClusterFilePath, flags.ConfigDir, true); err != nil {
 			return err
 		}

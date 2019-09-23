@@ -108,19 +108,16 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 		if err != nil {
 			logrus.Errorf("error getting schema %v", err)
 		}
-		userCredFields, pwdFields, defaults := getCredFields(obj.Annotations)
+		pubCredFields, privateCredFields, passwordFields, defaults := getCredFields(obj.Annotations)
 		for name, field := range existingSchema.Spec.ResourceFields {
-			if _, ok := SSHKeyFields[name]; ok {
+			if SSHKeyFields[name] || passwordFields[name] || privateCredFields[name] {
 				if field.Type != "password" {
 					forceUpdate = true
 					break
 				}
-				continue
 			}
-			if pwdFields[name] {
-				field.Type = "password"
-			}
-			if field.Type == "password" || userCredFields[name] {
+			// even if forceUpdate is false, calculate credFields to check if credSchema needs to be updated
+			if privateCredFields[name] || pubCredFields[name] {
 				credField := field
 				credField.Required = true
 				if val, ok := defaults[name]; ok {
@@ -186,14 +183,11 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	}
 	credFields := map[string]v3.Field{}
 	resourceFields := map[string]v3.Field{}
-	userCredFields, pwdFields, defaults := getCredFields(obj.Annotations)
+	pubCredFields, privateCredFields, passwordFields, defaults := getCredFields(obj.Annotations)
 	for _, flag := range flags {
 		name, field, err := FlagToField(flag)
 		if err != nil {
 			return nil, err
-		}
-		if pwdFields[name] {
-			field.Type = "password"
 		}
 		if aliases, ok := Aliases[driverName]; ok {
 			// convert path fields to their alias to take file contents
@@ -203,17 +197,17 @@ func (m *Lifecycle) download(obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 			}
 		}
 
-		if field.Type == "password" && !SSHKeyFields[name] || userCredFields[name] {
+		if privateCredFields[name] || passwordFields[name] || SSHKeyFields[name] {
+			field.Type = "password"
+		}
+
+		if pubCredFields[name] || privateCredFields[name] {
 			credField := field
 			credField.Required = true
 			if val, ok := defaults[name]; ok {
 				credField = updateDefault(credField, val, field.Type)
 			}
 			credFields[name] = credField
-		}
-
-		if _, ok := SSHKeyFields[name]; ok {
-			field.Type = "password"
 		}
 
 		resourceFields[name] = field
@@ -473,7 +467,7 @@ func (m *Lifecycle) createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, f
 	return nil
 }
 
-func getCredFields(annotations map[string]string) (map[string]bool, map[string]bool, map[string]string) {
+func getCredFields(annotations map[string]string) (map[string]bool, map[string]bool, map[string]bool, map[string]string) {
 	getMap := func(fields string) map[string]bool {
 		data := map[string]bool{}
 		for _, field := range strings.Split(fields, ",") {
@@ -491,7 +485,10 @@ func getCredFields(annotations map[string]string) (map[string]bool, map[string]b
 		}
 		return data
 	}
-	return getMap(annotations["cred"]), getMap(annotations["password"]), getDefaults(annotations["defaults"])
+	return getMap(annotations["publicCredentialFields"]),
+		getMap(annotations["privateCredentialFields"]),
+		getMap(annotations["passwordFields"]),
+		getDefaults(annotations["defaults"])
 }
 
 func credentialConfigSchemaName(driverName string) string {

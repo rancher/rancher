@@ -107,6 +107,8 @@ const (
 	WeavePassword    = "WeavePassword"
 	RBACConfig       = "RBACConfig"
 	ClusterVersion   = "ClusterVersion"
+
+	NodeSelector = "NodeSelector"
 )
 
 var EtcdPortList = []string{
@@ -169,6 +171,7 @@ func (c *Cluster) doFlannelDeploy(ctx context.Context, data map[string]interface
 		},
 		RBACConfig:     c.Authorization.Mode,
 		ClusterVersion: util.GetTagMajorVersion(c.Version),
+		NodeSelector:   c.Network.NodeSelector,
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(flannelConfig, data)
 	if err != nil {
@@ -190,6 +193,7 @@ func (c *Cluster) doCalicoDeploy(ctx context.Context, data map[string]interface{
 		CloudProvider:    c.Network.Options[CalicoCloudProvider],
 		FlexVolImg:       c.SystemImages.CalicoFlexVol,
 		RBACConfig:       c.Authorization.Mode,
+		NodeSelector:     c.Network.NodeSelector,
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(calicoConfig, data)
 	if err != nil {
@@ -227,6 +231,7 @@ func (c *Cluster) doCanalDeploy(ctx context.Context, data map[string]interface{}
 			"VNI":  flannelVni,
 			"Port": flannelPort,
 		},
+		NodeSelector: c.Network.NodeSelector,
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(canalConfig, data)
 	if err != nil {
@@ -243,6 +248,7 @@ func (c *Cluster) doWeaveDeploy(ctx context.Context, data map[string]interface{}
 		CNIImage:           c.SystemImages.WeaveCNI,
 		WeaveLoopbackImage: c.SystemImages.Alpine,
 		RBACConfig:         c.Authorization.Mode,
+		NodeSelector:       c.Network.NodeSelector,
 	}
 	pluginYaml, err := c.getNetworkPluginManifest(weaveConfig, data)
 	if err != nil {

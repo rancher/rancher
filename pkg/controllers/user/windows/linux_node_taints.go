@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/rancher/rancher/pkg/taints"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	apicorev1 "github.com/rancher/types/apis/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,18 +27,18 @@ var (
 )
 
 // NodeTaintsController This controller will only run on the cluster with windowsPreferred is true.
-// It will add taints to the nodes with label beta.kubernetes.io/os=linux.
+// It will add taints to the v1.Node.Spec.Taints to the nodes with label beta.kubernetes.io/os=linux.
 type NodeTaintsController struct {
-	nodeClient v3.NodeInterface
+	nodeClient apicorev1.NodeInterface
 }
 
-func (n *NodeTaintsController) sync(key string, obj *v3.Node) (runtime.Object, error) {
+func (n *NodeTaintsController) sync(key string, obj *v1.Node) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return obj, nil
 	}
 	found := false
 	for _, hostOSLabel := range HostOSLabels {
-		if hostOSLabel.AsSelector().Matches(labels.Set(obj.Status.NodeLabels)) {
+		if hostOSLabel.AsSelector().Matches(labels.Set(obj.Labels)) {
 			found = true
 			break
 		}
@@ -47,22 +47,14 @@ func (n *NodeTaintsController) sync(key string, obj *v3.Node) (runtime.Object, e
 		return obj, nil
 	}
 
-	// NodeTaints is updating, skip this sync
-	if obj.Spec.UpdateTaintsFromAPI != nil {
-		return obj, nil
-	}
-
-	taintSet := taints.GetTaintSet(obj.Spec.InternalNodeSpec.Taints)
+	taintSet := taints.GetTaintSet(obj.Spec.Taints)
 	// taint exists on nodes
 	if _, ok := taintSet[taints.GetTaintsString(nodeTaint)]; ok {
 		return obj, nil
 	}
 
 	newObj := obj.DeepCopy()
-	newObj.Spec.DesiredNodeTaints = append(newObj.Spec.DesiredNodeTaints, newObj.Spec.InternalNodeSpec.Taints...)
-	newObj.Spec.DesiredNodeTaints = append(newObj.Spec.DesiredNodeTaints, nodeTaint)
-	falseValue := false
-	newObj.Spec.UpdateTaintsFromAPI = &falseValue
+	newObj.Spec.Taints = append(newObj.Spec.Taints, nodeTaint)
 	if _, err := n.nodeClient.Update(newObj); err != nil {
 		return nil, fmt.Errorf("failed to update node taints for node %s/%s, error: %s", obj.Namespace, obj.Name, err.Error())
 	}

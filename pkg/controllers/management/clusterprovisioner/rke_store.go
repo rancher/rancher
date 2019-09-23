@@ -1,7 +1,7 @@
 package clusterprovisioner
 
 import (
-	"strings"
+	"github.com/rancher/kontainer-driver-metadata/rke/templates"
 
 	kontainerengine "github.com/rancher/kontainer-engine/drivers/rke"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
@@ -21,6 +21,17 @@ type rkeStore struct {
 	SystemImages       v3.RKEK8sSystemImageInterface
 }
 
+var addonMap = map[string]bool{
+	templates.Calico:        true,
+	templates.Flannel:       true,
+	templates.Canal:         true,
+	templates.Weave:         true,
+	templates.NginxIngress:  true,
+	templates.MetricsServer: true,
+	templates.KubeDNS:       true,
+	templates.CoreDNS:       true,
+}
+
 func NewDataStore(addonLister v3.RKEAddonLister, addons v3.RKEAddonInterface,
 	svcOptionLister v3.RKEK8sServiceOptionLister, svcOptions v3.RKEK8sServiceOptionInterface,
 	sysImageLister v3.RKEK8sSystemImageLister, sysImages v3.RKEK8sSystemImageInterface) kontainerengine.Store {
@@ -34,39 +45,51 @@ func NewDataStore(addonLister v3.RKEAddonLister, addons v3.RKEAddonInterface,
 	}
 }
 
-func (a *rkeStore) GetAddonTemplates(k8sVersion string) map[string]interface{} {
+func (a *rkeStore) GetAddonTemplates(k8sVersion string) (map[string]interface{}, error) {
 	data := map[string]interface{}{}
 	sysImage, err := a.SystemImagesLister.Get(namespace.GlobalNamespace, k8sVersion)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			logrus.Errorf("getAddonTemplates: error finding system image for %s %v", k8sVersion, err)
-			return data
+			return data, err
 		}
 		sysImage, err = a.SystemImages.GetNamespaced(namespace.GlobalNamespace, k8sVersion, metav1.GetOptions{})
 		if err != nil {
 			logrus.Errorf("getAddonTemplates: error finding system image for %s %v", k8sVersion, err)
-			return data
+			return data, err
 		}
 	}
 	for k, v := range sysImage.Labels {
-		if strings.HasPrefix(k, "cattle.io") || strings.HasPrefix(k, "io.cattle") {
+		if _, ok := addonMap[k]; !ok {
 			continue
 		}
 		template, err := kd.GetRKEAddonTemplate(v, a.AddonLister, a.Addons)
 		if err != nil {
 			logrus.Errorf("getAddonTemplates: k8sVersion %s addon %s [%v]", k8sVersion, v, err)
+			return data, err
 		}
 		if template != "" {
 			data[k] = template
 		}
 	}
-	return data
+	return data, nil
 }
 
-func (a *rkeStore) GetServiceOptions(k8sVersion string) *v3.KubernetesServicesOptions {
-	svcOptions, err := kd.GetRKEK8sServiceOptions(k8sVersion, a.SvcOptionLister, a.SvcOptions)
+func (a *rkeStore) GetServiceOptions(k8sVersion string) (map[string]*v3.KubernetesServicesOptions, error) {
+	linuxSvcOptions, err := kd.GetRKEK8sServiceOptions(k8sVersion, a.SvcOptionLister, a.SvcOptions, a.SystemImagesLister, a.SystemImages, kd.Linux)
 	if err != nil {
-		logrus.Errorf("getK8sServiceOptions: k8sVersion %s [%v]", k8sVersion, err)
+		logrus.Errorf("getLinuxK8sServiceOptions: k8sVersion %s [%v]", k8sVersion, err)
+		return nil, err
 	}
-	return svcOptions
+
+	windowsSvcOptions, err := kd.GetRKEK8sServiceOptions(k8sVersion, a.SvcOptionLister, a.SvcOptions, a.SystemImagesLister, a.SystemImages, kd.Windows)
+	if err != nil {
+		logrus.Errorf("getWindowsK8sServiceOptions: k8sVersion %s [%v]", k8sVersion, err)
+		return nil, err
+	}
+
+	return map[string]*v3.KubernetesServicesOptions{
+		"k8s-service-options":         linuxSvcOptions,
+		"k8s-windows-service-options": windowsSvcOptions,
+	}, nil
 }

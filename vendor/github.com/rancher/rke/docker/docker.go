@@ -507,7 +507,7 @@ func IsContainerUpgradable(ctx context.Context, dClient *client.Client, imageCfg
 		!sliceEqualsIgnoreOrder(containerInspect.Config.Cmd, imageCfg.Cmd) ||
 		!isContainerEnvChanged(containerInspect.Config.Env, imageCfg.Env, imageInspect.Config.Env) ||
 		!sliceEqualsIgnoreOrder(containerInspect.HostConfig.Binds, hostCfg.Binds) ||
-		!sliceEqualsIgnoreOrder(containerInspect.HostConfig.SecurityOpt, hostCfg.SecurityOpt) {
+		!securityOptsliceEqualsIgnoreOrder(containerInspect.HostConfig.SecurityOpt, hostCfg.SecurityOpt) {
 		logrus.Debugf("[%s] Container [%s] is eligible for upgrade on host [%s]", plane, containerName, hostname)
 		return true, nil
 	}
@@ -518,6 +518,23 @@ func IsContainerUpgradable(ctx context.Context, dClient *client.Client, imageCfg
 func sliceEqualsIgnoreOrder(left, right []string) bool {
 	if equal := sets.NewString(left...).Equal(sets.NewString(right...)); !equal {
 		logrus.Debugf("slice is not equal, showing data in new value which is not in old value: %v", sets.NewString(right...).Difference(sets.NewString(left...)))
+		logrus.Debugf("slice is not equal, showing data in old value which is not in new value: %v", sets.NewString(left...).Difference(sets.NewString(right...)))
+		return false
+	}
+	return true
+}
+
+func securityOptsliceEqualsIgnoreOrder(left, right []string) bool {
+	if equal := sets.NewString(left...).Equal(sets.NewString(right...)); !equal {
+		logrus.Debugf("slice is not equal, showing data in new value which is not in old value: %v", sets.NewString(right...).Difference(sets.NewString(left...)))
+		diff := sets.NewString(left...).Difference(sets.NewString(right...))
+		logrus.Debugf("slice is not equal, showing data in old value which is not in new value: %v", diff)
+		// Docker sets label=disable automatically on all non labeled containers with will result in a false diff between spec and the actual running container
+		// If the diff matches the disable label exactly, we still report true as being equal
+		if equal := sets.NewString([]string{"label=disable"}...).Equal(diff); equal {
+			logrus.Debugf("returning equal as true because diff matches the automatically added disable label for SELinux which can be ignored: %v", diff)
+			return true
+		}
 		return false
 	}
 	return true

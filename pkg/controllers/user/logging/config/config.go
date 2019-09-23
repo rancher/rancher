@@ -9,7 +9,7 @@ import (
 const (
 	AppName        = "rancher-logging"
 	TesterAppName  = "rancher-logging-tester"
-	AppInitVersion = "0.1.1"
+	AppInitVersion = "initializing"
 	templateName   = "rancher-logging"
 )
 
@@ -83,7 +83,7 @@ func RancherLoggingTemplateID() string {
 	return fmt.Sprintf("%s-%s", cutils.SystemLibraryName, templateName)
 }
 
-func RancherLoggingFullVersion() string {
+func RancherLoggingInitVersion() string {
 	return fmt.Sprintf("%s-%s-%s", cutils.SystemLibraryName, templateName, AppInitVersion)
 }
 

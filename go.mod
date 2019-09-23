@@ -3,10 +3,11 @@ module github.com/rancher/rancher
 go 1.12
 
 replace (
+	git.apache.org/thrift.git => github.com/apache/thrift v0.12.0
 	github.com/crewjam/saml => github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009
-	github.com/rancher/types => github.com/luthermonson/types v0.0.0-20190827220737-fd7416efc303
+	k8s.io/client-go => github.com/rancher/client-go v1.14.5-rancher.1
 )
 
 require (
@@ -34,15 +35,14 @@ require (
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/google/go-github v0.0.0-20170719170300-e062a8cd852f
 	github.com/google/go-querystring v0.0.0-20170111101155-53e6ce116135
-	github.com/gorilla/mux v1.6.1
-	github.com/gorilla/websocket v1.4.0
+	github.com/gorilla/mux v1.7.3
+	github.com/gorilla/websocket v1.4.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.0.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
 	github.com/mattn/go-colorable v0.1.0
 	github.com/mcuadros/go-version v0.0.0-20180611085657-6d5863ca60fa
-	github.com/minio/minio-go v0.0.0-20180613230128-10531abd0af1
-	github.com/mitchellh/go-homedir v1.1.0 // indirect
+	github.com/minio/minio-go v0.0.0-20190523192347-c6c2912aa552
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/mrjones/oauth v0.0.0-20180629183705-f4e24b6d100c
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
@@ -51,12 +51,13 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.1.0
 	github.com/prometheus/common v0.6.0
-	github.com/rancher/kontainer-driver-metadata v0.0.0-20190826223322-3e1df77e6153
-	github.com/rancher/kontainer-engine v0.0.4-dev.0.20190819182532-d4cdf8e56671
-	github.com/rancher/norman v0.0.0-20190821234528-20a936b685b0
+	github.com/rancher/kontainer-driver-metadata v0.0.0-20190918213354-34c3e9b259b3
+	github.com/rancher/kontainer-engine v0.0.4-dev.0.20190913233423-b9e2974bf5eb
+	github.com/rancher/norman v0.0.0-20190917211548-a40a48add2fb
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
-	github.com/rancher/rke v0.3.0-rc7.0.20190827012814-16a1a5e2508b
-	github.com/rancher/types v0.0.0-20190826213409-c0775cc536a2
+	github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6
+	github.com/rancher/rke v0.3.0-rc10.0.20190920161630-14827e2cdfac
+	github.com/rancher/types v0.0.0-20190917172018-55dc8a6c4865
 	github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect

@@ -15,11 +15,14 @@ try
 {
     New-Item -Force -ItemType Directory -Path @(
         "c:\host\opt"
+        "c:\host\opt\bin"
         "c:\host\opt\cni"
         "c:\host\opt\cni\bin"
         "c:\host\etc"
         "c:\host\etc\rancher"
+        "c:\host\etc\rancher\wins"
         "c:\host\etc\kubernetes"
+        "c:\host\etc\kubernetes\bin"
         "c:\host\etc\cni"
         "c:\host\etc\cni\net.d"
         "c:\host\etc\nginx"
@@ -38,6 +41,7 @@ try
         "c:\host\var\lib\kubelet"
         "c:\host\var\lib\kubelet\volumeplugins"
         "c:\host\run"
+        "c:\host\ProgramData\docker\certs.d"
     ) | Out-Null
 } catch { }
 
@@ -51,14 +55,6 @@ try
         "c:\Windows\wins.exe"
     )
 } catch { }
-
-$processWhitePaths = @(
-    "--wl-process-path c:\etc\wmi-exporter\wmi-exporter.exe"
-    "--wl-process-path c:\etc\kubernetes\bin\kube-proxy.exe"
-    "--wl-process-path c:\etc\kubernetes\bin\kubelet.exe"
-    "--wl-process-path c:\etc\nginx\nginx.exe"
-    "--wl-process-path c:\opt\bin\flanneld.exe"
-)
 
 $verfication = @"
 Log-Info "Detecting running permission ..."
@@ -74,8 +70,8 @@ try
     if (`$cpuLogicalProccessors -le 1) {
         Log-Fatal "The CPU resource could not satisfy the default reservation for both Windows system and Kuberentes components, please increase the CPU resource to more than 2 logic processors"
     } elseif (`$cpuLogicalProccessors -lt 2) {
-        Log-Warn "The CPU resource only satisfy the lowest limit of running Kubernetes components"
-        Log-Warn "Please increase the CPU resource to more than 2 logic processors if could not schedual Pods in this Node"
+        Log-Warn "The CPU resource only satisfies the lowest limit for running Kubernetes components"
+        Log-Warn "Please increase the CPU resource to more than 2 logic processors if you are unable to schedule Pods on this Node"
     }
 }
 catch
@@ -95,15 +91,15 @@ try
 
     `$ramTotalGB = `$(Get-WmiObject -Class Win32_ComputerSystem | Select-Object -ExpandProperty TotalPhysicalMemory)/1GB
     if (`$ramTotalGB -lt `$lowestLimitGB) {
-        Log-Fatal "The RAM resource could not satisfy the default reservation for both Windows system and Kuberentes components, please increase the RAM resource to more than `$lowestLimitGB GB"
+        Log-Fatal "The RAM resource could not satisfy the default reservation for both Windows system and Kubernetes components, please increase the RAM resource to more than `$lowestLimitGB GB"
     }
 
     `$ramAvailableMB = `$(Get-WmiObject -Class Win32_PerfFormattedData_PerfOS_Memory | Measure-Object -Sum -Property AvailableBytes | Select-Object -ExpandProperty Sum)/1MB
     if (`$ramAvailableMB -le 500) {
         Log-Fatal "The RAM resource could not satisfy the default reservation for Kuberentes components, please increase the RAM resource to more than `$lowestLimitGB GB"
     } elseif (`$ramAvailableMB -le 600) {
-        Log-Warn "The RAM resource only satisfy the lowest limit of running Kubernetes components"
-        Log-Warn "Please increase the RAM resource to more than `$lowestLimitGB GB if could not schedual Pods in this Node"
+        Log-Warn "The RAM resource only satisfies the lowest limit for running Kubernetes components"
+        Log-Warn "Please increase the RAM resource to more than `$lowestLimitGB GB if you are unable to schedule Pods on this Node"
     }
 }
 catch
@@ -115,11 +111,11 @@ Log-Info "Detecting host DISK reservation ..."
 try
 {
     `$diskAvaliableGB = `$(Get-WmiObject -Class Win32_LogicalDisk | Where-Object {`$_.DeviceID -eq "C:"} | Select-Object -ExpandProperty Size)/1GB
-    if (`$diskAvaliableGB -lt 31.9) {
-        Log-Fatal "The DISK resource could not satisfy the default reservation for both Windows system and Kuberentes components, please increase the DISK resource to more than 32 GB"
+    if (`$diskAvaliableGB -lt 29.5) {
+        Log-Fatal "The DISK resource could not satisfy the default reservation for both Windows system and Kubernetes components, please increase the DISK resource to more than 30 GB"
     } elseif (`$diskAvaliableGB -lt 49.5) {
-        Log-Warn "The DISK resource only satisfy the lowest limit of running Kubernetes components"
-        Log-Warn "Please increase the DISK resource to more than 50 GB if could not schedual Pods in this Node"
+        Log-Warn "The DISK resource only satisfies the lowest limit for running Kubernetes components"
+        Log-Warn "Please increase the DISK resource to more than 50 GB if you are unable to schedule Pods on this Node"
     }
 }
 catch
@@ -249,10 +245,23 @@ catch
     Log-Warn "Could not clean: `$(`$_.Exception.Message)"
 }
 
+# output wins config
+@{
+    whiteList = @{
+        processPaths = @(
+            "c:\etc\wmi-exporter\wmi-exporter.exe"
+            "c:\etc\kubernetes\bin\kube-proxy.exe"
+            "c:\etc\kubernetes\bin\kubelet.exe"
+            "c:\etc\nginx\nginx.exe"
+            "c:\opt\bin\flanneld.exe"
+        )
+    }
+} | ConvertTo-Json -Compress -Depth 32 | Out-File -NoNewline -Encoding utf8 -Force -FilePath "c:\etc\rancher\wins\config"
+
 # register wins
 Start-Process -NoNewWindow -Wait ``
     -FilePath "c:\etc\rancher\wins.exe" ``
-    -ArgumentList "srv app run --register $($processWhitePaths -join ' ')"
+    -ArgumentList "srv app run --register"
 
 # start wins
 Start-Service -Name "rancher-wins" -ErrorAction Ignore
@@ -260,7 +269,7 @@ Start-Service -Name "rancher-wins" -ErrorAction Ignore
 # run agent
 Start-Process -NoNewWindow -Wait ``
     -FilePath "docker.exe" ``
-    -ArgumentList "run -d --restart=unless-stopped -v //./pipe/docker_engine://./pipe/docker_engine -v c:/etc/kubernetes:c:/etc/kubernetes -v //./pipe/rancher_wins://./pipe/rancher_wins $($env:AGENT_IMAGE) execute $($args -join " ")"
+    -ArgumentList "run -d --restart=unless-stopped -v //./pipe/docker_engine://./pipe/docker_engine -v c:/ProgramData/docker/certs.d:c:/etc/docker/certs.d -v c:/etc/kubernetes:c:/etc/kubernetes -v //./pipe/rancher_wins://./pipe/rancher_wins -v c:/etc/rancher/wins:c:/etc/rancher/wins $($env:AGENT_IMAGE) execute $($args -join " ")"
 "@
 
 Write-Output -InputObject "c:\etc\rancher\bootstrap.ps1"

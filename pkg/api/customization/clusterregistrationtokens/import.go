@@ -30,7 +30,7 @@ func ClusterImportHandler(resp http.ResponseWriter, req *http.Request) {
 		authImage = authImages[0]
 	}
 
-	if err := systemtemplate.SystemTemplate(resp, image.Resolve(settings.AgentImage.Get()), authImage, token, url); err != nil {
+	if err := systemtemplate.SystemTemplate(resp, image.Resolve(settings.AgentImage.Get()), authImage, token, url, false); err != nil {
 		resp.WriteHeader(500)
 		resp.Write([]byte(err.Error()))
 	}

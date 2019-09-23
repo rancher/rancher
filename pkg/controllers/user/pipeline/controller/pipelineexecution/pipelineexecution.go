@@ -18,7 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
-	"github.com/rancher/types/apis/apps/v1beta2"
+	appsv1 "github.com/rancher/types/apis/apps/v1"
 	v1 "github.com/rancher/types/apis/core/v1"
 	mv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	networkv1 "github.com/rancher/types/apis/networking.k8s.io/v1"
@@ -81,8 +81,8 @@ type Lifecycle struct {
 
 	clusterRoleBindings rbacv1.ClusterRoleBindingInterface
 	roleBindings        rbacv1.RoleBindingInterface
-	deployments         v1beta2.DeploymentInterface
-	daemonsets          v1beta2.DaemonSetInterface
+	deployments         appsv1.DeploymentInterface
+	daemonsets          appsv1.DaemonSetInterface
 
 	notifierLister             mv3.NotifierLister
 	pipelineLister             v3.PipelineLister
@@ -480,7 +480,8 @@ func (l *Lifecycle) doNotify(obj *v3.PipelineExecution) (runtime.Object, error) 
 		message = obj.Spec.PipelineConfig.Notification.Message
 	}
 	var g errgroup.Group
-	for _, toSendRecipient := range toSendRecipients {
+	for i := range toSendRecipients {
+		toSendRecipient := toSendRecipients[i]
 		notifierMessage := &notifiers.Message{
 			Content: message,
 		}

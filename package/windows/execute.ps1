@@ -294,6 +294,9 @@ if ($CATTLE_CA_CHECKSUM)
     $CATTLE_SERVER_HOSTNAME = ([System.Uri]"$server").Host
     $CATTLE_SERVER_HOSTNAME_WITH_PORT = ([System.Uri]"$server").Authority
 
+    # windows path could not allow colons
+    $CATTLE_SERVER_HOSTNAME_WITH_PORT = $CATTLE_SERVER_HOSTNAME_WITH_PORT -replace ":", ""
+
     $dockerCertsPath = "c:\etc\docker\certs.d\$CATTLE_SERVER_HOSTNAME_WITH_PORT"
     New-Item -Force -ItemType Directory -Path $dockerCertsPath -ErrorAction Ignore | Out-Null
     Copy-Item -Force -Path "$sslCertDir\serverca" -Destination "$dockerCertsPath\ca.crt" -ErrorAction Ignore
@@ -328,9 +331,6 @@ Set-Env -Key "CATTLE_NODE_LABEL" -Value $($CATTLE_NODE_LABEL -join ",")
 Set-Env -Key "CATTLE_NODE_TAINTS" -Value $($CATTLE_NODE_TAINTS -join ",")
 
 # upgrade wins.exe
-wins.exe cli app upgrade
-if (-not $?) {
-    exit 1
-}
+Transfer-File -Src c:\Windows\wins.exe -Dst c:\etc\rancher\wins\wins.exe
 
 Start-Process -NoNewWindow -Wait -FilePath "c:\etc\rancher\agent.exe"

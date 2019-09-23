@@ -375,7 +375,7 @@ func GetS3Client(sbc *v3.S3BackupConfig, timeout int) (*minio.Client, error) {
 	}
 	var s3Client = &minio.Client{}
 	var creds *credentials.Credentials
-	var tr = minio.DefaultTransport
+	var tr = http.DefaultTransport
 	tr.(*http.Transport).DialContext = (&net.Dialer{
 		Timeout:   time.Duration(timeout) * time.Second,
 		KeepAlive: 30 * time.Second,

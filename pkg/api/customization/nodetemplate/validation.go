@@ -6,14 +6,6 @@ import (
 	"github.com/rancher/rancher/pkg/configfield"
 )
 
-const (
-	Amazonec2driver    = "amazonec2"
-	Azuredriver        = "azure"
-	Linodedriver       = "linode"
-	Vmwaredriver       = "vmwarevsphere"
-	DigitalOceandriver = "digitalocean"
-)
-
 func Validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
 	driver := configfield.GetDriver(data)
 	if driver == "" {

@@ -201,7 +201,7 @@ func fetchAndUpdateStateFromLegacyCluster(ctx context.Context, kubeCluster *clus
 		// try to fetch certs from nodes
 		recoveredCerts, err = cluster.GetClusterCertsFromNodes(ctx, kubeCluster)
 		if err != nil {
-			return err
+			return fmt.Errorf("Failed to fetch cluster certs from nodes, aborting upgrade: %v", err)
 		}
 	}
 	fullState.CurrentState.RancherKubernetesEngineConfig = kubeCluster.RancherKubernetesEngineConfig.DeepCopy()

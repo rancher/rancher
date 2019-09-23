@@ -4,7 +4,7 @@ set -e
 source $(dirname $0)/version
 
 ARCH=${ARCH:-"amd64"}
-SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH:-"v2.3-preview2"}
+SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH:-"v2.3-dev"}
 SUFFIX=""
 [ "${ARCH}" != "amd64" ] && SUFFIX="_${ARCH}"
 
@@ -38,5 +38,5 @@ echo Built ${IMAGE} #${AGENT_IMAGE}
 echo
 
 cd ../bin
-mkdir -p /tmp/system-charts && git clone --branch master https://github.com/rancher/system-charts /tmp/system-charts
+mkdir -p /tmp/system-charts && git clone --branch $SYSTEM_CHART_DEFAULT_BRANCH https://github.com/rancher/system-charts /tmp/system-charts
 TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go /tmp/system-charts $IMAGE $AGENT_IMAGE

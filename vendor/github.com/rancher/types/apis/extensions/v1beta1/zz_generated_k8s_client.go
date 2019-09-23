@@ -20,15 +20,13 @@ type Interface interface {
 	RESTClient() rest.Interface
 	controller.Starter
 
-	PodSecurityPoliciesGetter
 	IngressesGetter
 }
 
 type Clients struct {
 	Interface Interface
 
-	PodSecurityPolicy PodSecurityPolicyClient
-	Ingress           IngressClient
+	Ingress IngressClient
 }
 
 type Client struct {
@@ -36,8 +34,7 @@ type Client struct {
 	restClient rest.Interface
 	starters   []controller.Starter
 
-	podSecurityPolicyControllers map[string]PodSecurityPolicyController
-	ingressControllers           map[string]IngressController
+	ingressControllers map[string]IngressController
 }
 
 func Factory(ctx context.Context, config rest.Config) (context.Context, controller.Starter, error) {
@@ -73,9 +70,6 @@ func NewClientsFromInterface(iface Interface) *Clients {
 	return &Clients{
 		Interface: iface,
 
-		PodSecurityPolicy: &podSecurityPolicyClient2{
-			iface: iface.PodSecurityPolicies(""),
-		},
 		Ingress: &ingressClient2{
 			iface: iface.Ingresses(""),
 		},
@@ -95,8 +89,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 	return &Client{
 		restClient: restClient,
 
-		podSecurityPolicyControllers: map[string]PodSecurityPolicyController{},
-		ingressControllers:           map[string]IngressController{},
+		ingressControllers: map[string]IngressController{},
 	}, nil
 }
 
@@ -110,19 +103,6 @@ func (c *Client) Sync(ctx context.Context) error {
 
 func (c *Client) Start(ctx context.Context, threadiness int) error {
 	return controller.Start(ctx, threadiness, c.starters...)
-}
-
-type PodSecurityPoliciesGetter interface {
-	PodSecurityPolicies(namespace string) PodSecurityPolicyInterface
-}
-
-func (c *Client) PodSecurityPolicies(namespace string) PodSecurityPolicyInterface {
-	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &PodSecurityPolicyResource, PodSecurityPolicyGroupVersionKind, podSecurityPolicyFactory{})
-	return &podSecurityPolicyClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
-	}
 }
 
 type IngressesGetter interface {

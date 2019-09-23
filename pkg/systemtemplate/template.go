@@ -94,7 +94,7 @@ rules:
 
 ---
 
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cattle-cluster-agent
@@ -160,7 +160,7 @@ spec:
 
 ---
 
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
     name: cattle-node-agent
@@ -244,9 +244,11 @@ spec:
   updateStrategy:
     type: RollingUpdate
 
+{{- if .IsWindowsCluster}}
+
 ---
 
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
     name: cattle-node-agent-windows
@@ -271,12 +273,7 @@ spec:
                     - linux
       serviceAccountName: cattle
       tolerations:
-      - effect: NoExecute
-        key: "node-role.kubernetes.io/etcd"
-        value: "true"
-      - effect: NoSchedule
-        key: "node-role.kubernetes.io/controlplane"
-        value: "true"
+      - operator: Exists
       containers:
       - name: agent
         image: {{.AgentImage}}
@@ -310,6 +307,8 @@ spec:
           mountPath: \\.\pipe\docker_engine
         - name: wins-pipe
           mountPath: \\.\pipe\rancher_wins
+        - name: wins-config
+          mountPath: c:/etc/rancher/wins
       volumes:
       - name: k8s-ssl
         hostPath:
@@ -332,14 +331,19 @@ spec:
       - name: wins-pipe
         hostPath:
           path: \\.\pipe\rancher_wins
+      - name: wins-config
+        hostPath:
+          path: c:/etc/rancher/wins
+          type: DirectoryOrCreate
   updateStrategy:
     type: RollingUpdate
+{{- end }}
 
 {{- if .AuthImage}}
 
 ---
 
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
     name: kube-api-auth
@@ -390,7 +394,7 @@ spec:
 `
 
 var AuthDaemonSet = `
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
     name: kube-api-auth

@@ -5,7 +5,7 @@ import (
 )
 
 func TestVersion(t *testing.T) {
-	expectedVersion := "system-library-rancher-logging-0.1.1"
+	expectedVersion := "system-library-rancher-logging-initializing"
 	loggingService := &LoggingService{}
 	version, err := loggingService.Version()
 	if err != nil {

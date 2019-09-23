@@ -89,12 +89,12 @@ const (
 	SystemNamespace = "kube-system"
 )
 
-func (c *Cluster) DeployControlPlane(ctx context.Context, svcOptions *v3.KubernetesServicesOptions) error {
+func (c *Cluster) DeployControlPlane(ctx context.Context, svcOptionData map[string]*v3.KubernetesServicesOptions) error {
 	// Deploy Etcd Plane
 	etcdNodePlanMap := make(map[string]v3.RKEConfigNodePlan)
 	// Build etcd node plan map
 	for _, etcdHost := range c.EtcdHosts {
-		etcdNodePlanMap[etcdHost.Address] = BuildRKEConfigNodePlan(ctx, c, etcdHost, etcdHost.DockerInfo, svcOptions)
+		etcdNodePlanMap[etcdHost.Address] = BuildRKEConfigNodePlan(ctx, c, etcdHost, etcdHost.DockerInfo, svcOptionData)
 	}
 
 	if len(c.Services.Etcd.ExternalURLs) > 0 {
@@ -109,7 +109,7 @@ func (c *Cluster) DeployControlPlane(ctx context.Context, svcOptions *v3.Kuberne
 	cpNodePlanMap := make(map[string]v3.RKEConfigNodePlan)
 	// Build cp node plan map
 	for _, cpHost := range c.ControlPlaneHosts {
-		cpNodePlanMap[cpHost.Address] = BuildRKEConfigNodePlan(ctx, c, cpHost, cpHost.DockerInfo, svcOptions)
+		cpNodePlanMap[cpHost.Address] = BuildRKEConfigNodePlan(ctx, c, cpHost, cpHost.DockerInfo, svcOptionData)
 	}
 	if err := services.RunControlPlane(ctx, c.ControlPlaneHosts,
 		c.LocalConnDialerFactory,
@@ -124,13 +124,13 @@ func (c *Cluster) DeployControlPlane(ctx context.Context, svcOptions *v3.Kuberne
 	return nil
 }
 
-func (c *Cluster) DeployWorkerPlane(ctx context.Context, svcOptions *v3.KubernetesServicesOptions) error {
+func (c *Cluster) DeployWorkerPlane(ctx context.Context, svcOptionData map[string]*v3.KubernetesServicesOptions) error {
 	// Deploy Worker plane
 	workerNodePlanMap := make(map[string]v3.RKEConfigNodePlan)
 	// Build cp node plan map
 	allHosts := hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, c.WorkerHosts)
 	for _, workerHost := range allHosts {
-		workerNodePlanMap[workerHost.Address] = BuildRKEConfigNodePlan(ctx, c, workerHost, workerHost.DockerInfo, svcOptions)
+		workerNodePlanMap[workerHost.Address] = BuildRKEConfigNodePlan(ctx, c, workerHost, workerHost.DockerInfo, svcOptionData)
 	}
 	if err := services.RunWorkerPlane(ctx, allHosts,
 		c.LocalConnDialerFactory,
@@ -310,6 +310,8 @@ func ApplyAuthzResources(ctx context.Context, rkeConfig v3.RancherKubernetesEngi
 	if len(kubeCluster.ControlPlaneHosts) == 0 {
 		return nil
 	}
+	// Print proxy environment variables as we are directly contacting the cluster
+	util.PrintProxyEnvVars()
 	if err := authz.ApplyJobDeployerServiceAccount(ctx, kubeCluster.LocalKubeConfigPath, kubeCluster.K8sWrapTransport); err != nil {
 		return fmt.Errorf("Failed to apply the ServiceAccount needed for job execution: %v", err)
 	}
@@ -354,7 +356,7 @@ func (c *Cluster) SyncLabelsAndTaints(ctx context.Context, currentCluster *Clust
 	if currentCluster != nil {
 		cpToDelete := hosts.GetToDeleteHosts(currentCluster.ControlPlaneHosts, c.ControlPlaneHosts, c.InactiveHosts, false)
 		if len(cpToDelete) == len(currentCluster.ControlPlaneHosts) {
-			log.Infof(ctx, "[sync] Cleaning left control plane nodes from reconcilation")
+			log.Infof(ctx, "[sync] Cleaning left control plane nodes from reconciliation")
 			for _, toDeleteHost := range cpToDelete {
 				if err := cleanControlNode(ctx, c, currentCluster, toDeleteHost); err != nil {
 					return err

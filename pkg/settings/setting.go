@@ -32,13 +32,13 @@ var (
 	KubernetesVersionToServiceOptions = NewSetting("k8s-version-to-service-options", "")
 	KubernetesVersionToSystemImages   = NewSetting("k8s-version-to-images", "")
 	KubernetesVersionsCurrent         = NewSetting("k8s-versions-current", "")
+	KubernetesVersionsDeprecated      = NewSetting("k8s-versions-deprecated", "")
 	MachineVersion                    = NewSetting("machine-version", "dev")
 	Namespace                         = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PeerServices                      = NewSetting("peer-service", os.Getenv("CATTLE_PEER_SERVICE"))
 	RDNSServerBaseURL                 = NewSetting("rdns-base-url", "https://api.lb.rancher.cloud/v1")
 	RkeVersion                        = NewSetting("rke-version", "")
-	RkeMetadataURL                    = NewSetting("rke-metadata-url", getMetadataURL())
-	RkeMetadataRefreshIntervalMins    = NewSetting("rke-metadata-refresh-interval-minutes", "1440")
+	RkeMetadataConfig                 = NewSetting("rke-metadata-config", getMetadataConfig())
 	ServerImage                       = NewSetting("server-image", "rancher/rancher")
 	ServerURL                         = NewSetting("server-url", "")
 	ServerVersion                     = NewSetting("server-version", "dev")
@@ -55,10 +55,7 @@ var (
 	UIKubernetesDefaultVersion        = NewSetting("ui-k8s-default-version-range", "<=1.14.x")
 	WhitelistDomain                   = NewSetting("whitelist-domain", "forums.rancher.com")
 	WhitelistEnvironmentVars          = NewSetting("whitelist-envvars", "HTTP_PROXY,HTTPS_PROXY,NO_PROXY")
-	SystemMonitoringCatalogID         = NewSetting("system-monitoring-catalog-id", "catalog://?catalog=system-library&template=rancher-monitoring&version=0.0.3")
-	SystemLoggingCatalogID            = NewSetting("system-logging-catalog-id", "catalog://?catalog=system-library&template=rancher-logging&version=0.1.1")
-	SystemExternalDNSCatalogID        = NewSetting("system-externaldns-catalog-id", "catalog://?catalog=system-library&template=rancher-external-dns&version=0.0.1")
-	SystemGlobalIstioCatalogID        = NewSetting("system-global-istio-catalog-id", "catalog://?catalog=system-library&template=rancher-istio&version=0.0.1")
+	SystemExternalDNSCatalogID        = NewSetting("system-externaldns-catalog-id", "catalog://?catalog=system-library&template=rancher-external-dns&version=0.0.2")
 	SystemCISBenchmarkCatalogID       = NewSetting("system-cis-benchmark-catalog-id", "catalog://?catalog=system-library&template=rancher-cis-benchmark&version=0.1.0")
 	AuthUserInfoResyncCron            = NewSetting("auth-user-info-resync-cron", "0 0 * * *")
 	AuthUserSessionTTLMinutes         = NewSetting("auth-user-session-ttl-minutes", "960")   // 16 hours
@@ -146,10 +143,11 @@ func NewSetting(name, def string) Setting {
 	return s
 }
 
-func getMetadataURL() string {
+func getMetadataConfig() string {
 	data := map[string]interface{}{
-		"url":    "https://github.com/rancher/kontainer-driver-metadata.git",
-		"branch": "master",
+		"url":                      "https://github.com/rancher/kontainer-driver-metadata.git",
+		"branch":                   "master",
+		"refresh-interval-minutes": "1440",
 	}
 	ans, err := json.Marshal(data)
 	if err == nil {

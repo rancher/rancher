@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/store/workload"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	client "github.com/rancher/types/client/management/v3"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
@@ -83,15 +86,48 @@ func (n nodeStore) Update(apiContext *types.APIContext, schema *types.Schema, da
 	if err := n.validateDesiredTaints(data); err != nil {
 		return nil, err
 	}
+
+	node := client.Node{}
+	err := access.ByID(apiContext, apiContext.Version, apiContext.Type, id, &node)
+	if err != nil {
+		return nil, err
+	}
+
+	changed := v3.MetadataUpdate{
+		Labels:      diff(convert.ToMapInterface(data["labels"]), node.Labels),
+		Annotations: diff(convert.ToMapInterface(data["annotations"]), node.Annotations),
+	}
+
+	data["metadataUpdate"] = changed
 	format(data)
+
 	return n.Store.Update(apiContext, schema, data, id)
 }
 
+func diff(desired map[string]interface{}, actual map[string]string) (result v3.MapDelta) {
+	if len(desired) == 0 {
+		return
+	}
+
+	result.Delete = map[string]bool{}
+	result.Add = map[string]string{}
+
+	for k, v := range desired {
+		if actual[k] != v {
+			result.Add[k] = convert.ToString(v)
+		}
+	}
+
+	for k := range actual {
+		if _, exists := desired[k]; !exists {
+			result.Delete[k] = true
+		}
+	}
+
+	return
+}
+
 func format(data map[string]interface{}) {
-	data["currentNodeLabels"] = map[string]string{apiUpdate: "true"}
-	data["currentNodeAnnotations"] = map[string]string{apiUpdate: "true"}
-	data["desiredNodeLabels"] = data["labels"]
-	data["desiredNodeAnnotations"] = data["annotations"]
 	data["desiredNodeTaints"] = data["taints"]
 	trueValue := true
 	data["updateTaintsFromAPI"] = &trueValue
