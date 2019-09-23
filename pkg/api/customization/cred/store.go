@@ -9,7 +9,8 @@ import (
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/rancher/pkg/api/customization/globalresource"
+	"github.com/rancher/rancher/pkg/api/customization/namespacedresource"
+	"github.com/rancher/rancher/pkg/namespace"
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"k8s.io/apimachinery/pkg/labels"
@@ -35,10 +36,7 @@ func Wrap(store types.Store, ns v1.NamespaceInterface, nodeTemplateLister v3.Nod
 		nodeTemplateLister,
 	}
 
-	return &globalresource.GlobalNamespaceStore{
-		Store:              newStore,
-		NamespaceInterface: ns,
-	}
+	return namespacedresource.Wrap(newStore, ns, namespace.GlobalNamespace)
 }
 
 func configExists(data map[string]interface{}) bool {
