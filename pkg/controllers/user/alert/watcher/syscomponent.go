@@ -7,7 +7,6 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/user/alert/common"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
-	"github.com/rancher/rancher/pkg/ticker"
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -39,10 +38,17 @@ func StartSysComponentWatcher(ctx context.Context, cluster *config.UserContext, 
 }
 
 func (w *SysComponentWatcher) watch(ctx context.Context, interval time.Duration) {
-	for range ticker.Context(ctx, interval) {
-		err := w.watchRule()
-		if err != nil {
-			logrus.Infof("Failed to watch system component, error: %v", err)
+	tryTicker := time.NewTicker(interval)
+
+	for {
+		select{
+		case <-ctx.Done():
+			return
+		case <-tryTicker.C:
+			err := w.watchRule()
+			if err != nil {
+				logrus.Infof("Failed to watch system component, error: %v", err)
+			}
 		}
 	}
 }

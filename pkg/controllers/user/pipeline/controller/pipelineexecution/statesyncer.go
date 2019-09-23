@@ -8,7 +8,6 @@ import (
 	"github.com/rancher/rancher/pkg/pipeline/engine"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/rancher/pkg/ticker"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,10 +33,16 @@ type ExecutionStateSyncer struct {
 }
 
 func (s *ExecutionStateSyncer) sync(ctx context.Context, syncInterval time.Duration) {
-	for range ticker.Context(ctx, syncInterval) {
-		s.syncState()
-	}
+	tryTicker := time.NewTicker(syncInterval)
 
+	for {
+		select{
+		case <-ctx.Done():
+			return
+		case <-tryTicker.C:
+			s.syncState()
+		}
+	}
 }
 
 func (s *ExecutionStateSyncer) syncState() {

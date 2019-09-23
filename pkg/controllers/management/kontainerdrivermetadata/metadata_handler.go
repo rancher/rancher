@@ -16,7 +16,6 @@ import (
 	"github.com/rancher/rancher/pkg/catalog/git"
 	"github.com/rancher/rancher/pkg/randomtoken"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/ticker"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -166,20 +165,27 @@ func (m *MetadataController) sync(key string, setting *v3.Setting) (runtime.Obje
 
 func (m *MetadataController) startTicker(ctx context.Context, tickerData *TickerData) {
 	checkInterval := tickerData.interval
-	for range ticker.Context(ctx, checkInterval) {
-		logrus.Infof("driverMetadata: checking rke-metadata-url every %v", checkInterval)
-		settingValues, err := getSettingValues()
-		if err != nil {
-			logrus.Errorf("driverMetadata: error getting settings %v %v", settingValues, err)
+	tryTicker := time.NewTicker(checkInterval)
+
+	for {
+		select{
+		case <-ctx.Done():
 			return
-		}
-		url, err := parseURL(settingValues)
-		if err != nil {
-			logrus.Errorf("driverMetadata: error parsing url %v %v", url, err)
-			return
-		}
-		if err := m.refresh(url, false); err != nil {
-			logrus.Errorf("driverMetadata failed to refresh %v", err)
+		case <-tryTicker.C:
+			logrus.Infof("driverMetadata: checking rke-metadata-url every %v", checkInterval)
+			settingValues, err := getSettingValues()
+			if err != nil {
+				logrus.Errorf("driverMetadata: error getting settings %v %v", settingValues, err)
+				return
+			}
+			url, err := parseURL(settingValues)
+			if err != nil {
+				logrus.Errorf("driverMetadata: error parsing url %v %v", url, err)
+				return
+			}
+			if err := m.refresh(url, false); err != nil {
+				logrus.Errorf("driverMetadata failed to refresh %v", err)
+			}
 		}
 	}
 }

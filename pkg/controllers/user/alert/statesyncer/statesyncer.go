@@ -7,7 +7,6 @@ import (
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/common"
 	"github.com/rancher/rancher/pkg/controllers/user/alert/manager"
-	"github.com/rancher/rancher/pkg/ticker"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -26,8 +25,15 @@ func StartStateSyncer(ctx context.Context, cluster *config.UserContext, manager 
 }
 
 func (s *StateSyncer) watch(ctx context.Context, interval time.Duration) {
-	for range ticker.Context(ctx, interval) {
-		s.syncState()
+	tryTicker := time.NewTicker(interval)
+
+	for {
+		select{
+		case <-ctx.Done():
+			return
+		case <-tryTicker.C:
+			s.syncState()
+		}
 	}
 }
 

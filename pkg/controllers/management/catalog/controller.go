@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/catalog/manager"
-	"github.com/rancher/rancher/pkg/ticker"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -27,40 +26,61 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 }
 
 func runRefreshCatalog(ctx context.Context, interval int, controller v3.CatalogController, m *manager.Manager) {
-	for range ticker.Context(ctx, time.Duration(interval)*time.Second) {
-		catalogs, err := m.CatalogLister.List("", labels.NewSelector())
-		if err != nil {
-			logrus.Error(err)
-			continue
-		}
-		for _, catalog := range catalogs {
-			controller.Enqueue("", catalog.Name)
+	tryTicker := time.NewTicker(time.Duration(interval)*time.Second)
+
+	for {
+		select{
+		case <-ctx.Done():
+			return
+		case <-tryTicker.C:
+			catalogs, err := m.CatalogLister.List("", labels.NewSelector())
+			if err != nil {
+				logrus.Error(err)
+				continue
+			}
+			for _, catalog := range catalogs {
+				controller.Enqueue("", catalog.Name)
+			}
 		}
 	}
 }
 
 func runRefreshProjectCatalog(ctx context.Context, interval int, controller v3.ProjectCatalogController, m *manager.Manager) {
-	for range ticker.Context(ctx, time.Duration(interval)*time.Second) {
-		projectCatalogs, err := m.ProjectCatalogLister.List("", labels.NewSelector())
-		if err != nil {
-			logrus.Error(err)
-			continue
-		}
-		for _, pc := range projectCatalogs {
-			controller.Enqueue(pc.Namespace, pc.Name)
+	tryTicker := time.NewTicker(time.Duration(interval)*time.Second)
+
+	for {
+		select{
+		case <-ctx.Done():
+			return
+		case <-tryTicker.C:
+			projectCatalogs, err := m.ProjectCatalogLister.List("", labels.NewSelector())
+			if err != nil {
+				logrus.Error(err)
+				continue
+			}
+			for _, pc := range projectCatalogs {
+				controller.Enqueue(pc.Namespace, pc.Name)
+			}
 		}
 	}
 }
 
 func runRefreshClusterCatalog(ctx context.Context, interval int, controller v3.ClusterCatalogController, m *manager.Manager) {
-	for range ticker.Context(ctx, time.Duration(interval)*time.Second) {
-		clusterCatalogs, err := m.ClusterCatalogLister.List("", labels.NewSelector())
-		if err != nil {
-			logrus.Error(err)
-			continue
-		}
-		for _, cc := range clusterCatalogs {
-			controller.Enqueue(cc.Namespace, cc.Name)
+	tryTicker := time.NewTicker(time.Duration(interval)*time.Second)
+
+	for {
+		select{
+		case <-ctx.Done():
+			return
+		case <-tryTicker.C:
+			clusterCatalogs, err := m.ClusterCatalogLister.List("", labels.NewSelector())
+			if err != nil {
+				logrus.Error(err)
+				continue
+			}
+			for _, cc := range clusterCatalogs {
+				controller.Enqueue(cc.Namespace, cc.Name)
+			}
 		}
 	}
 }

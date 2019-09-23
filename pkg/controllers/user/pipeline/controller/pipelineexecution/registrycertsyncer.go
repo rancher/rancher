@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/pipeline/utils"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/rancher/pkg/ticker"
 	"github.com/rancher/rke/pki/cert"
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
@@ -43,8 +42,15 @@ type RegistryCertSyncer struct {
 }
 
 func (s *RegistryCertSyncer) sync(ctx context.Context, syncInterval time.Duration) {
-	for range ticker.Context(ctx, checkCertRotateInterval) {
-		s.checkAndRotateCerts(ctx)
+	tryTicker := time.NewTicker(checkCertRotateInterval)
+
+	for {
+		select{
+		case <-ctx.Done():
+			return
+		case <-tryTicker.C:
+			s.checkAndRotateCerts(ctx)
+		}
 	}
 }
 
@@ -104,16 +110,24 @@ func (s *RegistryCertSyncer) rotateCerts(ctx context.Context, projectID string) 
 	set := labels.Set(map[string]string{utils.PipelineFinishLabel: "false"})
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
 	defer cancelFunc()
-	for range ticker.Context(cancelCtx, time.Minute) {
-		runningExecutions, err := s.pipelineExecutionLister.List(projectID, set.AsSelector())
-		if err != nil {
-			return err
-		}
-		if len(runningExecutions) == 0 {
-			break
-		}
-		if time.Now().After(startTime.Add(maxRetry * time.Minute)) {
-			return errors.New("time out waiting all executions to finish")
+	tryTicker := time.NewTicker(time.Minute)
+
+	outer:
+	for {
+		select{
+		case <-cancelCtx.Done():
+			break outer
+		case <-tryTicker.C:
+			runningExecutions, err := s.pipelineExecutionLister.List(projectID, set.AsSelector())
+			if err != nil {
+				return err
+			}
+			if len(runningExecutions) == 0 {
+				break outer
+			}
+			if time.Now().After(startTime.Add(maxRetry * time.Minute)) {
+				return errors.New("time out waiting all executions to finish")
+			}
 		}
 	}
 

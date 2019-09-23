@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/controllers/user/logging/utils"
-	"github.com/rancher/rancher/pkg/ticker"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/config/dialer"
@@ -35,13 +34,20 @@ func StartEndpointWatcher(ctx context.Context, cluster *config.UserContext) {
 }
 
 func (e *endpointWatcher) watch(ctx context.Context, interval time.Duration) {
-	for range ticker.Context(ctx, interval) {
-		if err := e.checkClusterTarget(); err != nil {
-			logrus.Error(err)
-		}
+	tryTicker := time.NewTicker(interval)
 
-		if err := e.checkProjectTarget(); err != nil {
-			logrus.Error(err)
+	for {
+		select{
+		case <-ctx.Done():
+			return
+		case <-tryTicker.C:
+			if err := e.checkClusterTarget(); err != nil {
+				logrus.Error(err)
+			}
+
+			if err := e.checkProjectTarget(); err != nil {
+				logrus.Error(err)
+			}
 		}
 	}
 }

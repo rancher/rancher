@@ -1,17 +1,13 @@
 package healthsyncer
 
 import (
-	"time"
-
 	"context"
-
 	"reflect"
-
 	"sort"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/condition"
-	"github.com/rancher/rancher/pkg/ticker"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -53,10 +49,17 @@ func Register(ctx context.Context, workload *config.UserContext, clusterManager 
 }
 
 func (h *HealthSyncer) syncHealth(ctx context.Context, syncHealth time.Duration) {
-	for range ticker.Context(ctx, syncHealth) {
-		err := h.updateClusterHealth()
-		if err != nil && !apierrors.IsConflict(err) {
-			logrus.Error(err)
+	tryTicker := time.NewTicker(syncHealth)
+
+	for {
+		select{
+		case <-ctx.Done():
+			return
+		case <-tryTicker.C:
+			err := h.updateClusterHealth()
+			if err != nil && !apierrors.IsConflict(err) {
+				logrus.Error(err)
+			}
 		}
 	}
 }

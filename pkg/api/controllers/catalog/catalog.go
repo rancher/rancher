@@ -9,7 +9,6 @@ import (
 
 	"github.com/bep/debounce"
 	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
-	"github.com/rancher/rancher/pkg/ticker"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -40,8 +39,15 @@ func Register(ctx context.Context, context *config.ScaledContext) {
 
 func (c *CacheCleaner) runPeriodicCatalogCacheCleaner(ctx context.Context, interval time.Duration) {
 	c.GoCleanupLogError()
-	for range ticker.Context(ctx, interval) {
-		c.GoCleanupLogError()
+	tryTicker := time.NewTicker(interval)
+
+	for {
+		select{
+		case <-ctx.Done():
+			return
+		case <-tryTicker.C:
+			c.GoCleanupLogError()
+		}
 	}
 }
 

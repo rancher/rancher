@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/namespace"
-	"github.com/rancher/rancher/pkg/ticker"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
@@ -55,9 +54,15 @@ func deleteContext(mcappName string) {
 }
 
 func startTicker(ctx context.Context, set int, mcApps v3.MultiClusterAppInterface, name string) {
-	interval := time.Duration(set) * time.Second
-	for range ticker.Context(ctx, interval) {
-		logrus.Debugf("mcappTicker: interval %v enqueue %s", set, name)
-		mcApps.Controller().Enqueue(namespace.GlobalNamespace, name)
+	tryTicker := time.NewTicker(time.Duration(set) * time.Second)
+
+	for {
+		select{
+		case <-ctx.Done():
+			return
+		case <-tryTicker.C:
+			logrus.Debugf("mcappTicker: interval %v enqueue %s", set, name)
+			mcApps.Controller().Enqueue(namespace.GlobalNamespace, name)
+		}
 	}
 }

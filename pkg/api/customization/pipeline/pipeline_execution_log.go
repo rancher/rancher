@@ -11,7 +11,6 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/pipeline/engine"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/rancher/pkg/ticker"
 	"github.com/sirupsen/logrus"
 )
 
@@ -77,39 +76,46 @@ func (h *ExecutionHandler) handleLog(apiContext *types.APIContext) error {
 	}()
 
 	prevLog := ""
-	for range ticker.Context(cancelCtx, logSyncInterval) {
-		execution, err = h.PipelineExecutionLister.Get(ns, name)
-		if err != nil {
-			logrus.Debugf("error in execution get: %v", err)
-			if prevLog == "" {
-				writeData(c, []byte("Log is unavailable."))
-			}
-			c.WriteControl(websocket.CloseMessage, []byte{}, time.Now().Add(writeWait))
+
+	tryTicker := time.NewTicker(logSyncInterval)
+
+	for {
+		select{
+		case <-cancelCtx.Done():
 			return nil
-		}
-		log, err := pipelineEngine.GetStepLog(execution, stage, step)
-		if err != nil {
-			logrus.Debug(err)
-			if prevLog == "" {
-				writeData(c, []byte("Log is unavailable."))
+		case <-tryTicker.C:
+			execution, err = h.PipelineExecutionLister.Get(ns, name)
+			if err != nil {
+				logrus.Debugf("error in execution get: %v", err)
+				if prevLog == "" {
+					writeData(c, []byte("Log is unavailable."))
+				}
+				c.WriteControl(websocket.CloseMessage, []byte{}, time.Now().Add(writeWait))
+				return nil
 			}
-			c.WriteControl(websocket.CloseMessage, []byte{}, time.Now().Add(writeWait))
-			return nil
-		}
-		newLog := getNewLog(prevLog, log)
-		prevLog = log
-		if newLog != "" {
-			if err := writeData(c, []byte(newLog)); err != nil {
-				logrus.Debugf("error in writeData: %v", err)
+			log, err := pipelineEngine.GetStepLog(execution, stage, step)
+			if err != nil {
+				logrus.Debug(err)
+				if prevLog == "" {
+					writeData(c, []byte("Log is unavailable."))
+				}
+				c.WriteControl(websocket.CloseMessage, []byte{}, time.Now().Add(writeWait))
+				return nil
+			}
+			newLog := getNewLog(prevLog, log)
+			prevLog = log
+			if newLog != "" {
+				if err := writeData(c, []byte(newLog)); err != nil {
+					logrus.Debugf("error in writeData: %v", err)
+					return nil
+				}
+			}
+			if execution.Status.Stages[stage].Steps[step].Ended != "" {
+				c.WriteControl(websocket.CloseMessage, []byte{}, time.Now().Add(writeWait))
 				return nil
 			}
 		}
-		if execution.Status.Stages[stage].Steps[step].Ended != "" {
-			c.WriteControl(websocket.CloseMessage, []byte{}, time.Now().Add(writeWait))
-			return nil
-		}
 	}
-	return nil
 }
 
 func writeData(c *websocket.Conn, buf []byte) error {
