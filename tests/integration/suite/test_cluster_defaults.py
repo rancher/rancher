@@ -1,6 +1,6 @@
 import json
 import pytest
-
+from rancher import ApiError
 from .common import random_str
 
 
@@ -78,3 +78,21 @@ def test_import_initial_conditions(admin_mc, remove_resource):
     remove_resource(cluster)
 
     assert cluster.conditions is None
+
+
+def test_rke_k8s_deprecated_versions(admin_mc, remove_resource):
+    client = admin_mc.client
+    deprecated_versions_setting = client.by_id_setting(
+                                "k8s-versions-deprecated")
+    client.update_by_id_setting(id=deprecated_versions_setting.id,
+                                value="{\"v1.8.10-rancher1-1\":true}")
+    with pytest.raises(ApiError) as e:
+        cluster = client.create_cluster(
+            name=random_str(), rancherKubernetesEngineConfig={
+                "kubernetesVersion": "v1.8.10-rancher1-1"})
+        remove_resource(cluster)
+    assert e.value.error.status == 500
+    assert e.value.error.message == 'Requested kubernetesVersion ' \
+                                    'v1.8.10-rancher1-1 is deprecated'
+    client.update_by_id_setting(id=deprecated_versions_setting.id,
+                                value="")
