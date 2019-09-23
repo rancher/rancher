@@ -115,11 +115,8 @@ func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) (
 	}
 
 	dn := externalID
-	if strings.Contains(externalID, `\`) {
-		dn = strings.SplitN(externalID, `\`, 2)[1]
-	}
 
-	logrus.Debugf("LDAP Search query: {%s}", dn)
+	logrus.Debugf("LDAP Refetch principals base DN : {%s}", dn)
 
 	search := ldapv2.NewSearchRequest(
 		dn,
