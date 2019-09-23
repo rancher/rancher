@@ -9,6 +9,7 @@ rb_resource = 'rolebinding'
 
 
 def test_create_cluster_template_with_revision(admin_mc, remove_resource):
+
     cluster_template = create_cluster_template(admin_mc,
                                                remove_resource, [], admin_mc)
     templateId = cluster_template.id
@@ -585,21 +586,6 @@ def test_member_accesstype_check(admin_mc, user_factory, remove_resource):
         assert e.error.status == 422
 
 
-@pytest.mark.skip(reason='flaky test maybe, skipping for now')
-def test_template_access(admin_mc, remove_resource, user_factory):
-    user = user_factory()
-    cluster_template = create_cluster_template(admin_mc, remove_resource,
-                                               [], admin_mc)
-    templateId = cluster_template.id
-    rev = create_cluster_template_revision(admin_mc.client, templateId)
-
-    with pytest.raises(ApiError) as e:
-        user.client.create_cluster(name=random_str(),
-                                   clusterTemplateRevisionId=rev.id,
-                                   description="template from cluster")
-    assert e.value.error.status == 404
-
-
 def test_create_cluster_with_invalid_revision(admin_mc, remove_resource):
     cluster_template = create_cluster_template(admin_mc,
                                                remove_resource, [], admin_mc)
@@ -712,6 +698,22 @@ def test_template_delete_by_members(admin_mc, remove_resource,
 
     admin_mc.client.delete(cluster)
     wait_for_cluster_to_be_deleted(admin_mc.client, cluster.id)
+
+
+def test_template_access(admin_mc, remove_resource, user_factory):
+    user = user_factory()
+    cluster_template = create_cluster_template(admin_mc, remove_resource,
+                                               [], admin_mc)
+    templateId = cluster_template.id
+    rev = create_cluster_template_revision(admin_mc.client, templateId)
+
+    wait_for_clusterTemplate_list_failure(user.client, rev)
+
+    with pytest.raises(ApiError) as e:
+        user.client.create_cluster(name=random_str(),
+                                   clusterTemplateRevisionId=rev.id,
+                                   description="template from cluster")
+    assert e.value.error.status == 404
 
 
 def rtb_cb(client, rtb):
@@ -923,5 +925,22 @@ def wait_for_clusterTemplate_update_failure(client, revision, timeout=45):
             if e.error.status == 422:
                 updateWorks = False
 
+        time.sleep(interval)
+        interval *= 2
+
+
+def wait_for_clusterTemplate_list_failure(client, revision, timeout=45):
+    listWorks = True
+    start = time.time()
+    interval = 0.5
+    while listWorks:
+        if time.time() - start > timeout:
+            raise AssertionError(
+                "Timed out waiting for clustertemplate list failure")
+        try:
+            client.by_id_cluster_template_revision(revision.id)
+        except ApiError as e:
+            if e.error.status == 403:
+                listWorks = False
         time.sleep(interval)
         interval *= 2
