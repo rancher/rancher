@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
-	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
+	"github.com/rancher/rancher/pkg/controllers/management/rbac"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -115,7 +115,7 @@ func (mc *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.
 	if err != nil {
 		return mcapp, err
 	}
-	creatorID, ok := metaAccessor.GetAnnotations()[globalnamespacerbac.CreatorIDAnn]
+	creatorID, ok := metaAccessor.GetAnnotations()[rbac.CreatorIDAnn]
 	if !ok {
 		return mcapp, fmt.Errorf("MultiClusterApp %v has no creatorId annotation. Cannot create apps for %v", metaAccessor.GetName(), mcapp.Name)
 	}
@@ -157,8 +157,8 @@ func (mc *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.
 		}
 	}
 
-	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.MultiClusterAppResource, mcapp.Name,
-		globalnamespacerbac.RancherManagementAPIVersion, creatorID, []string{globalnamespacerbac.RancherManagementAPIVersion},
+	if err := rbac.CreateRoleAndRoleBinding(rbac.MultiClusterAppResource, mcapp.Name, namespace.GlobalNamespace,
+		rbac.RancherManagementAPIVersion, creatorID, []string{rbac.RancherManagementAPIVersion},
 		mcapp.UID,
 		mcapp.Spec.Members, mc.managementContext); err != nil {
 		return nil, err
@@ -171,9 +171,9 @@ func (mc *MCAppController) sync(key string, mcapp *v3.MultiClusterApp) (runtime.
 		return mcapp, err
 	}
 	for _, rev := range revisions {
-		if err := globalnamespacerbac.CreateRoleAndRoleBinding(
-			globalnamespacerbac.MultiClusterAppRevisionResource, rev.Name, globalnamespacerbac.RancherManagementAPIVersion,
-			creatorID, []string{globalnamespacerbac.RancherManagementAPIVersion}, rev.UID, mcapp.Spec.Members,
+		if err := rbac.CreateRoleAndRoleBinding(
+			rbac.MultiClusterAppRevisionResource, rev.Name, namespace.GlobalNamespace, rbac.RancherManagementAPIVersion,
+			creatorID, []string{rbac.RancherManagementAPIVersion}, rev.UID, mcapp.Spec.Members,
 			mc.managementContext); err != nil {
 			return nil, err
 		}
@@ -190,7 +190,7 @@ func (r *MCAppRevisionController) sync(key string, mcappRevision *v3.MultiCluste
 	if err != nil {
 		return mcappRevision, err
 	}
-	creatorID, ok := metaAccessor.GetAnnotations()[globalnamespacerbac.CreatorIDAnn]
+	creatorID, ok := metaAccessor.GetAnnotations()[rbac.CreatorIDAnn]
 	if !ok {
 		return mcappRevision, fmt.Errorf("mcapp revision %v has no creatorId annotation", mcappRevision.Name)
 	}
@@ -204,9 +204,9 @@ func (r *MCAppRevisionController) sync(key string, mcappRevision *v3.MultiCluste
 		return mcappRevision, err
 	}
 
-	if err := globalnamespacerbac.CreateRoleAndRoleBinding(
-		globalnamespacerbac.MultiClusterAppRevisionResource, mcappRevision.Name, globalnamespacerbac.RancherManagementAPIVersion,
-		creatorID, []string{globalnamespacerbac.RancherManagementAPIVersion}, mcappRevision.UID, mcapp.Spec.Members,
+	if err := rbac.CreateRoleAndRoleBinding(
+		rbac.MultiClusterAppRevisionResource, mcappRevision.Name, namespace.GlobalNamespace, rbac.RancherManagementAPIVersion,
+		creatorID, []string{rbac.RancherManagementAPIVersion}, mcappRevision.UID, mcapp.Spec.Members,
 		r.managementContext); err != nil {
 		return nil, err
 	}
