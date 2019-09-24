@@ -4,9 +4,12 @@ from .common import *  # NOQA
 project = {}
 project_detail = {"c0_id": None, "c1_id": None, "c2_id": None,
                   "p0_id": None, "p1_id": None, "p2_id": None,
-                  "p_client0": None, "namespace0": None, "cluster0": None, "project0": None,
-                  "p_client1": None, "namespace1": None, "cluster1": None, "project1": None,
-                  "p_client2": None, "namespace2": None, "cluster2": None, "project2": None}
+                  "p_client0": None, "namespace0": None,
+                  "cluster0": None, "project0": None,
+                  "p_client1": None, "namespace1": None,
+                  "cluster1": None, "project1": None,
+                  "p_client2": None, "namespace2": None,
+                  "cluster2": None, "project2": None}
 
 global_client = {"client": None, "cluster_count": False}
 answer_105version = {
@@ -199,11 +202,12 @@ def test_multi_cluster_template_upgrade():
     for projectid in project:
         targets.append({"projectId": projectid, "type": "target"})
     client = global_client["client"]
-    multiclusterapp = client.create_multiClusterApp(templateVersionId=MYSQL_TEMP_VER,
-                                                    targets=targets,
-                                                    roles=ROLES,
-                                                    name=random_name(),
-                                                    answers=[mysql_answers])
+    multiclusterapp = client.create_multiClusterApp(
+        templateVersionId=MYSQL_TEMP_VER,
+        targets=targets,
+        roles=ROLES,
+        name=random_name(),
+        answers=[mysql_answers])
     multiclusterapp = wait_for_mcapp_to_active(client, multiclusterapp)
     validate_multi_cluster_app_cluster(multiclusterapp)
     multiclusterapp = client.update(multiclusterapp,
@@ -221,11 +225,12 @@ def test_multi_cluster_template_rollback():
     for projectid in project:
         targets.append({"projectId": projectid, "type": "target"})
     client = global_client["client"]
-    multiclusterapp = client.create_multiClusterApp(templateVersionId=MYSQL_TEMP_VER,
-                                                    targets=targets,
-                                                    roles=ROLES,
-                                                    name=random_name(),
-                                                    answers=[mysql_answers])
+    multiclusterapp = client.create_multiClusterApp(
+        templateVersionId=MYSQL_TEMP_VER,
+        targets=targets,
+        roles=ROLES,
+        name=random_name(),
+        answers=[mysql_answers])
     multiclusterapp = wait_for_mcapp_to_active(client, multiclusterapp)
     validate_multi_cluster_app_cluster(multiclusterapp)
     first_id = multiclusterapp["status"]["revisionId"]
@@ -251,12 +256,12 @@ def test_multi_cluster_upgrade_and_add_target():
     targets = [{"projectId": project_id, "type": "target"}]
     project_id_2 = project_detail["p1_id"]
     client = global_client["client"]
-    multiclusterapp = client.create_multiClusterApp(templateVersionId=MYSQL_TEMP_VER,
-                                                    roles=ROLES,
-                                                    targets=targets,
-                                                    name=random_name(),
-                                                    answers=[mysql_answers],
-                                                    )
+    multiclusterapp = client.create_multiClusterApp(
+        templateVersionId=MYSQL_TEMP_VER,
+        roles=ROLES,
+        targets=targets,
+        name=random_name(),
+        answers=[mysql_answers])
     multiclusterapp = wait_for_mcapp_to_active(client, multiclusterapp)
     uuid = multiclusterapp.uuid
     name = multiclusterapp.name
@@ -279,47 +284,40 @@ def test_multi_cluster_project_answer_override():
     for projectid in project:
         targets.append({"projectId": projectid, "type": "target"})
     client = global_client["client"]
-    multiclusterapp = client.create_multiClusterApp(templateVersionId=MYSQL_TEMP_VER,
-                                                    targets=targets,
-                                                    roles=ROLES,
-                                                    name=random_name(),
-                                                    answers=[mysql_answers],
-                                                    )
+    multiclusterapp = client.create_multiClusterApp(
+        templateVersionId=MYSQL_TEMP_VER,
+        targets=targets,
+        roles=ROLES,
+        name=random_name(),
+        answers=[mysql_answers])
     multiclusterapp = wait_for_mcapp_to_active(client, multiclusterapp)
-    mysql_override = [{
-        "values": {
-            "defaultImage": "true",
-            "image": "mysql",
-            "imageTag": "5.7.14",
-            "mysqlDatabase": "admin",
-            "mysqlPassword": "",
-            "mysqlUser": "admin",
-            "persistence.enabled": "false",
-            "persistence.size": "8Gi",
-            "persistence.storageClass": "",
-            "service.nodePort": "",
-            "service.port": "3306",
-            "service.type": "ClusterIP"
-        }
-    },
-        {
+    answers_override = {
             "clusterId": None,
             "projectId": project_detail["p0_id"],
             "type": "/v3/schemas/answer",
             "values": {
-                "mysqlUser": "test_override"
-            }
-        }]
+                "mysqlUser": "test_override"}
+    }
+    mysql_override = []
+    mysql_override.extend([mysql_answers, answers_override])
     multiclusterapp = client.update(multiclusterapp,
                                     roles=ROLES,
-                                    answers=mysql_override
-                                    )
+                                    answers=mysql_override)
     multiclusterapp = client.reload(multiclusterapp)
+    multiclusterapp = wait_for_mcapp_to_active(client, multiclusterapp)
+    projectId_answer_override = project_detail["p0_id"]
     for i in range(0, len(multiclusterapp.targets)):
         project_client = project_detail["p_client"+str(i)]
-        app = multiclusterapp.targets[i].projectId.split(":")
-        appid = app[1] + ":" + multiclusterapp.targets[i].appId
-        validate_answer_override(project_client, appid, i)
+        app_id = multiclusterapp.targets[i].appId
+        target_project_id = multiclusterapp.targets[i].projectId
+        app_answers = project_client.list_app(id=app_id).data[0].answers
+        if target_project_id == projectId_answer_override:
+            assert answers_override["values"]["mysqlUser"] == \
+                   app_answers.get("mysqlUser"), \
+                   "Answers are not available on the expected project"
+        else:
+            assert app_answers.get("mysqlUser") == "admin", \
+                "answers should not have changed"
     delete_multi_cluster_app(multiclusterapp)
 
 
@@ -378,11 +376,12 @@ def test_multi_cluster_role_change():
         targets.append({"projectId": projectid, "type": "target"})
     client = global_client["client"]
     original_role = ["project-member"]
-    multiclusterapp = client.create_multiClusterApp(templateVersionId=GRAFANA_VER,
-                                                    targets=targets,
-                                                    roles=original_role,
-                                                    name=random_name(),
-                                                    answers=[grafana_answers])
+    multiclusterapp = client.create_multiClusterApp(
+        templateVersionId=GRAFANA_VER,
+        targets=targets,
+        roles=original_role,
+        name=random_name(),
+        answers=[grafana_answers])
     try:
         multiclusterapp = wait_for_mcapp_to_active(client, multiclusterapp)
     except Exception:
@@ -480,50 +479,63 @@ def test_multi_cluster_cluster_answer_override():
     targets = []
     for projectid in project:
         targets.append({"projectId": projectid, "type": "target"})
-    mysql_override = [{
-        "values": {
-            "defaultImage": "true",
-            "image": "mysql",
-            "imageTag": "5.7.14",
-            "mysqlDatabase": "admin",
-            "mysqlPassword": "",
-            "mysqlUser": "admin",
-            "persistence.enabled": "false",
-            "persistence.size": "8Gi",
-            "persistence.storageClass": "",
-            "service.nodePort": "",
-            "service.port": "3306",
-            "service.type": "ClusterIP"
-        }
-    },
-        {
-            "clusterId": project_detail["c0_id"],
-            "projectId": None,
-            "type": "/v3/schemas/answer",
-            "values": {
-                "mysqlUser": "test_override"
-            }
-        }]
-    multiclusterapp = client.create_multiClusterApp(templateVersionId=MYSQL_TEMP_VER,
-                                                    targets=targets,
-                                                    roles=ROLES,
-                                                    name=random_name(),
-                                                    answers=[mysql_answers],
-                                                    )
+    multiclusterapp = client.create_multiClusterApp(
+        templateVersionId=MYSQL_TEMP_VER,
+        targets=targets,
+        roles=ROLES,
+        name=random_name(),
+        answers=[mysql_answers])
     multiclusterapp = wait_for_mcapp_to_active(client, multiclusterapp)
+    answers_override_cluster = {
+        "clusterId": project_detail["c0_id"],
+        "projectId": None,
+        "type": "/v3/schemas/answer",
+        "values": {
+            "mysqlUser": "test_override"}
+    }
+    mysql_override_cluster = []
+    mysql_override_cluster.extend([mysql_answers, answers_override_cluster])
+    clusterId_answer_override = project_detail["c0_id"]
     multiclusterapp = client.update(multiclusterapp,
                                     roles=ROLES,
-                                    answers=mysql_override
-                                    )
+                                    answers=mysql_override_cluster)
     multiclusterapp = client.reload(multiclusterapp)
+    multiclusterapp = wait_for_mcapp_to_active(client, multiclusterapp)
     for i in range(0, len(multiclusterapp.targets)):
         project_client = project_detail["p_client" + str(i)]
-        app = multiclusterapp.targets[i].projectId.split(":")
-        appid = app[1] + ":" + multiclusterapp.targets[i].appId
-        validate_answer_override(project_client, appid, i)
-    client_admin = get_admin_client()
-    client_admin.delete(p3, ns3, p_client2)
+        app_id = multiclusterapp.targets[i].appId
+        target_projectId = multiclusterapp.targets[i].projectId
+        target_clusterId = target_projectId.split(":")[0]
+        app_answers = project_client.list_app(id=app_id).data[0].answers
+        if target_clusterId == clusterId_answer_override:
+            assert answers_override_cluster["values"]["mysqlUser"] == \
+                   app_answers.get("mysqlUser"), \
+                   "Answers are not available on the expected project"
+        else:
+            assert app_answers.get("mysqlUser") == "admin", \
+                "answers should not have changed"
     delete_multi_cluster_app(multiclusterapp)
+    client.delete(p3, ns3, p_client2)
+
+
+def validate_answer_override(project_client, appid, i):
+        app_answers = project_client.list_app(id=appid).data[0].answers
+        start = time.time()
+        if i == 0:
+            while app_answers.get("mysqlUser") != "test_override":
+                if time.time() - start > 120:
+                    assert False, "timed out waiting for answer override"
+                time.sleep(1)
+                app_answers = project_client.list_app(id=appid).data[0].answers
+        elif i == 1:
+            assert app_answers.get("mysqlUser") == "admin", \
+                "answers should not have changed"
+        elif i == 2:
+            while app_answers.get("mysqlUser") != "test_override":
+                if time.time() - start > 120:
+                    assert False, "timed out waiting for answer override"
+                time.sleep(1)
+                app_answers = project_client.list_app(id=appid).data[0].answers
 
 
 @pytest.fixture(scope='module', autouse="True")
@@ -668,23 +680,3 @@ def validate_all_answer_override_mca(multiclusterapp):
             project_client.list_app(id=appid).data[0].answers
         assert str(val) == str(app_answers), \
             "App answers are different than the Multi cluster answers"
-
-
-def validate_answer_override(project_client, appid, i):
-    app_answers = project_client.list_app(id=appid).data[0].answers
-    start = time.time()
-    if i == 0:
-        while app_answers.get("mysqlUser") != "test_override":
-            if time.time()-start > 120:
-                assert False, "timed out waiting for answer override"
-            time.sleep(1)
-            app_answers = project_client.list_app(id=appid).data[0].answers
-    elif i == 1:
-        assert app_answers.get("mysqlUser") == "admin", \
-            "answers should not have changed"
-    elif i == 2:
-        while app_answers.get("mysqlUser") != "test_override":
-            if time.time() - start > 120:
-                assert False, "timed out waiting for answer override"
-            time.sleep(1)
-            app_answers = project_client.list_app(id=appid).data[0].answers

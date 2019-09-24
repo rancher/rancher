@@ -1117,6 +1117,8 @@ def validate_file_content(pod, content, filename):
 def wait_for_mcapp_to_active(client, multiClusterApp,
                              timeout=DEFAULT_MULTI_CLUSTER_APP_TIMEOUT):
     time.sleep(5)
+    # When the app is deployed it goes into Active state for a short
+    # period of time and then into installing/deploying.
     mcapps = client.list_multiClusterApp(uuid=multiClusterApp.uuid,
                                          name=multiClusterApp.name).data
     start = time.time()
@@ -1186,6 +1188,9 @@ def validate_response_app_endpoint(p_client, appId):
 
 def wait_for_app_to_active(client, app_id,
                            timeout=DEFAULT_MULTI_CLUSTER_APP_TIMEOUT):
+    time.sleep(5)
+    #When the app is deployed it goes into Active state for a short
+    # period of time and then into installing/deploying.
     app_data = client.list_app(id=app_id).data
     start = time.time()
     assert len(app_data) >= 1, "Cannot find app"
