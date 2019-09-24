@@ -13,6 +13,7 @@ from lib.aws import AmazonWebServices
 
 DEFAULT_TIMEOUT = 120
 DEFAULT_MULTI_CLUSTER_APP_TIMEOUT = 300
+DEFAULT_APP_DELETION_TIMEOUT = 360
 
 CATTLE_TEST_URL = os.environ.get('CATTLE_TEST_URL', "http://localhost:80")
 CATTLE_API_URL = CATTLE_TEST_URL + "/v3"
@@ -1117,6 +1118,8 @@ def validate_file_content(pod, content, filename):
 def wait_for_mcapp_to_active(client, multiClusterApp,
                              timeout=DEFAULT_MULTI_CLUSTER_APP_TIMEOUT):
     time.sleep(5)
+    # When the app is deployed it goes into Active state for a short
+    # period of time and then into installing/deploying.
     mcapps = client.list_multiClusterApp(uuid=multiClusterApp.uuid,
                                          name=multiClusterApp.name).data
     start = time.time()
@@ -1136,20 +1139,26 @@ def wait_for_mcapp_to_active(client, multiClusterApp,
 
 def wait_for_app_to_active(client, app_id,
                            timeout=DEFAULT_MULTI_CLUSTER_APP_TIMEOUT):
+    time.sleep(5)
+    #When the app is deployed it goes into Active state for a short
+    # period of time and then into installing/deploying.
+    app_data = client.list_app(id=app_id).data
     start = time.time()
-    while True:
-        app_data = client.list_app(name=app_id).data
-        if len(app_data) == 1:
-            application = app_data[0]
-            if application.state == "active":
-                return application
+    assert len(app_data) >= 1, "Cannot find app"
+    application = app_data[0]
+    while application.state != "active":
         if time.time() - start > timeout:
             raise AssertionError(
                 "Timed out waiting for state to get to active")
         time.sleep(.5)
+        app = client.list_app(id=app_id).data
+        assert len(app) >= 1
+        application = app[0]
+    return application
 
 
-def validate_response_app_endpoint(p_client, appId):
+def validate_response_app_endpoint(p_client, appId,
+                                   timeout=DEFAULT_MULTI_CLUSTER_APP_TIMEOUT):
     ingress_list = p_client.list_ingress(namespaceId=appId).data
     assert len(ingress_list) == 1
     ingress = ingress_list[0]
@@ -1159,10 +1168,17 @@ def validate_response_app_endpoint(p_client, appId):
                 public_endpoint["protocol"].lower() + "://" + \
                 public_endpoint["hostname"]
             print(url)
+            start = time.time()
             try:
-                r = requests.head(url)
-                assert r.status_code == 200, \
-                    "Http response is not 200. Failed to launch the app"
+                while True:
+                    r = requests.head(url)
+                    print(r.status_code)
+                    if r.status_code == 200:
+                        return
+                    if time.time() - start > timeout:
+                        raise AssertionError(
+                            "Timed out waiting response to be 200.")
+                    time.sleep(.5)
             except requests.ConnectionError:
                 print("failed to connect")
                 assert False, "failed to connect to the app"
@@ -1240,4 +1256,20 @@ def get_defaut_question_answers(client, externalId):
                             get_answer(sub_question)
     print(questions_and_answers)
     return questions_and_answers
+
+
+def validate_app_deletion(client, app_id, timeout=DEFAULT_APP_DELETION_TIMEOUT):
+    app_data = client.list_app(id=app_id).data
+    start = time.time()
+    if len(app_data) == 0:
+        return
+    application = app_data[0]
+    while application.state == "removing":
+        if time.time() - start > timeout:
+            raise AssertionError(
+                "Timed out waiting for app to delete")
+        time.sleep(.5)
+        app = client.list_app(id=app_id).data
+        if len(app) == 0:
+            break
 
