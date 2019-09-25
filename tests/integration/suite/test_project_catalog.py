@@ -1,4 +1,5 @@
-from .conftest import wait_until, wait_until_available
+from .conftest import wait_until, wait_until_available, wait_for_condition,\
+    user_project_client
 from rancher import ApiError
 from .common import random_str
 import time
@@ -209,6 +210,59 @@ def test_user_addition_after_creating_project_catalog(admin_mc,
 
     client.delete(project_catalog)
     wait_for_projectcatalog_template_to_be_deleted(client, catalog_name)
+
+
+def test_project_catalog_access_before_app_creation(admin_mc, admin_pc,
+                                                    remove_resource,
+                                                    user_factory):
+    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                  projectId=admin_pc.
+                                                  project.id)
+    remove_resource(ns)
+    client = admin_mc.client
+
+    name = random_str()
+    new_project = client.create_project(name=random_str(), clusterId='local')
+    remove_resource(new_project)
+    wait_for_condition('InitialRolesPopulated', 'True', client, new_project)
+    new_project = client.reload(new_project)
+
+    project_name = str.lstrip(new_project.id, "local:")
+    catalog_name = project_name + ":" + name
+    url = "https://github.com/rancher/integration-test-charts.git"
+
+    client.create_project_catalog(name=name,
+                                  branch="master",
+                                  url=url,
+                                  projectId=new_project.id,
+                                  )
+    wait_for_projectcatalog_template_to_be_created(client,
+                                                   catalog_name)
+
+    external_id = "catalog://?catalog="+project_name+"/"+name + \
+                  "&type=projectCatalog&template=chartmuseum" \
+                  "&version=1.6.0"
+
+    user = user_factory()
+    # Add this user as project-owner
+    prtb_owner = client.create_project_role_template_binding(
+        projectId=admin_pc.project.id,
+        roleTemplateId="project-owner",
+        userId=user.user.id)
+    remove_resource(prtb_owner)
+    u_p_client = user_project_client(user, admin_pc.project)
+    try:
+        # creating app in user's project, using template version from
+        # new_project should not be allowed
+        u_p_client.create_app(
+            name=random_str(),
+            externalId=external_id,
+            targetNamespace=ns.name,
+            projectId=admin_pc.project.id,
+        )
+    except ApiError as e:
+        assert e.error.status == 404
+        assert "Cannot find template version" in e.error.message
 
 
 def wait_for_projectcatalog_template_to_be_created(client, name, timeout=45):
