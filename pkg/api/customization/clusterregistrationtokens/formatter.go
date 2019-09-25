@@ -15,7 +15,7 @@ const (
 	insecureCommandFormat = "curl --insecure -sfL %s | kubectl apply -f -"
 	nodeCommandFormat     = "sudo docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run %s --server %s --token %s%s"
 
-	windowsNodeCommandFormat = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:/:c:/host %s bootstrap --server %s --token %s%s | iex}"`
+	windowsNodeCommandFormat = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:/:c:/host %s%s bootstrap --server %s --token %s%s | iex}"`
 )
 
 func Formatter(request *types.APIContext, resource *types.RawResource) {
@@ -29,16 +29,27 @@ func Formatter(request *types.APIContext, resource *types.RawResource) {
 		url := getURL(request, token)
 		resource.Values["insecureCommand"] = fmt.Sprintf(insecureCommandFormat, url)
 		resource.Values["command"] = fmt.Sprintf(commandFormat, url)
-		resource.Values["nodeCommand"] = fmt.Sprintf(nodeCommandFormat,
-			image.Resolve(settings.AgentImage.Get()),
-			getRootURL(request),
-			token,
-			ca)
 		resource.Values["token"] = token
 		resource.Values["manifestUrl"] = url
+
+		rootURL := getRootURL(request)
+		agentImage := image.Resolve(settings.AgentImage.Get())
+		// for linux
+		resource.Values["nodeCommand"] = fmt.Sprintf(nodeCommandFormat,
+			agentImage,
+			rootURL,
+			token,
+			ca)
+		// for windows
+		var agentImageDockerEnv string
+		if settings.SystemDefaultRegistry.Get() != "" {
+			// patch the AGENT_IMAGE env
+			agentImageDockerEnv = fmt.Sprintf("-e AGENT_IMAGE=%s ", agentImage)
+		}
 		resource.Values["windowsNodeCommand"] = fmt.Sprintf(windowsNodeCommandFormat,
-			image.Resolve(settings.AgentImage.Get()),
-			getRootURL(request),
+			agentImageDockerEnv,
+			agentImage,
+			rootURL,
 			token,
 			ca)
 	}
