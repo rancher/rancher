@@ -286,9 +286,22 @@ if ($CATTLE_CA_CHECKSUM)
     $temp.MoveTo("$sslCertDir\serverca")
 
     # import the self-signed certificate
-    certoc.exe -addstore root "$sslCertDir\serverca" | Out-Null
-    if (-not $?) {
-        Log-Error "Failed to import rancher server certificates to Root"
+    $caBytes = $null
+    Get-Content "$sslCertDir\serverca" | % {
+        if ($_ -match '-+BEGIN CERTIFICATE-+') {
+            $caBytes = @()
+        } elseif ($_ -match '-+END CERTIFICATE-+') {
+            $caTemp = New-TemporaryFile
+            Set-Content -Value $caBytes -Path $caTemp.FullName -Encoding Byte
+            certoc.exe -addstore root $caTemp.FullName | Out-Null
+            if (-not $?) {
+                $caTemp.Delete()
+                Log-Fatal "Failed to import rancher server certificates to Root"
+            }
+            $caTemp.Delete()
+        } else {
+            $caBytes += [Convert]::FromBase64String($_)
+        }
     }
 
     $CATTLE_SERVER_HOSTNAME = ([System.Uri]"$server").Host
