@@ -30,6 +30,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/nodepool"
 	"github.com/rancher/rancher/pkg/api/customization/nodetemplate"
 	"github.com/rancher/rancher/pkg/api/customization/pipeline"
+	psptBinding "github.com/rancher/rancher/pkg/api/customization/podsecuritypolicybinding"
 	"github.com/rancher/rancher/pkg/api/customization/podsecuritypolicytemplate"
 	projectStore "github.com/rancher/rancher/pkg/api/customization/project"
 	projectaction "github.com/rancher/rancher/pkg/api/customization/project"
@@ -176,6 +177,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	ProjectRoleTemplateBinding(schemas, apiContext)
 	TemplateContent(schemas)
 	PodSecurityPolicyTemplate(schemas, apiContext)
+	PodSecurityPolicyTemplateProjectBinding(schemas, apiContext)
 	GlobalRoleBindings(schemas, apiContext)
 	RoleTemplate(schemas, apiContext)
 	MultiClusterApps(schemas, apiContext)
@@ -649,6 +651,11 @@ func PodSecurityPolicyTemplate(schemas *types.Schemas, management *config.Scaled
 		Store: schema.Store,
 	}
 	schema.Validator = podsecuritypolicytemplate.Validator
+}
+
+func PodSecurityPolicyTemplateProjectBinding(schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.PodSecurityPolicyTemplateProjectBindingType)
+	schema.Validator = psptBinding.NewValidator(management)
 }
 
 func ClusterRoleTemplateBinding(schemas *types.Schemas, management *config.ScaledContext) {
