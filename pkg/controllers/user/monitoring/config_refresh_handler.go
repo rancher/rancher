@@ -9,7 +9,7 @@ import (
 	apiv1 "github.com/rancher/types/apis/core/v1"
 	rmonitoringv1 "github.com/rancher/types/apis/monitoring.coreos.com/v1"
 
-	monitoringv1 "github.com/coreos/prometheus-operator/pkg/client/monitoring/v1"
+	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"

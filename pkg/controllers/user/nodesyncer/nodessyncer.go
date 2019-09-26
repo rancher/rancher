@@ -725,7 +725,7 @@ func getPodData(pod *corev1.Pod) (map[corev1.ResourceName]resource.Quantity, map
 func addMap(data1 map[corev1.ResourceName]resource.Quantity, data2 map[corev1.ResourceName]resource.Quantity) {
 	for name, quantity := range data1 {
 		if value, ok := data2[name]; !ok {
-			data2[name] = *quantity.Copy()
+			data2[name] = quantity.DeepCopy()
 		} else {
 			value.Add(quantity)
 			data2[name] = value
@@ -737,11 +737,11 @@ func addMapForInit(data1 map[corev1.ResourceName]resource.Quantity, data2 map[co
 	for name, quantity := range data1 {
 		value, ok := data2[name]
 		if !ok {
-			data2[name] = *quantity.Copy()
+			data2[name] = quantity.DeepCopy()
 			continue
 		}
 		if quantity.Cmp(value) > 0 {
-			data2[name] = *quantity.Copy()
+			data2[name] = quantity.DeepCopy()
 		}
 	}
 }
