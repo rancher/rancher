@@ -2,6 +2,7 @@ package client
 
 const (
 	CSIPersistentVolumeSourceType                            = "csiPersistentVolumeSource"
+	CSIPersistentVolumeSourceFieldControllerExpandSecretRef  = "controllerExpandSecretRef"
 	CSIPersistentVolumeSourceFieldControllerPublishSecretRef = "controllerPublishSecretRef"
 	CSIPersistentVolumeSourceFieldDriver                     = "driver"
 	CSIPersistentVolumeSourceFieldFSType                     = "fsType"
@@ -13,6 +14,7 @@ const (
 )
 
 type CSIPersistentVolumeSource struct {
+	ControllerExpandSecretRef  *SecretReference  `json:"controllerExpandSecretRef,omitempty" yaml:"controllerExpandSecretRef,omitempty"`
 	ControllerPublishSecretRef *SecretReference  `json:"controllerPublishSecretRef,omitempty" yaml:"controllerPublishSecretRef,omitempty"`
 	Driver                     string            `json:"driver,omitempty" yaml:"driver,omitempty"`
 	FSType                     string            `json:"fsType,omitempty" yaml:"fsType,omitempty"`

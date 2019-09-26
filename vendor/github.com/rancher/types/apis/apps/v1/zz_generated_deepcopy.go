@@ -9,7 +9,7 @@ import (
 func (in *DaemonSetList) DeepCopyInto(out *DaemonSetList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]appsv1.DaemonSet, len(*in))
@@ -42,7 +42,7 @@ func (in *DaemonSetList) DeepCopyObject() runtime.Object {
 func (in *DeploymentList) DeepCopyInto(out *DeploymentList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]appsv1.Deployment, len(*in))
@@ -75,7 +75,7 @@ func (in *DeploymentList) DeepCopyObject() runtime.Object {
 func (in *ReplicaSetList) DeepCopyInto(out *ReplicaSetList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]appsv1.ReplicaSet, len(*in))
@@ -108,7 +108,7 @@ func (in *ReplicaSetList) DeepCopyObject() runtime.Object {
 func (in *StatefulSetList) DeepCopyInto(out *StatefulSetList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]appsv1.StatefulSet, len(*in))

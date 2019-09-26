@@ -10,22 +10,34 @@ const (
 	PrometheusSpecFieldBaseImage                     = "baseImage"
 	PrometheusSpecFieldConfigMaps                    = "configMaps"
 	PrometheusSpecFieldContainers                    = "containers"
+	PrometheusSpecFieldEnableAdminAPI                = "enableAdminAPI"
 	PrometheusSpecFieldEvaluationInterval            = "evaluationInterval"
 	PrometheusSpecFieldExternalLabels                = "externalLabels"
 	PrometheusSpecFieldExternalURL                   = "externalUrl"
+	PrometheusSpecFieldImage                         = "image"
 	PrometheusSpecFieldImagePullSecrets              = "imagePullSecrets"
+	PrometheusSpecFieldInitContainers                = "initContainers"
 	PrometheusSpecFieldListenLocal                   = "listenLocal"
+	PrometheusSpecFieldLogFormat                     = "logFormat"
 	PrometheusSpecFieldLogLevel                      = "logLevel"
 	PrometheusSpecFieldNodeSelector                  = "nodeSelector"
 	PrometheusSpecFieldPodMetadata                   = "podMetadata"
+	PrometheusSpecFieldPodMonitorNamespaceSelector   = "podMonitorNamespaceSelector"
+	PrometheusSpecFieldPodMonitorSelector            = "podMonitorSelector"
+	PrometheusSpecFieldPortName                      = "portName"
 	PrometheusSpecFieldPriorityClassName             = "priorityClassName"
+	PrometheusSpecFieldPrometheusExternalLabelName   = "prometheusExternalLabelName"
+	PrometheusSpecFieldQuery                         = "query"
 	PrometheusSpecFieldRemoteRead                    = "remoteRead"
 	PrometheusSpecFieldRemoteWrite                   = "remoteWrite"
+	PrometheusSpecFieldReplicaExternalLabelName      = "replicaExternalLabelName"
 	PrometheusSpecFieldReplicas                      = "replicas"
 	PrometheusSpecFieldResources                     = "resources"
 	PrometheusSpecFieldRetention                     = "retention"
+	PrometheusSpecFieldRetentionSize                 = "retentionSize"
 	PrometheusSpecFieldRoutePrefix                   = "routePrefix"
 	PrometheusSpecFieldRuleSelector                  = "ruleSelector"
+	PrometheusSpecFieldRules                         = "rules"
 	PrometheusSpecFieldSHA                           = "sha"
 	PrometheusSpecFieldScrapeInterval                = "scrapeInterval"
 	PrometheusSpecFieldSecrets                       = "secrets"
@@ -36,6 +48,8 @@ const (
 	PrometheusSpecFieldTag                           = "tag"
 	PrometheusSpecFieldTolerations                   = "tolerations"
 	PrometheusSpecFieldVersion                       = "version"
+	PrometheusSpecFieldVolumes                       = "volumes"
+	PrometheusSpecFieldWALCompression                = "walCompression"
 )
 
 type PrometheusSpec struct {
@@ -47,22 +61,34 @@ type PrometheusSpec struct {
 	BaseImage                     string                 `json:"baseImage,omitempty" yaml:"baseImage,omitempty"`
 	ConfigMaps                    []string               `json:"configMaps,omitempty" yaml:"configMaps,omitempty"`
 	Containers                    []Container            `json:"containers,omitempty" yaml:"containers,omitempty"`
+	EnableAdminAPI                bool                   `json:"enableAdminAPI,omitempty" yaml:"enableAdminAPI,omitempty"`
 	EvaluationInterval            string                 `json:"evaluationInterval,omitempty" yaml:"evaluationInterval,omitempty"`
 	ExternalLabels                map[string]string      `json:"externalLabels,omitempty" yaml:"externalLabels,omitempty"`
 	ExternalURL                   string                 `json:"externalUrl,omitempty" yaml:"externalUrl,omitempty"`
+	Image                         string                 `json:"image,omitempty" yaml:"image,omitempty"`
 	ImagePullSecrets              []LocalObjectReference `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
+	InitContainers                []Container            `json:"initContainers,omitempty" yaml:"initContainers,omitempty"`
 	ListenLocal                   bool                   `json:"listenLocal,omitempty" yaml:"listenLocal,omitempty"`
+	LogFormat                     string                 `json:"logFormat,omitempty" yaml:"logFormat,omitempty"`
 	LogLevel                      string                 `json:"logLevel,omitempty" yaml:"logLevel,omitempty"`
 	NodeSelector                  map[string]string      `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty"`
 	PodMetadata                   *ObjectMeta            `json:"podMetadata,omitempty" yaml:"podMetadata,omitempty"`
+	PodMonitorNamespaceSelector   *LabelSelector         `json:"podMonitorNamespaceSelector,omitempty" yaml:"podMonitorNamespaceSelector,omitempty"`
+	PodMonitorSelector            *LabelSelector         `json:"podMonitorSelector,omitempty" yaml:"podMonitorSelector,omitempty"`
+	PortName                      string                 `json:"portName,omitempty" yaml:"portName,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
+	PrometheusExternalLabelName   string                 `json:"prometheusExternalLabelName,omitempty" yaml:"prometheusExternalLabelName,omitempty"`
+	Query                         *QuerySpec             `json:"query,omitempty" yaml:"query,omitempty"`
 	RemoteRead                    []RemoteReadSpec       `json:"remoteRead,omitempty" yaml:"remoteRead,omitempty"`
 	RemoteWrite                   []RemoteWriteSpec      `json:"remoteWrite,omitempty" yaml:"remoteWrite,omitempty"`
+	ReplicaExternalLabelName      string                 `json:"replicaExternalLabelName,omitempty" yaml:"replicaExternalLabelName,omitempty"`
 	Replicas                      *int64                 `json:"replicas,omitempty" yaml:"replicas,omitempty"`
 	Resources                     *ResourceRequirements  `json:"resources,omitempty" yaml:"resources,omitempty"`
 	Retention                     string                 `json:"retention,omitempty" yaml:"retention,omitempty"`
+	RetentionSize                 string                 `json:"retentionSize,omitempty" yaml:"retentionSize,omitempty"`
 	RoutePrefix                   string                 `json:"routePrefix,omitempty" yaml:"routePrefix,omitempty"`
 	RuleSelector                  *LabelSelector         `json:"ruleSelector,omitempty" yaml:"ruleSelector,omitempty"`
+	Rules                         *Rules                 `json:"rules,omitempty" yaml:"rules,omitempty"`
 	SHA                           string                 `json:"sha,omitempty" yaml:"sha,omitempty"`
 	ScrapeInterval                string                 `json:"scrapeInterval,omitempty" yaml:"scrapeInterval,omitempty"`
 	Secrets                       []string               `json:"secrets,omitempty" yaml:"secrets,omitempty"`
@@ -73,4 +99,6 @@ type PrometheusSpec struct {
 	Tag                           string                 `json:"tag,omitempty" yaml:"tag,omitempty"`
 	Tolerations                   []Toleration           `json:"tolerations,omitempty" yaml:"tolerations,omitempty"`
 	Version                       string                 `json:"version,omitempty" yaml:"version,omitempty"`
+	Volumes                       []Volume               `json:"volumes,omitempty" yaml:"volumes,omitempty"`
+	WALCompression                *bool                  `json:"walCompression,omitempty" yaml:"walCompression,omitempty"`
 }

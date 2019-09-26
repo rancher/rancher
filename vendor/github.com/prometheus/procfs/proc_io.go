@@ -39,8 +39,8 @@ type ProcIO struct {
 	CancelledWriteBytes int64
 }
 
-// IO creates a new ProcIO instance from a given Proc instance.
-func (p Proc) IO() (ProcIO, error) {
+// NewIO creates a new ProcIO instance from a given Proc instance.
+func (p Proc) NewIO() (ProcIO, error) {
 	pio := ProcIO{}
 
 	f, err := os.Open(p.path("io"))

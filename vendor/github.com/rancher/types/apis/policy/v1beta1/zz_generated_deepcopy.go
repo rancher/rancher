@@ -9,7 +9,7 @@ import (
 func (in *PodSecurityPolicyList) DeepCopyInto(out *PodSecurityPolicyList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]policyv1beta1.PodSecurityPolicy, len(*in))

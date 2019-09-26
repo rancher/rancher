@@ -14,7 +14,6 @@
 include Makefile.common
 
 %/.unpacked: %.ttar
-	@echo ">> extracting fixtures"
 	./ttar -C $(dir $*) -x -f $*.ttar
 	touch $@
 

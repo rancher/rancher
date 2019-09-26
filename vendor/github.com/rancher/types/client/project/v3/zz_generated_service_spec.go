@@ -7,6 +7,7 @@ const (
 	ServiceSpecFieldExternalTrafficPolicy    = "externalTrafficPolicy"
 	ServiceSpecFieldHealthCheckNodePort      = "healthCheckNodePort"
 	ServiceSpecFieldHostname                 = "hostname"
+	ServiceSpecFieldIPFamily                 = "ipFamily"
 	ServiceSpecFieldLoadBalancerIP           = "loadBalancerIP"
 	ServiceSpecFieldLoadBalancerSourceRanges = "loadBalancerSourceRanges"
 	ServiceSpecFieldPorts                    = "ports"
@@ -23,6 +24,7 @@ type ServiceSpec struct {
 	ExternalTrafficPolicy    string                 `json:"externalTrafficPolicy,omitempty" yaml:"externalTrafficPolicy,omitempty"`
 	HealthCheckNodePort      int64                  `json:"healthCheckNodePort,omitempty" yaml:"healthCheckNodePort,omitempty"`
 	Hostname                 string                 `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	IPFamily                 string                 `json:"ipFamily,omitempty" yaml:"ipFamily,omitempty"`
 	LoadBalancerIP           string                 `json:"loadBalancerIP,omitempty" yaml:"loadBalancerIP,omitempty"`
 	LoadBalancerSourceRanges []string               `json:"loadBalancerSourceRanges,omitempty" yaml:"loadBalancerSourceRanges,omitempty"`
 	Ports                    []ServicePort          `json:"ports,omitempty" yaml:"ports,omitempty"`

@@ -1,7 +1,7 @@
 package v1
 
 import (
-	monitoringv1 "github.com/coreos/prometheus-operator/pkg/client/monitoring/v1"
+	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -9,7 +9,7 @@ import (
 func (in *AlertmanagerList) DeepCopyInto(out *AlertmanagerList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]monitoringv1.Alertmanager, len(*in))
@@ -42,7 +42,7 @@ func (in *AlertmanagerList) DeepCopyObject() runtime.Object {
 func (in *PrometheusList) DeepCopyInto(out *PrometheusList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]monitoringv1.Prometheus, len(*in))
@@ -75,7 +75,7 @@ func (in *PrometheusList) DeepCopyObject() runtime.Object {
 func (in *PrometheusRuleList) DeepCopyInto(out *PrometheusRuleList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]monitoringv1.PrometheusRule, len(*in))
@@ -108,7 +108,7 @@ func (in *PrometheusRuleList) DeepCopyObject() runtime.Object {
 func (in *ServiceMonitorList) DeepCopyInto(out *ServiceMonitorList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]monitoringv1.ServiceMonitor, len(*in))

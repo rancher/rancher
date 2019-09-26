@@ -1,10 +1,12 @@
 package client
 
 const (
-	NamespaceStatusType       = "namespaceStatus"
-	NamespaceStatusFieldPhase = "phase"
+	NamespaceStatusType            = "namespaceStatus"
+	NamespaceStatusFieldConditions = "conditions"
+	NamespaceStatusFieldPhase      = "phase"
 )
 
 type NamespaceStatus struct {
-	Phase string `json:"phase,omitempty" yaml:"phase,omitempty"`
+	Conditions []NamespaceCondition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	Phase      string               `json:"phase,omitempty" yaml:"phase,omitempty"`
 }

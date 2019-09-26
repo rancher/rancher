@@ -76,8 +76,8 @@ type LinkType int32
 // LinkType values.
 const (
 	LinkTypeUnspecified LinkType = iota // The relationship of the two spans is unknown.
-	LinkTypeChild                       // The current span is a child of the linked span.
-	LinkTypeParent                      // The current span is the parent of the linked span.
+	LinkTypeChild                       // The linked span is a child of the current span.
+	LinkTypeParent                      // The linked span is the parent of the current span.
 )
 
 // Link represents a reference from one span to another span.
