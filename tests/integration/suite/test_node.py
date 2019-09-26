@@ -37,6 +37,7 @@ def test_node_fields(admin_mc):
         'nodeTemplateId': 'cr',
         'volumesInUse': 'r',
         'podCidr': 'r',
+        'podCidrs': 'r',
         'name': 'cru',
         'taints': 'ru',
         'unschedulable': 'r',

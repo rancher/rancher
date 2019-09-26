@@ -9,6 +9,7 @@ def test_dns_fields(admin_pc_client):
         'projectId': 'cr',
         'hostname': 'cru',
         'ipAddresses': 'cru',
+        'ipFamily': 'cru',
         'clusterIp': 'r',
         'selector': 'cru',
         'targetWorkloadIds': 'cru',
