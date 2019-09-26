@@ -1185,3 +1185,59 @@ def provision_nfs_server():
     node.execute_command(command)
     return node
 
+
+def get_defaut_question_answers(client, externalId):
+    def get_answer(quest):
+        if "default" in quest.keys():
+            answer = quest["default"]
+        else:
+            answer = ""
+            # If required and no default value is available, set fake value
+            # only for type string . For other types error out
+            if "required" in quest.keys():
+                if quest["required"]:
+                    assert quest["type"] == "string", \
+                        "Cannot set default for types other than string"
+                    answer = "fake"
+        return answer
+
+    def check_if_question_needed(questions_and_answers, ques):
+        add_question = False
+        match_string = ques["showIf"]
+        match_q_as = match_string.split("&&")
+        for q_a in match_q_as:
+            items = q_a.split("=")
+            if len(items) == 1:
+                items.append("")
+            if items[0] in questions_and_answers.keys():
+                if questions_and_answers[items[0]] == items[1]:
+                    add_question = True
+                else:
+                    add_question = False
+                    break
+        return add_question
+
+    questions_and_answers = {}
+    template_revs = client.list_template_version(externalId=externalId).data
+    assert len(template_revs) == 1
+    template_rev = template_revs[0]
+    questions = template_rev.questions
+    for ques in questions:
+        add_question = True
+        if "showIf" in ques.keys():
+            add_question = \
+                check_if_question_needed(questions_and_answers, ques)
+        if add_question:
+            question = ques["variable"]
+            answer = get_answer(ques)
+            questions_and_answers[question] = get_answer(ques)
+            if "showSubquestionIf" in ques.keys():
+                if ques["showSubquestionIf"] == answer:
+                    sub_questions = ques["subquestions"]
+                    for sub_question in sub_questions:
+                        question = sub_question["variable"]
+                        questions_and_answers[question] = \
+                            get_answer(sub_question)
+    print(questions_and_answers)
+    return questions_and_answers
+

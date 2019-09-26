@@ -75,22 +75,6 @@ pre_upgrade_externalId = \
 post_upgrade_externalId = \
     "catalog://?catalog=library&template=mysql&version=0.3.8"
 
-# Answers for mysql app
-app_answers = {
-    "defaultImage": "true",
-    "image": "mysql",
-    "imageTag": "5.7.14",
-    "mysqlDatabase": "admin",
-    "mysqlPassword": "",
-    "mysqlUser": "admin",
-    "persistence.enabled": "false",
-    "persistence.size": "8Gi",
-    "persistence.storageClass": "",
-    "service.nodePort": "",
-    "service.port": "3306",
-    "service.type": "ClusterIP"
-}
-
 if_post_upgrade = pytest.mark.skipif(
     upgrade_check_stage != "postupgrade",
     reason='This test is not executed for PreUpgrade checks')
@@ -623,7 +607,8 @@ def create_and_validate_catalog_app():
     ns = create_ns(get_cluster_client_for_token(cluster, ADMIN_TOKEN),
                    cluster, namespace["project"], ns_name=app_ns)
     app = p_client.create_app(
-        answers=app_answers,
+        answers=get_defaut_question_answers(get_admin_client(),
+                                            pre_upgrade_externalId),
         externalId=pre_upgrade_externalId,
         name=app_create_name,
         projectId=namespace["project"].id,
@@ -638,7 +623,9 @@ def modify_catalog_app():
     app = wait_for_app_to_active(p_client, app_validate_name)
     # upgrade the catalog app to a newer version
     p_client.action(obj=app, action_name="upgrade",
-                    answers=app_answers,
+                    answers=get_defaut_question_answers(
+                        get_admin_client(),
+                        post_upgrade_externalId),
                     externalId=post_upgrade_externalId)
     validate_catalog_app(app.name, post_upgrade_externalId)
 
