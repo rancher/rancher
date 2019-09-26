@@ -82,7 +82,7 @@ func SplitExternalID(externalID string) (string, string, string, string, string,
 func StartTiller(context context.Context, tempDirs *HelmPath, port, namespace string) error {
 	probePort := GenerateRandomPort()
 	cmd := exec.Command(tillerName, "--listen", ":"+port, "--probe", ":"+probePort)
-	cmd.Env = []string{fmt.Sprintf("%s=%s", "KUBECONFIG", tempDirs.KubeConfigInJail), fmt.Sprintf("%s=%s", "TILLER_NAMESPACE", namespace), fmt.Sprintf("%s=%s", "TILLER_HISTORY_MAX", "1")}
+	cmd.Env = []string{fmt.Sprintf("%s=%s", "KUBECONFIG", tempDirs.KubeConfigInJail), fmt.Sprintf("%s=%s", "TILLER_NAMESPACE", namespace), fmt.Sprintf("%s=%s", "TILLER_HISTORY_MAX", "10")}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
