@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	monitoringv1 "github.com/coreos/prometheus-operator/pkg/client/monitoring/v1"
+	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	util "github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"

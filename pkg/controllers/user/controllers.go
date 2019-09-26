@@ -3,7 +3,7 @@ package user
 import (
 	"context"
 
-	monitoringv1 "github.com/coreos/prometheus-operator/pkg/client/monitoring/v1"
+	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/rancher/norman/store/crd"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/controllers/management/compose/common"

@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	monitoringv1 "github.com/coreos/prometheus-operator/pkg/client/monitoring/v1"
+	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	util "github.com/rancher/rancher/pkg/controllers/user/workload"
 	rmonitoringv1 "github.com/rancher/types/apis/monitoring.coreos.com/v1"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
