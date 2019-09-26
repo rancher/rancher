@@ -14,7 +14,6 @@ func NewMetadataMapper() types.Mapper {
 		Move{From: "creationTimestamp", To: "created"},
 		Move{From: "deletionTimestamp", To: "removed"},
 		Drop{Field: "deletionGracePeriodSeconds"},
-		Drop{Field: "initializers"},
 		Drop{Field: "clusterName"},
 		ReadOnly{Field: "*"},
 		Access{

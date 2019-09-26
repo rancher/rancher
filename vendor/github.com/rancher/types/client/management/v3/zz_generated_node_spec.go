@@ -15,6 +15,7 @@ const (
 	NodeSpecFieldNodePoolID               = "nodePoolId"
 	NodeSpecFieldNodeTemplateID           = "nodeTemplateId"
 	NodeSpecFieldPodCidr                  = "podCidr"
+	NodeSpecFieldPodCidrs                 = "podCidrs"
 	NodeSpecFieldProviderId               = "providerId"
 	NodeSpecFieldRequestedHostname        = "requestedHostname"
 	NodeSpecFieldTaints                   = "taints"
@@ -37,6 +38,7 @@ type NodeSpec struct {
 	NodePoolID               string          `json:"nodePoolId,omitempty" yaml:"nodePoolId,omitempty"`
 	NodeTemplateID           string          `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`
 	PodCidr                  string          `json:"podCidr,omitempty" yaml:"podCidr,omitempty"`
+	PodCidrs                 []string        `json:"podCidrs,omitempty" yaml:"podCidrs,omitempty"`
 	ProviderId               string          `json:"providerId,omitempty" yaml:"providerId,omitempty"`
 	RequestedHostname        string          `json:"requestedHostname,omitempty" yaml:"requestedHostname,omitempty"`
 	Taints                   []Taint         `json:"taints,omitempty" yaml:"taints,omitempty"`

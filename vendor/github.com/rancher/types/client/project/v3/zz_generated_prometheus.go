@@ -18,28 +18,40 @@ const (
 	PrometheusFieldCreated                       = "created"
 	PrometheusFieldCreatorID                     = "creatorId"
 	PrometheusFieldDescription                   = "description"
+	PrometheusFieldEnableAdminAPI                = "enableAdminAPI"
 	PrometheusFieldEvaluationInterval            = "evaluationInterval"
 	PrometheusFieldExternalLabels                = "externalLabels"
 	PrometheusFieldExternalURL                   = "externalUrl"
+	PrometheusFieldImage                         = "image"
 	PrometheusFieldImagePullSecrets              = "imagePullSecrets"
+	PrometheusFieldInitContainers                = "initContainers"
 	PrometheusFieldLabels                        = "labels"
 	PrometheusFieldListenLocal                   = "listenLocal"
+	PrometheusFieldLogFormat                     = "logFormat"
 	PrometheusFieldLogLevel                      = "logLevel"
 	PrometheusFieldName                          = "name"
 	PrometheusFieldNamespaceId                   = "namespaceId"
 	PrometheusFieldNodeSelector                  = "nodeSelector"
 	PrometheusFieldOwnerReferences               = "ownerReferences"
 	PrometheusFieldPodMetadata                   = "podMetadata"
+	PrometheusFieldPodMonitorNamespaceSelector   = "podMonitorNamespaceSelector"
+	PrometheusFieldPodMonitorSelector            = "podMonitorSelector"
+	PrometheusFieldPortName                      = "portName"
 	PrometheusFieldPriorityClassName             = "priorityClassName"
 	PrometheusFieldProjectID                     = "projectId"
+	PrometheusFieldPrometheusExternalLabelName   = "prometheusExternalLabelName"
+	PrometheusFieldQuery                         = "query"
 	PrometheusFieldRemoteRead                    = "remoteRead"
 	PrometheusFieldRemoteWrite                   = "remoteWrite"
 	PrometheusFieldRemoved                       = "removed"
+	PrometheusFieldReplicaExternalLabelName      = "replicaExternalLabelName"
 	PrometheusFieldReplicas                      = "replicas"
 	PrometheusFieldResources                     = "resources"
 	PrometheusFieldRetention                     = "retention"
+	PrometheusFieldRetentionSize                 = "retentionSize"
 	PrometheusFieldRoutePrefix                   = "routePrefix"
 	PrometheusFieldRuleSelector                  = "ruleSelector"
+	PrometheusFieldRules                         = "rules"
 	PrometheusFieldSHA                           = "sha"
 	PrometheusFieldScrapeInterval                = "scrapeInterval"
 	PrometheusFieldSecrets                       = "secrets"
@@ -54,6 +66,8 @@ const (
 	PrometheusFieldTransitioningMessage          = "transitioningMessage"
 	PrometheusFieldUUID                          = "uuid"
 	PrometheusFieldVersion                       = "version"
+	PrometheusFieldVolumes                       = "volumes"
+	PrometheusFieldWALCompression                = "walCompression"
 )
 
 type Prometheus struct {
@@ -70,28 +84,40 @@ type Prometheus struct {
 	Created                       string                 `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                     string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Description                   string                 `json:"description,omitempty" yaml:"description,omitempty"`
+	EnableAdminAPI                bool                   `json:"enableAdminAPI,omitempty" yaml:"enableAdminAPI,omitempty"`
 	EvaluationInterval            string                 `json:"evaluationInterval,omitempty" yaml:"evaluationInterval,omitempty"`
 	ExternalLabels                map[string]string      `json:"externalLabels,omitempty" yaml:"externalLabels,omitempty"`
 	ExternalURL                   string                 `json:"externalUrl,omitempty" yaml:"externalUrl,omitempty"`
+	Image                         string                 `json:"image,omitempty" yaml:"image,omitempty"`
 	ImagePullSecrets              []LocalObjectReference `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
+	InitContainers                []Container            `json:"initContainers,omitempty" yaml:"initContainers,omitempty"`
 	Labels                        map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
 	ListenLocal                   bool                   `json:"listenLocal,omitempty" yaml:"listenLocal,omitempty"`
+	LogFormat                     string                 `json:"logFormat,omitempty" yaml:"logFormat,omitempty"`
 	LogLevel                      string                 `json:"logLevel,omitempty" yaml:"logLevel,omitempty"`
 	Name                          string                 `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId                   string                 `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeSelector                  map[string]string      `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty"`
 	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PodMetadata                   *ObjectMeta            `json:"podMetadata,omitempty" yaml:"podMetadata,omitempty"`
+	PodMonitorNamespaceSelector   *LabelSelector         `json:"podMonitorNamespaceSelector,omitempty" yaml:"podMonitorNamespaceSelector,omitempty"`
+	PodMonitorSelector            *LabelSelector         `json:"podMonitorSelector,omitempty" yaml:"podMonitorSelector,omitempty"`
+	PortName                      string                 `json:"portName,omitempty" yaml:"portName,omitempty"`
 	PriorityClassName             string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
 	ProjectID                     string                 `json:"projectId,omitempty" yaml:"projectId,omitempty"`
+	PrometheusExternalLabelName   string                 `json:"prometheusExternalLabelName,omitempty" yaml:"prometheusExternalLabelName,omitempty"`
+	Query                         *QuerySpec             `json:"query,omitempty" yaml:"query,omitempty"`
 	RemoteRead                    []RemoteReadSpec       `json:"remoteRead,omitempty" yaml:"remoteRead,omitempty"`
 	RemoteWrite                   []RemoteWriteSpec      `json:"remoteWrite,omitempty" yaml:"remoteWrite,omitempty"`
 	Removed                       string                 `json:"removed,omitempty" yaml:"removed,omitempty"`
+	ReplicaExternalLabelName      string                 `json:"replicaExternalLabelName,omitempty" yaml:"replicaExternalLabelName,omitempty"`
 	Replicas                      *int64                 `json:"replicas,omitempty" yaml:"replicas,omitempty"`
 	Resources                     *ResourceRequirements  `json:"resources,omitempty" yaml:"resources,omitempty"`
 	Retention                     string                 `json:"retention,omitempty" yaml:"retention,omitempty"`
+	RetentionSize                 string                 `json:"retentionSize,omitempty" yaml:"retentionSize,omitempty"`
 	RoutePrefix                   string                 `json:"routePrefix,omitempty" yaml:"routePrefix,omitempty"`
 	RuleSelector                  *LabelSelector         `json:"ruleSelector,omitempty" yaml:"ruleSelector,omitempty"`
+	Rules                         *Rules                 `json:"rules,omitempty" yaml:"rules,omitempty"`
 	SHA                           string                 `json:"sha,omitempty" yaml:"sha,omitempty"`
 	ScrapeInterval                string                 `json:"scrapeInterval,omitempty" yaml:"scrapeInterval,omitempty"`
 	Secrets                       []string               `json:"secrets,omitempty" yaml:"secrets,omitempty"`
@@ -106,6 +132,8 @@ type Prometheus struct {
 	TransitioningMessage          string                 `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                          string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Version                       string                 `json:"version,omitempty" yaml:"version,omitempty"`
+	Volumes                       []Volume               `json:"volumes,omitempty" yaml:"volumes,omitempty"`
+	WALCompression                *bool                  `json:"walCompression,omitempty" yaml:"walCompression,omitempty"`
 }
 
 type PrometheusCollection struct {

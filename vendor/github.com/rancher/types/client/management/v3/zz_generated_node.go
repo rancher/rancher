@@ -33,6 +33,7 @@ const (
 	NodeFieldNodeTemplateID       = "nodeTemplateId"
 	NodeFieldOwnerReferences      = "ownerReferences"
 	NodeFieldPodCidr              = "podCidr"
+	NodeFieldPodCidrs             = "podCidrs"
 	NodeFieldProviderId           = "providerId"
 	NodeFieldPublicEndpoints      = "publicEndpoints"
 	NodeFieldRemoved              = "removed"
@@ -79,6 +80,7 @@ type Node struct {
 	NodeTemplateID       string                    `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`
 	OwnerReferences      []OwnerReference          `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PodCidr              string                    `json:"podCidr,omitempty" yaml:"podCidr,omitempty"`
+	PodCidrs             []string                  `json:"podCidrs,omitempty" yaml:"podCidrs,omitempty"`
 	ProviderId           string                    `json:"providerId,omitempty" yaml:"providerId,omitempty"`
 	PublicEndpoints      []PublicEndpoint          `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
 	Removed              string                    `json:"removed,omitempty" yaml:"removed,omitempty"`

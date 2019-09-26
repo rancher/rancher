@@ -2,11 +2,13 @@ package objectclient
 
 import (
 	"encoding/json"
+	"net/http"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/restwatch"
 	"github.com/sirupsen/logrus"
+	k8sError "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -248,7 +250,7 @@ func (p *ObjectClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 	}
 	streamDecoder := streaming.NewDecoder(json2.Framer.NewFrameReader(r), embeddedDecoder)
 	decoder := restclientwatch.NewDecoder(streamDecoder, embeddedDecoder)
-	return watch.NewStreamWatcher(decoder), nil
+	return watch.NewStreamWatcher(decoder, k8sError.NewClientErrorReporter(http.StatusInternalServerError, "watch", "ClientWatchDecoding")), nil
 }
 
 type structuredDecoder struct {

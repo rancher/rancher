@@ -16,6 +16,7 @@ const (
 	ServiceFieldHealthCheckNodePort      = "healthCheckNodePort"
 	ServiceFieldHostname                 = "hostname"
 	ServiceFieldIPAddresses              = "ipAddresses"
+	ServiceFieldIPFamily                 = "ipFamily"
 	ServiceFieldKind                     = "kind"
 	ServiceFieldLabels                   = "labels"
 	ServiceFieldLoadBalancerIP           = "loadBalancerIP"
@@ -52,6 +53,7 @@ type Service struct {
 	HealthCheckNodePort      int64                  `json:"healthCheckNodePort,omitempty" yaml:"healthCheckNodePort,omitempty"`
 	Hostname                 string                 `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	IPAddresses              []string               `json:"ipAddresses,omitempty" yaml:"ipAddresses,omitempty"`
+	IPFamily                 string                 `json:"ipFamily,omitempty" yaml:"ipFamily,omitempty"`
 	Kind                     string                 `json:"kind,omitempty" yaml:"kind,omitempty"`
 	Labels                   map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
 	LoadBalancerIP           string                 `json:"loadBalancerIP,omitempty" yaml:"loadBalancerIP,omitempty"`

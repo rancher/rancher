@@ -158,8 +158,10 @@ func nativeNodeTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Drop{Field: "configSource"},
 			&m.Move{From: "providerID", To: "providerId"},
 			&m.Move{From: "podCIDR", To: "podCidr"},
+			&m.Move{From: "podCIDRs", To: "podCidrs"},
 			m.Access{Fields: map[string]string{
 				"podCidr":       "r",
+				"podCidrs":      "r",
 				"providerId":    "r",
 				"taints":        "ru",
 				"unschedulable": "ru",
