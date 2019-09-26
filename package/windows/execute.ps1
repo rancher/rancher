@@ -292,7 +292,8 @@ if ($CATTLE_CA_CHECKSUM)
             $caBytes = @()
         } elseif ($_ -match '-+END CERTIFICATE-+') {
             $caTemp = New-TemporaryFile
-            Set-Content -Value $caBytes -Path $caTemp.FullName -Encoding Byte
+            $caString = [Convert]::ToBase64String($caBytes)
+            Set-Content -Value $caString -Path $caTemp.FullName
             certoc.exe -addstore root $caTemp.FullName | Out-Null
             if (-not $?) {
                 $caTemp.Delete()
