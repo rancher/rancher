@@ -9,6 +9,7 @@ const (
 	QueueConfigFieldMaxSamplesPerSend = "maxSamplesPerSend"
 	QueueConfigFieldMaxShards         = "maxShards"
 	QueueConfigFieldMinBackoff        = "minBackoff"
+	QueueConfigFieldMinShards         = "minShards"
 )
 
 type QueueConfig struct {
@@ -19,4 +20,5 @@ type QueueConfig struct {
 	MaxSamplesPerSend int64  `json:"maxSamplesPerSend,omitempty" yaml:"maxSamplesPerSend,omitempty"`
 	MaxShards         int64  `json:"maxShards,omitempty" yaml:"maxShards,omitempty"`
 	MinBackoff        string `json:"minBackoff,omitempty" yaml:"minBackoff,omitempty"`
+	MinShards         int64  `json:"minShards,omitempty" yaml:"minShards,omitempty"`
 }

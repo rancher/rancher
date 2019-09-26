@@ -4,25 +4,51 @@ go 1.12
 
 replace (
 	git.apache.org/thrift.git => github.com/apache/thrift v0.12.0
+	github.com/Azure/go-autorest => github.com/Azure/go-autorest v12.2.0+incompatible
 	github.com/crewjam/saml => github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009
-	k8s.io/client-go => github.com/rancher/client-go v1.14.5-rancher.1
+
+	github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.3
+
+	k8s.io/api => k8s.io/api v0.0.0-20190918155943-95b840bb6a1f
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.0.0-20190918161926-8f644eb6e783
+	k8s.io/apimachinery => k8s.io/apimachinery v0.0.0-20190913080033-27d36303b655
+	k8s.io/apiserver => k8s.io/apiserver v0.0.0-20190918160949-bfa5e2e684ad
+	k8s.io/cli-runtime => k8s.io/cli-runtime v0.0.0-20190918162238-f783a3654da8
+	k8s.io/client-go => github.com/rancher/client-go v1.16.0-rancher.3
+	k8s.io/cloud-provider => k8s.io/cloud-provider v0.0.0-20190918163234-a9c1f33e9fb9
+	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.0.0-20190918163108-da9fdfce26bb
+	k8s.io/code-generator => k8s.io/code-generator v0.0.0-20190912054826-cd179ad6a269
+	k8s.io/component-base => k8s.io/component-base v0.0.0-20190918160511-547f6c5d7090
+	k8s.io/cri-api => k8s.io/cri-api v0.0.0-20190828162817-608eb1dad4ac
+	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.0.0-20190918163402-db86a8c7bb21
+	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.0.0-20190918161219-8c8f079fddc3
+	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.0.0-20190918162944-7a93a0ddadd8
+	k8s.io/kube-proxy => k8s.io/kube-proxy v0.0.0-20190918162534-de037b596c1e
+	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.0.0-20190918162820-3b5c1246eb18
+	k8s.io/kubectl => k8s.io/kubectl v0.0.0-20190918164019-21692a0861df
+	k8s.io/kubelet => k8s.io/kubelet v0.0.0-20190918162654-250a1838aa2c
+	k8s.io/kubernetes => k8s.io/kubernetes v1.16.0
+	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.0.0-20190918163543-cfa506e53441
+	k8s.io/metrics => k8s.io/metrics v0.0.0-20190918162108-227c654b2546
+	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.0.0-20190918161442-d4c9c65c82af
 )
 
 require (
-	github.com/Azure/azure-sdk-for-go v19.1.0+incompatible
-	github.com/Azure/go-autorest v10.11.3+incompatible
+	github.com/Azure/azure-sdk-for-go v32.5.0+incompatible
+	github.com/Azure/go-autorest/autorest v0.9.0
+	github.com/Azure/go-autorest/autorest/adal v0.5.0
 	github.com/DataDog/zstd v1.4.1 // indirect
-	github.com/aws/aws-sdk-go v1.16.19
+	github.com/aws/aws-sdk-go v1.16.26
 	github.com/beevik/etree v0.0.0-20171015221209-af219c0c7ea1 // indirect
 	github.com/bep/debounce v1.2.0
-	github.com/blang/semver v0.0.0-20190414102917-ba2c2ddd8906
-	github.com/coreos/etcd v3.3.13+incompatible
-	github.com/coreos/prometheus-operator v0.25.0
+	github.com/blang/semver v3.5.1+incompatible
+	github.com/coreos/etcd v3.3.15+incompatible
+	github.com/coreos/prometheus-operator v0.33.0
 	github.com/crewjam/saml v0.0.0-20190521120225-344d075952c9
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
-	github.com/docker/distribution v2.7.1-0.20190205005809-0d3efadf0154+incompatible
+	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v0.7.3-0.20190808172531-150530564a14
 	github.com/docker/go-connections v0.3.0
 	github.com/docker/machine v0.0.0-20160115011140-7246b2c9650c
@@ -32,32 +58,28 @@ require (
 	github.com/elazarl/goproxy/ext v0.0.0-20190711103511-473e67f1d7d2 // indirect
 	github.com/frankban/quicktest v1.4.1 // indirect
 	github.com/ghodss/yaml v1.0.0
-	github.com/golang/snappy v0.0.1 // indirect
 	github.com/google/go-github v0.0.0-20170719170300-e062a8cd852f
-	github.com/google/go-querystring v0.0.0-20170111101155-53e6ce116135
+	github.com/google/go-querystring v1.0.0
 	github.com/gorilla/mux v1.7.3
 	github.com/gorilla/websocket v1.4.1
-	github.com/grpc-ecosystem/go-grpc-middleware v1.0.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.1
-	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
 	github.com/mattn/go-colorable v0.1.0
 	github.com/mcuadros/go-version v0.0.0-20180611085657-6d5863ca60fa
 	github.com/minio/minio-go v0.0.0-20190523192347-c6c2912aa552
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/mrjones/oauth v0.0.0-20180629183705-f4e24b6d100c
-	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/pborman/uuid v1.2.0
 	github.com/pierrec/lz4 v2.2.6+incompatible // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.1.0
 	github.com/prometheus/common v0.6.0
-	github.com/rancher/kontainer-driver-metadata v0.0.0-20190923200325-2253b7228ad2
-	github.com/rancher/kontainer-engine v0.0.4-dev.0.20190913233423-b9e2974bf5eb
-	github.com/rancher/norman v0.0.0-20190917211548-a40a48add2fb
+	github.com/rancher/kontainer-driver-metadata v0.0.0-20190930170218-cea47774d036
+	github.com/rancher/kontainer-engine v0.0.4-dev.0.20190930174220-db9e24343393
+	github.com/rancher/norman v0.0.0-20190930164704-e09204b63081
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6
-	github.com/rancher/rke v0.3.0-rc10.0.20190923202243-82f812e96794
-	github.com/rancher/types v0.0.0-20190923165440-59fbe5e3a97f
+	github.com/rancher/rke v0.3.0-rc11.0.20190930172345-88449ec73b31
+	github.com/rancher/types v0.0.0-20190930165650-6bbedae77a35
 	github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect
@@ -78,20 +100,19 @@ require (
 	golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58
-	google.golang.org/api v0.2.1-0.20190315042342-d827405e6070
+	google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
 	google.golang.org/grpc v1.23.0
 	gopkg.in/asn1-ber.v1 v1.0.0-20150924051756-4e86f4367175 // indirect
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/ldap.v2 v2.5.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.2.2
-	k8s.io/api v0.0.0-20190805182251-6c9aa3caf3d6
-	k8s.io/apiextensions-apiserver v0.0.0-20190805184801-2defa3e98ef1
-	k8s.io/apimachinery v0.0.0-20190404173353-6a84e37a896d
-	k8s.io/apiserver v0.0.0-20190805183321-97412272efd4
-	k8s.io/cli-runtime v0.0.0-20190805185326-9eaa1a86d213
+	k8s.io/api v0.0.0
+	k8s.io/apiextensions-apiserver v0.0.0
+	k8s.io/apimachinery v0.0.0
+	k8s.io/apiserver v0.0.0
+	k8s.io/cli-runtime v0.0.0
 	k8s.io/client-go v11.0.1-0.20190805182715-88a2adca7e76+incompatible
-	k8s.io/cloud-provider v0.0.0-20190805190417-1c521de1d7ab // indirect
-	k8s.io/kubernetes v1.14.5
-	k8s.io/utils v0.0.0-20190506122338-8fab8cb257d5
+	k8s.io/kubernetes v1.16.0
+	k8s.io/utils v0.0.0-20190801114015-581e00157fb1
 )

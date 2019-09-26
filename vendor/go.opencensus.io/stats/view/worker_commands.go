@@ -21,8 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"go.opencensus.io/exemplar"
-
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/internal"
 	"go.opencensus.io/tag"
@@ -105,7 +103,7 @@ func (cmd *unregisterFromViewReq) handleCommand(w *worker) {
 			// The collected data can be cleared.
 			vi.clearRows()
 		}
-		delete(w.views, name)
+		w.unregisterView(name)
 	}
 	cmd.done <- struct{}{}
 }
@@ -123,6 +121,8 @@ type retrieveDataResp struct {
 }
 
 func (cmd *retrieveDataReq) handleCommand(w *worker) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	vi, ok := w.views[cmd.v]
 	if !ok {
 		cmd.c <- &retrieveDataResp{
@@ -150,23 +150,20 @@ func (cmd *retrieveDataReq) handleCommand(w *worker) {
 type recordReq struct {
 	tm          *tag.Map
 	ms          []stats.Measurement
-	attachments map[string]string
+	attachments map[string]interface{}
 	t           time.Time
 }
 
 func (cmd *recordReq) handleCommand(w *worker) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	for _, m := range cmd.ms {
 		if (m == stats.Measurement{}) { // not registered
 			continue
 		}
 		ref := w.getMeasureRef(m.Measure().Name())
 		for v := range ref.views {
-			e := &exemplar.Exemplar{
-				Value:       m.Value(),
-				Timestamp:   cmd.t,
-				Attachments: cmd.attachments,
-			}
-			v.addSample(cmd.tm, e)
+			v.addSample(cmd.tm, m.Value(), cmd.attachments, time.Now())
 		}
 	}
 }

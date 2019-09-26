@@ -3,7 +3,7 @@ package schema
 import (
 	"net/http"
 
-	monitoringv1 "github.com/coreos/prometheus-operator/pkg/client/monitoring/v1"
+	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	istiov1alpha3 "github.com/knative/pkg/apis/istio/v1alpha3"
 	"github.com/rancher/norman/types"
 	m "github.com/rancher/norman/types/mapper"
@@ -944,11 +944,6 @@ func pipelineTypes(schema *types.Schemas) *types.Schemas {
 
 func monitoringTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
-		AddMapperForType(&Version, monitoringv1.StorageSpec{},
-			&m.Drop{Field: "class"},
-			&m.Drop{Field: "selector"},
-			&m.Drop{Field: "resources"},
-		).
 		AddMapperForType(&Version, monitoringv1.Prometheus{},
 			&m.Drop{Field: "status"},
 			&m.AnnotationField{Field: "description"},

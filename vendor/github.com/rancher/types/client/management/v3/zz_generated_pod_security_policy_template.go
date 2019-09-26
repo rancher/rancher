@@ -34,6 +34,7 @@ const (
 	PodSecurityPolicyTemplateFieldRequiredDropCapabilities        = "requiredDropCapabilities"
 	PodSecurityPolicyTemplateFieldRunAsGroup                      = "runAsGroup"
 	PodSecurityPolicyTemplateFieldRunAsUser                       = "runAsUser"
+	PodSecurityPolicyTemplateFieldRuntimeClass                    = "runtimeClass"
 	PodSecurityPolicyTemplateFieldSELinux                         = "seLinux"
 	PodSecurityPolicyTemplateFieldSupplementalGroups              = "supplementalGroups"
 	PodSecurityPolicyTemplateFieldUUID                            = "uuid"
@@ -70,6 +71,7 @@ type PodSecurityPolicyTemplate struct {
 	RequiredDropCapabilities        []string                           `json:"requiredDropCapabilities,omitempty" yaml:"requiredDropCapabilities,omitempty"`
 	RunAsGroup                      *RunAsGroupStrategyOptions         `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsUser                       *RunAsUserStrategyOptions          `json:"runAsUser,omitempty" yaml:"runAsUser,omitempty"`
+	RuntimeClass                    *RuntimeClassStrategyOptions       `json:"runtimeClass,omitempty" yaml:"runtimeClass,omitempty"`
 	SELinux                         *SELinuxStrategyOptions            `json:"seLinux,omitempty" yaml:"seLinux,omitempty"`
 	SupplementalGroups              *SupplementalGroupsStrategyOptions `json:"supplementalGroups,omitempty" yaml:"supplementalGroups,omitempty"`
 	UUID                            string                             `json:"uuid,omitempty" yaml:"uuid,omitempty"`

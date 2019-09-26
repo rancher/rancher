@@ -53,7 +53,7 @@ func (in *AppCondition) DeepCopy() *AppCondition {
 func (in *AppList) DeepCopyInto(out *AppList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]App, len(*in))
@@ -115,7 +115,7 @@ func (in *AppRevision) DeepCopyObject() runtime.Object {
 func (in *AppRevisionList) DeepCopyInto(out *AppRevisionList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]AppRevision, len(*in))
@@ -380,7 +380,7 @@ func (in *BasicAuth) DeepCopyObject() runtime.Object {
 func (in *BasicAuthList) DeepCopyInto(out *BasicAuthList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]BasicAuth, len(*in))
@@ -614,7 +614,7 @@ func (in *Certificate) DeepCopyObject() runtime.Object {
 func (in *CertificateList) DeepCopyInto(out *CertificateList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Certificate, len(*in))
@@ -749,7 +749,7 @@ func (in *DockerCredential) DeepCopyObject() runtime.Object {
 func (in *DockerCredentialList) DeepCopyInto(out *DockerCredentialList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]DockerCredential, len(*in))
@@ -963,7 +963,7 @@ func (in *NamespacedBasicAuth) DeepCopyObject() runtime.Object {
 func (in *NamespacedBasicAuthList) DeepCopyInto(out *NamespacedBasicAuthList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]NamespacedBasicAuth, len(*in))
@@ -1028,7 +1028,7 @@ func (in *NamespacedCertificate) DeepCopyObject() runtime.Object {
 func (in *NamespacedCertificateList) DeepCopyInto(out *NamespacedCertificateList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]NamespacedCertificate, len(*in))
@@ -1095,7 +1095,7 @@ func (in *NamespacedDockerCredential) DeepCopyObject() runtime.Object {
 func (in *NamespacedDockerCredentialList) DeepCopyInto(out *NamespacedDockerCredentialList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]NamespacedDockerCredential, len(*in))
@@ -1155,7 +1155,7 @@ func (in *NamespacedSSHAuth) DeepCopyObject() runtime.Object {
 func (in *NamespacedSSHAuthList) DeepCopyInto(out *NamespacedSSHAuthList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]NamespacedSSHAuth, len(*in))
@@ -1215,7 +1215,7 @@ func (in *NamespacedServiceAccountToken) DeepCopyObject() runtime.Object {
 func (in *NamespacedServiceAccountTokenList) DeepCopyInto(out *NamespacedServiceAccountTokenList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]NamespacedServiceAccountToken, len(*in))
@@ -1398,7 +1398,7 @@ func (in *PipelineExecution) DeepCopyObject() runtime.Object {
 func (in *PipelineExecutionList) DeepCopyInto(out *PipelineExecutionList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]PipelineExecution, len(*in))
@@ -1476,7 +1476,7 @@ func (in *PipelineExecutionStatus) DeepCopy() *PipelineExecutionStatus {
 func (in *PipelineList) DeepCopyInto(out *PipelineList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Pipeline, len(*in))
@@ -1562,7 +1562,7 @@ func (in *PipelineSetting) DeepCopyObject() runtime.Object {
 func (in *PipelineSettingList) DeepCopyInto(out *PipelineSettingList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]PipelineSetting, len(*in))
@@ -1847,7 +1847,7 @@ func (in *SSHAuth) DeepCopyObject() runtime.Object {
 func (in *SSHAuthList) DeepCopyInto(out *SSHAuthList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]SSHAuth, len(*in))
@@ -1907,7 +1907,7 @@ func (in *ServiceAccountToken) DeepCopyObject() runtime.Object {
 func (in *ServiceAccountTokenList) DeepCopyInto(out *ServiceAccountTokenList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ServiceAccountToken, len(*in))
@@ -1985,7 +1985,7 @@ func (in *SourceCodeCredential) DeepCopyObject() runtime.Object {
 func (in *SourceCodeCredentialList) DeepCopyInto(out *SourceCodeCredentialList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]SourceCodeCredential, len(*in))
@@ -2103,7 +2103,7 @@ func (in *SourceCodeProviderConfig) DeepCopyObject() runtime.Object {
 func (in *SourceCodeProviderConfigList) DeepCopyInto(out *SourceCodeProviderConfigList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]SourceCodeProviderConfig, len(*in))
@@ -2136,7 +2136,7 @@ func (in *SourceCodeProviderConfigList) DeepCopyObject() runtime.Object {
 func (in *SourceCodeProviderList) DeepCopyInto(out *SourceCodeProviderList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]SourceCodeProvider, len(*in))
@@ -2198,7 +2198,7 @@ func (in *SourceCodeRepository) DeepCopyObject() runtime.Object {
 func (in *SourceCodeRepositoryList) DeepCopyInto(out *SourceCodeRepositoryList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]SourceCodeRepository, len(*in))
@@ -2419,7 +2419,7 @@ func (in *Workload) DeepCopyObject() runtime.Object {
 func (in *WorkloadList) DeepCopyInto(out *WorkloadList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Workload, len(*in))

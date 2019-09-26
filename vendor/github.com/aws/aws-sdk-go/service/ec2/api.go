@@ -85154,14 +85154,8 @@ const (
 	// InstanceTypeR54xlarge is a InstanceType enum value
 	InstanceTypeR54xlarge = "r5.4xlarge"
 
-	// InstanceTypeR58xlarge is a InstanceType enum value
-	InstanceTypeR58xlarge = "r5.8xlarge"
-
 	// InstanceTypeR512xlarge is a InstanceType enum value
 	InstanceTypeR512xlarge = "r5.12xlarge"
-
-	// InstanceTypeR516xlarge is a InstanceType enum value
-	InstanceTypeR516xlarge = "r5.16xlarge"
 
 	// InstanceTypeR524xlarge is a InstanceType enum value
 	InstanceTypeR524xlarge = "r5.24xlarge"
@@ -85199,14 +85193,8 @@ const (
 	// InstanceTypeR5d4xlarge is a InstanceType enum value
 	InstanceTypeR5d4xlarge = "r5d.4xlarge"
 
-	// InstanceTypeR5d8xlarge is a InstanceType enum value
-	InstanceTypeR5d8xlarge = "r5d.8xlarge"
-
 	// InstanceTypeR5d12xlarge is a InstanceType enum value
 	InstanceTypeR5d12xlarge = "r5d.12xlarge"
-
-	// InstanceTypeR5d16xlarge is a InstanceType enum value
-	InstanceTypeR5d16xlarge = "r5d.16xlarge"
 
 	// InstanceTypeR5d24xlarge is a InstanceType enum value
 	InstanceTypeR5d24xlarge = "r5d.24xlarge"

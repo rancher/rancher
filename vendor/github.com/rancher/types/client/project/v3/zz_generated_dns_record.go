@@ -13,6 +13,7 @@ const (
 	DNSRecordFieldDescription          = "description"
 	DNSRecordFieldHostname             = "hostname"
 	DNSRecordFieldIPAddresses          = "ipAddresses"
+	DNSRecordFieldIPFamily             = "ipFamily"
 	DNSRecordFieldLabels               = "labels"
 	DNSRecordFieldName                 = "name"
 	DNSRecordFieldNamespaceId          = "namespaceId"
@@ -40,6 +41,7 @@ type DNSRecord struct {
 	Description          string            `json:"description,omitempty" yaml:"description,omitempty"`
 	Hostname             string            `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	IPAddresses          []string          `json:"ipAddresses,omitempty" yaml:"ipAddresses,omitempty"`
+	IPFamily             string            `json:"ipFamily,omitempty" yaml:"ipFamily,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId          string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`

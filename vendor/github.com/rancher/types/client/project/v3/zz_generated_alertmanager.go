@@ -15,9 +15,12 @@ const (
 	AlertmanagerFieldCreated              = "created"
 	AlertmanagerFieldCreatorID            = "creatorId"
 	AlertmanagerFieldExternalURL          = "externalUrl"
+	AlertmanagerFieldImage                = "image"
 	AlertmanagerFieldImagePullSecrets     = "imagePullSecrets"
+	AlertmanagerFieldInitContainers       = "initContainers"
 	AlertmanagerFieldLabels               = "labels"
 	AlertmanagerFieldListenLocal          = "listenLocal"
+	AlertmanagerFieldLogFormat            = "logFormat"
 	AlertmanagerFieldLogLevel             = "logLevel"
 	AlertmanagerFieldName                 = "name"
 	AlertmanagerFieldNamespaceId          = "namespaceId"
@@ -25,6 +28,7 @@ const (
 	AlertmanagerFieldOwnerReferences      = "ownerReferences"
 	AlertmanagerFieldPaused               = "paused"
 	AlertmanagerFieldPodMetadata          = "podMetadata"
+	AlertmanagerFieldPortName             = "portName"
 	AlertmanagerFieldPriorityClassName    = "priorityClassName"
 	AlertmanagerFieldProjectID            = "projectId"
 	AlertmanagerFieldRemoved              = "removed"
@@ -44,6 +48,8 @@ const (
 	AlertmanagerFieldTransitioningMessage = "transitioningMessage"
 	AlertmanagerFieldUUID                 = "uuid"
 	AlertmanagerFieldVersion              = "version"
+	AlertmanagerFieldVolumeMounts         = "volumeMounts"
+	AlertmanagerFieldVolumes              = "volumes"
 )
 
 type Alertmanager struct {
@@ -57,9 +63,12 @@ type Alertmanager struct {
 	Created              string                 `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	ExternalURL          string                 `json:"externalUrl,omitempty" yaml:"externalUrl,omitempty"`
+	Image                string                 `json:"image,omitempty" yaml:"image,omitempty"`
 	ImagePullSecrets     []LocalObjectReference `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
+	InitContainers       []Container            `json:"initContainers,omitempty" yaml:"initContainers,omitempty"`
 	Labels               map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
 	ListenLocal          bool                   `json:"listenLocal,omitempty" yaml:"listenLocal,omitempty"`
+	LogFormat            string                 `json:"logFormat,omitempty" yaml:"logFormat,omitempty"`
 	LogLevel             string                 `json:"logLevel,omitempty" yaml:"logLevel,omitempty"`
 	Name                 string                 `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId          string                 `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
@@ -67,6 +76,7 @@ type Alertmanager struct {
 	OwnerReferences      []OwnerReference       `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Paused               bool                   `json:"paused,omitempty" yaml:"paused,omitempty"`
 	PodMetadata          *ObjectMeta            `json:"podMetadata,omitempty" yaml:"podMetadata,omitempty"`
+	PortName             string                 `json:"portName,omitempty" yaml:"portName,omitempty"`
 	PriorityClassName    string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
 	ProjectID            string                 `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	Removed              string                 `json:"removed,omitempty" yaml:"removed,omitempty"`
@@ -86,6 +96,8 @@ type Alertmanager struct {
 	TransitioningMessage string                 `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                 string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Version              string                 `json:"version,omitempty" yaml:"version,omitempty"`
+	VolumeMounts         []VolumeMount          `json:"volumeMounts,omitempty" yaml:"volumeMounts,omitempty"`
+	Volumes              []Volume               `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 }
 
 type AlertmanagerCollection struct {

@@ -9,7 +9,7 @@ import (
 func (in *APIServiceList) DeepCopyInto(out *APIServiceList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]apiregistrationv1.APIService, len(*in))

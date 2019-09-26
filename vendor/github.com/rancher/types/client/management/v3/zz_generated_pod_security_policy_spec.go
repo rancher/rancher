@@ -22,6 +22,7 @@ const (
 	PodSecurityPolicySpecFieldRequiredDropCapabilities        = "requiredDropCapabilities"
 	PodSecurityPolicySpecFieldRunAsGroup                      = "runAsGroup"
 	PodSecurityPolicySpecFieldRunAsUser                       = "runAsUser"
+	PodSecurityPolicySpecFieldRuntimeClass                    = "runtimeClass"
 	PodSecurityPolicySpecFieldSELinux                         = "seLinux"
 	PodSecurityPolicySpecFieldSupplementalGroups              = "supplementalGroups"
 	PodSecurityPolicySpecFieldVolumes                         = "volumes"
@@ -48,6 +49,7 @@ type PodSecurityPolicySpec struct {
 	RequiredDropCapabilities        []string                           `json:"requiredDropCapabilities,omitempty" yaml:"requiredDropCapabilities,omitempty"`
 	RunAsGroup                      *RunAsGroupStrategyOptions         `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsUser                       *RunAsUserStrategyOptions          `json:"runAsUser,omitempty" yaml:"runAsUser,omitempty"`
+	RuntimeClass                    *RuntimeClassStrategyOptions       `json:"runtimeClass,omitempty" yaml:"runtimeClass,omitempty"`
 	SELinux                         *SELinuxStrategyOptions            `json:"seLinux,omitempty" yaml:"seLinux,omitempty"`
 	SupplementalGroups              *SupplementalGroupsStrategyOptions `json:"supplementalGroups,omitempty" yaml:"supplementalGroups,omitempty"`
 	Volumes                         []string                           `json:"volumes,omitempty" yaml:"volumes,omitempty"`

@@ -9,7 +9,7 @@ import (
 func (in *DestinationRuleList) DeepCopyInto(out *DestinationRuleList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]istiov1alpha3.DestinationRule, len(*in))
@@ -42,7 +42,7 @@ func (in *DestinationRuleList) DeepCopyObject() runtime.Object {
 func (in *VirtualServiceList) DeepCopyInto(out *VirtualServiceList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]istiov1alpha3.VirtualService, len(*in))

@@ -3,7 +3,7 @@ package v1
 import (
 	"context"
 
-	v1 "github.com/coreos/prometheus-operator/pkg/client/monitoring/v1"
+	v1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/resource"

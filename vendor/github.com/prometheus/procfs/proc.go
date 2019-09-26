@@ -54,7 +54,7 @@ func NewProc(pid int) (Proc, error) {
 	if err != nil {
 		return Proc{}, err
 	}
-	return fs.Proc(pid)
+	return fs.NewProc(pid)
 }
 
 // AllProcs returns a list of all currently available processes under /proc.
@@ -76,18 +76,11 @@ func (fs FS) Self() (Proc, error) {
 	if err != nil {
 		return Proc{}, err
 	}
-	return fs.Proc(pid)
+	return fs.NewProc(pid)
 }
 
 // NewProc returns a process for the given pid.
-//
-// Deprecated: use fs.Proc() instead
 func (fs FS) NewProc(pid int) (Proc, error) {
-	return fs.Proc(pid)
-}
-
-// Proc returns a process for the given pid.
-func (fs FS) Proc(pid int) (Proc, error) {
 	if _, err := os.Stat(fs.proc.Path(strconv.Itoa(pid))); err != nil {
 		return Proc{}, err
 	}
@@ -245,20 +238,6 @@ func (p Proc) MountStats() ([]*Mount, error) {
 	defer f.Close()
 
 	return parseMountStats(f)
-}
-
-// MountInfo retrieves mount information for mount points in a
-// process's namespace.
-// It supplies information missing in `/proc/self/mounts` and
-// fixes various other problems with that file too.
-func (p Proc) MountInfo() ([]*MountInfo, error) {
-	f, err := os.Open(p.path("mountinfo"))
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	return parseMountInfo(f)
 }
 
 func (p Proc) fileDescriptors() ([]string, error) {
