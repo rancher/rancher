@@ -168,3 +168,35 @@ def test_incorrect_pspt(admin_mc, remove_resource):
         api_client.create_podSecurityPolicyTemplate(**args)
     assert e.value.error.status == 422
     assert e.value.error.code == 'InvalidBodyContent'
+
+
+def test_pspt_binding(admin_mc, admin_pc, remove_resource):
+    """Test that a PSPT binding is validated before creating it"""
+    api_client = admin_mc.client
+
+    # No podSecurityPolicyTemplateId causes a 422
+    name = random_str()
+    with pytest.raises(ApiError) as e:
+        b = api_client.create_podSecurityPolicyTemplateProjectBinding(
+            name=name,
+            namespaceId='default',
+            podSecurityPolicyTemplateId=None,
+            targetProjectId=admin_pc.project.id,
+        )
+        remove_resource(b)
+    assert e.value.error.status == 422
+    assert e.value.error.message == \
+        'missing required podSecurityPolicyTemplateId'
+
+    # An invalid podSecurityPolicyTemplateId causes a 422
+    name = random_str()
+    with pytest.raises(ApiError) as e:
+        b = api_client.create_podSecurityPolicyTemplateProjectBinding(
+            name=name,
+            namespaceId='default',
+            podSecurityPolicyTemplateId='thisdoesntexist',
+            targetProjectId=admin_pc.project.id,
+        )
+        remove_resource(b)
+    assert e.value.error.status == 422
+    assert e.value.error.message == 'podSecurityPolicyTemplate not found'
