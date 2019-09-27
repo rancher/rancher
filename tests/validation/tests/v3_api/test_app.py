@@ -1,4 +1,4 @@
-from .common import *
+from .common import *  # NOQA
 
 
 def cluster_and_client(cluster_id, mgmt_client):
@@ -54,14 +54,11 @@ def test_tiller():
                        clusterId=cluster_id,
                        resourceQuota={
                            "limit": {
-                               "secrets": "1"
-                           }
-                       },
+                               "secrets": "1"}},
                        namespaceDefaultResourceQuota={
                            "limit": {
-                               "secrets": "1"
-                           }
-                       })
+                               "secrets": "1"}}
+                       )
 
     p = admin_client.reload(p)
     proj_client = rancher.Client(url=p.links.self + '/schemas', verify=False,
@@ -73,8 +70,8 @@ def test_tiller():
                                          resourceQuota={
                                              "limit": {
                                                  "secrets": "1"
-                                             }
-                                         })
+                                             }}
+                                         )
     wait_for_template_to_be_created(admin_client, "library")
     answers = {
         "defaultImage": "true",
