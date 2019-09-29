@@ -10,10 +10,10 @@ ISTIO_PATH = os.path.join(
     os.path.dirname(os.path.realpath(__file__)), "resource/istio_files")
 ISTIO_CATALOG = os.environ.get('RANCHER_ISTIO_CATALOG', "system-library")
 ISTIO_TEMPLATE = os.environ.get('RANCHER_ISTIO_TEMPLATE', "rancher-istio")
-ISTIO_VERSION = os.environ.get('RANCHER_ISTIO_VERSION', "1.1.5-rancher1")
+ISTIO_VERSION = os.environ.get('RANCHER_ISTIO_VERSION', "1.3.0")
 ISTIO_INGRESSGATEWAY_NODEPORT = os.environ.get(
     'RANCHER_ISTIO_INGRESSGATEWAY_NODEPORT', 31380)
-ISTIO_CRD_COUNT = "53"
+ISTIO_CRD_COUNT = "23"
 ISTIO_BOOKINFO_QUERY_RESULT = "<title>Simple Bookstore App</title>"
 
 
