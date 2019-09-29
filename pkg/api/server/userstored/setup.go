@@ -63,6 +63,7 @@ func Setup(ctx context.Context, mgmt *config.ScaledContext, clusterManager *clus
 	addProxyStore(ctx, schemas, mgmt, client.ServiceMonitorType, "monitoring.coreos.com/v1", nil)
 	addProxyStore(ctx, schemas, mgmt, client.VirtualServiceType, "networking.istio.io/v1alpha3", nil)
 	addProxyStore(ctx, schemas, mgmt, client.DestinationRuleType, "networking.istio.io/v1alpha3", nil)
+	addProxyStore(ctx, schemas, mgmt, client.GatewayType, "networking.istio.io/v1alpha3", nil)
 
 	Secret(ctx, mgmt, schemas)
 	Service(ctx, schemas, mgmt)
@@ -156,7 +157,7 @@ func Secret(ctx context.Context, management *config.ScaledContext, schemas *type
 }
 
 func Istio(schemas *types.Schemas) {
-	istioTypes := []string{client.VirtualServiceType, client.DestinationRuleType}
+	istioTypes := []string{client.VirtualServiceType, client.DestinationRuleType, client.GatewayType}
 	for _, t := range istioTypes {
 		schema := schemas.Schema(&schema.Version, t)
 		store := &crd.ForgetCRDNotFoundStore{
