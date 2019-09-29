@@ -157,7 +157,7 @@ func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.C
 	for _, tempNode := range plan.Nodes {
 		if tempNode.Address == node.Status.NodeConfig.Address {
 			b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, rkehosts.B2DOS)
-			nc.Processes = augmentProcesses(token, tempNode.Processes, false, b2d)
+			nc.Processes = augmentProcesses(token, tempNode.Processes, false, b2d, node.Status.NodeConfig.HostnameOverride)
 			nc.Processes = appendTaintsToKubeletArgs(nc.Processes, node.Status.NodeConfig.Taints)
 			return nc, nil
 		}
@@ -218,7 +218,7 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 				nc.Processes = enhanceWindowsProcesses(tempNode.Processes)
 			} else {
 				b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, rkehosts.B2DOS)
-				nc.Processes = augmentProcesses(token, tempNode.Processes, true, b2d)
+				nc.Processes = augmentProcesses(token, tempNode.Processes, true, b2d, node.Status.NodeConfig.HostnameOverride)
 			}
 			nc.Processes = appendTaintsToKubeletArgs(nc.Processes, node.Status.NodeConfig.Taints)
 			nc.Files = tempNode.Files
@@ -239,7 +239,7 @@ func filterHostForSpec(spec *v3.RancherKubernetesEngineConfig, n *v3.Node) {
 	spec.Nodes = nodeList
 }
 
-func augmentProcesses(token string, processes map[string]v3.Process, worker, b2d bool) map[string]v3.Process {
+func augmentProcesses(token string, processes map[string]v3.Process, worker, b2d bool, nodeName string) map[string]v3.Process {
 	var shared []string
 
 	if b2d {
@@ -257,7 +257,7 @@ func augmentProcesses(token string, processes map[string]v3.Process, worker, b2d
 
 	if len(shared) > 0 {
 		nodeCommand := clusterregistrationtokens.NodeCommand(token) + " --no-register --only-write-certs"
-		args := []string{"--", "share-root.sh", strings.TrimPrefix(nodeCommand, "sudo ")}
+		args := []string{"--", "share-root.sh", strings.TrimPrefix(nodeCommand, "sudo "), "--node-name", nodeName}
 		args = append(args, shared...)
 
 		processes["share-mnt"] = v3.Process{
