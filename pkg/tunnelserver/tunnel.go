@@ -17,8 +17,10 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	client "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
+	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -105,6 +107,7 @@ func (t *Authorizer) AuthorizeLocalNode(username, password string) (string, []st
 func (t *Authorizer) Authorize(req *http.Request) (*Client, bool, error) {
 	token := req.Header.Get(Token)
 	if token == "" {
+		logrus.Debugf("Authorize: Token header [%s] is empty", Token)
 		return nil, false, nil
 	}
 
@@ -153,6 +156,7 @@ func (t *Authorizer) Authorize(req *http.Request) (*Client, bool, error) {
 
 func (t *Authorizer) getMachine(cluster *v3.Cluster, inNode *client.Node) (*v3.Node, error) {
 	machineName := machineName(inNode)
+	logrus.Debugf("getMachine: looking up machine [%s] in cluster [%s]", machineName, cluster.Name)
 	machine, err := t.machineLister.Get(cluster.Name, machineName)
 	if apierrors.IsNotFound(err) {
 		if objs, err := t.nodeIndexer.ByIndex(nodeKeyIndex, fmt.Sprintf("%s/%s", cluster.Name, inNode.RequestedHostname)); err == nil {
@@ -161,10 +165,20 @@ func (t *Authorizer) getMachine(cluster *v3.Cluster, inNode *client.Node) (*v3.N
 			}
 		}
 
+		logrus.Debugf("getMachine: looking up [%s] as node name in cluster [%s]", inNode.RequestedHostname, cluster.Name)
 		machine, err := t.machineLister.Get(cluster.Name, inNode.RequestedHostname)
 		if err == nil {
 			return machine, nil
 		}
+
+		logrus.Debugf("getMachine: looking up inNode.RequestedHostname [%s] in cluster [%s]", inNode.RequestedHostname, cluster.Name)
+		machines, _ := t.machineLister.List(cluster.Name, labels.NewSelector())
+		for _, machine := range machines {
+			if machine.Spec.RequestedHostname == inNode.RequestedHostname {
+				return machine, nil
+			}
+		}
+		logrus.Debugf("getMachine: unable to match inNode.RequestedHostname [%s] to a node in cluster [%s]", inNode.RequestedHostname, cluster.Name)
 	}
 
 	return machine, err
@@ -330,7 +344,9 @@ func (t *Authorizer) readInput(cluster *v3.Cluster, req *http.Request) (*input, 
 
 func machineName(machine *client.Node) string {
 	digest := md5.Sum([]byte(machine.RequestedHostname))
-	return "m-" + hex.EncodeToString(digest[:])[:12]
+	machineNameMD5 := fmt.Sprintf("m-%s", hex.EncodeToString(digest[:])[:12])
+	logrus.Debugf("machineName: returning [%s] for node with RequestedHostname [%s]", machineNameMD5, machine.RequestedHostname)
+	return machineNameMD5
 }
 
 func (t *Authorizer) getClusterByToken(token string) (*v3.Cluster, error) {
