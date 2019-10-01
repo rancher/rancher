@@ -62,6 +62,16 @@ type Node struct {
 	Status NodeStatus `json:"status"`
 }
 
+type MetadataUpdate struct {
+	Labels      MapDelta `json:"labels,omitempty"`
+	Annotations MapDelta `json:"annotations,omitempty"`
+}
+
+type MapDelta struct {
+	Add    map[string]string `json:"add,omitempty"`
+	Delete map[string]bool   `json:"delete,omitempty"`
+}
+
 type NodeStatus struct {
 	Conditions         []NodeCondition   `json:"conditions,omitempty"`
 	InternalNodeStatus v1.NodeStatus     `json:"internalNodeStatus,omitempty"`
@@ -182,19 +192,16 @@ type NodeSpec struct {
 	Worker           bool   `json:"worker" norman:"noupdate"`
 	NodeTemplateName string `json:"nodeTemplateName,omitempty" norman:"type=reference[nodeTemplate],noupdate"`
 
-	NodePoolName             string            `json:"nodePoolName" norman:"type=reference[nodePool],nocreate,noupdate"`
-	CustomConfig             *CustomConfig     `json:"customConfig"`
-	Imported                 bool              `json:"imported"`
-	Description              string            `json:"description,omitempty"`
-	DisplayName              string            `json:"displayName"`
-	RequestedHostname        string            `json:"requestedHostname,omitempty" norman:"type=hostname,nullable,noupdate,required"`
-	InternalNodeSpec         v1.NodeSpec       `json:"internalNodeSpec"`
-	DesiredNodeLabels        map[string]string `json:"desiredNodeLabels,omitempty"`
-	DesiredNodeAnnotations   map[string]string `json:"desiredNodeAnnotations,omitempty"`
-	CurrentNodeLabels        map[string]string `json:"currentNodeLabels,omitempty"`
-	CurrentNodeAnnotations   map[string]string `json:"currentNodeAnnotations,omitempty"`
-	DesiredNodeUnschedulable string            `json:"desiredNodeUnschedulable,omitempty"`
-	NodeDrainInput           *NodeDrainInput   `json:"nodeDrainInput,omitempty"`
+	NodePoolName             string          `json:"nodePoolName" norman:"type=reference[nodePool],nocreate,noupdate"`
+	CustomConfig             *CustomConfig   `json:"customConfig"`
+	Imported                 bool            `json:"imported"`
+	Description              string          `json:"description,omitempty"`
+	DisplayName              string          `json:"displayName"`
+	RequestedHostname        string          `json:"requestedHostname,omitempty" norman:"type=hostname,nullable,noupdate,required"`
+	InternalNodeSpec         v1.NodeSpec     `json:"internalNodeSpec"`
+	DesiredNodeUnschedulable string          `json:"desiredNodeUnschedulable,omitempty"`
+	NodeDrainInput           *NodeDrainInput `json:"nodeDrainInput,omitempty"`
+	MetadataUpdate           MetadataUpdate  `json:"metadataUpdate,omitempty"`
 }
 
 type NodeCommonParams struct {
