@@ -301,7 +301,7 @@ github.com/rancher/kontainer-engine/service
 github.com/rancher/kontainer-engine/store
 github.com/rancher/kontainer-engine/types
 github.com/rancher/kontainer-engine/utils
-# github.com/rancher/norman v0.0.0-20191118164900-ee09ed505060
+# github.com/rancher/norman v0.0.0-20191118213527-2115b952494f
 github.com/rancher/norman/api
 github.com/rancher/norman/api/access
 github.com/rancher/norman/api/builtin
@@ -346,7 +346,7 @@ github.com/rancher/norman/types/values
 github.com/rancher/norman/urlbuilder
 # github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 github.com/rancher/rdns-server/model
-# github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6
+# github.com/rancher/remotedialer v0.2.3
 github.com/rancher/remotedialer
 # github.com/rancher/rke v0.3.1-0.20191112000344-2006a6171213
 github.com/rancher/rke/addons
