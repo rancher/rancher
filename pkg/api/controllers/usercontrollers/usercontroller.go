@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/metrics"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	tpeermanager "github.com/rancher/types/peermanager"
@@ -118,7 +119,13 @@ func (u *userControllersController) peersSync() error {
 		if cluster.DeletionTimestamp != nil || !v3.ClusterConditionProvisioned.IsTrue(cluster) {
 			u.manager.Stop(cluster)
 		} else {
-			if err := u.manager.Start(u.ctx, cluster, u.amOwner(u.peers, cluster)); err != nil {
+			amOwner := u.amOwner(u.peers, cluster)
+			if amOwner {
+				metrics.SetClusterOwner(u.peers.SelfID, cluster.Name)
+			} else {
+				metrics.UnsetClusterOwner(u.peers.SelfID, cluster.Name)
+			}
+			if err := u.manager.Start(u.ctx, cluster, amOwner); err != nil {
 				errs = append(errs, errors.Wrapf(err, "failed to start user controllers for cluster %s", cluster.Name))
 			}
 		}

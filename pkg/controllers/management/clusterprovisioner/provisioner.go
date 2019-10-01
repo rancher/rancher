@@ -248,7 +248,7 @@ func (p *Provisioner) setKontainerEngineUpdate(cluster *v3.Cluster, anno string)
 		return true, nil
 	})
 	if err != nil {
-		return cluster, fmt.Errorf("Failed to update cluster [%s]: %v", cluster.Name, err)
+		return cluster, fmt.Errorf("[setKontainerEngineUpdate] Failed to update cluster [%s]: %v", cluster.Name, err)
 	}
 	return cluster, nil
 }
@@ -462,7 +462,7 @@ func (p *Provisioner) reconcileCluster(cluster *v3.Cluster, create bool) (*v3.Cl
 		v3.ClusterConditionUpdated.Unknown(cluster)
 		cluster, err = p.Clusters.Update(cluster)
 		if err != nil {
-			return cluster, fmt.Errorf("Failed to update cluster [%s]: %v", cluster.Name, err)
+			return cluster, fmt.Errorf("[reconcileCluster] Failed to update cluster [%s]: %v", cluster.Name, err)
 		}
 
 		apiEndpoint, serviceAccountToken, caCert, updateTriggered, err = p.driverUpdate(cluster, *spec)
