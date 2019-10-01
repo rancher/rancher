@@ -1,8 +1,6 @@
 package rke
 
-import (
-	"github.com/rancher/types/apis/management.cattle.io/v3"
-)
+import v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 
 func loadK8sVersionWindowsServiceOptions() map[string]v3.KubernetesServicesOptions {
 	// since 1.14, windows has been supported
@@ -13,10 +11,6 @@ func loadK8sVersionWindowsServiceOptions() map[string]v3.KubernetesServicesOptio
 		},
 		"v1.15": {
 			Kubelet:   getWindowsKubeletOptions115(),
-			Kubeproxy: getWindowsKubeProxyOptions(),
-		},
-		"v1.14": {
-			Kubelet:   getWindowsKubeletOptions(),
 			Kubeproxy: getWindowsKubeProxyOptions(),
 		},
 	}

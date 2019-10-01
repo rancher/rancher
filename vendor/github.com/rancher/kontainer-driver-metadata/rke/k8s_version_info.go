@@ -4,8 +4,8 @@ import v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 
 func loadRancherDefaultK8sVersions() map[string]string {
 	/*
-	Just mention the major version, the latest minor version will be
-	automatically picked based on Rancher's max/min version information.
+		Just mention the major version, the latest minor version will be
+		automatically picked based on Rancher's max/min version information.
 	*/
 	return map[string]string{
 		"2.3": "v1.15.x",
@@ -50,6 +50,10 @@ func loadK8sVersionInfo() map[string]v3.K8sVersionInfo {
 		"v1.12": {
 			MaxRancherVersion: "2.2",
 			MaxRKEVersion:     "0.2.2",
+		},
+		"v1.15.4-rancher1-1": {
+			MaxRancherVersion: "2.2.9",
+			MaxRKEVersion:     "0.2.8",
 		},
 		"v1.8.10-rancher1-1": {
 			DeprecateRKEVersion:     "0.2.2",
