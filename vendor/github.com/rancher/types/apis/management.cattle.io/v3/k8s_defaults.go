@@ -131,7 +131,7 @@ var (
 			AlertManagerHelper: m("rancher/alertmanager-helper:v0.0.2"),
 		},
 		PipelineSystemImages: projectv3.PipelineSystemImages{
-			Jenkins:       m("rancher/pipeline-jenkins-server:v0.1.0"),
+			Jenkins:       m("rancher/pipeline-jenkins-server:v0.1.4"),
 			JenkinsJnlp:   m("jenkins/jnlp-slave:3.10-1-alpine"),
 			AlpineGit:     m("rancher/pipeline-tools:v0.1.9"),
 			PluginsDocker: m("plugins/docker:17.12"),
