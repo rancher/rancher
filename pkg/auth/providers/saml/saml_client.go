@@ -16,6 +16,7 @@ import (
 	"github.com/crewjam/saml/samlsp"
 	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/server/responsewriter"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -178,6 +179,7 @@ func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) erro
 
 func AuthHandler() http.Handler {
 	root = mux.NewRouter()
+	root.Use(responsewriter.ContentTypeOptions)
 	root.Methods("POST").Path("/v1-saml/ping/saml/acs").Name("PingACS")
 	root.Methods("GET").Path("/v1-saml/ping/saml/metadata").Name("PingMetadata")
 
