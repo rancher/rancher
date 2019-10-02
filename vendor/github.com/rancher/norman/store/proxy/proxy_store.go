@@ -303,7 +303,7 @@ func (s *Store) realWatch(apiContext *types.APIContext, schema *types.Schema, op
 
 	framer := json.Framer.NewFrameReader(body)
 	decoder := streaming.NewDecoder(framer, &unstructuredDecoder{})
-	watcher := watch.NewStreamWatcher(restclientwatch.NewDecoder(decoder, &unstructuredDecoder{}), errors.NewClientErrorReporter(http.StatusInternalServerError, "watch", "ClientWatchDecoding"))
+	watcher := watch.NewStreamWatcher(restclientwatch.NewDecoder(decoder, &unstructuredDecoder{}), &errorReporter{})
 
 	watchingContext, cancelWatchingContext := context.WithCancel(apiContext.Request.Context())
 	go func() {
@@ -315,12 +315,17 @@ func (s *Store) realWatch(apiContext *types.APIContext, schema *types.Schema, op
 	result := make(chan map[string]interface{})
 	go func() {
 		for event := range watcher.ResultChan() {
-			data := event.Object.(*unstructured.Unstructured)
-			s.fromInternal(apiContext, schema, data.Object)
-			if event.Type == watch.Deleted && data.Object != nil {
-				data.Object[".removed"] = true
+			if data, ok := event.Object.(*metav1.Status); ok {
+				// just logging it, keeping the same behavior as before
+				logrus.Errorf("watcher error %v", data)
+			} else {
+				data := event.Object.(*unstructured.Unstructured)
+				s.fromInternal(apiContext, schema, data.Object)
+				if event.Type == watch.Deleted && data.Object != nil {
+					data.Object[".removed"] = true
+				}
+				result <- data.Object
 			}
-			result <- data.Object
 		}
 		logrus.Debugf("closing watcher for %s", schema.ID)
 		close(result)
@@ -331,6 +336,13 @@ func (s *Store) realWatch(apiContext *types.APIContext, schema *types.Schema, op
 }
 
 type unstructuredDecoder struct {
+}
+
+type errorReporter struct {
+}
+
+func (e *errorReporter) AsObject(err error) runtime.Object {
+	return &metav1.Status{Message: err.Error(), Code: http.StatusInternalServerError, Reason: "ClientWatchDecoding"}
 }
 
 func (d *unstructuredDecoder) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
