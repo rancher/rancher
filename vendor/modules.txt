@@ -301,7 +301,7 @@ github.com/rancher/kontainer-engine/drivers/util
 github.com/rancher/kontainer-engine/drivers/options
 github.com/rancher/kontainer-engine/store
 github.com/rancher/kontainer-engine/utils
-# github.com/rancher/norman v0.0.0-20190930164704-e09204b63081
+# github.com/rancher/norman v0.0.0-20191002173122-b1eb20740eab
 github.com/rancher/norman/controller
 github.com/rancher/norman/pkg/dump
 github.com/rancher/norman/pkg/kwrapper/k8s
@@ -348,7 +348,7 @@ github.com/rancher/norman/types/factory
 github.com/rancher/rdns-server/model
 # github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6
 github.com/rancher/remotedialer
-# github.com/rancher/rke v0.3.0-rc11.0.20191002174632-a7463787d854
+# github.com/rancher/rke v0.3.0-rc11.0.20191002184133-a3c499705a79
 github.com/rancher/rke/util
 github.com/rancher/rke/pki/cert
 github.com/rancher/rke/cloudprovider/aws
@@ -370,7 +370,7 @@ github.com/rancher/rke/dind
 github.com/rancher/rke/cloudprovider/custom
 github.com/rancher/rke/cloudprovider/openstack
 github.com/rancher/rke/cloudprovider/vsphere
-# github.com/rancher/types v0.0.0-20190930165650-6bbedae77a35
+# github.com/rancher/types v0.0.0-20191002181205-bbd00336fe89
 github.com/rancher/types/apis/management.cattle.io/v3
 github.com/rancher/types/client/management/v3
 github.com/rancher/types/config
