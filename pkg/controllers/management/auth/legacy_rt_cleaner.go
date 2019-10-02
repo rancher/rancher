@@ -1,4 +1,4 @@
-package rbac
+package auth
 
 import (
 	"strings"
@@ -6,17 +6,23 @@ import (
 	"github.com/rancher/norman/lifecycle"
 	"github.com/rancher/rancher/pkg/api/store/roletemplate"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/config"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type rtCleaner struct {
-	m *manager
+	clusterLister v3.ClusterLister
+	mgmt          *config.ManagementContext
 }
 
-func newLegacyRTCleaner(m *manager) *rtCleaner {
-	return &rtCleaner{m: m}
+func newLegacyRTCleaner(mgmt *config.ManagementContext) *rtCleaner {
+	return &rtCleaner{
+		mgmt:          mgmt,
+		clusterLister: mgmt.Management.Clusters("").Controller().Lister(),
+	}
+
 }
 
 func (p *rtCleaner) sync(key string, obj *v3.RoleTemplate) (runtime.Object, error) {
@@ -37,7 +43,7 @@ func (p *rtCleaner) sync(key string, obj *v3.RoleTemplate) (runtime.Object, erro
 		obj.SetAnnotations(annotations)
 	}
 	obj.Annotations[roletemplate.RTVersion] = "true"
-	return p.m.workload.Management.Management.RoleTemplates("").Update(obj)
+	return p.mgmt.Management.RoleTemplates("").Update(obj)
 }
 
 func (p *rtCleaner) removeFinalizerFromNonExistentCluster(obj *v3.RoleTemplate) (*v3.RoleTemplate, error) {
@@ -54,7 +60,7 @@ func (p *rtCleaner) removeFinalizerFromNonExistentCluster(obj *v3.RoleTemplate) 
 		if strings.HasPrefix(f, lifecycle.ScopedFinalizerKey) {
 			s := strings.Split(f, "_")
 			// if cluster was not reported, its a deleted cluster and will cause the finalizer to hang in the future
-			if _, err = p.m.clusterLister.Get("", s[1]); errors.IsNotFound(err) {
+			if _, err = p.clusterLister.Get("", s[1]); errors.IsNotFound(err) {
 				finalizers = append(finalizers[:i], finalizers[i+1:]...)
 			}
 		}
