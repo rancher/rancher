@@ -51,6 +51,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, localClusterEnabled boo
 
 	root := mux.NewRouter()
 	root.UseEncodedPath()
+	root.Use(responsewriter.ContentTypeOptions)
 
 	rawAuthedAPIs := newAuthed(tokenAPI, managementAPI, k8sProxy, scaledContext)
 
@@ -114,6 +115,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, localClusterEnabled boo
 func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.Handler, scaledContext *config.ScaledContext) *mux.Router {
 	authed := mux.NewRouter()
 	authed.UseEncodedPath()
+	authed.Use(responsewriter.ContentTypeOptions)
 	authed.Path("/meta/gkeMachineTypes").Handler(capabilities.NewGKEMachineTypesHandler())
 	authed.Path("/meta/gkeVersions").Handler(capabilities.NewGKEVersionsHandler())
 	authed.Path("/meta/gkeZones").Handler(capabilities.NewGKEZonesHandler())
