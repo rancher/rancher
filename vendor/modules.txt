@@ -283,7 +283,7 @@ github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 # github.com/prometheus/procfs v0.0.0-20190507164030-5867b95ac084
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
-# github.com/rancher/kontainer-driver-metadata v0.0.0-20191002224336-80a609cf01ab
+# github.com/rancher/kontainer-driver-metadata v0.0.0-20191003190312-bd4630881fb2
 github.com/rancher/kontainer-driver-metadata/rke/templates
 github.com/rancher/kontainer-driver-metadata/rke
 # github.com/rancher/kontainer-engine v0.0.4-dev.0.20190930174220-db9e24343393
@@ -301,7 +301,7 @@ github.com/rancher/kontainer-engine/drivers/util
 github.com/rancher/kontainer-engine/drivers/options
 github.com/rancher/kontainer-engine/store
 github.com/rancher/kontainer-engine/utils
-# github.com/rancher/norman v0.0.0-20191002173122-b1eb20740eab
+# github.com/rancher/norman v0.0.0-20191003174345-0ac7dd6ccb36
 github.com/rancher/norman/controller
 github.com/rancher/norman/pkg/dump
 github.com/rancher/norman/pkg/kwrapper/k8s
@@ -348,7 +348,7 @@ github.com/rancher/norman/types/factory
 github.com/rancher/rdns-server/model
 # github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6
 github.com/rancher/remotedialer
-# github.com/rancher/rke v0.3.0-rc11.0.20191003062924-a00d610b3094
+# github.com/rancher/rke v0.3.0-rc11.0.20191003191024-bd969be49d80
 github.com/rancher/rke/util
 github.com/rancher/rke/pki/cert
 github.com/rancher/rke/cloudprovider/aws
@@ -370,7 +370,7 @@ github.com/rancher/rke/dind
 github.com/rancher/rke/cloudprovider/custom
 github.com/rancher/rke/cloudprovider/openstack
 github.com/rancher/rke/cloudprovider/vsphere
-# github.com/rancher/types v0.0.0-20191002181205-bbd00336fe89
+# github.com/rancher/types v0.0.0-20191003184925-ab3403a2c8ca
 github.com/rancher/types/apis/management.cattle.io/v3
 github.com/rancher/types/client/management/v3
 github.com/rancher/types/config
