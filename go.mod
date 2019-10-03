@@ -11,9 +11,6 @@ replace (
 
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.3
 
-	github.com/rancher/kontainer-driver-metadata => github.com/rancher/kontainer-driver-metadata v0.0.0-20191002204032-d44b9574831a
-	github.com/rancher/rke => github.com/rancher/rke v0.3.0-rc11.0.20191002205152-dac31abb8c1e
-
 	k8s.io/api => k8s.io/api v0.0.0-20190918155943-95b840bb6a1f
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.0.0-20190918161926-8f644eb6e783
 	k8s.io/apimachinery => k8s.io/apimachinery v0.0.0-20190913080033-27d36303b655
@@ -76,12 +73,12 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.1.0
 	github.com/prometheus/common v0.6.0
-	github.com/rancher/kontainer-driver-metadata v0.0.0-20191002165411-ba368718a427
+	github.com/rancher/kontainer-driver-metadata v0.0.0-20191002224336-80a609cf01ab
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20190930174220-db9e24343393
 	github.com/rancher/norman v0.0.0-20191002173122-b1eb20740eab
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6
-	github.com/rancher/rke v0.3.0-rc11.0.20190930172345-88449ec73b31
+	github.com/rancher/rke v0.3.0-rc11.0.20191003062924-a00d610b3094
 	github.com/rancher/types v0.0.0-20191002181205-bbd00336fe89
 	github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95
 	github.com/robfig/cron v1.1.0
