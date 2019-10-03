@@ -69,6 +69,7 @@ rules:
       - watch
   - apiGroups:
       - "extensions"
+      - "networking.k8s.io"
     resources:
       - ingresses
       - daemonsets
@@ -85,6 +86,7 @@ rules:
         - patch
   - apiGroups:
       - "extensions"
+      - "networking.k8s.io"
     resources:
       - ingresses/status
     verbs:
