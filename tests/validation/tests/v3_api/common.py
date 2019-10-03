@@ -1258,7 +1258,8 @@ def get_defaut_question_answers(client, externalId):
     return questions_and_answers
 
 
-def validate_app_deletion(client, app_id, timeout=DEFAULT_APP_DELETION_TIMEOUT):
+def validate_app_deletion(client, app_id,
+                          timeout=DEFAULT_APP_DELETION_TIMEOUT):
     app_data = client.list_app(id=app_id).data
     start = time.time()
     if len(app_data) == 0:
@@ -1273,3 +1274,30 @@ def validate_app_deletion(client, app_id, timeout=DEFAULT_APP_DELETION_TIMEOUT):
         if len(app) == 0:
             break
 
+
+def validate_catalog_app(proj_client, app, external_id, answer=None):
+    if answer is None:
+        answers = get_defaut_question_answers(get_admin_client(), external_id)
+    else:
+        answers = answer
+    #validate app is active
+    app = wait_for_app_to_active(proj_client, app.id)
+    assert app.externalId == external_id, \
+        "the version of the app is not correct"
+    # check if associated workloads are active
+    ns = app.targetNamespace
+    pramaters = external_id.split('&')
+    assert len(pramaters) > 1, \
+        "Incorrect list of paramaters from catalog external ID"
+    chart = pramaters[len(pramaters)-2].split("=")[1] + "-" + \
+            pramaters[len(pramaters)-1].split("=")[1]
+    workloads = proj_client.list_workload(namespaceId=ns).data
+    for wl in workloads:
+        assert wl.state == "active"
+        assert wl.workloadLabels.chart == chart, \
+            "the chart version is wrong"
+
+    #validate_app_answers
+    assert len(answers.items() - app["answers"].items()) == 0, \
+        "Answers are not same as the original catalog answers"
+    return app
