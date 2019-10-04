@@ -2,7 +2,6 @@ package jailer
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/exec"
 	"os/user"
@@ -52,7 +51,10 @@ func CreateJail(name string) error {
 	cmd := exec.CommandContext(ctx, "/usr/bin/jailer.sh", name)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return errors.WithMessage(err, fmt.Sprintf("error running the jail command: %v", string(out)))
+		if strings.HasSuffix(err.Error(), "signal: killed") {
+			return errors.WithMessage(err, "error running the jail command: timed out waiting for the script to complete")
+		}
+		return errors.WithMessage(err, "error running the jail command")
 	}
 	logrus.Debugf("Output from create jail command %v", string(out))
 	return nil
