@@ -146,7 +146,7 @@ func NewSetting(name, def string) Setting {
 func getMetadataConfig() string {
 	data := map[string]interface{}{
 		"url":                      "https://github.com/rancher/kontainer-driver-metadata.git",
-		"branch":                   "master",
+		"branch":                   "dev",
 		"refresh-interval-minutes": "1440",
 	}
 	ans, err := json.Marshal(data)
