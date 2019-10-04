@@ -51,7 +51,8 @@ def test_legacy_template_migrate_and_delete(admin_mc, admin_cc,
                   "failed waiting for node template to migrate")
 
     # assert that config has not been removed from node template
-    assert nt.azureConfig["customData"] == dynamic_nt["azureConfig"]["customData"]
+    assert nt.azureConfig["customData"] ==\
+        dynamic_nt["azureConfig"]["customData"]
     wait_for(lambda: admin_client.by_id_node_template(id=ns.name + ":" +
              node_template_name) is None, fail_handler=lambda:
              "failed waiting for old node template to delete")
@@ -81,8 +82,7 @@ def test_user_can_only_view_own_template(user_factory, remove_resource):
 
     def can_view_template():
         try:
-            nt = user_client1.by_id_node_template(id=node_template.id)
-            return nt
+            return user_client1.by_id_node_template(id=node_template.id)
         except ApiError as e:
             assert e.error.status == 403
             return None
