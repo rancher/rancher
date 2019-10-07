@@ -106,6 +106,11 @@ func (w *NodeWatcher) watchRule() error {
 			}
 			for _, node := range nodes {
 				machine := nodeHelper.GetNodeByNodeName(machines, node.Name)
+				// handle the case when v3.node can't be found for v1.node
+				if machine == nil {
+					logrus.Warnf("Failed to find node %s", node.Name)
+					continue
+				}
 				w.checkNodeCondition(alert, machine)
 			}
 		}
