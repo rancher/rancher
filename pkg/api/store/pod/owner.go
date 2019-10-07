@@ -115,7 +115,7 @@ func SaveOwner(apiContext *types.APIContext, kind, name string, data map[string]
 
 func resolveWorkloadID(apiContext *types.APIContext, data map[string]interface{}) string {
 	kind, name := getOwner(data)
-	if kind == "" {
+	if kind == "" || !workload.WorkloadKinds[kind] {
 		return ""
 	}
 
