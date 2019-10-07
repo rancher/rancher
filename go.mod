@@ -89,6 +89,7 @@ require (
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.21.0
 	github.com/vmihailenco/msgpack v4.0.1+incompatible
+	github.com/vmware/govmomi v0.21.1-0.20191006164024-1d61d1ba0200
 	github.com/vmware/kube-fluentd-operator v0.0.0-20190307154903-bf9de7e79eaf
 	github.com/xanzy/go-gitlab v0.0.0-20180830102804-feb856f4760f
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
