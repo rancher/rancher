@@ -50,14 +50,15 @@ var (
 // aliases maps Schema field => driver field
 // The opposite of this lives in pkg/controllers/management/drivers/nodedriver/machine_driver.go
 var aliases = map[string]map[string]string{
-	"aliyunecs":    map[string]string{"sshKeyContents": "sshKeypath"},
-	"amazonec2":    map[string]string{"sshKeyContents": "sshKeypath", "userdata": "userdata"},
-	"azure":        map[string]string{"customData": "customData"},
-	"digitalocean": map[string]string{"sshKeyContents": "sshKeyPath", "userdata": "userdata"},
-	"exoscale":     map[string]string{"sshKey": "sshKey", "userdata": "userdata"},
-	"openstack":    map[string]string{"cacert": "cacert", "privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
-	"otc":          map[string]string{"privateKeyFile": "privateKeyFile"},
-	"packet":       map[string]string{"userdata": "userdata"},
+	"aliyunecs":     map[string]string{"sshKeyContents": "sshKeypath"},
+	"amazonec2":     map[string]string{"sshKeyContents": "sshKeypath", "userdata": "userdata"},
+	"azure":         map[string]string{"customData": "customData"},
+	"digitalocean":  map[string]string{"sshKeyContents": "sshKeyPath", "userdata": "userdata"},
+	"exoscale":      map[string]string{"sshKey": "sshKey", "userdata": "userdata"},
+	"openstack":     map[string]string{"cacert": "cacert", "privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
+	"otc":           map[string]string{"privateKeyFile": "privateKeyFile"},
+	"packet":        map[string]string{"userdata": "userdata"},
+	"vmwarevsphere": map[string]string{"cloudConfig": "cloud-config"},
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
