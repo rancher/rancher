@@ -153,6 +153,7 @@ func (a ActionWrapper) rollbackDeployment(apiContext *types.APIContext, clusterC
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error parsing api version for deployment %v: %v", name, err))
 	}
 	if deploymentVersion == k8sappsv1.SchemeGroupVersion {
+		logrus.Debugf("Deployment apiversion is apps/v1")
 		// DeploymentRollback & RollbackTo are deprecated in apps/v1
 		// only way to rollback is update deployment podSpec with replicaSet podSpec
 		split := strings.SplitN(rollbackInput.ReplicaSetID, ":", 3)
@@ -162,13 +163,17 @@ func (a ActionWrapper) rollbackDeployment(apiContext *types.APIContext, clusterC
 		replicaNamespace, replicaName := split[1], split[2]
 		rs, err := clusterContext.Apps.ReplicaSets("").Controller().Lister().Get(replicaNamespace, replicaName)
 		if err != nil {
-			return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("ReplicaSet %s doesn't exist for deployment %s", rollbackInput.ReplicaSetID, deployment.ID))
+			logrus.Debugf("ReplicaSet not found in cache, fetching from etcd")
+			rs, err = clusterContext.Apps.ReplicaSets("").GetNamespaced(replicaNamespace, replicaName, v1.GetOptions{})
+			if err != nil {
+				return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("ReplicaSet %s not found for deployment %s", rollbackInput.ReplicaSetID, deployment.ID))
+			}
 		}
 		toUpdateDepl := depl.DeepCopy()
 		toUpdateDepl.Spec.Template.Spec = rs.Spec.Template.Spec
 		_, err = clusterContext.Apps.Deployments("").Update(toUpdateDepl)
 		if err != nil {
-			return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error updating workload %s by %s : %s", deployment.ID, actionName, err.Error()))
+			return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error updating workload under apps/v1 %s by %s : %s", deployment.ID, actionName, err.Error()))
 		}
 		return nil
 	}
