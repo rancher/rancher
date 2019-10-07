@@ -436,6 +436,27 @@ github.com/urfave/cli
 # github.com/vmihailenco/msgpack v4.0.1+incompatible
 github.com/vmihailenco/msgpack
 github.com/vmihailenco/msgpack/codes
+# github.com/vmware/govmomi v0.21.1-0.20191006164024-1d61d1ba0200
+github.com/vmware/govmomi
+github.com/vmware/govmomi/find
+github.com/vmware/govmomi/object
+github.com/vmware/govmomi/vapi/library
+github.com/vmware/govmomi/vapi/rest
+github.com/vmware/govmomi/vapi/tags
+github.com/vmware/govmomi/property
+github.com/vmware/govmomi/session
+github.com/vmware/govmomi/vim25
+github.com/vmware/govmomi/vim25/soap
+github.com/vmware/govmomi/vim25/types
+github.com/vmware/govmomi/list
+github.com/vmware/govmomi/vim25/mo
+github.com/vmware/govmomi/nfc
+github.com/vmware/govmomi/task
+github.com/vmware/govmomi/vim25/methods
+github.com/vmware/govmomi/vim25/progress
+github.com/vmware/govmomi/vapi/internal
+github.com/vmware/govmomi/vim25/debug
+github.com/vmware/govmomi/vim25/xml
 # github.com/vmware/kube-fluentd-operator v0.0.0-20190307154903-bf9de7e79eaf
 github.com/vmware/kube-fluentd-operator/config-reloader/fluentd
 github.com/vmware/kube-fluentd-operator/config-reloader/util
