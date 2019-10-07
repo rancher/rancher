@@ -569,6 +569,11 @@ func (in *Capabilities) DeepCopyInto(out *Capabilities) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.PspEnabled != nil {
+		in, out := &in.PspEnabled, &out.PspEnabled
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
