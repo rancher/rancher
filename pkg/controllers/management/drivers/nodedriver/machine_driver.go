@@ -29,14 +29,15 @@ var (
 	// Aliases maps Driver field => schema field
 	// The opposite of this lives in pkg/controllers/management/node/controller.go
 	Aliases = map[string]map[string]string{
-		"aliyunecs":    map[string]string{"sshKeypath": "sshKeyContents"},
-		"amazonec2":    map[string]string{"sshKeypath": "sshKeyContents", "userdata": "userdata"},
-		"azure":        map[string]string{"customData": "customData"},
-		"digitalocean": map[string]string{"sshKeyPath": "sshKeyContents", "userdata": "userdata"},
-		"exoscale":     map[string]string{"sshKey": "sshKey", "userdata": "userdata"},
-		"openstack":    map[string]string{"cacert": "cacert", "privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
-		"otc":          map[string]string{"privateKeyFile": "privateKeyFile"},
-		"packet":       map[string]string{"userdata": "userdata"},
+		"aliyunecs":     map[string]string{"sshKeypath": "sshKeyContents"},
+		"amazonec2":     map[string]string{"sshKeypath": "sshKeyContents", "userdata": "userdata"},
+		"azure":         map[string]string{"customData": "customData"},
+		"digitalocean":  map[string]string{"sshKeyPath": "sshKeyContents", "userdata": "userdata"},
+		"exoscale":      map[string]string{"sshKey": "sshKey", "userdata": "userdata"},
+		"openstack":     map[string]string{"cacert": "cacert", "privateKeyFile": "privateKeyFile", "userDataFile": "userDataFile"},
+		"otc":           map[string]string{"privateKeyFile": "privateKeyFile"},
+		"packet":        map[string]string{"userdata": "userdata"},
+		"vmwarevsphere": map[string]string{"cloud-config": "cloudConfig"},
 	}
 	SSHKeyFields = map[string]bool{
 		"sshKeyContents": true,
