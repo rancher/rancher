@@ -190,8 +190,8 @@ func (c *Controller) doClusterBackupSync(cluster *v3.Cluster) error {
 
 	// this cluster has backups, lets see if the last one is old enough
 	// a new backup is due if this is true
-	internvalHours := cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.IntervalHours
-	backupIntervalHours := time.Duration(internvalHours) * time.Hour
+	intervalHours := cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.IntervalHours
+	backupIntervalHours := time.Duration(intervalHours) * time.Hour
 
 	if time.Since(getBackupCompletedTime(newestBackup)) > backupIntervalHours {
 		newBackup, err := c.createNewBackup(cluster)
@@ -266,8 +266,8 @@ func (c *Controller) etcdRemoveSnapshotWithBackoff(b *v3.EtcdBackup) error {
 
 func (c *Controller) rotateExpiredBackups(cluster *v3.Cluster, clusterBackups []*v3.EtcdBackup) error {
 	retention := cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.Retention
-	internvalHours := cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.IntervalHours
-	expiredBackups := getExpiredBackups(retention, internvalHours, clusterBackups)
+	intervalHours := cluster.Spec.RancherKubernetesEngineConfig.Services.Etcd.BackupConfig.IntervalHours
+	expiredBackups := getExpiredBackups(retention, intervalHours, clusterBackups)
 	for _, backup := range expiredBackups {
 		if backup.Spec.Manual {
 			continue
@@ -440,9 +440,9 @@ func getBackupCompletedTime(o runtime.Object) time.Time {
 	return t
 }
 
-func getExpiredBackups(retention, internvalHours int, backups []*v3.EtcdBackup) []*v3.EtcdBackup {
+func getExpiredBackups(retention, intervalHours int, backups []*v3.EtcdBackup) []*v3.EtcdBackup {
 	expiredList := []*v3.EtcdBackup{}
-	toKeepDuration := time.Duration(retention*internvalHours) * time.Hour
+	toKeepDuration := time.Duration(retention*intervalHours) * time.Hour
 	for _, backup := range backups {
 		if time.Since(getBackupCompletedTime(backup)) > toKeepDuration {
 			expiredList = append(expiredList, backup)
