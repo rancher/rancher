@@ -30,6 +30,7 @@ var (
 	HelmVersion                       = NewSetting("helm-version", "dev")
 	IngressIPDomain                   = NewSetting("ingress-ip-domain", "xip.io")
 	InstallUUID                       = NewSetting("install-uuid", "")
+	JailerTimeout                     = NewSetting("jailer-timeout", "60")
 	KubernetesVersion                 = NewSetting("k8s-version", "")
 	KubernetesVersionToServiceOptions = NewSetting("k8s-version-to-service-options", "")
 	KubernetesVersionToSystemImages   = NewSetting("k8s-version-to-images", "")
