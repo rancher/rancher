@@ -152,25 +152,28 @@ func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, err
 			return cd(network, address)
 		}, nil
 	}
-	logrus.Debugf("dialerFactory: no tunnel session found for cluster [%s]", cluster.Name)
+	logrus.Debugf("dialerFactory: no tunnel session found for cluster [%s], falling back to nodeDialer", cluster.Name)
 
-	if cluster.Status.Driver != v3.ClusterDriverRKE {
-		return nil, fmt.Errorf("waiting for cluster agent to connect")
-	}
-
-	// Only for RKE will we try to connect to a node for the cluster dialer
+	// Try to connect to a node for the cluster dialer
 	nodes, err := f.nodeLister.List(cluster.Name, labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 
+	var localAPIEndpoint bool
+	if cluster.Status.Driver == v3.ClusterDriverRKE {
+		localAPIEndpoint = true
+	}
+
 	for _, node := range nodes {
 		if node.DeletionTimestamp == nil && v3.NodeConditionProvisioned.IsTrue(node) {
-			logrus.Debugf("dialerFactory: using node [%s]/[%s] for nodeDialer", node.Labels["management.cattle.io/nodename"], node.Name)
+			logrus.Debugf("dialerFactory: using node [%s]/[%s] for nodeDialer",
+				node.Labels["management.cattle.io/nodename"], node.Name)
 			if nodeDialer, err := f.nodeDialer(clusterName, node.Name); err == nil {
 				return func(network, address string) (net.Conn, error) {
-					if address == hostPort {
-						logrus.Debug("dialerFactory: rewriting address/port to 127.0.0.1:6443 as node may not have direct kube-api accesss")
+					if address == hostPort && localAPIEndpoint {
+						logrus.Debug("dialerFactory: rewriting address/port to 127.0.0.1:6443 as node may not" +
+							" have direct kube-api access")
 						// The node dialer may not have direct access to kube-api so we hit localhost:6443 instead
 						address = "127.0.0.1:6443"
 					}
