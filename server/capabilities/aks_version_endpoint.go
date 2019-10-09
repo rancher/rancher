@@ -143,36 +143,18 @@ func (s sortableVersion) Less(a, b int) bool {
 }
 
 func validateRegionRequestBody(writer http.ResponseWriter, body *regionCapabilitiesRequestBody) error {
-	region := body.Region
-
-	clientID := body.ClientID
-	clientSecret := body.ClientSecret
-	subscriptionID := body.SubscriptionID
-	tenantID := body.TenantID
-
-	if region == "" {
-		writer.WriteHeader(http.StatusBadRequest)
-		return fmt.Errorf("invalid region")
+	toCheck := map[string]string{
+		"region":         body.Region,
+		"clientID":       body.ClientID,
+		"clientSecret":   body.ClientSecret,
+		"subscriptionID": body.SubscriptionID,
+		"tenantID":       body.TenantID,
 	}
-
-	if clientID == "" {
-		writer.WriteHeader(http.StatusBadRequest)
-		return fmt.Errorf("invalid clientID")
-	}
-
-	if clientSecret == "" {
-		writer.WriteHeader(http.StatusBadRequest)
-		return fmt.Errorf("invalid clientSecret")
-	}
-
-	if subscriptionID == "" {
-		writer.WriteHeader(http.StatusBadRequest)
-		return fmt.Errorf("invalid subscriptionID")
-	}
-
-	if tenantID == "" {
-		writer.WriteHeader(http.StatusBadRequest)
-		return fmt.Errorf("invalid tenantID")
+	for k, v := range toCheck {
+		if v == "" {
+			writer.WriteHeader(http.StatusBadRequest)
+			return fmt.Errorf("invalid %s", k)
+		}
 	}
 
 	return nil
