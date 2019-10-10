@@ -173,11 +173,11 @@ def test_edit_secret_single_ns():
 
 @pytest.fixture(scope='module', autouse="True")
 def create_project_client(request):
-    client, cluster = get_admin_client_and_cluster()
+    client, cluster = get_user_client_and_cluster()
     create_kubeconfig(cluster)
-    p, ns = create_project_and_ns(ADMIN_TOKEN, cluster, "testsecret")
-    p_client = get_project_client_for_token(p, ADMIN_TOKEN)
-    c_client = get_cluster_client_for_token(cluster, ADMIN_TOKEN)
+    p, ns = create_project_and_ns(USER_TOKEN, cluster, "testsecret")
+    p_client = get_project_client_for_token(p, USER_TOKEN)
+    c_client = get_cluster_client_for_token(cluster, USER_TOKEN)
     namespace["p_client"] = p_client
     namespace["ns"] = ns
     namespace["cluster"] = cluster
@@ -185,7 +185,7 @@ def create_project_client(request):
     namespace["c_client"] = c_client
 
     def fin():
-        client = get_admin_client()
+        client = get_user_client()
         client.delete(namespace["project"])
     request.addfinalizer(fin)
 

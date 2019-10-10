@@ -12,7 +12,7 @@ gkecredential = pytest.mark.skipif(not CREDENTIALS, reason='GKE Credentials '
 @gkecredential
 def test_create_gke_cluster():
 
-    client = get_admin_client()
+    client = get_user_client()
     gkeConfig = get_gke_config()
 
     print("Cluster creation")
@@ -47,7 +47,7 @@ def get_gke_version_credentials():
         }
         headers = {"Content-Type": "application/json",
                    "Accept": "application/json",
-                   "Authorization": "Bearer " + ADMIN_TOKEN}
+                   "Authorization": "Bearer " + USER_TOKEN}
 
         gke_version_url = CATTLE_TEST_URL + "/meta/gkeVersions"
         print(gke_version_url)

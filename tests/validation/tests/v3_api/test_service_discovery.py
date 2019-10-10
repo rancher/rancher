@@ -373,12 +373,12 @@ def create_dns_record(record, p_client=None):
 
 @pytest.fixture(scope='module', autouse="True")
 def setup(request):
-    client, cluster = get_admin_client_and_cluster()
+    client, cluster = get_user_client_and_cluster()
     create_kubeconfig(cluster)
 
-    p, ns = create_project_and_ns(ADMIN_TOKEN, cluster, "testsd")
-    p_client = get_project_client_for_token(p, ADMIN_TOKEN)
-    c_client = get_cluster_client_for_token(cluster, ADMIN_TOKEN)
+    p, ns = create_project_and_ns(USER_TOKEN, cluster, "testsd")
+    p_client = get_project_client_for_token(p, USER_TOKEN)
+    c_client = get_cluster_client_for_token(cluster, USER_TOKEN)
 
     new_ns = create_ns(c_client, cluster, p)
 
@@ -415,7 +415,7 @@ def setup(request):
     assert len(namespace["testclient_pods"]) == 2
 
     def fin():
-        client = get_admin_client()
+        client = get_user_client()
         client.delete(namespace["project"])
 
     if RANCHER_CLEANUP_PROJECT == "True":

@@ -211,7 +211,7 @@ def test_create_and_validate_catalog_app():
 @if_upgrade_rancher
 def test_rancher_upgrade():
     upgrade_rancher_server(CATTLE_TEST_URL)
-    client = get_admin_client()
+    client = get_user_client()
     version = client.list_setting(name="server-version").data[0].value
     assert version == upgradeVersion
 
@@ -456,7 +456,7 @@ def create_validate_wokloads_with_secret():
 
 @pytest.fixture(scope='module', autouse="True")
 def create_project_client(request):
-    client = get_admin_client()
+    client = get_user_client()
     clusters = client.list_cluster(name=cluster_name).data
     assert len(clusters) == 1
     cluster = clusters[0]
@@ -466,10 +466,10 @@ def create_project_client(request):
 
 def create_project_resources():
     cluster = namespace["cluster"]
-    p, ns = create_project_and_ns(ADMIN_TOKEN, cluster,
+    p, ns = create_project_and_ns(USER_TOKEN, cluster,
                                   project_name=create_prefix + project_name,
                                   ns_name=create_prefix + ns_name1)
-    p_client = get_project_client_for_token(p, ADMIN_TOKEN)
+    p_client = get_project_client_for_token(p, USER_TOKEN)
 
     namespace["p_client"] = p_client
     namespace["ns"] = ns
@@ -495,7 +495,7 @@ def create_project_resources():
     pod = wait_for_pod_to_running(p_client, pods[0])
     namespace["testclient_pods"].append(pod)
 
-    new_ns = create_ns(get_cluster_client_for_token(cluster, ADMIN_TOKEN),
+    new_ns = create_ns(get_cluster_client_for_token(cluster, USER_TOKEN),
                        cluster, p, ns_name=create_prefix + ns_name2)
 
     workload = p_client.create_workload(name=wlname,
@@ -516,14 +516,14 @@ def validate_existing_project_resources():
     ns2_name = validate_prefix + ns_name2
 
     # Get existing project
-    client = get_admin_client()
+    client = get_user_client()
     projects = client.list_project(name=p_name,
                                    clusterId=cluster.id).data
     assert len(projects) == 1
     project = projects[0]
 
-    c_client = get_cluster_client_for_token(cluster, ADMIN_TOKEN)
-    p_client = get_project_client_for_token(project, ADMIN_TOKEN)
+    c_client = get_cluster_client_for_token(cluster, USER_TOKEN)
+    p_client = get_project_client_for_token(project, USER_TOKEN)
 
     # Get existing namespace
     nss = c_client.list_namespace(name=ns_name).data
@@ -604,10 +604,10 @@ def upgrade_rancher_server(serverIp,
 def create_and_validate_catalog_app():
     cluster = namespace["cluster"]
     p_client = namespace['p_client']
-    ns = create_ns(get_cluster_client_for_token(cluster, ADMIN_TOKEN),
+    ns = create_ns(get_cluster_client_for_token(cluster, USER_TOKEN),
                    cluster, namespace["project"], ns_name=app_ns)
     app = p_client.create_app(
-        answers=get_defaut_question_answers(get_admin_client(),
+        answers=get_defaut_question_answers(get_user_client(),
                                             pre_upgrade_externalId),
         externalId=pre_upgrade_externalId,
         name=app_create_name,
@@ -624,7 +624,7 @@ def modify_catalog_app():
     # upgrade the catalog app to a newer version
     p_client.action(obj=app, action_name="upgrade",
                     answers=get_defaut_question_answers(
-                        get_admin_client(),
+                        get_user_client(),
                         post_upgrade_externalId),
                     externalId=post_upgrade_externalId)
     validate_catalog_app(app.name, post_upgrade_externalId)

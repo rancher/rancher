@@ -4,8 +4,8 @@ import ast
 AGENT_REG_CMD = os.environ.get('RANCHER_AGENT_REG_CMD', "")
 HOST_COUNT = int(os.environ.get('RANCHER_HOST_COUNT', 1))
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "testsa")
-RANCHER_SERVER_VERSION = os.environ.get('RANCHER_SERVER_VERSION', "master")
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', "None")
+RANCHER_SERVER_VERSION = os.environ.get('RANCHER_SERVER_VERSION',
+                                        "master-head")
 rke_config = {"authentication": {"type": "authnConfig", "strategy": "x509"},
               "ignoreDockerVersion": False,
               "network": {"type": "networkConfig", "plugin": "canal"},
@@ -34,7 +34,7 @@ def test_delete_keypair():
 
 def test_deploy_rancher_server():
     RANCHER_SERVER_CMD = \
-        'docker run -d --name="rancher-server" ' \
+        'sudo docker run -d --name="rancher-server" ' \
         '--restart=unless-stopped -p 80:80 -p 443:443  ' \
         'rancher/rancher'
     RANCHER_SERVER_CMD += ":" + RANCHER_SERVER_VERSION
@@ -46,12 +46,20 @@ def test_deploy_rancher_server():
     print(RANCHER_SERVER_URL)
     wait_until_active(RANCHER_SERVER_URL)
 
-    RANCHER_SET_DEBUG_CMD = "docker exec rancher-server loglevel --set debug"
+    RANCHER_SET_DEBUG_CMD = \
+        "sudo docker exec rancher-server loglevel --set debug"
     aws_nodes[0].execute_command(RANCHER_SET_DEBUG_CMD)
 
     token = get_admin_token(RANCHER_SERVER_URL)
+    admin_client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
+                                  token=token, verify=False)
+    AUTH_URL = RANCHER_SERVER_URL + \
+               "/v3-public/localproviders/local?action=login"
+    user, user_token = create_user(admin_client, AUTH_URL)
+
     env_details = "env.CATTLE_TEST_URL='" + RANCHER_SERVER_URL + "'\n"
     env_details += "env.ADMIN_TOKEN='" + token + "'\n"
+    env_details += "env.USER_TOKEN='" + user_token + "'\n"
 
     if AUTO_DEPLOY_CUSTOM_CLUSTER:
         aws_nodes = \
@@ -60,12 +68,12 @@ def test_deploy_rancher_server():
         node_roles = [["controlplane"], ["etcd"],
                       ["worker"], ["worker"], ["worker"]]
         client = rancher.Client(url=RANCHER_SERVER_URL+"/v3",
-                                token=token, verify=False)
+                                token=user_token, verify=False)
         cluster = client.create_cluster(
             name=random_name(),
             driver="rancherKubernetesEngine",
             rancherKubernetesEngineConfig=rke_config)
-        assert cluster.state == "active"
+        assert cluster.state == "provisioning"
         i = 0
         for aws_node in aws_nodes:
             docker_run_cmd = \
@@ -79,7 +87,7 @@ def test_deploy_rancher_server():
 
 
 def test_delete_rancher_server():
-    client = get_admin_client()
+    client = get_user_client()
     clusters = client.list_cluster().data
     for cluster in clusters:
         delete_cluster(client, cluster)
@@ -117,7 +125,7 @@ def get_admin_token(RANCHER_SERVER_URL):
     client = rancher.Client(url=RANCHER_SERVER_URL+"/v3",
                             token=token, verify=False)
     admin_user = client.list_user(username="admin").data
-    admin_user[0].setpassword(newPassword=ADMIN_PASSWORD)
+    admin_user[0].setpassword(newPassword=USER_PASSWORD)
 
     # Set server-url settings
     serverurl = client.list_setting(name="server-url").data

@@ -15,7 +15,7 @@ ekscredential = pytest.mark.skipif(not (EKS_ACCESS_KEY and EKS_SECRET_KEY),
 @ekscredential
 def test_create_eks_cluster():
 
-    client = get_admin_client()
+    client = get_user_client()
     eksConfig = get_eks_config()
 
     print("Cluster creation")

@@ -30,7 +30,7 @@ def test_create_project_quota():
     # successfully. Verify namespacedefault resource quota is set
 
     cluster = namespace["cluster"]
-    client = get_admin_client()
+    client = get_user_client()
     c_client = namespace["c_client"]
 
     quota = default_project_quota()
@@ -67,7 +67,7 @@ def test_resource_quota_create_namespace_with_ns_quota():
     # namespace creation is allowed within the quota
 
     cluster = namespace["cluster"]
-    client = get_admin_client()
+    client = get_user_client()
     c_client = namespace["c_client"]
 
     quota = default_project_quota()
@@ -146,11 +146,11 @@ def validate_resoucequota_thru_kubectl(namespace):
 
 @pytest.fixture(scope='module', autouse="True")
 def create_project_client(request):
-    client, cluster = get_admin_client_and_cluster()
+    client, cluster = get_user_client_and_cluster()
     create_kubeconfig(cluster)
-    p, ns = create_project_and_ns(ADMIN_TOKEN, cluster, "testworkload")
-    p_client = get_project_client_for_token(p, ADMIN_TOKEN)
-    c_client = get_cluster_client_for_token(cluster, ADMIN_TOKEN)
+    p, ns = create_project_and_ns(USER_TOKEN, cluster, "testworkload")
+    p_client = get_project_client_for_token(p, USER_TOKEN)
+    c_client = get_cluster_client_for_token(cluster, USER_TOKEN)
     namespace["p_client"] = p_client
     namespace["ns"] = ns
     namespace["cluster"] = cluster
@@ -158,6 +158,6 @@ def create_project_client(request):
     namespace["c_client"] = c_client
 
     def fin():
-        client = get_admin_client()
+        client = get_user_client()
         client.delete(namespace["project"])
     request.addfinalizer(fin)

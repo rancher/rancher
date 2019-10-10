@@ -34,7 +34,7 @@ def test_connectivity_between_pods():
     # Check that pods belonging to different namespace within the
     # same project can communicate
 
-    c_client = get_cluster_client_for_token(cluster, ADMIN_TOKEN)
+    c_client = get_cluster_client_for_token(cluster, USER_TOKEN)
     ns1 = create_ns(c_client, cluster, namespace["project"])
     workload1 = p_client.create_workload(name=name,
                                          containers=con,
@@ -51,8 +51,8 @@ def test_connectivity_between_pods():
     # Check communication between pods belonging to different namespace across
     # different projects
 
-    p2, ns2 = create_project_and_ns(ADMIN_TOKEN, cluster)
-    p2_client = get_project_client_for_token(p2, ADMIN_TOKEN)
+    p2, ns2 = create_project_and_ns(USER_TOKEN, cluster)
+    p2_client = get_project_client_for_token(p2, USER_TOKEN)
 
     workload2 = p2_client.create_workload(name=name,
                                           containers=con,
@@ -71,16 +71,16 @@ def test_connectivity_between_pods():
 
 @pytest.fixture(scope='module', autouse="True")
 def create_project_client(request):
-    client, cluster = get_admin_client_and_cluster()
+    client, cluster = get_user_client_and_cluster()
     create_kubeconfig(cluster)
-    p, ns = create_project_and_ns(ADMIN_TOKEN, cluster, "testnp")
-    p_client = get_project_client_for_token(p, ADMIN_TOKEN)
+    p, ns = create_project_and_ns(USER_TOKEN, cluster, "testnp")
+    p_client = get_project_client_for_token(p, USER_TOKEN)
     namespace["p_client"] = p_client
     namespace["ns"] = ns
     namespace["cluster"] = cluster
     namespace["project"] = p
 
     def fin():
-        client = get_admin_client()
+        client = get_user_client()
         client.delete(namespace["project"])
     request.addfinalizer(fin)

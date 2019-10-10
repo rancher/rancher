@@ -1,10 +1,9 @@
 import pytest
-import requests
 from rancher import ApiError, Client
 
 from .common import (
     ADMIN_TOKEN,
-    CATTLE_TEST_URL,
+    CATTLE_API_URL,
     assign_members_to_cluster,
     assign_members_to_project,
     change_member_role_in_cluster,
@@ -12,22 +11,18 @@ from .common import (
     create_ns,
     create_project,
     create_project_and_ns,
+    get_user_client,
     get_admin_client,
-    get_admin_client_and_cluster,
     get_client_for_token,
     get_cluster_client_for_token,
-    random_name,
+    create_user,
+    get_user_client_and_cluster
 )
-
-CATTLE_API_URL = CATTLE_TEST_URL + "/v3"
-CATTLE_AUTH_URL = \
-    CATTLE_TEST_URL + "/v3-public/localproviders/local?action=login"
-user_password = "password"
 
 
 def test_rbac_cluster_owner():
-    client, cluster = get_admin_client_and_cluster()
-    user1, user1_token = create_user(client)
+    client, cluster = get_user_client_and_cluster()
+    user1, user1_token = create_user(get_admin_client())
 
     # Assert that user1 is not able to list cluster
     user1_client = get_client_for_token(user1_token)
@@ -35,14 +30,14 @@ def test_rbac_cluster_owner():
     assert len(clusters) == 0
 
     # As admin , add user1 as cluster member of this cluster
-    client = get_admin_client()
+    client = get_user_client()
     assign_members_to_cluster(client, user1, cluster, "cluster-owner")
     validate_cluster_owner(user1_token, cluster)
 
 
 def test_rbac_cluster_member():
-    client, cluster = get_admin_client_and_cluster()
-    user1, user1_token = create_user(client)
+    client, cluster = get_user_client_and_cluster()
+    user1, user1_token = create_user(get_admin_client())
 
     # Assert that user1 is not able to list cluster
     user1_client = get_client_for_token(user1_token)
@@ -50,17 +45,17 @@ def test_rbac_cluster_member():
     assert len(clusters) == 0
 
     # Add user1 as cluster member of this cluster
-    client = get_admin_client()
+    client = get_user_client()
     assign_members_to_cluster(client, user1, cluster, "cluster-member")
     validate_cluster_member(user1_token, cluster)
 
 
 def test_rbac_project_owner():
-    client, cluster = get_admin_client_and_cluster()
+    client, cluster = get_user_client_and_cluster()
     #  As admin user create a project and namespace
     a_p, a_ns = create_project_and_ns(ADMIN_TOKEN, cluster)
 
-    user1, user1_token = create_user(client)
+    user1, user1_token = create_user(get_admin_client())
 
     # Assert that user1 is not able to list cluster
     user1_client = get_client_for_token(user1_token)
@@ -68,19 +63,19 @@ def test_rbac_project_owner():
     assert len(clusters) == 0
 
     # As admin user, Add user1 as project member of this project
-    client = get_admin_client()
+    client = get_user_client()
     assign_members_to_project(client, user1, a_p, "project-owner")
     validate_project_owner(user1_token, cluster, a_p, a_ns)
 
 
 def test_rbac_project_member():
-    client, cluster = get_admin_client_and_cluster()
+    client, cluster = get_user_client_and_cluster()
 
     #  As admin user create a project and namespace
     a_p, a_ns = create_project_and_ns(ADMIN_TOKEN, cluster)
 
-    user1, user1_token = create_user(client)
-    user2, user2_token = create_user(client)
+    user1, user1_token = create_user(get_admin_client())
+    user2, user2_token = create_user(get_admin_client())
 
     # Assert that user1 is not able to list cluster
     user1_client = get_client_for_token(user1_token)
@@ -88,15 +83,15 @@ def test_rbac_project_member():
     assert len(clusters) == 0
 
     # As admin user, Add user1 as project member of this project
-    client = get_admin_client()
+    client = get_user_client()
     assign_members_to_project(client, user1, a_p, "project-member")
     validate_project_member(user1_token, cluster, a_p, a_ns)
 
 
 def test_rbac_change_cluster_owner_to_cluster_member():
-    client, cluster = get_admin_client_and_cluster()
+    client, cluster = get_user_client_and_cluster()
 
-    user1, user1_token = create_user(client)
+    user1, user1_token = create_user(get_admin_client())
 
     # Assert that user1 is not able to list cluster
     user1_client = get_client_for_token(user1_token)
@@ -104,7 +99,7 @@ def test_rbac_change_cluster_owner_to_cluster_member():
     assert len(clusters) == 0
 
     # As admin , add user1 as cluster member of this cluster
-    client = get_admin_client()
+    client = get_user_client()
     crtb = assign_members_to_cluster(
         client, user1, cluster, "cluster-owner")
     validate_cluster_owner(user1_token, cluster)
@@ -114,9 +109,9 @@ def test_rbac_change_cluster_owner_to_cluster_member():
 
 
 def test_rbac_change_cluster_member_to_cluster_owner():
-    client, cluster = get_admin_client_and_cluster()
+    client, cluster = get_user_client_and_cluster()
 
-    user1, user1_token = create_user(client)
+    user1, user1_token = create_user(get_admin_client())
 
     # Assert that user1 is not able to list cluster
     user1_client = get_client_for_token(user1_token)
@@ -125,20 +120,20 @@ def test_rbac_change_cluster_member_to_cluster_owner():
 
     # Add user1 as cluster member of this cluster
     crtb = assign_members_to_cluster(
-        get_admin_client(), user1, cluster, "cluster-member")
+        get_user_client(), user1, cluster, "cluster-member")
     validate_cluster_member(user1_token, cluster)
     change_member_role_in_cluster(
-        get_admin_client(), user1, crtb, "cluster-owner")
+        get_user_client(), user1, crtb, "cluster-owner")
     validate_cluster_owner(user1_token, cluster)
 
 
 def test_rbac_change_project_owner_to_project_member():
-    client, cluster = get_admin_client_and_cluster()
+    client, cluster = get_user_client_and_cluster()
 
     #  As admin user create a project and namespace
     a_p, a_ns = create_project_and_ns(ADMIN_TOKEN, cluster)
 
-    user1, user1_token = create_user(client)
+    user1, user1_token = create_user(get_admin_client())
 
     # Assert that user1 is not able to list cluster
     user1_client = get_client_for_token(user1_token)
@@ -147,21 +142,21 @@ def test_rbac_change_project_owner_to_project_member():
 
     # As admin user, Add user1 as project member of this project
     prtb = assign_members_to_project(
-        get_admin_client(), user1, a_p, "project-owner")
+        get_user_client(), user1, a_p, "project-owner")
     validate_project_owner(user1_token, cluster, a_p, a_ns)
     change_member_role_in_project(
-        get_admin_client(), user1, prtb, "project-member")
+        get_user_client(), user1, prtb, "project-member")
     validate_project_member(user1_token, cluster, a_p, a_ns)
 
 
 def test_rbac_change_project_member_to_project_cluster():
-    client, cluster = get_admin_client_and_cluster()
+    client, cluster = get_user_client_and_cluster()
 
     #  As admin user create a project and namespace
     a_p, a_ns = create_project_and_ns(ADMIN_TOKEN, cluster)
 
-    user1, user1_token = create_user(client)
-    user2, user2_token = create_user(client)
+    user1, user1_token = create_user(get_admin_client())
+    user2, user2_token = create_user(get_admin_client())
 
     # Assert that user1 is not able to list cluster
     user1_client = get_client_for_token(user1_token)
@@ -170,10 +165,10 @@ def test_rbac_change_project_member_to_project_cluster():
 
     # As admin user, Add user1 as project member of this project
     prtb = assign_members_to_project(
-        get_admin_client(), user1, a_p, "project-member")
+        get_user_client(), user1, a_p, "project-member")
     validate_project_member(user1_token, cluster, a_p, a_ns)
     change_member_role_in_project(
-        get_admin_client(), user1, prtb, "project-owner")
+        get_user_client(), user1, prtb, "project-owner")
     validate_project_owner(user1_token, cluster, a_p, a_ns)
 
 
@@ -332,23 +327,3 @@ def validate_project_member(user_token, cluster, project, namespace):
         create_project(user_client, cluster)
     assert e.value.error.status == 403
     assert e.value.error.code == 'Forbidden'
-
-
-def get_user_token(user):
-    r = requests.post(CATTLE_AUTH_URL, json={
-        'username': user.username,
-        'password': user_password,
-        'responseType': 'json',
-    }, verify=False)
-    print(r.json())
-    return r.json()["token"]
-
-
-def create_user(client):
-    user = client.create_user(username=random_name(),
-                              password=user_password)
-    client.create_global_role_binding(globalRoleId="user",
-                                      subjectKind="User",
-                                      userId=user.id)
-    user_token = get_user_token(user)
-    return user, user_token
