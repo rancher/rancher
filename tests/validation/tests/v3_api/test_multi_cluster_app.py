@@ -391,7 +391,7 @@ def test_multi_cluster_rolling_upgrade():
 
 @pytest.fixture(scope='module', autouse="True")
 def create_project_client(request):
-    client, clusters = get_admin_client_and_cluster_mcapp()
+    client, clusters = get_admin_client_and_cluster_app()
     if len(clusters) > 1:
         global_client["cluster_count"] = True
     assert_if_valid_cluster_count()
@@ -449,21 +449,6 @@ def validate_multi_cluster_app_cluster(multiclusterapp):
         project_client = project_detail["p_client"+str(i)]
         wait_for_app_to_active(project_client, app_id)
         validate_app_version(project_client, multiclusterapp, app_id)
-
-
-def get_admin_client_and_cluster_mcapp():
-    clusters = []
-    client = get_admin_client()
-    if CLUSTER_NAME != "" and CLUSTER_NAME_2 != "":
-        assert len(client.list_cluster(name=CLUSTER_NAME).data) != 0, \
-            "Cluster is not available: %r" % CLUSTER_NAME
-        assert len(client.list_cluster(name=CLUSTER_NAME_2).data) != 0, \
-            "Cluster is not available: %r" % CLUSTER_NAME_2
-        clusters.append(client.list_cluster(name=CLUSTER_NAME).data[0])
-        clusters.append(client.list_cluster(name=CLUSTER_NAME_2).data[0])
-    else:
-        clusters = client.list_cluster().data
-    return client, clusters
 
 
 def delete_multi_cluster_app(multiclusterapp, validation=False):

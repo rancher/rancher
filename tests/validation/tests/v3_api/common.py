@@ -1302,3 +1302,18 @@ def validate_catalog_app(proj_client, app, external_id, answer=None):
     assert len(answers.items() - app["answers"].items()) == 0, \
         "Answers are not same as the original catalog answers"
     return app
+
+
+def get_admin_client_and_cluster_app():
+    clusters = []
+    client = get_admin_client()
+    if CLUSTER_NAME != "" and CLUSTER_NAME_2 != "":
+        assert len(client.list_cluster(name=CLUSTER_NAME).data) != 0, \
+            "Cluster is not available: %r" % CLUSTER_NAME
+        assert len(client.list_cluster(name=CLUSTER_NAME_2).data) != 0, \
+            "Cluster is not available: %r" % CLUSTER_NAME_2
+        clusters.append(client.list_cluster(name=CLUSTER_NAME).data[0])
+        clusters.append(client.list_cluster(name=CLUSTER_NAME_2).data[0])
+    else:
+        clusters = client.list_cluster().data
+    return client, clusters
