@@ -19,7 +19,7 @@ akscredential = pytest.mark.skipif(not (SUBSCRIPTION_ID and TENANT_ID and
 @akscredential
 def test_create_aks_cluster():
 
-    client = get_admin_client()
+    client = get_user_client()
     aksConfig = get_aks_config()
 
     print("Cluster creation")
@@ -41,7 +41,7 @@ def get_aks_version():
         }
         headers = {"Content-Type": "application/json",
                    "Accept": "application/json",
-                   "Authorization": "Bearer " + ADMIN_TOKEN}
+                   "Authorization": "Bearer " + USER_TOKEN}
 
         aks_version_url = CATTLE_TEST_URL + "/meta/aksVersions"
         print(aks_version_url)

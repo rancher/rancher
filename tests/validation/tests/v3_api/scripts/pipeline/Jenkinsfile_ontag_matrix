@@ -70,12 +70,13 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
 
       def CATTLE_TEST_URL_2 = ""
       def ADMIN_TOKEN_2 = ""
+      def USER_TOKEN_2 = ""
 
       wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
         withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                           string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
                           string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
-                          string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD')]) {
+                          string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD')]) {
 
           println "Branch: ${branch}"
           stage('Checkout') {
@@ -109,12 +110,13 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                     "pytest -v -s --junit-xml=${setupResultsOut} " +
                     "${deployPytestOptions} ${testsDir}\'"
 
-                  // copy file containing CATTLE_TEST_URL & ADMIN_TOKEN and load into environment variables
+                  // copy file containing CATTLE_TEST_URL, ADMIN_TOKEN, USER_TOKEN and load into environment variables
                   sh "docker cp ${setupContainer}:${rootPath}${testsDir}${rancherConfig} ."
                   load rancherConfig
 
                   CATTLE_TEST_URL_2 = "${CATTLE_TEST_URL}"
                   ADMIN_TOKEN_2 = "${ADMIN_TOKEN}"
+                  USER_TOKEN_2 = "${USER_TOKEN}"
                 } catch(err) {
                   echo "Error: " + err
                   echo 'Test run had failures. Collecting results...'
@@ -146,11 +148,13 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                     println "Branch: ${branch}"
                     params = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"),
                               string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"),
+                              string(name: 'USER_TOKEN', value: "${USER_TOKEN}"),
                               string(name: 'RANCHER_SERVER_VERSION', value: "${rancher_version}"), 
                               string(name: 'BRANCH', value: branch) ]
 
                     params2 = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL_2}"),
                                 string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN_2}"),
+                                string(name: 'USER_TOKEN', value: "${USER_TOKEN_2}"),
                                 string(name: 'RANCHER_SERVER_VERSION', value: "${rancher_version}"),
                                 string(name: 'BRANCH', value: branch) ]
 
@@ -177,7 +181,8 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                   try {
                     sh "docker run --name ${deleteContainer} -t --env-file ${envFile} " +
                     "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} && " +
-                    "export ADMIN_TOKEN=${env.ADMIN_TOKEN} && pytest -v -s --junit-xml=${deleteResultsOut} " +
+                    "export ADMIN_TOKEN=${env.ADMIN_TOKEN} && export USER_TOKEN=${env.USER_TOKEN} &&"+
+                    "pytest -v -s --junit-xml=${deleteResultsOut} " +
                     "${deletePytestOptions} ${testsDir}\'"
                   } catch(err) {
                     echo "Error: " + err
@@ -186,7 +191,8 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                   try {
                     sh "docker run --name ${deleteContainer2} -t --env-file ${envFile} " +
                     "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${CATTLE_TEST_URL_2} && " +
-                    "export ADMIN_TOKEN=${ADMIN_TOKEN_2} && pytest -v -s --junit-xml=${deleteResultsOut2} " +
+                    "export ADMIN_TOKEN=${ADMIN_TOKEN_2} && export USER_TOKEN=${USER_TOKEN_2} &&" +
+                    "pytest -v -s --junit-xml=${deleteResultsOut2} " +
                     "${deletePytestOptions} ${testsDir}\'"
                   } catch(err) {
                     echo "Error: " + err

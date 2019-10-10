@@ -260,11 +260,11 @@ def test_multi_cluster_project_answer_override():
 
 def test_multi_cluster_cluster_answer_override():
     assert_if_valid_cluster_count()
-    client, clusters = get_admin_client_and_cluster_mcapp()
+    client, clusters = get_user_client_and_cluster_mcapp()
     cluster1 = clusters[0]
     p3, ns3 = create_project_and_ns(
-        ADMIN_TOKEN, cluster1, random_test_name("mcapp-3"))
-    p_client2 = get_project_client_for_token(p3, ADMIN_TOKEN)
+        USER_TOKEN, cluster1, random_test_name("mcapp-3"))
+    p_client2 = get_project_client_for_token(p3, USER_TOKEN)
     project_detail["c2_id"] = cluster1.id
     project_detail["namespace2"] = ns3
     project_detail["p2_id"] = p3.id
@@ -391,18 +391,18 @@ def test_multi_cluster_rolling_upgrade():
 
 @pytest.fixture(scope='module', autouse="True")
 def create_project_client(request):
-    client, clusters = get_admin_client_and_cluster_mcapp()
+    client, clusters = get_user_client_and_cluster_mcapp()
     if len(clusters) > 1:
         global_client["cluster_count"] = True
     assert_if_valid_cluster_count()
     cluster1 = clusters[0]
     cluster2 = clusters[1]
     p1, ns1 = create_project_and_ns(
-        ADMIN_TOKEN, cluster1, random_test_name("mcapp-1"))
-    p_client1 = get_project_client_for_token(p1, ADMIN_TOKEN)
+        USER_TOKEN, cluster1, random_test_name("mcapp-1"))
+    p_client1 = get_project_client_for_token(p1, USER_TOKEN)
     p2, ns2 = create_project_and_ns(
-        ADMIN_TOKEN, cluster2, random_test_name("mcapp-2"))
-    p_client2 = get_project_client_for_token(p2, ADMIN_TOKEN)
+        USER_TOKEN, cluster2, random_test_name("mcapp-2"))
+    p_client2 = get_project_client_for_token(p2, USER_TOKEN)
     project_detail["c0_id"] = cluster1.id
     project_detail["p0_id"] = p1.id
     project_detail["namespace0"] = ns1
@@ -420,7 +420,7 @@ def create_project_client(request):
     global_client["client"] = client
 
     def fin():
-        client_admin = get_admin_client()
+        client_admin = get_user_client()
         client_admin.delete(p1, ns1, p_client1)
         client_admin.delete(p2, ns2, p_client2)
 
@@ -451,9 +451,9 @@ def validate_multi_cluster_app_cluster(multiclusterapp):
         validate_app_version(project_client, multiclusterapp, app_id)
 
 
-def get_admin_client_and_cluster_mcapp():
+def get_user_client_and_cluster_mcapp():
     clusters = []
-    client = get_admin_client()
+    client = get_user_client()
     if CLUSTER_NAME != "" and CLUSTER_NAME_2 != "":
         assert len(client.list_cluster(name=CLUSTER_NAME).data) != 0, \
             "Cluster is not available: %r" % CLUSTER_NAME

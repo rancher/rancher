@@ -10,7 +10,7 @@ AWS_SSH_KEY_NAME = os.environ.get("AWS_SSH_KEY_NAME")
 
 def test_import_rke_cluster():
 
-    client = get_admin_client()
+    client = get_user_client()
 
     # Create nodes in AWS
     aws_nodes = create_nodes()

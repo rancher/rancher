@@ -51,14 +51,15 @@ node {
               "${imageName} /bin/bash -c \'pytest -v -s --junit-xml=${setupResultsOut} " +
               "${deployPytestOptions} ${testsDir}\'"
 
-            // copy file containing CATTLE_TEST_URL & ADMIN_TOKEN and load into environment variables
+            // copy file containing CATTLE_TEST_URL, ADMIN_TOKEN, USER_TOKEN and load into environment variables
             sh "docker cp ${setupContainer}:${rootPath}${testsDir}${rancherConfig} ."
             load rancherConfig
 
             // run tests
             sh "docker run --name ${testContainer} -t --env-file ${envFile} " +
               "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} " +
-              "&& export ADMIN_TOKEN=${env.ADMIN_TOKEN} && pytest -v -s --junit-xml=${testResultsOut} " +
+              "&& export ADMIN_TOKEN=${env.ADMIN_TOKEN} && export USER_TOKEN=${env.USER_TOKEN} "+
+              "&& pytest -v -s --junit-xml=${testResultsOut} " +
               "${PYTEST_OPTIONS} ${testsDir}\'"
           } catch(err) {
             echo "Error: " + err

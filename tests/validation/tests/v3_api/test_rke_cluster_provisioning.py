@@ -2,6 +2,7 @@ import os
 from threading import Thread
 import pytest
 from .common import *  # NOQA
+from rancher import ApiError
 
 K8S_VERSION = os.environ.get('RANCHER_K8S_VERSION', "")
 K8S_VERSION_UPGRADE = os.environ.get('RANCHER_K8S_VERSION_UPGRADE', "")
@@ -156,7 +157,7 @@ def test_rke_custom_host_1():
             1, random_test_name(HOST_NAME))
     node_roles = ["worker", "controlplane", "etcd"]
 
-    client = get_admin_client()
+    client = get_user_client()
     cluster = client.create_cluster(name=evaluate_clustername(),
                                     driver="rancherKubernetesEngine",
                                     rancherKubernetesEngineConfig=rke_config)
@@ -177,7 +178,7 @@ def test_rke_custom_host_2():
     node_roles = [["controlplane"], ["etcd"],
                   ["worker"], ["worker"], ["worker"]]
 
-    client = get_admin_client()
+    client = get_user_client()
     cluster = client.create_cluster(name=evaluate_clustername(),
                                     driver="rancherKubernetesEngine",
                                     rancherKubernetesEngineConfig=rke_config)
@@ -202,7 +203,7 @@ def test_rke_custom_host_3():
         ["etcd"], ["etcd"], ["etcd"],
         ["worker"], ["worker"], ["worker"]
     ]
-    client = get_admin_client()
+    client = get_user_client()
     cluster = client.create_cluster(name=evaluate_clustername(),
                                     driver="rancherKubernetesEngine",
                                     rancherKubernetesEngineConfig=rke_config)
@@ -230,7 +231,7 @@ def test_rke_custom_host_4():
         {"roles": ["worker"],
          "nodes": [aws_nodes[5], aws_nodes[6], aws_nodes[7]]}
     ]
-    client = get_admin_client()
+    client = get_user_client()
     cluster = client.create_cluster(name=evaluate_clustername(),
                                     driver="rancherKubernetesEngine",
                                     rancherKubernetesEngineConfig=rke_config)
@@ -260,7 +261,7 @@ def test_rke_custom_host_stress():
     worker_role = ["worker"]
     for int in range(0, worker_count):
         node_roles.append(worker_role)
-    client = get_admin_client()
+    client = get_user_client()
     cluster = client.create_cluster(name=evaluate_clustername(),
                                     driver="rancherKubernetesEngine",
                                     rancherKubernetesEngineConfig=rke_config)
@@ -284,7 +285,7 @@ def test_rke_custom_host_etcd_plane_changes():
     node_roles = [["controlplane"], ["etcd"],
                   ["worker"], ["worker"], ["worker"]]
 
-    client = get_admin_client()
+    client = get_user_client()
     cluster = client.create_cluster(name=evaluate_clustername(),
                                     driver="rancherKubernetesEngine",
                                     rancherKubernetesEngineConfig=rke_config)
@@ -330,7 +331,7 @@ def test_rke_custom_host_etcd_plane_changes_1():
     node_roles = [["controlplane"], ["etcd"],
                   ["worker"], ["worker"], ["worker"]]
 
-    client = get_admin_client()
+    client = get_user_client()
     cluster = client.create_cluster(name=evaluate_clustername(),
                                     driver="rancherKubernetesEngine",
                                     rancherKubernetesEngineConfig=rke_config)
@@ -371,7 +372,7 @@ def test_rke_custom_host_control_plane_changes():
     node_roles = [["controlplane"], ["etcd"],
                   ["worker"], ["worker"], ["worker"]]
 
-    client = get_admin_client()
+    client = get_user_client()
     cluster = client.create_cluster(name=evaluate_clustername(),
                                     driver="rancherKubernetesEngine",
                                     rancherKubernetesEngineConfig=rke_config)
@@ -410,7 +411,7 @@ def test_rke_custom_host_worker_plane_changes():
     node_roles = [["controlplane"], ["etcd"],
                   ["worker"]]
 
-    client = get_admin_client()
+    client = get_user_client()
     cluster = client.create_cluster(name=evaluate_clustername(),
                                     driver="rancherKubernetesEngine",
                                     rancherKubernetesEngineConfig=rke_config)
@@ -448,7 +449,7 @@ def test_rke_custom_host_control_node_power_down():
     node_roles = [["controlplane"], ["etcd"],
                   ["worker"]]
 
-    client = get_admin_client()
+    client = get_user_client()
     cluster = client.create_cluster(name=evaluate_clustername(),
                                     driver="rancherKubernetesEngine",
                                     rancherKubernetesEngineConfig=rke_config)
@@ -496,7 +497,7 @@ def test_rke_custom_host_control_node_power_down():
 
 @if_test_edit_cluster
 def test_edit_cluster_k8s_version():
-    client = get_admin_client()
+    client = get_user_client()
     clusters = client.list_cluster(name=evaluate_clustername()).data
     assert len(clusters) == 1
     cluster = clusters[0]
@@ -511,7 +512,7 @@ def test_edit_cluster_k8s_version():
 
 
 def test_delete_cluster():
-    client = get_admin_client()
+    client = get_user_client()
     if len(evaluate_clustername()) > 0:
         clusters = client.list_cluster(name=evaluate_clustername()).data
     else:
@@ -522,12 +523,11 @@ def test_delete_cluster():
 
 def validate_rke_dm_host_1(node_template,
                            rancherKubernetesEngineConfig=rke_config):
-    client = get_admin_client()
+    client = get_user_client()
     nodes = []
     node_name = random_node_name()
     node = {"hostnamePrefix": node_name,
             "nodeTemplateId": node_template.id,
-            "requestedHostname": node_name,
             "controlPlane": True,
             "etcd": True,
             "worker": True,
@@ -541,7 +541,7 @@ def validate_rke_dm_host_1(node_template,
 
 def validate_rke_dm_host_2(node_template,
                            rancherKubernetesEngineConfig=rke_config):
-    client = get_admin_client()
+    client = get_user_client()
     nodes = []
     node_name = random_node_name()
     node = {"hostnamePrefix": node_name,
@@ -571,7 +571,7 @@ def validate_rke_dm_host_2(node_template,
 
 def validate_rke_dm_host_3(node_template,
                            rancherKubernetesEngineConfig=rke_config):
-    client = get_admin_client()
+    client = get_user_client()
     nodes = []
     node_name = random_node_name()
     node = {"hostnamePrefix": node_name,
@@ -601,7 +601,7 @@ def validate_rke_dm_host_3(node_template,
 
 def validate_rke_dm_host_4(node_template,
                            rancherKubernetesEngineConfig=rke_config):
-    client = get_admin_client()
+    client = get_user_client()
 
     # Create cluster and add a node pool to this cluster
     nodes = []
@@ -645,24 +645,22 @@ def create_and_vaildate_cluster(client, nodes,
     node_pools = []
     for node in nodes:
         node["clusterId"] = cluster.id
-        node_pool = client.create_node_pool(**node)
+        success = False
+        start = time.time()
+        while not success:
+            if time.time() - start > 10:
+                raise AssertionError(
+                    "Timed out waiting for cluster owner global Roles")
+            try:
+                time.sleep(1)
+                node_pool = client.create_node_pool(**node)
+                success = True
+            except ApiError:
+                success = False
         node_pool = client.wait_success(node_pool)
         node_pools.append(node_pool)
 
     cluster = validate_cluster(client, cluster)
-    nodes = client.list_node(clusterId=cluster.id).data
-    assert len(nodes) == len(nodes)
-    for node in nodes:
-        assert node.state == "active"
-    expected_host_names = []
-
-    for node in nodes:
-        expected_host_names.append(node["requestedHostname"])
-    for node in nodes:
-        assert node["requestedHostname"] in expected_host_names
-        i = expected_host_names.index(node["requestedHostname"])
-        del expected_host_names[i]
-    assert len(expected_host_names) == 0
     return cluster, node_pools
 
 
@@ -680,7 +678,7 @@ def evaluate_clustername():
 
 @pytest.fixture(scope='session')
 def node_template_az():
-    client = get_admin_client()
+    client = get_user_client()
     ec2_cloud_credential_config = {
         "clientId": AZURE_CLIENT_ID,
         "clientSecret": AZURE_CLIENT_SECRET,
@@ -731,7 +729,6 @@ def node_template_az():
         azureConfig=azConfig,
         name=random_name(),
         driver="azure",
-        namespaceId="fixme",
         cloudCredentialId=azure_cloud_credential.id,
         useInternalIpAddress=True)
     node_template = client.wait_success(node_template)
@@ -740,7 +737,7 @@ def node_template_az():
 
 @pytest.fixture(scope='session')
 def node_template_do():
-    client = get_admin_client()
+    client = get_user_client()
     do_cloud_credential_config = {"accessToken": DO_ACCESSKEY}
     do_cloud_credential = client.create_cloud_credential(
         digitaloceancredentialConfig=do_cloud_credential_config
@@ -751,7 +748,6 @@ def node_template_do():
                             "image": "ubuntu-16-04-x64"},
         name=random_name(),
         driver="digitalocean",
-        namespaceId="fixme",
         cloudCredentialId=do_cloud_credential.id,
         useInternalIpAddress=True)
     node_template = client.wait_success(node_template)
@@ -760,7 +756,7 @@ def node_template_do():
 
 @pytest.fixture(scope='session')
 def node_template_ec2():
-    client = get_admin_client()
+    client = get_user_client()
     ec2_cloud_credential_config = {"accessKey": AWS_ACCESS_KEY_ID,
                                    "secretKey": AWS_SECRET_ACCESS_KEY}
     ec2_cloud_credential = client.create_cloud_credential(
@@ -782,7 +778,6 @@ def node_template_ec2():
     node_template = client.create_node_template(
         amazonec2Config=amazonec2Config,
         name=random_name(),
-        namespaceId="fixme",
         useInternalIpAddress=True,
         driver="amazonec2",
         engineInstallURL=engine_install_url,
@@ -795,7 +790,7 @@ def node_template_ec2():
 
 @pytest.fixture(scope='session')
 def node_template_ec2_with_provider():
-    client = get_admin_client()
+    client = get_user_client()
     ec2_cloud_credential_config = {"accessKey": AWS_ACCESS_KEY_ID,
                                    "secretKey": AWS_SECRET_ACCESS_KEY}
     ec2_cloud_credential = client.create_cloud_credential(
@@ -818,7 +813,6 @@ def node_template_ec2_with_provider():
     node_template = client.create_node_template(
         amazonec2Config=amazonec2Config,
         name=random_name(),
-        namespaceId="fixme",
         useInternalIpAddress=True,
         driver="amazonec2",
         engineInstallURL=engine_install_url,
