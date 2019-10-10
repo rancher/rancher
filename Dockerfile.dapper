@@ -3,7 +3,7 @@ FROM ubuntu:18.04
 
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
-ENV CATTLE_HELM_VERSION v2.10.0-rancher10
+ENV CATTLE_HELM_VERSION v2.14.3-rancher1
 ENV CATTLE_K3S_VERSION v0.8.0
 ENV CATTLE_ETCD_VERSION v3.3.14
 
@@ -26,11 +26,11 @@ ENV DOCKER_URL_amd64=https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 \
     DOCKER_URL_arm64=https://github.com/rancher/docker/releases/download/v1.10.3-ros1/docker-1.10.3_arm64 \
     DOCKER_URL=DOCKER_URL_${ARCH}
 
-ENV HELM_URL_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/helm \
-    HELM_URL_arm64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/helm-arm64 \
+ENV HELM_URL_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm \
+    HELM_URL_arm64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm-arm64 \
     HELM_URL=HELM_URL_${ARCH} \
-    TILLER_URL_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/tiller \
-    TILLER_URL_arm64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/tiller-arm64 \
+    TILLER_URL_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-tiller \
+    TILLER_URL_arm64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-tiller-arm64 \
     TILLER_URL=TILLER_URL_${ARCH} \
     K3S_URL_amd64=https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s \
     K3S_URL_arm64=https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERSION}/k3s-arm64 \
@@ -39,13 +39,15 @@ ENV HELM_URL_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HE
     ETCD_URL_arm64=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-arm64.tar.gz \
     ETCD_URL=ETCD_URL_${ARCH}
 
-RUN curl -sLf ${!HELM_URL} > /usr/bin/helm && \
-    curl -sLf ${!TILLER_URL} > /usr/bin/tiller && \
+RUN curl -sLf ${!HELM_URL} > /usr/bin/rancher-helm && \
+    curl -sLf ${!TILLER_URL} > /usr/bin/rancher-tiller && \
     curl -sLf ${!K3S_URL} > /usr/bin/k3s && \
     curl -sfL ${!ETCD_URL} | tar xvzf - --strip-components=1 -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcd && \
-    chmod +x /usr/bin/helm /usr/bin/tiller /usr/bin/k3s && \
-    helm init -c && \
-    helm plugin install https://github.com/rancher/helm-unittest && \
+    chmod +x /usr/bin/rancher-helm /usr/bin/rancher-tiller /usr/bin/k3s && \
+    ln -s /usr/bin/rancher-helm /usr/bin/helm && \
+    ln -s /usr/bin/rancher-tiller /usr/bin/tiller && \
+    rancher-helm init -c && \
+    rancher-helm plugin install https://github.com/rancher/helm-unittest && \
     mkdir -p /go/src/github.com/rancher/rancher/.kube && \
     ln -s /etc/rancher/k3s/k3s.yaml /go/src/github.com/rancher/rancher/.kube/k3s.yaml
 
