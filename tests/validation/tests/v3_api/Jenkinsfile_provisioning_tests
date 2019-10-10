@@ -14,37 +14,45 @@ if ("${env.branch}" != "null" && "${env.branch}" != "") {
 
 node {
   wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
-    stage('Checkout') {
-      deleteDir()
-      checkout([
-                $class: 'GitSCM',
-                branches: [[name: "*/${branch}"]],
-                extensions: scm.extensions + [[$class: 'CleanCheckout']],
-                userRemoteConfigs: scm.userRemoteConfigs
-              ])
-    }
+    withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                          string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                          string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
+                          string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD')]) {
+      stage('Checkout') {
+        deleteDir()
+        checkout([
+                  $class: 'GitSCM',
+                  branches: [[name: "*/${branch}"]],
+                  extensions: scm.extensions + [[$class: 'CleanCheckout']],
+                  userRemoteConfigs: scm.userRemoteConfigs
+                ])
+      }
 
-    try {
       try {
-        dir ("tests/validation") {
-          stage('Configure and Build') {
-            if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
-              dir(".ssh") {
-                def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
-                writeFile file: AWS_SSH_KEY_NAME, text: decoded
+        try {
+          dir ("tests/validation") {
+            stage('Configure and Build') {
+              if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
+                dir(".ssh") {
+                  def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
+                  writeFile file: AWS_SSH_KEY_NAME, text: decoded
+                }
               }
+              sh "./tests/v3_api/scripts/configure.sh"
+              sh "./tests/v3_api/scripts/build.sh"
             }
-            sh "./tests/v3_api/scripts/configure.sh"
-            sh "./tests/v3_api/scripts/build.sh"
-          }
 
-          stage('Deploy Rancher server') {
-            sh "docker run --name ${JOB_NAME}${BUILD_NUMBER} -t --env-file .env ${imageName} /bin/bash " +
-              "-c \'pytest -v -s --junit-xml=setup.xml -k test_deploy_rancher_server tests/v3_api/\'"
-            sh "docker cp ${JOB_NAME}${BUILD_NUMBER}:/src/rancher-validation/tests/v3_api/rancher_env.config ."
-            load "rancher_env.config"
-            RANCHER_DEPLOYED = true
-          }  
+            stage('Deploy Rancher server') {
+              sh "docker run --name ${JOB_NAME}${BUILD_NUMBER} -t --env-file .env ${imageName} /bin/bash " +
+                "-c \'export RANCHER_SERVER_VERSION=${rancher_version} && " +
+                "pytest -v -s --junit-xml=setup.xml -k test_deploy_rancher_server tests/v3_api/\'"
+              
+              sh "docker cp ${JOB_NAME}${BUILD_NUMBER}:/src/rancher-validation/tests/v3_api/rancher_env.config ."
+              load "rancher_env.config"
+
+              RANCHER_DEPLOYED = true
+            }  
+          }
         } catch (err) {
             RANCHER_DEPLOYED = false
             echo "Error: " + err
@@ -55,10 +63,10 @@ node {
         stage('Run provisioning tests') {
           params = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"), string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"), string(name: 'BRANCH', value: branch) ]
 
-          jobs["custom"] = { build job: 'rancher-v3_test_custom_cluster', parameters: params}
-          jobs["do"] = { build job: 'rancher-v3_test_do_cluster', parameters: params }
-          jobs["ec2"] = { build job: 'rancher-v3_test_ec2_cluster', parameters: params }
-          jobs["az"] = { build job: 'rancher-v3_test_az_cluster', parameters: params }
+          jobs["custom"] = { build job: 'rancher-v3_custom_provisioning', parameters: params}
+          jobs["do"] = { build job: 'rancher-v3_do_provisioning', parameters: params }
+          jobs["ec2"] = { build job: 'rancher-v3_ec2_provisioning', parameters: params }
+          jobs["az"] = { build job: 'rancher-v3_az_provisioning', parameters: params }
 
           parallel jobs
         }
