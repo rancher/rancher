@@ -1,24 +1,20 @@
 #!/bin/bash
 set -e
 
-token=$1
-cluster=$2
-cacerts=$3
-
 mkdir -p /nonexistent
 mount -t tmpfs tmpfs /nonexistent
 cd /nonexistent
 
 mkdir -p .kube/certs
 
-SERVER="${CATTLE_SERVER}/k8s/clusters/${cluster}"
+SERVER="${CATTLE_SERVER}/k8s/clusters/${CLUSTER}"
 
 if [ -f /etc/kubernetes/ssl/certs/serverca ]; then
     cp /etc/kubernetes/ssl/certs/serverca .kube/certs/ca.crt
     chmod 666 .kube/certs/ca.crt
 
-elif [ -n "${cacerts}" ]; then
-    echo "${cacerts}" | base64 -d > .kube/certs/ca.crt
+elif [ -n "${CACERTS}" ]; then
+    echo "${CACERTS}" | base64 -d > .kube/certs/ca.crt
     chmod 666 .kube/certs/ca.crt
 fi
 
@@ -36,7 +32,7 @@ kind: Config
 clusters:
 - cluster:
     api-version: v1
-    server: "${CATTLE_SERVER}/k8s/clusters/${cluster}"
+    server: "${CATTLE_SERVER}/k8s/clusters/${CLUSTER}"
 ${CERT}
   name: "Default"
 contexts:
@@ -48,7 +44,7 @@ current-context: "Default"
 users:
 - name: "Default"
   user:
-    token: "${token}"
+    token: "${TOKEN}"
 EOF
 
 cp /etc/skel/.bashrc .
@@ -67,4 +63,5 @@ for i in $(env | cut -d "=" -f 1 | grep "CATTLE\|RANCHER"); do
     unset $i
 done
 
+unset TOKEN CLUSTER CACERTS
 exec su -s /bin/bash nobody
