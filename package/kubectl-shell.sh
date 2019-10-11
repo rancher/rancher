@@ -18,5 +18,7 @@ fi
 echo "# Run kubectl commands inside here"
 echo "# e.g. kubectl get all"
 export TERM=screen-256color
-
-unshare --fork --pid --mount-proc --mount shell-setup.sh ${token} ${cluster} "${cacerts}"
+export TOKEN=${token}
+export CLUSTER=${cluster}
+export CACERTS=${cacerts}
+unshare --fork --pid --mount-proc --mount shell-setup.sh || true
