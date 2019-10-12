@@ -170,7 +170,7 @@ func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, err
 			if nodeDialer, err := f.nodeDialer(clusterName, node.Name); err == nil {
 				return func(network, address string) (net.Conn, error) {
 					if address == hostPort {
-						logrus.Debug("dialerFactory: rewriting address/port to 127.0.0.1:6443 as node may not have direct kube-api accesss")
+						logrus.Debug("dialerFactory: rewriting address/port to 127.0.0.1:6443 as node may not have direct kube-api access")
 						// The node dialer may not have direct access to kube-api so we hit localhost:6443 instead
 						address = "127.0.0.1:6443"
 					}
