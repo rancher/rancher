@@ -58,9 +58,9 @@ func TestLoadBalancerCapability(t *testing.T) {
 
 	// map of cloud provider name to expected lb capability
 	cloudProviderLBCapabilityMap := map[v3.CloudProvider]*bool{
-		v3.CloudProvider{}: nil,
-		v3.CloudProvider{Name: aws.AWSCloudProviderName}:     &lbCap,
-		v3.CloudProvider{Name: azure.AzureCloudProviderName}: &lbCap,
+		{}:                                   nil,
+		{Name: aws.AWSCloudProviderName}:     &lbCap,
+		{Name: azure.AzureCloudProviderName}: &lbCap,
 	}
 	for cloudProvider, expectedLB := range cloudProviderLBCapabilityMap {
 		testCluster.Spec.RancherKubernetesEngineConfig.CloudProvider = cloudProvider

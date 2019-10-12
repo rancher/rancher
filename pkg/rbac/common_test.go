@@ -33,41 +33,41 @@ func Test_BuildSubjectFromRTB(t *testing.T) {
 	}
 
 	testCases := []testCase{
-		testCase{
+		{
 			from:  nil,
 			iserr: true,
 		},
-		testCase{
+		{
 			from: &v3.ProjectRoleTemplateBinding{
 				UserName: userSubject.Name,
 			},
 			to: userSubject,
 		},
-		testCase{
+		{
 			from: &v3.ProjectRoleTemplateBinding{
 				GroupName: groupSubject.Name,
 			},
 			to: groupSubject,
 		},
-		testCase{
+		{
 			from: &v3.ProjectRoleTemplateBinding{
 				ServiceAccount: fmt.Sprintf("%s:%s", saSubject.Namespace, saSubject.Name),
 			},
 			to: saSubject,
 		},
-		testCase{
+		{
 			from: &v3.ClusterRoleTemplateBinding{
 				UserName: userSubject.Name,
 			},
 			to: userSubject,
 		},
-		testCase{
+		{
 			from: &v3.ClusterRoleTemplateBinding{
 				GroupName: groupSubject.Name,
 			},
 			to: groupSubject,
 		},
-		testCase{
+		{
 			from: &v3.ProjectRoleTemplateBinding{
 				ServiceAccount: "wrong-format",
 			},

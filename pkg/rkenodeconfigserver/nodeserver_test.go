@@ -18,39 +18,39 @@ func TestAppendKubeletArgs(t *testing.T) {
 		expectedTaintSet map[string]struct{}
 	}
 	testCases := []testCase{
-		testCase{
+		{
 			name:           "taints args not exists",
 			currentCommand: []string{"kubelet", "--register-node"},
 			taints: []v3.RKETaint{
-				v3.RKETaint{
+				{
 					Key:    "test1",
 					Value:  "value1",
 					Effect: v1.TaintEffectNoSchedule,
 				},
-				v3.RKETaint{
+				{
 					Key:    "test2",
 					Value:  "value2",
 					Effect: v1.TaintEffectNoSchedule,
 				},
 			},
 			expectedTaintSet: map[string]struct{}{
-				"test1=value1:NoSchedule": struct{}{},
-				"test2=value2:NoSchedule": struct{}{},
+				"test1=value1:NoSchedule": {},
+				"test2=value2:NoSchedule": {},
 			},
 		},
-		testCase{
+		{
 			name:           "taints args exists",
 			currentCommand: []string{"kubelet", "--register-node", "--register-with-taints=node-role.kubernetes.io/controlplane=true:NoSchedule"},
 			taints: []v3.RKETaint{
-				v3.RKETaint{
+				{
 					Key:    "test1",
 					Value:  "value1",
 					Effect: v1.TaintEffectNoSchedule,
 				},
 			},
 			expectedTaintSet: map[string]struct{}{
-				"node-role.kubernetes.io/controlplane=true:NoSchedule": struct{}{},
-				"test1=value1:NoSchedule":                              struct{}{},
+				"node-role.kubernetes.io/controlplane=true:NoSchedule": {},
+				"test1=value1:NoSchedule":                              {},
 			},
 		},
 	}
@@ -64,7 +64,7 @@ func TestAppendKubeletArgs(t *testing.T) {
 
 func getKubeletProcess(commands []string) map[string]v3.Process {
 	return map[string]v3.Process{
-		"kubelet": v3.Process{
+		"kubelet": {
 			Name:    "kubelet",
 			Command: commands,
 		},

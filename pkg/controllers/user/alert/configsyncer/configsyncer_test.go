@@ -161,7 +161,7 @@ var (
 	}
 
 	clusterGroupMap = map[string]*v3.ClusterAlertGroup{
-		groupID: &v3.ClusterAlertGroup{
+		groupID: {
 			Spec: v3.ClusterGroupSpec{
 				ClusterName:      clusterName,
 				CommonGroupField: commonGroupField,
@@ -172,7 +172,7 @@ var (
 	}
 
 	projectGroupMap = map[string]*v3.ProjectAlertGroup{
-		groupID: &v3.ProjectAlertGroup{
+		groupID: {
 			Spec: v3.ProjectGroupSpec{
 				ProjectName:      projectID,
 				CommonGroupField: commonGroupField,

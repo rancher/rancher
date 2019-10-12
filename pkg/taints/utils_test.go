@@ -15,53 +15,53 @@ func TestMergeTaints(t *testing.T) {
 		mergedTaints []v1.Taint
 	}
 	testCases := []testCase{
-		testCase{
+		{
 			name: "merge with unique key and effect",
 			t1: []v1.Taint{
-				v1.Taint{
+				{
 					Key:    "t1",
 					Value:  "t1",
 					Effect: v1.TaintEffectNoSchedule,
 				},
 			},
 			t2: []v1.Taint{
-				v1.Taint{
+				{
 					Key:    "t2",
 					Value:  "t2",
 					Effect: v1.TaintEffectNoSchedule,
 				},
 			},
 			mergedTaints: []v1.Taint{
-				v1.Taint{
+				{
 					Key:    "t1",
 					Value:  "t1",
 					Effect: v1.TaintEffectNoSchedule,
 				},
-				v1.Taint{
+				{
 					Key:    "t2",
 					Value:  "t2",
 					Effect: v1.TaintEffectNoSchedule,
 				},
 			},
 		},
-		testCase{
+		{
 			name: "override values",
 			t1: []v1.Taint{
-				v1.Taint{
+				{
 					Key:    "t1",
 					Value:  "t1",
 					Effect: v1.TaintEffectNoSchedule,
 				},
 			},
 			t2: []v1.Taint{
-				v1.Taint{
+				{
 					Key:    "t1",
 					Value:  "v3",
 					Effect: v1.TaintEffectNoSchedule,
 				},
 			},
 			mergedTaints: []v1.Taint{
-				v1.Taint{
+				{
 					Key:    "t1",
 					Value:  "v3",
 					Effect: v1.TaintEffectNoSchedule,

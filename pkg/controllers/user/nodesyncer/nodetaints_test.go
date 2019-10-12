@@ -27,7 +27,7 @@ type syncTaintsTestCase struct {
 func TestSyncNodeTaints(t *testing.T) {
 	falseValue := false
 	testCases := []*syncTaintsTestCase{
-		&syncTaintsTestCase{
+		{
 			name:                "test taints equal",
 			machineShouldUpdate: true,
 			nodeShouldUpdate:    false,
@@ -35,7 +35,7 @@ func TestSyncNodeTaints(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "test1", Labels: map[string]string{nodehelper.LabelNodeName: "test1"}},
 				Status: v3.NodeStatus{
 					Conditions: []v3.NodeCondition{
-						v3.NodeCondition{
+						{
 							Type:   v3.NodeConditionRegistered,
 							Status: v1.ConditionTrue,
 						},
@@ -44,7 +44,7 @@ func TestSyncNodeTaints(t *testing.T) {
 				},
 				Spec: v3.NodeSpec{
 					DesiredNodeTaints: []v1.Taint{
-						v1.Taint{Key: "test-key", Value: "test-value", Effect: v1.TaintEffectNoSchedule},
+						{Key: "test-key", Value: "test-value", Effect: v1.TaintEffectNoSchedule},
 					},
 					UpdateTaintsFromAPI: &falseValue,
 				},
@@ -53,12 +53,12 @@ func TestSyncNodeTaints(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "test1"},
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{
-						v1.Taint{Key: "test-key", Value: "test-value", Effect: v1.TaintEffectNoSchedule},
+						{Key: "test-key", Value: "test-value", Effect: v1.TaintEffectNoSchedule},
 					},
 				},
 			},
 		},
-		&syncTaintsTestCase{
+		{
 			name:                "test add taints",
 			machineShouldUpdate: true,
 			nodeShouldUpdate:    true,
@@ -66,7 +66,7 @@ func TestSyncNodeTaints(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "test2", Labels: map[string]string{nodehelper.LabelNodeName: "test2"}},
 				Status: v3.NodeStatus{
 					Conditions: []v3.NodeCondition{
-						v3.NodeCondition{
+						{
 							Type:   v3.NodeConditionRegistered,
 							Status: v1.ConditionTrue,
 						},
@@ -75,7 +75,7 @@ func TestSyncNodeTaints(t *testing.T) {
 				},
 				Spec: v3.NodeSpec{
 					DesiredNodeTaints: []v1.Taint{
-						v1.Taint{Key: "test-key", Value: "test-value", Effect: v1.TaintEffectNoSchedule},
+						{Key: "test-key", Value: "test-value", Effect: v1.TaintEffectNoSchedule},
 					},
 					UpdateTaintsFromAPI: &falseValue,
 				},
@@ -85,7 +85,7 @@ func TestSyncNodeTaints(t *testing.T) {
 				Spec:       v1.NodeSpec{},
 			},
 		},
-		&syncTaintsTestCase{
+		{
 			name:                "test remove taints",
 			machineShouldUpdate: true,
 			nodeShouldUpdate:    true,
@@ -93,7 +93,7 @@ func TestSyncNodeTaints(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "test3", Labels: map[string]string{nodehelper.LabelNodeName: "test3"}},
 				Status: v3.NodeStatus{
 					Conditions: []v3.NodeCondition{
-						v3.NodeCondition{
+						{
 							Type:   v3.NodeConditionRegistered,
 							Status: v1.ConditionTrue,
 						},
@@ -108,7 +108,7 @@ func TestSyncNodeTaints(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "test3"},
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{
-						v1.Taint{Key: "test-key", Value: "test-value", Effect: v1.TaintEffectNoSchedule},
+						{Key: "test-key", Value: "test-value", Effect: v1.TaintEffectNoSchedule},
 					},
 				},
 			},

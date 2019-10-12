@@ -26,7 +26,7 @@ var (
 
 func Test_nodeController(t *testing.T) {
 	cases := []*testcase{
-		&testcase{
+		{
 			name: "test node with linux host labels",
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
@@ -36,7 +36,7 @@ func Test_nodeController(t *testing.T) {
 			},
 			shouldCall: true,
 		},
-		&testcase{
+		{
 			name: "test node with windows host labels",
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
@@ -46,7 +46,7 @@ func Test_nodeController(t *testing.T) {
 			},
 			shouldCall: false,
 		},
-		&testcase{
+		{
 			name: "test node with linux node labels and node taints",
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
