@@ -56,10 +56,10 @@ cp -r -l /opt/drivers/management-state/bin /opt/jail/$NAME/var/lib/rancher/manag
 cp -l /usr/bin/docker-machine /opt/jail/$NAME/usr/bin
 
 # Hard link helm into the jail 
-cp -l /usr/bin/rancher-helm /opt/jail/$NAME/usr/bin
+cp -l /usr/bin/helm /opt/jail/$NAME/usr/bin
 
 # Hard link tiller into the jail 
-cp -l /usr/bin/rancher-tiller /opt/jail/$NAME/usr/bin
+cp -l /usr/bin/tiller /opt/jail/$NAME/usr/bin
 
 # Hard link ssh into the jail
 cp -l /usr/bin/ssh /opt/jail/$NAME/usr/bin
