@@ -26,8 +26,8 @@ import (
 const (
 	base            = 32768
 	end             = 61000
-	tillerName      = "rancher-tiller"
-	helmName        = "rancher-helm"
+	tillerName      = "tiller"
+	helmName        = "helm"
 	forceUpgradeStr = "--force"
 )
 
@@ -81,7 +81,7 @@ func SplitExternalID(externalID string) (string, string, string, string, string,
 // StartTiller start tiller server and return the listening address of the grpc address
 func StartTiller(context context.Context, tempDirs *HelmPath, port, namespace string) error {
 	probePort := GenerateRandomPort()
-	cmd := exec.Command(tillerName, "--listen", ":"+port, "--probe-listen", ":"+probePort)
+	cmd := exec.Command(tillerName, "--listen", ":"+port, "--probe", ":"+probePort)
 	cmd.Env = []string{fmt.Sprintf("%s=%s", "KUBECONFIG", tempDirs.KubeConfigInJail), fmt.Sprintf("%s=%s", "TILLER_NAMESPACE", namespace), fmt.Sprintf("%s=%s", "TILLER_HISTORY_MAX", "10")}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
