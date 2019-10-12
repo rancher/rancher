@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	helmName    = "helm"
+	helmName    = "rancher-helm"
 	appLabel    = "io.cattle.field/appId"
 	failedLabel = "io.cattle.field/failed-revision"
 )
