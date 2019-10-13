@@ -104,7 +104,7 @@ require (
 	google.golang.org/grpc v1.23.0
 	gopkg.in/asn1-ber.v1 v1.0.0-20150924051756-4e86f4367175 // indirect
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
-	gopkg.in/ldap.v2 v2.5.0
+	gopkg.in/ldap.v3 v3.0.3
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.2.2
 	k8s.io/api v0.0.0
