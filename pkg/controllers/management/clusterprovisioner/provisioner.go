@@ -946,7 +946,7 @@ func isValidURL(URL string) bool {
 func GetBackupFilename(backup *v3.EtcdBackup) string {
 	snapshot := backup.Name
 	if filename, err := GetBackupFilenameFromURL(backup.Spec.Filename); err == nil { // s3 file
-		// need to remove extention
+		// need to remove extension
 		snapshot = strings.TrimSuffix(filename, path.Ext(filename))
 	} else if len(backup.Spec.Filename) != 0 { // not s3 url
 		snapshot = strings.TrimSuffix(backup.Spec.Filename, path.Ext(backup.Spec.Filename))
