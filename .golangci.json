@@ -1,0 +1,34 @@
+{
+    "linters": {
+        "disable-all": true,
+        "enable": [
+            "govet",
+            "golint",
+            "goimports"
+        ]
+    },
+    "linters-settings": {
+        "govet": {
+            "check-shadowing": false
+        },
+        "gofmt": {
+            "simplify": false
+        }
+    },
+    "run": {
+        "skip-dirs": [
+            "vendor",
+            "tests"
+        ],
+        "tests": false,
+        "timeout": "10m"
+    },
+    "issues": {
+        "exclude-rules": [
+            {
+                "linters": "govet",
+                "text": "^(nilness|structtag)"
+            }
+        ]
+    }
+}
