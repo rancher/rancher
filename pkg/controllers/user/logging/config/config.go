@@ -102,3 +102,7 @@ func RancherLoggingSSLSecretName() string {
 func GetNamespacePattern(namespace string) string {
 	return fmt.Sprintf("^%s$", namespace)
 }
+
+func GetNamespacePathPattern(namespace string) string {
+	return fmt.Sprintf("/var/log/containers/*_%s_*.log", namespace)
+}
