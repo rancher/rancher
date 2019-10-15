@@ -107,7 +107,11 @@ var MatchTemplate = `
 	output_data_type  "json"
 	output_include_tag  true
 	output_include_time  true
-	max_send_retries 3
+	max_send_retries 5
+	kafka_agg_max_bytes 768000
+	kafka_agg_max_messages 500
+	get_kafka_client_log true 
+
 	{{- if .KafkaConfig.Certificate }}        
 	ssl_ca_cert {{.CertFilePrefix}}_ca.pem
 	{{end}}
@@ -225,11 +229,14 @@ var MatchTemplate = `
 	  path /fluentd/log/buffer/{{.BufferFile}}
 	  flush_mode interval
 	  flush_interval {{.OutputFlushInterval}}s
-	  flush_thread_count 8
+	  flush_thread_count 16
+	  {{- if eq .CurrentTarget "kafka"}}
+	  chunk_limit_size 32m
+	  {{end}}
 	  {{- if eq .CurrentTarget "splunk"}}
 	  chunk_limit_size 8m
 	  {{end}}
-	  queued_chunks_limit_size 200
+	  queued_chunks_limit_size 300
 	</buffer> 
 	slow_flush_log_threshold 40.0	
 {{end}}
