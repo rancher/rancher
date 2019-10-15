@@ -12,6 +12,10 @@ import (
 	"context"
 
 	"fmt"
+	"reflect"
+	"sort"
+	"strings"
+	"time"
 
 	"github.com/ghodss/yaml"
 	"github.com/rancher/kontainer-engine/drivers/rke/rkecerts"
@@ -173,6 +177,10 @@ func (b *Bundle) Explode() error {
 func (b *Bundle) Changed() bool {
 	var newCertPEM string
 	for _, item := range b.certs {
+		// Skip empty kube-kubelet certificates that are created for other workers
+		if item.Name == "" {
+			continue
+		}
 		oldCertPEM, err := ioutil.ReadFile(item.Path)
 		if err != nil {
 			logrus.Warnf("Unable to read certificate %s: %v", item.Name, err)
@@ -181,10 +189,43 @@ func (b *Bundle) Changed() bool {
 		if item.Certificate != nil {
 			newCertPEM = string(cert.EncodeCertPEM(item.Certificate))
 		}
+
+		// kube-kubelet certificates will always be different as they are created on-demand, we need to limit replacing them only if its absolutely necessary
+		if strings.HasPrefix(item.Name, "kube-kubelet") {
+			// Check if expired
+			oldCertX509, err := cert.ParseCertsPEM(oldCertPEM)
+			if err != nil {
+				logrus.Errorf("Error parsing old certificate PEM for [%s]: %v", item.Name, err)
+			}
+			now := time.Now()
+			if len(oldCertX509) > 0 {
+				if now.After(oldCertX509[0].NotAfter) {
+					logrus.Infof("Bundle changed: now [%v] is after certificate NotAfter [%v] for certificate [%s]", now, oldCertX509[0].NotAfter, item.Name)
+					return true
+				}
+			}
+			// Check if AltNames changed
+			if newCertPEM != "" {
+				newCertX509, err := cert.ParseCertsPEM([]byte(newCertPEM))
+				if err != nil {
+					logrus.Errorf("Error parsing new certificate PEM for [%s]: %v", item.Name, err)
+				}
+				if len(newCertX509) > 0 {
+					sort.Strings(oldCertX509[0].DNSNames)
+					sort.Strings(newCertX509[0].DNSNames)
+					if !reflect.DeepEqual(oldCertX509[0].DNSNames, newCertX509[0].DNSNames) || !pki.DeepEqualIPsAltNames(oldCertX509[0].IPAddresses, newCertX509[0].IPAddresses) {
+						logrus.Infof("Bundle changed: DNSNames and/or IPAddresses changed for certificate [%s]: oldCert.DNSNames %v, newCert.DNSNames %v, oldCert.IPAddresses %v, newCert.IPAddresses %v", item.Name, oldCertX509[0].DNSNames, newCertX509[0].DNSNames, oldCertX509[0].IPAddresses, newCertX509[0].IPAddresses)
+						return true
+					}
+				}
+			}
+			continue
+		}
 		oldCertChecksum := fmt.Sprintf("%x", md5.Sum([]byte(oldCertPEM)))
 		newCertChecksum := fmt.Sprintf("%x", md5.Sum([]byte(newCertPEM)))
 
 		if oldCertChecksum != newCertChecksum {
+			logrus.Infof("Certificate checksum changed (old: [%s], new [%s]) for [%s]", oldCertChecksum, newCertChecksum, item.Name)
 			return true
 		}
 	}
