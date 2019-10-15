@@ -35,11 +35,26 @@ var FilterTemplate = `
 {{end}}
 
 {{define "filter-custom-tags"}}
+{{- if .OutputTags}}
+<filter {{ .ContainerLogSourceTag }}.**>
+  @type record_transformer
+  <record>
+    tag ${tag}
+    {{- range $k, $val := .OutputTags }}
+    {{$k}}  {{$val | escapeString}}
+    {{end}}
+  </record>
+</filter>
+{{end}}
+{{end}}
+
+{{define "filter-project-custom-tags"}}
 <filter {{ .ContainerLogSourceTag }}.**>
   @type record_transformer
   <record>
     tag ${tag}
     log_type k8s_normal_container 
+    projectID {{ .ContainerLogSourceTag}}
     {{- range $k, $val := .OutputTags }}
     {{$k}}  {{$val | escapeString}}
     {{end}}
@@ -87,28 +102,24 @@ var FilterTemplate = `
 {{end}}
 {{end}}
 
-{{define "filter-project-namespace"}}
+{{define "filter-add-projectid"}}
 <filter {{ .ContainerLogSourceTag}}.**>
   @type record_transformer
-  enable_ruby  true
   <record>
     tag ${tag}
-    namespace ${record["kubernetes"]["namespace_name"]}
+    log_type k8s_normal_container 
     projectID {{ .ContainerLogSourceTag}}
   </record>
 </filter>
+{{end}}
 
-<filter {{ .ContainerLogSourceTag}}.**>
-  @type grep
-  <regexp>
-    key namespace
-    pattern {{.GrepNamespace}}
-  </regexp>
-</filter>
-
+{{define "filter-add-logtype"}}
 <filter {{ .ContainerLogSourceTag}}.**>
   @type record_transformer
-  remove_keys namespace
+  <record>
+    tag ${tag}
+    log_type k8s_normal_container 
+  </record>
 </filter>
 {{end}}
 `

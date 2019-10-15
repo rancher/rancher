@@ -39,7 +39,7 @@ type ClusterLoggingTemplateWrap struct {
 }
 
 type ProjectLoggingTemplateWrap struct {
-	GrepNamespace string
+	ContainerSourcePath string
 
 	v3.LoggingCommonField
 	LoggingTargetTemplateWrap
@@ -88,7 +88,7 @@ func newWrapClusterLogging(logging v3.ClusterLoggingSpec, excludeNamespace, cert
 	}, nil
 }
 
-func newWrapProjectLogging(logging v3.ProjectLoggingSpec, grepNamespace, certDir string, isSystemProject bool) (*ProjectLoggingTemplateWrap, error) {
+func newWrapProjectLogging(logging v3.ProjectLoggingSpec, containerSourcePath, certDir string, isSystemProject bool) (*ProjectLoggingTemplateWrap, error) {
 	wrap, err := NewLoggingTargetTemplateWrap(logging.LoggingTargets)
 	if err != nil {
 		return nil, errors.Wrapf(err, "wrapper logging target failed")
@@ -106,7 +106,7 @@ func newWrapProjectLogging(logging v3.ProjectLoggingSpec, grepNamespace, certDir
 	containerLogPosFilename := getContainerLogPosFilename(level, logging.ProjectName)
 
 	return &ProjectLoggingTemplateWrap{
-		GrepNamespace:             grepNamespace,
+		ContainerSourcePath:       containerSourcePath,
 		LoggingCommonField:        logging.LoggingCommonField,
 		LoggingTargetTemplateWrap: *wrap,
 		IncludeRke:                isSystemProject,

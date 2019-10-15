@@ -75,8 +75,10 @@ func validate(level, containerLogSourceTag string, loggingTargets v3.LoggingTarg
 		}
 	}
 
-	if err = generator.ValidateCustomTags(wrap); err != nil {
-		return err
+	if len(outputTags) != 0 {
+		if err = generator.ValidateCustomTags(wrap); err != nil {
+			return err
+		}
 	}
 
 	return generator.ValidateCustomTarget(wrap)

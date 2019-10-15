@@ -2,7 +2,6 @@ package generator
 
 import (
 	"bytes"
-	"fmt"
 	"sort"
 	"strings"
 	"text/template"
@@ -49,8 +48,10 @@ func GenerateClusterConfig(logging mgmtv3.ClusterLoggingSpec, excludeNamespaces,
 		}
 	}
 
-	if err = ValidateCustomTags(wl); err != nil {
-		return nil, err
+	if len(logging.OutputTags) != 0 {
+		if err = ValidateCustomTags(wl); err != nil {
+			return nil, err
+		}
 	}
 
 	validateData := *wl
@@ -72,22 +73,22 @@ func GenerateClusterConfig(logging mgmtv3.ClusterLoggingSpec, excludeNamespaces,
 func GenerateProjectConfig(projectLoggings []*mgmtv3.ProjectLogging, namespaces []*k8scorev1.Namespace, systemProjectID, certDir string) ([]byte, error) {
 	var wl []ProjectLoggingTemplateWrap
 	for _, v := range projectLoggings {
-		var grepNamespace []string
+		var containerSourcePath []string
 		for _, v2 := range namespaces {
 			if nsProjectName, ok := v2.Annotations[project.ProjectIDAnn]; ok && nsProjectName == v.Spec.ProjectName {
-				namespacePattern := loggingconfig.GetNamespacePattern(v2.Name)
-				grepNamespace = append(grepNamespace, namespacePattern)
+				sourcePathPattern := loggingconfig.GetNamespacePathPattern(v2.Name)
+				containerSourcePath = append(containerSourcePath, sourcePathPattern)
 			}
 		}
 
-		if len(grepNamespace) == 0 {
+		if len(containerSourcePath) == 0 {
 			continue
 		}
 
-		sort.Strings(grepNamespace)
-		formatgrepNamespace := fmt.Sprintf("(%s)", strings.Join(grepNamespace, "|"))
+		sort.Strings(containerSourcePath)
+		containerSourcePaths := strings.Join(containerSourcePath, ",")
 		isSystemProject := v.Spec.ProjectName == systemProjectID
-		wpl, err := newWrapProjectLogging(v.Spec, formatgrepNamespace, certDir, isSystemProject)
+		wpl, err := newWrapProjectLogging(v.Spec, containerSourcePaths, certDir, isSystemProject)
 		if err != nil {
 			return nil, err
 		}
@@ -102,8 +103,10 @@ func GenerateProjectConfig(projectLoggings []*mgmtv3.ProjectLogging, namespaces 
 			}
 		}
 
-		if err = ValidateCustomTags(wpl); err != nil {
-			return nil, err
+		if len(wpl.OutputTags) != 0 {
+			if err = ValidateCustomTags(wpl); err != nil {
+				return nil, err
+			}
 		}
 
 		validateData := *wpl

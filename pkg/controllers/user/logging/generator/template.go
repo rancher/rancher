@@ -8,6 +8,7 @@ var Template = `
 {{end }}
 {{- template "source-container" . -}}
 {{- template "filter-container" . -}}
+{{- template "filter-add-logtype" . -}}
 {{- template "filter-custom-tags" . -}}
 {{- template "filter-prometheus" . -}}
 {{- template "filter-exclude-system-component" . -}}
@@ -21,10 +22,10 @@ var Template = `
 {{- template "source-rke" $store -}}
 {{- template "filter-rke" $store -}}
 {{end }}
-{{- template "source-container" $store -}}
+{{- template "source-project-container" $store -}}
 {{- template "filter-container" $store -}}
+{{- template "filter-add-projectid" $store -}}
 {{- template "filter-custom-tags" $store -}}
-{{- template "filter-project-namespace" $store -}}
 {{- template "filter-prometheus" $store -}}
 {{- template "filter-sumo" $store -}}
 {{- template "match" $store -}}
