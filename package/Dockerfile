@@ -27,10 +27,10 @@ ENV KUBECTL_VERSION v1.16.1
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.8
 ENV LINODE_UI_DRIVER_VERSION v0.3.0
 
-RUN mkdir -p /var/lib/rancher/management-state/local-catalogs/system-library && \
-    mkdir -p /var/lib/rancher/management-state/local-catalogs/library && \
-    git clone -b $CATTLE_SYSTEM_CHART_DEFAULT_BRANCH --single-branch https://github.com/rancher/system-charts /var/lib/rancher/management-state/local-catalogs/system-library && \
-    git clone -b master --single-branch https://github.com/rancher/charts /var/lib/rancher/management-state/local-catalogs/library
+RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
+    mkdir -p /var/lib/rancher-data/local-catalogs/library && \
+    git clone -b $CATTLE_SYSTEM_CHART_DEFAULT_BRANCH --single-branch https://github.com/rancher/system-charts /var/lib/rancher-data/local-catalogs/system-library && \
+    git clone -b master --single-branch https://github.com/rancher/charts /var/lib/rancher-data/local-catalogs/library
 
 
 RUN curl -sLf https://github.com/rancher/machine-package/releases/download/${CATTLE_MACHINE_VERSION}/docker-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin && \
