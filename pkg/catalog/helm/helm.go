@@ -41,7 +41,7 @@ var (
 	Locker          = locker.New()
 	CatalogCache    = filepath.Join("management-state", "catalog-cache")
 	IconCache       = filepath.Join(CatalogCache, ".icon-cache")
-	InternalCatalog = filepath.Join("management-state", "local-catalogs")
+	InternalCatalog = filepath.Join("..", "rancher-data", "local-catalogs")
 )
 
 type Helm struct {
