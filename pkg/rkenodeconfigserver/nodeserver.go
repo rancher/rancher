@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/tunnelserver"
 	rkehosts "github.com/rancher/rke/hosts"
+	rkepki "github.com/rancher/rke/pki"
 	rkeservices "github.com/rancher/rke/services"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -187,11 +188,6 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 		bundle = bundle.ForNode(spec.RancherKubernetesEngineConfig, hostAddress)
 	}
 
-	certString, err := bundle.Marshal()
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshall bundle")
-	}
-
 	rkeConfig := spec.RancherKubernetesEngineConfig
 	filterHostForSpec(rkeConfig, node)
 	logrus.Debugf("The number of nodes sent to the plan: %v", len(rkeConfig.Nodes))
@@ -205,7 +201,6 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 	}
 
 	nc := &rkeworker.NodeConfig{
-		Certs:       certString,
 		ClusterName: cluster.Name,
 	}
 	token, err := n.systemAccountManager.GetOrCreateSystemClusterToken(cluster.Name)
@@ -222,6 +217,25 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 			}
 			nc.Processes = appendTaintsToKubeletArgs(nc.Processes, node.Status.NodeConfig.Taints)
 			nc.Files = tempNode.Files
+			// Adding kubelet certificate
+			// Check if argument is set on kubelet for serving certificate
+			if rkepki.IsKubeletGenerateServingCertificateEnabledinConfig(rkeConfig) {
+				//			for _, command := range nc.Processes["kubelet"].Command {
+				//				if strings.Contains(command, "tls-cert-file") {
+				logrus.Debugf("nodeConfig: VerifyKubeletCAEnabled is true, generating kubelet certificate for [%s]", tempNode.Address)
+				err := rkepki.GenerateKubeletCertificate(ctx, bundle.Certs(), *rkeConfig, "", "", false)
+				if err != nil {
+					return nil, errors.Wrapf(err, "failed to generate kubelet certificate")
+				}
+				//					break
+				//				}
+			}
+			certString, err := bundle.Marshal()
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to marshal certificates bundle")
+			}
+			nc.Certs = certString
+
 			return nc, nil
 		}
 	}
