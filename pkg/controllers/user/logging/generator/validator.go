@@ -82,7 +82,7 @@ func validateFragmentsMatchExpected(fragments fluentd.Fragment, expected map[str
 
 func validateFragmentExist(expectedName string, fragments fluentd.Fragment) error {
 	if len(fragments) == 0 {
-		return errors.New("not configure element found")
+		return errors.New("no " + expectedName + " configure element found")
 	}
 
 	if len(fragments) > 1 {
