@@ -15,9 +15,11 @@ cleanup()
         rke remove --dind --force --config $dindYML
         rm -f $dindYML
     done
-    echo '***RANCHER LOGS***'
-    cat $CWD/rancherlogs.txt
-    echo '***END RANCHER LOGS***'
+    if [ $EXIT -ne 0 ]; then
+        echo '***RANCHER LOGS***'
+        cat $CWD/rancherlogs.txt
+        echo '***END RANCHER LOGS***'
+    fi
     return $EXIT
 }
 
