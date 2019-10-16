@@ -339,7 +339,7 @@ func aliasToPath(driver string, config map[string]interface{}, ns string) error 
 				if ok := nodedriver.SSHKeyFields[schemaField]; ok {
 					fileName = "id_rsa"
 				}
-
+				fmt.Println("something")
 				fileDir := path.Join(baseDir, sha)
 
 				// Delete the fileDir path if it's not a directory
