@@ -24,6 +24,9 @@ tests:
       count: 0
     template: issuer-rancher.yaml
 - it: should render letsEncrypt but not rancher
+  capabilities:
+    apiversions:
+    - certmanager.k8s.io/v1alpha1
   set:
     ingress.tls.source: letsEncrypt
   asserts:
@@ -34,6 +37,9 @@ tests:
       count: 0
     template: issuer-rancher.yaml
 - it: should render rancher but not letsEncrypt
+  capabilities:
+    apiversions:
+    - certmanager.k8s.io/v1alpha1
   set:
     ingress.tls.source: rancher
   asserts:
@@ -44,6 +50,9 @@ tests:
       count: 1
     template: issuer-rancher.yaml
 - it: should set letsEncrypt production by default
+  capabilities:
+    apiversions:
+    - certmanager.k8s.io/v1alpha1
   set:
     ingress.tls.source: letsEncrypt
   asserts:
@@ -52,6 +61,9 @@ tests:
       value: https://acme-v02.api.letsencrypt.org/directory
     template: issuer-letsEncrypt.yaml
 - it: should set letsEncrypt staging
+  capabilities:
+    apiversions:
+    - certmanager.k8s.io/v1alpha1
   set:
     ingress.tls.source: letsEncrypt
     letsEncrypt.environment: staging
@@ -61,6 +73,9 @@ tests:
       value: https://acme-staging-v02.api.letsencrypt.org/directory
     template: issuer-letsEncrypt.yaml
 - it: should set letsEncrypt email address
+  capabilities:
+    apiversions:
+    - certmanager.k8s.io/v1alpha1
   set:
     ingress.tls.source: letsEncrypt
     letsEncrypt.email: test@test.org
