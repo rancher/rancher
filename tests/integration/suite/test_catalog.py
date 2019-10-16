@@ -268,3 +268,18 @@ def test_embedded_system_catalog_missing_edit_link(admin_mc):
     system_catalog = client.by_id_catalog("system-library")
 
     assert "update" not in system_catalog.links
+
+
+def test_catalog_refresh(admin_mc):
+    """Test that on refresh the response includes the names of the catalogs
+    that are being refreshed"""
+    client = admin_mc.client
+    catalog = client.by_id_catalog("library")
+    out = client.action(obj=catalog, action_name="refresh")
+    assert out['catalogs'][0] == "library"
+
+    catalogs = client.list_catalog()
+    out = client.action(obj=catalogs, action_name="refresh")
+    # It just needs to be more than none, other test can add/remove catalogs
+    # so a hard count will break
+    assert len(out['catalogs']) > 0, 'no catalogs in response'
