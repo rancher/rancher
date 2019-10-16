@@ -66,6 +66,40 @@ def test_destination_rule(admin_pc):
     client.delete(ns)
 
 
+@pytest.mark.nonparallel
+def test_gateway(admin_pc):
+    client = admin_pc.client
+    ns = admin_pc.cluster.client.create_namespace(
+        name=random_str(),
+        projectId=admin_pc.project.id)
+    name = random_str()
+    client.create_gateway(
+        name=name,
+        namespaceId=ns.id,
+        servers=[{
+            "hosts": [
+                "*",
+            ],
+            "port": {
+                "number": 443,
+                "name": "https",
+                "protocol": "HTTPS",
+            },
+            "tls": {
+                "mode": "SIMPLE",
+                "serverCertificate": "/etc/certs/server.pem",
+                "privateKey": "/etc/certs/privatekey.pem",
+            }
+        }],
+    )
+    gateways = client.list_gateway(
+        namespaceId=ns.id
+    )
+    assert len(gateways) == 1
+    client.delete(gateways.data[0])
+    client.delete(ns)
+
+
 @pytest.fixture(scope='module', autouse="True")
 def install_crd(admin_mc):
     cluster, client = cluster_and_client('local', admin_mc.client)
