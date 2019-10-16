@@ -15,7 +15,7 @@ RUN curl -sLf https://github.com/rancher/machine-package/releases/download/v0.15
 ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH_arm64=arm64 GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
     GOPATH=/go PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash
 
-RUN wget -O - https://storage.googleapis.com/golang/go1.12.9.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local && \
+RUN wget -O - https://storage.googleapis.com/golang/go1.12.10.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local && \
     go get github.com/rancher/trash && \
     go get -u golang.org/x/lint/golint && \
     go get -d golang.org/x/tools/cmd/goimports && \
