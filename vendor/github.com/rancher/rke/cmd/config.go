@@ -4,12 +4,13 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"github.com/rancher/rke/metadata"
 	"io/ioutil"
 	"os"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/rancher/rke/metadata"
 
 	"github.com/rancher/rke/cluster"
 	"github.com/rancher/rke/pki"
@@ -100,13 +101,14 @@ func writeConfig(cluster *v3.RancherKubernetesEngineConfig, configFile string, p
 }
 
 func clusterConfig(ctx *cli.Context) error {
-	if ctx.Bool("system-images") {
-		if metadata.K8sVersionToRKESystemImages == nil {
-			err := metadata.InitMetadata(context.Background())
-			if err != nil {
-				return err
-			}
+	if metadata.K8sVersionToRKESystemImages == nil {
+		err := metadata.InitMetadata(context.Background())
+		if err != nil {
+			return err
 		}
+	}
+
+	if ctx.Bool("system-images") {
 		return generateSystemImagesList(ctx.String("version"), ctx.Bool("all"))
 	}
 
