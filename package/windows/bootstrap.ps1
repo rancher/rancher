@@ -123,13 +123,6 @@ catch
     Log-Warn "Could not detect the DISK resource: `$(`$_.Exception.Message)"
 }
 
-Log-Info "Detecting host system locale ..."
-`$sysLocale = Get-WinSystemLocale | Select-Object -ExpandProperty "IetfLanguageTag"
-if (-not `$sysLocale.StartsWith('en-'))
-{
-    Log-Fatal "Only support with English System Locale"
-}
-
 Log-Info "Detecting host Docker name pipe existing ..."
 `$dockerNPipe = Get-ChildItem //./pipe/ -ErrorAction Ignore | ? Name -eq "docker_engine"
 if (-not `$dockerNPipe)
