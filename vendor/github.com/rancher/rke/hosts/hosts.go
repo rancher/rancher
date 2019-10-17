@@ -337,6 +337,7 @@ func DoRunLogCleaner(ctx context.Context, host *Host, alpineImage string, prsMap
 	}
 	hostCfg := &container.HostConfig{
 		Binds: []string{
+			host.DockerInfo.DockerRootDir + ":" + host.DockerInfo.DockerRootDir,
 			"/var/lib:/var/lib",
 		},
 		Privileged: true,

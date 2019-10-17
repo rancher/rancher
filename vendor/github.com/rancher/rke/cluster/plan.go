@@ -47,6 +47,8 @@ const (
 	KubeletDockerConfigFileEnv = "RKE_KUBELET_DOCKER_FILE"
 	KubeletDockerConfigPath    = "/var/lib/kubelet/config.json"
 
+	AWSCloudProviderName = "aws"
+
 	// MaxEtcdOldEnvVersion The versions are maxed out for minor versions because -rancher1 suffix will cause semver to think its older, example: v1.15.0 > v1.15.0-rancher1
 	MaxEtcdOldEnvVersion = "v3.2.99"
 	MaxK8s115Version     = "v1.15"
@@ -583,6 +585,14 @@ func (c *Cluster) BuildKubeProxyProcess(host *hosts.Host, prefixPath string, svc
 				continue
 			}
 			CommandArgs[k] = v
+		}
+	}
+	// If cloudprovider is set to aws, set the bind address because the node will not be able to retrieve it's IP address because the nodename is set by AWS to internal DNS name
+	if c.CloudProvider.Name == AWSCloudProviderName {
+		if host.Address != host.InternalAddress {
+			CommandArgs["bind-address"] = host.InternalAddress
+		} else {
+			CommandArgs["bind-address"] = host.Address
 		}
 	}
 
