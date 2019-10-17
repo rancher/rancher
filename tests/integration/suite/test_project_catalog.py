@@ -250,6 +250,7 @@ def test_project_catalog_access_before_app_creation(admin_mc, admin_pc,
         roleTemplateId="project-owner",
         userId=user.user.id)
     remove_resource(prtb_owner)
+    wait_until(prtb_cb(client, prtb_owner))
     u_p_client = user_project_client(user, admin_pc.project)
     try:
         # creating app in user's project, using template version from
