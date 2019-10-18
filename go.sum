@@ -576,6 +576,8 @@ github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZN
 github.com/posener/complete v1.1.1/go.mod h1:em0nMJCgc9GFtwrmVmEMR/ZL6WyhyjMBndrE9hABlRI=
 github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021/go.mod h1:prYjPmNq4d1NPVmpShWobRqXY3q7Vp+80DqgxxUrUIA=
 github.com/pquerna/ffjson v0.0.0-20180717144149-af8b230fcd20/go.mod h1:YARuvh7BUWHNhzDq2OM5tzR2RiCcN2D7sapiKyCel/M=
+github.com/prachidamle/types v0.0.0-20191014222534-11f2021f933f h1:Gn54afrQLV/yf7aZoPqHX8XdN9AHkdkVEKucxO71qk0=
+github.com/prachidamle/types v0.0.0-20191014222534-11f2021f933f/go.mod h1:3k1KigFfdRBJhiE8EXTpoM0aPXAFuYuGxKtU93oNxAY=
 github.com/prometheus/client_golang v0.9.3 h1:9iH4JKXLzFbOAdtqv/a+j8aewx2Y8lAjAydhbaScPF8=
 github.com/prometheus/client_golang v0.9.3/go.mod h1:/TN21ttK/J9q6uSwhBd54HahCDft0ttaMvbicHlPoso=
 github.com/prometheus/client_model v0.0.0-20180712105110-5c3871d89910/go.mod h1:MbSGuTsp3dbXC40dX6PRTWyKYBIrTGTE9sqQNg2J8bo=
@@ -626,6 +628,8 @@ github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bH
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
+github.com/rancher/swarm v0.1.0 h1:aCATlZ02JfbNjGr6sbucFNa9QWNC1vVRfqXrHEYaFow=
+github.com/rancher/swarm v0.1.0/go.mod h1:4p1ah+P/fAyv67C1IPyh+lQQPrH8AgDP1Qo87iFwfgI=
 github.com/rancher/types v0.0.0-20190930165650-6bbedae77a35 h1:8ocmE+9FUB0EuOZ7HiDWb5zBXdlQootMX9sMXFCOerk=
 github.com/rancher/types v0.0.0-20190930165650-6bbedae77a35/go.mod h1:I0hSpsw/ZvWuOOvhiExji5IIkeQtmn4IvFcn7nbjhrk=
 github.com/rancher/types v0.0.0-20191003184925-ab3403a2c8ca h1:nr7M7Gdk1mFnTiF5c6mXuKK5T+VFuxMO1AxoAK2bI7Y=

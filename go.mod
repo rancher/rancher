@@ -10,6 +10,7 @@ replace (
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009
 
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.3
+	github.com/rancher/types => github.com/prachidamle/types v0.0.0-20191014222534-11f2021f933f
 
 	k8s.io/api => k8s.io/api v0.0.0-20190918155943-95b840bb6a1f
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.0.0-20190918161926-8f644eb6e783
@@ -33,6 +34,7 @@ replace (
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.0.0-20190918163543-cfa506e53441
 	k8s.io/metrics => k8s.io/metrics v0.0.0-20190918162108-227c654b2546
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.0.0-20190918161442-d4c9c65c82af
+
 )
 
 require (
@@ -79,6 +81,7 @@ require (
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6
 	github.com/rancher/rke v0.3.1-rc1
+	github.com/rancher/swarm v0.1.0 // indirect
 	github.com/rancher/types v0.0.0-20191003184925-ab3403a2c8ca
 	github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95
 	github.com/robfig/cron v1.1.0
