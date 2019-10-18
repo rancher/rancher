@@ -3,9 +3,11 @@ package settings
 import (
 	"encoding/json"
 	"os"
+	"strconv"
 	"strings"
 
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -145,19 +147,43 @@ func NewSetting(name, def string) Setting {
 	return s
 }
 
+func GetEnvKey(key string) string {
+	return "CATTLE_" + strings.ToUpper(strings.Replace(key, "-", "_", -1))
+}
+
 func getMetadataConfig() string {
+	key := GetEnvKey("server-version")
+	rancherVersion := os.Getenv(key)
+	branch := "dev"
+	if releaseServerVersion(rancherVersion) {
+		branch = "master"
+	}
 	data := map[string]interface{}{
 		"url":                      "https://github.com/rancher/kontainer-driver-metadata.git",
-		"branch":                   "dev",
+		"branch":                   branch,
 		"refresh-interval-minutes": "1440",
 	}
 	ans, err := json.Marshal(data)
-	if err == nil {
-		return string(ans)
+	if err != nil {
+		logrus.Errorf("error getting metadata config %v", err)
+		return ""
 	}
-	return ""
+	return string(ans)
 }
 
-func GetEnvKey(key string) string {
-	return "CATTLE_" + strings.ToUpper(strings.Replace(key, "-", "_", -1))
+func releaseServerVersion(serverVersion string) bool {
+	if serverVersion == "" {
+		return false
+	}
+	splitVersion := strings.Split(serverVersion[1:], ".")
+	if len(splitVersion) != 3 {
+		return false
+	}
+	for _, part := range splitVersion {
+		//part should be a numeric value
+		if _, err := strconv.Atoi(part); err != nil {
+			return false
+		}
+	}
+	return true
 }
