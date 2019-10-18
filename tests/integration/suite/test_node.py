@@ -4,7 +4,7 @@ import os
 import tempfile
 import pytest
 from rancher import ApiError
-from .common import auth_check
+from .common import auth_check, random_str
 from .conftest import wait_for
 import time
 
@@ -130,13 +130,20 @@ def test_writing_config_to_disk(admin_mc, wait_remove_resource):
     cloud_credential = client.create_cloud_credential(
         digitaloceancredentialConfig={"accessToken": "test"})
     wait_remove_resource(cloud_credential)
-    userdata = "do cool stuff"
+
+    data = {'userdata': 'do cool stuff',
+            # This validates ssh keys don't drop the ending \n
+            'id_rsa': 'some\nfake\nstuff\n'
+            }
 
     def _node_template():
         try:
             return client.create_node_template(
-                digitaloceanConfig={'userdata': userdata},
-                name='danssweetassthing',
+                digitaloceanConfig={
+                    'userdata': data['userdata'],
+                    'sshKeyContents': data['id_rsa']
+                },
+                name=random_str(),
                 cloudCredentialId=cloud_credential.id)
 
         except ApiError:
@@ -153,23 +160,25 @@ def test_writing_config_to_disk(admin_mc, wait_remove_resource):
         clusterId="local")
     wait_remove_resource(node_pool)
 
-    dir_name = string_to_encoding(userdata)
+    for key, value in data.items():
+        dir_name = string_to_encoding(value)
 
-    full_path = os.path.join(tempdir, dir_name, 'userdata')
+        full_path = os.path.join(tempdir, dir_name, key)
 
-    def file_exists():
-        try:
-            os.stat(full_path)
-            return True
-        except FileNotFoundError:
-            return False
+        def file_exists():
+            try:
+                os.stat(full_path)
+                return True
+            except FileNotFoundError:
+                return False
 
-    wait_for(file_exists)
+        wait_for(file_exists, timeout=10,
+                 fail_handler=lambda: 'file is missing from disk')
 
-    with open(full_path, 'r') as f:
-        contents = f.read()
+        with open(full_path, 'r') as f:
+            contents = f.read()
 
-    assert contents == userdata
+        assert contents == value
 
 
 def test_node_driver_schema(admin_mc):
