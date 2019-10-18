@@ -1101,5 +1101,8 @@ func istioTypes(schemas *types.Schemas) *types.Schemas {
 		}{}).
 		MustImport(&Version, istiov1alpha3.DestinationRule{}, projectOverride{}, struct {
 			Status interface{}
+		}{}).
+		MustImport(&Version, istiov1alpha3.Gateway{}, projectOverride{}, struct {
+			Status interface{}
 		}{})
 }
