@@ -587,9 +587,9 @@ func (c *Cluster) BuildKubeProxyProcess(host *hosts.Host, prefixPath string, svc
 			CommandArgs[k] = v
 		}
 	}
-	// If cloudprovider is set to aws, set the bind address because the node will not be able to retrieve it's IP address because the nodename is set by AWS to internal DNS name
-	if c.CloudProvider.Name == AWSCloudProviderName {
-		if host.Address != host.InternalAddress {
+	// If cloudprovider is set (not empty), set the bind address because the node will not be able to retrieve it's IP address in case cloud provider changes the node object name (i.e. AWS and Openstack)
+	if c.CloudProvider.Name != "" {
+		if host.InternalAddress != "" && host.Address != host.InternalAddress {
 			CommandArgs["bind-address"] = host.InternalAddress
 		} else {
 			CommandArgs["bind-address"] = host.Address
