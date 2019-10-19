@@ -248,13 +248,16 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 	schema.Store = clusterStore
 
 	handler := ccluster.ActionHandler{
-		NodepoolGetter:     managementContext.Management,
-		ClusterClient:      managementContext.Management.Clusters(""),
-		UserMgr:            managementContext.UserManager,
-		ClusterManager:     clusterManager,
-		NodeTemplateGetter: managementContext.Management,
-		BackupClient:       managementContext.Management.EtcdBackups(""),
-		ClusterScanClient:  managementContext.Management.ClusterScans(""),
+		NodepoolGetter:                managementContext.Management,
+		ClusterClient:                 managementContext.Management.Clusters(""),
+		UserMgr:                       managementContext.UserManager,
+		ClusterManager:                clusterManager,
+		NodeTemplateGetter:            managementContext.Management,
+		BackupClient:                  managementContext.Management.EtcdBackups(""),
+		ClusterScanClient:             managementContext.Management.ClusterScans(""),
+		ClusterTemplateClient:         managementContext.Management.ClusterTemplates(""),
+		ClusterTemplateRevisionClient: managementContext.Management.ClusterTemplateRevisions(""),
+		SubjectAccessReviewClient:     managementContext.K8sClient.AuthorizationV1().SubjectAccessReviews(),
 	}
 
 	schema.ActionHandler = handler.ClusterActionHandler

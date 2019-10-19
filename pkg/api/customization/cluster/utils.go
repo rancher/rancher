@@ -11,11 +11,14 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	v1 "github.com/rancher/types/apis/core/v1"
+	"github.com/sirupsen/logrus"
+	authV1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	clientauthv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
 type noopCloser struct {
@@ -126,4 +129,24 @@ func waitForNS(nsClient v1.NamespaceInterface, namespaces []string) {
 			time.Sleep(2 * time.Second)
 		}
 	}
+}
+
+func CanCreateRKETemplate(callerID string, subjectAccessReviewClient clientauthv1.SubjectAccessReviewInterface) (bool, error) {
+	review := authV1.SubjectAccessReview{
+		Spec: authV1.SubjectAccessReviewSpec{
+			User: callerID,
+			ResourceAttributes: &authV1.ResourceAttributes{
+				Verb:     "create",
+				Resource: "clustertemplates",
+				Group:    "management.cattle.io",
+			},
+		},
+	}
+
+	result, err := subjectAccessReviewClient.Create(&review)
+	if err != nil {
+		return false, err
+	}
+	logrus.Debugf("CanCreateRKETemplate: %v", result)
+	return result.Status.Allowed, nil
 }

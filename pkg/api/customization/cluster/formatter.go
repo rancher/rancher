@@ -6,22 +6,26 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	client "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
 type Formatter struct {
-	KontainerDriverLister v3.KontainerDriverLister
-	clusterSpecPwdFields  map[string]interface{}
+	KontainerDriverLister     v3.KontainerDriverLister
+	clusterSpecPwdFields      map[string]interface{}
+	SubjectAccessReviewClient v1.SubjectAccessReviewInterface
 }
 
 func NewFormatter(schemas *types.Schemas, managementContext *config.ScaledContext) *Formatter {
 	clusterFormatter := Formatter{
-		KontainerDriverLister: managementContext.Management.KontainerDrivers("").Controller().Lister(),
-		clusterSpecPwdFields:  gatherClusterSpecPwdFields(schemas, schemas.Schema(&managementschema.Version, client.ClusterSpecBaseType)),
+		KontainerDriverLister:     managementContext.Management.KontainerDrivers("").Controller().Lister(),
+		clusterSpecPwdFields:      gatherClusterSpecPwdFields(schemas, schemas.Schema(&managementschema.Version, client.ClusterSpecBaseType)),
+		SubjectAccessReviewClient: managementContext.K8sClient.AuthorizationV1().SubjectAccessReviews(),
 	}
 	return &clusterFormatter
 }
@@ -52,6 +56,14 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 			resource.AddAction(request, v3.ClusterActionEditMonitoring)
 		} else {
 			resource.AddAction(request, v3.ClusterActionEnableMonitoring)
+		}
+		if _, ok := resource.Values["rancherKubernetesEngineConfig"]; ok {
+			if val, ok := values.GetValue(resource.Values, "clusterTemplateRevisionId"); ok && val == nil {
+				callerID := request.Request.Header.Get(gaccess.ImpersonateUserHeader)
+				if canCreateTemplates, _ := CanCreateRKETemplate(callerID, f.SubjectAccessReviewClient); canCreateTemplates {
+					resource.AddAction(request, v3.ClusterActionSaveAsTemplate)
+				}
+			}
 		}
 	}
 

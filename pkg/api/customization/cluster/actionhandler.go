@@ -5,21 +5,26 @@ import (
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	mgmtclient "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/user"
+	v1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 type ActionHandler struct {
-	NodepoolGetter     v3.NodePoolsGetter
-	ClusterClient      v3.ClusterInterface
-	NodeTemplateGetter v3.NodeTemplatesGetter
-	UserMgr            user.Manager
-	ClusterManager     *clustermanager.Manager
-	BackupClient       v3.EtcdBackupInterface
-	ClusterScanClient  v3.ClusterScanInterface
+	NodepoolGetter                v3.NodePoolsGetter
+	ClusterClient                 v3.ClusterInterface
+	NodeTemplateGetter            v3.NodeTemplatesGetter
+	UserMgr                       user.Manager
+	ClusterManager                *clustermanager.Manager
+	BackupClient                  v3.EtcdBackupInterface
+	ClusterScanClient             v3.ClusterScanInterface
+	ClusterTemplateClient         v3.ClusterTemplateInterface
+	ClusterTemplateRevisionClient v3.ClusterTemplateRevisionInterface
+	SubjectAccessReviewClient     v1.SubjectAccessReviewInterface
 }
 
 func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -38,6 +43,13 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 			"namespaceId": apiContext.ID,
 		}
 		return apiContext.AccessControl.CanDo(v3.EtcdBackupGroupVersionKind.Group, v3.EtcdBackupResource.Name, "create", apiContext, backupMap, &etcdBackupSchema) == nil
+	}
+
+	canCreateClusterTemplate := func() bool {
+
+		callerID := apiContext.Request.Header.Get(gaccess.ImpersonateUserHeader)
+		canCreateTemplates, _ := CanCreateRKETemplate(callerID, a.SubjectAccessReviewClient)
+		return canCreateTemplates
 	}
 
 	switch actionName {
@@ -81,6 +93,14 @@ func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Act
 		return a.RotateCertificates(actionName, action, apiContext)
 	case v3.ClusterActionRunCISScan:
 		return a.runCISScan(actionName, action, apiContext)
+	case v3.ClusterActionSaveAsTemplate:
+		if !canUpdateCluster() {
+			return httperror.NewAPIError(httperror.PermissionDenied, "can not save the cluster as an RKETemplate")
+		}
+		if !canCreateClusterTemplate() {
+			return httperror.NewAPIError(httperror.PermissionDenied, "can not save the cluster as an RKETemplate")
+		}
+		return a.saveAsTemplate(actionName, action, apiContext)
 	}
 	return httperror.NewAPIError(httperror.NotFound, "not found")
 }
