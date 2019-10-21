@@ -108,8 +108,6 @@ func (h *Helm) request(pathURL string) (*http.Response, error) {
 }
 
 func (h *Helm) downloadIndex(indexURL string) (*RepoIndex, error) {
-	indexURL = strings.TrimSuffix(indexURL, "/")
-	indexURL = indexURL + "/index.yaml"
 	resp, err := h.request(indexURL)
 	if err != nil {
 		if e, ok := err.(net.Error); ok && e.Timeout() {
