@@ -50,6 +50,17 @@ VUi3lKqwXhtReYdrqVTPdjnyGIYIGGNRD7EKqQe15IRfbpy536DSN+LvL65Fdyis
 iNITDKNP1H3hedFNFfbTGpueYdRX6QaptK4+NB4+dOm7hn8iqq7U
 -----END RSA PRIVATE KEY-----"""
 
+MALFORMED_CERT = """-----BEGIN CERTIFICATE-----
+MIIDEDCCAfgCCQC+HwE8rpMN7jANBgkqhkiG9w0BAQUFADBKMQswCQYDVQQGEwJV
+UzEQMA4GA1UECBMHQXJpem9uYTEVMBMGA1UEChMMUmFuY2hlciBMYWJzMRIwEAYD
+VQQDEwlsb2NhbGhvc3QwHhcNMTYwNjMwMDExMzMyWhcNMjYwNjI4MDExMzMyWjBK
+MQswCQYDVQQGEwJVUzEQMA4GA1UECBMHQXJpem9uYTEVMBMGA1UEChMMUmFuY2hl
+ciBMYWJzMRIwEAYDVQQDEwlsb2NhbGhvc3QwggEiMA0GCSqGSIb3DQEBAQUAA4IB
+DwAwggEKAoIBAQC1PR0EiJjM0wbFQmU/yKSb7AuQdzhdW02ya+RQe+31/B+sOTMr
+z9b473KCKf8LiFKFOxyuC9wHS5bUmiNHweLXNpxLFTjK8
+BBUi6y1Vm9jrDi/LiiHcN4sJEoU=
+-----END CERTIFICATE-----"""
+
 
 def test_secrets(admin_pc):
     client = admin_pc.client
@@ -291,3 +302,36 @@ def test_secret_creation_kubectl(admin_mc, admin_cc, remove_resource):
     assert "RSA" in cert['algorithm']
     assert cert['expiresAt'] is not None
     assert cert['issuedAt'] is not None
+
+
+def test_malformed_secret_parse(admin_mc, admin_cc, remove_resource):
+    name = random_str()
+    project = admin_mc.client.create_project(name=random_str(),
+                                             clusterId='local')
+    remove_resource(project)
+    namespace_name = random_str()
+    ns = admin_cc.client.create_namespace(name=namespace_name,
+                                          projectId=project.id)
+    remove_resource(ns)
+
+    k8s_client = kubernetes_api_client(admin_mc.client, 'local')
+    secrets_api = kubernetes.client.CoreV1Api(k8s_client)
+
+    secret = kubernetes.client.V1Secret()
+    # Metadata
+    secret.metadata = kubernetes.client.V1ObjectMeta(
+        name=name,
+        namespace=namespace_name)
+    secret.string_data = {'tls.key': KEY, 'tls.crt': MALFORMED_CERT}
+    secret.type = "kubernetes.io/tls"
+
+    sec = secrets_api.create_namespaced_secret(namespace=namespace_name,
+                                               body=secret)
+    remove_resource(sec)
+    assert sec is not None
+
+    # now get this through rancher api as namespacedCertificate
+    cert_id = namespace_name+':'+name
+    proj_client = user_project_client(admin_mc, project)
+    cert = proj_client.by_id_namespaced_certificate(cert_id)
+    assert cert is not None
