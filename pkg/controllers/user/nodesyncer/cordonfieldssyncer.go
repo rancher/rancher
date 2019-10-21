@@ -138,7 +138,8 @@ func (d *nodeDrain) drain(ctx context.Context, obj *v3.Node, cancel context.Canc
 			if err != nil {
 				return obj, err
 			}
-			logrus.Infof("Draining node %s in %s", nodeName, obj.Namespace)
+			logrus.Infof("Draining node %s in %s with flags %v", nodeName, obj.Namespace,
+				strings.Join(getFlags(nodeObj.Spec.NodeDrainInput), " "))
 			_, msg, err := kubectl.Drain(ctx, kubeConfig, nodeName, getFlags(nodeObj.Spec.NodeDrainInput))
 			if err != nil {
 				if ctx.Err() == context.Canceled {
@@ -155,11 +156,15 @@ func (d *nodeDrain) drain(ctx context.Context, obj *v3.Node, cancel context.Canc
 		if err != nil {
 			ignore, timeoutErr := ignoreErr(err.Error())
 			if ignore {
-				kubeErr = nil
 				if timeoutErr {
 					err = fmt.Errorf(fmt.Sprintf("Drain failed: drain did not complete within %vs",
 						obj.Spec.NodeDrainInput.Timeout))
+				} else {
+					// log before ignoring
+					logrus.Errorf("nodeDrain: kubectl error draining node [%s] in cluster [%s]: %v", nodeName,
+						d.clusterName, kubeErr)
 				}
+				kubeErr = nil
 			}
 		}
 		if !stopped {
@@ -167,7 +172,13 @@ func (d *nodeDrain) drain(ctx context.Context, obj *v3.Node, cancel context.Canc
 			setConditionComplete(nodeCopy, err, kubeErr)
 			_, updateErr := d.updateNode(nodeCopy, setConditionComplete, err, kubeErr)
 			if kubeErr != nil || updateErr != nil {
-				logrus.Errorf("nodeDrain: [%s] in cluster [%s] : %v %v", nodeName, d.clusterName, err, updateErr)
+				if kubeErr != nil {
+					logrus.Errorf("nodeDrain: kubectl error draining node [%s] in cluster [%s]: %v", nodeName,
+						d.clusterName, kubeErr)
+				} else {
+					logrus.Errorf("nodeDrain: condition update failure for node [%s] in cluster [%s]: %v",
+						nodeName, d.clusterName, updateErr)
+				}
 				d.machines.Controller().Enqueue("", fmt.Sprintf("%s/%s", d.clusterName, obj.Name))
 			}
 			cancel()
