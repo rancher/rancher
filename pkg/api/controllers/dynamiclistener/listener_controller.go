@@ -2,11 +2,13 @@ package dynamiclistener
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/cert"
+	"github.com/rancher/rancher/pkg/controllers/management/clusterdeploy"
 	"github.com/rancher/rancher/pkg/dynamiclistener"
 	"github.com/rancher/rancher/pkg/settings"
 	v1 "github.com/rancher/types/apis/core/v1"
@@ -23,8 +25,12 @@ type Controller struct {
 	listenConfig       v3.ListenConfigInterface
 	listenConfigLister v3.ListenConfigLister
 	secrets            v1.SecretInterface
+	clusterLister      v3.ClusterLister
+	clusters           v3.ClusterInterface
 	server             dynamiclistener.ServerInterface
 }
+
+var toUpdate bool
 
 type storageUpdater interface {
 	Update(*v3.ListenConfig) (*v3.ListenConfig, error)
@@ -43,6 +49,8 @@ func Start(ctx context.Context, context *config.ScaledContext, httpPort, httpsPo
 	c := &Controller{
 		server:             dynamiclistener.NewServer(ctx, s, handler, httpPort, httpsPort),
 		secrets:            context.Core.Secrets(""),
+		clusterLister:      context.Management.Clusters("").Controller().Lister(),
+		clusters:           context.Management.Clusters(""),
 		listenConfig:       context.Management.ListenConfigs(""),
 		listenConfigLister: context.Management.ListenConfigs("").Controller().Lister(),
 	}
@@ -98,7 +106,11 @@ func (c *Controller) enable(listener *v3.ListenConfig) error {
 
 func (c *Controller) updateCurrent(listener *v3.ListenConfig) error {
 	caCerts := strings.TrimSpace(listener.CACerts)
-	settings.CACerts.Set(caCerts)
+	if settings.CACerts.Get() != caCerts {
+		settings.CACerts.Set(caCerts)
+		toUpdate = true
+	}
+
 	if listener.Key != "" && caCerts != "" && listener.Cert != "" {
 		certInfo, err := cert.Info(listener.Cert+"\n"+caCerts, listener.Key)
 		if err != nil {
@@ -124,7 +136,29 @@ func (c *Controller) updateCurrent(listener *v3.ListenConfig) error {
 		}
 	}
 
-	return c.saveCACertToSecret(listener.CAKey, listener.CACert)
+	if err := c.saveCACertToSecret(listener.CAKey, listener.CACert); err != nil {
+		return err
+	}
+
+	if toUpdate {
+		clusters, err := c.clusterLister.List("", labels.NewSelector())
+		if err != nil {
+			return fmt.Errorf("enableListenConfig: error getting clusters %v", err)
+		}
+		for _, cluster := range clusters {
+			if val, ok := cluster.Annotations[clusterdeploy.AgentForceDeployAnn]; ok && val == "true" {
+				continue
+			}
+			clusterCopy := cluster.DeepCopy()
+			clusterCopy.Annotations[clusterdeploy.AgentForceDeployAnn] = "true"
+			if _, err := c.clusters.Update(clusterCopy); err != nil {
+				return err
+			}
+		}
+		toUpdate = false
+	}
+
+	return nil
 }
 
 func (c *Controller) saveCACertToSecret(key, cert string) error {
