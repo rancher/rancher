@@ -24,6 +24,8 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
+const AgentForceDeployAnn = "io.cattle.agent.force.deploy"
+
 func Register(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	c := &clusterDeploy{
 		systemAccountManager: systemaccount.NewManager(management),
@@ -120,7 +122,9 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		}
 	}
 
-	if cluster.Status.AgentImage == desiredAgent && cluster.Status.AuthImage == desiredAuth {
+	forceDeploy := cluster.Annotations[AgentForceDeployAnn] == "true"
+
+	if !forceDeploy && cluster.Status.AgentImage == desiredAgent && cluster.Status.AuthImage == desiredAuth {
 		return nil
 	}
 
@@ -169,6 +173,9 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		cluster.Status.AuthImage = desiredAuth
 		if cluster.Spec.DesiredAuthImage == "fixed" {
 			cluster.Spec.DesiredAuthImage = desiredAuth
+		}
+		if forceDeploy {
+			cluster.Annotations[AgentForceDeployAnn] = "false"
 		}
 	}
 

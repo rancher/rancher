@@ -56,6 +56,18 @@ type StubServerInterface struct {
 	dynamiclistener.ServerInterface
 }
 
+type StubClustersInterface struct {
+	v3.ClusterInterface
+}
+
+type StubClusterLister struct {
+	v3.ClusterLister
+}
+
+func (s *StubClusterLister) List(namespace string, selector labels.Selector) (ret []*v3.Cluster, err error) {
+	return nil, nil
+}
+
 func (s *StubServerInterface) Enable(config *v3.ListenConfig) (bool, error) {
 	return true, nil
 }
@@ -66,6 +78,8 @@ func testCACertIsTransformedTo(t *testing.T, original string, final string) {
 		listenConfigLister: &StubListenConfigLister{},
 		secrets:            &StubSecretsInterface{},
 		server:             &StubServerInterface{},
+		clusterLister:      &StubClusterLister{},
+		clusters:           &StubClustersInterface{},
 	}
 
 	_, err := controller.sync("", &v3.ListenConfig{Enabled: true, CACerts: original})
