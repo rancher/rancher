@@ -117,4 +117,5 @@ type Config struct {
 	HorizontalPodAutoscalers       map[string]projectClient.HorizontalPodAutoscaler       `json:"horizontalPodAutoscalers,omitempty" yaml:"horizontalPodAutoscalers,omitempty"`
 	VirtualServices                map[string]projectClient.VirtualService                `json:"virtualServices,omitempty" yaml:"virtualServices,omitempty"`
 	DestinationRules               map[string]projectClient.DestinationRule               `json:"destinationRules,omitempty" yaml:"destinationRules,omitempty"`
+	Gateways                       map[string]projectClient.Gateway                       `json:"gateways,omitempty" yaml:"gateways,omitempty"`
 }
