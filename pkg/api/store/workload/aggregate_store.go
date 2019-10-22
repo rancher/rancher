@@ -130,6 +130,15 @@ func (a *AggregateStore) Create(apiContext *types.APIContext, schema *types.Sche
 	return toStore.Create(apiContext, toSchema, data)
 }
 
+func (a *AggregateStore) Refresh(apiContext *types.APIContext, schema *types.Schema, id string) error {
+	store, schemaType, err := a.getStore(id)
+	if err != nil {
+		return err
+	}
+	_, shortID := splitTypeAndID(id)
+	return store.Refresh(apiContext, a.Schemas[schemaType], shortID)
+}
+
 func store(registries map[string]projectclient.RegistryCredential, domainToCreds map[string][]corev1.LocalObjectReference, name string) {
 	for registry := range registries {
 		rd, err := GetRegistryDomain(registry)

@@ -47,7 +47,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	kontainerdriver.Register(ctx, management)
 	kontainerdrivermetadata.Register(ctx, management)
 	nodedriver.Register(ctx, management)
-	nodepool.Register(ctx, management)
+	nodepool.Register(ctx, manager.ScaledContext, management)
 	cloudcredential.Register(ctx, management)
 	node.Register(ctx, management)
 	podsecuritypolicy.Register(ctx, management)

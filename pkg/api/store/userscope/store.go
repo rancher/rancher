@@ -17,7 +17,7 @@ const (
 )
 
 type Store struct {
-	Store    types.Store
+	types.Store
 	nsClient v1.NamespaceInterface
 }
 
@@ -111,9 +111,14 @@ func (s *Store) Watch(apiContext *types.APIContext, schema *types.Schema, opt *t
 }
 
 func getUser(apiContext *types.APIContext) (string, error) {
+	var err = httperror.NewAPIError(httperror.NotFound, "missing user")
+	if apiContext == nil || apiContext.Request == nil {
+		return "", err
+	}
+
 	user := apiContext.Request.Header.Get("Impersonate-User")
 	if user == "" {
-		return "", httperror.NewAPIError(httperror.NotFound, "missing user")
+		return "", err
 	}
 	return user, nil
 }

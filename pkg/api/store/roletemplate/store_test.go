@@ -3,6 +3,7 @@ package roletemplate
 import (
 	"testing"
 
+	"github.com/rancher/norman/store/empty"
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3/fakes"
@@ -11,7 +12,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-type dummyStore struct{}
+type dummyStore struct {
+	types.Store
+}
 
 // testWithInherited attempt delete given key and inserts the key in  the inherited
 // list for a roletemplate if insertInLister is true.
@@ -24,7 +27,9 @@ func testWithInherited(key string, insertInLister bool) (map[string]interface{},
 		ListFunc: mockList(insert),
 	}
 
-	testStore := Wrap(dummyStore{}, mockRTLister)
+	testStore := Wrap(dummyStore{
+		&empty.Store{},
+	}, mockRTLister)
 
 	return testStore.Delete(nil, nil, key)
 }
@@ -69,25 +74,7 @@ func TestDelete(t *testing.T) {
 func (ds dummyStore) Context() types.StorageContext {
 	return types.StorageContext("test")
 }
-func (ds dummyStore) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
-	return nil, nil
-}
-func (ds dummyStore) List(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) ([]map[string]interface{}, error) {
-	return nil, nil
-}
 
 func (ds dummyStore) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
 	return data, nil
-}
-
-func (ds dummyStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-	return nil, nil
-}
-
-func (ds dummyStore) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
-	return nil, nil
-}
-
-func (ds dummyStore) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
-	return nil, nil
 }

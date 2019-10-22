@@ -129,6 +129,10 @@ func (p *PasswordStore) Watch(apiContext *types.APIContext, schema *types.Schema
 	return p.Stores[schema.ID].Watch(apiContext, schema, opt)
 }
 
+func (p *PasswordStore) Refresh(apiContext *types.APIContext, schema *types.Schema, id string) error {
+	return p.Stores[schema.ID].Refresh(apiContext, schema, id)
+}
+
 func (p *PasswordStore) replacePasswords(sepData, data, existing map[string]interface{}) error {
 	/*
 		sepData: path to all password fields built recursively from schema

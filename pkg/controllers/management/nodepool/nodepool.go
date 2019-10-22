@@ -3,22 +3,29 @@ package nodepool
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rke/services"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
+	client "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 var (
@@ -36,17 +43,23 @@ type Controller struct {
 	NodePools          v3.NodePoolInterface
 	NodeLister         v3.NodeLister
 	Nodes              v3.NodeInterface
+	nodeTemplateLister v3.NodeTemplateLister
+	userLister         v3.UserLister
+	ntSchema           *types.Schema
 	mutex              sync.RWMutex
 	syncmap            map[string]bool
 }
 
-func Register(ctx context.Context, management *config.ManagementContext) {
+func Register(ctx context.Context, sctx *config.ScaledContext, management *config.ManagementContext) {
 	p := &Controller{
 		NodePoolController: management.Management.NodePools("").Controller(),
 		NodePoolLister:     management.Management.NodePools("").Controller().Lister(),
 		NodePools:          management.Management.NodePools(""),
 		NodeLister:         management.Management.Nodes("").Controller().Lister(),
 		Nodes:              management.Management.Nodes(""),
+		nodeTemplateLister: management.Management.NodeTemplates("").Controller().Lister(),
+		userLister:         management.Management.Users("").Controller().Lister(),
+		ntSchema:           sctx.Schemas.Schema(&managementschema.Version, client.NodeTemplateType),
 		syncmap:            make(map[string]bool),
 	}
 
@@ -86,7 +99,80 @@ func (c *Controller) Remove(nodePool *v3.NodePool) (runtime.Object, error) {
 		}
 	}
 
-	return nodePool, nil
+	go c.refreshNodeTemplate(nodePool)
+
+	return nodePool, err
+}
+
+// refreshNodeTemplate waits for the given nodePool to be deleted,
+// then refreshes the nodeTemplate it referenced to trigger its formatter
+func (c *Controller) refreshNodeTemplate(nodePool *v3.NodePool) {
+	nodeTemplateFullName := nodePool.Spec.NodeTemplateName
+	nodeTemplateParts := strings.Split(nodeTemplateFullName, ":")
+	if len(nodeTemplateParts) != 2 {
+		logrus.Errorf("[NodePool Lifecycle] unable to parse nodeTemplate ID [%s]", nodeTemplateFullName)
+		return
+	}
+	nodeTemplateName := nodeTemplateParts[1]
+	nodeTemplateNamespace := nodeTemplateParts[0]
+
+	nt, err := c.nodeTemplateLister.Get(nodeTemplateNamespace, nodeTemplateName)
+	if err != nil {
+		logrus.Errorf("[NodePool Lifecycle] error getting nodeTemplate [%s]: %v", nodeTemplateFullName, err)
+		return
+	}
+
+	err = wait.ExponentialBackoff(wait.Backoff{
+		Duration: 2,
+		Factor:   2,
+		Steps:    10,
+	}, func() (bool, error) {
+		if _, err := c.NodePools.GetNamespaced(nodePool.Namespace, nodePool.Name, metav1.GetOptions{}); err != nil {
+			if !errors.IsNotFound(err) {
+				return false, err
+			}
+			return true, nil
+		}
+		return false, err
+	})
+	if err != nil {
+		logrus.Errorf("[NodePool Lifecycle] error waiting for node pool [%s] to delete: %v", nodeTemplateFullName, err)
+		return
+	}
+
+	localSystemUserID, err := c.getLocalSystemUserID()
+	if err != nil {
+		logrus.Errorf("[NodePool Lifecycle] Error getting local system user: %v", err)
+		return
+	}
+
+	apiContext := &types.APIContext{
+		Request: &http.Request{
+			Header: http.Header{"Impersonate-User": []string{localSystemUserID}},
+		},
+	}
+
+	id := fmt.Sprintf("%s:%s", nt.Namespace, nt.Name)
+
+	if err := c.ntSchema.Store.Refresh(apiContext, c.ntSchema, id); err != nil {
+		logrus.Errorf("[NodePool Lifecycle] Error refreshing nodeTemplate [%s]: %v", id, err)
+		return
+	}
+}
+
+func (c *Controller) getLocalSystemUserID() (string, error) {
+	users, err := c.userLister.List("", labels.Everything())
+	if err != nil {
+		return "", err
+	}
+	for _, user := range users {
+		if ids := user.PrincipalIDs; len(ids) > 0 {
+			if ids[0] == "system://local" {
+				return user.Name, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("no local system user found")
 }
 
 func (c *Controller) machineChanged(key string, machine *v3.Node) (runtime.Object, error) {
