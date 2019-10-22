@@ -3,7 +3,8 @@ import pytest
 from rancher import ApiError
 from .test_catalog import wait_for_template_to_be_created
 from .common import random_str
-from .conftest import set_server_version, wait_for, DEFAULT_CATALOG
+from .conftest import set_server_version, wait_for, DEFAULT_CATALOG \
+wait_for_condition, wait_until
 
 
 def test_app_mysql(admin_pc, admin_mc):
@@ -646,7 +647,52 @@ def test_app_has_helmversion(admin_pc, admin_mc, remove_resource):
     assert app2.helmVersion == "helm_v3"
 
 
-def wait_for_workload(client, ns, timeout=240, count=0):
+def test_app_externalid_target_project_verification(admin_mc,
+                                                    admin_pc,
+                                                    remove_resource):
+    client = admin_mc.client
+
+    p1 = client.create_project(name=random_str(), clusterId='local')
+    remove_resource(p1)
+    wait_for_condition('InitialRolesPopulated', 'True', client, p1)
+    p1 = client.reload(p1)
+
+    # create a project scoped catalog in p1
+    project_name = str.lstrip(p1.id, "local:")
+    name = random_str()
+    url = "https://github.com/rancher/integration-test-charts.git"
+
+    client.create_project_catalog(name=name,
+                                  branch="master",
+                                  url=url,
+                                  projectId=p1.id,
+                                  )
+    wait_until(lambda: len(client.list_template(projectCatalogId=name)) > 0)
+
+    external_id = "catalog://?catalog=" + project_name + "/" + name + \
+                  "&type=projectCatalog&template=chartmuseum" \
+                  "&version=1.6.0"
+
+    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                  projectId=admin_pc.
+                                                  project.id)
+    remove_resource(ns)
+    app_data = {
+        'name': random_str(),
+        'externalId': external_id,
+        'targetNamespace': ns.name,
+        'projectId': admin_pc.project.id,
+    }
+
+    try:
+        # using this catalog creating an app in another project should fail
+        admin_pc.client.create_app(app_data)
+    except ApiError as e:
+        assert e.error.status == 422
+        assert "Cannot use catalog from" in e.error.message
+
+
+def wait_for_workload(client, ns, timeout=60, count=0):
     start = time.time()
     interval = 0.5
     workloads = client.list_workload(namespaceId=ns)
