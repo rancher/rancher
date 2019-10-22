@@ -246,11 +246,6 @@ func up(token string, port int, config *compose.Config) error {
 				}
 				id = v.(string)
 			}
-			if f, ok := WaitCondition[schemaKey]; ok {
-				if err := f(baseClient, id, schemaKey); err != nil {
-					return err
-				}
-			}
 		}
 		// fill in reference map name -> id
 		if err := common.FillInReferenceMap(baseClient, schemaKey, referenceMap, nil); err != nil {
