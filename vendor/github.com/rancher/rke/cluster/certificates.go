@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/pki/cert"
 	"github.com/rancher/rke/services"
-	"github.com/sirupsen/logrus"
 )
 
 func SetUpAuthentication(ctx context.Context, kubeCluster, currentCluster *Cluster, fullState *FullState) error {
@@ -22,20 +21,6 @@ func SetUpAuthentication(ctx context.Context, kubeCluster, currentCluster *Clust
 		return nil
 	}
 	return nil
-}
-
-func regenerateAPICertificate(c *Cluster, certificates map[string]pki.CertificatePKI) (map[string]pki.CertificatePKI, error) {
-	logrus.Debugf("[certificates] Regenerating kubeAPI certificate")
-	kubeAPIAltNames := pki.GetAltNames(c.ControlPlaneHosts, c.ClusterDomain, c.KubernetesServiceIP, c.Authentication.SANs)
-	caCrt := certificates[pki.CACertName].Certificate
-	caKey := certificates[pki.CACertName].Key
-	kubeAPIKey := certificates[pki.KubeAPICertName].Key
-	kubeAPICert, _, err := pki.GenerateSignedCertAndKey(caCrt, caKey, true, pki.KubeAPICertName, kubeAPIAltNames, kubeAPIKey, nil)
-	if err != nil {
-		return nil, err
-	}
-	certificates[pki.KubeAPICertName] = pki.ToCertObject(pki.KubeAPICertName, "", "", kubeAPICert, kubeAPIKey, nil)
-	return certificates, nil
 }
 
 func GetClusterCertsFromKubernetes(ctx context.Context, kubeCluster *Cluster) (map[string]pki.CertificatePKI, error) {
@@ -130,24 +115,6 @@ func (c *Cluster) getBackupHosts() []*hosts.Host {
 		backupHosts = hosts.GetUniqueHostList(c.EtcdHosts, c.ControlPlaneHosts, nil)
 	}
 	return backupHosts
-}
-
-func regenerateAPIAggregationCerts(c *Cluster, certificates map[string]pki.CertificatePKI) (map[string]pki.CertificatePKI, error) {
-	logrus.Debugf("[certificates] Regenerating Kubernetes API server aggregation layer requestheader client CA certificates")
-	requestHeaderCACrt, requestHeaderCAKey, err := pki.GenerateCACertAndKey(pki.RequestHeaderCACertName, nil)
-	if err != nil {
-		return nil, err
-	}
-	certificates[pki.RequestHeaderCACertName] = pki.ToCertObject(pki.RequestHeaderCACertName, "", "", requestHeaderCACrt, requestHeaderCAKey, nil)
-
-	//generate API server proxy client key and certs
-	logrus.Debugf("[certificates] Regenerating Kubernetes API server proxy client certificates")
-	apiserverProxyClientCrt, apiserverProxyClientKey, err := pki.GenerateSignedCertAndKey(requestHeaderCACrt, requestHeaderCAKey, true, pki.APIProxyClientCertName, nil, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	certificates[pki.APIProxyClientCertName] = pki.ToCertObject(pki.APIProxyClientCertName, "", "", apiserverProxyClientCrt, apiserverProxyClientKey, nil)
-	return certificates, nil
 }
 
 func RotateRKECertificates(ctx context.Context, c *Cluster, flags ExternalFlags, clusterState *FullState) error {

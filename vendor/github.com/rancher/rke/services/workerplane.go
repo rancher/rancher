@@ -7,7 +7,7 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/pki"
 	"github.com/rancher/rke/util"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -148,12 +148,4 @@ func doDeployWorkerPlane(ctx context.Context, host *hosts.Host,
 		return err
 	}
 	return runKubeproxy(ctx, host, localConnDialerFactory, prsMap, processMap[KubeproxyContainerName], alpineImage)
-}
-
-func copyProcessMap(m map[string]v3.Process) map[string]v3.Process {
-	c := make(map[string]v3.Process)
-	for k, v := range m {
-		c[k] = v
-	}
-	return c
 }
