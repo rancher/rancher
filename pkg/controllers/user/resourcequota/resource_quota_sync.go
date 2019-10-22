@@ -37,7 +37,6 @@ defined in namespace.resourceQuota
 type SyncController struct {
 	ProjectLister       v3.ProjectLister
 	Namespaces          v1.NamespaceInterface
-	NamespaceLister     v1.NamespaceLister
 	ResourceQuotas      v1.ResourceQuotaInterface
 	ResourceQuotaLister v1.ResourceQuotaLister
 	LimitRange          v1.LimitRangeInterface

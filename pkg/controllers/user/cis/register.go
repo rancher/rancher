@@ -20,7 +20,6 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 	mgmtContext := userContext.Management
 
 	userNSClient := userContext.Core.Namespaces(metav1.NamespaceAll)
-	mgmtProjClient := mgmtContext.Management.Projects(clusterName)
 	mgmtAppClient := mgmtContext.Project.Apps(metav1.NamespaceAll)
 	mgmtTemplateVersionLister := mgmtContext.Management.CatalogTemplateVersions(metav1.NamespaceAll).Controller().Lister()
 	systemAccountManager := systemaccount.NewManager(mgmtContext)
@@ -32,19 +31,14 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 
 	podHandler := &podHandler{
 		mgmtClusterScanClient,
-		mgmtClusterClient,
-		clusterLister,
-		userContext.ClusterName,
 	}
 
 	clusterScanHandler := &cisScanHandler{
 		mgmtCtxClusterClient:         mgmtClusterClient,
-		mgmtCtxProjClient:            mgmtProjClient,
 		mgmtCtxAppClient:             mgmtAppClient,
 		mgmtCtxTemplateVersionLister: mgmtTemplateVersionLister,
 		mgmtCtxClusterScanClient:     mgmtClusterScanClient,
 		systemAccountManager:         systemAccountManager,
-		userCtx:                      userContext,
 		clusterNamespace:             userContext.ClusterName,
 		userCtxNSClient:              userNSClient,
 		clusterLister:                clusterLister,

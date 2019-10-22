@@ -14,8 +14,6 @@ import (
 
 type ServicesController struct {
 	services           v1.ServiceInterface
-	serviceLister      v1.ServiceLister
-	podLister          v1.PodLister
 	workloadController workloadutil.CommonController
 	machinesLister     v3.NodeLister
 	clusterName        string

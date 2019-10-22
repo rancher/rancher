@@ -37,7 +37,6 @@ type HealthSyncer struct {
 	clusters          v3.ClusterInterface
 	componentStatuses corev1.ComponentStatusInterface
 	namespaces        corev1.NamespaceInterface
-	clusterManager    ClusterControllerLifecycle
 }
 
 func Register(ctx context.Context, workload *config.UserContext, clusterManager ClusterControllerLifecycle) {
@@ -48,7 +47,6 @@ func Register(ctx context.Context, workload *config.UserContext, clusterManager 
 		clusters:          workload.Management.Management.Clusters(""),
 		componentStatuses: workload.Core.ComponentStatuses(""),
 		namespaces:        workload.Core.Namespaces(""),
-		clusterManager:    clusterManager,
 	}
 
 	go h.syncHealth(ctx, syncInterval)

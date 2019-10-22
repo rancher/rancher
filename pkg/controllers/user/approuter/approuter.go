@@ -19,11 +19,9 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	secretLister := cluster.Management.Core.Secrets("").Controller().Lister()
 	workload := cluster.UserOnlyContext()
 	c := &Controller{
-		ingressInterface:       workload.Extensions.Ingresses(""),
-		ingressLister:          workload.Extensions.Ingresses("").Controller().Lister(),
-		dnsClient:              NewClient(secrets, secretLister, workload.ClusterName),
-		clusterName:            workload.ClusterName,
-		managementSecretLister: secretLister,
+		ingressInterface: workload.Extensions.Ingresses(""),
+		ingressLister:    workload.Extensions.Ingresses("").Controller().Lister(),
+		dnsClient:        NewClient(secrets, secretLister, workload.ClusterName),
 	}
 	workload.Extensions.Ingresses("").AddHandler(ctx, "approuterController", c.sync)
 	go c.renew(ctx)

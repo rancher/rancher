@@ -101,7 +101,6 @@ func Register(ctx context.Context, workload *config.UserContext) {
 
 	sync := &resourcequota.SyncController{
 		Namespaces:          workload.Core.Namespaces(""),
-		NamespaceLister:     workload.Core.Namespaces("").Controller().Lister(),
 		NsIndexer:           nsInformer.GetIndexer(),
 		ResourceQuotas:      workload.Core.ResourceQuotas(""),
 		ResourceQuotaLister: workload.Core.ResourceQuotas("").Controller().Lister(),

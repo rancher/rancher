@@ -7,7 +7,6 @@ import (
 
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
-	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	corev1 "k8s.io/api/core/v1"
@@ -20,16 +19,12 @@ const (
 )
 
 type ProviderSecretSyncer struct {
-	managementContext       *config.ManagementContext
 	globalDNSProviders      v3.GlobalDNSProviderInterface
-	secrets                 v1.SecretInterface
 	globalDNSProviderLister v3.GlobalDNSProviderLister
 }
 
 func newProviderSecretSyncer(ctx context.Context, mgmt *config.ManagementContext) *ProviderSecretSyncer {
 	n := &ProviderSecretSyncer{
-		managementContext:       mgmt,
-		secrets:                 mgmt.Core.Secrets(""),
 		globalDNSProviders:      mgmt.Management.GlobalDNSProviders(""),
 		globalDNSProviderLister: mgmt.Management.GlobalDNSProviders("").Controller().Lister(),
 	}

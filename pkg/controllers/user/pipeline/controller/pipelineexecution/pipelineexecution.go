@@ -126,24 +126,23 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 
 	pipelineEngine := engine.New(cluster, true)
 	pipelineExecutionLifecycle := &Lifecycle{
-		systemAccountManager: systemaccount.NewManager(cluster.Management),
-		namespaces:           namespaces,
-		namespaceLister:      namespaceLister,
-		secrets:              secrets,
-		managementSecrets:    managementSecrets,
-		services:             services,
-		serviceLister:        serviceLister,
-		serviceAccounts:      serviceAccounts,
-		networkPolicies:      networkPolicies,
-		clusterRoleBindings:  clusterRoleBindings,
-		roleBindings:         roleBindings,
-		deployments:          deployments,
-		daemonsets:           daemonsets,
-		pods:                 pods,
-		podLister:            podLister,
-		configMaps:           configMaps,
-		configMapLister:      configMapLister,
-
+		systemAccountManager:       systemaccount.NewManager(cluster.Management),
+		namespaces:                 namespaces,
+		namespaceLister:            namespaceLister,
+		secrets:                    secrets,
+		managementSecrets:          managementSecrets,
+		services:                   services,
+		serviceLister:              serviceLister,
+		serviceAccounts:            serviceAccounts,
+		networkPolicies:            networkPolicies,
+		clusterRoleBindings:        clusterRoleBindings,
+		roleBindings:               roleBindings,
+		deployments:                deployments,
+		daemonsets:                 daemonsets,
+		pods:                       pods,
+		podLister:                  podLister,
+		configMaps:                 configMaps,
+		configMapLister:            configMapLister,
 		pipelineLister:             pipelineLister,
 		pipelines:                  pipelines,
 		pipelineExecutionLister:    pipelineExecutionLister,
@@ -154,8 +153,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		notifierLister:             notifierLister,
 	}
 	stateSyncer := &ExecutionStateSyncer{
-		clusterName: clusterName,
-
+		clusterName:             clusterName,
 		pipelineLister:          pipelineLister,
 		pipelines:               pipelines,
 		pipelineExecutionLister: pipelineExecutionLister,
@@ -163,8 +161,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		pipelineEngine:          pipelineEngine,
 	}
 	registryCertSyncer := &RegistryCertSyncer{
-		clusterName: clusterName,
-
+		clusterName:             clusterName,
 		pods:                    pods,
 		podLister:               podLister,
 		secrets:                 secrets,

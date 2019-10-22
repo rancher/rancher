@@ -135,7 +135,7 @@ func (m *Manager) startController(r *record, controllers, clusterOwner bool) err
 		return nil
 	}
 	// Prior to k8s v1.14, we simply did a DiscoveryClient.Version() check to see if the user cluster is alive
-	// As of k8s v1.14, kubeapi returns a successfull version response even if etcd is not available.
+	// As of k8s v1.14, kubeapi returns a successful version response even if etcd is not available.
 	// To work around this, now we try to get a namespace from the API, even if not found, it means the API is up.
 	if _, err := r.cluster.K8sClient.CoreV1().Namespaces().Get("kube-system", v1.GetOptions{}); err != nil && !apierrors.IsNotFound(err) {
 		return errors.Wrapf(err, "failed to contact server")

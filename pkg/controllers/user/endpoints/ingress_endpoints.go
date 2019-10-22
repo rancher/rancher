@@ -5,7 +5,6 @@ import (
 
 	workloadutil "github.com/rancher/rancher/pkg/controllers/user/workload"
 	"github.com/rancher/types/apis/extensions/v1beta1"
-	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -14,9 +13,7 @@ import (
 type IngressEndpointsController struct {
 	workloadController workloadutil.CommonController
 	ingressInterface   v1beta1.IngressInterface
-	machinesLister     managementv3.NodeLister
 	isRKE              bool
-	clusterName        string
 }
 
 func (c *IngressEndpointsController) sync(key string, obj *extensionsv1beta1.Ingress) (runtime.Object, error) {
