@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
+	"github.com/rancher/rancher/pkg/controllers/management/rbac"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -122,7 +122,7 @@ func (a ActionHandler) newClusterTemplate(clusterTempName string, cluster *v3.Cl
 				"cattle.io/creator": "norman",
 			},
 			Annotations: map[string]string{
-				globalnamespacerbac.CreatorIDAnn: creatorID,
+				rbac.CreatorIDAnn: creatorID,
 			},
 		},
 		Spec: v3.ClusterTemplateSpec{
@@ -160,7 +160,7 @@ func (a ActionHandler) newClusterTemplateRevision(clusterTempRevisionName string
 				"io.cattle.field/clusterTemplateId": clusterTemplate.Name,
 			},
 			Annotations: map[string]string{
-				globalnamespacerbac.CreatorIDAnn: creatorID,
+				rbac.CreatorIDAnn: creatorID,
 			},
 		},
 		Spec: v3.ClusterTemplateRevisionSpec{
