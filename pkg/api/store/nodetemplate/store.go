@@ -6,6 +6,7 @@ import (
 
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
+	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
@@ -19,13 +20,37 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-type Store struct {
+type nodeTemplateStore struct {
 	types.Store
 	NodePoolLister        v3.NodePoolLister
 	CloudCredentialLister corev1.SecretLister
+	NodeTemplateClient    v3.NodeTemplateInterface
 }
 
-func (s *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
+func Wrap(store types.Store, npLister v3.NodePoolLister, secretLister corev1.SecretLister, ntClient v3.NodeTemplateInterface) types.Store {
+	s := &nodeTemplateStore{
+		Store:                 store,
+		NodePoolLister:        npLister,
+		CloudCredentialLister: secretLister,
+		NodeTemplateClient:    ntClient,
+	}
+	return &transform.Store{
+		Store:       s,
+		Transformer: s.filterLegacyTemplates,
+	}
+}
+
+func (s *nodeTemplateStore) filterLegacyTemplates(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error) {
+	ns, _ := data["namespaceId"].(string)
+	name, _ := data["name"].(string)
+	if ns != namespace.NodeTemplateGlobalNamespace {
+		s.NodeTemplateClient.Controller().Enqueue(ns, name)
+		return nil, nil
+	}
+	return data, nil
+}
+
+func (s *nodeTemplateStore) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
 	pools, err := s.NodePoolLister.List("", labels.Everything())
 	if err != nil {
 		return nil, err
@@ -38,21 +63,21 @@ func (s *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 	return s.Store.Delete(apiContext, schema, id)
 }
 
-func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
+func (s *nodeTemplateStore) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
 	if err := s.replaceCloudCredFields(apiContext, data); err != nil {
 		return data, err
 	}
 	return s.Store.Create(apiContext, schema, data)
 }
 
-func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
+func (s *nodeTemplateStore) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
 	if err := s.replaceCloudCredFields(apiContext, data); err != nil {
 		return data, err
 	}
 	return s.Store.Update(apiContext, schema, data, id)
 }
 
-func (s *Store) replaceCloudCredFields(apiContext *types.APIContext, data map[string]interface{}) error {
+func (s *nodeTemplateStore) replaceCloudCredFields(apiContext *types.APIContext, data map[string]interface{}) error {
 	credID := convert.ToString(values.GetValueN(data, "cloudCredentialId"))
 	if credID == "" {
 		return nil

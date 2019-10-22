@@ -23,6 +23,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/multiclusterapp"
 	"github.com/rancher/rancher/pkg/controllers/management/node"
 	"github.com/rancher/rancher/pkg/controllers/management/nodepool"
+	"github.com/rancher/rancher/pkg/controllers/management/nodetemplate"
 	"github.com/rancher/rancher/pkg/controllers/management/podsecuritypolicy"
 	"github.com/rancher/rancher/pkg/controllers/management/usercontrollers"
 	"github.com/rancher/types/config"
@@ -54,6 +55,7 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	globaldns.Register(ctx, management)
 	multiclusterapp.Register(ctx, management, manager)
 	clustertemplate.Register(ctx, management)
+	nodetemplate.Register(ctx, management)
 
 	// Register last
 	auth.RegisterLate(ctx, management)

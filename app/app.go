@@ -198,7 +198,7 @@ func addData(management *config.ManagementContext, cfg Config) error {
 		return err
 	}
 
-	if err := addCattleGlobalNamespace(management); err != nil {
+	if err := addCattleGlobalNamespaces(management); err != nil {
 		return err
 	}
 
