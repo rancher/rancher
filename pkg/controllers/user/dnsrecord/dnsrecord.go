@@ -38,7 +38,6 @@ type Controller struct {
 	services          v1.ServiceInterface
 	serviceController v1.ServiceController
 	endpointLister    v1.EndpointsLister
-	namespaceLister   v1.NamespaceLister
 	serviceLister     v1.ServiceLister
 }
 
@@ -56,7 +55,6 @@ func Register(ctx context.Context, workload *config.UserOnlyContext) {
 		services:          workload.Core.Services(""),
 		serviceController: workload.Core.Services("").Controller(),
 		endpointLister:    workload.Core.Endpoints("").Controller().Lister(),
-		namespaceLister:   workload.Core.Namespaces("").Controller().Lister(),
 		serviceLister:     workload.Core.Services("").Controller().Lister(),
 	}
 

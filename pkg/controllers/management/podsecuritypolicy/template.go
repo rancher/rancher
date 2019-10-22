@@ -22,9 +22,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	psptpbInformer.AddIndexers(psptpbIndexers)
 
 	lifecycle := &lifecycle{
-		psptpbs:      management.Management.PodSecurityPolicyTemplateProjectBindings(""),
-		psptpbLister: management.Management.PodSecurityPolicyTemplateProjectBindings("").Controller().Lister(),
-
+		psptpbs:       management.Management.PodSecurityPolicyTemplateProjectBindings(""),
 		psptpbIndexer: psptpbInformer.GetIndexer(),
 	}
 
@@ -32,9 +30,7 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 }
 
 type lifecycle struct {
-	psptpbs      v3.PodSecurityPolicyTemplateProjectBindingInterface
-	psptpbLister v3.PodSecurityPolicyTemplateProjectBindingLister
-
+	psptpbs       v3.PodSecurityPolicyTemplateProjectBindingInterface
 	psptpbIndexer cache.Indexer
 }
 

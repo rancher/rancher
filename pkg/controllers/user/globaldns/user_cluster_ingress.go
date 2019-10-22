@@ -6,10 +6,7 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/namespace"
-	v1Rancher "github.com/rancher/types/apis/core/v1"
-	v1beta1Rancher "github.com/rancher/types/apis/extensions/v1beta1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -28,22 +25,16 @@ const (
 )
 
 type UserIngressController struct {
-	ingressLister         v1beta1Rancher.IngressLister
 	globalDNSs            v3.GlobalDNSInterface
 	globalDNSLister       v3.GlobalDNSLister
-	appLister             projectv3.AppLister
-	namespaceLister       v1Rancher.NamespaceLister
 	multiclusterappLister v3.MultiClusterAppLister
 	clusterName           string
 }
 
 func newUserIngressController(ctx context.Context, clusterContext *config.UserContext) *UserIngressController {
 	n := &UserIngressController{
-		ingressLister:         clusterContext.Extensions.Ingresses("").Controller().Lister(),
 		globalDNSs:            clusterContext.Management.Management.GlobalDNSs(""),
 		globalDNSLister:       clusterContext.Management.Management.GlobalDNSs("").Controller().Lister(),
-		appLister:             clusterContext.Management.Project.Apps("").Controller().Lister(),
-		namespaceLister:       clusterContext.Core.Namespaces("").Controller().Lister(),
 		multiclusterappLister: clusterContext.Management.Management.MultiClusterApps("").Controller().Lister(),
 		clusterName:           clusterContext.ClusterName,
 	}

@@ -11,7 +11,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/ticker"
-	v1 "github.com/rancher/types/apis/core/v1"
 	"github.com/rancher/types/apis/extensions/v1beta1"
 	"github.com/sirupsen/logrus"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -30,12 +29,10 @@ var (
 )
 
 type Controller struct {
-	ctx                    context.Context
-	ingressInterface       v1beta1.IngressInterface
-	ingressLister          v1beta1.IngressLister
-	managementSecretLister v1.SecretLister
-	clusterName            string
-	dnsClient              *Client
+	ctx              context.Context
+	ingressInterface v1beta1.IngressInterface
+	ingressLister    v1beta1.IngressLister
+	dnsClient        *Client
 }
 
 func isGeneratedDomain(obj *extensionsv1beta1.Ingress, host, domain string) bool {

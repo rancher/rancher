@@ -10,23 +10,21 @@ import (
 )
 
 type appHandler struct {
-	cattleAppClient             projectv3.AppInterface
-	cattleSecretClient          corev1.SecretInterface
-	cattleTemplateVersionClient mgmtv3.CatalogTemplateVersionInterface
-	cattleProjectClient         mgmtv3.ProjectInterface
-	cattleClusterGraphClient    mgmtv3.ClusterMonitorGraphInterface
-	cattleProjectGraphClient    mgmtv3.ProjectMonitorGraphInterface
-	cattleMonitorMetricClient   mgmtv3.MonitorMetricInterface
-	agentDeploymentClient       appsv1.DeploymentInterface
-	agentStatefulSetClient      appsv1.StatefulSetInterface
-	agentDaemonSetClient        appsv1.DaemonSetInterface
-	agentServiceAccountClient   corev1.ServiceAccountInterface
-	agentSecretClient           corev1.SecretInterface
-	agentNodeClient             corev1.NodeInterface
-	agentNamespaceClient        corev1.NamespaceInterface
-	systemAccountManager        *systemaccount.Manager
-	projectLister               mgmtv3.ProjectLister
-	catalogTemplateLister       mgmtv3.CatalogTemplateLister
+	cattleAppClient           projectv3.AppInterface
+	cattleSecretClient        corev1.SecretInterface
+	cattleProjectClient       mgmtv3.ProjectInterface
+	cattleClusterGraphClient  mgmtv3.ClusterMonitorGraphInterface
+	cattleProjectGraphClient  mgmtv3.ProjectMonitorGraphInterface
+	cattleMonitorMetricClient mgmtv3.MonitorMetricInterface
+	agentDeploymentClient     appsv1.DeploymentInterface
+	agentStatefulSetClient    appsv1.StatefulSetInterface
+	agentServiceAccountClient corev1.ServiceAccountInterface
+	agentSecretClient         corev1.SecretInterface
+	agentNodeClient           corev1.NodeInterface
+	agentNamespaceClient      corev1.NamespaceInterface
+	systemAccountManager      *systemaccount.Manager
+	projectLister             mgmtv3.ProjectLister
+	catalogTemplateLister     mgmtv3.CatalogTemplateLister
 }
 
 func (ah *appHandler) withdrawApp(clusterID, appName, appTargetNamespace string) error {

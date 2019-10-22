@@ -44,8 +44,6 @@ func Register(ctx context.Context, workload *config.UserContext) {
 
 	s := &ServicesController{
 		services:           workload.Core.Services(""),
-		serviceLister:      workload.Core.Services("").Controller().Lister(),
-		podLister:          workload.Core.Pods("").Controller().Lister(),
 		workloadController: workloadUtil.NewWorkloadController(ctx, workload.UserOnlyContext(), nil),
 		machinesLister:     workload.Management.Management.Nodes(workload.ClusterName).Controller().Lister(),
 		clusterName:        workload.ClusterName,
@@ -72,9 +70,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	i := &IngressEndpointsController{
 		workloadController: workloadUtil.NewWorkloadController(ctx, workload.UserOnlyContext(), nil),
 		ingressInterface:   workload.Extensions.Ingresses(""),
-		machinesLister:     workload.Management.Management.Nodes(workload.ClusterName).Controller().Lister(),
 		isRKE:              isRKE,
-		clusterName:        workload.ClusterName,
 	}
 	workload.Extensions.Ingresses("").AddHandler(ctx, "ingressEndpointsController", i.sync)
 }

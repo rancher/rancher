@@ -23,23 +23,21 @@ func Register(ctx context.Context, agentContext *config.UserContext) {
 
 	// app handler
 	ah := &appHandler{
-		cattleAppClient:             cattleContext.Project.Apps(metav1.NamespaceAll),
-		cattleProjectClient:         cattleProjectsClient,
-		cattleSecretClient:          cattleContext.Core.Secrets(metav1.NamespaceAll),
-		cattleTemplateVersionClient: mgmtContext.CatalogTemplateVersions(metav1.NamespaceAll),
-		cattleClusterGraphClient:    mgmtContext.ClusterMonitorGraphs(metav1.NamespaceAll),
-		cattleProjectGraphClient:    mgmtContext.ProjectMonitorGraphs(metav1.NamespaceAll),
-		cattleMonitorMetricClient:   mgmtContext.MonitorMetrics(metav1.NamespaceAll),
-		agentDeploymentClient:       agentContext.Apps.Deployments(metav1.NamespaceAll),
-		agentDaemonSetClient:        agentContext.Apps.DaemonSets(metav1.NamespaceAll),
-		agentStatefulSetClient:      agentContext.Apps.StatefulSets(metav1.NamespaceAll),
-		agentServiceAccountClient:   agentContext.Core.ServiceAccounts(metav1.NamespaceAll),
-		agentSecretClient:           agentContext.Core.Secrets(metav1.NamespaceAll),
-		agentNodeClient:             agentContext.Core.Nodes(metav1.NamespaceAll),
-		agentNamespaceClient:        agentContext.Core.Namespaces(metav1.NamespaceAll),
-		systemAccountManager:        systemaccount.NewManager(agentContext.Management),
-		projectLister:               mgmtContext.Projects(metav1.NamespaceAll).Controller().Lister(),
-		catalogTemplateLister:       mgmtContext.CatalogTemplates(metav1.NamespaceAll).Controller().Lister(),
+		cattleAppClient:           cattleContext.Project.Apps(metav1.NamespaceAll),
+		cattleProjectClient:       cattleProjectsClient,
+		cattleSecretClient:        cattleContext.Core.Secrets(metav1.NamespaceAll),
+		cattleClusterGraphClient:  mgmtContext.ClusterMonitorGraphs(metav1.NamespaceAll),
+		cattleProjectGraphClient:  mgmtContext.ProjectMonitorGraphs(metav1.NamespaceAll),
+		cattleMonitorMetricClient: mgmtContext.MonitorMetrics(metav1.NamespaceAll),
+		agentDeploymentClient:     agentContext.Apps.Deployments(metav1.NamespaceAll),
+		agentStatefulSetClient:    agentContext.Apps.StatefulSets(metav1.NamespaceAll),
+		agentServiceAccountClient: agentContext.Core.ServiceAccounts(metav1.NamespaceAll),
+		agentSecretClient:         agentContext.Core.Secrets(metav1.NamespaceAll),
+		agentNodeClient:           agentContext.Core.Nodes(metav1.NamespaceAll),
+		agentNamespaceClient:      agentContext.Core.Namespaces(metav1.NamespaceAll),
+		systemAccountManager:      systemaccount.NewManager(agentContext.Management),
+		projectLister:             mgmtContext.Projects(metav1.NamespaceAll).Controller().Lister(),
+		catalogTemplateLister:     mgmtContext.CatalogTemplates(metav1.NamespaceAll).Controller().Lister(),
 	}
 
 	// operator handler

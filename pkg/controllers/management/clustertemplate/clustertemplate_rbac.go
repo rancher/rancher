@@ -23,7 +23,6 @@ const (
 
 type clusterTemplateController struct {
 	clusterTemplates              v3.ClusterTemplateInterface
-	clusterTemplateLister         v3.ClusterTemplateLister
 	clusterTemplateRevisionLister v3.ClusterTemplateRevisionLister
 	managementContext             *config.ManagementContext
 }
@@ -39,7 +38,6 @@ func registerRbacControllers(ctx context.Context, mgmt *config.ManagementContext
 	ct := clusterTemplateController{
 		managementContext:             mgmt,
 		clusterTemplates:              mgmt.Management.ClusterTemplates(""),
-		clusterTemplateLister:         mgmt.Management.ClusterTemplates("").Controller().Lister(),
 		clusterTemplateRevisionLister: mgmt.Management.ClusterTemplateRevisions("").Controller().Lister(),
 	}
 	ct.clusterTemplates.AddHandler(ctx, "cluster-template-rbac-controller", ct.sync)

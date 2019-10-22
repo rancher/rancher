@@ -31,22 +31,14 @@ const (
 )
 
 type GDController struct {
-	globalDNSs        v3.GlobalDNSInterface
-	globalDNSLister   v3.GlobalDNSLister
 	ingresses         clientv1beta1.IngressInterface //need to use client-go IngressInterface to update Ingress.Status field
 	managementContext *config.ManagementContext
-	prtbLister        v3.ProjectRoleTemplateBindingLister
-	rtLister          v3.RoleTemplateLister
 }
 
 func newGlobalDNSController(ctx context.Context, mgmt *config.ManagementContext) *GDController {
 	n := &GDController{
-		globalDNSs:        mgmt.Management.GlobalDNSs(namespace.GlobalNamespace),
-		globalDNSLister:   mgmt.Management.GlobalDNSs(namespace.GlobalNamespace).Controller().Lister(),
 		ingresses:         mgmt.K8sClient.ExtensionsV1beta1().Ingresses(namespace.GlobalNamespace),
 		managementContext: mgmt,
-		prtbLister:        mgmt.Management.ProjectRoleTemplateBindings("").Controller().Lister(),
-		rtLister:          mgmt.Management.RoleTemplates("").Controller().Lister(),
 	}
 	return n
 }

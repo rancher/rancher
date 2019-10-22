@@ -30,7 +30,6 @@ type MCAppController struct {
 	crtbs                         v3.ClusterRoleTemplateBindingInterface
 	crtbLister                    v3.ClusterRoleTemplateBindingLister
 	rtLister                      v3.RoleTemplateLister
-	gDNSs                         v3.GlobalDNSInterface
 	users                         v3.UserInterface
 	userManager                   user.Manager
 }
@@ -63,7 +62,6 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 		crtbs:                         management.Management.ClusterRoleTemplateBindings(""),
 		crtbLister:                    management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
 		rtLister:                      management.Management.RoleTemplates("").Controller().Lister(),
-		gDNSs:                         management.Management.GlobalDNSs(""),
 		userManager:                   management.UserManager,
 		users:                         management.Management.Users(""),
 	}

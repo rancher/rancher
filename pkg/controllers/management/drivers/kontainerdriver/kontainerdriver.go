@@ -32,24 +32,20 @@ var kontainerDriverName = regexp.MustCompile("kontainer-engine-driver-(.+)$")
 
 func Register(ctx context.Context, management *config.ManagementContext) {
 	lifecycle := &Lifecycle{
-		dynamicSchemas:        management.Management.DynamicSchemas(""),
-		dynamicSchemasLister:  management.Management.DynamicSchemas("").Controller().Lister(),
-		namespaces:            management.Core.Namespaces(""),
-		coreV1:                management.Core,
-		kontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
-		kontainerDrivers:      management.Management.KontainerDrivers(""),
+		dynamicSchemas:       management.Management.DynamicSchemas(""),
+		dynamicSchemasLister: management.Management.DynamicSchemas("").Controller().Lister(),
+		namespaces:           management.Core.Namespaces(""),
+		coreV1:               management.Core,
 	}
 
 	management.Management.KontainerDrivers("").AddLifecycle(ctx, "mgmt-kontainer-driver-lifecycle", lifecycle)
 }
 
 type Lifecycle struct {
-	dynamicSchemas        v3.DynamicSchemaInterface
-	dynamicSchemasLister  v3.DynamicSchemaLister
-	namespaces            v1.NamespaceInterface
-	coreV1                corev1.Interface
-	kontainerDriverLister v3.KontainerDriverLister
-	kontainerDrivers      v3.KontainerDriverInterface
+	dynamicSchemas       v3.DynamicSchemaInterface
+	dynamicSchemasLister v3.DynamicSchemaLister
+	namespaces           v1.NamespaceInterface
+	coreV1               corev1.Interface
 }
 
 func (l *Lifecycle) Create(obj *v3.KontainerDriver) (runtime.Object, error) {

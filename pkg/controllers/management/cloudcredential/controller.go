@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
-	corev1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	v1 "k8s.io/api/core/v1"
@@ -15,17 +14,14 @@ import (
 )
 
 type Controller struct {
-	cloudCredentials  corev1.SecretInterface
 	managementContext *config.ManagementContext
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
-	cloudCredentials := management.Core.Secrets("")
 	m := Controller{
-		cloudCredentials:  cloudCredentials,
 		managementContext: management,
 	}
-	m.cloudCredentials.AddHandler(ctx, "management-cloudcredential-controller", m.ccSync)
+	management.Core.Secrets("").AddHandler(ctx, "management-cloudcredential-controller", m.ccSync)
 }
 
 func (n *Controller) ccSync(key string, cloudCredential *v1.Secret) (runtime.Object, error) {

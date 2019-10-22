@@ -18,19 +18,16 @@ import (
 // webhook management in source code providers.
 
 type Lifecycle struct {
-	clusterName                string
 	sourceCodeCredentialLister v3.SourceCodeCredentialLister
 	sourceCodeCredentials      v3.SourceCodeCredentialInterface
 }
 
 func Register(ctx context.Context, cluster *config.UserContext) {
-	clusterName := cluster.ClusterName
 	pipelines := cluster.Management.Project.Pipelines("")
 	sourceCodeCredentials := cluster.Management.Project.SourceCodeCredentials("")
 	sourceCodeCredentialLister := sourceCodeCredentials.Controller().Lister()
 
 	pipelineLifecycle := &Lifecycle{
-		clusterName:                clusterName,
 		sourceCodeCredentialLister: sourceCodeCredentialLister,
 		sourceCodeCredentials:      sourceCodeCredentials,
 	}

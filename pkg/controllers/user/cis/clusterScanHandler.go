@@ -10,7 +10,6 @@ import (
 	rcorev1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projv3 "github.com/rancher/types/apis/project.cattle.io/v3"
-	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,11 +20,9 @@ type cisScanHandler struct {
 	clusterLister                v3.ClusterLister
 	projectLister                v3.ProjectLister
 	mgmtCtxClusterClient         v3.ClusterInterface
-	mgmtCtxProjClient            v3.ProjectInterface
 	mgmtCtxAppClient             projv3.AppInterface
 	mgmtCtxTemplateVersionLister v3.CatalogTemplateVersionLister
 	mgmtCtxClusterScanClient     v3.ClusterScanInterface
-	userCtx                      *config.UserContext
 	userCtxNSClient              rcorev1.NamespaceInterface
 	clusterNamespace             string
 	systemAccountManager         *systemaccount.Manager

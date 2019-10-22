@@ -21,7 +21,6 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	nsInformer.AddIndexers(nsIndexers)
 	sync := &SyncController{
 		Namespaces:          cluster.Core.Namespaces(""),
-		NamespaceLister:     cluster.Core.Namespaces("").Controller().Lister(),
 		NsIndexer:           nsInformer.GetIndexer(),
 		ResourceQuotas:      cluster.Core.ResourceQuotas(""),
 		ResourceQuotaLister: cluster.Core.ResourceQuotas("").Controller().Lister(),

@@ -34,35 +34,29 @@ const (
 var workloadServiceUUIDToWorkloadIDs sync.Map
 
 type Controller struct {
-	pods            v1.PodInterface
-	workloadLister  util.CommonController
-	podLister       v1.PodLister
-	namespaceLister v1.NamespaceLister
-	serviceLister   v1.ServiceLister
-	services        v1.ServiceInterface
+	pods           v1.PodInterface
+	workloadLister util.CommonController
+	podLister      v1.PodLister
+	services       v1.ServiceInterface
 }
 
 type PodController struct {
 	pods           v1.PodInterface
 	workloadLister util.CommonController
 	serviceLister  v1.ServiceLister
-	services       v1.ServiceInterface
 }
 
 func Register(ctx context.Context, workload *config.UserOnlyContext) {
 	c := &Controller{
-		pods:            workload.Core.Pods(""),
-		workloadLister:  util.NewWorkloadController(ctx, workload, nil),
-		podLister:       workload.Core.Pods("").Controller().Lister(),
-		namespaceLister: workload.Core.Namespaces("").Controller().Lister(),
-		serviceLister:   workload.Core.Services("").Controller().Lister(),
-		services:        workload.Core.Services(""),
+		pods:           workload.Core.Pods(""),
+		workloadLister: util.NewWorkloadController(ctx, workload, nil),
+		podLister:      workload.Core.Pods("").Controller().Lister(),
+		services:       workload.Core.Services(""),
 	}
 	p := &PodController{
 		workloadLister: util.NewWorkloadController(ctx, workload, nil),
 		pods:           workload.Core.Pods(""),
 		serviceLister:  workload.Core.Services("").Controller().Lister(),
-		services:       workload.Core.Services(""),
 	}
 	workload.Core.Services("").AddHandler(ctx, "workloadServiceController", c.sync)
 	workload.Core.Pods("").AddHandler(ctx, "podToWorkloadServiceController", p.sync)

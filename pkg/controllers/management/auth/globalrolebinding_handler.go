@@ -34,24 +34,20 @@ const (
 
 func newGlobalRoleBindingLifecycle(management *config.ManagementContext) *globalRoleBindingLifecycle {
 	return &globalRoleBindingLifecycle{
-		crbLister:         management.RBAC.ClusterRoleBindings("").Controller().Lister(),
-		crbClient:         management.RBAC.ClusterRoleBindings(""),
-		grLister:          management.Management.GlobalRoles("").Controller().Lister(),
-		roles:             management.RBAC.Roles(""),
-		roleLister:        management.RBAC.Roles("").Controller().Lister(),
-		roleBindings:      management.RBAC.RoleBindings(""),
-		roleBindingLister: management.RBAC.RoleBindings("").Controller().Lister(),
+		crbLister:    management.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		crbClient:    management.RBAC.ClusterRoleBindings(""),
+		grLister:     management.Management.GlobalRoles("").Controller().Lister(),
+		roles:        management.RBAC.Roles(""),
+		roleBindings: management.RBAC.RoleBindings(""),
 	}
 }
 
 type globalRoleBindingLifecycle struct {
-	crbLister         rbacv1.ClusterRoleBindingLister
-	grLister          v3.GlobalRoleLister
-	crbClient         rbacv1.ClusterRoleBindingInterface
-	roles             rbacv1.RoleInterface
-	roleLister        rbacv1.RoleLister
-	roleBindings      rbacv1.RoleBindingInterface
-	roleBindingLister rbacv1.RoleBindingLister
+	crbLister    rbacv1.ClusterRoleBindingLister
+	grLister     v3.GlobalRoleLister
+	crbClient    rbacv1.ClusterRoleBindingInterface
+	roles        rbacv1.RoleInterface
+	roleBindings rbacv1.RoleBindingInterface
 }
 
 func (grb *globalRoleBindingLifecycle) Create(obj *v3.GlobalRoleBinding) (runtime.Object, error) {

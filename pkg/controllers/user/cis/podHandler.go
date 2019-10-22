@@ -13,9 +13,6 @@ import (
 
 type podHandler struct {
 	mgmtCtxClusterScanClient v3.ClusterScanInterface
-	clusterClient            v3.ClusterInterface
-	clusterLister            v3.ClusterLister
-	clusterNamespace         string
 }
 
 func (ph *podHandler) Sync(key string, pod *corev1.Pod) (runtime.Object, error) {

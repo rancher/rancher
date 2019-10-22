@@ -39,7 +39,7 @@ const (
 
 var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/default-project": "true"})
 var systemProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/system-project": "true"})
-var crtbCeatorOwnerAnnotations = map[string]string{creatorOwnerBindingAnnotation: "true"}
+var crtbCreatorOwnerAnnotations = map[string]string{creatorOwnerBindingAnnotation: "true"}
 
 var defaultProjects = map[string]bool{
 	project.Default: true,
@@ -57,7 +57,6 @@ func newPandCLifecycles(management *config.ManagementContext) (*projectLifecycle
 		crtbClient:           management.Management.ClusterRoleTemplateBindings(""),
 		projectLister:        management.Management.Projects("").Controller().Lister(),
 		roleTemplateLister:   management.Management.RoleTemplates("").Controller().Lister(),
-		clusterRoleClient:    management.RBAC.ClusterRoles(""),
 		systemAccountManager: systemaccount.NewManager(management),
 	}
 	p := &projectLifecycle{
@@ -418,7 +417,7 @@ func (m *mgr) reconcileCreatorRTB(obj runtime.Object) (runtime.Object, error) {
 					Name:      rtbName,
 					Namespace: metaAccessor.GetName(),
 				}
-				om.Annotations = crtbCeatorOwnerAnnotations
+				om.Annotations = crtbCreatorOwnerAnnotations
 
 				logrus.Infof("[%v] Creating creator clusterRoleTemplateBinding for user %v for cluster %v", projectCreateController, creatorID, metaAccessor.GetName())
 				if _, err := m.mgmt.Management.ClusterRoleTemplateBindings(metaAccessor.GetName()).Create(&v3.ClusterRoleTemplateBinding{

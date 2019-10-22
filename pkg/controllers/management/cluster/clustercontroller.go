@@ -31,7 +31,6 @@ const (
 
 type controller struct {
 	clusterClient         v3.ClusterInterface
-	clusterLister         v3.ClusterLister
 	nodeLister            v3.NodeLister
 	kontainerDriverLister v3.KontainerDriverLister
 	namespaces            v1.NamespaceInterface
@@ -41,7 +40,6 @@ type controller struct {
 func Register(ctx context.Context, management *config.ManagementContext) {
 	c := controller{
 		clusterClient:         management.Management.Clusters(""),
-		clusterLister:         management.Management.Clusters("").Controller().Lister(),
 		nodeLister:            management.Management.Nodes("").Controller().Lister(),
 		kontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
 		namespaces:            management.Core.Namespaces(""),

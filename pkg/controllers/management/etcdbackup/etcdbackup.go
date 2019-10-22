@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
 	"github.com/rancher/rancher/pkg/ticker"
-	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -42,7 +41,6 @@ type Controller struct {
 	backupClient          v3.EtcdBackupInterface
 	backupLister          v3.EtcdBackupLister
 	backupDriver          *service.EngineService
-	secretsClient         v1.SecretInterface
 	KontainerDriverLister v3.KontainerDriverLister
 }
 
@@ -54,7 +52,6 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		backupClient:          management.Management.EtcdBackups(""),
 		backupLister:          management.Management.EtcdBackups("").Controller().Lister(),
 		backupDriver:          service.NewEngineService(clusterprovisioner.NewPersistentStore(management.Core.Namespaces(""), management.Core)),
-		secretsClient:         management.Core.Secrets(""),
 		KontainerDriverLister: management.Management.KontainerDrivers("").Controller().Lister(),
 	}
 
