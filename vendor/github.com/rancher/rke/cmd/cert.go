@@ -126,10 +126,6 @@ func generateCSRFromCli(ctx *cli.Context) error {
 	return GenerateRKECSRs(context.Background(), rkeConfig, externalFlags)
 }
 
-func showRKECertificatesFromCli(ctx *cli.Context) error {
-	return nil
-}
-
 func rebuildClusterWithRotatedCertificates(ctx context.Context,
 	dialersOptions hosts.DialersOptions,
 	flags cluster.ExternalFlags, svcOptionData map[string]*v3.KubernetesServicesOptions) (string, string, string, string, map[string]pki.CertificatePKI, error) {

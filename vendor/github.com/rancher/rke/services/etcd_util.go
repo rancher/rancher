@@ -140,8 +140,5 @@ func getEtcdTLSConfig(certificate, key []byte) (*tls.Config, error) {
 		InsecureSkipVerify: true,
 		Certificates:       []tls.Certificate{x509Pair},
 	}
-	if err != nil {
-		return nil, err
-	}
 	return tlsConfig, nil
 }

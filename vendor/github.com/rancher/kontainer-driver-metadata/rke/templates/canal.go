@@ -1508,6 +1508,9 @@ spec:
             # Use Kubernetes API as the backing datastore.
             - name: DATASTORE_TYPE
               value: "kubernetes"
+            # Configure route aggregation based on pod CIDR.
+            - name: USE_POD_CIDR
+              value: "true"
             # Wait for the datastore.
             - name: WAIT_FOR_DATASTORE
               value: "true"
@@ -1656,6 +1659,8 @@ metadata:
 # Create all the CustomResourceDefinitions needed for
 # Calico policy and networking mode.
 
+---
+# Source: calico/templates/kdd-crds.yaml
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
@@ -1772,6 +1777,21 @@ spec:
     kind: NetworkPolicy
     plural: networkpolicies
     singular: networkpolicy
+
+---
+
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: networksets.crd.projectcalico.org
+spec:
+  scope: Namespaced
+  group: crd.projectcalico.org
+  version: v1
+  names:
+    kind: NetworkSet
+    plural: networksets
+    singular: networkset
 `
 
 const CanalTemplateV116 = `
@@ -2279,9 +2299,15 @@ spec:
             # Disable IPv6 on Kubernetes.
             - name: FELIX_IPV6SUPPORT
               value: "false"
-            # Set Felix logging to "info"
+            # Disable felix logging to file
+            - name: FELIX_LOGFILEPATH
+              value: "none"
+            # Disable felix logging for syslog
+            - name: FELIX_LOGSEVERITYSYS
+              value: ""
+            # Enable felix logging to stdout
             - name: FELIX_LOGSEVERITYSCREEN
-              value: "info"
+              value: "Warning"
             - name: FELIX_HEALTHENABLED
               value: "true"
           securityContext:
