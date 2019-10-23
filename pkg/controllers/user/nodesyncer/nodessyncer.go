@@ -670,21 +670,13 @@ func (m *nodesSyncer) getNonTerminatedPods() (map[string][]*corev1.Pod, error) {
 
 func aggregateRequestAndLimitsForNode(pods []*corev1.Pod) (map[corev1.ResourceName]resource.Quantity, map[corev1.ResourceName]resource.Quantity) {
 	requests, limits := map[corev1.ResourceName]resource.Quantity{}, map[corev1.ResourceName]resource.Quantity{}
-	podsData := make(map[string]map[string]map[corev1.ResourceName]resource.Quantity)
-	if pods != nil {
-		//podName -> req/limit -> data
-		for _, pod := range pods {
-			podsData[pod.Name] = make(map[string]map[corev1.ResourceName]resource.Quantity)
-			requests, limits := getPodData(pod)
-			podsData[pod.Name]["requests"] = requests
-			podsData[pod.Name]["limits"] = limits
-		}
-		requests[corev1.ResourcePods] = *resource.NewQuantity(int64(len(pods)), resource.DecimalSI)
-	}
-	for _, podData := range podsData {
-		podRequests, podLimits := podData["requests"], podData["limits"]
+	for _, pod := range pods {
+		podRequests, podLimits := getPodData(pod)
 		addMap(podRequests, requests)
 		addMap(podLimits, limits)
+	}
+	if pods != nil {
+		requests[corev1.ResourcePods] = *resource.NewQuantity(int64(len(pods)), resource.DecimalSI)
 	}
 	return requests, limits
 }
