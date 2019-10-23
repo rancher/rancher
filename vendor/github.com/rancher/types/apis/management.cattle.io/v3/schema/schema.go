@@ -109,12 +109,13 @@ func catalogTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Embed{Field: "status"},
 			&m.Drop{Field: "helmVersionCommits"},
 		).
+		MustImport(&Version, v3.CatalogRefresh{}).
 		MustImportAndCustomize(&Version, v3.Catalog{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
-				"refresh": {},
+				"refresh": {Output: "catalogRefresh"},
 			}
 			schema.CollectionActions = map[string]types.Action{
-				"refresh": {},
+				"refresh": {Output: "catalogRefresh"},
 			}
 		}).
 		AddMapperForType(&Version, v3.Template{},
@@ -726,10 +727,10 @@ func projectCatalogTypes(schemas *types.Schemas) *types.Schemas {
 			&mapper.NamespaceIDMapper{}).
 		MustImportAndCustomize(&Version, v3.ProjectCatalog{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
-				"refresh": {},
+				"refresh": {Output: "catalogRefresh"},
 			}
 			schema.CollectionActions = map[string]types.Action{
-				"refresh": {},
+				"refresh": {Output: "catalogRefresh"},
 			}
 		})
 }
@@ -743,10 +744,10 @@ func clusterCatalogTypes(schemas *types.Schemas) *types.Schemas {
 			&mapper.NamespaceIDMapper{}).
 		MustImportAndCustomize(&Version, v3.ClusterCatalog{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
-				"refresh": {},
+				"refresh": {Output: "catalogRefresh"},
 			}
 			schema.CollectionActions = map[string]types.Action{
-				"refresh": {},
+				"refresh": {Output: "catalogRefresh"},
 			}
 		})
 }

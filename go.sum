@@ -357,7 +357,7 @@ github.com/gorilla/websocket v1.4.1/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/ad
 github.com/gregjones/httpcache v0.0.0-20170728041850-787624de3eb7/go.mod h1:FecbI9+v66THATjSRHfNgh1IVFe/9kFxbXtjV0ctIMA=
 github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7/go.mod h1:FecbI9+v66THATjSRHfNgh1IVFe/9kFxbXtjV0ctIMA=
 github.com/grpc-ecosystem/go-grpc-middleware v0.0.0-20190222133341-cfaf5686ec79/go.mod h1:FiyG127CGDf3tlThmgyCl78X/SZQqEOJBCDaAfeWzPs=
-github.com/grpc-ecosystem/go-grpc-middleware v1.0.0 h1:Iju5GlWwrvL6UBg4zJJt3btmonfrMlCDdsejg4CZE7c=
+github.com/grpc-ecosystem/go-grpc-middleware v1.0.0 h1:BWIsLfhgKhV5g/oF34aRjniBHLTZe5DNekSjbAjIS6c=
 github.com/grpc-ecosystem/go-grpc-middleware v1.0.0/go.mod h1:FiyG127CGDf3tlThmgyCl78X/SZQqEOJBCDaAfeWzPs=
 github.com/grpc-ecosystem/go-grpc-prometheus v0.0.0-20181025070259-68e3a13e4117/go.mod h1:8NvIoxWQoOIhqOTXgfV/d3M/q6VIi02HzZEHgUlZvzk=
 github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 h1:Ovs26xHkKqVztRpIrF/92BcuyuQ/YW4NSIpoGtfXNho=
@@ -628,8 +628,8 @@ github.com/rancher/types v0.0.0-20190930165650-6bbedae77a35 h1:8ocmE+9FUB0EuOZ7H
 github.com/rancher/types v0.0.0-20190930165650-6bbedae77a35/go.mod h1:I0hSpsw/ZvWuOOvhiExji5IIkeQtmn4IvFcn7nbjhrk=
 github.com/rancher/types v0.0.0-20191003184925-ab3403a2c8ca h1:nr7M7Gdk1mFnTiF5c6mXuKK5T+VFuxMO1AxoAK2bI7Y=
 github.com/rancher/types v0.0.0-20191003184925-ab3403a2c8ca/go.mod h1:3k1KigFfdRBJhiE8EXTpoM0aPXAFuYuGxKtU93oNxAY=
-github.com/rancher/types v0.0.0-20191017035452-5500a3772434 h1:lwHwzKussCiPs7kZGu4rxwbIElY6mhTXD7Naa3oV6rg=
-github.com/rancher/types v0.0.0-20191017035452-5500a3772434/go.mod h1:3k1KigFfdRBJhiE8EXTpoM0aPXAFuYuGxKtU93oNxAY=
+github.com/rancher/types v0.0.0-20191023170600-1563e7864c02 h1:KUkhl//mPmHN0wYGH+KjN+hFqhtNqraHLv4wcmdE6d0=
+github.com/rancher/types v0.0.0-20191023170600-1563e7864c02/go.mod h1:3k1KigFfdRBJhiE8EXTpoM0aPXAFuYuGxKtU93oNxAY=
 github.com/rancher/wrangler v0.1.5 h1:HiXOeP6Kci2DK+e04D1g6INT77xAYpAr54zmTTe0Spk=
 github.com/rancher/wrangler v0.1.5/go.mod h1:EYP7cqpg42YqElaCm+U9ieSrGQKAXxUH5xsr+XGpWyE=
 github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95 h1:/yghR1MGJk6l6CVxJSx9JGBFP1D6NchJ74wJz7JwxC4=

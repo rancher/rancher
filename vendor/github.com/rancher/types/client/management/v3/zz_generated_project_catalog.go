@@ -74,9 +74,9 @@ type ProjectCatalogOperations interface {
 	ByID(id string) (*ProjectCatalog, error)
 	Delete(container *ProjectCatalog) error
 
-	ActionRefresh(resource *ProjectCatalog) error
+	ActionRefresh(resource *ProjectCatalog) (*CatalogRefresh, error)
 
-	CollectionActionRefresh(resource *ProjectCatalogCollection) error
+	CollectionActionRefresh(resource *ProjectCatalogCollection) (*CatalogRefresh, error)
 }
 
 func newProjectCatalogClient(apiClient *Client) *ProjectCatalogClient {
@@ -130,12 +130,14 @@ func (c *ProjectCatalogClient) Delete(container *ProjectCatalog) error {
 	return c.apiClient.Ops.DoResourceDelete(ProjectCatalogType, &container.Resource)
 }
 
-func (c *ProjectCatalogClient) ActionRefresh(resource *ProjectCatalog) error {
-	err := c.apiClient.Ops.DoAction(ProjectCatalogType, "refresh", &resource.Resource, nil, nil)
-	return err
+func (c *ProjectCatalogClient) ActionRefresh(resource *ProjectCatalog) (*CatalogRefresh, error) {
+	resp := &CatalogRefresh{}
+	err := c.apiClient.Ops.DoAction(ProjectCatalogType, "refresh", &resource.Resource, nil, resp)
+	return resp, err
 }
 
-func (c *ProjectCatalogClient) CollectionActionRefresh(resource *ProjectCatalogCollection) error {
-	err := c.apiClient.Ops.DoCollectionAction(ProjectCatalogType, "refresh", &resource.Collection, nil, nil)
-	return err
+func (c *ProjectCatalogClient) CollectionActionRefresh(resource *ProjectCatalogCollection) (*CatalogRefresh, error) {
+	resp := &CatalogRefresh{}
+	err := c.apiClient.Ops.DoCollectionAction(ProjectCatalogType, "refresh", &resource.Collection, nil, resp)
+	return resp, err
 }
