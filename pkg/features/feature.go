@@ -18,7 +18,6 @@ var (
 	// Features, ex.: ClusterRandomName = newFeature("cluster-randomizer", false)
 
 	UnsupportedStorageDrivers = newFeature("unsupported-storage-drivers", false)
-	IstioVirtualServiceUI     = newFeature("istio-virtual-service-ui", false)
 )
 
 type feature struct {
