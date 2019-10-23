@@ -184,7 +184,9 @@ func InitClusterObject(ctx context.Context, rkeConfig *v3.RancherKubernetesEngin
 		return nil, err
 	}
 	// extract cluster network configuration
-	c.setNetworkOptions()
+	if err = c.setNetworkOptions(); err != nil {
+		return nil, fmt.Errorf("failed set network options: %v", err)
+	}
 
 	// Register cloud provider
 	if err := c.setCloudProvider(); err != nil {
