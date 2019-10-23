@@ -335,6 +335,23 @@ func (s *Store) realWatch(apiContext *types.APIContext, schema *types.Schema, op
 	return result, nil
 }
 
+func (s *Store) Refresh(apiContext *types.APIContext, schema *types.Schema, id string) error {
+	client, err := s.clientGetter.UnversionedClient(nil, s.storageContext)
+	if err != nil {
+		return err
+	}
+
+	nodeTemplate, err := schema.Store.ByID(apiContext, schema, id)
+	if err != nil {
+		return err
+	}
+
+	if broadcaster := s.broadcasters[client]; broadcaster != nil {
+		return s.broadcasters[client].Inject(nodeTemplate)
+	}
+	return nil
+}
+
 type unstructuredDecoder struct {
 }
 

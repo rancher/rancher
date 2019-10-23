@@ -9,6 +9,7 @@ import (
 
 type Store struct {
 	types.Store
+
 	subType string
 }
 

@@ -12,20 +12,16 @@ func Wrap(store types.Store) types.Store {
 	}
 
 	return &StoreWrapper{
-		store: store,
+		store,
 	}
 }
 
 type StoreWrapper struct {
-	store types.Store
-}
-
-func (s *StoreWrapper) Context() types.StorageContext {
-	return s.store.Context()
+	types.Store
 }
 
 func (s *StoreWrapper) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
-	data, err := s.store.ByID(apiContext, schema, id)
+	data, err := s.Store.ByID(apiContext, schema, id)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +33,7 @@ func (s *StoreWrapper) ByID(apiContext *types.APIContext, schema *types.Schema, 
 
 func (s *StoreWrapper) List(apiContext *types.APIContext, schema *types.Schema, opts *types.QueryOptions) ([]map[string]interface{}, error) {
 	opts.Conditions = append(opts.Conditions, apiContext.SubContextAttributeProvider.Query(apiContext, schema)...)
-	data, err := s.store.List(apiContext, schema, opts)
+	data, err := s.Store.List(apiContext, schema, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +42,7 @@ func (s *StoreWrapper) List(apiContext *types.APIContext, schema *types.Schema, 
 }
 
 func (s *StoreWrapper) Watch(apiContext *types.APIContext, schema *types.Schema, opt *types.QueryOptions) (chan map[string]interface{}, error) {
-	c, err := s.store.Watch(apiContext, schema, opt)
+	c, err := s.Store.Watch(apiContext, schema, opt)
 	if err != nil || c == nil {
 		return nil, err
 	}
@@ -66,7 +62,7 @@ func (s *StoreWrapper) Create(apiContext *types.APIContext, schema *types.Schema
 		data[key] = value
 	}
 
-	data, err := s.store.Create(apiContext, schema, data)
+	data, err := s.Store.Create(apiContext, schema, data)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +76,7 @@ func (s *StoreWrapper) Update(apiContext *types.APIContext, schema *types.Schema
 		return nil, err
 	}
 
-	data, err = s.store.Update(apiContext, schema, data, id)
+	data, err = s.Store.Update(apiContext, schema, data, id)
 	if err != nil {
 		return nil, err
 	}
@@ -95,16 +91,16 @@ func (s *StoreWrapper) Delete(apiContext *types.APIContext, schema *types.Schema
 		return nil, err
 	}
 
-	return s.store.Delete(apiContext, schema, id)
+	return s.Store.Delete(apiContext, schema, id)
 }
 
 func validateGet(apiContext *types.APIContext, schema *types.Schema, id string) error {
-	store := schema.Store
-	if store == nil {
+	Store := schema.Store
+	if Store == nil {
 		return nil
 	}
 
-	existing, err := store.ByID(apiContext, schema, id)
+	existing, err := Store.ByID(apiContext, schema, id)
 	if err != nil {
 		return err
 	}

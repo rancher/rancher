@@ -2,6 +2,7 @@ package broadcast
 
 import (
 	"context"
+	"fmt"
 	"sync"
 )
 
@@ -11,6 +12,7 @@ type Broadcaster struct {
 	sync.Mutex
 	running bool
 	subs    map[chan map[string]interface{}]struct{}
+	inject  chan map[string]interface{}
 }
 
 func (b *Broadcaster) Subscribe(ctx context.Context, connect ConnectFunc) (chan map[string]interface{}, error) {
@@ -56,6 +58,7 @@ func (b *Broadcaster) start(connect ConnectFunc) error {
 	}
 
 	go b.stream(c)
+	b.inject = c
 	b.running = true
 	return nil
 }
@@ -81,6 +84,14 @@ func (b *Broadcaster) stream(input chan map[string]interface{}) {
 	}
 	b.running = false
 	b.Unlock()
+}
+
+func (b *Broadcaster) Inject(data map[string]interface{}) error {
+	if b.inject == nil {
+		return fmt.Errorf("broadcaster cannot be injected")
+	}
+	b.inject <- data
+	return nil
 }
 
 func cloneMap(data map[string]interface{}) map[string]interface{} {

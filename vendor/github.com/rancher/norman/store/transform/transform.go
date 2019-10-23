@@ -15,14 +15,11 @@ type ListTransformerFunc func(apiContext *types.APIContext, schema *types.Schema
 type StreamTransformerFunc func(apiContext *types.APIContext, schema *types.Schema, data chan map[string]interface{}, opt *types.QueryOptions) (chan map[string]interface{}, error)
 
 type Store struct {
-	Store             types.Store
+	types.Store
+
 	Transformer       TransformerFunc
 	ListTransformer   ListTransformerFunc
 	StreamTransformer StreamTransformerFunc
-}
-
-func (s *Store) Context() types.StorageContext {
-	return s.Store.Context()
 }
 
 func (s *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
