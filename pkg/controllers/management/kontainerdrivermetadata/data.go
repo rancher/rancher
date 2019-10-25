@@ -35,7 +35,7 @@ const (
 
 const (
 	APIVersion           = "management.cattle.io/v3"
-	RancherVersionDev    = "2.3"
+	RancherVersionDev    = "2.4"
 	sendRKELabel         = "io.cattle.rke_store"
 	svcOptionLinuxKey    = "service-option-linux-key"
 	svcOptionWindowsKey  = "service-option-windows-key"
