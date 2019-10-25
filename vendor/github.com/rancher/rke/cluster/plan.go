@@ -236,18 +236,21 @@ func (c *Cluster) BuildKubeAPIProcess(host *hosts.Host, prefixPath string, svcOp
 		CommandArgs["advertise-address"] = host.InternalAddress
 	}
 
+	admissionControlOptionName := ""
+	for _, optionName := range admissionControlOptionNames {
+		if _, ok := CommandArgs[optionName]; ok {
+			admissionControlOptionName = optionName
+			break
+		}
+	}
+
 	if c.Services.KubeAPI.PodSecurityPolicy {
 		CommandArgs["runtime-config"] = "policy/v1beta1/podsecuritypolicy=true"
-		for _, optionName := range admissionControlOptionNames {
-			if _, ok := CommandArgs[optionName]; ok {
-				if c.Services.KubeAPI.AlwaysPullImages {
-					CommandArgs[optionName] = CommandArgs[optionName] + ",PodSecurityPolicy,AlwaysPullImages"
-				} else {
-					CommandArgs[optionName] = CommandArgs[optionName] + ",PodSecurityPolicy"
-				}
-				break
-			}
-		}
+		CommandArgs[admissionControlOptionName] = CommandArgs[admissionControlOptionName] + ",PodSecurityPolicy"
+	}
+
+	if c.Services.KubeAPI.AlwaysPullImages {
+		CommandArgs[admissionControlOptionName] = CommandArgs[admissionControlOptionName] + ",AlwaysPullImages"
 	}
 
 	VolumesFrom := []string{

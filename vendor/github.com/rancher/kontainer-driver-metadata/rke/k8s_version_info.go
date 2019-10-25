@@ -10,17 +10,17 @@ func loadRancherDefaultK8sVersions() map[string]string {
 	return map[string]string{
 		"2.3.0": "v1.15.x",
 		"2.3.1": "v1.15.x",
-		"2.3":   "v1.16.x",
+		"2.3":   "v1.15.x",
 		// rancher will use default if its version is absent
-		"default": "v1.16.x",
+		"default": "v1.15.x",
 	}
 }
 
 func loadRKEDefaultK8sVersions() map[string]string {
 	return map[string]string{
-		"0.3": "v1.16.2-rancher1-1",
+		"0.3": "v1.15.5-rancher1-2",
 		// rke will use default if its version is absent
-		"default": "v1.16.2-rancher1-1",
+		"default": "v1.15.5-rancher1-2",
 	}
 }
 
