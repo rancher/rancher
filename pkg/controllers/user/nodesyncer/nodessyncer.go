@@ -413,6 +413,12 @@ func (m *nodesSyncer) updateNode(existing *v3.Node, node *corev1.Node, pods map[
 }
 
 func (m *nodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Pod) error {
+	// respect user defined name or label
+	if nodehelper.IgnoreNode(node) {
+		logrus.Debugf("Skipping v3.node creation for [%v] node", node.Name)
+		return nil
+	}
+
 	// try to get machine from api, in case cache didn't get the update
 	existing, err := m.getMachineForNode(node, false)
 	if err != nil {
