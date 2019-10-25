@@ -49,6 +49,7 @@ type Client struct {
 	HorizontalPodAutoscaler       HorizontalPodAutoscalerOperations
 	VirtualService                VirtualServiceOperations
 	DestinationRule               DestinationRuleOperations
+	Gateway                       GatewayOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -103,6 +104,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.HorizontalPodAutoscaler = newHorizontalPodAutoscalerClient(client)
 	client.VirtualService = newVirtualServiceClient(client)
 	client.DestinationRule = newDestinationRuleClient(client)
+	client.Gateway = newGatewayClient(client)
 
 	return client, nil
 }
