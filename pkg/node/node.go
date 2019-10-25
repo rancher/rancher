@@ -1,6 +1,7 @@
 package node
 
 import (
+	"github.com/rancher/rancher/pkg/settings"
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
@@ -11,6 +12,7 @@ import (
 const (
 	externalAddressAnnotation = "rke.cattle.io/external-ip"
 	LabelNodeName             = "management.cattle.io/nodename"
+	nodeStatusLabel           = "cattle.rancher.io/node-status"
 )
 
 func GetNodeName(machine *v3.Node) string {
@@ -24,6 +26,19 @@ func GetNodeName(machine *v3.Node) string {
 		}
 	}
 	return ""
+}
+
+func IgnoreNode(node *corev1.Node) bool {
+	ignoreName := settings.IgnoreNodeName.Get()
+	if node.Name == ignoreName {
+		return true
+	}
+
+	if node.Labels == nil {
+		return false
+	}
+	value, ok := node.Labels[nodeStatusLabel]
+	return ok && value == "ignore"
 }
 
 // IsNodeForNode returns true if node names or addresses are equal
