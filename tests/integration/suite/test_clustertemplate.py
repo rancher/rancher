@@ -30,7 +30,7 @@ def test_create_template_revision_k8s_translation(admin_mc, remove_resource):
 
     cconfig = {
         "rancherKubernetesEngineConfig": {
-            "kubernetesVersion": "1.13"
+            "kubernetesVersion": "1.15"
         }
     }
     with pytest.raises(ApiError) as e:
@@ -42,7 +42,7 @@ def test_create_template_revision_k8s_translation(admin_mc, remove_resource):
     # template k8s question needed if using generic version
     cconfig = {
         "rancherKubernetesEngineConfig": {
-            "kubernetesVersion": "1.13.x"
+            "kubernetesVersion": "1.15.x"
         }
     }
     questions = [{
@@ -137,7 +137,7 @@ def test_create_cluster_with_template(admin_mc, remove_resource):
     assert cluster.conditions[0].status == 'True'
     assert cluster.questions is not None
     k8s_version = cluster.rancherKubernetesEngineConfig.kubernetesVersion
-    assert k8s_version != "v1.13.x"
+    assert k8s_version != "v1.15.x"
 
     # edit cluster should not fail
     client.update(cluster, name=random_str(), clusterTemplateRevisionId=revId)
@@ -785,7 +785,7 @@ def create_cluster_template_revision(client, clusterTemplateId):
                   "rancherKubernetesEngineConfig.kubernetesVersion",
                   "required": "false",
                   "type": "string",
-                  "default": "1.13.x"
+                  "default": "1.15.x"
                  }]
 
     revision_name = random_str()
@@ -808,7 +808,7 @@ def getRKEConfig():
         "ignoreDockerVersion": "true",
         "sshAgentAuth": "false",
         "type": "rancherKubernetesEngineConfig",
-        "kubernetesVersion": "1.13.x",
+        "kubernetesVersion": "1.15.x",
         "authentication": {
             "strategy": "x509",
             "type": "authnConfig"
