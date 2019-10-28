@@ -8,9 +8,8 @@ import (
 )
 
 const (
-	statusAnn                   = "cattle.io/status"
-	GlobalNamespace             = "cattle-global-data"
-	NodeTemplateGlobalNamespace = "cattle-global-nt"
+	statusAnn       = "cattle.io/status"
+	GlobalNamespace = "cattle-global-data"
 )
 
 func SetNamespaceCondition(namespace *v1.Namespace, d time.Duration, conditionType string, conditionStatus bool, message string) error {

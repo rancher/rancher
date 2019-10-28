@@ -21,11 +21,11 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/etcdbackup"
 	"github.com/rancher/rancher/pkg/api/customization/feature"
 	"github.com/rancher/rancher/pkg/api/customization/globaldns"
+	"github.com/rancher/rancher/pkg/api/customization/globalresource"
 	"github.com/rancher/rancher/pkg/api/customization/kontainerdriver"
 	"github.com/rancher/rancher/pkg/api/customization/logging"
 	"github.com/rancher/rancher/pkg/api/customization/monitor"
 	"github.com/rancher/rancher/pkg/api/customization/multiclusterapp"
-	"github.com/rancher/rancher/pkg/api/customization/namespacedresource"
 	"github.com/rancher/rancher/pkg/api/customization/node"
 	"github.com/rancher/rancher/pkg/api/customization/nodepool"
 	"github.com/rancher/rancher/pkg/api/customization/nodetemplate"
@@ -376,20 +376,15 @@ func Tokens(ctx context.Context, schemas *types.Schemas, mgmt *config.ScaledCont
 func NodeTemplates(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.NodeTemplateType)
 	npl := management.Management.NodePools("").Controller().Lister()
-	userLister := management.Management.Users("").Controller().Lister()
 	f := nodetemplate.Formatter{
 		NodePoolLister: npl,
-		UserLister:     userLister,
 	}
 	schema.Formatter = f.Formatter
-
-	nsLister := management.Core.Namespaces("")
-	nodeTemplateGlobalStore := namespacedresource.Wrap(schema.Store, nsLister, namespace.NodeTemplateGlobalNamespace)
-
-	globalSecretLister := management.Core.Secrets(namespace.GlobalNamespace).Controller().Lister()
-	nodeTemplateClient := management.Management.NodeTemplates("")
-
-	s := nodeTemplateStore.Wrap(nodeTemplateGlobalStore, npl, globalSecretLister, nodeTemplateClient)
+	s := &nodeTemplateStore.Store{
+		Store:                 userscope.NewStore(management.Core.Namespaces(""), schema.Store),
+		NodePoolLister:        npl,
+		CloudCredentialLister: management.Core.Secrets(namespace.GlobalNamespace).Controller().Lister(),
+	}
 	schema.Store = s
 	schema.Validator = nodetemplate.Validator
 }
@@ -714,9 +709,15 @@ func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 
 func MultiClusterApps(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.MultiClusterAppType)
-	schema.Store = namespacedresource.Wrap(schema.Store, management.Core.Namespaces(""), namespace.GlobalNamespace)
+	schema.Store = &globalresource.GlobalNamespaceStore{
+		Store:              schema.Store,
+		NamespaceInterface: management.Core.Namespaces(""),
+	}
 	revisionSchema := schemas.Schema(&managementschema.Version, client.MultiClusterAppRevisionType)
-	revisionSchema.Store = namespacedresource.Wrap(revisionSchema.Store, management.Core.Namespaces(""), namespace.GlobalNamespace)
+	revisionSchema.Store = &globalresource.GlobalNamespaceStore{
+		Store:              revisionSchema.Store,
+		NamespaceInterface: management.Core.Namespaces(""),
+	}
 	wrapper := multiclusterapp.Wrapper{
 		MultiClusterApps:              management.Management.MultiClusterApps(""),
 		MultiClusterAppLister:         management.Management.MultiClusterApps("").Controller().Lister(),
@@ -751,7 +752,10 @@ func GlobalDNSs(schemas *types.Schemas, management *config.ScaledContext, localC
 		GrLister:              management.Management.GlobalRoles("").Controller().Lister(),
 	}
 	schema := schemas.Schema(&managementschema.Version, client.GlobalDNSType)
-	schema.Store = namespacedresource.Wrap(schema.Store, management.Core.Namespaces(""), namespace.GlobalNamespace)
+	schema.Store = &globalresource.GlobalNamespaceStore{
+		Store:              schema.Store,
+		NamespaceInterface: management.Core.Namespaces(""),
+	}
 	schema.Formatter = gdns.Formatter
 	schema.ActionHandler = gdns.ActionHandler
 	schema.Validator = gdns.Validator
@@ -764,7 +768,10 @@ func GlobalDNSs(schemas *types.Schemas, management *config.ScaledContext, localC
 
 func GlobalDNSProviders(schemas *types.Schemas, management *config.ScaledContext, localClusterEnabled bool) {
 	schema := schemas.Schema(&managementschema.Version, client.GlobalDNSProviderType)
-	schema.Store = namespacedresource.Wrap(schema.Store, management.Core.Namespaces(""), namespace.GlobalNamespace)
+	schema.Store = &globalresource.GlobalNamespaceStore{
+		Store:              schema.Store,
+		NamespaceInterface: management.Core.Namespaces(""),
+	}
 	schema.Store = globaldnsAPIStore.ProviderWrap(schema.Store)
 	if !localClusterEnabled {
 		schema.CollectionMethods = []string{}
@@ -787,14 +794,20 @@ func ClusterTemplates(schemas *types.Schemas, management *config.ScaledContext) 
 	wrapper.ClusterTemplateQuestions = wrapper.BuildQuestionsFromSchema(schemas.Schema(&managementschema.Version, client.ClusterSpecBaseType), schemas, "")
 
 	schema := schemas.Schema(&managementschema.Version, client.ClusterTemplateType)
-	schema.Store = namespacedresource.Wrap(schema.Store, management.Core.Namespaces(""), namespace.GlobalNamespace)
+	schema.Store = &globalresource.GlobalNamespaceStore{
+		Store:              schema.Store,
+		NamespaceInterface: management.Core.Namespaces(""),
+	}
 	schema.Store = clustertemplatestore.WrapStore(schema.Store, management)
 
 	schema.Formatter = wrapper.Formatter
 	schema.LinkHandler = wrapper.LinkHandler
 
 	revisionSchema := schemas.Schema(&managementschema.Version, client.ClusterTemplateRevisionType)
-	revisionSchema.Store = namespacedresource.Wrap(revisionSchema.Store, management.Core.Namespaces(""), namespace.GlobalNamespace)
+	revisionSchema.Store = &globalresource.GlobalNamespaceStore{
+		Store:              revisionSchema.Store,
+		NamespaceInterface: management.Core.Namespaces(""),
+	}
 	revisionSchema.Store = clustertemplatestore.WrapStore(revisionSchema.Store, management)
 	revisionSchema.Formatter = wrapper.RevisionFormatter
 	revisionSchema.CollectionFormatter = wrapper.CollectionFormatter
@@ -814,7 +827,10 @@ func ClusterScans(schemas *types.Schemas, management *config.ScaledContext, clus
 
 func SystemImages(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.RKEK8sSystemImageType)
-	schema.Store = namespacedresource.Wrap(schema.Store, management.Core.Namespaces(""), namespace.GlobalNamespace)
+	schema.Store = &globalresource.GlobalNamespaceStore{
+		Store:              schema.Store,
+		NamespaceInterface: management.Core.Namespaces(""),
+	}
 }
 
 func EtcdBackups(schemas *types.Schemas, management *config.ScaledContext) {
