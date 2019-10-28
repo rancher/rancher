@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/api/customization/clustertemplate"
-	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
+	"github.com/rancher/rancher/pkg/controllers/management/rbac"
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	mgmtSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
@@ -287,7 +287,7 @@ func (p *Store) checkMembersAccessType(data map[string]interface{}) error {
 	members := convert.ToMapSlice(data[managementv3.ClusterTemplateFieldMembers])
 	for _, m := range members {
 		accessType := convert.ToString(m[managementv3.MemberFieldAccessType])
-		if accessType != globalnamespacerbac.OwnerAccess && accessType != globalnamespacerbac.ReadOnlyAccess {
+		if accessType != rbac.OwnerAccess && accessType != rbac.ReadOnlyAccess {
 			return httperror.NewAPIError(httperror.InvalidBodyContent, "Invalid accessType provided while sharing cluster template")
 		}
 	}

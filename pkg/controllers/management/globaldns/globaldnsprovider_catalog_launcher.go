@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
+	"github.com/rancher/rancher/pkg/controllers/management/rbac"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/settings"
@@ -61,13 +61,13 @@ func (n *ProviderCatalogLauncher) sync(key string, obj *v3.GlobalDNSProvider) (r
 	if err != nil {
 		return nil, err
 	}
-	creatorID, ok := metaAccessor.GetAnnotations()[globalnamespacerbac.CreatorIDAnn]
+	creatorID, ok := metaAccessor.GetAnnotations()[rbac.CreatorIDAnn]
 	if !ok {
 		return nil, fmt.Errorf("GlobalDNS %v has no creatorId annotation", metaAccessor.GetName())
 	}
 
-	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.GlobalDNSProviderResource, obj.Name,
-		globalnamespacerbac.RancherManagementAPIVersion, creatorID, []string{globalnamespacerbac.RancherManagementAPIVersion},
+	if err := rbac.CreateRoleAndRoleBinding(rbac.GlobalDNSProviderResource, obj.Name, namespace.GlobalNamespace,
+		rbac.RancherManagementAPIVersion, creatorID, []string{rbac.RancherManagementAPIVersion},
 		obj.UID, obj.Spec.Members, n.managementContext); err != nil {
 		return nil, err
 	}
