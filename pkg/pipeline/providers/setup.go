@@ -63,8 +63,6 @@ func configure(management *config.ScaledContext) {
 		SourceCodeRepositories:     management.Project.SourceCodeRepositories(""),
 		Pipelines:                  management.Project.Pipelines(""),
 		PipelineExecutions:         management.Project.PipelineExecutions(""),
-		NamespaceLister:            management.Core.Namespaces("").Controller().Lister(),
-		Namespaces:                 management.Core.Namespaces(""),
 
 		PipelineIndexer:             pipelineInformer.GetIndexer(),
 		PipelineExecutionIndexer:    executionInformer.GetIndexer(),

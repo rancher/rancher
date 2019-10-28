@@ -10,8 +10,7 @@ import json
 import rancher
 from sys import platform
 from .common import random_str, wait_for_template_to_be_created
-from kubernetes.client import ApiClient, Configuration, CustomObjectsApi, \
-    ApiextensionsV1beta1Api
+from kubernetes.client import ApiClient, Configuration, CustomObjectsApi
 from kubernetes.client.rest import ApiException
 from kubernetes.config.kube_config import KubeConfigLoader
 from rancher import ApiError
@@ -371,50 +370,6 @@ def remove_resource(admin_mc, request):
                         in e.error.message:
                     pass
                 elif code != 404:
-                    raise e
-        request.addfinalizer(clean)
-    return _cleanup
-
-
-@pytest.fixture
-def raw_remove_custom_resource(admin_mc, request):
-    """Remove a custom resource, using the k8s client, after a test finishes
-    even if the test fails. This should only be used if remove_resource, which
-    exclusively uses the rancher api, cannot be used"""
-    def _cleanup(resource):
-        k8s_v1beta1_client = ApiextensionsV1beta1Api(admin_mc.k8s_client)
-        k8s_client = CustomObjectsApi(admin_mc.k8s_client)
-
-        def clean():
-            kind = resource["kind"]
-            metadata = resource["metadata"]
-            api_version = resource["apiVersion"]
-            api_version_parts = api_version.split("/")
-            if len(api_version_parts) != 2:
-                raise ValueError("Error parsing ApiVersion [" + api_version
-                                 + "]." + "Expected form \"group/version\""
-                                 )
-
-            group = api_version_parts[0]
-            version = api_version_parts[1]
-
-            crd_list = k8s_v1beta1_client.\
-                list_custom_resource_definition().items
-            crd = list(filter(lambda x: x.spec.names.kind == kind and
-                              x.spec.group == group and
-                              x.spec.version == version,
-                              crd_list))[0]
-            try:
-                k8s_client.delete_namespaced_custom_object(
-                    group,
-                    version,
-                    metadata["namespace"],
-                    crd.spec.names.plural,
-                    metadata["name"],
-                    {})
-            except ApiException as e:
-                body = json.loads(e.body)
-                if body["code"] != 404:
                     raise e
         request.addfinalizer(clean)
     return _cleanup

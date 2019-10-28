@@ -58,7 +58,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("get", "list", "watch").
-		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("create").
+		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("*").
 		addRule().apiGroups("*").resources("secrets").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("multiclusterapps", "globaldnses", "globaldnsproviders", "clustertemplaterevisions").verbs("create").
 		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
@@ -75,6 +75,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("clustertemplaterevisions").verbs("create")
 
 	// TODO user should be dynamically authorized to only see herself
+	// TODO Need "self-service" for nodetemplates such that a user can create them, but only RUD their own
 	// TODO enable when groups are "in". they need to be self-service
 
 	if err := rb.reconcileGlobalRoles(management); err != nil {
