@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/etcdbackup"
 	"github.com/rancher/rancher/pkg/api/customization/feature"
 	"github.com/rancher/rancher/pkg/api/customization/globaldns"
+	"github.com/rancher/rancher/pkg/api/customization/globalrole"
 	"github.com/rancher/rancher/pkg/api/customization/kontainerdriver"
 	"github.com/rancher/rancher/pkg/api/customization/logging"
 	"github.com/rancher/rancher/pkg/api/customization/monitor"
@@ -45,6 +46,7 @@ import (
 	clustertemplatestore "github.com/rancher/rancher/pkg/api/store/clustertemplate"
 	featStore "github.com/rancher/rancher/pkg/api/store/feature"
 	globaldnsAPIStore "github.com/rancher/rancher/pkg/api/store/globaldns"
+	globalRoleStore "github.com/rancher/rancher/pkg/api/store/globalrole"
 	grbstore "github.com/rancher/rancher/pkg/api/store/globalrolebindings"
 	nodeStore "github.com/rancher/rancher/pkg/api/store/node"
 	nodeTemplateStore "github.com/rancher/rancher/pkg/api/store/nodetemplate"
@@ -178,6 +180,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	TemplateContent(schemas)
 	PodSecurityPolicyTemplate(schemas, apiContext)
 	PodSecurityPolicyTemplateProjectBinding(schemas, apiContext)
+	GlobalRole(schemas, apiContext)
 	GlobalRoleBindings(schemas, apiContext)
 	RoleTemplate(schemas, apiContext)
 	MultiClusterApps(schemas, apiContext)
@@ -675,6 +678,17 @@ func ClusterRoleTemplateBinding(schemas *types.Schemas, management *config.Scale
 func ProjectRoleTemplateBinding(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.ProjectRoleTemplateBindingType)
 	schema.Validator = roletemplatebinding.NewPRTBValidator(management)
+}
+
+func GlobalRole(schemas *types.Schemas, management *config.ScaledContext) {
+	schema := schemas.Schema(&managementschema.Version, client.GlobalRoleType)
+	grLister := management.Management.GlobalRoles("").Controller().Lister()
+	schema.Store = globalRoleStore.Wrap(schema.Store, grLister)
+	schema.Formatter = globalrole.Formatter
+	w := globalrole.Wrapper{
+		GlobalRoleLister: grLister,
+	}
+	schema.Validator = w.Validator
 }
 
 func GlobalRoleBindings(schemas *types.Schemas, management *config.ScaledContext) {
