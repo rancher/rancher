@@ -355,13 +355,15 @@ func (p *ldapProvider) searchUser(name string, config *v3.LdapConfig, lConn *lda
 	for _, attr := range srchAttributes {
 		srchAttrs += fmt.Sprintf("(%v=%v*)", attr, name)
 	}
-	query += srchAttrs + "))"
+	// The user search filter will be added as another and clause
+	// and is expected to follow ldap syntax and enclosed in parenthesis
+	query += srchAttrs + ")" + config.UserSearchFilter + ")"
 	logrus.Debugf("%s searchUser query: %s", p.providerName, query)
 	return p.searchLdap(query, p.userScope, config, lConn)
 }
 
 func (p *ldapProvider) searchGroup(name string, config *v3.LdapConfig, lConn *ldapv2.Conn) ([]v3.Principal, error) {
-	query := fmt.Sprintf("(&(%v=*%v*)(%v=%v))", config.GroupSearchAttribute, name, ObjectClass, config.GroupObjectClass)
+	query := "(&(" + ObjectClass + "=" + config.GroupObjectClass + ")(" + config.GroupSearchAttribute + "=*" + name + "*)" + config.GroupSearchFilter + ")"
 	logrus.Debugf("%s searchGroup query: %s", p.providerName, query)
 	return p.searchLdap(query, p.groupScope, config, lConn)
 }
