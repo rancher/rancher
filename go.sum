@@ -357,7 +357,7 @@ github.com/gorilla/websocket v1.4.1/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/ad
 github.com/gregjones/httpcache v0.0.0-20170728041850-787624de3eb7/go.mod h1:FecbI9+v66THATjSRHfNgh1IVFe/9kFxbXtjV0ctIMA=
 github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7/go.mod h1:FecbI9+v66THATjSRHfNgh1IVFe/9kFxbXtjV0ctIMA=
 github.com/grpc-ecosystem/go-grpc-middleware v0.0.0-20190222133341-cfaf5686ec79/go.mod h1:FiyG127CGDf3tlThmgyCl78X/SZQqEOJBCDaAfeWzPs=
-github.com/grpc-ecosystem/go-grpc-middleware v1.0.0 h1:BWIsLfhgKhV5g/oF34aRjniBHLTZe5DNekSjbAjIS6c=
+github.com/grpc-ecosystem/go-grpc-middleware v1.0.0 h1:Iju5GlWwrvL6UBg4zJJt3btmonfrMlCDdsejg4CZE7c=
 github.com/grpc-ecosystem/go-grpc-middleware v1.0.0/go.mod h1:FiyG127CGDf3tlThmgyCl78X/SZQqEOJBCDaAfeWzPs=
 github.com/grpc-ecosystem/go-grpc-prometheus v0.0.0-20181025070259-68e3a13e4117/go.mod h1:8NvIoxWQoOIhqOTXgfV/d3M/q6VIi02HzZEHgUlZvzk=
 github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 h1:Ovs26xHkKqVztRpIrF/92BcuyuQ/YW4NSIpoGtfXNho=
@@ -599,12 +599,8 @@ github.com/quobyte/api v0.1.2/go.mod h1:jL7lIHrmqQ7yh05OJ+eEEdHr0u/kmT1Ff9iHd+4H
 github.com/rancher/client-go v1.16.0-rancher.3 h1:bOA0zwtJi8wUeldqfrCGyDRuN6oW+zJ092i/OhWP2nU=
 github.com/rancher/client-go v1.16.0-rancher.3/go.mod h1:J69/JveO6XESwVgG53q3Uz5OSfgsv4uxpScmmyYOOlk=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20190930170218-cea47774d036/go.mod h1:n9MKsJByqAqhVG61d9G5pbJuKcHUMXUw97YF8+98ar0=
-github.com/rancher/kontainer-driver-metadata v0.0.0-20191017185510-5220b54b5eb5 h1:NdDEn3cEMrvw+NlOADrxQDmIMBTd9eh3dEYxfmHON0Q=
-github.com/rancher/kontainer-driver-metadata v0.0.0-20191017185510-5220b54b5eb5/go.mod h1:n9MKsJByqAqhVG61d9G5pbJuKcHUMXUw97YF8+98ar0=
-github.com/rancher/kontainer-driver-metadata v0.0.0-20191021164950-6514452b9732 h1:6InjIL/kY99O1kdLLmiYVaUkMRhVEZjjlz7WRxRJraQ=
-github.com/rancher/kontainer-driver-metadata v0.0.0-20191021164950-6514452b9732/go.mod h1:n9MKsJByqAqhVG61d9G5pbJuKcHUMXUw97YF8+98ar0=
-github.com/rancher/kontainer-driver-metadata v0.0.0-20191025185845-49276141b5ac h1:PlHUzWW0YdvumAxtcCBJIcX9nLUAFUgyikZqGcoe4lc=
-github.com/rancher/kontainer-driver-metadata v0.0.0-20191025185845-49276141b5ac/go.mod h1:n9MKsJByqAqhVG61d9G5pbJuKcHUMXUw97YF8+98ar0=
+github.com/rancher/kontainer-driver-metadata v0.0.0-20191028181128-096e86e3ec17 h1:9Hy4e4JYmrH24SHxjUe46dV/F4F7KzREbOkRwJky05U=
+github.com/rancher/kontainer-driver-metadata v0.0.0-20191028181128-096e86e3ec17/go.mod h1:n9MKsJByqAqhVG61d9G5pbJuKcHUMXUw97YF8+98ar0=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20190930174220-db9e24343393 h1:WXDu/Aan5tZj850UNT8io+Xw+pti+1Re1VWo9CgN8uU=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20190930174220-db9e24343393/go.mod h1:Eccd5R2X1vvjYg0O1gZ0jWAl+bDq6Egv/H2YzKz5tP0=
 github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009 h1:Xsxh7fX3+2wAUJtPy8g2lZh0cYuyifqhBL0vxCIYojs=
@@ -620,10 +616,8 @@ github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a/go.mod h1:YW8w
 github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6 h1:iTE16wwmbXLS3WBk1SgwoEvUYGid1JcTOjGIbqO9jQ8=
 github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6/go.mod h1:tkU8ZvrR5lRgaKWaX71nAy6daeqvPFx/lJEnbW7tXSI=
 github.com/rancher/rke v0.3.0-rc11.0.20190930172345-88449ec73b31/go.mod h1:5uw/a0TlRpyf2ASPgEo4HBSEFsc80zuR4raGwazwJa8=
-github.com/rancher/rke v0.3.2-rc1.0.20191018203742-ccb5380aaeaa h1:XlVO/PZ2JG0zyCrAK1JcANWObEyiO3gNy918LUYqtwQ=
-github.com/rancher/rke v0.3.2-rc1.0.20191018203742-ccb5380aaeaa/go.mod h1:a5e+UBDYf6Ey+2pI/flfRTofXgg2x0+8ykcNfUTxS4k=
-github.com/rancher/rke v0.3.2-rc3.0.20191025215600-c1ef1f414b9e h1:lMMtlDtCsIXa+TzNRUksQQqcIzdyARUbpTcSFAJo0fg=
-github.com/rancher/rke v0.3.2-rc3.0.20191025215600-c1ef1f414b9e/go.mod h1:CPX3IXfRdxxU5NuOvK/eOmIc1yMJuM21doJuRFOWotI=
+github.com/rancher/rke v0.3.2 h1:vLlBH15uc3HAVc3ia2Dxr0o75YfE7jSfREq+NIYx0LM=
+github.com/rancher/rke v0.3.2/go.mod h1:KAFHtTBO1TkVqMpkAuw2I/ADj0o+6BzaIjc8KZbUQz8=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
