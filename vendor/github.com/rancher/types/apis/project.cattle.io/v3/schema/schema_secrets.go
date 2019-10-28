@@ -206,7 +206,7 @@ func secretTypes(schemas *types.Schemas) *types.Schemas {
 				},
 			},
 		).
-		AddMapperForType(&Version, v3.RegistryCredential{}, RegistryCredentialMapper{}).
+		AddMapperForType(&Version, v1.Secret{}, RegistryCredentialMapper{}).
 		MustImportAndCustomize(&Version, v1.Secret{}, func(schema *types.Schema) {
 			schema.MustCustomizeField("kind", func(f types.Field) types.Field {
 				f.Options = []string{

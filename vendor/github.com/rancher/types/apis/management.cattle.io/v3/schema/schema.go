@@ -214,6 +214,7 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.MonitoringInput{}).
 		MustImport(&Version, v3.MonitoringOutput{}).
 		MustImport(&Version, v3.RestoreFromEtcdBackupInput{}).
+		MustImport(&Version, v3.SaveAsTemplateInput{}).
 		MustImportAndCustomize(&Version, v3.ETCDService{}, func(schema *types.Schema) {
 			schema.MustCustomizeField("extraArgs", func(field types.Field) types.Field {
 				field.Default = map[string]interface{}{
@@ -258,6 +259,9 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 				Output: "rotateCertificateOutput",
 			}
 			schema.ResourceActions[v3.ClusterActionRunCISScan] = types.Action{}
+			schema.ResourceActions[v3.ClusterActionSaveAsTemplate] = types.Action{
+				Input: "saveAsTemplateInput",
+			}
 		})
 }
 
