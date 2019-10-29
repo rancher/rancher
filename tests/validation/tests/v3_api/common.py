@@ -1141,7 +1141,7 @@ def wait_for_mcapp_to_active(client, multiClusterApp,
 def wait_for_app_to_active(client, app_id,
                            timeout=DEFAULT_MULTI_CLUSTER_APP_TIMEOUT):
     time.sleep(5)
-    #When the app is deployed it goes into Active state for a short
+    # When the app is deployed it goes into Active state for a short
     # period of time and then into installing/deploying.
     app_data = client.list_app(id=app_id).data
     start = time.time()
@@ -1276,12 +1276,14 @@ def validate_app_deletion(client, app_id,
             break
 
 
-def validate_catalog_app(proj_client, app, external_id, answer=None):
+def validate_catalog_app(proj_client, app, external_id, answer=None,
+                         timeout=DEFAULT_TIMEOUT):
     if answer is None:
         answers = get_defaut_question_answers(get_admin_client(), external_id)
     else:
         answers = answer
-    #validate app is active
+    # validate app is active
+    time.sleep(5)
     app = wait_for_app_to_active(proj_client, app.id)
     assert app.externalId == external_id, \
         "the version of the app is not correct"
@@ -1291,14 +1293,25 @@ def validate_catalog_app(proj_client, app, external_id, answer=None):
     assert len(pramaters) > 1, \
         "Incorrect list of paramaters from catalog external ID"
     chart = pramaters[len(pramaters)-2].split("=")[1] + "-" + \
-            pramaters[len(pramaters)-1].split("=")[1]
+        pramaters[len(pramaters)-1].split("=")[1]
     workloads = proj_client.list_workload(namespaceId=ns).data
+    # Wait for workloads to become Active
     for wl in workloads:
+        start = time.time()
+        while wl.state != "active":
+            print(wl.state)
+            if time.time() - start > timeout:
+                raise AssertionError(
+                    "Timed out waiting for workload to become Active")
+            time.sleep(.5)
+    # Verify Workload state and the chart version
+    for wl in workloads:
+        print(wl.state)
         assert wl.state == "active"
         assert wl.workloadLabels.chart == chart, \
             "the chart version is wrong"
 
-    #validate_app_answers
+    # validate_app_answers
     assert len(answers.items() - app["answers"].items()) == 0, \
         "Answers are not same as the original catalog answers"
     return app
