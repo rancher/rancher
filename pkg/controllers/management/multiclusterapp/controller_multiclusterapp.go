@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
-	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
+	"github.com/rancher/rancher/pkg/controllers/management/rbac"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -80,7 +80,7 @@ func (m *MCAppManager) sync(key string, mcapp *v3.MultiClusterApp) (runtime.Obje
 	if err != nil {
 		return mcapp, err
 	}
-	creatorID, ok := metaAccessor.GetAnnotations()[globalnamespacerbac.CreatorIDAnn]
+	creatorID, ok := metaAccessor.GetAnnotations()[rbac.CreatorIDAnn]
 	if !ok {
 		return mcapp, fmt.Errorf("MultiClusterApp %v has no creatorId annotation. Cannot create apps for %v", metaAccessor.GetName(), mcapp.Name)
 	}
@@ -293,7 +293,7 @@ func (m *MCAppManager) updateApp(app *pv3.App, answerMap map[string]map[string]s
 func (m *MCAppManager) createRevision(mcapp *v3.MultiClusterApp, creatorID string) (*v3.MultiClusterAppRevision, error) {
 	ownerReference := metav1.OwnerReference{
 		APIVersion: "management.cattle.io/v3",
-		Kind:       globalnamespacerbac.MultiClusterAppResource,
+		Kind:       rbac.MultiClusterAppResource,
 		Name:       mcapp.Name,
 		UID:        mcapp.UID,
 	}
