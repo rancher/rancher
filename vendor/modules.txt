@@ -348,7 +348,7 @@ github.com/rancher/norman/types/factory
 github.com/rancher/rdns-server/model
 # github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6
 github.com/rancher/remotedialer
-# github.com/rancher/rke v0.3.2
+# github.com/rancher/rke v0.3.3-0.20191029224024-4cc67ce86ee2
 github.com/rancher/rke/util
 github.com/rancher/rke/pki/cert
 github.com/rancher/rke/cloudprovider/aws
@@ -370,7 +370,7 @@ github.com/rancher/rke/dind
 github.com/rancher/rke/cloudprovider/custom
 github.com/rancher/rke/cloudprovider/openstack
 github.com/rancher/rke/cloudprovider/vsphere
-# github.com/rancher/types v0.0.0-20191029163455-5809c05fa11a
+# github.com/rancher/types v0.0.0-20191029222543-bf95e4c22455
 github.com/rancher/types/apis/management.cattle.io/v3
 github.com/rancher/types/client/management/v3
 github.com/rancher/types/config
@@ -712,6 +712,8 @@ k8s.io/apimachinery/pkg/api/equality
 # k8s.io/apiserver v0.0.0 => k8s.io/apiserver v0.0.0-20190918160949-bfa5e2e684ad
 k8s.io/apiserver/pkg/authentication/user
 k8s.io/apiserver/pkg/server/healthz
+k8s.io/apiserver/pkg/apis/config
+k8s.io/apiserver/pkg/apis/config/v1
 k8s.io/apiserver/pkg/admission
 k8s.io/apiserver/pkg/server/httplog
 k8s.io/apiserver/pkg/util/feature
