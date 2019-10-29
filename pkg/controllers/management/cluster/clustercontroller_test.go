@@ -1,8 +1,11 @@
 package cluster
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rke/cloudprovider/aws"
 	"github.com/rancher/rke/cloudprovider/azure"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -11,6 +14,7 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/utils/pointer"
 )
 
 const testServiceNodePortRange = "10000-32769"
@@ -105,4 +109,91 @@ func TestIngressCapability(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, testCluster.Spec.RancherKubernetesEngineConfig.Ingress.Provider, caps.IngressCapabilities[0].IngressProvider)
 	}
+}
+
+type capabilitiesTestCase struct {
+	annotations  map[string]string
+	capabilities v3.Capabilities
+	result       v3.Capabilities
+	errMsg       string
+}
+
+func TestOverrideCapabilities(t *testing.T) {
+	assert := assert.New(t)
+
+	fakeCapabilitiesSchema := types.Schema{
+		ResourceFields: map[string]types.Field{
+			"pspEnabled": {
+				Type: "boolean",
+			},
+			"nodePortRange": {
+				Type: "string",
+			},
+			"ingressCapabilities": {
+				Type: "something",
+			},
+		},
+	}
+	tests := []capabilitiesTestCase{
+		{
+			annotations: map[string]string{
+				fmt.Sprintf("%s%s", capabilitiesAnnotation, "pspEnabled"): "true",
+			},
+			capabilities: v3.Capabilities{},
+			result: v3.Capabilities{
+				PspEnabled: true,
+			},
+		},
+		{
+			annotations: map[string]string{
+				fmt.Sprintf("%s%s", capabilitiesAnnotation, "nodePortRange"): "9999",
+			},
+			capabilities: v3.Capabilities{},
+			result: v3.Capabilities{
+				NodePortRange: "9999",
+			},
+		},
+		{
+			annotations: map[string]string{
+				fmt.Sprintf("%s%s", capabilitiesAnnotation, "ingressCapabilities"): "[{\"customDefaultBackend\":true,\"ingressProvider\":\"asdf\"}]",
+			},
+			capabilities: v3.Capabilities{},
+			result: v3.Capabilities{
+				IngressCapabilities: []v3.IngressCapabilities{
+					{
+						CustomDefaultBackend: pointer.BoolPtr(true),
+						IngressProvider:      "asdf",
+					},
+				},
+			},
+		},
+		{
+			annotations: map[string]string{
+				fmt.Sprintf("%s%s", capabilitiesAnnotation, "notarealcapability"): "something",
+			},
+			capabilities: v3.Capabilities{},
+			errMsg:       "resource field [notarealcapability] from capabillities annotation not found",
+		},
+		{
+			annotations: map[string]string{
+				fmt.Sprintf("%s%s", capabilitiesAnnotation, "pspEnabled"): "5",
+			},
+			capabilities: v3.Capabilities{},
+			errMsg:       "strconv.ParseBool: parsing \"5\": invalid syntax",
+		},
+	}
+
+	c := controller{
+		capabilitiesSchema: &fakeCapabilitiesSchema,
+	}
+	for _, test := range tests {
+		result, err := c.overrideCapabilities(test.annotations, test.capabilities)
+		if err != nil {
+			assert.Equal(test.errMsg, err.Error())
+		} else {
+			assert.True(reflect.DeepEqual(test.result, result))
+		}
+	}
+
+	assert.Nil(nil)
 }

@@ -284,8 +284,8 @@ github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 # github.com/rancher/kontainer-driver-metadata v0.0.0-20191028181128-096e86e3ec17
-github.com/rancher/kontainer-driver-metadata/rke/templates
 github.com/rancher/kontainer-driver-metadata/rke
+github.com/rancher/kontainer-driver-metadata/rke/templates
 # github.com/rancher/kontainer-engine v0.0.4-dev.0.20190930174220-db9e24343393
 github.com/rancher/kontainer-engine/logstream
 github.com/rancher/kontainer-engine/service
@@ -370,10 +370,11 @@ github.com/rancher/rke/dind
 github.com/rancher/rke/cloudprovider/custom
 github.com/rancher/rke/cloudprovider/openstack
 github.com/rancher/rke/cloudprovider/vsphere
-# github.com/rancher/types v0.0.0-20191023170600-1563e7864c02
+# github.com/rancher/types v0.0.0-20191029163455-5809c05fa11a
 github.com/rancher/types/apis/management.cattle.io/v3
 github.com/rancher/types/client/management/v3
 github.com/rancher/types/config
+github.com/rancher/types/image
 github.com/rancher/types/apis/core/v1
 github.com/rancher/types/apis/management.cattle.io/v3/schema
 github.com/rancher/types/peermanager
@@ -384,7 +385,6 @@ github.com/rancher/types/client/cluster/v3
 github.com/rancher/types/client/project/v3
 github.com/rancher/types/user
 github.com/rancher/types/compose
-github.com/rancher/types/image
 github.com/rancher/types/config/dialer
 github.com/rancher/types/apis/apps/v1
 github.com/rancher/types/apis/apiregistration.k8s.io/v1
