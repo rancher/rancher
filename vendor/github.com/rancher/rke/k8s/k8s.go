@@ -2,8 +2,9 @@ package k8s
 
 import (
 	"bytes"
-	"k8s.io/client-go/transport"
 	"time"
+
+	"k8s.io/client-go/transport"
 
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
@@ -36,7 +37,7 @@ func NewClient(kubeConfigPath string, k8sWrapTransport transport.WrapperFunc) (*
 	return K8sClientSet, nil
 }
 
-func decodeYamlResource(resource interface{}, yamlManifest string) error {
+func DecodeYamlResource(resource interface{}, yamlManifest string) error {
 	decoder := yamlutil.NewYAMLToJSONDecoder(bytes.NewReader([]byte(yamlManifest)))
 	return decoder.Decode(&resource)
 }

@@ -57,7 +57,7 @@ func ClusterRemove(
 
 	log.Infof(ctx, "Tearing down Kubernetes cluster")
 
-	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags)
+	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags, "")
 	if err != nil {
 		return err
 	}

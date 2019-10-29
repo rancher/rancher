@@ -66,7 +66,6 @@ func ReconcileCluster(ctx context.Context, kubeCluster, currentCluster *Cluster,
 			return err
 		}
 	}
-
 	log.Infof(ctx, "[reconcile] Reconciled cluster state successfully")
 	return nil
 }

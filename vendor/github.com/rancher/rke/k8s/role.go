@@ -8,7 +8,7 @@ import (
 
 func UpdateRoleBindingFromYaml(k8sClient *kubernetes.Clientset, roleBindingYaml, namespace string) error {
 	roleBinding := rbacv1.RoleBinding{}
-	if err := decodeYamlResource(&roleBinding, roleBindingYaml); err != nil {
+	if err := DecodeYamlResource(&roleBinding, roleBindingYaml); err != nil {
 		return err
 	}
 	roleBinding.Namespace = namespace
@@ -30,7 +30,7 @@ func updateRoleBinding(k8sClient *kubernetes.Clientset, rb interface{}) error {
 
 func UpdateRoleFromYaml(k8sClient *kubernetes.Clientset, roleYaml, namespace string) error {
 	role := rbacv1.Role{}
-	if err := decodeYamlResource(&role, roleYaml); err != nil {
+	if err := DecodeYamlResource(&role, roleYaml); err != nil {
 		return err
 	}
 	role.Namespace = namespace

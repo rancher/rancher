@@ -36,11 +36,13 @@ type FullState struct {
 type State struct {
 	RancherKubernetesEngineConfig *v3.RancherKubernetesEngineConfig `json:"rkeConfig,omitempty"`
 	CertificatesBundle            map[string]pki.CertificatePKI     `json:"certificatesBundle,omitempty"`
+	EncryptionConfig              string                            `json:"encryptionConfig,omitempty"`
 }
 
 func (c *Cluster) UpdateClusterCurrentState(ctx context.Context, fullState *FullState) error {
 	fullState.CurrentState.RancherKubernetesEngineConfig = c.RancherKubernetesEngineConfig.DeepCopy()
 	fullState.CurrentState.CertificatesBundle = c.Certificates
+	fullState.CurrentState.EncryptionConfig = c.EncryptionConfig.EncryptionProviderFile
 	return fullState.WriteStateFile(ctx, c.StateFilePath)
 }
 
@@ -52,12 +54,12 @@ func (c *Cluster) GetClusterState(ctx context.Context, fullState *FullState) (*C
 
 	// resetup external flags
 	flags := GetExternalFlags(false, false, false, c.ConfigDir, c.ConfigPath)
-	currentCluster, err := InitClusterObject(ctx, fullState.CurrentState.RancherKubernetesEngineConfig, flags)
+	currentCluster, err := InitClusterObject(ctx, fullState.CurrentState.RancherKubernetesEngineConfig, flags, fullState.CurrentState.EncryptionConfig)
 	if err != nil {
 		return nil, err
 	}
 	currentCluster.Certificates = fullState.CurrentState.CertificatesBundle
-
+	currentCluster.EncryptionConfig.EncryptionProviderFile = fullState.CurrentState.EncryptionConfig
 	// resetup dialers
 	dialerOptions := hosts.GetDialerOptions(c.DockerDialerFactory, c.LocalConnDialerFactory, c.K8sWrapTransport)
 	if err := currentCluster.SetupDialers(ctx, dialerOptions); err != nil {
@@ -147,7 +149,8 @@ func GetK8sVersion(localConfigPath string, k8sWrapTransport transport.WrapperFun
 	return fmt.Sprintf("%#v", *serverVersion), nil
 }
 
-func RebuildState(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, oldState *FullState, flags ExternalFlags) (*FullState, error) {
+func RebuildState(ctx context.Context, kubeCluster *Cluster, oldState *FullState, flags ExternalFlags) (*FullState, error) {
+	rkeConfig := &kubeCluster.RancherKubernetesEngineConfig
 	newState := &FullState{
 		DesiredState: State{
 			RancherKubernetesEngineConfig: rkeConfig.DeepCopy(),
@@ -169,25 +172,14 @@ func RebuildState(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConf
 	}
 
 	// Rebuilding the certificates of the desired state
-	if oldState.DesiredState.CertificatesBundle == nil {
-		// Get the certificate Bundle
-		certBundle, err := pki.GenerateRKECerts(ctx, *rkeConfig, "", "")
-		if err != nil {
-			return nil, fmt.Errorf("Failed to generate certificate bundle: %v", err)
-		}
-		newState.DesiredState.CertificatesBundle = certBundle
-	} else {
-		pkiCertBundle := oldState.DesiredState.CertificatesBundle
-		// check for legacy clusters prior to requestheaderca
-		if pkiCertBundle[pki.RequestHeaderCACertName].Certificate == nil {
-			if err := pki.GenerateRKERequestHeaderCACert(ctx, pkiCertBundle, flags.ClusterFilePath, flags.ConfigDir); err != nil {
-				return nil, err
-			}
-		}
-		if err := pki.GenerateRKEServicesCerts(ctx, pkiCertBundle, *rkeConfig, flags.ClusterFilePath, flags.ConfigDir, false); err != nil {
+	if oldState.DesiredState.CertificatesBundle == nil { // this is a fresh cluster
+		if err := buildFreshState(ctx, kubeCluster, newState); err != nil {
 			return nil, err
 		}
-		newState.DesiredState.CertificatesBundle = pkiCertBundle
+	} else { // This is an existing cluster with an old DesiredState
+		if err := rebuildExistingState(ctx, kubeCluster, oldState, newState, flags); err != nil {
+			return nil, err
+		}
 	}
 	newState.CurrentState = oldState.CurrentState
 	return newState, nil
@@ -291,4 +283,47 @@ func GetStateFromNodes(ctx context.Context, kubeCluster *Cluster) *Cluster {
 	}
 	log.Infof(ctx, "[state] Successfully fetched cluster state from Nodes")
 	return &currentCluster
+}
+
+func buildFreshState(ctx context.Context, kubeCluster *Cluster, newState *FullState) error {
+	rkeConfig := &kubeCluster.RancherKubernetesEngineConfig
+	// Get the certificate Bundle
+	certBundle, err := pki.GenerateRKECerts(ctx, *rkeConfig, "", "")
+	if err != nil {
+		return fmt.Errorf("Failed to generate certificate bundle: %v", err)
+	}
+	newState.DesiredState.CertificatesBundle = certBundle
+	if isEncryptionEnabled(rkeConfig) {
+		if newState.DesiredState.EncryptionConfig, err = kubeCluster.getEncryptionProviderFile(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func rebuildExistingState(ctx context.Context, kubeCluster *Cluster, oldState, newState *FullState, flags ExternalFlags) error {
+	rkeConfig := &kubeCluster.RancherKubernetesEngineConfig
+	pkiCertBundle := oldState.DesiredState.CertificatesBundle
+	// check for legacy clusters prior to requestheaderca
+	if pkiCertBundle[pki.RequestHeaderCACertName].Certificate == nil {
+		if err := pki.GenerateRKERequestHeaderCACert(ctx, pkiCertBundle, flags.ClusterFilePath, flags.ConfigDir); err != nil {
+			return err
+		}
+	}
+	if err := pki.GenerateRKEServicesCerts(ctx, pkiCertBundle, *rkeConfig, flags.ClusterFilePath, flags.ConfigDir, false); err != nil {
+		return err
+	}
+	newState.DesiredState.CertificatesBundle = pkiCertBundle
+	if isEncryptionEnabled(rkeConfig) {
+		if oldState.DesiredState.EncryptionConfig != "" {
+			newState.DesiredState.EncryptionConfig = oldState.DesiredState.EncryptionConfig
+		} else {
+			var err error
+			if newState.DesiredState.EncryptionConfig, err = kubeCluster.getEncryptionProviderFile(); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
