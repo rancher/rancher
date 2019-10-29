@@ -92,7 +92,7 @@ func SnapshotSaveEtcdHosts(
 	flags cluster.ExternalFlags, snapshotName string) error {
 
 	log.Infof(ctx, "Starting saving snapshot on etcd hosts")
-	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags)
+	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags, "")
 	if err != nil {
 		return err
 	}
@@ -121,12 +121,14 @@ func RestoreEtcdSnapshot(
 	snapshotName string) (string, string, string, string, map[string]pki.CertificatePKI, error) {
 	var APIURL, caCrt, clientCert, clientKey string
 	log.Infof(ctx, "Restoring etcd snapshot %s", snapshotName)
-	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags)
+
+	stateFilePath := cluster.GetStateFilePath(flags.ClusterFilePath, flags.ConfigDir)
+	rkeFullState, _ := cluster.ReadStateFile(ctx, stateFilePath)
+
+	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags, rkeFullState.DesiredState.EncryptionConfig)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
-	stateFilePath := cluster.GetStateFilePath(flags.ClusterFilePath, flags.ConfigDir)
-	rkeFullState, _ := cluster.ReadStateFile(ctx, stateFilePath)
 	if err := checkLegacyCluster(ctx, kubeCluster, rkeFullState, flags); err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
@@ -240,7 +242,7 @@ func SnapshotRemoveFromEtcdHosts(
 	flags cluster.ExternalFlags, snapshotName string) error {
 
 	log.Infof(ctx, "Starting snapshot remove on etcd hosts")
-	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags)
+	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags, "")
 	if err != nil {
 		return err
 	}

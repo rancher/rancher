@@ -136,7 +136,7 @@ func rebuildClusterWithRotatedCertificates(ctx context.Context,
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
 
-	kubeCluster, err := cluster.InitClusterObject(ctx, clusterState.DesiredState.RancherKubernetesEngineConfig.DeepCopy(), flags)
+	kubeCluster, err := cluster.InitClusterObject(ctx, clusterState.DesiredState.RancherKubernetesEngineConfig.DeepCopy(), flags, clusterState.DesiredState.EncryptionConfig)
 	if err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
@@ -231,7 +231,7 @@ func GenerateRKECSRs(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineC
 	}
 
 	// initialze the cluster object from the config file
-	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags)
+	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags, "")
 	if err != nil {
 		return err
 	}

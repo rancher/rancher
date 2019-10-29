@@ -69,7 +69,7 @@ func GetServiceOptionData(data map[string]interface{}) map[string]*v3.Kubernetes
 
 func GeneratePlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, hostsInfoMap map[string]types.Info, data map[string]interface{}) (v3.RKEPlan, error) {
 	clusterPlan := v3.RKEPlan{}
-	myCluster, err := InitClusterObject(ctx, rkeConfig, ExternalFlags{})
+	myCluster, err := InitClusterObject(ctx, rkeConfig, ExternalFlags{}, "")
 	if err != nil {
 		return clusterPlan, err
 	}
@@ -109,15 +109,23 @@ func BuildRKEConfigNodePlan(ctx context.Context, myCluster *Cluster, host *hosts
 
 		portChecks = append(portChecks, BuildPortChecksFromPortList(host, EtcdPortList, ProtocolTCP)...)
 	}
-	cloudConfig := v3.File{
-		Name:     cloudConfigFileName,
-		Contents: b64.StdEncoding.EncodeToString([]byte(myCluster.CloudConfigFile)),
+	files := []v3.File{
+		v3.File{
+			Name:     cloudConfigFileName,
+			Contents: b64.StdEncoding.EncodeToString([]byte(myCluster.CloudConfigFile)),
+		},
+	}
+	if myCluster.IsEncryptionEnabled() {
+		files = append(files, v3.File{
+			Name:     EncryptionProviderFilePath,
+			Contents: b64.StdEncoding.EncodeToString([]byte(myCluster.EncryptionConfig.EncryptionProviderFile)),
+		})
 	}
 	return v3.RKEConfigNodePlan{
 		Address:    host.Address,
 		Processes:  osLimitationFilter(hostDockerInfo.OSType, processes),
 		PortChecks: portChecks,
-		Files:      []v3.File{cloudConfig},
+		Files:      files,
 		Annotations: map[string]string{
 			k8s.ExternalAddressAnnotation: host.Address,
 			k8s.InternalAddressAnnotation: host.InternalAddress,
@@ -210,6 +218,10 @@ func (c *Cluster) BuildKubeAPIProcess(host *hosts.Host, prefixPath string, svcOp
 			c.Services.KubeAPI.ExtraEnv,
 			fmt.Sprintf("%s=%s", CloudConfigSumEnv, getCloudConfigChecksum(c.CloudConfigFile)))
 	}
+	if c.EncryptionConfig.EncryptionProviderFile != "" {
+		CommandArgs["experimental-encryption-provider-config"] = EncryptionProviderFilePath
+	}
+
 	serviceOptions := c.GetKubernetesServicesOptions(host.DockerInfo.OSType, svcOptionData)
 	if serviceOptions.KubeAPI != nil {
 		for k, v := range serviceOptions.KubeAPI {

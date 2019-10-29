@@ -157,6 +157,11 @@ func (c *Cluster) SetUpHosts(ctx context.Context, flags ExternalFlags) error {
 			}
 			log.Infof(ctx, "[%s] Successfully deployed authentication webhook config Cluster nodes", authnWebhookFileName)
 		}
+		if c.EncryptionConfig.EncryptionProviderFile != "" {
+			if err := c.DeployEncryptionProviderFile(ctx); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/types/factory"
 	"github.com/rancher/types/mapper"
 	v1 "k8s.io/api/core/v1"
+	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 )
 
 var (
@@ -45,7 +46,8 @@ var (
 		Init(credTypes).
 		Init(mgmtSecretTypes).
 		Init(clusterTemplateTypes).
-		Init(driverMetadataTypes)
+		Init(driverMetadataTypes).
+		Init(encryptionTypes)
 
 	TokenSchemas = factory.Schemas(&Version).
 			Init(tokens)
@@ -899,4 +901,13 @@ func clusterScanTypes(schemas *types.Schemas) *types.Schemas {
 		schema.CollectionMethods = []string{http.MethodGet}
 		schema.ResourceMethods = []string{http.MethodGet, http.MethodDelete}
 	})
+}
+
+func encryptionTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.MustImport(&Version, v3.SecretsEncryptionConfig{}).
+		MustImport(&Version, apiserverconfig.Key{}, struct {
+			Secret string `norman:"type=password"`
+		}{}).MustImport(&Version, apiserverconfig.KMSConfiguration{}, struct {
+		Timeout string
+	}{})
 }

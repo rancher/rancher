@@ -10,7 +10,7 @@ import (
 func UpdateServiceAccountFromYaml(k8sClient *kubernetes.Clientset, serviceAccountYaml string) error {
 	serviceAccount := v1.ServiceAccount{}
 
-	if err := decodeYamlResource(&serviceAccount, serviceAccountYaml); err != nil {
+	if err := DecodeYamlResource(&serviceAccount, serviceAccountYaml); err != nil {
 		return err
 	}
 	return retryTo(updateServiceAccount, k8sClient, serviceAccount, DefaultRetries, DefaultSleepSeconds)

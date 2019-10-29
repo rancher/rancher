@@ -8,7 +8,7 @@ import (
 
 func UpdateClusterRoleBindingFromYaml(k8sClient *kubernetes.Clientset, clusterRoleBindingYaml string) error {
 	clusterRoleBinding := rbacv1.ClusterRoleBinding{}
-	if err := decodeYamlResource(&clusterRoleBinding, clusterRoleBindingYaml); err != nil {
+	if err := DecodeYamlResource(&clusterRoleBinding, clusterRoleBindingYaml); err != nil {
 		return err
 	}
 	return retryTo(updateClusterRoleBinding, k8sClient, clusterRoleBinding, DefaultRetries, DefaultSleepSeconds)
@@ -29,7 +29,7 @@ func updateClusterRoleBinding(k8sClient *kubernetes.Clientset, crb interface{}) 
 
 func UpdateClusterRoleFromYaml(k8sClient *kubernetes.Clientset, clusterRoleYaml string) error {
 	clusterRole := rbacv1.ClusterRole{}
-	if err := decodeYamlResource(&clusterRole, clusterRoleYaml); err != nil {
+	if err := DecodeYamlResource(&clusterRole, clusterRoleYaml); err != nil {
 		return err
 	}
 
