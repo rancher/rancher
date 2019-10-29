@@ -4,6 +4,7 @@ import (
 	"github.com/rancher/norman/types"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 )
 
 type RancherKubernetesEngineConfig struct {
@@ -271,6 +272,8 @@ type KubeAPIService struct {
 	PodSecurityPolicy bool `yaml:"pod_security_policy" json:"podSecurityPolicy,omitempty"`
 	// Enable/Disable AlwaysPullImages admissions plugin
 	AlwaysPullImages bool `yaml:"always_pull_images" json:"alwaysPullImages,omitempty"`
+	// Secrets encryption provider config
+	SecretsEncryptionConfig *SecretsEncryptionConfig `yaml:"secrets_encryption_config" json:"secretsEncryptionConfig,omitempty"`
 }
 
 type KubeControllerService struct {
@@ -770,4 +773,11 @@ type RKETaint struct {
 	Value     string         `json:"value,omitempty" yaml:"value"`
 	Effect    v1.TaintEffect `json:"effect,omitempty" yaml:"effect"`
 	TimeAdded *metav1.Time   `json:"timeAdded,omitempty" yaml:"timeAdded,omitempty"`
+}
+
+type SecretsEncryptionConfig struct {
+	// Enable/disable secrets encryption provider config
+	Enabled bool `yaml:"enabled" json:"enabled,omitempty"`
+	// Custom Encryption Provider configuration object
+	CustomConfig *apiserverconfig.EncryptionConfiguration `yaml:"custom_config" json:"customConfig,omitempty" norman:"type=map[json]"`
 }

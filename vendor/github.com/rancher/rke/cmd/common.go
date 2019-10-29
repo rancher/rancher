@@ -74,10 +74,8 @@ func ClusterInit(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfi
 	if len(flags.CertificateDir) == 0 {
 		flags.CertificateDir = cluster.GetCertificateDirPath(flags.ClusterFilePath, flags.ConfigDir)
 	}
-
 	rkeFullState, _ := cluster.ReadStateFile(ctx, stateFilePath)
-
-	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags)
+	kubeCluster, err := cluster.InitClusterObject(ctx, rkeConfig, flags, rkeFullState.DesiredState.EncryptionConfig)
 	if err != nil {
 		return err
 	}
@@ -93,14 +91,19 @@ func ClusterInit(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfi
 		}
 		log.Warnf(ctx, "[state] can't fetch legacy cluster state from Kubernetes: %v", err)
 	}
+
 	// check if certificate rotate or normal init
 	if kubeCluster.RancherKubernetesEngineConfig.RotateCertificates != nil {
 		fullState, err = rotateRKECertificates(ctx, kubeCluster, flags, rkeFullState)
 	} else {
-		fullState, err = cluster.RebuildState(ctx, &kubeCluster.RancherKubernetesEngineConfig, rkeFullState, flags)
+		fullState, err = cluster.RebuildState(ctx, kubeCluster, rkeFullState, flags)
 	}
 	if err != nil {
 		return err
+	}
+
+	if fullState.DesiredState.EncryptionConfig != "" {
+		kubeCluster.EncryptionConfig.EncryptionProviderFile = fullState.DesiredState.EncryptionConfig
 	}
 
 	rkeState := cluster.FullState{

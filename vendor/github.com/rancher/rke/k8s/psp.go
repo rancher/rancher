@@ -8,7 +8,7 @@ import (
 
 func UpdatePodSecurityPolicyFromYaml(k8sClient *kubernetes.Clientset, pspYaml string) error {
 	psp := v1beta1.PodSecurityPolicy{}
-	if err := decodeYamlResource(&psp, pspYaml); err != nil {
+	if err := DecodeYamlResource(&psp, pspYaml); err != nil {
 		return err
 	}
 	return retryTo(updatePodSecurityPolicy, k8sClient, psp, DefaultRetries, DefaultSleepSeconds)

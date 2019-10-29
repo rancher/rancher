@@ -58,6 +58,13 @@ type Cluster struct {
 	UseKubectlDeploy                 bool
 	v3.RancherKubernetesEngineConfig `yaml:",inline"`
 	WorkerHosts                      []*hosts.Host
+	EncryptionConfig                 encryptionConfig
+}
+
+type encryptionConfig struct {
+	RewriteSecrets         bool
+	RotateKey              bool
+	EncryptionProviderFile string
 }
 
 const (
@@ -147,14 +154,28 @@ func (c *Cluster) DeployWorkerPlane(ctx context.Context, svcOptionData map[strin
 func ParseConfig(clusterFile string) (*v3.RancherKubernetesEngineConfig, error) {
 	logrus.Debugf("Parsing cluster file [%v]", clusterFile)
 	var rkeConfig v3.RancherKubernetesEngineConfig
+
+	// the customConfig is mapped to a k8s type, which doesn't unmarshal well because it has a
+	// nested struct and no yaml tags. Therefor, we have to re-parse it again and assign it correctly.
+	// this only affects rke cli. Since rkeConfig is passed from rancher directly in the rancher use case.
+	clusterFile, secretConfig, err := resolvCustomEncryptionConfig(clusterFile)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := yaml.Unmarshal([]byte(clusterFile), &rkeConfig); err != nil {
 		return nil, err
+	}
+
+	if isEncryptionEnabled(&rkeConfig) && secretConfig != nil {
+		rkeConfig.Services.KubeAPI.SecretsEncryptionConfig.CustomConfig = secretConfig
 	}
 	return &rkeConfig, nil
 }
 
-func InitClusterObject(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, flags ExternalFlags) (*Cluster, error) {
+func InitClusterObject(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, flags ExternalFlags, encryptConfig string) (*Cluster, error) {
 	// basic cluster object from rkeConfig
+	var err error
 	c := &Cluster{
 		AuthnStrategies:               make(map[string]bool),
 		RancherKubernetesEngineConfig: *rkeConfig,
@@ -164,6 +185,9 @@ func InitClusterObject(ctx context.Context, rkeConfig *v3.RancherKubernetesEngin
 		CertificateDir:                flags.CertificateDir,
 		StateFilePath:                 GetStateFilePath(flags.ClusterFilePath, flags.ConfigDir),
 		PrivateRegistriesMap:          make(map[string]v3.PrivateRegistry),
+		EncryptionConfig: encryptionConfig{
+			EncryptionProviderFile: encryptConfig,
+		},
 	}
 	if metadata.K8sVersionToRKESystemImages == nil {
 		metadata.InitMetadata(ctx)
@@ -177,9 +201,19 @@ func InitClusterObject(ctx context.Context, rkeConfig *v3.RancherKubernetesEngin
 	if len(c.CertificateDir) == 0 {
 		c.CertificateDir = GetCertificateDirPath(c.ConfigPath, c.ConfigDir)
 	}
+	// We don't manage custom configuration, if it's there we just use it.
+	if isEncryptionCustomConfig(rkeConfig) {
+		if c.EncryptionConfig.EncryptionProviderFile, err = c.readEncryptionCustomConfig(); err != nil {
+			return nil, err
+		}
+	} else if isEncryptionEnabled(rkeConfig) && c.EncryptionConfig.EncryptionProviderFile == "" {
+		if c.EncryptionConfig.EncryptionProviderFile, err = c.getEncryptionProviderFile(); err != nil {
+			return nil, err
+		}
+	}
 
 	// Setting cluster Defaults
-	err := c.setClusterDefaults(ctx, flags)
+	err = c.setClusterDefaults(ctx, flags)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +328,7 @@ func getLocalAdminConfigWithNewAddress(localConfigPath, cpAddress string, cluste
 
 func ApplyAuthzResources(ctx context.Context, rkeConfig v3.RancherKubernetesEngineConfig, flags ExternalFlags, dailersOptions hosts.DialersOptions) error {
 	// dialer factories are not needed here since we are not uses docker only k8s jobs
-	kubeCluster, err := InitClusterObject(ctx, &rkeConfig, flags)
+	kubeCluster, err := InitClusterObject(ctx, &rkeConfig, flags, "")
 	if err != nil {
 		return err
 	}
@@ -466,7 +500,7 @@ func ConfigureCluster(
 	data map[string]interface{},
 	useKubectl bool) error {
 	// dialer factories are not needed here since we are not uses docker only k8s jobs
-	kubeCluster, err := InitClusterObject(ctx, &rkeConfig, flags)
+	kubeCluster, err := InitClusterObject(ctx, &rkeConfig, flags, "")
 	if err != nil {
 		return err
 	}

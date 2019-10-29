@@ -232,7 +232,7 @@ func BastionHostWrapTransport(bastionHost v3.BastionHost) (transport.WrapperFunc
 		useSSHAgentAuth: bastionHost.SSHAgentAuth,
 	}
 
-	if bastionDialer.sshKeyString == "" {
+	if bastionDialer.sshKeyString == "" && !bastionDialer.useSSHAgentAuth {
 		var err error
 		bastionDialer.sshKeyString, err = privateKeyPath(bastionHost.SSHKeyPath)
 		if err != nil {

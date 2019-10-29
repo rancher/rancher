@@ -50,7 +50,7 @@ func GetClusterCertsFromKubernetes(ctx context.Context, kubeCluster *Cluster) (m
 
 	certMap := make(map[string]pki.CertificatePKI)
 	for _, certName := range certificatesNames {
-		secret, err := k8s.GetSecret(k8sClient, certName)
+		secret, err := k8s.GetSystemSecret(k8sClient, certName)
 		if err != nil && !strings.HasPrefix(certName, "kube-etcd") &&
 			!strings.Contains(certName, pki.RequestHeaderCACertName) &&
 			!strings.Contains(certName, pki.APIProxyClientCertName) &&
