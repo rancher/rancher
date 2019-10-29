@@ -27,7 +27,7 @@ const (
 )
 
 var driverData = map[string]map[string][]string{
-	Amazonec2driver:    {"publicCredentialFields": []string{"accessKey"}, "privateCredentialFields": []string{"secretKey"}},
+	Amazonec2driver:    {"publicCredentialFields": []string{"accessKey", "region"}, "privateCredentialFields": []string{"secretKey"}},
 	Azuredriver:        {"publicCredentialFields": []string{"clientId", "subscriptionId"}, "privateCredentialFields": []string{"clientSecret"}},
 	DigitalOceandriver: {"privateCredentialFields": []string{"accessToken"}},
 	ExoscaleDriver:     {"privateCredentialFields": []string{"apiSecretKey"}},
@@ -41,7 +41,8 @@ var driverData = map[string]map[string][]string{
 }
 
 var driverDefaults = map[string]map[string]string{
-	Vmwaredriver: {"vcenterPort": "443"},
+	Vmwaredriver:    {"vcenterPort": "443"},
+	Amazonec2driver: {"region": "us-east-1"},
 }
 
 type machineDriverCompare struct {

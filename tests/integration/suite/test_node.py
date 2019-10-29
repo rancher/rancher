@@ -206,6 +206,22 @@ def create_node_template(client):
     return node_template, cloud_credential
 
 
+def test_amazon_cloud_credential_region(admin_mc):
+    client = admin_mc.client
+    cloud_credential = client.create_cloud_credential(
+                        amazonec2credentialConfig={})
+    # default region
+    assert cloud_credential.amazonec2credentialConfig["region"] == "us-east-1"
+    nt_region = "us-west-2"
+    node_template = client.create_node_template(
+        amazonec2Config={
+            "region": nt_region,
+        },
+        cloudCredentialId=cloud_credential.id)
+
+    assert node_template.amazonec2Config["region"] == nt_region
+
+
 def wait_for_cloud_credential(client, cloud_credential_id, timeout=60):
     start = time.time()
     interval = 0.5
