@@ -86,6 +86,45 @@ func (ma *MemberAccess) IsAdmin(callerID string) (bool, error) {
 	return false, nil
 }
 
+func (ma *MemberAccess) CanCreateRKETemplate(callerID string) (bool, error) {
+	u, err := ma.Users.Controller().Lister().Get("", callerID)
+	if err != nil {
+		return false, err
+	}
+	if u == nil {
+		return false, fmt.Errorf("No user found with ID %v", callerID)
+	}
+	// Get globalRoleBinding for this user
+	grbs, err := ma.GrbLister.List("", labels.NewSelector())
+	if err != nil {
+		return false, err
+	}
+	var callerRole string
+	for _, grb := range grbs {
+		if grb.UserName == callerID {
+			callerRole = grb.GlobalRoleName
+			gr, err := ma.GrLister.Get("", callerRole)
+			if err != nil {
+				return false, err
+			}
+			if gr != nil {
+				for _, rule := range gr.Rules {
+					// admin roles have all resources and all verbs allowed
+					if slice.ContainsString(rule.Resources, "*") && slice.ContainsString(rule.APIGroups, "*") && slice.ContainsString(rule.Verbs, "*") {
+						// caller is global admin
+						return true, nil
+					}
+					if slice.ContainsString(rule.Resources, "clustertemplates") && slice.ContainsString(rule.APIGroups, "management.cattle.io") && slice.ContainsString(rule.Verbs, "create") {
+						// caller can create RKE templates
+						return true, nil
+					}
+				}
+			}
+		}
+	}
+	return false, nil
+}
+
 func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []string, callerID string) error {
 	isAdmin, err := ma.IsAdmin(callerID)
 	if err != nil {

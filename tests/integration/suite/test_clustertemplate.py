@@ -713,7 +713,26 @@ def test_template_access(admin_mc, remove_resource, user_factory):
         user.client.create_cluster(name=random_str(),
                                    clusterTemplateRevisionId=rev.id,
                                    description="template from cluster")
-    assert e.value.error.status == 404
+    assert e.value.error is not None
+
+
+def test_save_as_template_action(admin_mc, remove_resource):
+    cluster_template = create_cluster_template(admin_mc, remove_resource,
+                                               [], admin_mc)
+    templateId = cluster_template.id
+    rev = create_cluster_template_revision(admin_mc.client, templateId)
+
+    cluster = wait_for_cluster_create(admin_mc.client, name=random_str(),
+                                      clusterTemplateRevisionId=rev.id,
+                                      description="template from cluster")
+    remove_resource(cluster)
+    assert cluster.conditions[0].type == 'Pending'
+    assert cluster.conditions[0].status == 'True'
+
+    try:
+        admin_mc.client.action(obj=cluster, action_name="saveAsTemplate", )
+    except AttributeError as e:
+        assert e is not None
 
 
 def rtb_cb(client, rtb):

@@ -123,3 +123,43 @@ def test_rke_k8s_deprecated_versions(admin_mc, remove_resource):
                                     'v1.8.10-rancher1-1 is deprecated'
     client.update_by_id_setting(id=deprecated_versions_setting.id,
                                 value="")
+
+
+def test_save_as_template_action_rbac(admin_mc, remove_resource, user_factory):
+    cluster = admin_mc.client.create_cluster(name=random_str(),
+                                             rancherKubernetesEngineConfig={
+                                                 "services": {
+                                                     "type":
+                                                     "rkeConfigServices",
+                                                     "kubeApi": {
+                                                         "alwaysPullImages":
+                                                         "false",
+                                                         "podSecurityPolicy":
+                                                         "false",
+                                                         "serviceNodePort\
+                                                         Range":
+                                                         "30000-32767",
+                                                         "type":
+                                                         "kubeAPIService"
+                                                     }
+                                                 }
+                                             })
+    remove_resource(cluster)
+    assert cluster.conditions[0].type == 'Pending'
+    assert cluster.conditions[0].status == 'True'
+    try:
+        admin_mc.client.action(obj=cluster, action_name="saveAsTemplate",
+                               clusterTemplateName="template1",
+                               clusterTemplateRevisionName="v1")
+    except ApiError as e:
+        assert e.error.status == 503
+
+    user = user_factory()
+    user_cluster = user.client.create_cluster(name=random_str())
+    remove_resource(user_cluster)
+    assert cluster.conditions[0].type == 'Pending'
+    assert cluster.conditions[0].status == 'True'
+    try:
+        user.client.action(obj=user_cluster, action_name="saveAsTemplate")
+    except AttributeError as e:
+        assert e is not None

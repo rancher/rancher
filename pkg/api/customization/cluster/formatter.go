@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
+	gaccess "github.com/rancher/rancher/pkg/api/customization/globalnamespaceaccess"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	client "github.com/rancher/types/client/management/v3"
@@ -16,12 +17,18 @@ import (
 type Formatter struct {
 	KontainerDriverLister v3.KontainerDriverLister
 	clusterSpecPwdFields  map[string]interface{}
+	Users                 v3.UserInterface
+	GrbLister             v3.GlobalRoleBindingLister
+	GrLister              v3.GlobalRoleLister
 }
 
 func NewFormatter(schemas *types.Schemas, managementContext *config.ScaledContext) *Formatter {
 	clusterFormatter := Formatter{
 		KontainerDriverLister: managementContext.Management.KontainerDrivers("").Controller().Lister(),
 		clusterSpecPwdFields:  gatherClusterSpecPwdFields(schemas, schemas.Schema(&managementschema.Version, client.ClusterSpecBaseType)),
+		Users:                 managementContext.Management.Users(""),
+		GrbLister:             managementContext.Management.GlobalRoleBindings("").Controller().Lister(),
+		GrLister:              managementContext.Management.GlobalRoles("").Controller().Lister(),
 	}
 	return &clusterFormatter
 }
@@ -52,6 +59,20 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 			resource.AddAction(request, v3.ClusterActionEditMonitoring)
 		} else {
 			resource.AddAction(request, v3.ClusterActionEnableMonitoring)
+		}
+		if _, ok := resource.Values["rancherKubernetesEngineConfig"]; ok {
+			if val, ok := values.GetValue(resource.Values, "clusterTemplateRevisionId"); ok && val == nil {
+				ma := gaccess.MemberAccess{
+					Users:     f.Users,
+					GrLister:  f.GrLister,
+					GrbLister: f.GrbLister,
+				}
+				callerID := request.Request.Header.Get(gaccess.ImpersonateUserHeader)
+
+				if canCreateTemplates, _ := ma.CanCreateRKETemplate(callerID); canCreateTemplates {
+					resource.AddAction(request, v3.ClusterActionSaveAsTemplate)
+				}
+			}
 		}
 	}
 
