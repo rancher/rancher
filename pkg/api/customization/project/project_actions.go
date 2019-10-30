@@ -15,14 +15,12 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/monitoring"
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	client "github.com/rancher/types/client/management/v3"
 	"github.com/rancher/types/compose"
-	"github.com/rancher/types/user"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -45,10 +43,9 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 }
 
 type Handler struct {
-	Projects       v3.ProjectInterface
-	ProjectLister  v3.ProjectLister
-	ClusterManager *clustermanager.Manager
-	UserMgr        user.Manager
+	Projects      v3.ProjectInterface
+	ProjectLister v3.ProjectLister
+	ClusterLister v3.ClusterLister
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -191,6 +188,17 @@ func (h *Handler) editMonitoring(actionName string, action *types.Action, apiCon
 
 func (h *Handler) enableMonitoring(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	namespace, id := ref.Parse(apiContext.ID)
+
+	// should enable cluster-level monitoring at first
+	clusterName := namespace
+	cluster, err := h.ClusterLister.Get("", clusterName)
+	if err != nil {
+		return httperror.WrapAPIError(err, httperror.ServerError, "failed to enable monitoring, could not get cluster")
+	}
+	if !cluster.Spec.EnableClusterMonitoring {
+		return httperror.WrapAPIError(err, httperror.ServerError, "failed to enable monitoring, the cluster-level monitoring is disabling")
+	}
+
 	project, err := h.ProjectLister.Get(namespace, id)
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.NotFound, "none existent Project")

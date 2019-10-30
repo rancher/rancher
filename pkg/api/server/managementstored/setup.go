@@ -636,10 +636,9 @@ func Project(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.ProjectType)
 	schema.Formatter = projectaction.Formatter
 	handler := &projectaction.Handler{
-		Projects:       management.Management.Projects(""),
-		ProjectLister:  management.Management.Projects("").Controller().Lister(),
-		UserMgr:        management.UserManager,
-		ClusterManager: management.ClientGetter.(*clustermanager.Manager),
+		Projects:      management.Management.Projects(""),
+		ProjectLister: management.Management.Projects("").Controller().Lister(),
+		ClusterLister: management.Management.Clusters("").Controller().Lister(),
 	}
 	schema.ActionHandler = handler.Actions
 }
