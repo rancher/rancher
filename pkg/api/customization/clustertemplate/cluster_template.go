@@ -123,7 +123,7 @@ func (w Wrapper) updateEnabledFlagOnRevision(apiContext *types.APIContext, enabl
 		return httperror.WrapAPIError(err, httperror.ServerError, "failed to load clusterTemplateRevision")
 	}
 
-	if enabledFlag == *revision.Spec.Enabled {
+	if revision.Spec.Enabled != nil && enabledFlag == *revision.Spec.Enabled {
 		apiContext.WriteResponse(http.StatusNoContent, map[string]interface{}{})
 		return nil
 	}
