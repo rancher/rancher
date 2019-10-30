@@ -829,7 +829,6 @@ func monitorTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.QueryProjectMetricInput{}).
 		MustImport(&Version, v3.QueryMetricOutput{}).
 		MustImport(&Version, v3.ClusterMetricNamesInput{}).
-		MustImport(&Version, v3.ProjectMetricNamesInput{}).
 		MustImport(&Version, v3.MetricNamesOutput{}).
 		MustImport(&Version, v3.TimeSeries{}).
 		MustImportAndCustomize(&Version, v3.MonitorMetric{}, func(schema *types.Schema) {
@@ -838,17 +837,13 @@ func monitorTypes(schemas *types.Schemas) *types.Schemas {
 					Input:  "queryClusterMetricInput",
 					Output: "queryMetricOutput",
 				},
-				"listclustermetricname": {
+				"listmetricname": {
 					Input:  "clusterMetricNamesInput",
 					Output: "metricNamesOutput",
 				},
 				"queryproject": {
 					Input:  "queryProjectMetricInput",
 					Output: "queryMetricOutput",
-				},
-				"listprojectmetricname": {
-					Input:  "projectMetricNamesInput",
-					Output: "metricNamesOutput",
 				},
 			}
 		}).
