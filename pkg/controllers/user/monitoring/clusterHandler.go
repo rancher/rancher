@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -15,7 +16,6 @@ import (
 	"github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rke/pki"
-	corev1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	k8scorev1 "k8s.io/api/core/v1"
@@ -42,7 +42,6 @@ type etcdTLSConfig struct {
 type clusterHandler struct {
 	clusterName          string
 	cattleClustersClient mgmtv3.ClusterInterface
-	agentEndpointsLister corev1.EndpointsLister
 	app                  *appHandler
 }
 
@@ -109,7 +108,7 @@ func (ch *clusterHandler) doSync(cluster *mgmtv3.Cluster) error {
 			cluster.Status.MonitoringStatus = &mgmtv3.MonitoringStatus{}
 		}
 
-		isReady, err := ch.isPrometheusReady(cluster)
+		isReady, err := ch.isPrometheusReady(monitoring.ClusterPrometheusEndpoint())
 		if err != nil {
 			mgmtv3.ClusterConditionMonitoringEnabled.Unknown(cluster)
 			mgmtv3.ClusterConditionMonitoringEnabled.Message(cluster, err.Error())
@@ -121,7 +120,7 @@ func (ch *clusterHandler) doSync(cluster *mgmtv3.Cluster) error {
 			return nil
 		}
 
-		cluster.Status.MonitoringStatus.GrafanaEndpoint = fmt.Sprintf("/k8s/clusters/%s/api/v1/namespaces/%s/services/http:access-grafana:80/proxy/", cluster.Name, appTargetNamespace)
+		cluster.Status.MonitoringStatus.GrafanaEndpoint = monitoring.GetClusterGrafanaProxyURL(cluster.Name)
 
 		_, err = ConditionMetricExpressionDeployed.DoUntilTrue(cluster.Status.MonitoringStatus, func() (status *mgmtv3.MonitoringStatus, e error) {
 			return status, ch.deployMetrics(cluster)
@@ -488,15 +487,14 @@ func (ch *clusterHandler) withdrawMetrics(cluster *mgmtv3.Cluster) error {
 	return nil
 }
 
-func (ch *clusterHandler) isPrometheusReady(cluster *mgmtv3.Cluster) (bool, error) {
-	svcName, namespace, _ := monitoring.ClusterPrometheusEndpoint()
-
-	endpoints, err := ch.agentEndpointsLister.Get(namespace, svcName)
+func (ch *clusterHandler) isPrometheusReady(svcName, namespace, port string) (bool, error) {
+	endpoints, err := ch.app.agentEndpointsForCluster.Get(namespace, svcName)
 	if err != nil {
-		return false, errors.Wrapf(err, "failed to get %s/%s endpoints", namespace, svcName)
+		return false, errors.Wrapf(err, "failed to get %s/%s Prometheus endpoints", namespace, svcName)
 	}
 
-	if len(endpoints.Subsets) == 0 || len(endpoints.Subsets[0].Addresses) == 0 {
+	if len(endpoints.Subsets) == 0 || len(endpoints.Subsets[0].Addresses) == 0 ||
+		len(endpoints.Subsets[0].Ports) == 0 || strconv.Itoa(int(endpoints.Subsets[0].Ports[0].Port)) != port {
 		return false, nil
 	}
 

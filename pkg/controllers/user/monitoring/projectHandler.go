@@ -3,7 +3,7 @@ package monitoring
 import (
 	"fmt"
 	"reflect"
-	"time"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/app/utils"
@@ -11,7 +11,6 @@ import (
 	"github.com/rancher/rancher/pkg/ref"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
-	k8scorev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -103,11 +102,23 @@ func (ph *projectHandler) doSync(project *mgmtv3.Project, clusterName string) er
 			return errors.Wrap(err, "failed to deploy monitoring")
 		}
 
-		if err := ph.detectAppComponentsWhileInstall(appName, appTargetNamespace, project); err != nil {
+		if project.Status.MonitoringStatus == nil {
+			project.Status.MonitoringStatus = &mgmtv3.MonitoringStatus{}
+		}
+
+		isReady, err := ph.isGrafanaReady(monitoring.ProjectGrafanaEndpoint(project.Name))
+		if err != nil {
 			mgmtv3.ProjectConditionMonitoringEnabled.Unknown(project)
 			mgmtv3.ProjectConditionMonitoringEnabled.Message(project, err.Error())
-			return errors.Wrap(err, "failed to detect the installation status of monitoring components")
+			return err
 		}
+		if !isReady {
+			mgmtv3.ProjectConditionMonitoringEnabled.Unknown(project)
+			mgmtv3.ProjectConditionMonitoringEnabled.Message(project, "grafana is not ready")
+			return err
+		}
+
+		project.Status.MonitoringStatus.GrafanaEndpoint = monitoring.GetProjectGrafanaProxyURL(project.Spec.ClusterName, project.Name)
 
 		mgmtv3.ProjectConditionMonitoringEnabled.True(project)
 		mgmtv3.ProjectConditionMonitoringEnabled.Message(project, "")
@@ -118,14 +129,10 @@ func (ph *projectHandler) doSync(project *mgmtv3.Project, clusterName string) er
 			return errors.Wrap(err, "failed to withdraw monitoring")
 		}
 
-		if err := ph.detectAppComponentsWhileUninstall(appName, appTargetNamespace, project); err != nil {
-			mgmtv3.ProjectConditionMonitoringEnabled.Unknown(project)
-			mgmtv3.ProjectConditionMonitoringEnabled.Message(project, err.Error())
-			return errors.Wrap(err, "failed to detect the uninstallation status of monitoring components")
-		}
-
 		mgmtv3.ProjectConditionMonitoringEnabled.False(project)
 		mgmtv3.ProjectConditionMonitoringEnabled.Message(project, "")
+
+		project.Status.MonitoringStatus = nil
 	}
 
 	return nil
@@ -173,10 +180,13 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 
 		"exporter-fluentd.enabled": "false",
 
-		"grafana.enabled":  "true",
-		"grafana.level":    "project",
-		"grafana.apiGroup": monitoring.APIVersion.Group,
+		"grafana.enabled":                        "true",
+		"grafana.level":                          "project",
+		"grafana.apiGroup":                       monitoring.APIVersion.Group,
+		"grafana.projectServiceAccountName":      appName,
+		"grafana.projectPrometheusDatasourceURL": fmt.Sprintf("http://%s.%s:%s", clusterPrometheusSvcName, clusterPrometheusSvcNamespaces, clusterPrometheusPort),
 
+		"prometheus.projectAllowed":                "false",
 		"prometheus.enabled":                       "true",
 		"prometheus.level":                         "project",
 		"prometheus.apiGroup":                      monitoring.APIVersion.Group,
@@ -235,71 +245,6 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 	return ph.deployAppRoles(deployed)
 }
 
-func (ph *projectHandler) detectAppComponentsWhileInstall(appName, appTargetNamespace string, project *mgmtv3.Project) error {
-	if project.Status.MonitoringStatus == nil {
-		project.Status.MonitoringStatus = &mgmtv3.MonitoringStatus{
-			Conditions: []mgmtv3.MonitoringCondition{
-				{Type: mgmtv3.ClusterConditionType(ConditionPrometheusDeployed), Status: k8scorev1.ConditionFalse},
-				{Type: mgmtv3.ClusterConditionType(ConditionGrafanaDeployed), Status: k8scorev1.ConditionFalse},
-			},
-		}
-	}
-	monitoringStatus := project.Status.MonitoringStatus
-
-	checkers := make([]func() error, 0, len(monitoringStatus.Conditions))
-	if !ConditionGrafanaDeployed.IsTrue(monitoringStatus) {
-		checkers = append(checkers, func() error {
-			return isGrafanaDeployed(ph.app.agentDeploymentClient, appTargetNamespace, appName, monitoringStatus, project.Spec.ClusterName)
-		})
-	}
-	if !ConditionPrometheusDeployed.IsTrue(monitoringStatus) {
-		checkers = append(checkers, func() error {
-			return isPrometheusDeployed(ph.app.agentStatefulSetClient, appTargetNamespace, appName, monitoringStatus)
-		})
-	}
-
-	if len(checkers) == 0 {
-		return nil
-	}
-
-	err := stream(checkers...)
-	if err != nil {
-		time.Sleep(5 * time.Second)
-	}
-
-	return err
-}
-
-func (ph *projectHandler) detectAppComponentsWhileUninstall(appName, appTargetNamespace string, project *mgmtv3.Project) error {
-	if project.Status.MonitoringStatus == nil {
-		return nil
-	}
-	monitoringStatus := project.Status.MonitoringStatus
-
-	checkers := make([]func() error, 0, len(monitoringStatus.Conditions))
-	if !ConditionGrafanaDeployed.IsFalse(monitoringStatus) {
-		checkers = append(checkers, func() error {
-			return isGrafanaWithdrew(ph.app.agentDeploymentClient, appTargetNamespace, appName, monitoringStatus)
-		})
-	}
-	if !ConditionPrometheusDeployed.IsFalse(monitoringStatus) {
-		checkers = append(checkers, func() error {
-			return isPrometheusWithdrew(ph.app.agentStatefulSetClient, appTargetNamespace, appName, monitoringStatus)
-		})
-	}
-
-	if len(checkers) == 0 {
-		return nil
-	}
-
-	err := stream(checkers...)
-	if err != nil {
-		time.Sleep(5 * time.Second)
-	}
-
-	return err
-}
-
 func getProjectTag(project *mgmtv3.Project, clusterName string) string {
 	return fmt.Sprintf("%s(%s) of Cluster %s(%s)", project.Name, project.Spec.DisplayName, project.Spec.ClusterName, clusterName)
 }
@@ -348,4 +293,18 @@ func prtbBySAFunc(obj interface{}) ([]string, error) {
 	}
 
 	return []string{projectRoleBinding.ServiceAccount}, nil
+}
+
+func (ph *projectHandler) isGrafanaReady(svcName, namespace, port string) (bool, error) {
+	endpoints, err := ph.app.agentEndpointClient.GetNamespaced(namespace, svcName, metav1.GetOptions{})
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to get %s/%s Grafana endpoints", namespace, svcName)
+	}
+
+	if len(endpoints.Subsets) == 0 || len(endpoints.Subsets[0].Addresses) == 0 ||
+		len(endpoints.Subsets[0].Ports) == 0 || strconv.Itoa(int(endpoints.Subsets[0].Ports[0].Port)) != port {
+		return false, nil
+	}
+
+	return true, nil
 }

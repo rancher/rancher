@@ -22,6 +22,8 @@ type appHandler struct {
 	agentSecretClient         corev1.SecretInterface
 	agentNodeClient           corev1.NodeInterface
 	agentNamespaceClient      corev1.NamespaceInterface
+	agentEndpointClient       corev1.EndpointsInterface
+	agentEndpointsForCluster  corev1.EndpointsLister // endpoint lister belong to `cattle-prometheus` namespace
 	systemAccountManager      *systemaccount.Manager
 	projectLister             mgmtv3.ProjectLister
 	catalogTemplateLister     mgmtv3.CatalogTemplateLister

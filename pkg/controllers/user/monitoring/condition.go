@@ -12,6 +12,10 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
+var (
+	ConditionMetricExpressionDeployed = condition(mgmtv3.MonitoringConditionMetricExpressionDeployed)
+)
+
 var temfileRegexp = regexp.MustCompile("/tmp/[-_a-zA-Z0-9]+")
 
 type condition ncondition.Cond

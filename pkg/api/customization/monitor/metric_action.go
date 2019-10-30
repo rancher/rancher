@@ -74,7 +74,7 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 
 			comm = queryMetricInput.CommonQueryMetricInput
 			appName, saNamespace = monitorutil.ProjectMonitoringInfo(projectName)
-			svcName, svcNamespace, svcPort = monitorutil.ProjectPrometheusEndpoint(projectName)
+			svcName, svcNamespace, svcPort = monitorutil.ClusterPrometheusEndpoint()
 		}
 
 		start, end, step, err := parseTimeParams(comm.From, comm.To, comm.Interval)
@@ -199,7 +199,7 @@ func (h *MetricHandler) Action(actionName string, action *types.Action, apiConte
 		reqContext, cancel := context.WithTimeout(context.Background(), prometheusReqTimeout)
 		defer cancel()
 
-		svcName, svcNamespace, svcPort := monitorutil.ProjectPrometheusEndpoint(projectName)
+		svcName, svcNamespace, svcPort := monitorutil.ClusterPrometheusEndpoint()
 		prometheusQuery, err := NewPrometheusQuery(reqContext, clusterName, token, svcNamespace, svcName, svcPort, h.dialerFactory, userContext)
 		if err != nil {
 			return err

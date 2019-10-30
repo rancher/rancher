@@ -53,6 +53,9 @@ const (
 	alertManagerHeadlessServiceName = "alertmanager-operated"
 	prometheusHeadlessServiceName   = "prometheus-operated"
 
+	// The access service name of Grafana
+	grafanaAccessServiceName = "access-grafana"
+
 	// The service name of istio prometheus
 	istioPrometheusServiceName = "prometheus"
 
@@ -154,8 +157,31 @@ func ClusterPrometheusEndpoint() (headlessServiceName, namespace, port string) {
 	return prometheusHeadlessServiceName, cattleNamespaceName, "9090"
 }
 
-func ProjectPrometheusEndpoint(projectName string) (headlessServiceName, namespace, port string) {
-	return prometheusHeadlessServiceName, fmt.Sprintf("%s-%s", cattleNamespaceName, projectName), "9090"
+func ClusterGrafanaEndpoint() (accessServiceName, namespace, port string) {
+	return grafanaAccessServiceName, cattleNamespaceName, "80"
+}
+
+func ProjectGrafanaEndpoint(projectName string) (accessServiceName, namespace, port string) {
+	return grafanaAccessServiceName, fmt.Sprintf("%s-%s", cattleNamespaceName, projectName), "80"
+}
+
+func GetGrafanaProxyURL(clusterName, namespace, svcName, port string) string {
+	return fmt.Sprintf("/k8s/clusters/%s/api/v1/namespaces/%s/services/http:%s:%s/proxy/",
+		clusterName,
+		namespace,
+		svcName,
+		port,
+	)
+}
+
+func GetClusterGrafanaProxyURL(clusterName string) string {
+	svcName, namespace, port := ClusterGrafanaEndpoint()
+	return GetGrafanaProxyURL(clusterName, namespace, svcName, port)
+}
+
+func GetProjectGrafanaProxyURL(clusterName, projectName string) string {
+	svcName, namespace, port := ProjectGrafanaEndpoint(projectName)
+	return GetGrafanaProxyURL(clusterName, namespace, svcName, port)
 }
 
 /*OverwriteAppAnswersAndCatalogID Usage
