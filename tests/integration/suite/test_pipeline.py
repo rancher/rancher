@@ -1,4 +1,5 @@
 import pytest
+import time
 from .pipeline_common import MockGithub
 from .conftest import ProjectContext, rancher
 
@@ -135,12 +136,7 @@ def test_pipeline_github_log_in_out(admin_pc, mock_github):
 
 
 def set_up_pipeline_github(user_pc):
-    client = user_pc.client
-    configs = client.list_source_code_provider_config()
-    gh = None
-    for c in configs:
-        if c.type == "githubPipelineConfig":
-            gh = c
+    gh = get_source_code_provider_config(user_pc, "githubPipelineConfig")
     assert gh is not None
 
     gh.testAndApply(code="test_code",
@@ -148,3 +144,15 @@ def set_up_pipeline_github(user_pc):
                     tls=False,
                     clientId="test_id",
                     clientSecret="test_secret")
+
+
+def get_source_code_provider_config(user_pc, config_type):
+    client = user_pc.client
+    start_time = int(time.time())
+    while int(time.time()) - start_time < 30:
+        configs = client.list_source_code_provider_config()
+        for c in configs:
+            if c.type == config_type:
+                return c
+        time.sleep(3)
+    raise Exception('Timeout getting {0}'.format(config_type))
