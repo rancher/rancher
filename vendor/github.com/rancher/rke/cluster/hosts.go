@@ -1,10 +1,9 @@
 package cluster
 
 import (
+	"context"
 	"fmt"
 	"strings"
-
-	"context"
 
 	"github.com/docker/docker/api/types"
 	"github.com/rancher/rke/hosts"
@@ -15,6 +14,8 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	"k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -118,6 +119,69 @@ func (c *Cluster) InvertIndexHosts() error {
 	return nil
 }
 
+func (c *Cluster) getConsolidatedAdmissionConfiguration() (*v1alpha1.AdmissionConfiguration, error) {
+	var err error
+	var admissionConfig *v1alpha1.AdmissionConfiguration
+
+	if c.Services.KubeAPI.EventRateLimit == nil ||
+		!c.Services.KubeAPI.EventRateLimit.Enabled {
+		return c.Services.KubeAPI.AdmissionConfiguration, nil
+	}
+
+	logrus.Debugf("EventRateLimit is enabled")
+	found := false
+	if c.Services.KubeAPI.AdmissionConfiguration != nil {
+		plugins := c.Services.KubeAPI.AdmissionConfiguration.Plugins
+		for _, plugin := range plugins {
+			if plugin.Name == EventRateLimitPluginName {
+				found = true
+				break
+			}
+		}
+	}
+	if found {
+		logrus.Debugf("EventRateLimit Plugin configuration found in admission config")
+		if c.Services.KubeAPI.EventRateLimit.Configuration != nil {
+			logrus.Warnf("conflicting EventRateLimit configuration found, using the one from Admission Configuration")
+			return c.Services.KubeAPI.AdmissionConfiguration, nil
+		}
+	}
+
+	logrus.Debugf("EventRateLimit Plugin configuration not found in admission config")
+	if c.Services.KubeAPI.AdmissionConfiguration == nil {
+		logrus.Debugf("no user specified admission configuration found")
+		admissionConfig, err = newDefaultAdmissionConfiguration()
+		if err != nil {
+			logrus.Errorf("error getting default admission configuration: %v", err)
+			return nil, err
+		}
+	} else {
+		admissionConfig, err = newDefaultAdmissionConfiguration()
+		if err != nil {
+			logrus.Errorf("error getting default admission configuration: %v", err)
+			return nil, err
+		}
+		copy(admissionConfig.Plugins, c.Services.KubeAPI.AdmissionConfiguration.Plugins)
+	}
+	if c.Services.KubeAPI.EventRateLimit.Configuration != nil {
+		logrus.Debugf("user specified EventRateLimit configuration found")
+		p, err := getEventRateLimitPluginFromConfig(c.Services.KubeAPI.EventRateLimit.Configuration)
+		if err != nil {
+			logrus.Errorf("error getting eventratelimit plugin from config: %v", err)
+		}
+		admissionConfig.Plugins = append(admissionConfig.Plugins, p)
+	} else {
+		logrus.Debugf("using default EventRateLimit configuration")
+		p, err := newDefaultEventRateLimitPlugin()
+		if err != nil {
+			logrus.Errorf("error getting default eventratelimit plugin: %v", err)
+		}
+		admissionConfig.Plugins = append(admissionConfig.Plugins, p)
+	}
+
+	return admissionConfig, nil
+}
+
 func (c *Cluster) SetUpHosts(ctx context.Context, flags ExternalFlags) error {
 	if c.AuthnStrategies[AuthnX509Provider] {
 		log.Infof(ctx, "[certificates] Deploying kubernetes certificates to Cluster nodes")
@@ -160,6 +224,38 @@ func (c *Cluster) SetUpHosts(ctx context.Context, flags ExternalFlags) error {
 		if c.EncryptionConfig.EncryptionProviderFile != "" {
 			if err := c.DeployEncryptionProviderFile(ctx); err != nil {
 				return err
+			}
+		}
+
+		if _, ok := c.Services.KubeAPI.ExtraArgs[KubeAPIArgAdmissionControlConfigFile]; !ok {
+			if c.Services.KubeAPI.EventRateLimit != nil && c.Services.KubeAPI.EventRateLimit.Enabled {
+				controlPlaneHosts := hosts.GetUniqueHostList(nil, c.ControlPlaneHosts, nil)
+				ac, err := c.getConsolidatedAdmissionConfiguration()
+				if err != nil {
+					return fmt.Errorf("error getting consolidated admission configuration: %v", err)
+				}
+				bytes, err := yaml.Marshal(ac)
+				if err != nil {
+					return err
+				}
+				if err := deployFile(ctx, controlPlaneHosts, c.SystemImages.Alpine, c.PrivateRegistriesMap, DefaultKubeAPIArgAdmissionControlConfigFileValue, string(bytes)); err != nil {
+					return err
+				}
+				log.Infof(ctx, "[%s] Successfully deployed admission control config to Cluster control nodes", DefaultKubeAPIArgAdmissionControlConfigFileValue)
+			}
+		}
+
+		if _, ok := c.Services.KubeAPI.ExtraArgs[KubeAPIArgAuditPolicyFile]; !ok {
+			if c.Services.KubeAPI.AuditLog != nil && c.Services.KubeAPI.AuditLog.Enabled {
+				controlPlaneHosts := hosts.GetUniqueHostList(nil, c.ControlPlaneHosts, nil)
+				bytes, err := yaml.Marshal(c.Services.KubeAPI.AuditLog.Configuration.Policy)
+				if err != nil {
+					return err
+				}
+				if err := deployFile(ctx, controlPlaneHosts, c.SystemImages.Alpine, c.PrivateRegistriesMap, DefaultKubeAPIArgAuditPolicyFileValue, string(bytes)); err != nil {
+					return err
+				}
+				log.Infof(ctx, "[%s] Successfully deployed audit policy file to Cluster control nodes", DefaultKubeAPIArgAuditPolicyFileValue)
 			}
 		}
 	}

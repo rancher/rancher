@@ -2,15 +2,15 @@ package cluster
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"reflect"
 	"strings"
 	"time"
 
-	"github.com/rancher/rke/pki/cert"
-
 	"github.com/docker/docker/api/types"
+	ghodssyaml "github.com/ghodss/yaml"
 	"github.com/rancher/rke/authz"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/metadata"
 	"github.com/rancher/rke/pki"
+	"github.com/rancher/rke/pki/cert"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/rke/util"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -25,6 +26,10 @@ import (
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	apiserverv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
+	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/transport"
@@ -151,6 +156,104 @@ func (c *Cluster) DeployWorkerPlane(ctx context.Context, svcOptionData map[strin
 	return nil
 }
 
+func parseAuditLogConfig(clusterFile string, rkeConfig *v3.RancherKubernetesEngineConfig) error {
+	if rkeConfig.Services.KubeAPI.AuditLog != nil &&
+		rkeConfig.Services.KubeAPI.AuditLog.Enabled &&
+		rkeConfig.Services.KubeAPI.AuditLog.Configuration.Policy == nil {
+		return nil
+	}
+	logrus.Debugf("audit log policy found in cluster.yml")
+	var r map[string]interface{}
+	err := ghodssyaml.Unmarshal([]byte(clusterFile), &r)
+	if err != nil {
+		return fmt.Errorf("error unmarshalling: %v", err)
+	}
+	if r["services"] == nil {
+		return nil
+	}
+	services := r["services"].(map[string]interface{})
+	if services["kube-api"] == nil {
+		return nil
+	}
+	kubeapi := services["kube-api"].(map[string]interface{})
+	if kubeapi["audit_log"] == nil {
+		return nil
+	}
+	auditlog := kubeapi["audit_log"].(map[string]interface{})
+	if auditlog["configuration"] == nil {
+		return nil
+	}
+	alc := auditlog["configuration"].(map[string]interface{})
+	if alc["policy"] == nil {
+		return nil
+	}
+	policyBytes, err := json.Marshal(alc["policy"])
+	if err != nil {
+		return fmt.Errorf("error marshalling audit policy: %v", err)
+	}
+	scheme := runtime.NewScheme()
+	err = auditv1.AddToScheme(scheme)
+	if err != nil {
+		return fmt.Errorf("error adding to scheme: %v", err)
+	}
+	codecs := serializer.NewCodecFactory(scheme)
+	p := auditv1.Policy{}
+	err = runtime.DecodeInto(codecs.UniversalDecoder(), policyBytes, &p)
+	if err != nil || p.Kind != "Policy" {
+		return fmt.Errorf("error decoding audit policy: %v", err)
+	}
+	rkeConfig.Services.KubeAPI.AuditLog.Configuration.Policy = &p
+	return err
+}
+
+func parseAdmissionConfig(clusterFile string, rkeConfig *v3.RancherKubernetesEngineConfig) error {
+	if rkeConfig.Services.KubeAPI.AdmissionConfiguration == nil {
+		return nil
+	}
+	logrus.Debugf("admission configuration found in cluster.yml")
+	var r map[string]interface{}
+	err := ghodssyaml.Unmarshal([]byte(clusterFile), &r)
+	if err != nil {
+		return fmt.Errorf("error unmarshalling: %v", err)
+	}
+	if r["services"] == nil {
+		return nil
+	}
+	services := r["services"].(map[string]interface{})
+	if services["kube-api"] == nil {
+		return nil
+	}
+	kubeapi := services["kube-api"].(map[string]interface{})
+	if kubeapi["admission_configuration"] == nil {
+		return nil
+	}
+	data, err := json.Marshal(kubeapi["admission_configuration"])
+	if err != nil {
+		return fmt.Errorf("error marshalling admission configuration: %v", err)
+	}
+	scheme := runtime.NewScheme()
+	err = apiserverv1alpha1.AddToScheme(scheme)
+	if err != nil {
+		return fmt.Errorf("error adding to scheme: %v", err)
+	}
+	err = scheme.SetVersionPriority(apiserverv1alpha1.SchemeGroupVersion)
+	if err != nil {
+		return fmt.Errorf("error setting version priority: %v", err)
+	}
+	codecs := serializer.NewCodecFactory(scheme)
+	decoder := codecs.UniversalDecoder(apiserverv1alpha1.SchemeGroupVersion)
+	decodedObj, err := runtime.Decode(decoder, data)
+	if err != nil {
+		return fmt.Errorf("error decoding data: %v", err)
+	}
+	decodedConfig, ok := decodedObj.(*apiserverv1alpha1.AdmissionConfiguration)
+	if !ok {
+		return fmt.Errorf("unexpected type: %T", decodedObj)
+	}
+	rkeConfig.Services.KubeAPI.AdmissionConfiguration = decodedConfig
+	return nil
+}
+
 func ParseConfig(clusterFile string) (*v3.RancherKubernetesEngineConfig, error) {
 	logrus.Debugf("Parsing cluster file [%v]", clusterFile)
 	var rkeConfig v3.RancherKubernetesEngineConfig
@@ -169,6 +272,12 @@ func ParseConfig(clusterFile string) (*v3.RancherKubernetesEngineConfig, error) 
 
 	if isEncryptionEnabled(&rkeConfig) && secretConfig != nil {
 		rkeConfig.Services.KubeAPI.SecretsEncryptionConfig.CustomConfig = secretConfig
+	}
+	if err := parseAdmissionConfig(clusterFile, &rkeConfig); err != nil {
+		return &rkeConfig, fmt.Errorf("error parsing admission config: %v", err)
+	}
+	if err := parseAuditLogConfig(clusterFile, &rkeConfig); err != nil {
+		return &rkeConfig, fmt.Errorf("error parsing audit log config: %v", err)
 	}
 	return &rkeConfig, nil
 }

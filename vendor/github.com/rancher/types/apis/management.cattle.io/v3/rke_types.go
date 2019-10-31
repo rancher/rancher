@@ -4,7 +4,10 @@ import (
 	"github.com/rancher/norman/types"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiserverv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
+	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
+	eventratelimitv1alpha1 "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1"
 )
 
 type RancherKubernetesEngineConfig struct {
@@ -274,6 +277,31 @@ type KubeAPIService struct {
 	AlwaysPullImages bool `yaml:"always_pull_images" json:"alwaysPullImages,omitempty"`
 	// Secrets encryption provider config
 	SecretsEncryptionConfig *SecretsEncryptionConfig `yaml:"secrets_encryption_config" json:"secretsEncryptionConfig,omitempty"`
+	// Audit Log Configuration
+	AuditLog *AuditLog `yaml:"audit_log" json:"auditLog,omitempty"`
+	// AdmissionConfiguration
+	AdmissionConfiguration *apiserverv1alpha1.AdmissionConfiguration `yaml:"admission_configuration" json:"admissionConfiguration,omitempty" norman:"type=map[json]"`
+	// Event Rate Limit configuration
+	EventRateLimit *EventRateLimit `yaml:"event_rate_limit" json:"eventRateLimit,omitempty"`
+}
+
+type EventRateLimit struct {
+	Enabled       bool                                  `yaml:"enabled" json:"enabled,omitempty"`
+	Configuration *eventratelimitv1alpha1.Configuration `yaml:"configuration" json:"configuration,omitempty" norman:"type=map[json]"`
+}
+
+type AuditLog struct {
+	Enabled       bool            `yaml:"enabled" json:"enabled,omitempty"`
+	Configuration *AuditLogConfig `yaml:"configuration" json:"configuration,omitempty"`
+}
+
+type AuditLogConfig struct {
+	MaxAge    int             `yaml:"max_age" json:"maxAge,omitempty"`
+	MaxBackup int             `yaml:"max_backup" json:"maxBackup,omitempty"`
+	MaxSize   int             `yaml:"max_size" json:"maxSize,omitempty"`
+	Path      string          `yaml:"path" json:"path,omitempty"`
+	Format    string          `yaml:"format" json:"format,omitempty"`
+	Policy    *auditv1.Policy `yaml:"policy" json:"policy,omitempty" norman:"type=map[json]"`
 }
 
 type KubeControllerService struct {

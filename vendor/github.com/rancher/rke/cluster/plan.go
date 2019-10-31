@@ -265,11 +265,25 @@ func (c *Cluster) BuildKubeAPIProcess(host *hosts.Host, prefixPath string, svcOp
 		CommandArgs[admissionControlOptionName] = CommandArgs[admissionControlOptionName] + ",AlwaysPullImages"
 	}
 
+	if c.Services.KubeAPI.AuditLog != nil {
+		if alc := c.Services.KubeAPI.AuditLog.Configuration; alc != nil {
+			CommandArgs[KubeAPIArgAuditLogPath] = alc.Path
+			CommandArgs[KubeAPIArgAuditLogMaxAge] = strconv.Itoa(alc.MaxAge)
+			CommandArgs[KubeAPIArgAuditLogMaxBackup] = strconv.Itoa(alc.MaxBackup)
+			CommandArgs[KubeAPIArgAuditLogMaxSize] = strconv.Itoa(alc.MaxSize)
+			CommandArgs[KubeAPIArgAuditLogFormat] = alc.Format
+			CommandArgs[KubeAPIArgAuditPolicyFile] = DefaultKubeAPIArgAuditPolicyFileValue
+		}
+	}
+
 	VolumesFrom := []string{
 		services.SidekickContainerName,
 	}
 	Binds := []string{
 		fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(prefixPath, "/etc/kubernetes")),
+	}
+	if c.Services.KubeAPI.AuditLog != nil && c.Services.KubeAPI.AuditLog.Enabled {
+		Binds = append(Binds, fmt.Sprintf("%s:/var/log/kube-audit:z", path.Join(prefixPath, "/var/log/kube-audit")))
 	}
 
 	// Override args if they exist, add additional args
