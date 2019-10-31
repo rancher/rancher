@@ -48,6 +48,7 @@ type Handler struct {
 	Projects       v3.ProjectInterface
 	ProjectLister  v3.ProjectLister
 	ClusterManager *clustermanager.Manager
+	ClusterLister  v3.ClusterLister
 	UserMgr        user.Manager
 }
 
@@ -261,11 +262,31 @@ func (h *Handler) setPodSecurityPolicyTemplate(actionName string, action *types.
 		return fmt.Errorf("error parse/validate action body: %v", err)
 	}
 
-	podSecurityPolicyTemplateName, ok :=
-		input[client.PodSecurityPolicyTemplateProjectBindingFieldPodSecurityPolicyTemplateName].(string)
-	if !ok && input[client.PodSecurityPolicyTemplateProjectBindingFieldPodSecurityPolicyTemplateName] != nil {
-		return fmt.Errorf("could not convert: %v",
-			input[client.PodSecurityPolicyTemplateProjectBindingFieldPodSecurityPolicyTemplateName])
+	providedPSP := input[client.PodSecurityPolicyTemplateProjectBindingFieldPodSecurityPolicyTemplateName]
+
+	if providedPSP != nil {
+		// cannot use cluster manager to get cluster name as subcontext is nil
+		idParts := strings.Split(request.ID, ":")
+		if len(idParts) != 2 {
+			return httperror.NewAPIError(httperror.InvalidBodyContent,
+				fmt.Sprintf("cannot parse cluster from ID [%s]", request.ID))
+		}
+
+		clusterName := idParts[0]
+		cluster, err := h.ClusterLister.Get("", clusterName)
+		if err != nil {
+			return fmt.Errorf("error retrieving cluster [%s]: %v", clusterName, err)
+		}
+
+		if !cluster.Status.Capabilities.PspEnabled {
+			return httperror.NewAPIError(httperror.InvalidAction,
+				fmt.Sprintf("cluster [%s] does not have Pod Security Policies enabled", clusterName))
+		}
+	}
+
+	podSecurityPolicyTemplateName, ok := providedPSP.(string)
+	if !ok && providedPSP != nil {
+		return fmt.Errorf("could not convert: %v", providedPSP)
 	}
 
 	schema := request.Schemas.Schema(&managementschema.Version, client.PodSecurityPolicyTemplateProjectBindingType)
