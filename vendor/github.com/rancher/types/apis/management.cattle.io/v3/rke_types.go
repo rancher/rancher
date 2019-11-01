@@ -324,6 +324,8 @@ type KubeletService struct {
 	ClusterDNSServer string `yaml:"cluster_dns_server" json:"clusterDnsServer,omitempty"`
 	// Fail if swap is enabled
 	FailSwapOn bool `yaml:"fail_swap_on" json:"failSwapOn,omitempty"`
+	// Generate per node kubelet serving certificates created using kube-ca
+	GenerateServingCertificate bool `yaml:"generate_serving_certificate" json:"generateServingCertificate,omitempty"`
 }
 
 type KubeproxyService struct {
