@@ -62,35 +62,17 @@ func GenerateRKECerts(ctx context.Context, rkeConfig v3.RancherKubernetesEngineC
 func GenerateRKENodeCerts(ctx context.Context, rkeConfig v3.RancherKubernetesEngineConfig, nodeAddress string, certBundle map[string]CertificatePKI) map[string]CertificatePKI {
 	crtMap := make(map[string]CertificatePKI)
 	crtKeys := []string{}
-	removeCAKey := true
 	for _, node := range rkeConfig.Nodes {
 		if node.Address == nodeAddress {
 			for _, role := range node.Role {
-				switch role {
-				case controlRole:
-					keys := getControlCertKeys()
-					crtKeys = append(crtKeys, keys...)
-					removeCAKey = false
-				case workerRole:
-					keys := getWorkerCertKeys()
-					crtKeys = append(crtKeys, keys...)
-				case etcdRole:
-					keys := getEtcdCertKeys(rkeConfig.Nodes, etcdRole)
-					crtKeys = append(crtKeys, keys...)
-				}
+				keys := getCertKeys(rkeConfig.Nodes, role, &rkeConfig)
+				crtKeys = append(crtKeys, keys...)
 			}
 			break
 		}
 	}
 	for _, key := range crtKeys {
 		crtMap[key] = certBundle[key]
-	}
-	if removeCAKey {
-		caCert := crtMap[CACertName]
-		caCert.Key = nil
-		caCert.KeyEnvName = ""
-		caCert.KeyPath = ""
-		crtMap[CACertName] = caCert
 	}
 	return crtMap
 }
@@ -103,7 +85,8 @@ func RegenerateEtcdCertificate(
 	clusterDomain string,
 	KubernetesServiceIP net.IP) (map[string]CertificatePKI, error) {
 
-	log.Infof(ctx, "[certificates] Regenerating new etcd-%s certificate and key", etcdHost.InternalAddress)
+	etcdName := GetCrtNameForHost(etcdHost, EtcdCertName)
+	log.Infof(ctx, "[certificates] Regenerating new %s certificate and key", etcdName)
 	caCrt := crtMap[CACertName].Certificate
 	caKey := crtMap[CACertName].Key
 	etcdAltNames := GetAltNames(etcdHosts, clusterDomain, KubernetesServiceIP, []string{})
@@ -112,9 +95,8 @@ func RegenerateEtcdCertificate(
 	if err != nil {
 		return nil, err
 	}
-	etcdName := GetEtcdCrtName(etcdHost.InternalAddress)
 	crtMap[etcdName] = ToCertObject(etcdName, "", "", etcdCrt, etcdKey, nil)
-	log.Infof(ctx, "[certificates] Successfully generated new etcd-%s certificate and key", etcdHost.InternalAddress)
+	log.Infof(ctx, "[certificates] Successfully generated new %s certificate and key", etcdName)
 	return crtMap, nil
 }
 
