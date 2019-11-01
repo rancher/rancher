@@ -33,7 +33,7 @@ const (
 	AzureL4LB               = "Azure L4 LB"
 	NginxIngressProvider    = "Nginx"
 	DefaultNodePortRange    = "30000-32767"
-	capabilitiesAnnotation  = "capabilities.cattle.io/"
+	capabilitiesAnnotation  = "capabilities/"
 )
 
 type controller struct {
