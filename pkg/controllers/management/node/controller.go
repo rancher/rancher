@@ -332,10 +332,11 @@ func aliasToPath(driver string, config map[string]interface{}, ns string) error 
 				fileName := driverField
 				if ok := nodedriver.SSHKeyFields[schemaField]; ok {
 					fileName = "id_rsa"
-					// The ending newline gets stripped, add em back
-					if !strings.HasSuffix(fileContents, "\n") {
-						fileContents = fileContents + "\n"
-					}
+				}
+
+				// The ending newline gets stripped, add em back
+				if !strings.HasSuffix(fileContents, "\n") {
+					fileContents = fileContents + "\n"
 				}
 
 				hasher.Reset()
