@@ -30,7 +30,7 @@ func GenerateKubeAPICertificate(ctx context.Context, certs map[string]Certificat
 	kubeAPICert := certs[KubeAPICertName].Certificate
 	if kubeAPICert != nil &&
 		reflect.DeepEqual(kubeAPIAltNames.DNSNames, kubeAPICert.DNSNames) &&
-		deepEqualIPsAltNames(kubeAPIAltNames.IPs, kubeAPICert.IPAddresses) && !rotate {
+		DeepEqualIPsAltNames(kubeAPIAltNames.IPs, kubeAPICert.IPAddresses) && !rotate {
 		return nil
 	}
 	log.Infof(ctx, "[certificates] Generating Kubernetes API server certificates")
@@ -65,7 +65,7 @@ func GenerateKubeAPICSR(ctx context.Context, certs map[string]CertificatePKI, rk
 	oldKubeAPICSR := certs[KubeAPICertName].CSR
 	if oldKubeAPICSR != nil &&
 		reflect.DeepEqual(kubeAPIAltNames.DNSNames, oldKubeAPICSR.DNSNames) &&
-		deepEqualIPsAltNames(kubeAPIAltNames.IPs, oldKubeAPICSR.IPAddresses) {
+		DeepEqualIPsAltNames(kubeAPIAltNames.IPs, oldKubeAPICSR.IPAddresses) {
 		return nil
 	}
 	log.Infof(ctx, "[certificates] Generating Kubernetes API server csr")
@@ -372,7 +372,7 @@ func GenerateEtcdCertificates(ctx context.Context, certs map[string]CertificateP
 	sort.Strings(ips)
 
 	for _, host := range etcdHosts {
-		etcdName := GetEtcdCrtName(host.InternalAddress)
+		etcdName := GetCrtNameForHost(host, EtcdCertName)
 		if _, ok := certs[etcdName]; ok && certs[etcdName].CertificatePEM != "" && !rotate {
 			cert := certs[etcdName].Certificate
 			if cert != nil && len(dnsNames) == len(cert.DNSNames) && len(ips) == len(cert.IPAddresses) {
@@ -396,7 +396,7 @@ func GenerateEtcdCertificates(ctx context.Context, certs map[string]CertificateP
 		if !rotate {
 			serviceKey = certs[etcdName].Key
 		}
-		log.Infof(ctx, "[certificates] Generating etcd-%s certificate and key", host.InternalAddress)
+		log.Infof(ctx, "[certificates] Generating %s certificate and key", etcdName)
 		etcdCrt, etcdKey, err := GenerateSignedCertAndKey(caCrt, caKey, true, EtcdCertName, etcdAltNames, serviceKey, nil)
 		if err != nil {
 			return err
@@ -415,7 +415,7 @@ func GenerateEtcdCSRs(ctx context.Context, certs map[string]CertificatePKI, rkeC
 	etcdHosts := hosts.NodesToHosts(rkeConfig.Nodes, etcdRole)
 	etcdAltNames := GetAltNames(etcdHosts, clusterDomain, kubernetesServiceIP, []string{})
 	for _, host := range etcdHosts {
-		etcdName := GetEtcdCrtName(host.InternalAddress)
+		etcdName := GetCrtNameForHost(host, EtcdCertName)
 		etcdCrt := certs[etcdName].Certificate
 		etcdCSRPEM := certs[etcdName].CSRPEM
 		if etcdCSRPEM != "" {
@@ -484,6 +484,63 @@ func GenerateRKERequestHeaderCACert(ctx context.Context, certs map[string]Certif
 	return nil
 }
 
+func GenerateKubeletCertificate(ctx context.Context, certs map[string]CertificatePKI, rkeConfig v3.RancherKubernetesEngineConfig, configPath, configDir string, rotate bool) error {
+	// generate kubelet certificate and key
+	caCrt := certs[CACertName].Certificate
+	caKey := certs[CACertName].Key
+	if caCrt == nil || caKey == nil {
+		return fmt.Errorf("CA Certificate or Key is empty")
+	}
+	log.Infof(ctx, "[certificates] Generating Kubernetes Kubelet certificates")
+	allHosts := hosts.NodesToHosts(rkeConfig.Nodes, "")
+	for _, host := range allHosts {
+		kubeletName := GetCrtNameForHost(host, KubeletCertName)
+		kubeletCert := certs[kubeletName].Certificate
+		if kubeletCert != nil && !rotate {
+			continue
+		}
+		kubeletAltNames := GetIPHostAltnamesForHost(host)
+		if kubeletCert != nil &&
+			reflect.DeepEqual(kubeletAltNames.DNSNames, kubeletCert.DNSNames) &&
+			DeepEqualIPsAltNames(kubeletAltNames.IPs, kubeletCert.IPAddresses) && !rotate {
+			continue
+		}
+		var serviceKey *rsa.PrivateKey
+		if !rotate {
+			serviceKey = certs[kubeletName].Key
+		}
+		log.Infof(ctx, "[certificates] Generating %s certificate and key", kubeletName)
+		kubeletCrt, kubeletKey, err := GenerateSignedCertAndKey(caCrt, caKey, true, kubeletName, kubeletAltNames, serviceKey, nil)
+		if err != nil {
+			return err
+		}
+		certs[kubeletName] = ToCertObject(kubeletName, "", "", kubeletCrt, kubeletKey, nil)
+	}
+	return nil
+}
+
+func GenerateKubeletCSR(ctx context.Context, certs map[string]CertificatePKI, rkeConfig v3.RancherKubernetesEngineConfig) error {
+	allHosts := hosts.NodesToHosts(rkeConfig.Nodes, "")
+	for _, host := range allHosts {
+		kubeletName := GetCrtNameForHost(host, KubeletCertName)
+		kubeletCert := certs[kubeletName].Certificate
+		oldKubeletCSR := certs[kubeletName].CSR
+		kubeletAltNames := GetIPHostAltnamesForHost(host)
+		if oldKubeletCSR != nil &&
+			reflect.DeepEqual(kubeletAltNames.DNSNames, oldKubeletCSR.DNSNames) &&
+			DeepEqualIPsAltNames(kubeletAltNames.IPs, oldKubeletCSR.IPAddresses) {
+			return nil
+		}
+		log.Infof(ctx, "[certificates] Generating %s Kubernetes Kubelet csr", kubeletName)
+		kubeletCSR, kubeletKey, err := GenerateCertSigningRequestAndKey(true, kubeletName, kubeletAltNames, certs[kubeletName].Key, nil)
+		if err != nil {
+			return err
+		}
+		certs[kubeletName] = ToCertObject(kubeletName, "", "", kubeletCert, kubeletKey, kubeletCSR)
+	}
+	return nil
+}
+
 func GenerateRKEServicesCerts(ctx context.Context, certs map[string]CertificatePKI, rkeConfig v3.RancherKubernetesEngineConfig, configPath, configDir string, rotate bool) error {
 	RKECerts := []GenFunc{
 		GenerateKubeAPICertificate,
@@ -495,6 +552,9 @@ func GenerateRKEServicesCerts(ctx context.Context, certs map[string]CertificateP
 		GenerateKubeAdminCertificate,
 		GenerateAPIProxyClientCertificate,
 		GenerateEtcdCertificates,
+	}
+	if IsKubeletGenerateServingCertificateEnabledinConfig(&rkeConfig) {
+		RKECerts = append(RKECerts, GenerateKubeletCertificate)
 	}
 	for _, gen := range RKECerts {
 		if err := gen(ctx, certs, rkeConfig, configPath, configDir, rotate); err != nil {
@@ -517,6 +577,9 @@ func GenerateRKEServicesCSRs(ctx context.Context, certs map[string]CertificatePK
 		GenerateKubeAdminCSR,
 		GenerateAPIProxyClientCSR,
 		GenerateEtcdCSRs,
+	}
+	if IsKubeletGenerateServingCertificateEnabledinConfig(&rkeConfig) {
+		RKECerts = append(RKECerts, GenerateKubeletCSR)
 	}
 	for _, csr := range RKECerts {
 		if err := csr(ctx, certs, rkeConfig); err != nil {

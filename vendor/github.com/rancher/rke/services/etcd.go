@@ -428,7 +428,7 @@ func DownloadEtcdSnapshotFromS3(ctx context.Context, etcdHost *hosts.Host, prsMa
 
 func RestoreEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdRestoreImage, snapshotName, initCluster string, es v3.ETCDService) error {
 	log.Infof(ctx, "[etcd] Restoring [%s] snapshot on etcd host [%s]", snapshotName, etcdHost.Address)
-	nodeName := pki.GetEtcdCrtName(etcdHost.InternalAddress)
+	nodeName := pki.GetCrtNameForHost(etcdHost, pki.EtcdCertName)
 	snapshotPath := fmt.Sprintf("%s%s", EtcdSnapshotPath, snapshotName)
 
 	// make sure that restore path is empty otherwise etcd restore will fail
