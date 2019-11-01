@@ -129,7 +129,7 @@ def test_writing_config_to_disk(admin_mc, wait_remove_resource):
         digitaloceancredentialConfig={"accessToken": "test"})
     wait_remove_resource(cloud_credential)
 
-    data = {'userdata': 'do cool stuff',
+    data = {'userdata': 'do cool stuff\n',
             # This validates ssh keys don't drop the ending \n
             'id_rsa': 'some\nfake\nstuff\n'
             }
