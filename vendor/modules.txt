@@ -286,7 +286,7 @@ github.com/prometheus/procfs/internal/fs
 # github.com/rancher/kontainer-driver-metadata v0.0.0-20191021164950-6514452b9732
 github.com/rancher/kontainer-driver-metadata/rke/templates
 github.com/rancher/kontainer-driver-metadata/rke
-# github.com/rancher/kontainer-engine v0.0.4-dev.0.20190930174220-db9e24343393
+# github.com/rancher/kontainer-engine v0.0.4-dev.0.20191104182032-b0a8fe9ff757
 github.com/rancher/kontainer-engine/logstream
 github.com/rancher/kontainer-engine/service
 github.com/rancher/kontainer-engine/types
