@@ -435,7 +435,6 @@ def get_role_nodes(cluster, role):
 
 def validate_ingress(p_client, cluster, workloads, host, path,
                      insecure_redirect=False):
-    time.sleep(10)
     curl_args = " "
     if (insecure_redirect):
         curl_args = " -L --insecure "
@@ -445,7 +444,11 @@ def validate_ingress(p_client, cluster, workloads, host, path,
     target_name_list = get_target_names(p_client, workloads)
     for node in nodes:
         host_ip = resolve_node_ip(node)
-        cmd = curl_args + " http://" + host_ip + path
+        url = "http://" + host_ip + path
+        wait_until_ok(url, timeout=300, headers={
+            "Host": host
+        })
+        cmd = curl_args + " " + url
         validate_http_response(cmd, target_name_list)
 
 
@@ -519,24 +522,51 @@ def wait_until_lb_is_active(url, timeout=300):
     return
 
 
-def check_for_no_access(url, verify=False):
+def check_for_no_access(url, verify=False, headers={}):
     try:
-        requests.get(url, verify=verify)
-        return False
+        requests.get(url, verify=verify, headers=headers)
+        return True
     except requests.ConnectionError:
         print("Connection Error - " + url)
         return True
 
 
-def wait_until_active(url, timeout=120):
+def wait_until_active(url, timeout=120, headers={}):
     start = time.time()
-    while check_for_no_access(url):
+    print("Waiting until {0} is active and responding to http requests"
+          .format(url))
+    while check_for_no_access(url, headers=headers):
         time.sleep(.5)
-        print("No access yet")
+        print(".", end="\r")
         if time.time() - start > timeout:
-            raise Exception('Timed out waiting for url '
-                            'to become active')
+            raise Exception(
+                'Timed out waiting for {0} to become active'.format(url)
+            )
     return
+
+
+def wait_until_ok(url, timeout=120, headers={}):
+    start = time.time()
+    print("Waiting until {0} is 200OK".format(url))
+    while not check_if_ok(url, headers=headers):
+        time.sleep(.5)
+        print(".", end="\r")
+        if time.time() - start > timeout:
+            raise Exception(
+                'Timed out waiting for {0} to become ok'.format(url)
+            )
+    return
+
+
+def check_if_ok(url, verify=False, headers={}):
+    try:
+        res = requests.head(url, verify=verify, headers=headers)
+        if res.status_code == 200:
+            return True
+        return False
+    except requests.ConnectionError:
+        print("Connection Error - " + url)
+        return False
 
 
 def validate_http_response(cmd, target_name_list, client_pod=None):
@@ -759,6 +789,12 @@ def create_custom_host_registration_token(client, cluster):
     cluster_token = client.wait_success(cluster_token)
     assert cluster_token.state == 'active'
     return cluster_token
+
+
+def get_cluster_by_name(client, name):
+    clusters = client.list_cluster(name=name).data
+    assert len(clusters) == 1, "Cluster " + name + " does not exist"
+    return clusters[0]
 
 
 def get_cluster_type(client, cluster):
@@ -1140,7 +1176,7 @@ def wait_for_mcapp_to_active(client, multiClusterApp,
 def wait_for_app_to_active(client, app_id,
                            timeout=DEFAULT_MULTI_CLUSTER_APP_TIMEOUT):
     time.sleep(5)
-    #When the app is deployed it goes into Active state for a short
+    # When the app is deployed it goes into Active state for a short
     # period of time and then into installing/deploying.
     app_data = client.list_app(id=app_id).data
     start = time.time()
@@ -1273,3 +1309,50 @@ def validate_app_deletion(client, app_id, timeout=DEFAULT_APP_DELETION_TIMEOUT):
         if len(app) == 0:
             break
 
+
+def validate_catalog_app(proj_client, app, external_id, answer=None):
+    if answer is None:
+        answers = get_defaut_question_answers(get_admin_client(), external_id)
+    else:
+        answers = answer
+    # validate app is active
+    app = wait_for_app_to_active(proj_client, app.id)
+    assert app.externalId == external_id, \
+        "the version of the app is not correct"
+    # check if associated workloads are active
+    ns = app.targetNamespace
+    pramaters = external_id.split('&')
+    assert len(pramaters) > 1, \
+        "Incorrect list of paramaters from catalog external ID"
+    chart = pramaters[len(pramaters)-2].split("=")[1] + "-" + \
+            pramaters[len(pramaters)-1].split("=")[1]
+    workloads = proj_client.list_workload(namespaceId=ns).data
+    for wl in workloads:
+        assert wl.state == "active"
+        assert wl.workloadLabels.chart == chart, \
+            "the chart version is wrong"
+
+    # validate_app_answers
+    assert len(answers.items() - app["answers"].items()) == 0, \
+        "Answers are not same as the original catalog answers"
+    return app
+
+
+def get_admin_token(api_url=CATTLE_TEST_URL,
+                    password="admin"):
+    """Generates an admin token and sets ADMIN_TOKEN"""
+    auth_url = api_url + "/v3-public/localproviders/local?action=login"
+    r = requests.post(auth_url, json={
+        'username': 'admin',
+        'password': 'admin',
+        'responseType': 'json',
+    }, verify=False)
+    token = r.json()['token']
+    client = get_client_for_token(token)
+    if password != "admin":
+        admin_user = client.list_user(username="admin").data
+        admin_user[0].setpassword(newPassword=password)
+
+    global ADMIN_TOKEN
+    ADMIN_TOKEN = token
+    return token
