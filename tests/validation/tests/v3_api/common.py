@@ -436,8 +436,9 @@ def wait_for_pod_to_running(client, pod, timeout=DEFAULT_TIMEOUT):
     return p
 
 
-def get_schedulable_nodes(cluster):
-    client = get_user_client()
+def get_schedulable_nodes(cluster, client=None):
+    if not client:
+        client = get_user_client()
     nodes = client.list_node(clusterId=cluster.id).data
     schedulable_nodes = []
     for node in nodes:
@@ -449,12 +450,13 @@ def get_schedulable_nodes(cluster):
     return schedulable_nodes
 
 
-def get_role_nodes(cluster, role):
+def get_role_nodes(cluster, role, client=None):
     etcd_nodes = []
     control_nodes = []
     worker_nodes = []
     node_list = []
-    client = get_user_client()
+    if not client:
+        client = get_user_client()
     nodes = client.list_node(clusterId=cluster.id).data
     for node in nodes:
         if node.etcd:
@@ -632,7 +634,8 @@ def validate_http_response(cmd, target_name_list, client_pod=None):
 
 def validate_cluster(client, cluster, intermediate_state="provisioning",
                      check_intermediate_state=True, skipIngresscheck=True,
-                     nodes_not_in_active_state=[], k8s_version=""):
+                     nodes_not_in_active_state=[], k8s_version="",
+                     userToken=USER_TOKEN):
     # Allow sometime for the "cluster_owner" CRTB to take effect
     time.sleep(5)
     cluster = validate_cluster_state(
@@ -646,9 +649,9 @@ def validate_cluster(client, cluster, intermediate_state="provisioning",
     if k8s_version != "":
         check_cluster_version(cluster, k8s_version)
     if hasattr(cluster, 'rancherKubernetesEngineConfig'):
-        check_cluster_state(len(get_role_nodes(cluster, "etcd")))
-    project, ns = create_project_and_ns(USER_TOKEN, cluster)
-    p_client = get_project_client_for_token(project, USER_TOKEN)
+        check_cluster_state(len(get_role_nodes(cluster, "etcd", client)))
+    project, ns = create_project_and_ns(userToken, cluster)
+    p_client = get_project_client_for_token(project, userToken)
     con = [{"name": "test1",
             "image": TEST_IMAGE}]
     name = random_test_name("default")
@@ -657,7 +660,7 @@ def validate_cluster(client, cluster, intermediate_state="provisioning",
                                         namespaceId=ns.id,
                                         daemonSetConfig={})
     validate_workload(p_client, workload, "daemonSet", ns.name,
-                      len(get_schedulable_nodes(cluster)))
+                      len(get_schedulable_nodes(cluster, client)))
     if not skipIngresscheck:
         host = "test" + str(random_int(10000, 99999)) + ".com"
         path = "/name.html"
@@ -983,8 +986,9 @@ def wait_for_pods_in_workload(p_client, workload, pod_count,
     return pods
 
 
-def get_user_client_and_cluster():
-    client = get_user_client()
+def get_user_client_and_cluster(client=None):
+    if not client:
+        client = get_user_client()
     if CLUSTER_NAME == "":
         clusters = client.list_cluster().data
     else:

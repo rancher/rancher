@@ -4,6 +4,7 @@ from .common import *  # NOQA
 from .test_bkp_restore import wait_for_backup_to_active
 from .test_rbac import create_user
 from rancher import ApiError
+import requests
 
 DO_ACCESSKEY = os.environ.get('DO_ACCESSKEY', "None")
 RANCHER_S3_BUCKETNAME = os.environ.get('RANCHER_S3_BUCKETNAME', "None")
@@ -11,8 +12,9 @@ RANCHER_S3_ENDPOINT = os.environ.get('RANCHER_S3_ENDPOINT', "None")
 AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID', "None")
 AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY', "None")
 
-user_token = {"user_standard": {"user": None, "token": None},
-              "newuser_standard": {"user": None, "token": None}}
+user_token = {"stduser_with_createrketemplate_role": {"user": None,
+                                                      "token": None},
+              "standard_user": {"user": None, "token": None}}
 
 
 @pytest.fixture(scope='module', autouse="True")
@@ -21,17 +23,20 @@ def setup(request):
     client = get_admin_client()
 
     # create users
-    user_token["user_standard"]["user"], \
-        user_token["user_standard"]["token"] = create_user(client)
-    user_token["newuser_standard"]["user"], \
-        user_token["newuser_standard"]["token"] = create_user(client)
+    user_token["stduser_with_createrketemplate_role"]["user"], \
+        user_token["stduser_with_createrketemplate_role"]["token"] = \
+        create_user(client)
+    user_token["standard_user"]["user"], \
+        user_token["standard_user"]["token"] = create_user(client)
 
-    user_standard_id = user_token["user_standard"]["user"].id
+    stduser_with_createrketemplate_role_id = \
+        user_token["stduser_with_createrketemplate_role"]["user"].id
 
     # Add clustertemplates-create global role binding to the standard user
-    client.create_global_role_binding(globalRoleId="clustertemplates-create",
-                                      subjectKind="User",
-                                      userId=user_standard_id)
+    client.create_global_role_binding(
+        globalRoleId="clustertemplates-create",
+        subjectKind="User",
+        userId=stduser_with_createrketemplate_role_id)
 
 
 def get_k8s_versionlist():
@@ -137,21 +142,27 @@ def test_cluster_template_create_with_questions():
     }
 
     standard_user_client = \
-        get_client_for_token(user_token["user_standard"]["token"])
+        get_client_for_token(
+            user_token["stduser_with_createrketemplate_role"]["token"])
     cluster_template = standard_user_client.create_cluster_template(
             name=random_test_name("template"), description="test-template")
     clusterTemplateId = cluster_template.id
 
+    revision_name = random_test_name("revision")
     cluster_template_revision = \
         standard_user_client.create_cluster_template_revision(
-            name=random_test_name("revision"),
+            name=revision_name,
             clusterConfig=cluster_config,
             clusterTemplateId=clusterTemplateId,
             enabled="true", questions=questions)
+    time.sleep(2)
+    cluster_template_revision = standard_user_client.reload(
+        cluster_template_revision)
+    userToken = user_token["stduser_with_createrketemplate_role"]["token"]
     cluster = create_node_cluster(
-                standard_user_client, name=random_test_name("test-auto"),
-                clusterTemplateRevisionId=cluster_template_revision.id,
-                answers=answers)
+        standard_user_client, name=random_test_name("test-auto"),
+        clusterTemplateRevisionId=cluster_template_revision.id,
+        answers=answers, userToken=userToken)
 
     # Verify that the cluster's applied spec has the parameters set as expected
     assert cluster.appliedSpec.dockerRootDir == "/var/lib/docker123"
@@ -201,8 +212,7 @@ def test_cluster_template_create_edit_adminuser():
     # revisions R1 and R2. Create a cluster using R1.
     # Edit and change revision to R2
 
-    client = get_admin_client()
-    cluster_template_create_edit(client)
+    cluster_template_create_edit(ADMIN_TOKEN)
 
 
 def test_cluster_template_create_edit_stduser():
@@ -210,9 +220,8 @@ def test_cluster_template_create_edit_stduser():
     # template and revisions R1 and R2. Create a cluster using R1.
     # Edit and change revision to R2
 
-    standard_user_client = \
-        get_client_for_token(user_token["user_standard"]["token"])
-    cluster_template_create_edit(standard_user_client)
+    userToken = user_token["stduser_with_createrketemplate_role"]["token"]
+    cluster_template_create_edit(userToken)
 
 
 def test_cluster_template_add_owner():
@@ -223,15 +232,13 @@ def test_cluster_template_add_owner():
     cluster_config2 = get_cluster_config(k8sversionlist[1])
     client = get_admin_client()
 
-    standard_newuser_client = \
-        get_client_for_token(user_token["newuser_standard"]["token"])
-    # As an Admin, create a cluster template, revision and update the members
+    # As an Admin, create a cluster template and update the members
     # list with the new user as owner
     template_name = random_test_name("template")
     cluster_template = client.create_cluster_template(
         name=template_name, description="test-template")
 
-    principalid = user_token["newuser_standard"]["user"]["principalIds"]
+    principalid = user_token["standard_user"]["user"]["principalIds"]
     members = [{
         "type": "member",
         "accessType": "owner",
@@ -241,32 +248,41 @@ def test_cluster_template_add_owner():
     cluster_template = client.update(cluster_template,
                                      name=template_name,
                                      members=members)
+    standard_user_client = \
+        get_client_for_token(user_token["standard_user"]["token"])
     # As an owner of the template, create a revision using the template
     # and also create a cluster using the template revision
     revision_name = random_test_name("revision1")
     cluster_template_revision = \
-        standard_newuser_client.create_cluster_template_revision(
+        standard_user_client.create_cluster_template_revision(
             name=revision_name,
             clusterConfig=cluster_config1,
             clusterTemplateId=cluster_template.id)
+    time.sleep(2)
+    cluster_template_revision = standard_user_client.reload(
+        cluster_template_revision)
+    userToken = user_token["standard_user"]["token"]
     cluster = create_node_cluster(
-        standard_newuser_client, name=random_test_name("test-auto"),
-        clusterTemplateRevisionId=cluster_template_revision.id)
+        standard_user_client, name=random_test_name("test-auto"),
+        clusterTemplateRevisionId=cluster_template_revision.id,
+        userToken=userToken)
 
     # As an admin, create another template and a revision.
     cluster_template_new = client.create_cluster_template(
         name="new_template", description="newtest-template")
-    revision_name = random_test_name("revision2")
+    newrevision_name = random_test_name("revision2")
     cluster_template_newrevision = \
         client.create_cluster_template_revision(
-            name=revision_name,
+            name=newrevision_name,
             clusterConfig=cluster_config2,
             clusterTemplateId=cluster_template_new.id)
-
+    time.sleep(2)
+    cluster_template_newrevision = client.reload(
+        cluster_template_newrevision)
     # Verify that the existing standard user cannot create a new revision using
     #  this template
     with pytest.raises(ApiError) as e:
-        standard_newuser_client.create_cluster_template_revision(
+        standard_user_client.create_cluster_template_revision(
             name=random_test_name("userrevision"),
             clusterConfig=cluster_config2,
             clusterTemplateId=cluster_template_new.id)
@@ -276,17 +292,20 @@ def test_cluster_template_add_owner():
     assert e.value.error.status == 404
     assert e.value.error.code == "NotFound"
 
+    userToken = user_token["standard_user"]["token"]
+
     # Verify that the existing standard user cannot create a cluster
     # using the new revision
     with pytest.raises(ApiError) as e:
         create_node_cluster(
-            standard_newuser_client, name=random_test_name("test-auto"),
-            clusterTemplateRevisionId=cluster_template_newrevision.id)
+            standard_user_client, name=random_test_name("test-auto"),
+            clusterTemplateRevisionId=cluster_template_newrevision.id,
+            userToken=userToken)
     print(e)
     assert e.value.error.status == 404
     assert e.value.error.code == "NotFound"
 
-    cluster_cleanup(standard_newuser_client, cluster)
+    cluster_cleanup(standard_user_client, cluster)
 
 
 def test_cluster_template_add_readonly_member():
@@ -296,21 +315,13 @@ def test_cluster_template_add_readonly_member():
     cluster_config1 = get_cluster_config(k8sversionlist[0])
     client = get_admin_client()
 
-    standard_newuser_client = \
-        get_client_for_token(user_token["newuser_standard"]["token"])
-    # As an Admin, create a cluster template, revision and update the members
-    # list with the new user as read-only user
+    # As an Admin, create a cluster template and update the members
+    # list with the new standard user as read-only user
     template_name = random_test_name("usertemplate")
     cluster_template = client.create_cluster_template(
         name=template_name, description="test-template")
 
-    revision_name = random_test_name("revision1")
-    cluster_template_revision1 = client.create_cluster_template_revision(
-        name=revision_name,
-        clusterConfig=cluster_config1,
-        clusterTemplateId=cluster_template.id)
-
-    principalid = user_token["newuser_standard"]["user"]["principalIds"]
+    principalid = user_token["standard_user"]["user"]["principalIds"]
     members = [{
         "type": "member",
         "accessType": "read-only",
@@ -320,11 +331,24 @@ def test_cluster_template_add_readonly_member():
     cluster_template = client.update(cluster_template,
                                      name=template_name, members=members)
 
+    revision_name = random_test_name("revision1")
+    cluster_template_revision1 = client.create_cluster_template_revision(
+        name=revision_name,
+        clusterConfig=cluster_config1,
+        clusterTemplateId=cluster_template.id)
+
+    time.sleep(2)
+    cluster_template_revision1 = client.reload(
+        cluster_template_revision1)
+
+    standard_user_client = \
+        get_client_for_token(user_token["standard_user"]["token"])
+
     # As a read-only member of the rke template, verify that
     # adding another revision to the template fails
     revision_name = "userrevision"
     with pytest.raises(ApiError) as e:
-        standard_newuser_client.create_cluster_template_revision(
+        standard_user_client.create_cluster_template_revision(
             name=revision_name,
             clusterConfig=cluster_config1,
             clusterTemplateId=cluster_template.id)
@@ -332,11 +356,14 @@ def test_cluster_template_add_readonly_member():
     assert e.value.error.status == 403
     assert e.value.error.code == 'PermissionDenied'
 
+    userToken = user_token["standard_user"]["token"]
+
     # Verify that the read-only user can create a cluster with the existing
     # template revision
     cluster = create_node_cluster(
-        standard_newuser_client, name=random_test_name("test-auto"),
-        clusterTemplateRevisionId=cluster_template_revision1.id)
+        standard_user_client, name=random_test_name("test-auto"),
+        clusterTemplateRevisionId=cluster_template_revision1.id,
+        userToken=userToken)
 
     # As an admin, create another template and a revision.
     cluster_template_new = client.create_cluster_template(
@@ -352,16 +379,190 @@ def test_cluster_template_add_readonly_member():
     # using the new revision
     with pytest.raises(ApiError) as e:
         create_node_cluster(
-            standard_newuser_client, name=random_test_name("test-auto"),
-            clusterTemplateRevisionId=cluster_template_newrevision.id)
+            standard_user_client, name=random_test_name("test-auto"),
+            clusterTemplateRevisionId=cluster_template_newrevision.id,
+            userToken=userToken)
     print(e)
     assert e.value.error.status == 404
     assert e.value.error.code == "NotFound"
 
-    cluster_cleanup(standard_newuser_client, cluster)
+    cluster_cleanup(standard_user_client, cluster)
 
 
-def cluster_template_create_edit(testclient):
+def test_cluster_template_export():
+
+    # Create a DO cluster using rke config. Save a rketemplate from this
+    # cluster (with template name and revision V1).
+    # Create another cluster using the cluster template revision V1
+
+    k8sversionlist = get_k8s_versionlist()
+    standard_user_client = \
+        get_client_for_token(
+            user_token["stduser_with_createrketemplate_role"]["token"])
+
+    rke_config = getRKEConfig(k8sversionlist[0])
+
+    cluster_name = random_test_name("test-auto-export")
+    userToken = user_token["stduser_with_createrketemplate_role"]["token"]
+    cluster = create_node_cluster(standard_user_client, cluster_name,
+                                  rancherKubernetesEngineConfig=rke_config,
+                                  userToken=userToken)
+
+    # Export a Template
+    cluster.saveAsTemplate(clusterTemplateName="testnewrketemplate",
+                           clusterTemplateRevisionName="v1")
+    cluster = standard_user_client.reload(cluster)
+    templateid = cluster.clusterTemplateId
+    revisionid = cluster.clusterTemplateRevisionId
+
+    # Create a new cluster using the template revision just exported
+    newcluster = create_node_cluster(
+        standard_user_client, name=random_test_name("test-auto"),
+        clusterTemplateRevisionId=revisionid, userToken=userToken)
+    newcluster = standard_user_client.reload(newcluster)
+    assert newcluster.appliedSpec.clusterTemplateId == templateid
+    assert newcluster.appliedSpec.clusterTemplateRevisionId == revisionid
+
+    cluster_cleanup(standard_user_client, cluster)
+    cluster_cleanup(standard_user_client, newcluster)
+
+
+def test_cluster_template_enforcement_on_admin(request):
+
+    # As an admin turn ON enforcement and ensure that admin can create clusters
+    # using rke config and also using rke template
+    try:
+        enforcement_settings_url = CATTLE_TEST_URL + \
+                          "/v3/settings/cluster-template-enforcement"
+        data_test = {
+            "name": "cluster-template-enforcement",
+            "value": "true"
+        }
+        headers = {"Content-Type": "application/json",
+                   "Accept": "application/json",
+                   "Authorization": "Bearer " + ADMIN_TOKEN}
+        response = requests.put(enforcement_settings_url, json=data_test,
+                                verify=False, headers=headers)
+        print(response.content)
+        k8sversionlist = get_k8s_versionlist()
+        cluster_config1 = get_cluster_config(k8sversionlist[0])
+        rke_config = getRKEConfig(k8sversionlist[0])
+
+    # Verify creating cluster using rkeconfig succeeds
+
+        client = get_admin_client()
+        cluster_name = random_test_name("test-auto-rkeconfig")
+
+        rkecluster = \
+            create_node_cluster(client, cluster_name,
+                                rancherKubernetesEngineConfig=rke_config,
+                                userToken=ADMIN_TOKEN)
+
+    # Verify creating cluster using rke template succeeds
+        cluster_template = client.create_cluster_template(
+            name=random_test_name("template"), description="test-template")
+        revision_name = random_test_name("revision1")
+        cluster_template_revision1 = client.create_cluster_template_revision(
+            name=revision_name,
+            clusterConfig=cluster_config1,
+            clusterTemplateId=cluster_template.id)
+        time.sleep(2)
+        cluster_template_revision1 = client.reload(
+            cluster_template_revision1)
+        cluster_name = random_test_name("test-auto")
+        cluster = create_node_cluster(
+            client, name=cluster_name,
+            clusterTemplateRevisionId=cluster_template_revision1.id,
+            userToken=ADMIN_TOKEN)
+        check_cluster_version(cluster, k8sversionlist[0])
+
+    # Reset the enforcement flag to false
+    finally:
+
+        data_test = {
+            "name": "cluster-template-enforcement",
+            "value": "false"
+        }
+        requests.put(enforcement_settings_url, json=data_test,
+                     verify=False, headers=headers)
+
+    cluster_cleanup(client, cluster)
+    cluster_cleanup(client, rkecluster)
+
+
+def test_cluster_template_enforcement_on_stduser():
+
+    # As an admin turn ON enforcement and ensure that standandard users
+    # can create clusters only using rke template. Creating clusters using
+    # regular rke config should not be allowed
+
+    standard_user_client = \
+        get_client_for_token(
+            user_token["stduser_with_createrketemplate_role"]["token"])
+    k8sversionlist = get_k8s_versionlist()
+    cluster_config1 = get_cluster_config(k8sversionlist[0])
+    rke_config = getRKEConfig(k8sversionlist[0])
+    try:
+        enforcement_settings_url = CATTLE_TEST_URL + \
+                          "/v3/settings/cluster-template-enforcement"
+        data_test = {
+            "name": "cluster-template-enforcement",
+            "value": "true"
+        }
+        headers = {"Content-Type": "application/json",
+                   "Accept": "application/json",
+                   "Authorization": "Bearer " + ADMIN_TOKEN}
+        response = requests.put(enforcement_settings_url, json=data_test,
+                                verify=False, headers=headers)
+        print(response.content)
+
+        # Verify creating cluster using rke template succeeds
+
+        cluster_template = standard_user_client.create_cluster_template(
+            name=random_test_name("template"), description="test-template")
+        revision_name = random_test_name("revision1")
+
+        cluster_template_revision1 = \
+            standard_user_client.create_cluster_template_revision(
+                                        name=revision_name,
+                                        clusterConfig=cluster_config1,
+                                        clusterTemplateId=cluster_template.id)
+        time.sleep(2)
+        cluster_template_revision1 = standard_user_client.reload(
+            cluster_template_revision1)
+        cluster_name = random_test_name("test-auto")
+        userToken = user_token["stduser_with_createrketemplate_role"]["token"]
+        cluster = create_node_cluster(
+            standard_user_client, name=cluster_name,
+            clusterTemplateRevisionId=cluster_template_revision1.id,
+            userToken=userToken)
+        check_cluster_version(cluster, k8sversionlist[0])
+
+        # Verify creating cluster using rkeconfig fails. API returns error as:
+        # "MissingRequired : A clusterTemplateRevision to create a cluster"
+
+        cluster_name = random_test_name("test-auto-rkeconfig")
+        with pytest.raises(ApiError) as e:
+            create_node_cluster(standard_user_client, cluster_name,
+                                rancherKubernetesEngineConfig=rke_config,
+                                userToken=userToken)
+        print(e)
+        assert e.value.error.status == 422
+        assert e.value.error.code == "MissingRequired"
+
+    # Reset the enforcement flag to false
+    finally:
+        data_test = {
+            "name": "cluster-template-enforcement",
+            "value": "false"
+        }
+        requests.put(enforcement_settings_url, json=data_test,
+                     verify=False, headers=headers)
+
+    cluster_cleanup(standard_user_client, cluster)
+
+
+def cluster_template_create_edit(userToken):
 
     # Method to create cluster template revisions R1, R2.
     # Create a cluster with a RKE template revision R1.
@@ -371,45 +572,50 @@ def cluster_template_create_edit(testclient):
     cluster_config1 = get_cluster_config(k8sversionlist[0])
     cluster_config2 = get_cluster_config(k8sversionlist[1])
 
-    client = testclient
-
+    client = get_client_for_token(userToken)
     cluster_template = client.create_cluster_template(
         name=random_test_name("template"), description="test-template")
-
+    revision1_name = random_test_name("revision1")
     cluster_template_revision1 = client.create_cluster_template_revision(
-        name=random_test_name("revision1"),
+        name=revision1_name,
         clusterConfig=cluster_config1,
         clusterTemplateId=cluster_template.id)
-
+    time.sleep(2)
+    cluster_template_revision1 = client.reload(
+        cluster_template_revision1)
     cluster_name = random_test_name("test-auto")
     cluster = create_node_cluster(
         client, name=cluster_name,
-        clusterTemplateRevisionId=cluster_template_revision1.id)
+        clusterTemplateRevisionId=cluster_template_revision1.id,
+        userToken=userToken)
     check_cluster_version(cluster, k8sversionlist[0])
 
+    revision2_name = random_test_name("revision2")
     cluster_template_revision2 = client.create_cluster_template_revision(
-        name=random_test_name("revision2"),
+        name=revision2_name,
         clusterConfig=cluster_config2,
         clusterTemplateId=cluster_template.id)
-
+    time.sleep(2)
+    cluster_template_revision2 = client.reload(
+        cluster_template_revision2)
     cluster = client.update(
             cluster,
             name=cluster_name,
             clusterTemplateRevisionId=cluster_template_revision2.id)
-
     cluster = validate_cluster(client,
                                cluster,
-                               intermediate_state="updating")
+                               intermediate_state="updating",
+                               userToken=userToken)
     check_cluster_version(cluster, k8sversionlist[1])
     cluster_cleanup(client, cluster)
 
 
-def node_template_do():
-    client = get_admin_client()
+def node_template_do(userclient):
+    client = userclient
     do_cloud_credential_config = {"accessToken": DO_ACCESSKEY}
     do_cloud_credential = client.create_cloud_credential(
-        digitaloceancredentialConfig=do_cloud_credential_config
-    )
+        digitaloceancredentialConfig=do_cloud_credential_config)
+    time.sleep(3)
     node_template = client.create_node_template(
         digitaloceanConfig={"region": "nyc3",
                             "size": "4gb",
@@ -423,13 +629,20 @@ def node_template_do():
     return node_template
 
 
-def create_node_cluster(client, name, clusterTemplateRevisionId, answers=None):
-
-    cluster = client.create_cluster(
-        name=name,
-        clusterTemplateRevisionId=clusterTemplateRevisionId,
-        answers=answers)
-    nodetemplate = node_template_do()
+def create_node_cluster(userclient, name, clusterTemplateRevisionId=None,
+                        rancherKubernetesEngineConfig=None, answers=None,
+                        userToken=None):
+    client = userclient
+    if(rancherKubernetesEngineConfig is not None):
+        cluster = client.create_cluster(
+            name=name,
+            rancherKubernetesEngineConfig=rancherKubernetesEngineConfig)
+    else:
+        cluster = client.create_cluster(
+                    name=name,
+                    clusterTemplateRevisionId=clusterTemplateRevisionId,
+                    answers=answers)
+    nodetemplate = node_template_do(client)
     nodes = []
     node = {"hostnamePrefix": random_test_name("test-auto"),
             "nodeTemplateId": nodetemplate.id,
@@ -443,11 +656,21 @@ def create_node_cluster(client, name, clusterTemplateRevisionId, answers=None):
     node_pools = []
     for node in nodes:
         node["clusterId"] = cluster.id
-        node_pool = client.create_node_pool(**node)
+        success = False
+        start = time.time()
+        while not success:
+            if time.time() - start > 10:
+                raise AssertionError(
+                    "Timed out waiting for cluster owner global Roles")
+            try:
+                time.sleep(1)
+                node_pool = client.create_node_pool(**node)
+                success = True
+            except ApiError:
+                success = False
         node_pool = client.wait_success(node_pool)
         node_pools.append(node_pool)
-
-    cluster = validate_cluster(client, cluster)
+    cluster = validate_cluster(client, cluster, userToken=userToken)
     nodes = client.list_node(clusterId=cluster.id).data
     assert len(nodes) == len(nodes)
     for node in nodes:
