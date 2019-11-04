@@ -21,9 +21,10 @@ AZURE_CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET")
 AZURE_TENANT_ID = os.environ.get("AZURE_TENANT_ID")
 worker_count = int(os.environ.get('RANCHER_STRESS_TEST_WORKER_COUNT', 1))
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "testcustom")
+ENGINE_INSTALL_URL = \
+    os.environ.get("RANCHER_ENGINE_INSTALL_URL",
+                   "https://releases.rancher.com/install-docker/18.09.sh")
 
-
-engine_install_url = "https://releases.rancher.com/install-docker/18.09.sh"
 rke_config = {
     "addonJobTimeout": 30,
     "authentication":
@@ -780,7 +781,7 @@ def node_template_ec2():
         name=random_name(),
         useInternalIpAddress=True,
         driver="amazonec2",
-        engineInstallURL=engine_install_url,
+        engineInstallURL=ENGINE_INSTALL_URL,
         cloudCredentialId=ec2_cloud_credential.id
 
     )
@@ -815,7 +816,7 @@ def node_template_ec2_with_provider():
         name=random_name(),
         useInternalIpAddress=True,
         driver="amazonec2",
-        engineInstallURL=engine_install_url,
+        engineInstallURL=ENGINE_INSTALL_URL,
         cloudCredentialId=ec2_cloud_credential.id
     )
     node_template = client.wait_success(node_template)

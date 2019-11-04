@@ -14,6 +14,9 @@ Now run a test:
 
 # General Notes about this framework current status:
 
+## Linting
+Uses [Flake8](http://flake8.pycqa.org/en/latest/) to lint your tests  
+
 ## ENV Variables:
 If you add any new ENV variables, check the scripts/rke/configure.sh will pass them into the container for Jenkins. Running on your own machine, export these variables as needed.
 
@@ -61,7 +64,25 @@ CATTLE_TEST_URL no default. The Rancher server for test execution.
 ADMIN_TOKEN no default. Required to create resources during test execution
 RANCHER_CLEANUP_CLUSTER default true. Cleans up clusters after test execution
 RANCHER_CLEANUP_PROJECT default true. Cleans up projects after test execution
-CLUSTER_NAME no default. Some tests allow test resources to be created in a specific cluster. If not provided, tests will default to the first cluster found.
+RANCHER_CLUSTER_NAME no default. Some tests allow test resources to be created in a specific cluster. If not provided, tests will default to the first cluster found.
+```
+### vmwarevsphere_driver test
+Because our vSphere servers are behind a VPN you will need to connect to the VPN and run these tests from your laptop
+or run them from a Rancher installation inside of vSphere. When running locally on your laptop you will need to connect 
+the VPN and start an ngrok tunnel and set your SERVER_URL by hand to get vSphere nodes to talk back to the Rancher Server
+
+Environment variables for this test
+```
+CATTLE_TEST_URL no default. The Rancher server for test execution.
+RANCHER_CLUSTER_NAME defaults to a random cluster name if not set
+RANCHER_CLEANUP_CLUSTER defaults to "True", set to "False" to leave the cluster after the test
+RANCHER_VSPHERE_USERNAME username used to login to vSphere Admin Interface
+RANCHER_VSPHERE_PASSWORD password used to login to vSphere Admin Interface
+RANCHER_VSPHERE_VCENTER URL of vCenter web interface
+RANCHER_VSPHERE_VCENTER_PORT port of vCenter web interface, defaults to 443
+RANCHER_ENGINE_INSTALL_URL defaults to https://get.docker.com/, docker installer engine script
+RANCHER_CLONE_FROM defaults to ubuntu-bionic-18.04-cloudimg, vm to clone from.
+RANCHER_RESOURCE_POOL defaults to the validation-tests pool resource pool to put the vms in
 ```
 
 ## RKE template defaults variables:
