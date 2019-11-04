@@ -217,6 +217,7 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	if err := validateS3Credentials(data); err != nil {
 		return nil, err
 	}
+
 	return r.Store.Create(apiContext, schema, data)
 }
 
