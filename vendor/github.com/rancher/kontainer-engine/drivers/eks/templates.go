@@ -1,5 +1,7 @@
 package eks
 
+// These are the CloudFormation templates used for EKS clusters, when making edits here ensure the whitespace is correct.
+
 const (
 	vpcTemplate = `---
 AWSTemplateFormatVersion: '2010-09-09'
@@ -347,6 +349,11 @@ Parameters:
     Type: String
     Default: "true"
 
+  EbsEncryption:
+    Description: Encrypt EBS volumes of worker nodes
+    Type: String
+    Default: "false"
+
 Metadata:
 
   AWS::CloudFormation::Interface:
@@ -533,6 +540,7 @@ Resources:
             VolumeSize: !Ref NodeVolumeSize
             VolumeType: gp2
             DeleteOnTermination: true
+            Encrypted: !Ref EbsEncryption
       UserData: !Base64
         'Fn::Sub': %q
 
