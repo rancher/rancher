@@ -22,5 +22,5 @@ def test_sa_for_user_clusters():
 
 @pytest.fixture(scope='module', autouse="True")
 def create_cluster_client(request):
-    client, cluster = get_admin_client_and_cluster()
+    client, cluster = get_user_client_and_cluster()
     create_kubeconfig(cluster)

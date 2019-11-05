@@ -15,11 +15,17 @@ DEFAULT_TIMEOUT = 120
 DEFAULT_MULTI_CLUSTER_APP_TIMEOUT = 300
 DEFAULT_APP_DELETION_TIMEOUT = 360
 DEFAULT_MONITORING_TIMEOUT = 180
+MONITORING_VERSION = os.environ.get('MONITORING_VERSION', "0.0.5")
 
 CATTLE_TEST_URL = os.environ.get('CATTLE_TEST_URL', "http://localhost:80")
 CATTLE_API_URL = CATTLE_TEST_URL + "/v3"
+CATTLE_AUTH_URL = \
+    CATTLE_TEST_URL + "/v3-public/localproviders/local?action=login"
 
 ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', "None")
+USER_TOKEN = os.environ.get('USER_TOKEN', "None")
+USER_PASSWORD = os.environ.get('USER_PASSWORD', "None")
+
 kube_fname = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                           "k8s_kube_config")
 MACHINE_TIMEOUT = float(os.environ.get('RANCHER_MACHINE_TIMEOUT', "1200"))
@@ -52,6 +58,10 @@ def random_test_name(name="test"):
 
 def get_admin_client():
     return rancher.Client(url=CATTLE_API_URL, token=ADMIN_TOKEN, verify=False)
+
+
+def get_user_client():
+    return rancher.Client(url=CATTLE_API_URL, token=USER_TOKEN, verify=False)
 
 
 def get_client_for_token(token):
@@ -402,7 +412,7 @@ def wait_for_pod_to_running(client, pod, timeout=DEFAULT_TIMEOUT):
 
 
 def get_schedulable_nodes(cluster):
-    client = get_admin_client()
+    client = get_user_client()
     nodes = client.list_node(clusterId=cluster.id).data
     schedulable_nodes = []
     for node in nodes:
@@ -416,7 +426,7 @@ def get_role_nodes(cluster, role):
     control_nodes = []
     worker_nodes = []
     node_list = []
-    client = get_admin_client()
+    client = get_user_client()
     nodes = client.list_node(clusterId=cluster.id).data
     for node in nodes:
         if node.etcd:
@@ -598,6 +608,8 @@ def validate_http_response(cmd, target_name_list, client_pod=None):
 def validate_cluster(client, cluster, intermediate_state="provisioning",
                      check_intermediate_state=True, skipIngresscheck=True,
                      nodes_not_in_active_state=[], k8s_version=""):
+    # Allow sometime for the "cluster_owner" CRTB to take effect
+    time.sleep(5)
     cluster = validate_cluster_state(
         client, cluster,
         check_intermediate_state=check_intermediate_state,
@@ -610,8 +622,8 @@ def validate_cluster(client, cluster, intermediate_state="provisioning",
         check_cluster_version(cluster, k8s_version)
     if hasattr(cluster, 'rancherKubernetesEngineConfig'):
         check_cluster_state(len(get_role_nodes(cluster, "etcd")))
-    project, ns = create_project_and_ns(ADMIN_TOKEN, cluster)
-    p_client = get_project_client_for_token(project, ADMIN_TOKEN)
+    project, ns = create_project_and_ns(USER_TOKEN, cluster)
+    p_client = get_project_client_for_token(project, USER_TOKEN)
     con = [{"name": "test1",
             "image": TEST_IMAGE}]
     name = random_test_name("default")
@@ -785,6 +797,8 @@ def get_custom_host_registration_cmd(client, cluster, roles, node):
 
 
 def create_custom_host_registration_token(client, cluster):
+    # Allow sometime for the "cluster_owner" CRTB to take effect
+    time.sleep(5)
     cluster_token = client.create_cluster_registration_token(
         clusterId=cluster.id)
     cluster_token = client.wait_success(cluster_token)
@@ -944,8 +958,8 @@ def wait_for_pods_in_workload(p_client, workload, pod_count,
     return pods
 
 
-def get_admin_client_and_cluster():
-    client = get_admin_client()
+def get_user_client_and_cluster():
+    client = get_user_client()
     if CLUSTER_NAME == "":
         clusters = client.list_cluster().data
     else:
@@ -1012,6 +1026,7 @@ def cluster_cleanup(client, cluster, aws_nodes=None):
     else:
         env_details = "env.CATTLE_TEST_URL='" + CATTLE_TEST_URL + "'\n"
         env_details += "env.ADMIN_TOKEN='" + ADMIN_TOKEN + "'\n"
+        env_details += "env.USER_TOKEN='" + USER_TOKEN + "'\n"
         env_details += "env.CLUSTER_NAME='" + cluster.name + "'\n"
         create_config_file(env_details)
 
@@ -1314,7 +1329,7 @@ def validate_app_deletion(client, app_id,
 
 def validate_catalog_app(proj_client, app, external_id, answer=None):
     if answer is None:
-        answers = get_defaut_question_answers(get_admin_client(), external_id)
+        answers = get_defaut_question_answers(get_user_client(), external_id)
     else:
         answers = answer
     # validate app is active
@@ -1334,7 +1349,7 @@ def validate_catalog_app(proj_client, app, external_id, answer=None):
         assert wl.workloadLabels.chart == chart, \
             "the chart version is wrong"
 
-    # validate_app_answers
+    # Validate_app_answers
     assert len(answers.items() - app["answers"].items()) == 0, \
         "Answers are not same as the original catalog answers"
     return app
@@ -1358,3 +1373,25 @@ def get_admin_token(api_url=CATTLE_TEST_URL,
     global ADMIN_TOKEN
     ADMIN_TOKEN = token
     return token
+
+
+def create_user(client, cattle_auth_url=CATTLE_AUTH_URL):
+    user_name = random_name()
+    user = client.create_user(username=user_name,
+                              password=USER_PASSWORD)
+    client.create_global_role_binding(globalRoleId="user",
+                                      subjectKind="User",
+                                      userId=user.id)
+    user_token = get_user_token(user, cattle_auth_url)
+    return user, user_token
+
+
+def get_user_token(user, cattle_auth_url=CATTLE_AUTH_URL):
+    r = requests.post(cattle_auth_url, json={
+        'username': user.username,
+        'password': USER_PASSWORD,
+        'responseType': 'json',
+    }, verify=False)
+    print(r.json())
+    return r.json()["token"]
+>>>>>>> r/master

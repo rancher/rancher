@@ -152,16 +152,16 @@ def test_nfs_wl_daemonSet():
 
 @pytest.fixture(scope="module", autouse="True")
 def create_project_client(request):
-    client, cluster = get_admin_client_and_cluster()
+    client, cluster = get_user_client_and_cluster()
     create_kubeconfig(cluster)
-    p, ns = create_project_and_ns(ADMIN_TOKEN, cluster, "project-test-nfs")
-    p_client = get_project_client_for_token(p, ADMIN_TOKEN)
+    p, ns = create_project_and_ns(USER_TOKEN, cluster, "project-test-nfs")
+    p_client = get_project_client_for_token(p, USER_TOKEN)
     nfs_node = provision_nfs_server()
     nfs_ip = nfs_node.get_public_ip()
     print("the IP of the NFS: ", nfs_ip)
 
     # add  persistent volume to the cluster
-    cluster_client = get_cluster_client_for_token(cluster, ADMIN_TOKEN)
+    cluster_client = get_cluster_client_for_token(cluster, USER_TOKEN)
     pv_name = random_test_name("pv")
     pv_config = {"type": "persistentVolume",
                  "accessModes": ["ReadWriteOnce"],
@@ -195,7 +195,7 @@ def create_project_client(request):
 
     def fin():
         cluster_client = get_cluster_client_for_token(namespace["cluster"],
-                                                      ADMIN_TOKEN)
+                                                      USER_TOKEN)
         cluster_client.delete(namespace["project"])
         cluster_client.delete(namespace["pv"])
         if DELETE_NFS is True:

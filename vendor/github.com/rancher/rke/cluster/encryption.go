@@ -18,8 +18,8 @@ import (
 	"github.com/rancher/rke/services"
 	"github.com/rancher/rke/templates"
 	"github.com/rancher/rke/util"
-	"github.com/rancher/types/apis/management.cattle.io/v3"
-	"k8s.io/api/core/v1"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -41,7 +41,6 @@ type keyList struct {
 }
 
 func ReconcileEncryptionProviderConfig(ctx context.Context, kubeCluster, currentCluster *Cluster) error {
-	log.Infof(ctx, "[%s] Reconciling cluster's encryption provider configuration..", services.ControlRole)
 	if len(kubeCluster.ControlPlaneHosts) == 0 {
 		return nil
 	}
@@ -49,33 +48,47 @@ func ReconcileEncryptionProviderConfig(ctx context.Context, kubeCluster, current
 	if (currentCluster == nil || !currentCluster.IsEncryptionEnabled()) &&
 		kubeCluster.IsEncryptionEnabled() {
 		kubeCluster.EncryptionConfig.RewriteSecrets = true
+		logrus.Debugf("Encryption is enabled in the new spec; have to rewrite secrets")
 		return nil
 	}
 	// encryption is disabled
 	if !kubeCluster.IsEncryptionEnabled() && !currentCluster.IsEncryptionEnabled() {
+		logrus.Debugf("Encryption is disabled in both current and new spec; no action is required")
 		return nil
 	}
+
 	// disable encryption
 	if !kubeCluster.IsEncryptionEnabled() && currentCluster.IsEncryptionEnabled() {
-		if currentCluster.IsEncryptionCustomConfig() {
-			// KubeAPI will be restarted for the last time during controlplane redeployment, since the
-			// Configuration file is now empty, the Process Plan will change.
-			kubeCluster.EncryptionConfig.EncryptionProviderFile = ""
-			return kubeCluster.DeployEncryptionProviderFile(ctx)
-		}
-		return kubeCluster.DisableSecretsEncryption(ctx, currentCluster)
+		logrus.Debugf("Encryption is enabled in the current spec and disabled in the new spec")
+		return kubeCluster.DisableSecretsEncryption(ctx, currentCluster, currentCluster.IsEncryptionCustomConfig())
 	}
+
+	// encryption configuration updated
+	if kubeCluster.IsEncryptionEnabled() && currentCluster.IsEncryptionEnabled() &&
+		kubeCluster.EncryptionConfig.EncryptionProviderFile != currentCluster.EncryptionConfig.EncryptionProviderFile {
+		kubeCluster.EncryptionConfig.RewriteSecrets = true
+		log.Infof(ctx, "[%s] Encryption provider config has changed;"+
+			" reconciling cluster's encryption provider configuration", services.ControlRole)
+		return services.RestartKubeAPIWithHealthcheck(ctx, kubeCluster.ControlPlaneHosts,
+			kubeCluster.LocalConnDialerFactory, kubeCluster.Certificates)
+	}
+
 	return nil
 }
 
-func (c *Cluster) DisableSecretsEncryption(ctx context.Context, currentCluster *Cluster) error {
+func (c *Cluster) DisableSecretsEncryption(ctx context.Context, currentCluster *Cluster, custom bool) error {
 	log.Infof(ctx, "[%s] Disabling Secrets Encryption..", services.ControlRole)
 
 	if len(c.ControlPlaneHosts) == 0 {
 		return nil
 	}
 	var err error
-	c.EncryptionConfig.EncryptionProviderFile, err = currentCluster.generateDisabledEncryptionProviderFile()
+	if custom {
+		c.EncryptionConfig.EncryptionProviderFile, err = currentCluster.generateDisabledCustomEncryptionProviderFile()
+	} else {
+		c.EncryptionConfig.EncryptionProviderFile, err = currentCluster.generateDisabledEncryptionProviderFile()
+	}
+
 	if err != nil {
 		return err
 	}
@@ -83,7 +96,8 @@ func (c *Cluster) DisableSecretsEncryption(ctx context.Context, currentCluster *
 	if err := c.DeployEncryptionProviderFile(ctx); err != nil {
 		return err
 	}
-	if err := services.RestartKubeAPIWithHealthcheck(ctx, c.ControlPlaneHosts, c.LocalConnDialerFactory, c.Certificates); err != nil {
+	if err := services.RestartKubeAPIWithHealthcheck(ctx, c.ControlPlaneHosts, c.LocalConnDialerFactory,
+		c.Certificates); err != nil {
 		return err
 	}
 	if err := c.RewriteSecrets(ctx); err != nil {
@@ -95,7 +109,7 @@ func (c *Cluster) DisableSecretsEncryption(ctx context.Context, currentCluster *
 	if err := c.DeployEncryptionProviderFile(ctx); err != nil {
 		return err
 	}
-	log.Infof(ctx, "[%s] Secrets Encryption disabled successfully", services.ControlRole)
+	log.Infof(ctx, "[%s] Secrets Encryption is disabled successfully", services.ControlRole)
 	return nil
 }
 
@@ -104,7 +118,7 @@ func (c *Cluster) RewriteSecrets(ctx context.Context) error {
 	var errgrp errgroup.Group
 	k8sClient, err := k8s.NewClient(c.LocalKubeConfigPath, c.K8sWrapTransport)
 	if err != nil {
-		return fmt.Errorf("Failed to initialize new kubernetes client: %v", err)
+		return fmt.Errorf("failed to initialize new kubernetes client: %v", err)
 	}
 	secretsList, err := k8s.GetSecretsList(k8sClient, "")
 	if err != nil {
@@ -246,6 +260,39 @@ func (c *Cluster) extractActiveKey(s string) (*encryptionKey, error) {
 	}, nil
 }
 
+func (c *Cluster) generateDisabledCustomEncryptionProviderFile() (string, error) {
+	config := apiserverconfigv1.EncryptionConfiguration{}
+	if err := k8s.DecodeYamlResource(&config, c.EncryptionConfig.EncryptionProviderFile); err != nil {
+		return "", err
+	}
+
+	// 1. Prepend custom config providers with ignore provider
+	updatedProviders := []apiserverconfigv1.ProviderConfiguration{{
+		Identity: &apiserverconfigv1.IdentityConfiguration{},
+	}}
+
+	for _, provider := range config.Resources[0].Providers {
+		if provider.Identity != nil {
+			continue
+		}
+		updatedProviders = append(updatedProviders, provider)
+	}
+
+	config.Resources[0].Providers = updatedProviders
+
+	// 2. Generate custom config file
+	jsonConfig, err := json.Marshal(config)
+	if err != nil {
+		return "", err
+	}
+	yamlConfig, err := sigsyaml.JSONToYAML(jsonConfig)
+	if err != nil {
+		return "", nil
+	}
+
+	return string(yamlConfig), nil
+}
+
 func (c *Cluster) generateDisabledEncryptionProviderFile() (string, error) {
 	key, err := c.extractActiveKey(c.EncryptionConfig.EncryptionProviderFile)
 	if err != nil {
@@ -327,7 +374,7 @@ func (c *Cluster) readEncryptionCustomConfig() (string, error) {
 		struct{ CustomConfig string }{CustomConfig: string(yamlConfig)})
 }
 
-func resolvCustomEncryptionConfig(clusterFile string) (string, *apiserverconfig.EncryptionConfiguration, error) {
+func resolveCustomEncryptionConfig(clusterFile string) (string, *apiserverconfig.EncryptionConfiguration, error) {
 	var err error
 	var r map[string]interface{}
 	err = ghodssyaml.Unmarshal([]byte(clusterFile), &r)

@@ -547,17 +547,17 @@ def test_wl_with_lb_scale_and_upgrade():
 
 @pytest.fixture(scope='module', autouse="True")
 def create_project_client(request):
-    client, cluster = get_admin_client_and_cluster()
+    client, cluster = get_user_client_and_cluster()
     create_kubeconfig(cluster)
     p, ns = create_project_and_ns(
-        ADMIN_TOKEN, cluster, random_test_name("testworkload"))
-    p_client = get_project_client_for_token(p, ADMIN_TOKEN)
+        USER_TOKEN, cluster, random_test_name("testworkload"))
+    p_client = get_project_client_for_token(p, USER_TOKEN)
     namespace["p_client"] = p_client
     namespace["ns"] = ns
     namespace["cluster"] = cluster
     namespace["project"] = p
 
     def fin():
-        client = get_admin_client()
+        client = get_user_client()
         client.delete(namespace["project"])
     request.addfinalizer(fin)

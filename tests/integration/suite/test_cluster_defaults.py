@@ -2,6 +2,7 @@ import json
 import pytest
 from rancher import ApiError
 from .common import random_str
+from .conftest import wait_for
 
 
 @pytest.mark.skip(reason="cluster-defaults disabled")
@@ -71,6 +72,32 @@ def test_rke_initial_conditions(admin_mc, remove_resource):
     assert cluster.conditions[2].status == 'Unknown'
 
     assert 'exportYaml' in cluster.actions
+
+
+def test_psp_enabled_set(admin_mc, remove_resource):
+    """Asserts podSecurityPolicy field is used to populate pspEnabled in
+    cluster capabilities"""
+    admin_client = admin_mc.client
+    cluster = admin_client.create_cluster(
+        name=random_str(), rancherKubernetesEngineConfig={
+            "accessKey": "asdfsd",
+            "services": {
+                "kubeApi": {
+                    "podSecurityPolicy": True,
+                }
+            }
+        })
+    remove_resource(cluster)
+
+    def psp_set_to_true():
+        updated_cluster = admin_client.by_id_cluster(id=cluster.id)
+        capabilities = updated_cluster.get("capabilities")
+        if capabilities is not None:
+            return capabilities.get("pspEnabled") is True
+        return None
+
+    wait_for(lambda: psp_set_to_true(), fail_handler=lambda: "failed waiting "
+             "for pspEnabled to be set")
 
 
 def test_import_initial_conditions(admin_mc, remove_resource):

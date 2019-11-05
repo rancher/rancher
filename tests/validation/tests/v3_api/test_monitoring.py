@@ -84,13 +84,36 @@ name_mapping = {
     "node": node_graph_list,
 }
 
+C_MONITORING_ANSWERS = {"operator-init.enabled": "true", "exporter-node.enabled": "true",
+                        "exporter-node.ports.metrics.port": "9796", "exporter-kubelets.https": "true",
+                        "exporter-node.resources.limits.cpu": "200m", "exporter-node.resources.limits.memory": "200Mi",
+                        "operator.resources.limits.memory": "500Mi", "prometheus.retention": "12h",
+                        "grafana.persistence.enabled": "false", "prometheus.persistence.enabled": "false",
+                        "prometheus.persistence.storageClass": "default", "grafana.persistence.storageClass": "default",
+                        "grafana.persistence.size": "10Gi", "prometheus.persistence.size": "50Gi",
+                        "prometheus.resources.core.requests.cpu": "750m",
+                        "prometheus.resources.core.limits.cpu": "1000m",
+                        "prometheus.resources.core.requests.memory": "750Mi",
+                        "prometheus.resources.core.limits.memory": "1000Mi",
+                        "prometheus.persistent.useReleaseName": "true"}
+
+P_MONITORING_ANSWER = {"prometheus.retention": "12h", "grafana.persistence.enabled": "false",
+                       "prometheus.persistence.enabled": "false", "prometheus.persistence.storageClass": "default",
+                       "grafana.persistence.storageClass": "default", "grafana.persistence.size": "10Gi",
+                       "prometheus.persistence.size": "50Gi", "prometheus.resources.core.requests.cpu": "750m",
+                       "prometheus.resources.core.limits.cpu": "1000m",
+                       "prometheus.resources.core.requests.memory": "750Mi",
+                       "prometheus.resources.core.limits.memory": "1000Mi",
+                       "prometheus.persistent.useReleaseName": "true"}
+
+
 CLUSTER_MONITORING_APP = "cluster-monitoring"
 MONITORING_OPERATOR_APP = "monitoring-operator"
 PROJECT_MONITORING_APP = "project-monitoring"
 
 
 def test_monitoring_cluster_graph():
-    rancher_client, cluster = get_admin_client_and_cluster()
+    rancher_client, cluster = get_user_client_and_cluster()
     cluster_monitor_obj = rancher_client.list_clusterMonitorGraph()
     # generate the request payload
     query1 = copy.deepcopy(cluster_query_template)
@@ -101,7 +124,7 @@ def test_monitoring_cluster_graph():
 
 
 def test_monitoring_etcd_graph():
-    rancher_client, cluster = get_admin_client_and_cluster()
+    rancher_client, cluster = get_user_client_and_cluster()
     cluster_monitor_obj = rancher_client.list_clusterMonitorGraph()
     # generate the request payload
     query1 = copy.deepcopy(cluster_query_template)
@@ -112,7 +135,7 @@ def test_monitoring_etcd_graph():
 
 
 def test_monitoring_kube_component_graph():
-    rancher_client, cluster = get_admin_client_and_cluster()
+    rancher_client, cluster = get_user_client_and_cluster()
     cluster_monitor_obj = rancher_client.list_clusterMonitorGraph()
     # generate the request payload
     query1 = copy.deepcopy(cluster_query_template)
@@ -124,7 +147,7 @@ def test_monitoring_kube_component_graph():
 
 # rancher component graphs are from the fluent app for cluster logging
 def test_monitoring_rancher_component_graph():
-    rancher_client, cluster = get_admin_client_and_cluster()
+    rancher_client, cluster = get_user_client_and_cluster()
     # check if the cluster logging is enabled, assuming fluent is used
     if cluster.enableClusterAlerting is False:
         print("cluster logging is not enabled, skip the test")
@@ -140,7 +163,7 @@ def test_monitoring_rancher_component_graph():
 
 
 def test_monitoring_node_graph():
-    rancher_client, cluster = get_admin_client_and_cluster()
+    rancher_client, cluster = get_user_client_and_cluster()
     node_list_raw = rancher_client.list_node(clusterId=cluster.id).data
     for node in node_list_raw:
         cluster_monitor_obj = rancher_client.list_clusterMonitorGraph()
@@ -154,7 +177,7 @@ def test_monitoring_node_graph():
 
 
 def test_monitoring_workload_graph():
-    rancher_client, cluster = get_admin_client_and_cluster()
+    rancher_client, cluster = get_user_client_and_cluster()
     system_project = rancher_client.list_project(clusterId=cluster.id, name="System").data[0]
     project_monitor_obj = rancher_client.list_projectMonitorGraph()
     # generate the request payload
@@ -168,13 +191,14 @@ def test_monitoring_workload_graph():
 
 
 def test_monitoring_project_monitoring():
-    rancher_client, cluster = get_admin_client_and_cluster()
+    rancher_client, cluster = get_user_client_and_cluster()
     system_project = rancher_client.list_project(name="System").data[0]
-    system_project_client = get_project_client_for_token(system_project, ADMIN_TOKEN)
+    system_project_client = get_project_client_for_token(system_project, USER_TOKEN)
     project = namespace["project"]
     # enable the project monitoring
-    project.enableMonitoring()
-    project_client = get_project_client_for_token(project, ADMIN_TOKEN)
+    if project["enableProjectMonitoring"] is False:
+        rancher_client.action(project, "enableMonitoring", answers=P_MONITORING_ANSWER, version=MONITORING_VERSION)
+    project_client = get_project_client_for_token(project, USER_TOKEN)
     namespace["project"] = rancher_client.reload(project)
     wait_for_app_to_active(project_client, PROJECT_MONITORING_APP)
     wait_for_app_to_active(system_project_client, MONITORING_OPERATOR_APP)
@@ -183,7 +207,7 @@ def test_monitoring_project_monitoring():
     wait_for_target_up("expose-prometheus-metrics")
     wait_for_target_up("expose-grafana-metrics")
     # deploy a workload to test project monitoring
-    cluster_client = get_cluster_client_for_token(cluster, ADMIN_TOKEN)
+    cluster_client = get_cluster_client_for_token(cluster, USER_TOKEN)
     ns = create_ns(cluster_client, cluster, project, random_name())
     port = {"containerPort": 8080,
             "type": "containerPort",
@@ -204,7 +228,7 @@ def test_monitoring_project_monitoring():
     app = project_client.list_app(name=PROJECT_MONITORING_APP).data[0]
     url = CATTLE_TEST_URL + '/k8s/clusters/' + cluster.id + '/api/v1/namespaces/' + app.targetNamespace \
           + '/services/http:access-prometheus:80/proxy/api/v1/query?query=web_app_online_user_count'
-    headers1 = {'Authorization': 'Bearer ' + ADMIN_TOKEN}
+    headers1 = {'Authorization': 'Bearer ' + USER_TOKEN}
     start = time.time()
     while True:
         result = requests.get(headers=headers1, url=url, verify=False).json()
@@ -218,7 +242,7 @@ def test_monitoring_project_monitoring():
 
 @pytest.fixture(scope="module", autouse="True")
 def create_project_client(request):
-    rancher_client, cluster = get_admin_client_and_cluster()
+    rancher_client, cluster = get_user_client_and_cluster()
     create_kubeconfig(cluster)
     project = create_project(rancher_client, cluster,
                              random_test_name("p-monitoring"))
@@ -226,26 +250,28 @@ def create_project_client(request):
     namespace["project"] = project
 
     system_project = rancher_client.list_project(clusterId=cluster.id, name="System").data[0]
-    system_project_client = get_project_client_for_token(system_project, ADMIN_TOKEN)
+    system_project_client = get_project_client_for_token(system_project, USER_TOKEN)
     # enable the cluster monitoring
     if cluster["enableClusterMonitoring"] is False:
-        cluster.enableMonitoring()
+        rancher_client.action(cluster, "enableMonitoring", answers=C_MONITORING_ANSWERS, version=MONITORING_VERSION)
     wait_for_app_to_active(system_project_client, CLUSTER_MONITORING_APP)
     wait_for_app_to_active(system_project_client, MONITORING_OPERATOR_APP)
     # wait 2 minutes for all graphs to be available
-    time.sleep(60*2)
+    time.sleep(60 * 2)
 
     def fin():
-        rancher_client.delete(project)
-        cluster2 = rancher_client.reload(cluster)
-        if "disableMonitoring" in cluster2.actions:
-            cluster2.disableMonitoring()
+        project = rancher_client.reload(namespace["project"])
+        if project["enableProjectMonitoring"] is True:
+            rancher_client.action(project, "disableMonitoring")
+        cluster = rancher_client.reload(namespace["cluster"])
+        if cluster["enableClusterMonitoring"] is True:
+            rancher_client.action(cluster, "disableMonitoring")
 
     request.addfinalizer(fin)
 
 
 def get_graph_data(query1, list_len, timeout=10):
-    rancher_client, cluster = get_admin_client_and_cluster()
+    rancher_client, cluster = get_user_client_and_cluster()
     start = time.time()
     while True:
         res = rancher_client.action(**query1)
@@ -278,12 +304,12 @@ def validate_cluster_graph(action_query, resource_type):
 
 
 def wait_for_target_up(job):
-    _, cluster = get_admin_client_and_cluster()
-    project_client = get_project_client_for_token(namespace["project"], ADMIN_TOKEN)
+    _, cluster = get_user_client_and_cluster()
+    project_client = get_project_client_for_token(namespace["project"], USER_TOKEN)
     app = project_client.list_app(name=PROJECT_MONITORING_APP).data[0]
     url = CATTLE_TEST_URL + '/k8s/clusters/' + cluster.id + '/api/v1/namespaces/' + app.targetNamespace \
           + '/services/http:access-prometheus:80/proxy/api/v1/targets'
-    headers1 = {'Authorization': 'Bearer ' + ADMIN_TOKEN}
+    headers1 = {'Authorization': 'Bearer ' + USER_TOKEN}
     start = time.time()
     while True:
         t = requests.get(headers=headers1, url=url, verify=False).json()

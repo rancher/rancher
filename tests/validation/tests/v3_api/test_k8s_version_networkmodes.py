@@ -43,7 +43,7 @@ def validate_k8s_version(k8s_version, plugin="canal"):
     node_roles = [["controlplane"], ["controlplane"],
                   ["etcd"], ["etcd"], ["etcd"],
                   ["worker"], ["worker"], ["worker"]]
-    client = get_admin_client()
+    client = get_user_client()
     cluster = client.create_cluster(name=random_name(),
                                     driver="rancherKubernetesEngine",
                                     rancherKubernetesEngineConfig=rke_config)

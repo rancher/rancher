@@ -91,7 +91,7 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
           }
 
           stage('Run provisioning tests') {
-            params = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"), string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"), string(name: 'BRANCH', value: branch) ]
+            params = [ string(name: 'CATTLE_TEST_URL', value: "${CATTLE_TEST_URL}"), string(name: 'USER_TOKEN', value: "${USER_TOKEN}"), string(name: 'ADMIN_TOKEN', value: "${ADMIN_TOKEN}"), string(name: 'BRANCH', value: branch) ]
 
             jobs["custom"] = { build job: 'rancher-v3_test_custom_cluster', parameters: params}
             jobs["do"] = { build job: 'rancher-v3_test_do_cluster', parameters: params }
@@ -110,7 +110,8 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                 sleep(time: RANCHER_DELETE_DELAY.toInteger(), unit: "HOURS")
                 sh "docker run --name ${deleteContainer} -t --env-file ${envFile} " +
                 "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${CATTLE_TEST_URL} && " +
-                "export ADMIN_TOKEN=${ADMIN_TOKEN} && pytest -v -s --junit-xml=${deleteResultsOut} " +
+                "export ADMIN_TOKEN=${ADMIN_TOKEN} && export USER_TOKEN=${USER_TOKEN} && "+
+                "pytest -v -s --junit-xml=${deleteResultsOut} " +
                 "${deletePytestOptions} ${testsDir}\'"
               }
               else {

@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/tunnelserver"
 	rkehosts "github.com/rancher/rke/hosts"
+	rkepki "github.com/rancher/rke/pki"
 	rkeservices "github.com/rancher/rke/services"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -157,7 +158,7 @@ func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.C
 	for _, tempNode := range plan.Nodes {
 		if tempNode.Address == node.Status.NodeConfig.Address {
 			b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, rkehosts.B2DOS)
-			nc.Processes = augmentProcesses(token, tempNode.Processes, false, b2d)
+			nc.Processes = augmentProcesses(token, tempNode.Processes, false, b2d, node.Status.NodeConfig.HostnameOverride)
 			nc.Processes = appendTaintsToKubeletArgs(nc.Processes, node.Status.NodeConfig.Taints)
 			return nc, nil
 		}
@@ -187,11 +188,6 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 		bundle = bundle.ForNode(spec.RancherKubernetesEngineConfig, hostAddress)
 	}
 
-	certString, err := bundle.Marshal()
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshall bundle")
-	}
-
 	rkeConfig := spec.RancherKubernetesEngineConfig
 	filterHostForSpec(rkeConfig, node)
 	logrus.Debugf("The number of nodes sent to the plan: %v", len(rkeConfig.Nodes))
@@ -205,7 +201,6 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 	}
 
 	nc := &rkeworker.NodeConfig{
-		Certs:       certString,
 		ClusterName: cluster.Name,
 	}
 	token, err := n.systemAccountManager.GetOrCreateSystemClusterToken(cluster.Name)
@@ -218,10 +213,29 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 				nc.Processes = enhanceWindowsProcesses(tempNode.Processes)
 			} else {
 				b2d := strings.Contains(infos[tempNode.Address].OperatingSystem, rkehosts.B2DOS)
-				nc.Processes = augmentProcesses(token, tempNode.Processes, true, b2d)
+				nc.Processes = augmentProcesses(token, tempNode.Processes, true, b2d, node.Status.NodeConfig.HostnameOverride)
 			}
 			nc.Processes = appendTaintsToKubeletArgs(nc.Processes, node.Status.NodeConfig.Taints)
 			nc.Files = tempNode.Files
+			// Adding kubelet certificate
+			// Check if argument is set on kubelet for serving certificate
+			if rkepki.IsKubeletGenerateServingCertificateEnabledinConfig(rkeConfig) {
+				//			for _, command := range nc.Processes["kubelet"].Command {
+				//				if strings.Contains(command, "tls-cert-file") {
+				logrus.Debugf("nodeConfig: VerifyKubeletCAEnabled is true, generating kubelet certificate for [%s]", tempNode.Address)
+				err := rkepki.GenerateKubeletCertificate(ctx, bundle.Certs(), *rkeConfig, "", "", false)
+				if err != nil {
+					return nil, errors.Wrapf(err, "failed to generate kubelet certificate")
+				}
+				//					break
+				//				}
+			}
+			certString, err := bundle.Marshal()
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to marshal certificates bundle")
+			}
+			nc.Certs = certString
+
 			return nc, nil
 		}
 	}
@@ -239,7 +253,7 @@ func filterHostForSpec(spec *v3.RancherKubernetesEngineConfig, n *v3.Node) {
 	spec.Nodes = nodeList
 }
 
-func augmentProcesses(token string, processes map[string]v3.Process, worker, b2d bool) map[string]v3.Process {
+func augmentProcesses(token string, processes map[string]v3.Process, worker, b2d bool, nodeName string) map[string]v3.Process {
 	var shared []string
 
 	if b2d {
@@ -257,7 +271,7 @@ func augmentProcesses(token string, processes map[string]v3.Process, worker, b2d
 
 	if len(shared) > 0 {
 		nodeCommand := clusterregistrationtokens.NodeCommand(token) + " --no-register --only-write-certs"
-		args := []string{"--", "share-root.sh", strings.TrimPrefix(nodeCommand, "sudo ")}
+		args := []string{"--", "share-root.sh", strings.TrimPrefix(nodeCommand, "sudo "), "--node-name", nodeName}
 		args = append(args, shared...)
 
 		processes["share-mnt"] = v3.Process{

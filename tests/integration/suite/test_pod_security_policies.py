@@ -3,6 +3,7 @@ from .conftest import kubernetes_api_client, wait_for
 from .common import random_str
 from rancher import ApiError
 import pytest
+from kubernetes.client import CustomObjectsApi
 
 
 def cleanup_pspt(client, request, cluster):
@@ -97,6 +98,7 @@ def test_pod_security_policy_template_del(admin_mc, admin_pc, remove_resource):
     ref https://localhost:8443/v3/podsecuritypolicytemplates
     """
     api_client = admin_mc.client
+    k8s_dynamic_client = CustomObjectsApi(admin_mc.k8s_client)
     # these create a mock pspts... not valid for real psp's
 
     pspt_proj = create_pspt(api_client)
@@ -106,6 +108,31 @@ def test_pod_security_policy_template_del(admin_mc, admin_pc, remove_resource):
     #  creates a project and handles cleanup
     proj = admin_pc.project
     # this will retry 3 times if there is an ApiError
+
+    def set_psp_enabled(value):
+        local_cluster = k8s_dynamic_client.get_cluster_custom_object(
+            "management.cattle.io", "v3", "clusters", "local")
+        local_cluster["metadata"]["annotations"]["capabilities/pspEnabled"] \
+            = value
+        k8s_dynamic_client.replace_cluster_custom_object(
+            "management.cattle.io", "v3", "clusters", "local", local_cluster)
+
+    set_psp_enabled("false")
+    wait_for(lambda: not api_client.by_id_cluster(id="local").capabilities.
+             pspEnabled)
+
+    with pytest.raises(ApiError) as e:
+        api_client.action(obj=proj,
+                          action_name="setpodsecuritypolicytemplate",
+                          podSecurityPolicyTemplateId=pspt_proj.id)
+    assert e.value.error.status == 422
+    assert "cluster [local] does not have Pod Security Policies enabled" in \
+           e.value.error.message
+
+    set_psp_enabled("true")
+    wait_for(lambda: api_client.by_id_cluster(id="local").capabilities.
+             pspEnabled)
+
     api_client.action(obj=proj, action_name="setpodsecuritypolicytemplate",
                       podSecurityPolicyTemplateId=pspt_proj.id)
     proj = api_client.wait_success(proj)
@@ -143,6 +170,10 @@ def test_pod_security_policy_template_del(admin_mc, admin_pc, remove_resource):
     # will timeout if pspt is not deleted
     wait_for(pspt_del_check)
     assert api_client.by_id_pod_security_policy_template(pspt_proj.id) is None
+
+    set_psp_enabled("false")
+    wait_for(lambda: not api_client.by_id_cluster(id="local").capabilities.
+             pspEnabled)
 
 
 def test_incorrect_pspt(admin_mc, remove_resource):

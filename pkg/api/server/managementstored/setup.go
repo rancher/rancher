@@ -640,6 +640,7 @@ func Project(schemas *types.Schemas, management *config.ScaledContext) {
 		ProjectLister:  management.Management.Projects("").Controller().Lister(),
 		UserMgr:        management.UserManager,
 		ClusterManager: management.ClientGetter.(*clustermanager.Manager),
+		ClusterLister:  management.Management.Clusters("").Controller().Lister(),
 	}
 	schema.ActionHandler = handler.Actions
 }

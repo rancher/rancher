@@ -1,6 +1,5 @@
 from .common import *  # NOQA
 import pytest
-from .test_rbac import create_user
 
 project_detail = {"project": None, "namespace": None, "cluster": None,
                   "project2": None, "namespace2": None, "cluster2": None}
@@ -60,7 +59,7 @@ def check_condition(condition_type, status):
 
 def test_tiller():
     name = random_test_name()
-    admin_client = get_admin_client()
+    admin_client = get_user_client()
 
     clusters = admin_client.list_cluster(name=CLUSTER_NAME).data
     assert len(clusters) > 0
@@ -80,7 +79,7 @@ def test_tiller():
     p = admin_client.reload(p)
     proj_client = rancher.Client(url=p.links.self +
                                  '/schemas', verify=False,
-                                 token=ADMIN_TOKEN)
+                                 token=USER_TOKEN)
     # need a cluster scoped client to create a namespace
     _cluster, cluster_client = cluster_and_client(cluster_id, admin_client)
     ns = cluster_client.create_namespace(name=random_str(),
@@ -107,13 +106,13 @@ def test_tiller():
 
 
 def test_app_deploy():
-    admin_client = get_admin_client()
+    admin_client = get_user_client()
     proj_client = get_project_client_for_token(
         project_detail["project"],
-        ADMIN_TOKEN)
+        USER_TOKEN)
     answer = get_defaut_question_answers(
-            admin_client,
-            MYSQL_EXTERNALID_037)
+        admin_client,
+        MYSQL_EXTERNALID_037)
     wait_for_template_to_be_created(admin_client, "library")
     app = proj_client.create_app(
         name=random_test_name(),
@@ -127,14 +126,14 @@ def test_app_deploy():
 
 
 def test_app_delete():
-    admin_client = get_admin_client()
+    admin_client = get_user_client()
     proj_client = get_project_client_for_token(
         project_detail["project"],
-        ADMIN_TOKEN)
+        USER_TOKEN)
     wait_for_template_to_be_created(admin_client, "library")
     answer = get_defaut_question_answers(
-            admin_client,
-            MYSQL_EXTERNALID_037)
+        admin_client,
+        MYSQL_EXTERNALID_037)
     app = proj_client.create_app(
         name=random_test_name(),
         externalId=MYSQL_EXTERNALID_037,
@@ -148,14 +147,14 @@ def test_app_delete():
 
 
 def test_app_upgrade_version():
-    admin_client = get_admin_client()
+    admin_client = get_user_client()
     proj_client = get_project_client_for_token(
         project_detail["project"],
-        ADMIN_TOKEN)
+        USER_TOKEN)
     wait_for_template_to_be_created(admin_client, "library")
     answer = get_defaut_question_answers(
-            admin_client,
-            MYSQL_EXTERNALID_037)
+        admin_client,
+        MYSQL_EXTERNALID_037)
     app = proj_client.create_app(
         name=random_test_name(),
         externalId=MYSQL_EXTERNALID_037,
@@ -180,14 +179,14 @@ def test_app_upgrade_version():
 
 
 def test_app_rollback():
-    admin_client = get_admin_client()
+    admin_client = get_user_client()
     proj_client = get_project_client_for_token(
         project_detail["project"],
-        ADMIN_TOKEN)
+        USER_TOKEN)
     wait_for_template_to_be_created(admin_client, "library")
     answer = get_defaut_question_answers(
-            admin_client,
-            MYSQL_EXTERNALID_037)
+        admin_client,
+        MYSQL_EXTERNALID_037)
     app = proj_client.create_app(
         name=random_test_name(),
         externalId=MYSQL_EXTERNALID_037,
@@ -219,10 +218,10 @@ def test_app_rollback():
 
 
 def test_app_answer_override():
-    admin_client = get_admin_client()
+    admin_client = get_user_client()
     proj_client = get_project_client_for_token(
         project_detail["project"],
-        ADMIN_TOKEN)
+        USER_TOKEN)
     wait_for_template_to_be_created(admin_client, "library")
     answers = get_defaut_question_answers(
         admin_client,
@@ -250,10 +249,10 @@ def test_app_answer_override():
 
 
 def test_rbac_app_project_scope_deploy():
-    admin_client = get_admin_client()
+    admin_client = get_user_client()
     proj_client = get_project_client_for_token(
         project_detail["project"],
-        ADMIN_TOKEN)
+        USER_TOKEN)
     catalog = admin_client.create_projectCatalog(
         name="projectcatalog",
         baseType="projectCatalog",
@@ -277,7 +276,7 @@ def test_rbac_app_project_scope_deploy():
         projectId=project_detail["project"].id)
     validate_catalog_app(proj_client, app, catalog_proj_scoped_ext_id)
     p2, ns2 = create_project_and_ns(
-        ADMIN_TOKEN,
+        USER_TOKEN,
         project_detail["cluster"],
         random_test_name("testapp"))
     #Assign role
@@ -319,12 +318,11 @@ def test_rbac_app_project_scope_deploy():
 
 @pytest.fixture(scope='module', autouse="True")
 def create_project_client(request):
-    client, clusters = get_admin_client_and_cluster()
     client = get_admin_client()
     clusters = client.list_cluster(name=CLUSTER_NAME).data
     assert len(clusters) > 0
     project_detail["project"], project_detail["namespace"] = \
-        create_project_and_ns(ADMIN_TOKEN, clusters[0],
+        create_project_and_ns(USER_TOKEN, clusters[0],
                               random_test_name("testapp"))
     project_detail["cluster"] = clusters[0]
     #create users
@@ -347,6 +345,6 @@ def create_project_client(request):
                               "project-member")
 
     def fin():
-        client = get_admin_client()
+        client = get_user_client()
         client.delete(project_detail["project"])
     request.addfinalizer(fin)
