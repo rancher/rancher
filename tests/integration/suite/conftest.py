@@ -587,3 +587,42 @@ def create_kubeconfig(request, dind_cc, client):
     wait_for(cluster_token_available)
 
     return cluster_kubeconfig_file
+
+
+def set_cluster_psp(admin_mc, value):
+    """Enable or Disable the pod security policy at the local cluster"""
+    k8s_dynamic_client = CustomObjectsApi(admin_mc.k8s_client)
+    # these create a mock pspts... not valid for real psp's
+
+    def update_cluster():
+        try:
+            local_cluster = k8s_dynamic_client.get_cluster_custom_object(
+                "management.cattle.io", "v3", "clusters", "local")
+            local_cluster["metadata"]["annotations"][
+                "capabilities/pspEnabled"] = value
+            k8s_dynamic_client.replace_cluster_custom_object(
+                "management.cattle.io", "v3", "clusters", "local",
+                local_cluster)
+        except ApiException as e:
+            assert e.status == 409
+            return False
+        return True
+
+    wait_for(update_cluster)
+
+    def check_psp():
+        cluster_obj = admin_mc.client.by_id_cluster(id="local")
+        return str(cluster_obj.capabilities.pspEnabled).lower() == value
+
+    wait_for(check_psp)
+
+
+@pytest.fixture()
+def restore_cluster_psp(admin_mc, request):
+    cluster_obj = admin_mc.client.by_id_cluster(id="local")
+    value = str(cluster_obj.capabilities.pspEnabled).lower()
+
+    def _restore():
+        set_cluster_psp(admin_mc, value)
+
+    request.addfinalizer(_restore)

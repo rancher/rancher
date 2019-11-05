@@ -45,11 +45,12 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 }
 
 type Handler struct {
-	Projects       v3.ProjectInterface
-	ProjectLister  v3.ProjectLister
-	ClusterManager *clustermanager.Manager
-	ClusterLister  v3.ClusterLister
-	UserMgr        user.Manager
+	Projects          v3.ProjectInterface
+	ProjectLister     v3.ProjectLister
+	ClusterManager    *clustermanager.Manager
+	ClusterLister     v3.ClusterLister
+	UserMgr           user.Manager
+	PSPTemplateLister v3.PodSecurityPolicyTemplateLister
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -287,6 +288,16 @@ func (h *Handler) setPodSecurityPolicyTemplate(actionName string, action *types.
 	podSecurityPolicyTemplateName, ok := providedPSP.(string)
 	if !ok && providedPSP != nil {
 		return fmt.Errorf("could not convert: %v", providedPSP)
+	}
+
+	if ok {
+		if _, err := h.PSPTemplateLister.Get("", podSecurityPolicyTemplateName); err != nil {
+			if apierrors.IsNotFound(err) {
+				return httperror.NewAPIError(httperror.InvalidBodyContent,
+					fmt.Sprintf("podSecurityPolicyTemplate [%v] not found", podSecurityPolicyTemplateName))
+			}
+			return err
+		}
 	}
 
 	schema := request.Schemas.Schema(&managementschema.Version, client.PodSecurityPolicyTemplateProjectBindingType)
