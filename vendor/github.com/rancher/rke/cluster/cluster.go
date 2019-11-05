@@ -73,26 +73,22 @@ type encryptionConfig struct {
 }
 
 const (
-	AuthnX509Provider       = "x509"
-	AuthnWebhookProvider    = "webhook"
-	StateConfigMapName      = "cluster-state"
-	FullStateConfigMapName  = "full-cluster-state"
-	UpdateStateTimeout      = 30
-	GetStateTimeout         = 30
-	KubernetesClientTimeOut = 30
-	SyncWorkers             = 10
-	NoneAuthorizationMode   = "none"
-	LocalNodeAddress        = "127.0.0.1"
-	LocalNodeHostname       = "localhost"
-	LocalNodeUser           = "root"
-	CloudProvider           = "CloudProvider"
-	ControlPlane            = "controlPlane"
-	WorkerPlane             = "workerPlan"
-	EtcdPlane               = "etcd"
-
-	KubeAppLabel = "k8s-app"
-	AppLabel     = "app"
-	NameLabel    = "name"
+	AuthnX509Provider      = "x509"
+	AuthnWebhookProvider   = "webhook"
+	StateConfigMapName     = "cluster-state"
+	FullStateConfigMapName = "full-cluster-state"
+	UpdateStateTimeout     = 30
+	GetStateTimeout        = 30
+	SyncWorkers            = 10
+	NoneAuthorizationMode  = "none"
+	LocalNodeAddress       = "127.0.0.1"
+	LocalNodeHostname      = "localhost"
+	LocalNodeUser          = "root"
+	CloudProvider          = "CloudProvider"
+	ControlPlane           = "controlPlane"
+	KubeAppLabel           = "k8s-app"
+	AppLabel               = "app"
+	NameLabel              = "name"
 
 	WorkerThreads = util.WorkerThreads
 
@@ -261,7 +257,7 @@ func ParseConfig(clusterFile string) (*v3.RancherKubernetesEngineConfig, error) 
 	// the customConfig is mapped to a k8s type, which doesn't unmarshal well because it has a
 	// nested struct and no yaml tags. Therefor, we have to re-parse it again and assign it correctly.
 	// this only affects rke cli. Since rkeConfig is passed from rancher directly in the rancher use case.
-	clusterFile, secretConfig, err := resolvCustomEncryptionConfig(clusterFile)
+	clusterFile, secretConfig, err := resolveCustomEncryptionConfig(clusterFile)
 	if err != nil {
 		return nil, err
 	}
