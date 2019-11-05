@@ -16,7 +16,6 @@ import (
 	"github.com/rancher/kontainer-engine/service"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
-	"github.com/rancher/rancher/pkg/ticker"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -140,7 +139,7 @@ func (c *Controller) clusterBackupSync(ctx context.Context, interval time.Durati
 	tryTicker := time.NewTicker(interval)
 
 	for {
-		select{
+		select {
 		case <-ctx.Done():
 			return nil
 		case <-tryTicker.C:

@@ -10,7 +10,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/ticker"
 	"github.com/rancher/types/apis/extensions/v1beta1"
 	"github.com/sirupsen/logrus"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -169,7 +168,7 @@ func (c *Controller) renew(ctx context.Context) {
 	tryTicker := time.NewTicker(renewInterval)
 
 	for {
-		select{
+		select {
 		case <-ctx.Done():
 			return
 		case <-tryTicker.C:
