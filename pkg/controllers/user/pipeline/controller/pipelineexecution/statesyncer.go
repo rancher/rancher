@@ -36,7 +36,7 @@ func (s *ExecutionStateSyncer) sync(ctx context.Context, syncInterval time.Durat
 	tryTicker := time.NewTicker(syncInterval)
 
 	for {
-		select{
+		select {
 		case <-ctx.Done():
 			return
 		case <-tryTicker.C:

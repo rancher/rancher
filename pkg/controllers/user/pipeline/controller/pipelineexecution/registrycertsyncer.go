@@ -45,7 +45,7 @@ func (s *RegistryCertSyncer) sync(ctx context.Context, syncInterval time.Duratio
 	tryTicker := time.NewTicker(checkCertRotateInterval)
 
 	for {
-		select{
+		select {
 		case <-ctx.Done():
 			return
 		case <-tryTicker.C:
@@ -112,9 +112,9 @@ func (s *RegistryCertSyncer) rotateCerts(ctx context.Context, projectID string) 
 	defer cancelFunc()
 	tryTicker := time.NewTicker(time.Minute)
 
-	outer:
+outer:
 	for {
-		select{
+		select {
 		case <-cancelCtx.Done():
 			break outer
 		case <-tryTicker.C:

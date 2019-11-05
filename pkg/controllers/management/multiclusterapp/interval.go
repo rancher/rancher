@@ -57,7 +57,7 @@ func startTicker(ctx context.Context, set int, mcApps v3.MultiClusterAppInterfac
 	tryTicker := time.NewTicker(time.Duration(set) * time.Second)
 
 	for {
-		select{
+		select {
 		case <-ctx.Done():
 			return
 		case <-tryTicker.C:

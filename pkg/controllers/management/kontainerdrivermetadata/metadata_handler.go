@@ -168,7 +168,7 @@ func (m *MetadataController) startTicker(ctx context.Context, tickerData *Ticker
 	tryTicker := time.NewTicker(checkInterval)
 
 	for {
-		select{
+		select {
 		case <-ctx.Done():
 			return
 		case <-tryTicker.C:

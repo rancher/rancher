@@ -41,7 +41,7 @@ func (w *SysComponentWatcher) watch(ctx context.Context, interval time.Duration)
 	tryTicker := time.NewTicker(interval)
 
 	for {
-		select{
+		select {
 		case <-ctx.Done():
 			return
 		case <-tryTicker.C:

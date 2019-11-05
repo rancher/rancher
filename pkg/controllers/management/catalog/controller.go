@@ -26,10 +26,10 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 }
 
 func runRefreshCatalog(ctx context.Context, interval int, controller v3.CatalogController, m *manager.Manager) {
-	tryTicker := time.NewTicker(time.Duration(interval)*time.Second)
+	tryTicker := time.NewTicker(time.Duration(interval) * time.Second)
 
 	for {
-		select{
+		select {
 		case <-ctx.Done():
 			return
 		case <-tryTicker.C:
@@ -46,10 +46,10 @@ func runRefreshCatalog(ctx context.Context, interval int, controller v3.CatalogC
 }
 
 func runRefreshProjectCatalog(ctx context.Context, interval int, controller v3.ProjectCatalogController, m *manager.Manager) {
-	tryTicker := time.NewTicker(time.Duration(interval)*time.Second)
+	tryTicker := time.NewTicker(time.Duration(interval) * time.Second)
 
 	for {
-		select{
+		select {
 		case <-ctx.Done():
 			return
 		case <-tryTicker.C:
@@ -66,10 +66,10 @@ func runRefreshProjectCatalog(ctx context.Context, interval int, controller v3.P
 }
 
 func runRefreshClusterCatalog(ctx context.Context, interval int, controller v3.ClusterCatalogController, m *manager.Manager) {
-	tryTicker := time.NewTicker(time.Duration(interval)*time.Second)
+	tryTicker := time.NewTicker(time.Duration(interval) * time.Second)
 
 	for {
-		select{
+		select {
 		case <-ctx.Done():
 			return
 		case <-tryTicker.C:

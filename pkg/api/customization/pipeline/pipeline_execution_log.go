@@ -80,7 +80,7 @@ func (h *ExecutionHandler) handleLog(apiContext *types.APIContext) error {
 	tryTicker := time.NewTicker(logSyncInterval)
 
 	for {
-		select{
+		select {
 		case <-cancelCtx.Done():
 			return nil
 		case <-tryTicker.C:

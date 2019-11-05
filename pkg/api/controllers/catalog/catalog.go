@@ -42,7 +42,7 @@ func (c *CacheCleaner) runPeriodicCatalogCacheCleaner(ctx context.Context, inter
 	tryTicker := time.NewTicker(interval)
 
 	for {
-		select{
+		select {
 		case <-ctx.Done():
 			return
 		case <-tryTicker.C:
