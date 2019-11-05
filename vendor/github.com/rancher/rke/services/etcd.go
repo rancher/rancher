@@ -81,16 +81,21 @@ func RunEtcdPlane(
 	}
 	log.Infof(ctx, "[%s] Successfully started etcd plane.. Checking etcd cluster health", ETCDRole)
 	clientCert := cert.EncodeCertPEM(certMap[pki.KubeNodeCertName].Certificate)
-	clientkey := cert.EncodePrivateKeyPEM(certMap[pki.KubeNodeCertName].Key)
-	var healthy bool
+	clientKey := cert.EncodePrivateKeyPEM(certMap[pki.KubeNodeCertName].Key)
+	var healthError error
+	var hosts []string
 	for _, host := range etcdHosts {
 		_, _, healthCheckURL := GetProcessConfig(etcdNodePlanMap[host.Address].Processes[EtcdContainerName], host)
-		if healthy = isEtcdHealthy(ctx, localConnDialerFactory, host, clientCert, clientkey, healthCheckURL); healthy {
+		healthError = isEtcdHealthy(localConnDialerFactory, host, clientCert, clientKey, healthCheckURL)
+		if healthError == nil {
 			break
 		}
+		logrus.Warn(healthError)
+		hosts = append(hosts, host.Address)
 	}
-	if !healthy {
-		return fmt.Errorf("[etcd] Etcd Cluster is not healthy")
+	if healthError != nil {
+		return fmt.Errorf("etcd cluster is unhealthy: hosts [%s] failed to report healthy."+
+			" Check etcd container logs on each host for more information", strings.Join(hosts, ","))
 	}
 	return nil
 }
@@ -239,15 +244,20 @@ func ReloadEtcdCluster(ctx context.Context, readyEtcdHosts []*hosts.Host, newHos
 		return err
 	}
 	time.Sleep(EtcdInitWaitTime * time.Second)
-	var healthy bool
+	var healthError error
+	var hosts []string
 	for _, host := range readyEtcdHosts {
 		_, _, healthCheckURL := GetProcessConfig(etcdNodePlanMap[host.Address].Processes[EtcdContainerName], host)
-		if healthy = isEtcdHealthy(ctx, localConnDialerFactory, host, cert, key, healthCheckURL); healthy {
+		healthError = isEtcdHealthy(localConnDialerFactory, host, cert, key, healthCheckURL)
+		if healthError == nil {
 			break
 		}
+		logrus.Warn(healthError)
+		hosts = append(hosts, host.Address)
 	}
-	if !healthy {
-		return fmt.Errorf("[etcd] Etcd Cluster is not healthy")
+	if healthError != nil {
+		return fmt.Errorf("etcd cluster is unhealthy: hosts [%s] failed to report healthy."+
+			" Check etcd container logs on each host for more information", strings.Join(hosts, ","))
 	}
 	return nil
 }

@@ -217,23 +217,23 @@ func IsContainerRunning(ctx context.Context, dClient *client.Client, hostname st
 	return false, nil
 }
 
-func localImageExists(ctx context.Context, dClient *client.Client, hostname string, containerImage string) (bool, error) {
+func localImageExists(ctx context.Context, dClient *client.Client, hostname string, containerImage string) error {
 	var err error
 	for i := 1; i <= RetryCount; i++ {
-		logrus.Infof("Checking if image [%s] exists on host [%s], try #%d", containerImage, hostname, i)
+		logrus.Debugf("Checking if image [%s] exists on host [%s], try #%d", containerImage, hostname, i)
 		_, _, err = dClient.ImageInspectWithRaw(ctx, containerImage)
 		if err != nil {
 			if client.IsErrNotFound(err) {
-				logrus.Infof("Image [%s] does not exist on host [%s]: %v", containerImage, hostname, err)
-				return false, nil
+				logrus.Debugf("Image [%s] does not exist on host [%s]: %v", containerImage, hostname, err)
+				return err
 			}
-			logrus.Warnf("Error checking if image [%s] exists on host [%s]: %v", containerImage, hostname, err)
+			logrus.Debugf("Error checking if image [%s] exists on host [%s]: %v", containerImage, hostname, err)
 			continue
 		}
 		logrus.Infof("Image [%s] exists on host [%s]", containerImage, hostname)
-		return true, nil
+		return nil
 	}
-	return false, fmt.Errorf("Error checking if image [%s] exists on host [%s]: %v", containerImage, hostname, err)
+	return fmt.Errorf("Error checking if image [%s] exists on host [%s]: %v", containerImage, hostname, err)
 }
 
 func pullImage(ctx context.Context, dClient *client.Client, hostname string, containerImage string, prsMap map[string]v3.PrivateRegistry) error {
@@ -274,9 +274,7 @@ func UseLocalOrPull(ctx context.Context, dClient *client.Client, hostname string
 	if dClient == nil {
 		return fmt.Errorf("[%s] Failed to use local image or pull: docker client is nil for container [%s] on host [%s]", plane, containerImage, hostname)
 	}
-	var imageExists bool
 	var err error
-
 	// Retry up to RetryCount times to see if image exists
 	for i := 1; i <= RetryCount; i++ {
 		// Increasing wait time on retry, but not on the first two try
@@ -284,26 +282,30 @@ func UseLocalOrPull(ctx context.Context, dClient *client.Client, hostname string
 			time.Sleep(time.Duration(i) * time.Second)
 		}
 
-		// Check for local image and if error, log and retry
-		imageExists, err = localImageExists(ctx, dClient, hostname, containerImage)
-		if err != nil {
-			logrus.Warnf("[%s] %v", plane, err)
-			continue
-		}
-
-		// Return if image exists to prevent pulling
-		if imageExists {
+		if err = localImageExists(ctx, dClient, hostname, containerImage); err == nil {
+			// Return if image exists to prevent pulling
 			return nil
 		}
 
-		// Try pulling and if error, log and retry
+		// If error, log and retry
+		if !client.IsErrNotFound(err) {
+			logrus.Debugf("[%s] %v", plane, err)
+			continue
+		}
+
+		// Try pulling when not found and if error, log and retry
 		err = pullImage(ctx, dClient, hostname, containerImage, prsMap)
 		if err != nil {
-			logrus.Warnf("[%s] Can't pull Docker image [%s] on host [%s]: %v", plane, containerImage, hostname, err)
+			logrus.Debugf("[%s] Can't pull Docker image [%s] on host [%s]: %v", plane, containerImage, hostname, err)
 			continue
 		}
 	}
 	// If the for loop does not return, return the error
+	if err != nil {
+		// Although error should be logged in the caller stack, logging the final error here just in case. Mostly
+		// because error logging was reduced in other places
+		logrus.Warnf("[%s] Can't pull Docker image [%s] on host [%s]: %v", plane, containerImage, hostname, err)
+	}
 	return err
 }
 
