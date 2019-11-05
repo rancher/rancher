@@ -370,7 +370,7 @@ github.com/rancher/rke/dind
 github.com/rancher/rke/cloudprovider/custom
 github.com/rancher/rke/cloudprovider/openstack
 github.com/rancher/rke/cloudprovider/vsphere
-# github.com/rancher/types v0.0.0-20191101191051-9d37fcf2e9b2
+# github.com/rancher/types v0.0.0-20191105221814-8902f4960195
 github.com/rancher/types/apis/management.cattle.io/v3
 github.com/rancher/types/client/management/v3
 github.com/rancher/types/config
