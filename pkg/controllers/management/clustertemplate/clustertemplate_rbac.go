@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rancher/rancher/pkg/controllers/management/globalnamespacerbac"
+	"github.com/rancher/rancher/pkg/controllers/management/rbac"
 	"github.com/rancher/rancher/pkg/namespace"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -59,13 +59,13 @@ func (ct *clusterTemplateController) sync(key string, clusterTemplate *v3.Cluste
 	if err != nil {
 		return clusterTemplate, err
 	}
-	creatorID, ok := metaAccessor.GetAnnotations()[globalnamespacerbac.CreatorIDAnn]
+	creatorID, ok := metaAccessor.GetAnnotations()[rbac.CreatorIDAnn]
 	if !ok {
 		return clusterTemplate, fmt.Errorf("clusterTemplate %v has no creatorId annotation", metaAccessor.GetName())
 	}
 
-	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.ClusterTemplateResource, clusterTemplate.Name,
-		globalnamespacerbac.RancherManagementAPIVersion, creatorID, []string{globalnamespacerbac.RancherManagementAPIVersion},
+	if err := rbac.CreateRoleAndRoleBinding(rbac.ClusterTemplateResource, clusterTemplate.Name, namespace.GlobalNamespace,
+		rbac.RancherManagementAPIVersion, creatorID, []string{rbac.RancherManagementAPIVersion},
 		clusterTemplate.UID,
 		clusterTemplate.Spec.Members, ct.managementContext); err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func (ctr *clusterTemplateRevisionController) sync(key string, clusterTemplateRe
 	if err != nil {
 		return clusterTemplateRev, err
 	}
-	creatorID, ok := metaAccessor.GetAnnotations()[globalnamespacerbac.CreatorIDAnn]
+	creatorID, ok := metaAccessor.GetAnnotations()[rbac.CreatorIDAnn]
 	if !ok {
 		return clusterTemplateRev, fmt.Errorf("clusterTemplateRevision %v has no creatorId annotation", metaAccessor.GetName())
 	}
@@ -105,8 +105,8 @@ func (ctr *clusterTemplateRevisionController) sync(key string, clusterTemplateRe
 	if err != nil {
 		return nil, err
 	}
-	if err := globalnamespacerbac.CreateRoleAndRoleBinding(globalnamespacerbac.ClusterTemplateRevisionResource, clusterTemplateRev.Name,
-		globalnamespacerbac.RancherManagementAPIVersion, creatorID, []string{globalnamespacerbac.RancherManagementAPIVersion},
+	if err := rbac.CreateRoleAndRoleBinding(rbac.ClusterTemplateRevisionResource, clusterTemplateRev.Name, namespace.GlobalNamespace,
+		rbac.RancherManagementAPIVersion, creatorID, []string{rbac.RancherManagementAPIVersion},
 		clusterTemplateRev.UID,
 		clusterTemp.Spec.Members, ctr.managementContext); err != nil {
 		return nil, err
