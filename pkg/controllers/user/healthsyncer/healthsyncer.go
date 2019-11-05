@@ -52,7 +52,7 @@ func (h *HealthSyncer) syncHealth(ctx context.Context, syncHealth time.Duration)
 	tryTicker := time.NewTicker(syncHealth)
 
 	for {
-		select{
+		select {
 		case <-ctx.Done():
 			return
 		case <-tryTicker.C:

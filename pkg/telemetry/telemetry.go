@@ -100,10 +100,10 @@ func Start(ctx context.Context, httpsPort int, management *config.ScaledContext)
 	}()
 
 	go func() {
-		tryTicker := time.NewTicker(time.Second*5)
+		tryTicker := time.NewTicker(time.Second * 5)
 
 		for {
-			select{
+			select {
 			case <-ctx.Done():
 				return
 			case <-tryTicker.C:
