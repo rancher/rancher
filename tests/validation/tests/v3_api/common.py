@@ -435,7 +435,6 @@ def get_role_nodes(cluster, role):
 
 def validate_ingress(p_client, cluster, workloads, host, path,
                      insecure_redirect=False):
-    time.sleep(10)
     curl_args = " "
     if (insecure_redirect):
         curl_args = " -L --insecure "
@@ -445,7 +444,11 @@ def validate_ingress(p_client, cluster, workloads, host, path,
     target_name_list = get_target_names(p_client, workloads)
     for node in nodes:
         host_ip = resolve_node_ip(node)
-        cmd = curl_args + " http://" + host_ip + path
+        url = "http://" + host_ip + path
+        wait_until_ok(url, timeout=300, headers={
+            "Host": host
+        })
+        cmd = curl_args + " " + url
         validate_http_response(cmd, target_name_list)
 
 
@@ -537,6 +540,28 @@ def wait_until_active(url, timeout=120):
             raise Exception('Timed out waiting for url '
                             'to become active')
     return
+
+
+def wait_until_ok(url, timeout=120, headers={}):
+    start = time.time()
+    while not check_if_ok(url, headers=headers):
+        time.sleep(.5)
+        if time.time() - start > timeout:
+            raise Exception(
+                'Timed out waiting for {0} to become ok'.format(url)
+            )
+    return
+
+
+def check_if_ok(url, verify=False, headers={}):
+    try:
+        res = requests.head(url, verify=verify, headers=headers)
+        if res.status_code == 200:
+            return True
+        return False
+    except requests.ConnectionError:
+        print("Connection Error - " + url)
+        return False
 
 
 def validate_http_response(cmd, target_name_list, client_pod=None):
@@ -759,6 +784,12 @@ def create_custom_host_registration_token(client, cluster):
     cluster_token = client.wait_success(cluster_token)
     assert cluster_token.state == 'active'
     return cluster_token
+
+
+def get_cluster_by_name(client, name):
+    clusters = client.list_cluster(name=name).data
+    assert len(clusters) == 1, "Cluster " + name + " does not exist"
+    return clusters[0]
 
 
 def get_cluster_type(client, cluster):
@@ -1272,4 +1303,3 @@ def validate_app_deletion(client, app_id, timeout=DEFAULT_APP_DELETION_TIMEOUT):
         app = client.list_app(id=app_id).data
         if len(app) == 0:
             break
-
