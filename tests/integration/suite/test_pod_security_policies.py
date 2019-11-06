@@ -4,6 +4,7 @@ from .common import random_str
 from rancher import ApiError
 import pytest
 from kubernetes.client import CustomObjectsApi
+from kubernetes.client.rest import ApiException
 
 
 def cleanup_pspt(client, request, cluster):
@@ -93,7 +94,9 @@ def test_service_accounts_have_role_binding(admin_mc, request):
 
 
 def test_pod_security_policy_template_del(admin_mc, admin_pc, remove_resource):
-    """ Test for pod security policy template binding correctly
+    """ Test for pod security policy template binding correctly.
+    May have to mark this test as nonparallel if new test are introduced
+    that toggle pspEnabled.
     ref https://github.com/rancher/rancher/issues/15728
     ref https://localhost:8443/v3/podsecuritypolicytemplates
     """
@@ -110,12 +113,20 @@ def test_pod_security_policy_template_del(admin_mc, admin_pc, remove_resource):
     # this will retry 3 times if there is an ApiError
 
     def set_psp_enabled(value):
-        local_cluster = k8s_dynamic_client.get_cluster_custom_object(
-            "management.cattle.io", "v3", "clusters", "local")
-        local_cluster["metadata"]["annotations"]["capabilities/pspEnabled"] \
-            = value
-        k8s_dynamic_client.replace_cluster_custom_object(
-            "management.cattle.io", "v3", "clusters", "local", local_cluster)
+        def update_cluster():
+            try:
+                local_cluster = k8s_dynamic_client.get_cluster_custom_object(
+                    "management.cattle.io", "v3", "clusters", "local")
+                local_cluster["metadata"]["annotations"][
+                    "capabilities/pspEnabled"] = value
+                k8s_dynamic_client.replace_cluster_custom_object(
+                    "management.cattle.io", "v3", "clusters", "local",
+                    local_cluster)
+            except ApiException as e:
+                assert e.status == 409
+                return False
+            return True
+        wait_for(update_cluster)
 
     set_psp_enabled("false")
     wait_for(lambda: not api_client.by_id_cluster(id="local").capabilities.
