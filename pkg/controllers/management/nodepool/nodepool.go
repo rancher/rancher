@@ -177,16 +177,14 @@ func (c *Controller) nodes(nodePool *v3.NodePool, simulate bool) ([]*v3.Node, er
 		return c.NodeLister.List(nodePool.Namespace, labels.Everything())
 	}
 
-	nodeList, err := c.Nodes.List(metav1.ListOptions{})
+	nodeList, err := c.Nodes.ListNamespaced(nodePool.Namespace, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 
 	var nodes []*v3.Node
 	for i := range nodeList.Items {
-		if nodeList.Items[i].Namespace == nodePool.Namespace {
-			nodes = append(nodes, &nodeList.Items[i])
-		}
+		nodes = append(nodes, &nodeList.Items[i])
 	}
 
 	return nodes, nil
