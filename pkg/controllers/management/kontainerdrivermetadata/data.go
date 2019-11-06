@@ -333,7 +333,7 @@ func getLabelMap(k8sVersion string, data map[string]map[string]string,
 			}
 		}
 		if !found {
-			return nil, fmt.Errorf("no template found for k8sVersion %s plugin %s", k8sVersion, addon)
+			logrus.Debugf("getPluginData: no template found for k8sVersion %s plugin %s", k8sVersion, addon)
 		}
 	}
 	// store service options
