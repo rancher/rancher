@@ -236,3 +236,7 @@ type ClusterCatalog struct {
 	Catalog     `json:",inline" mapstructure:",squash"`
 	ClusterName string `json:"clusterName,omitempty" norman:"required,type=reference[cluster]"`
 }
+
+type CatalogRefresh struct {
+	Catalogs []string `json:"catalogs"`
+}
