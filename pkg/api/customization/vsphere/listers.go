@@ -32,6 +32,8 @@ func processSoapFinder(ctx context.Context, fieldName string, cc *v1.Secret, dc 
 		data, err = listVirtualMachines(ctx, finder, "templates")
 	case "data-stores":
 		data, err = listDataStores(ctx, finder)
+	case "data-store-clusters":
+		data, err = listDataStoreClusters(ctx, finder)
 	case "folders":
 		data, err = listFolders(ctx, finder)
 	case "hosts":
@@ -253,13 +255,27 @@ func listDataStores(ctx context.Context, finder *find.Finder) ([]string, error) 
 	return data, nil
 }
 
-func listFolders(ctx context.Context, finder *find.Finder) ([]string, error) {
-	folders, err := finder.FolderList(ctx, "*")
+func listDataStoreClusters(ctx context.Context, finder *find.Finder) ([]string, error) {
+	dataStores, err := finder.DatastoreClusterList(ctx, "*")
 	if err != nil {
 		return nil, err
 	}
 
-	data := []string{"/"} //slash default
+	var data []string
+	for _, ds := range dataStores {
+		data = append(data, ds.InventoryPath)
+	}
+
+	return data, nil
+}
+
+func listFolders(ctx context.Context, finder *find.Finder) ([]string, error) {
+	folders, err := finder.FolderList(ctx, "vm/*")
+	if err != nil {
+		return nil, err
+	}
+
+	data := []string{""}
 	for _, f := range folders {
 		data = append(data, f.InventoryPath)
 	}
