@@ -98,13 +98,11 @@ func (n ContainerPorts) ToInternal(data map[string]interface{}) error {
 					logrus.Warnf("Failed to encode port: %v", err)
 					return obj
 				}
-				if strings.EqualFold(convert.ToString(mapped["kind"]), "HostPort") {
-					if _, ok := mapped["sourcePort"]; ok {
-						mapped["hostPort"] = mapped["sourcePort"]
-					}
+				if !strings.EqualFold(convert.ToString(mapped["kind"]), "HostPort") {
+					// delete the source port so it doesn't get converted to the host port by default mapper
+					delete(mapped, "sourcePort")
 				}
-				// delete the source port so it doesn't get converted to the host port by default mapper
-				delete(mapped, "sourcePort")
+
 			}
 			ports = append(ports, l)
 		}
