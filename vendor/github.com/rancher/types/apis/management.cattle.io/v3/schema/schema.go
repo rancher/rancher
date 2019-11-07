@@ -111,12 +111,13 @@ func catalogTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Embed{Field: "status"},
 			&m.Drop{Field: "helmVersionCommits"},
 		).
+		MustImport(&Version, v3.CatalogRefresh{}).
 		MustImportAndCustomize(&Version, v3.Catalog{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
-				"refresh": {},
+				"refresh": {Output: "catalogRefresh"},
 			}
 			schema.CollectionActions = map[string]types.Action{
-				"refresh": {},
+				"refresh": {Output: "catalogRefresh"},
 			}
 		}).
 		AddMapperForType(&Version, v3.Template{},
@@ -215,6 +216,7 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.MonitoringInput{}).
 		MustImport(&Version, v3.MonitoringOutput{}).
 		MustImport(&Version, v3.RestoreFromEtcdBackupInput{}).
+		MustImport(&Version, v3.SaveAsTemplateInput{}).
 		MustImportAndCustomize(&Version, v3.ETCDService{}, func(schema *types.Schema) {
 			schema.MustCustomizeField("extraArgs", func(field types.Field) types.Field {
 				field.Default = map[string]interface{}{
@@ -259,6 +261,9 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 				Output: "rotateCertificateOutput",
 			}
 			schema.ResourceActions[v3.ClusterActionRunCISScan] = types.Action{}
+			schema.ResourceActions[v3.ClusterActionSaveAsTemplate] = types.Action{
+				Input: "saveAsTemplateInput",
+			}
 		})
 }
 
@@ -728,10 +733,10 @@ func projectCatalogTypes(schemas *types.Schemas) *types.Schemas {
 			&mapper.NamespaceIDMapper{}).
 		MustImportAndCustomize(&Version, v3.ProjectCatalog{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
-				"refresh": {},
+				"refresh": {Output: "catalogRefresh"},
 			}
 			schema.CollectionActions = map[string]types.Action{
-				"refresh": {},
+				"refresh": {Output: "catalogRefresh"},
 			}
 		})
 }
@@ -745,10 +750,10 @@ func clusterCatalogTypes(schemas *types.Schemas) *types.Schemas {
 			&mapper.NamespaceIDMapper{}).
 		MustImportAndCustomize(&Version, v3.ClusterCatalog{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
-				"refresh": {},
+				"refresh": {Output: "catalogRefresh"},
 			}
 			schema.CollectionActions = map[string]types.Action{
-				"refresh": {},
+				"refresh": {Output: "catalogRefresh"},
 			}
 		})
 }
