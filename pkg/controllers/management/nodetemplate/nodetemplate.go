@@ -3,6 +3,7 @@ package nodetemplate
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/rancher/rancher/pkg/controllers/management/rbac"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -21,6 +22,7 @@ import (
 
 const (
 	ownerBindingsAnno = "ownerBindingsCreated"
+	vmwaredriver      = "vmwarevsphere"
 )
 
 type nodeTemplateController struct {
@@ -221,10 +223,55 @@ func (nt *nodeTemplateController) createGlobalNodeTemplateClone(legacyName, clon
 			"labels":      labels,
 		}
 
+		vsphereLegacyNormalizer(globalNodeTemplate)
+
 		if _, err = client.Namespace(namespace.NodeTemplateGlobalNamespace).Create(globalNodeTemplate, metav1.CreateOptions{}); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+/*
+	legacy vmwarevsphere nodetemplates were free form text fields
+	and this is an attempt to normalize the data to a valid vsphere path
+	e.g. "My Network" becomes "/DC_NAME/networks/My Network"
+*/
+func vsphereLegacyNormalizer(nt *unstructured.Unstructured) {
+	spec, ok := nt.Object["spec"].(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	driver, _ := spec["driver"]
+	if driver != vmwaredriver {
+		return
+	}
+
+	k := vmwaredriver + "Config"
+	c, ok := nt.Object[k].(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	dc, _ := c["datacenter"].(string)
+	if dc != "" && !strings.HasPrefix(dc, "/") {
+		dc = "/" + dc
+		c["datacenter"] = dc
+	}
+
+	ds, _ := c["datastore"].(string)
+	if ds != "" && !strings.HasPrefix(ds, "/") {
+		c["datastore"] = fmt.Sprintf("%s/datastore/%s", dc, ds)
+	}
+
+	nets, _ := c["network"].([]interface{})
+	for i, net := range nets {
+		n := net.(string)
+		if n != "" && !strings.HasPrefix(n, "/") {
+			n = fmt.Sprintf("%s/network/%s", dc, n)
+			nets[i] = n
+		}
+	}
 }
