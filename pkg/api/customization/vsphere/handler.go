@@ -28,20 +28,21 @@ const (
 )
 
 var fieldNames = map[string]int{
-	"data-centers":      SoapFinder,
-	"hosts":             SoapFinder,
-	"data-stores":       SoapFinder,
-	"folders":           SoapFinder,
-	"networks":          SoapFinder,
-	"virtual-machines":  SoapFinder,
-	"templates":         SoapFinder,
-	"clusters":          SoapFinder,
-	"resource-pools":    SoapFinder,
-	"content-libraries": ContentLibraryManager,
-	"library-templates": ContentLibraryManager,
-	"tags":              TagsManager,
-	"tag-categories":    TagsManager,
-	"custom-attributes": CustomFieldsFinder,
+	"data-centers":        SoapFinder,
+	"hosts":               SoapFinder,
+	"data-stores":         SoapFinder,
+	"data-store-clusters": SoapFinder,
+	"folders":             SoapFinder,
+	"networks":            SoapFinder,
+	"virtual-machines":    SoapFinder,
+	"templates":           SoapFinder,
+	"clusters":            SoapFinder,
+	"resource-pools":      SoapFinder,
+	"content-libraries":   ContentLibraryManager,
+	"library-templates":   ContentLibraryManager,
+	"tags":                TagsManager,
+	"tag-categories":      TagsManager,
+	"custom-attributes":   CustomFieldsFinder,
 }
 
 var dataFields = map[string]string{
