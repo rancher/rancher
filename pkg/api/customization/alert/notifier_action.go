@@ -10,6 +10,8 @@ import (
 	"github.com/rancher/rancher/pkg/notifiers"
 	"github.com/rancher/rancher/pkg/ref"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	client "github.com/rancher/types/client/management/v3"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -42,9 +44,17 @@ func (h *Handler) testNotifier(actionName string, action *types.Action, apiConte
 		Message string
 		v3.NotifierSpec
 	}{}
+	clientNotifier := &struct {
+		client.NotifierSpec
+	}{}
+
 	if err = json.Unmarshal(data, input); err != nil {
-		return errors.Wrap(err, "unmarshaling input error")
+		return errors.Wrap(err, "unmarshalling input error")
 	}
+	if err = json.Unmarshal(data, clientNotifier); err != nil {
+		return errors.Wrap(err, "unmarshalling input error client")
+	}
+
 	notifier := &v3.Notifier{
 		Spec: input.NotifierSpec,
 	}
@@ -62,5 +72,10 @@ func (h *Handler) testNotifier(actionName string, action *types.Action, apiConte
 	if notifier.Spec.SMTPConfig != nil {
 		notifierMessage.Title = testSMTPTitle
 	}
-	return notifiers.SendMessage(notifier, "", notifierMessage)
+
+	dialer, err := h.DialerFactory.ClusterDialer(clientNotifier.ClusterID)
+	if err != nil {
+		return errors.Wrap(err, "error getting dialer")
+	}
+	return notifiers.SendMessage(notifier, "", notifierMessage, dialer)
 }

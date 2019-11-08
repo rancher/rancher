@@ -557,6 +557,7 @@ func Alert(schemas *types.Schemas, management *config.ScaledContext) {
 		ClusterAlertRule: management.Management.ClusterAlertRules(""),
 		ProjectAlertRule: management.Management.ProjectAlertRules(""),
 		Notifiers:        management.Management.Notifiers(""),
+		DialerFactory:    management.Dialer,
 	}
 
 	schema := schemas.Schema(&managementschema.Version, client.NotifierType)
