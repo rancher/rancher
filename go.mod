@@ -33,7 +33,6 @@ replace (
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.0.0-20190918163543-cfa506e53441
 	k8s.io/metrics => k8s.io/metrics v0.0.0-20190918162108-227c654b2546
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.0.0-20190918161442-d4c9c65c82af
-
 )
 
 require (
@@ -74,20 +73,20 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.1.0
 	github.com/prometheus/common v0.6.0
-	github.com/rancher/kontainer-driver-metadata v0.0.0-20191029184535-deb9b9936256
+	github.com/rancher/kontainer-driver-metadata v0.0.0-20191109011910-a616dde83e55
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20190930174220-db9e24343393
 	github.com/rancher/norman v0.0.0-20191003174345-0ac7dd6ccb36
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6
-	github.com/rancher/rke v0.3.3-0.20191105172502-c58667826ac6
-	github.com/rancher/types v0.0.0-20191107233103-69dee8782444
+	github.com/rancher/rke v1.0.0-rc1.0.20191109051740-865a31dbd2a2
+	github.com/rancher/types v0.0.0-20191108235045-716d86fa44c9
 	github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/kafka-go v0.0.0-20190411192201-218fd49cff39
 	github.com/sirupsen/logrus v1.4.2
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.4.0
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.21.0
 	github.com/vmihailenco/msgpack v4.0.1+incompatible
