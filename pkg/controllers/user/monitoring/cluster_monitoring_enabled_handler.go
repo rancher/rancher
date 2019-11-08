@@ -44,6 +44,10 @@ func (h *clusterMonitoringEnabledHandler) sync(key string, endpoints *k8scorev1.
 
 // sync will trigger clusterHandler sync loop when node updated, if Cluster Monitoring is enabling.
 func (h *clusterMonitoringEnabledHandler) syncWindowsNode(key string, node *k8scorev1.Node) (runtime.Object, error) {
+	if node == nil || node.Labels == nil {
+		return node, nil
+	}
+
 	_, monitoringNamespace := monitoring.ClusterMonitoringInfo()
 	cluster, err := h.cattleClusterLister.Get(metav1.NamespaceAll, h.clusterName)
 	if err != nil || cluster.DeletionTimestamp != nil {
