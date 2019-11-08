@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/rke/log"
 	"github.com/rancher/rke/services"
 	"github.com/rancher/rke/util"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
@@ -46,14 +47,17 @@ const (
 var DNSProviders = []string{KubeDNSProvider, CoreDNSProvider}
 
 type ingressOptions struct {
-	RBACConfig     string
-	Options        map[string]string
-	NodeSelector   map[string]string
-	ExtraArgs      map[string]string
-	DNSPolicy      string
-	AlpineImage    string
-	IngressImage   string
-	IngressBackend string
+	RBACConfig        string
+	Options           map[string]string
+	NodeSelector      map[string]string
+	ExtraArgs         map[string]string
+	ExtraEnvs         []v3.ExtraEnv
+	ExtraVolumes      []v3.ExtraVolume
+	ExtraVolumeMounts []v3.ExtraVolumeMount
+	DNSPolicy         string
+	AlpineImage       string
+	IngressImage      string
+	IngressBackend    string
 }
 
 type MetricsServerOptions struct {
@@ -484,13 +488,16 @@ func (c *Cluster) deployIngress(ctx context.Context, data map[string]interface{}
 	}
 	log.Infof(ctx, "[ingress] Setting up %s ingress controller", c.Ingress.Provider)
 	ingressConfig := ingressOptions{
-		RBACConfig:     c.Authorization.Mode,
-		Options:        c.Ingress.Options,
-		NodeSelector:   c.Ingress.NodeSelector,
-		ExtraArgs:      c.Ingress.ExtraArgs,
-		DNSPolicy:      c.Ingress.DNSPolicy,
-		IngressImage:   c.SystemImages.Ingress,
-		IngressBackend: c.SystemImages.IngressBackend,
+		RBACConfig:        c.Authorization.Mode,
+		Options:           c.Ingress.Options,
+		NodeSelector:      c.Ingress.NodeSelector,
+		ExtraArgs:         c.Ingress.ExtraArgs,
+		DNSPolicy:         c.Ingress.DNSPolicy,
+		IngressImage:      c.SystemImages.Ingress,
+		IngressBackend:    c.SystemImages.IngressBackend,
+		ExtraEnvs:         c.Ingress.ExtraEnvs,
+		ExtraVolumes:      c.Ingress.ExtraVolumes,
+		ExtraVolumeMounts: c.Ingress.ExtraVolumeMounts,
 	}
 	// since nginx ingress controller 0.16.0, it can be run as non-root and doesn't require privileged anymore.
 	// So we can use securityContext instead of setting privileges via initContainer.
