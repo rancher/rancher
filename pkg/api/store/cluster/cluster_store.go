@@ -480,6 +480,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	setBackupConfigSecretKeyIfNotExists(existingCluster, data)
 	setPrivateRegistryPasswordIfNotExists(existingCluster, data)
 	setCloudProviderPasswordFieldsIfNotExists(existingCluster, data)
+	setWeavePasswordFieldsIfNotExists(existingCluster, data)
 	if err := validateUpdatedS3Credentials(existingCluster, data); err != nil {
 		return nil, err
 	}
@@ -677,6 +678,21 @@ func setBackupConfigSecretKeyIfNotExists(oldData, newData map[string]interface{}
 	oldSecretKey := convert.ToString(values.GetValueN(oldData, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig", "secretKey"))
 	if oldSecretKey != "" {
 		values.PutValue(newData, oldSecretKey, "rancherKubernetesEngineConfig", "services", "etcd", "backupConfig", "s3BackupConfig", "secretKey")
+	}
+}
+
+func setWeavePasswordFieldsIfNotExists(oldData, newData map[string]interface{}) {
+	weaveConfig := values.GetValueN(newData, "rancherKubernetesEngineConfig", "network", "weaveNetworkProvider")
+	if weaveConfig == nil {
+		return
+	}
+	val := convert.ToMapInterface(weaveConfig)
+	if val["password"] != nil {
+		return
+	}
+	oldWeavePassword := convert.ToString(values.GetValueN(oldData, "rancherKubernetesEngineConfig", "network", "weaveNetworkProvider", "password"))
+	if oldWeavePassword != "" {
+		values.PutValue(newData, oldWeavePassword, "rancherKubernetesEngineConfig", "network", "weaveNetworkProvider", "password")
 	}
 }
 
