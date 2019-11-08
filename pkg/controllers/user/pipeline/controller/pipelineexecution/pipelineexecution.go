@@ -25,6 +25,7 @@ import (
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
+	"github.com/rancher/types/config/dialer"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
@@ -92,6 +93,8 @@ type Lifecycle struct {
 	pipelineSettingLister      v3.PipelineSettingLister
 	pipelineEngine             engine.PipelineEngine
 	sourceCodeCredentialLister v3.SourceCodeCredentialLister
+
+	DialerFactory dialer.Factory
 }
 
 func Register(ctx context.Context, cluster *config.UserContext) {
@@ -152,6 +155,8 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		pipelineEngine:             pipelineEngine,
 		sourceCodeCredentialLister: sourceCodeCredentialLister,
 		notifierLister:             notifierLister,
+
+		DialerFactory: cluster.Management.Dialer,
 	}
 	stateSyncer := &ExecutionStateSyncer{
 		clusterName: clusterName,
@@ -476,6 +481,11 @@ func (l *Lifecycle) doNotify(obj *v3.PipelineExecution) (runtime.Object, error) 
 	if err != nil {
 		return obj, err
 	}
+	clusterName, _ := ref.Parse(obj.Spec.ProjectName)
+	clusterDialer, err := l.DialerFactory.ClusterDialer(clusterName)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting dialer")
+	}
 	if obj.Spec.PipelineConfig.Notification.Message != "" {
 		message = obj.Spec.PipelineConfig.Notification.Message
 	}
@@ -491,7 +501,7 @@ func (l *Lifecycle) doNotify(obj *v3.PipelineExecution) (runtime.Object, error) 
 			notifierMessage.Content = strings.Replace(message, "\n", "<br>\n", -1)
 		}
 		g.Go(func() error {
-			return notifiers.SendMessage(toSendRecipient.Notifier, toSendRecipient.Recipient, notifierMessage)
+			return notifiers.SendMessage(toSendRecipient.Notifier, toSendRecipient.Recipient, notifierMessage, clusterDialer)
 		})
 	}
 	return obj, g.Wait()
