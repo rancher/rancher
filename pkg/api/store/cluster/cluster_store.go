@@ -217,7 +217,9 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	if err := validateS3Credentials(data); err != nil {
 		return nil, err
 	}
-
+	if err := validateIngressConfigExtraFields(data); err != nil {
+		return nil, err
+	}
 	return r.Store.Create(apiContext, schema, data)
 }
 
@@ -485,6 +487,9 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, err
 	}
 
+	if err := validateIngressConfigExtraFields(data); err != nil {
+		return nil, err
+	}
 	return r.Store.Update(apiContext, schema, data, id)
 }
 
@@ -824,4 +829,56 @@ func replaceWithOldSecretIfNotExists(oldData, newData map[string]interface{}, cl
 	if oldSecret != "" {
 		values.PutValue(newData, oldSecret, keys...)
 	}
+}
+
+func validateIngressConfigExtraFields(data map[string]interface{}) error {
+	if err := validateIngressConfigExtraVolumes(data); err != nil {
+		return err
+	}
+	if err := validateIngressConfigExtraVolumeMounts(data); err != nil {
+		return err
+	}
+	if err := validateIngressConfigExtraEnvs(data); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateIngressConfigExtraVolumes(data map[string]interface{}) error {
+	var volumes []v3.ExtraVolume
+	extraVolumes := values.GetValueN(data, "rancherKubernetesEngineConfig", "ingress", managementv3.IngressConfigFieldExtraVolumes)
+	if extraVolumes == nil {
+		return nil
+	}
+	if err := convert.ToObj(extraVolumes, &volumes); err != nil {
+		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "ingressExtraVolumes spec conversion error")
+	}
+	values.PutValue(data, volumes, "rancherKubernetesEngineConfig", "ingress", managementv3.IngressConfigFieldExtraVolumes)
+	return nil
+}
+
+func validateIngressConfigExtraVolumeMounts(data map[string]interface{}) error {
+	var volumeMounts []v3.ExtraVolumeMount
+	extraVolumeMounts := values.GetValueN(data, "rancherKubernetesEngineConfig", "ingress", managementv3.IngressConfigFieldExtraVolumeMounts)
+	if extraVolumeMounts == nil {
+		return nil
+	}
+	if err := convert.ToObj(extraVolumeMounts, &volumeMounts); err != nil {
+		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "ingressExtraVolumeMounts spec conversion error")
+	}
+	values.PutValue(data, volumeMounts, "rancherKubernetesEngineConfig", "ingress", managementv3.IngressConfigFieldExtraVolumeMounts)
+	return nil
+}
+
+func validateIngressConfigExtraEnvs(data map[string]interface{}) error {
+	var envVars []v3.ExtraEnv
+	extraEnvs := values.GetValueN(data, "rancherKubernetesEngineConfig", "ingress", managementv3.IngressConfigFieldExtraEnvs)
+	if extraEnvs == nil {
+		return nil
+	}
+	if err := convert.ToObj(extraEnvs, &envVars); err != nil {
+		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "ingressExtraEnvs spec conversion error")
+	}
+	values.PutValue(data, envVars, "rancherKubernetesEngineConfig", "ingress", managementv3.IngressConfigFieldExtraEnvs)
+	return nil
 }
