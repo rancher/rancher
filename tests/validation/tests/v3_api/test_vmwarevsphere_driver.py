@@ -18,7 +18,7 @@ CLONE_FROM = \
 RESOURCE_POOL = \
     os.environ.get("RANCHER_RESOURCE_POOL",
                    "/RNCH-HE-FMT/host/FMT2.R620.1/Resources/validation-tests")
-ADMIN_TOKEN = get_admin_token()
+# ADMIN_TOKEN = get_admin_token()
 
 rke_config = {
     "addonJobTimeout": 30,
