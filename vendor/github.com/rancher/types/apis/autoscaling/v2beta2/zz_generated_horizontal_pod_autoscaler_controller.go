@@ -86,6 +86,7 @@ type HorizontalPodAutoscalerInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*HorizontalPodAutoscalerList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*HorizontalPodAutoscalerList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() HorizontalPodAutoscalerController
@@ -270,6 +271,11 @@ func (s *horizontalPodAutoscalerClient) DeleteNamespaced(namespace, name string,
 
 func (s *horizontalPodAutoscalerClient) List(opts metav1.ListOptions) (*HorizontalPodAutoscalerList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*HorizontalPodAutoscalerList), err
+}
+
+func (s *horizontalPodAutoscalerClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*HorizontalPodAutoscalerList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*HorizontalPodAutoscalerList), err
 }
 

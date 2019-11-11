@@ -674,6 +674,7 @@ var (
 	lockRKEK8sSystemImageInterfaceMockGet                              sync.RWMutex
 	lockRKEK8sSystemImageInterfaceMockGetNamespaced                    sync.RWMutex
 	lockRKEK8sSystemImageInterfaceMockList                             sync.RWMutex
+	lockRKEK8sSystemImageInterfaceMockListNamespaced                   sync.RWMutex
 	lockRKEK8sSystemImageInterfaceMockObjectClient                     sync.RWMutex
 	lockRKEK8sSystemImageInterfaceMockUpdate                           sync.RWMutex
 	lockRKEK8sSystemImageInterfaceMockWatch                            sync.RWMutex
@@ -736,6 +737,9 @@ var _ v3.RKEK8sSystemImageInterface = &RKEK8sSystemImageInterfaceMock{}
 //             },
 //             ListFunc: func(opts v1.ListOptions) (*v3.RKEK8sSystemImageList, error) {
 // 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.RKEK8sSystemImageList, error) {
+// 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
@@ -800,6 +804,9 @@ type RKEK8sSystemImageInterfaceMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(opts v1.ListOptions) (*v3.RKEK8sSystemImageList, error)
+
+	// ListNamespacedFunc mocks the ListNamespaced method.
+	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.RKEK8sSystemImageList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -949,6 +956,13 @@ type RKEK8sSystemImageInterfaceMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// Opts is the opts argument value.
+			Opts v1.ListOptions
+		}
+		// ListNamespaced holds details about calls to the ListNamespaced method.
+		ListNamespaced []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
 			// Opts is the opts argument value.
 			Opts v1.ListOptions
 		}
@@ -1580,6 +1594,41 @@ func (mock *RKEK8sSystemImageInterfaceMock) ListCalls() []struct {
 	lockRKEK8sSystemImageInterfaceMockList.RLock()
 	calls = mock.calls.List
 	lockRKEK8sSystemImageInterfaceMockList.RUnlock()
+	return calls
+}
+
+// ListNamespaced calls ListNamespacedFunc.
+func (mock *RKEK8sSystemImageInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.RKEK8sSystemImageList, error) {
+	if mock.ListNamespacedFunc == nil {
+		panic("RKEK8sSystemImageInterfaceMock.ListNamespacedFunc: method is nil but RKEK8sSystemImageInterface.ListNamespaced was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}{
+		Namespace: namespace,
+		Opts:      opts,
+	}
+	lockRKEK8sSystemImageInterfaceMockListNamespaced.Lock()
+	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
+	lockRKEK8sSystemImageInterfaceMockListNamespaced.Unlock()
+	return mock.ListNamespacedFunc(namespace, opts)
+}
+
+// ListNamespacedCalls gets all the calls that were made to ListNamespaced.
+// Check the length with:
+//     len(mockedRKEK8sSystemImageInterface.ListNamespacedCalls())
+func (mock *RKEK8sSystemImageInterfaceMock) ListNamespacedCalls() []struct {
+	Namespace string
+	Opts      v1.ListOptions
+} {
+	var calls []struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}
+	lockRKEK8sSystemImageInterfaceMockListNamespaced.RLock()
+	calls = mock.calls.ListNamespaced
+	lockRKEK8sSystemImageInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 

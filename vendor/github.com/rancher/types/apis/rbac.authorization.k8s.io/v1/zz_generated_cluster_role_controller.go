@@ -85,6 +85,7 @@ type ClusterRoleInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ClusterRoleList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*ClusterRoleList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterRoleController
@@ -269,6 +270,11 @@ func (s *clusterRoleClient) DeleteNamespaced(namespace, name string, options *me
 
 func (s *clusterRoleClient) List(opts metav1.ListOptions) (*ClusterRoleList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*ClusterRoleList), err
+}
+
+func (s *clusterRoleClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ClusterRoleList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*ClusterRoleList), err
 }
 

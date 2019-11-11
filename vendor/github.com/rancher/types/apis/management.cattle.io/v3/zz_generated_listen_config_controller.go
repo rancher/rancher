@@ -84,6 +84,7 @@ type ListenConfigInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ListenConfigList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*ListenConfigList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ListenConfigController
@@ -268,6 +269,11 @@ func (s *listenConfigClient) DeleteNamespaced(namespace, name string, options *m
 
 func (s *listenConfigClient) List(opts metav1.ListOptions) (*ListenConfigList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*ListenConfigList), err
+}
+
+func (s *listenConfigClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ListenConfigList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*ListenConfigList), err
 }
 

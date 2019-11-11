@@ -85,6 +85,7 @@ type ProjectMonitorGraphInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ProjectMonitorGraphList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*ProjectMonitorGraphList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ProjectMonitorGraphController
@@ -269,6 +270,11 @@ func (s *projectMonitorGraphClient) DeleteNamespaced(namespace, name string, opt
 
 func (s *projectMonitorGraphClient) List(opts metav1.ListOptions) (*ProjectMonitorGraphList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*ProjectMonitorGraphList), err
+}
+
+func (s *projectMonitorGraphClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ProjectMonitorGraphList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*ProjectMonitorGraphList), err
 }
 

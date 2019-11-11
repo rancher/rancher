@@ -85,6 +85,7 @@ type RKEK8sServiceOptionInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*RKEK8sServiceOptionList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*RKEK8sServiceOptionList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() RKEK8sServiceOptionController
@@ -269,6 +270,11 @@ func (s *rkeK8sServiceOptionClient) DeleteNamespaced(namespace, name string, opt
 
 func (s *rkeK8sServiceOptionClient) List(opts metav1.ListOptions) (*RKEK8sServiceOptionList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*RKEK8sServiceOptionList), err
+}
+
+func (s *rkeK8sServiceOptionClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*RKEK8sServiceOptionList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*RKEK8sServiceOptionList), err
 }
 

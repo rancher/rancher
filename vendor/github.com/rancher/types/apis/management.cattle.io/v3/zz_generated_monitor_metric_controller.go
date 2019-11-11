@@ -85,6 +85,7 @@ type MonitorMetricInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*MonitorMetricList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*MonitorMetricList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() MonitorMetricController
@@ -269,6 +270,11 @@ func (s *monitorMetricClient) DeleteNamespaced(namespace, name string, options *
 
 func (s *monitorMetricClient) List(opts metav1.ListOptions) (*MonitorMetricList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*MonitorMetricList), err
+}
+
+func (s *monitorMetricClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*MonitorMetricList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*MonitorMetricList), err
 }
 

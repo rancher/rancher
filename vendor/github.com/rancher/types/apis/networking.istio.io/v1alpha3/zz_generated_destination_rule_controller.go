@@ -86,6 +86,7 @@ type DestinationRuleInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*DestinationRuleList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*DestinationRuleList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DestinationRuleController
@@ -270,6 +271,11 @@ func (s *destinationRuleClient) DeleteNamespaced(namespace, name string, options
 
 func (s *destinationRuleClient) List(opts metav1.ListOptions) (*DestinationRuleList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*DestinationRuleList), err
+}
+
+func (s *destinationRuleClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*DestinationRuleList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*DestinationRuleList), err
 }
 

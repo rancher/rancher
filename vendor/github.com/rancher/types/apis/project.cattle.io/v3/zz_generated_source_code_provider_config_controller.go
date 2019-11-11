@@ -85,6 +85,7 @@ type SourceCodeProviderConfigInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*SourceCodeProviderConfigList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*SourceCodeProviderConfigList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() SourceCodeProviderConfigController
@@ -269,6 +270,11 @@ func (s *sourceCodeProviderConfigClient) DeleteNamespaced(namespace, name string
 
 func (s *sourceCodeProviderConfigClient) List(opts metav1.ListOptions) (*SourceCodeProviderConfigList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*SourceCodeProviderConfigList), err
+}
+
+func (s *sourceCodeProviderConfigClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*SourceCodeProviderConfigList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*SourceCodeProviderConfigList), err
 }
 

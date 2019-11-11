@@ -85,6 +85,7 @@ type CertificateInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*CertificateList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*CertificateList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() CertificateController
@@ -269,6 +270,11 @@ func (s *certificateClient) DeleteNamespaced(namespace, name string, options *me
 
 func (s *certificateClient) List(opts metav1.ListOptions) (*CertificateList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*CertificateList), err
+}
+
+func (s *certificateClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*CertificateList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*CertificateList), err
 }
 

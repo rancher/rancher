@@ -85,6 +85,7 @@ type NodeInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*NodeList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*NodeList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NodeController
@@ -269,6 +270,11 @@ func (s *nodeClient) DeleteNamespaced(namespace, name string, options *metav1.De
 
 func (s *nodeClient) List(opts metav1.ListOptions) (*NodeList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*NodeList), err
+}
+
+func (s *nodeClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*NodeList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*NodeList), err
 }
 

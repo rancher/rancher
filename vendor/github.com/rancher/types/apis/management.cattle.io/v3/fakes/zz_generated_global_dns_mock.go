@@ -674,6 +674,7 @@ var (
 	lockGlobalDNSInterfaceMockGet                              sync.RWMutex
 	lockGlobalDNSInterfaceMockGetNamespaced                    sync.RWMutex
 	lockGlobalDNSInterfaceMockList                             sync.RWMutex
+	lockGlobalDNSInterfaceMockListNamespaced                   sync.RWMutex
 	lockGlobalDNSInterfaceMockObjectClient                     sync.RWMutex
 	lockGlobalDNSInterfaceMockUpdate                           sync.RWMutex
 	lockGlobalDNSInterfaceMockWatch                            sync.RWMutex
@@ -736,6 +737,9 @@ var _ v3.GlobalDNSInterface = &GlobalDNSInterfaceMock{}
 //             },
 //             ListFunc: func(opts v1.ListOptions) (*v3.GlobalDNSList, error) {
 // 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.GlobalDNSList, error) {
+// 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
@@ -800,6 +804,9 @@ type GlobalDNSInterfaceMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(opts v1.ListOptions) (*v3.GlobalDNSList, error)
+
+	// ListNamespacedFunc mocks the ListNamespaced method.
+	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.GlobalDNSList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -949,6 +956,13 @@ type GlobalDNSInterfaceMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// Opts is the opts argument value.
+			Opts v1.ListOptions
+		}
+		// ListNamespaced holds details about calls to the ListNamespaced method.
+		ListNamespaced []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
 			// Opts is the opts argument value.
 			Opts v1.ListOptions
 		}
@@ -1580,6 +1594,41 @@ func (mock *GlobalDNSInterfaceMock) ListCalls() []struct {
 	lockGlobalDNSInterfaceMockList.RLock()
 	calls = mock.calls.List
 	lockGlobalDNSInterfaceMockList.RUnlock()
+	return calls
+}
+
+// ListNamespaced calls ListNamespacedFunc.
+func (mock *GlobalDNSInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.GlobalDNSList, error) {
+	if mock.ListNamespacedFunc == nil {
+		panic("GlobalDNSInterfaceMock.ListNamespacedFunc: method is nil but GlobalDNSInterface.ListNamespaced was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}{
+		Namespace: namespace,
+		Opts:      opts,
+	}
+	lockGlobalDNSInterfaceMockListNamespaced.Lock()
+	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
+	lockGlobalDNSInterfaceMockListNamespaced.Unlock()
+	return mock.ListNamespacedFunc(namespace, opts)
+}
+
+// ListNamespacedCalls gets all the calls that were made to ListNamespaced.
+// Check the length with:
+//     len(mockedGlobalDNSInterface.ListNamespacedCalls())
+func (mock *GlobalDNSInterfaceMock) ListNamespacedCalls() []struct {
+	Namespace string
+	Opts      v1.ListOptions
+} {
+	var calls []struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}
+	lockGlobalDNSInterfaceMockListNamespaced.RLock()
+	calls = mock.calls.ListNamespaced
+	lockGlobalDNSInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 

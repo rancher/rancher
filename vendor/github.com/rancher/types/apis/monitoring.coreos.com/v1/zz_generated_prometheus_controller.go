@@ -86,6 +86,7 @@ type PrometheusInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*PrometheusList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*PrometheusList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PrometheusController
@@ -270,6 +271,11 @@ func (s *prometheusClient) DeleteNamespaced(namespace, name string, options *met
 
 func (s *prometheusClient) List(opts metav1.ListOptions) (*PrometheusList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*PrometheusList), err
+}
+
+func (s *prometheusClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*PrometheusList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*PrometheusList), err
 }
 

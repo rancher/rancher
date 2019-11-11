@@ -86,6 +86,7 @@ type StatefulSetInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*StatefulSetList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*StatefulSetList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() StatefulSetController
@@ -270,6 +271,11 @@ func (s *statefulSetClient) DeleteNamespaced(namespace, name string, options *me
 
 func (s *statefulSetClient) List(opts metav1.ListOptions) (*StatefulSetList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*StatefulSetList), err
+}
+
+func (s *statefulSetClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*StatefulSetList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*StatefulSetList), err
 }
 

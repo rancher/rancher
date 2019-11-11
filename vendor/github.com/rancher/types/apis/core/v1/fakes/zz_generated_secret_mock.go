@@ -675,6 +675,7 @@ var (
 	lockSecretInterfaceMockGet                              sync.RWMutex
 	lockSecretInterfaceMockGetNamespaced                    sync.RWMutex
 	lockSecretInterfaceMockList                             sync.RWMutex
+	lockSecretInterfaceMockListNamespaced                   sync.RWMutex
 	lockSecretInterfaceMockObjectClient                     sync.RWMutex
 	lockSecretInterfaceMockUpdate                           sync.RWMutex
 	lockSecretInterfaceMockWatch                            sync.RWMutex
@@ -737,6 +738,9 @@ var _ v1a.SecretInterface = &SecretInterfaceMock{}
 //             },
 //             ListFunc: func(opts v1b.ListOptions) (*v1a.SecretList, error) {
 // 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts v1b.ListOptions) (*v1a.SecretList, error) {
+// 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
@@ -801,6 +805,9 @@ type SecretInterfaceMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(opts v1b.ListOptions) (*v1a.SecretList, error)
+
+	// ListNamespacedFunc mocks the ListNamespaced method.
+	ListNamespacedFunc func(namespace string, opts v1b.ListOptions) (*v1a.SecretList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -950,6 +957,13 @@ type SecretInterfaceMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// Opts is the opts argument value.
+			Opts v1b.ListOptions
+		}
+		// ListNamespaced holds details about calls to the ListNamespaced method.
+		ListNamespaced []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
 			// Opts is the opts argument value.
 			Opts v1b.ListOptions
 		}
@@ -1581,6 +1595,41 @@ func (mock *SecretInterfaceMock) ListCalls() []struct {
 	lockSecretInterfaceMockList.RLock()
 	calls = mock.calls.List
 	lockSecretInterfaceMockList.RUnlock()
+	return calls
+}
+
+// ListNamespaced calls ListNamespacedFunc.
+func (mock *SecretInterfaceMock) ListNamespaced(namespace string, opts v1b.ListOptions) (*v1a.SecretList, error) {
+	if mock.ListNamespacedFunc == nil {
+		panic("SecretInterfaceMock.ListNamespacedFunc: method is nil but SecretInterface.ListNamespaced was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Opts      v1b.ListOptions
+	}{
+		Namespace: namespace,
+		Opts:      opts,
+	}
+	lockSecretInterfaceMockListNamespaced.Lock()
+	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
+	lockSecretInterfaceMockListNamespaced.Unlock()
+	return mock.ListNamespacedFunc(namespace, opts)
+}
+
+// ListNamespacedCalls gets all the calls that were made to ListNamespaced.
+// Check the length with:
+//     len(mockedSecretInterface.ListNamespacedCalls())
+func (mock *SecretInterfaceMock) ListNamespacedCalls() []struct {
+	Namespace string
+	Opts      v1b.ListOptions
+} {
+	var calls []struct {
+		Namespace string
+		Opts      v1b.ListOptions
+	}
+	lockSecretInterfaceMockListNamespaced.RLock()
+	calls = mock.calls.ListNamespaced
+	lockSecretInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 

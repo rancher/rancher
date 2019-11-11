@@ -85,6 +85,7 @@ type ComponentStatusInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ComponentStatusList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*ComponentStatusList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ComponentStatusController
@@ -269,6 +270,11 @@ func (s *componentStatusClient) DeleteNamespaced(namespace, name string, options
 
 func (s *componentStatusClient) List(opts metav1.ListOptions) (*ComponentStatusList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*ComponentStatusList), err
+}
+
+func (s *componentStatusClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ComponentStatusList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*ComponentStatusList), err
 }
 

@@ -85,6 +85,7 @@ type ServiceAccountTokenInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ServiceAccountTokenList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*ServiceAccountTokenList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ServiceAccountTokenController
@@ -269,6 +270,11 @@ func (s *serviceAccountTokenClient) DeleteNamespaced(namespace, name string, opt
 
 func (s *serviceAccountTokenClient) List(opts metav1.ListOptions) (*ServiceAccountTokenList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*ServiceAccountTokenList), err
+}
+
+func (s *serviceAccountTokenClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ServiceAccountTokenList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*ServiceAccountTokenList), err
 }
 

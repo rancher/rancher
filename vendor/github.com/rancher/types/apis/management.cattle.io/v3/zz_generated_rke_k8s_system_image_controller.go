@@ -85,6 +85,7 @@ type RKEK8sSystemImageInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*RKEK8sSystemImageList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*RKEK8sSystemImageList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() RKEK8sSystemImageController
@@ -269,6 +270,11 @@ func (s *rkeK8sSystemImageClient) DeleteNamespaced(namespace, name string, optio
 
 func (s *rkeK8sSystemImageClient) List(opts metav1.ListOptions) (*RKEK8sSystemImageList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*RKEK8sSystemImageList), err
+}
+
+func (s *rkeK8sSystemImageClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*RKEK8sSystemImageList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*RKEK8sSystemImageList), err
 }
 

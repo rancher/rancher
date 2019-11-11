@@ -85,6 +85,7 @@ type PipelineInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*PipelineList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*PipelineList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PipelineController
@@ -269,6 +270,11 @@ func (s *pipelineClient) DeleteNamespaced(namespace, name string, options *metav
 
 func (s *pipelineClient) List(opts metav1.ListOptions) (*PipelineList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*PipelineList), err
+}
+
+func (s *pipelineClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*PipelineList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*PipelineList), err
 }
 

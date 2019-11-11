@@ -84,6 +84,7 @@ type SettingInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*SettingList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*SettingList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() SettingController
@@ -268,6 +269,11 @@ func (s *settingClient) DeleteNamespaced(namespace, name string, options *metav1
 
 func (s *settingClient) List(opts metav1.ListOptions) (*SettingList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*SettingList), err
+}
+
+func (s *settingClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*SettingList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*SettingList), err
 }
 

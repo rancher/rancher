@@ -84,6 +84,7 @@ type DynamicSchemaInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*DynamicSchemaList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*DynamicSchemaList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DynamicSchemaController
@@ -268,6 +269,11 @@ func (s *dynamicSchemaClient) DeleteNamespaced(namespace, name string, options *
 
 func (s *dynamicSchemaClient) List(opts metav1.ListOptions) (*DynamicSchemaList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*DynamicSchemaList), err
+}
+
+func (s *dynamicSchemaClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*DynamicSchemaList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*DynamicSchemaList), err
 }
 

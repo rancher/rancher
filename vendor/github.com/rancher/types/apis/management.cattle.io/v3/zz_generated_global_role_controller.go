@@ -84,6 +84,7 @@ type GlobalRoleInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*GlobalRoleList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*GlobalRoleList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() GlobalRoleController
@@ -268,6 +269,11 @@ func (s *globalRoleClient) DeleteNamespaced(namespace, name string, options *met
 
 func (s *globalRoleClient) List(opts metav1.ListOptions) (*GlobalRoleList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*GlobalRoleList), err
+}
+
+func (s *globalRoleClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*GlobalRoleList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*GlobalRoleList), err
 }
 

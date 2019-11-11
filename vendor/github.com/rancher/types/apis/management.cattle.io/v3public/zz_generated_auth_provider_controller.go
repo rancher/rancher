@@ -84,6 +84,7 @@ type AuthProviderInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*AuthProviderList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*AuthProviderList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() AuthProviderController
@@ -268,6 +269,11 @@ func (s *authProviderClient) DeleteNamespaced(namespace, name string, options *m
 
 func (s *authProviderClient) List(opts metav1.ListOptions) (*AuthProviderList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*AuthProviderList), err
+}
+
+func (s *authProviderClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*AuthProviderList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*AuthProviderList), err
 }
 

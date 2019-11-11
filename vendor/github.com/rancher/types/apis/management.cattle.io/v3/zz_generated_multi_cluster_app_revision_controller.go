@@ -85,6 +85,7 @@ type MultiClusterAppRevisionInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*MultiClusterAppRevisionList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*MultiClusterAppRevisionList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() MultiClusterAppRevisionController
@@ -269,6 +270,11 @@ func (s *multiClusterAppRevisionClient) DeleteNamespaced(namespace, name string,
 
 func (s *multiClusterAppRevisionClient) List(opts metav1.ListOptions) (*MultiClusterAppRevisionList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*MultiClusterAppRevisionList), err
+}
+
+func (s *multiClusterAppRevisionClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*MultiClusterAppRevisionList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*MultiClusterAppRevisionList), err
 }
 

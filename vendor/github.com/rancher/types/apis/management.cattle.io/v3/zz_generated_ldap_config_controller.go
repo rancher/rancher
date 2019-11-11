@@ -84,6 +84,7 @@ type LdapConfigInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*LdapConfigList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*LdapConfigList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() LdapConfigController
@@ -268,6 +269,11 @@ func (s *ldapConfigClient) DeleteNamespaced(namespace, name string, options *met
 
 func (s *ldapConfigClient) List(opts metav1.ListOptions) (*LdapConfigList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*LdapConfigList), err
+}
+
+func (s *ldapConfigClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*LdapConfigList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*LdapConfigList), err
 }
 

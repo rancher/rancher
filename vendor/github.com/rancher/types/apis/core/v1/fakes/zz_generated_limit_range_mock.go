@@ -675,6 +675,7 @@ var (
 	lockLimitRangeInterfaceMockGet                              sync.RWMutex
 	lockLimitRangeInterfaceMockGetNamespaced                    sync.RWMutex
 	lockLimitRangeInterfaceMockList                             sync.RWMutex
+	lockLimitRangeInterfaceMockListNamespaced                   sync.RWMutex
 	lockLimitRangeInterfaceMockObjectClient                     sync.RWMutex
 	lockLimitRangeInterfaceMockUpdate                           sync.RWMutex
 	lockLimitRangeInterfaceMockWatch                            sync.RWMutex
@@ -737,6 +738,9 @@ var _ v1a.LimitRangeInterface = &LimitRangeInterfaceMock{}
 //             },
 //             ListFunc: func(opts v1b.ListOptions) (*v1a.LimitRangeList, error) {
 // 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts v1b.ListOptions) (*v1a.LimitRangeList, error) {
+// 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
@@ -801,6 +805,9 @@ type LimitRangeInterfaceMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(opts v1b.ListOptions) (*v1a.LimitRangeList, error)
+
+	// ListNamespacedFunc mocks the ListNamespaced method.
+	ListNamespacedFunc func(namespace string, opts v1b.ListOptions) (*v1a.LimitRangeList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -950,6 +957,13 @@ type LimitRangeInterfaceMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// Opts is the opts argument value.
+			Opts v1b.ListOptions
+		}
+		// ListNamespaced holds details about calls to the ListNamespaced method.
+		ListNamespaced []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
 			// Opts is the opts argument value.
 			Opts v1b.ListOptions
 		}
@@ -1581,6 +1595,41 @@ func (mock *LimitRangeInterfaceMock) ListCalls() []struct {
 	lockLimitRangeInterfaceMockList.RLock()
 	calls = mock.calls.List
 	lockLimitRangeInterfaceMockList.RUnlock()
+	return calls
+}
+
+// ListNamespaced calls ListNamespacedFunc.
+func (mock *LimitRangeInterfaceMock) ListNamespaced(namespace string, opts v1b.ListOptions) (*v1a.LimitRangeList, error) {
+	if mock.ListNamespacedFunc == nil {
+		panic("LimitRangeInterfaceMock.ListNamespacedFunc: method is nil but LimitRangeInterface.ListNamespaced was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Opts      v1b.ListOptions
+	}{
+		Namespace: namespace,
+		Opts:      opts,
+	}
+	lockLimitRangeInterfaceMockListNamespaced.Lock()
+	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
+	lockLimitRangeInterfaceMockListNamespaced.Unlock()
+	return mock.ListNamespacedFunc(namespace, opts)
+}
+
+// ListNamespacedCalls gets all the calls that were made to ListNamespaced.
+// Check the length with:
+//     len(mockedLimitRangeInterface.ListNamespacedCalls())
+func (mock *LimitRangeInterfaceMock) ListNamespacedCalls() []struct {
+	Namespace string
+	Opts      v1b.ListOptions
+} {
+	var calls []struct {
+		Namespace string
+		Opts      v1b.ListOptions
+	}
+	lockLimitRangeInterfaceMockListNamespaced.RLock()
+	calls = mock.calls.ListNamespaced
+	lockLimitRangeInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 

@@ -85,6 +85,7 @@ type SourceCodeCredentialInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*SourceCodeCredentialList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*SourceCodeCredentialList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() SourceCodeCredentialController
@@ -269,6 +270,11 @@ func (s *sourceCodeCredentialClient) DeleteNamespaced(namespace, name string, op
 
 func (s *sourceCodeCredentialClient) List(opts metav1.ListOptions) (*SourceCodeCredentialList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*SourceCodeCredentialList), err
+}
+
+func (s *sourceCodeCredentialClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*SourceCodeCredentialList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*SourceCodeCredentialList), err
 }
 

@@ -85,6 +85,7 @@ type PreferenceInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*PreferenceList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*PreferenceList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PreferenceController
@@ -269,6 +270,11 @@ func (s *preferenceClient) DeleteNamespaced(namespace, name string, options *met
 
 func (s *preferenceClient) List(opts metav1.ListOptions) (*PreferenceList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*PreferenceList), err
+}
+
+func (s *preferenceClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*PreferenceList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*PreferenceList), err
 }
 

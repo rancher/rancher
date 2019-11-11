@@ -675,6 +675,7 @@ var (
 	lockConfigMapInterfaceMockGet                              sync.RWMutex
 	lockConfigMapInterfaceMockGetNamespaced                    sync.RWMutex
 	lockConfigMapInterfaceMockList                             sync.RWMutex
+	lockConfigMapInterfaceMockListNamespaced                   sync.RWMutex
 	lockConfigMapInterfaceMockObjectClient                     sync.RWMutex
 	lockConfigMapInterfaceMockUpdate                           sync.RWMutex
 	lockConfigMapInterfaceMockWatch                            sync.RWMutex
@@ -737,6 +738,9 @@ var _ v1a.ConfigMapInterface = &ConfigMapInterfaceMock{}
 //             },
 //             ListFunc: func(opts v1b.ListOptions) (*v1a.ConfigMapList, error) {
 // 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts v1b.ListOptions) (*v1a.ConfigMapList, error) {
+// 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
@@ -801,6 +805,9 @@ type ConfigMapInterfaceMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(opts v1b.ListOptions) (*v1a.ConfigMapList, error)
+
+	// ListNamespacedFunc mocks the ListNamespaced method.
+	ListNamespacedFunc func(namespace string, opts v1b.ListOptions) (*v1a.ConfigMapList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -950,6 +957,13 @@ type ConfigMapInterfaceMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// Opts is the opts argument value.
+			Opts v1b.ListOptions
+		}
+		// ListNamespaced holds details about calls to the ListNamespaced method.
+		ListNamespaced []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
 			// Opts is the opts argument value.
 			Opts v1b.ListOptions
 		}
@@ -1581,6 +1595,41 @@ func (mock *ConfigMapInterfaceMock) ListCalls() []struct {
 	lockConfigMapInterfaceMockList.RLock()
 	calls = mock.calls.List
 	lockConfigMapInterfaceMockList.RUnlock()
+	return calls
+}
+
+// ListNamespaced calls ListNamespacedFunc.
+func (mock *ConfigMapInterfaceMock) ListNamespaced(namespace string, opts v1b.ListOptions) (*v1a.ConfigMapList, error) {
+	if mock.ListNamespacedFunc == nil {
+		panic("ConfigMapInterfaceMock.ListNamespacedFunc: method is nil but ConfigMapInterface.ListNamespaced was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Opts      v1b.ListOptions
+	}{
+		Namespace: namespace,
+		Opts:      opts,
+	}
+	lockConfigMapInterfaceMockListNamespaced.Lock()
+	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
+	lockConfigMapInterfaceMockListNamespaced.Unlock()
+	return mock.ListNamespacedFunc(namespace, opts)
+}
+
+// ListNamespacedCalls gets all the calls that were made to ListNamespaced.
+// Check the length with:
+//     len(mockedConfigMapInterface.ListNamespacedCalls())
+func (mock *ConfigMapInterfaceMock) ListNamespacedCalls() []struct {
+	Namespace string
+	Opts      v1b.ListOptions
+} {
+	var calls []struct {
+		Namespace string
+		Opts      v1b.ListOptions
+	}
+	lockConfigMapInterfaceMockListNamespaced.RLock()
+	calls = mock.calls.ListNamespaced
+	lockConfigMapInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 

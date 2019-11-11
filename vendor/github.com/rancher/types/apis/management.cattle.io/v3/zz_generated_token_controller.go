@@ -84,6 +84,7 @@ type TokenInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*TokenList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*TokenList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() TokenController
@@ -268,6 +269,11 @@ func (s *tokenClient) DeleteNamespaced(namespace, name string, options *metav1.D
 
 func (s *tokenClient) List(opts metav1.ListOptions) (*TokenList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*TokenList), err
+}
+
+func (s *tokenClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*TokenList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*TokenList), err
 }
 

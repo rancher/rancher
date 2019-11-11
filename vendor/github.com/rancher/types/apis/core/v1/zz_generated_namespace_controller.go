@@ -85,6 +85,7 @@ type NamespaceInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*NamespaceList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*NamespaceList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NamespaceController
@@ -269,6 +270,11 @@ func (s *namespaceClient) DeleteNamespaced(namespace, name string, options *meta
 
 func (s *namespaceClient) List(opts metav1.ListOptions) (*NamespaceList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*NamespaceList), err
+}
+
+func (s *namespaceClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*NamespaceList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*NamespaceList), err
 }
 

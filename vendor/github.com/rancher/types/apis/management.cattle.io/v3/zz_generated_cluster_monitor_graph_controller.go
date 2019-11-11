@@ -85,6 +85,7 @@ type ClusterMonitorGraphInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ClusterMonitorGraphList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*ClusterMonitorGraphList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterMonitorGraphController
@@ -269,6 +270,11 @@ func (s *clusterMonitorGraphClient) DeleteNamespaced(namespace, name string, opt
 
 func (s *clusterMonitorGraphClient) List(opts metav1.ListOptions) (*ClusterMonitorGraphList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*ClusterMonitorGraphList), err
+}
+
+func (s *clusterMonitorGraphClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ClusterMonitorGraphList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*ClusterMonitorGraphList), err
 }
 

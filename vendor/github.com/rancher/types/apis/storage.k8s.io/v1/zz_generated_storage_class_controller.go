@@ -85,6 +85,7 @@ type StorageClassInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*StorageClassList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*StorageClassList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() StorageClassController
@@ -269,6 +270,11 @@ func (s *storageClassClient) DeleteNamespaced(namespace, name string, options *m
 
 func (s *storageClassClient) List(opts metav1.ListOptions) (*StorageClassList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*StorageClassList), err
+}
+
+func (s *storageClassClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*StorageClassList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*StorageClassList), err
 }
 

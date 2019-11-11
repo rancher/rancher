@@ -85,6 +85,7 @@ type ProjectCatalogInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ProjectCatalogList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*ProjectCatalogList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ProjectCatalogController
@@ -269,6 +270,11 @@ func (s *projectCatalogClient) DeleteNamespaced(namespace, name string, options 
 
 func (s *projectCatalogClient) List(opts metav1.ListOptions) (*ProjectCatalogList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*ProjectCatalogList), err
+}
+
+func (s *projectCatalogClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ProjectCatalogList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*ProjectCatalogList), err
 }
 

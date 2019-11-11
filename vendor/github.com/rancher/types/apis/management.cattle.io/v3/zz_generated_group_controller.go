@@ -84,6 +84,7 @@ type GroupInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*GroupList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*GroupList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() GroupController
@@ -268,6 +269,11 @@ func (s *groupClient) DeleteNamespaced(namespace, name string, options *metav1.D
 
 func (s *groupClient) List(opts metav1.ListOptions) (*GroupList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*GroupList), err
+}
+
+func (s *groupClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*GroupList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*GroupList), err
 }
 

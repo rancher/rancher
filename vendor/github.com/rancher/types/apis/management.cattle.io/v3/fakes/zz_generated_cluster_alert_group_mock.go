@@ -674,6 +674,7 @@ var (
 	lockClusterAlertGroupInterfaceMockGet                              sync.RWMutex
 	lockClusterAlertGroupInterfaceMockGetNamespaced                    sync.RWMutex
 	lockClusterAlertGroupInterfaceMockList                             sync.RWMutex
+	lockClusterAlertGroupInterfaceMockListNamespaced                   sync.RWMutex
 	lockClusterAlertGroupInterfaceMockObjectClient                     sync.RWMutex
 	lockClusterAlertGroupInterfaceMockUpdate                           sync.RWMutex
 	lockClusterAlertGroupInterfaceMockWatch                            sync.RWMutex
@@ -736,6 +737,9 @@ var _ v3.ClusterAlertGroupInterface = &ClusterAlertGroupInterfaceMock{}
 //             },
 //             ListFunc: func(opts v1.ListOptions) (*v3.ClusterAlertGroupList, error) {
 // 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.ClusterAlertGroupList, error) {
+// 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
@@ -800,6 +804,9 @@ type ClusterAlertGroupInterfaceMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(opts v1.ListOptions) (*v3.ClusterAlertGroupList, error)
+
+	// ListNamespacedFunc mocks the ListNamespaced method.
+	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.ClusterAlertGroupList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -949,6 +956,13 @@ type ClusterAlertGroupInterfaceMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// Opts is the opts argument value.
+			Opts v1.ListOptions
+		}
+		// ListNamespaced holds details about calls to the ListNamespaced method.
+		ListNamespaced []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
 			// Opts is the opts argument value.
 			Opts v1.ListOptions
 		}
@@ -1580,6 +1594,41 @@ func (mock *ClusterAlertGroupInterfaceMock) ListCalls() []struct {
 	lockClusterAlertGroupInterfaceMockList.RLock()
 	calls = mock.calls.List
 	lockClusterAlertGroupInterfaceMockList.RUnlock()
+	return calls
+}
+
+// ListNamespaced calls ListNamespacedFunc.
+func (mock *ClusterAlertGroupInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.ClusterAlertGroupList, error) {
+	if mock.ListNamespacedFunc == nil {
+		panic("ClusterAlertGroupInterfaceMock.ListNamespacedFunc: method is nil but ClusterAlertGroupInterface.ListNamespaced was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}{
+		Namespace: namespace,
+		Opts:      opts,
+	}
+	lockClusterAlertGroupInterfaceMockListNamespaced.Lock()
+	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
+	lockClusterAlertGroupInterfaceMockListNamespaced.Unlock()
+	return mock.ListNamespacedFunc(namespace, opts)
+}
+
+// ListNamespacedCalls gets all the calls that were made to ListNamespaced.
+// Check the length with:
+//     len(mockedClusterAlertGroupInterface.ListNamespacedCalls())
+func (mock *ClusterAlertGroupInterfaceMock) ListNamespacedCalls() []struct {
+	Namespace string
+	Opts      v1.ListOptions
+} {
+	var calls []struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}
+	lockClusterAlertGroupInterfaceMockListNamespaced.RLock()
+	calls = mock.calls.ListNamespaced
+	lockClusterAlertGroupInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 

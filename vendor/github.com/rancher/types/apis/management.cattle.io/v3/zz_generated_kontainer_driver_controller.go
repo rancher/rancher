@@ -84,6 +84,7 @@ type KontainerDriverInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*KontainerDriverList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*KontainerDriverList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() KontainerDriverController
@@ -268,6 +269,11 @@ func (s *kontainerDriverClient) DeleteNamespaced(namespace, name string, options
 
 func (s *kontainerDriverClient) List(opts metav1.ListOptions) (*KontainerDriverList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*KontainerDriverList), err
+}
+
+func (s *kontainerDriverClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*KontainerDriverList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*KontainerDriverList), err
 }
 

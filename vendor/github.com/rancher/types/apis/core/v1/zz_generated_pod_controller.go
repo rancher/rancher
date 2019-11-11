@@ -86,6 +86,7 @@ type PodInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*PodList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*PodList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PodController
@@ -270,6 +271,11 @@ func (s *podClient) DeleteNamespaced(namespace, name string, options *metav1.Del
 
 func (s *podClient) List(opts metav1.ListOptions) (*PodList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*PodList), err
+}
+
+func (s *podClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*PodList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*PodList), err
 }
 

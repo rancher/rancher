@@ -301,7 +301,7 @@ github.com/rancher/kontainer-engine/drivers/util
 github.com/rancher/kontainer-engine/drivers/options
 github.com/rancher/kontainer-engine/store
 github.com/rancher/kontainer-engine/utils
-# github.com/rancher/norman v0.0.0-20191003174345-0ac7dd6ccb36
+# github.com/rancher/norman v0.0.0-20191111202053-1fcac7eb4fea
 github.com/rancher/norman/controller
 github.com/rancher/norman/pkg/dump
 github.com/rancher/norman/pkg/kwrapper/k8s
@@ -370,7 +370,7 @@ github.com/rancher/rke/dind
 github.com/rancher/rke/cloudprovider/custom
 github.com/rancher/rke/cloudprovider/openstack
 github.com/rancher/rke/cloudprovider/vsphere
-# github.com/rancher/types v0.0.0-20191107233540-9644e7bb8497
+# github.com/rancher/types v0.0.0-20191111203803-675504f2943e
 github.com/rancher/types/apis/management.cattle.io/v3
 github.com/rancher/types/client/management/v3
 github.com/rancher/types/config

@@ -674,6 +674,7 @@ var (
 	lockTemplateContentInterfaceMockGet                              sync.RWMutex
 	lockTemplateContentInterfaceMockGetNamespaced                    sync.RWMutex
 	lockTemplateContentInterfaceMockList                             sync.RWMutex
+	lockTemplateContentInterfaceMockListNamespaced                   sync.RWMutex
 	lockTemplateContentInterfaceMockObjectClient                     sync.RWMutex
 	lockTemplateContentInterfaceMockUpdate                           sync.RWMutex
 	lockTemplateContentInterfaceMockWatch                            sync.RWMutex
@@ -736,6 +737,9 @@ var _ v3.TemplateContentInterface = &TemplateContentInterfaceMock{}
 //             },
 //             ListFunc: func(opts v1.ListOptions) (*v3.TemplateContentList, error) {
 // 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.TemplateContentList, error) {
+// 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
@@ -800,6 +804,9 @@ type TemplateContentInterfaceMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(opts v1.ListOptions) (*v3.TemplateContentList, error)
+
+	// ListNamespacedFunc mocks the ListNamespaced method.
+	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.TemplateContentList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -949,6 +956,13 @@ type TemplateContentInterfaceMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// Opts is the opts argument value.
+			Opts v1.ListOptions
+		}
+		// ListNamespaced holds details about calls to the ListNamespaced method.
+		ListNamespaced []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
 			// Opts is the opts argument value.
 			Opts v1.ListOptions
 		}
@@ -1580,6 +1594,41 @@ func (mock *TemplateContentInterfaceMock) ListCalls() []struct {
 	lockTemplateContentInterfaceMockList.RLock()
 	calls = mock.calls.List
 	lockTemplateContentInterfaceMockList.RUnlock()
+	return calls
+}
+
+// ListNamespaced calls ListNamespacedFunc.
+func (mock *TemplateContentInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.TemplateContentList, error) {
+	if mock.ListNamespacedFunc == nil {
+		panic("TemplateContentInterfaceMock.ListNamespacedFunc: method is nil but TemplateContentInterface.ListNamespaced was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}{
+		Namespace: namespace,
+		Opts:      opts,
+	}
+	lockTemplateContentInterfaceMockListNamespaced.Lock()
+	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
+	lockTemplateContentInterfaceMockListNamespaced.Unlock()
+	return mock.ListNamespacedFunc(namespace, opts)
+}
+
+// ListNamespacedCalls gets all the calls that were made to ListNamespaced.
+// Check the length with:
+//     len(mockedTemplateContentInterface.ListNamespacedCalls())
+func (mock *TemplateContentInterfaceMock) ListNamespacedCalls() []struct {
+	Namespace string
+	Opts      v1.ListOptions
+} {
+	var calls []struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}
+	lockTemplateContentInterfaceMockListNamespaced.RLock()
+	calls = mock.calls.ListNamespaced
+	lockTemplateContentInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 

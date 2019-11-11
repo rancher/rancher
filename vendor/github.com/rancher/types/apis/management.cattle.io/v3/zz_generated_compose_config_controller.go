@@ -84,6 +84,7 @@ type ComposeConfigInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ComposeConfigList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*ComposeConfigList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ComposeConfigController
@@ -268,6 +269,11 @@ func (s *composeConfigClient) DeleteNamespaced(namespace, name string, options *
 
 func (s *composeConfigClient) List(opts metav1.ListOptions) (*ComposeConfigList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*ComposeConfigList), err
+}
+
+func (s *composeConfigClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ComposeConfigList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*ComposeConfigList), err
 }
 
