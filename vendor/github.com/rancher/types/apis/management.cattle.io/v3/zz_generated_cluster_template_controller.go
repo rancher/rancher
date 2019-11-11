@@ -85,6 +85,7 @@ type ClusterTemplateInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ClusterTemplateList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*ClusterTemplateList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterTemplateController
@@ -269,6 +270,11 @@ func (s *clusterTemplateClient) DeleteNamespaced(namespace, name string, options
 
 func (s *clusterTemplateClient) List(opts metav1.ListOptions) (*ClusterTemplateList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*ClusterTemplateList), err
+}
+
+func (s *clusterTemplateClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ClusterTemplateList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*ClusterTemplateList), err
 }
 

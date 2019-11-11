@@ -86,6 +86,7 @@ type DeploymentInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*DeploymentList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*DeploymentList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DeploymentController
@@ -270,6 +271,11 @@ func (s *deploymentClient) DeleteNamespaced(namespace, name string, options *met
 
 func (s *deploymentClient) List(opts metav1.ListOptions) (*DeploymentList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*DeploymentList), err
+}
+
+func (s *deploymentClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*DeploymentList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*DeploymentList), err
 }
 

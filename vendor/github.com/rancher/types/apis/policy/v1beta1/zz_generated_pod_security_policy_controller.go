@@ -85,6 +85,7 @@ type PodSecurityPolicyInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*PodSecurityPolicyList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*PodSecurityPolicyList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PodSecurityPolicyController
@@ -269,6 +270,11 @@ func (s *podSecurityPolicyClient) DeleteNamespaced(namespace, name string, optio
 
 func (s *podSecurityPolicyClient) List(opts metav1.ListOptions) (*PodSecurityPolicyList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*PodSecurityPolicyList), err
+}
+
+func (s *podSecurityPolicyClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*PodSecurityPolicyList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*PodSecurityPolicyList), err
 }
 

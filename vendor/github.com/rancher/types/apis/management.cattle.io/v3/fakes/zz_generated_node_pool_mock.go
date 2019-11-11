@@ -674,6 +674,7 @@ var (
 	lockNodePoolInterfaceMockGet                              sync.RWMutex
 	lockNodePoolInterfaceMockGetNamespaced                    sync.RWMutex
 	lockNodePoolInterfaceMockList                             sync.RWMutex
+	lockNodePoolInterfaceMockListNamespaced                   sync.RWMutex
 	lockNodePoolInterfaceMockObjectClient                     sync.RWMutex
 	lockNodePoolInterfaceMockUpdate                           sync.RWMutex
 	lockNodePoolInterfaceMockWatch                            sync.RWMutex
@@ -736,6 +737,9 @@ var _ v3.NodePoolInterface = &NodePoolInterfaceMock{}
 //             },
 //             ListFunc: func(opts v1.ListOptions) (*v3.NodePoolList, error) {
 // 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.NodePoolList, error) {
+// 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
@@ -800,6 +804,9 @@ type NodePoolInterfaceMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(opts v1.ListOptions) (*v3.NodePoolList, error)
+
+	// ListNamespacedFunc mocks the ListNamespaced method.
+	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.NodePoolList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -949,6 +956,13 @@ type NodePoolInterfaceMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// Opts is the opts argument value.
+			Opts v1.ListOptions
+		}
+		// ListNamespaced holds details about calls to the ListNamespaced method.
+		ListNamespaced []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
 			// Opts is the opts argument value.
 			Opts v1.ListOptions
 		}
@@ -1580,6 +1594,41 @@ func (mock *NodePoolInterfaceMock) ListCalls() []struct {
 	lockNodePoolInterfaceMockList.RLock()
 	calls = mock.calls.List
 	lockNodePoolInterfaceMockList.RUnlock()
+	return calls
+}
+
+// ListNamespaced calls ListNamespacedFunc.
+func (mock *NodePoolInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.NodePoolList, error) {
+	if mock.ListNamespacedFunc == nil {
+		panic("NodePoolInterfaceMock.ListNamespacedFunc: method is nil but NodePoolInterface.ListNamespaced was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}{
+		Namespace: namespace,
+		Opts:      opts,
+	}
+	lockNodePoolInterfaceMockListNamespaced.Lock()
+	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
+	lockNodePoolInterfaceMockListNamespaced.Unlock()
+	return mock.ListNamespacedFunc(namespace, opts)
+}
+
+// ListNamespacedCalls gets all the calls that were made to ListNamespaced.
+// Check the length with:
+//     len(mockedNodePoolInterface.ListNamespacedCalls())
+func (mock *NodePoolInterfaceMock) ListNamespacedCalls() []struct {
+	Namespace string
+	Opts      v1.ListOptions
+} {
+	var calls []struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}
+	lockNodePoolInterfaceMockListNamespaced.RLock()
+	calls = mock.calls.ListNamespaced
+	lockNodePoolInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 

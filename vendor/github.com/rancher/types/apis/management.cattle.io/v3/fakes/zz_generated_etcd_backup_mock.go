@@ -674,6 +674,7 @@ var (
 	lockEtcdBackupInterfaceMockGet                              sync.RWMutex
 	lockEtcdBackupInterfaceMockGetNamespaced                    sync.RWMutex
 	lockEtcdBackupInterfaceMockList                             sync.RWMutex
+	lockEtcdBackupInterfaceMockListNamespaced                   sync.RWMutex
 	lockEtcdBackupInterfaceMockObjectClient                     sync.RWMutex
 	lockEtcdBackupInterfaceMockUpdate                           sync.RWMutex
 	lockEtcdBackupInterfaceMockWatch                            sync.RWMutex
@@ -736,6 +737,9 @@ var _ v3.EtcdBackupInterface = &EtcdBackupInterfaceMock{}
 //             },
 //             ListFunc: func(opts v1.ListOptions) (*v3.EtcdBackupList, error) {
 // 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.EtcdBackupList, error) {
+// 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
@@ -800,6 +804,9 @@ type EtcdBackupInterfaceMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(opts v1.ListOptions) (*v3.EtcdBackupList, error)
+
+	// ListNamespacedFunc mocks the ListNamespaced method.
+	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.EtcdBackupList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -949,6 +956,13 @@ type EtcdBackupInterfaceMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// Opts is the opts argument value.
+			Opts v1.ListOptions
+		}
+		// ListNamespaced holds details about calls to the ListNamespaced method.
+		ListNamespaced []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
 			// Opts is the opts argument value.
 			Opts v1.ListOptions
 		}
@@ -1580,6 +1594,41 @@ func (mock *EtcdBackupInterfaceMock) ListCalls() []struct {
 	lockEtcdBackupInterfaceMockList.RLock()
 	calls = mock.calls.List
 	lockEtcdBackupInterfaceMockList.RUnlock()
+	return calls
+}
+
+// ListNamespaced calls ListNamespacedFunc.
+func (mock *EtcdBackupInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.EtcdBackupList, error) {
+	if mock.ListNamespacedFunc == nil {
+		panic("EtcdBackupInterfaceMock.ListNamespacedFunc: method is nil but EtcdBackupInterface.ListNamespaced was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}{
+		Namespace: namespace,
+		Opts:      opts,
+	}
+	lockEtcdBackupInterfaceMockListNamespaced.Lock()
+	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
+	lockEtcdBackupInterfaceMockListNamespaced.Unlock()
+	return mock.ListNamespacedFunc(namespace, opts)
+}
+
+// ListNamespacedCalls gets all the calls that were made to ListNamespaced.
+// Check the length with:
+//     len(mockedEtcdBackupInterface.ListNamespacedCalls())
+func (mock *EtcdBackupInterfaceMock) ListNamespacedCalls() []struct {
+	Namespace string
+	Opts      v1.ListOptions
+} {
+	var calls []struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}
+	lockEtcdBackupInterfaceMockListNamespaced.RLock()
+	calls = mock.calls.ListNamespaced
+	lockEtcdBackupInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 

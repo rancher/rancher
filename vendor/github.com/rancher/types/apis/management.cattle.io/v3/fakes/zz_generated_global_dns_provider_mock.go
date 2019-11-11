@@ -674,6 +674,7 @@ var (
 	lockGlobalDNSProviderInterfaceMockGet                              sync.RWMutex
 	lockGlobalDNSProviderInterfaceMockGetNamespaced                    sync.RWMutex
 	lockGlobalDNSProviderInterfaceMockList                             sync.RWMutex
+	lockGlobalDNSProviderInterfaceMockListNamespaced                   sync.RWMutex
 	lockGlobalDNSProviderInterfaceMockObjectClient                     sync.RWMutex
 	lockGlobalDNSProviderInterfaceMockUpdate                           sync.RWMutex
 	lockGlobalDNSProviderInterfaceMockWatch                            sync.RWMutex
@@ -736,6 +737,9 @@ var _ v3.GlobalDNSProviderInterface = &GlobalDNSProviderInterfaceMock{}
 //             },
 //             ListFunc: func(opts v1.ListOptions) (*v3.GlobalDNSProviderList, error) {
 // 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.GlobalDNSProviderList, error) {
+// 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
@@ -800,6 +804,9 @@ type GlobalDNSProviderInterfaceMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(opts v1.ListOptions) (*v3.GlobalDNSProviderList, error)
+
+	// ListNamespacedFunc mocks the ListNamespaced method.
+	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.GlobalDNSProviderList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -949,6 +956,13 @@ type GlobalDNSProviderInterfaceMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// Opts is the opts argument value.
+			Opts v1.ListOptions
+		}
+		// ListNamespaced holds details about calls to the ListNamespaced method.
+		ListNamespaced []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
 			// Opts is the opts argument value.
 			Opts v1.ListOptions
 		}
@@ -1580,6 +1594,41 @@ func (mock *GlobalDNSProviderInterfaceMock) ListCalls() []struct {
 	lockGlobalDNSProviderInterfaceMockList.RLock()
 	calls = mock.calls.List
 	lockGlobalDNSProviderInterfaceMockList.RUnlock()
+	return calls
+}
+
+// ListNamespaced calls ListNamespacedFunc.
+func (mock *GlobalDNSProviderInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.GlobalDNSProviderList, error) {
+	if mock.ListNamespacedFunc == nil {
+		panic("GlobalDNSProviderInterfaceMock.ListNamespacedFunc: method is nil but GlobalDNSProviderInterface.ListNamespaced was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}{
+		Namespace: namespace,
+		Opts:      opts,
+	}
+	lockGlobalDNSProviderInterfaceMockListNamespaced.Lock()
+	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
+	lockGlobalDNSProviderInterfaceMockListNamespaced.Unlock()
+	return mock.ListNamespacedFunc(namespace, opts)
+}
+
+// ListNamespacedCalls gets all the calls that were made to ListNamespaced.
+// Check the length with:
+//     len(mockedGlobalDNSProviderInterface.ListNamespacedCalls())
+func (mock *GlobalDNSProviderInterfaceMock) ListNamespacedCalls() []struct {
+	Namespace string
+	Opts      v1.ListOptions
+} {
+	var calls []struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}
+	lockGlobalDNSProviderInterfaceMockListNamespaced.RLock()
+	calls = mock.calls.ListNamespaced
+	lockGlobalDNSProviderInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 

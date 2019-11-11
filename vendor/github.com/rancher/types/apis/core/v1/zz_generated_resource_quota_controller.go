@@ -86,6 +86,7 @@ type ResourceQuotaInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ResourceQuotaList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*ResourceQuotaList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ResourceQuotaController
@@ -270,6 +271,11 @@ func (s *resourceQuotaClient) DeleteNamespaced(namespace, name string, options *
 
 func (s *resourceQuotaClient) List(opts metav1.ListOptions) (*ResourceQuotaList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*ResourceQuotaList), err
+}
+
+func (s *resourceQuotaClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ResourceQuotaList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*ResourceQuotaList), err
 }
 

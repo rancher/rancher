@@ -85,6 +85,7 @@ type ClusterRegistrationTokenInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ClusterRegistrationTokenList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*ClusterRegistrationTokenList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ClusterRegistrationTokenController
@@ -269,6 +270,11 @@ func (s *clusterRegistrationTokenClient) DeleteNamespaced(namespace, name string
 
 func (s *clusterRegistrationTokenClient) List(opts metav1.ListOptions) (*ClusterRegistrationTokenList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*ClusterRegistrationTokenList), err
+}
+
+func (s *clusterRegistrationTokenClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ClusterRegistrationTokenList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*ClusterRegistrationTokenList), err
 }
 

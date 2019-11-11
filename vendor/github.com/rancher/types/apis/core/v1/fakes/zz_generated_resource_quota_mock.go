@@ -675,6 +675,7 @@ var (
 	lockResourceQuotaInterfaceMockGet                              sync.RWMutex
 	lockResourceQuotaInterfaceMockGetNamespaced                    sync.RWMutex
 	lockResourceQuotaInterfaceMockList                             sync.RWMutex
+	lockResourceQuotaInterfaceMockListNamespaced                   sync.RWMutex
 	lockResourceQuotaInterfaceMockObjectClient                     sync.RWMutex
 	lockResourceQuotaInterfaceMockUpdate                           sync.RWMutex
 	lockResourceQuotaInterfaceMockWatch                            sync.RWMutex
@@ -737,6 +738,9 @@ var _ v1a.ResourceQuotaInterface = &ResourceQuotaInterfaceMock{}
 //             },
 //             ListFunc: func(opts v1b.ListOptions) (*v1a.ResourceQuotaList, error) {
 // 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts v1b.ListOptions) (*v1a.ResourceQuotaList, error) {
+// 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
@@ -801,6 +805,9 @@ type ResourceQuotaInterfaceMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(opts v1b.ListOptions) (*v1a.ResourceQuotaList, error)
+
+	// ListNamespacedFunc mocks the ListNamespaced method.
+	ListNamespacedFunc func(namespace string, opts v1b.ListOptions) (*v1a.ResourceQuotaList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -950,6 +957,13 @@ type ResourceQuotaInterfaceMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// Opts is the opts argument value.
+			Opts v1b.ListOptions
+		}
+		// ListNamespaced holds details about calls to the ListNamespaced method.
+		ListNamespaced []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
 			// Opts is the opts argument value.
 			Opts v1b.ListOptions
 		}
@@ -1581,6 +1595,41 @@ func (mock *ResourceQuotaInterfaceMock) ListCalls() []struct {
 	lockResourceQuotaInterfaceMockList.RLock()
 	calls = mock.calls.List
 	lockResourceQuotaInterfaceMockList.RUnlock()
+	return calls
+}
+
+// ListNamespaced calls ListNamespacedFunc.
+func (mock *ResourceQuotaInterfaceMock) ListNamespaced(namespace string, opts v1b.ListOptions) (*v1a.ResourceQuotaList, error) {
+	if mock.ListNamespacedFunc == nil {
+		panic("ResourceQuotaInterfaceMock.ListNamespacedFunc: method is nil but ResourceQuotaInterface.ListNamespaced was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Opts      v1b.ListOptions
+	}{
+		Namespace: namespace,
+		Opts:      opts,
+	}
+	lockResourceQuotaInterfaceMockListNamespaced.Lock()
+	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
+	lockResourceQuotaInterfaceMockListNamespaced.Unlock()
+	return mock.ListNamespacedFunc(namespace, opts)
+}
+
+// ListNamespacedCalls gets all the calls that were made to ListNamespaced.
+// Check the length with:
+//     len(mockedResourceQuotaInterface.ListNamespacedCalls())
+func (mock *ResourceQuotaInterfaceMock) ListNamespacedCalls() []struct {
+	Namespace string
+	Opts      v1b.ListOptions
+} {
+	var calls []struct {
+		Namespace string
+		Opts      v1b.ListOptions
+	}
+	lockResourceQuotaInterfaceMockListNamespaced.RLock()
+	calls = mock.calls.ListNamespaced
+	lockResourceQuotaInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 

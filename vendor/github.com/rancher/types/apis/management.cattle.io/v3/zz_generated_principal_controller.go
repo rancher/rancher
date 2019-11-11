@@ -84,6 +84,7 @@ type PrincipalInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*PrincipalList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*PrincipalList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PrincipalController
@@ -268,6 +269,11 @@ func (s *principalClient) DeleteNamespaced(namespace, name string, options *meta
 
 func (s *principalClient) List(opts metav1.ListOptions) (*PrincipalList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*PrincipalList), err
+}
+
+func (s *principalClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*PrincipalList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*PrincipalList), err
 }
 

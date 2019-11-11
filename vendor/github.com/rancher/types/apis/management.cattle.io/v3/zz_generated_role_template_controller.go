@@ -84,6 +84,7 @@ type RoleTemplateInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*RoleTemplateList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*RoleTemplateList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() RoleTemplateController
@@ -268,6 +269,11 @@ func (s *roleTemplateClient) DeleteNamespaced(namespace, name string, options *m
 
 func (s *roleTemplateClient) List(opts metav1.ListOptions) (*RoleTemplateList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*RoleTemplateList), err
+}
+
+func (s *roleTemplateClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*RoleTemplateList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*RoleTemplateList), err
 }
 

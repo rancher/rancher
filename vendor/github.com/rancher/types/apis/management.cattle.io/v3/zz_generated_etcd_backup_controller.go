@@ -85,6 +85,7 @@ type EtcdBackupInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*EtcdBackupList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*EtcdBackupList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() EtcdBackupController
@@ -269,6 +270,11 @@ func (s *etcdBackupClient) DeleteNamespaced(namespace, name string, options *met
 
 func (s *etcdBackupClient) List(opts metav1.ListOptions) (*EtcdBackupList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*EtcdBackupList), err
+}
+
+func (s *etcdBackupClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*EtcdBackupList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*EtcdBackupList), err
 }
 

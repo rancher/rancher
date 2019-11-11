@@ -85,6 +85,7 @@ type PodSecurityPolicyTemplateProjectBindingInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*PodSecurityPolicyTemplateProjectBindingList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*PodSecurityPolicyTemplateProjectBindingList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() PodSecurityPolicyTemplateProjectBindingController
@@ -269,6 +270,11 @@ func (s *podSecurityPolicyTemplateProjectBindingClient) DeleteNamespaced(namespa
 
 func (s *podSecurityPolicyTemplateProjectBindingClient) List(opts metav1.ListOptions) (*PodSecurityPolicyTemplateProjectBindingList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*PodSecurityPolicyTemplateProjectBindingList), err
+}
+
+func (s *podSecurityPolicyTemplateProjectBindingClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*PodSecurityPolicyTemplateProjectBindingList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*PodSecurityPolicyTemplateProjectBindingList), err
 }
 

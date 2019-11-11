@@ -674,6 +674,7 @@ var (
 	lockClusterScanInterfaceMockGet                              sync.RWMutex
 	lockClusterScanInterfaceMockGetNamespaced                    sync.RWMutex
 	lockClusterScanInterfaceMockList                             sync.RWMutex
+	lockClusterScanInterfaceMockListNamespaced                   sync.RWMutex
 	lockClusterScanInterfaceMockObjectClient                     sync.RWMutex
 	lockClusterScanInterfaceMockUpdate                           sync.RWMutex
 	lockClusterScanInterfaceMockWatch                            sync.RWMutex
@@ -736,6 +737,9 @@ var _ v3.ClusterScanInterface = &ClusterScanInterfaceMock{}
 //             },
 //             ListFunc: func(opts v1.ListOptions) (*v3.ClusterScanList, error) {
 // 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.ClusterScanList, error) {
+// 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
@@ -800,6 +804,9 @@ type ClusterScanInterfaceMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(opts v1.ListOptions) (*v3.ClusterScanList, error)
+
+	// ListNamespacedFunc mocks the ListNamespaced method.
+	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.ClusterScanList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -949,6 +956,13 @@ type ClusterScanInterfaceMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// Opts is the opts argument value.
+			Opts v1.ListOptions
+		}
+		// ListNamespaced holds details about calls to the ListNamespaced method.
+		ListNamespaced []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
 			// Opts is the opts argument value.
 			Opts v1.ListOptions
 		}
@@ -1580,6 +1594,41 @@ func (mock *ClusterScanInterfaceMock) ListCalls() []struct {
 	lockClusterScanInterfaceMockList.RLock()
 	calls = mock.calls.List
 	lockClusterScanInterfaceMockList.RUnlock()
+	return calls
+}
+
+// ListNamespaced calls ListNamespacedFunc.
+func (mock *ClusterScanInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.ClusterScanList, error) {
+	if mock.ListNamespacedFunc == nil {
+		panic("ClusterScanInterfaceMock.ListNamespacedFunc: method is nil but ClusterScanInterface.ListNamespaced was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}{
+		Namespace: namespace,
+		Opts:      opts,
+	}
+	lockClusterScanInterfaceMockListNamespaced.Lock()
+	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
+	lockClusterScanInterfaceMockListNamespaced.Unlock()
+	return mock.ListNamespacedFunc(namespace, opts)
+}
+
+// ListNamespacedCalls gets all the calls that were made to ListNamespaced.
+// Check the length with:
+//     len(mockedClusterScanInterface.ListNamespacedCalls())
+func (mock *ClusterScanInterfaceMock) ListNamespacedCalls() []struct {
+	Namespace string
+	Opts      v1.ListOptions
+} {
+	var calls []struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}
+	lockClusterScanInterfaceMockListNamespaced.RLock()
+	calls = mock.calls.ListNamespaced
+	lockClusterScanInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 

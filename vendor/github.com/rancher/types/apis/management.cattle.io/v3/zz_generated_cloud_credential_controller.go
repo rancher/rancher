@@ -85,6 +85,7 @@ type CloudCredentialInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*CloudCredentialList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*CloudCredentialList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() CloudCredentialController
@@ -269,6 +270,11 @@ func (s *cloudCredentialClient) DeleteNamespaced(namespace, name string, options
 
 func (s *cloudCredentialClient) List(opts metav1.ListOptions) (*CloudCredentialList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*CloudCredentialList), err
+}
+
+func (s *cloudCredentialClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*CloudCredentialList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*CloudCredentialList), err
 }
 

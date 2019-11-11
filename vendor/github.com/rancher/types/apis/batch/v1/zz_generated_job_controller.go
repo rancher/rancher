@@ -86,6 +86,7 @@ type JobInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*JobList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*JobList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() JobController
@@ -270,6 +271,11 @@ func (s *jobClient) DeleteNamespaced(namespace, name string, options *metav1.Del
 
 func (s *jobClient) List(opts metav1.ListOptions) (*JobList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*JobList), err
+}
+
+func (s *jobClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*JobList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*JobList), err
 }
 

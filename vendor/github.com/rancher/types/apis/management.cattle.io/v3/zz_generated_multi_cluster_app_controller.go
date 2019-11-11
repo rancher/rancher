@@ -85,6 +85,7 @@ type MultiClusterAppInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*MultiClusterAppList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*MultiClusterAppList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() MultiClusterAppController
@@ -269,6 +270,11 @@ func (s *multiClusterAppClient) DeleteNamespaced(namespace, name string, options
 
 func (s *multiClusterAppClient) List(opts metav1.ListOptions) (*MultiClusterAppList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*MultiClusterAppList), err
+}
+
+func (s *multiClusterAppClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*MultiClusterAppList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*MultiClusterAppList), err
 }
 

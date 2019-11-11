@@ -85,6 +85,7 @@ type ProjectRoleTemplateBindingInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ProjectRoleTemplateBindingList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*ProjectRoleTemplateBindingList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ProjectRoleTemplateBindingController
@@ -269,6 +270,11 @@ func (s *projectRoleTemplateBindingClient) DeleteNamespaced(namespace, name stri
 
 func (s *projectRoleTemplateBindingClient) List(opts metav1.ListOptions) (*ProjectRoleTemplateBindingList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*ProjectRoleTemplateBindingList), err
+}
+
+func (s *projectRoleTemplateBindingClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ProjectRoleTemplateBindingList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*ProjectRoleTemplateBindingList), err
 }
 

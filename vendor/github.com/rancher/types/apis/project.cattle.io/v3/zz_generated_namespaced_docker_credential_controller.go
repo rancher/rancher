@@ -85,6 +85,7 @@ type NamespacedDockerCredentialInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*NamespacedDockerCredentialList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*NamespacedDockerCredentialList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NamespacedDockerCredentialController
@@ -269,6 +270,11 @@ func (s *namespacedDockerCredentialClient) DeleteNamespaced(namespace, name stri
 
 func (s *namespacedDockerCredentialClient) List(opts metav1.ListOptions) (*NamespacedDockerCredentialList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*NamespacedDockerCredentialList), err
+}
+
+func (s *namespacedDockerCredentialClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*NamespacedDockerCredentialList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*NamespacedDockerCredentialList), err
 }
 

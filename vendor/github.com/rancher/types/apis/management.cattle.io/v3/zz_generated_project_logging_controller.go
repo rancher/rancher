@@ -85,6 +85,7 @@ type ProjectLoggingInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ProjectLoggingList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*ProjectLoggingList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ProjectLoggingController
@@ -269,6 +270,11 @@ func (s *projectLoggingClient) DeleteNamespaced(namespace, name string, options 
 
 func (s *projectLoggingClient) List(opts metav1.ListOptions) (*ProjectLoggingList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*ProjectLoggingList), err
+}
+
+func (s *projectLoggingClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ProjectLoggingList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*ProjectLoggingList), err
 }
 

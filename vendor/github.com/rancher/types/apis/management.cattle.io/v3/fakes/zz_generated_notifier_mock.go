@@ -674,6 +674,7 @@ var (
 	lockNotifierInterfaceMockGet                              sync.RWMutex
 	lockNotifierInterfaceMockGetNamespaced                    sync.RWMutex
 	lockNotifierInterfaceMockList                             sync.RWMutex
+	lockNotifierInterfaceMockListNamespaced                   sync.RWMutex
 	lockNotifierInterfaceMockObjectClient                     sync.RWMutex
 	lockNotifierInterfaceMockUpdate                           sync.RWMutex
 	lockNotifierInterfaceMockWatch                            sync.RWMutex
@@ -736,6 +737,9 @@ var _ v3.NotifierInterface = &NotifierInterfaceMock{}
 //             },
 //             ListFunc: func(opts v1.ListOptions) (*v3.NotifierList, error) {
 // 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.NotifierList, error) {
+// 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
@@ -800,6 +804,9 @@ type NotifierInterfaceMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(opts v1.ListOptions) (*v3.NotifierList, error)
+
+	// ListNamespacedFunc mocks the ListNamespaced method.
+	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.NotifierList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -949,6 +956,13 @@ type NotifierInterfaceMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// Opts is the opts argument value.
+			Opts v1.ListOptions
+		}
+		// ListNamespaced holds details about calls to the ListNamespaced method.
+		ListNamespaced []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
 			// Opts is the opts argument value.
 			Opts v1.ListOptions
 		}
@@ -1580,6 +1594,41 @@ func (mock *NotifierInterfaceMock) ListCalls() []struct {
 	lockNotifierInterfaceMockList.RLock()
 	calls = mock.calls.List
 	lockNotifierInterfaceMockList.RUnlock()
+	return calls
+}
+
+// ListNamespaced calls ListNamespacedFunc.
+func (mock *NotifierInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.NotifierList, error) {
+	if mock.ListNamespacedFunc == nil {
+		panic("NotifierInterfaceMock.ListNamespacedFunc: method is nil but NotifierInterface.ListNamespaced was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}{
+		Namespace: namespace,
+		Opts:      opts,
+	}
+	lockNotifierInterfaceMockListNamespaced.Lock()
+	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
+	lockNotifierInterfaceMockListNamespaced.Unlock()
+	return mock.ListNamespacedFunc(namespace, opts)
+}
+
+// ListNamespacedCalls gets all the calls that were made to ListNamespaced.
+// Check the length with:
+//     len(mockedNotifierInterface.ListNamespacedCalls())
+func (mock *NotifierInterfaceMock) ListNamespacedCalls() []struct {
+	Namespace string
+	Opts      v1.ListOptions
+} {
+	var calls []struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}
+	lockNotifierInterfaceMockListNamespaced.RLock()
+	calls = mock.calls.ListNamespaced
+	lockNotifierInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 

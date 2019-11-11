@@ -674,6 +674,7 @@ var (
 	lockClusterRoleTemplateBindingInterfaceMockGet                              sync.RWMutex
 	lockClusterRoleTemplateBindingInterfaceMockGetNamespaced                    sync.RWMutex
 	lockClusterRoleTemplateBindingInterfaceMockList                             sync.RWMutex
+	lockClusterRoleTemplateBindingInterfaceMockListNamespaced                   sync.RWMutex
 	lockClusterRoleTemplateBindingInterfaceMockObjectClient                     sync.RWMutex
 	lockClusterRoleTemplateBindingInterfaceMockUpdate                           sync.RWMutex
 	lockClusterRoleTemplateBindingInterfaceMockWatch                            sync.RWMutex
@@ -736,6 +737,9 @@ var _ v3.ClusterRoleTemplateBindingInterface = &ClusterRoleTemplateBindingInterf
 //             },
 //             ListFunc: func(opts v1.ListOptions) (*v3.ClusterRoleTemplateBindingList, error) {
 // 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.ClusterRoleTemplateBindingList, error) {
+// 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
@@ -800,6 +804,9 @@ type ClusterRoleTemplateBindingInterfaceMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(opts v1.ListOptions) (*v3.ClusterRoleTemplateBindingList, error)
+
+	// ListNamespacedFunc mocks the ListNamespaced method.
+	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.ClusterRoleTemplateBindingList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -949,6 +956,13 @@ type ClusterRoleTemplateBindingInterfaceMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// Opts is the opts argument value.
+			Opts v1.ListOptions
+		}
+		// ListNamespaced holds details about calls to the ListNamespaced method.
+		ListNamespaced []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
 			// Opts is the opts argument value.
 			Opts v1.ListOptions
 		}
@@ -1580,6 +1594,41 @@ func (mock *ClusterRoleTemplateBindingInterfaceMock) ListCalls() []struct {
 	lockClusterRoleTemplateBindingInterfaceMockList.RLock()
 	calls = mock.calls.List
 	lockClusterRoleTemplateBindingInterfaceMockList.RUnlock()
+	return calls
+}
+
+// ListNamespaced calls ListNamespacedFunc.
+func (mock *ClusterRoleTemplateBindingInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.ClusterRoleTemplateBindingList, error) {
+	if mock.ListNamespacedFunc == nil {
+		panic("ClusterRoleTemplateBindingInterfaceMock.ListNamespacedFunc: method is nil but ClusterRoleTemplateBindingInterface.ListNamespaced was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}{
+		Namespace: namespace,
+		Opts:      opts,
+	}
+	lockClusterRoleTemplateBindingInterfaceMockListNamespaced.Lock()
+	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
+	lockClusterRoleTemplateBindingInterfaceMockListNamespaced.Unlock()
+	return mock.ListNamespacedFunc(namespace, opts)
+}
+
+// ListNamespacedCalls gets all the calls that were made to ListNamespaced.
+// Check the length with:
+//     len(mockedClusterRoleTemplateBindingInterface.ListNamespacedCalls())
+func (mock *ClusterRoleTemplateBindingInterfaceMock) ListNamespacedCalls() []struct {
+	Namespace string
+	Opts      v1.ListOptions
+} {
+	var calls []struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}
+	lockClusterRoleTemplateBindingInterfaceMockListNamespaced.RLock()
+	calls = mock.calls.ListNamespaced
+	lockClusterRoleTemplateBindingInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 

@@ -675,6 +675,7 @@ var (
 	lockServiceAccountInterfaceMockGet                              sync.RWMutex
 	lockServiceAccountInterfaceMockGetNamespaced                    sync.RWMutex
 	lockServiceAccountInterfaceMockList                             sync.RWMutex
+	lockServiceAccountInterfaceMockListNamespaced                   sync.RWMutex
 	lockServiceAccountInterfaceMockObjectClient                     sync.RWMutex
 	lockServiceAccountInterfaceMockUpdate                           sync.RWMutex
 	lockServiceAccountInterfaceMockWatch                            sync.RWMutex
@@ -737,6 +738,9 @@ var _ v1a.ServiceAccountInterface = &ServiceAccountInterfaceMock{}
 //             },
 //             ListFunc: func(opts v1b.ListOptions) (*v1a.ServiceAccountList, error) {
 // 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts v1b.ListOptions) (*v1a.ServiceAccountList, error) {
+// 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
@@ -801,6 +805,9 @@ type ServiceAccountInterfaceMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(opts v1b.ListOptions) (*v1a.ServiceAccountList, error)
+
+	// ListNamespacedFunc mocks the ListNamespaced method.
+	ListNamespacedFunc func(namespace string, opts v1b.ListOptions) (*v1a.ServiceAccountList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -950,6 +957,13 @@ type ServiceAccountInterfaceMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// Opts is the opts argument value.
+			Opts v1b.ListOptions
+		}
+		// ListNamespaced holds details about calls to the ListNamespaced method.
+		ListNamespaced []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
 			// Opts is the opts argument value.
 			Opts v1b.ListOptions
 		}
@@ -1581,6 +1595,41 @@ func (mock *ServiceAccountInterfaceMock) ListCalls() []struct {
 	lockServiceAccountInterfaceMockList.RLock()
 	calls = mock.calls.List
 	lockServiceAccountInterfaceMockList.RUnlock()
+	return calls
+}
+
+// ListNamespaced calls ListNamespacedFunc.
+func (mock *ServiceAccountInterfaceMock) ListNamespaced(namespace string, opts v1b.ListOptions) (*v1a.ServiceAccountList, error) {
+	if mock.ListNamespacedFunc == nil {
+		panic("ServiceAccountInterfaceMock.ListNamespacedFunc: method is nil but ServiceAccountInterface.ListNamespaced was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Opts      v1b.ListOptions
+	}{
+		Namespace: namespace,
+		Opts:      opts,
+	}
+	lockServiceAccountInterfaceMockListNamespaced.Lock()
+	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
+	lockServiceAccountInterfaceMockListNamespaced.Unlock()
+	return mock.ListNamespacedFunc(namespace, opts)
+}
+
+// ListNamespacedCalls gets all the calls that were made to ListNamespaced.
+// Check the length with:
+//     len(mockedServiceAccountInterface.ListNamespacedCalls())
+func (mock *ServiceAccountInterfaceMock) ListNamespacedCalls() []struct {
+	Namespace string
+	Opts      v1b.ListOptions
+} {
+	var calls []struct {
+		Namespace string
+		Opts      v1b.ListOptions
+	}
+	lockServiceAccountInterfaceMockListNamespaced.RLock()
+	calls = mock.calls.ListNamespaced
+	lockServiceAccountInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 

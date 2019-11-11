@@ -86,6 +86,7 @@ type ServiceInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ServiceList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*ServiceList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ServiceController
@@ -270,6 +271,11 @@ func (s *serviceClient) DeleteNamespaced(namespace, name string, options *metav1
 
 func (s *serviceClient) List(opts metav1.ListOptions) (*ServiceList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*ServiceList), err
+}
+
+func (s *serviceClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ServiceList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*ServiceList), err
 }
 

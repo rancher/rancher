@@ -48,6 +48,7 @@ type GenericClient interface {
 	DeleteNamespaced(namespace, name string, opts *metav1.DeleteOptions) error
 	Delete(name string, opts *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (runtime.Object, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (runtime.Object, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOptions *metav1.DeleteOptions, listOptions metav1.ListOptions) error
 	Patch(name string, o runtime.Object, patchType types.PatchType, data []byte, subresources ...string) (runtime.Object, error)
@@ -222,6 +223,18 @@ func (p *ObjectClient) List(opts metav1.ListOptions) (runtime.Object, error) {
 	return result, p.restClient.Get().
 		Prefix(p.getAPIPrefix(), p.gvk.Group, p.gvk.Version).
 		NamespaceIfScoped(p.ns, p.resource.Namespaced).
+		Resource(p.resource.Name).
+		VersionedParams(&opts, metav1.ParameterCodec).
+		Do().
+		Into(result)
+}
+
+func (p *ObjectClient) ListNamespaced(namespace string, opts metav1.ListOptions) (runtime.Object, error) {
+	result := p.Factory.List()
+	logrus.Debugf("REST LIST %s/%s/%s/%s/%s", p.getAPIPrefix(), p.gvk.Group, p.gvk.Version, namespace, p.resource.Name)
+	return result, p.restClient.Get().
+		Prefix(p.getAPIPrefix(), p.gvk.Group, p.gvk.Version).
+		NamespaceIfScoped(namespace, p.resource.Namespaced).
 		Resource(p.resource.Name).
 		VersionedParams(&opts, metav1.ParameterCodec).
 		Do().

@@ -674,6 +674,7 @@ var (
 	lockClusterTemplateInterfaceMockGet                              sync.RWMutex
 	lockClusterTemplateInterfaceMockGetNamespaced                    sync.RWMutex
 	lockClusterTemplateInterfaceMockList                             sync.RWMutex
+	lockClusterTemplateInterfaceMockListNamespaced                   sync.RWMutex
 	lockClusterTemplateInterfaceMockObjectClient                     sync.RWMutex
 	lockClusterTemplateInterfaceMockUpdate                           sync.RWMutex
 	lockClusterTemplateInterfaceMockWatch                            sync.RWMutex
@@ -736,6 +737,9 @@ var _ v3.ClusterTemplateInterface = &ClusterTemplateInterfaceMock{}
 //             },
 //             ListFunc: func(opts v1.ListOptions) (*v3.ClusterTemplateList, error) {
 // 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.ClusterTemplateList, error) {
+// 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
@@ -800,6 +804,9 @@ type ClusterTemplateInterfaceMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(opts v1.ListOptions) (*v3.ClusterTemplateList, error)
+
+	// ListNamespacedFunc mocks the ListNamespaced method.
+	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.ClusterTemplateList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -949,6 +956,13 @@ type ClusterTemplateInterfaceMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// Opts is the opts argument value.
+			Opts v1.ListOptions
+		}
+		// ListNamespaced holds details about calls to the ListNamespaced method.
+		ListNamespaced []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
 			// Opts is the opts argument value.
 			Opts v1.ListOptions
 		}
@@ -1580,6 +1594,41 @@ func (mock *ClusterTemplateInterfaceMock) ListCalls() []struct {
 	lockClusterTemplateInterfaceMockList.RLock()
 	calls = mock.calls.List
 	lockClusterTemplateInterfaceMockList.RUnlock()
+	return calls
+}
+
+// ListNamespaced calls ListNamespacedFunc.
+func (mock *ClusterTemplateInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.ClusterTemplateList, error) {
+	if mock.ListNamespacedFunc == nil {
+		panic("ClusterTemplateInterfaceMock.ListNamespacedFunc: method is nil but ClusterTemplateInterface.ListNamespaced was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}{
+		Namespace: namespace,
+		Opts:      opts,
+	}
+	lockClusterTemplateInterfaceMockListNamespaced.Lock()
+	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
+	lockClusterTemplateInterfaceMockListNamespaced.Unlock()
+	return mock.ListNamespacedFunc(namespace, opts)
+}
+
+// ListNamespacedCalls gets all the calls that were made to ListNamespaced.
+// Check the length with:
+//     len(mockedClusterTemplateInterface.ListNamespacedCalls())
+func (mock *ClusterTemplateInterfaceMock) ListNamespacedCalls() []struct {
+	Namespace string
+	Opts      v1.ListOptions
+} {
+	var calls []struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}
+	lockClusterTemplateInterfaceMockListNamespaced.RLock()
+	calls = mock.calls.ListNamespaced
+	lockClusterTemplateInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 

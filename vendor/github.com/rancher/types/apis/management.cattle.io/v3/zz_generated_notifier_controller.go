@@ -85,6 +85,7 @@ type NotifierInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*NotifierList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*NotifierList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NotifierController
@@ -269,6 +270,11 @@ func (s *notifierClient) DeleteNamespaced(namespace, name string, options *metav
 
 func (s *notifierClient) List(opts metav1.ListOptions) (*NotifierList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*NotifierList), err
+}
+
+func (s *notifierClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*NotifierList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*NotifierList), err
 }
 

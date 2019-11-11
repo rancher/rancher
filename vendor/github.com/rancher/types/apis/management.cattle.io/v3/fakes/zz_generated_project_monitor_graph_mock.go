@@ -674,6 +674,7 @@ var (
 	lockProjectMonitorGraphInterfaceMockGet                              sync.RWMutex
 	lockProjectMonitorGraphInterfaceMockGetNamespaced                    sync.RWMutex
 	lockProjectMonitorGraphInterfaceMockList                             sync.RWMutex
+	lockProjectMonitorGraphInterfaceMockListNamespaced                   sync.RWMutex
 	lockProjectMonitorGraphInterfaceMockObjectClient                     sync.RWMutex
 	lockProjectMonitorGraphInterfaceMockUpdate                           sync.RWMutex
 	lockProjectMonitorGraphInterfaceMockWatch                            sync.RWMutex
@@ -736,6 +737,9 @@ var _ v3.ProjectMonitorGraphInterface = &ProjectMonitorGraphInterfaceMock{}
 //             },
 //             ListFunc: func(opts v1.ListOptions) (*v3.ProjectMonitorGraphList, error) {
 // 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.ProjectMonitorGraphList, error) {
+// 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
@@ -800,6 +804,9 @@ type ProjectMonitorGraphInterfaceMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(opts v1.ListOptions) (*v3.ProjectMonitorGraphList, error)
+
+	// ListNamespacedFunc mocks the ListNamespaced method.
+	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.ProjectMonitorGraphList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -949,6 +956,13 @@ type ProjectMonitorGraphInterfaceMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// Opts is the opts argument value.
+			Opts v1.ListOptions
+		}
+		// ListNamespaced holds details about calls to the ListNamespaced method.
+		ListNamespaced []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
 			// Opts is the opts argument value.
 			Opts v1.ListOptions
 		}
@@ -1580,6 +1594,41 @@ func (mock *ProjectMonitorGraphInterfaceMock) ListCalls() []struct {
 	lockProjectMonitorGraphInterfaceMockList.RLock()
 	calls = mock.calls.List
 	lockProjectMonitorGraphInterfaceMockList.RUnlock()
+	return calls
+}
+
+// ListNamespaced calls ListNamespacedFunc.
+func (mock *ProjectMonitorGraphInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.ProjectMonitorGraphList, error) {
+	if mock.ListNamespacedFunc == nil {
+		panic("ProjectMonitorGraphInterfaceMock.ListNamespacedFunc: method is nil but ProjectMonitorGraphInterface.ListNamespaced was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}{
+		Namespace: namespace,
+		Opts:      opts,
+	}
+	lockProjectMonitorGraphInterfaceMockListNamespaced.Lock()
+	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
+	lockProjectMonitorGraphInterfaceMockListNamespaced.Unlock()
+	return mock.ListNamespacedFunc(namespace, opts)
+}
+
+// ListNamespacedCalls gets all the calls that were made to ListNamespaced.
+// Check the length with:
+//     len(mockedProjectMonitorGraphInterface.ListNamespacedCalls())
+func (mock *ProjectMonitorGraphInterfaceMock) ListNamespacedCalls() []struct {
+	Namespace string
+	Opts      v1.ListOptions
+} {
+	var calls []struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}
+	lockProjectMonitorGraphInterfaceMockListNamespaced.RLock()
+	calls = mock.calls.ListNamespaced
+	lockProjectMonitorGraphInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 

@@ -85,6 +85,7 @@ type ProjectAlertRuleInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ProjectAlertRuleList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*ProjectAlertRuleList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ProjectAlertRuleController
@@ -269,6 +270,11 @@ func (s *projectAlertRuleClient) DeleteNamespaced(namespace, name string, option
 
 func (s *projectAlertRuleClient) List(opts metav1.ListOptions) (*ProjectAlertRuleList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*ProjectAlertRuleList), err
+}
+
+func (s *projectAlertRuleClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ProjectAlertRuleList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*ProjectAlertRuleList), err
 }
 

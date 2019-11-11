@@ -86,6 +86,7 @@ type VirtualServiceInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*VirtualServiceList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*VirtualServiceList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() VirtualServiceController
@@ -270,6 +271,11 @@ func (s *virtualServiceClient) DeleteNamespaced(namespace, name string, options 
 
 func (s *virtualServiceClient) List(opts metav1.ListOptions) (*VirtualServiceList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*VirtualServiceList), err
+}
+
+func (s *virtualServiceClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*VirtualServiceList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*VirtualServiceList), err
 }
 

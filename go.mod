@@ -74,11 +74,11 @@ require (
 	github.com/prometheus/common v0.6.0
 	github.com/rancher/kontainer-driver-metadata v0.0.0-20191021164950-6514452b9732
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20191104182032-b0a8fe9ff757
-	github.com/rancher/norman v0.0.0-20191003174345-0ac7dd6ccb36
+	github.com/rancher/norman v0.0.0-20191111202053-1fcac7eb4fea
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6
 	github.com/rancher/rke v0.3.1-0.20191111231255-72fd42b8d2a7
-	github.com/rancher/types v0.0.0-20191107233540-9644e7bb8497
+	github.com/rancher/types v0.0.0-20191111203803-675504f2943e
 	github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect

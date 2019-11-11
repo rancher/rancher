@@ -86,6 +86,7 @@ type DaemonSetInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*DaemonSetList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*DaemonSetList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() DaemonSetController
@@ -270,6 +271,11 @@ func (s *daemonSetClient) DeleteNamespaced(namespace, name string, options *meta
 
 func (s *daemonSetClient) List(opts metav1.ListOptions) (*DaemonSetList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*DaemonSetList), err
+}
+
+func (s *daemonSetClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*DaemonSetList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*DaemonSetList), err
 }
 

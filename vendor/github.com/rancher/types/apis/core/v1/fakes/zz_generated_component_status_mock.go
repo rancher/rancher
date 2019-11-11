@@ -675,6 +675,7 @@ var (
 	lockComponentStatusInterfaceMockGet                              sync.RWMutex
 	lockComponentStatusInterfaceMockGetNamespaced                    sync.RWMutex
 	lockComponentStatusInterfaceMockList                             sync.RWMutex
+	lockComponentStatusInterfaceMockListNamespaced                   sync.RWMutex
 	lockComponentStatusInterfaceMockObjectClient                     sync.RWMutex
 	lockComponentStatusInterfaceMockUpdate                           sync.RWMutex
 	lockComponentStatusInterfaceMockWatch                            sync.RWMutex
@@ -737,6 +738,9 @@ var _ v1a.ComponentStatusInterface = &ComponentStatusInterfaceMock{}
 //             },
 //             ListFunc: func(opts v1b.ListOptions) (*v1a.ComponentStatusList, error) {
 // 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts v1b.ListOptions) (*v1a.ComponentStatusList, error) {
+// 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
@@ -801,6 +805,9 @@ type ComponentStatusInterfaceMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(opts v1b.ListOptions) (*v1a.ComponentStatusList, error)
+
+	// ListNamespacedFunc mocks the ListNamespaced method.
+	ListNamespacedFunc func(namespace string, opts v1b.ListOptions) (*v1a.ComponentStatusList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -950,6 +957,13 @@ type ComponentStatusInterfaceMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// Opts is the opts argument value.
+			Opts v1b.ListOptions
+		}
+		// ListNamespaced holds details about calls to the ListNamespaced method.
+		ListNamespaced []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
 			// Opts is the opts argument value.
 			Opts v1b.ListOptions
 		}
@@ -1581,6 +1595,41 @@ func (mock *ComponentStatusInterfaceMock) ListCalls() []struct {
 	lockComponentStatusInterfaceMockList.RLock()
 	calls = mock.calls.List
 	lockComponentStatusInterfaceMockList.RUnlock()
+	return calls
+}
+
+// ListNamespaced calls ListNamespacedFunc.
+func (mock *ComponentStatusInterfaceMock) ListNamespaced(namespace string, opts v1b.ListOptions) (*v1a.ComponentStatusList, error) {
+	if mock.ListNamespacedFunc == nil {
+		panic("ComponentStatusInterfaceMock.ListNamespacedFunc: method is nil but ComponentStatusInterface.ListNamespaced was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Opts      v1b.ListOptions
+	}{
+		Namespace: namespace,
+		Opts:      opts,
+	}
+	lockComponentStatusInterfaceMockListNamespaced.Lock()
+	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
+	lockComponentStatusInterfaceMockListNamespaced.Unlock()
+	return mock.ListNamespacedFunc(namespace, opts)
+}
+
+// ListNamespacedCalls gets all the calls that were made to ListNamespaced.
+// Check the length with:
+//     len(mockedComponentStatusInterface.ListNamespacedCalls())
+func (mock *ComponentStatusInterfaceMock) ListNamespacedCalls() []struct {
+	Namespace string
+	Opts      v1b.ListOptions
+} {
+	var calls []struct {
+		Namespace string
+		Opts      v1b.ListOptions
+	}
+	lockComponentStatusInterfaceMockListNamespaced.RLock()
+	calls = mock.calls.ListNamespaced
+	lockComponentStatusInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 

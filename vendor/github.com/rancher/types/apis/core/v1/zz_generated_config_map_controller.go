@@ -86,6 +86,7 @@ type ConfigMapInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ConfigMapList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*ConfigMapList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ConfigMapController
@@ -270,6 +271,11 @@ func (s *configMapClient) DeleteNamespaced(namespace, name string, options *meta
 
 func (s *configMapClient) List(opts metav1.ListOptions) (*ConfigMapList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*ConfigMapList), err
+}
+
+func (s *configMapClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ConfigMapList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*ConfigMapList), err
 }
 

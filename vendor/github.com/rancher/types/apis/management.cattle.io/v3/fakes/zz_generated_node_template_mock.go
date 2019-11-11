@@ -674,6 +674,7 @@ var (
 	lockNodeTemplateInterfaceMockGet                              sync.RWMutex
 	lockNodeTemplateInterfaceMockGetNamespaced                    sync.RWMutex
 	lockNodeTemplateInterfaceMockList                             sync.RWMutex
+	lockNodeTemplateInterfaceMockListNamespaced                   sync.RWMutex
 	lockNodeTemplateInterfaceMockObjectClient                     sync.RWMutex
 	lockNodeTemplateInterfaceMockUpdate                           sync.RWMutex
 	lockNodeTemplateInterfaceMockWatch                            sync.RWMutex
@@ -736,6 +737,9 @@ var _ v3.NodeTemplateInterface = &NodeTemplateInterfaceMock{}
 //             },
 //             ListFunc: func(opts v1.ListOptions) (*v3.NodeTemplateList, error) {
 // 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.NodeTemplateList, error) {
+// 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
@@ -800,6 +804,9 @@ type NodeTemplateInterfaceMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(opts v1.ListOptions) (*v3.NodeTemplateList, error)
+
+	// ListNamespacedFunc mocks the ListNamespaced method.
+	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.NodeTemplateList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -949,6 +956,13 @@ type NodeTemplateInterfaceMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// Opts is the opts argument value.
+			Opts v1.ListOptions
+		}
+		// ListNamespaced holds details about calls to the ListNamespaced method.
+		ListNamespaced []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
 			// Opts is the opts argument value.
 			Opts v1.ListOptions
 		}
@@ -1580,6 +1594,41 @@ func (mock *NodeTemplateInterfaceMock) ListCalls() []struct {
 	lockNodeTemplateInterfaceMockList.RLock()
 	calls = mock.calls.List
 	lockNodeTemplateInterfaceMockList.RUnlock()
+	return calls
+}
+
+// ListNamespaced calls ListNamespacedFunc.
+func (mock *NodeTemplateInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.NodeTemplateList, error) {
+	if mock.ListNamespacedFunc == nil {
+		panic("NodeTemplateInterfaceMock.ListNamespacedFunc: method is nil but NodeTemplateInterface.ListNamespaced was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}{
+		Namespace: namespace,
+		Opts:      opts,
+	}
+	lockNodeTemplateInterfaceMockListNamespaced.Lock()
+	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
+	lockNodeTemplateInterfaceMockListNamespaced.Unlock()
+	return mock.ListNamespacedFunc(namespace, opts)
+}
+
+// ListNamespacedCalls gets all the calls that were made to ListNamespaced.
+// Check the length with:
+//     len(mockedNodeTemplateInterface.ListNamespacedCalls())
+func (mock *NodeTemplateInterfaceMock) ListNamespacedCalls() []struct {
+	Namespace string
+	Opts      v1.ListOptions
+} {
+	var calls []struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}
+	lockNodeTemplateInterfaceMockListNamespaced.RLock()
+	calls = mock.calls.ListNamespaced
+	lockNodeTemplateInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 

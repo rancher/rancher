@@ -86,6 +86,7 @@ type SecretInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*SecretList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*SecretList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() SecretController
@@ -270,6 +271,11 @@ func (s *secretClient) DeleteNamespaced(namespace, name string, options *metav1.
 
 func (s *secretClient) List(opts metav1.ListOptions) (*SecretList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*SecretList), err
+}
+
+func (s *secretClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*SecretList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*SecretList), err
 }
 

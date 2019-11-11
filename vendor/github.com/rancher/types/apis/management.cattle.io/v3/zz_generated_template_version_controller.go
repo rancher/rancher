@@ -84,6 +84,7 @@ type TemplateVersionInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*TemplateVersionList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*TemplateVersionList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() TemplateVersionController
@@ -268,6 +269,11 @@ func (s *templateVersionClient) DeleteNamespaced(namespace, name string, options
 
 func (s *templateVersionClient) List(opts metav1.ListOptions) (*TemplateVersionList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*TemplateVersionList), err
+}
+
+func (s *templateVersionClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*TemplateVersionList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*TemplateVersionList), err
 }
 

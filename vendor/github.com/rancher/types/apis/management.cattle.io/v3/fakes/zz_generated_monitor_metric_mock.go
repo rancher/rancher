@@ -674,6 +674,7 @@ var (
 	lockMonitorMetricInterfaceMockGet                              sync.RWMutex
 	lockMonitorMetricInterfaceMockGetNamespaced                    sync.RWMutex
 	lockMonitorMetricInterfaceMockList                             sync.RWMutex
+	lockMonitorMetricInterfaceMockListNamespaced                   sync.RWMutex
 	lockMonitorMetricInterfaceMockObjectClient                     sync.RWMutex
 	lockMonitorMetricInterfaceMockUpdate                           sync.RWMutex
 	lockMonitorMetricInterfaceMockWatch                            sync.RWMutex
@@ -736,6 +737,9 @@ var _ v3.MonitorMetricInterface = &MonitorMetricInterfaceMock{}
 //             },
 //             ListFunc: func(opts v1.ListOptions) (*v3.MonitorMetricList, error) {
 // 	               panic("mock out the List method")
+//             },
+//             ListNamespacedFunc: func(namespace string, opts v1.ListOptions) (*v3.MonitorMetricList, error) {
+// 	               panic("mock out the ListNamespaced method")
 //             },
 //             ObjectClientFunc: func() *objectclient.ObjectClient {
 // 	               panic("mock out the ObjectClient method")
@@ -800,6 +804,9 @@ type MonitorMetricInterfaceMock struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(opts v1.ListOptions) (*v3.MonitorMetricList, error)
+
+	// ListNamespacedFunc mocks the ListNamespaced method.
+	ListNamespacedFunc func(namespace string, opts v1.ListOptions) (*v3.MonitorMetricList, error)
 
 	// ObjectClientFunc mocks the ObjectClient method.
 	ObjectClientFunc func() *objectclient.ObjectClient
@@ -949,6 +956,13 @@ type MonitorMetricInterfaceMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
+			// Opts is the opts argument value.
+			Opts v1.ListOptions
+		}
+		// ListNamespaced holds details about calls to the ListNamespaced method.
+		ListNamespaced []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
 			// Opts is the opts argument value.
 			Opts v1.ListOptions
 		}
@@ -1580,6 +1594,41 @@ func (mock *MonitorMetricInterfaceMock) ListCalls() []struct {
 	lockMonitorMetricInterfaceMockList.RLock()
 	calls = mock.calls.List
 	lockMonitorMetricInterfaceMockList.RUnlock()
+	return calls
+}
+
+// ListNamespaced calls ListNamespacedFunc.
+func (mock *MonitorMetricInterfaceMock) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.MonitorMetricList, error) {
+	if mock.ListNamespacedFunc == nil {
+		panic("MonitorMetricInterfaceMock.ListNamespacedFunc: method is nil but MonitorMetricInterface.ListNamespaced was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}{
+		Namespace: namespace,
+		Opts:      opts,
+	}
+	lockMonitorMetricInterfaceMockListNamespaced.Lock()
+	mock.calls.ListNamespaced = append(mock.calls.ListNamespaced, callInfo)
+	lockMonitorMetricInterfaceMockListNamespaced.Unlock()
+	return mock.ListNamespacedFunc(namespace, opts)
+}
+
+// ListNamespacedCalls gets all the calls that were made to ListNamespaced.
+// Check the length with:
+//     len(mockedMonitorMetricInterface.ListNamespacedCalls())
+func (mock *MonitorMetricInterfaceMock) ListNamespacedCalls() []struct {
+	Namespace string
+	Opts      v1.ListOptions
+} {
+	var calls []struct {
+		Namespace string
+		Opts      v1.ListOptions
+	}
+	lockMonitorMetricInterfaceMockListNamespaced.RLock()
+	calls = mock.calls.ListNamespaced
+	lockMonitorMetricInterfaceMockListNamespaced.RUnlock()
 	return calls
 }
 

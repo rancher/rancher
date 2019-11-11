@@ -86,6 +86,7 @@ type CronJobInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*CronJobList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*CronJobList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() CronJobController
@@ -270,6 +271,11 @@ func (s *cronJobClient) DeleteNamespaced(namespace, name string, options *metav1
 
 func (s *cronJobClient) List(opts metav1.ListOptions) (*CronJobList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*CronJobList), err
+}
+
+func (s *cronJobClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*CronJobList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*CronJobList), err
 }
 

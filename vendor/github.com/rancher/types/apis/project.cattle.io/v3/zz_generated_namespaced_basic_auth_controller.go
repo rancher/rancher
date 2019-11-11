@@ -85,6 +85,7 @@ type NamespacedBasicAuthInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*NamespacedBasicAuthList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*NamespacedBasicAuthList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() NamespacedBasicAuthController
@@ -269,6 +270,11 @@ func (s *namespacedBasicAuthClient) DeleteNamespaced(namespace, name string, opt
 
 func (s *namespacedBasicAuthClient) List(opts metav1.ListOptions) (*NamespacedBasicAuthList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*NamespacedBasicAuthList), err
+}
+
+func (s *namespacedBasicAuthClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*NamespacedBasicAuthList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*NamespacedBasicAuthList), err
 }
 

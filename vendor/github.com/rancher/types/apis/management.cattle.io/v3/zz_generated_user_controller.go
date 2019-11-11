@@ -84,6 +84,7 @@ type UserInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*UserList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*UserList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() UserController
@@ -268,6 +269,11 @@ func (s *userClient) DeleteNamespaced(namespace, name string, options *metav1.De
 
 func (s *userClient) List(opts metav1.ListOptions) (*UserList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*UserList), err
+}
+
+func (s *userClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*UserList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*UserList), err
 }
 

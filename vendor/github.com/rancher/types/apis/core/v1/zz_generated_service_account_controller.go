@@ -86,6 +86,7 @@ type ServiceAccountInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*ServiceAccountList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*ServiceAccountList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() ServiceAccountController
@@ -270,6 +271,11 @@ func (s *serviceAccountClient) DeleteNamespaced(namespace, name string, options 
 
 func (s *serviceAccountClient) List(opts metav1.ListOptions) (*ServiceAccountList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*ServiceAccountList), err
+}
+
+func (s *serviceAccountClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*ServiceAccountList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*ServiceAccountList), err
 }
 

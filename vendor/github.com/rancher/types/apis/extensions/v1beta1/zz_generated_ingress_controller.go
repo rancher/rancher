@@ -86,6 +86,7 @@ type IngressInterface interface {
 	Delete(name string, options *metav1.DeleteOptions) error
 	DeleteNamespaced(namespace, name string, options *metav1.DeleteOptions) error
 	List(opts metav1.ListOptions) (*IngressList, error)
+	ListNamespaced(namespace string, opts metav1.ListOptions) (*IngressList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	DeleteCollection(deleteOpts *metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Controller() IngressController
@@ -270,6 +271,11 @@ func (s *ingressClient) DeleteNamespaced(namespace, name string, options *metav1
 
 func (s *ingressClient) List(opts metav1.ListOptions) (*IngressList, error) {
 	obj, err := s.objectClient.List(opts)
+	return obj.(*IngressList), err
+}
+
+func (s *ingressClient) ListNamespaced(namespace string, opts metav1.ListOptions) (*IngressList, error) {
+	obj, err := s.objectClient.ListNamespaced(namespace, opts)
 	return obj.(*IngressList), err
 }
 
