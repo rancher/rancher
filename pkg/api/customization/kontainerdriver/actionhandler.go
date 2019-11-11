@@ -67,14 +67,12 @@ func (a ActionHandler) refresh(apiContext *types.APIContext) error {
 	response := map[string]interface{}{}
 	url, err := kd.GetURLSettingValue()
 	if err != nil {
-		response["message"] = fmt.Sprintf("failed to get settings %v", err)
-		apiContext.WriteResponse(http.StatusInternalServerError, response)
-		return err
+		msg := fmt.Sprintf("failed to get settings %v", err)
+		return httperror.WrapAPIError(err, httperror.ServerError, msg)
 	}
 	if err := a.MetadataHandler.Refresh(url, false); err != nil {
-		response["message"] = fmt.Sprintf("failed to refresh %v", err)
-		apiContext.WriteResponse(http.StatusInternalServerError, response)
-		return err
+		msg := fmt.Sprintf("failed to refresh %v", err)
+		return httperror.WrapAPIError(err, httperror.ServerError, msg)
 	}
 	apiContext.WriteResponse(http.StatusOK, response)
 	return nil
