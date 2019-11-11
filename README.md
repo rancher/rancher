@@ -20,7 +20,7 @@ To get automated notifications of our latest release, you can watch the announce
 
     sudo docker run -d --restart=unless-stopped -p 80:80 -p 443:443 rancher/rancher
 
-Open your browser to https://localhost
+Open your browser to https://localhost or http://localhost (http will be redirected to https, but attention please, if you were not using hostport 80 for http, example like `-p 8080:80`, the https redirect URL would be https://localhost:8443, not https://localhost, because the external https port would follow the formula `https_port = ((http_port / 1000) * 1000) + 443)` to be converted)
 
 ## Installation
 Rancher can be deployed in either a single node or multi-node setup.  Please refer to the following for guides on how to get Rancher up and running.
