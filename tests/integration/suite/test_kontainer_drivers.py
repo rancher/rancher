@@ -331,3 +331,49 @@ def verify_driver_not_in_types(client, kd):
     wait_until(check)
     client.reload_schema()
     assert kd.name + 'EngineConfig' not in client.schema.types
+
+
+@pytest.mark.nonparallel
+def test_user_update_settings(admin_mc):
+    client = admin_mc.client
+    k8s_version_setting = client.by_id_setting('k8s-version')
+    default_k8s_version = k8s_version_setting["default"]
+    k8s_versions_curr = client.by_id_setting(
+        'k8s-versions-current')["value"].split(",")
+
+    # user updates correct value
+    user_value = k8s_versions_curr[0]
+    updated_version = admin_mc.client.update_by_id_setting(
+                        id='k8s-version', value=user_value)
+    assert updated_version["default"] == default_k8s_version
+    assert updated_version["value"] == user_value
+    assert updated_version["labels"]["io.cattle.user.updated"] == "true"
+
+    # assert refresh action doesn't override
+    lister = client.list_kontainerDriver()
+
+    try:
+        client.action(obj=lister, action_name="refresh")
+    except ApiError as e:
+        assert e.value.error.status == 422
+
+    new_k8s_version = client.by_id_setting('k8s-version')
+    assert new_k8s_version["default"] == default_k8s_version
+    assert new_k8s_version["value"] == user_value
+
+    # user updates invalid value
+    user_value = "v1.15.4-rancher13"
+    try:
+        updated_version = admin_mc.client.update_by_id_setting(
+                            id='k8s-version', value=user_value)
+    except ApiError as e:
+        assert e.error.code == "MissingRequired"
+        assert e.error.status == 422
+
+    # bring back the default value, user updates with empty value
+    user_value = ""
+    updated_version = admin_mc.client.update_by_id_setting(
+                        id='k8s-version', value=user_value)
+    assert updated_version["default"] == default_k8s_version
+    assert updated_version["value"] == default_k8s_version
+    assert updated_version["labels"]["io.cattle.user.updated"] == "false"

@@ -30,6 +30,8 @@ type MetadataController struct {
 	ServiceOptions       v3.RKEK8sServiceOptionInterface
 	AddonsLister         v3.RKEAddonLister
 	Addons               v3.RKEAddonInterface
+	SettingLister        v3.SettingLister
+	Settings             v3.SettingInterface
 	ctx                  context.Context
 }
 
@@ -86,6 +88,8 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		ServiceOptions:       mgmt.RKEK8sServiceOptions(""),
 		AddonsLister:         mgmt.RKEAddons("").Controller().Lister(),
 		Addons:               mgmt.RKEAddons(""),
+		SettingLister:        mgmt.Settings("").Controller().Lister(),
+		Settings:             mgmt.Settings(""),
 		ctx:                  ctx,
 	}
 
