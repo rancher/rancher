@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -159,8 +160,9 @@ func rebuildClusterWithRotatedCertificates(ctx context.Context,
 	if err := kubeCluster.SetUpHosts(ctx, flags); err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
+
 	// Save new State
-	if err := kubeCluster.UpdateClusterCurrentState(ctx, clusterState); err != nil {
+	if err := saveClusterState(ctx, kubeCluster, clusterState); err != nil {
 		return APIURL, caCrt, clientCert, clientKey, nil, err
 	}
 
@@ -200,6 +202,26 @@ func rebuildClusterWithRotatedCertificates(ctx context.Context,
 		}
 	}
 	return APIURL, caCrt, clientCert, clientKey, kubeCluster.Certificates, nil
+}
+
+func saveClusterState(ctx context.Context, kubeCluster *cluster.Cluster, clusterState *cluster.FullState) error {
+	var err error
+	if err = kubeCluster.UpdateClusterCurrentState(ctx, clusterState); err != nil {
+		return err
+	}
+	// Attempt to store cluster full state to Kubernetes
+	for i := 1; i <= 3; i++ {
+		err = cluster.SaveFullStateToKubernetes(ctx, kubeCluster, clusterState)
+		if err != nil {
+			time.Sleep(time.Second * time.Duration(2))
+			continue
+		}
+		break
+	}
+	if err != nil {
+		logrus.Warnf("Failed to save full cluster state to Kubernetes")
+	}
+	return nil
 }
 
 func rotateRKECertificates(ctx context.Context, kubeCluster *cluster.Cluster, flags cluster.ExternalFlags, rkeFullState *cluster.FullState) (*cluster.FullState, error) {
