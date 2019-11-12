@@ -5,9 +5,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
+	nodehelper "github.com/rancher/rancher/pkg/node"
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
+	"github.com/sirupsen/logrus"
 )
 
 type nodeRemove struct {
@@ -26,6 +28,11 @@ func (n *nodeRemove) Create(obj *v3.Node) (runtime.Object, error) {
 }
 
 func (n *nodeRemove) Remove(obj *v3.Node) (runtime.Object, error) {
+	if nodehelper.IgnoreNode(obj.Status.NodeName, obj.Labels) {
+		logrus.Debugf("Skipping v1.node removal for [%v] node", obj.Status.NodeName)
+		return obj, nil
+	}
+
 	if obj.Status.NodeName != "" {
 		n.userNodes.Delete(obj.Status.NodeName, nil)
 	}

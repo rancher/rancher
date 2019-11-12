@@ -414,7 +414,7 @@ func (m *nodesSyncer) updateNode(existing *v3.Node, node *corev1.Node, pods map[
 
 func (m *nodesSyncer) createNode(node *corev1.Node, pods map[string][]*corev1.Pod) error {
 	// respect user defined name or label
-	if nodehelper.IgnoreNode(node) {
+	if nodehelper.IgnoreNode(node.Name, node.Labels) {
 		logrus.Debugf("Skipping v3.node creation for [%v] node", node.Name)
 		return nil
 	}
