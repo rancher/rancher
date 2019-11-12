@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"path"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -500,31 +499,36 @@ func RestoreEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 
 func RunEtcdSnapshotRemove(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdSnapshotImage string, name string, cleanupRestore bool, es v3.ETCDService) error {
 	log.Infof(ctx, "[etcd] Removing snapshot [%s] from host [%s]", name, etcdHost.Address)
-
-	compressedPath := fmt.Sprintf("/backup/%s.%s", name, EtcdSnapshotCompressedExtension)
-	uncompressedPath := fmt.Sprintf("/backup/%s", name)
-	// Make sure we have a safe path to remove
-	for _, p := range []string{compressedPath, uncompressedPath} {
-		if safePath, err := filepath.Match("/backup/*", p); err != nil || !safePath {
-			return fmt.Errorf("invalid or malformed snapshot path [%s]: %v", p, err)
-		}
-	}
-
 	imageCfg := &container.Config{
 		Image: etcdSnapshotImage,
 		Env:   es.ExtraEnv,
+		Cmd: []string{
+			"/opt/rke-tools/rke-etcd-backup",
+			"etcd-backup",
+			"delete",
+			"--name", name,
+		},
 	}
 	if cleanupRestore {
-		// Since we have to support compressed and uncompressed versions of snapshots.
-		// We can't remove the uncompressed snapshot unless we are sure the compressed
-		// is there, hence the complex check. The || true is to get a 0 exist status even if -f is false.
-		imageCfg.Cmd = []string{
-			"sh", "-c", fmt.Sprintf("[ -f %s ] && rm -f %s || true", compressedPath, uncompressedPath),
+		imageCfg.Cmd = append(imageCfg.Cmd, "--cleanup")
+	}
+	if es.BackupConfig != nil && es.BackupConfig.S3BackupConfig != nil {
+		s3cmd := []string{
+			"--s3-backup",
+			"--s3-endpoint=" + es.BackupConfig.S3BackupConfig.Endpoint,
+			"--s3-accessKey=" + es.BackupConfig.S3BackupConfig.AccessKey,
+			"--s3-secretKey=" + es.BackupConfig.S3BackupConfig.SecretKey,
+			"--s3-bucketName=" + es.BackupConfig.S3BackupConfig.BucketName,
+			"--s3-region=" + es.BackupConfig.S3BackupConfig.Region,
 		}
-	} else {
-		imageCfg.Cmd = []string{
-			"sh", "-c", fmt.Sprintf("rm -f %s %s", compressedPath, uncompressedPath),
+		if es.BackupConfig.S3BackupConfig.CustomCA != "" {
+			caStr := base64.StdEncoding.EncodeToString([]byte(es.BackupConfig.S3BackupConfig.CustomCA))
+			s3cmd = append(s3cmd, "--s3-endpoint-ca="+caStr)
 		}
+		if es.BackupConfig.S3BackupConfig.Folder != "" {
+			s3cmd = append(s3cmd, "--s3-folder="+es.BackupConfig.S3BackupConfig.Folder)
+		}
+		imageCfg.Cmd = append(imageCfg.Cmd, s3cmd...)
 	}
 
 	hostCfg := &container.HostConfig{
@@ -533,7 +537,6 @@ func RunEtcdSnapshotRemove(ctx context.Context, etcdHost *hosts.Host, prsMap map
 		},
 		RestartPolicy: container.RestartPolicy{Name: "no"},
 	}
-
 	if err := docker.DoRemoveContainer(ctx, etcdHost.DClient, EtcdSnapshotRemoveContainerName, etcdHost.Address); err != nil {
 		return err
 	}
