@@ -28,16 +28,16 @@ func GetNodeName(machine *v3.Node) string {
 	return ""
 }
 
-func IgnoreNode(node *corev1.Node) bool {
+func IgnoreNode(name string, labels map[string]string) bool {
 	ignoreName := settings.IgnoreNodeName.Get()
-	if node.Name == ignoreName {
+	if name == ignoreName {
 		return true
 	}
 
-	if node.Labels == nil {
+	if labels == nil {
 		return false
 	}
-	value, ok := node.Labels[nodeStatusLabel]
+	value, ok := labels[nodeStatusLabel]
 	return ok && value == "ignore"
 }
 
