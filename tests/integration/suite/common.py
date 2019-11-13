@@ -1,3 +1,5 @@
+import base64
+import hashlib
 import random
 import time
 
@@ -157,3 +159,9 @@ def wait_for_atleast_workload(pclient, nsid, timeout=60, count=0):
         interval *= 2
         workloads = pclient.list_workload(namespaceId=nsid)
     return workloads
+
+
+def string_to_encoding(input):
+    m = hashlib.sha256()
+    m.update(bytes(input, 'utf-8'))
+    return base64.b32encode(m.digest())[:10].decode('utf-8')

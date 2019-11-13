@@ -1,10 +1,8 @@
-import base64
-import hashlib
 import os
 import tempfile
 import pytest
 from rancher import ApiError
-from .common import auth_check, random_str
+from .common import auth_check, random_str, string_to_encoding
 from .conftest import wait_for
 import time
 
@@ -240,12 +238,6 @@ def wait_for_cloud_credential(client, cloud_credential_id, timeout=60):
             if val["id"] == cloud_credential_id:
                 cred = val
     return cred
-
-
-def string_to_encoding(input):
-    m = hashlib.sha256()
-    m.update(bytes(input, 'utf-8'))
-    return base64.b32encode(m.digest())[:10].decode('utf-8')
 
 
 def wait_for_node_template(client, node_template_id, timeout=60):
