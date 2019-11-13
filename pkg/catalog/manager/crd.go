@@ -19,7 +19,7 @@ const (
 	TemplateNameLabel = "catalog.cattle.io/template_name"
 )
 
-func (m *Manager) createTemplate(template v3.CatalogTemplate, catalog *v3.Catalog) error {
+func (m *Manager) createTemplate(template v3.CatalogTemplate, catalog *v3.Catalog) (bool, error) {
 	template.Labels = labels.Merge(template.Labels, map[string]string{
 		CatalogNameLabel: catalog.Name,
 	})
@@ -33,8 +33,9 @@ func (m *Manager) createTemplate(template v3.CatalogTemplate, catalog *v3.Catalo
 	logrus.Debugf("Creating template %s", template.Name)
 	createdTemplate, err := m.templateClient.Create(&template)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create template %s", template.Name)
+		return false, errors.Wrapf(err, "failed to create template %s", template.Name)
 	}
+
 	return m.createTemplateVersions(catalog.Name, versionFiles, createdTemplate)
 }
 
@@ -51,11 +52,12 @@ func (m *Manager) getTemplateMap(catalogName string, namespace string) (map[stri
 	return templateMap, nil
 }
 
-func (m *Manager) updateTemplate(template *v3.CatalogTemplate, toUpdate v3.CatalogTemplate) error {
+func (m *Manager) updateTemplate(template *v3.CatalogTemplate, toUpdate v3.CatalogTemplate) (bool, error) {
 	r, _ := labels.NewRequirement(TemplateNameLabel, selection.Equals, []string{template.Name})
+	updated := false
 	templateVersions, err := m.templateVersionLister.List(template.Namespace, labels.NewSelector().Add(*r))
 	if err != nil {
-		return errors.Wrapf(err, "failed to list templateVersions")
+		return false, errors.Wrapf(err, "failed to list templateVersions")
 	}
 	tvByVersion := map[string]*v3.CatalogTemplateVersion{}
 	for _, ver := range templateVersions {
@@ -74,8 +76,9 @@ func (m *Manager) updateTemplate(template *v3.CatalogTemplate, toUpdate v3.Catal
 				newObject := tv.DeepCopy()
 				newObject.Spec = templateVersion.Spec
 				if _, err := m.templateVersionClient.Update(newObject); err != nil {
-					return err
+					return false, err
 				}
+				updated = true
 			}
 		} else {
 			toCreate := &v3.CatalogTemplateVersion{}
@@ -87,8 +90,9 @@ func (m *Manager) updateTemplate(template *v3.CatalogTemplate, toUpdate v3.Catal
 			toCreate.Spec = templateVersion.Spec
 			logrus.Debugf("Creating templateVersion %v", toCreate.Name)
 			if _, err := m.templateVersionClient.Create(toCreate); err != nil {
-				return err
+				return false, err
 			}
+			updated = true
 		}
 	}
 
@@ -101,7 +105,7 @@ func (m *Manager) updateTemplate(template *v3.CatalogTemplate, toUpdate v3.Catal
 		if _, ok := toUpdateTvs[v]; !ok {
 			logrus.Infof("Deleting templateVersion %s", tv.Name)
 			if err := m.templateVersionClient.DeleteNamespaced(template.Namespace, tv.Name, &metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
-				return err
+				return false, err
 			}
 		}
 	}
@@ -115,9 +119,9 @@ func (m *Manager) updateTemplate(template *v3.CatalogTemplate, toUpdate v3.Catal
 	newObj.Spec = toUpdate.Spec
 	newObj.Labels = mergeLabels(template.Labels, toUpdate.Labels)
 	if _, err := m.templateClient.Update(newObj); err != nil {
-		return err
+		return false, err
 	}
-	return nil
+	return updated, nil
 }
 
 // merge any label from set2 into set1 and delete label
@@ -157,7 +161,7 @@ func (m *Manager) getTemplateVersion(templateName string, namespace string) (map
 	return tVersion, nil
 }
 
-func (m *Manager) createTemplateVersions(catalogName string, versionsSpec []v3.TemplateVersionSpec, template *v3.CatalogTemplate) error {
+func (m *Manager) createTemplateVersions(catalogName string, versionsSpec []v3.TemplateVersionSpec, template *v3.CatalogTemplate) (bool, error) {
 	for _, spec := range versionsSpec {
 		templateVersion := &v3.CatalogTemplateVersion{}
 		templateVersion.Spec = spec
@@ -169,10 +173,10 @@ func (m *Manager) createTemplateVersions(catalogName string, versionsSpec []v3.T
 
 		logrus.Debugf("Creating templateVersion %s", templateVersion.Name)
 		if _, err := m.templateVersionClient.Create(templateVersion); err != nil && !kerrors.IsAlreadyExists(err) {
-			return err
+			return false, err
 		}
 	}
-	return nil
+	return true, nil
 }
 
 func showUpgradeLinks(version, upgradeVersion string) bool {

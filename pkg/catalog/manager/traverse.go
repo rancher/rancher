@@ -133,12 +133,15 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 			v.VersionName = version.Name
 			v.VersionURLs = version.URLs
 
-			v.UpgradeVersionLinks = map[string]string{}
 			for _, versionSpec := range template.Spec.Versions {
+				if v.UpgradeVersionLinks == nil {
+					v.UpgradeVersionLinks = map[string]string{}
+				}
 				if showUpgradeLinks(v.Version, versionSpec.Version) {
 					version := versionSpec.Version
 					v.UpgradeVersionLinks[versionSpec.Version] = fmt.Sprintf("%s-%s", template.Name, version)
 				}
+
 			}
 
 			if catalogType == client.CatalogType {
@@ -207,12 +210,17 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 
 		// look for template by name, if not found then create it, otherwise do update
 		existing, err := m.templateLister.Get(template.Namespace, template.Name)
+		increaseCount := false
 		if apierrors.IsNotFound(err) {
-			err = m.createTemplate(template, catalog)
-			createdTemplates++
+			increaseCount, err = m.createTemplate(template, catalog)
+			if increaseCount {
+				createdTemplates++
+			}
 		} else if err == nil {
-			err = m.updateTemplate(existing, template)
-			updatedTemplates++
+			increaseCount, err = m.updateTemplate(existing, template)
+			if increaseCount {
+				updatedTemplates++
+			}
 		}
 		if err != nil {
 			delete(newHelmVersionCommits, template.Spec.DisplayName)
