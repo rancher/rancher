@@ -43,7 +43,7 @@ func Validator(request *types.APIContext, schema *types.Schema, data map[string]
 		var secretState map[string]interface{}
 
 		if err := access.ByID(request, request.Version, request.Type, request.ID, &secretState); err != nil {
-			if httperror.IsNotFound(err) || isUnauthorized(err) {
+			if httperror.IsNotFound(err) || httperror.IsForbidden(err) {
 				return httperror.NewAPIError(httperror.NotFound, "not found")
 			}
 			return httperror.NewAPIError(httperror.ServerError, err.Error())
@@ -54,11 +54,4 @@ func Validator(request *types.APIContext, schema *types.Schema, data map[string]
 		}
 	}
 	return nil
-}
-
-func isUnauthorized(err interface{}) bool {
-	if err, ok := err.(*httperror.APIError); ok {
-		return err.Code.Status == 403
-	}
-	return false
 }
