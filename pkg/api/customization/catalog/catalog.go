@@ -69,15 +69,18 @@ func (a ActionHandler) RefreshActionHandler(actionName string, action *types.Act
 			catalogs = append(catalogs, catalog)
 		}
 	}
+	var catalogNames []string
 	for _, catalog := range catalogs {
 		catalog.Status.LastRefreshTimestamp = time.Now().Format(time.RFC3339)
 		v3.CatalogConditionRefreshed.Unknown(&catalog)
 		if _, err := a.CatalogClient.Update(&catalog); err != nil {
 			return err
 		}
+		catalogNames = append(catalogNames, catalog.Name)
 	}
 	data := map[string]interface{}{
-		"catalogs": catalogs,
+		"catalogs": catalogNames,
+		"type":     "catalogRefresh",
 	}
 	apiContext.WriteResponse(http.StatusOK, data)
 	return nil
@@ -144,6 +147,7 @@ func (a ActionHandler) RefreshProjectCatalogActionHandler(actionName string, act
 			prjCatalogs = append(prjCatalogs, catalog)
 		}
 	}
+	var catalogNames []string
 	for _, catalog := range prjCatalogs {
 		catalog.Status.LastRefreshTimestamp = time.Now().Format(time.RFC3339)
 		v3.CatalogConditionRefreshed.Unknown(&catalog)
@@ -152,7 +156,8 @@ func (a ActionHandler) RefreshProjectCatalogActionHandler(actionName string, act
 		}
 	}
 	data := map[string]interface{}{
-		"catalogs": prjCatalogs,
+		"catalogs": catalogNames,
+		"type":     "catalogRefresh",
 	}
 	apiContext.WriteResponse(http.StatusOK, data)
 	return nil
@@ -180,6 +185,7 @@ func (a ActionHandler) RefreshClusterCatalogActionHandler(actionName string, act
 			clCatalogs = append(clCatalogs, catalog)
 		}
 	}
+	var catalogNames []string
 	for _, catalog := range clCatalogs {
 		catalog.Status.LastRefreshTimestamp = time.Now().Format(time.RFC3339)
 		v3.CatalogConditionRefreshed.Unknown(&catalog)
@@ -188,7 +194,8 @@ func (a ActionHandler) RefreshClusterCatalogActionHandler(actionName string, act
 		}
 	}
 	data := map[string]interface{}{
-		"catalogs": clCatalogs,
+		"catalogs": catalogNames,
+		"type":     "catalogRefresh",
 	}
 	apiContext.WriteResponse(http.StatusOK, data)
 	return nil
