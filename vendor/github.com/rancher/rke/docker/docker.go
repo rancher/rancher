@@ -42,9 +42,11 @@ type dockerConfig struct {
 
 type authConfig types.AuthConfig
 
-func DoRunContainer(ctx context.Context, dClient *client.Client, imageCfg *container.Config, hostCfg *container.HostConfig, containerName string, hostname string, plane string, prsMap map[string]v3.PrivateRegistry) error {
+func DoRunContainer(ctx context.Context, dClient *client.Client, imageCfg *container.Config, hostCfg *container.HostConfig,
+	containerName string, hostname string, plane string, prsMap map[string]v3.PrivateRegistry) error {
 	if dClient == nil {
-		return fmt.Errorf("[%s] Failed to run container: docker client is nil for container [%s] on host [%s]", plane, containerName, hostname)
+		return fmt.Errorf("[%s] Failed to run container: docker client is nil for container [%s] on host [%s]",
+			plane, containerName, hostname)
 	}
 	container, err := InspectContainer(ctx, dClient, hostname, containerName)
 	if err != nil {
@@ -236,7 +238,8 @@ func localImageExists(ctx context.Context, dClient *client.Client, hostname stri
 	return fmt.Errorf("Error checking if image [%s] exists on host [%s]: %v", containerImage, hostname, err)
 }
 
-func pullImage(ctx context.Context, dClient *client.Client, hostname string, containerImage string, prsMap map[string]v3.PrivateRegistry) error {
+func pullImage(ctx context.Context, dClient *client.Client, hostname string, containerImage string,
+	prsMap map[string]v3.PrivateRegistry) error {
 	var out io.ReadCloser
 	var err error
 	pullOptions := types.ImagePullOptions{}
@@ -270,7 +273,8 @@ func pullImage(ctx context.Context, dClient *client.Client, hostname string, con
 	return err
 }
 
-func UseLocalOrPull(ctx context.Context, dClient *client.Client, hostname string, containerImage string, plane string, prsMap map[string]v3.PrivateRegistry) error {
+func UseLocalOrPull(ctx context.Context, dClient *client.Client, hostname string, containerImage string, plane string,
+	prsMap map[string]v3.PrivateRegistry) error {
 	if dClient == nil {
 		return fmt.Errorf("[%s] Failed to use local image or pull: docker client is nil for container [%s] on host [%s]", plane, containerImage, hostname)
 	}
@@ -634,16 +638,45 @@ func getRegistryAuth(pr v3.PrivateRegistry) (string, error) {
 }
 
 func GetImageRegistryConfig(image string, prsMap map[string]v3.PrivateRegistry) (string, string, error) {
+	/*
+		Image can be passed as
+		- Example1: repo.com/foo/bar/rancher/rke-tools:v0.1.51
+		or
+		- Example2: repo.com/rancher/rke-tools:v0.1.51 // image2
+		or
+		- rancher/rke-tools
+		Where the repo can be:
+		- repo.com
+		or
+		- repo.com/foo/bar
+		When checking for the repo presence in prsMap, the following repo will be found:
+		- Example1: repo.com/foo/bar
+		- Exmaple2: repo.com
+	*/
 	namedImage, err := ref.ParseNormalizedNamed(image)
 	if err != nil {
 		return "", "", err
 	}
+	if len(prsMap) == 0 {
+		return "", "", nil
+	}
 	regURL := ref.Domain(namedImage)
+	regPath := ref.Path(namedImage)
+
+	splitPath := strings.Split(regPath, "/")
+	if len(splitPath) > 2 {
+		splitPath = splitPath[:len(splitPath)-2]
+		regPath = strings.Join(splitPath, "/")
+		regURL = fmt.Sprintf("%s/%s", regURL, regPath)
+	}
+
 	if pr, ok := prsMap[regURL]; ok {
+		logrus.Debugf("Found regURL %v", regURL)
 		// We do this if we have some docker.io login information
 		regAuth, err := getRegistryAuth(pr)
 		return regAuth, pr.URL, err
 	}
+
 	return "", "", nil
 }
 
