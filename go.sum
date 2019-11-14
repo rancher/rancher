@@ -628,8 +628,8 @@ github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/types v0.0.0-20190930165650-6bbedae77a35/go.mod h1:I0hSpsw/ZvWuOOvhiExji5IIkeQtmn4IvFcn7nbjhrk=
 github.com/rancher/types v0.0.0-20191030200339-4ba6690e1914/go.mod h1:K5zlxVpe7bY2QgOs1YUcU8dVXtzKncxpGEcvxGMgr0k=
-github.com/rancher/types v0.0.0-20191111203803-675504f2943e h1:VGa3u8Xb3mEwNtoWJ7EgUPks5WpxWLby/o/cpqSQC7M=
-github.com/rancher/types v0.0.0-20191111203803-675504f2943e/go.mod h1:BTwoSAQPH4x/QEUtGF/ZDZyapdUSZiBYm3zNuDLLQD4=
+github.com/rancher/types v0.0.0-20191113224327-a0d18782c0f1 h1:DOyUBD2nMF0JSG6+3PzN9I4XMZCoOpGc3BVo778PgJ4=
+github.com/rancher/types v0.0.0-20191113224327-a0d18782c0f1/go.mod h1:BTwoSAQPH4x/QEUtGF/ZDZyapdUSZiBYm3zNuDLLQD4=
 github.com/rancher/wrangler v0.1.5 h1:HiXOeP6Kci2DK+e04D1g6INT77xAYpAr54zmTTe0Spk=
 github.com/rancher/wrangler v0.1.5/go.mod h1:EYP7cqpg42YqElaCm+U9ieSrGQKAXxUH5xsr+XGpWyE=
 github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95 h1:/yghR1MGJk6l6CVxJSx9JGBFP1D6NchJ74wJz7JwxC4=
@@ -878,6 +878,7 @@ golang.org/x/tools v0.0.0-20190606124116-d0a3d012864b/go.mod h1:/rFqwRUd4F7ZHNgw
 golang.org/x/tools v0.0.0-20190614205625-5aca471b1d59/go.mod h1:/rFqwRUd4F7ZHNgwSSTFct+R/Kf4OFW1sUzUTQQTgfc=
 golang.org/x/tools v0.0.0-20190621195816-6e04913cbbac/go.mod h1:/rFqwRUd4F7ZHNgwSSTFct+R/Kf4OFW1sUzUTQQTgfc=
 golang.org/x/tools v0.0.0-20190926165942-a8d5d34286bd/go.mod h1:b+2E5dAYhXwXZwtnZ6UAqBI28+e2cm9otk0dWdXHAEo=
+golang.org/x/tools v0.0.0-20191029041327-9cc4af7d6b2c h1:IGkKhmfzcztjm6gYkykvu/NiS8kaqbCWAEWWAyf8J5U=
 golang.org/x/tools v0.0.0-20191029041327-9cc4af7d6b2c/go.mod h1:b+2E5dAYhXwXZwtnZ6UAqBI28+e2cm9otk0dWdXHAEo=
 golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485/go.mod h1:2ltnJ7xHfj0zHS40VVPYEAAMTa3ZGguvHGBSJeRWqE0=

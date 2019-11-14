@@ -67,7 +67,10 @@ func rkeTypes(schemas *types.Schemas) *types.Schemas {
 				"key",
 			}},
 			m.ReadOnly{Field: "timeAdded"},
-		)
+		).
+		MustImport(&Version, v3.ExtraEnv{}).
+		MustImport(&Version, v3.ExtraVolume{}).
+		MustImport(&Version, v3.ExtraVolumeMount{})
 }
 
 func schemaTypes(schemas *types.Schemas) *types.Schemas {
