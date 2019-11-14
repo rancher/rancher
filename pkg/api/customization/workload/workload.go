@@ -82,7 +82,7 @@ func fetchRevisionFor(apiContext *types.APIContext, rollbackInput *projectclient
 }
 
 func getRevisions(apiContext *types.APIContext, namespace string, name string, requestedID string) []map[string]interface{} {
-	data, replicaSets := []map[string]interface{}{}, []map[string]interface{}{}
+	var data, replicaSets []map[string]interface{}
 	options := map[string]string{"hidden": "true"}
 	conditions := []*types.QueryCondition{
 		types.NewConditionFromString("namespaceId", types.ModifierEQ, []string{namespace}...),
