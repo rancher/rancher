@@ -37,13 +37,14 @@ func (rb *roleBuilder) String() string {
 }
 
 func newRoleBuilder() *roleBuilder {
-	return &roleBuilder{}
+	return &roleBuilder{
+		builtin: true,
+	}
 }
 
-func (rb *roleBuilder) addRoleTemplate(displayName, name, context string, builtin, external, hidden, administrative bool) *roleBuilder {
+func (rb *roleBuilder) addRoleTemplate(displayName, name, context string, external, hidden, administrative bool) *roleBuilder {
 	r := rb.addRole(displayName, name)
 	r.context = context
-	r.builtin = builtin
 	r.external = external
 	r.hidden = hidden
 	r.administrative = administrative
@@ -60,11 +61,11 @@ func (rb *roleBuilder) addRole(displayName, name string) *roleBuilder {
 	if rb.next != nil {
 		return rb.next.addRole(displayName, name)
 	}
-	rb.next = &roleBuilder{
-		name:        name,
-		displayName: displayName,
-		previous:    rb,
-	}
+	rb.next = newRoleBuilder()
+	rb.next.name = name
+	rb.next.displayName = displayName
+	rb.next.previous = rb
+
 	return rb.next
 }
 
@@ -134,12 +135,12 @@ func (r *ruleBuilder) nonResourceURLs(u ...string) *ruleBuilder {
 	return r
 }
 
-func (r *ruleBuilder) addRoleTemplate(diplsayName, name, context string, builtin, external, hidden, administrative bool) *roleBuilder {
-	return r.rb.addRoleTemplate(diplsayName, name, context, builtin, external, hidden, administrative)
+func (r *ruleBuilder) addRoleTemplate(displayName, name, context string, external, hidden, administrative bool) *roleBuilder {
+	return r.rb.addRoleTemplate(displayName, name, context, external, hidden, administrative)
 }
 
-func (r *ruleBuilder) addRole(diplsayName, name string) *roleBuilder {
-	return r.rb.addRole(diplsayName, name)
+func (r *ruleBuilder) addRole(displayName, name string) *roleBuilder {
+	return r.rb.addRole(displayName, name)
 }
 
 func (r *ruleBuilder) addRule() *ruleBuilder {
@@ -230,6 +231,7 @@ func (rb *roleBuilder) reconcileGlobalRoles(mgmt *config.ManagementContext) erro
 			},
 			DisplayName: current.displayName,
 			Rules:       current.policyRules(),
+			Builtin:     current.builtin,
 		}
 		return gr.Name, gr
 	}
@@ -257,10 +259,12 @@ func (rb *roleBuilder) reconcileGlobalRoles(mgmt *config.ManagementContext) erro
 			return false, nil, errors.Errorf("unexpected type comparing %v and %v", have, want)
 		}
 
-		equal := haveGR.DisplayName == wantGR.DisplayName && reflect.DeepEqual(haveGR.Rules, wantGR.Rules)
+		builtin := haveGR.Builtin == wantGR.Builtin
+		equal := builtin && haveGR.DisplayName == wantGR.DisplayName && reflect.DeepEqual(haveGR.Rules, wantGR.Rules)
 
 		haveGR.DisplayName = wantGR.DisplayName
 		haveGR.Rules = wantGR.Rules
+		haveGR.Builtin = wantGR.Builtin
 
 		return equal, haveGR, nil
 	}
