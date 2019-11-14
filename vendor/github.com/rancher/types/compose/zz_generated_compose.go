@@ -15,6 +15,7 @@ type Config struct {
 	NodeDrivers                              map[string]managementClient.NodeDriver                              `json:"nodeDrivers,omitempty" yaml:"nodeDrivers,omitempty"`
 	NodeTemplates                            map[string]managementClient.NodeTemplate                            `json:"nodeTemplates,omitempty" yaml:"nodeTemplates,omitempty"`
 	Projects                                 map[string]managementClient.Project                                 `json:"projects,omitempty" yaml:"projects,omitempty"`
+	GlobalRoles                              map[string]managementClient.GlobalRole                              `json:"globalRoles,omitempty" yaml:"globalRoles,omitempty"`
 	GlobalRoleBindings                       map[string]managementClient.GlobalRoleBinding                       `json:"globalRoleBindings,omitempty" yaml:"globalRoleBindings,omitempty"`
 	RoleTemplates                            map[string]managementClient.RoleTemplate                            `json:"roleTemplates,omitempty" yaml:"roleTemplates,omitempty"`
 	PodSecurityPolicyTemplates               map[string]managementClient.PodSecurityPolicyTemplate               `json:"podSecurityPolicyTemplates,omitempty" yaml:"podSecurityPolicyTemplates,omitempty"`

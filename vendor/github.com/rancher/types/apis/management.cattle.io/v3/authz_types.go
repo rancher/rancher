@@ -63,10 +63,11 @@ type GlobalRole struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	DisplayName    string              `json:"displayName,omitempty" norman:"required,noupdate"`
-	Description    string              `json:"description" norman:"noupdate"`
-	Rules          []rbacv1.PolicyRule `json:"rules,omitempty" norman:"noupdate"`
+	DisplayName    string              `json:"displayName,omitempty" norman:"required"`
+	Description    string              `json:"description"`
+	Rules          []rbacv1.PolicyRule `json:"rules,omitempty"`
 	NewUserDefault bool                `json:"newUserDefault,omitempty" norman:"required"`
+	Builtin        bool                `json:"builtin" norman:"nocreate,noupdate"`
 }
 
 type GlobalRoleBinding struct {
