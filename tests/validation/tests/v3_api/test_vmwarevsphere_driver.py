@@ -1,4 +1,4 @@
-import pytest
+import pytest, copy
 from .common import *  # NOQA
 
 RANCHER_VSPHERE_USERNAME = os.environ.get("RANCHER_VSPHERE_USERNAME", "")
@@ -18,7 +18,17 @@ CLONE_FROM = \
 RESOURCE_POOL = \
     os.environ.get("RANCHER_RESOURCE_POOL",
                    "/RNCH-HE-FMT/host/FMT2.R620.1/Resources/validation-tests")
-# ADMIN_TOKEN = get_admin_token()
+DATASTORE = \
+    os.environ.get("RANCHER_DATASTORE",
+                   "/RNCH-HE-FMT/datastore/ranch01-silo01-vm01")
+
+DATASTORE_CLUSTER = \
+    os.environ.get("RANCHER_DATASTORE_CLUSTER",
+                   "/RNCH-HE-FMT/datastore/ds_cluster")
+
+CLOUD_CONFIG = \
+    os.environ.get("RANCHER_CLOUD_CONFIG",
+                   "#cloud-config\r\npackages:\r\n - redis-server")
 
 rke_config = {
     "addonJobTimeout": 30,
@@ -57,14 +67,14 @@ rke_config = {
 vsphereConfig = {
     "cfgparam": ["disk.enableUUID=TRUE"],
     "cloneFrom": CLONE_FROM,
-    "cloudConfig": "#cloud-config\r\npackages:\r\n - redis-server",
     "cloudinit": "",
     "contentLibrary": "",
     "cpuCount": "4",
     "creationType": "vm",
     "customAttribute": ["203=CustomA", "204=CustomB"],
     "datacenter": "/RNCH-HE-FMT",
-    "datastore": "/RNCH-HE-FMT/datastore/ranch01-silo01-vm01",
+    "datastore": "",
+    "datastoreCluster": "",
     "diskSize": "20000",
     "folder": "/",
     "hostsystem": "",
@@ -105,7 +115,7 @@ def test_nodes_ready():
     client = get_client_for_token(ADMIN_TOKEN)
     cluster = get_cluster_by_name(client=client, name=CLUSTER_NAME)
     nodes = client.list_node(clusterId=cluster.id).data
-    assert 2 == len(nodes)
+    assert 4 == len(nodes)
     validate_cluster_state(client, cluster)
 
 
@@ -114,16 +124,18 @@ def test_ingress():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     cluster = namespace["cluster"]
+    node_count = len(get_schedulable_nodes(cluster))
     con = [{"name": "test1",
             "image": TEST_IMAGE}]
     name = random_test_name("default")
     workload = p_client.create_workload(name=name,
                                         containers=con,
+                                        scale=node_count,
                                         namespaceId=ns.id,
                                         daemonSetConfig={})
 
     validate_workload(p_client, workload, "daemonSet", ns.name,
-                      len(get_schedulable_nodes(cluster)))
+                      node_count)
 
     host = "test1.com"
     path = "/name.html"
@@ -140,7 +152,12 @@ def test_ingress():
 def create_cluster(request):
     client = get_client_for_token(ADMIN_TOKEN)
     cloud_cred = create_vsphere_credential(client)
-    nt = create_vsphere_nodetemplate(client, cloud_cred)
+    nt = create_vsphere_nodetemplate(
+        client, cloud_cred, datastore=DATASTORE)
+    ntcc = create_vsphere_nodetemplate(
+        client, cloud_cred, datastore=DATASTORE, cloud_config=CLOUD_CONFIG)
+    ntdsc = create_vsphere_nodetemplate(
+        client, cloud_cred, datastore_cluster=DATASTORE_CLUSTER)
     cluster = client.create_cluster(
         name=CLUSTER_NAME,
         rancherKubernetesEngineConfig=rke_config)
@@ -157,7 +174,7 @@ def create_cluster(request):
         "worker": False,
     })
 
-    worker_pool = client.create_node_pool({
+    worker_pool1 = client.create_node_pool({
         "type": "nodetemplate",
         "clusterId": cluster.id,
         "controlPlane": False,
@@ -168,9 +185,34 @@ def create_cluster(request):
         "worker": True,
     })
 
+    worker_pool2 = client.create_node_pool({
+        "type": "nodetemplate",
+        "clusterId": cluster.id,
+        "controlPlane": False,
+        "etcd": False,
+        "hostnamePrefix": CLUSTER_NAME + "-worker-cc",
+        "nodeTemplateId": ntcc.id,
+        "quantity": 1,
+        "worker": True,
+    })
+
+    worker_pool3 = client.create_node_pool({
+        "type": "nodetemplate",
+        "clusterId": cluster.id,
+        "controlPlane": False,
+        "etcd": False,
+        "hostnamePrefix": CLUSTER_NAME + "-worker-dsc",
+        "nodeTemplateId": ntdsc.id,
+        "quantity": 1,
+        "worker": True,
+    })
+
     client.wait_success(master_pool)
-    client.wait_success(worker_pool)
-    wait_for_cluster_node_count(client, cluster, 2, timeout=900)
+    client.wait_success(worker_pool1)
+    client.wait_success(worker_pool2)
+    client.wait_success(worker_pool3)
+
+    wait_for_cluster_node_count(client, cluster, 4, timeout=900)
 
 
 def create_vsphere_credential(client):
@@ -196,9 +238,17 @@ def cluster_cleanup():
         wait_for_node_to_be_deleted(client, node)
 
 
-def create_vsphere_nodetemplate(client, cloud_cred):
+def create_vsphere_nodetemplate(
+        client, cloud_cred, cloud_config="", datastore="", datastore_cluster=""):
+    vc = copy.copy(vsphereConfig)
+    if cloud_config != "":
+        vc["cloudConfig"] = cloud_config
+    if datastore != "":
+        vc["datastore"] = datastore
+    if datastore_cluster != "":
+        vc["datastoreCluster"] = datastore_cluster
     return client.create_node_template({
-        "vmwarevsphereConfig": vsphereConfig,
+        "vmwarevsphereConfig": vc,
         "name": random_name(),
         "namespaceId": "fixme",
         "useInternalIpAddress": True,
@@ -221,20 +271,3 @@ def create_namespace(token):
         "cluster": cluster,
         "project": p,
     }
-
-
-def get_admin_token(api_url=CATTLE_TEST_URL,
-                    password="admin"):
-    """Generates an admin token and sets ADMIN_TOKEN"""
-    auth_url = api_url + "/v3-public/localproviders/local?action=login"
-    r = requests.post(auth_url, json={
-        'username': 'admin',
-        'password': 'admin',
-        'responseType': 'json',
-    }, verify=False)
-    token = r.json()['token']
-    client = get_client_for_token(token)
-    if password != "admin":
-        admin_user = client.list_user(username="admin").data
-        admin_user[0].setpassword(newPassword=password)
-    return token
