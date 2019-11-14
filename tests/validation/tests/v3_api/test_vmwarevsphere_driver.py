@@ -18,7 +18,12 @@ CLONE_FROM = \
 RESOURCE_POOL = \
     os.environ.get("RANCHER_RESOURCE_POOL",
                    "/RNCH-HE-FMT/host/FMT2.R620.1/Resources/validation-tests")
-# ADMIN_TOKEN = get_admin_token()
+
+if_vsphere_var_present = pytest.mark.skipif(
+    RANCHER_VSPHERE_USERNAME == '' or
+    RANCHER_VSPHERE_PASSWORD == '' or
+    RANCHER_VSPHERE_VCENTER == '',
+    reason='required env variables are not present')
 
 rke_config = {
     "addonJobTimeout": 30,
@@ -91,54 +96,19 @@ vsphereConfig = {
 }
 
 
-def test_valid_environment_variables():
-    assert RANCHER_VSPHERE_USERNAME != '', \
-        "vSphere User is required to make a cloud credential"
-    assert RANCHER_VSPHERE_PASSWORD != '', \
-        "vSphere Password is required to make a cloud credential"
-    assert RANCHER_VSPHERE_VCENTER != '', \
-        "vCenter URL is required to make a cloud credential"
-
-
+@if_vsphere_var_present
 @pytest.mark.usefixtures("create_cluster")
-def test_nodes_ready():
-    client = get_client_for_token(ADMIN_TOKEN)
+def test_vsphere_provisioning():
+    client = get_client_for_token(USER_TOKEN)
     cluster = get_cluster_by_name(client=client, name=CLUSTER_NAME)
     nodes = client.list_node(clusterId=cluster.id).data
     assert 2 == len(nodes)
-    validate_cluster_state(client, cluster)
-
-
-def test_ingress():
-    namespace = create_namespace(ADMIN_TOKEN)
-    p_client = namespace["p_client"]
-    ns = namespace["ns"]
-    cluster = namespace["cluster"]
-    con = [{"name": "test1",
-            "image": TEST_IMAGE}]
-    name = random_test_name("default")
-    workload = p_client.create_workload(name=name,
-                                        containers=con,
-                                        namespaceId=ns.id,
-                                        daemonSetConfig={})
-
-    validate_workload(p_client, workload, "daemonSet", ns.name,
-                      len(get_schedulable_nodes(cluster)))
-
-    host = "test1.com"
-    path = "/name.html"
-    rule = {"host": host,
-            "paths": [{"workloadIds": [workload.id], "targetPort": "80"}]}
-    p_client.create_ingress(name=name,
-                            namespaceId=ns.id,
-                            rules=[rule])
-    validate_ingress(namespace["p_client"], namespace["cluster"],
-                     [workload], host, path)
+    validate_cluster(client, cluster, skipIngresscheck=False )
 
 
 @pytest.fixture(scope='module', autouse="True")
 def create_cluster(request):
-    client = get_client_for_token(ADMIN_TOKEN)
+    client = get_client_for_token(USER_TOKEN)
     cloud_cred = create_vsphere_credential(client)
     nt = create_vsphere_nodetemplate(client, cloud_cred)
     cluster = client.create_cluster(
@@ -188,7 +158,7 @@ def create_vsphere_credential(client):
 def cluster_cleanup():
     if not RANCHER_CLEANUP_CLUSTER:
         return
-    client = get_client_for_token(ADMIN_TOKEN)
+    client = get_client_for_token(USER_TOKEN)
     cluster = get_cluster_by_name(client=client, name=CLUSTER_NAME)
     nodes = get_schedulable_nodes(cluster)
     delete_cluster(client, cluster)
@@ -206,35 +176,3 @@ def create_vsphere_nodetemplate(client, cloud_cred):
         "engineInstallURL": ENGINE_INSTALL_URL,
         "cloudCredentialId": cloud_cred.id,
     })
-
-
-def create_namespace(token):
-    client = get_client_for_token(token)
-    cluster = get_cluster_by_name(client=client, name=CLUSTER_NAME)
-    create_kubeconfig(cluster)
-    p, ns = create_project_and_ns(
-        token, cluster, random_test_name("testworkload"))
-    p_client = get_project_client_for_token(p, token)
-    return {
-        "p_client": p_client,
-        "ns": ns,
-        "cluster": cluster,
-        "project": p,
-    }
-
-
-def get_admin_token(api_url=CATTLE_TEST_URL,
-                    password="admin"):
-    """Generates an admin token and sets ADMIN_TOKEN"""
-    auth_url = api_url + "/v3-public/localproviders/local?action=login"
-    r = requests.post(auth_url, json={
-        'username': 'admin',
-        'password': 'admin',
-        'responseType': 'json',
-    }, verify=False)
-    token = r.json()['token']
-    client = get_client_for_token(token)
-    if password != "admin":
-        admin_user = client.list_user(username="admin").data
-        admin_user[0].setpassword(newPassword=password)
-    return token

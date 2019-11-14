@@ -248,7 +248,7 @@ def test_app_answer_override():
     proj_client.delete(app)
 
 
-def test_rbac_app_project_scope_deploy():
+def test_app_project_scope_deploy():
     admin_client = get_user_client()
     proj_client = get_project_client_for_token(
         project_detail["project"],
