@@ -100,57 +100,26 @@ vsphereConfig = {
     "vcenterPort": "443",
 }
 
-
-def test_valid_environment_variables():
-    assert RANCHER_VSPHERE_USERNAME != '', \
-        "vSphere User is required to make a cloud credential"
-    assert RANCHER_VSPHERE_PASSWORD != '', \
-        "vSphere Password is required to make a cloud credential"
-    assert RANCHER_VSPHERE_VCENTER != '', \
-        "vCenter URL is required to make a cloud credential"
+if_vsphere_var_present = pytest.mark.skipif(
+    RANCHER_VSPHERE_USERNAME == '' or
+    RANCHER_VSPHERE_PASSWORD == '' or
+    RANCHER_VSPHERE_VCENTER == '',
+    reason='required env variables are not present')
 
 
+@if_vsphere_var_present
 @pytest.mark.usefixtures("create_cluster")
-def test_nodes_ready():
-    client = get_client_for_token(ADMIN_TOKEN)
+def test_vsphere_provisioning():
+    client = get_client_for_token(USER_TOKEN)
     cluster = get_cluster_by_name(client=client, name=CLUSTER_NAME)
     nodes = client.list_node(clusterId=cluster.id).data
     assert 4 == len(nodes)
-    validate_cluster_state(client, cluster)
-
-
-def test_ingress():
-    namespace = create_namespace(ADMIN_TOKEN)
-    p_client = namespace["p_client"]
-    ns = namespace["ns"]
-    cluster = namespace["cluster"]
-    node_count = len(get_schedulable_nodes(cluster))
-    con = [{"name": "test1",
-            "image": TEST_IMAGE}]
-    name = random_test_name("default")
-    workload = p_client.create_workload(name=name,
-                                        containers=con,
-                                        scale=node_count,
-                                        namespaceId=ns.id,
-                                        daemonSetConfig={})
-
-    validate_workload(p_client, workload, "daemonSet", ns.name,
-                      node_count)
-
-    host = "test1.com"
-    path = "/name.html"
-    rule = {"host": host,
-            "paths": [{"workloadIds": [workload.id], "targetPort": "80"}]}
-    p_client.create_ingress(name=name,
-                            namespaceId=ns.id,
-                            rules=[rule])
-    validate_ingress(namespace["p_client"], namespace["cluster"],
-                     [workload], host, path)
+    validate_cluster(client, cluster, skipIngresscheck=False)
 
 
 @pytest.fixture(scope='module', autouse="True")
 def create_cluster(request):
-    client = get_client_for_token(ADMIN_TOKEN)
+    client = get_client_for_token(USER_TOKEN)
     cloud_cred = create_vsphere_credential(client)
     nt = create_vsphere_nodetemplate(
         client, cloud_cred, datastore=DATASTORE)
@@ -161,6 +130,8 @@ def create_cluster(request):
     cluster = client.create_cluster(
         name=CLUSTER_NAME,
         rancherKubernetesEngineConfig=rke_config)
+    # Allow sometime for the "cluster_owner" CRTB to take effect
+    time.sleep(5)
 
     request.addfinalizer(cluster_cleanup)
     master_pool = client.create_node_pool({
@@ -230,7 +201,7 @@ def create_vsphere_credential(client):
 def cluster_cleanup():
     if not RANCHER_CLEANUP_CLUSTER:
         return
-    client = get_client_for_token(ADMIN_TOKEN)
+    client = get_client_for_token(USER_TOKEN)
     cluster = get_cluster_by_name(client=client, name=CLUSTER_NAME)
     nodes = get_schedulable_nodes(cluster)
     delete_cluster(client, cluster)
@@ -239,7 +210,8 @@ def cluster_cleanup():
 
 
 def create_vsphere_nodetemplate(
-        client, cloud_cred, cloud_config="", datastore="", datastore_cluster=""):
+        client, cloud_cred, cloud_config="", datastore="",
+        datastore_cluster=""):
     vc = copy.copy(vsphereConfig)
     if cloud_config != "":
         vc["cloudConfig"] = cloud_config
@@ -256,18 +228,3 @@ def create_vsphere_nodetemplate(
         "engineInstallURL": ENGINE_INSTALL_URL,
         "cloudCredentialId": cloud_cred.id,
     })
-
-
-def create_namespace(token):
-    client = get_client_for_token(token)
-    cluster = get_cluster_by_name(client=client, name=CLUSTER_NAME)
-    create_kubeconfig(cluster)
-    p, ns = create_project_and_ns(
-        token, cluster, random_test_name("testworkload"))
-    p_client = get_project_client_for_token(p, token)
-    return {
-        "p_client": p_client,
-        "ns": ns,
-        "cluster": cluster,
-        "project": p,
-    }
