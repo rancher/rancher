@@ -13,6 +13,14 @@ const (
 
 func loadK8sVersionServiceOptions() map[string]v3.KubernetesServicesOptions {
 	return map[string]v3.KubernetesServicesOptions{
+		"v1.16.3-rancher1-1": {
+			Etcd:           getETCDOptions(),
+			KubeAPI:        getKubeAPIOptions116(),
+			Kubelet:        getKubeletOptions116(),
+			KubeController: getKubeControllerOptions(),
+			Kubeproxy:      getKubeProxyOptions(),
+			Scheduler:      getSchedulerOptions(),
+		},
 		"v1.16": {
 			KubeAPI:        getKubeAPIOptions116(),
 			Kubelet:        getKubeletOptions116(),
@@ -20,9 +28,25 @@ func loadK8sVersionServiceOptions() map[string]v3.KubernetesServicesOptions {
 			Kubeproxy:      getKubeProxyOptions(),
 			Scheduler:      getSchedulerOptions(),
 		},
+		"v1.15.6-rancher1-1": {
+			Etcd:           getETCDOptions(),
+			KubeAPI:        getKubeAPIOptions115(),
+			Kubelet:        getKubeletOptions115(),
+			KubeController: getKubeControllerOptions(),
+			Kubeproxy:      getKubeProxyOptions(),
+			Scheduler:      getSchedulerOptions(),
+		},
 		"v1.15": {
 			KubeAPI:        getKubeAPIOptions115(),
 			Kubelet:        getKubeletOptions115(),
+			KubeController: getKubeControllerOptions(),
+			Kubeproxy:      getKubeProxyOptions(),
+			Scheduler:      getSchedulerOptions(),
+		},
+		"v1.14.9-rancher1-1": {
+			Etcd:           getETCDOptions(),
+			KubeAPI:        getKubeAPIOptions114(),
+			Kubelet:        getKubeletOptions(),
 			KubeController: getKubeControllerOptions(),
 			Kubeproxy:      getKubeProxyOptions(),
 			Scheduler:      getSchedulerOptions(),
@@ -190,5 +214,12 @@ func getSchedulerOptions() map[string]string {
 		"v":            "2",
 		"address":      "0.0.0.0",
 		"profiling":    "false",
+	}
+}
+
+func getETCDOptions() map[string]string {
+	return map[string]string{
+		"client-cert-auth":      "true",
+		"peer-client-cert-auth": "true",
 	}
 }

@@ -156,6 +156,7 @@ func (c *Cluster) DeployWorkerPlane(ctx context.Context, svcOptionData map[strin
 func parseAuditLogConfig(clusterFile string, rkeConfig *v3.RancherKubernetesEngineConfig) error {
 	if rkeConfig.Services.KubeAPI.AuditLog != nil &&
 		rkeConfig.Services.KubeAPI.AuditLog.Enabled &&
+		rkeConfig.Services.KubeAPI.AuditLog.Configuration != nil &&
 		rkeConfig.Services.KubeAPI.AuditLog.Configuration.Policy == nil {
 		return nil
 	}
