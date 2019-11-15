@@ -173,6 +173,8 @@ func (ph *projectHandler) deployApp(appName, appTargetNamespace string, appProje
 
 		"exporter-fluentd.enabled": "false",
 
+		"prometheus-adapter.enabled": "false",
+
 		"grafana.enabled":  "true",
 		"grafana.level":    "project",
 		"grafana.apiGroup": monitoring.APIVersion.Group,
