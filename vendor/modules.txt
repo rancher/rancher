@@ -295,7 +295,7 @@ github.com/prometheus/common/model
 # github.com/prometheus/procfs v0.0.0-20190507164030-5867b95ac084
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
-# github.com/rancher/kontainer-driver-metadata v0.0.0-20191113181829-54094fc6ca6f
+# github.com/rancher/kontainer-driver-metadata v0.0.0-20191115214702-0e8ef4aabaf1
 github.com/rancher/kontainer-driver-metadata/rke
 github.com/rancher/kontainer-driver-metadata/rke/templates
 # github.com/rancher/kontainer-engine v0.0.4-dev.0.20191113162551-1e8159ce892e
@@ -360,7 +360,7 @@ github.com/rancher/norman/urlbuilder
 github.com/rancher/rdns-server/model
 # github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6
 github.com/rancher/remotedialer
-# github.com/rancher/rke v1.0.0-rc3.0.20191113190027-d4ceb956b840
+# github.com/rancher/rke v1.0.0-rc4.0.20191115222446-f86d28789c56
 github.com/rancher/rke/addons
 github.com/rancher/rke/authz
 github.com/rancher/rke/cloudprovider
@@ -382,7 +382,7 @@ github.com/rancher/rke/pki/cert
 github.com/rancher/rke/services
 github.com/rancher/rke/templates
 github.com/rancher/rke/util
-# github.com/rancher/types v0.0.0-20191108235045-716d86fa44c9
+# github.com/rancher/types v0.0.0-20191115181915-fa1ec441252a
 github.com/rancher/types/apis/apiregistration.k8s.io/v1
 github.com/rancher/types/apis/apps/v1
 github.com/rancher/types/apis/autoscaling/v2beta2
