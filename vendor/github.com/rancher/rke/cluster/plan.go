@@ -267,6 +267,11 @@ func (c *Cluster) BuildKubeAPIProcess(host *hosts.Host, prefixPath string, svcOp
 		CommandArgs[admissionControlOptionName] = CommandArgs[admissionControlOptionName] + ",AlwaysPullImages"
 	}
 
+	if c.Services.KubeAPI.EventRateLimit != nil && c.Services.KubeAPI.EventRateLimit.Enabled {
+		CommandArgs[KubeAPIArgAdmissionControlConfigFile] = DefaultKubeAPIArgAdmissionControlConfigFileValue
+		CommandArgs[admissionControlOptionName] = CommandArgs[admissionControlOptionName] + ",EventRateLimit"
+	}
+
 	if c.Services.KubeAPI.AuditLog != nil {
 		if alc := c.Services.KubeAPI.AuditLog.Configuration; alc != nil {
 			CommandArgs[KubeAPIArgAuditLogPath] = alc.Path

@@ -4,18 +4,24 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/blang/semver"
-	"github.com/rancher/kontainer-driver-metadata/rke/templates"
-	"github.com/sirupsen/logrus"
+	"strings"
 	"text/template"
 
+	"github.com/Masterminds/sprig/v3"
+	"github.com/blang/semver"
+	"github.com/ghodss/yaml"
+	"github.com/rancher/kontainer-driver-metadata/rke/templates"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rke/metadata"
+	"github.com/sirupsen/logrus"
 )
 
 func CompileTemplateFromMap(tmplt string, configMap interface{}) (string, error) {
 	out := new(bytes.Buffer)
-	t := template.Must(template.New("compiled_template").Funcs(template.FuncMap{"GetKubednsStubDomains": GetKubednsStubDomains}).Parse(tmplt))
+	templateFuncMap := sprig.TxtFuncMap()
+	templateFuncMap["GetKubednsStubDomains"] = GetKubednsStubDomains
+	templateFuncMap["toYaml"] = ToYAML
+	t := template.Must(template.New("compiled_template").Funcs(templateFuncMap).Parse(tmplt))
 	if err := t.Execute(out, configMap); err != nil {
 		return "", err
 	}
@@ -32,6 +38,22 @@ func GetVersionedTemplates(templateName string, data map[string]interface{}, k8s
 func GetKubednsStubDomains(stubDomains map[string][]string) string {
 	json, _ := json.Marshal(stubDomains)
 	return string(json)
+}
+
+func ToYAML(v interface{}) string {
+	data, err := json.Marshal(v)
+	if err != nil {
+		// Swallow errors inside of a template so it doesn't affect remaining template lines
+		logrus.Errorf("[ToYAML] Error marshaling %v: %v", v, err)
+		return ""
+	}
+	yamlData, err := yaml.JSONToYAML(data)
+	if err != nil {
+		// Swallow errors inside of a template so it doesn't affect remaining template lines
+		logrus.Errorf("[ToYAML] Error converting json to yaml for %v: %v ", string(data), err)
+		return ""
+	}
+	return strings.TrimSuffix(string(yamlData), "\n")
 }
 
 func getTemplate(templateName, k8sVersion string) (string, error) {
