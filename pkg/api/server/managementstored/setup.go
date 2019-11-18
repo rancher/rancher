@@ -164,7 +164,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	ClusterCatalog(schemas, apiContext)
 	SecretTypes(ctx, schemas, apiContext)
 	App(schemas, apiContext, clusterManager)
-	Setting(schemas)
+	Setting(schemas, apiContext)
 	Feature(schemas)
 	Preference(schemas, apiContext)
 	ClusterRegistrationTokens(schemas)
@@ -514,11 +514,21 @@ func App(schemas *types.Schemas, management *config.ScaledContext, kubeConfigGet
 	schema.Validator = wrapper.Validator
 }
 
-func Setting(schemas *types.Schemas) {
+func Setting(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.SettingType)
 	schema.Formatter = setting.Formatter
 	schema.Validator = setting.Validator
-	schema.Store = settingstore.New(schema.Store)
+	metadataHandler := md.MetadataController{
+		SystemImagesLister:   management.Management.RKEK8sSystemImages("").Controller().Lister(),
+		SystemImages:         management.Management.RKEK8sSystemImages(""),
+		ServiceOptionsLister: management.Management.RKEK8sServiceOptions("").Controller().Lister(),
+		ServiceOptions:       management.Management.RKEK8sServiceOptions(""),
+		AddonsLister:         management.Management.RKEAddons("").Controller().Lister(),
+		Addons:               management.Management.RKEAddons(""),
+		SettingLister:        management.Management.Settings("").Controller().Lister(),
+		Settings:             management.Management.Settings(""),
+	}
+	schema.Store = settingstore.New(schema.Store, metadataHandler)
 }
 
 func Feature(schemas *types.Schemas) {
