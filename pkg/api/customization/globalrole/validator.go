@@ -3,8 +3,10 @@ package globalrole
 import (
 	"net/http"
 
+	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"k8s.io/apimachinery/pkg/api/errors"
 )
 
 type Wrapper struct {
@@ -18,6 +20,9 @@ func (w Wrapper) Validator(request *types.APIContext, schema *types.Schema, data
 
 	gr, err := w.GlobalRoleLister.Get("", request.ID)
 	if err != nil {
+		if errors.IsNotFound(err) {
+			return httperror.NewAPIError(httperror.NotFound, err.Error())
+		}
 		return err
 	}
 
