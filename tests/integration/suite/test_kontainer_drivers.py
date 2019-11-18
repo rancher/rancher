@@ -361,6 +361,16 @@ def test_user_update_settings(admin_mc):
     assert new_k8s_version["default"] == default_k8s_version
     assert new_k8s_version["value"] == user_value
 
+    ui_k8s_version = client.by_id_setting('ui-k8s-default-version-range')
+
+    def default_range(k8s_version):
+        # k8s_version for instance, 1.15.3-rancher1-1
+        version = k8s_version.split("-rancher")[0]  # v1.15.3
+        major = ".".join(version.split(".")[:2])  # v1.15
+        a = "<=%s.x" % major
+        return a  # <=v1.15.x
+    assert ui_k8s_version["value"] == default_range(user_value)
+
     # user updates invalid value
     user_value = "v1.15.4-rancher13"
     try:

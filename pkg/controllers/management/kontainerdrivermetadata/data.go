@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/kontainer-driver-metadata/rke"
 	"github.com/rancher/kontainer-driver-metadata/rke/templates"
 	"github.com/rancher/norman/types/convert"
-	setting2 "github.com/rancher/rancher/pkg/api/store/setting"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/util"
@@ -32,6 +31,7 @@ const (
 const (
 	APIVersion           = "management.cattle.io/v3"
 	RancherVersionDev    = "2.4"
+	UserUpdateLabel      = "io.cattle.user.updated"
 	sendRKELabel         = "io.cattle.rke_store"
 	svcOptionLinuxKey    = "service-option-linux-key"
 	svcOptionWindowsKey  = "service-option-windows-key"
@@ -469,7 +469,7 @@ func (md *MetadataController) getUserSettings() (map[string]string, bool, error)
 				return nil, false, fmt.Errorf("driverMetadata: error getting setting %s: %v", key, err)
 			}
 		}
-		if val, ok := setting.Labels[setting2.UserUpdateLabel]; ok && convert.ToString(val) == "true" {
+		if val, ok := setting.Labels[UserUpdateLabel]; ok && convert.ToString(val) == "true" {
 			userSettings[key] = get(key)
 		}
 	}

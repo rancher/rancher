@@ -11,16 +11,14 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/api/customization/setting"
+	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/settings"
 )
 
 type Store struct {
 	types.Store
+	MetadataHandler kd.MetadataController
 }
-
-const (
-	UserUpdateLabel = "io.cattle.user.updated"
-)
 
 var MetadataSettings = map[string]bool{
 	settings.KubernetesVersion.Name:            true,
@@ -28,7 +26,7 @@ var MetadataSettings = map[string]bool{
 	settings.KubernetesVersionsDeprecated.Name: true,
 }
 
-func New(store types.Store) types.Store {
+func New(store types.Store, metadataHandler kd.MetadataController) types.Store {
 	return &Store{
 		&transform.Store{
 			Store: store,
@@ -53,6 +51,7 @@ func New(store types.Store) types.Store {
 				return data, nil
 			},
 		},
+		metadataHandler,
 	}
 }
 
@@ -65,24 +64,39 @@ func (s *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 }
 
 func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-	if _, ok := MetadataSettings[id]; ok {
-		labels := map[string]interface{}{}
-		if val, ok := data["labels"]; ok {
-			labels = convert.ToMapInterface(val)
-		}
-		if val, ok := data["value"]; ok && convert.ToString(val) == "" {
-			labels[UserUpdateLabel] = "false"
-		} else {
-			if id == settings.KubernetesVersion.Name || id == settings.KubernetesVersionsCurrent.Name {
-				if err := validate(id, convert.ToString(val)); err != nil {
-					return nil, err
-				}
-			}
-			labels[UserUpdateLabel] = "true"
-		}
-		data["labels"] = labels
+	if _, ok := MetadataSettings[id]; !ok {
+		return s.Store.Update(apiContext, schema, data, id)
 	}
-	return s.Store.Update(apiContext, schema, data, id)
+	labels := map[string]interface{}{}
+	if val, ok := data["labels"]; ok {
+		labels = convert.ToMapInterface(val)
+	}
+	if val, ok := data["value"]; ok && convert.ToString(val) == "" {
+		labels[kd.UserUpdateLabel] = "false"
+	} else {
+		if id == settings.KubernetesVersion.Name || id == settings.KubernetesVersionsCurrent.Name {
+			if err := validate(id, convert.ToString(val)); err != nil {
+				return nil, err
+			}
+		}
+		labels[kd.UserUpdateLabel] = "true"
+	}
+	url, err := kd.GetURLSettingValue()
+	if err != nil {
+		msg := fmt.Sprintf("failed to get settings %v", err)
+		return nil, httperror.WrapAPIError(err, httperror.ServerError, msg)
+	}
+	data["labels"] = labels
+	data, err = s.Store.Update(apiContext, schema, data, id)
+	if err != nil {
+		return nil, err
+	}
+	// trigger refresh for ui settings
+	if err := s.MetadataHandler.Refresh(url, false); err != nil {
+		msg := fmt.Sprintf("failed to refresh %v", err)
+		return nil, httperror.WrapAPIError(err, httperror.ServerError, msg)
+	}
+	return data, nil
 }
 
 func validate(id, value string) error {
