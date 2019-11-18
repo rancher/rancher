@@ -5,9 +5,13 @@ import (
 	"net/url"
 
 	"github.com/rancher/norman/types"
+	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/config"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -18,7 +22,18 @@ const (
 	windowsNodeCommandFormat = `PowerShell -NoLogo -NonInteractive -Command "& {docker run -v c:/:c:/host %s%s bootstrap --server %s --token %s%s | iex}"`
 )
 
-func Formatter(request *types.APIContext, resource *types.RawResource) {
+type Formatter struct {
+	Clusters v3.ClusterInterface
+}
+
+func NewFormatter(managementContext *config.ScaledContext) *Formatter {
+	clusterFormatter := Formatter{
+		Clusters: managementContext.Management.Clusters(""),
+	}
+	return &clusterFormatter
+}
+
+func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawResource) {
 	ca := systemtemplate.CAChecksum()
 	if ca != "" {
 		ca = " --ca-checksum " + ca
@@ -31,9 +46,11 @@ func Formatter(request *types.APIContext, resource *types.RawResource) {
 		resource.Values["command"] = fmt.Sprintf(commandFormat, url)
 		resource.Values["token"] = token
 		resource.Values["manifestUrl"] = url
-
 		rootURL := getRootURL(request)
-		agentImage := image.Resolve(settings.AgentImage.Get())
+
+		cluster, _ := f.Clusters.Get(fmt.Sprintf("%v", resource.Values["clusterId"]), metav1.GetOptions{})
+
+		agentImage := image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
 		// for linux
 		resource.Values["nodeCommand"] = fmt.Sprintf(nodeCommandFormat,
 			agentImage,
@@ -42,7 +59,7 @@ func Formatter(request *types.APIContext, resource *types.RawResource) {
 			ca)
 		// for windows
 		var agentImageDockerEnv string
-		if settings.SystemDefaultRegistry.Get() != "" {
+		if util.GetPrivateRepoURL(cluster) != "" {
 			// patch the AGENT_IMAGE env
 			agentImageDockerEnv = fmt.Sprintf("-e AGENT_IMAGE=%s ", agentImage)
 		}
@@ -55,14 +72,14 @@ func Formatter(request *types.APIContext, resource *types.RawResource) {
 	}
 }
 
-func NodeCommand(token string) string {
+func NodeCommand(token string, cluster *v3.Cluster) string {
 	ca := systemtemplate.CAChecksum()
 	if ca != "" {
 		ca = " --ca-checksum " + ca
 	}
 
 	return fmt.Sprintf(nodeCommandFormat,
-		image.Resolve(settings.AgentImage.Get()),
+		image.ResolveWithCluster(settings.AgentImage.Get(), cluster),
 		getRootURL(nil),
 		token,
 		ca)

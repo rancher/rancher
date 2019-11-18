@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	libhelm "github.com/rancher/rancher/pkg/catalog/helm"
-	"github.com/rancher/rancher/pkg/settings"
+	util "github.com/rancher/rancher/pkg/cluster"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	img "github.com/rancher/types/image"
 	"gopkg.in/yaml.v2"
@@ -26,7 +26,11 @@ const (
 )
 
 func Resolve(image string) string {
-	reg := settings.SystemDefaultRegistry.Get()
+	return ResolveWithCluster(image, nil)
+}
+
+func ResolveWithCluster(image string, cluster *v3.Cluster) string {
+	reg := util.GetPrivateRepoURL(cluster)
 	if reg != "" && !strings.HasPrefix(image, reg) {
 		//Images from Dockerhub Library repo, we add rancher prefix when using private registry
 		if !strings.Contains(image, "/") {
