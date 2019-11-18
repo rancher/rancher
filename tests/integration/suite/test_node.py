@@ -245,3 +245,106 @@ def wait_for_node_template(client, node_template_id, timeout=60):
         for each_template in nodeTemplates:
             if each_template["id"] == node_template_id:
                 template = each_template
+
+
+def test_user_access_to_other_template(user_factory, remove_resource):
+    """Asserts that a normal user's nodepool cannot reference another user's
+    nodetemplate"""
+    user1_client = user_factory().client
+    user2_client = user_factory().client
+
+    user2_node_template = user2_client.create_node_template(name="nt-" +
+                                                                 random_str(),
+                                                            azureConfig={})
+    remove_resource(user2_node_template)
+    wait_for_node_template(user2_client, user2_node_template.id)
+
+    with pytest.raises(ApiError) as e:
+        user1_client.create_node_pool(
+            nodeTemplateId=user2_node_template.id,
+            hostnamePrefix="test1",
+            clusterId="local")
+    assert e.value.error.status == 404
+    assert e.value.error.message == \
+        "unable to find node template [%s]" % user2_node_template.id
+
+
+def test_admin_access_to_node_template(admin_mc, list_remove_resource):
+    """Asserts that an admin user's nodepool can reference
+    nodetemplates they have created"""
+    admin_client = admin_mc.client
+
+    admin_node_template = admin_client.create_node_template(name="nt-" +
+                                                                 random_str(),
+                                                            azureConfig={})
+    remove_list = [admin_node_template]
+    list_remove_resource(remove_list)
+
+    # Admin has access to create nodepool and nodepool create only happens
+    # after it passes validation.
+    node_pool = admin_client.create_node_pool(
+        nodeTemplateId=admin_node_template.id,
+        hostnamePrefix="test1",
+        clusterId="local")
+
+    remove_list.insert(0, node_pool)
+
+
+def test_user_access_to_node_template(user_mc, remove_resource):
+    """Asserts that a normal user's nodepool can reference
+    nodetemplates they have created"""
+    user_client = user_mc.client
+
+    user_node_template = user_client.create_node_template(name="nt-" +
+                                                               random_str(),
+                                                          azureConfig={})
+    remove_resource(user_node_template)
+    wait_for_node_template(user_client, user_node_template.id)
+
+    with pytest.raises(ApiError) as e:
+        user_client.create_node_pool(
+            nodeTemplateId=user_node_template.id,
+            hostnamePrefix="test1",
+            clusterId="local")
+    # User does not have access to create nodepools but has
+    # access to nodetemplate. Nodepool create happens after
+    # validation has passed.
+    assert e.value.error.status == 403
+    assert 'cannot create resource "nodepools"' in e.value.error.message
+
+
+def test_admin_access_user_template(admin_mc, user_mc, list_remove_resource):
+    """Asserts that an admin user's nodepool can reference another user's
+    nodetemplates"""
+    admin_client = admin_mc.client
+    user_client = user_mc.client
+
+    user_node_template = user_client.create_node_template(name="nt-" +
+                                                               random_str(),
+                                                          azureConfig={})
+    remove_list = [user_node_template]
+    list_remove_resource(remove_list)
+    # Admin has access to create nodepool and nodepool create only happens
+    # after it passes validation.
+    node_pool = admin_client.create_node_pool(
+        nodeTemplateId=user_node_template.id,
+        hostnamePrefix="test1",
+        clusterId="local")
+    remove_list.insert(0, node_pool)
+
+
+def test_no_node_template(user_mc):
+    """Asserts that a nodepool cannot create without a valid
+    nodetemplate"""
+    user_client = user_mc.client
+
+    invalid_template_id = "thisinsnotatemplateid"
+
+    with pytest.raises(ApiError) as e:
+        user_client.create_node_pool(
+            nodeTemplateId=invalid_template_id,
+            hostnamePrefix="test1",
+            clusterId="local")
+    assert e.value.error.status == 404
+    assert e.value.error.message == \
+        "unable to find node template [%s]" % invalid_template_id
