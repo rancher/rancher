@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/rancher/norman/types"
+	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/kubectl"
@@ -108,23 +109,49 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 	return cd.setNetworkPolicyAnn(cluster)
 }
 
+func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string) bool {
+	forceDeploy := cluster.Annotations[AgentForceDeployAnn] == "true"
+	imageChange := cluster.Status.AgentImage != desiredAgent || cluster.Status.AuthImage != desiredAuth
+	repoChange := false
+	if cluster.Spec.RancherKubernetesEngineConfig != nil {
+		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
+			desiredRepo := util.GetPrivateRepo(cluster)
+			var appliedRepo *v3.PrivateRegistry
+			if len(cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.PrivateRegistries) > 0 {
+				appliedRepo = &cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.PrivateRegistries[0]
+			}
+			if desiredRepo != nil && appliedRepo != nil && !reflect.DeepEqual(desiredRepo, appliedRepo) {
+				repoChange = true
+			}
+			if (desiredRepo == nil && appliedRepo != nil) || (desiredRepo != nil && appliedRepo == nil) {
+				repoChange = true
+			}
+		}
+	}
+
+	if forceDeploy || imageChange || repoChange {
+		logrus.Infof("Redeploy Rancher Agents is needed: forceDeploy=%v, agent/auth image changed=%v,"+
+			" private repo changed=%v", forceDeploy, imageChange, repoChange)
+		return true
+	}
+	return false
+}
+
 func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	desiredAgent := cluster.Spec.DesiredAgentImage
 	if desiredAgent == "" || desiredAgent == "fixed" {
-		desiredAgent = image.Resolve(settings.AgentImage.Get())
+		desiredAgent = image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
 	}
 
 	var desiredAuth string
 	if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
 		desiredAuth = cluster.Spec.DesiredAuthImage
 		if desiredAuth == "" || desiredAuth == "fixed" {
-			desiredAuth = image.Resolve(settings.AuthImage.Get())
+			desiredAuth = image.ResolveWithCluster(settings.AuthImage.Get(), cluster)
 		}
 	}
 
-	forceDeploy := cluster.Annotations[AgentForceDeployAnn] == "true"
-
-	if !forceDeploy && cluster.Status.AgentImage == desiredAgent && cluster.Status.AuthImage == desiredAuth {
+	if !redeployAgent(cluster, desiredAgent, desiredAuth) {
 		return nil
 	}
 
@@ -174,7 +201,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		if cluster.Spec.DesiredAuthImage == "fixed" {
 			cluster.Spec.DesiredAuthImage = desiredAuth
 		}
-		if forceDeploy {
+		if cluster.Annotations[AgentForceDeployAnn] == "true" {
 			cluster.Annotations[AgentForceDeployAnn] = "false"
 		}
 	}
@@ -225,7 +252,8 @@ func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage stri
 	}
 
 	buf := &bytes.Buffer{}
-	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, token, url, cluster.Spec.WindowsPreferedCluster)
+	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, token, url, cluster.Spec.WindowsPreferedCluster,
+		cluster)
 
 	return buf.Bytes(), err
 }

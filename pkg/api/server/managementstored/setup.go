@@ -170,7 +170,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	Setting(schemas)
 	Feature(schemas)
 	Preference(schemas, apiContext)
-	ClusterRegistrationTokens(schemas)
+	ClusterRegistrationTokens(schemas, apiContext)
 	Tokens(ctx, schemas, apiContext)
 	NodeTemplates(schemas, apiContext)
 	LoggingTypes(schemas, apiContext, clusterManager, k8sProxy)
@@ -364,12 +364,13 @@ func ClusterCatalog(schemas *types.Schemas, managementContext *config.ScaledCont
 	schema.Store = catalogStore.Wrap(schema.Store)
 }
 
-func ClusterRegistrationTokens(schemas *types.Schemas) {
+func ClusterRegistrationTokens(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.ClusterRegistrationTokenType)
 	schema.Store = &cluster.RegistrationTokenStore{
 		Store: schema.Store,
 	}
-	schema.Formatter = clusterregistrationtokens.Formatter
+	tokenFormatter := clusterregistrationtokens.NewFormatter(management)
+	schema.Formatter = tokenFormatter.Formatter
 }
 
 func Tokens(ctx context.Context, schemas *types.Schemas, mgmt *config.ScaledContext) {
