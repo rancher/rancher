@@ -2,6 +2,7 @@ import pytest
 from rancher import ApiError
 
 from .common import random_str
+from .conftest import wait_for
 
 
 @pytest.mark.nonparallel
@@ -43,7 +44,14 @@ def test_only_admin_can_crud_global_roles(admin_mc, user_mc, remove_resource):
 
     gr.annotations = {"test": "asdf"}
 
-    gr = admin_client.update_by_id_global_role(id=gr.id, value=gr)
+    def try_gr_update():
+        try:
+            return admin_client.update_by_id_global_role(id=gr.id, value=gr)
+        except ApiError as e:
+            e.error.status == 404
+            return False
+
+    wait_for(try_gr_update)
 
     gr_list = admin_client.list_global_role()
     assert len(gr_list.data) > 0
