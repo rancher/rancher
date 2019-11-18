@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/norman/types/values"
+	util "github.com/rancher/rancher/pkg/cluster"
 	kd "github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/rancher/pkg/rkedialerfactory"
@@ -734,7 +735,7 @@ func (p *Provisioner) getSystemImages(spec v3.ClusterSpec) (*v3.RKESystemImages,
 		return nil, fmt.Errorf("failed to find system images for version %s: %v", version, err)
 	}
 
-	privateRegistry := getPrivateRepo(spec.RancherKubernetesEngineConfig)
+	privateRegistry := util.GetPrivateRepoURL(&v3.Cluster{Spec: spec})
 	if privateRegistry == "" {
 		return &systemImages, nil
 	}
@@ -753,13 +754,6 @@ func (p *Provisioner) getSystemImages(spec v3.ClusterSpec) (*v3.RKESystemImages,
 		return nil, err
 	}
 	return &systemImages, nil
-}
-
-func getPrivateRepo(config *v3.RancherKubernetesEngineConfig) string {
-	if len(config.PrivateRegistries) > 0 {
-		return config.PrivateRegistries[0].URL
-	}
-	return settings.SystemDefaultRegistry.Get()
 }
 
 func (p *Provisioner) getSpec(cluster *v3.Cluster) (*v3.ClusterSpec, error) {

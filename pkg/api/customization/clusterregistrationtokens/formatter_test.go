@@ -9,7 +9,9 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/urlbuilder"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/types/config"
 	assertlib "github.com/stretchr/testify/assert"
+	restclient "k8s.io/client-go/rest"
 )
 
 const (
@@ -127,7 +129,11 @@ func TestFormatter(t *testing.T) {
 		assert.Nilf(err, "%s could not new fake RawResource", cs.caseName)
 
 		// verify
-		Formatter(fakeAPIContext, fakeRawResource)
+		scaledContext, err := config.NewScaledContext(restclient.Config{})
+		assert.Nil(err)
+		assert.NotNil(scaledContext)
+		tokenFormatter := NewFormatter(scaledContext)
+		tokenFormatter.Formatter(fakeAPIContext, fakeRawResource)
 		assert.Equal(cs.outputShouldEqual, fakeRawResource.Values, cs.caseName)
 	}
 

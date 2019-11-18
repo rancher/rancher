@@ -74,6 +74,19 @@ data:
 
 ---
 
+{{- if .PrivateRegistryConfig}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cattle-private-registry
+  namespace: cattle-system
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: "{{.PrivateRegistryConfig}}"
+
+---
+{{- end }}
+
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -152,6 +165,10 @@ spec:
           - name: cattle-credentials
             mountPath: /cattle-credentials
             readOnly: true
+      {{- if .PrivateRegistryConfig}}
+      imagePullSecrets:
+      - name: cattle-private-registry
+      {{- end }}
       volumes:
       - name: cattle-credentials
         secret:
@@ -220,6 +237,10 @@ spec:
           mountPath: /etc/docker/certs.d
         securityContext:
           privileged: true
+      {{- if .PrivateRegistryConfig}}
+      imagePullSecrets:
+      - name: cattle-private-registry
+      {{- end }}
       volumes:
       - name: k8s-ssl
         hostPath:
@@ -383,6 +404,10 @@ spec:
           mountPath: /etc/kubernetes
         securityContext:
           privileged: true
+      {{- if .PrivateRegistryConfig}}
+      imagePullSecrets:
+      - name: cattle-private-registry
+      {{- end }}
       volumes:
       - name: k8s-ssl
         hostPath:
