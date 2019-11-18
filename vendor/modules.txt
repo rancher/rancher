@@ -301,7 +301,7 @@ github.com/rancher/kontainer-engine/service
 github.com/rancher/kontainer-engine/store
 github.com/rancher/kontainer-engine/types
 github.com/rancher/kontainer-engine/utils
-# github.com/rancher/norman v0.0.0-20191111202053-1fcac7eb4fea
+# github.com/rancher/norman v0.0.0-20191118164900-ee09ed505060
 github.com/rancher/norman/api
 github.com/rancher/norman/api/access
 github.com/rancher/norman/api/builtin
