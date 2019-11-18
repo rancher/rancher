@@ -9,7 +9,9 @@ import (
 	"strings"
 	"text/template"
 
+	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/settings"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
 
 var (
@@ -17,17 +19,19 @@ var (
 )
 
 type context struct {
-	CAChecksum       string
-	AgentImage       string
-	AuthImage        string
-	TokenKey         string
-	Token            string
-	URL              string
-	URLPlain         string
-	IsWindowsCluster bool
+	CAChecksum            string
+	AgentImage            string
+	AuthImage             string
+	TokenKey              string
+	Token                 string
+	URL                   string
+	URLPlain              string
+	IsWindowsCluster      bool
+	PrivateRegistryConfig string
 }
 
-func SystemTemplate(resp io.Writer, agentImage, authImage, token, url string, isWindowsCluster bool) error {
+func SystemTemplate(resp io.Writer, agentImage, authImage, token, url string, isWindowsCluster bool,
+	cluster *v3.Cluster) error {
 	d := md5.Sum([]byte(token))
 	tokenKey := hex.EncodeToString(d[:])[:7]
 
@@ -35,15 +39,21 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, token, url string, is
 		authImage = settings.AuthImage.Get()
 	}
 
+	privateRegistryConfig, err := util.GeneratePrivateRegistryDockerConfig(util.GetPrivateRepo(cluster))
+	if err != nil {
+		return err
+	}
+
 	context := &context{
-		CAChecksum:       CAChecksum(),
-		AgentImage:       agentImage,
-		AuthImage:        authImage,
-		TokenKey:         tokenKey,
-		Token:            base64.StdEncoding.EncodeToString([]byte(token)),
-		URL:              base64.StdEncoding.EncodeToString([]byte(url)),
-		URLPlain:         url,
-		IsWindowsCluster: isWindowsCluster,
+		CAChecksum:            CAChecksum(),
+		AgentImage:            agentImage,
+		AuthImage:             authImage,
+		TokenKey:              tokenKey,
+		Token:                 base64.StdEncoding.EncodeToString([]byte(token)),
+		URL:                   base64.StdEncoding.EncodeToString([]byte(url)),
+		URLPlain:              url,
+		IsWindowsCluster:      isWindowsCluster,
+		PrivateRegistryConfig: privateRegistryConfig,
 	}
 
 	return t.Execute(resp, context)
