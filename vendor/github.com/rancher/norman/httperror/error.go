@@ -120,3 +120,10 @@ func IsConflict(err error) bool {
 
 	return false
 }
+
+func IsForbidden(err error) bool {
+	if apiError, ok := err.(*APIError); ok {
+		return apiError.Code.Status == 403
+	}
+	return false
+}
