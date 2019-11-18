@@ -46,9 +46,11 @@ def test_only_admin_can_crud_global_roles(admin_mc, user_mc, remove_resource):
 
     def try_gr_update():
         try:
-            return admin_client.update_by_id_global_role(id=gr.id, value=gr)
+            return admin_client.update_by_id_global_role(
+                    id=gr.id,
+                    value=gr)
         except ApiError as e:
-            e.error.status == 404
+            assert e.error.status == 404
             return False
 
     wait_for(try_gr_update)
@@ -70,9 +72,15 @@ def test_only_admin_can_crud_global_roles(admin_mc, user_mc, remove_resource):
         user_client.by_id_global_role(id=gr3.id)
     gr3.annotations = {"test2": "jkl"}
 
-    with pytest.raises(ApiError) as e:
-        user_client.update_by_id_global_role(id=gr3.id, value=gr3)
-    assert e.value.error.status == 403
+    def try_gr_unauth():
+        with pytest.raises(ApiError) as e:
+            user_client.update_by_id_global_role(id=gr3.id, value=gr3)
+        if e.value.error.status == 404:
+            return False
+        assert e.value.error.status == 403
+        return True
+
+    wait_for(try_gr_unauth)
 
     gr_list = user_client.list_global_role()
     assert len(gr_list.data) == 0
