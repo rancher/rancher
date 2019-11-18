@@ -631,8 +631,8 @@ github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a/go.mod h1:YW8w
 github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6 h1:iTE16wwmbXLS3WBk1SgwoEvUYGid1JcTOjGIbqO9jQ8=
 github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6/go.mod h1:tkU8ZvrR5lRgaKWaX71nAy6daeqvPFx/lJEnbW7tXSI=
 github.com/rancher/rke v0.3.0-rc11.0.20190930172345-88449ec73b31/go.mod h1:5uw/a0TlRpyf2ASPgEo4HBSEFsc80zuR4raGwazwJa8=
-github.com/rancher/rke v1.0.0-rc4.0.20191115222446-f86d28789c56 h1:TAIBCY/3q+sQfnXdCilPOKnigNKPl9I2RhWrsk3LWPI=
-github.com/rancher/rke v1.0.0-rc4.0.20191115222446-f86d28789c56/go.mod h1:PWHXovLJffPYxKkXXlym+S2OYnw1ws2nngbC9efmnbk=
+github.com/rancher/rke v1.0.0-rc5 h1:sBNOCW8qIqqEhg9MWo64bsHuejf/Dk/i6vNbniUh8m8=
+github.com/rancher/rke v1.0.0-rc5/go.mod h1:PWHXovLJffPYxKkXXlym+S2OYnw1ws2nngbC9efmnbk=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bHn7qfRXZO9WKtBe8b4vhucg9lg=
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
