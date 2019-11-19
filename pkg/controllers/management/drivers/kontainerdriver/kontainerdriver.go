@@ -312,6 +312,13 @@ func toResourceField(name string, flag *types.Flag) (string, v3.Field, error) {
 		if flag.Default != nil {
 			field.Default.StringSliceValue = flag.Default.DefaultStringSlice.Value
 		}
+	} else if flag.Type == types.StringMapType {
+		field.Type = "map[json]"
+
+		if flag.Default != nil {
+			// Intentionally using StringSlice here as data transfer is done as a slice of strings
+			field.Default.StringSliceValue = flag.Default.DefaultStringSlice.Value
+		}
 	} else {
 		return name, field, fmt.Errorf("unknown type of flag %v: %v", flag, reflect.TypeOf(flag))
 	}
