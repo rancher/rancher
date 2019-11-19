@@ -19,7 +19,7 @@ mkdir -p /opt/jail/$NAME/management-state/bin
 mkdir -p /opt/jail/$NAME/tmp
 
 # Copy over required files to the jail
-if [[ -d /lib64 ]]; then 
+if [[ -d /lib64 ]]; then
   cp -r /lib64 /opt/jail/$NAME
 fi
 
@@ -52,13 +52,13 @@ fi
 # Hard link driver binaries
 cp -r -l /opt/drivers/management-state/bin /opt/jail/$NAME/var/lib/rancher/management-state
 
-# Hard link docker-machine into the jail 
-cp -l /usr/bin/docker-machine /opt/jail/$NAME/usr/bin
+# Hard link rancher-machine into the jail
+cp -l /usr/bin/rancher-machine /opt/jail/$NAME/usr/bin
 
-# Hard link helm into the jail 
+# Hard link helm into the jail
 cp -l /usr/bin/rancher-helm /opt/jail/$NAME/usr/bin
 
-# Hard link tiller into the jail 
+# Hard link tiller into the jail
 cp -l /usr/bin/rancher-tiller /opt/jail/$NAME/usr/bin
 
 # Hard link ssh into the jail
