@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/norman/types"
 	clusterController "github.com/rancher/rancher/pkg/controllers/user"
 	"github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/pki/cert"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -453,13 +454,18 @@ func (m *Manager) cluster(apiContext *types.APIContext, context types.StorageCon
 }
 
 func (m *Manager) KubeConfig(clusterName, token string) *clientcmdapi.Config {
+	baseURL := fmt.Sprintf("https://localhost:%d", m.httpsPort)
+	if serverURL := settings.ServerURL.Get(); serverURL != "" {
+		baseURL = serverURL
+	}
+
 	return &clientcmdapi.Config{
 		CurrentContext: "default",
 		APIVersion:     "v1",
 		Kind:           "Config",
 		Clusters: map[string]*clientcmdapi.Cluster{
 			"default": {
-				Server:                fmt.Sprintf("https://localhost:%d/k8s/clusters/%s", m.httpsPort, clusterName),
+				Server:                fmt.Sprintf("%s/k8s/clusters/%s", baseURL, clusterName),
 				InsecureSkipTLSVerify: true,
 			},
 		},
