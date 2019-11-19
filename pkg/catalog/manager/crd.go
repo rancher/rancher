@@ -52,7 +52,10 @@ func (m *Manager) getTemplateMap(catalogName string, namespace string) (map[stri
 }
 
 func (m *Manager) updateTemplate(template *v3.CatalogTemplate, toUpdate v3.CatalogTemplate) error {
-	r, _ := labels.NewRequirement(TemplateNameLabel, selection.Equals, []string{template.Name})
+	r, err := labels.NewRequirement(TemplateNameLabel, selection.Equals, []string{template.Name})
+	if err != nil {
+		return err
+	}
 	templateVersions, err := m.templateVersionLister.List(template.Namespace, labels.NewSelector().Add(*r))
 	if err != nil {
 		return errors.Wrapf(err, "failed to list templateVersions")
@@ -145,7 +148,10 @@ func mergeLabels(set1, set2 map[string]string) map[string]string {
 
 func (m *Manager) getTemplateVersion(templateName string, namespace string) (map[string]struct{}, error) {
 	//because templates is a cluster resource now so we set namespace to "" when listing it.
-	r, _ := labels.NewRequirement(TemplateNameLabel, selection.Equals, []string{templateName})
+	r, err := labels.NewRequirement(TemplateNameLabel, selection.Equals, []string{templateName})
+	if err != nil {
+		return nil, err
+	}
 	templateVersions, err := m.templateVersionLister.List(namespace, labels.NewSelector().Add(*r))
 	if err != nil {
 		return nil, err
