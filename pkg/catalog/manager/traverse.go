@@ -18,6 +18,7 @@ import (
 )
 
 func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *CatalogInfo) error {
+
 	var templateNamespace string
 	catalog := cmt.catalog
 	projectCatalog := cmt.projectCatalog

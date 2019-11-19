@@ -107,6 +107,7 @@ func (m *Manager) updateTemplate(template *v3.CatalogTemplate, toUpdate v3.Catal
 			if err := m.templateVersionClient.DeleteNamespaced(template.Namespace, tv.Name, &metav1.DeleteOptions{}); err != nil && !kerrors.IsNotFound(err) {
 				return false, err
 			}
+			updated = true
 		}
 	}
 
