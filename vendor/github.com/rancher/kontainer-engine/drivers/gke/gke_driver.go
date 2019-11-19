@@ -90,6 +90,8 @@ type state struct {
 	LegacyAbac bool
 	// NodePool id
 	NodePoolID string
+	// Default max pods per node
+	DefaultMaxPodsConstraint int64
 
 	EnableStackdriverLogging    *bool
 	EnableStackdriverMonitoring *bool
@@ -175,7 +177,7 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		},
 	}
 	driverFlag.Options["labels"] = &types.Flag{
-		Type:  types.StringSliceType,
+		Type:  types.StringMapType,
 		Usage: "The map of Kubernetes labels (key/value pairs) to be applied to each node",
 	}
 	driverFlag.Options["machine-type"] = &types.Flag{
@@ -209,8 +211,15 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Usage: "When to performance updates on the nodes, in 24-hour time (e.g. \"19:00\")",
 	}
 	driverFlag.Options["resource-labels"] = &types.Flag{
-		Type:  types.StringSliceType,
+		Type:  types.StringMapType,
 		Usage: "The map of Kubernetes labels (key/value pairs) to be applied to each cluster",
+	}
+	driverFlag.Options["annotations"] = &types.Flag{
+		Type:  types.StringMapType,
+		Usage: "Annotations map of Kubernetes labels (key/value pairs) to be applied to each cluster",
+		Default: &types.Default{
+			DefaultStringSlice: &types.StringSlice{Value: []string{}}, //avoid nil value for init
+		},
 	}
 	driverFlag.Options["enable-nodepool-autoscaling"] = &types.Flag{
 		Type:  types.BoolType,
@@ -373,6 +382,13 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Usage: "Enable network policy config for the cluster",
 		Default: &types.Default{
 			DefaultBool: true,
+		},
+	}
+	driverFlag.Options["default-max-pods-constraint"] = &types.Flag{
+		Type:  types.IntType,
+		Usage: "Default max pods per node",
+		Default: &types.Default{
+			DefaultInt: 110,
 		},
 	}
 	return &driverFlag, nil
@@ -540,6 +556,8 @@ func getStateFromOpts(driverOptions *types.DriverOptions) (state, error) {
 	d.EnableStackdriverMonitoring, _ = options.GetValueFromDriverOptions(driverOptions, types.BoolPointerType, "enable-stackdriver-monitoring", "enableStackdriverMonitoring").(*bool)
 	d.MaintenanceWindow = options.GetValueFromDriverOptions(driverOptions, types.StringType, "maintenance-window", "maintenanceWindow").(string)
 
+	d.DefaultMaxPodsConstraint = options.GetValueFromDriverOptions(driverOptions, types.IntType, "default-max-pods-constraint", "defaultMaxPodsConstraint").(int64)
+
 	return d, d.validate()
 }
 
@@ -669,7 +687,7 @@ func (d *Driver) Update(ctx context.Context, info *types.ClusterInfo, opts *type
 		log.Infof(ctx, "Updating node version to %v", newState.NodeVersion)
 		operation, err := svc.Projects.Locations.Clusters.NodePools.Update(
 			nodePoolRRN(state.ProjectID, state.location(), state.Name, state.NodePoolID), &raw.UpdateNodePoolRequest{
-				NodeVersion: state.NodeVersion,
+				NodeVersion: newState.NodeVersion,
 			}).Context(ctx).Do()
 		if err != nil {
 			return nil, err
@@ -776,6 +794,9 @@ func (d *Driver) generateClusterCreateRequest(state state) *raw.CreateClusterReq
 		}
 	}
 	request.Cluster.Locations = state.Locations
+	request.Cluster.DefaultMaxPodsConstraint = &raw.MaxPodsConstraint{
+		MaxPodsPerNode: state.DefaultMaxPodsConstraint,
+	}
 
 	return &request
 }
@@ -992,7 +1013,7 @@ func (d *Driver) getClusterStats(ctx context.Context, info *types.ClusterInfo) (
 		return nil, err
 	}
 
-	cluster, err := svc.Projects.Zones.Clusters.Get(state.ProjectID, state.location(), state.Name).Context(ctx).Do()
+	cluster, err := svc.Projects.Locations.Clusters.Get(clusterRRN(state.ProjectID, state.location(), state.Name)).Context(ctx).Do()
 
 	if err != nil {
 		return nil, fmt.Errorf("error getting cluster info: %v", err)

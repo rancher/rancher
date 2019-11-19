@@ -2,6 +2,9 @@ package util
 
 import (
 	"fmt"
+	"math"
+	"regexp"
+	"strings"
 	"time"
 
 	errs "github.com/pkg/errors"
@@ -141,4 +144,27 @@ func ConvertToRkeConfig(config string) (v3.RancherKubernetesEngineConfig, error)
 		return rkeConfig, err
 	}
 	return rkeConfig, nil
+}
+
+// cleanCloudTag cleanses a string to use as a tag/label key/value suitable for all cloud providers
+func cleanCloudTag(input string) string {
+	maxLength := 50
+	validChars := regexp.MustCompile(`[^a-z0-9-_]`)
+	replacementChar := "_"
+
+	lastCharPos := int(math.Min(float64(len(input)), float64(maxLength)))
+	output := strings.ToLower(input)[0:lastCharPos]
+	output = validChars.ReplaceAllString(output, replacementChar)
+
+	return output
+}
+
+// AnnotationPair returns the key and value component for an annotation key=value pair
+func AnnotationPair(input string) (string, string) {
+	split := strings.SplitAfterN(input, "=", 2)
+
+	key := split[0][:len(split[0])-1]
+	value := split[1]
+
+	return cleanCloudTag(key), cleanCloudTag(value)
 }

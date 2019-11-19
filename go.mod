@@ -10,6 +10,9 @@ replace (
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009
 
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.3
+
+	github.com/rancher/kontainer-engine => github.com/confluentinc/kontainer-engine v0.0.0-20191114103402-ae8652c627ba
+
 	k8s.io/api => k8s.io/api v0.0.0-20190918155943-95b840bb6a1f
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.0.0-20190918161926-8f644eb6e783
 	k8s.io/apimachinery => k8s.io/apimachinery v0.0.0-20190913080033-27d36303b655
@@ -35,11 +38,11 @@ replace (
 )
 
 require (
-	github.com/Azure/azure-sdk-for-go v32.5.0+incompatible
-	github.com/Azure/go-autorest/autorest v0.9.0
-	github.com/Azure/go-autorest/autorest/adal v0.5.0
+	github.com/Azure/azure-sdk-for-go v33.2.0+incompatible
+	github.com/Azure/go-autorest/autorest v0.9.1
+	github.com/Azure/go-autorest/autorest/adal v0.6.0
 	github.com/DataDog/zstd v1.4.1 // indirect
-	github.com/aws/aws-sdk-go v1.16.26
+	github.com/aws/aws-sdk-go v1.25.29
 	github.com/beevik/etree v0.0.0-20171015221209-af219c0c7ea1 // indirect
 	github.com/bep/debounce v1.2.0
 	github.com/blang/semver v3.5.1+incompatible

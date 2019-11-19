@@ -17,6 +17,8 @@ const (
 	IntPointerType = "intPtr"
 	// StringSliceType is the type for stringSlice flag
 	StringSliceType = "stringSlice"
+	// StringMapType mostly works like a stringSlice for data transfer but sets a different type for norman dynamic schema purposes
+	StringMapType = "stringMap"
 )
 
 type CloseableDriver interface {

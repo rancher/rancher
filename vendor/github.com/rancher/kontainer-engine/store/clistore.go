@@ -159,7 +159,7 @@ func storeConfig(c cluster.Cluster) error {
 	cluster := ConfigCluster{
 		Cluster: DataCluster{
 			CertificateAuthorityData: string(c.RootCACert),
-			Server: host,
+			Server:                   host,
 		},
 		Name: c.Name,
 	}

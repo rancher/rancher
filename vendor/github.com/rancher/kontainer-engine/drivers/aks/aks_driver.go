@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2018-03-31/containerservice"
+	"github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2019-08-01/containerservice"
 	"github.com/Azure/azure-sdk-for-go/services/preview/operationalinsights/mgmt/2015-11-01-preview/operationalinsights"
-	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2017-05-10/resources"
+	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2019-03-01/resources"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -114,6 +114,22 @@ type state struct {
 	Tags map[string]string `json:"tags,omitempty"`
 
 	/**
+	Auto-scaling related properties
+	*/
+	// Should we enable auto-scaling
+	EnableAutoScaling bool `json:"enableAutoScaling,omitempty"`
+	// Minimum number of nodes in the cluster (when auto-scaling is enabled)
+	MinCount int64 `json:"minCount,omitempty"`
+	// Maximum number of nodes in the cluster (when auto-scaling is enabled)
+	MaxCount int64 `json:"maxCount,omitempty"`
+	// Agent pool type (VirtualMachineScaleSets or AvailabilitySet)
+	AgentPoolType string `json:"agentPoolType,omitempty"`
+	// Availability zones to use
+	AvailabilityZones []string `json:"availabilityZones,omitempty"`
+	// Load balancer type (must be standard for auto-scaling)
+	LoadBalancerSku string `json:"loadBalancerSku,omitempty"`
+
+	/**
 	Azure Kubernetes Service API Metadata & Authentication
 	*/
 	// BaseURL specifies the Azure Resource management endpoint, it defaults "https://management.azure.com/". [requirement]
@@ -210,6 +226,10 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Usage: `The name of an existing Azure Log Analytics Workspace to use for storing monitoring data. If not specified, uses '{resource group}-{subscription id}-{location code}'.`,
 	}
 
+	driverFlag.Options["agent-dns-prefix"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "DNS prefix to be used to create the FQDN for the agent pool.",
+	}
 	driverFlag.Options["count"] = &types.Flag{
 		Type:  types.IntType,
 		Usage: "Number of machines (VMs) in the agent pool. Allowed values must be in the range of 1 to 100 (inclusive).",
@@ -242,7 +262,7 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 	driverFlag.Options["agent-vm-size"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "Size of machine in the agent pool.",
-		Value: string(containerservice.StandardD1V2),
+		Value: string(containerservice.VMSizeTypesStandardD1V2),
 	}
 	driverFlag.Options["virtual-network-resource-group"] = &types.Flag{
 		Type:  types.StringType,
@@ -310,11 +330,55 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Usage: "Specify the version of Kubernetes.",
 		Value: "1.11.5",
 	}
-	driverFlag.Options["tags"] = &types.Flag{
+	driverFlag.Options["enable-auto-scaling"] = &types.Flag{
+		Type:  types.BoolType,
+		Usage: "Should we enable auto-scaling.",
+		Default: &types.Default{
+			DefaultBool: false,
+		},
+	}
+	driverFlag.Options["min-count"] = &types.Flag{
+		Type:  types.IntType,
+		Usage: "Minimum number of nodes in the cluster (when auto-scaling is enabled).",
+		Default: &types.Default{
+			DefaultInt: 1,
+		},
+	}
+	driverFlag.Options["max-count"] = &types.Flag{
+		Type:  types.IntType,
+		Usage: "Maximum number of nodes in the cluster (when auto-scaling is enabled).",
+		Default: &types.Default{
+			DefaultInt: 3,
+		},
+	}
+	driverFlag.Options["agent-pool-type"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "Agent pool type (VirtualMachineScaleSets or AvailabilitySet).",
+		Value: "AvailabilitySet",
+	}
+	driverFlag.Options["availability-zones"] = &types.Flag{
 		Type:  types.StringSliceType,
+		Usage: "Availability zones to setup agent pools for.",
+		Default: &types.Default{
+			DefaultStringSlice: &types.StringSlice{Value: []string{"1"}}, //avoid nil value for init
+		},
+	}
+	driverFlag.Options["load-balancer-sku"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "Load balancer SKU (Basic or Standard).",
+		Value: "Basic",
+	}
+	driverFlag.Options["tags"] = &types.Flag{
+		Type:  types.StringMapType,
 		Usage: "Tags for Kubernetes cluster. For example, foo=bar.",
 	}
-
+	driverFlag.Options["annotations"] = &types.Flag{
+		Type:  types.StringMapType,
+		Usage: "Annotations for Kubernetes cluster (appended to tags). For example, foo=bar.",
+		Default: &types.Default{
+			DefaultStringSlice: &types.StringSlice{Value: []string{}}, //avoid nil value for init
+		},
+	}
 	driverFlag.Options["base-url"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "Different resource management API url to use.",
@@ -389,9 +453,54 @@ func (d *Driver) GetDriverUpdateOptions(ctx context.Context) (*types.DriverFlags
 		Usage: "Specify the version of Kubernetes.",
 		Value: "1.11.5",
 	}
-	driverFlag.Options["tags"] = &types.Flag{
+	driverFlag.Options["enable-auto-scaling"] = &types.Flag{
+		Type:  types.BoolType,
+		Usage: "Should we enable auto-scaling.",
+		Default: &types.Default{
+			DefaultBool: false,
+		},
+	}
+	driverFlag.Options["min-count"] = &types.Flag{
+		Type:  types.IntType,
+		Usage: "Minimum number of nodes in the cluster (when auto-scaling is enabled).",
+		Default: &types.Default{
+			DefaultInt: 1,
+		},
+	}
+	driverFlag.Options["max-count"] = &types.Flag{
+		Type:  types.IntType,
+		Usage: "Maximum number of nodes in the cluster (when auto-scaling is enabled).",
+		Default: &types.Default{
+			DefaultInt: 3,
+		},
+	}
+	driverFlag.Options["agent-pool-type"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "Agent pool type (VirtualMachineScaleSets or AvailabilitySet).",
+		Value: "AvailabilitySet",
+	}
+	driverFlag.Options["availability-zones"] = &types.Flag{
 		Type:  types.StringSliceType,
+		Usage: "Ava.",
+		Default: &types.Default{
+			DefaultStringSlice: &types.StringSlice{Value: []string{}}, //avoid nil value for init
+		},
+	}
+	driverFlag.Options["load-balancer-sku"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "Load balancer SKU (Basic or Standard).",
+		Value: "Basic",
+	}
+	driverFlag.Options["tags"] = &types.Flag{
+		Type:  types.StringMapType,
 		Usage: "Tags for Kubernetes cluster. For example, foo=bar.",
+	}
+	driverFlag.Options["annotations"] = &types.Flag{
+		Type:  types.StringMapType,
+		Usage: "Annotations for Kubernetes cluster (appended to tags). For example, foo=bar.",
+		Default: &types.Default{
+			DefaultStringSlice: &types.StringSlice{Value: []string{}}, //avoid nil value for init
+		},
 	}
 	driverFlag.Options["client-id"] = &types.Flag{
 		Type:  types.StringType,
@@ -424,6 +533,7 @@ func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state.LogAnalyticsWorkspaceResourceGroup = options.GetValueFromDriverOptions(driverOptions, types.StringType, "log-analytics-workspace-resource-group", "logAnalyticsWorkspaceResourceGroup").(string)
 	state.LogAnalyticsWorkspace = options.GetValueFromDriverOptions(driverOptions, types.StringType, "log-analytics-workspace", "logAnalyticsWorkspace").(string)
 
+	state.AgentDNSPrefix = options.GetValueFromDriverOptions(driverOptions, types.StringType, "agent-dns-prefix", "agentDnsPrefix").(string)
 	state.AgentCount = options.GetValueFromDriverOptions(driverOptions, types.IntType, "count").(int64)
 	state.AgentMaxPods = options.GetValueFromDriverOptions(driverOptions, types.IntType, "max-pods", "maxPods").(int64)
 	state.AgentName = options.GetValueFromDriverOptions(driverOptions, types.StringType, "agent-pool-name", "agentPoolName").(string)
@@ -444,6 +554,17 @@ func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 	state.NetworkPodCIDR = options.GetValueFromDriverOptions(driverOptions, types.StringType, "pod-cidr", "podCidr").(string)
 	state.NetworkServiceCIDR = options.GetValueFromDriverOptions(driverOptions, types.StringType, "service-cidr", "serviceCidr").(string)
 
+	state.EnableAutoScaling = options.GetValueFromDriverOptions(driverOptions, types.BoolType, "enable-auto-scaling", "enableAutoScaling").(bool)
+	state.MinCount = options.GetValueFromDriverOptions(driverOptions, types.IntType, "min-count", "minCount").(int64)
+	state.MaxCount = options.GetValueFromDriverOptions(driverOptions, types.IntType, "max-count", "maxCount").(int64)
+	state.AgentPoolType = options.GetValueFromDriverOptions(driverOptions, types.StringType, "agent-pool-type", "agentPoolType").(string)
+	azValues := options.GetValueFromDriverOptions(driverOptions, types.StringSliceType, "availability-zones", "availabilityZones").(*types.StringSlice)
+	state.AvailabilityZones = []string{}
+	for _, vals := range azValues.Value {
+		state.AvailabilityZones = append(state.AvailabilityZones, vals)
+	}
+	state.LoadBalancerSku = options.GetValueFromDriverOptions(driverOptions, types.StringType, "load-balancer-sku", "loadBalancerSku").(string)
+
 	state.Location = options.GetValueFromDriverOptions(driverOptions, types.StringType, "location").(string)
 	state.DNSPrefix = options.GetValueFromDriverOptions(driverOptions, types.StringType, "master-dns-prefix", "masterDnsPrefix").(string)
 	state.KubernetesVersion = options.GetValueFromDriverOptions(driverOptions, types.StringType, "kubernetes-version", "kubernetesVersion").(string)
@@ -454,6 +575,11 @@ func getStateFromOptions(driverOptions *types.DriverOptions) (state, error) {
 		if len(kv) == 2 {
 			state.Tags[kv[0]] = kv[1]
 		}
+	}
+	annotationValues := options.GetValueFromDriverOptions(driverOptions, types.StringSliceType, "annotations").(*types.StringSlice)
+	for _, pair := range annotationValues.Value {
+		key, value := util.AnnotationPair(pair)
+		state.Tags[key] = value
 	}
 
 	state.BaseURL = options.GetValueFromDriverOptions(driverOptions, types.StringType, "base-url", "baseUrl").(string)
@@ -494,6 +620,18 @@ func (state state) validate() error {
 
 	if state.LinuxSSHPublicKeyContents == "" {
 		return fmt.Errorf(`"ssh public key contents" is required`)
+	}
+
+	if state.AgentCount < state.MinCount {
+		return fmt.Errorf(`"agent count" must be greater than min count`)
+	}
+
+	if state.AgentCount > state.MaxCount {
+		return fmt.Errorf(`"agent count" must be less than max count`)
+	}
+
+	if state.MinCount > state.MaxCount {
+		return fmt.Errorf(`"min count" must be less than "max count"`)
 	}
 
 	return nil
@@ -727,7 +865,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 	}
 
 	var vmNetSubnetID *string
-	var networkProfile *containerservice.NetworkProfile
+	var networkProfile *containerservice.NetworkProfileType
 	if driverState.hasCustomVirtualNetwork() {
 		virtualNetworkResourceGroup := driverState.ResourceGroup
 
@@ -744,10 +882,16 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 			driverState.Subnet,
 		))
 
-		networkProfile = &containerservice.NetworkProfile{
+		loadBalancerSku := containerservice.Basic
+		if driverState.LoadBalancerSku != "" {
+			loadBalancerSku = containerservice.LoadBalancerSku(driverState.LoadBalancerSku)
+		}
+
+		networkProfile = &containerservice.NetworkProfileType{
 			DNSServiceIP:     to.StringPtr(driverState.NetworkDNSServiceIP),
 			DockerBridgeCidr: to.StringPtr(driverState.NetworkDockerBridgeCIDR),
 			ServiceCidr:      to.StringPtr(driverState.NetworkServiceCIDR),
+			LoadBalancerSku:  loadBalancerSku,
 		}
 
 		if driverState.NetworkPlugin == "" {
@@ -766,7 +910,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 		}
 	}
 
-	var agentPoolProfiles *[]containerservice.ManagedClusterAgentPoolProfile
+	var agentPoolProfiles []containerservice.ManagedClusterAgentPoolProfile
 	if driverState.hasAgentPoolProfile() {
 		var countPointer *int32
 		if driverState.AgentCount > 0 {
@@ -787,27 +931,58 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 			osDiskSizeGBPointer = to.Int32Ptr(int32(driverState.AgentOsdiskSizeGB))
 		}
 
-		agentStorageProfile := containerservice.ManagedDisks
-		if driverState.AgentStorageProfile != "" {
-			agentStorageProfile = containerservice.StorageProfileTypes(driverState.AgentStorageProfile)
+		agentDNSPrefix := driverState.AgentDNSPrefix
+		if agentDNSPrefix == "" {
+			agentDNSPrefix = driverState.getDefaultDNSPrefix() + "-agent"
 		}
 
-		agentVMSize := containerservice.StandardD1V2
+		agentVMSize := containerservice.VMSizeTypesStandardD1V2
 		if driverState.AgentVMSize != "" {
 			agentVMSize = containerservice.VMSizeTypes(driverState.AgentVMSize)
 		}
 
-		agentPoolProfiles = &[]containerservice.ManagedClusterAgentPoolProfile{
-			{
-				Count:          countPointer,
-				MaxPods:        maxPodsPointer,
-				Name:           to.StringPtr(driverState.AgentName),
-				OsDiskSizeGB:   osDiskSizeGBPointer,
-				OsType:         containerservice.Linux,
-				StorageProfile: agentStorageProfile,
-				VMSize:         agentVMSize,
-				VnetSubnetID:   vmNetSubnetID,
-			},
+		enableAutoScaling := to.BoolPtr(driverState.EnableAutoScaling)
+
+		var minCount *int32
+		if driverState.MinCount > 0 {
+			minCount = to.Int32Ptr(int32(driverState.MinCount))
+		} else {
+			minCount = to.Int32Ptr(1)
+		}
+
+		var maxCount *int32
+		if driverState.MaxCount > 0 {
+			maxCount = to.Int32Ptr(int32(driverState.MaxCount))
+		} else {
+			maxCount = to.Int32Ptr(1)
+		}
+
+		agentPoolType := containerservice.AvailabilitySet
+		if driverState.AgentPoolType != "" {
+			agentPoolType = containerservice.AgentPoolType(driverState.AgentPoolType)
+		}
+
+		agentPoolProfiles = []containerservice.ManagedClusterAgentPoolProfile{}
+		for _, availabilityZone := range driverState.AvailabilityZones {
+			tmpProfile := containerservice.ManagedClusterAgentPoolProfile{
+				Count:               countPointer,
+				MaxPods:             maxPodsPointer,
+				Name:                to.StringPtr(driverState.AgentName),
+				OsDiskSizeGB:        osDiskSizeGBPointer,
+				OsType:              containerservice.Linux,
+				VMSize:              agentVMSize,
+				VnetSubnetID:        vmNetSubnetID,
+				OrchestratorVersion: to.StringPtr(driverState.KubernetesVersion),
+				EnableAutoScaling:   enableAutoScaling,
+			}
+			if *enableAutoScaling {
+				tmpProfile.Name = to.StringPtr(driverState.AgentName + string(availabilityZone))
+				tmpProfile.MinCount = minCount
+				tmpProfile.MaxCount = maxCount
+				tmpProfile.Type = agentPoolType
+				tmpProfile.AvailabilityZones = &[]string{availabilityZone}
+			}
+			agentPoolProfiles = append(agentPoolProfiles, tmpProfile)
 		}
 	}
 
@@ -833,7 +1008,7 @@ func (d *Driver) createOrUpdate(ctx context.Context, options *types.DriverOption
 			DNSPrefix:         to.StringPtr(masterDNSPrefix),
 			AadProfile:        aadProfile,
 			AddonProfiles:     addonProfiles,
-			AgentPoolProfiles: agentPoolProfiles,
+			AgentPoolProfiles: &agentPoolProfiles,
 			LinuxProfile:      linuxProfile,
 			NetworkProfile:    networkProfile,
 			ServicePrincipalProfile: &containerservice.ManagedClusterServicePrincipalProfile{
@@ -1166,7 +1341,12 @@ func (d *Driver) GetClusterSize(ctx context.Context, info *types.ClusterInfo) (*
 		return nil, fmt.Errorf("error getting cluster info: %v", err)
 	}
 
-	return &types.NodeCount{Count: int64(*(*result.AgentPoolProfiles)[0].Count)}, nil
+	var count int64
+	for _, profile := range *result.AgentPoolProfiles {
+		count += int64(*profile.Count)
+	}
+
+	return &types.NodeCount{Count: count}, nil
 }
 
 func (d *Driver) SetClusterSize(ctx context.Context, info *types.ClusterInfo, size *types.NodeCount) error {
@@ -1189,7 +1369,16 @@ func (d *Driver) SetClusterSize(ctx context.Context, info *types.ClusterInfo, si
 	}
 
 	// mutate struct
-	(*cluster.ManagedClusterProperties.AgentPoolProfiles)[0].Count = to.Int32Ptr(int32(size.Count))
+	countPerProfile := to.Int32Ptr(int32(size.Count))
+	for _, profile := range *cluster.ManagedClusterProperties.AgentPoolProfiles {
+		profile.Count = countPerProfile
+		if *profile.MaxCount < *profile.Count {
+			profile.MaxCount = profile.Count
+		}
+		if *profile.MinCount > *profile.Count && *profile.Count > 0 {
+			profile.MinCount = profile.Count
+		}
+	}
 
 	// PUT same data
 	_, err = client.CreateOrUpdate(context.Background(), state.ResourceGroup, state.Name, cluster)

@@ -122,8 +122,8 @@ func flatten(data map[string]interface{}, driverOptions *types.DriverOptions) {
 		case []string:
 			driverOptions.StringSliceOptions[k] = &types.StringSlice{Value: v.([]string)}
 		case map[string]interface{}:
-			// hack for labels
-			if k == "labels" {
+			// hack for labels & annotations
+			if k == "labels" || k == "annotations" {
 				r := []string{}
 				for key1, value1 := range v.(map[string]interface{}) {
 					r = append(r, fmt.Sprintf("%v=%v", key1, value1))

@@ -6,12 +6,11 @@ package restjson
 //go:generate go run -tags codegen ../../../models/protocol_tests/generate.go ../../../models/protocol_tests/output/rest-json.json unmarshal_test.go
 
 import (
-	"encoding/json"
-	"io"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/private/protocol/json/jsonutil"
 	"github.com/aws/aws-sdk-go/private/protocol/jsonrpc"
 	"github.com/aws/aws-sdk-go/private/protocol/rest"
 )
@@ -33,6 +32,9 @@ func Build(r *request.Request) {
 	rest.Build(r)
 
 	if t := rest.PayloadType(r.Params); t == "structure" || t == "" {
+		if v := r.HTTPRequest.Header.Get("Content-Type"); len(v) == 0 {
+			r.HTTPRequest.Header.Set("Content-Type", "application/json")
+		}
 		jsonrpc.Build(r)
 	}
 }
@@ -56,17 +58,11 @@ func UnmarshalError(r *request.Request) {
 	defer r.HTTPResponse.Body.Close()
 
 	var jsonErr jsonErrorResponse
-	err := json.NewDecoder(r.HTTPResponse.Body).Decode(&jsonErr)
-	if err == io.EOF {
+	err := jsonutil.UnmarshalJSONError(&jsonErr, r.HTTPResponse.Body)
+	if err != nil {
 		r.Error = awserr.NewRequestFailure(
-			awserr.New("SerializationError", r.HTTPResponse.Status, nil),
-			r.HTTPResponse.StatusCode,
-			r.RequestID,
-		)
-		return
-	} else if err != nil {
-		r.Error = awserr.NewRequestFailure(
-			awserr.New("SerializationError", "failed decoding REST JSON error response", err),
+			awserr.New(request.ErrCodeSerialization,
+				"failed to unmarshal response error", err),
 			r.HTTPResponse.StatusCode,
 			r.RequestID,
 		)
