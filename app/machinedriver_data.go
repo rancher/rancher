@@ -27,7 +27,7 @@ const (
 )
 
 var driverData = map[string]map[string][]string{
-	Amazonec2driver:    {"publicCredentialFields": []string{"accessKey", "region"}, "privateCredentialFields": []string{"secretKey"}},
+	Amazonec2driver:    {"publicCredentialFields": []string{"accessKey", "region"}, "privateCredentialFields": []string{"secretKey", "sessionToken"}},
 	Azuredriver:        {"publicCredentialFields": []string{"clientId", "subscriptionId"}, "privateCredentialFields": []string{"clientSecret"}},
 	DigitalOceandriver: {"privateCredentialFields": []string{"accessToken"}},
 	ExoscaleDriver:     {"privateCredentialFields": []string{"apiSecretKey"}},
@@ -66,7 +66,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 		return err
 	}
 	if err := addMachineDriver(Amazonec2driver, "local://", "", "",
-		[]string{"iam.amazonaws.com", "iam.%.amazonaws.com.cn", "ec2.%.amazonaws.com", "ec2.%.amazonaws.com.cn"},
+		[]string{"iam.amazonaws.com", "iam.%.amazonaws.com.cn", "ec2.%.amazonaws.com", "ec2.%.amazonaws.com.cn", "eks.%.amazonaws.com", "eks.%.amazonaws.com.cn"},
 		true, true, management); err != nil {
 		return err
 	}
