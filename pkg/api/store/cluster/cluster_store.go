@@ -69,10 +69,14 @@ func (t *transformer) transposeGenericConfigToDynamicField(data map[string]inter
 		}
 
 		var driver *v3.KontainerDriver
-		driverName := data["genericEngineConfig"].(map[string]interface{})[clusterprovisioner.DriverNameField].(string)
+		driverName := data["genericEngineConfig"].(map[string]interface{})[clusterprovisioner.DriverNameField]
+		if driverName == nil || driverName.(string) == "" {
+			return nil, errors.New("required 'genericEngineConfig.driverName' is not set")
+		}
+
 		// iterate over kontainer drivers to find the one that maps to the genericEngineConfig DriverName ("kd-**") -> "example"
 		for _, candidate := range drivers {
-			if driverName == candidate.Name {
+			if driverName.(string) == candidate.Name {
 				driver = candidate
 				break
 			}
