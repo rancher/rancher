@@ -36,6 +36,7 @@ func newGlobalRoleBindingLifecycle(management *config.ManagementContext) *global
 	return &globalRoleBindingLifecycle{
 		crbLister:    management.RBAC.ClusterRoleBindings("").Controller().Lister(),
 		crbClient:    management.RBAC.ClusterRoleBindings(""),
+		grbClient:    management.Management.GlobalRoleBindings(""),
 		grLister:     management.Management.GlobalRoles("").Controller().Lister(),
 		roles:        management.RBAC.Roles(""),
 		roleBindings: management.RBAC.RoleBindings(""),
@@ -46,6 +47,7 @@ type globalRoleBindingLifecycle struct {
 	crbLister    rbacv1.ClusterRoleBindingLister
 	grLister     v3.GlobalRoleLister
 	crbClient    rbacv1.ClusterRoleBindingInterface
+	grbClient    v3.GlobalRoleBindingInterface
 	roles        rbacv1.RoleInterface
 	roleBindings rbacv1.RoleBindingInterface
 }
