@@ -18,7 +18,7 @@ ARG SYSTEM_CHART_DEFAULT_BRANCH=release-v2.3
 ENV CATTLE_SYSTEM_CHART_DEFAULT_BRANCH=$SYSTEM_CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.14.3-rancher1
 ENV CATTLE_K3S_VERSION v0.8.0
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher20-1
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher23
 ENV CATTLE_ETCD_VERSION v3.3.14
 ENV LOGLEVEL_VERSION v0.1.2
 ENV TINI_VERSION v0.18.0
@@ -33,7 +33,7 @@ RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     git clone -b master --single-branch https://github.com/rancher/charts /var/lib/rancher-data/local-catalogs/library
 
 
-RUN curl -sLf https://github.com/rancher/machine-package/releases/download/${CATTLE_MACHINE_VERSION}/docker-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin && \
+RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin && \
     curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-${ARCH}-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin && \
     curl -LO https://github.com/linode/docker-machine-driver-linode/releases/download/${DOCKER_MACHINE_LINODE_VERSION}/docker-machine-driver-linode_linux-amd64.zip && \
     unzip docker-machine-driver-linode_linux-amd64.zip -d /opt/drivers/management-state/bin && \

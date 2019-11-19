@@ -62,9 +62,9 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		schemas:          management.Schemas,
 	}
 
-	version, err := getDockerMachineVersion()
+	version, err := getRancherMachineVersion()
 	if err != nil {
-		logrus.Warnf("error getting docker-machine version: %v", err)
+		logrus.Warnf("error getting rancher-machine version: %v", err)
 	}
 	nodeDriverLifecycle.dockerMachineVersion = version
 
@@ -297,7 +297,7 @@ func (m *Lifecycle) checkDriverVersion(obj *v3.NodeDriver) bool {
 		}
 	}
 
-	// Builtin drivers use the docker-machine version to validate against
+	// Builtin drivers use the rancher-machine version to validate against
 	if obj.Spec.Builtin {
 		if obj.Status.AppliedDockerMachineVersion != m.dockerMachineVersion {
 			return true
@@ -517,8 +517,8 @@ func updateDefault(credField v3.Field, val, kind string) v3.Field {
 	return credField
 }
 
-func getDockerMachineVersion() (string, error) {
-	cmd := exec.Command("docker-machine", "--version")
+func getRancherMachineVersion() (string, error) {
+	cmd := exec.Command("rancher-machine", "--version")
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }
