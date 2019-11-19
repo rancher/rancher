@@ -446,6 +446,7 @@ def get_role_nodes(cluster, role):
 
 def validate_ingress(p_client, cluster, workloads, host, path,
                      insecure_redirect=False):
+    time.sleep(10)
     curl_args = " "
     if (insecure_redirect):
         curl_args = " -L --insecure "
@@ -456,9 +457,10 @@ def validate_ingress(p_client, cluster, workloads, host, path,
     for node in nodes:
         host_ip = resolve_node_ip(node)
         url = "http://" + host_ip + path
-        wait_until_ok(url, timeout=300, headers={
-            "Host": host
-        })
+        if not insecure_redirect:
+            wait_until_ok(url, timeout=300, headers={
+                "Host": host
+            })
         cmd = curl_args + " " + url
         validate_http_response(cmd, target_name_list)
 
