@@ -41,7 +41,8 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 	newHelmVersionCommits := map[string]v3.VersionCommits{}
 	var errs []error
 	var terrors []error
-	createdTemplates, updatedTemplates, deletedTemplates := 0, 0, 0
+	var createErrors []error
+	createdTemplates, updatedTemplates, deletedTemplates, failedTemplates := 0, 0, 0, 0
 	for chart, metadata := range index.IndexFile.Entries {
 		newHelmVersionCommits[chart] = v3.VersionCommits{
 			Value: map[string]string{},
@@ -133,8 +134,10 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 			v.VersionName = version.Name
 			v.VersionURLs = version.URLs
 
-			v.UpgradeVersionLinks = map[string]string{}
 			for _, versionSpec := range template.Spec.Versions {
+				if v.UpgradeVersionLinks == nil {
+					v.UpgradeVersionLinks = map[string]string{}
+				}
 				if showUpgradeLinks(v.Version, versionSpec.Version) {
 					version := versionSpec.Version
 					v.UpgradeVersionLinks[versionSpec.Version] = fmt.Sprintf("%s-%s", template.Name, version)
@@ -209,10 +212,19 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 		existing, err := m.templateLister.Get(template.Namespace, template.Name)
 		if apierrors.IsNotFound(err) {
 			err = m.createTemplate(template, catalog)
-			createdTemplates++
+			if err != nil {
+				createErrors = append(createErrors, err)
+				failedTemplates++
+			} else {
+				createdTemplates++
+			}
 		} else if err == nil {
 			err = m.updateTemplate(existing, template)
-			updatedTemplates++
+			if err != nil {
+				failedTemplates++
+			} else {
+				updatedTemplates++
+			}
 		}
 		if err != nil {
 			delete(newHelmVersionCommits, template.Spec.DisplayName)
@@ -234,7 +246,7 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 		}
 		deletedTemplates++
 	}
-	logrus.Infof("Catalog sync done. %v templates created, %v templates updated, %v templates deleted", createdTemplates, updatedTemplates, deletedTemplates)
+	logrus.Infof("Catalog sync done. %v templates created, %v templates updated, %v templates deleted, %v templates failed", createdTemplates, updatedTemplates, deletedTemplates, failedTemplates)
 
 	catalog.Status.HelmVersionCommits = newHelmVersionCommits
 
@@ -246,6 +258,12 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 	cmt.catalog = catalog
 	cmt.projectCatalog = projectCatalog
 	cmt.clusterCatalog = clusterCatalog
+	if len(createErrors) > 0 {
+		if _, err := m.updateCatalogInfo(cmt, catalogType, "", false, true); err != nil {
+			return err
+		}
+		return errors.Errorf("failed to create templates. Multiple error occurred: %v", createErrors)
+	}
 	if len(terrors) > 0 {
 		if _, err := m.updateCatalogInfo(cmt, catalogType, "", false, true); err != nil {
 			return err
