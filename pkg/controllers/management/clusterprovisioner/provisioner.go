@@ -2,6 +2,7 @@ package clusterprovisioner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"path"
@@ -674,8 +675,11 @@ func (p *Provisioner) getDriver(cluster *v3.Cluster) (string, error) {
 	var err error
 
 	if cluster.Spec.GenericEngineConfig != nil {
-		kontainerDriverName := (*cluster.Spec.GenericEngineConfig)["driverName"].(string)
-		driver, err = p.KontainerDriverLister.Get("", kontainerDriverName)
+		kontainerDriverName := (*cluster.Spec.GenericEngineConfig)["driverName"]
+		if kontainerDriverName == nil || kontainerDriverName.(string) == "" {
+			return "", errors.New("required 'genericEngineConfig.driverName' is not set")
+		}
+		driver, err = p.KontainerDriverLister.Get("", kontainerDriverName.(string))
 		if err != nil {
 			return "", err
 		}
@@ -786,14 +790,6 @@ func (p *Provisioner) getSpec(cluster *v3.Cluster) (*v3.ClusterSpec, error) {
 	newSpec, newConfig, err := p.getConfig(true, censoredSpec, driverName, cluster.Name)
 	if err != nil {
 		return nil, err
-	}
-
-	// Version is the only parameter that can be updated for EKS, if they is equal we do not need to update
-	// TODO: Replace with logic that is more adaptable
-	if cluster.Spec.GenericEngineConfig != nil && (*cluster.Spec.GenericEngineConfig)["driverName"] == "amazonelasticcontainerservice" &&
-		cluster.Status.AppliedSpec.GenericEngineConfig != nil && (*cluster.Spec.GenericEngineConfig)["kubernetesVersion"] ==
-		(*cluster.Status.AppliedSpec.GenericEngineConfig)["kubernetesVersion"] {
-		return nil, nil
 	}
 
 	if reflect.DeepEqual(oldConfig, newConfig) {
