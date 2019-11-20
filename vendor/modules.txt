@@ -370,7 +370,7 @@ github.com/rancher/rke/pki/cert
 github.com/rancher/rke/services
 github.com/rancher/rke/templates
 github.com/rancher/rke/util
-# github.com/rancher/types v0.0.0-20191114201118-5469d35f9511
+# github.com/rancher/types v0.0.0-20191120215848-7193c7169517
 github.com/rancher/types/apis/apiregistration.k8s.io/v1
 github.com/rancher/types/apis/apps/v1
 github.com/rancher/types/apis/autoscaling/v2beta2
