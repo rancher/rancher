@@ -287,10 +287,11 @@ func (m *Lifecycle) provision(driverConfig, nodeDir string, obj *v3.Node) (*v3.N
 	}
 
 	createCommandsArgs := buildCreateCommand(obj, configRawMap)
-	cmd, err := buildCommand(nodeDir, obj, createCommandsArgs)
+	cmd, cancel, err := buildCommand(nodeDir, obj, createCommandsArgs)
 	if err != nil {
 		return obj, err
 	}
+	defer cancel()
 
 	logrus.Infof("Provisioning node %s", obj.Spec.RequestedHostname)
 
@@ -388,10 +389,11 @@ func (m *Lifecycle) deployAgent(nodeDir string, obj *v3.Node) error {
 
 	drun := clusterregistrationtokens.NodeCommand(token)
 	args := buildAgentCommand(obj, drun)
-	cmd, err := buildCommand(nodeDir, obj, args)
+	cmd, cancel, err := buildCommand(nodeDir, obj, args)
 	if err != nil {
 		return err
 	}
+	defer cancel()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return errors.Wrap(err, string(output))
