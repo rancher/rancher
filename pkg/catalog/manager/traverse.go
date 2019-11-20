@@ -40,9 +40,9 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 
 	newHelmVersionCommits := map[string]v3.VersionCommits{}
 	var errs []error
-	var terrors []error
+	var updateErrors []error
 	var createErrors []error
-	createdTemplates, updatedTemplates, deletedTemplates, failedTemplates := 0, 0, 0, 0
+	var createdTemplates, updatedTemplates, deletedTemplates, failedTemplates int
 	for chart, metadata := range index.IndexFile.Entries {
 		newHelmVersionCommits[chart] = v3.VersionCommits{
 			Value: map[string]string{},
@@ -135,9 +135,7 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 			v.VersionURLs = version.URLs
 
 			for _, versionSpec := range template.Spec.Versions {
-				if v.UpgradeVersionLinks == nil {
-					v.UpgradeVersionLinks = map[string]string{}
-				}
+				v.UpgradeVersionLinks = map[string]string{}
 				if showUpgradeLinks(v.Version, versionSpec.Version) {
 					version := versionSpec.Version
 					v.UpgradeVersionLinks[versionSpec.Version] = fmt.Sprintf("%s-%s", template.Name, version)
@@ -221,6 +219,7 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 		} else if err == nil {
 			err = m.updateTemplate(existing, template)
 			if err != nil {
+				updateErrors = append(updateErrors, err)
 				failedTemplates++
 			} else {
 				updatedTemplates++
@@ -228,7 +227,6 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 		}
 		if err != nil {
 			delete(newHelmVersionCommits, template.Spec.DisplayName)
-			terrors = append(terrors, err)
 		}
 	}
 
@@ -255,20 +253,25 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 	} else if clusterCatalog != nil {
 		clusterCatalog.Catalog = *catalog
 	}
+	/*conditions need to be set here to stop templates from updating
+	each time when they have no changes
+	*/
+	v3.CatalogConditionUpgraded.True(catalog)
+	v3.CatalogConditionDiskCached.True(catalog)
 	cmt.catalog = catalog
 	cmt.projectCatalog = projectCatalog
 	cmt.clusterCatalog = clusterCatalog
 	if len(createErrors) > 0 {
-		if _, err := m.updateCatalogInfo(cmt, catalogType, "", false, true); err != nil {
+		if _, err := m.updateCatalogInfo(cmt, catalogType, "", true, false); err != nil {
 			return err
 		}
 		return errors.Errorf("failed to create templates. Multiple error occurred: %v", createErrors)
 	}
-	if len(terrors) > 0 {
+	if len(updateErrors) > 0 {
 		if _, err := m.updateCatalogInfo(cmt, catalogType, "", false, true); err != nil {
 			return err
 		}
-		return errors.Errorf("failed to update templates. Multiple error occurred: %v", terrors)
+		return errors.Errorf("failed to update templates. Multiple error occurred: %v", updateErrors)
 	}
 	var finalError error
 	if len(errs) > 0 {
@@ -276,10 +279,7 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 		commit = ""
 	}
 
-	v3.CatalogConditionUpgraded.True(catalog)
-	v3.CatalogConditionDiskCached.True(catalog)
 	catalog.Status.Commit = commit
-
 	if projectCatalog != nil {
 		projectCatalog.Catalog = *catalog
 	} else if clusterCatalog != nil {
