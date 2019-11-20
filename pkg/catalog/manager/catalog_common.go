@@ -2,6 +2,7 @@ package manager
 
 import (
 	"fmt"
+	"strings"
 
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	client "github.com/rancher/types/client/management/v3"
@@ -48,6 +49,10 @@ func (m *Manager) deleteTemplates(key string, namespace string) error {
 	for _, t := range templates {
 		tvs, err := m.getTemplateVersion(t.Name, namespace)
 		if err != nil {
+			//if template version doesn't exist continue to delete template
+			if strings.Contains(err.Error(), "invalid label value") {
+				continue
+			}
 			return err
 		}
 		for k := range tvs {
