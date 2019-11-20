@@ -454,6 +454,19 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 			return nil, httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("cannot update cluster, cluster cannot be changed to a new clusterTemplate"))
 		}
 
+		if !clusterTemplateRevision.Spec.ClusterConfig.EnableClusterMonitoring {
+			//this template will turn off ClusterMonitoring, ensure that the cluster is not using Monitoring
+			if convert.ToBool(existingCluster[managementv3.ClusterSpecFieldEnableClusterMonitoring]) {
+				return nil, httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("cannot update cluster to this RKE template revision, since it will turn off the cluster monitoring"))
+			}
+		}
+
+		if !clusterTemplateRevision.Spec.ClusterConfig.EnableClusterAlerting {
+			if convert.ToBool(existingCluster[managementv3.ClusterSpecFieldEnableClusterAlerting]) {
+				return nil, httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("cannot update cluster to this RKE template revision, since it will turn off the cluster alerting"))
+			}
+		}
+
 		clusterConfigSchema := apiContext.Schemas.Schema(&managementschema.Version, managementv3.ClusterSpecBaseType)
 		clusterUpdate, err := loadDataFromTemplate(clusterTemplateRevision, clusterTemplate, data, clusterConfigSchema, existingCluster)
 		if err != nil {
