@@ -1,6 +1,7 @@
 package rbac
 
 import (
+	"github.com/rancher/rancher/pkg/rbac"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
@@ -15,18 +16,19 @@ const (
 	grbByUserAndRoleIndex = "authz.cluster.cattle.io/grb-by-user-and-role"
 )
 
-func newGlobalRoleBindingHandler(workload *config.UserContext) *grbHandler {
+func newGlobalRoleBindingHandler(workload *config.UserContext) v3.GlobalRoleBindingHandlerFunc {
 	informer := workload.Management.Management.GlobalRoleBindings("").Controller().Informer()
 	indexers := map[string]cache.IndexFunc{
 		grbByUserAndRoleIndex: grbByUserAndRole,
 	}
 	informer.AddIndexers(indexers)
 
-	return &grbHandler{
+	h := &grbHandler{
 		grbIndexer:          informer.GetIndexer(),
 		clusterRoleBindings: workload.RBAC.ClusterRoleBindings(""),
 		crbLister:           workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
 	}
+	return h.sync
 }
 
 // grbHandler ensures the global admins have full access to every cluster. If a globalRoleBinding is created that uses
@@ -37,12 +39,12 @@ type grbHandler struct {
 	grbIndexer          cache.Indexer
 }
 
-func (c *grbHandler) Create(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
-	if obj.GlobalRoleName != "admin" {
+func (c *grbHandler) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object, error) {
+	if obj == nil || obj.DeletionTimestamp != nil || obj.GlobalRoleName != "admin" {
 		return obj, nil
 	}
 
-	bindingName := grbCRBName(obj)
+	bindingName := rbac.GrbCRBName(obj)
 	b, err := c.crbLister.Get("", bindingName)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return obj, err
@@ -68,36 +70,12 @@ func (c *grbHandler) Create(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
 			Kind: "ClusterRole",
 		},
 	})
-	return obj, err
-}
-
-func (c *grbHandler) Updated(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
-	return nil, nil
-}
-
-func (c *grbHandler) Remove(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
-	if obj.GlobalRoleName != "admin" {
-		return obj, nil
-	}
-
-	grbs, err := c.grbIndexer.ByIndex(grbByUserAndRoleIndex, obj.UserName+"-"+obj.GlobalRoleName)
 	if err != nil {
-		return obj, err
+		if !apierrors.IsAlreadyExists(err) {
+			return obj, err
+		}
 	}
-
-	if len(grbs) > 1 {
-		return obj, nil
-	}
-
-	if err := c.clusterRoleBindings.Delete(grbCRBName(obj), nil); err != nil && !apierrors.IsNotFound(err) {
-		return obj, err
-	}
-
 	return obj, nil
-}
-
-func grbCRBName(grb *v3.GlobalRoleBinding) string {
-	return "globaladmin-" + grb.UserName
 }
 
 func grbByUserAndRole(obj interface{}) ([]string, error) {

@@ -98,6 +98,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	workload.RBAC.ClusterRoleBindings("").AddHandler(ctx, "legacy-crb-cleaner-sync", newLegacyCRBCleaner(r).sync)
 	workload.Management.Management.ClusterRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-crtb-sync", workload.ClusterName, newCRTBLifecycle(r))
 	workload.Management.Management.Clusters("").AddHandler(ctx, "global-admin-cluster-sync", newClusterHandler(workload))
+	workload.Management.Management.GlobalRoleBindings("").AddHandler(ctx, "grb-cluster-sync", newGlobalRoleBindingHandler(workload))
 
 	sync := &resourcequota.SyncController{
 		Namespaces:          workload.Core.Namespaces(""),
@@ -117,10 +118,6 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	rti := workload.Management.Management.RoleTemplates("")
 	rtSync := v3.NewRoleTemplateLifecycleAdapter("cluster-roletemplate-sync_"+workload.ClusterName, true, rti, newRTLifecycle(r))
 	workload.Management.Management.RoleTemplates("").AddHandler(ctx, "cluster-roletemplate-sync", rtSync)
-
-	grbi := workload.Management.Management.GlobalRoleBindings("")
-	grbSync := v3.NewGlobalRoleBindingLifecycleAdapter("grb-sync_"+workload.ClusterName, true, grbi, newGlobalRoleBindingHandler(workload))
-	workload.Management.Management.GlobalRoleBindings("").AddHandler(ctx, "grb-sync", grbSync)
 }
 
 type manager struct {
