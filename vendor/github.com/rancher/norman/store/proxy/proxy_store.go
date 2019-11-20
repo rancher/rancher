@@ -317,7 +317,7 @@ func (s *Store) realWatch(apiContext *types.APIContext, schema *types.Schema, op
 		for event := range watcher.ResultChan() {
 			if data, ok := event.Object.(*metav1.Status); ok {
 				// just logging it, keeping the same behavior as before
-				logrus.Errorf("watcher error %s", data.Message)
+				logrus.Debugf("watcher status for %s: %s", schema.ID, data.Message)
 			} else {
 				data := event.Object.(*unstructured.Unstructured)
 				s.fromInternal(apiContext, schema, data.Object)
