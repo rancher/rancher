@@ -136,16 +136,6 @@ github.com/docker/go-connections/sockets
 github.com/docker/go-connections/tlsconfig
 # github.com/docker/go-units v0.3.3
 github.com/docker/go-units
-# github.com/docker/machine v0.0.0-20160115011140-7246b2c9650c
-github.com/docker/machine/libmachine/drivers
-github.com/docker/machine/libmachine/drivers/plugin/localbinary
-github.com/docker/machine/libmachine/drivers/rpc
-github.com/docker/machine/libmachine/log
-github.com/docker/machine/libmachine/mcnflag
-github.com/docker/machine/libmachine/mcnutils
-github.com/docker/machine/libmachine/ssh
-github.com/docker/machine/libmachine/state
-github.com/docker/machine/libmachine/version
 # github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c
 github.com/docker/spdystream
 github.com/docker/spdystream/spdy
@@ -301,6 +291,17 @@ github.com/rancher/kontainer-engine/service
 github.com/rancher/kontainer-engine/store
 github.com/rancher/kontainer-engine/types
 github.com/rancher/kontainer-engine/utils
+# github.com/rancher/machine v0.15.0-rancher23
+github.com/rancher/machine/libmachine/drivers
+github.com/rancher/machine/libmachine/drivers/plugin/localbinary
+github.com/rancher/machine/libmachine/drivers/rpc
+github.com/rancher/machine/libmachine/log
+github.com/rancher/machine/libmachine/mcnflag
+github.com/rancher/machine/libmachine/mcnutils
+github.com/rancher/machine/libmachine/ssh
+github.com/rancher/machine/libmachine/state
+github.com/rancher/machine/libmachine/version
+github.com/rancher/machine/version
 # github.com/rancher/norman v0.0.0-20191118213527-2115b952494f
 github.com/rancher/norman/api
 github.com/rancher/norman/api/access

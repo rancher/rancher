@@ -3,9 +3,9 @@ package drivers
 import (
 	"fmt"
 
-	"github.com/docker/machine/libmachine/log"
-	"github.com/docker/machine/libmachine/mcnutils"
-	"github.com/docker/machine/libmachine/ssh"
+	"github.com/rancher/machine/libmachine/log"
+	"github.com/rancher/machine/libmachine/mcnutils"
+	"github.com/rancher/machine/libmachine/ssh"
 )
 
 func GetSSHClientFromDriver(d Driver) (ssh.Client, error) {
@@ -44,11 +44,7 @@ func RunSSHCommandFromDriver(d Driver, command string) (string, error) {
 	output, err := client.Output(command)
 	log.Debugf("SSH cmd err, output: %v: %s", err, output)
 	if err != nil {
-		return "", fmt.Errorf(`Something went wrong running an SSH command!
-command : %s
-err     : %v
-output  : %s
-`, command, err, output)
+		return "", fmt.Errorf(`ssh command error: command: %s err: %v output: %s`, command, err, output)
 	}
 
 	return output, nil
