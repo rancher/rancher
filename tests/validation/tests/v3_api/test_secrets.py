@@ -178,6 +178,7 @@ def create_project_client(request):
     p, ns = create_project_and_ns(USER_TOKEN, cluster, "testsecret")
     p_client = get_project_client_for_token(p, USER_TOKEN)
     c_client = get_cluster_client_for_token(cluster, USER_TOKEN)
+
     namespace["p_client"] = p_client
     namespace["ns"] = ns
     namespace["cluster"] = cluster
