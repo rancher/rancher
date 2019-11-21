@@ -55,68 +55,44 @@ def test_edit_builtin_role_template(admin_mc, remove_resource):
 
 def test_context_prtb(admin_mc, admin_pc, remove_resource,
                       user_mc):
-    """Tests that any user cannot edit a cluster role binding form the project
-    context
+    """Asserts that a projectroletemplatebinding cannot reference a cluster
+    roletemplate
     """
+    admin_client = admin_mc.client
     project = admin_pc.project
-    user_client = user_mc.client
 
-    prtb = admin_mc.client.create_project_role_template_binding(
-        name="prtb-" + random_str(),
-        userId=user_mc.user.id,
-        projectId=project.id,
-        roleTemplateId="project-owner"
-    )
-    remove_resource(prtb)
-
-    wait_until_available(user_client, project)
-
-    prtb.roleTemplateId = "cluster-owner"
     with pytest.raises(ApiError) as e:
-        prtb = user_client.update_by_id_projectRoleTemplateBinding(prtb.id,
-                                                                   prtb)
-    assert e.value.error.status == 422
-    assert "Cannot edit" in e.value.error.message
+        prtb = admin_client.create_project_role_template_binding(
+            name="prtb-" + random_str(),
+            userId=user_mc.user.id,
+            projectId=project.id,
+            roleTemplateId="cluster-owner"
+        )
+        remove_resource(prtb)
 
-    prtb = admin_mc.client.reload(prtb)
-    prtb.roleTemplateId = "cluster-owner"
-    with pytest.raises(ApiError) as e:
-        prtb = admin_mc.client.update_by_id_projectRoleTemplateBinding(prtb.id,
-                                                                       prtb)
     assert e.value.error.status == 422
-    assert "Cannot edit" in e.value.error.message
+    assert "Cannot reference context [cluster] from [project] context" in \
+           e.value.error.message
 
 
 def test_context_crtb(admin_mc, admin_cc, remove_resource,
                       user_mc):
-    """Tests that any user cannot edit a project role binding from the cluster
-    context
+    """Asserts that a clusterroletemplatebinding cannot reference a project
+    roletemplate
     """
-    user_client = user_mc.client
+    admin_client = admin_mc.client
 
-    crtb = admin_mc.client.create_cluster_role_template_binding(
-        userId=user_mc.user.id,
-        roleTemplateId="cluster-owner",
-        clusterId=admin_cc.cluster.id,
-    )
-    remove_resource(crtb)
-
-    wait_until_available(user_client, admin_cc.cluster)
-
-    crtb.roleTemplateId = "project-owner"
     with pytest.raises(ApiError) as e:
-        crtb = user_client.update_by_id_clusterRoleTemplateBinding(crtb.id,
-                                                                   crtb)
-    assert e.value.error.status == 422
-    assert "Cannot edit" in e.value.error.message
+        crtb = admin_client.create_cluster_role_template_binding(
+            userId=user_mc.user.id,
+            roleTemplateId="project-owner",
+            clusterId=admin_cc.cluster.id,
+        )
+        remove_resource(crtb)
 
-    crtb = admin_mc.client.reload(crtb)
-    crtb.roleTemplateId = "project-owner"
-    with pytest.raises(ApiError) as e:
-        crtb = admin_mc.client.update_by_id_clusterRoleTemplateBinding(crtb.id,
-                                                                       crtb)
     assert e.value.error.status == 422
-    assert "Cannot edit" in e.value.error.message
+    assert "Cannot reference context [project] from [cluster] context" in \
+        e.value.error.message
 
 
 def test_cloned_role_permissions(admin_mc, remove_resource, user_factory,
