@@ -786,9 +786,11 @@ def test_cluster_desc_update(admin_mc, list_remove_resource):
     wait_for_cluster_to_be_deleted(client, cluster.id)
 
 
-def test_update_cluster_monitoring(admin_mc, remove_resource):
-    cluster_template = create_cluster_template(admin_mc,
-                                               remove_resource, [], admin_mc)
+def test_update_cluster_monitoring(admin_mc, list_remove_resource):
+    cluster_template = create_cluster_template(admin_mc, [], admin_mc)
+    remove_list = [cluster_template]
+    list_remove_resource(remove_list)
+
     tId = cluster_template.id
     client = admin_mc.client
     cconfig = {
@@ -834,16 +836,18 @@ def test_update_cluster_monitoring(admin_mc, remove_resource):
     cluster = wait_for_cluster_create(client, name=cluster_name,
                                       clusterTemplateRevisionId=rev1.id,
                                       description="template from cluster")
-    remove_resource(cluster)
+    remove_list.insert(0, cluster)
     assert cluster.conditions[0].type == 'Pending'
     assert cluster.conditions[0].status == 'True'
 
-    # update cluster to use rev2 that turns of monitoring
-    # expect error
-    with pytest.raises(ApiError) as e:
-        client.update(cluster,
-                      name=cluster_name, clusterTemplateRevisionId=rev2.id)
-    assert e.value.error.status == 422
+    # update cluster to use rev2 that turns off monitoring
+    # expect no change to monitoring
+
+    client.update(cluster,
+                  name=cluster_name, clusterTemplateRevisionId=rev2.id)
+
+    reloaded_cluster = client.by_id_cluster(cluster.id)
+    assert reloaded_cluster.enableClusterMonitoring is True
 
     client.delete(cluster)
     wait_for_cluster_to_be_deleted(client, cluster.id)
