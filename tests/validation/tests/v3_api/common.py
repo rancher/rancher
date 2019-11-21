@@ -418,6 +418,9 @@ def get_schedulable_nodes(cluster):
     for node in nodes:
         if node.worker:
             schedulable_nodes.append(node)
+        # Including master in list of nodes as master is also schedulable
+        if 'k3s' in cluster.version["gitVersion"] and node.controlPlane:
+            schedulable_nodes.append(node)
     return schedulable_nodes
 
 
