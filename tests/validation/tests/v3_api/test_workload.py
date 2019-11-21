@@ -1,6 +1,7 @@
 import pytest
 
 from .common import *  # NOQA
+from rancher import ApiError
 
 namespace = {"p_client": None, "ns": None, "cluster": None, "project": None}
 
@@ -543,6 +544,197 @@ def test_wl_with_lb_scale_and_upgrade():
     workload = wait_for_wl_to_active(p_client, workload)
     wait_for_pods_in_workload(p_client, workload, 2)
     validate_lb(p_client, workload)
+
+
+@if_test_rbac
+def test_rbac_wl_cluster_owner(remove_resource):
+    # cluster owner can create project and deploy workload in it
+    user_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
+    project, ns = create_project_and_ns(user_token, namespace["cluster"], random_test_name("rbac-cluster-owner"))
+    remove_resource(ns)
+    remove_resource(project)
+    p_client = get_project_client_for_token(project, user_token)
+    con = [{"name": "test1",
+            "image": TEST_IMAGE}]
+    name = random_test_name("default")
+    workload = p_client.create_workload(name=name, containers=con, namespaceId=ns.id)
+    validate_workload(p_client, workload, "deployment", ns.name)
+    remove_resource(workload)
+
+    # cluster owner can edit workload in the project
+    p_client.update(workload, scale=2)
+    validate_workload(p_client, workload, "deployment", ns.name, 2)
+    con = [{"name": "test1",
+            "image": "nginx"}]
+    p_client.update(workload, containers=con)
+    validate_workload(p_client, workload, "deployment", ns.name, 2)
+    validate_workload_image(p_client, workload, "nginx", ns)
+
+    # assert that cluster owner can delete workload in the project
+    p_client.delete(workload)
+    assert len(p_client.list_workload(uuid=workload.uuid).data) == 0
+
+    # assert that cluster owner can deploy workload in any project
+    p2 = rbac_get_unshared_project()
+    p_client2 = get_project_client_for_token(p2, user_token)
+    ns2 = rbac_get_unshared_ns()
+    wl = p_client2.create_workload(name=name, containers=con, namespaceId=ns2.id)
+    validate_workload(p_client2, wl, "deployment", ns2.name)
+    remove_resource(wl)
+
+
+@if_test_rbac
+def test_rbac_wl_cluster_member(remove_resource):
+    # cluster member can create project and deploy workload in it
+    user_token = rbac_get_user_token_by_role(CLUSTER_MEMBER)
+    project, ns = create_project_and_ns(user_token, namespace["cluster"], random_test_name("rbac-cluster-member"))
+    remove_resource(ns)
+    remove_resource(project)
+    p_client = get_project_client_for_token(project, user_token)
+    con = [{"name": "test1",
+            "image": TEST_IMAGE}]
+    name = random_test_name("default")
+    workload = p_client.create_workload(name=name, containers=con, namespaceId=ns.id)
+    validate_workload(p_client, workload, "deployment", ns.name)
+    remove_resource(workload)
+
+    # cluster member can edit workload in the project
+    p_client.update(workload, scale=2)
+    validate_workload(p_client, workload, "deployment", ns.name, 2)
+    con = [{"name": "test1",
+            "image": "nginx"}]
+    p_client.update(workload, containers=con)
+    validate_workload(p_client, workload, "deployment", ns.name, 2)
+    validate_workload_image(p_client, workload, "nginx", ns)
+
+    # assert that cluster member can delete workload in the project
+    p_client.delete(workload)
+    assert len(p_client.list_workload(uuid=workload.uuid).data) == 0
+
+    # assert that cluster member can NOT deploy workload in the project he can NOT access to
+    with pytest.raises(ApiError) as e:
+        p2 = rbac_get_unshared_project()
+        ns2 = rbac_get_unshared_ns()
+        new_p_client = get_project_client_for_token(p2, user_token)
+        new_p_client.create_workload(name=name, containers=con, namespaceId=ns2.id)
+    assert e.value.error.status == 403
+    assert e.value.error.code == 'Forbidden'
+
+
+@if_test_rbac
+def test_rbac_wl_project_member(remove_resource):
+    # project member can deploy workload in the project
+    project = rbac_get_project()
+    user_token = rbac_get_user_token_by_role(PROJECT_MEMBER)
+    p_client = get_project_client_for_token(project, user_token)
+    ns = rbac_get_namespace()
+
+    con = [{"name": "test1",
+            "image": TEST_IMAGE}]
+    name = random_test_name("default")
+    workload = p_client.create_workload(name=name, containers=con, namespaceId=ns.id)
+    remove_resource(workload)
+    validate_workload(p_client, workload, "deployment", ns.name)
+
+    # project member can edit workload in the project
+    p_client.update(workload, scale=2)
+    validate_workload(p_client, workload, "deployment", ns.name, 2)
+    con = [{"name": "test1",
+            "image": "nginx"}]
+    p_client.update(workload, containers=con)
+    validate_workload(p_client, workload, "deployment", ns.name, 2)
+    validate_workload_image(p_client, workload, "nginx", ns)
+
+    # assert that project member can delete workload in the project
+    p_client.delete(workload)
+    assert len(p_client.list_workload(uuid=workload.uuid).data) == 0
+
+    # assert that project member can NOT deploy workload in the project he can NOT access to
+    with pytest.raises(ApiError) as e:
+        p2 = rbac_get_unshared_project()
+        ns2 = rbac_get_unshared_ns()
+        new_p_client = get_project_client_for_token(p2, user_token)
+        new_p_client.create_workload(name=name, containers=con, namespaceId=ns2.id)
+    assert e.value.error.status == 403
+    assert e.value.error.code == 'Forbidden'
+
+
+@if_test_rbac
+def test_rbac_wl_project_owner(remove_resource):
+    # project owner can deploy workload in the project
+    project = rbac_get_project()
+    user_token = rbac_get_user_token_by_role(PROJECT_OWNER)
+    p_client = get_project_client_for_token(project, user_token)
+    ns = rbac_get_namespace()
+
+    con = [{"name": "test1",
+            "image": TEST_IMAGE}]
+    name = random_test_name("default")
+    workload = p_client.create_workload(name=name, containers=con, namespaceId=ns.id)
+    remove_resource(workload)
+    validate_workload(p_client, workload, "deployment", ns.name)
+
+    # project owner can edit workload in the project
+    p_client.update(workload, scale=2)
+    validate_workload(p_client, workload, "deployment", ns.name, 2)
+    con = [{"name": "test1",
+            "image": "nginx"}]
+    p_client.update(workload, containers=con)
+    validate_workload(p_client, workload, "deployment", ns.name, 2)
+    validate_workload_image(p_client, workload, "nginx", ns)
+
+    # assert that project owner can delete workload in the project
+    p_client.delete(workload)
+    assert len(p_client.list_workload(uuid=workload.uuid).data) == 0
+
+    # assert that project owner can NOT deploy workload in the project he can NOT access to
+    with pytest.raises(ApiError) as e:
+        p2 = rbac_get_unshared_project()
+        ns2 = rbac_get_unshared_ns()
+        new_p_client = get_project_client_for_token(p2, user_token)
+        new_p_client.create_workload(name=name, containers=con, namespaceId=ns2.id)
+    assert e.value.error.status == 403
+    assert e.value.error.code == 'Forbidden'
+
+
+@if_test_rbac
+def test_rbac_wl_project_read_only(remove_resource):
+    # project read-only can NOT deploy workloads in the project
+    project = rbac_get_project()
+    user_token = rbac_get_user_token_by_role(PROJECT_READ_ONLY)
+    p_client = get_project_client_for_token(project, user_token)
+    ns = rbac_get_namespace()
+    con = [{"name": "test1",
+            "image": TEST_IMAGE}]
+    name = random_test_name("default")
+    with pytest.raises(ApiError) as e:
+        workload = p_client.create_workload(name=name, containers=con, namespaceId=ns.id)
+    assert e.value.error.status == 403
+    assert e.value.error.code == 'Forbidden'
+
+    # deploy a new workload as cluster owner
+    cluster_owner_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
+    cluster_owner_p_client = get_project_client_for_token(project, cluster_owner_token)
+    workload = cluster_owner_p_client.create_workload(name=name, containers=con, namespaceId=ns.id)
+    wait_for_wl_to_active(cluster_owner_p_client, workload)
+    remove_resource(workload)
+    # project read-only can NOT edit existing workload
+    with pytest.raises(ApiError) as e:
+        p_client.update(workload, scale=2)
+    assert e.value.error.status == 403
+    assert e.value.error.code == 'Forbidden'
+
+    # project read-only can NOT delete existing workload
+    with pytest.raises(ApiError) as e:
+        p_client.delete(workload)
+    assert e.value.error.status == 403
+    assert e.value.error.code == 'Forbidden'
+
+    # assert that project read-only can NOT see workloads in the project he has no access
+    p2 = rbac_get_unshared_project()
+    p_client = get_project_client_for_token(p2, user_token)
+    workloads = p_client.list_workload().data
+    assert len(workloads) == 0
 
 
 @pytest.fixture(scope='module', autouse="True")
