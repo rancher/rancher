@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/machine/libmachine/drivers/plugin/localbinary"
-	rpcdriver "github.com/docker/machine/libmachine/drivers/rpc"
-	cli "github.com/docker/machine/libmachine/mcnflag"
+	"github.com/rancher/machine/libmachine/drivers/plugin/localbinary"
+	rpcdriver "github.com/rancher/machine/libmachine/drivers/rpc"
+	cli "github.com/rancher/machine/libmachine/mcnflag"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )

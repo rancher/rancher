@@ -4,21 +4,23 @@ FROM ubuntu:18.04
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
 ENV CATTLE_HELM_VERSION v2.14.3-rancher1
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher23
 ENV CATTLE_K3S_VERSION v0.8.0
 ENV CATTLE_ETCD_VERSION v3.3.14
 
 RUN apt-get update && \
     apt-get install -y gcc ca-certificates git wget curl vim less file xz-utils unzip && \
     rm -f /bin/sh && ln -s /bin/bash /bin/sh
-RUN curl -sLf https://github.com/rancher/machine-package/releases/download/v0.15.0-rancher5-3/docker-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin
+
+RUN curl -sLf https://github.com/rancher/machine/releases/download/${CATTLE_MACHINE_VERSION}/rancher-machine-${ARCH}.tar.gz | tar xvzf - -C /usr/bin
 
 ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH_arm64=arm64 GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
     GOPATH=/go PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash
 
 RUN wget -O - https://storage.googleapis.com/golang/go1.12.9.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local
 
-RUN if [ "${ARCH}" == "amd64" ]; then \	
-    curl -sL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s v1.20.0; \	
+RUN if [ "${ARCH}" == "amd64" ]; then \
+    curl -sL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s v1.20.0; \
     fi
 
 ENV DOCKER_URL_amd64=https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 \

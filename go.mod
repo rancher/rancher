@@ -50,7 +50,6 @@ require (
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v0.7.3-0.20190808172531-150530564a14
 	github.com/docker/go-connections v0.3.0
-	github.com/docker/machine v0.0.0-20160115011140-7246b2c9650c
 	github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c // indirect
 	github.com/ehazlett/simplelog v0.0.0-20170112055302-9fcd579ee7c6
 	github.com/elazarl/goproxy v0.0.0-20190711103511-473e67f1d7d2 // indirect
@@ -75,6 +74,7 @@ require (
 	github.com/prometheus/common v0.6.0
 	github.com/rancher/kontainer-driver-metadata v0.0.0-20191021164950-6514452b9732
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20191104182032-b0a8fe9ff757
+	github.com/rancher/machine v0.15.0-rancher23
 	github.com/rancher/norman v0.0.0-20191118213527-2115b952494f
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.3

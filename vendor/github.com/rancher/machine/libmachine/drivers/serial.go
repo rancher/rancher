@@ -5,8 +5,8 @@ import (
 
 	"encoding/json"
 
-	"github.com/docker/machine/libmachine/mcnflag"
-	"github.com/docker/machine/libmachine/state"
+	"github.com/rancher/machine/libmachine/mcnflag"
+	"github.com/rancher/machine/libmachine/state"
 )
 
 var stdLock = &sync.Mutex{}
