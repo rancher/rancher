@@ -454,19 +454,6 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 			return nil, httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("cannot update cluster, cluster cannot be changed to a new clusterTemplate"))
 		}
 
-		if !clusterTemplateRevision.Spec.ClusterConfig.EnableClusterMonitoring {
-			//this template will turn off ClusterMonitoring, ensure that the cluster is not using Monitoring
-			if convert.ToBool(existingCluster[managementv3.ClusterSpecFieldEnableClusterMonitoring]) {
-				return nil, httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("cannot update cluster to this RKE template revision, since it will turn off the cluster monitoring"))
-			}
-		}
-
-		if !clusterTemplateRevision.Spec.ClusterConfig.EnableClusterAlerting {
-			if convert.ToBool(existingCluster[managementv3.ClusterSpecFieldEnableClusterAlerting]) {
-				return nil, httperror.NewAPIError(httperror.InvalidOption, fmt.Sprintf("cannot update cluster to this RKE template revision, since it will turn off the cluster alerting"))
-			}
-		}
-
 		clusterConfigSchema := apiContext.Schemas.Schema(&managementschema.Version, managementv3.ClusterSpecBaseType)
 		clusterUpdate, err := loadDataFromTemplate(clusterTemplateRevision, clusterTemplate, data, clusterConfigSchema, existingCluster)
 		if err != nil {
@@ -474,6 +461,15 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		}
 
 		data = clusterUpdate
+
+		//keep monitoring and alerting flags on the cluster as is, no turning off these flags from templaterevision.
+		if !clusterTemplateRevision.Spec.ClusterConfig.EnableClusterMonitoring {
+			data[managementv3.ClusterSpecFieldEnableClusterMonitoring] = existingCluster[managementv3.ClusterSpecFieldEnableClusterMonitoring]
+		}
+		if !clusterTemplateRevision.Spec.ClusterConfig.EnableClusterAlerting {
+			data[managementv3.ClusterSpecFieldEnableClusterAlerting] = existingCluster[managementv3.ClusterSpecFieldEnableClusterAlerting]
+		}
+
 	} else if existingCluster[managementv3.ClusterSpecFieldClusterTemplateRevisionID] != nil {
 		return nil, httperror.NewFieldAPIError(httperror.MissingRequired, "ClusterTemplateRevision", "this cluster is created from a clusterTemplateRevision, please pass the clusterTemplateRevision")
 	}
