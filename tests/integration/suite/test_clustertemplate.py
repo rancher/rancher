@@ -787,12 +787,14 @@ def test_update_cluster_monitoring(admin_mc, remove_resource):
     assert cluster.conditions[0].type == 'Pending'
     assert cluster.conditions[0].status == 'True'
 
-    # update cluster to use rev2 that turns of monitoring
-    # expect error
-    with pytest.raises(ApiError) as e:
-        client.update(cluster,
-                      name=cluster_name, clusterTemplateRevisionId=rev2.id)
-    assert e.value.error.status == 422
+    # update cluster to use rev2 that turns off monitoring
+    # expect no change to monitoring
+
+    client.update(cluster,
+                  name=cluster_name, clusterTemplateRevisionId=rev2.id)
+
+    reloaded_cluster = client.by_id_cluster(cluster.id)
+    assert reloaded_cluster.enableClusterMonitoring is True
 
     client.delete(cluster)
     wait_for_cluster_to_be_deleted(client, cluster.id)
