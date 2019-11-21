@@ -215,7 +215,7 @@ StageLoop:
 		stage := c.execution.Spec.PipelineConfig.Stages[i]
 		for j := len(stage.Steps) - 1; j >= 0; j-- {
 			step := stage.Steps[j]
-			if step.PublishImageConfig != nil {
+			if step.PublishImageConfig != nil && utils.MatchAll(stage.When, c.execution) && utils.MatchAll(step.When, c.execution) {
 				config := step.PublishImageConfig
 				if config.PushRemote {
 					registry = step.PublishImageConfig.Registry
