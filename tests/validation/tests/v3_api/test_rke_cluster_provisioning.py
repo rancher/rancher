@@ -7,6 +7,7 @@ from rancher import ApiError
 K8S_VERSION = os.environ.get('RANCHER_K8S_VERSION', "")
 K8S_VERSION_UPGRADE = os.environ.get('RANCHER_K8S_VERSION_UPGRADE', "")
 DO_ACCESSKEY = os.environ.get('DO_ACCESSKEY', "None")
+LINODE_ACCESSKEY = os.environ.get('RANCHER_LINODE_ACCESSKEY', "None")
 AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.environ.get("AWS_REGION")
@@ -123,6 +124,18 @@ def test_rke_do_host_3(node_template_do):
 
 def test_rke_do_host_4(node_template_do):
     validate_rke_dm_host_4(node_template_do, rke_config)
+
+
+def test_rke_linode_host_1(node_template_linode):
+    validate_rke_dm_host_1(node_template_linode, rke_config)
+
+
+def test_rke_linode_host_2(node_template_linode):
+    validate_rke_dm_host_2(node_template_linode, rke_config)
+
+
+def test_rke_linode_host_3(node_template_linode):
+    validate_rke_dm_host_3(node_template_linode, rke_config)
 
 
 def test_rke_ec2_host_1(node_template_ec2):
@@ -749,6 +762,37 @@ def node_template_do():
         name=random_name(),
         driver="digitalocean",
         cloudCredentialId=do_cloud_credential.id,
+        useInternalIpAddress=True)
+    node_template = client.wait_success(node_template)
+    return node_template
+
+
+@pytest.fixture(scope='session')
+def node_template_linode():
+    client = get_user_client()
+    linode_cloud_credential_config = {"token": LINODE_ACCESSKEY}
+    linode_cloud_credential = client.create_cloud_credential(
+        linodecredentialConfig=linode_cloud_credential_config
+    )
+    node_template = client.create_node_template(
+        linodeConfig={"authorizedUsers": "",
+                      "createPrivateIp": False,
+                      "dockerPort": "2376",
+                      "image": "linode/ubuntu18.04",
+                      "instanceType": "g6-standard-2",
+                      "label": "",
+                      "region": "us-west",
+                      "sshPort": "22",
+                      "sshUser": "",
+                      "stackscript": "",
+                      "stackscriptData": "",
+                      "swapSize": "512",
+                      "tags": "",
+                      "uaPrefix": "Rancher"},
+        name=random_name(),
+        driver="linode",
+        cloudCredentialId=linode_cloud_credential.id,
+        engineInstallURL=engine_install_url,
         useInternalIpAddress=True)
     node_template = client.wait_success(node_template)
     return node_template
