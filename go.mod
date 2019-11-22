@@ -72,13 +72,13 @@ require (
 	github.com/prometheus/client_golang v1.1.0
 	github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90
 	github.com/prometheus/common v0.6.0
-	github.com/rancher/kontainer-driver-metadata v0.0.0-20191021164950-6514452b9732
+	github.com/rancher/kontainer-driver-metadata v0.0.0-20191113181829-54094fc6ca6f
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20191104182032-b0a8fe9ff757
 	github.com/rancher/machine v0.15.0-rancher23
 	github.com/rancher/norman v0.0.0-20191118213527-2115b952494f
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.3
-	github.com/rancher/rke v0.3.1-0.20191112000344-2006a6171213
+	github.com/rancher/rke v0.3.1-0.20191121220833-b9900f3b9cc8
 	github.com/rancher/types v0.0.0-20191120215848-7193c7169517
 	github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95
 	github.com/robfig/cron v1.1.0
@@ -86,7 +86,7 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/kafka-go v0.0.0-20190411192201-218fd49cff39
 	github.com/sirupsen/logrus v1.4.2
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.4.0
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.21.0
 	github.com/vmihailenco/msgpack v4.0.1+incompatible

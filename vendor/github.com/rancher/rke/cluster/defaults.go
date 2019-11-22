@@ -76,7 +76,7 @@ const (
 	KubeAPIArgAuditLogFormat              = "audit-log-format"
 	KubeAPIArgAuditPolicyFile             = "audit-policy-file"
 	DefaultKubeAPIArgAuditLogPathValue    = "/var/log/kube-audit/audit-log.json"
-	DefaultKubeAPIArgAuditPolicyFileValue = "/etc/kubernetes/audit.yaml"
+	DefaultKubeAPIArgAuditPolicyFileValue = "/etc/kubernetes/audit-policy.yaml"
 )
 
 type ExternalFlags struct {
@@ -284,8 +284,8 @@ func newDefaultAuditPolicy() *auditv1.Policy {
 func newDefaultAuditLogConfig() *v3.AuditLogConfig {
 	p := newDefaultAuditPolicy()
 	c := &v3.AuditLogConfig{
-		MaxAge:    5,
-		MaxBackup: 5,
+		MaxAge:    30,
+		MaxBackup: 10,
 		MaxSize:   100,
 		Path:      DefaultKubeAPIArgAuditLogPathValue,
 		Format:    "json",

@@ -11,6 +11,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	ghodssyaml "github.com/ghodss/yaml"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rke/authz"
 	"github.com/rancher/rke/docker"
 	"github.com/rancher/rke/hosts"
@@ -155,6 +156,7 @@ func (c *Cluster) DeployWorkerPlane(ctx context.Context, svcOptionData map[strin
 func parseAuditLogConfig(clusterFile string, rkeConfig *v3.RancherKubernetesEngineConfig) error {
 	if rkeConfig.Services.KubeAPI.AuditLog != nil &&
 		rkeConfig.Services.KubeAPI.AuditLog.Enabled &&
+		rkeConfig.Services.KubeAPI.AuditLog.Configuration != nil &&
 		rkeConfig.Services.KubeAPI.AuditLog.Configuration.Policy == nil {
 		return nil
 	}
@@ -250,6 +252,82 @@ func parseAdmissionConfig(clusterFile string, rkeConfig *v3.RancherKubernetesEng
 	return nil
 }
 
+func parseIngressConfig(clusterFile string, rkeConfig *v3.RancherKubernetesEngineConfig) error {
+	if &rkeConfig.Ingress == nil {
+		return nil
+	}
+	var r map[string]interface{}
+	err := ghodssyaml.Unmarshal([]byte(clusterFile), &r)
+	if err != nil {
+		return fmt.Errorf("[parseIngressConfig] error unmarshalling ingress config: %v", err)
+	}
+	ingressMap := convert.ToMapInterface(r["ingress"])
+	if err := parseIngressExtraEnv(ingressMap, rkeConfig); err != nil {
+		return err
+	}
+	if err := parseIngressExtraVolumes(ingressMap, rkeConfig); err != nil {
+		return err
+	}
+	if err := parseIngressExtraVolumeMounts(ingressMap, rkeConfig); err != nil {
+		return err
+	}
+	return nil
+}
+
+func parseIngressExtraEnv(ingressMap map[string]interface{}, rkeConfig *v3.RancherKubernetesEngineConfig) error {
+	extraEnvs, ok := ingressMap["extra_envs"]
+	if !ok {
+		return nil
+	}
+	ingressEnvBytes, err := json.Marshal(extraEnvs)
+	if err != nil {
+		return fmt.Errorf("[parseIngressExtraEnv] error marshalling ingress config extraEnvs: %v", err)
+	}
+	var envs []v3.ExtraEnv
+	err = json.Unmarshal(ingressEnvBytes, &envs)
+	if err != nil {
+		return fmt.Errorf("[parseIngressExtraEnv] error unmarshaling ingress config extraEnvs: %v", err)
+	}
+	rkeConfig.Ingress.ExtraEnvs = envs
+	return nil
+}
+
+func parseIngressExtraVolumes(ingressMap map[string]interface{}, rkeConfig *v3.RancherKubernetesEngineConfig) error {
+	extraVolumes, ok := ingressMap["extra_volumes"]
+	if !ok {
+		return nil
+	}
+	ingressVolBytes, err := json.Marshal(extraVolumes)
+	if err != nil {
+		return fmt.Errorf("[parseIngressExtraVolumes] error marshalling ingress config extraVolumes: %v", err)
+	}
+	var volumes []v3.ExtraVolume
+	err = json.Unmarshal(ingressVolBytes, &volumes)
+	if err != nil {
+		return fmt.Errorf("[parseIngressExtraVolumes] error unmarshaling ingress config extraVolumes: %v", err)
+	}
+	rkeConfig.Ingress.ExtraVolumes = volumes
+	return nil
+}
+
+func parseIngressExtraVolumeMounts(ingressMap map[string]interface{}, rkeConfig *v3.RancherKubernetesEngineConfig) error {
+	extraVolMounts, ok := ingressMap["extra_volume_mounts"]
+	if !ok {
+		return nil
+	}
+	ingressVolMountBytes, err := json.Marshal(extraVolMounts)
+	if err != nil {
+		return fmt.Errorf("[parseIngressExtraVolumeMounts] error marshalling ingress config extraVolumeMounts: %v", err)
+	}
+	var volumeMounts []v3.ExtraVolumeMount
+	err = json.Unmarshal(ingressVolMountBytes, &volumeMounts)
+	if err != nil {
+		return fmt.Errorf("[parseIngressExtraVolumeMounts] error unmarshaling ingress config extraVolumeMounts: %v", err)
+	}
+	rkeConfig.Ingress.ExtraVolumeMounts = volumeMounts
+	return nil
+}
+
 func ParseConfig(clusterFile string) (*v3.RancherKubernetesEngineConfig, error) {
 	logrus.Debugf("Parsing cluster file [%v]", clusterFile)
 	var rkeConfig v3.RancherKubernetesEngineConfig
@@ -261,7 +339,6 @@ func ParseConfig(clusterFile string) (*v3.RancherKubernetesEngineConfig, error) 
 	if err != nil {
 		return nil, err
 	}
-
 	if err := yaml.Unmarshal([]byte(clusterFile), &rkeConfig); err != nil {
 		return nil, err
 	}
@@ -274,6 +351,10 @@ func ParseConfig(clusterFile string) (*v3.RancherKubernetesEngineConfig, error) 
 	}
 	if err := parseAuditLogConfig(clusterFile, &rkeConfig); err != nil {
 		return &rkeConfig, fmt.Errorf("error parsing audit log config: %v", err)
+	}
+
+	if err := parseIngressConfig(clusterFile, &rkeConfig); err != nil {
+		return &rkeConfig, fmt.Errorf("error parsing ingress config: %v", err)
 	}
 	return &rkeConfig, nil
 }
