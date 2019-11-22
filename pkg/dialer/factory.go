@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -136,7 +137,7 @@ func (f *Factory) clusterDialer(clusterName, address string) (dialer.Dialer, err
 
 	hostPort := hostPort(cluster)
 	logrus.Debugf("dialerFactory: apiEndpoint hostPort for cluster [%s] is [%s]", clusterName, hostPort)
-	if address == hostPort && isCloudDriver(cluster) {
+	if (address == hostPort || isProxyAddress(address)) && isCloudDriver(cluster) {
 		// For cloud drivers we just connect directly to the k8s API, not through the tunnel.  All other go through tunnel
 		return native()
 	}
@@ -255,4 +256,53 @@ func (f *Factory) nodeDialer(clusterName, machineName string) (dialer.Dialer, er
 
 func machineSessionKey(machine *v3.Node) string {
 	return fmt.Sprintf("%s:%s", machine.Namespace, machine.Name)
+}
+
+func isProxyAddress(address string) bool {
+	proxy := getEnvAny("HTTP_PROXY", "http_proxy")
+	if proxy == "" {
+		proxy = getEnvAny("HTTPS_PROXY", "https_proxy")
+	}
+
+	if proxy == "" {
+		return false
+	}
+
+	parsed, err := parseProxy(proxy)
+	if err != nil {
+		logrus.Warnf("Failed to parse http_proxy url %s: %v", proxy, err)
+		return false
+	}
+	return parsed.Host == address
+}
+
+func getEnvAny(names ...string) string {
+	for _, n := range names {
+		if val := os.Getenv(n); val != "" {
+			return val
+		}
+	}
+	return ""
+}
+
+func parseProxy(proxy string) (*url.URL, error) {
+	if proxy == "" {
+		return nil, nil
+	}
+
+	proxyURL, err := url.Parse(proxy)
+	if err != nil ||
+		(proxyURL.Scheme != "http" &&
+			proxyURL.Scheme != "https" &&
+			proxyURL.Scheme != "socks5") {
+		// proxy was bogus. Try pre-pending "http://" to it and
+		// see if that parses correctly. If not, fall through
+		if proxyURL, err := url.Parse("http://" + proxy); err == nil {
+			return proxyURL, nil
+		}
+	}
+	if err != nil {
+		return nil, fmt.Errorf("invalid proxy address %q: %v", proxy, err)
+	}
+	return proxyURL, nil
 }
