@@ -52,6 +52,8 @@ const (
 	// MaxEtcdOldEnvVersion The versions are maxed out for minor versions because -rancher1 suffix will cause semver to think its older, example: v1.15.0 > v1.15.0-rancher1
 	MaxEtcdOldEnvVersion = "v3.2.99"
 	MaxK8s115Version     = "v1.15"
+
+	EncryptionProviderConfigArgument = "encryption-provider-config"
 )
 
 var admissionControlOptionNames = []string{"enable-admission-plugins", "admission-control"}
@@ -221,7 +223,7 @@ func (c *Cluster) BuildKubeAPIProcess(host *hosts.Host, prefixPath string, svcOp
 			fmt.Sprintf("%s=%s", CloudConfigSumEnv, getCloudConfigChecksum(c.CloudConfigFile)))
 	}
 	if c.EncryptionConfig.EncryptionProviderFile != "" {
-		CommandArgs["experimental-encryption-provider-config"] = EncryptionProviderFilePath
+		CommandArgs[EncryptionProviderConfigArgument] = EncryptionProviderFilePath
 	}
 
 	if c.IsKubeletGenerateServingCertificateEnabled() {
