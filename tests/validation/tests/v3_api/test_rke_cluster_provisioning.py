@@ -6,6 +6,7 @@ from rancher import ApiError
 
 K8S_VERSION = os.environ.get('RANCHER_K8S_VERSION', "")
 K8S_VERSION_UPGRADE = os.environ.get('RANCHER_K8S_VERSION_UPGRADE', "")
+POD_SECURITY_POLICY_TEMPLATE = os.environ.get('RANCHER_POD_SECURITY_POLICY_TEMPLATE', "restricted")
 DO_ACCESSKEY = os.environ.get('DO_ACCESSKEY', "None")
 LINODE_ACCESSKEY = os.environ.get('RANCHER_LINODE_ACCESSKEY', "None")
 AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
@@ -59,8 +60,103 @@ rke_config = {
             "type": "kubeAPIService"}},
     "sshAgentAuth": False}
 
+rke_config_cis = {
+    "addonJobTimeout": 30,
+    "authentication":
+    {"strategy": "x509",
+     "type": "authnConfig"},
+    "ignoreDockerVersion": True,
+    "ingress":
+        {"provider": "nginx",
+         "type": "ingressConfig"},
+    "monitoring":
+        {"provider": "metrics-server",
+         "type": "monitoringConfig"},
+    "network":
+        {"plugin": "canal",
+         "type": "networkConfig",
+         "options": {"flannelBackendType": "vxlan"}},
+    "services": {
+        "etcd": {
+            "extraArgs":
+                {"heartbeat-interval": 500,
+                 "election-timeout": 5000},
+            "snapshot": False,
+            "backupConfig":
+                {"intervalHours": 12, "retention": 6, "type": "backupConfig"},
+            "creation": "12h",
+            "retention": "72h",
+            "type": "etcdService",
+            "gid": 1001,
+            "uid": 1001},
+        "kubeApi": {
+            "alwaysPullImages": True,
+            "auditLog":
+                {"enabled": True},
+            "eventRateLimit":
+                {"enabled": True},
+            "extraArgs":
+                {"anonymous-auth": False,
+                 "enable-admission-plugins": "ServiceAccount,"
+                                             "NamespaceLifecycle,"
+                                             "LimitRanger,"
+                                             "PersistentVolumeLabel,"
+                                             "DefaultStorageClass,"
+                                             "ResourceQuota,"
+                                             "DefaultTolerationSeconds,"
+                                             "AlwaysPullImages,"
+                                             "DenyEscalatingExec,"
+                                             "NodeRestriction,"
+                                             "PodSecurityPolicy,"
+                                             "MutatingAdmissionWebhook,"
+                                             "ValidatingAdmissionWebhook,"
+                                             "Priority,"
+                                             "TaintNodesByCondition,"
+                                             "PersistentVolumeClaimResize",
+                 "profiling": False,
+                 "service-account-lookup": True,
+                 "tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_"
+                                      "128_GCM_SHA256,"
+                                      "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,"
+                                      "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,"
+                                      "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,"
+                                      "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,"
+                                      "TLS_ECDHE_ECDSA_WITH_AES_"
+                                      "256_GCM_SHA384,"
+                                      "TLS_RSA_WITH_AES_256_GCM_SHA384,"
+                                      "TLS_RSA_WITH_AES_128_GCM_SHA256"},
+            "extraBinds": ["/opt/kubernetes:/opt/kubernetes"],
+            "podSecurityPolicy": True,
+            "secretsEncryptionConfig":
+                {"enabled": True},
+            "serviceNodePortRange": "30000-32767",
+            "type": "kubeAPIService"},
+        "kubeController": {
+            "extraArgs": {
+                "address": "127.0.0.1",
+                "feature-gates": "RotateKubeletServerCertificate=true",
+                "profiling": "false",
+                "terminated-pod-gc-threshold": "1000"
+            },
+        },
+        "kubelet": {
+            "extraArgs": {
+                "protect-kernel-defaults": True
+            },
+            "generateServingCertificate": True
+        },
+        "scheduler": {
+            "extraArgs": {
+                "address": "127.0.0.1",
+                "profiling": False
+            }
+        }},
+    "sshAgentAuth": False}
+
 if K8S_VERSION != "":
     rke_config["kubernetesVersion"] = K8S_VERSION
+    rke_config_cis["kubernetesVersion"] = K8S_VERSION
+
 
 rke_config_aws_provider = rke_config.copy()
 rke_config_aws_provider["cloudProvider"] = {"name": "aws",
@@ -84,6 +180,40 @@ if_stress_enabled = pytest.mark.skipif(
 if_test_edit_cluster = pytest.mark.skipif(
     CLUSTER_NAME == "",
     reason='Edit cluster tests not enabled')
+
+
+def test_cis_complaint():
+    #rke_config_cis
+    aws_nodes = \
+        AmazonWebServices().create_multiple_nodes(
+            8, random_test_name(HOST_NAME))
+    node_roles = [
+        ["controlplane"], ["controlplane"],
+        ["etcd"], ["etcd"], ["etcd"],
+        ["worker"], ["worker"], ["worker"]
+    ]
+    client = get_admin_client()
+    cluster = client.create_cluster(name=evaluate_clustername(),
+                                    driver="rancherKubernetesEngine",
+                                    rancherKubernetesEngineConfig=
+                                    rke_config_cis,
+                                    defaultPodSecurityPolicyTemplateId=
+                                    POD_SECURITY_POLICY_TEMPLATE)
+    assert cluster.state == "provisioning"
+    i = 0
+    for aws_node in aws_nodes:
+        aws_node.execute_command("sudo sysctl -w vm.overcommit_memory=1")
+        aws_node.execute_command("sudo sysctl -w kernel.panic=10")
+        aws_node.execute_command("sudo sysctl -w kernel.panic_on_oops=1")
+        if node_roles[i] == ["etcd"]:
+            aws_node.execute_command("sudo useradd etcd")
+        docker_run_cmd = \
+            get_custom_host_registration_cmd(client, cluster, node_roles[i],
+                                             aws_node)
+        aws_node.execute_command(docker_run_cmd)
+        i += 1
+    cluster = validate_cluster_state(client, cluster)
+    cluster_cleanup(client, cluster, aws_nodes)
 
 
 def test_rke_az_host_1(node_template_az):
