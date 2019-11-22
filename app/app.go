@@ -104,7 +104,7 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 	// cache works properly
 	features.InitializeFeatures(scaledContext, cfg.Features)
 
-	if os.Getenv("CATTLE_PROMETHEUS_METRICS") != "true" {
+	if os.Getenv("CATTLE_PROMETHEUS_METRICS") == "true" {
 		metrics.Register(ctx, scaledContext)
 	}
 
