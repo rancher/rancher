@@ -295,7 +295,7 @@ github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 # github.com/prometheus/procfs v0.0.0-20190507164030-5867b95ac084
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
-# github.com/rancher/kontainer-driver-metadata v0.0.0-20191118205911-28f79fefc067
+# github.com/rancher/kontainer-driver-metadata v0.0.0-20191125162457-09a06565759f
 github.com/rancher/kontainer-driver-metadata/rke/templates
 github.com/rancher/kontainer-driver-metadata/rke
 # github.com/rancher/kontainer-engine v0.0.4-dev.0.20191113162551-1e8159ce892e
@@ -360,7 +360,7 @@ github.com/rancher/norman/types/factory
 github.com/rancher/rdns-server/model
 # github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6
 github.com/rancher/remotedialer
-# github.com/rancher/rke v1.0.0-rc6.0.20191121220830-0f2b1a60272d
+# github.com/rancher/rke v1.0.0-rc6.0.20191125170742-40958cb2b8b1
 github.com/rancher/rke/util
 github.com/rancher/rke/pki/cert
 github.com/rancher/rke/cloudprovider/aws
