@@ -988,6 +988,15 @@ def validate_cluster_state(client, cluster,
     assert cluster.state == "active"
     wait_for_nodes_to_become_active(client, cluster,
                                     exception_list=nodes_not_in_active_state)
+    timeout = 60
+    start = time.time()
+    while "version" not in cluster.keys():
+        time.sleep(1)
+        cluster = client.reload(cluster)
+        delta = time.time() - start
+        if delta > timeout:
+            msg = "Timeout waiting for K8s version to be synced"
+            raise Exception(msg)
     return cluster
 
 
