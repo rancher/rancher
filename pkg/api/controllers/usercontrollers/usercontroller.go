@@ -22,6 +22,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+var (
+	all = "_all_"
+)
+
 func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) {
 	u := &userControllersController{
 		manager:       clusterManager,
@@ -85,7 +89,11 @@ func (u *userControllersController) sync(key string, cluster *v3.Cluster) (runti
 			return nil, err
 		}
 	}
-	return nil, u.setPeers(nil)
+	if key == all {
+		return nil, u.setPeers(nil)
+	}
+	u.clusters.Controller().Enqueue("", all)
+	return cluster, nil
 }
 
 func (u *userControllersController) setPeers(peers *tpeermanager.Peers) error {
