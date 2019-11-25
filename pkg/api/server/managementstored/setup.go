@@ -694,7 +694,8 @@ func GlobalRole(schemas *types.Schemas, management *config.ScaledContext) {
 
 func GlobalRoleBindings(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.GlobalRoleBindingType)
-	schema.Store = grbstore.Wrap(schema.Store, management.Management.GlobalRoleBindings("").Controller().Lister())
+	grLister := management.Management.GlobalRoles("").Controller().Lister()
+	schema.Store = grbstore.Wrap(schema.Store, grLister)
 }
 
 func RoleTemplate(schemas *types.Schemas, management *config.ScaledContext) {
