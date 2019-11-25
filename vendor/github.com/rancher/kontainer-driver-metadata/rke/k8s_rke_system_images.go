@@ -1625,7 +1625,7 @@ func loadK8sRKESystemImages() map[string]v3.RKESystemImages {
 			WindowsPodInfraContainer:  m("rancher/kubelet-pause:v0.1.3"),
 		},
 		// Enabled in Rancher v2.3.3
-		"v1.15.6-rancher1-1": {
+		"v1.15.6-rancher1-2": {
 			Etcd:                      m("quay.io/coreos/etcd:v3.3.10-rancher1"),
 			Kubernetes:                m("rancher/hyperkube:v1.15.6-rancher1"),
 			Alpine:                    m("rancher/rke-tools:v0.1.51"),
