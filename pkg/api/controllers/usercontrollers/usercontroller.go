@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -20,6 +19,10 @@ import (
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+)
+
+var (
+	all = "_all_"
 )
 
 func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) {
@@ -85,7 +88,11 @@ func (u *userControllersController) sync(key string, cluster *v3.Cluster) (runti
 			return nil, err
 		}
 	}
-	return nil, u.setPeers(nil)
+	if key == all {
+		return nil, u.setPeers(nil)
+	}
+	u.clusters.Controller().Enqueue("", all)
+	return cluster, nil
 }
 
 func (u *userControllersController) setPeers(peers *tpeermanager.Peers) error {
