@@ -10,7 +10,7 @@ import (
 func RegisterEarly(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	prtb, crtb := newRTBLifecycles(management)
 	gr := newGlobalRoleLifecycle(management)
-	grb := newGlobalRoleBindingLifecycle(management)
+	grb := newGlobalRoleBindingLifecycle(management, clusterManager)
 	p, c := newPandCLifecycles(management)
 	u := newUserLifecycle(management, clusterManager)
 	n := newTokenController(management)

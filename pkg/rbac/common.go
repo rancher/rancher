@@ -67,3 +67,7 @@ func BuildSubjectFromRTB(object interface{}) (rbacv1.Subject, error) {
 		Name:      name,
 	}, nil
 }
+
+func GrbCRBName(grb *v3.GlobalRoleBinding) string {
+	return "globaladmin-" + grb.UserName
+}
