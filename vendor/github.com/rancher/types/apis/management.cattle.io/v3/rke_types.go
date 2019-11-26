@@ -525,6 +525,8 @@ type WeaveNetworkProvider struct {
 }
 
 type KubernetesServicesOptions struct {
+	// Additional options passed to Etcd
+	Etcd map[string]string `json:"etcd"`
 	// Additional options passed to KubeAPI
 	KubeAPI map[string]string `json:"kubeapi"`
 	// Additional options passed to Kubelet

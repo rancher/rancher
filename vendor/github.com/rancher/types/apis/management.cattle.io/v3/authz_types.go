@@ -74,8 +74,9 @@ type GlobalRoleBinding struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	UserName       string `json:"userName,omitempty" norman:"required,type=reference[user]"`
-	GlobalRoleName string `json:"globalRoleName,omitempty" norman:"required,noupdate,type=reference[globalRole]"`
+	UserName           string `json:"userName,omitempty" norman:"noupdate,type=reference[user]"`
+	GroupPrincipalName string `json:"groupPrincipalName,omitempty" norman:"noupdate,type=reference[principal]"`
+	GlobalRoleName     string `json:"globalRoleName,omitempty" norman:"required,noupdate,type=reference[globalRole]"`
 }
 
 type RoleTemplate struct {
