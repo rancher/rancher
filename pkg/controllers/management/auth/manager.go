@@ -737,7 +737,7 @@ func (m *manager) reconcileManagementPlaneRole(namespace string, resourceToVerbs
 		},
 		Rules: rules,
 	})
-	if err != nil {
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return errors.Wrapf(err, "couldn't create role %v", rt.Name)
 	}
 
