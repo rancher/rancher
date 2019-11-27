@@ -1,11 +1,29 @@
 from .common import *  # NOQA
 import pytest
+from .test_rbac import create_user
 
-project_detail = {"project": None, "namespace": None, "cluster": None,
-                  "project2": None, "namespace2": None, "cluster2": None}
-user_token = {"user_c1_p1_owner": {"user": None, "token": None},
-              "user_c1_p1_member": {"user": None, "token": None},
+project_detail = {"cluster1": {"project1": rbac_get_project(),
+                               "namespace1": rbac_get_namespace(),
+                               "project2": None, "namespace2": None,
+                               "cluster": None},
+                  "cluster2": {"project1": None, "namespace1": None,
+                               "project2": None, "namespace2": None,
+                               "cluster": None}}
+user_token = {"user_c1_p1_owner": {
+                  "user": rbac_data["users"][PROJECT_OWNER]["user"],
+                  "token": rbac_data["users"][PROJECT_OWNER]["token"]},
+              "user_c1_p1_member": {
+                  "user": rbac_data["users"][PROJECT_MEMBER]["user"],
+                  "token": rbac_data["users"][PROJECT_MEMBER]["token"]},
               "user_c1_p2_owner": {"user": None, "token": None},
+              "user_c2_p1_owner": {"user": None, "token": None},
+              "user_c1_owner": {
+                  "user": rbac_data["users"][CLUSTER_OWNER]["user"],
+                  "token": rbac_data["users"][CLUSTER_OWNER]["token"]},
+              "user_c1_member": {
+                  "user": rbac_data["users"][CLUSTER_MEMBER]["user"],
+                  "token": rbac_data["users"][CLUSTER_MEMBER]["token"]},
+              "user_c2_owner": {"user": None, "token": None},
               "user_standard": {"user": None, "token": None}}
 
 CATALOG_URL = "https://git.rancher.io/charts"
@@ -59,13 +77,13 @@ def check_condition(condition_type, status):
 
 def test_tiller():
     name = random_test_name()
-    admin_client = get_user_client()
+    user_client = get_user_client()
 
-    clusters = admin_client.list_cluster(name=CLUSTER_NAME).data
+    clusters = user_client.list_cluster(name=CLUSTER_NAME).data
     assert len(clusters) > 0
     cluster_id = clusters[0].id
 
-    p = admin_client. \
+    p = user_client. \
         create_project(name="test-" + random_str(),
                        clusterId=cluster_id,
                        resourceQuota={
@@ -76,12 +94,12 @@ def test_tiller():
                                "secrets": "1"}}
                        )
 
-    p = admin_client.reload(p)
+    p = user_client.reload(p)
     proj_client = rancher.Client(url=p.links.self +
                                  '/schemas', verify=False,
                                  token=USER_TOKEN)
     # need a cluster scoped client to create a namespace
-    _cluster, cluster_client = cluster_and_client(cluster_id, admin_client)
+    _cluster, cluster_client = cluster_and_client(cluster_id, user_client)
     ns = cluster_client.create_namespace(name=random_str(),
                                          projectId=p.id,
                                          resourceQuota={
@@ -89,56 +107,58 @@ def test_tiller():
                                                  "secrets": "1"
                                              }}
                                          )
-    wait_for_template_to_be_created(admin_client, "library")
+    wait_for_template_to_be_created(user_client, "library")
     app = proj_client.create_app(
         name=name,
         externalId=WORDPRESS_EXTID,
         targetNamespace=ns.name,
         projectId=p.id,
-        answers=get_defaut_question_answers(admin_client, WORDPRESS_EXTID)
+        answers=get_defaut_question_answers(user_client, WORDPRESS_EXTID)
     )
 
     app = proj_client.reload(app)
     # test for tiller to be stuck on bad installs
     wait_for_condition(proj_client, app, check_condition('Installed', 'False'))
     # cleanup by deleting project
-    admin_client.delete(p)
+    user_client.delete(p)
 
 
+    # Test to validate app deployment
 def test_app_deploy():
-    admin_client = get_user_client()
+    user_client = get_user_client()
     proj_client = get_project_client_for_token(
-        project_detail["project"],
+        project_detail["cluster1"]["project1"],
         USER_TOKEN)
     answer = get_defaut_question_answers(
-        admin_client,
-        MYSQL_EXTERNALID_037)
-    wait_for_template_to_be_created(admin_client, "library")
+            user_client,
+            MYSQL_EXTERNALID_037)
+    wait_for_template_to_be_created(user_client, "library")
     app = proj_client.create_app(
         name=random_test_name(),
         externalId=MYSQL_EXTERNALID_037,
-        targetNamespace=project_detail["namespace"].name,
-        projectId=project_detail["project"].id,
+        targetNamespace=project_detail["cluster1"]["namespace1"].name,
+        projectId=project_detail["cluster1"]["project1"].id,
         answers=answer)
     print("App is active")
     validate_catalog_app(proj_client, app, MYSQL_EXTERNALID_037)
     proj_client.delete(app)
 
 
+    # Test to validate app deletion
 def test_app_delete():
-    admin_client = get_user_client()
+    user_client = get_user_client()
     proj_client = get_project_client_for_token(
-        project_detail["project"],
+        project_detail["cluster1"]["project1"],
         USER_TOKEN)
-    wait_for_template_to_be_created(admin_client, "library")
+    wait_for_template_to_be_created(user_client, "library")
     answer = get_defaut_question_answers(
-        admin_client,
-        MYSQL_EXTERNALID_037)
+            user_client,
+            MYSQL_EXTERNALID_037)
     app = proj_client.create_app(
         name=random_test_name(),
         externalId=MYSQL_EXTERNALID_037,
-        targetNamespace=project_detail["namespace"].name,
-        projectId=project_detail["project"].id,
+        targetNamespace=project_detail["cluster1"]["namespace1"].name,
+        projectId=project_detail["cluster1"]["project1"].id,
         answers=answer)
     print("App is active")
     validate_catalog_app(proj_client, app, MYSQL_EXTERNALID_037)
@@ -146,31 +166,32 @@ def test_app_delete():
     validate_app_deletion(proj_client, app.id)
 
 
+    # Test to validate upgrading app
 def test_app_upgrade_version():
-    admin_client = get_user_client()
+    user_client = get_user_client()
     proj_client = get_project_client_for_token(
-        project_detail["project"],
+        project_detail["cluster1"]["project1"],
         USER_TOKEN)
-    wait_for_template_to_be_created(admin_client, "library")
+    wait_for_template_to_be_created(user_client, "library")
     answer = get_defaut_question_answers(
-        admin_client,
-        MYSQL_EXTERNALID_037)
+            user_client,
+            MYSQL_EXTERNALID_037)
     app = proj_client.create_app(
         name=random_test_name(),
         externalId=MYSQL_EXTERNALID_037,
-        targetNamespace=project_detail["namespace"].name,
-        projectId=project_detail["project"].id,
+        targetNamespace=project_detail["cluster1"]["namespace1"].name,
+        projectId=project_detail["cluster1"]["project1"].id,
         answers=answer)
     print("App is active")
     validate_catalog_app(proj_client, app, MYSQL_EXTERNALID_037)
     new_answer = get_defaut_question_answers(
-            admin_client,
+            user_client,
             MYSQL_EXTERNALID_038)
     app = proj_client.update(
         obj=app,
         externalId=MYSQL_EXTERNALID_038,
-        targetNamespace=project_detail["namespace"].name,
-        projectId=project_detail["project"].id,
+        targetNamespace=project_detail["cluster1"]["namespace1"].name,
+        projectId=project_detail["cluster1"]["project1"].id,
         answers=new_answer)
     app = proj_client.reload(app)
     validate_catalog_app(proj_client, app, MYSQL_EXTERNALID_038)
@@ -178,32 +199,33 @@ def test_app_upgrade_version():
     proj_client.delete(app)
 
 
+    # Test to validate app rollback
 def test_app_rollback():
-    admin_client = get_user_client()
+    user_client = get_user_client()
     proj_client = get_project_client_for_token(
-        project_detail["project"],
+        project_detail["cluster1"]["project1"],
         USER_TOKEN)
-    wait_for_template_to_be_created(admin_client, "library")
+    wait_for_template_to_be_created(user_client, "library")
     answer = get_defaut_question_answers(
-        admin_client,
-        MYSQL_EXTERNALID_037)
+            user_client,
+            MYSQL_EXTERNALID_037)
     app = proj_client.create_app(
         name=random_test_name(),
         externalId=MYSQL_EXTERNALID_037,
-        targetNamespace=project_detail["namespace"].name,
-        projectId=project_detail["project"].id,
+        targetNamespace=project_detail["cluster1"]["namespace1"].name,
+        projectId=project_detail["cluster1"]["project1"].id,
         answers=answer)
     print("App is active")
     app = validate_catalog_app(proj_client, app, MYSQL_EXTERNALID_037)
     rev_id = app.appRevisionId
     new_answer = get_defaut_question_answers(
-            admin_client,
+            user_client,
             MYSQL_EXTERNALID_038)
     app = proj_client.update(
         obj=app,
         externalId=MYSQL_EXTERNALID_038,
-        targetNamespace=project_detail["namespace"].name,
-        projectId=project_detail["project"].id,
+        targetNamespace=project_detail["cluster1"]["namespace1"].name,
+        projectId=project_detail["cluster1"]["project1"].id,
         answers=new_answer)
     app = proj_client.reload(app)
     app = validate_catalog_app(proj_client, app, MYSQL_EXTERNALID_038)
@@ -217,20 +239,21 @@ def test_app_rollback():
     proj_client.delete(app)
 
 
+    # Test to validate answer override in an app
 def test_app_answer_override():
-    admin_client = get_user_client()
+    user_client = get_user_client()
     proj_client = get_project_client_for_token(
-        project_detail["project"],
+        project_detail["cluster1"]["project1"],
         USER_TOKEN)
-    wait_for_template_to_be_created(admin_client, "library")
+    wait_for_template_to_be_created(user_client, "library")
     answers = get_defaut_question_answers(
-        admin_client,
+        user_client,
         MYSQL_EXTERNALID_037)
     app = proj_client.create_app(
         name=random_test_name(),
         externalId=MYSQL_EXTERNALID_037,
-        targetNamespace=project_detail["namespace"].name,
-        projectId=project_detail["project"].id,
+        targetNamespace=project_detail["cluster1"]["namespace1"].name,
+        projectId=project_detail["cluster1"]["project1"].id,
         answers=answers)
     print("App is active")
     app = validate_catalog_app(proj_client, app, MYSQL_EXTERNALID_037)
@@ -238,8 +261,8 @@ def test_app_answer_override():
     app = proj_client.update(
         obj=app,
         externalId=MYSQL_EXTERNALID_037,
-        targetNamespace=project_detail["namespace"].name,
-        projectId=project_detail["project"].id,
+        targetNamespace=project_detail["cluster1"]["namespace1"].name,
+        projectId=project_detail["cluster1"]["project1"].id,
         answers=answers)
     app = proj_client.reload(app)
     app = validate_catalog_app(proj_client, app, MYSQL_EXTERNALID_037, answers)
@@ -248,103 +271,513 @@ def test_app_answer_override():
     proj_client.delete(app)
 
 
-def test_app_rbac_project_scope_deploy():
-    admin_client = get_user_client()
+    # Test to validate listing a catalog app at project level
+    # and deploying from the catalog
+@if_test_rbac
+def test_rbac_app_project_scope_list_deploy():
+    user_client = get_user_client()
     proj_client = get_project_client_for_token(
-        project_detail["project"],
+        project_detail["cluster1"]["project1"],
         USER_TOKEN)
-    catalog = admin_client.create_projectCatalog(
+    catalog = user_client.create_projectCatalog(
         name="projectcatalog",
         baseType="projectCatalog",
         branch="master",
         url=CATALOG_URL,
-        projectId=project_detail["project"].id)
-    time.sleep(5)
-    pId = project_detail["project"].id.split(":")[1]
+        projectId=project_detail["cluster1"]["project1"].id)
+    time.sleep(10)
+    assert catalog.state == "active", "Catalog is not in Active state."
+    pId = project_detail["cluster1"]["project1"].id.split(":")[1]
     catalog_proj_scoped_ext_id = "catalog://?catalog=" + pId + \
-                                 "/projectcatalog&type=" \
-                                 "projectCatalog&template=" \
-                                 "mysql&version=0.3.8"
+                                 "/" + catalog.name + "&type=" \
+                                 + catalog.baseType + "&template=" \
+                                                      "mysql&version=0.3.8"
+    print(catalog_proj_scoped_ext_id)
     answers = get_defaut_question_answers(
-        admin_client,
+        user_client,
         catalog_proj_scoped_ext_id)
     app = proj_client.create_app(
         name=random_test_name(),
         externalId=catalog_proj_scoped_ext_id,
         answers=answers,
-        targetNamespace=project_detail["namespace"].name,
-        projectId=project_detail["project"].id)
+        targetNamespace=project_detail["cluster1"]["namespace1"].name,
+        projectId=project_detail["cluster1"]["project1"].id)
     validate_catalog_app(proj_client, app, catalog_proj_scoped_ext_id)
-    p2, ns2 = create_project_and_ns(
-        USER_TOKEN,
-        project_detail["cluster"],
-        random_test_name("testapp"))
-    #Assign role
-    assign_members_to_project(admin_client,
-                              user_token["user_c1_p2_owner"]["user"],
-                              p2,
-                              "project-owner")
-    #Verify "project-owner" of p1 can list the added catalog
-    user1_client = get_client_for_token(
+    proj_client.delete(app)
+    validate_app_deletion(proj_client, app.id)
+
+    # Verify user_c1_p1_owner CAN list the added catalog
+    validate_user_list_catalog("user_c1_p1_owner", clustercatalog=False)
+    # deploy an app
+    proj_client_user = get_project_client_for_token(
+        project_detail["cluster1"]["project1"],
         user_token["user_c1_p1_owner"]["token"])
-    catalogs_list = user1_client.list_projectCatalog()
-    assert len(catalogs_list) == 1, \
-        "Project catalog not found for the user"
-    assert catalogs_list["data"][0]["name"] == \
-           "projectcatalog", "Incorrect project catalog found"
+    validate_catalog_app_deploy(proj_client_user,
+                                project_detail["cluster1"]["namespace1"].name,
+                                project_detail["cluster1"]["project1"].id,
+                                catalog_proj_scoped_ext_id)
 
-    # Verify "project-member" of p1 can list the added catalog
-    user2_client = get_client_for_token(
+    validate_user_list_catalog("user_c1_p1_member", clustercatalog=False)
+    # Verify user_c1_p1_member CAN list the added catalog
+    proj_client_user2 = get_project_client_for_token(
+        project_detail["cluster1"]["project1"],
         user_token["user_c1_p1_member"]["token"])
-    catalogs_list_2 = user2_client.list_projectCatalog()
-    assert len(catalogs_list_2) == 1, \
-        "Project catalog not found for the user"
+    validate_catalog_app_deploy(proj_client_user2,
+                                project_detail["cluster1"]["namespace1"].name,
+                                project_detail["cluster1"]["project1"].id,
+                                catalog_proj_scoped_ext_id)
 
-    # Verify "project-owner" of p2 CANNOT list the added catalog
-    user3_client = get_client_for_token(
+    # Verify user_c1_p2_owner CANNOT list the added catalog and deploy app
+    validate_user_list_catalog("user_c1_p2_owner", False, False)
+    proj_client_user3 = get_project_client_for_token(
+        project_detail["cluster1"]["project2"],
         user_token["user_c1_p2_owner"]["token"])
-    catalogs_list_3 = user3_client.list_projectCatalog()
-    assert len(catalogs_list_3) == 0, \
-        "Project catalog found for the user"
+    validate_catalog_app_deploy(proj_client_user3,
+                                project_detail["cluster1"]["namespace2"].name,
+                                project_detail["cluster1"]["project2"].id,
+                                catalog_proj_scoped_ext_id, False)
 
-    # Verify A standard user CANNOT list the added catalog
-    user4_client = get_client_for_token(
-        user_token["user_standard"]["token"])
-    catalogs_list_4 = user4_client.list_projectCatalog()
-    assert len(catalogs_list_4) == 0, \
-        "Project catalog found for the user"
-    admin_client.delete(p2)
+    # Verify user_standard CANNOT list the added catalog
+    validate_user_list_catalog("user_standard", False, False)
+
+    # Verify user_c2_p1_owner CANNOT list the added catalog  and deploy app
+    validate_user_list_catalog("user_c2_p1_owner", False, False)
+    proj_client_user3 = get_project_client_for_token(
+        project_detail["cluster2"]["project1"],
+        user_token["user_c2_p1_owner"]["token"])
+    validate_catalog_app_deploy(proj_client_user3,
+                                project_detail["cluster2"]["namespace1"].name,
+                                project_detail["cluster2"]["project1"].id,
+                                catalog_proj_scoped_ext_id, False)
+
+    # Verify user_c1_owner CAN list the added catalog
+    validate_user_list_catalog("user_c1_owner", clustercatalog=False)
+    proj_client_user3 = get_project_client_for_token(
+        project_detail["cluster1"]["project1"],
+        user_token["user_c1_owner"]["token"])
+    validate_catalog_app_deploy(proj_client_user3,
+                                project_detail["cluster1"]["namespace1"].name,
+                                project_detail["cluster1"]["project1"].id,
+                                catalog_proj_scoped_ext_id)
+
+    # Verify user_c1_member CANNOT list the added catalog  and deploy app
+    validate_user_list_catalog("user_c1_member", False, False)
+    p3, ns3 = create_project_and_ns(user_token["user_c1_member"]["token"],
+                              project_detail["cluster1"]["cluster"],
+                              random_test_name("testapp-u-c1-m"))
+    proj_client_user4 = get_project_client_for_token(
+        p3, user_token["user_c1_member"]["token"])
+    validate_catalog_app_deploy(proj_client_user4,
+                                ns3.name,
+                                p3.id,
+                                catalog_proj_scoped_ext_id, False)
+
+
+    # Verify user_c2_owner CANNOT list the added catalog  and deploy app
+    validate_user_list_catalog("user_c2_owner", False, False)
+    proj_client_user3 = get_project_client_for_token(
+        project_detail["cluster2"]["project1"],
+        user_token["user_c2_owner"]["token"])
+    validate_catalog_app_deploy(proj_client_user3,
+                                project_detail["cluster2"]["namespace1"].name,
+                                project_detail["cluster2"]["project1"].id,
+                                catalog_proj_scoped_ext_id, False)
+    user_client.delete(p3)
+    user_client.delete(catalog)
+
+
+    # Test to validate listing a catalog app at cluster level
+    # and deploying from the catalog
+@if_test_rbac
+def test_rbac_app_cluster_scope_list_deploy():
+    user_client = get_user_client()
+    proj_client1 = get_project_client_for_token(
+        project_detail["cluster1"]["project1"],
+        USER_TOKEN)
+    print(project_detail["cluster1"]["cluster"].id)
+    print(project_detail["cluster1"]["cluster"])
+    catalog = user_client.create_clusterCatalog(
+        name="cluster-catalog",
+        baseType="clustercatalog",
+        branch="master",
+        url=CATALOG_URL,
+        clusterId=project_detail["cluster1"]["cluster"].id)
+    time.sleep(10)
+    assert catalog.state == "active", "Catalog is not in Active state."
+    catalog_cluster_scoped_ext_id = \
+        "catalog://?catalog=" + \
+        project_detail["cluster1"]["cluster"].id + \
+        "/cluster-catalog&type=clusterCatalog&template=mysql&version=0.3.8"
+    answers = get_defaut_question_answers(
+        user_client,
+        catalog_cluster_scoped_ext_id)
+    app = proj_client1.create_app(
+        name=random_test_name(),
+        externalId=catalog_cluster_scoped_ext_id,
+        answers=answers,
+        targetNamespace=project_detail["cluster1"]["namespace1"].name,
+        projectId=project_detail["cluster1"]["project1"].id)
+    validate_catalog_app(proj_client1, app, catalog_cluster_scoped_ext_id)
+    proj_client1.delete(app)
+    validate_app_deletion(proj_client1, app.id)
+
+    # verify user_c1_p1_owner CAN list the catalog
+    validate_user_list_catalog("user_c1_p1_owner")
+
+    proj_client_user = get_project_client_for_token(
+        project_detail["cluster1"]["project1"],
+        user_token["user_c1_p1_owner"]["token"])
+    validate_catalog_app_deploy(proj_client_user,
+                                project_detail["cluster1"]["namespace1"].name,
+                                project_detail["cluster1"]["project1"].id,
+                                catalog_cluster_scoped_ext_id)
+
+    # verify user_c1_p1_member CAN list the catalog
+    validate_user_list_catalog("user_c1_p1_member")
+    proj_client_user = get_project_client_for_token(
+        project_detail["cluster1"]["project1"],
+        user_token["user_c1_p1_member"]["token"])
+    validate_catalog_app_deploy(proj_client_user,
+                                project_detail["cluster1"]["namespace1"].name,
+                                project_detail["cluster1"]["project1"].id,
+                                catalog_cluster_scoped_ext_id)
+
+    # verify user_c1_p2_owner CAN list the catalog
+    validate_user_list_catalog("user_c1_p2_owner")
+    proj_client_user = get_project_client_for_token(
+        project_detail["cluster1"]["project2"],
+        user_token["user_c1_p2_owner"]["token"])
+    validate_catalog_app_deploy(proj_client_user,
+                                project_detail["cluster1"]["namespace2"].name,
+                                project_detail["cluster1"]["project2"].id,
+                                catalog_cluster_scoped_ext_id)
+
+    # verify user_c2_p1_owner CANNOT list the catalog
+    validate_user_list_catalog("user_c2_p1_owner", False)
+    proj_client_user3 = get_project_client_for_token(
+        project_detail["cluster2"]["project1"],
+        user_token["user_c2_p1_owner"]["token"])
+    validate_catalog_app_deploy(proj_client_user3,
+                                project_detail["cluster2"]["namespace1"].name,
+                                project_detail["cluster2"]["project1"].id,
+                                catalog_cluster_scoped_ext_id, False)
+
+    # verify user_standard CANNOT list the catalog
+    validate_user_list_catalog("user_standard", False)
+
+    # user_c1_owner CAN list the catalog
+    validate_user_list_catalog("user_c1_owner")
+    proj_client_user = get_project_client_for_token(
+        project_detail["cluster1"]["project1"],
+        user_token["user_c1_owner"]["token"])
+    validate_catalog_app_deploy(proj_client_user,
+                                project_detail["cluster1"]["namespace1"].name,
+                                project_detail["cluster1"]["project1"].id,
+                                catalog_cluster_scoped_ext_id)
+
+    # user_c1_member CAN list the catalog
+    validate_user_list_catalog("user_c1_member")
+    p3, n3 = create_project_and_ns(
+        user_token["user_c1_member"]["token"],
+        project_detail["cluster1"]["cluster"],
+        random_test_name("testapp"))
+    proj_client_user = get_project_client_for_token(
+        p3, user_token["user_c1_member"]["token"])
+    validate_catalog_app_deploy(proj_client_user,
+                                n3.name,
+                                p3.id,
+                                catalog_cluster_scoped_ext_id)
+
+    # user_c2_owner CANNOT list the catalog
+    validate_user_list_catalog("user_c2_owner", False)
+    proj_client_user3 = get_project_client_for_token(
+        project_detail["cluster2"]["project1"],
+        user_token["user_c2_owner"]["token"])
+    validate_catalog_app_deploy(proj_client_user3,
+                                project_detail["cluster2"]["namespace1"].name,
+                                project_detail["cluster2"]["project1"].id,
+                                catalog_cluster_scoped_ext_id, False)
+
+    user_client.delete(catalog)
+    user_client.delete(p3)
+
+
+    # Test to validate deleting a catalog app added at project level
+@if_test_rbac
+def test_rbac_app_project_scope_catalog_delete():
+    user_client = get_user_client()
+    proj_client = get_project_client_for_token(
+        project_detail["cluster1"]["project1"],
+        USER_TOKEN)
+    catalog = user_client.create_projectCatalog(
+        name="project-catalog",
+        baseType="projectCatalog",
+        branch="master",
+        url=CATALOG_URL,
+        projectId=project_detail["cluster1"]["project1"].id)
+    time.sleep(10)
+    assert catalog.state == "active", "Catalog is not in Active state."
+    pId = project_detail["cluster1"]["project1"].id.split(":")[1]
+    catalog_proj_scoped_ext_id = "catalog://?catalog=" + pId + \
+                                 "/project-catalog&type=" \
+                                 "projectCatalog&template=" \
+                                 "mysql&version=0.3.8"
+    answers = get_defaut_question_answers(
+        user_client,
+        catalog_proj_scoped_ext_id)
+    app = proj_client.create_app(
+        name=random_test_name(),
+        externalId=catalog_proj_scoped_ext_id,
+        answers=answers,
+        targetNamespace=project_detail["cluster1"]["namespace1"].name,
+        projectId=project_detail["cluster1"]["project1"].id)
+    validate_catalog_app(proj_client, app, catalog_proj_scoped_ext_id)
+    proj_client.delete(app)
+
+    # Verify user_c1_p1_owner CAN delete the added catalog
+    validate_catalog_app_deletion(catalog,
+                                  "user_c1_p1_owner", True, False)
+
+    catalog = user_client.create_projectCatalog(
+        name="project-catalog",
+        baseType="projectCatalog",
+        branch="master",
+        url=CATALOG_URL,
+        projectId=project_detail["cluster1"]["project1"].id)
+    time.sleep(10)
+    assert catalog.state == "active", "Catalog is not in Active state."
+
+    # Verify user_c1_p1_member CANNOT delete the added catalog
+    validate_catalog_app_deletion(catalog,
+                                  "user_c1_p1_member", False, False)
+
+    # Verify user_c1_p2_owner CANNOT delete the added catalog
+    validate_catalog_app_deletion(catalog,
+                                  "user_c1_p2_owner", False, False)
+
+    # Verify user_c2_p1_owner CANNOT delete the added catalog
+    validate_catalog_app_deletion(catalog,
+                                  "user_c2_p1_owner", False, False)
+
+    # Verify user_c1_owner CAN delete the added catalog
+    validate_catalog_app_deletion(catalog,
+                                  "user_c1_owner", True, False)
+
+    catalog = user_client.create_projectCatalog(
+        name="project-catalog",
+        baseType="projectCatalog",
+        branch="master",
+        url=CATALOG_URL,
+        projectId=project_detail["cluster1"]["project1"].id)
+    time.sleep(10)
+    assert catalog.state == "active", "Catalog is not in Active state."
+
+    # Verify user_c1_member CANNOT delete the added catalog
+    validate_catalog_app_deletion(catalog,
+                                  "user_c1_member", False, False)
+
+    # Verify user_c2_owner CANNOT delete the added catalog
+    validate_catalog_app_deletion(catalog,
+                                  "user_c2_owner", False, False)
+
+    # Verify user_standard CANNOT delete the added catalog
+    validate_catalog_app_deletion(catalog,
+                                  "user_standard", False, False)
+
+    user_client.delete(catalog)
+
+
+    # Test to validate deleting a catalog app added at cluster level
+@if_test_rbac
+def test_rbac_app_cluster_scope_catalog_delete():
+    user_client = get_user_client()
+    proj_client1 = get_project_client_for_token(
+        project_detail["cluster1"]["project1"],
+        USER_TOKEN)
+    print(project_detail["cluster1"]["cluster"].id)
+    print(project_detail["cluster1"]["cluster"])
+    catalog = user_client.create_clusterCatalog(
+        name="cluster-catalog2",
+        baseType="clustercatalog",
+        branch="master",
+        url=CATALOG_URL,
+        clusterId=project_detail["cluster1"]["cluster"].id)
+    time.sleep(10)
+    assert catalog.state == "active", "Catalog is not in Active state."
+    catalog_cluster_scoped_ext_id = \
+        "catalog://?catalog=" + \
+        project_detail["cluster1"]["cluster"].id + \
+        "/cluster-catalog2&type=clusterCatalog&template=mysql&version=0.3.8"
+    answers = get_defaut_question_answers(
+        user_client,
+        catalog_cluster_scoped_ext_id)
+    app = proj_client1.create_app(
+        name=random_test_name(),
+        externalId=catalog_cluster_scoped_ext_id,
+        answers=answers,
+        targetNamespace=project_detail["cluster1"]["namespace1"].name,
+        projectId=project_detail["cluster1"]["project1"].id)
+    validate_catalog_app(proj_client1, app, catalog_cluster_scoped_ext_id)
+    proj_client1.delete(app)
+    validate_app_deletion(proj_client1, app.id)
+
+    # verify user_c1_p1_owner CANNOT delete the catalog
+    validate_catalog_app_deletion(catalog,
+                                  "user_c1_p1_owner", False)
+
+    # verify user_c1_p1_member CANNOT delete the catalog
+    validate_catalog_app_deletion(catalog,
+                                  "user_c1_p1_member", False)
+
+    # verify user_c1_p2_owner CANNOT delete the catalog
+    validate_catalog_app_deletion(catalog,
+                                  "user_c1_p2_owner", False)
+
+    # verify user_c2_p1_owner CANNOT delete the catalog
+    validate_catalog_app_deletion(catalog,
+                                  "user_c2_p1_owner", False)
+
+    # verify user_c1_owner CAN delete the catalog
+    validate_catalog_app_deletion(catalog,
+                                  "user_c1_owner", True)
+    catalog = user_client.create_clusterCatalog(
+        name="cluster-catalog2",
+        baseType="clustercatalog",
+        branch="master",
+        url=CATALOG_URL,
+        clusterId=project_detail["cluster1"]["cluster"].id)
+    time.sleep(10)
+    assert catalog.state == "active", "Catalog is not in Active state."
+
+    # verify user_c1_member CANNOT delete the catalog
+    validate_catalog_app_deletion(catalog,
+                                  "user_c1_member", False)
+
+    # verify user_c2_owner CANNOT delete the catalog
+    validate_catalog_app_deletion(catalog,
+                                  "user_c2_owner", False)
+
+    # verify user_standard CANNOT delete the catalog
+    validate_catalog_app_deletion(catalog,
+                                  "user_standard", False)
 
 
 @pytest.fixture(scope='module', autouse="True")
 def create_project_client(request):
-    client = get_admin_client()
-    clusters = client.list_cluster(name=CLUSTER_NAME).data
+    client, clusters = get_user_client_and_cluster_app()
+    admin_client = get_admin_client()
+    cluster1 = clusters[0]
+    cluster2 = clusters[1]
     assert len(clusters) > 0
-    project_detail["project"], project_detail["namespace"] = \
-        create_project_and_ns(USER_TOKEN, clusters[0],
+    project_detail["cluster1"]["project2"], \
+    project_detail["cluster1"]["namespace2"] = \
+        create_project_and_ns(USER_TOKEN,
+                              cluster1,
                               random_test_name("testapp"))
-    project_detail["cluster"] = clusters[0]
-    #create users
-    user_token["user_c1_p1_owner"]["user"], \
-        user_token["user_c1_p1_owner"]["token"] = create_user(client)
-    user_token["user_c1_p1_member"]["user"], \
-        user_token["user_c1_p1_member"]["token"] = create_user(client)
+    project_detail["cluster2"]["project1"], \
+        project_detail["cluster2"]["namespace1"] = \
+        create_project_and_ns(USER_TOKEN,
+                              cluster2,
+                              random_test_name("testapp"))
+    project_detail["cluster1"]["cluster"] = cluster1
+    project_detail["cluster2"]["cluster"] = cluster2
+
+    # create users
     user_token["user_c1_p2_owner"]["user"], \
-        user_token["user_c1_p2_owner"]["token"] = create_user(client)
+        user_token["user_c1_p2_owner"]["token"] = create_user(admin_client)
+    user_token["user_c2_p1_owner"]["user"], \
+        user_token["user_c2_p1_owner"]["token"] = create_user(admin_client)
+    user_token["user_c2_owner"]["user"], \
+        user_token["user_c2_owner"]["token"] = create_user(admin_client)
     user_token["user_standard"]["user"], \
-        user_token["user_standard"]["token"] = create_user(client)
-    #Assign roles to the users
-    assign_members_to_project(client,
-                              user_token["user_c1_p1_owner"]["user"],
-                              project_detail["project"],
+        user_token["user_standard"]["token"] = create_user(admin_client)
+
+    # Assign roles to the users
+    assign_members_to_project(admin_client,
+                              user_token["user_c1_p2_owner"]["user"],
+                              project_detail["cluster1"]["project2"],
                               "project-owner")
-    assign_members_to_project(client,
-                              user_token["user_c1_p1_member"]["user"],
-                              project_detail["project"],
-                              "project-member")
+    assign_members_to_project(admin_client,
+                              user_token["user_c2_p1_owner"]["user"],
+                              project_detail["cluster2"]["project1"],
+                              "project-owner")
+    assign_members_to_cluster(admin_client,
+                              user_token["user_c2_owner"]["user"],
+                              project_detail["cluster2"]["cluster"],
+                              "cluster-owner")
 
     def fin():
-        client = get_user_client()
-        client.delete(project_detail["project"])
+        admin_client.delete(project_detail["cluster1"]["project2"])
+        admin_client.delete(project_detail["cluster2"]["project1"])
+        for userkey in user_token:
+            admin_client.delete(user_token[userkey]["user"])
+
     request.addfinalizer(fin)
+
+
+def validate_user_list_catalog(user, listcatalog=True, clustercatalog=True):
+    user_client = get_client_for_token(user_token[user]["token"])
+    if clustercatalog:
+        catalogs_list = user_client.list_clusterCatalog()
+        catalogName = "cluster-catalog"
+    else:
+        catalogs_list = user_client.list_projectCatalog()
+        catalogName = "projectcatalog"
+
+    if listcatalog:
+        print("Length of catalog list:", len(catalogs_list))
+        assert len(catalogs_list) == 1, \
+            "Catalog not found for the user"
+        assert catalogs_list["data"][0]["name"] == catalogName, \
+            "Incorrect catalog found"
+    else:
+        assert len(catalogs_list) == 0, \
+            "Catalog found for the user"
+
+
+def validate_catalog_app_deploy(proj_client_user, namespace,
+                                projectid, catalog_ext_id, can_deploy=True):
+    print(can_deploy)
+    if can_deploy:
+        app = proj_client_user.create_app(
+            name=random_test_name(),
+            externalId=catalog_ext_id,
+            answers=get_defaut_question_answers(get_user_client(),
+                                                catalog_ext_id),
+            targetNamespace=namespace,
+            projectId=projectid)
+        validate_catalog_app(proj_client_user, app, catalog_ext_id)
+        proj_client_user.delete(app)
+    else:
+        try:
+            app = proj_client_user.create_app(
+                name=random_test_name(),
+                externalId=catalog_ext_id,
+                answers=get_defaut_question_answers(get_user_client(),
+                                                    catalog_ext_id),
+                targetNamespace=namespace,
+                projectId=projectid)
+            assert False, "User is allowed to deploy app"
+        except ApiError as e:
+            print(e.error)
+            assert e.error.status == 404
+            assert "Cannot find template version" in e.error.message
+
+
+def validate_catalog_app_deletion(catalog,
+                                  user, candelete=True, clustercatalog=True):
+    user_client = get_client_for_token(user_token[user]["token"])
+    if not candelete:
+        try:
+            user_client.delete(catalog)
+        except:
+            print(user + " is not able to delete the catalog")
+            pass
+    else:
+        user_client.delete(catalog)
+        if clustercatalog:
+            catalogs_list = user_client.list_clusterCatalog()
+        else:
+            catalogs_list = user_client.list_projectCatalog()
+        assert len(catalogs_list) == 0, \
+            "Catalog has not been deleted for the user"

@@ -1376,12 +1376,14 @@ def validate_app_deletion(client, app_id,
             break
 
 
-def validate_catalog_app(proj_client, app, external_id, answer=None):
+def validate_catalog_app(proj_client, app, external_id, answer=None,
+                         timeout=DEFAULT_TIMEOUT):
     if answer is None:
         answers = get_defaut_question_answers(get_user_client(), external_id)
     else:
         answers = answer
     # validate app is active
+    time.sleep(5)
     app = wait_for_app_to_active(proj_client, app.id)
     assert app.externalId == external_id, \
         "the version of the app is not correct"
@@ -1391,17 +1393,43 @@ def validate_catalog_app(proj_client, app, external_id, answer=None):
     assert len(pramaters) > 1, \
         "Incorrect list of paramaters from catalog external ID"
     chart = pramaters[len(pramaters)-2].split("=")[1] + "-" + \
-            pramaters[len(pramaters)-1].split("=")[1]
+        pramaters[len(pramaters)-1].split("=")[1]
     workloads = proj_client.list_workload(namespaceId=ns).data
+    # Wait for workloads to become Active
     for wl in workloads:
+        start = time.time()
+        while wl.state != "active":
+            print(wl.state)
+            if time.time() - start > timeout:
+                raise AssertionError(
+                    "Timed out waiting for workload to become Active")
+            time.sleep(.5)
+    # Verify Workload state and the chart version
+    for wl in workloads:
+        print(wl.state)
         assert wl.state == "active"
         assert wl.workloadLabels.chart == chart, \
             "the chart version is wrong"
 
-    # Validate_app_answers
+    # validate_app_answers
     assert len(answers.items() - app["answers"].items()) == 0, \
         "Answers are not same as the original catalog answers"
     return app
+
+
+def get_user_client_and_cluster_app():
+    clusters = []
+    client = get_user_client()
+    if CLUSTER_NAME != "" and CLUSTER_NAME_2 != "":
+        assert len(client.list_cluster(name=CLUSTER_NAME).data) != 0, \
+            "Cluster is not available: %r" % CLUSTER_NAME
+        assert len(client.list_cluster(name=CLUSTER_NAME_2).data) != 0, \
+            "Cluster is not available: %r" % CLUSTER_NAME_2
+        clusters.append(client.list_cluster(name=CLUSTER_NAME).data[0])
+        clusters.append(client.list_cluster(name=CLUSTER_NAME_2).data[0])
+    else:
+        clusters = client.list_cluster().data
+    return client, clusters
 
 
 def create_user(client, cattle_auth_url=CATTLE_AUTH_URL):
