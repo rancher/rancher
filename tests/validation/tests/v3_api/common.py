@@ -1456,6 +1456,7 @@ def rbac_get_unshared_workload():
 def rbac_prepare():
     """this function creates one project, one namespace,and four users with different roles"""
     admin_client, cluster = get_global_admin_client_and_cluster()
+    create_kubeconfig(cluster)
     # create a new project in the cluster
     project, ns = create_project_and_ns(ADMIN_TOKEN, cluster, random_test_name("p-test-rbac"))
     rbac_data["project"] = project
