@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net"
 	"os"
@@ -43,6 +44,9 @@ type Conn struct {
 	// base network connection
 	conn net.Conn
 
+	// number of inflight requests on the connection.
+	inflight int32
+
 	// offset management (synchronized on the mutex field)
 	mutex  sync.Mutex
 	offset int64
@@ -54,6 +58,7 @@ type Conn struct {
 	// write buffer (synchronized on wlock)
 	wlock sync.Mutex
 	wbuf  bufio.Writer
+	wb    writeBuffer
 
 	// deadline management
 	wdeadline connDeadline
@@ -158,6 +163,8 @@ func NewConnWith(conn net.Conn, config ConnConfig) *Conn {
 		requiredAcks:    -1,
 		transactionalID: emptyToNullable(config.TransactionalID),
 	}
+
+	c.wb.w = &c.wbuf
 
 	// The fetch request needs to ask for a MaxBytes value that is at least
 	// enough to load the control data of the response. To avoid having to
@@ -492,10 +499,10 @@ func (c *Conn) offsetFetch(request offsetFetchRequestV1) (offsetFetchResponseV1,
 	return response, nil
 }
 
-// syncGroups completes the handshake to join a consumer group
+// syncGroup completes the handshake to join a consumer group
 //
 // See http://kafka.apache.org/protocol.html#The_Messages_SyncGroup
-func (c *Conn) syncGroups(request syncGroupRequestV0) (syncGroupResponseV0, error) {
+func (c *Conn) syncGroup(request syncGroupRequestV0) (syncGroupResponseV0, error) {
 	var response syncGroupResponseV0
 
 	err := c.readOperation(
@@ -595,6 +602,12 @@ const (
 	SeekAbsolute = 1 // Seek to an absolute offset.
 	SeekEnd      = 2 // Seek relative to the last offset available in the partition.
 	SeekCurrent  = 3 // Seek relative to the current offset.
+
+	// This flag may be combined to any of the SeekAbsolute and SeekCurrent
+	// constants to skip the bound check that the connection would do otherwise.
+	// Programs can use this flag to avoid making a metadata request to the kafka
+	// broker to read the current first and last offsets of the partition.
+	SeekDontCheck = 1 << 30
 )
 
 // Seek sets the offset for the next read or write operation according to whence, which
@@ -604,10 +617,30 @@ const (
 // as in lseek(2) or os.Seek.
 // The method returns the new absolute offset of the connection.
 func (c *Conn) Seek(offset int64, whence int) (int64, error) {
+	seekDontCheck := (whence & SeekDontCheck) != 0
+	whence &= ^SeekDontCheck
+
 	switch whence {
 	case SeekStart, SeekAbsolute, SeekEnd, SeekCurrent:
 	default:
 		return 0, fmt.Errorf("whence must be one of 0, 1, 2, or 3. (whence = %d)", whence)
+	}
+
+	if seekDontCheck {
+		if whence == SeekAbsolute {
+			c.mutex.Lock()
+			c.offset = offset
+			c.mutex.Unlock()
+			return offset, nil
+		}
+
+		if whence == SeekCurrent {
+			c.mutex.Lock()
+			c.offset += offset
+			offset = c.offset
+			c.mutex.Unlock()
+			return offset, nil
+		}
 	}
 
 	if whence == SeekAbsolute {
@@ -618,6 +651,7 @@ func (c *Conn) Seek(offset int64, whence int) (int64, error) {
 			return offset, nil
 		}
 	}
+
 	if whence == SeekCurrent {
 		c.mutex.Lock()
 		offset = c.offset + offset
@@ -726,7 +760,9 @@ func (c *Conn) ReadBatchWith(cfg ReadBatchConfig) *Batch {
 		return &Batch{err: fmt.Errorf("kafka.(*Conn).ReadBatch: minBytes (%d) > maxBytes (%d)", cfg.MinBytes, cfg.MaxBytes)}
 	}
 
-	offset, err := c.Seek(c.Offset())
+	offset, whence := c.Offset()
+
+	offset, err := c.Seek(offset, whence|SeekDontCheck)
 	if err != nil {
 		return &Batch{err: dontExpectEOF(err)}
 	}
@@ -734,11 +770,9 @@ func (c *Conn) ReadBatchWith(cfg ReadBatchConfig) *Batch {
 	id, err := c.doRequest(&c.rdeadline, func(deadline time.Time, id int32) error {
 		now := time.Now()
 		deadline = adjustDeadlineForRTT(deadline, now, defaultRTT)
-		adjustedDeadline = deadline
 		switch c.fetchVersion {
 		case v10:
-			return writeFetchRequestV10(
-				&c.wbuf,
+			return c.wb.writeFetchRequestV10(
 				id,
 				c.clientID,
 				c.topic,
@@ -750,8 +784,7 @@ func (c *Conn) ReadBatchWith(cfg ReadBatchConfig) *Batch {
 				int8(cfg.IsolationLevel),
 			)
 		case v5:
-			return writeFetchRequestV5(
-				&c.wbuf,
+			return c.wb.writeFetchRequestV5(
 				id,
 				c.clientID,
 				c.topic,
@@ -763,8 +796,7 @@ func (c *Conn) ReadBatchWith(cfg ReadBatchConfig) *Batch {
 				int8(cfg.IsolationLevel),
 			)
 		default:
-			return writeFetchRequestV2(
-				&c.wbuf,
+			return c.wb.writeFetchRequestV2(
 				id,
 				c.clientID,
 				c.topic,
@@ -803,7 +835,11 @@ func (c *Conn) ReadBatchWith(cfg ReadBatchConfig) *Batch {
 
 	var msgs *messageSetReader
 	if err == nil {
-		msgs, err = newMessageSetReader(&c.rbuf, remain)
+		if highWaterMark == offset {
+			msgs = &messageSetReader{empty: true}
+		} else {
+			msgs, err = newMessageSetReader(&c.rbuf, remain)
+		}
 	}
 	if err == errShortRead {
 		err = checkTimeoutErr(adjustedDeadline)
@@ -818,7 +854,11 @@ func (c *Conn) ReadBatchWith(cfg ReadBatchConfig) *Batch {
 		partition:     int(c.partition), // partition is copied to Batch to prevent race with Batch.close
 		offset:        offset,
 		highWaterMark: highWaterMark,
-		err:           dontExpectEOF(err),
+		// there shouldn't be a short read on initially setting up the batch.
+		// as such, any io.EOF is re-mapped to an io.ErrUnexpectedEOF so that we
+		// don't accidentally signal that we successfully reached the end of the
+		// batch.
+		err: dontExpectEOF(err),
 	}
 }
 
@@ -857,7 +897,7 @@ func (c *Conn) ReadOffsets() (first, last int64, err error) {
 func (c *Conn) readOffset(t int64) (offset int64, err error) {
 	err = c.readOperation(
 		func(deadline time.Time, id int32) error {
-			return writeListOffsetRequestV1(&c.wbuf, id, c.clientID, c.topic, c.partition, t)
+			return c.wb.writeListOffsetRequestV1(id, c.clientID, c.topic, c.partition, t)
 		},
 		func(deadline time.Time, size int) error {
 			return expectZeroSize(readArrayWith(&c.rbuf, size, func(r *bufio.Reader, size int) (int, error) {
@@ -1024,9 +1064,15 @@ func (c *Conn) writeCompressedMessages(codec CompressionCodec, msgs ...Message) 
 			deadline = adjustDeadlineForRTT(deadline, now, defaultRTT)
 			switch version := c.apiVersions[produceRequest].MaxVersion; {
 			case version >= 7:
-				return writeProduceRequestV7(
-					&c.wbuf,
-					codec,
+				recordBatch, err :=
+					newRecordBatch(
+						codec,
+						msgs...,
+					)
+				if err != nil {
+					return err
+				}
+				return c.wb.writeProduceRequestV7(
 					id,
 					c.clientID,
 					c.topic,
@@ -1034,12 +1080,18 @@ func (c *Conn) writeCompressedMessages(codec CompressionCodec, msgs ...Message) 
 					deadlineToTimeout(deadline, now),
 					int16(atomic.LoadInt32(&c.requiredAcks)),
 					c.transactionalID,
-					msgs...,
+					recordBatch,
 				)
 			case version >= 3:
-				return writeProduceRequestV3(
-					&c.wbuf,
-					codec,
+				recordBatch, err :=
+					newRecordBatch(
+						codec,
+						msgs...,
+					)
+				if err != nil {
+					return err
+				}
+				return c.wb.writeProduceRequestV3(
 					id,
 					c.clientID,
 					c.topic,
@@ -1047,11 +1099,10 @@ func (c *Conn) writeCompressedMessages(codec CompressionCodec, msgs ...Message) 
 					deadlineToTimeout(deadline, now),
 					int16(atomic.LoadInt32(&c.requiredAcks)),
 					c.transactionalID,
-					msgs...,
+					recordBatch,
 				)
 			default:
-				return writeProduceRequestV2(
-					&c.wbuf,
+				return c.wb.writeProduceRequestV2(
 					codec,
 					id,
 					c.clientID,
@@ -1136,14 +1187,14 @@ func (c *Conn) SetRequiredAcks(n int) error {
 func (c *Conn) writeRequestHeader(apiKey apiKey, apiVersion apiVersion, correlationID int32, size int32) {
 	hdr := c.requestHeader(apiKey, apiVersion, correlationID)
 	hdr.Size = (hdr.size() + size) - 4
-	hdr.writeTo(&c.wbuf)
+	hdr.writeTo(&c.wb)
 }
 
 func (c *Conn) writeRequest(apiKey apiKey, apiVersion apiVersion, correlationID int32, req request) error {
 	hdr := c.requestHeader(apiKey, apiVersion, correlationID)
 	hdr.Size = (hdr.size() + req.size()) - 4
-	hdr.writeTo(&c.wbuf)
-	req.writeTo(&c.wbuf)
+	hdr.writeTo(&c.wb)
+	req.writeTo(&c.wb)
 	return c.wbuf.Flush()
 }
 
@@ -1188,6 +1239,18 @@ func (c *Conn) writeOperation(write func(time.Time, int32) error, read func(time
 	return c.do(&c.wdeadline, write, read)
 }
 
+func (c *Conn) enter() {
+	atomic.AddInt32(&c.inflight, +1)
+}
+
+func (c *Conn) leave() {
+	atomic.AddInt32(&c.inflight, -1)
+}
+
+func (c *Conn) concurrency() int {
+	return int(atomic.LoadInt32(&c.inflight))
+}
+
 func (c *Conn) do(d *connDeadline, write func(time.Time, int32) error, read func(time.Time, int) error) error {
 	id, err := c.doRequest(d, write)
 	if err != nil {
@@ -1213,6 +1276,7 @@ func (c *Conn) do(d *connDeadline, write func(time.Time, int32) error, read func
 }
 
 func (c *Conn) doRequest(d *connDeadline, write func(time.Time, int32) error) (id int32, err error) {
+	c.enter()
 	c.wlock.Lock()
 	c.correlationID++
 	id = c.correlationID
@@ -1224,6 +1288,7 @@ func (c *Conn) doRequest(d *connDeadline, write func(time.Time, int32) error) (i
 		// recoverable state so we're better off just giving up at this point to
 		// avoid any risk of corrupting the following operations.
 		c.conn.Close()
+		c.leave()
 	}
 
 	c.wlock.Unlock()
@@ -1237,18 +1302,30 @@ func (c *Conn) waitResponse(d *connDeadline, id int32) (deadline time.Time, size
 
 		c.rlock.Lock()
 		deadline = d.setConnReadDeadline(c.conn)
+		rsz, rid, err = c.peekResponseSizeAndID()
 
-		if rsz, rid, err = c.peekResponseSizeAndID(); err != nil {
+		if err != nil {
 			d.unsetConnReadDeadline()
 			c.conn.Close()
 			c.rlock.Unlock()
-			return
+			break
 		}
 
 		if id == rid {
 			c.skipResponseSizeAndID()
 			size, lock = int(rsz-4), &c.rlock
-			return
+			// Don't unlock the read mutex to yield ownership to the caller.
+			break
+		}
+
+		if c.concurrency() == 1 {
+			// If the goroutine is the only one waiting on this connection it
+			// should be impossible to read a correlation id different from the
+			// one it expects. This is a sign that the data we are reading on
+			// the wire is corrupted and the connection needs to be closed.
+			err = io.ErrNoProgress
+			c.rlock.Unlock()
+			break
 		}
 
 		// Optimistically release the read lock if a response has already
@@ -1256,6 +1333,9 @@ func (c *Conn) waitResponse(d *connDeadline, id int32) (deadline time.Time, size
 		c.rlock.Unlock()
 		runtime.Gosched()
 	}
+
+	c.leave()
+	return
 }
 
 func (c *Conn) requestHeader(apiKey apiKey, apiVersion apiVersion, correlationID int32) requestHeader {
@@ -1305,7 +1385,7 @@ func (c *Conn) ApiVersions() ([]ApiVersion, error) {
 		}
 		h.Size = (h.size() - 4)
 
-		h.writeTo(&c.wbuf)
+		h.writeTo(&c.wb)
 		return c.wbuf.Flush()
 	})
 	if err != nil {
@@ -1474,11 +1554,11 @@ func (c *Conn) saslAuthenticate(data []byte) ([]byte, error) {
 
 	// fall back to opaque bytes on the wire.  the broker is expecting these if
 	// it just processed a v0 sasl handshake.
-	writeInt32(&c.wbuf, int32(len(data)))
-	if _, err := c.wbuf.Write(data); err != nil {
+	c.wb.writeInt32(int32(len(data)))
+	if _, err := c.wb.Write(data); err != nil {
 		return nil, err
 	}
-	if err := c.wbuf.Flush(); err != nil {
+	if err := c.wb.Flush(); err != nil {
 		return nil, err
 	}
 

@@ -11,7 +11,7 @@ func (t listGroupsRequestV1) size() int32 {
 	return 0
 }
 
-func (t listGroupsRequestV1) writeTo(w *bufio.Writer) {
+func (t listGroupsRequestV1) writeTo(wb *writeBuffer) {
 }
 
 type ListGroupsResponseGroupV1 struct {
@@ -21,13 +21,12 @@ type ListGroupsResponseGroupV1 struct {
 }
 
 func (t ListGroupsResponseGroupV1) size() int32 {
-	return sizeofString(t.GroupID) +
-		sizeofString(t.ProtocolType)
+	return sizeofString(t.GroupID) + sizeofString(t.ProtocolType)
 }
 
-func (t ListGroupsResponseGroupV1) writeTo(w *bufio.Writer) {
-	writeString(w, t.GroupID)
-	writeString(w, t.ProtocolType)
+func (t ListGroupsResponseGroupV1) writeTo(wb *writeBuffer) {
+	wb.writeString(t.GroupID)
+	wb.writeString(t.ProtocolType)
 }
 
 func (t *ListGroupsResponseGroupV1) readFrom(r *bufio.Reader, size int) (remain int, err error) {
@@ -57,10 +56,10 @@ func (t listGroupsResponseV1) size() int32 {
 		sizeofArray(len(t.Groups), func(i int) int32 { return t.Groups[i].size() })
 }
 
-func (t listGroupsResponseV1) writeTo(w *bufio.Writer) {
-	writeInt32(w, t.ThrottleTimeMS)
-	writeInt16(w, t.ErrorCode)
-	writeArray(w, len(t.Groups), func(i int) { t.Groups[i].writeTo(w) })
+func (t listGroupsResponseV1) writeTo(wb *writeBuffer) {
+	wb.writeInt32(t.ThrottleTimeMS)
+	wb.writeInt16(t.ErrorCode)
+	wb.writeArray(len(t.Groups), func(i int) { t.Groups[i].writeTo(wb) })
 }
 
 func (t *listGroupsResponseV1) readFrom(r *bufio.Reader, size int) (remain int, err error) {

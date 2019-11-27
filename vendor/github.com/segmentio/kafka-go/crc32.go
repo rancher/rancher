@@ -1,80 +1,55 @@
 package kafka
 
 import (
-	"bytes"
 	"encoding/binary"
 	"hash/crc32"
-	"sync"
 )
 
-func crc32OfMessage(magicByte int8, attributes int8, timestamp int64, key []byte, value []byte) uint32 {
-	b := acquireCrc32Buffer()
-	b.writeInt8(magicByte)
-	b.writeInt8(attributes)
-	if magicByte != 0 {
-		b.writeInt64(timestamp)
-	}
-	b.writeBytes(key)
-	b.writeBytes(value)
-	sum := b.sum
-	releaseCrc32Buffer(b)
-	return sum
+type crc32Writer struct {
+	table  *crc32.Table
+	buffer [8]byte
+	crc32  uint32
 }
 
-type crc32Buffer struct {
-	sum uint32
-	buf bytes.Buffer
+func (w *crc32Writer) update(b []byte) {
+	w.crc32 = crc32.Update(w.crc32, w.table, b)
 }
 
-func (c *crc32Buffer) writeInt8(i int8) {
-	c.buf.Truncate(0)
-	c.buf.WriteByte(byte(i))
-	c.update()
+func (w *crc32Writer) writeInt8(i int8) {
+	w.buffer[0] = byte(i)
+	w.update(w.buffer[:1])
 }
 
-func (c *crc32Buffer) writeInt32(i int32) {
-	a := [4]byte{}
-	binary.BigEndian.PutUint32(a[:], uint32(i))
-	c.buf.Truncate(0)
-	c.buf.Write(a[:])
-	c.update()
+func (w *crc32Writer) writeInt16(i int16) {
+	binary.BigEndian.PutUint16(w.buffer[:2], uint16(i))
+	w.update(w.buffer[:2])
 }
 
-func (c *crc32Buffer) writeInt64(i int64) {
-	a := [8]byte{}
-	binary.BigEndian.PutUint64(a[:], uint64(i))
-	c.buf.Truncate(0)
-	c.buf.Write(a[:])
-	c.update()
+func (w *crc32Writer) writeInt32(i int32) {
+	binary.BigEndian.PutUint32(w.buffer[:4], uint32(i))
+	w.update(w.buffer[:4])
 }
 
-func (c *crc32Buffer) writeBytes(b []byte) {
+func (w *crc32Writer) writeInt64(i int64) {
+	binary.BigEndian.PutUint64(w.buffer[:8], uint64(i))
+	w.update(w.buffer[:8])
+}
+
+func (w *crc32Writer) writeBytes(b []byte) {
+	n := len(b)
 	if b == nil {
-		c.writeInt32(-1)
-	} else {
-		c.writeInt32(int32(len(b)))
+		n = -1
 	}
-	c.sum = crc32Update(c.sum, b)
+	w.writeInt32(int32(n))
+	w.update(b)
 }
 
-func (c *crc32Buffer) update() {
-	c.sum = crc32Update(c.sum, c.buf.Bytes())
+func (w *crc32Writer) Write(b []byte) (int, error) {
+	w.update(b)
+	return len(b), nil
 }
 
-func crc32Update(sum uint32, b []byte) uint32 {
-	return crc32.Update(sum, crc32.IEEETable, b)
-}
-
-var crc32BufferPool = sync.Pool{
-	New: func() interface{} { return &crc32Buffer{} },
-}
-
-func acquireCrc32Buffer() *crc32Buffer {
-	c := crc32BufferPool.Get().(*crc32Buffer)
-	c.sum = 0
-	return c
-}
-
-func releaseCrc32Buffer(b *crc32Buffer) {
-	crc32BufferPool.Put(b)
+func (w *crc32Writer) WriteString(s string) (int, error) {
+	w.update([]byte(s))
+	return len(s), nil
 }

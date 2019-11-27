@@ -1,147 +1,171 @@
 package kafka
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
 	"hash/crc32"
+	"io"
 	"time"
 )
 
-type writable interface {
-	writeTo(*bufio.Writer)
+type writeBuffer struct {
+	w io.Writer
+	b [16]byte
 }
 
-func writeInt8(w *bufio.Writer, i int8) {
-	w.WriteByte(byte(i))
+func (wb *writeBuffer) writeInt8(i int8) {
+	wb.b[0] = byte(i)
+	wb.Write(wb.b[:1])
 }
 
-func writeInt16(w *bufio.Writer, i int16) {
-	var b [2]byte
-	binary.BigEndian.PutUint16(b[:], uint16(i))
-	w.WriteByte(b[0])
-	w.WriteByte(b[1])
+func (wb *writeBuffer) writeInt16(i int16) {
+	binary.BigEndian.PutUint16(wb.b[:2], uint16(i))
+	wb.Write(wb.b[:2])
 }
 
-func writeInt32(w *bufio.Writer, i int32) {
-	var b [4]byte
-	binary.BigEndian.PutUint32(b[:], uint32(i))
-	w.WriteByte(b[0])
-	w.WriteByte(b[1])
-	w.WriteByte(b[2])
-	w.WriteByte(b[3])
+func (wb *writeBuffer) writeInt32(i int32) {
+	binary.BigEndian.PutUint32(wb.b[:4], uint32(i))
+	wb.Write(wb.b[:4])
 }
 
-func writeInt64(w *bufio.Writer, i int64) {
-	var b [8]byte
-	binary.BigEndian.PutUint64(b[:], uint64(i))
-	w.WriteByte(b[0])
-	w.WriteByte(b[1])
-	w.WriteByte(b[2])
-	w.WriteByte(b[3])
-	w.WriteByte(b[4])
-	w.WriteByte(b[5])
-	w.WriteByte(b[6])
-	w.WriteByte(b[7])
+func (wb *writeBuffer) writeInt64(i int64) {
+	binary.BigEndian.PutUint64(wb.b[:8], uint64(i))
+	wb.Write(wb.b[:8])
 }
 
-func writeVarInt(w *bufio.Writer, i int64) {
-	i = i<<1 ^ i>>63
-	for i&0x7f != i {
-		w.WriteByte(byte(i&0x7f | 0x80))
-		i >>= 7
+func (wb *writeBuffer) writeVarInt(i int64) {
+	u := uint64((i << 1) ^ (i >> 63))
+	n := 0
+
+	for u >= 0x80 && n < len(wb.b) {
+		wb.b[n] = byte(u) | 0x80
+		u >>= 7
+		n++
 	}
-	w.WriteByte(byte(i))
-}
 
-func varIntLen(i int64) (l int) {
-	i = i<<1 ^ i>>63
-	for i&0x7f != i {
-		l++
-		i >>= 7
+	if n < len(wb.b) {
+		wb.b[n] = byte(u)
+		n++
 	}
-	l++
-	return l
+
+	wb.Write(wb.b[:n])
 }
 
-func writeString(w *bufio.Writer, s string) {
-	writeInt16(w, int16(len(s)))
-	w.WriteString(s)
+func (wb *writeBuffer) writeString(s string) {
+	wb.writeInt16(int16(len(s)))
+	wb.WriteString(s)
 }
 
-func writeNullableString(w *bufio.Writer, s *string) {
+func (wb *writeBuffer) writeVarString(s string) {
+	wb.writeVarInt(int64(len(s)))
+	wb.WriteString(s)
+}
+
+func (wb *writeBuffer) writeNullableString(s *string) {
 	if s == nil {
-		writeInt16(w, -1)
+		wb.writeInt16(-1)
 	} else {
-		writeString(w, *s)
+		wb.writeString(*s)
 	}
 }
 
-func writeBytes(w *bufio.Writer, b []byte) {
+func (wb *writeBuffer) writeBytes(b []byte) {
 	n := len(b)
 	if b == nil {
 		n = -1
 	}
-	writeInt32(w, int32(n))
-	w.Write(b)
+	wb.writeInt32(int32(n))
+	wb.Write(b)
 }
 
-func writeBool(w *bufio.Writer, b bool) {
+func (wb *writeBuffer) writeVarBytes(b []byte) {
+	if b != nil {
+		wb.writeVarInt(int64(len(b)))
+		wb.Write(b)
+	} else {
+		//-1 is used to indicate nil key
+		wb.writeVarInt(-1)
+	}
+}
+
+func (wb *writeBuffer) writeBool(b bool) {
 	v := int8(0)
 	if b {
 		v = 1
 	}
-	writeInt8(w, v)
+	wb.writeInt8(v)
 }
 
-func writeArrayLen(w *bufio.Writer, n int) {
-	writeInt32(w, int32(n))
+func (wb *writeBuffer) writeArrayLen(n int) {
+	wb.writeInt32(int32(n))
 }
 
-func writeArray(w *bufio.Writer, n int, f func(int)) {
-	writeArrayLen(w, n)
-	for i := 0; i != n; i++ {
+func (wb *writeBuffer) writeArray(n int, f func(int)) {
+	wb.writeArrayLen(n)
+	for i := 0; i < n; i++ {
 		f(i)
 	}
 }
 
-func writeStringArray(w *bufio.Writer, a []string) {
-	writeArray(w, len(a), func(i int) { writeString(w, a[i]) })
+func (wb *writeBuffer) writeVarArray(n int, f func(int)) {
+	wb.writeVarInt(int64(n))
+	for i := 0; i < n; i++ {
+		f(i)
+	}
 }
 
-func writeInt32Array(w *bufio.Writer, a []int32) {
-	writeArray(w, len(a), func(i int) { writeInt32(w, a[i]) })
+func (wb *writeBuffer) writeStringArray(a []string) {
+	wb.writeArray(len(a), func(i int) { wb.writeString(a[i]) })
 }
 
-func write(w *bufio.Writer, a interface{}) {
+func (wb *writeBuffer) writeInt32Array(a []int32) {
+	wb.writeArray(len(a), func(i int) { wb.writeInt32(a[i]) })
+}
+
+func (wb *writeBuffer) write(a interface{}) {
 	switch v := a.(type) {
 	case int8:
-		writeInt8(w, v)
+		wb.writeInt8(v)
 	case int16:
-		writeInt16(w, v)
+		wb.writeInt16(v)
 	case int32:
-		writeInt32(w, v)
+		wb.writeInt32(v)
 	case int64:
-		writeInt64(w, v)
+		wb.writeInt64(v)
 	case string:
-		writeString(w, v)
+		wb.writeString(v)
 	case []byte:
-		writeBytes(w, v)
+		wb.writeBytes(v)
 	case bool:
-		writeBool(w, v)
+		wb.writeBool(v)
 	case writable:
-		v.writeTo(w)
+		v.writeTo(wb)
 	default:
 		panic(fmt.Sprintf("unsupported type: %T", a))
 	}
 }
 
-// The functions bellow are used as optimizations to avoid dynamic memory
-// allocations that occur when building the data structures representing the
-// kafka protocol requests.
+func (wb *writeBuffer) Write(b []byte) (int, error) {
+	return wb.w.Write(b)
+}
 
-func writeFetchRequestV2(w *bufio.Writer, correlationID int32, clientID, topic string, partition int32, offset int64, minBytes, maxBytes int, maxWait time.Duration) error {
+func (wb *writeBuffer) WriteString(s string) (int, error) {
+	return io.WriteString(wb.w, s)
+}
+
+func (wb *writeBuffer) Flush() error {
+	if x, ok := wb.w.(interface{ Flush() error }); ok {
+		return x.Flush()
+	}
+	return nil
+}
+
+type writable interface {
+	writeTo(*writeBuffer)
+}
+
+func (wb *writeBuffer) writeFetchRequestV2(correlationID int32, clientID, topic string, partition int32, offset int64, minBytes, maxBytes int, maxWait time.Duration) error {
 	h := requestHeader{
 		ApiKey:        int16(fetchRequest),
 		ApiVersion:    int16(v2),
@@ -159,25 +183,25 @@ func writeFetchRequestV2(w *bufio.Writer, correlationID int32, clientID, topic s
 		8 + // offset
 		4 // max bytes
 
-	h.writeTo(w)
-	writeInt32(w, -1) // replica ID
-	writeInt32(w, milliseconds(maxWait))
-	writeInt32(w, int32(minBytes))
+	h.writeTo(wb)
+	wb.writeInt32(-1) // replica ID
+	wb.writeInt32(milliseconds(maxWait))
+	wb.writeInt32(int32(minBytes))
 
 	// topic array
-	writeArrayLen(w, 1)
-	writeString(w, topic)
+	wb.writeArrayLen(1)
+	wb.writeString(topic)
 
 	// partition array
-	writeArrayLen(w, 1)
-	writeInt32(w, partition)
-	writeInt64(w, offset)
-	writeInt32(w, int32(maxBytes))
+	wb.writeArrayLen(1)
+	wb.writeInt32(partition)
+	wb.writeInt64(offset)
+	wb.writeInt32(int32(maxBytes))
 
-	return w.Flush()
+	return wb.Flush()
 }
 
-func writeFetchRequestV5(w *bufio.Writer, correlationID int32, clientID, topic string, partition int32, offset int64, minBytes, maxBytes int, maxWait time.Duration, isolationLevel int8) error {
+func (wb *writeBuffer) writeFetchRequestV5(correlationID int32, clientID, topic string, partition int32, offset int64, minBytes, maxBytes int, maxWait time.Duration, isolationLevel int8) error {
 	h := requestHeader{
 		ApiKey:        int16(fetchRequest),
 		ApiVersion:    int16(v5),
@@ -198,28 +222,28 @@ func writeFetchRequestV5(w *bufio.Writer, correlationID int32, clientID, topic s
 		8 + // log start offset
 		4 // max bytes
 
-	h.writeTo(w)
-	writeInt32(w, -1) // replica ID
-	writeInt32(w, milliseconds(maxWait))
-	writeInt32(w, int32(minBytes))
-	writeInt32(w, int32(maxBytes))
-	writeInt8(w, isolationLevel) // isolation level 0 - read uncommitted
+	h.writeTo(wb)
+	wb.writeInt32(-1) // replica ID
+	wb.writeInt32(milliseconds(maxWait))
+	wb.writeInt32(int32(minBytes))
+	wb.writeInt32(int32(maxBytes))
+	wb.writeInt8(isolationLevel) // isolation level 0 - read uncommitted
 
 	// topic array
-	writeArrayLen(w, 1)
-	writeString(w, topic)
+	wb.writeArrayLen(1)
+	wb.writeString(topic)
 
 	// partition array
-	writeArrayLen(w, 1)
-	writeInt32(w, partition)
-	writeInt64(w, offset)
-	writeInt64(w, int64(0)) // log start offset only used when is sent by follower
-	writeInt32(w, int32(maxBytes))
+	wb.writeArrayLen(1)
+	wb.writeInt32(partition)
+	wb.writeInt64(offset)
+	wb.writeInt64(int64(0)) // log start offset only used when is sent by follower
+	wb.writeInt32(int32(maxBytes))
 
-	return w.Flush()
+	return wb.Flush()
 }
 
-func writeFetchRequestV10(w *bufio.Writer, correlationID int32, clientID, topic string, partition int32, offset int64, minBytes, maxBytes int, maxWait time.Duration, isolationLevel int8) error {
+func (wb *writeBuffer) writeFetchRequestV10(correlationID int32, clientID, topic string, partition int32, offset int64, minBytes, maxBytes int, maxWait time.Duration, isolationLevel int8) error {
 	h := requestHeader{
 		ApiKey:        int16(fetchRequest),
 		ApiVersion:    int16(v10),
@@ -244,34 +268,34 @@ func writeFetchRequestV10(w *bufio.Writer, correlationID int32, clientID, topic 
 		4 + // partition max bytes
 		4 // forgotten topics data
 
-	h.writeTo(w)
-	writeInt32(w, -1) // replica ID
-	writeInt32(w, milliseconds(maxWait))
-	writeInt32(w, int32(minBytes))
-	writeInt32(w, int32(maxBytes))
-	writeInt8(w, isolationLevel) // isolation level 0 - read uncommitted
-	writeInt32(w, 0)             //FIXME
-	writeInt32(w, -1)            //FIXME
+	h.writeTo(wb)
+	wb.writeInt32(-1) // replica ID
+	wb.writeInt32(milliseconds(maxWait))
+	wb.writeInt32(int32(minBytes))
+	wb.writeInt32(int32(maxBytes))
+	wb.writeInt8(isolationLevel) // isolation level 0 - read uncommitted
+	wb.writeInt32(0)             //FIXME
+	wb.writeInt32(-1)            //FIXME
 
 	// topic array
-	writeArrayLen(w, 1)
-	writeString(w, topic)
+	wb.writeArrayLen(1)
+	wb.writeString(topic)
 
 	// partition array
-	writeArrayLen(w, 1)
-	writeInt32(w, partition)
-	writeInt32(w, -1) //FIXME
-	writeInt64(w, offset)
-	writeInt64(w, int64(0)) // log start offset only used when is sent by follower
-	writeInt32(w, int32(maxBytes))
+	wb.writeArrayLen(1)
+	wb.writeInt32(partition)
+	wb.writeInt32(-1) //FIXME
+	wb.writeInt64(offset)
+	wb.writeInt64(int64(0)) // log start offset only used when is sent by follower
+	wb.writeInt32(int32(maxBytes))
 
 	// forgotten topics array
-	writeArrayLen(w, 0) // forgotten topics not supported yet
+	wb.writeArrayLen(0) // forgotten topics not supported yet
 
-	return w.Flush()
+	return wb.Flush()
 }
 
-func writeListOffsetRequestV1(w *bufio.Writer, correlationID int32, clientID, topic string, partition int32, time int64) error {
+func (wb *writeBuffer) writeListOffsetRequestV1(correlationID int32, clientID, topic string, partition int32, time int64) error {
 	h := requestHeader{
 		ApiKey:        int16(listOffsetRequest),
 		ApiVersion:    int16(v1),
@@ -286,31 +310,35 @@ func writeListOffsetRequestV1(w *bufio.Writer, correlationID int32, clientID, to
 		4 + // partition
 		8 // time
 
-	h.writeTo(w)
-	writeInt32(w, -1) // replica ID
+	h.writeTo(wb)
+	wb.writeInt32(-1) // replica ID
 
 	// topic array
-	writeArrayLen(w, 1)
-	writeString(w, topic)
+	wb.writeArrayLen(1)
+	wb.writeString(topic)
 
 	// partition array
-	writeArrayLen(w, 1)
-	writeInt32(w, partition)
-	writeInt64(w, time)
+	wb.writeArrayLen(1)
+	wb.writeInt32(partition)
+	wb.writeInt64(time)
 
-	return w.Flush()
+	return wb.Flush()
 }
 
-func writeProduceRequestV2(w *bufio.Writer, codec CompressionCodec, correlationID int32, clientID, topic string, partition int32, timeout time.Duration, requiredAcks int16, msgs ...Message) (err error) {
+func (wb *writeBuffer) writeProduceRequestV2(codec CompressionCodec, correlationID int32, clientID, topic string, partition int32, timeout time.Duration, requiredAcks int16, msgs ...Message) (err error) {
+	var size int32
+	var attributes int8
+	var compressed *bytes.Buffer
 
-	attributes := int8(CompressionNoneCode)
-	if codec != nil {
-		if msgs, err = compress(codec, msgs...); err != nil {
-			return err
+	if codec == nil {
+		size = messageSetSize(msgs...)
+	} else {
+		compressed, attributes, size, err = compressMessageSet(codec, msgs...)
+		if err != nil {
+			return
 		}
-		attributes = codec.Code()
+		msgs = []Message{{Value: compressed.Bytes()}}
 	}
-	size := messageSetSize(msgs...)
 
 	h := requestHeader{
 		ApiKey:        int16(produceRequest),
@@ -328,49 +356,30 @@ func writeProduceRequestV2(w *bufio.Writer, codec CompressionCodec, correlationI
 		4 + // message set size
 		size
 
-	h.writeTo(w)
-	writeInt16(w, requiredAcks) // required acks
-	writeInt32(w, milliseconds(timeout))
+	h.writeTo(wb)
+	wb.writeInt16(requiredAcks) // required acks
+	wb.writeInt32(milliseconds(timeout))
 
 	// topic array
-	writeArrayLen(w, 1)
-	writeString(w, topic)
+	wb.writeArrayLen(1)
+	wb.writeString(topic)
 
 	// partition array
-	writeArrayLen(w, 1)
-	writeInt32(w, partition)
+	wb.writeArrayLen(1)
+	wb.writeInt32(partition)
 
-	writeInt32(w, size)
+	wb.writeInt32(size)
+	cw := &crc32Writer{table: crc32.IEEETable}
+
 	for _, msg := range msgs {
-		writeMessage(w, msg.Offset, attributes, msg.Time, msg.Key, msg.Value)
+		wb.writeMessage(msg.Offset, attributes, msg.Time, msg.Key, msg.Value, cw)
 	}
-	return w.Flush()
+
+	releaseBuffer(compressed)
+	return wb.Flush()
 }
 
-func writeProduceRequestV3(w *bufio.Writer, codec CompressionCodec, correlationID int32, clientID, topic string, partition int32, timeout time.Duration, requiredAcks int16, transactionalID *string, msgs ...Message) (err error) {
-
-	var size int32
-	var compressed []byte
-	var attributes int16
-	if codec != nil {
-		attributes = int16(codec.Code())
-		recordBuf := &bytes.Buffer{}
-		recordBuf.Grow(int(recordBatchSize(msgs...)))
-		compressedWriter := bufio.NewWriter(recordBuf)
-		for i, msg := range msgs {
-			writeRecord(compressedWriter, 0, msgs[0].Time, int64(i), msg)
-		}
-		compressedWriter.Flush()
-
-		compressed, err = codec.Encode(recordBuf.Bytes())
-		if err != nil {
-			return
-		}
-		attributes = int16(codec.Code())
-		size = recordBatchHeaderSize() + int32(len(compressed))
-	} else {
-		size = recordBatchSize(msgs...)
-	}
+func (wb *writeBuffer) writeProduceRequestV3(correlationID int32, clientID, topic string, partition int32, timeout time.Duration, requiredAcks int16, transactionalID *string, recordBatch *recordBatch) (err error) {
 
 	h := requestHeader{
 		ApiKey:        int16(produceRequest),
@@ -378,6 +387,7 @@ func writeProduceRequestV3(w *bufio.Writer, codec CompressionCodec, correlationI
 		CorrelationID: correlationID,
 		ClientID:      clientID,
 	}
+
 	h.Size = (h.size() - 4) +
 		sizeofNullableString(transactionalID) +
 		2 + // required acks
@@ -387,64 +397,27 @@ func writeProduceRequestV3(w *bufio.Writer, codec CompressionCodec, correlationI
 		4 + // partition array length
 		4 + // partition
 		4 + // message set size
-		size
+		recordBatch.size
 
-	h.writeTo(w)
-	writeNullableString(w, transactionalID)
-	writeInt16(w, requiredAcks) // required acks
-	writeInt32(w, milliseconds(timeout))
+	h.writeTo(wb)
+	wb.writeNullableString(transactionalID)
+	wb.writeInt16(requiredAcks) // required acks
+	wb.writeInt32(milliseconds(timeout))
 
 	// topic array
-	writeArrayLen(w, 1)
-	writeString(w, topic)
+	wb.writeArrayLen(1)
+	wb.writeString(topic)
 
 	// partition array
-	writeArrayLen(w, 1)
-	writeInt32(w, partition)
+	wb.writeArrayLen(1)
+	wb.writeInt32(partition)
 
-	writeInt32(w, size)
-	if codec != nil {
-		err = writeRecordBatch(w, attributes, size, func(w *bufio.Writer) {
-			w.Write(compressed)
-		}, msgs...)
-	} else {
-		err = writeRecordBatch(w, attributes, size, func(w *bufio.Writer) {
-			for i, msg := range msgs {
-				writeRecord(w, 0, msgs[0].Time, int64(i), msg)
-			}
-		}, msgs...)
-	}
-	if err != nil {
-		return
-	}
+	recordBatch.writeTo(wb)
 
-	return w.Flush()
+	return wb.Flush()
 }
 
-func writeProduceRequestV7(w *bufio.Writer, codec CompressionCodec, correlationID int32, clientID, topic string, partition int32, timeout time.Duration, requiredAcks int16, transactionalID *string, msgs ...Message) (err error) {
-
-	var size int32
-	var compressed []byte
-	var attributes int16
-	if codec != nil {
-		attributes = int16(codec.Code())
-		recordBuf := &bytes.Buffer{}
-		recordBuf.Grow(int(recordBatchSize(msgs...)))
-		compressedWriter := bufio.NewWriter(recordBuf)
-		for i, msg := range msgs {
-			writeRecord(compressedWriter, 0, msgs[0].Time, int64(i), msg)
-		}
-		compressedWriter.Flush()
-
-		compressed, err = codec.Encode(recordBuf.Bytes())
-		if err != nil {
-			return
-		}
-		attributes = int16(codec.Code())
-		size = recordBatchHeaderSize() + int32(len(compressed))
-	} else {
-		size = recordBatchSize(msgs...)
-	}
+func (wb *writeBuffer) writeProduceRequestV7(correlationID int32, clientID, topic string, partition int32, timeout time.Duration, requiredAcks int16, transactionalID *string, recordBatch *recordBatch) (err error) {
 
 	h := requestHeader{
 		ApiKey:        int16(produceRequest),
@@ -461,38 +434,169 @@ func writeProduceRequestV7(w *bufio.Writer, codec CompressionCodec, correlationI
 		4 + // partition array length
 		4 + // partition
 		4 + // message set size
-		size
+		recordBatch.size
 
-	h.writeTo(w)
-	writeNullableString(w, transactionalID)
-	writeInt16(w, requiredAcks) // required acks
-	writeInt32(w, milliseconds(timeout))
+	h.writeTo(wb)
+	wb.writeNullableString(transactionalID)
+	wb.writeInt16(requiredAcks) // required acks
+	wb.writeInt32(milliseconds(timeout))
 
 	// topic array
-	writeArrayLen(w, 1)
-	writeString(w, topic)
+	wb.writeArrayLen(1)
+	wb.writeString(topic)
 
 	// partition array
-	writeArrayLen(w, 1)
-	writeInt32(w, partition)
+	wb.writeArrayLen(1)
+	wb.writeInt32(partition)
 
-	writeInt32(w, size)
-	if codec != nil {
-		err = writeRecordBatch(w, attributes, size, func(w *bufio.Writer) {
-			w.Write(compressed)
-		}, msgs...)
-	} else {
-		err = writeRecordBatch(w, attributes, size, func(w *bufio.Writer) {
-			for i, msg := range msgs {
-				writeRecord(w, 0, msgs[0].Time, int64(i), msg)
-			}
-		}, msgs...)
+	recordBatch.writeTo(wb)
+
+	return wb.Flush()
+}
+
+func (wb *writeBuffer) writeRecordBatch(attributes int16, size int32, count int, baseTime, lastTime time.Time, write func(*writeBuffer)) {
+	var (
+		baseTimestamp   = timestamp(baseTime)
+		lastTimestamp   = timestamp(lastTime)
+		lastOffsetDelta = int32(count - 1)
+		producerID      = int64(-1)    // default producer id for now
+		producerEpoch   = int16(-1)    // default producer epoch for now
+		baseSequence    = int32(-1)    // default base sequence
+		recordCount     = int32(count) // record count
+		writerBackup    = wb.w
+	)
+
+	// dry run to compute the checksum
+	cw := &crc32Writer{table: crc32.MakeTable(crc32.Castagnoli)}
+	wb.w = cw
+	cw.writeInt16(attributes) // attributes, timestamp type 0 - create time, not part of a transaction, no control messages
+	cw.writeInt32(lastOffsetDelta)
+	cw.writeInt64(baseTimestamp)
+	cw.writeInt64(lastTimestamp)
+	cw.writeInt64(producerID)
+	cw.writeInt16(producerEpoch)
+	cw.writeInt32(baseSequence)
+	cw.writeInt32(recordCount)
+	write(wb)
+	wb.w = writerBackup
+
+	// actual write to the output buffer
+	wb.writeInt64(int64(0))
+	wb.writeInt32(int32(size - 12)) // 12 = batch length + base offset sizes
+	wb.writeInt32(-1)               // partition leader epoch
+	wb.writeInt8(2)                 // magic byte
+	wb.writeInt32(int32(cw.crc32))
+
+	wb.writeInt16(attributes)
+	wb.writeInt32(lastOffsetDelta)
+	wb.writeInt64(baseTimestamp)
+	wb.writeInt64(lastTimestamp)
+	wb.writeInt64(producerID)
+	wb.writeInt16(producerEpoch)
+	wb.writeInt32(baseSequence)
+	wb.writeInt32(recordCount)
+	write(wb)
+}
+
+func compressMessageSet(codec CompressionCodec, msgs ...Message) (compressed *bytes.Buffer, attributes int8, size int32, err error) {
+	compressed = acquireBuffer()
+	compressor := codec.NewWriter(compressed)
+	wb := &writeBuffer{w: compressor}
+	cw := &crc32Writer{table: crc32.IEEETable}
+
+	for offset, msg := range msgs {
+		wb.writeMessage(int64(offset), 0, msg.Time, msg.Key, msg.Value, cw)
 	}
-	if err != nil {
+
+	if err = compressor.Close(); err != nil {
+		releaseBuffer(compressed)
 		return
 	}
 
-	return w.Flush()
+	attributes = codec.Code()
+	size = messageSetSize(Message{Value: compressed.Bytes()})
+	return
+}
+
+func (wb *writeBuffer) writeMessage(offset int64, attributes int8, time time.Time, key, value []byte, cw *crc32Writer) {
+	const magicByte = 1 // compatible with kafka 0.10.0.0+
+
+	timestamp := timestamp(time)
+	size := messageSize(key, value)
+
+	// dry run to compute the checksum
+	cw.crc32 = 0
+	cw.writeInt8(magicByte)
+	cw.writeInt8(attributes)
+	cw.writeInt64(timestamp)
+	cw.writeBytes(key)
+	cw.writeBytes(value)
+
+	// actual write to the output buffer
+	wb.writeInt64(offset)
+	wb.writeInt32(size)
+	wb.writeInt32(int32(cw.crc32))
+	wb.writeInt8(magicByte)
+	wb.writeInt8(attributes)
+	wb.writeInt64(timestamp)
+	wb.writeBytes(key)
+	wb.writeBytes(value)
+}
+
+// Messages with magic >2 are called records. This method writes messages using message format 2.
+func (wb *writeBuffer) writeRecord(attributes int8, baseTime time.Time, offset int64, msg Message) {
+	timestampDelta := msg.Time.Sub(baseTime)
+	offsetDelta := int64(offset)
+
+	wb.writeVarInt(int64(recordSize(&msg, timestampDelta, offsetDelta)))
+	wb.writeInt8(attributes)
+	wb.writeVarInt(int64(milliseconds(timestampDelta)))
+	wb.writeVarInt(offsetDelta)
+
+	wb.writeVarBytes(msg.Key)
+	wb.writeVarBytes(msg.Value)
+	wb.writeVarArray(len(msg.Headers), func(i int) {
+		h := &msg.Headers[i]
+		wb.writeVarString(h.Key)
+		wb.writeVarBytes(h.Value)
+	})
+}
+
+func varIntLen(i int64) int {
+	u := uint64((i << 1) ^ (i >> 63)) // zig-zag encoding
+	n := 0
+
+	for u >= 0x80 {
+		u >>= 7
+		n++
+	}
+
+	return n + 1
+}
+
+func varBytesLen(b []byte) int {
+	return varIntLen(int64(len(b))) + len(b)
+}
+
+func varStringLen(s string) int {
+	return varIntLen(int64(len(s))) + len(s)
+}
+
+func varArrayLen(n int, f func(int) int) int {
+	size := varIntLen(int64(n))
+	for i := 0; i < n; i++ {
+		size += f(i)
+	}
+	return size
+}
+
+func messageSize(key, value []byte) int32 {
+	return 4 + // crc
+		1 + // magic byte
+		1 + // attributes
+		8 + // timestamp
+		sizeofBytes(key) +
+		sizeofBytes(value)
 }
 
 func messageSetSize(msgs ...Message) (size int32) {
@@ -507,168 +611,4 @@ func messageSetSize(msgs ...Message) (size int32) {
 			sizeofBytes(msg.Value)
 	}
 	return
-}
-
-func recordBatchHeaderSize() int32 {
-	return 8 + // base offset
-		4 + // batch length
-		4 + // partition leader epoch
-		1 + // magic
-		4 + // crc
-		2 + // attributes
-		4 + // last offset delta
-		8 + // first timestamp
-		8 + // max timestamp
-		8 + // producer id
-		2 + // producer epoch
-		4 + // base sequence
-		4 // msg count
-}
-
-func recordBatchSize(msgs ...Message) (size int32) {
-	size = recordBatchHeaderSize()
-
-	baseTime := msgs[0].Time
-
-	for i, msg := range msgs {
-
-		sz := recordSize(&msg, msg.Time.Sub(baseTime), int64(i))
-
-		size += int32(sz + varIntLen(int64(sz)))
-	}
-	return
-}
-
-func writeRecordBatch(w *bufio.Writer, attributes int16, size int32, write func(*bufio.Writer), msgs ...Message) error {
-
-	baseTime := msgs[0].Time
-
-	writeInt64(w, int64(0))
-
-	writeInt32(w, int32(size-12)) // 12 = batch length + base offset sizes
-
-	writeInt32(w, -1) // partition leader epoch
-	writeInt8(w, 2)   // magic byte
-
-	crcBuf := &bytes.Buffer{}
-	crcBuf.Grow(int(size - 12)) // 12 = batch length + base offset sizes
-	crcWriter := bufio.NewWriter(crcBuf)
-
-	writeInt16(crcWriter, attributes)         // attributes, timestamp type 0 - create time, not part of a transaction, no control messages
-	writeInt32(crcWriter, int32(len(msgs)-1)) // max offset
-	writeInt64(crcWriter, timestamp(baseTime))
-	lastTime := timestamp(msgs[len(msgs)-1].Time)
-	writeInt64(crcWriter, int64(lastTime))
-	writeInt64(crcWriter, -1)               // default producer id for now
-	writeInt16(crcWriter, -1)               // default producer epoch for now
-	writeInt32(crcWriter, -1)               // default base sequence
-	writeInt32(crcWriter, int32(len(msgs))) // record count
-
-	write(crcWriter)
-	if err := crcWriter.Flush(); err != nil {
-		return err
-	}
-
-	crcTable := crc32.MakeTable(crc32.Castagnoli)
-	crcChecksum := crc32.Checksum(crcBuf.Bytes(), crcTable)
-
-	writeInt32(w, int32(crcChecksum))
-	if _, err := w.Write(crcBuf.Bytes()); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-var maxDate = time.Date(5000, time.January, 0, 0, 0, 0, 0, time.UTC)
-
-func recordSize(msg *Message, timestampDelta time.Duration, offsetDelta int64) (size int) {
-	size += 1 + // attributes
-		varIntLen(int64(timestampDelta)) +
-		varIntLen(offsetDelta) +
-		varIntLen(int64(len(msg.Key))) +
-		len(msg.Key) +
-		varIntLen(int64(len(msg.Value))) +
-		len(msg.Value) +
-		varIntLen(int64(len(msg.Headers)))
-	for _, h := range msg.Headers {
-		size += varIntLen(int64(len([]byte(h.Key)))) +
-			len([]byte(h.Key)) +
-			varIntLen(int64(len(h.Value))) +
-			len(h.Value)
-	}
-	return
-}
-
-func compress(codec CompressionCodec, msgs ...Message) ([]Message, error) {
-	estimatedLen := 0
-	for _, msg := range msgs {
-		estimatedLen += int(msgSize(msg.Key, msg.Value))
-	}
-	buf := &bytes.Buffer{}
-	buf.Grow(estimatedLen)
-	bufWriter := bufio.NewWriter(buf)
-	for offset, msg := range msgs {
-		writeMessage(bufWriter, int64(offset), CompressionNoneCode, msg.Time, msg.Key, msg.Value)
-	}
-	bufWriter.Flush()
-
-	compressed, err := codec.Encode(buf.Bytes())
-	if err != nil {
-		return nil, err
-	}
-
-	return []Message{{Value: compressed}}, nil
-}
-
-const magicByte = 1 // compatible with kafka 0.10.0.0+
-
-func writeMessage(w *bufio.Writer, offset int64, attributes int8, time time.Time, key, value []byte) {
-	timestamp := timestamp(time)
-	crc32 := crc32OfMessage(magicByte, attributes, timestamp, key, value)
-	size := msgSize(key, value)
-
-	writeInt64(w, offset)
-	writeInt32(w, size)
-	writeInt32(w, int32(crc32))
-	writeInt8(w, magicByte)
-	writeInt8(w, attributes)
-	writeInt64(w, timestamp)
-	writeBytes(w, key)
-	writeBytes(w, value)
-}
-
-func msgSize(key, value []byte) int32 {
-	return 4 + // crc
-		1 + // magic byte
-		1 + // attributes
-		8 + // timestamp
-		sizeofBytes(key) +
-		sizeofBytes(value)
-}
-
-// Messages with magic >2 are called records. This method writes messages using message format 2.
-func writeRecord(w *bufio.Writer, attributes int8, baseTime time.Time, offset int64, msg Message) {
-
-	timestampDelta := msg.Time.Sub(baseTime)
-	offsetDelta := int64(offset)
-
-	writeVarInt(w, int64(recordSize(&msg, timestampDelta, offsetDelta)))
-
-	writeInt8(w, attributes)
-	writeVarInt(w, int64(timestampDelta))
-	writeVarInt(w, offsetDelta)
-
-	writeVarInt(w, int64(len(msg.Key)))
-	w.Write(msg.Key)
-	writeVarInt(w, int64(len(msg.Value)))
-	w.Write(msg.Value)
-	writeVarInt(w, int64(len(msg.Headers)))
-
-	for _, h := range msg.Headers {
-		writeVarInt(w, int64(len(h.Key)))
-		w.Write([]byte(h.Key))
-		writeVarInt(w, int64(len(h.Value)))
-		w.Write(h.Value)
-	}
 }

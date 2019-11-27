@@ -27,9 +27,9 @@ func (t createTopicsRequestV0ConfigEntry) size() int32 {
 		sizeofString(t.ConfigValue)
 }
 
-func (t createTopicsRequestV0ConfigEntry) writeTo(w *bufio.Writer) {
-	writeString(w, t.ConfigName)
-	writeString(w, t.ConfigValue)
+func (t createTopicsRequestV0ConfigEntry) writeTo(wb *writeBuffer) {
+	wb.writeString(t.ConfigName)
+	wb.writeString(t.ConfigValue)
 }
 
 type ReplicaAssignment struct {
@@ -54,9 +54,9 @@ func (t createTopicsRequestV0ReplicaAssignment) size() int32 {
 		sizeofInt32(t.Replicas)
 }
 
-func (t createTopicsRequestV0ReplicaAssignment) writeTo(w *bufio.Writer) {
-	writeInt32(w, t.Partition)
-	writeInt32(w, t.Replicas)
+func (t createTopicsRequestV0ReplicaAssignment) writeTo(wb *writeBuffer) {
+	wb.writeInt32(t.Partition)
+	wb.writeInt32(t.Replicas)
 }
 
 type TopicConfig struct {
@@ -126,12 +126,12 @@ func (t createTopicsRequestV0Topic) size() int32 {
 		sizeofArray(len(t.ConfigEntries), func(i int) int32 { return t.ConfigEntries[i].size() })
 }
 
-func (t createTopicsRequestV0Topic) writeTo(w *bufio.Writer) {
-	writeString(w, t.Topic)
-	writeInt32(w, t.NumPartitions)
-	writeInt16(w, t.ReplicationFactor)
-	writeArray(w, len(t.ReplicaAssignments), func(i int) { t.ReplicaAssignments[i].writeTo(w) })
-	writeArray(w, len(t.ConfigEntries), func(i int) { t.ConfigEntries[i].writeTo(w) })
+func (t createTopicsRequestV0Topic) writeTo(wb *writeBuffer) {
+	wb.writeString(t.Topic)
+	wb.writeInt32(t.NumPartitions)
+	wb.writeInt16(t.ReplicationFactor)
+	wb.writeArray(len(t.ReplicaAssignments), func(i int) { t.ReplicaAssignments[i].writeTo(wb) })
+	wb.writeArray(len(t.ConfigEntries), func(i int) { t.ConfigEntries[i].writeTo(wb) })
 }
 
 // See http://kafka.apache.org/protocol.html#The_Messages_CreateTopics
@@ -150,9 +150,9 @@ func (t createTopicsRequestV0) size() int32 {
 		sizeofInt32(t.Timeout)
 }
 
-func (t createTopicsRequestV0) writeTo(w *bufio.Writer) {
-	writeArray(w, len(t.Topics), func(i int) { t.Topics[i].writeTo(w) })
-	writeInt32(w, t.Timeout)
+func (t createTopicsRequestV0) writeTo(wb *writeBuffer) {
+	wb.writeArray(len(t.Topics), func(i int) { t.Topics[i].writeTo(wb) })
+	wb.writeInt32(t.Timeout)
 }
 
 type createTopicsResponseV0TopicError struct {
@@ -168,9 +168,9 @@ func (t createTopicsResponseV0TopicError) size() int32 {
 		sizeofInt16(t.ErrorCode)
 }
 
-func (t createTopicsResponseV0TopicError) writeTo(w *bufio.Writer) {
-	writeString(w, t.Topic)
-	writeInt16(w, t.ErrorCode)
+func (t createTopicsResponseV0TopicError) writeTo(wb *writeBuffer) {
+	wb.writeString(t.Topic)
+	wb.writeInt16(t.ErrorCode)
 }
 
 func (t *createTopicsResponseV0TopicError) readFrom(r *bufio.Reader, size int) (remain int, err error) {
@@ -192,8 +192,8 @@ func (t createTopicsResponseV0) size() int32 {
 	return sizeofArray(len(t.TopicErrors), func(i int) int32 { return t.TopicErrors[i].size() })
 }
 
-func (t createTopicsResponseV0) writeTo(w *bufio.Writer) {
-	writeArray(w, len(t.TopicErrors), func(i int) { t.TopicErrors[i].writeTo(w) })
+func (t createTopicsResponseV0) writeTo(wb *writeBuffer) {
+	wb.writeArray(len(t.TopicErrors), func(i int) { t.TopicErrors[i].writeTo(wb) })
 }
 
 func (t *createTopicsResponseV0) readFrom(r *bufio.Reader, size int) (remain int, err error) {

@@ -360,7 +360,7 @@ github.com/rancher/norman/urlbuilder
 github.com/rancher/rdns-server/model
 # github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6
 github.com/rancher/remotedialer
-# github.com/rancher/rke v1.0.0-rc6.0.20191126014335-34ad08a71570
+# github.com/rancher/rke v1.0.0
 github.com/rancher/rke/addons
 github.com/rancher/rke/authz
 github.com/rancher/rke/cloudprovider
@@ -431,7 +431,7 @@ github.com/russellhaering/goxmldsig/etreeutils
 github.com/russellhaering/goxmldsig/types
 # github.com/satori/go.uuid v1.2.0
 github.com/satori/go.uuid
-# github.com/segmentio/kafka-go v0.0.0-20190411192201-218fd49cff39
+# github.com/segmentio/kafka-go v0.3.4
 github.com/segmentio/kafka-go
 github.com/segmentio/kafka-go/sasl
 # github.com/sirupsen/logrus v1.4.2

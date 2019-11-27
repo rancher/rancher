@@ -283,17 +283,16 @@ func (d *Dialer) connect(ctx context.Context, network, address string, connCfg C
 // In case of error, this function *does not* close the connection.  That is the
 // responsibility of the caller.
 func (d *Dialer) authenticateSASL(ctx context.Context, conn *Conn) error {
-	mech, state, err := d.SASLMechanism.Start(ctx)
-	if err != nil {
+	if err := conn.saslHandshake(d.SASLMechanism.Name()); err != nil {
 		return err
 	}
-	err = conn.saslHandshake(mech)
+
+	sess, state, err := d.SASLMechanism.Start(ctx)
 	if err != nil {
 		return err
 	}
 
-	var completed bool
-	for !completed {
+	for completed := false; !completed; {
 		challenge, err := conn.saslAuthenticate(state)
 		switch err {
 		case nil:
@@ -306,7 +305,7 @@ func (d *Dialer) authenticateSASL(ctx context.Context, conn *Conn) error {
 			return err
 		}
 
-		completed, state, err = d.SASLMechanism.Next(ctx, challenge)
+		completed, state, err = sess.Next(ctx, challenge)
 		if err != nil {
 			return err
 		}

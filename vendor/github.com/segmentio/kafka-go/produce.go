@@ -12,10 +12,10 @@ func (r produceRequestV2) size() int32 {
 	return 2 + 4 + sizeofArray(len(r.Topics), func(i int) int32 { return r.Topics[i].size() })
 }
 
-func (r produceRequestV2) writeTo(w *bufio.Writer) {
-	writeInt16(w, r.RequiredAcks)
-	writeInt32(w, r.Timeout)
-	writeArray(w, len(r.Topics), func(i int) { r.Topics[i].writeTo(w) })
+func (r produceRequestV2) writeTo(wb *writeBuffer) {
+	wb.writeInt16(r.RequiredAcks)
+	wb.writeInt32(r.Timeout)
+	wb.writeArray(len(r.Topics), func(i int) { r.Topics[i].writeTo(wb) })
 }
 
 type produceRequestTopicV2 struct {
@@ -28,9 +28,9 @@ func (t produceRequestTopicV2) size() int32 {
 		sizeofArray(len(t.Partitions), func(i int) int32 { return t.Partitions[i].size() })
 }
 
-func (t produceRequestTopicV2) writeTo(w *bufio.Writer) {
-	writeString(w, t.TopicName)
-	writeArray(w, len(t.Partitions), func(i int) { t.Partitions[i].writeTo(w) })
+func (t produceRequestTopicV2) writeTo(wb *writeBuffer) {
+	wb.writeString(t.TopicName)
+	wb.writeArray(len(t.Partitions), func(i int) { t.Partitions[i].writeTo(wb) })
 }
 
 type produceRequestPartitionV2 struct {
@@ -43,10 +43,10 @@ func (p produceRequestPartitionV2) size() int32 {
 	return 4 + 4 + p.MessageSet.size()
 }
 
-func (p produceRequestPartitionV2) writeTo(w *bufio.Writer) {
-	writeInt32(w, p.Partition)
-	writeInt32(w, p.MessageSetSize)
-	p.MessageSet.writeTo(w)
+func (p produceRequestPartitionV2) writeTo(wb *writeBuffer) {
+	wb.writeInt32(p.Partition)
+	wb.writeInt32(p.MessageSetSize)
+	p.MessageSet.writeTo(wb)
 }
 
 type produceResponseV2 struct {
@@ -58,9 +58,9 @@ func (r produceResponseV2) size() int32 {
 	return 4 + sizeofArray(len(r.Topics), func(i int) int32 { return r.Topics[i].size() })
 }
 
-func (r produceResponseV2) writeTo(w *bufio.Writer) {
-	writeInt32(w, r.ThrottleTime)
-	writeArray(w, len(r.Topics), func(i int) { r.Topics[i].writeTo(w) })
+func (r produceResponseV2) writeTo(wb *writeBuffer) {
+	wb.writeInt32(r.ThrottleTime)
+	wb.writeArray(len(r.Topics), func(i int) { r.Topics[i].writeTo(wb) })
 }
 
 type produceResponseTopicV2 struct {
@@ -73,9 +73,9 @@ func (t produceResponseTopicV2) size() int32 {
 		sizeofArray(len(t.Partitions), func(i int) int32 { return t.Partitions[i].size() })
 }
 
-func (t produceResponseTopicV2) writeTo(w *bufio.Writer) {
-	writeString(w, t.TopicName)
-	writeArray(w, len(t.Partitions), func(i int) { t.Partitions[i].writeTo(w) })
+func (t produceResponseTopicV2) writeTo(wb *writeBuffer) {
+	wb.writeString(t.TopicName)
+	wb.writeArray(len(t.Partitions), func(i int) { t.Partitions[i].writeTo(wb) })
 }
 
 type produceResponsePartitionV2 struct {
@@ -89,11 +89,11 @@ func (p produceResponsePartitionV2) size() int32 {
 	return 4 + 2 + 8 + 8
 }
 
-func (p produceResponsePartitionV2) writeTo(w *bufio.Writer) {
-	writeInt32(w, p.Partition)
-	writeInt16(w, p.ErrorCode)
-	writeInt64(w, p.Offset)
-	writeInt64(w, p.Timestamp)
+func (p produceResponsePartitionV2) writeTo(wb *writeBuffer) {
+	wb.writeInt32(p.Partition)
+	wb.writeInt16(p.ErrorCode)
+	wb.writeInt64(p.Offset)
+	wb.writeInt64(p.Timestamp)
 }
 
 func (p *produceResponsePartitionV2) readFrom(r *bufio.Reader, sz int) (remain int, err error) {
@@ -124,12 +124,12 @@ func (p produceResponsePartitionV7) size() int32 {
 	return 4 + 2 + 8 + 8 + 8
 }
 
-func (p produceResponsePartitionV7) writeTo(w *bufio.Writer) {
-	writeInt32(w, p.Partition)
-	writeInt16(w, p.ErrorCode)
-	writeInt64(w, p.Offset)
-	writeInt64(w, p.Timestamp)
-	writeInt64(w, p.StartOffset)
+func (p produceResponsePartitionV7) writeTo(wb *writeBuffer) {
+	wb.writeInt32(p.Partition)
+	wb.writeInt16(p.ErrorCode)
+	wb.writeInt64(p.Offset)
+	wb.writeInt64(p.Timestamp)
+	wb.writeInt64(p.StartOffset)
 }
 
 func (p *produceResponsePartitionV7) readFrom(r *bufio.Reader, sz int) (remain int, err error) {

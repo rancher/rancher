@@ -19,10 +19,10 @@ func (t offsetCommitRequestV2Partition) size() int32 {
 		sizeofString(t.Metadata)
 }
 
-func (t offsetCommitRequestV2Partition) writeTo(w *bufio.Writer) {
-	writeInt32(w, t.Partition)
-	writeInt64(w, t.Offset)
-	writeString(w, t.Metadata)
+func (t offsetCommitRequestV2Partition) writeTo(wb *writeBuffer) {
+	wb.writeInt32(t.Partition)
+	wb.writeInt64(t.Offset)
+	wb.writeString(t.Metadata)
 }
 
 type offsetCommitRequestV2Topic struct {
@@ -38,9 +38,9 @@ func (t offsetCommitRequestV2Topic) size() int32 {
 		sizeofArray(len(t.Partitions), func(i int) int32 { return t.Partitions[i].size() })
 }
 
-func (t offsetCommitRequestV2Topic) writeTo(w *bufio.Writer) {
-	writeString(w, t.Topic)
-	writeArray(w, len(t.Partitions), func(i int) { t.Partitions[i].writeTo(w) })
+func (t offsetCommitRequestV2Topic) writeTo(wb *writeBuffer) {
+	wb.writeString(t.Topic)
+	wb.writeArray(len(t.Partitions), func(i int) { t.Partitions[i].writeTo(wb) })
 }
 
 type offsetCommitRequestV2 struct {
@@ -68,12 +68,12 @@ func (t offsetCommitRequestV2) size() int32 {
 		sizeofArray(len(t.Topics), func(i int) int32 { return t.Topics[i].size() })
 }
 
-func (t offsetCommitRequestV2) writeTo(w *bufio.Writer) {
-	writeString(w, t.GroupID)
-	writeInt32(w, t.GenerationID)
-	writeString(w, t.MemberID)
-	writeInt64(w, t.RetentionTime)
-	writeArray(w, len(t.Topics), func(i int) { t.Topics[i].writeTo(w) })
+func (t offsetCommitRequestV2) writeTo(wb *writeBuffer) {
+	wb.writeString(t.GroupID)
+	wb.writeInt32(t.GenerationID)
+	wb.writeString(t.MemberID)
+	wb.writeInt64(t.RetentionTime)
+	wb.writeArray(len(t.Topics), func(i int) { t.Topics[i].writeTo(wb) })
 }
 
 type offsetCommitResponseV2PartitionResponse struct {
@@ -88,9 +88,9 @@ func (t offsetCommitResponseV2PartitionResponse) size() int32 {
 		sizeofInt16(t.ErrorCode)
 }
 
-func (t offsetCommitResponseV2PartitionResponse) writeTo(w *bufio.Writer) {
-	writeInt32(w, t.Partition)
-	writeInt16(w, t.ErrorCode)
+func (t offsetCommitResponseV2PartitionResponse) writeTo(wb *writeBuffer) {
+	wb.writeInt32(t.Partition)
+	wb.writeInt16(t.ErrorCode)
 }
 
 func (t *offsetCommitResponseV2PartitionResponse) readFrom(r *bufio.Reader, size int) (remain int, err error) {
@@ -113,9 +113,9 @@ func (t offsetCommitResponseV2Response) size() int32 {
 		sizeofArray(len(t.PartitionResponses), func(i int) int32 { return t.PartitionResponses[i].size() })
 }
 
-func (t offsetCommitResponseV2Response) writeTo(w *bufio.Writer) {
-	writeString(w, t.Topic)
-	writeArray(w, len(t.PartitionResponses), func(i int) { t.PartitionResponses[i].writeTo(w) })
+func (t offsetCommitResponseV2Response) writeTo(wb *writeBuffer) {
+	wb.writeString(t.Topic)
+	wb.writeArray(len(t.PartitionResponses), func(i int) { t.PartitionResponses[i].writeTo(wb) })
 }
 
 func (t *offsetCommitResponseV2Response) readFrom(r *bufio.Reader, size int) (remain int, err error) {
@@ -146,8 +146,8 @@ func (t offsetCommitResponseV2) size() int32 {
 	return sizeofArray(len(t.Responses), func(i int) int32 { return t.Responses[i].size() })
 }
 
-func (t offsetCommitResponseV2) writeTo(w *bufio.Writer) {
-	writeArray(w, len(t.Responses), func(i int) { t.Responses[i].writeTo(w) })
+func (t offsetCommitResponseV2) writeTo(wb *writeBuffer) {
+	wb.writeArray(len(t.Responses), func(i int) { t.Responses[i].writeTo(wb) })
 }
 
 func (t *offsetCommitResponseV2) readFrom(r *bufio.Reader, size int) (remain int, err error) {

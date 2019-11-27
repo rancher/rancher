@@ -19,8 +19,8 @@ func (t *saslHandshakeRequestV0) readFrom(r *bufio.Reader, sz int) (remain int, 
 	return readString(r, sz, &t.Mechanism)
 }
 
-func (t saslHandshakeRequestV0) writeTo(w *bufio.Writer) {
-	writeString(w, t.Mechanism)
+func (t saslHandshakeRequestV0) writeTo(wb *writeBuffer) {
+	wb.writeString(t.Mechanism)
 }
 
 // saslHandshakeResponseV0 implements the format for V0 and V1 SASL
@@ -37,9 +37,9 @@ func (t saslHandshakeResponseV0) size() int32 {
 	return sizeofInt16(t.ErrorCode) + sizeofStringArray(t.EnabledMechanisms)
 }
 
-func (t saslHandshakeResponseV0) writeTo(w *bufio.Writer) {
-	writeInt16(w, t.ErrorCode)
-	writeStringArray(w, t.EnabledMechanisms)
+func (t saslHandshakeResponseV0) writeTo(wb *writeBuffer) {
+	wb.writeInt16(t.ErrorCode)
+	wb.writeStringArray(t.EnabledMechanisms)
 }
 
 func (t *saslHandshakeResponseV0) readFrom(r *bufio.Reader, sz int) (remain int, err error) {

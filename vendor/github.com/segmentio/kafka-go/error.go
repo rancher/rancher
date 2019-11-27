@@ -463,3 +463,12 @@ func coalesceErrors(errs ...error) error {
 	}
 	return nil
 }
+
+type MessageTooLargeError struct {
+	Message   Message
+	Remaining []Message
+}
+
+func (e MessageTooLargeError) Error() string {
+	return MessageSizeTooLarge.Error()
+}

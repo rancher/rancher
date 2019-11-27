@@ -35,6 +35,10 @@ software.
 `kafka-go` is currently compatible with Kafka versions from 0.10.1.0 to 2.1.0. While latest versions will be working,
 some features available from the Kafka API may not be implemented yet.
 
+## Golang version
+
+`kafka-go` is currently compatible with golang version from 1.12+. To use with older versions of golang use release [v0.2.5](https://github.com/segmentio/kafka-go/releases/tag/v0.2.5).
+
 ## Connection [![GoDoc](https://godoc.org/github.com/segmentio/kafka-go?status.svg)](https://godoc.org/github.com/segmentio/kafka-go#Conn)
 
 The `Conn` type is the core of the `kafka-go` package. It wraps around a raw
@@ -227,17 +231,46 @@ w.Close()
 **Note:** Even though kafka.Message contain ```Topic``` and ```Partition``` fields, they **MUST NOT** be
 set when writing messages.  They are intended for read use only.
 
-### Compatibility with Sarama
+### Compatibility with other clients
+
+#### Sarama
 
 If you're switching from Sarama and need/want to use the same algorithm for message
 partitioning, you can use the ```kafka.Hash``` balancer.  ```kafka.Hash``` routes
-messages to the same partitions that sarama's default partitioner would route to.
+messages to the same partitions that Sarama's default partitioner would route to.
 
 ```go
 w := kafka.NewWriter(kafka.WriterConfig{
-	Brokers: []string{"localhost:9092"},
-	Topic:   "topic-A",
+	Brokers:  []string{"localhost:9092"},
+	Topic:    "topic-A",
 	Balancer: &kafka.Hash{},
+})
+```
+
+#### librdkafka and confluent-kafka-go
+
+Use the ```kafka.CRC32Balancer``` balancer to get the same behaviour as librdkafka's
+default ```consistent_random``` partition strategy.
+
+```go
+w := kafka.NewWriter(kafka.WriterConfig{
+	Brokers:  []string{"localhost:9092"},
+	Topic:    "topic-A",
+	Balancer: kafka.CRC32Balancer{},
+})
+```
+
+#### Java
+
+Use the ```kafka.Murmur2Balancer``` balancer to get the same behaviour as the canonical
+Java client's default partitioner.  Note: the Java class allows you to directly specify
+the partition which is not permitted.
+
+```go
+w := kafka.NewWriter(kafka.WriterConfig{
+	Brokers:  []string{"localhost:9092"},
+	Topic:    "topic-A",
+	Balancer: kafka.Murmur2Balancer{},
 })
 ```
 

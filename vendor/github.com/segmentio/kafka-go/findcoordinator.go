@@ -17,8 +17,8 @@ func (t findCoordinatorRequestV0) size() int32 {
 	return sizeofString(t.CoordinatorKey)
 }
 
-func (t findCoordinatorRequestV0) writeTo(w *bufio.Writer) {
-	writeString(w, t.CoordinatorKey)
+func (t findCoordinatorRequestV0) writeTo(wb *writeBuffer) {
+	wb.writeString(t.CoordinatorKey)
 }
 
 type findCoordinatorResponseCoordinatorV0 struct {
@@ -38,10 +38,10 @@ func (t findCoordinatorResponseCoordinatorV0) size() int32 {
 		sizeofInt32(t.Port)
 }
 
-func (t findCoordinatorResponseCoordinatorV0) writeTo(w *bufio.Writer) {
-	writeInt32(w, t.NodeID)
-	writeString(w, t.Host)
-	writeInt32(w, t.Port)
+func (t findCoordinatorResponseCoordinatorV0) writeTo(wb *writeBuffer) {
+	wb.writeInt32(t.NodeID)
+	wb.writeString(t.Host)
+	wb.writeInt32(t.Port)
 }
 
 func (t *findCoordinatorResponseCoordinatorV0) readFrom(r *bufio.Reader, size int) (remain int, err error) {
@@ -70,9 +70,9 @@ func (t findCoordinatorResponseV0) size() int32 {
 		t.Coordinator.size()
 }
 
-func (t findCoordinatorResponseV0) writeTo(w *bufio.Writer) {
-	writeInt16(w, t.ErrorCode)
-	t.Coordinator.writeTo(w)
+func (t findCoordinatorResponseV0) writeTo(wb *writeBuffer) {
+	wb.writeInt16(t.ErrorCode)
+	t.Coordinator.writeTo(wb)
 }
 
 func (t *findCoordinatorResponseV0) readFrom(r *bufio.Reader, size int) (remain int, err error) {

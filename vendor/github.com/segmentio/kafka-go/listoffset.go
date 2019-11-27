@@ -11,9 +11,9 @@ func (r listOffsetRequestV1) size() int32 {
 	return 4 + sizeofArray(len(r.Topics), func(i int) int32 { return r.Topics[i].size() })
 }
 
-func (r listOffsetRequestV1) writeTo(w *bufio.Writer) {
-	writeInt32(w, r.ReplicaID)
-	writeArray(w, len(r.Topics), func(i int) { r.Topics[i].writeTo(w) })
+func (r listOffsetRequestV1) writeTo(wb *writeBuffer) {
+	wb.writeInt32(r.ReplicaID)
+	wb.writeArray(len(r.Topics), func(i int) { r.Topics[i].writeTo(wb) })
 }
 
 type listOffsetRequestTopicV1 struct {
@@ -26,9 +26,9 @@ func (t listOffsetRequestTopicV1) size() int32 {
 		sizeofArray(len(t.Partitions), func(i int) int32 { return t.Partitions[i].size() })
 }
 
-func (t listOffsetRequestTopicV1) writeTo(w *bufio.Writer) {
-	writeString(w, t.TopicName)
-	writeArray(w, len(t.Partitions), func(i int) { t.Partitions[i].writeTo(w) })
+func (t listOffsetRequestTopicV1) writeTo(wb *writeBuffer) {
+	wb.writeString(t.TopicName)
+	wb.writeArray(len(t.Partitions), func(i int) { t.Partitions[i].writeTo(wb) })
 }
 
 type listOffsetRequestPartitionV1 struct {
@@ -40,9 +40,9 @@ func (p listOffsetRequestPartitionV1) size() int32 {
 	return 4 + 8
 }
 
-func (p listOffsetRequestPartitionV1) writeTo(w *bufio.Writer) {
-	writeInt32(w, p.Partition)
-	writeInt64(w, p.Time)
+func (p listOffsetRequestPartitionV1) writeTo(wb *writeBuffer) {
+	wb.writeInt32(p.Partition)
+	wb.writeInt64(p.Time)
 }
 
 type listOffsetResponseV1 []listOffsetResponseTopicV1
@@ -51,8 +51,8 @@ func (r listOffsetResponseV1) size() int32 {
 	return sizeofArray(len(r), func(i int) int32 { return r[i].size() })
 }
 
-func (r listOffsetResponseV1) writeTo(w *bufio.Writer) {
-	writeArray(w, len(r), func(i int) { r[i].writeTo(w) })
+func (r listOffsetResponseV1) writeTo(wb *writeBuffer) {
+	wb.writeArray(len(r), func(i int) { r[i].writeTo(wb) })
 }
 
 type listOffsetResponseTopicV1 struct {
@@ -65,9 +65,9 @@ func (t listOffsetResponseTopicV1) size() int32 {
 		sizeofArray(len(t.PartitionOffsets), func(i int) int32 { return t.PartitionOffsets[i].size() })
 }
 
-func (t listOffsetResponseTopicV1) writeTo(w *bufio.Writer) {
-	writeString(w, t.TopicName)
-	writeArray(w, len(t.PartitionOffsets), func(i int) { t.PartitionOffsets[i].writeTo(w) })
+func (t listOffsetResponseTopicV1) writeTo(wb *writeBuffer) {
+	wb.writeString(t.TopicName)
+	wb.writeArray(len(t.PartitionOffsets), func(i int) { t.PartitionOffsets[i].writeTo(wb) })
 }
 
 type partitionOffsetV1 struct {
@@ -81,11 +81,11 @@ func (p partitionOffsetV1) size() int32 {
 	return 4 + 2 + 8 + 8
 }
 
-func (p partitionOffsetV1) writeTo(w *bufio.Writer) {
-	writeInt32(w, p.Partition)
-	writeInt16(w, p.ErrorCode)
-	writeInt64(w, p.Timestamp)
-	writeInt64(w, p.Offset)
+func (p partitionOffsetV1) writeTo(wb *writeBuffer) {
+	wb.writeInt32(p.Partition)
+	wb.writeInt16(p.ErrorCode)
+	wb.writeInt64(p.Timestamp)
+	wb.writeInt64(p.Offset)
 }
 
 func (p *partitionOffsetV1) readFrom(r *bufio.Reader, sz int) (remain int, err error) {

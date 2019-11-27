@@ -1,15 +1,13 @@
 package kafka
 
-import "bufio"
-
 type topicMetadataRequestV1 []string
 
 func (r topicMetadataRequestV1) size() int32 {
 	return sizeofStringArray([]string(r))
 }
 
-func (r topicMetadataRequestV1) writeTo(w *bufio.Writer) {
-	writeStringArray(w, []string(r))
+func (r topicMetadataRequestV1) writeTo(wb *writeBuffer) {
+	wb.writeStringArray([]string(r))
 }
 
 type metadataResponseV1 struct {
@@ -24,10 +22,10 @@ func (r metadataResponseV1) size() int32 {
 	return 4 + n1 + n2
 }
 
-func (r metadataResponseV1) writeTo(w *bufio.Writer) {
-	writeArray(w, len(r.Brokers), func(i int) { r.Brokers[i].writeTo(w) })
-	writeInt32(w, r.ControllerID)
-	writeArray(w, len(r.Topics), func(i int) { r.Topics[i].writeTo(w) })
+func (r metadataResponseV1) writeTo(wb *writeBuffer) {
+	wb.writeArray(len(r.Brokers), func(i int) { r.Brokers[i].writeTo(wb) })
+	wb.writeInt32(r.ControllerID)
+	wb.writeArray(len(r.Topics), func(i int) { r.Topics[i].writeTo(wb) })
 }
 
 type brokerMetadataV1 struct {
@@ -41,11 +39,11 @@ func (b brokerMetadataV1) size() int32 {
 	return 4 + 4 + sizeofString(b.Host) + sizeofString(b.Rack)
 }
 
-func (b brokerMetadataV1) writeTo(w *bufio.Writer) {
-	writeInt32(w, b.NodeID)
-	writeString(w, b.Host)
-	writeInt32(w, b.Port)
-	writeString(w, b.Rack)
+func (b brokerMetadataV1) writeTo(wb *writeBuffer) {
+	wb.writeInt32(b.NodeID)
+	wb.writeString(b.Host)
+	wb.writeInt32(b.Port)
+	wb.writeString(b.Rack)
 }
 
 type topicMetadataV1 struct {
@@ -61,11 +59,11 @@ func (t topicMetadataV1) size() int32 {
 		sizeofArray(len(t.Partitions), func(i int) int32 { return t.Partitions[i].size() })
 }
 
-func (t topicMetadataV1) writeTo(w *bufio.Writer) {
-	writeInt16(w, t.TopicErrorCode)
-	writeString(w, t.TopicName)
-	writeBool(w, t.Internal)
-	writeArray(w, len(t.Partitions), func(i int) { t.Partitions[i].writeTo(w) })
+func (t topicMetadataV1) writeTo(wb *writeBuffer) {
+	wb.writeInt16(t.TopicErrorCode)
+	wb.writeString(t.TopicName)
+	wb.writeBool(t.Internal)
+	wb.writeArray(len(t.Partitions), func(i int) { t.Partitions[i].writeTo(wb) })
 }
 
 type partitionMetadataV1 struct {
@@ -80,10 +78,10 @@ func (p partitionMetadataV1) size() int32 {
 	return 2 + 4 + 4 + sizeofInt32Array(p.Replicas) + sizeofInt32Array(p.Isr)
 }
 
-func (p partitionMetadataV1) writeTo(w *bufio.Writer) {
-	writeInt16(w, p.PartitionErrorCode)
-	writeInt32(w, p.PartitionID)
-	writeInt32(w, p.Leader)
-	writeInt32Array(w, p.Replicas)
-	writeInt32Array(w, p.Isr)
+func (p partitionMetadataV1) writeTo(wb *writeBuffer) {
+	wb.writeInt16(p.PartitionErrorCode)
+	wb.writeInt32(p.PartitionID)
+	wb.writeInt32(p.Leader)
+	wb.writeInt32Array(p.Replicas)
+	wb.writeInt32Array(p.Isr)
 }

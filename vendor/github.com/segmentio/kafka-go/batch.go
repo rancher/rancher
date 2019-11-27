@@ -92,6 +92,19 @@ func (batch *Batch) close() (err error) {
 	return
 }
 
+// Err returns a non-nil error if the batch is broken. This is the same error
+// that would be returned by Read, ReadMessage or Close (except in the case of
+// io.EOF which is never returned by Close).
+//
+// This method is useful when building retry mechanisms for (*Conn).ReadBatch,
+// the program can check whether the batch carried a error before attempting to
+// read the first message.
+//
+// Note that checking errors on a batch is optional, calling Read or ReadMessage
+// is always valid and can be used to either read a message or an error in cases
+// where that's convenient.
+func (batch *Batch) Err() error { return batch.err }
+
 // Read reads the value of the next message from the batch into b, returning the
 // number of bytes read, or an error if the next message couldn't be read.
 //
@@ -118,6 +131,11 @@ func (batch *Batch) Read(b []byte) (int, error) {
 		func(r *bufio.Reader, size int, nbytes int) (int, error) {
 			if nbytes < 0 {
 				return size, nil
+			}
+			// make sure there are enough bytes for the message value.  return
+			// errShortRead if the message is truncated.
+			if nbytes > size {
+				return size, errShortRead
 			}
 			n = nbytes // return value
 			if nbytes > cap(b) {
@@ -212,7 +230,12 @@ func (batch *Batch) readMessage(
 		err = batch.msgs.discard()
 		switch {
 		case err != nil:
-			batch.err = err
+			// Since io.EOF is used by the batch to indicate that there is are
+			// no more messages to consume, it is crucial that any io.EOF errors
+			// on the underlying connection are repackaged.  Otherwise, the
+			// caller can't tell the difference between a batch that was fully
+			// consumed or a batch whose connection is in an error state.
+			batch.err = dontExpectEOF(err)
 		case batch.msgs.remaining() == 0:
 			// Because we use the adjusted deadline we could end up returning
 			// before the actual deadline occurred. This is necessary otherwise
@@ -225,7 +248,12 @@ func (batch *Batch) readMessage(
 			batch.err = err
 		}
 	default:
-		batch.err = err
+		// Since io.EOF is used by the batch to indicate that there is are
+		// no more messages to consume, it is crucial that any io.EOF errors
+		// on the underlying connection are repackaged.  Otherwise, the
+		// caller can't tell the difference between a batch that was fully
+		// consumed or a batch whose connection is in an error state.
+		batch.err = dontExpectEOF(err)
 	}
 
 	return
