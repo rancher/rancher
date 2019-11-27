@@ -59,12 +59,7 @@ func (c *grbHandler) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object
 		ObjectMeta: metav1.ObjectMeta{
 			Name: bindingName,
 		},
-		Subjects: []v12.Subject{
-			{
-				Kind: "User",
-				Name: obj.UserName,
-			},
-		},
+		Subjects: []v12.Subject{rbac.GetGRBSubject(obj)},
 		RoleRef: v12.RoleRef{
 			Name: "cluster-admin",
 			Kind: "ClusterRole",
@@ -84,5 +79,5 @@ func grbByUserAndRole(obj interface{}) ([]string, error) {
 		return []string{}, nil
 	}
 
-	return []string{grb.UserName + "-" + grb.GlobalRoleName}, nil
+	return []string{rbac.GetGRBTargetKey(grb) + "-" + grb.GlobalRoleName}, nil
 }

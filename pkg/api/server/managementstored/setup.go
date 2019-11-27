@@ -22,6 +22,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/feature"
 	"github.com/rancher/rancher/pkg/api/customization/globaldns"
 	"github.com/rancher/rancher/pkg/api/customization/globalrole"
+	"github.com/rancher/rancher/pkg/api/customization/globalrolebinding"
 	"github.com/rancher/rancher/pkg/api/customization/kontainerdriver"
 	"github.com/rancher/rancher/pkg/api/customization/logging"
 	"github.com/rancher/rancher/pkg/api/customization/monitor"
@@ -696,6 +697,7 @@ func GlobalRoleBindings(schemas *types.Schemas, management *config.ScaledContext
 	schema := schemas.Schema(&managementschema.Version, client.GlobalRoleBindingType)
 	grLister := management.Management.GlobalRoles("").Controller().Lister()
 	schema.Store = grbstore.Wrap(schema.Store, grLister)
+	schema.Validator = globalrolebinding.Validator
 }
 
 func RoleTemplate(schemas *types.Schemas, management *config.ScaledContext) {
