@@ -17,9 +17,9 @@ func (t offsetFetchRequestV1Topic) size() int32 {
 		sizeofInt32Array(t.Partitions)
 }
 
-func (t offsetFetchRequestV1Topic) writeTo(w *bufio.Writer) {
-	writeString(w, t.Topic)
-	writeInt32Array(w, t.Partitions)
+func (t offsetFetchRequestV1Topic) writeTo(wb *writeBuffer) {
+	wb.writeString(t.Topic)
+	wb.writeInt32Array(t.Partitions)
 }
 
 type offsetFetchRequestV1 struct {
@@ -35,9 +35,9 @@ func (t offsetFetchRequestV1) size() int32 {
 		sizeofArray(len(t.Topics), func(i int) int32 { return t.Topics[i].size() })
 }
 
-func (t offsetFetchRequestV1) writeTo(w *bufio.Writer) {
-	writeString(w, t.GroupID)
-	writeArray(w, len(t.Topics), func(i int) { t.Topics[i].writeTo(w) })
+func (t offsetFetchRequestV1) writeTo(wb *writeBuffer) {
+	wb.writeString(t.GroupID)
+	wb.writeArray(len(t.Topics), func(i int) { t.Topics[i].writeTo(wb) })
 }
 
 type offsetFetchResponseV1PartitionResponse struct {
@@ -61,11 +61,11 @@ func (t offsetFetchResponseV1PartitionResponse) size() int32 {
 		sizeofInt16(t.ErrorCode)
 }
 
-func (t offsetFetchResponseV1PartitionResponse) writeTo(w *bufio.Writer) {
-	writeInt32(w, t.Partition)
-	writeInt64(w, t.Offset)
-	writeString(w, t.Metadata)
-	writeInt16(w, t.ErrorCode)
+func (t offsetFetchResponseV1PartitionResponse) writeTo(wb *writeBuffer) {
+	wb.writeInt32(t.Partition)
+	wb.writeInt64(t.Offset)
+	wb.writeString(t.Metadata)
+	wb.writeInt16(t.ErrorCode)
 }
 
 func (t *offsetFetchResponseV1PartitionResponse) readFrom(r *bufio.Reader, size int) (remain int, err error) {
@@ -97,9 +97,9 @@ func (t offsetFetchResponseV1Response) size() int32 {
 		sizeofArray(len(t.PartitionResponses), func(i int) int32 { return t.PartitionResponses[i].size() })
 }
 
-func (t offsetFetchResponseV1Response) writeTo(w *bufio.Writer) {
-	writeString(w, t.Topic)
-	writeArray(w, len(t.PartitionResponses), func(i int) { t.PartitionResponses[i].writeTo(w) })
+func (t offsetFetchResponseV1Response) writeTo(wb *writeBuffer) {
+	wb.writeString(t.Topic)
+	wb.writeArray(len(t.PartitionResponses), func(i int) { t.PartitionResponses[i].writeTo(wb) })
 }
 
 func (t *offsetFetchResponseV1Response) readFrom(r *bufio.Reader, size int) (remain int, err error) {
@@ -131,8 +131,8 @@ func (t offsetFetchResponseV1) size() int32 {
 	return sizeofArray(len(t.Responses), func(i int) int32 { return t.Responses[i].size() })
 }
 
-func (t offsetFetchResponseV1) writeTo(w *bufio.Writer) {
-	writeArray(w, len(t.Responses), func(i int) { t.Responses[i].writeTo(w) })
+func (t offsetFetchResponseV1) writeTo(wb *writeBuffer) {
+	wb.writeArray(len(t.Responses), func(i int) { t.Responses[i].writeTo(wb) })
 }
 
 func (t *offsetFetchResponseV1) readFrom(r *bufio.Reader, size int) (remain int, err error) {

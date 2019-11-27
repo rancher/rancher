@@ -21,9 +21,9 @@ func (t deleteTopicsRequestV0) size() int32 {
 		sizeofInt32(t.Timeout)
 }
 
-func (t deleteTopicsRequestV0) writeTo(w *bufio.Writer) {
-	writeStringArray(w, t.Topics)
-	writeInt32(w, t.Timeout)
+func (t deleteTopicsRequestV0) writeTo(wb *writeBuffer) {
+	wb.writeStringArray(t.Topics)
+	wb.writeInt32(t.Timeout)
 }
 
 type deleteTopicsResponseV0 struct {
@@ -50,8 +50,8 @@ func (t *deleteTopicsResponseV0) readFrom(r *bufio.Reader, size int) (remain int
 	return
 }
 
-func (t deleteTopicsResponseV0) writeTo(w *bufio.Writer) {
-	writeArray(w, len(t.TopicErrorCodes), func(i int) { t.TopicErrorCodes[i].writeTo(w) })
+func (t deleteTopicsResponseV0) writeTo(wb *writeBuffer) {
+	wb.writeArray(len(t.TopicErrorCodes), func(i int) { t.TopicErrorCodes[i].writeTo(wb) })
 }
 
 type deleteTopicsResponseV0TopicErrorCode struct {
@@ -77,9 +77,9 @@ func (t *deleteTopicsResponseV0TopicErrorCode) readFrom(r *bufio.Reader, size in
 	return
 }
 
-func (t deleteTopicsResponseV0TopicErrorCode) writeTo(w *bufio.Writer) {
-	writeString(w, t.Topic)
-	writeInt16(w, t.ErrorCode)
+func (t deleteTopicsResponseV0TopicErrorCode) writeTo(wb *writeBuffer) {
+	wb.writeString(t.Topic)
+	wb.writeInt16(t.ErrorCode)
 }
 
 // deleteTopics deletes the specified topics.

@@ -13,8 +13,8 @@ func (t describeGroupsRequestV0) size() int32 {
 	return sizeofStringArray(t.GroupIDs)
 }
 
-func (t describeGroupsRequestV0) writeTo(w *bufio.Writer) {
-	writeStringArray(w, t.GroupIDs)
+func (t describeGroupsRequestV0) writeTo(wb *writeBuffer) {
+	wb.writeStringArray(t.GroupIDs)
 }
 
 type describeGroupsResponseMemberV0 struct {
@@ -47,12 +47,12 @@ func (t describeGroupsResponseMemberV0) size() int32 {
 		sizeofBytes(t.MemberAssignments)
 }
 
-func (t describeGroupsResponseMemberV0) writeTo(w *bufio.Writer) {
-	writeString(w, t.MemberID)
-	writeString(w, t.ClientID)
-	writeString(w, t.ClientHost)
-	writeBytes(w, t.MemberMetadata)
-	writeBytes(w, t.MemberAssignments)
+func (t describeGroupsResponseMemberV0) writeTo(wb *writeBuffer) {
+	wb.writeString(t.MemberID)
+	wb.writeString(t.ClientID)
+	wb.writeString(t.ClientHost)
+	wb.writeBytes(t.MemberMetadata)
+	wb.writeBytes(t.MemberAssignments)
 }
 
 func (t *describeGroupsResponseMemberV0) readFrom(r *bufio.Reader, size int) (remain int, err error) {
@@ -105,13 +105,13 @@ func (t describeGroupsResponseGroupV0) size() int32 {
 		sizeofArray(len(t.Members), func(i int) int32 { return t.Members[i].size() })
 }
 
-func (t describeGroupsResponseGroupV0) writeTo(w *bufio.Writer) {
-	writeInt16(w, t.ErrorCode)
-	writeString(w, t.GroupID)
-	writeString(w, t.State)
-	writeString(w, t.ProtocolType)
-	writeString(w, t.Protocol)
-	writeArray(w, len(t.Members), func(i int) { t.Members[i].writeTo(w) })
+func (t describeGroupsResponseGroupV0) writeTo(wb *writeBuffer) {
+	wb.writeInt16(t.ErrorCode)
+	wb.writeString(t.GroupID)
+	wb.writeString(t.State)
+	wb.writeString(t.ProtocolType)
+	wb.writeString(t.Protocol)
+	wb.writeArray(len(t.Members), func(i int) { t.Members[i].writeTo(wb) })
 }
 
 func (t *describeGroupsResponseGroupV0) readFrom(r *bufio.Reader, size int) (remain int, err error) {
@@ -155,8 +155,8 @@ func (t describeGroupsResponseV0) size() int32 {
 	return sizeofArray(len(t.Groups), func(i int) int32 { return t.Groups[i].size() })
 }
 
-func (t describeGroupsResponseV0) writeTo(w *bufio.Writer) {
-	writeArray(w, len(t.Groups), func(i int) { t.Groups[i].writeTo(w) })
+func (t describeGroupsResponseV0) writeTo(wb *writeBuffer) {
+	wb.writeArray(len(t.Groups), func(i int) { t.Groups[i].writeTo(wb) })
 }
 
 func (t *describeGroupsResponseV0) readFrom(r *bufio.Reader, sz int) (remain int, err error) {

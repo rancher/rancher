@@ -12,13 +12,12 @@ type leaveGroupRequestV0 struct {
 }
 
 func (t leaveGroupRequestV0) size() int32 {
-	return sizeofString(t.GroupID) +
-		sizeofString(t.MemberID)
+	return sizeofString(t.GroupID) + sizeofString(t.MemberID)
 }
 
-func (t leaveGroupRequestV0) writeTo(w *bufio.Writer) {
-	writeString(w, t.GroupID)
-	writeString(w, t.MemberID)
+func (t leaveGroupRequestV0) writeTo(wb *writeBuffer) {
+	wb.writeString(t.GroupID)
+	wb.writeString(t.MemberID)
 }
 
 type leaveGroupResponseV0 struct {
@@ -30,13 +29,11 @@ func (t leaveGroupResponseV0) size() int32 {
 	return sizeofInt16(t.ErrorCode)
 }
 
-func (t leaveGroupResponseV0) writeTo(w *bufio.Writer) {
-	writeInt16(w, t.ErrorCode)
+func (t leaveGroupResponseV0) writeTo(wb *writeBuffer) {
+	wb.writeInt16(t.ErrorCode)
 }
 
 func (t *leaveGroupResponseV0) readFrom(r *bufio.Reader, size int) (remain int, err error) {
-	if remain, err = readInt16(r, size, &t.ErrorCode); err != nil {
-		return
-	}
+	remain, err = readInt16(r, size, &t.ErrorCode)
 	return
 }

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"time"
 )
 
@@ -24,24 +25,23 @@ type Message struct {
 	Time time.Time
 }
 
-func (msg Message) item() messageSetItem {
-	item := messageSetItem{
-		Offset:  msg.Offset,
-		Message: msg.message(),
-	}
-	item.MessageSize = item.Message.size()
-	return item
-}
-
-func (msg Message) message() message {
+func (msg Message) message(cw *crc32Writer) message {
 	m := message{
 		MagicByte: 1,
 		Key:       msg.Key,
 		Value:     msg.Value,
 		Timestamp: timestamp(msg.Time),
 	}
-	m.CRC = m.crc32()
+	if cw != nil {
+		m.CRC = m.crc32(cw)
+	}
 	return m
+}
+
+const timestampSize = 8
+
+func (msg Message) size() int32 {
+	return 4 + 1 + 1 + sizeofBytes(msg.Key) + sizeofBytes(msg.Value) + timestampSize
 }
 
 type message struct {
@@ -53,27 +53,35 @@ type message struct {
 	Value      []byte
 }
 
-func (m message) crc32() int32 {
-	return int32(crc32OfMessage(m.MagicByte, m.Attributes, m.Timestamp, m.Key, m.Value))
+func (m message) crc32(cw *crc32Writer) int32 {
+	cw.crc32 = 0
+	cw.writeInt8(m.MagicByte)
+	cw.writeInt8(m.Attributes)
+	if m.MagicByte != 0 {
+		cw.writeInt64(m.Timestamp)
+	}
+	cw.writeBytes(m.Key)
+	cw.writeBytes(m.Value)
+	return int32(cw.crc32)
 }
 
 func (m message) size() int32 {
 	size := 4 + 1 + 1 + sizeofBytes(m.Key) + sizeofBytes(m.Value)
 	if m.MagicByte != 0 {
-		size += 8 // Timestamp
+		size += timestampSize
 	}
 	return size
 }
 
-func (m message) writeTo(w *bufio.Writer) {
-	writeInt32(w, m.CRC)
-	writeInt8(w, m.MagicByte)
-	writeInt8(w, m.Attributes)
+func (m message) writeTo(wb *writeBuffer) {
+	wb.writeInt32(m.CRC)
+	wb.writeInt8(m.MagicByte)
+	wb.writeInt8(m.Attributes)
 	if m.MagicByte != 0 {
-		writeInt64(w, m.Timestamp)
+		wb.writeInt64(m.Timestamp)
 	}
-	writeBytes(w, m.Key)
-	writeBytes(w, m.Value)
+	wb.writeBytes(m.Key)
+	wb.writeBytes(m.Value)
 }
 
 type messageSetItem struct {
@@ -86,10 +94,10 @@ func (m messageSetItem) size() int32 {
 	return 8 + 4 + m.Message.size()
 }
 
-func (m messageSetItem) writeTo(w *bufio.Writer) {
-	writeInt64(w, m.Offset)
-	writeInt32(w, m.MessageSize)
-	m.Message.writeTo(w)
+func (m messageSetItem) writeTo(wb *writeBuffer) {
+	wb.writeInt64(m.Offset)
+	wb.writeInt32(m.MessageSize)
+	m.Message.writeTo(wb)
 }
 
 type messageSet []messageSetItem
@@ -101,13 +109,14 @@ func (s messageSet) size() (size int32) {
 	return
 }
 
-func (s messageSet) writeTo(w *bufio.Writer) {
+func (s messageSet) writeTo(wb *writeBuffer) {
 	for _, m := range s {
-		m.writeTo(w)
+		m.writeTo(wb)
 	}
 }
 
 type messageSetReader struct {
+	empty   bool
 	version int
 	v1      messageSetReaderV1
 	v2      messageSetReaderV2
@@ -117,6 +126,9 @@ func (r *messageSetReader) readMessage(min int64,
 	key func(*bufio.Reader, int, int) (int, error),
 	val func(*bufio.Reader, int, int) (int, error),
 ) (offset int64, timestamp int64, headers []Header, err error) {
+	if r.empty {
+		return 0, 0, nil, RequestTimedOut
+	}
 	switch r.version {
 	case 1:
 		return r.v1.readMessage(min, key, val)
@@ -128,6 +140,9 @@ func (r *messageSetReader) readMessage(min int64,
 }
 
 func (r *messageSetReader) remaining() (remain int) {
+	if r.empty {
+		return 0
+	}
 	switch r.version {
 	case 1:
 		return r.v1.remaining()
@@ -139,6 +154,9 @@ func (r *messageSetReader) remaining() (remain int) {
 }
 
 func (r *messageSetReader) discard() (err error) {
+	if r.empty {
+		return nil
+	}
 	switch r.version {
 	case 1:
 		return r.v1.discard()
@@ -227,13 +245,19 @@ func (r *messageSetReaderV1) readMessage(min int64,
 			}
 
 			// read and decompress the contained message set.
-			var decompressed []byte
+			var decompressed bytes.Buffer
+
 			if r.remain, err = readBytesWith(r.reader, r.remain, func(r *bufio.Reader, sz, n int) (remain int, err error) {
-				var value []byte
-				if value, remain, err = readNewBytes(r, sz, n); err != nil {
-					return
-				}
-				decompressed, err = codec.Decode(value)
+				// x4 as a guess that the average compression ratio is near 75%
+				decompressed.Grow(4 * n)
+
+				l := io.LimitedReader{R: r, N: int64(n)}
+				d := codec.NewReader(&l)
+
+				_, err = decompressed.ReadFrom(d)
+				remain = sz - (n - int(l.N))
+
+				d.Close()
 				return
 			}); err != nil {
 				return
@@ -246,13 +270,16 @@ func (r *messageSetReaderV1) readMessage(min int64,
 			// messages at offsets 10-13, then the container message will have
 			// offset 13 and the contained messages will be 0,1,2,3.  the base
 			// offset for the container, then is 13-3=10.
-			if offset, err = extractOffset(offset, decompressed); err != nil {
+			if offset, err = extractOffset(offset, decompressed.Bytes()); err != nil {
 				return
 			}
 
 			r.readerStack = &readerStack{
-				reader: bufio.NewReader(bytes.NewReader(decompressed)),
-				remain: len(decompressed),
+				// Allocate a buffer of size 0, which gets capped at 16 bytes
+				// by the bufio package. We are already reading buffered data
+				// here, no need to reserve another 4KB buffer.
+				reader: bufio.NewReaderSize(&decompressed, 0),
+				remain: decompressed.Len(),
 				base:   offset,
 				parent: r.readerStack,
 			}
@@ -448,33 +475,40 @@ func (r *messageSetReaderV2) readMessage(min int64,
 				r.readerStack = r.parent
 			}
 		}
+
 		if err = r.readHeader(); err != nil {
 			return
 		}
-		code := r.header.compression()
-		var decompressed []byte
-		if code != 0 {
+
+		if code := r.header.compression(); code != 0 {
 			var codec CompressionCodec
 			if codec, err = resolveCodec(code); err != nil {
 				return
 			}
-			batchRemain := int(r.header.length - 49)
+
+			var batchRemain = int(r.header.length - 49)
 			if batchRemain > r.remain {
 				err = errShortRead
 				return
 			}
-			var compressed []byte
-			compressed, r.remain, err = readNewBytes(r.reader, r.remain, batchRemain)
+
+			var decompressed bytes.Buffer
+			decompressed.Grow(4 * batchRemain)
+
+			l := io.LimitedReader{R: r.reader, N: int64(batchRemain)}
+			d := codec.NewReader(&l)
+
+			_, err = decompressed.ReadFrom(d)
+			r.remain = r.remain - (batchRemain - int(l.N))
+			d.Close()
+
 			if err != nil {
-				return
-			}
-			if decompressed, err = codec.Decode(compressed); err != nil {
 				return
 			}
 
 			r.readerStack = &readerStack{
-				reader: bufio.NewReader(bytes.NewReader(decompressed)),
-				remain: len(decompressed),
+				reader: bufio.NewReaderSize(&decompressed, 0),
+				remain: decompressed.Len(),
 				base:   -1, // base is unused here
 				parent: r.readerStack,
 			}

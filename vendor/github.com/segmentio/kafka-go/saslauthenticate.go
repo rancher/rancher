@@ -17,8 +17,8 @@ func (t *saslAuthenticateRequestV0) readFrom(r *bufio.Reader, sz int) (remain in
 	return readBytes(r, sz, &t.Data)
 }
 
-func (t saslAuthenticateRequestV0) writeTo(w *bufio.Writer) {
-	writeBytes(w, t.Data)
+func (t saslAuthenticateRequestV0) writeTo(wb *writeBuffer) {
+	wb.writeBytes(t.Data)
 }
 
 type saslAuthenticateResponseV0 struct {
@@ -34,10 +34,10 @@ func (t saslAuthenticateResponseV0) size() int32 {
 	return sizeofInt16(t.ErrorCode) + sizeofString(t.ErrorMessage) + sizeofBytes(t.Data)
 }
 
-func (t saslAuthenticateResponseV0) writeTo(w *bufio.Writer) {
-	writeInt16(w, t.ErrorCode)
-	writeString(w, t.ErrorMessage)
-	writeBytes(w, t.Data)
+func (t saslAuthenticateResponseV0) writeTo(wb *writeBuffer) {
+	wb.writeInt16(t.ErrorCode)
+	wb.writeString(t.ErrorMessage)
+	wb.writeBytes(t.Data)
 }
 
 func (t *saslAuthenticateResponseV0) readFrom(r *bufio.Reader, sz int) (remain int, err error) {

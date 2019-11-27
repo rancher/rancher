@@ -27,6 +27,9 @@ _testmain.go
 # Emacs
 *~
 
+# VIM
+*.swp
+
 # Goland
 .idea
 

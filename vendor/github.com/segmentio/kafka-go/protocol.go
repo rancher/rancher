@@ -1,7 +1,6 @@
 package kafka
 
 import (
-	"bufio"
 	"encoding/binary"
 	"fmt"
 )
@@ -53,17 +52,17 @@ func (h requestHeader) size() int32 {
 	return 4 + 2 + 2 + 4 + sizeofString(h.ClientID)
 }
 
-func (h requestHeader) writeTo(w *bufio.Writer) {
-	writeInt32(w, h.Size)
-	writeInt16(w, h.ApiKey)
-	writeInt16(w, h.ApiVersion)
-	writeInt32(w, h.CorrelationID)
-	writeString(w, h.ClientID)
+func (h requestHeader) writeTo(wb *writeBuffer) {
+	wb.writeInt32(h.Size)
+	wb.writeInt16(h.ApiKey)
+	wb.writeInt16(h.ApiVersion)
+	wb.writeInt32(h.CorrelationID)
+	wb.writeString(h.ClientID)
 }
 
 type request interface {
 	size() int32
-	writeTo(*bufio.Writer)
+	writable
 }
 
 func makeInt8(b []byte) int8 {

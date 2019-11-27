@@ -2,19 +2,26 @@ package kafka
 
 import (
 	"errors"
+	"io"
 	"sync"
 )
 
-var errUnknownCodec = errors.New("the compression code is invalid or its codec has not been imported")
+const (
+	compressionCodecMask = 0x07
+)
 
-var codecs = make(map[int8]CompressionCodec)
-var codecsMutex sync.RWMutex
+var (
+	errUnknownCodec = errors.New("the compression code is invalid or its codec has not been imported")
+
+	codecs      = make(map[int8]CompressionCodec)
+	codecsMutex sync.RWMutex
+)
 
 // RegisterCompressionCodec registers a compression codec so it can be used by a Writer.
-func RegisterCompressionCodec(codec func() CompressionCodec) {
-	c := codec()
+func RegisterCompressionCodec(codec CompressionCodec) {
+	code := codec.Code()
 	codecsMutex.Lock()
-	codecs[c.Code()] = c
+	codecs[code] = codec
 	codecsMutex.Unlock()
 }
 
@@ -40,12 +47,12 @@ type CompressionCodec interface {
 	// Code returns the compression codec code
 	Code() int8
 
-	// Encode encodes the src data
-	Encode(src []byte) ([]byte, error)
+	// Human-readable name for the codec.
+	Name() string
 
-	// Decode decodes the src data
-	Decode(src []byte) ([]byte, error)
+	// Constructs a new reader which decompresses data from r.
+	NewReader(r io.Reader) io.ReadCloser
+
+	// Constructs a new writer which writes compressed data to w.
+	NewWriter(w io.Writer) io.WriteCloser
 }
-
-const compressionCodecMask int8 = 0x07
-const CompressionNoneCode = 0

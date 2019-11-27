@@ -21,16 +21,16 @@ func (t groupAssignment) size() int32 {
 	return sz + sizeofBytes(t.UserData)
 }
 
-func (t groupAssignment) writeTo(w *bufio.Writer) {
-	writeInt16(w, t.Version)
-	writeInt32(w, int32(len(t.Topics)))
+func (t groupAssignment) writeTo(wb *writeBuffer) {
+	wb.writeInt16(t.Version)
+	wb.writeInt32(int32(len(t.Topics)))
 
 	for topic, partitions := range t.Topics {
-		writeString(w, topic)
-		writeInt32Array(w, partitions)
+		wb.writeString(topic)
+		wb.writeInt32Array(partitions)
 	}
 
-	writeBytes(w, t.UserData)
+	wb.writeBytes(t.UserData)
 }
 
 func (t *groupAssignment) readFrom(r *bufio.Reader, size int) (remain int, err error) {
@@ -57,9 +57,7 @@ func (t *groupAssignment) readFrom(r *bufio.Reader, size int) (remain int, err e
 
 func (t groupAssignment) bytes() []byte {
 	buf := bytes.NewBuffer(nil)
-	w := bufio.NewWriter(buf)
-	t.writeTo(w)
-	w.Flush()
+	t.writeTo(&writeBuffer{w: buf})
 	return buf.Bytes()
 }
 
@@ -78,9 +76,9 @@ func (t syncGroupRequestGroupAssignmentV0) size() int32 {
 		sizeofBytes(t.MemberAssignments)
 }
 
-func (t syncGroupRequestGroupAssignmentV0) writeTo(w *bufio.Writer) {
-	writeString(w, t.MemberID)
-	writeBytes(w, t.MemberAssignments)
+func (t syncGroupRequestGroupAssignmentV0) writeTo(wb *writeBuffer) {
+	wb.writeString(t.MemberID)
+	wb.writeBytes(t.MemberAssignments)
 }
 
 type syncGroupRequestV0 struct {
@@ -103,11 +101,11 @@ func (t syncGroupRequestV0) size() int32 {
 		sizeofArray(len(t.GroupAssignments), func(i int) int32 { return t.GroupAssignments[i].size() })
 }
 
-func (t syncGroupRequestV0) writeTo(w *bufio.Writer) {
-	writeString(w, t.GroupID)
-	writeInt32(w, t.GenerationID)
-	writeString(w, t.MemberID)
-	writeArray(w, len(t.GroupAssignments), func(i int) { t.GroupAssignments[i].writeTo(w) })
+func (t syncGroupRequestV0) writeTo(wb *writeBuffer) {
+	wb.writeString(t.GroupID)
+	wb.writeInt32(t.GenerationID)
+	wb.writeString(t.MemberID)
+	wb.writeArray(len(t.GroupAssignments), func(i int) { t.GroupAssignments[i].writeTo(wb) })
 }
 
 type syncGroupResponseV0 struct {
@@ -125,9 +123,9 @@ func (t syncGroupResponseV0) size() int32 {
 		sizeofBytes(t.MemberAssignments)
 }
 
-func (t syncGroupResponseV0) writeTo(w *bufio.Writer) {
-	writeInt16(w, t.ErrorCode)
-	writeBytes(w, t.MemberAssignments)
+func (t syncGroupResponseV0) writeTo(wb *writeBuffer) {
+	wb.writeInt16(t.ErrorCode)
+	wb.writeBytes(t.MemberAssignments)
 }
 
 func (t *syncGroupResponseV0) readFrom(r *bufio.Reader, sz int) (remain int, err error) {

@@ -19,10 +19,10 @@ func (t heartbeatRequestV0) size() int32 {
 		sizeofString(t.MemberID)
 }
 
-func (t heartbeatRequestV0) writeTo(w *bufio.Writer) {
-	writeString(w, t.GroupID)
-	writeInt32(w, t.GenerationID)
-	writeString(w, t.MemberID)
+func (t heartbeatRequestV0) writeTo(wb *writeBuffer) {
+	wb.writeString(t.GroupID)
+	wb.writeInt32(t.GenerationID)
+	wb.writeString(t.MemberID)
 }
 
 type heartbeatResponseV0 struct {
@@ -34,8 +34,8 @@ func (t heartbeatResponseV0) size() int32 {
 	return sizeofInt16(t.ErrorCode)
 }
 
-func (t heartbeatResponseV0) writeTo(w *bufio.Writer) {
-	writeInt16(w, t.ErrorCode)
+func (t heartbeatResponseV0) writeTo(wb *writeBuffer) {
+	wb.writeInt16(t.ErrorCode)
 }
 
 func (t *heartbeatResponseV0) readFrom(r *bufio.Reader, sz int) (remain int, err error) {
