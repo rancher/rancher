@@ -85,6 +85,11 @@ type BasicDependency struct {
 	ResourceName *string `json:"resourceName,omitempty"`
 }
 
+// CloudError an error response for a resource management request.
+type CloudError struct {
+	Error *ErrorResponse `json:"error,omitempty"`
+}
+
 // CreateOrUpdateByIDFuture an abstraction for monitoring and retrieving the results of a long-running
 // operation.
 type CreateOrUpdateByIDFuture struct {
@@ -662,6 +667,28 @@ type DeploymentValidateResult struct {
 	Error *ManagementErrorWithDetails `json:"error,omitempty"`
 	// Properties - The template deployment properties.
 	Properties *DeploymentPropertiesExtended `json:"properties,omitempty"`
+}
+
+// ErrorAdditionalInfo the resource management error additional info.
+type ErrorAdditionalInfo struct {
+	// Type - READ-ONLY; The additional info type.
+	Type *string `json:"type,omitempty"`
+	// Info - READ-ONLY; The additional info.
+	Info interface{} `json:"info,omitempty"`
+}
+
+// ErrorResponse the resource management error response.
+type ErrorResponse struct {
+	// Code - READ-ONLY; The error code.
+	Code *string `json:"code,omitempty"`
+	// Message - READ-ONLY; The error message.
+	Message *string `json:"message,omitempty"`
+	// Target - READ-ONLY; The error target.
+	Target *string `json:"target,omitempty"`
+	// Details - READ-ONLY; The error details.
+	Details *[]ErrorResponse `json:"details,omitempty"`
+	// AdditionalInfo - READ-ONLY; The error additional info.
+	AdditionalInfo *[]ErrorAdditionalInfo `json:"additionalInfo,omitempty"`
 }
 
 // ExportTemplateRequest export resource group template request parameters.
@@ -1665,6 +1692,16 @@ type TargetResource struct {
 	ResourceName *string `json:"resourceName,omitempty"`
 	// ResourceType - The type of the resource.
 	ResourceType *string `json:"resourceType,omitempty"`
+}
+
+// TemplateHashResult result of the request to calculate template hash. It contains a string of minified
+// template and its hash.
+type TemplateHashResult struct {
+	autorest.Response `json:"-"`
+	// MinifiedTemplate - The minified template string.
+	MinifiedTemplate *string `json:"minifiedTemplate,omitempty"`
+	// TemplateHash - The template hash.
+	TemplateHash *string `json:"templateHash,omitempty"`
 }
 
 // TemplateLink entity representing the reference to the template.
