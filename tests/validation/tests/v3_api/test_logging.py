@@ -2,7 +2,7 @@ import pytest
 import requests
 import base64
 import time
-from .common import random_test_name
+from .common import random_test_name, get_user_client
 from .common import get_user_client_and_cluster
 from .common import create_project_and_ns
 from .common import get_project_client_for_token

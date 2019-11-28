@@ -248,6 +248,9 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+{{if .ExtraEnvs}}
+{{ toYaml .ExtraEnvs | indent 12}}
+{{end}}
           ports:
           - name: http
             containerPort: 80
@@ -272,6 +275,15 @@ spec:
             periodSeconds: 10
             successThreshold: 1
             timeoutSeconds: 1
+{{if .ExtraVolumeMounts}}
+          volumeMounts:
+{{ toYaml .ExtraVolumeMounts | indent 12}}
+{{end}}
+{{if .ExtraVolumes}}
+      volumes:
+{{ toYaml .ExtraVolumes | indent 8}}
+{{end}}
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -595,6 +607,9 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+{{if .ExtraEnvs}}
+{{ toYaml .ExtraEnvs | indent 12}}
+{{end}}
           ports:
           - name: http
             containerPort: 80
@@ -619,6 +634,15 @@ spec:
             periodSeconds: 10
             successThreshold: 1
             timeoutSeconds: 1
+{{if .ExtraVolumeMounts}}
+          volumeMounts:
+{{ toYaml .ExtraVolumeMounts | indent 12}}
+{{end}}
+{{if .ExtraVolumes}}
+      volumes:
+{{ toYaml .ExtraVolumes | indent 8}}
+{{end}}
+
 ---
 apiVersion: apps/v1
 kind: Deployment

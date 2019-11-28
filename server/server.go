@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rancher/rancher/pkg/api/controllers/dynamiclistener"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	"github.com/rancher/rancher/pkg/api/customization/vsphere"
@@ -19,6 +20,7 @@ import (
 	rancherdialer "github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/httpproxy"
 	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"
+	"github.com/rancher/rancher/pkg/metrics"
 	"github.com/rancher/rancher/pkg/pipeline/hooks"
 	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/rancher/pkg/telemetry"
@@ -61,6 +63,12 @@ func Start(ctx context.Context, httpPort, httpsPort int, localClusterEnabled boo
 	if err != nil {
 		return err
 	}
+
+	metricsHandler, err := requests.NewAuthenticationFilter(ctx, scaledContext, metrics.NewMetricsHandler(scaledContext, promhttp.Handler()), sar)
+	if err != nil {
+		return err
+	}
+
 	websocketHandler := websocket.NewWebsocketHandler(authedHandler)
 
 	auditHandler := audit.NewAuditLogFilter(ctx, auditLogWriter, websocketHandler)
@@ -82,6 +90,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, localClusterEnabled boo
 	root.Handle("/v3/settings/cacerts", rawAuthedAPIs).Methods(http.MethodGet)
 	root.Handle("/v3/settings/first-login", rawAuthedAPIs).Methods(http.MethodGet)
 	root.Handle("/v3/settings/ui-pl", rawAuthedAPIs).Methods(http.MethodGet)
+	root.PathPrefix("/metrics").Handler(metricsHandler)
 	root.PathPrefix("/v3").Handler(chainGzip.Handler(auditHandler))
 	root.PathPrefix("/hooks").Handler(webhookHandler)
 	root.PathPrefix("/k8s/clusters/").Handler(auditHandler)

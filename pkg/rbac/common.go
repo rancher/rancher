@@ -1,6 +1,8 @@
 package rbac
 
 import (
+	"crypto/sha256"
+	"encoding/base32"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -66,4 +68,41 @@ func BuildSubjectFromRTB(object interface{}) (rbacv1.Subject, error) {
 		Kind:      kind,
 		Name:      name,
 	}, nil
+}
+
+func GrbCRBName(grb *v3.GlobalRoleBinding) string {
+	return "globaladmin-" + GetGRBTargetKey(grb)
+}
+
+// GetGRBSubject creates and returns a subject that is
+// determined by inspecting the the GRB's target fields
+func GetGRBSubject(grb *v3.GlobalRoleBinding) rbacv1.Subject {
+	kind := "User"
+	name := grb.UserName
+	if grb.ClusterName == "" && grb.GroupPrincipalName != "" {
+		kind = "Group"
+		name = grb.GroupPrincipalName
+	}
+
+	return rbacv1.Subject{
+		Kind:     kind,
+		Name:     name,
+		APIGroup: rbacv1.GroupName,
+	}
+}
+
+// getGRBTargetKey returns a key that uniquely identifies the given GRB's target.
+// If a user is being targeted, then the user's name is returned.
+// Otherwise, the group principal name is converted to a valid user string and
+// is returned.
+func GetGRBTargetKey(grb *v3.GlobalRoleBinding) string {
+	name := grb.UserName
+
+	if name == "" {
+		hasher := sha256.New()
+		hasher.Write([]byte(grb.GroupPrincipalName))
+		sha := base32.StdEncoding.WithPadding(-1).EncodeToString(hasher.Sum(nil))[:10]
+		name = "u-" + strings.ToLower(sha)
+	}
+	return name
 }

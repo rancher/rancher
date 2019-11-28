@@ -33,7 +33,7 @@ var (
 const (
 	errorCreatingNode = "Error creating machine: "
 	nodeDirEnvKey     = "MACHINE_STORAGE_PATH="
-	nodeCmd           = "docker-machine"
+	nodeCmd           = "rancher-machine"
 	ec2TagFlag        = "tags"
 )
 
@@ -197,7 +197,7 @@ func (m *Lifecycle) reportStatus(stdoutReader io.Reader, stderrReader io.Reader,
 		if err != nil {
 			return node, err
 		}
-		logrus.Infof("[node-controller-docker-machine] %v", msg)
+		logrus.Infof("[node-controller-rancher-machine] %v", msg)
 		v3.NodeConditionProvisioned.Message(node, msg)
 		// ignore update errors
 		if newObj, err := m.nodeClient.Update(node); err == nil {
@@ -272,12 +272,12 @@ func deleteNode(nodeDir string, node *v3.Node) error {
 	scanner := bufio.NewScanner(stdoutReader)
 	for scanner.Scan() {
 		msg := scanner.Text()
-		logrus.Infof("[node-controller-docker-machine] %v", msg)
+		logrus.Infof("[node-controller-rancher-machine] %v", msg)
 	}
 	scanner = bufio.NewScanner(stderrReader)
 	for scanner.Scan() {
 		msg := scanner.Text()
-		logrus.Warnf("[node-controller-docker-machine] %v", msg)
+		logrus.Warnf("[node-controller-rancher-machine] %v", msg)
 	}
 
 	return command.Wait()

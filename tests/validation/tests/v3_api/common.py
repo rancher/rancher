@@ -4,6 +4,7 @@ import os
 import random
 import subprocess
 import time
+import pytest
 import requests
 import ast
 import paramiko
@@ -38,6 +39,30 @@ RANCHER_CLEANUP_CLUSTER = \
 env_file = os.path.join(
     os.path.dirname(os.path.realpath(__file__)),
     "rancher_env.config")
+
+TEST_RBAC = ast.literal_eval(os.environ.get('RANCHER_TEST_RBAC', "False"))
+if_test_rbac = pytest.mark.skipif(TEST_RBAC is False, reason='rbac tests are skipped')
+
+CLUSTER_MEMBER = "cluster-member"
+CLUSTER_OWNER  = "cluster-owner"
+PROJECT_MEMBER = "project-member"
+PROJECT_OWNER  = "project-owner"
+PROJECT_READ_ONLY = "read-only"
+
+rbac_data = {
+    "project"   : None,
+    "namespace" : None,
+    "p_unshared" : None,
+    "ns_unshared": None,
+    "wl_unshared": None,
+    "users": {
+        CLUSTER_OWNER    : {},
+        CLUSTER_MEMBER   : {},
+        PROJECT_OWNER    : {},
+        PROJECT_MEMBER   : {},
+        PROJECT_READ_ONLY: {},
+    }
+}
 
 
 def random_str():
@@ -418,6 +443,9 @@ def get_schedulable_nodes(cluster):
     for node in nodes:
         if node.worker:
             schedulable_nodes.append(node)
+        # Including master in list of nodes as master is also schedulable
+        if 'k3s' in cluster.version["gitVersion"] and node.controlPlane:
+            schedulable_nodes.append(node)
     return schedulable_nodes
 
 
@@ -446,6 +474,7 @@ def get_role_nodes(cluster, role):
 
 def validate_ingress(p_client, cluster, workloads, host, path,
                      insecure_redirect=False):
+    time.sleep(10)
     curl_args = " "
     if (insecure_redirect):
         curl_args = " -L --insecure "
@@ -456,9 +485,10 @@ def validate_ingress(p_client, cluster, workloads, host, path,
     for node in nodes:
         host_ip = resolve_node_ip(node)
         url = "http://" + host_ip + path
-        wait_until_ok(url, timeout=300, headers={
-            "Host": host
-        })
+        if not insecure_redirect:
+            wait_until_ok(url, timeout=300, headers={
+                "Host": host
+            })
         cmd = curl_args + " " + url
         validate_http_response(cmd, target_name_list)
 
@@ -964,6 +994,17 @@ def get_user_client_and_cluster():
     return client, cluster
 
 
+def get_global_admin_client_and_cluster():
+    client = get_admin_client()
+    if CLUSTER_NAME == "":
+        clusters = client.list_cluster().data
+    else:
+        clusters = client.list_cluster(name=CLUSTER_NAME).data
+    assert len(clusters) > 0
+    cluster = clusters[0]
+    return client, cluster
+
+
 def validate_cluster_state(client, cluster,
                            check_intermediate_state=True,
                            intermediate_state="provisioning",
@@ -983,6 +1024,15 @@ def validate_cluster_state(client, cluster,
     assert cluster.state == "active"
     wait_for_nodes_to_become_active(client, cluster,
                                     exception_list=nodes_not_in_active_state)
+    timeout = 60
+    start = time.time()
+    while "version" not in cluster.keys():
+        time.sleep(1)
+        cluster = client.reload(cluster)
+        delta = time.time() - start
+        if delta > timeout:
+            msg = "Timeout waiting for K8s version to be synced"
+            raise Exception(msg)
     return cluster
 
 
@@ -1369,3 +1419,83 @@ def get_user_token(user, cattle_auth_url=CATTLE_AUTH_URL):
     }, verify=False)
     print(r.json())
     return r.json()["token"]
+
+
+def rbac_get_user_by_role(role_template_id):
+    if role_template_id in rbac_data["users"].keys():
+        return rbac_data["users"][role_template_id]["user"]
+    return None
+
+
+def rbac_get_user_token_by_role(role_template_id):
+    if role_template_id in rbac_data["users"].keys():
+        return rbac_data["users"][role_template_id]["token"]
+    return None
+
+
+def rbac_get_project():
+    return rbac_data["project"]
+
+
+def rbac_get_namespace():
+    return rbac_data["namespace"]
+
+
+def rbac_get_unshared_project():
+    return rbac_data["p_unshared"]
+
+
+def rbac_get_unshared_ns():
+    return rbac_data["ns_unshared"]
+
+
+def rbac_get_unshared_workload():
+    return rbac_data["wl_unshared"]
+
+
+def rbac_prepare():
+    """this function creates one project, one namespace,and four users with different roles"""
+    admin_client, cluster = get_global_admin_client_and_cluster()
+    create_kubeconfig(cluster)
+    # create a new project in the cluster
+    project, ns = create_project_and_ns(ADMIN_TOKEN, cluster, random_test_name("p-test-rbac"))
+    rbac_data["project"] = project
+    rbac_data["namespace"] = ns
+    # create new users
+    for key in rbac_data["users"]:
+        user1, token1 = create_user(admin_client)
+        rbac_data["users"][key]["user"] = user1
+        rbac_data["users"][key]["token"] = token1
+
+    # assign different role to each user
+    assign_members_to_cluster(admin_client, rbac_data["users"][CLUSTER_OWNER]["user"], cluster, CLUSTER_OWNER)
+    assign_members_to_cluster(admin_client, rbac_data["users"][CLUSTER_MEMBER]["user"], cluster, CLUSTER_MEMBER)
+    assign_members_to_project(admin_client, rbac_data["users"][PROJECT_MEMBER]["user"], project, PROJECT_MEMBER)
+    assign_members_to_project(admin_client, rbac_data["users"][PROJECT_OWNER]["user"], project, PROJECT_OWNER)
+    assign_members_to_project(admin_client, rbac_data["users"][PROJECT_READ_ONLY]["user"], project, PROJECT_READ_ONLY)
+
+    # create another project that none of the above users are assigned to
+    p2, ns2 = create_project_and_ns(ADMIN_TOKEN, cluster, random_test_name("p-unshared"))
+    con = [{"name": "test1",
+            "image": TEST_IMAGE}]
+    name = random_test_name("default")
+    p_client = get_project_client_for_token(p2, ADMIN_TOKEN)
+    workload = p_client.create_workload(name=name, containers=con, namespaceId=ns2.id)
+    validate_workload(p_client, workload, "deployment", ns2.name)
+    rbac_data["p_unshared"] = p2
+    rbac_data["ns_unshared"] = ns2
+    rbac_data["wl_unshared"] = workload
+
+
+def rbac_cleanup():
+    """ remove the project, namespace and users created for the RBAC tests"""
+    client = get_admin_client()
+    for _, value in rbac_data["users"].items():
+        try:
+            client.delete(value["user"])
+        except:
+            pass
+    client.delete(rbac_data["project"])
+    client.delete(rbac_data["wl_unshared"])
+    client.delete(rbac_data["p_unshared"])
+

@@ -6,6 +6,12 @@ replace (
 	git.apache.org/thrift.git => github.com/apache/thrift v0.12.0
 	github.com/Azure/go-autorest => github.com/Azure/go-autorest v12.2.0+incompatible
 	github.com/crewjam/saml => github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde
+
+	github.com/cznic/cc => modernc.org/cc v1.0.0
+	github.com/cznic/golex => modernc.org/golex v1.0.0
+	github.com/cznic/mathutil => modernc.org/mathutil v1.0.0
+	github.com/cznic/strutil => modernc.org/strutil v1.0.0
+	github.com/cznic/xc => modernc.org/xc v1.0.0
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009
 
@@ -53,7 +59,6 @@ require (
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v0.7.3-0.20190808172531-150530564a14
 	github.com/docker/go-connections v0.3.0
-	github.com/docker/machine v0.0.0-20160115011140-7246b2c9650c
 	github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c // indirect
 	github.com/ehazlett/simplelog v0.0.0-20170112055302-9fcd579ee7c6
 	github.com/elazarl/goproxy v0.0.0-20190711103511-473e67f1d7d2 // indirect
@@ -74,21 +79,23 @@ require (
 	github.com/pierrec/lz4 v2.2.6+incompatible // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.1.0
+	github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90
 	github.com/prometheus/common v0.6.0
-	github.com/rancher/kontainer-driver-metadata v0.0.0-20191021164950-6514452b9732
+	github.com/rancher/kontainer-driver-metadata v0.0.0-20191125162457-09a06565759f
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20191104182032-b0a8fe9ff757
-	github.com/rancher/norman v0.0.0-20191118164900-ee09ed505060
+	github.com/rancher/machine v0.15.0-rancher23
+	github.com/rancher/norman v0.0.0-20191126010027-3afadb987c81
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
-	github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6
-	github.com/rancher/rke v0.3.1-0.20191112000344-2006a6171213
-	github.com/rancher/types v0.0.0-20191114201118-5469d35f9511
+	github.com/rancher/remotedialer v0.2.3
+	github.com/rancher/rke v0.3.1-0.20191126021122-58cd00391ca1
+	github.com/rancher/types v0.0.0-20191126014355-31d195f931ec
 	github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect
 	github.com/satori/go.uuid v1.2.0
 	github.com/segmentio/kafka-go v0.0.0-20190411192201-218fd49cff39
 	github.com/sirupsen/logrus v1.4.2
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.4.0
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.21.0
 	github.com/vmihailenco/msgpack v4.0.1+incompatible

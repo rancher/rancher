@@ -13,12 +13,17 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/metrics"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	tpeermanager "github.com/rancher/types/peermanager"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+)
+
+var (
+	all = "_all_"
 )
 
 func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) {
@@ -84,7 +89,11 @@ func (u *userControllersController) sync(key string, cluster *v3.Cluster) (runti
 			return nil, err
 		}
 	}
-	return nil, u.setPeers(nil)
+	if key == all {
+		return nil, u.setPeers(nil)
+	}
+	u.clusters.Controller().Enqueue("", all)
+	return cluster, nil
 }
 
 func (u *userControllersController) setPeers(peers *tpeermanager.Peers) error {
@@ -118,7 +127,13 @@ func (u *userControllersController) peersSync() error {
 		if cluster.DeletionTimestamp != nil || !v3.ClusterConditionProvisioned.IsTrue(cluster) {
 			u.manager.Stop(cluster)
 		} else {
-			if err := u.manager.Start(u.ctx, cluster, u.amOwner(u.peers, cluster)); err != nil {
+			amOwner := u.amOwner(u.peers, cluster)
+			if amOwner {
+				metrics.SetClusterOwner(u.peers.SelfID, cluster.Name)
+			} else {
+				metrics.UnsetClusterOwner(u.peers.SelfID, cluster.Name)
+			}
+			if err := u.manager.Start(u.ctx, cluster, amOwner); err != nil {
 				errs = append(errs, errors.Wrapf(err, "failed to start user controllers for cluster %s", cluster.Name))
 			}
 		}

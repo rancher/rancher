@@ -1,9 +1,9 @@
 import boto3
+import logging
 import os
 import time
-from boto3.exceptions import Boto3Error
-import logging
 
+from boto3.exceptions import Boto3Error
 from .cloud_provider import CloudProviderBase
 from .node import Node
 
@@ -23,6 +23,9 @@ AWS_CICD_INSTANCE_TAG = os.environ.get(
     "AWS_CICD_INSTANCE_TAG", 'rancher-validation')
 AWS_INSTANCE_TYPE = os.environ.get("AWS_INSTANCE_TYPE", 't2.medium')
 AWS_IAM_PROFILE = os.environ.get("AWS_IAM_PROFILE", "")
+
+AWS_AMI = os.environ.get("AWS_AMI", "")
+AWS_USER = os.environ.get("AWS_USER", "ubuntu")
 
 PRIVATE_IMAGES = {
     "rancheros-v1.5.1-docker-native": {
@@ -92,11 +95,14 @@ class AmazonWebServices(CloudProviderBase):
 
         os_version = os_version or self.OS_VERSION
         docker_version = docker_version or self.DOCKER_VERSION
-        if self.DOCKER_INSTALLED.lower() == 'false':
-            image, ssh_user = self._select_ami(os_version)
+        if AWS_AMI:
+            image = AWS_AMI
+            ssh_user = AWS_USER
         else:
-            image, ssh_user = self._select_private_ami(
-                os_version, docker_version)
+            if self.DOCKER_INSTALLED.lower() == 'false':
+                image, ssh_user = self._select_ami(os_version)
+            else:
+                image, ssh_user = self._select_private_ami(os_version, docker_version)
 
         if key_name:
             # if cert private key
@@ -153,6 +159,7 @@ class AmazonWebServices(CloudProviderBase):
             node = self.wait_for_node_state(node)
             node.ready_node()
         return node
+
 
     def create_multiple_nodes(
         self, number_of_nodes, node_name_prefix, os_version=None,

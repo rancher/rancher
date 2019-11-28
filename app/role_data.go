@@ -48,6 +48,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 	rb.addRole("Manage PodSecurityPolicy Templates", "podsecuritypolicytemplates-manage").addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("*")
 	rb.addRole("Manage Cluster Scans", "clusterscans-manage").addRule().apiGroups("management.cattle.io").resources("clusterscans").verbs("*")
 	rb.addRole("Create RKE Templates", "clustertemplates-create").addRule().apiGroups("management.cattle.io").resources("clustertemplates").verbs("create")
+	rb.addRole("View Rancher Metrics", "view-rancher-metrics").addRule().apiGroups("management.cattle.io").resources("ranchermetrics").verbs("get")
 
 	rb.addRole("Admin", "admin").addRule().apiGroups("*").resources("*").verbs("*").
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")

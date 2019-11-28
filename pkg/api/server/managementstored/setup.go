@@ -22,6 +22,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/customization/feature"
 	"github.com/rancher/rancher/pkg/api/customization/globaldns"
 	"github.com/rancher/rancher/pkg/api/customization/globalrole"
+	"github.com/rancher/rancher/pkg/api/customization/globalrolebinding"
 	"github.com/rancher/rancher/pkg/api/customization/kontainerdriver"
 	"github.com/rancher/rancher/pkg/api/customization/logging"
 	"github.com/rancher/rancher/pkg/api/customization/monitor"
@@ -694,7 +695,9 @@ func GlobalRole(schemas *types.Schemas, management *config.ScaledContext) {
 
 func GlobalRoleBindings(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.GlobalRoleBindingType)
-	schema.Store = grbstore.Wrap(schema.Store, management.Management.GlobalRoleBindings("").Controller().Lister())
+	grLister := management.Management.GlobalRoles("").Controller().Lister()
+	schema.Store = grbstore.Wrap(schema.Store, grLister)
+	schema.Validator = globalrolebinding.Validator
 }
 
 func RoleTemplate(schemas *types.Schemas, management *config.ScaledContext) {
@@ -716,6 +719,8 @@ func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 		ServiceOptions:       management.Management.RKEK8sServiceOptions(""),
 		AddonsLister:         management.Management.RKEAddons("").Controller().Lister(),
 		Addons:               management.Management.RKEAddons(""),
+		SettingLister:        management.Management.Settings("").Controller().Lister(),
+		Settings:             management.Management.Settings(""),
 	}
 	handler := kontainerdriver.ActionHandler{
 		KontainerDrivers:      management.Management.KontainerDrivers(""),

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/blang/semver"
 	"github.com/rancher/kontainer-driver-metadata/rke/templates"
+	"github.com/sirupsen/logrus"
 	"os"
 	"strings"
 
@@ -43,9 +44,10 @@ type Data struct {
 }
 
 var (
-	DriverData Data
-	TemplateData  map[string]map[string]string
-	m          = image.Mirror
+	DriverData     Data
+	TemplateData   map[string]map[string]string
+	MissedTemplate map[string][]string
+	m              = image.Mirror
 )
 
 func init() {
@@ -89,6 +91,7 @@ func validateDefaultPresent(versions map[string]string) {
 
 func validateTemplateMatch() {
 	TemplateData = map[string]map[string]string{}
+	MissedTemplate = map[string][]string{}
 	for k8sVersion := range DriverData.K8sVersionRKESystemImages {
 		toMatch, err := semver.Make(k8sVersion[1:])
 		if err != nil {
@@ -117,7 +120,13 @@ func validateTemplateMatch() {
 				}
 			}
 			if matchedKey == "" {
-				panic(fmt.Sprintf("no template found for k8sVersion %s plugin %s", k8sVersion, plugin))
+				if val, ok := MissedTemplate[plugin]; ok {
+					val = append(val, k8sVersion)
+					MissedTemplate[plugin] = val
+				} else {
+					MissedTemplate[plugin] = []string{k8sVersion}
+				}
+				continue
 			}
 			TemplateData[k8sVersion][plugin] = fmt.Sprintf("range=%s key=%s", matchedRange, matchedKey)
 		}
@@ -129,7 +138,6 @@ func GenerateData() {
 		splitStr := strings.SplitN(os.Args[1], "=", 2)
 		if len(splitStr) == 2 {
 			if splitStr[0] == "--write-data" && splitStr[1] == "true" {
-				
 				buf := new(bytes.Buffer)
 				enc := json.NewEncoder(buf)
 				enc.SetEscapeHTML(false)
@@ -139,6 +147,13 @@ func GenerateData() {
 					panic(fmt.Sprintf("error encoding template data %v", err))
 				}
 				fmt.Println(buf.String())
+
+				if len(MissedTemplate) != 0 {
+					logrus.Warnf("found k8s versions without a template")
+					for plugin, data := range MissedTemplate {
+						logrus.Warnf("no %s template for k8sVersions %v \n", plugin, data)
+					}
+				}
 
 				fmt.Println("generating data.json")
 				//todo: zip file

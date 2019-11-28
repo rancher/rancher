@@ -206,10 +206,6 @@ func (m *nodesSyncer) syncLabels(key string, obj *v3.Node) (runtime.Object, erro
 		return nil, nil
 	}
 
-	if obj.Status.NodeConfig == nil {
-		return nil, nil
-	}
-
 	node, err := nodehelper.GetNodeForMachine(obj, m.nodeLister)
 	if err != nil || node == nil {
 		return nil, err
@@ -277,6 +273,10 @@ func (m *nodesSyncer) getNodePlan(node *v3.Node) (v3.RKEConfigNodePlan, error) {
 	}
 
 	if cluster.Status.Driver != v3.ClusterDriverRKE || cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
+		return v3.RKEConfigNodePlan{}, nil
+	}
+
+	if node.Status.NodeConfig == nil {
 		return v3.RKEConfigNodePlan{}, nil
 	}
 

@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/jailer"
+	"github.com/rancher/rancher/pkg/metrics"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/tls"
@@ -102,6 +103,10 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 	// this step needs to happen prior to starting scaled context to ensure
 	// cache works properly
 	features.InitializeFeatures(scaledContext, cfg.Features)
+
+	if os.Getenv("CATTLE_PROMETHEUS_METRICS") == "true" {
+		metrics.Register(ctx, scaledContext)
+	}
 
 	if err := scaledContext.Start(ctx); err != nil {
 		return err
