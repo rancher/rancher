@@ -60,3 +60,22 @@ def verify_smtp_password(crd_client, ns, name, password):
 
 def get_crd_client(admin_mc):
     return CustomObjectsApi(admin_mc.k8s_client)
+
+
+def test_notifier_wechat_apiurl(admin_mc, remove_resource):
+    client = admin_mc.client
+    name = random_str()
+    n = client.create_notifier(
+        clusterId="local",
+        name=name,
+        wechatConfig={"agent": "1111",
+                      "apiUrl": "test.com",
+                      "corp": "corp",
+                      "defaultRecipient": "2",
+                      "recipientType": "party",
+                      "secret": "231"})
+    remove_resource(n)
+    assert n is not None
+    assert (n["wechatConfig"]["apiUrl"]) == "test.com"
+    n = client.update(n, wechatConfig={"apiUrl": "test2.com"})
+    assert (n["wechatConfig"]["apiUrl"]) == "test2.com"
