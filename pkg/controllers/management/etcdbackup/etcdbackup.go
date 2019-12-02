@@ -375,11 +375,17 @@ func GetS3Client(sbc *v3.S3BackupConfig, timeout int) (*minio.Client, error) {
 	}
 	var s3Client = &minio.Client{}
 	var creds *credentials.Credentials
-	var tr = http.DefaultTransport
-	tr.(*http.Transport).DialContext = (&net.Dialer{
-		Timeout:   time.Duration(timeout) * time.Second,
-		KeepAlive: 30 * time.Second,
-	}).DialContext
+	var tr http.RoundTripper = &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   time.Duration(timeout) * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
 	endpoint := sbc.Endpoint
 	// no access credentials, we assume IAM roles
 	if sbc.AccessKey == "" ||
