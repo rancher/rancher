@@ -2,6 +2,7 @@ package cis
 
 import (
 	"fmt"
+	"strings"
 
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -16,15 +17,15 @@ type podHandler struct {
 }
 
 func (ph *podHandler) Sync(key string, pod *corev1.Pod) (runtime.Object, error) {
-	if pod == nil || pod.DeletionTimestamp != nil || pod.Name != DefaultSonobuoyPodName {
+	if pod == nil || pod.DeletionTimestamp != nil || !strings.HasPrefix(pod.Name, v3.DefaultSonobuoyPodName) {
 		return nil, nil
 	}
 	// Check the annotation to see if it's done processing
-	if _, ok := pod.Annotations[SonobuoyCompletionAnnotation]; !ok {
+	if _, ok := pod.Annotations[v3.SonobuoyCompletionAnnotation]; !ok {
 		return nil, nil
 	}
 
-	owner, ok := pod.Annotations[CisHelmChartOwner]
+	owner, ok := pod.Annotations[v3.CisHelmChartOwner]
 	if !ok {
 		return nil, fmt.Errorf("sonobuoy done, but couldn't find owner annotation")
 	}

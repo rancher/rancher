@@ -2,6 +2,7 @@ package cis
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/app/utils"
@@ -24,9 +25,19 @@ type cisScanHandler struct {
 	mgmtCtxTemplateVersionLister v3.CatalogTemplateVersionLister
 	mgmtCtxClusterScanClient     v3.ClusterScanInterface
 	userCtxNSClient              rcorev1.NamespaceInterface
+	userCtxCMLister              rcorev1.ConfigMapLister
 	clusterNamespace             string
 	systemAccountManager         *systemaccount.Manager
 	configMapsClient             rcorev1.ConfigMapInterface
+}
+
+type appInfo struct {
+	appName           string
+	clusterName       string
+	skip              string
+	skipConfigMapName string
+	debugMaster       string
+	debugWorker       string
 }
 
 func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
@@ -41,8 +52,30 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 	}
 	if !v3.ClusterScanConditionCreated.IsTrue(cs) {
 		logrus.Infof("cisScanHandler: Create: deploying helm chart")
+
+		appInfo := &appInfo{
+			appName:     cs.Name,
+			clusterName: cs.Spec.ClusterID,
+		}
+		if cs.Spec.ScanConfig.CisScanConfig != nil {
+			appInfo.skip = strings.Join(cs.Spec.ScanConfig.CisScanConfig.Skip, ",")
+			if cs.Spec.ScanConfig.CisScanConfig.DebugMaster {
+				appInfo.debugMaster = "true"
+			}
+			if cs.Spec.ScanConfig.CisScanConfig.DebugWorker {
+				appInfo.debugWorker = "true"
+			}
+		}
+		// Check if the configmap is populated
+		cm, err := csh.userCtxCMLister.Get(v3.DefaultNamespaceForCis, v3.ConfigMapNameForUserConfig)
+		if err != nil && !kerrors.IsNotFound(err) {
+			return cs, fmt.Errorf("cisScanHandler: Create: error fetching configmap %v: %v", err, v3.ConfigMapNameForUserConfig)
+		}
+		if cm != nil {
+			appInfo.skipConfigMapName = cm.Name
+		}
 		// Deploy the system helm chart
-		if err := csh.deployApp(cs.Spec.ClusterID, cs.Name); err != nil {
+		if err := csh.deployApp(appInfo); err != nil {
 			return cs, fmt.Errorf("cisScanHandler: Create: error deploying app: %v", err)
 		}
 		v3.ClusterScanConditionCreated.True(cs)
@@ -66,7 +99,11 @@ func (csh *cisScanHandler) Remove(cs *v3.ClusterScan) (runtime.Object, error) {
 		}
 	}
 
-	if err := csh.deleteApp(cs.ClusterName, cs.Name); err != nil {
+	appInfo := &appInfo{
+		appName:     cs.Name,
+		clusterName: cs.Spec.ClusterID,
+	}
+	if err := csh.deleteApp(appInfo); err != nil {
 		if !kerrors.IsNotFound(err) {
 			return nil, fmt.Errorf("cisScanHandler: Remove: error deleting app: %v", err)
 		}
@@ -77,9 +114,9 @@ func (csh *cisScanHandler) Remove(cs *v3.ClusterScan) (runtime.Object, error) {
 		return nil, fmt.Errorf("cisScanHandler: Remove: error getting cluster %v", err)
 	}
 
-	if owner, ok := cluster.Annotations[RunCISScanAnnotation]; ok && owner == cs.Name {
+	if owner, ok := cluster.Annotations[v3.RunCisScanAnnotation]; ok && owner == cs.Name {
 		updatedCluster := cluster.DeepCopy()
-		delete(updatedCluster.Annotations, RunCISScanAnnotation)
+		delete(updatedCluster.Annotations, v3.RunCisScanAnnotation)
 		if _, err := csh.mgmtCtxClusterClient.Update(updatedCluster); err != nil {
 			return nil, fmt.Errorf("cisScanHandler: Remove: failed to update cluster about CIS scan completion")
 		}
@@ -92,7 +129,11 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 	if !v3.ClusterScanConditionCompleted.IsUnknown(cs) &&
 		v3.ClusterScanConditionCompleted.IsFalse(cs) {
 		// Delete the system helm chart
-		if err := csh.deleteApp(cs.ClusterName, cs.Name); err != nil {
+		appInfo := &appInfo{
+			appName:     cs.Name,
+			clusterName: cs.Spec.ClusterID,
+		}
+		if err := csh.deleteApp(appInfo); err != nil {
 			return nil, fmt.Errorf("cisScanHandler: Updated: error deleting app: %v", err)
 		}
 
@@ -102,7 +143,7 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 		}
 
 		updatedCluster := cluster.DeepCopy()
-		delete(updatedCluster.Annotations, RunCISScanAnnotation)
+		delete(updatedCluster.Annotations, v3.RunCisScanAnnotation)
 		if _, err := csh.mgmtCtxClusterClient.Update(updatedCluster); err != nil {
 			return nil, fmt.Errorf("cisScanHandler: Updated: failed to update cluster about CIS scan completion")
 		}
@@ -116,35 +157,39 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 	return cs, nil
 }
 
-func (csh *cisScanHandler) deployApp(clusterName, appName string) error {
+func (csh *cisScanHandler) deployApp(appInfo *appInfo) error {
 	appCatalogID := settings.SystemCISBenchmarkCatalogID.Get()
 	err := utils.DetectAppCatalogExistence(appCatalogID, csh.mgmtCtxTemplateVersionLister)
 	if err != nil {
 		return errors.Wrapf(err, "cisScanHandler: deployApp: failed to find cis system catalog %q", appCatalogID)
 	}
-	appDeployProjectID, err := utils.GetSystemProjectID(clusterName, csh.projectLister)
+	appDeployProjectID, err := utils.GetSystemProjectID(appInfo.clusterName, csh.projectLister)
 	if err != nil {
 		return err
 	}
 
-	appProjectName, err := utils.EnsureAppProjectName(csh.userCtxNSClient, appDeployProjectID, clusterName, DefaultNamespaceForCis)
+	appProjectName, err := utils.EnsureAppProjectName(csh.userCtxNSClient, appDeployProjectID, appInfo.clusterName, v3.DefaultNamespaceForCis)
 	if err != nil {
 		return err
 	}
 
-	creator, err := csh.systemAccountManager.GetSystemUser(clusterName)
+	creator, err := csh.systemAccountManager.GetSystemUser(appInfo.clusterName)
 	if err != nil {
 		return err
 	}
 
 	appAnswers := map[string]string{
-		"owner": appName,
+		"owner":             appInfo.appName,
+		"skip":              appInfo.skip,
+		"skipConfigMapName": appInfo.skipConfigMapName,
+		"debugMaster":       appInfo.debugMaster,
+		"debugWorker":       appInfo.debugWorker,
 	}
-
+	logrus.Debugf("appAnswers: %v", appAnswers)
 	app := &projv3.App{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{creatorIDAnno: creator.Name},
-			Name:        appName,
+			Name:        appInfo.appName,
 			Namespace:   appDeployProjectID,
 		},
 		Spec: projv3.AppSpec{
@@ -152,7 +197,7 @@ func (csh *cisScanHandler) deployApp(clusterName, appName string) error {
 			Description:     "Rancher CIS Benchmark",
 			ExternalID:      appCatalogID,
 			ProjectName:     appProjectName,
-			TargetNamespace: DefaultNamespaceForCis,
+			TargetNamespace: v3.DefaultNamespaceForCis,
 		},
 	}
 
@@ -164,8 +209,8 @@ func (csh *cisScanHandler) deployApp(clusterName, appName string) error {
 	return nil
 }
 
-func (csh *cisScanHandler) deleteApp(clusterName, appName string) error {
-	appDeployProjectID, err := utils.GetSystemProjectID(clusterName, csh.projectLister)
+func (csh *cisScanHandler) deleteApp(appInfo *appInfo) error {
+	appDeployProjectID, err := utils.GetSystemProjectID(appInfo.clusterName, csh.projectLister)
 	if err != nil {
 		if !kerrors.IsNotFound(err) {
 			return err
@@ -173,7 +218,7 @@ func (csh *cisScanHandler) deleteApp(clusterName, appName string) error {
 		return nil
 	}
 
-	err = utils.DeleteApp(csh.mgmtCtxAppClient, appDeployProjectID, appName)
+	err = utils.DeleteApp(csh.mgmtCtxAppClient, appDeployProjectID, appInfo.appName)
 	if err != nil {
 		if !kerrors.IsNotFound(err) {
 			return err

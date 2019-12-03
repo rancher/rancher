@@ -8,11 +8,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	ClusterScanTypeCis = "cis"
-)
-
-func NewCISScan(cluster *v3.Cluster) *v3.ClusterScan {
+func NewCisScan(cluster *v3.Cluster, cisScanConfig *v3.CisScanConfig) *v3.ClusterScan {
 	controller := true
 	name := fmt.Sprintf("cis-%v", time.Now().UnixNano())
 	return &v3.ClusterScan{
@@ -30,8 +26,11 @@ func NewCISScan(cluster *v3.Cluster) *v3.ClusterScan {
 			},
 		},
 		Spec: v3.ClusterScanSpec{
-			ScanType:  ClusterScanTypeCis,
+			ScanType:  v3.ClusterScanTypeCis,
 			ClusterID: cluster.Name,
+			ScanConfig: v3.ClusterScanConfig{
+				CisScanConfig: cisScanConfig,
+			},
 		},
 	}
 }

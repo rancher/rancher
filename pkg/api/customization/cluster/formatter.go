@@ -47,7 +47,7 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 			resource.AddAction(request, v3.ClusterActionBackupEtcd)
 			resource.AddAction(request, v3.ClusterActionRestoreFromEtcdBackup)
 		}
-		resource.AddAction(request, v3.ClusterActionRunCISScan)
+		resource.AddAction(request, v3.ClusterActionRunSecurityScan)
 	}
 
 	if err := request.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", request, resource.Values, request.Schema); err == nil {
