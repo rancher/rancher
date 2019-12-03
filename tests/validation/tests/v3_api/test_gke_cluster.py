@@ -7,6 +7,7 @@ GKE_MASTER_VERSION = os.environ.get('RANCHER_GKE_MASTER_VERSION', "")
 
 gkecredential = pytest.mark.skipif(not CREDENTIALS, reason='GKE Credentials '
                                    'not provided, cannot create cluster')
+CUSTOM_INGRESS_DOMAIN = "foo.bar"
 
 
 @gkecredential
@@ -20,6 +21,9 @@ def test_create_gke_cluster():
     print(cluster)
     cluster = validate_cluster(client, cluster, check_intermediate_state=True,
                                skipIngresscheck=True)
+
+    # validate settings are propagated to cluster level api
+    test_cluster_ingress_ip_domain_setting(client, cluster)
 
     cluster_cleanup(client, cluster)
 
@@ -107,3 +111,68 @@ def get_gke_config():
     }
 
     return gkeConfig
+
+
+def test_cluster_ingress_ip_domain_setting(client, cluster):
+
+    # set custom ingress-ip-domain setting
+    ingress_ip_domain = client.by_id_setting('ingress-ip-domain')
+    print(ingress_ip_domain)
+    updated_ingress_ip_domain = client.update_by_id_setting(
+        id='ingress-ip-domain', value=CUSTOM_INGRESS_DOMAIN)
+    assert updated_ingress_ip_domain.value == CUSTOM_INGRESS_DOMAIN
+
+    # create new namespace for ingress custom domain test
+    p, ns = create_project_and_ns(USER_TOKEN, cluster, "testingressdoamin")
+    p_client = get_project_client_for_token(p, USER_TOKEN)
+
+    name = random_str()
+    workload = p_client.create_workload(
+        name=name,
+        namespaceId=ns.id,
+        scale=1,
+        containers=[{
+            'name': 'foo',
+            'image': 'nginx',
+            'ports': [
+                {
+                    'containerPort': 80,
+                    'kind': 'ClusterIP',
+                    'protocol': 'TCP',
+                }
+            ]
+        }])
+    wait_state(p_client, workload, "active")
+
+    name = random_str()
+    ingress = p_client.create_ingress(name=name,
+                                      namespaceId=ns.id,
+                                      rules=[{
+                                          'host': CUSTOM_INGRESS_DOMAIN,
+                                          'paths': [
+                                              {
+                                                  'targetPort': 80,
+                                                  'workloadIds':
+                                                      [workload.id],
+                                              },
+                                          ]},
+                                      ])
+
+    assert len(ingress.rules) == 1
+    assert ingress.rules[0].host == CUSTOM_INGRESS_DOMAIN
+    path = ingress.rules[0].paths[0]
+    assert path.targetPort == 80
+    assert path.workloadIds == [workload.id]
+    assert path.serviceId is None
+
+    # check the ingress generated service
+    obj = wait_state(p_client, ingress, "active")
+    assert len(obj.publicEndpoints) == 1
+    service_id = obj.publicEndpoints[0].serviceId
+    assert service_id != ""
+    time.sleep(5)
+
+    # https://github.com/rancher/rancher/issues/24018
+    ingress_generated_svc = p_client.by_id_service(service_id)
+    assert ingress_generated_svc is not None
+    p_client.delete(ns)
