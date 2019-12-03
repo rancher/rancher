@@ -33,7 +33,7 @@ func (m *Manager) createTemplate(template v3.CatalogTemplate, catalog *v3.Catalo
 	logrus.Debugf("Creating template %s", template.Name)
 	//check label length to ensure template doesn't get created without template versions
 	if len(template.Name) > 63 {
-		return errors.Errorf("%v must be no more than 63 characters", template.Name)
+		return errors.Errorf("failed %v must be no more than 63 characters", template.Name)
 	}
 	createdTemplate, err := m.templateClient.Create(&template)
 	if err != nil {
@@ -46,7 +46,7 @@ func (m *Manager) getTemplateMap(catalogName string, namespace string) (map[stri
 	r, _ := labels.NewRequirement(CatalogNameLabel, selection.Equals, []string{catalogName})
 	templateList, err := m.templateLister.List(namespace, labels.NewSelector().Add(*r))
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to list templates for %v", catalogName)
 	}
 	templateMap := map[string]*v3.CatalogTemplate{}
 	for _, t := range templateList {
@@ -58,7 +58,7 @@ func (m *Manager) getTemplateMap(catalogName string, namespace string) (map[stri
 func (m *Manager) updateTemplate(template *v3.CatalogTemplate, toUpdate v3.CatalogTemplate) error {
 	r, err := labels.NewRequirement(TemplateNameLabel, selection.Equals, []string{template.Name})
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to find template version with label %v for %v", TemplateNameLabel, template.Name)
 	}
 	templateVersions, err := m.templateVersionLister.List(template.Namespace, labels.NewSelector().Add(*r))
 	if err != nil {
@@ -154,11 +154,11 @@ func (m *Manager) getTemplateVersion(templateName string, namespace string) (map
 	//because templates is a cluster resource now so we set namespace to "" when listing it.
 	r, err := labels.NewRequirement(TemplateNameLabel, selection.Equals, []string{templateName})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to find template version with label %v for %v", TemplateNameLabel, templateName)
 	}
 	templateVersions, err := m.templateVersionLister.List(namespace, labels.NewSelector().Add(*r))
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to list template version(s) for %v: ", templateName)
 	}
 	tVersion := map[string]struct{}{}
 	for _, ver := range templateVersions {
@@ -178,8 +178,8 @@ func (m *Manager) createTemplateVersions(catalogName string, versionsSpec []v3.T
 		}
 		//help with garbage collection on delete
 		ownerRef := []metav1.OwnerReference{{
-			Name:       catalogName,
-			APIVersion: "v3",
+			Name:       template.Name,
+			APIVersion: "management.cattle.io/v3",
 			UID:        template.UID,
 			Kind:       template.Kind,
 		}}

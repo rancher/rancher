@@ -43,6 +43,13 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 	var updateErrors []error
 	var createErrors []error
 	var createdTemplates, updatedTemplates, deletedTemplates, failedTemplates int
+
+	if (v3.CatalogConditionRefreshed.IsUnknown(catalog) && !strings.Contains(v3.CatalogConditionRefreshed.GetStatus(catalog), "syncing catalog")) || v3.CatalogConditionRefreshed.IsTrue(catalog) || catalog.Status.Conditions == nil {
+		cmt, err = m.updateCatalogInfo(cmt, catalogType, "sync", true, false)
+		if err != nil {
+			return err
+		}
+	}
 	for chart, metadata := range index.IndexFile.Entries {
 		newHelmVersionCommits[chart] = v3.VersionCommits{
 			Value: map[string]string{},
@@ -135,7 +142,10 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 			v.VersionURLs = version.URLs
 
 			for _, versionSpec := range template.Spec.Versions {
-				v.UpgradeVersionLinks = map[string]string{}
+				// only set UpgradeVersionLinks once and not every loop
+				if v.UpgradeVersionLinks == nil {
+					v.UpgradeVersionLinks = map[string]string{}
+				}
 				if showUpgradeLinks(v.Version, versionSpec.Version) {
 					version := versionSpec.Version
 					v.UpgradeVersionLinks[versionSpec.Version] = fmt.Sprintf("%s-%s", template.Name, version)
@@ -188,10 +198,6 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 			labelMap[split[0]+"-"+projectCatalog.Namespace+"-"+projectCatalog.Name] = projectCatalog.Name
 			newLabels := labels.Merge(template.Labels, labelMap)
 			template.Labels = newLabels
-		}
-		cmt, err = m.updateCatalogInfo(cmt, catalogType, template.Name, true, false)
-		if err != nil {
-			return err
 		}
 
 		catalog = cmt.catalog
@@ -258,20 +264,19 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 	*/
 	v3.CatalogConditionUpgraded.True(catalog)
 	v3.CatalogConditionDiskCached.True(catalog)
-	cmt.catalog = catalog
-	cmt.projectCatalog = projectCatalog
-	cmt.clusterCatalog = clusterCatalog
+	var errstrings []string
 	if len(createErrors) > 0 {
-		if _, err := m.updateCatalogInfo(cmt, catalogType, "", true, false); err != nil {
-			return err
-		}
-		return errors.Errorf("failed to create templates. Multiple error occurred: %v", createErrors)
+		errstrings = append(errstrings, fmt.Sprintf("failed to create templates. Multiple error(s) occured: %v", createErrors))
 	}
 	if len(updateErrors) > 0 {
+		errstrings = append(errstrings, fmt.Sprintf("failed to update templates. Multiple error(s) occurred: %v", updateErrors))
+	}
+	if len(errstrings) > 0 {
+		setCatalogErrorState(cmt, catalog, projectCatalog, clusterCatalog)
 		if _, err := m.updateCatalogInfo(cmt, catalogType, "", false, true); err != nil {
 			return err
 		}
-		return errors.Errorf("failed to update templates. Multiple error occurred: %v", updateErrors)
+		return errors.Errorf(strings.Join(errstrings, ";"))
 	}
 	var finalError error
 	if len(errs) > 0 {
@@ -303,4 +308,12 @@ type catalogYml struct {
 	Categories []string          `yaml:"categories,omitempty"`
 	Namespace  string            `yaml:"namespace,omitempty"`
 	Labels     map[string]string `yaml:"labels,omitempty"`
+}
+
+func setCatalogErrorState(cmt *CatalogInfo, catalog *v3.Catalog, projectCatalog *v3.ProjectCatalog, clusterCatalog *v3.ClusterCatalog) {
+	v3.CatalogConditionRefreshed.False(catalog)
+	v3.CatalogConditionRefreshed.Message(catalog, fmt.Sprintf("Error syncing catalog %v", catalog.Name))
+	cmt.catalog = catalog
+	cmt.projectCatalog = projectCatalog
+	cmt.clusterCatalog = clusterCatalog
 }

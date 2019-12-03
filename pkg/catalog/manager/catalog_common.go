@@ -104,7 +104,7 @@ func (m *Manager) updateCatalogInfo(cmt *CatalogInfo, catalogType string, templa
 		}
 		v3.CatalogConditionRefreshed.Unknown(obj)
 		if templateName != "" {
-			v3.CatalogConditionRefreshed.Message(obj, fmt.Sprintf("syncing template %v", templateName))
+			v3.CatalogConditionRefreshed.Message(obj, fmt.Sprintf("syncing catalog %v", cmt.catalog.Name))
 		} else {
 			v3.CatalogConditionRefreshed.Message(obj, fmt.Sprintf(""))
 		}
