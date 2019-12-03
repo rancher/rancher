@@ -122,4 +122,17 @@ var FilterTemplate = `
   </record>
 </filter>
 {{end}}
+
+{{define "filter-json"}}
+{{- if .EnableJSONParsing}}
+<filter {{ .ContainerLogSourceTag}}.**>
+  @type parser
+  key_name log
+  reserve_data true
+  <parse>
+    @type json
+  </parse>
+</filter>
+{{end}}
+{{end}}
 `

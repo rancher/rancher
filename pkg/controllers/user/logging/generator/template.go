@@ -13,6 +13,7 @@ var Template = `
 {{- template "filter-prometheus" . -}}
 {{- template "filter-exclude-system-component" . -}}
 {{- template "filter-sumo" . -}}
+{{- template "filter-json" . -}}
 {{- template "match" . -}}
 {{end}}
 
@@ -28,6 +29,7 @@ var Template = `
 {{- template "filter-custom-tags" $store -}}
 {{- template "filter-prometheus" $store -}}
 {{- template "filter-sumo" $store -}}
+{{- template "filter-json" $store -}}
 {{- template "match" $store -}}
 {{end}}
 {{end}}
