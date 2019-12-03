@@ -5,6 +5,7 @@ const (
 	ProjectLoggingSpecFieldCustomTargetConfig    = "customTargetConfig"
 	ProjectLoggingSpecFieldDisplayName           = "displayName"
 	ProjectLoggingSpecFieldElasticsearchConfig   = "elasticsearchConfig"
+	ProjectLoggingSpecFieldEnableJSONParsing     = "enableJSONParsing"
 	ProjectLoggingSpecFieldFluentForwarderConfig = "fluentForwarderConfig"
 	ProjectLoggingSpecFieldKafkaConfig           = "kafkaConfig"
 	ProjectLoggingSpecFieldOutputFlushInterval   = "outputFlushInterval"
@@ -18,6 +19,7 @@ type ProjectLoggingSpec struct {
 	CustomTargetConfig    *CustomTargetConfig    `json:"customTargetConfig,omitempty" yaml:"customTargetConfig,omitempty"`
 	DisplayName           string                 `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	ElasticsearchConfig   *ElasticsearchConfig   `json:"elasticsearchConfig,omitempty" yaml:"elasticsearchConfig,omitempty"`
+	EnableJSONParsing     bool                   `json:"enableJSONParsing,omitempty" yaml:"enableJSONParsing,omitempty"`
 	FluentForwarderConfig *FluentForwarderConfig `json:"fluentForwarderConfig,omitempty" yaml:"fluentForwarderConfig,omitempty"`
 	KafkaConfig           *KafkaConfig           `json:"kafkaConfig,omitempty" yaml:"kafkaConfig,omitempty"`
 	OutputFlushInterval   int64                  `json:"outputFlushInterval,omitempty" yaml:"outputFlushInterval,omitempty"`
