@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/rancher/pkg/settings"
@@ -24,7 +25,32 @@ var (
 )
 
 func Content() http.Handler {
-	return http.FileServer(http.Dir(settings.UIPath.Get()))
+	return http.FileServer(neuteredFileSystem{http.Dir(settings.UIPath.Get())})
+}
+
+type neuteredFileSystem struct {
+	fs http.FileSystem
+}
+
+func (nfs neuteredFileSystem) Open(path string) (http.File, error) {
+	f, err := nfs.fs.Open(path)
+	if err != nil {
+		return nil, err
+	}
+
+	s, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+
+	if s.IsDir() {
+		index := strings.TrimSuffix(path, "/") + "/index.html"
+		if _, err := nfs.fs.Open(index); err != nil {
+			return nil, err
+		}
+	}
+
+	return f, nil
 }
 
 func UI(next http.Handler) http.Handler {
