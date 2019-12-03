@@ -1,0 +1,422 @@
+---
+controls:
+id: 1
+text: "Master Checks"
+type: "master"
+groups:
+- id: 1.1
+  text: "Kube-apiserver"
+  checks:
+    - id: 0
+      text: "flag is set"
+      tests:
+        test_items:
+          - flag: "--allow-privileged"
+            set: true
+
+    - id: 1
+      text: "flag is not set"
+      tests:
+        test_items:
+          - flag: "--basic-auth"
+            set: false
+
+    - id: 2
+      text: "flag value is set to some value"
+      tests:
+        test_items:
+          - flag: "--insecure-port"
+            compare:
+              op: eq
+              value: 0
+            set: true
+
+    - id: 3
+      text: "flag value is greater than or equal some number"
+      tests:
+        test_items:
+          - flag: "--audit-log-maxage"
+            compare:
+              op: gte
+              value: 30
+            set: true
+
+    - id: 4
+      text: "flag value is less than some number"
+      tests:
+        test_items:
+          - flag: "--max-backlog"
+            compare:
+              op: lt
+              value: 30
+            set: true
+
+    - id: 5
+      text: "flag value does not have some value"
+      tests:
+        test_items:
+          - flag: "--admission-control"
+            compare:
+              op: nothave
+              value: AlwaysAdmit
+            set: true
+
+    - id: 6
+      text: "test AND binary operation"
+      tests:
+        bin_op: and
+        test_items:
+        - flag: "--kubelet-client-certificate"
+          set: true
+        - flag: "--kubelet-clientkey"
+          set: true
+
+    - id: 7
+      text: "test OR binary operation"
+      tests:
+        bin_op: or
+        test_items:
+          - flag:  "--secure-port"
+            compare:
+              op: eq
+              value: 0
+            set: true
+          -
+            flag: "--secure-port"
+            set: false
+
+    - id: 8
+      text: "test flag with arbitrary text"
+      tests:
+        test_items:
+        - flag: "644"
+          compare:
+            op: eq
+            value: "644"
+          set: true
+
+    - id: 9
+      text: "test permissions"
+      audit: "/bin/sh -c 'if test -e $config; then stat -c %a $config; fi'"
+      tests:
+        bin_op: or
+        test_items:
+        - flag: "644"
+          compare:
+            op: eq
+            value: "644"
+          set: true
+        - flag: "640"
+          compare:
+            op: eq
+            value: "640"
+          set: true
+        - flag: "600"
+          compare:
+            op: eq
+            value: "600"
+          set: true
+
+    - id: 10
+      text: "flag value includes some value in a comma-separated list, value is last in list"
+      tests:
+        test_items:
+          - flag: "--admission-control"
+            compare:
+              op: has
+              value: RBAC
+            set: true
+
+    - id: 11
+      text: "flag value includes some value in a comma-separated list, value is first in list"
+      tests:
+        test_items:
+          - flag: "--admission-control"
+            compare:
+              op: has
+              value: WebHook
+            set: true
+
+    - id: 12
+      text: "flag value includes some value in a comma-separated list, value middle of list"
+      tests:
+        test_items:
+          - flag: "--admission-control"
+            compare:
+              op: has
+              value: Something
+            set: true
+
+    - id: 13
+      text: "flag value includes some value in a comma-separated list, value only one in list"
+      tests:
+        test_items:
+          - flag: "--admission-control"
+            compare:
+              op: has
+              value: Something
+            set: true
+
+    - id: 14
+      text: "check that flag some-arg is set to some-val with ':' separator"
+      tests:
+        test_items:
+          - flag: "some-arg"
+            compare:
+              op: eq
+              value: some-val
+            set: true
+            
+    - id: 15
+      text: "jsonpath correct value on field"
+      tests:
+        test_items:
+          - path: "{.readOnlyPort}"
+            compare:
+              op: eq
+              value: 15000
+            set: true
+          - path: "{.readOnlyPort}"
+            compare:
+              op: gte
+              value: 15000
+            set: true
+          - path: "{.readOnlyPort}"
+            compare:
+              op: lte
+              value: 15000
+            set: true
+
+    - id: 16
+      text: "jsonpath correct case-sensitive value on string field"
+      tests:
+        test_items:
+          - path: "{.stringValue}"
+            compare:
+              op: noteq
+              value: "None"
+            set: true
+          - path: "{.stringValue}"
+            compare:
+              op: noteq
+              value: "webhook,Something,RBAC"
+            set: true
+          - path: "{.stringValue}"
+            compare:
+              op: eq
+              value: "WebHook,Something,RBAC"
+            set: true
+
+    - id: 17
+      text: "jsonpath correct value on boolean field"
+      tests:
+        test_items:
+          - path: "{.trueValue}"
+            compare:
+              op: noteq
+              value: somethingElse
+            set: true
+          - path: "{.trueValue}"
+            compare:
+              op: noteq
+              value: false
+            set: true
+          - path: "{.trueValue}"
+            compare:
+              op: eq
+              value: true
+            set: true
+
+    - id: 18
+      text: "jsonpath field absent"
+      tests:
+        test_items:
+          - path: "{.notARealField}"
+            set: false
+
+    - id: 19
+      text: "jsonpath correct value on nested field"
+      tests:
+        test_items:
+          - path: "{.authentication.anonymous.enabled}"
+            compare:
+              op: eq
+              value: "false"
+            set: true
+
+    - id: 20
+      text: "yamlpath correct value on field"
+      tests:
+        test_items:
+          - path: "{.readOnlyPort}"
+            compare:
+              op: gt
+              value: 14999
+            set: true
+
+    - id: 21
+      text: "yamlpath field absent"
+      tests:
+        test_items:
+          - path: "{.fieldThatIsUnset}"
+            set: false
+
+    - id: 22
+      text: "yamlpath correct value on nested field"
+      tests:
+        test_items:
+          - path: "{.authentication.anonymous.enabled}"
+            compare:
+              op: eq
+              value: "false"
+            set: true
+
+    - id: 23
+      text: "path on invalid json"
+      tests:
+        test_items:
+          - path: "{.authentication.anonymous.enabled}"
+            compare:
+              op: eq
+              value: "false"
+            set: true
+
+    - id: 24
+      text: "path with broken expression"
+      tests:
+        test_items:
+          - path: "{.missingClosingBrace"
+            set: true
+
+    - id: 25
+      text: "yamlpath on invalid yaml"
+      tests:
+        test_items:
+          - path: "{.authentication.anonymous.enabled}"
+            compare:
+              op: eq
+              value: "false"
+            set: true
+
+    - id: 26
+      text: "check regex op matches"
+      tests:
+        test_items:
+          - path: "{.currentMasterVersion}"
+            compare:
+              op: regex
+              value: '^1\.12.*$'
+            set: true
+
+- id: 2.1
+  text: "audit and audit_config commands"
+  checks:
+    - id: 0
+      text: "audit finds flag and passes, audit_config doesn't exist -> pass"
+      audit: "echo flag=correct"
+      tests:
+        test_items:
+          - flag: "flag"
+            compare:
+              op: eq
+              value: "correct"
+            set: true
+      scored: true
+    - id: 1
+      text: "audit finds flag and fails, audit_config doesn't exist -> fail"
+      audit: "echo flag=wrong"
+      tests:
+        test_items:
+          - flag: "flag"
+            compare:
+              op: eq
+              value: "correct"
+            set: true
+      scored: true
+    - id: 2
+      text: "audit doesn't find flag, audit_config doesn't exist -> fail"
+      audit: "echo somethingElse=correct"
+      tests:
+        test_items:
+          - flag: "flag"
+            compare:
+              op: eq
+              value: "correct"
+            set: true
+      scored: true
+    - id: 3
+      text: "audit doesn't find flag, audit_config has correct setting -> pass"
+      audit: "echo somethingElse=correct"
+      audit_config: "echo 'flag: correct'"
+      tests:
+        test_items:
+          - flag: "flag"
+            path: "{.flag}"
+            compare:
+              op: eq
+              value: "correct"
+            set: true
+      scored: true
+    - id: 4
+      text: "audit doesn't find flag, audit_config has wrong setting -> fail"
+      audit: "echo somethingElse=correct"
+      audit_config: "echo 'flag: wrong'"
+      tests:
+        test_items:
+          - flag: "flag"
+            path: "{.flag}"
+            compare:
+              op: eq
+              value: "correct"
+            set: true
+      scored: true
+    - id: 5
+      text: "audit finds correct flag, audit_config has wrong setting -> pass"
+      audit: "echo flag=correct"
+      audit_config: "echo 'flag: wrong'"
+      tests:
+        test_items:
+          - flag: "flag"
+            path: "{.flag}"
+            compare:
+              op: eq
+              value: "correct"
+            set: true
+      scored: true
+    - id: 6
+      text: "neither audit nor audit_config has correct setting -> fail"
+      audit: "echo flag=wrong"
+      audit_config: "echo 'flag: wrong'"
+      tests:
+        test_items:
+          - flag: "flag"
+            path: "{.flag}"
+            compare:
+              op: eq
+              value: "correct"
+            set: true
+      scored: true
+    - id: 7
+      text: "audit isn't present, superfluous flag field,audit_config is correct -> pass"
+      audit_config: "echo 'flag: correct'"
+      tests:
+        test_items:
+          - flag: "flag"
+            path: "{.flag}"
+            compare:
+              op: eq
+              value: "correct"
+            set: true
+      scored: true
+    - id: 8
+      text: "audit isn't present, superfluous flag field,audit_config is wrong -> fail"
+      audit_config: "echo 'flag: wrong'"
+      tests:
+        test_items:
+          - flag: "flag"
+            path: "{.flag}"
+            compare:
+              op: eq
+              value: "correct"
+            set: true
+      scored: true

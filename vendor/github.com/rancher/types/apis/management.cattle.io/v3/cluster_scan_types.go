@@ -11,9 +11,28 @@ import (
 const (
 	ClusterScanConditionCreated   condition.Cond = "Created"
 	ClusterScanConditionCompleted condition.Cond = "Completed"
+
+	ClusterScanTypeCis         = "cis"
+	DefaultNamespaceForCis     = "security-scan"
+	DefaultSonobuoyPodName     = "security-scan-runner"
+	ConfigMapNameForUserConfig = "security-scan-cfg"
+
+	RunCisScanAnnotation         = "field.cattle.io/runCisScan"
+	SonobuoyCompletionAnnotation = "field.cattle.io/sonobuoyDone"
+	CisHelmChartOwner            = "field.cattle.io/clusterScanOwner"
 )
 
+type CisScanConfig struct {
+	// IDs of the checks that need to be skipped in the final report
+	Skip []string `json:"skip"`
+	// Internal flag for debugging master component of the scan
+	DebugMaster bool `json:"debugMaster"`
+	// Internal flag for debugging worker component of the scan
+	DebugWorker bool `json:"debugWorker"`
+}
+
 type ClusterScanConfig struct {
+	CisScanConfig *CisScanConfig `json:"cisScanConfig"`
 }
 
 type ClusterScanCondition struct {
