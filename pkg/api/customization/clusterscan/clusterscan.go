@@ -1,7 +1,6 @@
 package clusterscan
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -9,11 +8,15 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	"github.com/rancher/rancher/pkg/controllers/user/cis"
 	"github.com/rancher/rancher/pkg/ref"
+	"github.com/rancher/security-scan/pkg/kb-summarizer/report"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	ScanOutputFileName = "output.json"
 )
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
@@ -45,12 +48,12 @@ func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 		return err
 	}
 
-	cm, err := clusterContext.Core.ConfigMaps(cis.DefaultNamespaceForCis).Get(clusterScanID, metav1.GetOptions{})
+	cm, err := clusterContext.Core.ConfigMaps(mgmtv3.DefaultNamespaceForCis).Get(clusterScanID, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 
-	reportJSON, err := json.Marshal(cm.Data["report.json"])
+	reportJSON, err := report.Generate([]byte(cm.Data[ScanOutputFileName]))
 	if err != nil {
 		return err
 	}

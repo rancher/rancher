@@ -3,6 +3,8 @@ package cis
 import (
 	"context"
 
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -20,14 +22,15 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 	mgmtContext := userContext.Management
 
 	userNSClient := userContext.Core.Namespaces(metav1.NamespaceAll)
+	userCtxCMLister := userContext.Core.ConfigMaps(metav1.NamespaceAll).Controller().Lister()
 	mgmtAppClient := mgmtContext.Project.Apps(metav1.NamespaceAll)
 	mgmtTemplateVersionLister := mgmtContext.Management.CatalogTemplateVersions(metav1.NamespaceAll).Controller().Lister()
 	systemAccountManager := systemaccount.NewManager(mgmtContext)
 
 	mgmtClusterClient := mgmtContext.Management.Clusters(metav1.NamespaceAll)
 	mgmtClusterScanClient := mgmtContext.Management.ClusterScans(clusterName)
-	pods := userContext.Core.Pods(DefaultNamespaceForCis)
-	configMapsClient := userContext.Core.ConfigMaps(DefaultNamespaceForCis)
+	pods := userContext.Core.Pods(v3.DefaultNamespaceForCis)
+	configMapsClient := userContext.Core.ConfigMaps(v3.DefaultNamespaceForCis)
 
 	podHandler := &podHandler{
 		mgmtClusterScanClient,
@@ -41,6 +44,7 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 		systemAccountManager:         systemAccountManager,
 		clusterNamespace:             userContext.ClusterName,
 		userCtxNSClient:              userNSClient,
+		userCtxCMLister:              userCtxCMLister,
 		clusterLister:                clusterLister,
 		projectLister:                projectLister,
 		configMapsClient:             configMapsClient,

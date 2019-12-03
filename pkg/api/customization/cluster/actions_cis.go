@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -22,9 +24,20 @@ const (
 	RetryIntervalInMilliseconds     = 5
 )
 
-func (a ActionHandler) runCISScan(actionName string, action *types.Action, apiContext *types.APIContext) error {
+func (a ActionHandler) runCisScan(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	var clusterForAccessCheck mgmtclient.Cluster
 	var err error
+
+	data, err := ioutil.ReadAll(apiContext.Request.Body)
+	if err != nil {
+		return errors.Wrap(err, "reading request body error")
+	}
+
+	cisScanConfig := &v3.CisScanConfig{}
+	if err = json.Unmarshal(data, cisScanConfig); err != nil {
+		return errors.Wrap(err, "unmarshaling input error")
+	}
+
 	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &clusterForAccessCheck); err != nil {
 		return httperror.NewAPIError(httperror.NotFound,
 			fmt.Sprintf("failed to get cluster by id %v", apiContext.ID))
@@ -44,12 +57,12 @@ func (a ActionHandler) runCISScan(actionName string, action *types.Action, apiCo
 		return httperror.WrapAPIError(err, httperror.ClusterUnavailable,
 			fmt.Sprintf("cluster not ready"))
 	}
-	if _, ok := cluster.Annotations[cis.RunCISScanAnnotation]; ok {
+	if _, ok := cluster.Annotations[v3.RunCisScanAnnotation]; ok {
 		return httperror.WrapAPIError(err, httperror.Conflict,
 			fmt.Sprintf("CIS scan already running on cluster"))
 	}
 
-	newCisScan := cis.NewCISScan(cluster)
+	newCisScan := cis.NewCisScan(cluster, cisScanConfig)
 	cisScan, err := a.ClusterScanClient.Create(newCisScan)
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.ServerError,
@@ -57,7 +70,7 @@ func (a ActionHandler) runCISScan(actionName string, action *types.Action, apiCo
 	}
 
 	updatedCluster := cluster.DeepCopy()
-	updatedCluster.Annotations[cis.RunCISScanAnnotation] = cisScan.Name
+	updatedCluster.Annotations[v3.RunCisScanAnnotation] = cisScan.Name
 
 	// Can't add either too many retries or longer interval as this an API handler
 	for i := 0; i < NumberOfRetriesForClusterUpdate; i++ {
@@ -72,7 +85,7 @@ func (a ActionHandler) runCISScan(actionName string, action *types.Action, apiCo
 			continue
 		}
 		updatedCluster = cluster.DeepCopy()
-		updatedCluster.Annotations[cis.RunCISScanAnnotation] = cisScan.Name
+		updatedCluster.Annotations[v3.RunCisScanAnnotation] = cisScan.Name
 	}
 	if err != nil {
 		return httperror.WrapAPIError(err, httperror.ServerError, "failed to update cluster annotation for cis scan")
