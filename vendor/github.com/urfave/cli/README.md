@@ -3,15 +3,11 @@ cli
 
 [![Build Status](https://travis-ci.org/urfave/cli.svg?branch=master)](https://travis-ci.org/urfave/cli)
 [![Windows Build Status](https://ci.appveyor.com/api/projects/status/rtgk5xufi932pb2v?svg=true)](https://ci.appveyor.com/project/urfave/cli)
+
 [![GoDoc](https://godoc.org/github.com/urfave/cli?status.svg)](https://godoc.org/github.com/urfave/cli)
 [![codebeat](https://codebeat.co/badges/0a8f30aa-f975-404b-b878-5fab3ae1cc5f)](https://codebeat.co/projects/github-com-urfave-cli)
 [![Go Report Card](https://goreportcard.com/badge/urfave/cli)](https://goreportcard.com/report/urfave/cli)
-[![top level coverage](https://gocover.io/_badge/github.com/urfave/cli?0 "top level coverage")](http://gocover.io/github.com/urfave/cli) /
-[![altsrc coverage](https://gocover.io/_badge/github.com/urfave/cli/altsrc?0 "altsrc coverage")](http://gocover.io/github.com/urfave/cli/altsrc)
-
-This is the library formerly known as `github.com/codegangsta/cli` -- Github
-will automatically redirect requests to this repository, but we recommend
-updating your references for clarity.
+[![codecov](https://codecov.io/gh/urfave/cli/branch/master/graph/badge.svg)](https://codecov.io/gh/urfave/cli)
 
 cli is a simple, fast, and fun package for building command line apps in Go. The
 goal is to enable developers to write fast and distributable command line
@@ -23,7 +19,7 @@ applications in an expressive way.
 - [Installation](#installation)
   * [Supported platforms](#supported-platforms)
   * [Using the `v2` branch](#using-the-v2-branch)
-  * [Pinning to the `v1` releases](#pinning-to-the-v1-releases)
+  * [Using `v1` releases](#using-v1-releases)
 - [Getting Started](#getting-started)
 - [Examples](#examples)
   * [Arguments](#arguments)
@@ -38,6 +34,7 @@ applications in an expressive way.
   * [Subcommands](#subcommands)
   * [Subcommands categories](#subcommands-categories)
   * [Exit code](#exit-code)
+  * [Combining short options](#combining-short-options)
   * [Bash Completion](#bash-completion)
     + [Enabling](#enabling)
     + [Distribution](#distribution)
@@ -47,7 +44,6 @@ applications in an expressive way.
   * [Version Flag](#version-flag)
     + [Customization](#customization-2)
     + [Full API Example](#full-api-example)
-  * [Combining short Bool options](#combining-short-bool-options)
 - [Contribution Guidelines](#contribution-guidelines)
 
 <!-- tocstop -->
@@ -64,7 +60,7 @@ organized, and expressive!
 
 ## Installation
 
-Make sure you have a working Go environment.  Go version 1.2+ is supported.  [See
+Make sure you have a working Go environment.  Go version 1.10+ is supported.  [See
 the install instructions for Go](http://golang.org/doc/install.html).
 
 To install cli, simply run:
@@ -108,25 +104,20 @@ import (
 ...
 ```
 
-### Pinning to the `v1` releases
-
-Similarly to the section above describing use of the `v2` branch, if one wants
-to avoid any unexpected compatibility pains once `v2` becomes `master`, then
-pinning to `v1` is an acceptable option, e.g.:
+### Using `v1` releases
 
 ```
-$ go get gopkg.in/urfave/cli.v1
+$ go get github.com/urfave/cli
 ```
 
-``` go
+```go
 ...
 import (
-  "gopkg.in/urfave/cli.v1" // imports as package "cli"
+  "github.com/urfave/cli"
 )
 ...
 ```
 
-This will pull the latest tagged `v1` release (e.g. `v1.18.1` at the time of writing).
 
 ## Getting Started
 
@@ -679,6 +670,7 @@ from other file input sources.
 
 Currently supported input source formats:
 * YAML
+* JSON
 * TOML
 
 In order to get values for a flag from an alternate input source the following
@@ -701,7 +693,7 @@ the yaml input source for any flags that are defined on that command.  As a note
 the "load" flag used would also have to be defined on the command flags in order
 for this code snipped to work.
 
-Currently only YAML and JSON files are supported but developers can add support
+Currently only YAML, JSON, and TOML files are supported but developers can add support
 for other input sources by implementing the altsrc.InputSourceContext for their
 given sources.
 
@@ -887,7 +879,9 @@ Calling `App.Run` will not automatically call `os.Exit`, which means that by
 default the exit code will "fall through" to being `0`.  An explicit exit code
 may be set by returning a non-nil error that fulfills `cli.ExitCoder`, *or* a
 `cli.MultiError` that includes an error that fulfills `cli.ExitCoder`, e.g.:
-
+<!-- {
+  "error": "Ginger croutons are not in the soup"
+} -->
 ``` go
 package main
 
@@ -901,14 +895,14 @@ import (
 func main() {
   app := cli.NewApp()
   app.Flags = []cli.Flag{
-    cli.BoolTFlag{
+    cli.BoolFlag{
       Name:  "ginger-crouton",
-      Usage: "is it in the soup?",
+      Usage: "Add ginger croutons to the soup",
     },
   }
   app.Action = func(ctx *cli.Context) error {
     if !ctx.Bool("ginger-crouton") {
-      return cli.NewExitError("it is not in the soup", 86)
+      return cli.NewExitError("Ginger croutons are not in the soup", 86)
     }
     return nil
   }
@@ -919,6 +913,76 @@ func main() {
   }
 }
 ```
+
+### Combining short options
+
+Traditional use of options using their shortnames look like this:
+
+```
+$ cmd -s -o -m "Some message"
+```
+
+Suppose you want users to be able to combine options with their shortnames. This
+can be done using the `UseShortOptionHandling` bool in your app configuration,
+or for individual commands by attaching it to the command configuration. For
+example:
+
+<!-- {
+  "args": ["short", "&#45;som", "Some message"],
+  "output": "serve: true\noption: true\nmessage: Some message\n"
+} -->
+``` go
+package main
+
+import (
+  "fmt"
+  "log"
+  "os"
+
+  "github.com/urfave/cli"
+)
+
+func main() {
+  app := cli.NewApp()
+  app.UseShortOptionHandling = true
+  app.Commands = []cli.Command{
+    {
+      Name:  "short",
+      Usage: "complete a task on the list",
+      Flags: []cli.Flag{
+        cli.BoolFlag{Name: "serve, s"},
+        cli.BoolFlag{Name: "option, o"},
+        cli.StringFlag{Name: "message, m"},
+      },
+      Action: func(c *cli.Context) error {
+        fmt.Println("serve:", c.Bool("serve"))
+        fmt.Println("option:", c.Bool("option"))
+        fmt.Println("message:", c.String("message"))
+        return nil
+      },
+    },
+  }
+
+  err := app.Run(os.Args)
+  if err != nil {
+    log.Fatal(err)
+  }
+}
+```
+
+If your program has any number of bool flags such as `serve` and `option`, and
+optionally one non-bool flag `message`, with the short options of `-s`, `-o`,
+and `-m` respectively, setting `UseShortOptionHandling` will also support the
+following syntax:
+
+```
+$ cmd -som "Some message"
+```
+
+If you enable `UseShortOptionHandling`, then you must not use any flags that
+have a single leading `-` or this will result in failures. For example,
+`-option` can no longer be used. Flags with two leading dashes (such as
+`--options`) are still valid.
 
 ### Bash Completion
 
@@ -1371,6 +1435,7 @@ func main() {
     cli.Uint64Flag{Name: "bigage"},
   }
   app.EnableBashCompletion = true
+  app.UseShortOptionHandling = true
   app.HideHelp = false
   app.HideVersion = false
   app.BashComplete = func(c *cli.Context) {
@@ -1500,26 +1565,6 @@ func wopAction(c *cli.Context) error {
   return nil
 }
 ```
-
-### Combining short Bool options
-
-Traditional use of boolean options using their shortnames look like this:
-```
-# cmd foobar -s -o
-```
-
-Suppose you want users to be able to combine your bool options with their shortname.  This
-can be done using the **UseShortOptionHandling** bool in your commands.  Suppose your program
-has a two bool flags such as *serve* and *option* with the short options of *-o* and
-*-s* respectively. With **UseShortOptionHandling** set to *true*, a user can use a syntax
-like:
-```
-# cmd foobar -so
-```
-
-If you enable the **UseShortOptionHandling*, then you must not use any flags that have a single
-leading *-* or this will result in failures.  For example, **-option** can no longer be used.  Flags
-with two leading dashes (such as **--options**) are still valid.
 
 ## Contribution Guidelines
 
