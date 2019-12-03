@@ -243,6 +243,8 @@ spec:
         name: docker-certs
   updateStrategy:
     type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
 
 {{- if .IsWindowsCluster}}
 
@@ -337,6 +339,8 @@ spec:
           type: DirectoryOrCreate
   updateStrategy:
     type: RollingUpdate
+    rollingUpdate:
+	  maxUnavailable: 25%
 {{- end }}
 
 {{- if .AuthImage}}
@@ -390,6 +394,8 @@ spec:
           type: DirectoryOrCreate
   updateStrategy:
     type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
 {{- end }}
 `
 
