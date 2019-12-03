@@ -28,7 +28,7 @@ func (n *nodeRemove) Create(obj *v3.Node) (runtime.Object, error) {
 }
 
 func (n *nodeRemove) Remove(obj *v3.Node) (runtime.Object, error) {
-	if nodehelper.IgnoreNode(obj.Status.NodeName, obj.Labels) {
+	if nodehelper.IgnoreNode(obj.Status.NodeName, obj.Status.NodeLabels) {
 		logrus.Debugf("Skipping v1.node removal for [%v] node", obj.Status.NodeName)
 		return obj, nil
 	}
