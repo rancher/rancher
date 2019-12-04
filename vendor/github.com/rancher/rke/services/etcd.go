@@ -435,7 +435,8 @@ func DownloadEtcdSnapshotFromS3(ctx context.Context, etcdHost *hosts.Host, prsMa
 	return docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdDownloadBackupContainerName)
 }
 
-func RestoreEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdRestoreImage, snapshotName, initCluster string, es v3.ETCDService) error {
+func RestoreEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry,
+	etcdRestoreImage, etcdBackupImage, snapshotName, initCluster string, es v3.ETCDService) error {
 	log.Infof(ctx, "[etcd] Restoring [%s] snapshot on etcd host [%s]", snapshotName, etcdHost.Address)
 	nodeName := pki.GetCrtNameForHost(etcdHost, pki.EtcdCertName)
 	snapshotPath := fmt.Sprintf("%s%s", EtcdSnapshotPath, snapshotName)
@@ -494,7 +495,7 @@ func RestoreEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 	if err := docker.RemoveContainer(ctx, etcdHost.DClient, etcdHost.Address, EtcdRestoreContainerName); err != nil {
 		return err
 	}
-	return RunEtcdSnapshotRemove(ctx, etcdHost, prsMap, etcdRestoreImage, snapshotName, true, es)
+	return RunEtcdSnapshotRemove(ctx, etcdHost, prsMap, etcdBackupImage, snapshotName, true, es)
 }
 
 func RunEtcdSnapshotRemove(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdSnapshotImage string, name string, cleanupRestore bool, es v3.ETCDService) error {
