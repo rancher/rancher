@@ -23,10 +23,7 @@ tests:
   - hasDocuments:
       count: 0
     template: issuer-rancher.yaml
-- it: should render letsEncrypt but not rancher with cert-manager < 0.11.0
-  capabilities:
-    apiversions:
-    - certmanager.k8s.io/v1alpha1
+- it: should render letsEncrypt but not rancher
   set:
     ingress.tls.source: letsEncrypt
   asserts:
@@ -36,23 +33,7 @@ tests:
   - hasDocuments:
       count: 0
     template: issuer-rancher.yaml
-- it: should render letsEncrypt but not rancher with cert-manager > 0.11.0
-  capabilities:
-    apiversions:
-    - cert-manager.io/v1alpha2
-  set:
-    ingress.tls.source: letsEncrypt
-  asserts:
-  - hasDocuments:
-      count: 1
-    template: issuer-letsEncrypt.yaml
-  - hasDocuments:
-      count: 0
-    template: issuer-rancher.yaml
-- it: should render rancher but not letsEncrypt with cert-manager < 0.11.0
-  capabilities:
-    apiversions:
-    - certmanager.k8s.io/v1alpha1
+- it: should render rancher but not letsEncrypt
   set:
     ingress.tls.source: rancher
   asserts:
@@ -62,23 +43,7 @@ tests:
   - hasDocuments:
       count: 1
     template: issuer-rancher.yaml
-- it: should render rancher but not letsEncrypt with cert-manager > 0.11.0
-  capabilities:
-    apiversions:
-    - cert-manager.io/v1alpha2
-  set:
-    ingress.tls.source: rancher
-  asserts:
-  - hasDocuments:
-      count: 0
-    template: issuer-letsEncrypt.yaml
-  - hasDocuments:
-      count: 1
-    template: issuer-rancher.yaml
-- it: should set letsEncrypt production by default with cert-manager < 0.11.0
-  capabilities:
-    apiversions:
-    - certmanager.k8s.io/v1alpha1
+- it: should set letsEncrypt production by default
   set:
     ingress.tls.source: letsEncrypt
   asserts:
@@ -86,21 +51,7 @@ tests:
       path: spec.acme.server
       value: https://acme-v02.api.letsencrypt.org/directory
     template: issuer-letsEncrypt.yaml
-- it: should set letsEncrypt production by default with cert-manager > 0.11.0
-  capabilities:
-    apiversions:
-    - cert-manager.io/v1alpha2
-  set:
-    ingress.tls.source: letsEncrypt
-  asserts:
-  - equal:
-      path: spec.acme.server
-      value: https://acme-v02.api.letsencrypt.org/directory
-    template: issuer-letsEncrypt.yaml
-- it: should set letsEncrypt staging with cert-manager < 0.11.0
-  capabilities:
-    apiversions:
-    - certmanager.k8s.io/v1alpha1
+- it: should set letsEncrypt staging
   set:
     ingress.tls.source: letsEncrypt
     letsEncrypt.environment: staging
@@ -109,34 +60,7 @@ tests:
       path: spec.acme.server
       value: https://acme-staging-v02.api.letsencrypt.org/directory
     template: issuer-letsEncrypt.yaml
-- it: should set letsEncrypt staging with cert-manager > 0.11.0
-  capabilities:
-    apiversions:
-    - cert-manager.io/v1alpha2
-  set:
-    ingress.tls.source: letsEncrypt
-    letsEncrypt.environment: staging
-  asserts:
-  - equal:
-      path: spec.acme.server
-      value: https://acme-staging-v02.api.letsencrypt.org/directory
-    template: issuer-letsEncrypt.yaml
-- it: should set letsEncrypt email address with cert-manager < 0.11.0
-  capabilities:
-    apiversions:
-    - certmanager.k8s.io/v1alpha1
-  set:
-    ingress.tls.source: letsEncrypt
-    letsEncrypt.email: test@test.org
-  asserts:
-  - equal:
-      path: spec.acme.email
-      value: test@test.org
-    template: issuer-letsEncrypt.yaml
-- it: should set letsEncrypt email address with cert-manager > 0.11.0
-  capabilities:
-    apiversions:
-    - cert-manager.io/v1alpha2
+- it: should set letsEncrypt email address
   set:
     ingress.tls.source: letsEncrypt
     letsEncrypt.email: test@test.org
