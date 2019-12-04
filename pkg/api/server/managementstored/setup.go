@@ -649,11 +649,12 @@ func Project(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.ProjectType)
 	schema.Formatter = projectaction.Formatter
 	handler := &projectaction.Handler{
-		Projects:       management.Management.Projects(""),
-		ProjectLister:  management.Management.Projects("").Controller().Lister(),
-		UserMgr:        management.UserManager,
-		ClusterManager: management.ClientGetter.(*clustermanager.Manager),
-		ClusterLister:  management.Management.Clusters("").Controller().Lister(),
+		Projects:          management.Management.Projects(""),
+		ProjectLister:     management.Management.Projects("").Controller().Lister(),
+		UserMgr:           management.UserManager,
+		ClusterManager:    management.ClientGetter.(*clustermanager.Manager),
+		ClusterLister:     management.Management.Clusters("").Controller().Lister(),
+		PSPTemplateLister: management.Management.PodSecurityPolicyTemplates("").Controller().Lister(),
 	}
 	schema.ActionHandler = handler.Actions
 }
