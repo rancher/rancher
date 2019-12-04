@@ -409,7 +409,7 @@ github.com/rancher/rke/util
 # github.com/rancher/security-scan v0.1.3
 github.com/rancher/security-scan/pkg/kb-summarizer/report
 github.com/rancher/security-scan/pkg/kb-summarizer/summarizer
-# github.com/rancher/types v0.0.0-20191202213210-7be993457c77
+# github.com/rancher/types v0.0.0-20191204233503-847b69705b18
 github.com/rancher/types/apis/apiregistration.k8s.io/v1
 github.com/rancher/types/apis/apps/v1
 github.com/rancher/types/apis/autoscaling/v2beta2

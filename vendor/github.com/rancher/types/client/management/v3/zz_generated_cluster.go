@@ -148,7 +148,7 @@ type ClusterOperations interface {
 
 	ActionRunSecurityScan(resource *Cluster, input *CisScanConfig) error
 
-	ActionSaveAsTemplate(resource *Cluster, input *SaveAsTemplateInput) error
+	ActionSaveAsTemplate(resource *Cluster, input *SaveAsTemplateInput) (*SaveAsTemplateOutput, error)
 
 	ActionViewMonitoring(resource *Cluster) (*MonitoringOutput, error)
 }
@@ -258,9 +258,10 @@ func (c *ClusterClient) ActionRunSecurityScan(resource *Cluster, input *CisScanC
 	return err
 }
 
-func (c *ClusterClient) ActionSaveAsTemplate(resource *Cluster, input *SaveAsTemplateInput) error {
-	err := c.apiClient.Ops.DoAction(ClusterType, "saveAsTemplate", &resource.Resource, input, nil)
-	return err
+func (c *ClusterClient) ActionSaveAsTemplate(resource *Cluster, input *SaveAsTemplateInput) (*SaveAsTemplateOutput, error) {
+	resp := &SaveAsTemplateOutput{}
+	err := c.apiClient.Ops.DoAction(ClusterType, "saveAsTemplate", &resource.Resource, input, resp)
+	return resp, err
 }
 
 func (c *ClusterClient) ActionViewMonitoring(resource *Cluster) (*MonitoringOutput, error) {
