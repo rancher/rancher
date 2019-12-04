@@ -212,12 +212,17 @@ def test_app_namespace_annotation(admin_pc, admin_mc):
     client.delete(app1)
     wait_for_app_to_be_deleted(client, app1)
 
-    ns = admin_pc.cluster.client.reload(ns)
+    ns = wait_for_app_annotation(admin_pc, ns, app1.name, exists=False)
     assert app1.name not in ns.annotations['cattle.io/appIds']
     assert app2.name in ns.annotations['cattle.io/appIds']
 
     client.delete(app2)
     wait_for_app_to_be_deleted(client, app2)
+
+    def _check_anno():
+        n = admin_pc.cluster.client.reload(ns)
+        return 'cattle.io/appIds' not in n.annotations
+    wait_for(_check_anno)
     ns = admin_pc.cluster.client.reload(ns)
     assert 'cattle.io/appIds' not in ns.annotations
 
@@ -266,11 +271,11 @@ def test_helm_timeout(admin_pc, admin_mc, remove_resource):
     assert "timed out waiting for the condition" in app1.transitioningMessage
 
 
-def wait_for_app_annotation(admin_pc, ns, app_name, timeout=60):
+def wait_for_app_annotation(admin_pc, ns, app_name, exists=True, timeout=60):
     start = time.time()
     interval = 0.5
     ns = admin_pc.cluster.client.reload(ns)
-    while app_name not in ns.annotations['cattle.io/appIds']:
+    while (app_name in ns.annotations['cattle.io/appIds']) != exists:
         if time.time() - start > timeout:
             print(ns.annotations)
             raise Exception('Timeout waiting for app annotation')
