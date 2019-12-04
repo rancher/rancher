@@ -1,32 +1,5 @@
-
 {{- if eq .Values.tls "ingress" -}}
   {{- if eq .Values.ingress.tls.source "letsEncrypt" -}}
-    {{- if .Capabilities.APIVersions.Has "cert-manager.io/v1alpha2" -}}
-apiVersion: cert-manager.io/v1alpha2
-kind: ClusterIssuer
-metadata:
-  name: {{ template "rancher.fullname" . }}
-  labels:
-    app: {{ template "rancher.fullname" . }}
-    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
-    heritage: {{ .Release.Service }}
-    release: {{ .Release.Name }}
-spec:
-  acme:
-    {{- if eq .Values.letsEncrypt.environment "production" }}
-    server: https://acme-v02.api.letsencrypt.org/directory
-    {{- end }}
-    {{- if eq .Values.letsEncrypt.environment "staging" }}
-    server: https://acme-staging-v02.api.letsencrypt.org/directory
-    {{- end }}
-    email: {{ .Values.letsEncrypt.email }}
-    privateKeySecretRef:
-      name: letsencrypt-{{ .Values.letsEncrypt.environment }}
-    solvers:
-    - http01:
-        ingress:
-          class: nginx
-    {{- else if .Capabilities.APIVersions.Has "certmanager.k8s.io/v1alpha1" -}}
 apiVersion: certmanager.k8s.io/v1alpha1
 kind: Issuer
 metadata:
@@ -48,6 +21,5 @@ spec:
     privateKeySecretRef:
       name: letsencrypt-{{ .Values.letsEncrypt.environment }}
     http01: {}
-    {{- end -}}
   {{- end -}}
 {{- end -}}

@@ -13,7 +13,7 @@ fi
 helm unittest --help >/dev/null 2>&1
 if [[ $? > 0 ]]; then
     echo "helm plugin unittest not found."
-    echo "Run to install plugin: helm plugin install https://github.com/rancher/helm-unittest"
+    echo "Run to install plugin: helm plugin install https://github.com/lrills/helm-unittest"
     exit 1
 fi
 
