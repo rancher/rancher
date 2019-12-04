@@ -219,13 +219,13 @@ func (c *Controller) etcdSaveWithBackoff(b *v3.EtcdBackup) (runtime.Object, erro
 		return b, err
 	}
 
+	snapshotName := clusterprovisioner.GetBackupFilename(b)
 	bObj, err := v3.BackupConditionCompleted.Do(b, func() (runtime.Object, error) {
 		cluster, err := c.clusterClient.Get(b.Spec.ClusterID, metav1.GetOptions{})
 		if err != nil {
 			return b, err
 		}
 		var inErr error
-		snapshotName := clusterprovisioner.GetBackupFilename(b)
 		err = wait.ExponentialBackoff(backoff, func() (bool, error) {
 			if inErr = c.backupDriver.ETCDSave(c.ctx, cluster.Name, kontainerDriver, cluster.Spec, snapshotName); inErr != nil {
 				logrus.Warnf("%v", inErr)
@@ -255,8 +255,9 @@ func (c *Controller) etcdRemoveSnapshotWithBackoff(b *v3.EtcdBackup) error {
 	if err != nil {
 		return err
 	}
+	snapshotName := clusterprovisioner.GetBackupFilename(b)
 	return wait.ExponentialBackoff(backoff, func() (bool, error) {
-		if inErr := c.backupDriver.ETCDRemoveSnapshot(c.ctx, cluster.Name, kontainerDriver, cluster.Spec, b.Name); inErr != nil {
+		if inErr := c.backupDriver.ETCDRemoveSnapshot(c.ctx, cluster.Name, kontainerDriver, cluster.Spec, snapshotName); inErr != nil {
 			logrus.Warnf("%v", inErr)
 			return false, nil
 		}
