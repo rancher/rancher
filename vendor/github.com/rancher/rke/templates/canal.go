@@ -1489,6 +1489,9 @@ spec:
             - name: DATASTORE_TYPE
               value: "kubernetes"
             # Wait for the datastore.
+            # Configure route aggregation based on pod CIDR.
+            - name: USE_POD_CIDR
+              value: "true"
             - name: WAIT_FOR_DATASTORE
               value: "true"
             # Set based on the k8s node name.
@@ -1752,4 +1755,19 @@ spec:
     kind: NetworkPolicy
     plural: networkpolicies
     singular: networkpolicy
+
+---
+
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: networksets.crd.projectcalico.org
+spec:
+  scope: Namespaced
+  group: crd.projectcalico.org
+  version: v1
+  names:
+    kind: NetworkSet
+    plural: networksets
+    singular: networkset
 `
