@@ -92,7 +92,8 @@ def test_roletemplate_finalizer_cleanup(admin_mc, remove_resource):
         "metadata": {
             "finalizers": [
                 "clusterscoped.controller.cattle.io/" +
-                "cluster-roletemplate-sync_fake"
+                "cluster-roletemplate-sync_fake",
+                "fake-finalizer"
             ],
             "name": "test-" + random_str(),
         }
@@ -123,5 +124,6 @@ def test_roletemplate_finalizer_cleanup(admin_mc, remove_resource):
         plural="roletemplates",
         name=rt_k8s.id,
     )
-    assert "clusterscoped.controller.cattle.io/grb-sync_fake" \
-        not in rt1["metadata"]["finalizers"]
+    if "finalizers" in rt1["metadata"]:
+        assert "clusterscoped.controller.cattle.io/grb-sync_fake" \
+            not in rt1["metadata"]["finalizers"]
