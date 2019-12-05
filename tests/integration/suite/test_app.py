@@ -190,7 +190,7 @@ def test_app_namespace_annotation(admin_pc, admin_mc):
     wait_for_template_to_be_created(admin_mc.client, "library")
     app1 = client.create_app(
         name=random_str(),
-        externalId="catalog://?catalog=library&template=mysql&version=0.3.7"
+        externalId="catalog://?catalog=library&template=mysql&version=1.3.1"
                    "&namespace=cattle-global-data",
         targetNamespace=ns.name,
         projectId=admin_pc.project.id,
@@ -198,7 +198,7 @@ def test_app_namespace_annotation(admin_pc, admin_mc):
     wait_for_workload(client, ns.name, count=1)
 
     external_id = "catalog://?catalog=library&template=wordpress" \
-                  "&version=1.0.5&namespace=cattle-global-data"
+                  "&version=7.3.8&namespace=cattle-global-data"
     app2 = client.create_app(
         name=random_str(),
         externalId=external_id,
@@ -219,12 +219,8 @@ def test_app_namespace_annotation(admin_pc, admin_mc):
     client.delete(app2)
     wait_for_app_to_be_deleted(client, app2)
 
-    def _check_anno():
-        n = admin_pc.cluster.client.reload(ns)
-        return 'cattle.io/appIds' not in n.annotations
-    wait_for(_check_anno)
-    ns = admin_pc.cluster.client.reload(ns)
-    assert 'cattle.io/appIds' not in ns.annotations
+    ns = wait_for_app_annotation(admin_pc, ns, app2.name, exists=False)
+    assert app2.name not in ns.annotations.get('cattle.io/appIds', [])
 
 
 def test_helm_timeout(admin_pc, admin_mc, remove_resource):
@@ -275,7 +271,7 @@ def wait_for_app_annotation(admin_pc, ns, app_name, exists=True, timeout=60):
     start = time.time()
     interval = 0.5
     ns = admin_pc.cluster.client.reload(ns)
-    while (app_name in ns.annotations['cattle.io/appIds']) != exists:
+    while (app_name in ns.annotations.get('cattle.io/appIds', [])) != exists:
         if time.time() - start > timeout:
             print(ns.annotations)
             raise Exception('Timeout waiting for app annotation')
@@ -591,7 +587,7 @@ def wait_for_workload(client, ns, timeout=60, count=0):
     start = time.time()
     interval = 0.5
     workloads = client.list_workload(namespaceId=ns)
-    while len(workloads.data) != count:
+    while len(workloads.data) < count:
         if time.time() - start > timeout:
             print(workloads)
             raise Exception('Timeout waiting for workload service')
