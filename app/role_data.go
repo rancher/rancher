@@ -45,6 +45,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 	rb.addRole("Manage Features", "features-manage").addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch", "update")
 	rb.addRole("Manage PodSecurityPolicy Templates", "podsecuritypolicytemplates-manage").addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("*")
 	rb.addRole("Create RKE Templates", "clustertemplates-create").addRule().apiGroups("management.cattle.io").resources("clustertemplates").verbs("create")
+	rb.addRole("Create RKE Template Revisions", "clustertemplaterevisions-create").addRule().apiGroups("management.cattle.io").resources("clustertemplaterevisions").verbs("create")
 
 	rb.addRole("Admin", "admin").addRule().apiGroups("*").resources("*").verbs("*").
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
@@ -71,8 +72,7 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch").
 		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
-		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*").
-		addRule().apiGroups("management.cattle.io").resources("clustertemplaterevisions").verbs("create")
+		addRule().apiGroups("project.cattle.io").resources("sourcecoderepositories").verbs("*")
 
 	// TODO user should be dynamically authorized to only see herself
 	// TODO enable when groups are "in". they need to be self-service
