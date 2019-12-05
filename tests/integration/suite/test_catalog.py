@@ -283,3 +283,34 @@ def test_catalog_refresh(admin_mc):
     # It just needs to be more than none, other test can add/remove catalogs
     # so a hard count will break
     assert len(out['catalogs']) > 0, 'no catalogs in response'
+
+
+def test_invalid_catalog_charts(admin_mc, remove_resource):
+    """Test chart with too long name and chart with invalid
+     name in catalog error properly"""
+    client = admin_mc.client
+    name = random_str()
+    url = "https://github.com/rancher/integration-test-charts"
+
+    catalog = client.create_catalog(name=name,
+                                    branch="broke-charts",
+                                    url=url,
+                                    )
+    remove_resource(catalog)
+    wait_for_template_to_be_created(client, catalog.id)
+
+    catalog = client.reload(catalog)
+    templates = client.list_template(catalogId=catalog.id).data
+
+    assert "areallylongnamelikereallyreallylongwestillneedmorez234dasdfasd "\
+        not in templates
+    assert "trying-a-name_with_underscores-and_dashes" not in templates
+    assert catalog.state == "refreshed"
+    assert catalog.transitioning == "error"
+    assert catalog.transitioningMessage == "Error syncing catalog " + name
+    # this will break if github repo changes
+    assert len(templates) == 6
+    # checking that the errored catalog can be deleted successfully
+    client.delete(catalog)
+    wait_for_template_to_be_deleted(client, name)
+    assert not client.list_catalog(name=name).data
