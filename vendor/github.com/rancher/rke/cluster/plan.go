@@ -659,7 +659,6 @@ func (c *Cluster) BuildKubeProxyProcess(host *hosts.Host, prefixPath string, svc
 			fmt.Sprintf("%s:c:/host/etc/kubernetes", path.Join(prefixPath, "/etc/kubernetes")),
 			// exchange resources with other components
 			fmt.Sprintf("%s:c:/host/run", path.Join(prefixPath, "/run")),
-			fmt.Sprintf("%s:c:/host/lib/modules", path.Join(prefixPath, "/lib/modules")),
 		}
 	}
 
