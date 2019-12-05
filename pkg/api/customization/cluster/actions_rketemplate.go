@@ -61,7 +61,13 @@ func (a ActionHandler) saveAsTemplate(actionName string, action *types.Action, a
 		return err
 	}
 
-	apiContext.WriteResponse(http.StatusNoContent, map[string]interface{}{})
+	response := map[string]interface{}{
+		"clusterTemplateName":         ref.Ref(clusterTemplate),
+		"clusterTemplateRevisionName": ref.Ref(clusterTemplateRevision),
+		"type":                        "saveAsTemplateOutput",
+	}
+
+	apiContext.WriteResponse(http.StatusOK, response)
 	return nil
 }
 
