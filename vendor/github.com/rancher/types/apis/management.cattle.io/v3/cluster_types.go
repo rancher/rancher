@@ -295,3 +295,8 @@ type SaveAsTemplateInput struct {
 	ClusterTemplateName         string `json:"clusterTemplateName,omitempty"`
 	ClusterTemplateRevisionName string `json:"clusterTemplateRevisionName,omitempty"`
 }
+
+type SaveAsTemplateOutput struct {
+	ClusterTemplateName         string `json:"clusterTemplateName,omitempty"`
+	ClusterTemplateRevisionName string `json:"clusterTemplateRevisionName,omitempty"`
+}
