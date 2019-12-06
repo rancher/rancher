@@ -40,8 +40,23 @@ env_file = os.path.join(
     os.path.dirname(os.path.realpath(__file__)),
     "rancher_env.config")
 
+AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
+AWS_REGION = os.environ.get("AWS_REGION")
+AWS_SUBNET = os.environ.get("AWS_SUBNET")
+AWS_VPC = os.environ.get("AWS_VPC")
+AWS_SG = os.environ.get("AWS_SG")
+AWS_ZONE = os.environ.get("AWS_ZONE")
+AWS_IAM_PROFILE = os.environ.get("AWS_IAM_PROFILE", "")
+AWS_S3_BUCKET_NAME = os.environ.get("AWS_S3_BUCKET_NAME", "")
+AWS_S3_BUCKET_FOLDER_NAME = os.environ.get("AWS_S3_BUCKET_FOLDER_NAME", "")
+LINODE_ACCESSKEY = os.environ.get('RANCHER_LINODE_ACCESSKEY', "None")
+
 TEST_RBAC = ast.literal_eval(os.environ.get('RANCHER_TEST_RBAC', "False"))
 if_test_rbac = pytest.mark.skipif(TEST_RBAC is False, reason='rbac tests are skipped')
+
+TEST_S3 = ast.literal_eval(os.environ.get('RANCHER_TEST_S3', "False"))
+if_test_s3 = pytest.mark.skipif(TEST_S3 is False, reason='S3 tests are skipped')
 
 CLUSTER_MEMBER = "cluster-member"
 CLUSTER_OWNER  = "cluster-owner"

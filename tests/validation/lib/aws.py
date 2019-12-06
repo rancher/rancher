@@ -11,8 +11,8 @@ logging.getLogger('boto3').setLevel(logging.CRITICAL)
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
 
 
-AWS_REGION = 'us-east-2'
-AWS_REGION_AZ = 'us-east-2a'
+AWS_REGION = os.environ.get("AWS_REGION", "us-east-2")
+AWS_REGION_AZ = os.environ.get("AWS_REGION_AZ", "us-east-2a")
 AWS_SECURITY_GROUP = os.environ.get("AWS_SECURITY_GROUPS",
                                     'sg-0e753fd5550206e55')
 AWS_SECURITY_GROUPS = [AWS_SECURITY_GROUP]
@@ -161,7 +161,6 @@ class AmazonWebServices(CloudProviderBase):
             node = self.wait_for_node_state(node)
             node.ready_node()
         return node
-
 
     def create_multiple_nodes(
         self, number_of_nodes, node_name_prefix, os_version=None,
@@ -335,3 +334,28 @@ class AmazonWebServices(CloudProviderBase):
                 if keyName.startswith(name_prefix):
                     print(keyName)
                     self._client.delete_key_pair(KeyName=keyName)
+
+    def _s3_list_files(self, client):
+        """List files in specific S3 URL"""
+        response = client.list_objects(Bucket=os.environ.get("AWS_S3_BUCKET_NAME", ""),
+                                       Prefix=os.environ.get("AWS_S3_BUCKET_FOLDER_NAME", ""))
+        for content in response.get('Contents', []):
+            yield content.get('Key')
+
+    def s3_backup_check(self, filename=""):
+        print(AWS_REGION)
+        print(AWS_REGION_AZ)
+        client = boto3.client(
+            's3',
+            aws_access_key_id=AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+            region_name=AWS_REGION)
+        file_list = self._s3_list_files(client)
+        found = False
+        for file in file_list:
+            print(file)
+            if filename in file:
+                found = True
+                break
+        return found
+
