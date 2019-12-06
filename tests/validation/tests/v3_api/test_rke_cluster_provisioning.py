@@ -1,4 +1,3 @@
-import os
 from threading import Thread
 import pytest
 from .common import *  # NOQA
@@ -8,15 +7,6 @@ K8S_VERSION = os.environ.get('RANCHER_K8S_VERSION', "")
 K8S_VERSION_UPGRADE = os.environ.get('RANCHER_K8S_VERSION_UPGRADE', "")
 POD_SECURITY_POLICY_TEMPLATE = os.environ.get('RANCHER_POD_SECURITY_POLICY_TEMPLATE', "restricted")
 DO_ACCESSKEY = os.environ.get('DO_ACCESSKEY', "None")
-LINODE_ACCESSKEY = os.environ.get('RANCHER_LINODE_ACCESSKEY', "None")
-AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
-AWS_REGION = os.environ.get("AWS_REGION")
-AWS_SUBNET = os.environ.get("AWS_SUBNET")
-AWS_VPC = os.environ.get("AWS_VPC")
-AWS_SG = os.environ.get("AWS_SG")
-AWS_ZONE = os.environ.get("AWS_ZONE")
-AWS_IAM_PROFILE = os.environ.get("AWS_IAM_PROFILE", "")
 AZURE_SUBSCRIPTION_ID = os.environ.get("AZURE_SUBSCRIPTION_ID")
 AZURE_CLIENT_ID = os.environ.get("AZURE_CLIENT_ID")
 AZURE_CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET")
@@ -24,8 +14,8 @@ AZURE_TENANT_ID = os.environ.get("AZURE_TENANT_ID")
 worker_count = int(os.environ.get('RANCHER_STRESS_TEST_WORKER_COUNT', 1))
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "testcustom")
 
-
 engine_install_url = "https://releases.rancher.com/install-docker/18.09.sh"
+
 rke_config = {
     "addonJobTimeout": 30,
     "authentication":
@@ -692,7 +682,7 @@ def validate_rke_dm_host_1(node_template,
 
 
 def validate_rke_dm_host_2(node_template,
-                           rancherKubernetesEngineConfig=rke_config):
+                           rancherKubernetesEngineConfig=rke_config, attemptDelete=True, clusterName=None):
     client = get_user_client()
     nodes = []
     node_name = random_node_name()
@@ -717,8 +707,9 @@ def validate_rke_dm_host_2(node_template,
             "quantity": 3}
     nodes.append(node)
     cluster, node_pools = create_and_vaildate_cluster(
-        client, nodes, rancherKubernetesEngineConfig)
-    cluster_cleanup(client, cluster)
+        client, nodes, rancherKubernetesEngineConfig, clusterName)
+    if attemptDelete:
+        cluster_cleanup(client, cluster)
 
 
 def validate_rke_dm_host_3(node_template,
@@ -790,9 +781,10 @@ def validate_rke_dm_host_4(node_template,
 
 
 def create_and_vaildate_cluster(client, nodes,
-                                rancherKubernetesEngineConfig=rke_config):
+                                rancherKubernetesEngineConfig=rke_config, clusterName=None):
+
     cluster = client.create_cluster(
-        name=evaluate_clustername(),
+        name=clusterName if clusterName is not None else evaluate_clustername(),
         rancherKubernetesEngineConfig=rancherKubernetesEngineConfig)
     node_pools = []
     for node in nodes:
@@ -817,7 +809,7 @@ def create_and_vaildate_cluster(client, nodes,
 
 
 def random_node_name():
-    return "testauto" + "-" + str(random_int(10000, 99999))
+    return "testauto" + "-" + str(random_int(100000, 999999))
 
 
 def evaluate_clustername():
