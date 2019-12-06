@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/kontainer-engine/drivers/util"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -494,6 +495,13 @@ func (state state) validate() error {
 
 	if state.LinuxSSHPublicKeyContents == "" {
 		return fmt.Errorf(`"ssh public key contents" is required`)
+	}
+	_, _, _, _, err := ssh.ParseAuthorizedKey([]byte(state.LinuxSSHPublicKeyContents))
+	if err != nil {
+		if strings.Contains(state.LinuxSSHPublicKeyContents, "PRIVATE") {
+			return fmt.Errorf("possible private key: %s", err)
+		}
+		return fmt.Errorf(`invalid ssh key: %s`, err)
 	}
 
 	return nil
