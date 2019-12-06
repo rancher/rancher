@@ -29,8 +29,8 @@ const (
 	EtcdDataDir                     = "/var/lib/rancher/etcd/"
 	EtcdInitWaitTime                = 10
 	EtcdSnapshotWaitTime            = 5
-	EtcdSnapshotCompressedExtension = "zip"
 	EtcdPermFixContainerName        = "etcd-fix-perm"
+	EtcdSnapshotCompressedExtension = "zip"
 )
 
 func RunEtcdPlane(
@@ -380,7 +380,6 @@ func RunEtcdSnapshotSave(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 }
 
 func DownloadEtcdSnapshotFromS3(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdSnapshotImage string, name string, es v3.ETCDService) error {
-
 	log.Infof(ctx, "[etcd] Get snapshot [%s] on host [%s]", name, etcdHost.Address)
 	s3Backend := es.BackupConfig.S3BackupConfig
 	if len(s3Backend.Endpoint) == 0 || len(s3Backend.BucketName) == 0 {
@@ -498,7 +497,8 @@ func RestoreEtcdSnapshot(ctx context.Context, etcdHost *hosts.Host, prsMap map[s
 	return RunEtcdSnapshotRemove(ctx, etcdHost, prsMap, etcdRestoreImage, snapshotName, true, es)
 }
 
-func RunEtcdSnapshotRemove(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry, etcdSnapshotImage string, name string, cleanupRestore bool, es v3.ETCDService) error {
+func RunEtcdSnapshotRemove(ctx context.Context, etcdHost *hosts.Host, prsMap map[string]v3.PrivateRegistry,
+	etcdSnapshotImage string, name string, cleanupRestore bool, es v3.ETCDService) error {
 	log.Infof(ctx, "[etcd] Removing snapshot [%s] from host [%s]", name, etcdHost.Address)
 
 	compressedPath := fmt.Sprintf("/backup/%s.%s", name, EtcdSnapshotCompressedExtension)
@@ -737,7 +737,11 @@ func setEtcdPermissions(ctx context.Context, etcdHost *hosts.Host, prsMap map[st
 	hostCfg := &container.HostConfig{
 		Binds: []string{dataBind},
 	}
-	return docker.DoRunOnetimeContainer(ctx, etcdHost.DClient, imageCfg, hostCfg, EtcdPermFixContainerName, etcdHost.Address, ETCDRole, prsMap)
+	if err := docker.DoRunOnetimeContainer(ctx, etcdHost.DClient, imageCfg, hostCfg, EtcdPermFixContainerName,
+		etcdHost.Address, ETCDRole, prsMap); err != nil {
+		return err
+	}
+	return docker.DoRemoveContainer(ctx, etcdHost.DClient, EtcdPermFixContainerName, etcdHost.Address)
 }
 
 func getSanitizedSnapshotCmd(imageCfg *container.Config, bc *v3.BackupConfig) string {
