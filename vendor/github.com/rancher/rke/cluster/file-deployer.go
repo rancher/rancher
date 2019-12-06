@@ -36,7 +36,9 @@ func doDeployFile(ctx context.Context, host *hosts.Host, fileName, fileContents,
 	}
 	var cmd, containerEnv []string
 
-	if fileContents != "" {
+	// fileContents determines if a file is placed or removed
+	// exception to this is the cloud-config file, as it is valid being empty (for example, when only specifying the aws cloudprovider and no additional config)
+	if fileContents != "" || fileName == cloudConfigFileName {
 		containerEnv = []string{ConfigEnv + "=" + fileContents}
 		cmd = []string{
 			"sh",

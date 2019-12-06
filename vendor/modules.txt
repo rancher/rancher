@@ -360,7 +360,7 @@ github.com/rancher/norman/urlbuilder
 github.com/rancher/rdns-server/model
 # github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6
 github.com/rancher/remotedialer
-# github.com/rancher/rke v1.0.1-0.20191204220336-a9c97c28927d
+# github.com/rancher/rke v1.0.1-rc1
 github.com/rancher/rke/addons
 github.com/rancher/rke/authz
 github.com/rancher/rke/cloudprovider
