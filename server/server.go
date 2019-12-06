@@ -57,14 +57,16 @@ func Start(ctx context.Context, httpPort, httpsPort int, localClusterEnabled boo
 
 	rawAuthedAPIs := newAuthed(tokenAPI, managementAPI, k8sProxy, scaledContext)
 
-	sar := sar.NewSubjectAccessReview(clusterManager)
+	auth := requests.NewAuthenticator(ctx, scaledContext)
+	auth = wrapTunnelAuth(scaledContext, auth)
 
-	authedHandler, err := requests.NewAuthenticationFilter(ctx, scaledContext, rawAuthedAPIs, sar)
+	sar := sar.NewSubjectAccessReview(clusterManager)
+	authedHandler, err := requests.NewAuthenticationFilter(ctx, auth, scaledContext, rawAuthedAPIs, sar)
 	if err != nil {
 		return err
 	}
 
-	metricsHandler, err := requests.NewAuthenticationFilter(ctx, scaledContext, metrics.NewMetricsHandler(scaledContext, promhttp.Handler()), sar)
+	metricsHandler, err := requests.NewAuthenticationFilter(ctx, auth, scaledContext, metrics.NewMetricsHandler(scaledContext, promhttp.Handler()), sar)
 	if err != nil {
 		return err
 	}
@@ -155,4 +157,11 @@ func connectHandlers(scaledContext *config.ScaledContext) (http.Handler, http.Ha
 
 func newProxy(scaledContext *config.ScaledContext) http.Handler {
 	return httpproxy.NewProxy("/proxy/", whitelist.Proxy.Get, scaledContext)
+}
+
+func wrapTunnelAuth(scaledContext *config.ScaledContext, auth requests.Authenticator) requests.Authenticator {
+	if f, ok := scaledContext.Dialer.(*rancherdialer.Factory); ok {
+		return requests.Chain(f.TunnelAuthorizer, auth)
+	}
+	return auth
 }

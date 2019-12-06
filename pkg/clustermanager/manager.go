@@ -177,15 +177,15 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 		}
 	}()
 
-	if clusterOwner {
-		if err := clusterController.Register(rec.ctx, rec.cluster, rec.clusterRec, m, m); err != nil {
-			return err
-		}
-	} else {
-		if err := clusterController.RegisterFollower(rec.ctx, rec.cluster, m, m); err != nil {
-			return err
-		}
+	//if clusterOwner {
+	//	if err := clusterController.Register(rec.ctx, rec.cluster, rec.clusterRec, m, m); err != nil {
+	//		return err
+	//	}
+	//} else {
+	if err := clusterController.RegisterFollower(rec.ctx, rec.cluster, m, m); err != nil {
+		return err
 	}
+	//}
 
 	done := make(chan error, 1)
 	go func() {

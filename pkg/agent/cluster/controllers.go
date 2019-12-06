@@ -5,6 +5,7 @@ package cluster
 import (
 	"context"
 
+	"github.com/rancher/rancher/pkg/agent/cluster/controllers"
 	clusterController "github.com/rancher/rancher/pkg/controllers/user"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -13,7 +14,7 @@ import (
 
 var running bool
 
-func RunControllers() error {
+func RunControllers(namespace, token, url string) error {
 	if running {
 		return nil
 	}
@@ -34,9 +35,18 @@ func RunControllers() error {
 		return err
 	}
 
-	err = userOnly.Start(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	err = userOnly.Start(ctx)
 	if err != nil {
 		return err
+	}
+
+	if namespace != "" {
+		logrus.Infof("Starting agent controllers for namespace [%s], url [%s]", namespace, url)
+		if err := controllers.StartControllers(ctx, token, url, namespace); err != nil {
+			cancel()
+			return err
+		}
 	}
 
 	running = true

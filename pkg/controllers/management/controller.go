@@ -57,6 +57,8 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 	clustertemplate.Register(ctx, management)
 	nodetemplate.Register(ctx, management)
 
+	wrangler(ctx, management)
+
 	// Register last
 	auth.RegisterLate(ctx, management)
 }
