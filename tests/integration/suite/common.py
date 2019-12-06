@@ -121,7 +121,7 @@ def wait_for_template_to_be_created(client, name, timeout=45):
         interval *= 2
 
 
-def wait_for_template_to_be_deleted(client, name, timeout=45):
+def wait_for_template_to_be_deleted(client, name, timeout=60):
     found = False
     start = time.time()
     interval = 0.5
