@@ -1512,3 +1512,18 @@ def rbac_cleanup():
     client.delete(rbac_data["wl_unshared"])
     client.delete(rbac_data["p_unshared"])
 
+
+def check_condition(condition_type, status):
+    def _find_condition(resource):
+        if not hasattr(resource, "conditions"):
+            return False
+
+        if resource.conditions is None:
+            return False
+
+        for condition in resource.conditions:
+            if condition.type == condition_type and condition.status == status:
+                return True
+        return False
+
+    return _find_condition
