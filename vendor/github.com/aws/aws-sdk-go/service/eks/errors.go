@@ -4,6 +4,13 @@ package eks
 
 const (
 
+	// ErrCodeBadRequestException for service response error code
+	// "BadRequestException".
+	//
+	// This exception is thrown if the request contains a semantic error. The precise
+	// meaning will depend on the API, and will be documented in the error message.
+	ErrCodeBadRequestException = "BadRequestException"
+
 	// ErrCodeClientException for service response error code
 	// "ClientException".
 	//
@@ -25,6 +32,13 @@ const (
 	// The request is invalid given the state of the cluster. Check the state of
 	// the cluster and the associated operations.
 	ErrCodeInvalidRequestException = "InvalidRequestException"
+
+	// ErrCodeNotFoundException for service response error code
+	// "NotFoundException".
+	//
+	// A service resource associated with the request could not be found. Clients
+	// should not retry such requests.
+	ErrCodeNotFoundException = "NotFoundException"
 
 	// ErrCodeResourceInUseException for service response error code
 	// "ResourceInUseException".
