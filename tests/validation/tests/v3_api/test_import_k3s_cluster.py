@@ -4,7 +4,7 @@ from .common import *  # NOQA
 
 DATA_SUBDIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                            'resource')
-RANCHER_K3S_VERSION = os.environ.get("K3S_VERSION", "")
+RANCHER_K3S_VERSION = os.environ.get("RANCHER_K3S_VERSION", "")
 RANCHER_K3S_NO_OF_WORKER_NODES = os.environ.get("AWS_NO_OF_WORKER_NODES", 3)
 
 def test_import_k3s_cluster():
@@ -77,6 +77,7 @@ def install_k3s_master_node(master):
 
     # Get node token from master
     cmd = "sudo cat /var/lib/rancher/k3s/server/node-token"
+    print(cmd)
     node_token = master.execute_command(cmd)
     print(node_token)
 
@@ -98,8 +99,8 @@ def join_k3s_worker_nodes(master, workers, node_token):
             format("INSTALL_K3S_VERSION={}".format(RANCHER_K3S_VERSION) \
                        if RANCHER_K3S_VERSION else "", master.public_ip_address, node_token)
         cmd = cmd + " {} {}".format("--node-external-ip", worker.public_ip_address)
-
         print("Joining k3s master")
+        print(cmd)
         install_result = worker.execute_command(cmd)
         print(install_result)
 
