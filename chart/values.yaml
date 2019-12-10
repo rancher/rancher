@@ -98,3 +98,7 @@ resources: {}
 # - ingress (default)
 # - external
 tls: ingress
+
+# Certmanager version compatibility
+certmanager: 
+  version: ""
