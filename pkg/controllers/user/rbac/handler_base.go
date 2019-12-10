@@ -77,21 +77,25 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	crbInformer.AddIndexers(crbIndexers)
 
 	r := &manager{
-		workload:      workload,
-		prtbIndexer:   prtbInformer.GetIndexer(),
-		crtbIndexer:   crtbInformer.GetIndexer(),
-		nsIndexer:     nsInformer.GetIndexer(),
-		crIndexer:     crInformer.GetIndexer(),
-		crbIndexer:    crbInformer.GetIndexer(),
-		rtLister:      workload.Management.Management.RoleTemplates("").Controller().Lister(),
-		rbLister:      workload.RBAC.RoleBindings("").Controller().Lister(),
-		crbLister:     workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
-		crLister:      workload.RBAC.ClusterRoles("").Controller().Lister(),
-		nsLister:      workload.Core.Namespaces("").Controller().Lister(),
-		nsController:  workload.Core.Namespaces("").Controller(),
-		clusterLister: workload.Management.Management.Clusters("").Controller().Lister(),
-		projectLister: workload.Management.Management.Projects("").Controller().Lister(),
-		clusterName:   workload.ClusterName,
+		workload:            workload,
+		prtbIndexer:         prtbInformer.GetIndexer(),
+		crtbIndexer:         crtbInformer.GetIndexer(),
+		nsIndexer:           nsInformer.GetIndexer(),
+		crIndexer:           crInformer.GetIndexer(),
+		crbIndexer:          crbInformer.GetIndexer(),
+		rtLister:            workload.Management.Management.RoleTemplates("").Controller().Lister(),
+		rLister:             workload.Management.RBAC.Roles("").Controller().Lister(),
+		roles:               workload.Management.RBAC.Roles(""),
+		rbLister:            workload.RBAC.RoleBindings("").Controller().Lister(),
+		crbLister:           workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		crLister:            workload.RBAC.ClusterRoles("").Controller().Lister(),
+		clusterRoles:        workload.RBAC.ClusterRoles(""),
+		clusterRoleBindings: workload.RBAC.ClusterRoleBindings(""),
+		nsLister:            workload.Core.Namespaces("").Controller().Lister(),
+		nsController:        workload.Core.Namespaces("").Controller(),
+		clusterLister:       workload.Management.Management.Clusters("").Controller().Lister(),
+		projectLister:       workload.Management.Management.Projects("").Controller().Lister(),
+		clusterName:         workload.ClusterName,
 	}
 	workload.Management.Management.Projects("").AddClusterScopedLifecycle(ctx, "project-namespace-auth", workload.ClusterName, newProjectLifecycle(r))
 	workload.Management.Management.ProjectRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-prtb-sync", workload.ClusterName, newPRTBLifecycle(r))
@@ -121,21 +125,25 @@ func Register(ctx context.Context, workload *config.UserContext) {
 }
 
 type manager struct {
-	workload      *config.UserContext
-	rtLister      v3.RoleTemplateLister
-	prtbIndexer   cache.Indexer
-	crtbIndexer   cache.Indexer
-	nsIndexer     cache.Indexer
-	crIndexer     cache.Indexer
-	crbIndexer    cache.Indexer
-	crLister      typesrbacv1.ClusterRoleLister
-	crbLister     typesrbacv1.ClusterRoleBindingLister
-	rbLister      typesrbacv1.RoleBindingLister
-	nsLister      typescorev1.NamespaceLister
-	nsController  typescorev1.NamespaceController
-	clusterLister v3.ClusterLister
-	projectLister v3.ProjectLister
-	clusterName   string
+	workload            *config.UserContext
+	rtLister            v3.RoleTemplateLister
+	prtbIndexer         cache.Indexer
+	crtbIndexer         cache.Indexer
+	nsIndexer           cache.Indexer
+	crIndexer           cache.Indexer
+	crbIndexer          cache.Indexer
+	crLister            typesrbacv1.ClusterRoleLister
+	clusterRoles        typesrbacv1.ClusterRoleInterface
+	crbLister           typesrbacv1.ClusterRoleBindingLister
+	clusterRoleBindings typesrbacv1.ClusterRoleBindingInterface
+	rbLister            typesrbacv1.RoleBindingLister
+	rLister             typesrbacv1.RoleLister
+	roles               typesrbacv1.RoleInterface
+	nsLister            typescorev1.NamespaceLister
+	nsController        typescorev1.NamespaceController
+	clusterLister       v3.ClusterLister
+	projectLister       v3.ProjectLister
+	clusterName         string
 }
 
 func (m *manager) ensureRoles(rts map[string]*v3.RoleTemplate) error {
