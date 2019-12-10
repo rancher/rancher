@@ -1,8 +1,9 @@
 from .common import random_str
-from .conftest import wait_until_available
+from .conftest import wait_until_available, wait_until, wait_for
 from rancher import ApiError
 import time
 import pytest
+import kubernetes
 
 
 def test_role_template_creation(admin_mc, remove_resource):
@@ -142,6 +143,138 @@ def test_cloned_role_permissions(admin_mc, remove_resource, user_factory,
 
     project = cloned_user.client.by_id_project(admin_pc.project.id)
     assert project.actions.enableMonitoring
+
+
+def test_update_role_template_permissions(admin_mc, remove_resource,
+                                          user_factory, admin_cc):
+    client = admin_mc.client
+    cc_rt_name = random_str()
+    view_cc_rule = [{'apiGroups': ['management.cattle.io'],
+                     'resources': ['clustercatalogs'],
+                     'type': '/v3/schemas/policyRule',
+                     'verbs': ['get', 'list', 'watch']},
+                    {'apiGroups': ['management.cattle.io'],
+                     'resources': ['clusterevents'],
+                     'type': '/v3/schemas/policyRule',
+                     'verbs': ['get', 'list', 'watch']}]
+    rt = client.create_role_template(name=cc_rt_name, context="cluster",
+                                     rules=view_cc_rule)
+    # remove_resource(rt)
+    role_template_id = rt['id']
+    wait_for_role_template_creation(admin_mc, cc_rt_name)
+
+    user_view_cc = user_factory()
+    user_client = user_view_cc.client
+    crtb = client.create_cluster_role_template_binding(
+        userId=user_view_cc.user.id,
+        roleTemplateId=role_template_id,
+        clusterId=admin_cc.cluster.id,
+    )
+    remove_resource(crtb)
+    wait_until_available(user_client, admin_cc.cluster)
+
+    # add clustercatalog as admin
+    url = "https://github.com/rancher/integration-test-charts.git"
+    name = random_str()
+    cluster_catalog = \
+        client.create_cluster_catalog(name=name,
+                                      branch="master",
+                                      url=url,
+                                      clusterId="local",
+                                      )
+    remove_resource(cluster_catalog)
+    wait_until_available(client, cluster_catalog)
+
+    # list clustercatalog as the cluster-member
+    cc = user_client.list_cluster_catalog(name=name)
+    assert len(cc) == 1
+
+    # update role to remove view clustercatalogs permission
+    view_cc_role_template = client.by_id_role_template(role_template_id)
+    new_rules = [{'apiGroups': ['management.cattle.io'],
+                  'resources': ['clusterevents'],
+                  'type': '/v3/schemas/policyRule',
+                  'verbs': ['get', 'list', 'watch']}]
+    client.update(view_cc_role_template, rules=new_rules)
+    wait_until(lambda: client.reload(view_cc_role_template)['rules'] is None)
+
+    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
+
+    def check_role_rules(rbac, namespace, role_name, rules):
+        role = rbac.read_namespaced_role(role_name, namespace)
+        if len(role.rules) == len(rules) and \
+           role.rules[0].resources == ["clusterevents"]:
+            return True
+
+    wait_for(lambda: check_role_rules(rbac, 'local', role_template_id,
+                                      new_rules),
+             timeout=60, fail_handler=lambda:
+             'failed to check updated role')
+    # user should not be able to list cluster catalog now
+    cc = user_client.list_cluster_catalog(name=name)
+    assert len(cc) == 0
+
+
+def test_role_template_update_inherited_role(admin_mc, remove_resource,
+                                             user_factory, admin_pc):
+    client = admin_mc.client
+    name = random_str()
+    # clone project-member role
+    pm = client.by_id_role_template("project-member")
+    cloned_pm = client.create_role_template(name=name, context="project",
+                                            rules=pm.rules,
+                                            roleTemplateIds=["edit"])
+    remove_resource(cloned_pm)
+    role_template_id = cloned_pm['id']
+    wait_for_role_template_creation(admin_mc, name)
+
+    # add user to a project with this role
+    user_cloned_pm = user_factory()
+    prtb = client.create_project_role_template_binding(
+        name="prtb-" + random_str(),
+        userId=user_cloned_pm.user.id,
+        projectId=admin_pc.project.id,
+        roleTemplateId=cloned_pm.id
+    )
+    remove_resource(prtb)
+    wait_until_available(user_cloned_pm.client, admin_pc.project)
+
+    # check crbs created for this user
+    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
+    prtb_selector = prtb.uuid + "=" + "owner-user"
+    crbs = rbac.list_cluster_role_binding(label_selector=prtb_selector)
+    # crbs that get created for roleTemplate cloned from project-member
+    project_id = admin_pc.project.id.split(":")[1]
+    pm_crbs = [role_template_id+"-promoted",
+               project_id+"-namespaces-edit", "create-ns"]
+    for crb in crbs.items:
+        assert crb.role_ref.name in pm_crbs
+
+    # now edit the roleTemplate to remove "edit" from inherited roles,
+    # and add "view" to inherited roles
+    client.update(cloned_pm, roleTemplateIds=["view"])
+    wait_until(lambda: client.reload(cloned_pm)['roleTemplateIds'] is ["view"])
+    # check crbs are updated
+
+    pm_crbs = [role_template_id + "-promoted",
+               project_id + "-namespaces-readonly"]
+
+    def check_crb(rbac):
+        crbs = rbac.list_cluster_role_binding(label_selector=prtb_selector)
+        for crb in crbs.items:
+            if crb.role_ref.name == project_id + "-namespaces-readonly":
+                return True
+
+    wait_for(lambda: check_crb(rbac), timeout=60,
+             fail_handler=lambda: 'failed to check updated role')
+
+    crbs = rbac.list_cluster_role_binding(label_selector=prtb_selector)
+    found_crbs = []
+    for crb in crbs.items:
+        found_crbs.append(crb.role_ref.name)
+
+    for crb in pm_crbs:
+        assert crb in found_crbs
 
 
 def wait_for_role_template_creation(admin_mc, rt_name, timeout=60):
