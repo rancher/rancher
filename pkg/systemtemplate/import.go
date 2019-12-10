@@ -33,7 +33,7 @@ type context struct {
 
 func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool,
 	cluster *v3.Cluster) error {
-	d := md5.Sum([]byte(token))
+	d := md5.Sum([]byte(url + token + namespace))
 	tokenKey := hex.EncodeToString(d[:])[:7]
 
 	if authImage == "fixed" {

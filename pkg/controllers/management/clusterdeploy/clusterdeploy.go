@@ -20,7 +20,6 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -83,19 +82,19 @@ func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, 
 }
 
 func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
-	if !v3.ClusterConditionProvisioned.IsTrue(cluster) {
-		return nil
-	}
+	//if !v3.ClusterConditionProvisioned.IsTrue(cluster) {
+	//	return nil
+	//}
+	//
+	//nodes, err := cd.nodeLister.List(cluster.Name, labels.Everything())
+	//if err != nil {
+	//	return err
+	//}
+	//if len(nodes) == 0 {
+	//	return nil
+	//}
 
-	nodes, err := cd.nodeLister.List(cluster.Name, labels.Everything())
-	if err != nil {
-		return err
-	}
-	if len(nodes) == 0 {
-		return nil
-	}
-
-	_, err = v3.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
+	_, err := v3.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
 		return cluster, cd.systemAccountManager.CreateSystemAccount(cluster)
 	})
 	if err != nil {

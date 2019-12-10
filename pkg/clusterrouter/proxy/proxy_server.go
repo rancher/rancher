@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 
+	"k8s.io/kubernetes/pkg/apis/authentication"
+
 	"github.com/rancher/norman/httperror"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config/dialer"
@@ -227,6 +229,11 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		er.Error(rw, req, err)
 		return
 	}
+
+	// TODO: THIS IS SO BAD!!!!
+	req.Header.Del(authentication.ImpersonateUserHeader)
+	req.Header.Del(authentication.ImpersonateGroupHeader)
+
 	httpProxy := proxy.NewUpgradeAwareHandler(&u, transport, true, false, er)
 	httpProxy.ServeHTTP(rw, req)
 }

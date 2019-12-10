@@ -19,11 +19,12 @@ func Register(ctx context.Context, cluster managementv3.ClusterController, rbac 
 	managementv3.RegisterClusterGeneratingHandler(ctx,
 		cluster,
 		apply.WithCacheTypes(
+			cluster,
 			rbac.ClusterRole(),
 			rbac.ClusterRoleBinding(),
 			rbac.Role(),
 			rbac.RoleBinding()),
-		"AgentRBAC",
+		"",
 		"agent-auth",
 		h.generate,
 		&generic.GeneratingHandlerOptions{
