@@ -88,7 +88,6 @@ func PutValue(data map[string]interface{}, val interface{}, keys ...string) {
 		return
 	}
 
-	// This is so ugly
 	for i, key := range keys {
 		if i == len(keys)-1 {
 			data[key] = val
