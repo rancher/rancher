@@ -16,9 +16,10 @@ metadata:
     nginx.ingress.kubernetes.io/ssl-redirect: "false" # turn off ssl redirect for external.
 {{- else }}
   {{- if ne .Values.ingress.tls.source "secret" }}
-    {{- if .Capabilities.APIVersions.Has "cert-manager.io/v1alpha2" }}
+    {{- $certmanagerVer :=  split "." .Values.certmanager.version -}}
+    {{- if or (.Capabilities.APIVersions.Has "cert-manager.io/v1alpha2") (and (eq (int $certmanagerVer._0) 0) (ge (int $certmanagerVer._1) 11)) }}
     cert-manager.io/issuer: {{ template "rancher.fullname" . }}
-    {{- else if .Capabilities.APIVersions.Has "certmanager.k8s.io/v1alpha1" }}
+    {{- else if or (.Capabilities.APIVersions.Has "certmanager.k8s.io/v1alpha1") (and (eq (int $certmanagerVer._0) 0) (lt (int $certmanagerVer._1) 11)) }}
     certmanager.k8s.io/issuer: {{ template "rancher.fullname" . }}
     {{- end }}
   {{- end }}
