@@ -16,6 +16,7 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientcache "k8s.io/client-go/tools/cache"
@@ -101,11 +102,11 @@ func limitsChanged(existing []corev1.LimitRangeItem, toUpdate []corev1.LimitRang
 	if len(existing) == 0 || len(toUpdate) == 0 {
 		return true
 	}
-	if !reflect.DeepEqual(existing[0].DefaultRequest, toUpdate[0].DefaultRequest) {
+	if !apiequality.Semantic.DeepEqual(existing[0].DefaultRequest, toUpdate[0].DefaultRequest) {
 		return true
 	}
 
-	if !reflect.DeepEqual(existing[0].Default, toUpdate[0].Default) {
+	if !apiequality.Semantic.DeepEqual(existing[0].Default, toUpdate[0].Default) {
 		return true
 	}
 	return false
@@ -143,7 +144,7 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (runtime.Obje
 	} else {
 		if quotaSpec == nil {
 			operation = "delete"
-		} else if quotaToUpdate != "" || !reflect.DeepEqual(existing.Spec.Hard, quotaSpec.Hard) {
+		} else if quotaToUpdate != "" || !apiequality.Semantic.DeepEqual(existing.Spec.Hard, quotaSpec.Hard) {
 			operation = "update"
 		}
 	}
