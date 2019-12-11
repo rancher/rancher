@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/rancher/norman/types/convert"
+	provisioner "github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/remotedialer"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -50,12 +51,13 @@ func NewTunnelServer(authorizer *Authorizer) *remotedialer.Server {
 
 func NewAuthorizer(context *config.ScaledContext) *Authorizer {
 	auth := &Authorizer{
-		crtIndexer:    context.Management.ClusterRegistrationTokens("").Controller().Informer().GetIndexer(),
-		clusterLister: context.Management.Clusters("").Controller().Lister(),
-		nodeIndexer:   context.Management.Nodes("").Controller().Informer().GetIndexer(),
-		machineLister: context.Management.Nodes("").Controller().Lister(),
-		machines:      context.Management.Nodes(""),
-		clusters:      context.Management.Clusters(""),
+		crtIndexer:            context.Management.ClusterRegistrationTokens("").Controller().Informer().GetIndexer(),
+		clusterLister:         context.Management.Clusters("").Controller().Lister(),
+		nodeIndexer:           context.Management.Nodes("").Controller().Informer().GetIndexer(),
+		machineLister:         context.Management.Nodes("").Controller().Lister(),
+		machines:              context.Management.Nodes(""),
+		clusters:              context.Management.Clusters(""),
+		KontainerDriverLister: context.Management.KontainerDrivers("").Controller().Lister(),
 	}
 	context.Management.ClusterRegistrationTokens("").Controller().Informer().AddIndexers(map[string]cache.IndexFunc{
 		crtKeyIndex: auth.crtIndex,
@@ -67,12 +69,13 @@ func NewAuthorizer(context *config.ScaledContext) *Authorizer {
 }
 
 type Authorizer struct {
-	crtIndexer    cache.Indexer
-	clusterLister v3.ClusterLister
-	nodeIndexer   cache.Indexer
-	machineLister v3.NodeLister
-	machines      v3.NodeInterface
-	clusters      v3.ClusterInterface
+	crtIndexer            cache.Indexer
+	clusterLister         v3.ClusterLister
+	nodeIndexer           cache.Indexer
+	machineLister         v3.NodeLister
+	machines              v3.NodeInterface
+	clusters              v3.ClusterInterface
+	KontainerDriverLister v3.KontainerDriverLister
 }
 
 type Client struct {
@@ -279,7 +282,13 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 	}
 
 	changed := false
-	if cluster.Status.Driver == "" {
+
+	driver, err := provisioner.GetDriver(cluster, t.KontainerDriverLister)
+	if err != nil {
+		return cluster, true, err
+	}
+	if driver == "" {
+		logrus.Debugf("Setting the driver to imported for cluster %v %v", cluster.Name, cluster.Spec.DisplayName)
 		cluster.Status.Driver = importedDriver
 		changed = true
 	}
