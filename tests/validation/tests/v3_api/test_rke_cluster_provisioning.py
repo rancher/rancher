@@ -164,6 +164,10 @@ rke_config_aws_provider["cloudProvider"] = {"name": "aws",
                                             "awsCloudProvider":
                                             {"type": "awsCloudProvider"}}
 
+rke_config_aws_provider_2 = rke_config.copy()
+rke_config_aws_provider_2["cloudProvider"] = {"name": "aws",
+                                              "type": "cloudProvider"}
+
 rke_config_azure_provider = rke_config.copy()
 rke_config_azure_provider["cloudProvider"] = {
     "name": "azure",
@@ -288,6 +292,11 @@ def test_rke_ec2_host_with_aws_provider_1(node_template_ec2_with_provider):
 def test_rke_ec2_host_with_aws_provider_2(node_template_ec2_with_provider):
     validate_rke_dm_host_2(node_template_ec2_with_provider,
                            rke_config_aws_provider)
+
+
+def test_rke_ec2_host_with_aws_provider_3(node_template_ec2_with_provider):
+    validate_rke_dm_host_1(node_template_ec2_with_provider,
+                           rke_config_aws_provider_2)
 
 
 def test_rke_ec2_host_4(node_template_ec2):
