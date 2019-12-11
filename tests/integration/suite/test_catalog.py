@@ -302,9 +302,9 @@ def test_invalid_catalog_charts(admin_mc, remove_resource):
     catalog = client.reload(catalog)
     templates = client.list_template(catalogId=catalog.id).data
 
-    assert "areallylongnamelikereallyreallylongwestillneedmorez234dasdfasd "\
+    assert "areallylongnamelikereallyreallylongwestillneedmorez234dasdfasd"\
         not in templates
-    assert "trying-a-name_with_underscores-and_dashes" not in templates
+    assert "bad-chart_name" not in templates
     assert catalog.state == "refreshed"
     assert catalog.transitioning == "error"
     assert catalog.transitioningMessage == "Error syncing catalog " + name
