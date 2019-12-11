@@ -670,13 +670,13 @@ func (p *Provisioner) getConfig(reconcileRKE bool, spec v3.ClusterSpec, driverNa
 	return &spec, v, nil
 }
 
-func (p *Provisioner) getDriver(cluster *v3.Cluster) (string, error) {
+func GetDriver(cluster *v3.Cluster, driverLister v3.KontainerDriverLister) (string, error) {
 	var driver *v3.KontainerDriver
 	var err error
 
 	if cluster.Spec.GenericEngineConfig != nil {
 		kontainerDriverName := (*cluster.Spec.GenericEngineConfig)["driverName"].(string)
-		driver, err = p.KontainerDriverLister.Get("", kontainerDriverName)
+		driver, err = driverLister.Get("", kontainerDriverName)
 		if err != nil {
 			return "", err
 		}
@@ -700,7 +700,7 @@ func (p *Provisioner) validateDriver(cluster *v3.Cluster) (string, error) {
 		return v3.ClusterDriverImported, nil
 	}
 
-	newDriver, err := p.getDriver(cluster)
+	newDriver, err := GetDriver(cluster, p.KontainerDriverLister)
 	if err != nil {
 		return "", err
 	}
