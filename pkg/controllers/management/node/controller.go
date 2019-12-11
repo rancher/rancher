@@ -228,17 +228,16 @@ func (m *Lifecycle) Remove(obj *v3.Node) (runtime.Object, error) {
 			return obj, err
 		}
 
-		// Refresh first to save the compressed config, then Restore writes it to disk for machine to use
-		err = m.refreshNodeConfig(config, obj)
-		if err != nil {
-			return nil, errors.WithMessagef(err, "unable to refresh config for node %v", obj.Name)
-		}
-
 		if err := config.Restore(); err != nil {
 			return obj, err
 		}
 
 		defer config.Remove()
+
+		err = m.refreshNodeConfig(config, obj)
+		if err != nil {
+			return nil, errors.WithMessagef(err, "unable to refresh config for node %v", obj.Name)
+		}
 
 		mExists, err := nodeExists(config.Dir(), obj)
 		if err != nil {
@@ -402,14 +401,13 @@ func (m *Lifecycle) ready(obj *v3.Node) (*v3.Node, error) {
 	}
 	defer config.Cleanup()
 
-	// Refresh first to save the compressed config, then Restore writes it to disk for machine to use
+	if err := config.Restore(); err != nil {
+		return obj, err
+	}
+
 	err = m.refreshNodeConfig(config, obj)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "unable to refresh config for node %v", obj.Name)
-	}
-
-	if err := config.Restore(); err != nil {
-		return obj, err
 	}
 
 	driverConfig, err := config.DriverConfig()
@@ -569,12 +567,19 @@ func (m *Lifecycle) refreshNodeConfig(nc *nodeconfig.NodeConfig, obj *v3.Node) e
 		return fmt.Errorf("node config not specified for node %v", obj.Name)
 	}
 
-	if template.Spec.Driver == amazonec2 {
-		setEc2ClusterIDTag(rawConfig, obj.Namespace)
-	}
-
 	if err := m.updateRawConfigFromCredential(data, rawConfig, template); err != nil {
 		return err
+	}
+
+	var update bool
+
+	if template.Spec.Driver == amazonec2 {
+		setEc2ClusterIDTag(rawConfig, obj.Namespace)
+		//TODO: Update to not be amazon specific, this needs to be moved to the driver
+		update, err = nc.UpdateAmazonAuth(rawConfig)
+		if err != nil {
+			return err
+		}
 	}
 
 	bytes, err := json.Marshal(rawConfig)
@@ -589,7 +594,7 @@ func (m *Lifecycle) refreshNodeConfig(nc *nodeconfig.NodeConfig, obj *v3.Node) e
 		return err
 	}
 
-	if currentConfig != newConfig {
+	if currentConfig != newConfig || update {
 		err = nc.SetDriverConfig(string(bytes))
 		if err != nil {
 			return err
@@ -599,7 +604,6 @@ func (m *Lifecycle) refreshNodeConfig(nc *nodeconfig.NodeConfig, obj *v3.Node) e
 	}
 
 	return nil
-
 }
 
 func (m *Lifecycle) isNodeInAppliedSpec(node *v3.Node) (bool, error) {
