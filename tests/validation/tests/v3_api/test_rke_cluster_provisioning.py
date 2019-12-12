@@ -864,6 +864,8 @@ def node_template_az():
             "8888/tcp",
             "30456/tcp",
             "30457/tcp",
+            "30458/tcp",
+            "30459/tcp",
             "9001/tcp"
         ],
         "privateIpAddress": "",

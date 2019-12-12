@@ -1087,6 +1087,10 @@ def create_config_file(env_details):
 
 
 def validate_hostPort(p_client, workload, source_port, cluster):
+    url = get_endpoint_url_for_workload(p_client, workload)
+    wl = p_client.list_workload(uuid=workload.uuid).data[0]
+    source_port_wk = wl.publicEndpoints[0]["port"]
+    assert source_port == source_port_wk, "Source ports do not match"
     pods = p_client.list_pod(workloadId=workload.id).data
     nodes = get_schedulable_nodes(cluster)
     for node in nodes:
@@ -1103,17 +1107,21 @@ def validate_hostPort(p_client, workload, source_port, cluster):
             validate_http_response(curl_cmd, target_name_list)
 
 
-def validate_lb(p_client, workload):
+def validate_lb(p_client, workload, source_port):
     url = get_endpoint_url_for_workload(p_client, workload)
+    wl = p_client.list_workload(uuid=workload.uuid).data[0]
+    source_port_wk = wl.publicEndpoints[0]["port"]
+    assert source_port == source_port_wk, "Source ports do not match"
     target_name_list = get_target_names(p_client, [workload])
     wait_until_lb_is_active(url)
     validate_http_response(url + "/name.html", target_name_list)
 
 
-def validate_nodePort(p_client, workload, cluster):
+def validate_nodePort(p_client, workload, cluster, source_port):
     get_endpoint_url_for_workload(p_client, workload, 60)
     wl = p_client.list_workload(uuid=workload.uuid).data[0]
-    source_port = wl.publicEndpoints[0]["port"]
+    source_port_wk = wl.publicEndpoints[0]["port"]
+    assert source_port == source_port_wk, "Source ports do not match"
     nodes = get_schedulable_nodes(cluster)
     pods = p_client.list_pod(workloadId=wl.id).data
     target_name_list = []
@@ -1123,16 +1131,17 @@ def validate_nodePort(p_client, workload, cluster):
     for node in nodes:
         host_ip = resolve_node_ip(node)
         curl_cmd = " http://" + host_ip + ":" + \
-                   str(source_port) + "/name.html"
+                   str(source_port_wk) + "/name.html"
         validate_http_response(curl_cmd, target_name_list)
 
 
-def validate_clusterIp(p_client, workload, cluster_ip, test_pods):
+def validate_clusterIp(p_client, workload, cluster_ip, test_pods, source_port):
     pods = p_client.list_pod(workloadId=workload.id).data
     target_name_list = []
     for pod in pods:
         target_name_list.append(pod["name"])
-    curl_cmd = "http://" + cluster_ip + "/name.html"
+    curl_cmd = "http://" + cluster_ip + ":" + \
+               str(source_port) + "/name.html"
     for pod in test_pods:
         validate_http_response(curl_cmd, target_name_list, pod)
 

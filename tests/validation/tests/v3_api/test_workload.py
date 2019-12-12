@@ -293,16 +293,18 @@ def test_wl_with_nodePort():
                                         daemonSetConfig={})
 
     workload = wait_for_wl_to_active(p_client, workload)
-    validate_nodePort(p_client, workload, namespace["cluster"])
+    validate_nodePort(p_client, workload, namespace["cluster"],source_port)
 
 
 def test_wl_with_clusterIp():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
+    source_port = 30458
     port = {"containerPort": "80",
             "type": "containerPort",
             "kind": "ClusterIP",
-            "protocol": "TCP"}
+            "protocol": "TCP",
+            "sourcePort": source_port}
     con = [{"name": "test1",
             "image": TEST_IMAGE,
             "ports": [port]}]
@@ -330,7 +332,7 @@ def test_wl_with_clusterIp():
                                                  scale=2)
     wait_for_wl_to_active(p_client, workload_for_test)
     test_pods = wait_for_pods_in_workload(p_client, workload_for_test, 2)
-    validate_clusterIp(p_client, workload, cluster_ip, test_pods)
+    validate_clusterIp(p_client, workload, cluster_ip, test_pods, source_port)
 
 
 @if_check_lb
@@ -353,16 +355,18 @@ def test_wl_with_lb():
                                         namespaceId=ns.id,
                                         daemonSetConfig={})
     workload = wait_for_wl_to_active(p_client, workload)
-    validate_lb(p_client, workload)
+    validate_lb(p_client, workload, source_port)
 
 
 def test_wl_with_clusterIp_scale_and_upgrade():
     p_client = namespace["p_client"]
     ns = namespace["ns"]
+    source_port = 30459
     port = {"containerPort": "80",
             "type": "containerPort",
             "kind": "ClusterIP",
-            "protocol": "TCP"}
+            "protocol": "TCP",
+            "sourcePort": source_port}
     con = [{"name": "test-cluster-ip",
             "image": TEST_IMAGE,
             "ports": [port]}]
@@ -385,19 +389,19 @@ def test_wl_with_clusterIp_scale_and_upgrade():
                                                  scale=2)
     wait_for_wl_to_active(p_client, workload_for_test)
     test_pods = wait_for_pods_in_workload(p_client, workload_for_test, 2)
-    validate_clusterIp(p_client, workload, cluster_ip, test_pods)
+    validate_clusterIp(p_client, workload, cluster_ip, test_pods, source_port)
 
     # scale up
     p_client.update(workload, scale=3, caontainers=con)
     workload = wait_for_wl_to_active(p_client, workload)
     wait_for_pods_in_workload(p_client, workload, 3)
-    validate_clusterIp(p_client, workload, cluster_ip, test_pods)
+    validate_clusterIp(p_client, workload, cluster_ip, test_pods, source_port)
 
     # scale down
     p_client.update(workload, scale=2, containers=con)
     workload = wait_for_wl_to_active(p_client, workload)
     wait_for_pods_in_workload(p_client, workload, 2)
-    validate_clusterIp(p_client, workload, cluster_ip, test_pods)
+    validate_clusterIp(p_client, workload, cluster_ip, test_pods, source_port)
     # upgrade
     con = [{"name": "test-cluster-ip-upgrade-new",
             "image": TEST_IMAGE,
@@ -405,7 +409,7 @@ def test_wl_with_clusterIp_scale_and_upgrade():
     p_client.update(workload, containers=con)
     workload = wait_for_wl_to_active(p_client, workload)
     wait_for_pods_in_workload(p_client, workload, 2)
-    validate_clusterIp(p_client, workload, cluster_ip, test_pods)
+    validate_clusterIp(p_client, workload, cluster_ip, test_pods, source_port)
 
 
 @skip_host_node_port
@@ -428,19 +432,19 @@ def test_wl_with_nodePort_scale_and_upgrade():
                                         scale=1)
     workload = wait_for_wl_to_active(p_client, workload)
     wait_for_pods_in_workload(p_client, workload, 1)
-    validate_nodePort(p_client, workload, namespace["cluster"])
+    validate_nodePort(p_client, workload, namespace["cluster"], source_port)
 
     # scale up
     p_client.update(workload, scale=3, containers=con)
     workload = wait_for_wl_to_active(p_client, workload)
     wait_for_pods_in_workload(p_client, workload, 3)
-    validate_nodePort(p_client, workload, namespace["cluster"])
+    validate_nodePort(p_client, workload, namespace["cluster"], source_port)
 
     # scale down
     p_client.update(workload, scale=2, containers=con)
     workload = wait_for_wl_to_active(p_client, workload)
     wait_for_pods_in_workload(p_client, workload, 2)
-    validate_nodePort(p_client, workload, namespace["cluster"])
+    validate_nodePort(p_client, workload, namespace["cluster"], source_port)
 
     # upgrade
     con = [{"name": "test-node-port-scale-upgrade-new",
@@ -449,7 +453,7 @@ def test_wl_with_nodePort_scale_and_upgrade():
     p_client.update(workload, containers=con)
     workload = wait_for_wl_to_active(p_client, workload)
     wait_for_pods_in_workload(p_client, workload, 2)
-    validate_nodePort(p_client, workload, namespace["cluster"])
+    validate_nodePort(p_client, workload, namespace["cluster"], source_port)
 
 
 @skip_host_node_port
@@ -522,19 +526,19 @@ def test_wl_with_lb_scale_and_upgrade():
                                         scale=1)
     workload = wait_for_wl_to_active(p_client, workload)
     wait_for_pods_in_workload(p_client, workload, 1)
-    validate_lb(p_client, workload)
+    validate_lb(p_client, workload, source_port)
 
     # scale up
     p_client.update(workload, scale=3, containers=con)
     workload = wait_for_wl_to_active(p_client, workload)
     wait_for_pods_in_workload(p_client, workload, 3)
-    validate_lb(p_client, workload)
+    validate_lb(p_client, workload, source_port)
 
     # scale down
     p_client.update(workload, scale=2, containers=con)
     workload = wait_for_wl_to_active(p_client, workload)
     wait_for_pods_in_workload(p_client, workload, 2)
-    validate_lb(p_client, workload)
+    validate_lb(p_client, workload, source_port)
 
     # upgrade
     con = [{"name": "test-load-balance-upgrade-new",
@@ -543,7 +547,7 @@ def test_wl_with_lb_scale_and_upgrade():
     p_client.update(workload, containers=con)
     workload = wait_for_wl_to_active(p_client, workload)
     wait_for_pods_in_workload(p_client, workload, 2)
-    validate_lb(p_client, workload)
+    validate_lb(p_client, workload, source_port)
 
 
 @if_test_rbac
