@@ -177,7 +177,7 @@ func (m *NodeConfig) UpdateAmazonAuth(rawConfig interface{}) (bool, error) {
 	c := convert.ToMapInterface(rawConfig)
 
 	machines := filepath.Join(m.fullMachinePath, "machines")
-
+	logrus.Debugf("[UpdateAmazonAuth] machine path %v", machines)
 	files, err := ioutil.ReadDir(machines)
 	if err != nil {
 		// There aren't any machines, nothing to update
@@ -193,10 +193,13 @@ func (m *NodeConfig) UpdateAmazonAuth(rawConfig interface{}) (bool, error) {
 			b, err := ioutil.ReadFile(configPath)
 			if err != nil {
 				if os.IsNotExist(err) {
+					// config.json doesn't exist, no changes needed
 					continue
 				}
 				return update, err
 			}
+
+			logrus.Debugf("[UpdateAmazonAuth] config file found, path %v", configPath)
 
 			result := make(map[string]interface{})
 
@@ -204,28 +207,42 @@ func (m *NodeConfig) UpdateAmazonAuth(rawConfig interface{}) (bool, error) {
 				return update, errors.Wrap(err, "error unmarshaling machine config")
 			}
 
-			if _, ok := result["AccessKey"]; ok {
-				if result["AccessKey"] != c["accessKey"] {
-					result["AccessKey"] = c["accessKey"]
+			if _, ok := result["Driver"]; !ok {
+				logrus.Debug("[UpdateAmazonAuth] config file does not have Data key")
+				// No Driver config so no changes to be made
+				continue
+			}
+
+			driverConfig := convert.ToMapInterface(result["Driver"])
+
+			if _, ok := driverConfig["AccessKey"]; ok {
+				if driverConfig["AccessKey"] != c["accessKey"] {
+					logrus.Debug("[UpdateAmazonAuth] update access key")
+					driverConfig["AccessKey"] = c["accessKey"]
 					update = true
 				}
 			}
 
-			if _, ok := result["SecretKey"]; ok {
-				if result["SecretKey"] != c["secretKey"] {
-					result["SecretKey"] = c["secretKey"]
+			if _, ok := driverConfig["SecretKey"]; ok {
+				if driverConfig["SecretKey"] != c["secretKey"] {
+					logrus.Debug("[UpdateAmazonAuth] update secret key")
+					driverConfig["SecretKey"] = c["secretKey"]
 					update = true
 				}
 
 			}
 
-			out, err := json.Marshal(result)
-			if err != nil {
-				return update, errors.WithMessage(err, "error marshaling new machine config")
-			}
+			if update {
+				result["Driver"] = driverConfig
 
-			if err := ioutil.WriteFile(configPath, out, 0600); err != nil {
-				return update, errors.WithMessage(err, "error writing  new machine config")
+				out, err := json.Marshal(result)
+				if err != nil {
+					return update, errors.WithMessage(err, "error marshaling new machine config")
+				}
+
+				if err := ioutil.WriteFile(configPath, out, 0600); err != nil {
+					return update, errors.WithMessage(err, "error writing  new machine config")
+				}
 			}
 
 		}
