@@ -1,11 +1,12 @@
 package nodeconfig
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
-	"encoding/json"
-
+	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
 	"github.com/rancher/rancher/pkg/encryptedstore"
@@ -13,7 +14,7 @@ import (
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serror "k8s.io/apimachinery/pkg/api/errors"
 )
 
 const (
@@ -167,6 +168,89 @@ func (m *NodeConfig) Restore() error {
 	return extractConfig(m.fullMachinePath, data)
 }
 
+// UpdateAmazonAuth updates the machine config.json file on disk with the most
+// recent version of creds from the cloud credential
+// This code should not be updated or duplicated - it should be deleted once
+// https://github.com/rancher/rancher/issues/24541 is implemented
+func (m *NodeConfig) UpdateAmazonAuth(rawConfig interface{}) (bool, error) {
+	var update bool
+	c := convert.ToMapInterface(rawConfig)
+
+	machines := filepath.Join(m.fullMachinePath, "machines")
+	logrus.Debugf("[UpdateAmazonAuth] machine path %v", machines)
+	files, err := ioutil.ReadDir(machines)
+	if err != nil {
+		// There aren't any machines, nothing to update
+		if os.IsNotExist(err) {
+			return update, nil
+		}
+		return update, err
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			configPath := filepath.Join(machines, file.Name(), "config.json")
+			b, err := ioutil.ReadFile(configPath)
+			if err != nil {
+				if os.IsNotExist(err) {
+					// config.json doesn't exist, no changes needed
+					continue
+				}
+				return update, err
+			}
+
+			logrus.Debugf("[UpdateAmazonAuth] config file found, path %v", configPath)
+
+			result := make(map[string]interface{})
+
+			if err := json.Unmarshal(b, &result); err != nil {
+				return update, errors.Wrap(err, "error unmarshaling machine config")
+			}
+
+			if _, ok := result["Driver"]; !ok {
+				logrus.Debug("[UpdateAmazonAuth] config file does not have Data key")
+				// No Driver config so no changes to be made
+				continue
+			}
+
+			driverConfig := convert.ToMapInterface(result["Driver"])
+
+			if _, ok := driverConfig["AccessKey"]; ok {
+				if driverConfig["AccessKey"] != c["accessKey"] {
+					logrus.Debug("[UpdateAmazonAuth] update access key")
+					driverConfig["AccessKey"] = c["accessKey"]
+					update = true
+				}
+			}
+
+			if _, ok := driverConfig["SecretKey"]; ok {
+				if driverConfig["SecretKey"] != c["secretKey"] {
+					logrus.Debug("[UpdateAmazonAuth] update secret key")
+					driverConfig["SecretKey"] = c["secretKey"]
+					update = true
+				}
+
+			}
+
+			if update {
+				result["Driver"] = driverConfig
+
+				out, err := json.Marshal(result)
+				if err != nil {
+					return update, errors.WithMessage(err, "error marshaling new machine config")
+				}
+
+				if err := ioutil.WriteFile(configPath, out, 0600); err != nil {
+					return update, errors.WithMessage(err, "error writing  new machine config")
+				}
+			}
+
+		}
+	}
+
+	return update, nil
+}
+
 func (m *NodeConfig) loadConfig() error {
 	if m.cm != nil {
 		return nil
@@ -187,7 +271,7 @@ func (m *NodeConfig) loadConfig() error {
 
 func (m *NodeConfig) getConfigMap() (map[string]string, error) {
 	configMap, err := m.store.Get(m.id)
-	if errors.IsNotFound(err) {
+	if k8serror.IsNotFound(err) {
 		return nil, nil
 	}
 	if err != nil {
