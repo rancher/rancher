@@ -57,31 +57,48 @@ def test_dep_creation_kubectl(admin_mc, admin_cc, remove_resource):
     assert port['kind'] == 'HostPort'
 
 
-def test_dep_host_port(admin_pc):
+def test_port(admin_pc):
     client = admin_pc.client
-    ns = admin_pc.cluster.client.create_namespace(name=random_str(),
-                                                  projectId=admin_pc.
-                                                  project.id)
-    # create workload with a host port
 
-    name = random_str()
     ports = [{
-        'sourcePort': '776',
-        'containerPort': '80',
+        'sourcePort': 776,
+        'containerPort': 80,
         'kind': 'HostPort',
-        'protocol': 'TCP', }]
-    workload = client.create_workload(
-        name=name,
-        namespaceId=ns.id,
-        scale=1,
-        containers=[{
-            'name': 'one',
-            'image': 'nginx',
-            'ports': ports,
-        }])
+        'protocol': 'TCP', },
+        {
+        'sourcePort': 777,
+        'containerPort': 80,
+        'kind': 'NodePort',
+        'protocol': 'TCP', },
+        {
+        'sourcePort': 778,
+        'containerPort': 80,
+        'kind': 'LoadBalancer',
+        'protocol': 'TCP', },
+        {
+        'sourcePort': 779,
+        'containerPort': 80,
+        'kind': 'ClusterIP',
+        'protocol': 'TCP', },
+        ]
 
-    # update workload with port, and validate cluster ip is set
-    assert workload['containers'][0]['ports'] is not None
-    assert workload['containers'][0]['ports'][0]['kind'] == 'HostPort'
-    assert workload['containers'][0]['ports'][0]['containerPort'] == 80
-    assert workload['containers'][0]['ports'][0]['sourcePort'] == 776
+    for port in ports:
+        ns = admin_pc.cluster.client.create_namespace(name=random_str(),
+                                                      projectId=admin_pc.
+                                                      project.id)
+        name = random_str()
+
+        workload = client.create_workload(
+            name=name,
+            namespaceId=ns.id,
+            scale=1,
+            containers=[{
+                'name': 'one',
+                'image': 'nginx',
+                'ports': [port],
+            }])
+        workload_ports = workload['containers'][0]['ports']
+        assert workload_ports is not None
+        assert workload_ports[0]['kind'] == port['kind']
+        assert workload_ports[0]['containerPort'] == port['containerPort']
+        assert workload_ports[0]['sourcePort'] == port['sourcePort']
