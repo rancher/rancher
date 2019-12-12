@@ -688,7 +688,7 @@ func translatePreparingMessage(log string) string {
 	if message == "" {
 		message = "Setting up executors"
 	} else if strings.Contains(message, " offline") {
-		message = "Waiting executors to be ready"
+		message = "Waiting for executors to be ready"
 	} else if strings.Contains(message, "Running") {
 		message = stripTags(message)
 	} else {
