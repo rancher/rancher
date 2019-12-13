@@ -35,6 +35,7 @@ func (m *Manager) ClusterCatalogSync(key string, obj *v3.ClusterCatalog) (runtim
 	if err != nil {
 		return m.updateClusterCatalogError(clusterCatalog, err)
 	}
+	logrus.Debugf("Chart hash comparison for cluster catalog %v: new -- %v --- current -- %v", clusterCatalog.Name, commit, &clusterCatalog.Catalog.Status.Commit)
 
 	if isUpToDate(commit, &clusterCatalog.Catalog) {
 		if setRefreshed(&clusterCatalog.Catalog) {

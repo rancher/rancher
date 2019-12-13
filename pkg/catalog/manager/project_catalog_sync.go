@@ -35,6 +35,7 @@ func (m *Manager) ProjectCatalogSync(key string, obj *v3.ProjectCatalog) (runtim
 	if err != nil {
 		return m.updateProjectCatalogError(projectCatalog, err)
 	}
+	logrus.Debugf("Chart hash comparison for project catalog %v: new -- %v --- current -- %v", projectCatalog.Name, commit, &projectCatalog.Catalog.Status.Commit)
 
 	if isUpToDate(commit, &projectCatalog.Catalog) {
 		if setRefreshed(&projectCatalog.Catalog) {
