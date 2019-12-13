@@ -28,6 +28,7 @@ const (
 	RKESystemImagesFieldKubernetesServicesSidecar = "kubernetesServicesSidecar"
 	RKESystemImagesFieldMetricsServer             = "metricsServer"
 	RKESystemImagesFieldNginxProxy                = "nginxProxy"
+	RKESystemImagesFieldNodelocal                 = "nodelocal"
 	RKESystemImagesFieldPodInfraContainer         = "podInfraContainer"
 	RKESystemImagesFieldWeaveCNI                  = "weaveCni"
 	RKESystemImagesFieldWeaveNode                 = "weaveNode"
@@ -61,6 +62,7 @@ type RKESystemImages struct {
 	KubernetesServicesSidecar string `json:"kubernetesServicesSidecar,omitempty" yaml:"kubernetesServicesSidecar,omitempty"`
 	MetricsServer             string `json:"metricsServer,omitempty" yaml:"metricsServer,omitempty"`
 	NginxProxy                string `json:"nginxProxy,omitempty" yaml:"nginxProxy,omitempty"`
+	Nodelocal                 string `json:"nodelocal,omitempty" yaml:"nodelocal,omitempty"`
 	PodInfraContainer         string `json:"podInfraContainer,omitempty" yaml:"podInfraContainer,omitempty"`
 	WeaveCNI                  string `json:"weaveCni,omitempty" yaml:"weaveCni,omitempty"`
 	WeaveNode                 string `json:"weaveNode,omitempty" yaml:"weaveNode,omitempty"`

@@ -66,14 +66,13 @@ func (n ContainerPorts) FromInternal(data map[string]interface{}) {
 			if annotationPort, ok := portMap[convert.ToString(portName)]; ok {
 				containerPorts = append(containerPorts, annotationPort)
 			} else {
-				hostPort, _ := values.GetValue(asMap, "sourcePort")
+				hostPort, _ := values.GetValue(asMap, "hostPort")
 				if hostPort == nil {
 					asMap["kind"] = "ClusterIP"
 				} else {
 					asMap["sourcePort"] = hostPort
 					asMap["kind"] = "HostPort"
 				}
-				delete(asMap, "hostPort")
 				containerPorts = append(containerPorts, asMap)
 			}
 		}
@@ -98,11 +97,9 @@ func (n ContainerPorts) ToInternal(data map[string]interface{}) error {
 					logrus.Warnf("Failed to encode port: %v", err)
 					return obj
 				}
-				if !strings.EqualFold(convert.ToString(mapped["kind"]), "HostPort") {
-					// delete the source port so it doesn't get converted to the host port by default mapper
-					delete(mapped, "sourcePort")
+				if strings.EqualFold(convert.ToString(mapped["kind"]), "HostPort") {
+					mapped["hostPort"] = mapped["sourcePort"]
 				}
-
 			}
 			ports = append(ports, l)
 		}

@@ -61,6 +61,7 @@ var transitioningMap = map[string]string{
 	"InitialRolesPopulated":       "activating",
 	"ScalingActive":               "pending",
 	"AbleToScale":                 "pending",
+	"RunCompleted":                "running",
 }
 
 // True == error

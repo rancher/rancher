@@ -3,14 +3,17 @@ package v3
 import (
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
+	typescond "github.com/rancher/types/condition"
 	v1 "k8s.io/api/core/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
-	ClusterScanConditionCreated   condition.Cond = "Created"
-	ClusterScanConditionCompleted condition.Cond = "Completed"
+	ClusterScanConditionCreated      condition.Cond = typescond.Created
+	ClusterScanConditionRunCompleted condition.Cond = typescond.RunCompleted
+	ClusterScanConditionCompleted    condition.Cond = typescond.Completed
+	ClusterScanConditionFailed       condition.Cond = typescond.Failed
 
 	ClusterScanTypeCis         = "cis"
 	DefaultNamespaceForCis     = "security-scan"
@@ -24,7 +27,9 @@ const (
 
 type CisScanConfig struct {
 	// IDs of the checks that need to be skipped in the final report
-	Skip []string `json:"skip"`
+	Skip string `json:"skip,omitempty"`
+	// Override the CIS benchmark version to use for the scan (instead of latest)
+	OverrideBenchmarkVersion string `json:"overrideBenchmarkVersion,omitempty"`
 	// Internal flag for debugging master component of the scan
 	DebugMaster bool `json:"debugMaster"`
 	// Internal flag for debugging worker component of the scan
