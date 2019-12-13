@@ -82,10 +82,10 @@ func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, 
 }
 
 func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
-	//if !v3.ClusterConditionProvisioned.IsTrue(cluster) {
-	//	return nil
-	//}
-	//
+	if !v3.ClusterConditionProvisioned.IsTrue(cluster) {
+		return nil
+	}
+
 	//nodes, err := cd.nodeLister.List(cluster.Name, labels.Everything())
 	//if err != nil {
 	//	return err
