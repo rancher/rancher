@@ -770,6 +770,9 @@ data:
       "plugins": [
         {
           "type": "calico",
+{{- if ne .MTU ""}}
+          "mtu": {{.MTU}},
+{{- end}}
           "log_level": "WARNING",
           "datastore_type": "kubernetes",
           "nodename": "__KUBERNETES_NODE_NAME__",
@@ -1377,6 +1380,9 @@ data:
       "plugins": [
         {
           "type": "calico",
+{{- if ne .MTU ""}}
+          "mtu": {{.MTU}},
+{{- end}}
           "log_level": "WARNING",
           "datastore_type": "kubernetes",
           "nodename": "__KUBERNETES_NODE_NAME__",
@@ -1823,6 +1829,9 @@ data:
       "plugins": [
         {
           "type": "calico",
+{{- if ne .MTU ""}}
+          "mtu": {{.MTU}},
+{{- end}}
           "log_level": "WARNING",
           "datastore_type": "kubernetes",
           "nodename": "__KUBERNETES_NODE_NAME__",
