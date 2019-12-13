@@ -20,3 +20,4 @@ minio/minio rancher/minio-minio RELEASE.2019-09-25T18-25-51Z
 grafana/grafana rancher/grafana-grafana 6.3.6
 library/nginx rancher/nginx 1.17.4-alpine
 jenkins/jnlp-slave rancher/jenkins-jnlp-slave 3.35-4
+thanosio/thanos rancher/thanos v0.9.0
