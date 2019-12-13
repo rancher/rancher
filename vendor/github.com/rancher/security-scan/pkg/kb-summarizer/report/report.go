@@ -42,7 +42,7 @@ type Group struct {
 }
 
 type Report struct {
-	Version string                `json:"-"`
+	Version string                `json:"version"`
 	Total   int                   `json:"total"`
 	Pass    int                   `json:"pass"`
 	Fail    int                   `json:"fail"`
@@ -128,6 +128,7 @@ func mapReport(internalReport *summarizer.SummarizedReport) (*Report, error) {
 	sort.Slice(externalReport.Results, func(i, j int) bool {
 		return externalReport.Results[i].ID < externalReport.Results[j].ID
 	})
+	externalReport.Version = internalReport.Version
 	externalReport.Total = internalReport.Total
 	externalReport.Pass = internalReport.Pass
 	externalReport.Fail = internalReport.Fail

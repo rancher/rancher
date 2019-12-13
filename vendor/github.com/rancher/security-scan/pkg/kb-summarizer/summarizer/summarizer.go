@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"gopkg.in/yaml.v2"
 
@@ -31,7 +30,9 @@ const (
 )
 
 type Summarizer struct {
-	K8sVersion            string
+	// mapping for k8s version to default benchmark version
+	kubeToBenchmarkMap    map[string]string
+	BenchmarkVersion      string
 	ControlsDirectory     string
 	EtcdControlsDirectory string
 	InputDirectory        string
@@ -67,15 +68,16 @@ const (
 )
 
 type CheckWrapper struct {
-	ID          string                `yaml:"id" json:"id"`
-	Text        string                `json:"d"`
-	Type        string                `json:"-"`
-	Remediation string                `json:"r"`
-	State       State                 `json:"s"`
-	Scored      bool                  `json:"-"`
-	Result      map[kb.State][]string `json:"-"`
-	NodeType    []NodeType            `json:"t"`
-	Nodes       []string              `json:"n,omitempty"`
+	ID          string                       `yaml:"id" json:"id"`
+	Text        string                       `json:"d"`
+	Type        string                       `json:"-"`
+	Remediation string                       `json:"r"`
+	State       State                        `json:"s"`
+	Scored      bool                         `json:"-"`
+	Result      map[kb.State]map[string]bool `json:"-"`
+	NodeType    []NodeType                   `json:"t"`
+	NodesMap    map[string]bool              `json:"-"`
+	Nodes       []string                     `json:"n,omitempty"`
 }
 
 type GroupWrapper struct {
@@ -85,7 +87,7 @@ type GroupWrapper struct {
 }
 
 type SummarizedReport struct {
-	Version       string                `json:"-"`
+	Version       string                `json:"v"`
 	Total         int                   `json:"t"`
 	Fail          int                   `json:"f"`
 	Pass          int                   `json:"p"`
@@ -94,9 +96,13 @@ type SummarizedReport struct {
 	GroupWrappers []*GroupWrapper       `json:"o"`
 }
 
-func NewSummarizer(k8sVersion, controlsDir, etcdControlsDir, inputDir, outputDir, outputFilename, skipStr string, failuresOnly bool) (*Summarizer, error) {
+type skipConfig struct {
+	Skip map[string][]string `json:"skip"`
+}
+
+func NewSummarizer(k8sVersion, benchmarkVersion, controlsDir, etcdControlsDir, inputDir, outputDir, outputFilename, skipConfigFile string, failuresOnly bool) (*Summarizer, error) {
+	var err error
 	s := &Summarizer{
-		K8sVersion:            k8sVersion,
 		ControlsDirectory:     controlsDir,
 		EtcdControlsDirectory: etcdControlsDir,
 		InputDirectory:        inputDir,
@@ -109,25 +115,63 @@ func NewSummarizer(k8sVersion, controlsDir, etcdControlsDir, inputDir, outputDir
 		},
 		groupWrappersMap:  map[string]*GroupWrapper{},
 		checkWrappersMaps: map[string]*CheckWrapper{},
-		skip:              getSkipMap(skipStr),
 		nodeSeen:          map[NodeType]map[string]bool{},
+	}
+	if err := s.loadVersionMapping(); err != nil {
+		return nil, fmt.Errorf("error loading version mapping: %v", err)
+	}
+	if benchmarkVersion != "" {
+		s.BenchmarkVersion = benchmarkVersion
+	} else {
+		s.BenchmarkVersion, err = s.getBenchmarkFor(k8sVersion)
+		if err != nil {
+			return nil, fmt.Errorf("error getting benchmarkVersion for k8s version %v: %v", k8sVersion, err)
+		}
 	}
 	if err := s.loadControls(); err != nil {
 		return nil, fmt.Errorf("error loading controls: %v", err)
 	}
+	skip, err := getSkipInfo(s.BenchmarkVersion, skipConfigFile)
+	if err != nil {
+		logrus.Errorf("error getting skip info: %v, but ignoring", err)
+	}
+	s.skip = skip
 	return s, nil
 }
 
-func getSkipMap(skip string) map[string]bool {
+func getSkipInfo(benchmark, skipConfigFile string) (map[string]bool, error) {
 	skipMap := map[string]bool{}
-	if skip == "" {
-		return skipMap
+	sc := &skipConfig{}
+	if skipConfigFile == "" {
+		return skipMap, nil
 	}
-	splits := strings.Split(skip, ",")
-	for _, split := range splits {
-		skipMap[split] = true
+	data, err := ioutil.ReadFile(skipConfigFile)
+	if err != nil {
+		return skipMap, fmt.Errorf("error reading file %v: %v", skipConfigFile, err)
 	}
-	return skipMap
+	err = json.Unmarshal(data, sc)
+	if err != nil {
+		return skipMap, fmt.Errorf("error unmarshalling skip str: %v", err)
+	}
+	skipArr := sc.Skip[benchmark]
+	if len(skipArr) == 0 {
+		return skipMap, nil
+	}
+	for _, v := range skipArr {
+		skipMap[v] = true
+	}
+	return skipMap, nil
+}
+
+func (s *Summarizer) getBenchmarkFor(k8sversion string) (string, error) {
+	if k8sversion == "" {
+		return "", nil
+	}
+	b, ok := s.kubeToBenchmarkMap[k8sversion]
+	if !ok {
+		return "", fmt.Errorf("k8s version: %v not supported", k8sversion)
+	}
+	return b, nil
 }
 
 func (s *Summarizer) processOneResultFileForHost(results *kb.Controls, hostname string) {
@@ -154,10 +198,10 @@ func (s *Summarizer) processOneResultFileForHost(results *kb.Controls, hostname 
 			}
 
 			if cw.Result[check.State] == nil {
-				cw.Result[check.State] = []string{hostname}
-			} else {
-				cw.Result[check.State] = append(cw.Result[check.State], hostname)
+				cw.Result[check.State] = make(map[string]bool)
 			}
+			cw.Result[check.State][hostname] = true
+
 		}
 	}
 }
@@ -175,7 +219,7 @@ func (s *Summarizer) summarizeForHost(hostname string) error {
 	hostDir := fmt.Sprintf("%v/%v", s.InputDirectory, hostname)
 	resultFilesPaths, err := filepath.Glob(fmt.Sprintf("%v/*.json", hostDir))
 	if err != nil {
-		return err
+		return fmt.Errorf("error globing files: %v", err)
 	}
 
 	nodeTypeMapping := getResultsFileNodeTypeMapping()
@@ -228,21 +272,22 @@ func (s *Summarizer) save() error {
 	return nil
 }
 
-func (s *Summarizer) loadVersionMapping() (map[string]string, error) {
+func (s *Summarizer) loadVersionMapping() error {
 	configFileName := fmt.Sprintf("%v/%v", s.ControlsDirectory, ConfigFilename)
 	v := viper.New()
 	v.SetConfigFile(configFileName)
 	if err := v.ReadInConfig(); err != nil {
-		return nil, err
+		return fmt.Errorf("error reading in config file: %v", err)
 	}
 
 	kubeToBenchmarkMap := v.GetStringMapString(VersionMappingKey)
 	if kubeToBenchmarkMap == nil || (len(kubeToBenchmarkMap) == 0) {
-		return nil, fmt.Errorf("config file is missing '%v' section", VersionMappingKey)
+		return fmt.Errorf("config file is missing '%v' section", VersionMappingKey)
 	}
 	logrus.Debugf("%v: %v", VersionMappingKey, kubeToBenchmarkMap)
+	s.kubeToBenchmarkMap = kubeToBenchmarkMap
 
-	return kubeToBenchmarkMap, nil
+	return nil
 }
 
 func (s *Summarizer) loadControlsFromFile(filePath string) (*kb.Controls, error) {
@@ -291,21 +336,13 @@ func (s *Summarizer) getControlsDir(nodeType NodeType) string {
 }
 
 func (s *Summarizer) loadControls() error {
-	mapping, err := s.loadVersionMapping()
-	if err != nil {
-		return fmt.Errorf("error loading version mapping: %v", err)
-	}
-	benchmarkVersion, ok := mapping[s.K8sVersion]
-	if !ok {
-		return fmt.Errorf("k8s version: %v not supported", s.K8sVersion)
-	}
-
+	var ok bool
 	controlsFiles := getNodeTypeControlsFileMapping()
 
 	var groupWrappers []*GroupWrapper
 	for nodeType, controlsFile := range controlsFiles {
 		s.nodeSeen[nodeType] = map[string]bool{}
-		filePath := fmt.Sprintf("%v/%v/%v", s.getControlsDir(nodeType), benchmarkVersion, controlsFile)
+		filePath := fmt.Sprintf("%v/%v/%v", s.getControlsDir(nodeType), s.BenchmarkVersion, controlsFile)
 		controls, err := s.loadControlsFromFile(filePath)
 		if err != nil {
 			logrus.Errorf("error loading controls from file %v: %v", filePath, err)
@@ -375,7 +412,7 @@ func getCheckWrapper(check *kb.Check) *CheckWrapper {
 		Type:        check.Type,
 		Remediation: check.Remediation,
 		Scored:      check.Scored,
-		Result:      map[kb.State][]string{},
+		Result:      map[kb.State]map[string]bool{},
 	}
 }
 
@@ -389,14 +426,14 @@ func (s *Summarizer) getNodesMapOfCheckWrapper(check *CheckWrapper) map[string]b
 	return nodes
 }
 
-func (s *Summarizer) getMissingNodesMapOfCheckWrapper(check *CheckWrapper, nodes []string) []string {
+func (s *Summarizer) getMissingNodesMapOfCheckWrapper(check *CheckWrapper, nodes map[string]bool) []string {
 	allNodes := map[string]bool{}
 	for _, nodeType := range check.NodeType {
 		for _, v := range s.fullReport.Nodes[nodeType] {
 			allNodes[v] = true
 		}
 	}
-	for _, n := range nodes {
+	for n := range nodes {
 		if _, ok := allNodes[n]; ok {
 			delete(allNodes, n)
 		}
@@ -472,12 +509,15 @@ func (s *Summarizer) runFinalPassOnCheckWrapper(cw *CheckWrapper) {
 		if k == kb.PASS {
 			continue
 		}
-		cw.Nodes = append(cw.Nodes, cw.Result[k]...)
+		for n := range cw.Result[k] {
+			cw.Nodes = append(cw.Nodes, n)
+		}
 	}
 }
 
 func (s *Summarizer) runFinalPass() error {
 	logrus.Debugf("running final pass")
+	s.fullReport.Version = s.BenchmarkVersion
 	groups := s.fullReport.GroupWrappers
 	for _, group := range groups {
 		for _, cw := range group.CheckWrappers {
@@ -510,7 +550,7 @@ func (s *Summarizer) Summarize() error {
 		logrus.Debugf("hostDir: %v", hostname)
 
 		if err := s.summarizeForHost(hostname); err != nil {
-			return fmt.Errorf("error summarizeForHost: %v", hostname)
+			return fmt.Errorf("error summarizeForHost %v: %v", hostname, err)
 		}
 	}
 
