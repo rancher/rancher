@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/rancher/norman/types"
@@ -20,12 +21,26 @@ import (
 	"github.com/rancher/types/config"
 	"github.com/rancher/types/user"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-const AgentForceDeployAnn = "io.cattle.agent.force.deploy"
+const (
+	AgentForceDeployAnn = "io.cattle.agent.force.deploy"
+	nodeImage           = "nodeImage"
+	clusterImage        = "clusterImage"
+)
+
+var (
+	agentImagesMutex sync.RWMutex
+	agentImages      = map[string]map[string]string{
+		nodeImage:    map[string]string{},
+		clusterImage: map[string]string{},
+	}
+)
 
 func Register(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	c := &clusterDeploy{
@@ -101,6 +116,13 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 	if err != nil {
 		return err
 	}
+
+	if cluster.Status.AgentImage != "" && !agentImagesCached(cluster.Name) {
+		if err := cd.cacheAgentImages(cluster.Name); err != nil {
+			return err
+		}
+	}
+
 	err = cd.deployAgent(cluster)
 	if err != nil {
 		return err
@@ -130,15 +152,33 @@ func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string) bool {
 	}
 
 	if forceDeploy || imageChange || repoChange {
-		logrus.Infof("Redeploy Rancher Agents is needed: forceDeploy=%v, agent/auth image changed=%v,"+
-			" private repo changed=%v", forceDeploy, imageChange, repoChange)
+		logrus.Infof("Redeploy Rancher Agents is needed for %s: forceDeploy=%v, agent/auth image changed=%v,"+
+			" private repo changed=%v", cluster.Name, forceDeploy, imageChange, repoChange)
 		return true
 	}
+
+	na, ca := getAgentImages(cluster.Name)
+	if cluster.Status.AgentImage != na || cluster.Status.AgentImage != ca {
+		// downstream agent does not match, kick a redeploy with settings agent
+		logrus.Infof("Redeploy Rancher Agents due to Downstream Agent Image Mismatch for %s: was %s and will be %s",
+			cluster.Name, na, image.ResolveWithCluster(settings.AgentImage.Get(), cluster))
+		clearAgentImages(cluster.Name)
+		return true
+	}
+
 	return false
 }
 
+func getDesiredImage(cluster *v3.Cluster) string {
+	if cluster.Spec.AgentImageOverride != "" {
+		return cluster.Spec.AgentImageOverride
+	}
+
+	return cluster.Spec.DesiredAgentImage
+}
+
 func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
-	desiredAgent := cluster.Spec.DesiredAgentImage
+	desiredAgent := getDesiredImage(cluster)
 	if desiredAgent == "" || desiredAgent == "fixed" {
 		desiredAgent = image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
 	}
@@ -160,7 +200,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		return err
 	}
 
-	_, err = v3.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
+	if _, err = v3.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
 		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth)
 		if err != nil {
 			return cluster, err
@@ -187,26 +227,27 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		}
 		v3.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		return cluster, nil
-	})
-	if err != nil {
+	}); err != nil {
 		return err
 	}
 
-	if err == nil {
-		cluster.Status.AgentImage = desiredAgent
-		if cluster.Spec.DesiredAgentImage == "fixed" {
-			cluster.Spec.DesiredAgentImage = desiredAgent
-		}
-		cluster.Status.AuthImage = desiredAuth
-		if cluster.Spec.DesiredAuthImage == "fixed" {
-			cluster.Spec.DesiredAuthImage = desiredAuth
-		}
-		if cluster.Annotations[AgentForceDeployAnn] == "true" {
-			cluster.Annotations[AgentForceDeployAnn] = "false"
-		}
+	if err = cd.cacheAgentImages(cluster.Name); err != nil {
+		return err
 	}
 
-	return err
+	cluster.Status.AgentImage = desiredAgent
+	if cluster.Spec.DesiredAgentImage == "fixed" {
+		cluster.Spec.DesiredAgentImage = desiredAgent
+	}
+	cluster.Status.AuthImage = desiredAuth
+	if cluster.Spec.DesiredAuthImage == "fixed" {
+		cluster.Spec.DesiredAuthImage = desiredAuth
+	}
+	if cluster.Annotations[AgentForceDeployAnn] == "true" {
+		cluster.Annotations[AgentForceDeployAnn] = "false"
+	}
+
+	return nil
 }
 
 func (cd *clusterDeploy) setNetworkPolicyAnn(cluster *v3.Cluster) error {
@@ -256,4 +297,86 @@ func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage stri
 		cluster)
 
 	return buf.Bytes(), err
+}
+
+func (cd *clusterDeploy) getClusterAgentImage(name string) (string, error) {
+	uc, err := cd.clusterManager.UserContext(name)
+	if err != nil {
+		return "", err
+	}
+
+	d, err := uc.Apps.Deployments("cattle-system").Get("cattle-cluster-agent", v1.GetOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return "", err
+		}
+		return "", nil
+	}
+
+	for _, c := range d.Spec.Template.Spec.Containers {
+		if c.Name == "cluster-register" {
+			return c.Image, nil
+		}
+	}
+
+	return "", nil
+}
+
+func (cd *clusterDeploy) getNodeAgentImage(name string) (string, error) {
+	uc, err := cd.clusterManager.UserContext(name)
+	if err != nil {
+		return "", err
+	}
+
+	ds, err := uc.Apps.DaemonSets("cattle-system").Get("cattle-node-agent", v1.GetOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return "", err
+		}
+		return "", nil
+	}
+
+	for _, c := range ds.Spec.Template.Spec.Containers {
+		if c.Name == "agent" {
+			return c.Image, nil
+		}
+	}
+
+	return "", nil
+}
+
+func (cd *clusterDeploy) cacheAgentImages(name string) error {
+	na, err := cd.getNodeAgentImage(name)
+	if err != nil {
+		return err
+	}
+
+	ca, err := cd.getClusterAgentImage(name)
+	if err != nil {
+		return err
+	}
+
+	agentImagesMutex.Lock()
+	defer agentImagesMutex.Unlock()
+	agentImages[nodeImage][name] = na
+	agentImages[clusterImage][name] = ca
+	return nil
+}
+
+func agentImagesCached(name string) bool {
+	na, ca := getAgentImages(name)
+	return na != "" && ca != ""
+}
+
+func getAgentImages(name string) (string, string) {
+	agentImagesMutex.RLock()
+	defer agentImagesMutex.RUnlock()
+	return agentImages[nodeImage][name], agentImages[clusterImage][name]
+}
+
+func clearAgentImages(name string) {
+	agentImagesMutex.Lock()
+	defer agentImagesMutex.Unlock()
+	delete(agentImages[nodeImage], name)
+	delete(agentImages[clusterImage], name)
 }
