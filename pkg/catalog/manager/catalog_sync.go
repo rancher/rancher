@@ -41,6 +41,7 @@ func (m *Manager) Sync(key string, obj *v3.Catalog) (runtime.Object, error) {
 	if err != nil {
 		return m.updateCatalogError(catalog, err)
 	}
+	logrus.Debugf("Chart hash comparison for global catalog %v: new -- %v --- current -- %v", catalog.Name, commit, catalog.Status.Commit)
 
 	if isUpToDate(commit, catalog) {
 		if setRefreshed(catalog) {
