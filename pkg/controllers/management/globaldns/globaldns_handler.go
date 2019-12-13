@@ -140,7 +140,7 @@ func (n *GDController) generateNewIngressSpec(globaldns *v3.GlobalDNS) *v1beta1.
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					Name:       globaldns.Name,
-					APIVersion: "v3",
+					APIVersion: globaldns.APIVersion,
 					UID:        globaldns.UID,
 					Kind:       globaldns.Kind,
 					Controller: &controller,
