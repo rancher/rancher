@@ -21,13 +21,14 @@ func (ph *podHandler) Sync(key string, pod *corev1.Pod) (runtime.Object, error) 
 		return nil, nil
 	}
 	// Check the annotation to see if it's done processing
-	if _, ok := pod.Annotations[v3.SonobuoyCompletionAnnotation]; !ok {
+	done, ok := pod.Annotations[v3.SonobuoyCompletionAnnotation]
+	if !ok {
 		return nil, nil
 	}
 
 	owner, ok := pod.Annotations[v3.CisHelmChartOwner]
 	if !ok {
-		return nil, fmt.Errorf("sonobuoy done, but couldn't find owner annotation")
+		return nil, nil
 	}
 
 	cs, err := ph.mgmtCtxClusterScanClient.Get(owner, v1.GetOptions{})
@@ -38,9 +39,11 @@ func (ph *podHandler) Sync(key string, pod *corev1.Pod) (runtime.Object, error) 
 		return nil, nil
 	}
 
-	if v3.ClusterScanConditionCompleted.IsUnknown(cs) &&
-		!v3.ClusterScanConditionCompleted.IsFalse(cs) {
-		v3.ClusterScanConditionCompleted.False(cs)
+	if !v3.ClusterScanConditionCompleted.IsTrue(cs) && v3.ClusterScanConditionRunCompleted.IsUnknown(cs) {
+		v3.ClusterScanConditionRunCompleted.True(cs)
+		if done != "true" {
+			v3.ClusterScanConditionFailed.True(cs)
+		}
 		_, err = ph.mgmtCtxClusterScanClient.Update(cs)
 		if err != nil {
 			return nil, fmt.Errorf("error updating condition of cluster scan object: %v", owner)

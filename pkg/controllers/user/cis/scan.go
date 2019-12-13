@@ -11,7 +11,7 @@ import (
 func NewCisScan(cluster *v3.Cluster, cisScanConfig *v3.CisScanConfig) *v3.ClusterScan {
 	controller := true
 	name := fmt.Sprintf("cis-%v", time.Now().UnixNano())
-	return &v3.ClusterScan{
+	cs := &v3.ClusterScan{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      name,
 			Namespace: cluster.Name,
@@ -33,4 +33,6 @@ func NewCisScan(cluster *v3.Cluster, cisScanConfig *v3.CisScanConfig) *v3.Cluste
 			},
 		},
 	}
+	v3.ClusterScanConditionCreated.Unknown(cs)
+	return cs
 }

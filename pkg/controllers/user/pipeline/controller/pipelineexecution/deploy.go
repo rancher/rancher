@@ -505,11 +505,11 @@ func GetJenkinsDeployment(ns string) *appsv1.Deployment {
 							Resources: corev1.ResourceRequirements{
 								Limits: corev1.ResourceList{
 									corev1.ResourceCPU:    *resource.NewQuantity(1, resource.DecimalSI),
-									corev1.ResourceMemory: *resource.NewQuantity(1024E6, resource.BinarySI),
+									corev1.ResourceMemory: *resource.NewQuantity(1024e6, resource.BinarySI),
 								},
 								Requests: corev1.ResourceList{
 									corev1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-									corev1.ResourceMemory: *resource.NewQuantity(300E6, resource.BinarySI),
+									corev1.ResourceMemory: *resource.NewQuantity(300e6, resource.BinarySI),
 								},
 							},
 						},
@@ -619,11 +619,11 @@ func GetRegistryDeployment(ns string) *appsv1.Deployment {
 							Resources: corev1.ResourceRequirements{
 								Limits: corev1.ResourceList{
 									corev1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-									corev1.ResourceMemory: *resource.NewQuantity(200E6, resource.BinarySI),
+									corev1.ResourceMemory: *resource.NewQuantity(200e6, resource.BinarySI),
 								},
 								Requests: corev1.ResourceList{
 									corev1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-									corev1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
+									corev1.ResourceMemory: *resource.NewQuantity(100e6, resource.BinarySI),
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{
@@ -895,11 +895,11 @@ func GetMinioDeployment(ns string) *appsv1.Deployment {
 							Resources: corev1.ResourceRequirements{
 								Limits: corev1.ResourceList{
 									corev1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-									corev1.ResourceMemory: *resource.NewQuantity(200E6, resource.BinarySI),
+									corev1.ResourceMemory: *resource.NewQuantity(200e6, resource.BinarySI),
 								},
 								Requests: corev1.ResourceList{
 									corev1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-									corev1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
+									corev1.ResourceMemory: *resource.NewQuantity(100e6, resource.BinarySI),
 								},
 							},
 						},

@@ -2,7 +2,7 @@ package cis
 
 import (
 	"fmt"
-	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/app/utils"
@@ -12,9 +12,16 @@ import (
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+)
+
+const (
+	NumberOfRetriesForConfigMapCreate = 3
+	RetryIntervalInMilliseconds       = 100
+	ConfigFileName                    = "config.json"
 )
 
 type cisScanHandler struct {
@@ -34,10 +41,13 @@ type cisScanHandler struct {
 type appInfo struct {
 	appName           string
 	clusterName       string
-	skip              string
 	skipConfigMapName string
 	debugMaster       string
 	debugWorker       string
+}
+
+func getOverrideConfigMapName(cs *v3.ClusterScan) string {
+	return fmt.Sprintf("%v-cfg", cs.Name)
 }
 
 func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
@@ -53,23 +63,54 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 	if !v3.ClusterScanConditionCreated.IsTrue(cs) {
 		logrus.Infof("cisScanHandler: Create: deploying helm chart")
 
+		skipOverride := false
 		appInfo := &appInfo{
 			appName:     cs.Name,
 			clusterName: cs.Spec.ClusterID,
 		}
 		if cs.Spec.ScanConfig.CisScanConfig != nil {
-			appInfo.skip = strings.Join(cs.Spec.ScanConfig.CisScanConfig.Skip, ",")
 			if cs.Spec.ScanConfig.CisScanConfig.DebugMaster {
 				appInfo.debugMaster = "true"
 			}
 			if cs.Spec.ScanConfig.CisScanConfig.DebugWorker {
 				appInfo.debugWorker = "true"
 			}
+			if cs.Spec.ScanConfig.CisScanConfig.Skip != "" {
+				skipOverride = true
+			}
 		}
-		// Check if the configmap is populated
-		cm, err := csh.userCtxCMLister.Get(v3.DefaultNamespaceForCis, v3.ConfigMapNameForUserConfig)
-		if err != nil && !kerrors.IsNotFound(err) {
-			return cs, fmt.Errorf("cisScanHandler: Create: error fetching configmap %v: %v", err, v3.ConfigMapNameForUserConfig)
+
+		var cm *v1.ConfigMap
+		if skipOverride {
+			// create the cm
+			cm = &v1.ConfigMap{
+				TypeMeta: metav1.TypeMeta{
+					Kind: "ConfigMap",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: getOverrideConfigMapName(cs),
+				},
+				Data: map[string]string{
+					ConfigFileName: cs.Spec.ScanConfig.CisScanConfig.Skip,
+				},
+			}
+			logrus.Infof("cisScanHandler: Create: creating skip override configmap %v with contents: %v", cm.Name, cs.Spec.ScanConfig.CisScanConfig.Skip)
+			for i := 0; i < NumberOfRetriesForConfigMapCreate; i++ {
+				cm, err = csh.configMapsClient.Create(cm)
+				if err == nil || kerrors.IsAlreadyExists(err) {
+					break
+				}
+				if err != nil {
+					logrus.Errorf("cisScanHandler: Create: (try: %v) error creating configmap: %v", i+1, err)
+				}
+				time.Sleep(RetryIntervalInMilliseconds * time.Millisecond)
+			}
+		} else {
+			// Check if the configmap is populated
+			cm, err = csh.userCtxCMLister.Get(v3.DefaultNamespaceForCis, v3.ConfigMapNameForUserConfig)
+			if err != nil && !kerrors.IsNotFound(err) {
+				return cs, fmt.Errorf("cisScanHandler: Create: error fetching configmap %v: %v", err, v3.ConfigMapNameForUserConfig)
+			}
 		}
 		if cm != nil {
 			appInfo.skipConfigMapName = cm.Name
@@ -79,12 +120,7 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 			return cs, fmt.Errorf("cisScanHandler: Create: error deploying app: %v", err)
 		}
 		v3.ClusterScanConditionCreated.True(cs)
-		v3.ClusterScanConditionCompleted.Unknown(cs)
-
-		cs, err = csh.mgmtCtxClusterScanClient.Update(cs)
-		if err != nil {
-			return cs, fmt.Errorf("cisScanHandler: Create: error updating cs: %v error: %v", cs.Name, err)
-		}
+		v3.ClusterScanConditionRunCompleted.Unknown(cs)
 	}
 	return cs, nil
 }
@@ -109,6 +145,16 @@ func (csh *cisScanHandler) Remove(cs *v3.ClusterScan) (runtime.Object, error) {
 		}
 	}
 
+	if cs.Spec.ScanConfig.CisScanConfig != nil {
+		if cs.Spec.ScanConfig.CisScanConfig.Skip != "" {
+			// Delete the configmap
+			err := csh.configMapsClient.Delete(getOverrideConfigMapName(cs), nil)
+			if err != nil && !kerrors.IsNotFound(err) {
+				return nil, fmt.Errorf("cisScanHandler: Remove: error deleting configmap: %v", err)
+			}
+		}
+	}
+
 	cluster, err := csh.clusterLister.Get("", csh.clusterNamespace)
 	if err != nil {
 		return nil, fmt.Errorf("cisScanHandler: Remove: error getting cluster %v", err)
@@ -126,8 +172,7 @@ func (csh *cisScanHandler) Remove(cs *v3.ClusterScan) (runtime.Object, error) {
 }
 
 func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
-	if !v3.ClusterScanConditionCompleted.IsUnknown(cs) &&
-		v3.ClusterScanConditionCompleted.IsFalse(cs) {
+	if !v3.ClusterScanConditionCompleted.IsTrue(cs) && !v3.ClusterScanConditionRunCompleted.IsUnknown(cs) {
 		// Delete the system helm chart
 		appInfo := &appInfo{
 			appName:     cs.Name,
@@ -135,6 +180,16 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 		}
 		if err := csh.deleteApp(appInfo); err != nil {
 			return nil, fmt.Errorf("cisScanHandler: Updated: error deleting app: %v", err)
+		}
+
+		if cs.Spec.ScanConfig.CisScanConfig != nil {
+			if cs.Spec.ScanConfig.CisScanConfig.Skip != "" {
+				// Delete the configmap
+				err := csh.configMapsClient.Delete(getOverrideConfigMapName(cs), nil)
+				if err != nil && !kerrors.IsNotFound(err) {
+					return nil, fmt.Errorf("cisScanHandler: Updated: error deleting configmap: %v", err)
+				}
+			}
 		}
 
 		cluster, err := csh.clusterLister.Get("", csh.clusterNamespace)
@@ -149,10 +204,6 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 		}
 
 		v3.ClusterScanConditionCompleted.True(cs)
-		_, err = csh.mgmtCtxClusterScanClient.Update(cs)
-		if err != nil {
-			return nil, fmt.Errorf("cisScanHandler: Updated: error updating condition of cluster scan object: %v", cs.Name)
-		}
 	}
 	return cs, nil
 }
@@ -180,7 +231,6 @@ func (csh *cisScanHandler) deployApp(appInfo *appInfo) error {
 
 	appAnswers := map[string]string{
 		"owner":             appInfo.appName,
-		"skip":              appInfo.skip,
 		"skipConfigMapName": appInfo.skipConfigMapName,
 		"debugMaster":       appInfo.debugMaster,
 		"debugWorker":       appInfo.debugWorker,
