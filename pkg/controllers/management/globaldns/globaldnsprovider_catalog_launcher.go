@@ -217,7 +217,7 @@ func (n *ProviderCatalogLauncher) createUpdateExternalDNSApp(obj *v3.GlobalDNSPr
 		controller := true
 		ownerRef := []metav1.OwnerReference{{
 			Name:       obj.Name,
-			APIVersion: "v3",
+			APIVersion: obj.APIVersion,
 			UID:        obj.UID,
 			Kind:       obj.Kind,
 			Controller: &controller,
