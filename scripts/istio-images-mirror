@@ -14,3 +14,4 @@ pstauffer/curl rancher/pstauffer-curl v1.0.3
 coredns/coredns rancher/coredns-coredns 1.1.2
 quay.io/coreos/prometheus-operator rancher/coreos-prometheus-operator v0.32.0
 quay.io/coreos/prometheus-config-reloader rancher/coreos-prometheus-config-reloader v0.32.0
+thanosio/thanos rancher/thanos v0.9.0
