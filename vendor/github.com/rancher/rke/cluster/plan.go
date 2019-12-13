@@ -107,7 +107,7 @@ func BuildRKEConfigNodePlan(ctx context.Context, myCluster *Cluster, host *hosts
 		portChecks = append(portChecks, BuildPortChecksFromPortList(host, ControlPlanePortList, ProtocolTCP)...)
 	}
 	if host.IsEtcd {
-		processes[services.EtcdContainerName] = myCluster.BuildEtcdProcess(host, myCluster.EtcdReadyHosts, prefixPath)
+		processes[services.EtcdContainerName] = myCluster.BuildEtcdProcess(host, myCluster.EtcdReadyHosts, prefixPath, svcOptionData)
 
 		portChecks = append(portChecks, BuildPortChecksFromPortList(host, EtcdPortList, ProtocolTCP)...)
 	}
@@ -905,7 +905,7 @@ func (c *Cluster) BuildSidecarProcess(host *hosts.Host, prefixPath string) v3.Pr
 	}
 }
 
-func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, prefixPath string) v3.Process {
+func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, prefixPath string, svcOptionData map[string]*v3.KubernetesServicesOptions) v3.Process {
 	nodeName := pki.GetCrtNameForHost(host, pki.EtcdCertName)
 	initCluster := ""
 	architecture := "amd64"
@@ -925,8 +925,6 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, pr
 	}
 	args := []string{
 		"/usr/local/bin/etcd",
-		"--peer-client-cert-auth",
-		"--client-cert-auth",
 	}
 
 	// If InternalAddress is not explicitly set, it's set to the same value as Address. This is all good until we deploy on a host with a DNATed public address like AWS, in that case we can't bind to that address so we fall back to 0.0.0.0
@@ -958,10 +956,30 @@ func (c *Cluster) BuildEtcdProcess(host *hosts.Host, etcdHosts []*hosts.Host, pr
 		fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(prefixPath, "/etc/kubernetes")),
 	}
 
+	serviceOptions := c.GetKubernetesServicesOptions(host.DockerInfo.OSType, svcOptionData)
+	if serviceOptions.Etcd != nil {
+		for k, v := range serviceOptions.Etcd {
+			// if the value is empty, we remove that option
+			if len(v) == 0 {
+				delete(CommandArgs, k)
+				continue
+			}
+			CommandArgs[k] = v
+		}
+	}
+
 	for arg, value := range c.Services.Etcd.ExtraArgs {
 		if _, ok := c.Services.Etcd.ExtraArgs[arg]; ok {
 			CommandArgs[arg] = value
 		}
+	}
+
+	// adding the old default value from L922 if not present in metadata options or passed by user
+	if _, ok := CommandArgs["client-cert-auth"]; !ok {
+		args = append(args, "--client-cert-auth")
+	}
+	if _, ok := CommandArgs["peer-client-cert-auth"]; !ok {
+		args = append(args, "--peer-client-cert-auth")
 	}
 
 	for arg, value := range CommandArgs {

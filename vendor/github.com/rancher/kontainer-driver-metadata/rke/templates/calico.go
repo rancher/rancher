@@ -675,7 +675,11 @@ data:
   calico_backend: "bird"
 
   # Configure the MTU to use
+{{- if ne .MTU ""}}
+  veth_mtu: "{{.MTU}}"
+{{- else }}
   veth_mtu: "1440"
+{{- end}}
 
   # The CNI network configuration to install on each node.  The special
   # values in this config will be automatically populated.
@@ -1355,7 +1359,11 @@ data:
   calico_backend: "bird"
 
   # Configure the MTU to use
+{{- if ne .MTU ""}}
+  veth_mtu: "{{.MTU}}"
+{{- else }}
   veth_mtu: "1440"
+{{- end}}
 
   # The CNI network configuration to install on each node.  The special
   # values in this config will be automatically populated.
@@ -2090,7 +2098,11 @@ data:
   calico_backend: "bird"
 
   # Configure the MTU to use
+{{- if ne .MTU ""}}
+  veth_mtu: "{{.MTU}}"
+{{- else }}
   veth_mtu: "1440"
+{{- end}}
 
   # The CNI network configuration to install on each node.  The special
   # values in this config will be automatically populated.
