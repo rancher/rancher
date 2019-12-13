@@ -17,7 +17,7 @@ RUN apt-get update && \
 ENV LOGLEVEL_VERSION v0.1.2
 
 RUN curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-${ARCH}-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin
-RUN curl -sL https://github.com/rancher/share-mnt/releases/download/v1.0.4/share-mnt-${ARCH}.tar.gz | tar xvzf - -C /usr/bin
+RUN curl -sL https://github.com/rancher/share-mnt/releases/download/v1.0.6/share-mnt-${ARCH}.tar.gz | tar xvzf - -C /usr/bin
 ENV KUBEPROMPT_VERSION v1.0.6
 
 RUN curl -sL https://github.com/c-bata/kube-prompt/releases/download/${KUBEPROMPT_VERSION}/kube-prompt_${KUBEPROMPT_VERSION}_linux_${ARCH}.zip > /usr/bin/kube-prompt.zip && unzip /usr/bin/kube-prompt.zip -d /usr/bin
