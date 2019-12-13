@@ -22,7 +22,7 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 	mgmtContext := userContext.Management
 
 	userNSClient := userContext.Core.Namespaces(metav1.NamespaceAll)
-	userCtxCMLister := userContext.Core.ConfigMaps(metav1.NamespaceAll).Controller().Lister()
+	userCtxCMLister := userContext.Core.ConfigMaps(v3.DefaultNamespaceForCis).Controller().Lister()
 	mgmtAppClient := mgmtContext.Project.Apps(metav1.NamespaceAll)
 	mgmtTemplateVersionLister := mgmtContext.Management.CatalogTemplateVersions(metav1.NamespaceAll).Controller().Lister()
 	systemAccountManager := systemaccount.NewManager(mgmtContext)
