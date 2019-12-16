@@ -47,22 +47,30 @@ func (g *googleOauthProvider) getUserInfoAndGroups(adminSvc *admin.Service, gOAu
 		}
 	}
 	if config.NestedGroupMembershipEnabled {
-		groupMap := make(map[string]bool)
-		var nestedGroupPrincipals []v3.Principal
-		for _, principal := range groupPrincipals {
-			principals, err := g.gatherParentGroups(principal, adminSvc, config, user.HostedDomain, groupMap)
-			if err != nil {
-				return userPrincipal, groupPrincipals, err
-			}
-			if len(principals) > 0 {
-				nestedGroupPrincipals = append(nestedGroupPrincipals, principals...)
-			}
+		groupPrincipals, err = g.fetchParentGroups(config, groupPrincipals, adminSvc, user.HostedDomain)
+		if err != nil {
+			return userPrincipal, groupPrincipals, err
 		}
-		groupPrincipals = append(groupPrincipals, nestedGroupPrincipals...)
 	}
 
 	logrus.Debugf("[Google OAuth] loginuser: Retrieved user's groups using admin directory")
 	return userPrincipal, groupPrincipals, nil
+}
+
+func (g *googleOauthProvider) fetchParentGroups(config *v3.GoogleOauthConfig, groupPrincipals []v3.Principal, adminSvc *admin.Service, hostedDomain string) ([]v3.Principal, error) {
+	groupMap := make(map[string]bool)
+	var nestedGroupPrincipals []v3.Principal
+	for _, principal := range groupPrincipals {
+		principals, err := g.gatherParentGroups(principal, adminSvc, config, hostedDomain, groupMap)
+		if err != nil {
+			return groupPrincipals, err
+		}
+		if len(principals) > 0 {
+			nestedGroupPrincipals = append(nestedGroupPrincipals, principals...)
+		}
+	}
+	groupPrincipals = append(groupPrincipals, nestedGroupPrincipals...)
+	return groupPrincipals, nil
 }
 
 func (g *googleOauthProvider) getGroupsUserBelongsTo(adminSvc *admin.Service, userKey string, hostedDomain string, config *v3.GoogleOauthConfig) ([]v3.Principal, error) {
