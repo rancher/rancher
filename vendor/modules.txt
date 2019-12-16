@@ -38,7 +38,7 @@ github.com/Microsoft/go-winio
 github.com/PuerkitoBio/purell
 # github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
 github.com/PuerkitoBio/urlesc
-# github.com/aws/aws-sdk-go v1.16.26
+# github.com/aws/aws-sdk-go v1.20.20
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/arn
 github.com/aws/aws-sdk-go/aws/awserr
@@ -99,6 +99,8 @@ github.com/coreos/go-semver/semver
 # github.com/coreos/prometheus-operator v0.33.0
 github.com/coreos/prometheus-operator/pkg/apis/monitoring
 github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1
+# github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d
+github.com/cpuguy83/go-md2man/v2/md2man
 # github.com/crewjam/saml v0.0.0-20190521120225-344d075952c9 => github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde
 github.com/crewjam/saml
 github.com/crewjam/saml/logger
@@ -142,16 +144,6 @@ github.com/docker/go-connections/sockets
 github.com/docker/go-connections/tlsconfig
 # github.com/docker/go-units v0.3.3
 github.com/docker/go-units
-# github.com/docker/machine v0.0.0-20160115011140-7246b2c9650c
-github.com/docker/machine/libmachine/drivers
-github.com/docker/machine/libmachine/drivers/plugin/localbinary
-github.com/docker/machine/libmachine/drivers/rpc
-github.com/docker/machine/libmachine/log
-github.com/docker/machine/libmachine/mcnflag
-github.com/docker/machine/libmachine/mcnutils
-github.com/docker/machine/libmachine/ssh
-github.com/docker/machine/libmachine/state
-github.com/docker/machine/libmachine/version
 # github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c
 github.com/docker/spdystream
 github.com/docker/spdystream/spdy
@@ -313,6 +305,17 @@ github.com/rancher/kontainer-engine/service
 github.com/rancher/kontainer-engine/store
 github.com/rancher/kontainer-engine/types
 github.com/rancher/kontainer-engine/utils
+# github.com/rancher/machine v0.15.0-rancher25
+github.com/rancher/machine/libmachine/drivers
+github.com/rancher/machine/libmachine/drivers/plugin/localbinary
+github.com/rancher/machine/libmachine/drivers/rpc
+github.com/rancher/machine/libmachine/log
+github.com/rancher/machine/libmachine/mcnflag
+github.com/rancher/machine/libmachine/mcnutils
+github.com/rancher/machine/libmachine/ssh
+github.com/rancher/machine/libmachine/state
+github.com/rancher/machine/libmachine/version
+github.com/rancher/machine/version
 # github.com/rancher/norman v0.0.0-20191126011629-6269ccdbeace
 github.com/rancher/norman/api
 github.com/rancher/norman/api/access
@@ -429,11 +432,15 @@ github.com/robfig/cron
 github.com/russellhaering/goxmldsig
 github.com/russellhaering/goxmldsig/etreeutils
 github.com/russellhaering/goxmldsig/types
+# github.com/russross/blackfriday/v2 v2.0.1
+github.com/russross/blackfriday/v2
 # github.com/satori/go.uuid v1.2.0
 github.com/satori/go.uuid
 # github.com/segmentio/kafka-go v0.3.4
 github.com/segmentio/kafka-go
 github.com/segmentio/kafka-go/sasl
+# github.com/shurcooL/sanitized_anchor_name v1.0.0
+github.com/shurcooL/sanitized_anchor_name
 # github.com/sirupsen/logrus v1.4.2
 github.com/sirupsen/logrus
 # github.com/spf13/cast v1.3.0
@@ -445,7 +452,7 @@ github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
 # github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 github.com/tomnomnom/linkheader
-# github.com/urfave/cli v1.21.0
+# github.com/urfave/cli v1.22.2
 github.com/urfave/cli
 # github.com/vmihailenco/msgpack v4.0.1+incompatible
 github.com/vmihailenco/msgpack
@@ -534,7 +541,7 @@ golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
 # golang.org/x/sync v0.0.0-20190423024810-112230192c58
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.0.0-20190616124812-15dcb6c0061f
+# golang.org/x/sys v0.0.0-20190804053845-51ab0e2deafa
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
 golang.org/x/sys/windows
