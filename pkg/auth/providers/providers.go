@@ -142,6 +142,12 @@ func GetPrincipal(principalID string, myToken v3.Token) (v3.Principal, error) {
 }
 
 func SearchPrincipals(name, principalType string, myToken v3.Token) ([]v3.Principal, error) {
+	if myToken.AuthProvider == "" {
+		return []v3.Principal{}, fmt.Errorf("[SearchPrincipals] no authProvider specified in token")
+	}
+	if providers[myToken.AuthProvider] == nil {
+		return []v3.Principal{}, fmt.Errorf("[SearchPrincipals] authProvider %v not initialized", myToken.AuthProvider)
+	}
 	principals, err := providers[myToken.AuthProvider].SearchPrincipals(name, principalType, myToken)
 	if err != nil {
 		return principals, err
