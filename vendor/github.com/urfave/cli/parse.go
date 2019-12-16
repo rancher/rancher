@@ -14,42 +14,51 @@ type iterativeParser interface {
 // iteratively catch parsing errors.  This way we achieve LR parsing without
 // transforming any arguments. Otherwise, there is no way we can discriminate
 // combined short options from common arguments that should be left untouched.
-func parseIter(ip iterativeParser, args []string) (*flag.FlagSet, error) {
+func parseIter(set *flag.FlagSet, ip iterativeParser, args []string) error {
 	for {
-		set, err := ip.newFlagSet()
-		if err != nil {
-			return nil, err
-		}
-
-		err = set.Parse(args)
+		err := set.Parse(args)
 		if !ip.useShortOptionHandling() || err == nil {
-			return set, err
+			return err
 		}
 
 		errStr := err.Error()
-		trimmed := strings.TrimPrefix(errStr, "flag provided but not defined: ")
+		trimmed := strings.TrimPrefix(errStr, "flag provided but not defined: -")
 		if errStr == trimmed {
-			return nil, err
+			return err
 		}
 
 		// regenerate the initial args with the split short opts
-		newArgs := []string{}
+		argsWereSplit := false
 		for i, arg := range args {
-			if arg != trimmed {
-				newArgs = append(newArgs, arg)
+			// skip args that are not part of the error message
+			if name := strings.TrimLeft(arg, "-"); name != trimmed {
 				continue
 			}
 
-			shortOpts := splitShortOptions(set, trimmed)
+			// if we can't split, the error was accurate
+			shortOpts := splitShortOptions(set, arg)
 			if len(shortOpts) == 1 {
-				return nil, err
+				return err
 			}
 
-			// add each short option and all remaining arguments
-			newArgs = append(newArgs, shortOpts...)
-			newArgs = append(newArgs, args[i+1:]...)
-			args = newArgs
+			// swap current argument with the split version
+			args = append(args[:i], append(shortOpts, args[i+1:]...)...)
+			argsWereSplit = true
+			break
 		}
+
+		// This should be an impossible to reach code path, but in case the arg
+		// splitting failed to happen, this will prevent infinite loops
+		if !argsWereSplit {
+			return err
+		}
+
+		// Since custom parsing failed, replace the flag set before retrying
+		newSet, err := ip.newFlagSet()
+		if err != nil {
+			return err
+		}
+		*set = *newSet
 	}
 }
 

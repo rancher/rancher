@@ -49,7 +49,8 @@ const (
 	//
 	// The quota for the resource has already been reached.
 	//
-	// For information on stack set limitations, see Limitations of StackSets (http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-limitations.html).
+	// For information on resource and stack limitations, see Limits (https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cloudformation-limits.html)
+	// in the AWS CloudFormation User Guide.
 	ErrCodeLimitExceededException = "LimitExceededException"
 
 	// ErrCodeNameAlreadyExistsException for service response error code
