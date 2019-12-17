@@ -27,7 +27,7 @@ const (
 
 type CisScanConfig struct {
 	// IDs of the checks that need to be skipped in the final report
-	Skip string `json:"skip,omitempty"`
+	OverrideSkip []string `json:"overrideSkip,nullable"`
 	// Override the CIS benchmark version to use for the scan (instead of latest)
 	OverrideBenchmarkVersion string `json:"overrideBenchmarkVersion,omitempty"`
 	// Internal flag for debugging master component of the scan

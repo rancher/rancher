@@ -47,6 +47,7 @@ require (
 	github.com/coreos/etcd v3.3.15+incompatible
 	github.com/coreos/prometheus-operator v0.33.0
 	github.com/crewjam/saml v0.0.0-20190521120225-344d075952c9
+	github.com/davecgh/go-spew v1.1.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v0.7.3-0.20190808172531-150530564a14
@@ -81,7 +82,7 @@ require (
 	github.com/rancher/remotedialer v0.2.3
 	github.com/rancher/rke v1.1.0-rc2.0.20191211213434-747f63945c64
 	github.com/rancher/security-scan v0.1.4
-	github.com/rancher/types v0.0.0-20191213000433-bfc3105d2b29
+	github.com/rancher/types v0.0.0-20191217214229-b0c77ca09648
 	github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect
