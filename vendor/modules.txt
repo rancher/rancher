@@ -384,7 +384,7 @@ github.com/rancher/norman/urlbuilder
 github.com/rancher/rdns-server/model
 # github.com/rancher/remotedialer v0.2.3
 github.com/rancher/remotedialer
-# github.com/rancher/rke v1.1.0-rc2.0.20191211213434-747f63945c64
+# github.com/rancher/rke v1.1.0-rc2.0.20191217221038-4f2c87fcd04e
 github.com/rancher/rke/addons
 github.com/rancher/rke/authz
 github.com/rancher/rke/cloudprovider
