@@ -4,9 +4,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
+	"github.com/docker/docker/api/types"
 	"github.com/rancher/rancher/pkg/settings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
 func GetPrivateRepoURL(cluster *v3.Cluster) string {
@@ -37,23 +37,18 @@ func GenerateClusterPrivateRegistryDockerConfig(cluster *v3.Cluster) (string, er
 	return GeneratePrivateRegistryDockerConfig(GetPrivateRepo(cluster))
 }
 
-// This method serializes a ~/.docker/config.json file
+// This method generates base64 encoded credentials for the registry
 func GeneratePrivateRegistryDockerConfig(privateRegistry *v3.PrivateRegistry) (string, error) {
 	if privateRegistry == nil || privateRegistry.User == "" || privateRegistry.Password == "" {
 		return "", nil
 	}
-	auth := credentialprovider.DockerConfigEntry{
+	authConfig := types.AuthConfig{
 		Username: privateRegistry.User,
 		Password: privateRegistry.Password,
 	}
-
-	config := credentialprovider.DockerConfigJson{
-		Auths: map[string]credentialprovider.DockerConfigEntry{privateRegistry.URL: auth},
-	}
-
-	bt, err := json.Marshal(config)
+	encodedJSON, err := json.Marshal(authConfig)
 	if err != nil {
 		return "", err
 	}
-	return base64.StdEncoding.EncodeToString(bt), nil
+	return base64.URLEncoding.EncodeToString(encodedJSON), nil
 }
