@@ -270,7 +270,14 @@ func (g *googleOauthProvider) RefetchGroupPrincipals(principalID string, secret 
 		return principals, err
 	}
 	logrus.Debugf("[Google OAuth] GetPrincipal: Parsed principalID")
-	return g.getGroupsUserBelongsTo(adminSvc, externalID, config.Hostname, config)
+	groupPrincipals, err := g.getGroupsUserBelongsTo(adminSvc, externalID, config.Hostname, config)
+	if err != nil {
+		return principals, err
+	}
+	if !config.NestedGroupMembershipEnabled {
+		return groupPrincipals, nil
+	}
+	return g.fetchParentGroups(config, groupPrincipals, adminSvc, config.Hostname)
 }
 
 func (g *googleOauthProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
