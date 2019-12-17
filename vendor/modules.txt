@@ -326,7 +326,7 @@ github.com/rancher/kontainer-engine/service
 github.com/rancher/kontainer-engine/store
 github.com/rancher/kontainer-engine/types
 github.com/rancher/kontainer-engine/utils
-# github.com/rancher/machine v0.15.0-rancher24
+# github.com/rancher/machine v0.15.0-rancher25
 github.com/rancher/machine/libmachine/drivers
 github.com/rancher/machine/libmachine/drivers/plugin/localbinary
 github.com/rancher/machine/libmachine/drivers/rpc

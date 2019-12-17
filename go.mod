@@ -1,6 +1,6 @@
 module github.com/rancher/rancher
 
-go 1.12
+go 1.13
 
 replace (
 	git.apache.org/thrift.git => github.com/apache/thrift v0.12.0
@@ -8,9 +8,7 @@ replace (
 	github.com/crewjam/saml => github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009
-
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.3
-
 	k8s.io/api => k8s.io/api v0.0.0-20190918155943-95b840bb6a1f
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.0.0-20190918161926-8f644eb6e783
 	k8s.io/apimachinery => k8s.io/apimachinery v0.0.0-20190913080033-27d36303b655
@@ -75,7 +73,7 @@ require (
 	github.com/prometheus/common v0.6.0
 	github.com/rancher/kontainer-driver-metadata v0.0.0-20191210185103-dc45b432da60
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20191210170908-feb98acd7948
-	github.com/rancher/machine v0.15.0-rancher24
+	github.com/rancher/machine v0.15.0-rancher25
 	github.com/rancher/norman v0.0.0-20191126010027-3afadb987c81
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.3
