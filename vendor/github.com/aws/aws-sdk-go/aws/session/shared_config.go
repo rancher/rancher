@@ -5,7 +5,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-
 	"github.com/aws/aws-sdk-go/internal/ini"
 )
 
@@ -156,10 +155,21 @@ func (cfg *sharedConfig) setAssumeRoleSource(origProfile string, files []sharedC
 		if err != nil {
 			return err
 		}
+
+		// Chain if profile depends of other profiles
+		if len(assumeRoleSrc.AssumeRole.SourceProfile) > 0 {
+			err := assumeRoleSrc.setAssumeRoleSource(cfg.AssumeRole.SourceProfile, files)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
-	if len(assumeRoleSrc.Creds.AccessKeyID) == 0 {
-		return SharedConfigAssumeRoleError{RoleARN: cfg.AssumeRole.RoleARN}
+	if cfg.AssumeRole.SourceProfile == origProfile || len(assumeRoleSrc.AssumeRole.SourceProfile) == 0 {
+		//Check if at least either Credential Source, static creds, or credential process is set to retain credentials.
+		if len(assumeRoleSrc.AssumeRole.CredentialSource) == 0 && len(assumeRoleSrc.Creds.AccessKeyID) == 0 && len(assumeRoleSrc.CredentialProcess) == 0 {
+			return SharedConfigAssumeRoleError{RoleARN: cfg.AssumeRole.RoleARN}
+		}
 	}
 
 	cfg.AssumeRoleSource = &assumeRoleSrc
@@ -216,7 +226,9 @@ func (cfg *sharedConfig) setFromIniFile(profile string, file sharedConfigFile) e
 	roleArn := section.String(roleArnKey)
 	srcProfile := section.String(sourceProfileKey)
 	credentialSource := section.String(credentialSourceKey)
-	hasSource := len(srcProfile) > 0 || len(credentialSource) > 0
+	credentialProcess := section.String(credentialProcessKey)
+	//Has source to make sure the Assume Role has at least either srcProfile, credential Source, or credential Process.
+	hasSource := len(srcProfile) > 0 || len(credentialSource) > 0 || len(credentialProcess) > 0
 	if len(roleArn) > 0 && hasSource {
 		cfg.AssumeRole = assumeRoleConfig{
 			RoleARN:          roleArn,

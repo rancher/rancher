@@ -40,7 +40,7 @@ github.com/PuerkitoBio/purell
 github.com/PuerkitoBio/urlesc
 # github.com/aquasecurity/kube-bench v0.1.0
 github.com/aquasecurity/kube-bench/check
-# github.com/aws/aws-sdk-go v1.16.26
+# github.com/aws/aws-sdk-go v1.20.20
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/arn
 github.com/aws/aws-sdk-go/aws/awserr
@@ -326,7 +326,7 @@ github.com/rancher/kontainer-engine/service
 github.com/rancher/kontainer-engine/store
 github.com/rancher/kontainer-engine/types
 github.com/rancher/kontainer-engine/utils
-# github.com/rancher/machine v0.15.0-rancher23
+# github.com/rancher/machine v0.15.0-rancher24
 github.com/rancher/machine/libmachine/drivers
 github.com/rancher/machine/libmachine/drivers/plugin/localbinary
 github.com/rancher/machine/libmachine/drivers/rpc
@@ -484,7 +484,7 @@ github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
 # github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 github.com/tomnomnom/linkheader
-# github.com/urfave/cli v1.22.1
+# github.com/urfave/cli v1.22.2
 github.com/urfave/cli
 # github.com/vmihailenco/msgpack v4.0.1+incompatible
 github.com/vmihailenco/msgpack
@@ -573,7 +573,7 @@ golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
 # golang.org/x/sync v0.0.0-20190423024810-112230192c58
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.0.0-20190616124812-15dcb6c0061f
+# golang.org/x/sys v0.0.0-20190804053845-51ab0e2deafa
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
 golang.org/x/sys/windows

@@ -40,7 +40,7 @@ require (
 	github.com/Azure/go-autorest/autorest v0.9.0
 	github.com/Azure/go-autorest/autorest/adal v0.5.0
 	github.com/DataDog/zstd v1.4.1 // indirect
-	github.com/aws/aws-sdk-go v1.16.26
+	github.com/aws/aws-sdk-go v1.20.20
 	github.com/beevik/etree v0.0.0-20171015221209-af219c0c7ea1 // indirect
 	github.com/bep/debounce v1.2.0
 	github.com/blang/semver v3.5.1+incompatible
@@ -75,7 +75,7 @@ require (
 	github.com/prometheus/common v0.6.0
 	github.com/rancher/kontainer-driver-metadata v0.0.0-20191210185103-dc45b432da60
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20191210170908-feb98acd7948
-	github.com/rancher/machine v0.15.0-rancher23
+	github.com/rancher/machine v0.15.0-rancher24
 	github.com/rancher/norman v0.0.0-20191126010027-3afadb987c81
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.3
@@ -90,7 +90,7 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.4.0
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
-	github.com/urfave/cli v1.22.1
+	github.com/urfave/cli v1.22.2
 	github.com/vmihailenco/msgpack v4.0.1+incompatible
 	github.com/vmware/govmomi v0.21.1-0.20191006164024-1d61d1ba0200
 	github.com/vmware/kube-fluentd-operator v0.0.0-20190307154903-bf9de7e79eaf

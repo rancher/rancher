@@ -86,7 +86,7 @@ type RequiredFlag interface {
 type DocGenerationFlag interface {
 	Flag
 
-	// TakesValue returns true of the flag takes a value, otherwise false
+	// TakesValue returns true if the flag takes a value, otherwise false
 	TakesValue() bool
 
 	// GetUsage returns the usage string for the flag
