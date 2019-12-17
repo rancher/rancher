@@ -653,7 +653,7 @@ func (c *Cluster) BuildKubeProxyProcess(host *hosts.Host, prefixPath string, svc
 	Binds := []string{
 		fmt.Sprintf("%s:/etc/kubernetes:z", path.Join(prefixPath, "/etc/kubernetes")),
 		"/run:/run",
-		fmt.Sprintf("%s:/lib/modules:z,ro", path.Join(prefixPath, "/lib/modules")),
+		"/lib/modules:/lib/modules:z,ro",
 	}
 	if host.DockerInfo.OSType == "windows" { // compatible with Windows
 		Binds = []string{
