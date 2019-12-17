@@ -47,7 +47,19 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 			resource.AddAction(request, v3.ClusterActionBackupEtcd)
 			resource.AddAction(request, v3.ClusterActionRestoreFromEtcdBackup)
 		}
-		resource.AddAction(request, v3.ClusterActionRunSecurityScan)
+		canCreateClusterScanObject := func() bool {
+			return request.AccessControl.CanDo(
+				v3.ClusterScanGroupVersionKind.Group,
+				v3.ClusterScanResource.Name,
+				"create",
+				request,
+				nil,
+				request.Schema,
+			) == nil
+		}
+		if canCreateClusterScanObject() {
+			resource.AddAction(request, v3.ClusterActionRunSecurityScan)
+		}
 	}
 
 	if err := request.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", request, resource.Values, request.Schema); err == nil {

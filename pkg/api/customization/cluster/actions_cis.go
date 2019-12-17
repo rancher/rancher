@@ -9,12 +9,10 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/controllers/user/cis"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	mgmtclient "github.com/rancher/types/client/management/v3"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -25,8 +23,21 @@ const (
 )
 
 func (a ActionHandler) runCisScan(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	var clusterForAccessCheck mgmtclient.Cluster
 	var err error
+
+	canCreateClusterScanObject := func() bool {
+		return apiContext.AccessControl.CanDo(
+			v3.ClusterScanGroupVersionKind.Group,
+			v3.ClusterScanResource.Name,
+			"create",
+			apiContext,
+			nil,
+			apiContext.Schema,
+		) == nil
+	}
+	if !canCreateClusterScanObject() {
+		return httperror.NewAPIError(httperror.PermissionDenied, "can not run security scan")
+	}
 
 	data, err := ioutil.ReadAll(apiContext.Request.Body)
 	if err != nil {
@@ -36,11 +47,6 @@ func (a ActionHandler) runCisScan(actionName string, action *types.Action, apiCo
 	cisScanConfig := &v3.CisScanConfig{}
 	if err = json.Unmarshal(data, cisScanConfig); err != nil {
 		return errors.Wrap(err, "unmarshaling input error")
-	}
-
-	if err := access.ByID(apiContext, apiContext.Version, apiContext.Type, apiContext.ID, &clusterForAccessCheck); err != nil {
-		return httperror.NewAPIError(httperror.NotFound,
-			fmt.Sprintf("failed to get cluster by id %v", apiContext.ID))
 	}
 
 	cluster, err := a.ClusterClient.Get(apiContext.ID, v1.GetOptions{})
