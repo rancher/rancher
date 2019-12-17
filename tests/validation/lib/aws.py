@@ -43,6 +43,8 @@ PRIVATE_IMAGES = {
 
 PUBLIC_AMI = {
     'us-east-2': {
+        "ubuntu-18.04": {
+            'image': 'ami-0d5d9d301c853a04a', 'ssh_user': 'ubuntu'},
         "ubuntu-16.04": {
             'image': 'ami-965e6bf3', 'ssh_user': 'ubuntu'},
         "rhel-7.4": {

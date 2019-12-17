@@ -4,8 +4,8 @@ from invoke import run
 
 
 class CloudProviderBase(object, metaclass=abc.ABCMeta):
-    OS_VERSION = os.environ.get("OS_VERSION", 'ubuntu-16.04')
-    DOCKER_VERSION = os.environ.get("DOCKER_VERSION", '18.09')
+    OS_VERSION = os.environ.get("OS_VERSION", 'ubuntu-18.04')
+    DOCKER_VERSION = os.environ.get("DOCKER_VERSION", '19.03')
     DOCKER_INSTALLED = os.environ.get("DOCKER_INSTALLED", "true")
     OS_DOCKER_VERSION = os.environ.get("RANCHER_OS_DOCKER_VERSION", "")
     if len(OS_DOCKER_VERSION) > 0:
