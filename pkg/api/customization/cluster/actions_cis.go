@@ -25,6 +25,13 @@ const (
 func (a ActionHandler) runCisScan(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	var err error
 
+	canUpdateCluster := func(apiContext *types.APIContext) bool {
+		cluster := map[string]interface{}{
+			"id": apiContext.ID,
+		}
+		return apiContext.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", apiContext, cluster, apiContext.Schema) == nil
+	}
+
 	canCreateClusterScanObject := func() bool {
 		return apiContext.AccessControl.CanDo(
 			v3.ClusterScanGroupVersionKind.Group,
@@ -35,7 +42,7 @@ func (a ActionHandler) runCisScan(actionName string, action *types.Action, apiCo
 			apiContext.Schema,
 		) == nil
 	}
-	if !canCreateClusterScanObject() {
+	if !canUpdateCluster(apiContext) || !canCreateClusterScanObject() {
 		return httperror.NewAPIError(httperror.PermissionDenied, "can not run security scan")
 	}
 

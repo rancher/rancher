@@ -97,7 +97,7 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 			// create the cm
 			skipDataBytes, err := getOverrideSkipInfoData(cs.Spec.ScanConfig.CisScanConfig.OverrideSkip)
 			if err != nil {
-				logrus.Error("cisScanHandler: Create: error getting overrideSkip: %v", err)
+				logrus.Errorf("cisScanHandler: Create: error getting overrideSkip: %v", err)
 			} else {
 				cm = &v1.ConfigMap{
 					TypeMeta: metav1.TypeMeta{
@@ -121,6 +121,7 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 					time.Sleep(RetryIntervalInMilliseconds * time.Millisecond)
 				}
 				if !success {
+					cm = nil
 					logrus.Errorf("cisScanHandler: Create: error creating configmap: %v", err)
 				}
 			}
