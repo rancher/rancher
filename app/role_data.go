@@ -46,7 +46,6 @@ func addRoles(management *config.ManagementContext) (string, error) {
 	rb.addRole("Manage Settings", "settings-manage").addRule().apiGroups("management.cattle.io").resources("settings").verbs("*")
 	rb.addRole("Manage Features", "features-manage").addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch", "update")
 	rb.addRole("Manage PodSecurityPolicy Templates", "podsecuritypolicytemplates-manage").addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("*")
-	rb.addRole("Manage Cluster Scans", "clusterscans-manage").addRule().apiGroups("management.cattle.io").resources("clusterscans").verbs("*")
 	rb.addRole("Create RKE Templates", "clustertemplates-create").addRule().apiGroups("management.cattle.io").resources("clustertemplates").verbs("create")
 	rb.addRole("Create RKE Template Revisions", "clustertemplaterevisions-create").addRule().apiGroups("management.cattle.io").resources("clustertemplaterevisions").verbs("create")
 	rb.addRole("View Rancher Metrics", "view-rancher-metrics").addRule().apiGroups("management.cattle.io").resources("ranchermetrics").verbs("get")
@@ -162,9 +161,6 @@ func addRoles(management *config.ManagementContext) (string, error) {
 
 	rb.addRoleTemplate("Manage Cluster Backups", "backups-manage", "cluster", false, false, false).
 		addRule().apiGroups("management.cattle.io").resources("etcdbackups").verbs("*")
-
-	rb.addRoleTemplate("Manage Cluster Scans", "clusterscans-manage", "cluster", false, false, false).
-		addRule().apiGroups("management.cattle.io").resources("clusterscans").verbs("*")
 
 	// Project roles
 	rb.addRoleTemplate("Project Owner", "project-owner", "project", false, false, false).

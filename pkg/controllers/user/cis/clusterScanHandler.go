@@ -1,9 +1,11 @@
 package cis
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/app/utils"
 	"github.com/rancher/rancher/pkg/settings"
@@ -22,6 +24,7 @@ const (
 	NumberOfRetriesForConfigMapCreate = 3
 	RetryIntervalInMilliseconds       = 100
 	ConfigFileName                    = "config.json"
+	CurrentBenchmarkKey               = "current"
 )
 
 type cisScanHandler struct {
@@ -46,12 +49,21 @@ type appInfo struct {
 	debugWorker       string
 }
 
+type OverrideSkipInfoData struct {
+	Skip map[string][]string `json:"skip"`
+}
+
 func getOverrideConfigMapName(cs *v3.ClusterScan) string {
 	return fmt.Sprintf("%v-cfg", cs.Name)
 }
 
+func getOverrideSkipInfoData(skip []string) ([]byte, error) {
+	s := OverrideSkipInfoData{Skip: map[string][]string{CurrentBenchmarkKey: skip}}
+	return json.Marshal(s)
+}
+
 func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
-	logrus.Debugf("cisScanHandler: Create: %+v", cs)
+	logrus.Debugf("cisScanHandler: Create: %+v", spew.Sdump(cs))
 	var err error
 	cluster, err := csh.clusterLister.Get("", cs.Spec.ClusterID)
 	if err != nil {
@@ -75,7 +87,7 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 			if cs.Spec.ScanConfig.CisScanConfig.DebugWorker {
 				appInfo.debugWorker = "true"
 			}
-			if cs.Spec.ScanConfig.CisScanConfig.Skip != "" {
+			if cs.Spec.ScanConfig.CisScanConfig.OverrideSkip != nil {
 				skipOverride = true
 			}
 		}
@@ -83,27 +95,35 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 		var cm *v1.ConfigMap
 		if skipOverride {
 			// create the cm
-			cm = &v1.ConfigMap{
-				TypeMeta: metav1.TypeMeta{
-					Kind: "ConfigMap",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: getOverrideConfigMapName(cs),
-				},
-				Data: map[string]string{
-					ConfigFileName: cs.Spec.ScanConfig.CisScanConfig.Skip,
-				},
-			}
-			logrus.Infof("cisScanHandler: Create: creating skip override configmap %v with contents: %v", cm.Name, cs.Spec.ScanConfig.CisScanConfig.Skip)
-			for i := 0; i < NumberOfRetriesForConfigMapCreate; i++ {
-				cm, err = csh.configMapsClient.Create(cm)
-				if err == nil || kerrors.IsAlreadyExists(err) {
-					break
+			skipDataBytes, err := getOverrideSkipInfoData(cs.Spec.ScanConfig.CisScanConfig.OverrideSkip)
+			if err != nil {
+				logrus.Errorf("cisScanHandler: Create: error getting overrideSkip: %v", err)
+			} else {
+				cm = &v1.ConfigMap{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "ConfigMap",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: getOverrideConfigMapName(cs),
+					},
+					Data: map[string]string{
+						ConfigFileName: string(skipDataBytes),
+					},
 				}
-				if err != nil {
-					logrus.Errorf("cisScanHandler: Create: (try: %v) error creating configmap: %v", i+1, err)
+				success := false
+				for i := 0; i < NumberOfRetriesForConfigMapCreate; i++ {
+					cm, err = csh.configMapsClient.Create(cm)
+					if err == nil || kerrors.IsAlreadyExists(err) {
+						logrus.Infof("cisScanHandler: Create: created skip override configmap %v with contents: %v", cm.Name, string(skipDataBytes))
+						success = true
+						break
+					}
+					time.Sleep(RetryIntervalInMilliseconds * time.Millisecond)
 				}
-				time.Sleep(RetryIntervalInMilliseconds * time.Millisecond)
+				if !success {
+					cm = nil
+					logrus.Errorf("cisScanHandler: Create: error creating configmap: %v", err)
+				}
 			}
 		} else {
 			// Check if the configmap is populated
@@ -146,7 +166,7 @@ func (csh *cisScanHandler) Remove(cs *v3.ClusterScan) (runtime.Object, error) {
 	}
 
 	if cs.Spec.ScanConfig.CisScanConfig != nil {
-		if cs.Spec.ScanConfig.CisScanConfig.Skip != "" {
+		if cs.Spec.ScanConfig.CisScanConfig.OverrideSkip != nil {
 			// Delete the configmap
 			err := csh.configMapsClient.Delete(getOverrideConfigMapName(cs), nil)
 			if err != nil && !kerrors.IsNotFound(err) {
@@ -183,7 +203,7 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 		}
 
 		if cs.Spec.ScanConfig.CisScanConfig != nil {
-			if cs.Spec.ScanConfig.CisScanConfig.Skip != "" {
+			if cs.Spec.ScanConfig.CisScanConfig.OverrideSkip != nil {
 				// Delete the configmap
 				err := csh.configMapsClient.Delete(getOverrideConfigMapName(cs), nil)
 				if err != nil && !kerrors.IsNotFound(err) {
