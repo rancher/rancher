@@ -215,6 +215,68 @@ def test_update_role_template_permissions(admin_mc, remove_resource,
     assert len(cc) == 0
 
 
+def test_role_template_update_inherited_role(admin_mc, remove_resource,
+                                             user_factory, admin_pc):
+    client = admin_mc.client
+    name = random_str()
+    # clone project-member role
+    pm = client.by_id_role_template("project-member")
+    cloned_pm = client.create_role_template(name=name, context="project",
+                                            rules=pm.rules,
+                                            roleTemplateIds=["edit"])
+    remove_resource(cloned_pm)
+    role_template_id = cloned_pm['id']
+    wait_for_role_template_creation(admin_mc, name)
+
+    # add user to a project with this role
+    user_cloned_pm = user_factory()
+    prtb = client.create_project_role_template_binding(
+        name="prtb-" + random_str(),
+        userId=user_cloned_pm.user.id,
+        projectId=admin_pc.project.id,
+        roleTemplateId=cloned_pm.id
+    )
+    remove_resource(prtb)
+    wait_until_available(user_cloned_pm.client, admin_pc.project)
+
+    # check crbs created for this user
+    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
+    prtb_selector = prtb.uuid + "=" + "owner-user"
+    crbs = rbac.list_cluster_role_binding(label_selector=prtb_selector)
+    # crbs that get created for roleTemplate cloned from project-member
+    project_id = admin_pc.project.id.split(":")[1]
+    pm_crbs = [role_template_id+"-promoted",
+               project_id+"-namespaces-edit", "create-ns"]
+    for crb in crbs.items:
+        assert crb.role_ref.name in pm_crbs
+
+    # now edit the roleTemplate to remove "edit" from inherited roles,
+    # and add "view" to inherited roles
+    client.update(cloned_pm, roleTemplateIds=["view"])
+    wait_until(lambda: client.reload(cloned_pm)['roleTemplateIds'] is ["view"])
+    # check crbs are updated
+
+    pm_crbs = [role_template_id + "-promoted",
+               project_id + "-namespaces-readonly"]
+
+    def check_crb(rbac):
+        crbs = rbac.list_cluster_role_binding(label_selector=prtb_selector)
+        for crb in crbs.items:
+            if crb.role_ref.name == project_id + "-namespaces-readonly":
+                return True
+
+    wait_for(lambda: check_crb(rbac), timeout=60,
+             fail_handler=lambda: 'failed to check updated role')
+
+    crbs = rbac.list_cluster_role_binding(label_selector=prtb_selector)
+    found_crbs = []
+    for crb in crbs.items:
+        found_crbs.append(crb.role_ref.name)
+
+    for crb in pm_crbs:
+        assert crb in found_crbs
+
+
 def wait_for_role_template_creation(admin_mc, rt_name, timeout=60):
     start = time.time()
     interval = 0.5
