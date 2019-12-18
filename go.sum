@@ -636,8 +636,8 @@ github.com/rancher/kontainer-driver-metadata v0.0.0-20191210185103-dc45b432da60 
 github.com/rancher/kontainer-driver-metadata v0.0.0-20191210185103-dc45b432da60/go.mod h1:+FCrVV/rB6Bq6w988Qxw2kaaj+1FZq3ySsD23DFnQrw=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20191210170908-feb98acd7948 h1:we7G3n5HiKuQpBIYxWIma+CMvxxS8L14gN6joej9+vM=
 github.com/rancher/kontainer-engine v0.0.4-dev.0.20191210170908-feb98acd7948/go.mod h1:Kw85Yv6Geth1HggHpFKlojoAquN/spvAq0rhWEXkB2E=
-github.com/rancher/machine v0.15.0-rancher24 h1:OptiZknhrpv8Sqew27jXGO7pWdF4m4tfmHq7P0Jp6ec=
-github.com/rancher/machine v0.15.0-rancher24/go.mod h1:kWRdGYyUOZ0NTV0N/F+FHynSn1eBs+XaoDfIN2v5zfM=
+github.com/rancher/machine v0.15.0-rancher25 h1:i78iohBm9QLmxHOMM1ZssYwSNIObPdDUQjZ9h1mo8Jc=
+github.com/rancher/machine v0.15.0-rancher25/go.mod h1:Q7gKLOkNb8z8A/fYUhHFJ/ChJfpF8JVFxHPKZgEgpPA=
 github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009/go.mod h1:wpITyDPTi/Na5h73XkbuEf2AP9fbgrIGqqxVzFhYD6U=
 github.com/rancher/norman v0.0.0-20190930164704-e09204b63081/go.mod h1:kVWc1OyHK9decIY90IYExSHedI5a5qze7IfLiEOTmXQ=
 github.com/rancher/norman v0.0.0-20191003174345-0ac7dd6ccb36/go.mod h1:kVWc1OyHK9decIY90IYExSHedI5a5qze7IfLiEOTmXQ=
@@ -759,6 +759,7 @@ github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80 h1:nrZ3ySNYwJ
 github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80/go.mod h1:iFyPdL66DjUD96XmzVL3ZntbzcflLnznH0fr99w5VqE=
 github.com/ugorji/go v1.1.4/go.mod h1:uQMGLiO92mf5W77hV/PUCpI3pbzQx3CRekS0kk+RGrc=
 github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8/go.mod h1:VFNgLljTbGfSG7qAOspJ7OScBnGdDN/yBr0sguwnwf0=
+github.com/urfave/cli v1.11.1-0.20151120215642-0302d3914d2a/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijbERA=
 github.com/urfave/cli v1.18.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijbERA=
 github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijbERA=
 github.com/urfave/cli v1.22.1 h1:+mkCCcOFKPnCmVYVcURKps1Xe+3zP90gSYGNfRkjoIY=
