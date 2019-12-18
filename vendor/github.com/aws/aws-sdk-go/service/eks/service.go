@@ -12,7 +12,7 @@ import (
 )
 
 // EKS provides the API operation methods for making requests to
-// Amazon Elastic Container Service for Kubernetes. See this package's package overview docs
+// Amazon Elastic Kubernetes Service. See this package's package overview docs
 // for details on the service.
 //
 // EKS methods are safe to use concurrently. It is not safe to
@@ -64,7 +64,6 @@ func newClient(cfg aws.Config, handlers request.Handlers, endpoint, signingRegio
 				SigningRegion: signingRegion,
 				Endpoint:      endpoint,
 				APIVersion:    "2017-11-01",
-				JSONVersion:   "1.1",
 			},
 			handlers,
 		),

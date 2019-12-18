@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -231,6 +232,10 @@ func (r *Request) WillRetry() bool {
 	return r.Error != nil && aws.BoolValue(r.Retryable) && r.RetryCount < r.MaxRetries()
 }
 
+func fmtAttemptCount(retryCount, maxRetries int) string {
+	return fmt.Sprintf("attempt %v/%v", retryCount, maxRetries)
+}
+
 // ParamsFilled returns if the request's parameters have been populated
 // and the parameters are valid. False is returned if no parameters are
 // provided or invalid.
@@ -330,14 +335,15 @@ func getPresignedURL(r *Request, expire time.Duration) (string, http.Header, err
 	return r.HTTPRequest.URL.String(), r.SignedHeaderVals, nil
 }
 
-func debugLogReqError(r *Request, stage string, retrying bool, err error) {
+const (
+	willRetry   = "will retry"
+	notRetrying = "not retrying"
+	retryCount  = "retry %v/%v"
+)
+
+func debugLogReqError(r *Request, stage, retryStr string, err error) {
 	if !r.Config.LogLevel.Matches(aws.LogDebugWithRequestErrors) {
 		return
-	}
-
-	retryStr := "not retrying"
-	if retrying {
-		retryStr = "will retry"
 	}
 
 	r.Config.Logger.Log(fmt.Sprintf("DEBUG: %s %s/%s failed, %s, error %v",
@@ -358,12 +364,12 @@ func (r *Request) Build() error {
 	if !r.built {
 		r.Handlers.Validate.Run(r)
 		if r.Error != nil {
-			debugLogReqError(r, "Validate Request", false, r.Error)
+			debugLogReqError(r, "Validate Request", notRetrying, r.Error)
 			return r.Error
 		}
 		r.Handlers.Build.Run(r)
 		if r.Error != nil {
-			debugLogReqError(r, "Build Request", false, r.Error)
+			debugLogReqError(r, "Build Request", notRetrying, r.Error)
 			return r.Error
 		}
 		r.built = true
@@ -379,7 +385,7 @@ func (r *Request) Build() error {
 func (r *Request) Sign() error {
 	r.Build()
 	if r.Error != nil {
-		debugLogReqError(r, "Build Request", false, r.Error)
+		debugLogReqError(r, "Build Request", notRetrying, r.Error)
 		return r.Error
 	}
 
@@ -473,13 +479,13 @@ func (r *Request) Send() error {
 		r.AttemptTime = time.Now()
 
 		if err := r.Sign(); err != nil {
-			debugLogReqError(r, "Sign Request", false, err)
+			debugLogReqError(r, "Sign Request", notRetrying, err)
 			return err
 		}
 
 		if err := r.sendRequest(); err == nil {
 			return nil
-		} else if !shouldRetryCancel(r.Error) {
+		} else if !shouldRetryError(r.Error) {
 			return err
 		} else {
 			r.Handlers.Retry.Run(r)
@@ -520,7 +526,9 @@ func (r *Request) sendRequest() (sendErr error) {
 	r.Retryable = nil
 	r.Handlers.Send.Run(r)
 	if r.Error != nil {
-		debugLogReqError(r, "Send Request", r.WillRetry(), r.Error)
+		debugLogReqError(r, "Send Request",
+			fmtAttemptCount(r.RetryCount, r.MaxRetries()),
+			r.Error)
 		return r.Error
 	}
 
@@ -528,13 +536,17 @@ func (r *Request) sendRequest() (sendErr error) {
 	r.Handlers.ValidateResponse.Run(r)
 	if r.Error != nil {
 		r.Handlers.UnmarshalError.Run(r)
-		debugLogReqError(r, "Validate Response", r.WillRetry(), r.Error)
+		debugLogReqError(r, "Validate Response",
+			fmtAttemptCount(r.RetryCount, r.MaxRetries()),
+			r.Error)
 		return r.Error
 	}
 
 	r.Handlers.Unmarshal.Run(r)
 	if r.Error != nil {
-		debugLogReqError(r, "Unmarshal Response", r.WillRetry(), r.Error)
+		debugLogReqError(r, "Unmarshal Response",
+			fmtAttemptCount(r.RetryCount, r.MaxRetries()),
+			r.Error)
 		return r.Error
 	}
 
@@ -565,13 +577,13 @@ type temporary interface {
 	Temporary() bool
 }
 
-func shouldRetryCancel(err error) bool {
-	switch err := err.(type) {
+func shouldRetryError(origErr error) bool {
+	switch err := origErr.(type) {
 	case awserr.Error:
 		if err.Code() == CanceledErrorCode {
 			return false
 		}
-		return shouldRetryCancel(err.OrigErr())
+		return shouldRetryError(err.OrigErr())
 	case *url.Error:
 		if strings.Contains(err.Error(), "connection refused") {
 			// Refused connections should be retried as the service may not yet
@@ -581,14 +593,17 @@ func shouldRetryCancel(err error) bool {
 		}
 		// *url.Error only implements Temporary after golang 1.6 but since
 		// url.Error only wraps the error:
-		return shouldRetryCancel(err.Err)
+		return shouldRetryError(err.Err)
 	case temporary:
+		if netErr, ok := err.(*net.OpError); ok && netErr.Op == "dial" {
+			return true
+		}
 		// If the error is temporary, we want to allow continuation of the
 		// retry process
-		return err.Temporary()
+		return err.Temporary() || isErrConnectionReset(origErr)
 	case nil:
 		// `awserr.Error.OrigErr()` can be nil, meaning there was an error but
-		// because we don't know the cause, it is marked as retriable. See
+		// because we don't know the cause, it is marked as retryable. See
 		// TestRequest4xxUnretryable for an example.
 		return true
 	default:
