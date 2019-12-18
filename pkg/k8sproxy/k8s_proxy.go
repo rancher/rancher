@@ -10,6 +10,6 @@ import (
 )
 
 func New(scaledContext *config.ScaledContext, dialer dialer.Factory) http.Handler {
-	return clusterrouter.New(scaledContext.LocalConfig, k8slookup.New(scaledContext, true), dialer,
+	return clusterrouter.New(scaledContext.LocalConfig, k8slookup.New(scaledContext, false), dialer,
 		scaledContext.Management.Clusters("").Controller().Lister())
 }
