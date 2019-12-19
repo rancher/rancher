@@ -194,11 +194,11 @@ func (f *Factory) createCRD(apiClient clientset.Interface, schema *types.Schema,
 	}
 
 	logrus.Infof("Creating CRD %s", name)
-	crd, err := apiClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+	crd2, err := apiClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 	if errors.IsAlreadyExists(err) {
 		return crd, nil
 	}
-	return crd, err
+	return crd2, err
 }
 
 func (f *Factory) getReadyCRDs(apiClient clientset.Interface) (map[string]*apiext.CustomResourceDefinition, error) {
