@@ -25,7 +25,8 @@ var defaultAdminLabel = map[string]string{defaultAdminLabelKey: defaultAdminLabe
 func addRoles(management *config.ManagementContext) (string, error) {
 	rb := newRoleBuilder()
 
-	rb.addRole("Create Clusters", "clusters-create").addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create").
+	rb.addRole("Create Clusters", "clusters-create").
+		addRule().apiGroups("management.cattle.io").resources("clusters").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("get", "list", "watch").
@@ -33,25 +34,40 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("nodetemplates").verbs("*").
 		addRule().apiGroups("*").resources("secrets").verbs("create")
 
-	rb.addRole("Manage Node Drivers", "nodedrivers-manage").addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("*")
-	rb.addRole("Manage Cluster Drivers", "kontainerdrivers-manage").addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("*")
-	rb.addRole("Manage Catalogs", "catalogs-manage").addRule().apiGroups("management.cattle.io").resources("catalogs", "templates", "templateversions").verbs("*")
-	rb.addRole("Use Catalog Templates", "catalogs-use").addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list", "watch")
-	rb.addRole("Manage Users", "users-manage").addRule().apiGroups("management.cattle.io").resources("users", "globalrolebindings").verbs("*").
+	rb.addRole("Manage Node Drivers", "nodedrivers-manage").
+		addRule().apiGroups("management.cattle.io").resources("nodedrivers").verbs("*")
+	rb.addRole("Manage Cluster Drivers", "kontainerdrivers-manage").
+		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("*")
+	rb.addRole("Manage Catalogs", "catalogs-manage").
+		addRule().apiGroups("management.cattle.io").resources("catalogs", "templates", "templateversions").verbs("*")
+	rb.addRole("Use Catalog Templates", "catalogs-use").
+		addRule().apiGroups("management.cattle.io").resources("templates", "templateversions").verbs("get", "list", "watch")
+	rb.addRole("Manage Users", "users-manage").
+		addRule().apiGroups("management.cattle.io").resources("users", "globalrolebindings").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("globalroles").verbs("get", "list", "watch")
-	rb.addRole("Manage Roles", "roles-manage").addRule().apiGroups("management.cattle.io").resources("roletemplates").verbs("*")
-	rb.addRole("Manage Authentication", "authn-manage").addRule().apiGroups("management.cattle.io").resources("authconfigs").verbs("get", "list", "watch", "update")
-	rb.addRole("Manage Settings", "settings-manage").addRule().apiGroups("management.cattle.io").resources("settings").verbs("*")
-	rb.addRole("Manage Features", "features-manage").addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch", "update")
-	rb.addRole("Manage PodSecurityPolicy Templates", "podsecuritypolicytemplates-manage").addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("*")
-	rb.addRole("Create RKE Templates", "clustertemplates-create").addRule().apiGroups("management.cattle.io").resources("clustertemplates").verbs("create")
-	rb.addRole("Create RKE Template Revisions", "clustertemplaterevisions-create").addRule().apiGroups("management.cattle.io").resources("clustertemplaterevisions").verbs("create")
-	rb.addRole("View Rancher Metrics", "view-rancher-metrics").addRule().apiGroups("management.cattle.io").resources("ranchermetrics").verbs("get")
+	rb.addRole("Manage Roles", "roles-manage").
+		addRule().apiGroups("management.cattle.io").resources("roletemplates").verbs("*")
+	rb.addRole("Manage Authentication", "authn-manage").
+		addRule().apiGroups("management.cattle.io").resources("authconfigs").verbs("get", "list", "watch", "update")
+	rb.addRole("Manage Settings", "settings-manage").
+		addRule().apiGroups("management.cattle.io").resources("settings").verbs("*")
+	rb.addRole("Manage Features", "features-manage").
+		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch", "update")
+	rb.addRole("Manage PodSecurityPolicy Templates", "podsecuritypolicytemplates-manage").
+		addRule().apiGroups("management.cattle.io").resources("podsecuritypolicytemplates").verbs("*")
+	rb.addRole("Create RKE Templates", "clustertemplates-create").
+		addRule().apiGroups("management.cattle.io").resources("clustertemplates").verbs("create")
+	rb.addRole("Create RKE Template Revisions", "clustertemplaterevisions-create").
+		addRule().apiGroups("management.cattle.io").resources("clustertemplaterevisions").verbs("create")
+	rb.addRole("View Rancher Metrics", "view-rancher-metrics").
+		addRule().apiGroups("management.cattle.io").resources("ranchermetrics").verbs("get")
 
-	rb.addRole("Admin", "admin").addRule().apiGroups("*").resources("*").verbs("*").
+	rb.addRole("Admin", "admin").
+		addRule().apiGroups("*").resources("*").verbs("*").
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
 
-	rb.addRole("User", "user").addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
+	rb.addRole("User", "user").
+		addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch").
@@ -69,7 +85,8 @@ func addRoles(management *config.ManagementContext) (string, error) {
 		addRule().apiGroups("management.cattle.io").resources("rkek8sserviceoptions").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("rkeaddons").verbs("get", "list", "watch")
 
-	rb.addRole("User Base", "user-base").addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
+	rb.addRole("User Base", "user-base").
+		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch").
 		addRule().apiGroups("project.cattle.io").resources("sourcecodecredentials").verbs("*").
