@@ -59,7 +59,7 @@ items:
                 - name: WEAVE_PASSWORD
                   value: "{{.WeavePassword}}"
                 {{- end}}
-                {{- if ne .MTU ""}}
+                {{- if ne .MTU 0}}
                 - name: WEAVE_MTU
                   value: "{{.MTU}}"
                 {{- end }}
@@ -312,7 +312,7 @@ items:
                 - name: WEAVE_PASSWORD
                   value: "{{.WeavePassword}}"
                 {{- end}}
-                {{- if ne .MTU ""}}
+                {{- if ne .MTU 0}}
                 - name: WEAVE_MTU
                   value: "{{.MTU}}"
                 {{- end }}

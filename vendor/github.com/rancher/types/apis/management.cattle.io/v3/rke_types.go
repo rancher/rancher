@@ -355,7 +355,7 @@ type NetworkConfig struct {
 	// Plugin options to configure network properties
 	Options map[string]string `yaml:"options" json:"options,omitempty"`
 	// Set MTU for CNI provider
-	MTU string `yaml:"mtu" json:"mtu,omitempty"`
+	MTU int `yaml:"mtu" json:"mtu,omitempty"`
 	// CalicoNetworkProvider
 	CalicoNetworkProvider *CalicoNetworkProvider `yaml:"calico_network_provider,omitempty" json:"calicoNetworkProvider,omitempty"`
 	// CanalNetworkProvider
