@@ -144,7 +144,7 @@ func Generate(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshalling data into internal report: %v", err)
 	}
-	logrus.Infof("internalReport: %+v", internalReport)
+	logrus.Debugf("internalReport: %+v", internalReport)
 	report, err := mapReport(internalReport)
 	logrus.Debugf("report: %v", report)
 
