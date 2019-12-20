@@ -47,23 +47,21 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 			resource.AddAction(request, v3.ClusterActionBackupEtcd)
 			resource.AddAction(request, v3.ClusterActionRestoreFromEtcdBackup)
 		}
-		canUpdateCluster := func(request *types.APIContext, clusterID string) bool {
+		canUpdateClusterFn := func(request *types.APIContext, clusterID string) bool {
 			cluster := map[string]interface{}{
 				"id": clusterID,
 			}
-			return request.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", request, cluster, resource.Schema) == nil
-		}
-		canCreateClusterScanObject := func() bool {
 			return request.AccessControl.CanDo(
-				v3.ClusterScanGroupVersionKind.Group,
-				v3.ClusterScanResource.Name,
-				"create",
+				v3.ClusterGroupVersionKind.Group,
+				v3.ClusterResource.Name,
+				"update",
 				request,
-				nil,
-				request.Schema,
-			) == nil
+				cluster,
+				resource.Schema) == nil
 		}
-		if canUpdateCluster(request, resource.ID) && canCreateClusterScanObject() {
+		canUpdateCluster := canUpdateClusterFn(request, resource.ID)
+		logrus.Debugf("user: %v, canUpdateCluster: %v", request.Request.Header.Get("Impersonate-User"), canUpdateCluster)
+		if canUpdateCluster {
 			resource.AddAction(request, v3.ClusterActionRunSecurityScan)
 		}
 	}
