@@ -42,11 +42,12 @@ type cisScanHandler struct {
 }
 
 type appInfo struct {
-	appName           string
-	clusterName       string
-	skipConfigMapName string
-	debugMaster       string
-	debugWorker       string
+	appName                  string
+	clusterName              string
+	skipConfigMapName        string
+	debugMaster              string
+	debugWorker              string
+	overrideBenchmarkVersion string
 }
 
 type OverrideSkipInfoData struct {
@@ -89,6 +90,9 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 			}
 			if cs.Spec.ScanConfig.CisScanConfig.OverrideSkip != nil {
 				skipOverride = true
+			}
+			if cs.Spec.ScanConfig.CisScanConfig.OverrideBenchmarkVersion != "" {
+				appInfo.overrideBenchmarkVersion = cs.Spec.ScanConfig.CisScanConfig.OverrideBenchmarkVersion
 			}
 		}
 
@@ -192,6 +196,7 @@ func (csh *cisScanHandler) Remove(cs *v3.ClusterScan) (runtime.Object, error) {
 }
 
 func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
+	logrus.Debugf("cisScanHandler: Updated: %+v", cs)
 	if !v3.ClusterScanConditionCompleted.IsTrue(cs) && !v3.ClusterScanConditionRunCompleted.IsUnknown(cs) {
 		// Delete the system helm chart
 		appInfo := &appInfo{
@@ -250,10 +255,11 @@ func (csh *cisScanHandler) deployApp(appInfo *appInfo) error {
 	}
 
 	appAnswers := map[string]string{
-		"owner":             appInfo.appName,
-		"skipConfigMapName": appInfo.skipConfigMapName,
-		"debugMaster":       appInfo.debugMaster,
-		"debugWorker":       appInfo.debugWorker,
+		"owner":                    appInfo.appName,
+		"skipConfigMapName":        appInfo.skipConfigMapName,
+		"debugMaster":              appInfo.debugMaster,
+		"debugWorker":              appInfo.debugWorker,
+		"overrideBenchmarkVersion": appInfo.overrideBenchmarkVersion,
 	}
 	logrus.Debugf("appAnswers: %v", appAnswers)
 	app := &projv3.App{
