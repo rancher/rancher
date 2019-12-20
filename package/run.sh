@@ -115,10 +115,10 @@ set_certs_dir_permissions()
     masked=0
     getfacl -p $certs_dir | grep -q mask::r-x || masked=1
     if [ $masked -eq 0 ]; then
-        chmod 700 $certs_dir
+        chmod 755 $certs_dir
         setfacl -R -m m::rX $certs_dir
     else
-        chmod 700 $certs_dir
+        chmod 755 $certs_dir
     fi
 }
 
