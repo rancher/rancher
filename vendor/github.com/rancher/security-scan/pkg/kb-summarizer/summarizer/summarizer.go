@@ -27,6 +27,7 @@ const (
 	MasterResultsFilename        = "master.json"
 	EtcdResultsFilename          = "etcd.json"
 	NodeResultsFilename          = "node.json"
+	CurrentBenchmarkKey          = "current"
 )
 
 type Summarizer struct {
@@ -131,7 +132,7 @@ func NewSummarizer(k8sVersion, benchmarkVersion, controlsDir, etcdControlsDir, i
 	if err := s.loadControls(); err != nil {
 		return nil, fmt.Errorf("error loading controls: %v", err)
 	}
-	skip, err := getSkipInfo(s.BenchmarkVersion, skipConfigFile)
+	skip, err := GetSkipInfo(s.BenchmarkVersion, skipConfigFile)
 	if err != nil {
 		logrus.Errorf("error getting skip info: %v, but ignoring", err)
 	}
@@ -139,7 +140,7 @@ func NewSummarizer(k8sVersion, benchmarkVersion, controlsDir, etcdControlsDir, i
 	return s, nil
 }
 
-func getSkipInfo(benchmark, skipConfigFile string) (map[string]bool, error) {
+func GetSkipInfo(benchmark, skipConfigFile string) (map[string]bool, error) {
 	skipMap := map[string]bool{}
 	sc := &skipConfig{}
 	if skipConfigFile == "" {
@@ -153,23 +154,27 @@ func getSkipInfo(benchmark, skipConfigFile string) (map[string]bool, error) {
 	if err != nil {
 		return skipMap, fmt.Errorf("error unmarshalling skip str: %v", err)
 	}
-	skipArr := sc.Skip[benchmark]
+	skipArr, ok := sc.Skip[benchmark]
+	if !ok {
+		skipArr, ok = sc.Skip[CurrentBenchmarkKey]
+	}
 	if len(skipArr) == 0 {
 		return skipMap, nil
 	}
 	for _, v := range skipArr {
 		skipMap[v] = true
 	}
+	logrus.Debugf("skipMap: %+v", skipMap)
 	return skipMap, nil
 }
 
-func (s *Summarizer) getBenchmarkFor(k8sversion string) (string, error) {
-	if k8sversion == "" {
+func (s *Summarizer) getBenchmarkFor(k8sVersion string) (string, error) {
+	if k8sVersion == "" {
 		return "", nil
 	}
-	b, ok := s.kubeToBenchmarkMap[k8sversion]
+	b, ok := s.kubeToBenchmarkMap[k8sVersion]
 	if !ok {
-		return "", fmt.Errorf("k8s version: %v not supported", k8sversion)
+		return "", fmt.Errorf("k8s version: %v not supported", k8sVersion)
 	}
 	return b, nil
 }

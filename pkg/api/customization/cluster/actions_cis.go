@@ -25,24 +25,16 @@ const (
 func (a ActionHandler) runCisScan(actionName string, action *types.Action, apiContext *types.APIContext) error {
 	var err error
 
-	canUpdateCluster := func(apiContext *types.APIContext) bool {
+	canUpdateClusterFn := func(apiContext *types.APIContext) bool {
 		cluster := map[string]interface{}{
 			"id": apiContext.ID,
 		}
 		return apiContext.AccessControl.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", apiContext, cluster, apiContext.Schema) == nil
 	}
 
-	canCreateClusterScanObject := func() bool {
-		return apiContext.AccessControl.CanDo(
-			v3.ClusterScanGroupVersionKind.Group,
-			v3.ClusterScanResource.Name,
-			"create",
-			apiContext,
-			nil,
-			apiContext.Schema,
-		) == nil
-	}
-	if !canUpdateCluster(apiContext) || !canCreateClusterScanObject() {
+	canUpdateCluster := canUpdateClusterFn(apiContext)
+	logrus.Debugf("user: %v, canUpdateCluster: %v", apiContext.Request.Header.Get("Impersonate-User"), canUpdateCluster)
+	if !canUpdateCluster {
 		return httperror.NewAPIError(httperror.PermissionDenied, "can not run security scan")
 	}
 

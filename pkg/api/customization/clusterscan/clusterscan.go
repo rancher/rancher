@@ -32,8 +32,12 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 				failed = true
 			}
 		}
-		if completed && !failed {
-			resource.Links["report"] = apiContext.URLBuilder.Link("report", resource)
+		if completed {
+			if !failed {
+				resource.Links["report"] = apiContext.URLBuilder.Link("report", resource)
+			} else {
+				resource.Values["state"] = "error"
+			}
 		}
 	}
 }
