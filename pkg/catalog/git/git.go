@@ -41,7 +41,10 @@ func RemoteBranchHeadCommit(url, branch string) (string, error) {
 		return "", errors.Wrap(err, string(output))
 	}
 	parts := strings.Split(string(output), "\t")
-	return parts[0], nil
+	if len(parts) > 0 && len(parts[0]) > 0 {
+		return parts[0], nil
+	}
+	return "", fmt.Errorf("no commit found for url %s branch %s", branch, url)
 }
 
 func IsValid(url string) bool {
