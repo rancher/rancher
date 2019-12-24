@@ -115,7 +115,6 @@ def create_project_client(request):
     def fin():
         client = get_user_client()
         client.delete(namespace["project"])
-        cluster_cleanup(client, cluster)
     request.addfinalizer(fin)
 
 
