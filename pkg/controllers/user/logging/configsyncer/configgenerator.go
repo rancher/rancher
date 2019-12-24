@@ -99,6 +99,6 @@ func (s *ConfigGenerator) addExcludeNamespaces(systemProjectID string) (string, 
 			systemNamespaces = append(systemNamespaces, namespacePattern)
 		}
 	}
-
+	sort.Strings(systemNamespaces)
 	return strings.Join(systemNamespaces, "|"), nil
 }
