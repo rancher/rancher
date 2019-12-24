@@ -89,6 +89,7 @@ type Cluster struct {
 type ClusterSpecBase struct {
 	DesiredAgentImage                    string                         `json:"desiredAgentImage"`
 	DesiredAuthImage                     string                         `json:"desiredAuthImage"`
+	AgentImageOverride                   string                         `json:"agentImageOverride"`
 	RancherKubernetesEngineConfig        *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty"`
 	DefaultPodSecurityPolicyTemplateName string                         `json:"defaultPodSecurityPolicyTemplateName,omitempty" norman:"type=reference[podSecurityPolicyTemplate]"`
 	DefaultClusterRoleForProjectMembers  string                         `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
@@ -128,7 +129,6 @@ type ClusterStatus struct {
 	// https://kubernetes.io/docs/api-reference/v1.8/#componentstatus-v1-core
 	Driver                               string                    `json:"driver"`
 	AgentImage                           string                    `json:"agentImage"`
-	AgentImageOverride                   string                    `json:"agentImageOverride"`
 	AuthImage                            string                    `json:"authImage"`
 	ComponentStatuses                    []ClusterComponentStatus  `json:"componentStatuses,omitempty"`
 	APIEndpoint                          string                    `json:"apiEndpoint,omitempty"`

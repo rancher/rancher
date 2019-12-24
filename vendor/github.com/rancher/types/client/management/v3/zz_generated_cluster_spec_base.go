@@ -2,6 +2,7 @@ package client
 
 const (
 	ClusterSpecBaseType                                     = "clusterSpecBase"
+	ClusterSpecBaseFieldAgentImageOverride                  = "agentImageOverride"
 	ClusterSpecBaseFieldDefaultClusterRoleForProjectMembers = "defaultClusterRoleForProjectMembers"
 	ClusterSpecBaseFieldDefaultPodSecurityPolicyTemplateID  = "defaultPodSecurityPolicyTemplateId"
 	ClusterSpecBaseFieldDesiredAgentImage                   = "desiredAgentImage"
@@ -16,6 +17,7 @@ const (
 )
 
 type ClusterSpecBase struct {
+	AgentImageOverride                  string                         `json:"agentImageOverride,omitempty" yaml:"agentImageOverride,omitempty"`
 	DefaultClusterRoleForProjectMembers string                         `json:"defaultClusterRoleForProjectMembers,omitempty" yaml:"defaultClusterRoleForProjectMembers,omitempty"`
 	DefaultPodSecurityPolicyTemplateID  string                         `json:"defaultPodSecurityPolicyTemplateId,omitempty" yaml:"defaultPodSecurityPolicyTemplateId,omitempty"`
 	DesiredAgentImage                   string                         `json:"desiredAgentImage,omitempty" yaml:"desiredAgentImage,omitempty"`
