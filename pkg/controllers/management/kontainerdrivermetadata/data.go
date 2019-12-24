@@ -334,7 +334,7 @@ func getLabelMap(k8sVersion string, data map[string]map[string]string,
 	if err != nil {
 		return nil, fmt.Errorf("k8sVersion not sem-ver %s %v", k8sVersion, err)
 	}
-	labelMap := map[string]string{}
+	labelMap := map[string]string{"cattle.io/creator": "norman"}
 	for addon, addonData := range data {
 		if addon == templates.TemplateKeys {
 			continue
@@ -689,6 +689,9 @@ func labelEqual(labels map[string]string, exists bool) bool {
 	toSendValue := "true"
 	if exists {
 		toSendValue = "false"
+	}
+	if _, ok := labels[sendRKELabel]; !ok {
+		return toSendValue == "true"
 	}
 	return toSendValue == labels[sendRKELabel]
 }
