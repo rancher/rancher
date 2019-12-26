@@ -206,15 +206,22 @@ func (md *MetadataController) createOrUpdateSystemImageCRD(k8sVersion string, sy
 			return err
 		}
 		return nil
-
 	}
-	if reflect.DeepEqual(sysImage.SystemImages, systemImages) && reflect.DeepEqual(sysImage.Labels, pluginsMap) {
+	dataEqual := reflect.DeepEqual(sysImage.SystemImages, systemImages)
+	labelsEqual := reflect.DeepEqual(sysImage.Labels, pluginsMap)
+	if dataEqual && labelsEqual {
 		return nil
 	}
 	sysImageCopy := sysImage.DeepCopy()
-	sysImageCopy.SystemImages = systemImages
-	for k, v := range pluginsMap {
-		sysImageCopy.Labels[k] = v
+	if !dataEqual {
+		logrus.Debugf("systemImage changed %s", k8sVersion)
+		sysImageCopy.SystemImages = systemImages
+	}
+	if !labelsEqual {
+		logrus.Debugf("systemImage labels changed %s old: %v new: %v", k8sVersion, sysImageCopy.Labels, pluginsMap)
+		for k, v := range pluginsMap {
+			sysImageCopy.Labels[k] = v
+		}
 	}
 	if _, err := md.SystemImages.Update(sysImageCopy); err != nil {
 		return err
@@ -225,13 +232,14 @@ func (md *MetadataController) createOrUpdateSystemImageCRD(k8sVersion string, sy
 func (md *MetadataController) createOrUpdateServiceOptionCRD(k8sVersion string, serviceOptions v3.KubernetesServicesOptions, rkeDataKeys map[string]bool, osType OSType) error {
 	svcOption, err := md.getRKEServiceOption(k8sVersion, osType)
 	_, exists := rkeDataKeys[k8sVersion]
+	name := getVersionNameWithOsType(k8sVersion, osType)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return err
 		}
 		svcOption = &v3.RKEK8sServiceOption{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      getVersionNameWithOsType(k8sVersion, osType),
+				Name:      name,
 				Namespace: namespace.GlobalNamespace,
 			},
 			ServiceOptions: serviceOptions,
@@ -249,14 +257,20 @@ func (md *MetadataController) createOrUpdateServiceOptionCRD(k8sVersion string, 
 		return nil
 	}
 	var svcOptionCopy *v3.RKEK8sServiceOption
-	if reflect.DeepEqual(svcOption.ServiceOptions, serviceOptions) && labelEqual(svcOption.Labels, exists) {
+	dataEqual := reflect.DeepEqual(svcOption.ServiceOptions, serviceOptions)
+	labelsEqual := labelEqual(svcOption.Labels, exists)
+	if dataEqual && labelsEqual {
 		return nil
 	}
 	svcOptionCopy = svcOption.DeepCopy()
-	if !exists {
+	if !dataEqual {
+		logrus.Debugf("serviceOptions changed %s", name)
 		svcOptionCopy.ServiceOptions = serviceOptions
 	}
-	updateLabel(svcOptionCopy.Labels, exists)
+	if !labelsEqual {
+		logrus.Debugf("serviceOptions labels changed %s old: %v new: %v", name, svcOptionCopy.Labels, exists)
+		updateLabel(svcOptionCopy.Labels, exists)
+	}
 	if svcOptionCopy != nil {
 		if _, err := md.ServiceOptions.Update(svcOptionCopy); err != nil {
 			return err
@@ -292,14 +306,20 @@ func (md *MetadataController) createOrUpdateAddonCRD(addonName, template string,
 		return nil
 	}
 	var addonCopy *v3.RKEAddon
-	if reflect.DeepEqual(addon.Template, template) && labelEqual(addon.Labels, exists) {
+	dataEqual := reflect.DeepEqual(addon.Template, template)
+	labelsEqual := labelEqual(addon.Labels, exists)
+	if dataEqual && labelsEqual {
 		return nil
 	}
 	addonCopy = addon.DeepCopy()
-	if !exists {
+	if !dataEqual {
+		logrus.Debugf("addonTemplate changed %s", addonName)
 		addonCopy.Template = template
 	}
-	updateLabel(addonCopy.Labels, exists)
+	if !labelsEqual {
+		logrus.Debugf("addonTemplate labels changed %s old: %v new: %v", addonName, addonCopy.Labels, exists)
+		updateLabel(addonCopy.Labels, exists)
+	}
 	if addonCopy != nil {
 		if _, err := md.Addons.Update(addonCopy); err != nil {
 			return err
@@ -314,7 +334,7 @@ func getLabelMap(k8sVersion string, data map[string]map[string]string,
 	if err != nil {
 		return nil, fmt.Errorf("k8sVersion not sem-ver %s %v", k8sVersion, err)
 	}
-	labelMap := map[string]string{}
+	labelMap := map[string]string{"cattle.io/creator": "norman"}
 	for addon, addonData := range data {
 		if addon == templates.TemplateKeys {
 			continue
@@ -669,6 +689,9 @@ func labelEqual(labels map[string]string, exists bool) bool {
 	toSendValue := "true"
 	if exists {
 		toSendValue = "false"
+	}
+	if _, ok := labels[sendRKELabel]; !ok {
+		return toSendValue == "true"
 	}
 	return toSendValue == labels[sendRKELabel]
 }
