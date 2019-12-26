@@ -876,6 +876,7 @@ spec:
           # When cluster is using large nodes(with more cores), "coresPerReplica" should dominate.
           # If using small nodes, "nodesPerReplica" should dominate.
           - --default-params={"linear":{"coresPerReplica":128,"nodesPerReplica":4,"min":1,"preventSinglePointFailure":true}}
+          - --nodelabels=node-role.kubernetes.io/worker=true
           - --logtostderr=true
           - --v=2
 {{- if eq .RBACConfig "rbac"}}
