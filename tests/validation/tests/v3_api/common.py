@@ -53,10 +53,15 @@ AWS_S3_BUCKET_FOLDER_NAME = os.environ.get("AWS_S3_BUCKET_FOLDER_NAME", "")
 LINODE_ACCESSKEY = os.environ.get('RANCHER_LINODE_ACCESSKEY', "None")
 
 TEST_RBAC = ast.literal_eval(os.environ.get('RANCHER_TEST_RBAC', "False"))
-if_test_rbac = pytest.mark.skipif(TEST_RBAC is False, reason='rbac tests are skipped')
+if_test_rbac = pytest.mark.skipif(TEST_RBAC is False,
+                                  reason='rbac tests are skipped')
 
-TEST_S3 = ast.literal_eval(os.environ.get('RANCHER_TEST_S3', "False"))
-if_test_s3 = pytest.mark.skipif(TEST_S3 is False, reason='S3 tests are skipped')
+TEST_ALL_SNAPSHOT = ast.literal_eval(
+    os.environ.get('RANCHER_TEST_ALL_SNAPSHOT', "False")
+)
+if_test_all_snapshot = \
+    pytest.mark.skipif(TEST_ALL_SNAPSHOT is False,
+                       reason='Snapshots check tests are skipped')
 
 CLUSTER_MEMBER = "cluster-member"
 CLUSTER_OWNER  = "cluster-owner"
@@ -878,7 +883,7 @@ def delete_cluster(client, cluster):
     # Delete Cluster
     client.delete(cluster)
     # Delete nodes(in cluster) from AWS for Imported and Custom Cluster
-    if (len(nodes) > 0):
+    if len(nodes) > 0:
         cluster_type = get_cluster_type(client, cluster)
         print(cluster_type)
         if get_cluster_type(client, cluster) in ["Imported", "Custom"]:

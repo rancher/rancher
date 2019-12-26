@@ -3,28 +3,37 @@ from urllib.parse import urlparse
 import pytest
 from .common import *  # NOQA
 from .test_rke_cluster_provisioning import rke_config, engine_install_url, \
-    node_template_linode, validate_rke_dm_host_2
+    node_template_linode, validate_rke_dm_host_2, \
+    create_and_validate_custom_host
 
-namespace = {"p_client": None, "ns": None, "cluster": None, "project": None}
+namespace = {"p_client": None, "ns": None, "cluster": None, "project": None,
+             "nodes": []}
 
 
 def test_bkp_restore_local(create_project_client):
     validate_backup_create_restore_delete("local")
 
 
-@if_test_s3
+@if_test_all_snapshot
+def test_bkp_restore_local_with_snapshot_check(create_project_client_ec2):
+    validate_backup_create_restore_delete("filesystem")
+
+
+@if_test_all_snapshot
 def test_bkp_restore_s3_with_creds(
         create_project_client_and_cluster_s3_with_creds):
     validate_backup_create_restore_delete("s3")
 
 
-@if_test_s3
+@if_test_all_snapshot
 def test_bkp_restore_s3_with_iam(
         create_project_client_and_cluster_s3_with_iam):
     validate_backup_create_restore_delete("s3")
 
 
 def validate_backup_create_restore_delete(backup_mode):
+    ssh_user = os.environ.get('RANCHER_SSH_USER', "ubuntu")
+    ssh_key_path = ".ssh/jenkins-rke-validation.pem"
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     client = get_user_client()
@@ -68,6 +77,12 @@ def validate_backup_create_restore_delete(backup_mode):
         parseurl = urlparse(backupfileurl)
         backupfilename = os.path.basename(parseurl.path)
         assert AmazonWebServices().s3_backup_check(backupfilename)
+    elif backup_mode == 'filesystem':
+        for node in namespace['nodes']:
+            if 'etcd' not in node.roles: continue
+            get_filesystem_snapshots = 'ls /opt/rke/etcd-snapshots'
+            response = node.execute_command(get_filesystem_snapshots)[0]
+            assert etcdbackupdata[0]['filename'] in response
 
     # Create workload after backup
     testworkload = p_client.create_workload(name=name,
@@ -97,6 +112,14 @@ def validate_backup_create_restore_delete(backup_mode):
         client.delete(cluster.etcdBackups(id=backupId)['data'][0])
         wait_for_backup_to_delete(cluster, backupname)
         assert AmazonWebServices().s3_backup_check(backupfilename) is False
+    elif backup_mode == 'filesystem':
+        client.delete(cluster.etcdBackups(id=backupId)['data'][0])
+        wait_for_backup_to_delete(cluster, backupname)
+        for node in namespace['nodes']:
+            if 'etcd' not in node.roles: continue
+            get_filesystem_snapshots = 'ls /opt/rke/etcd-snapshots'
+            response = node.execute_command(get_filesystem_snapshots)[0]
+            assert etcdbackupdata[0]['filename'] not in response
 
 
 @pytest.fixture(scope='module')
@@ -118,8 +141,31 @@ def create_project_client(request):
     request.addfinalizer(fin)
 
 
+@pytest.fixture(scope='module')
+def create_project_client_ec2(request):
+    node_roles = [["controlplane"], ["etcd"],
+                  ["worker"], ["worker"], ["worker"]]
+    cluster, aws_nodes = create_and_validate_custom_host(node_roles)
+    client = get_user_client()
+    p, ns = create_project_and_ns(USER_TOKEN, cluster, "testsecret")
+    p_client = get_project_client_for_token(p, USER_TOKEN)
+    c_client = get_cluster_client_for_token(cluster, USER_TOKEN)
+    namespace["p_client"] = p_client
+    namespace["ns"] = ns
+    namespace["cluster"] = cluster
+    namespace["project"] = p
+    namespace["c_client"] = c_client
+    namespace["nodes"] = aws_nodes.copy()
+
+    def fin():
+        client.delete(namespace["project"])
+        cluster_cleanup(client, cluster, aws_nodes)
+    request.addfinalizer(fin)
+
+
 @pytest.fixture(scope='session')
-def create_project_client_and_cluster_s3_with_creds(node_template_linode, request):
+def create_project_client_and_cluster_s3_with_creds(node_template_linode,
+                                                    request):
     rke_config["services"]["etcd"]["backupConfig"] = {
         "enabled": "true",
         "intervalHours": 12,
@@ -158,7 +204,8 @@ def create_project_client_and_cluster_s3_with_creds(node_template_linode, reques
 
 
 @pytest.fixture(scope='session')
-def create_project_client_and_cluster_s3_with_iam(node_template_ec2_iam, request):
+def create_project_client_and_cluster_s3_with_iam(node_template_ec2_iam,
+                                                  request):
     rke_config["services"]["etcd"]["backupConfig"] = {
         "enabled": "true",
         "intervalHours": 12,
