@@ -156,7 +156,7 @@ class AmazonWebServices(CloudProviderBase):
                 "BlockDeviceMappings":
                     [{"DeviceName": "/dev/sda1", "Ebs": {"VolumeSize": 50}}]
                 }
-        if (len(AWS_IAM_PROFILE) > 0):
+        if len(AWS_IAM_PROFILE) > 0:
             args["IamInstanceProfile"] = {'Name': AWS_IAM_PROFILE}
 
         instance = self._client.run_instances(**args)

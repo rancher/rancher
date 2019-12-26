@@ -35,18 +35,26 @@ class Node(object):
         self.ssh_key_path = ssh_key_path
         self.os_version = os_version
         self.docker_version = docker_version
-        self.roles = None
+        self._roles = []
         self.labels = labels or {}
         self.state = state
         self._ssh_client = paramiko.SSHClient()
         self._ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.ssh_port = '22'
 
+    @property
+    def roles(self):
+        return self._roles
+
+    @roles.setter
+    def roles(self, r):
+        self._roles = r
+
     def wait_for_ssh_ready(self):
         command = 'whomai'
         start_time = int(time.time())
         logs_while_waiting = ''
-        while(int(time.time()) - start_time < 100):
+        while int(time.time()) - start_time < 100:
             try:
                 self._ssh_client.connect(
                     self.public_ip_address, username=self.ssh_user,

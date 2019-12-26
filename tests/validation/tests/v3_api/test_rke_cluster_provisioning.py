@@ -983,6 +983,8 @@ def create_and_validate_custom_host(node_roles):
         docker_run_cmd = \
             get_custom_host_registration_cmd(client, cluster, node_roles[i],
                                              aws_node)
+        for nr in node_roles[i]:
+            aws_node.roles.append(nr)
         aws_node.execute_command(docker_run_cmd)
         i += 1
     cluster = validate_cluster(client, cluster, k8s_version=K8S_VERSION)
