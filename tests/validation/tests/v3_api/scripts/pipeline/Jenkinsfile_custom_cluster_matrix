@@ -118,7 +118,8 @@ node {
                       string(name: 'RANCHER_SERVER_VERSION', value: "${rancher_version}"), 
                       string(name: 'BRANCH', value: branch),
                       string(name: 'RANCHER_OS_DOCKER_VERSION', value: "${version}"),
-                      string(name: 'DOCKER_INSTALLED', value: "${DOCKER_INSTALLED}")
+                      string(name: 'DOCKER_INSTALLED', value: "${DOCKER_INSTALLED}"),
+                      string(name: 'RANCHER_K8S_VERSION', value: "${env.RANCHER_K8S_VERSION}")
                       ]
                 println "parameters: ${params}"
                 jobs["${version}"] = { build job: 'rancher-v3_ontag_custom_certification', parameters: params }
