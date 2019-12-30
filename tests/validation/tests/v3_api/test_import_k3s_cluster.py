@@ -4,8 +4,8 @@ from .common import *  # NOQA
 
 DATA_SUBDIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                            'resource')
-RANCHER_K3S_VERSION = os.environ.get("K3S_VERSION", "")
-RANCHER_K3S_NO_OF_WORKER_NODES = os.environ.get("AWS_NO_OF_WORKER_NODES", 3)
+RANCHER_K3S_VERSION = os.environ.get("RANCHER_K3S_VERSION", "")
+RANCHER_K3S_NO_OF_WORKER_NODES = os.environ.get("RANCHER_AWS_NO_OF_WORKER_NODES", 3)
 
 def test_import_k3s_cluster():
 
@@ -60,8 +60,8 @@ def test_import_k3s_cluster():
 def create_nodes():
     aws_nodes = \
         AmazonWebServices().create_multiple_nodes(
-            RANCHER_K3S_NO_OF_WORKER_NODES, random_test_name("testk3s"))
-    assert len(aws_nodes) == RANCHER_K3S_NO_OF_WORKER_NODES
+            int(RANCHER_K3S_NO_OF_WORKER_NODES), random_test_name("testk3s"))
+    assert len(aws_nodes) == int(RANCHER_K3S_NO_OF_WORKER_NODES)
     for aws_node in aws_nodes:
         print("AWS NODE PUBLIC IP {}".format(aws_node.public_ip_address))
     return aws_nodes
@@ -69,14 +69,17 @@ def create_nodes():
 
 def install_k3s_master_node(master):
     # Connect to the node and install k3s on master
+    print("K3s VERSION {}".format(RANCHER_K3S_VERSION))
     cmd = "curl -sfL https://get.k3s.io | \
      {} sh -s - server --node-external-ip {}".\
         format("INSTALL_K3S_VERSION={}".format(RANCHER_K3S_VERSION) if RANCHER_K3S_VERSION else "", master.public_ip_address)
+    print("Master Install {}".format(cmd))
     install_result = master.execute_command(cmd)
     print(install_result)
 
     # Get node token from master
     cmd = "sudo cat /var/lib/rancher/k3s/server/node-token"
+    print(cmd)
     node_token = master.execute_command(cmd)
     print(node_token)
 
@@ -84,7 +87,7 @@ def install_k3s_master_node(master):
     cmd = "sudo cat /etc/rancher/k3s/k3s.yaml"
     kubeconfig = master.execute_command(cmd)
     print(kubeconfig)
-
+    print("NO OF WORKER NODES: {}".format(RANCHER_K3S_NO_OF_WORKER_NODES))
     print("NODE TOKEN: \n{}".format(node_token))
     print("KUBECONFIG: \n{}".format(kubeconfig))
 
@@ -98,8 +101,8 @@ def join_k3s_worker_nodes(master, workers, node_token):
             format("INSTALL_K3S_VERSION={}".format(RANCHER_K3S_VERSION) \
                        if RANCHER_K3S_VERSION else "", master.public_ip_address, node_token)
         cmd = cmd + " {} {}".format("--node-external-ip", worker.public_ip_address)
-
         print("Joining k3s master")
+        print(cmd)
         install_result = worker.execute_command(cmd)
         print(install_result)
 
