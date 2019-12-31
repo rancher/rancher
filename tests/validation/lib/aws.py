@@ -30,6 +30,10 @@ AWS_USER = os.environ.get("AWS_USER", "ubuntu")
 PRIVATE_IMAGES = {
     "rancheros-v1.5.1-docker-native": {
         'image': 'ami-00769ca587d8e100c', 'ssh_user': 'rancher'},
+    "rancheros-v1.5.4-docker-native": {
+        'image': 'ami-022fc798437fb846a', 'ssh_user': 'rancher'},
+    "rancheros-v1.5.5-docker-native": {
+        'image': 'ami-002ab867b8b8591d5', 'ssh_user': 'rancher'},
     "rhel-7.6-docker-native-113": {
         'image': 'ami-04b9aacf7e1512c0b', 'ssh_user': 'ec2-user'},
     "rhel-7.7-docker-native-113": {
