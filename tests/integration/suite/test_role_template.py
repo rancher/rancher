@@ -228,53 +228,62 @@ def test_role_template_update_inherited_role(admin_mc, remove_resource,
     role_template_id = cloned_pm['id']
     wait_for_role_template_creation(admin_mc, name)
 
+    # create a namespace in this project
+    ns_name = random_str()
+    ns = admin_pc.cluster.client.create_namespace(name=ns_name,
+                                                  projectId=admin_pc.
+                                                  project.id)
+    remove_resource(ns)
+
     # add user to a project with this role
     user_cloned_pm = user_factory()
     prtb = client.create_project_role_template_binding(
         name="prtb-" + random_str(),
         userId=user_cloned_pm.user.id,
         projectId=admin_pc.project.id,
-        roleTemplateId=cloned_pm.id
+        roleTemplateId=role_template_id
     )
     remove_resource(prtb)
     wait_until_available(user_cloned_pm.client, admin_pc.project)
 
-    # check crbs created for this user
+    # As the user, assert that the two expected role bindings exist in the
+    # namespace for the user. There should be one for the rancher role
+    # 'cloned_pm' and one for the k8s built-in role 'edit'
     rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
-    prtb_selector = prtb.uuid + "=" + "owner-user"
-    crbs = rbac.list_cluster_role_binding(label_selector=prtb_selector)
-    # crbs that get created for roleTemplate cloned from project-member
-    project_id = admin_pc.project.id.split(":")[1]
-    pm_crbs = [role_template_id+"-promoted",
-               project_id+"-namespaces-edit", "create-ns"]
-    for crb in crbs.items:
-        assert crb.role_ref.name in pm_crbs
+    rbs = rbac.list_namespaced_role_binding(ns_name)
+    rb_dict = {}
+    for rb in rbs.items:
+        if rb.subjects[0].name == user_cloned_pm.user.id:
+            rb_dict[rb.role_ref.name] = rb
+    assert role_template_id in rb_dict
+    assert 'edit' in rb_dict
 
     # now edit the roleTemplate to remove "edit" from inherited roles,
     # and add "view" to inherited roles
     client.update(cloned_pm, roleTemplateIds=["view"])
     wait_until(lambda: client.reload(cloned_pm)['roleTemplateIds'] is ["view"])
-    # check crbs are updated
 
-    pm_crbs = [role_template_id + "-promoted",
-               project_id + "-namespaces-readonly"]
-
-    def check_crb(rbac):
-        crbs = rbac.list_cluster_role_binding(label_selector=prtb_selector)
-        for crb in crbs.items:
-            if crb.role_ref.name == project_id + "-namespaces-readonly":
+    def check_rb(rbac):
+        rbs = rbac.list_namespaced_role_binding(ns_name)
+        for rb in rbs.items:
+            if rb.subjects[0].name == user_cloned_pm.user.id \
+                    and rb.role_ref.name == "view":
                 return True
 
-    wait_for(lambda: check_crb(rbac), timeout=60,
-             fail_handler=lambda: 'failed to check updated role')
+    wait_for(lambda: check_rb(rbac), timeout=60,
+             fail_handler=lambda: 'failed to check updated rolebinding')
 
-    crbs = rbac.list_cluster_role_binding(label_selector=prtb_selector)
-    found_crbs = []
-    for crb in crbs.items:
-        found_crbs.append(crb.role_ref.name)
-
-    for crb in pm_crbs:
-        assert crb in found_crbs
+    # Now there should be one rolebinding for the rancher role
+    # 'cloned_pm' and one for the k8s built-in role 'view'
+    rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
+    rbs = rbac.list_namespaced_role_binding(ns_name)
+    rb_dict = {}
+    for rb in rbs.items:
+        if rb.subjects[0].name == user_cloned_pm.user.id:
+            rb_dict[rb.role_ref.name] = rb
+    assert role_template_id in rb_dict
+    assert 'view' in rb_dict
+    assert 'edit' not in rb_dict
 
 
 def wait_for_role_template_creation(admin_mc, rt_name, timeout=60):

@@ -1,14 +1,11 @@
 package rbac
 
 import (
-	"fmt"
 	"reflect"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/slice"
-	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -124,120 +121,9 @@ func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding)
 }
 
 func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRoleTemplateBinding, rts map[string]*v3.RoleTemplate) error {
-	var role string
-	var createNSPerms bool
-	var roles []string
-	if parts := strings.SplitN(binding.ProjectName, ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
-		projectName := parts[1]
-		var roleVerb, roleSuffix string
-		for _, r := range rts {
-			for _, rule := range r.Rules {
-				if slice.ContainsString(rule.Resources, "namespaces") && len(rule.ResourceNames) == 0 {
-					if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, "create") {
-						roleVerb = "*"
-						createNSPerms = true
-						break
-					}
-				}
-
-			}
-		}
-		if roleVerb == "" {
-			roleVerb = "get"
-		}
-		roleSuffix = projectNSVerbToSuffix[roleVerb]
-		role = fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, roleSuffix)
-		roles = append(roles, role)
-
-		for _, rt := range rts {
-			for resource := range globalResourcesNeededInProjects {
-				verbs, err := p.m.checkForGlobalResourceRules(rt, resource)
-				if err != nil {
-					return err
-				}
-				if len(verbs) > 0 {
-					roleName, err := p.m.reconcileRoleForProjectAccessToGlobalResource(resource, rt, verbs)
-					if err != nil {
-						return err
-					}
-					roles = append(roles, roleName)
-				}
-			}
-		}
-	}
-
-	if len(roles) == 0 {
-		return nil
-	}
-
-	bindingCli := p.m.workload.RBAC.ClusterRoleBindings("")
-
-	if createNSPerms {
-		roles = append(roles, "create-ns")
-		if nsRole, _ := p.m.crLister.Get("", "create-ns"); nsRole == nil {
-			createNSRT, err := p.m.rtLister.Get("", "create-ns")
-			if err != nil {
-				return err
-			}
-			if err := p.m.ensureRoles(map[string]*v3.RoleTemplate{"create-ns": createNSRT}); err != nil && !apierrors.IsAlreadyExists(err) {
-				return err
-			}
-		}
-	}
-
-	rtbUID := string(binding.UID)
-	subject, err := pkgrbac.BuildSubjectFromRTB(binding)
+	_, err := p.m.reconcileProjectAccessToGlobalResources(binding, rts)
 	if err != nil {
 		return err
-	}
-	for _, role := range roles {
-		crbKey := rbRoleSubjectKey(role, subject)
-		crbs, _ := p.m.crbIndexer.ByIndex(crbByRoleAndSubjectIndex, crbKey)
-		if len(crbs) == 0 {
-			logrus.Infof("Creating clusterRoleBinding for project access to global resource for subject %v role %v.", subject.Name, role)
-			_, err := bindingCli.Create(&rbacv1.ClusterRoleBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "clusterrolebinding-",
-					Labels: map[string]string{
-						rtbUID: owner,
-					},
-				},
-				Subjects: []rbacv1.Subject{subject},
-				RoleRef: rbacv1.RoleRef{
-					Kind: "ClusterRole",
-					Name: role,
-				},
-			})
-			if err != nil {
-				return err
-			}
-		} else {
-		CRBs:
-			for _, obj := range crbs {
-				crb, ok := obj.(*rbacv1.ClusterRoleBinding)
-				if !ok {
-					continue
-				}
-
-				for owner := range crb.Labels {
-					if rtbUID == owner {
-						continue CRBs
-					}
-				}
-
-				crb = crb.DeepCopy()
-				if crb.Labels == nil {
-					crb.Labels = map[string]string{}
-				}
-				crb.Labels[rtbUID] = owner
-				logrus.Infof("Updating clusterRoleBinding %v for project access to global resource for subject %v role %v.", crb.Name, subject.Name, role)
-				_, err := bindingCli.Update(crb)
-				if err != nil {
-					return err
-				}
-			}
-		}
-
 	}
 	return nil
 }

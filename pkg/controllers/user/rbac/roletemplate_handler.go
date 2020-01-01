@@ -1,14 +1,9 @@
 package rbac
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/types/slice"
-	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-	rbacv1 "k8s.io/api/rbac/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -97,109 +92,39 @@ func (c *rtLifecycle) syncRT(template *v3.RoleTemplate, usedInProjects bool, prt
 		if !ok {
 			continue
 		}
+
+		crbsToKeep, err := c.m.reconcileProjectAccessToGlobalResources(prtb, roles)
+		if err != nil {
+			return err
+		}
+
 		rtbUID := string(prtb.UID)
 		set := labels.Set(map[string]string{rtbUID: owner})
-		crbs, err := c.m.crbLister.List("", set.AsSelector())
+		existingCrbs, err := c.m.crbLister.List("", set.AsSelector())
 		if err != nil {
 			return err
 		}
-		existingCRBs := make(map[string]bool)
-		for _, crb := range crbs {
-			existingCRBs[crb.RoleRef.Name] = true
-		}
-		if parts := strings.SplitN(prtb.ProjectName, ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
-			projectName := parts[1]
-			var roleVerb, roleSuffix string
-			for _, rtName := range template.RoleTemplateNames {
-				var createNS bool
-				rt, err := c.m.rtLister.Get("", rtName)
-				if err != nil {
-					return err
-				}
-				for _, rule := range rt.Rules {
-					if slice.ContainsString(rule.Resources, "namespaces") && len(rule.ResourceNames) == 0 {
-						if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, "create") {
-							roleVerb = "*"
-							createNS = true
-							break
-						}
-					}
-				}
-				if rt.Rules == nil {
-					// Kubernetes admin/edit roles
-					if rt.External && rt.Context == "project" && (rt.Name == "admin" || rt.Name == "edit") {
-						roleVerb = "*"
-						createNS = true
-					}
-				}
 
-				if roleVerb == "" {
-					roleVerb = "get"
-				}
-				roleSuffix = projectNSVerbToSuffix[roleVerb]
-				role := fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, roleSuffix)
-				rolesToKeep[role] = true
-				if createNS {
-					rolesToKeep["create-ns"] = true
-				}
-				for resource := range globalResourcesNeededInProjects {
-					verbs, err := c.m.checkForGlobalResourceRules(rt, resource)
-					if err != nil {
-						return err
-					}
-					if len(verbs) > 0 {
-						roleName, err := c.m.reconcileRoleForProjectAccessToGlobalResource(resource, rt, verbs)
-						if err != nil {
-							return err
-						}
-						rolesToKeep[roleName] = true
-					}
-				}
+		for _, crb := range existingCrbs {
+			if !crbsToKeep[crb.Name] {
+				c.m.clusterRoleBindings.Delete(crb.Name, &metav1.DeleteOptions{})
 			}
-			for _, crb := range crbs {
-				if !rolesToKeep[crb.RoleRef.Name] {
-					if err := c.m.clusterRoleBindings.Delete(crb.Name, &metav1.DeleteOptions{}); err != nil {
-						return err
-					}
-				} else {
-					delete(rolesToKeep, crb.RoleRef.Name)
-				}
-			}
-			for role := range rolesToKeep {
-				if existingCRBs[role] {
-					continue
-				}
-				subject, err := pkgrbac.BuildSubjectFromRTB(prtb)
-				if err != nil {
-					return err
-				}
-				_, err = c.m.clusterRoleBindings.Create(&rbacv1.ClusterRoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						GenerateName: "clusterrolebinding-",
-						Labels: map[string]string{
-							rtbUID: owner,
-						},
-					},
-					Subjects: []rbacv1.Subject{subject},
-					RoleRef: rbacv1.RoleRef{
-						Kind: "ClusterRole",
-						Name: role,
-					},
-				})
-				if err != nil && !apierrors.IsAlreadyExists(err) {
-					return err
-				}
+		}
+
+		// Get namespaces belonging to project to update the rolebinding in the namespaces of this project for the user
+		namespaces, err := c.m.nsIndexer.ByIndex(nsByProjectIndex, prtb.ProjectName)
+		if err != nil {
+			return errors.Wrapf(err, "couldn't list namespaces with project ID %v", prtb.ProjectName)
+		}
+
+		for _, n := range namespaces {
+			ns := n.(*v1.Namespace)
+			if err := c.m.ensureProjectRoleBindings(ns.Name, roles, prtb); err != nil {
+				return errors.Wrapf(err, "couldn't ensure binding %v in %v", prtb.Name, ns.Name)
 			}
 		}
 	}
 
-	for _, rtName := range template.RoleTemplateNames {
-		rt, err := c.m.rtLister.Get("", rtName)
-		if err != nil {
-			return err
-		}
-		roles[rt.Name] = rt
-	}
 	for _, obj := range crtbs {
 		crtb, ok := obj.(*v3.ClusterRoleTemplateBinding)
 		if !ok {
