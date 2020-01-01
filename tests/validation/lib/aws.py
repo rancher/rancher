@@ -36,10 +36,14 @@ PRIVATE_IMAGES = {
         'image': 'ami-002ab867b8b8591d5', 'ssh_user': 'rancher'},
     "rhel-7.6-docker-native-113": {
         'image': 'ami-04b9aacf7e1512c0b', 'ssh_user': 'ec2-user'},
-    "rhel-7.7-docker-native-113": {
+    "rhel-7.7-docker-native-113-selinux-off": {
+        'image': 'ami-03ff3301b6b68eaf8', 'ssh_user': 'ec2-user'},
+    "rhel-7.7-docker-native-113-selinux-on": {
         'image': 'ami-069569219156fdf07', 'ssh_user': 'ec2-user'},
-    "rhel-7.7-docker-19.03": {
+    "rhel-7.7-docker-19.03-selinux-off": {
         'image': 'ami-068182ee3b273d6ec', 'ssh_user': 'ec2-user'},
+    "oracleLinux-7.7-docker-19.03": {
+        'image': 'ami-0af048cee838aa482', 'ssh_user': 'ec2-user'},
     "suse-sles12-sp2-docker-18061ce": {
         'image': 'ami-0cc154aeb82bd8fa0', 'ssh_user': 'ec2-user'},
     "ubuntu-16.04-docker-18.09": {
