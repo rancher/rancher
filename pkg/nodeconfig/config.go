@@ -89,11 +89,13 @@ func (m *NodeConfig) FullDir() string {
 }
 
 func (m *NodeConfig) Cleanup() error {
+	logrus.Debugf("Cleaning up [%s]", m.fullMachinePath)
 	return os.RemoveAll(m.fullMachinePath)
 }
 
 func (m *NodeConfig) Remove() error {
 	m.Cleanup()
+	logrus.Debugf("Removing [%v]", m.id)
 	return m.store.Remove(m.id)
 }
 

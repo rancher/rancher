@@ -150,9 +150,18 @@ func (m *Lifecycle) Create(obj *v3.Node) (runtime.Object, error) {
 	}
 
 	newObj, err := v3.NodeConditionInitialized.Once(obj, func() (runtime.Object, error) {
+		logrus.Debugf("Called v3.NodeConditionInitialized.Once for [%s] in namespace [%s]", obj.Name, obj.Namespace)
+		// Ensure jail is created first, else the function `NewNodeConfig` will create the full jail path (including parent jail directory) and CreateJail will remove the directory as it does not contain a done file
+		if !m.devMode {
+			err := jailer.CreateJail(obj.Namespace)
+			if err != nil {
+				return nil, errors.WithMessage(err, "node create jail error")
+			}
+		}
+
 		nodeConfig, err := nodeconfig.NewNodeConfig(m.secretStore, obj)
 		if err != nil {
-			return obj, errors.Wrap(err, "failed to create node driver config")
+			return obj, errors.WithMessagef(err, "failed to create node driver config for node [%v]", obj.Name)
 		}
 
 		defer nodeConfig.Cleanup()
@@ -175,13 +184,6 @@ func (m *Lifecycle) Create(obj *v3.Node) (runtime.Object, error) {
 			obj.Status.NodeTemplateSpec.EngineInstallURL = defaultEngineInstallURL
 		}
 
-		if !m.devMode {
-			err := jailer.CreateJail(obj.Namespace)
-			if err != nil {
-				return nil, errors.WithMessage(err, "node create jail error")
-			}
-		}
-
 		return obj, nil
 	})
 
@@ -190,6 +192,7 @@ func (m *Lifecycle) Create(obj *v3.Node) (runtime.Object, error) {
 
 func (m *Lifecycle) getNodeTemplate(nodeTemplateName string) (*v3.NodeTemplate, error) {
 	ns, n := ref.Parse(nodeTemplateName)
+	logrus.Debugf("getNodeTemplate parsed [%s] to ns: [%s] and n: [%s]", nodeTemplateName, ns, n)
 	return m.nodeTemplateClient.GetNamespaced(ns, n, metav1.GetOptions{})
 }
 
@@ -556,10 +559,11 @@ func (m *Lifecycle) refreshNodeConfig(nc *nodeconfig.NodeConfig, obj *v3.Node) e
 	data := rawTemplate.(*unstructured.Unstructured).Object
 	rawConfig, ok := values.GetValue(data, template.Spec.Driver+"Config")
 	if !ok {
-		return fmt.Errorf("node config not specified for node %v", obj.Name)
+		return fmt.Errorf("refreshNodeConfig: node config not specified for node %v", obj.Name)
 	}
 
 	if err := m.updateRawConfigFromCredential(data, rawConfig, template); err != nil {
+		logrus.Debugf("refreshNodeConfig: error calling updateRawConfigFromCredential for [%v]: %v", obj.Name, err)
 		return err
 	}
 
@@ -567,7 +571,7 @@ func (m *Lifecycle) refreshNodeConfig(nc *nodeconfig.NodeConfig, obj *v3.Node) e
 
 	if template.Spec.Driver == amazonec2 {
 		setEc2ClusterIDTag(rawConfig, obj.Namespace)
-		logrus.Debug("[refreshNodeConfig] Updating amazonec2 machine config")
+		logrus.Debug("refreshNodeConfig: Updating amazonec2 machine config")
 		//TODO: Update to not be amazon specific, this needs to be moved to the driver
 		update, err = nc.UpdateAmazonAuth(rawConfig)
 		if err != nil {
