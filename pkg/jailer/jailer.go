@@ -23,20 +23,24 @@ var lock = sync.Mutex{}
 
 // CreateJail sets up the named directory for use with chroot
 func CreateJail(name string) error {
+	logrus.Debugf("CreateJail: called for [%s]", name)
 	lock.Lock()
 	defer lock.Unlock()
 
 	jailPath := path.Join(BaseJailPath, name)
 
+	logrus.Debugf("CreateJail: jailPath is [%s]", jailPath)
 	// Check for the done file, if that exists the jail is ready to be used
 	_, err := os.Stat(path.Join(jailPath, "done"))
 	if err == nil {
+		logrus.Debugf("CreateJail: done file found at [%s], jail is ready", path.Join(jailPath, "done"))
 		return nil
 	}
 
 	// If the base dir exists without the done file rebuild the directory
 	_, err = os.Stat(jailPath)
 	if err == nil {
+		logrus.Debugf("CreateJail: basedir for jail exists but no done file found, removing jailPath [%s]", jailPath)
 		if err := os.RemoveAll(jailPath); err != nil {
 			return err
 		}
@@ -47,10 +51,10 @@ func CreateJail(name string) error {
 	timeout, err := strconv.Atoi(t)
 	if err != nil {
 		timeout = 60
-		logrus.Warnf("error converting jailer-timeout setting to int, using default of 60 seconds - error:%v", err)
+		logrus.Warnf("error converting jailer-timeout setting to int, using default of 60 seconds - error: [%v]", err)
 	}
 
-	logrus.Debugf("Creating jail for %v", name)
+	logrus.Debugf("CreateJail: Running script to create jail for [%s]", name)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
@@ -63,7 +67,11 @@ func CreateJail(name string) error {
 		}
 		return errors.WithMessage(err, "error running the jail command")
 	}
-	logrus.Debugf("Output from create jail command %v", string(out))
+	if len(out) > 0 {
+		logrus.Debugf("CreateJail: output from jail script for [%s]: [%v]", name, string(out))
+	} else {
+		logrus.Debugf("CreateJail: no output from jail script for [%s]", name)
+	}
 	return nil
 }
 
