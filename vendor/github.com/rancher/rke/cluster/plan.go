@@ -1093,27 +1093,39 @@ func (c *Cluster) getDefaultKubernetesServicesOptions(osType string) v3.Kubernet
 		serviceOptionsTemplate = metadata.K8sVersionToServiceOptions
 	}
 
-	// read service options from minor version first
+	// read service options from most specific cluster version first
+	// Example c.Version: v1.16.3-rancher1-1
+	logrus.Debugf("getDefaultKubernetesServicesOptions: getting serviceOptions for cluster version [%s]", c.Version)
 	if serviceOptions, ok := serviceOptionsTemplate[c.Version]; ok {
+		logrus.Debugf("getDefaultKubernetesServicesOptions: serviceOptions [%v] found for cluster version [%s]", serviceOptions, c.Version)
 		return serviceOptions
 	}
 
+	// Get vX.X from cluster version
+	// Example clusterMajorVersion: v1.16
 	clusterMajorVersion := util.GetTagMajorVersion(c.Version)
+	// Retrieve image tag from Kubernetes image
+	// Example k8sImageTag: v1.16.3-rancher1
 	k8sImageTag, err := util.GetImageTagFromImage(c.SystemImages.Kubernetes)
 	if err != nil {
 		logrus.Warn(err)
 	}
 
+	// Example k8sImageMajorVersion: v1.16
 	k8sImageMajorVersion := util.GetTagMajorVersion(k8sImageTag)
 
+	// Image tag version from Kubernetes image takes precedence over cluster version
 	if clusterMajorVersion != k8sImageMajorVersion && k8sImageMajorVersion != "" {
+		logrus.Debugf("getDefaultKubernetesServicesOptions: cluster major version: [%s] is not equal to kubernetes image major version: [%s], setting cluster major version to [%s]", clusterMajorVersion, k8sImageMajorVersion, k8sImageMajorVersion)
 		clusterMajorVersion = k8sImageMajorVersion
 	}
 
 	if serviceOptions, ok := serviceOptionsTemplate[clusterMajorVersion]; ok {
+		logrus.Debugf("getDefaultKubernetesServicesOptions: serviceOptions [%v] found for cluster major version [%s]", serviceOptions, clusterMajorVersion)
 		return serviceOptions
 	}
 
+	logrus.Warnf("getDefaultKubernetesServicesOptions: No serviceOptions found for cluster version [%s] or cluster major version [%s]", c.Version, clusterMajorVersion)
 	return v3.KubernetesServicesOptions{}
 }
 
