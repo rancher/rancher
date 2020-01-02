@@ -133,6 +133,16 @@ func (m *MetadataController) sync(key string, setting *v3.Setting) (runtime.Obje
 			return setting, nil
 		}
 
+		k8sVersion := settings.KubernetesVersion.Get()
+		// setting empty, initialize first from defaults, then try actual URL:
+		// in cases when git clone takes very long, settings will have vendor values
+		if k8sVersion == "" {
+			logrus.Infof("driverMetadata: empty setting k8s-version, using stored defaults")
+			if err := m.createOrUpdateMetadataDefaults(); err != nil {
+				return nil, err
+			}
+		}
+
 		if err := m.refresh(url, true); err != nil {
 			return nil, err
 		}
