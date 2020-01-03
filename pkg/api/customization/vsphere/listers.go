@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"path"
 	"sort"
+	"strings"
 
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
@@ -35,7 +37,7 @@ func processSoapFinder(ctx context.Context, fieldName string, cc *v1.Secret, dc 
 	case "data-store-clusters":
 		data, err = listDataStoreClusters(ctx, finder)
 	case "folders":
-		data, err = listFolders(ctx, finder)
+		data, err = listFolders(ctx, finder, dc)
 	case "hosts":
 		data, err = listHosts(ctx, finder)
 	case "networks":
@@ -269,15 +271,19 @@ func listDataStoreClusters(ctx context.Context, finder *find.Finder) ([]string, 
 	return data, nil
 }
 
-func listFolders(ctx context.Context, finder *find.Finder) ([]string, error) {
-	folders, err := finder.FolderList(ctx, "vm/*")
+func listFolders(ctx context.Context, finder *find.Finder, dc string) ([]string, error) {
+	folders, err := finder.FolderList(ctx, "*")
 	if err != nil {
 		return nil, err
 	}
 
+	prefix := path.Join(dc, "vm")
+	// base case of /<datacenter>/vm is covered by ""
 	data := []string{""}
 	for _, f := range folders {
-		data = append(data, f.InventoryPath)
+		if strings.HasPrefix(f.InventoryPath, prefix) {
+			data = append(data, f.InventoryPath)
+		}
 	}
 
 	return data, nil
