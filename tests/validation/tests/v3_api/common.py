@@ -65,22 +65,22 @@ if_test_all_snapshot = \
 
 # here are all supported roles for RBAC testing
 CLUSTER_MEMBER = "cluster-member"
-CLUSTER_OWNER  = "cluster-owner"
+CLUSTER_OWNER = "cluster-owner"
 PROJECT_MEMBER = "project-member"
-PROJECT_OWNER  = "project-owner"
+PROJECT_OWNER = "project-owner"
 PROJECT_READ_ONLY = "read-only"
 
 rbac_data = {
-    "project"   : None,
-    "namespace" : None,
-    "p_unshared" : None,
+    "project": None,
+    "namespace": None,
+    "p_unshared": None,
     "ns_unshared": None,
     "wl_unshared": None,
     "users": {
-        CLUSTER_OWNER    : {},
-        CLUSTER_MEMBER   : {},
-        PROJECT_OWNER    : {},
-        PROJECT_MEMBER   : {},
+        CLUSTER_OWNER: {},
+        CLUSTER_MEMBER: {},
+        PROJECT_OWNER: {},
+        PROJECT_MEMBER: {},
         PROJECT_READ_ONLY: {},
     }
 }
@@ -1488,11 +1488,14 @@ def rbac_get_unshared_workload():
 
 
 def rbac_prepare():
-    """this function creates one project, one namespace,and four users with different roles"""
+    """this function creates one project, one namespace,
+    and four users with different roles"""
     admin_client, cluster = get_global_admin_client_and_cluster()
     create_kubeconfig(cluster)
     # create a new project in the cluster
-    project, ns = create_project_and_ns(ADMIN_TOKEN, cluster, random_test_name("p-test-rbac"))
+    project, ns = create_project_and_ns(ADMIN_TOKEN,
+                                        cluster,
+                                        random_test_name("p-test-rbac"))
     rbac_data["project"] = project
     rbac_data["namespace"] = ns
     # create new users
@@ -1502,19 +1505,38 @@ def rbac_prepare():
         rbac_data["users"][key]["token"] = token1
 
     # assign different role to each user
-    assign_members_to_cluster(admin_client, rbac_data["users"][CLUSTER_OWNER]["user"], cluster, CLUSTER_OWNER)
-    assign_members_to_cluster(admin_client, rbac_data["users"][CLUSTER_MEMBER]["user"], cluster, CLUSTER_MEMBER)
-    assign_members_to_project(admin_client, rbac_data["users"][PROJECT_MEMBER]["user"], project, PROJECT_MEMBER)
-    assign_members_to_project(admin_client, rbac_data["users"][PROJECT_OWNER]["user"], project, PROJECT_OWNER)
-    assign_members_to_project(admin_client, rbac_data["users"][PROJECT_READ_ONLY]["user"], project, PROJECT_READ_ONLY)
+    assign_members_to_cluster(admin_client,
+                              rbac_data["users"][CLUSTER_OWNER]["user"],
+                              cluster,
+                              CLUSTER_OWNER)
+    assign_members_to_cluster(admin_client,
+                              rbac_data["users"][CLUSTER_MEMBER]["user"],
+                              cluster,
+                              CLUSTER_MEMBER)
+    assign_members_to_project(admin_client,
+                              rbac_data["users"][PROJECT_MEMBER]["user"],
+                              project,
+                              PROJECT_MEMBER)
+    assign_members_to_project(admin_client,
+                              rbac_data["users"][PROJECT_OWNER]["user"],
+                              project,
+                              PROJECT_OWNER)
+    assign_members_to_project(admin_client,
+                              rbac_data["users"][PROJECT_READ_ONLY]["user"],
+                              project,
+                              PROJECT_READ_ONLY)
 
     # create another project that none of the above users are assigned to
-    p2, ns2 = create_project_and_ns(ADMIN_TOKEN, cluster, random_test_name("p-unshared"))
+    p2, ns2 = create_project_and_ns(ADMIN_TOKEN,
+                                    cluster,
+                                    random_test_name("p-unshared"))
     con = [{"name": "test1",
             "image": TEST_IMAGE}]
     name = random_test_name("default")
     p_client = get_project_client_for_token(p2, ADMIN_TOKEN)
-    workload = p_client.create_workload(name=name, containers=con, namespaceId=ns2.id)
+    workload = p_client.create_workload(name=name,
+                                        containers=con,
+                                        namespaceId=ns2.id)
     validate_workload(p_client, workload, "deployment", ns2.name)
     rbac_data["p_unshared"] = p2
     rbac_data["ns_unshared"] = ns2
@@ -1548,3 +1570,29 @@ def check_condition(condition_type, status):
         return False
 
     return _find_condition
+
+
+def get_user_client_and_cluster_app():
+    clusters = []
+    client = get_user_client()
+    if CLUSTER_NAME != "" and CLUSTER_NAME_2 != "":
+        assert len(client.list_cluster(name=CLUSTER_NAME).data) != 0, \
+            "Cluster is not available: %r" % CLUSTER_NAME
+        assert len(client.list_cluster(name=CLUSTER_NAME_2).data) != 0, \
+            "Cluster is not available: %r" % CLUSTER_NAME_2
+        clusters.append(client.list_cluster(name=CLUSTER_NAME).data[0])
+        clusters.append(client.list_cluster(name=CLUSTER_NAME_2).data[0])
+    else:
+        clusters = client.list_cluster().data
+    return client, clusters
+
+
+def create_catalog_external_id(catalog_name, template, version,
+                               project_cluster_id=None, catalog_type=None):
+    if catalog_type is None:
+        return "catalog://?catalog=" + catalog_name + \
+           "&template=" + template + "&version=" + version
+    elif catalog_type == "project" or catalog_type == "cluster":
+        return "catalog://?catalog=" + project_cluster_id + "/" \
+               + catalog_name + "&type=" + catalog_type \
+               + "Catalog&template=" + template + "&version=" + version
