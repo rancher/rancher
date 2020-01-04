@@ -30,12 +30,13 @@ def test_app_mysql(admin_pc, admin_mc):
     }
     client.create_app(
         name=name,
-        externalId="catalog://?catalog=library&template=mysql&version=0.3.7&"
+        externalId="catalog://?catalog=library&template=mysql&version=1.3.1&"
                    "namespace=cattle-global-data",
         targetNamespace=ns.name,
         projectId=admin_pc.project.id,
         answers=answers
     )
+
     wait_for_workload(client, ns.name, count=1)
 
 
@@ -55,7 +56,7 @@ def test_app_wordpress(admin_pc, admin_mc):
         "externalDatabase.port": "3306",
         "externalDatabase.user": "",
         "image.repository": "bitnami/wordpress",
-        "image.tag": "4.9.4",
+        "image.tag": "5.2.3",
         "ingress.enabled": "true",
         "ingress.hosts[0].name": "xip.io",
         "mariadb.enabled": "true",
@@ -78,7 +79,7 @@ def test_app_wordpress(admin_pc, admin_mc):
         "wordpressUsername": "user"
     }
     external_id = "catalog://?catalog=library&template=wordpress" \
-                  "&version=1.0.5&namespace=cattle-global-data"
+                  "&version=7.3.8&namespace=cattle-global-data"
     client.create_app(
         name=name,
         externalId=external_id,
@@ -155,7 +156,6 @@ def test_app_istio(admin_cc, admin_pc, admin_mc):
 def test_prehook_chart(admin_pc, admin_mc):
     client = admin_pc.client
     name = random_str()
-
     ns = admin_pc.cluster.client.create_namespace(name=random_str(),
                                                   projectId=admin_pc.
                                                   project.id)
