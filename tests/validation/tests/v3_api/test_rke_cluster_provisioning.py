@@ -5,7 +5,9 @@ from rancher import ApiError
 
 K8S_VERSION = os.environ.get('RANCHER_K8S_VERSION', "")
 K8S_VERSION_UPGRADE = os.environ.get('RANCHER_K8S_VERSION_UPGRADE', "")
-POD_SECURITY_POLICY_TEMPLATE = os.environ.get('RANCHER_POD_SECURITY_POLICY_TEMPLATE', "restricted")
+POD_SECURITY_POLICY_TEMPLATE = \
+    os.environ.get('RANCHER_POD_SECURITY_POLICY_TEMPLATE',
+                   "restricted")
 DO_ACCESSKEY = os.environ.get('DO_ACCESSKEY', "None")
 AZURE_SUBSCRIPTION_ID = os.environ.get("AZURE_SUBSCRIPTION_ID")
 AZURE_CLIENT_ID = os.environ.get("AZURE_CLIENT_ID")
@@ -177,7 +179,7 @@ if_test_edit_cluster = pytest.mark.skipif(
 
 
 def test_cis_complaint():
-    #rke_config_cis
+    # rke_config_cis
     aws_nodes = \
         AmazonWebServices().create_multiple_nodes(
             8, random_test_name(HOST_NAME))
@@ -187,12 +189,11 @@ def test_cis_complaint():
         ["worker"], ["worker"], ["worker"]
     ]
     client = get_admin_client()
-    cluster = client.create_cluster(name=evaluate_clustername(),
-                                    driver="rancherKubernetesEngine",
-                                    rancherKubernetesEngineConfig=
-                                    rke_config_cis,
-                                    defaultPodSecurityPolicyTemplateId=
-                                    POD_SECURITY_POLICY_TEMPLATE)
+    cluster = client.create_cluster(
+        name=evaluate_clustername(),
+        driver="rancherKubernetesEngine",
+        rancherKubernetesEngineConfig=rke_config_cis,
+        defaultPodSecurityPolicyTemplateId=POD_SECURITY_POLICY_TEMPLATE)
     assert cluster.state == "provisioning"
     i = 0
     for aws_node in aws_nodes:
@@ -294,71 +295,26 @@ def test_rke_ec2_host_4(node_template_ec2):
 
 
 def test_rke_custom_host_1():
-    aws_nodes = \
-        AmazonWebServices().create_multiple_nodes(
-            1, random_test_name(HOST_NAME))
     node_roles = ["worker", "controlplane", "etcd"]
-
-    client = get_user_client()
-    cluster = client.create_cluster(name=evaluate_clustername(),
-                                    driver="rancherKubernetesEngine",
-                                    rancherKubernetesEngineConfig=rke_config)
-    assert cluster.state == "provisioning"
-    for aws_node in aws_nodes:
-        docker_run_cmd = \
-            get_custom_host_registration_cmd(client, cluster, node_roles,
-                                             aws_node)
-        aws_node.execute_command(docker_run_cmd)
-    cluster = validate_cluster(client, cluster, k8s_version=K8S_VERSION)
-    cluster_cleanup(client, cluster, aws_nodes)
+    cluster, aws_nodes = create_and_validate_custom_host(node_roles)
+    cluster_cleanup(get_user_client(), cluster, aws_nodes)
 
 
 def test_rke_custom_host_2():
-    aws_nodes = \
-        AmazonWebServices().create_multiple_nodes(
-            5, random_test_name(HOST_NAME))
     node_roles = [["controlplane"], ["etcd"],
                   ["worker"], ["worker"], ["worker"]]
-
-    client = get_user_client()
-    cluster = client.create_cluster(name=evaluate_clustername(),
-                                    driver="rancherKubernetesEngine",
-                                    rancherKubernetesEngineConfig=rke_config)
-    assert cluster.state == "provisioning"
-    i = 0
-    for aws_node in aws_nodes:
-        docker_run_cmd = \
-            get_custom_host_registration_cmd(client, cluster, node_roles[i],
-                                             aws_node)
-        aws_node.execute_command(docker_run_cmd)
-        i += 1
-    cluster = validate_cluster(client, cluster, k8s_version=K8S_VERSION)
-    cluster_cleanup(client, cluster, aws_nodes)
+    cluster, aws_nodes = create_and_validate_custom_host(node_roles)
+    cluster_cleanup(get_user_client(), cluster, aws_nodes)
 
 
 def test_rke_custom_host_3():
-    aws_nodes = \
-        AmazonWebServices().create_multiple_nodes(
-            8, random_test_name(HOST_NAME))
     node_roles = [
         ["controlplane"], ["controlplane"],
         ["etcd"], ["etcd"], ["etcd"],
         ["worker"], ["worker"], ["worker"]
     ]
-    client = get_user_client()
-    cluster = client.create_cluster(name=evaluate_clustername(),
-                                    driver="rancherKubernetesEngine",
-                                    rancherKubernetesEngineConfig=rke_config)
-    assert cluster.state == "provisioning"
-    i = 0
-    for aws_node in aws_nodes:
-        docker_run_cmd = \
-            get_custom_host_registration_cmd(client, cluster, node_roles[i],
-                                             aws_node)
-        aws_node.execute_command(docker_run_cmd)
-        i += 1
-    cluster = validate_cluster(client, cluster, k8s_version=K8S_VERSION)
-    cluster_cleanup(client, cluster, aws_nodes)
+    cluster, aws_nodes = create_and_validate_custom_host(node_roles)
+    cluster_cleanup(get_user_client(), cluster, aws_nodes)
 
 
 def test_rke_custom_host_4():
@@ -682,7 +638,8 @@ def validate_rke_dm_host_1(node_template,
 
 
 def validate_rke_dm_host_2(node_template,
-                           rancherKubernetesEngineConfig=rke_config, attemptDelete=True, clusterName=None):
+                           rancherKubernetesEngineConfig=rke_config,
+                           attemptDelete=True, clusterName=None):
     client = get_user_client()
     nodes = []
     node_name = random_node_name()
@@ -781,10 +738,12 @@ def validate_rke_dm_host_4(node_template,
 
 
 def create_and_vaildate_cluster(client, nodes,
-                                rancherKubernetesEngineConfig=rke_config, clusterName=None):
+                                rancherKubernetesEngineConfig=rke_config,
+                                clusterName=None):
 
     cluster = client.create_cluster(
-        name=clusterName if clusterName is not None else evaluate_clustername(),
+        name=clusterName
+        if clusterName is not None else evaluate_clustername(),
         rancherKubernetesEngineConfig=rancherKubernetesEngineConfig)
     node_pools = []
     for node in nodes:
@@ -1007,3 +966,24 @@ def register_host_after_delay(client, cluster, node_role, delay):
                 client, cluster, node_role["roles"], aws_node)
         aws_node.execute_command(docker_run_cmd)
         time.sleep(delay)
+
+
+def create_and_validate_custom_host(node_roles):
+    aws_nodes = \
+        AmazonWebServices().create_multiple_nodes(
+            len(node_roles), random_test_name(HOST_NAME))
+
+    client = get_user_client()
+    cluster = client.create_cluster(name=evaluate_clustername(),
+                                    driver="rancherKubernetesEngine",
+                                    rancherKubernetesEngineConfig=rke_config)
+    assert cluster.state == "provisioning"
+    i = 0
+    for aws_node in aws_nodes:
+        docker_run_cmd = \
+            get_custom_host_registration_cmd(client, cluster, node_roles[i],
+                                             aws_node)
+        aws_node.execute_command(docker_run_cmd)
+        i += 1
+    cluster = validate_cluster(client, cluster, k8s_version=K8S_VERSION)
+    return cluster, aws_nodes
