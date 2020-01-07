@@ -295,7 +295,7 @@ def test_rke_ec2_host_4(node_template_ec2):
 
 
 def test_rke_custom_host_1():
-    node_roles = ["worker", "controlplane", "etcd"]
+    node_roles = [["worker", "controlplane", "etcd"]]
     cluster, aws_nodes = create_and_validate_custom_host(node_roles)
     cluster_cleanup(get_user_client(), cluster, aws_nodes)
 
