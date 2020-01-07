@@ -196,7 +196,7 @@ func (m *nodesSyncer) updateAnnotations(node *corev1.Node, obj *v3.Node, nodePla
 
 	node, obj = node.DeepCopy(), obj.DeepCopy()
 	node.Annotations = finalMap
-	obj.Spec.MetadataUpdate.Labels = v3.MapDelta{}
+	obj.Spec.MetadataUpdate.Annotations = v3.MapDelta{}
 
 	return m.updateNodeAndNode(node, obj)
 }
