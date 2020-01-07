@@ -47,6 +47,10 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 			resource.AddAction(request, v3.ClusterActionBackupEtcd)
 			resource.AddAction(request, v3.ClusterActionRestoreFromEtcdBackup)
 		}
+		isActiveCluster := false
+		if resource.Values["state"] == "active" {
+			isActiveCluster = true
+		}
 		canUpdateClusterFn := func(request *types.APIContext, clusterID string) bool {
 			cluster := map[string]interface{}{
 				"id": clusterID,
@@ -61,7 +65,7 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 		}
 		canUpdateCluster := canUpdateClusterFn(request, resource.ID)
 		logrus.Debugf("user: %v, canUpdateCluster: %v", request.Request.Header.Get("Impersonate-User"), canUpdateCluster)
-		if canUpdateCluster {
+		if isActiveCluster && canUpdateCluster {
 			resource.AddAction(request, v3.ClusterActionRunSecurityScan)
 		}
 	}
