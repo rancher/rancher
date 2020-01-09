@@ -58,6 +58,7 @@ if_test_rbac = pytest.mark.skipif(TEST_RBAC is False, reason='rbac tests are ski
 TEST_S3 = ast.literal_eval(os.environ.get('RANCHER_TEST_S3', "False"))
 if_test_s3 = pytest.mark.skipif(TEST_S3 is False, reason='S3 tests are skipped')
 
+# here are all supported roles for RBAC testing
 CLUSTER_MEMBER = "cluster-member"
 CLUSTER_OWNER  = "cluster-owner"
 PROJECT_MEMBER = "project-member"
@@ -1449,15 +1450,15 @@ def get_user_token(user, cattle_auth_url=CATTLE_AUTH_URL):
     return r.json()["token"]
 
 
-def rbac_get_user_by_role(role_template_id):
-    if role_template_id in rbac_data["users"].keys():
-        return rbac_data["users"][role_template_id]["user"]
+def rbac_get_user_by_role(role):
+    if role in rbac_data["users"].keys():
+        return rbac_data["users"][role]["user"]
     return None
 
 
-def rbac_get_user_token_by_role(role_template_id):
-    if role_template_id in rbac_data["users"].keys():
-        return rbac_data["users"][role_template_id]["token"]
+def rbac_get_user_token_by_role(role):
+    if role in rbac_data["users"].keys():
+        return rbac_data["users"][role]["token"]
     return None
 
 
