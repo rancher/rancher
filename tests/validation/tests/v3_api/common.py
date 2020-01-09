@@ -63,6 +63,7 @@ if_test_all_snapshot = \
     pytest.mark.skipif(TEST_ALL_SNAPSHOT is False,
                        reason='Snapshots check tests are skipped')
 
+# here are all supported roles for RBAC testing
 CLUSTER_MEMBER = "cluster-member"
 CLUSTER_OWNER  = "cluster-owner"
 PROJECT_MEMBER = "project-member"
@@ -1454,15 +1455,15 @@ def get_user_token(user, cattle_auth_url=CATTLE_AUTH_URL):
     return r.json()["token"]
 
 
-def rbac_get_user_by_role(role_template_id):
-    if role_template_id in rbac_data["users"].keys():
-        return rbac_data["users"][role_template_id]["user"]
+def rbac_get_user_by_role(role):
+    if role in rbac_data["users"].keys():
+        return rbac_data["users"][role]["user"]
     return None
 
 
-def rbac_get_user_token_by_role(role_template_id):
-    if role_template_id in rbac_data["users"].keys():
-        return rbac_data["users"][role_template_id]["token"]
+def rbac_get_user_token_by_role(role):
+    if role in rbac_data["users"].keys():
+        return rbac_data["users"][role]["token"]
     return None
 
 

@@ -19,7 +19,15 @@ def pytest_unconfigure(config):
 
 @pytest.fixture
 def remove_resource(request):
-    """Remove a resource after a test finishes even if the test fails."""
+    """Remove a resource after a test finishes even if the test fails.
+
+    How to use:
+      pass this function as an argument of your testing function,
+      then call this function with the new resource as argument after
+      creating any new resource
+
+    """
+
     client = get_admin_client()
 
     def _cleanup(resource):
