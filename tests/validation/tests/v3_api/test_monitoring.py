@@ -5,6 +5,8 @@ from .common import *  # NOQA
 namespace = {
     "cluster": None,
     "project": None,
+    "system_project": None,
+    "system_project_client": None
 }
 
 cluster_query_template = {
@@ -84,40 +86,54 @@ name_mapping = {
     "node": node_graph_list,
 }
 
-C_MONITORING_ANSWERS = {"operator-init.enabled": "true", "exporter-node.enabled": "true",
-                        "exporter-node.ports.metrics.port": "9796", "exporter-kubelets.https": "true",
-                        "exporter-node.resources.limits.cpu": "200m", "exporter-node.resources.limits.memory": "200Mi",
-                        "operator.resources.limits.memory": "500Mi", "prometheus.retention": "12h",
-                        "grafana.persistence.enabled": "false", "prometheus.persistence.enabled": "false",
-                        "prometheus.persistence.storageClass": "default", "grafana.persistence.storageClass": "default",
-                        "grafana.persistence.size": "10Gi", "prometheus.persistence.size": "50Gi",
+C_MONITORING_ANSWERS = {"operator-init.enabled": "true",
+                        "exporter-node.enabled": "true",
+                        "exporter-node.ports.metrics.port": "9796",
+                        "exporter-kubelets.https": "true",
+                        "exporter-node.resources.limits.cpu": "200m",
+                        "exporter-node.resources.limits.memory": "200Mi",
+                        "operator.resources.limits.memory": "500Mi",
+                        "prometheus.retention": "12h",
+                        "grafana.persistence.enabled": "false",
+                        "prometheus.persistence.enabled": "false",
+                        "prometheus.persistence.storageClass": "default",
+                        "grafana.persistence.storageClass": "default",
+                        "grafana.persistence.size": "10Gi",
+                        "prometheus.persistence.size": "50Gi",
                         "prometheus.resources.core.requests.cpu": "750m",
                         "prometheus.resources.core.limits.cpu": "1000m",
                         "prometheus.resources.core.requests.memory": "750Mi",
                         "prometheus.resources.core.limits.memory": "1000Mi",
                         "prometheus.persistent.useReleaseName": "true"}
 
-P_MONITORING_ANSWER = {"prometheus.retention": "12h", "grafana.persistence.enabled": "false",
-                       "prometheus.persistence.enabled": "false", "prometheus.persistence.storageClass": "default",
-                       "grafana.persistence.storageClass": "default", "grafana.persistence.size": "10Gi",
-                       "prometheus.persistence.size": "50Gi", "prometheus.resources.core.requests.cpu": "750m",
+P_MONITORING_ANSWER = {"prometheus.retention": "12h",
+                       "grafana.persistence.enabled": "false",
+                       "prometheus.persistence.enabled": "false",
+                       "prometheus.persistence.storageClass": "default",
+                       "grafana.persistence.storageClass": "default",
+                       "grafana.persistence.size": "10Gi",
+                       "prometheus.persistence.size": "50Gi",
+                       "prometheus.resources.core.requests.cpu": "750m",
                        "prometheus.resources.core.limits.cpu": "1000m",
                        "prometheus.resources.core.requests.memory": "750Mi",
                        "prometheus.resources.core.limits.memory": "1000Mi",
                        "prometheus.persistent.useReleaseName": "true"}
 
-
 CLUSTER_MONITORING_APP = "cluster-monitoring"
 MONITORING_OPERATOR_APP = "monitoring-operator"
 PROJECT_MONITORING_APP = "project-monitoring"
+GRAFANA_PROJECT_MONITORING = "grafana-project-monitoring"
+PROMETHEUS_PROJECT_MONITORING = "prometheus-project-monitoring"
+NUM_PROJECT_MONITOR_GRAPH = 13  # /v3/projectmonitorgraphs
+NUM_CLUSTER_MONITOR_GRAPH = 37  # /v3/clustermonitorgraphs
 
 
 def test_monitoring_cluster_graph():
     rancher_client, cluster = get_user_client_and_cluster()
-    cluster_monitor_obj = rancher_client.list_clusterMonitorGraph()
+    cluster_monitoring_obj = rancher_client.list_clusterMonitorGraph()
     # generate the request payload
     query1 = copy.deepcopy(cluster_query_template)
-    query1["obj"] = cluster_monitor_obj
+    query1["obj"] = cluster_monitoring_obj
     query1["filters"]["clusterId"] = cluster.id
     query1["filters"]["resourceType"] = "cluster"
     validate_cluster_graph(query1, "cluster")
@@ -125,10 +141,10 @@ def test_monitoring_cluster_graph():
 
 def test_monitoring_etcd_graph():
     rancher_client, cluster = get_user_client_and_cluster()
-    cluster_monitor_obj = rancher_client.list_clusterMonitorGraph()
+    cluster_monitoring_obj = rancher_client.list_clusterMonitorGraph()
     # generate the request payload
     query1 = copy.deepcopy(cluster_query_template)
-    query1["obj"] = cluster_monitor_obj
+    query1["obj"] = cluster_monitoring_obj
     query1["filters"]["clusterId"] = cluster.id
     query1["filters"]["resourceType"] = "etcd"
     validate_cluster_graph(query1, "etcd")
@@ -136,10 +152,10 @@ def test_monitoring_etcd_graph():
 
 def test_monitoring_kube_component_graph():
     rancher_client, cluster = get_user_client_and_cluster()
-    cluster_monitor_obj = rancher_client.list_clusterMonitorGraph()
+    cluster_monitoring_obj = rancher_client.list_clusterMonitorGraph()
     # generate the request payload
     query1 = copy.deepcopy(cluster_query_template)
-    query1["obj"] = cluster_monitor_obj
+    query1["obj"] = cluster_monitoring_obj
     query1["filters"]["clusterId"] = cluster.id
     query1["filters"]["displayResourceType"] = "kube-component"
     validate_cluster_graph(query1, "kube-component")
@@ -153,10 +169,10 @@ def test_monitoring_rancher_component_graph():
         print("cluster logging is not enabled, skip the test")
         return
     else:
-        cluster_monitor_obj = rancher_client.list_clusterMonitorGraph()
+        cluster_monitoring_obj = rancher_client.list_clusterMonitorGraph()
         # generate the request payload
         query1 = copy.deepcopy(cluster_query_template)
-        query1["obj"] = cluster_monitor_obj
+        query1["obj"] = cluster_monitoring_obj
         query1["filters"]["clusterId"] = cluster.id
         query1["filters"]["displayResourceType"] = "rancher-component"
         validate_cluster_graph(query1, "rancher-component")
@@ -166,10 +182,10 @@ def test_monitoring_node_graph():
     rancher_client, cluster = get_user_client_and_cluster()
     node_list_raw = rancher_client.list_node(clusterId=cluster.id).data
     for node in node_list_raw:
-        cluster_monitor_obj = rancher_client.list_clusterMonitorGraph()
+        cluster_monitoring_obj = rancher_client.list_clusterMonitorGraph()
         # generate the request payload
         query1 = copy.deepcopy(cluster_query_template)
-        query1["obj"] = cluster_monitor_obj
+        query1["obj"] = cluster_monitoring_obj
         query1["filters"]["clusterId"] = cluster.id
         query1["filters"]["resourceType"] = "node"
         query1["metricParams"]["instance"] = node.id
@@ -178,11 +194,12 @@ def test_monitoring_node_graph():
 
 def test_monitoring_workload_graph():
     rancher_client, cluster = get_user_client_and_cluster()
-    system_project = rancher_client.list_project(clusterId=cluster.id, name="System").data[0]
-    project_monitor_obj = rancher_client.list_projectMonitorGraph()
+    system_project = rancher_client.list_project(clusterId=cluster.id,
+                                                 name="System").data[0]
+    project_monitoring_obj = rancher_client.list_projectMonitorGraph()
     # generate the request payload
     query1 = copy.deepcopy(cluster_query_template)
-    query1["obj"] = project_monitor_obj
+    query1["obj"] = project_monitoring_obj
     query1["filters"]["projectId"] = system_project.id
     query1["filters"]["resourceType"] = "workload"
     query1["metricParams"]["workloadName"] = \
@@ -191,53 +208,244 @@ def test_monitoring_workload_graph():
 
 
 def test_monitoring_project_monitoring():
-    rancher_client, cluster = get_user_client_and_cluster()
-    system_project = rancher_client.list_project(name="System").data[0]
-    system_project_client = get_project_client_for_token(system_project, USER_TOKEN)
-    project = namespace["project"]
-    # enable the project monitoring
-    if project["enableProjectMonitoring"] is False:
-        rancher_client.action(project, "enableMonitoring", answers=P_MONITORING_ANSWER, version=MONITORING_VERSION)
-    project_client = get_project_client_for_token(project, USER_TOKEN)
-    namespace["project"] = rancher_client.reload(project)
-    wait_for_app_to_active(project_client, PROJECT_MONITORING_APP)
-    wait_for_app_to_active(system_project_client, MONITORING_OPERATOR_APP)
-    namespace["project"] = rancher_client.reload(project)
-    # wait for targets to be up
-    wait_for_target_up("expose-prometheus-metrics")
-    wait_for_target_up("expose-grafana-metrics")
-    # deploy a workload to test project monitoring
-    cluster_client = get_cluster_client_for_token(cluster, USER_TOKEN)
-    ns = create_ns(cluster_client, cluster, project, random_name())
-    port = {"containerPort": 8080,
-            "type": "containerPort",
-            "kind": "NodePort",
-            "protocol": "TCP"}
-    workloadMetrics = [{"path": "/metrics",
-                        "port": 8080,
-                        "schema": "HTTP"}]
-    con = [{"name": "test-web",
-            "image": "loganhz/web",
-            "ports": [port]}]
-    wl_name = random_name()
-    workload = project_client.create_workload(name=wl_name,
-                                              containers=con,
-                                              namespaceId=ns.id,
-                                              workloadMetrics=workloadMetrics)
-    wait_for_wl_to_active(project_client, workload)
-    app = project_client.list_app(name=PROJECT_MONITORING_APP).data[0]
-    url = CATTLE_TEST_URL + '/k8s/clusters/' + cluster.id + '/api/v1/namespaces/' + app.targetNamespace \
-          + '/services/http:access-prometheus:80/proxy/api/v1/query?query=web_app_online_user_count'
-    headers1 = {'Authorization': 'Bearer ' + USER_TOKEN}
-    start = time.time()
-    while True:
-        result = requests.get(headers=headers1, url=url, verify=False).json()
-        if len(result["data"]["result"]) > 0:
-            return
-        if time.time() - start > DEFAULT_MONITORING_TIMEOUT:
-            raise AssertionError(
-                "Timed out waiting for the graph data is available in Prometheus")
-        time.sleep(5)
+    validate_project_monitoring(namespace["project"], USER_TOKEN)
+
+
+# ------------------ RBAC for Project Monitoring ------------------
+@if_test_rbac
+def test_rbac_cluster_owner_control_project_monitoring():
+    # cluster owner can enable and disable monitoring in any project
+    user_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
+    user_client = get_client_for_token(user_token)
+    project = user_client.reload(rbac_get_project())
+
+    if project["enableProjectMonitoring"] is True:
+        assert "disableMonitoring" in project.actions.keys()
+        disable_project_monitoring(project, user_token)
+    validate_project_monitoring(project, user_token)
+
+
+@if_test_rbac
+def test_rbac_cluster_member_control_project_monitoring(remove_resource):
+    # cluster member can enable and disable monitoring in his project
+    user_token = rbac_get_user_token_by_role(CLUSTER_MEMBER)
+    user_client = get_client_for_token(user_token)
+    # create a new project
+    project = create_project(user_client, namespace["cluster"])
+    validate_project_monitoring(project, user_token)
+
+    remove_resource(project)
+
+
+@if_test_rbac
+def test_rbac_project_owner_control_project_monitoring():
+    # project owner can enable and disable monitoring in his project
+    user_token = rbac_get_user_token_by_role(PROJECT_OWNER)
+    user_client = get_client_for_token(user_token)
+    project = user_client.reload(rbac_get_project())
+
+    if project["enableProjectMonitoring"] is True:
+        assert "disableMonitoring" in project.actions.keys()
+        disable_project_monitoring(project)
+    validate_project_monitoring(project, user_token)
+
+
+@if_test_rbac
+def test_rbac_project_member_control_project_monitoring():
+    # project member can NOT enable and disable monitoring in his project
+    token = rbac_get_user_token_by_role(PROJECT_MEMBER)
+    validate_no_permission_project_monitoring(token)
+
+
+@if_test_rbac
+def test_rbac_project_read_only_control_project_monitoring():
+    # project read-only can NOT enable and disable monitoring in his project
+    token = rbac_get_user_token_by_role(PROJECT_READ_ONLY)
+    validate_no_permission_project_monitoring(token)
+
+
+@if_test_rbac
+def test_rbac_project_owner_project_graph_1():
+    # project owner can see graphs in his project
+    project = rbac_get_project()
+    wl = rbac_get_workload()
+    token = rbac_get_user_token_by_role(PROJECT_OWNER)
+    check_permission_project_graph(project, wl, token, True)
+
+
+@if_test_rbac
+def test_rbac_project_owner_project_graph_2():
+    # project owner can NOT see graphs in others' project
+    project = rbac_get_unshared_project()
+    wl = rbac_get_unshared_workload()
+    token = rbac_get_user_token_by_role(PROJECT_OWNER)
+    check_permission_project_graph(project, wl, token, False)
+
+
+@if_test_rbac
+def test_rbac_project_member_project_graph_1():
+    # project member can see graphs in his project
+    project = rbac_get_project()
+    wl = rbac_get_workload()
+    token = rbac_get_user_token_by_role(PROJECT_MEMBER)
+    check_permission_project_graph(project, wl, token, True)
+
+
+@if_test_rbac
+def test_rbac_project_member_project_graph_2():
+    # project member can NOT see graphs in others' project
+    project = rbac_get_unshared_project()
+    wl = rbac_get_unshared_workload()
+    token = rbac_get_user_token_by_role(PROJECT_MEMBER)
+    check_permission_project_graph(project, wl, token, False)
+
+
+@if_test_rbac
+def test_rbac_project_read_only_project_graph_1():
+    # project read-only can see graphs in his project
+    project = rbac_get_project()
+    wl = rbac_get_workload()
+    token = rbac_get_user_token_by_role(PROJECT_READ_ONLY)
+    check_permission_project_graph(project, wl, token, True)
+
+
+@if_test_rbac
+def test_rbac_project_read_only_project_graph_2():
+    # project read-only can NOT see graphs in other's project
+    project = rbac_get_unshared_project()
+    wl = rbac_get_unshared_workload()
+    token = rbac_get_user_token_by_role(PROJECT_READ_ONLY)
+    check_permission_project_graph(project, wl, token, False)
+
+
+@if_test_rbac
+def test_rbac_cluster_owner_project_graph():
+    # cluster owner can see graphs in all projects
+    token = rbac_get_user_token_by_role(CLUSTER_OWNER)
+    project1 = rbac_get_project()
+    wl1 = rbac_get_workload()
+    check_permission_project_graph(project1, wl1, token, True)
+    project2 = rbac_get_unshared_project()
+    wl2 = rbac_get_unshared_workload()
+    check_permission_project_graph(project2, wl2, token, True)
+
+
+@if_test_rbac
+def test_rbac_cluster_member_project_graph_1(remove_resource):
+    # cluster member can see graphs in his project only
+    token = rbac_get_user_token_by_role(CLUSTER_MEMBER)
+    project, ns = create_project_and_ns(token,
+                                        namespace["cluster"],
+                                        random_test_name("cluster-member"))
+    p_client = get_project_client_for_token(project, token)
+    con = [{"name": "test1", "image": TEST_IMAGE}]
+    name = random_test_name("default")
+    workload = p_client.create_workload(name=name,
+                                        containers=con,
+                                        namespaceId=ns.id)
+    wait_for_wl_to_active(p_client, workload)
+    remove_resource(project)
+    check_permission_project_graph(project, workload, token, True)
+
+
+@if_test_rbac
+def test_rbac_cluster_member_project_graph_2():
+    # cluster member can NOT see graphs in other's project
+    token = rbac_get_user_token_by_role(CLUSTER_MEMBER)
+    project = rbac_get_project()
+    wl = rbac_get_workload()
+    check_permission_project_graph(project, wl, token, False)
+
+
+# ------------------ RBAC for Cluster Monitoring ------------------
+@if_test_rbac
+def test_rbac_project_owner_cluster_graphs():
+    # project owner can NOT see cluster graphs
+    token = rbac_get_user_token_by_role(PROJECT_OWNER)
+    cluster = namespace["cluster"]
+    check_permission_cluster_graph(cluster, token, False)
+
+
+@if_test_rbac
+def test_rbac_project_member_cluster_graphs():
+    # project member can NOT see cluster graphs
+    token = rbac_get_user_token_by_role(PROJECT_MEMBER)
+    cluster = namespace["cluster"]
+    check_permission_cluster_graph(cluster, token, False)
+
+
+@if_test_rbac
+def test_rbac_project_read_only_cluster_graphs():
+    # project read-only can NOT see cluster graphs
+    token = rbac_get_user_token_by_role(PROJECT_READ_ONLY)
+    cluster = namespace["cluster"]
+    check_permission_cluster_graph(cluster, token, False)
+
+
+@if_test_rbac
+def test_rbac_cluster_owner_cluster_graphs():
+    # cluster owner can see cluster graph
+    token = rbac_get_user_token_by_role(CLUSTER_OWNER)
+    cluster = namespace["cluster"]
+    check_permission_cluster_graph(cluster, token, True)
+
+
+@if_test_rbac
+def test_rbac_cluster_member_cluster_graphs():
+    # cluster member can see cluster graphs
+    token = rbac_get_user_token_by_role(CLUSTER_MEMBER)
+    cluster = namespace["cluster"]
+    check_permission_cluster_graph(cluster, token, True)
+
+
+@if_test_rbac
+def test_rbac_cluster_member_control_cluster_monitoring():
+    # cluster member can NOT enable or disable the cluster monitoring
+    token = rbac_get_user_token_by_role(CLUSTER_MEMBER)
+    validate_no_permission_cluster_monitoring(token)
+
+
+@if_test_rbac
+def test_rbac_project_owner_control_cluster_monitoring():
+    # project owner can NOT enable or disable the cluster monitoring
+    token = rbac_get_user_token_by_role(PROJECT_OWNER)
+    validate_no_permission_cluster_monitoring(token)
+
+
+@if_test_rbac
+def test_rbac_project_member_control_cluster_monitoring():
+    # project member can NOT enable or disable the cluster monitoring
+    token = rbac_get_user_token_by_role(PROJECT_MEMBER)
+    validate_no_permission_cluster_monitoring(token)
+
+
+@if_test_rbac
+def test_rbac_project_read_only_control_cluster_monitoring():
+    # project read-only can NOT enable or disable the cluster monitoring
+    token = rbac_get_user_token_by_role(PROJECT_READ_ONLY)
+    validate_no_permission_cluster_monitoring(token)
+
+
+@pytest.mark.last
+@if_test_rbac
+def test_rbac_cluster_owner_control_cluster_monitoring():
+    # cluster owner can enable and disable the cluster monitoring
+    user_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
+    client = get_client_for_token(user_token)
+    user_client, cluster = get_user_client_and_cluster(client)
+
+    if cluster["enableClusterMonitoring"] is True:
+        assert "disableMonitoring" in cluster.actions.keys()
+        user_client.action(cluster, "disableMonitoring")
+        # sleep 10 seconds to wait for all apps removed
+        time.sleep(10)
+
+    cluster = user_client.reload(cluster)
+    assert "enableMonitoring" in cluster.actions.keys()
+    user_client.action(cluster, "enableMonitoring",
+                       answers=C_MONITORING_ANSWERS,
+                       version=MONITORING_VERSION)
+    validate_cluster_monitoring_apps()
 
 
 @pytest.fixture(scope="module", autouse="True")
@@ -246,23 +454,26 @@ def create_project_client(request):
     create_kubeconfig(cluster)
     project = create_project(rancher_client, cluster,
                              random_test_name("p-monitoring"))
+    system_project = rancher_client.list_project(clusterId=cluster.id,
+                                                 name="System").data[0]
+    sys_proj_client = get_project_client_for_token(system_project, USER_TOKEN)
     namespace["cluster"] = cluster
     namespace["project"] = project
+    namespace["system_project"] = system_project
+    namespace["system_project_client"] = sys_proj_client
 
-    system_project = rancher_client.list_project(clusterId=cluster.id, name="System").data[0]
-    system_project_client = get_project_client_for_token(system_project, USER_TOKEN)
     # enable the cluster monitoring
     if cluster["enableClusterMonitoring"] is False:
-        rancher_client.action(cluster, "enableMonitoring", answers=C_MONITORING_ANSWERS, version=MONITORING_VERSION)
-    wait_for_app_to_active(system_project_client, CLUSTER_MONITORING_APP)
-    wait_for_app_to_active(system_project_client, MONITORING_OPERATOR_APP)
-    # wait 2 minutes for all graphs to be available
+        rancher_client.action(cluster, "enableMonitoring",
+                              answers=C_MONITORING_ANSWERS,
+                              version=MONITORING_VERSION)
+    validate_cluster_monitoring_apps()
+
+    # wait 2 minute for all graphs to be available
     time.sleep(60 * 2)
 
     def fin():
-        project = rancher_client.reload(namespace["project"])
-        if project["enableProjectMonitoring"] is True:
-            rancher_client.action(project, "disableMonitoring")
+        rancher_client.delete(project)
         cluster = rancher_client.reload(namespace["cluster"])
         if cluster["enableClusterMonitoring"] is True:
             rancher_client.action(cluster, "disableMonitoring")
@@ -276,7 +487,7 @@ def get_graph_data(query1, list_len, timeout=10):
     while True:
         res = rancher_client.action(**query1)
         if hasattr(res, "data") is True:
-            print("\nthe length is ", len(res.data), "expected to be: ", list_len)
+            print("\nlength: ", len(res.data), "expected to be: ", list_len)
             print(res.data)
             if len(res.data) == list_len:
                 # check if all graphs have valid data points
@@ -303,13 +514,15 @@ def validate_cluster_graph(action_query, resource_type):
     assert len(target_graph_list) == 0, target_graph_list
 
 
-def wait_for_target_up(job):
-    _, cluster = get_user_client_and_cluster()
-    project_client = get_project_client_for_token(namespace["project"], USER_TOKEN)
+def wait_for_target_up(token, cluster, project, job):
+    """wait for a job's state to be up in Prometheus"""
+
+    project_client = get_project_client_for_token(project, token)
     app = project_client.list_app(name=PROJECT_MONITORING_APP).data[0]
-    url = CATTLE_TEST_URL + '/k8s/clusters/' + cluster.id + '/api/v1/namespaces/' + app.targetNamespace \
-          + '/services/http:access-prometheus:80/proxy/api/v1/targets'
-    headers1 = {'Authorization': 'Bearer ' + USER_TOKEN}
+    url = CATTLE_TEST_URL + '/k8s/clusters/' + cluster.id \
+        + '/api/v1/namespaces/' + app.targetNamespace \
+        + '/services/http:access-prometheus:80/proxy/api/v1/targets'
+    headers1 = {'Authorization': 'Bearer ' + token}
     start = time.time()
     while True:
         t = requests.get(headers=headers1, url=url, verify=False).json()
@@ -322,3 +535,193 @@ def wait_for_target_up(job):
                 "Timed out waiting for target to be up")
         time.sleep(5)
 
+
+def validate_cluster_monitoring_apps():
+    sys_project_client = namespace["system_project_client"]
+    wait_for_app_to_active(sys_project_client, CLUSTER_MONITORING_APP)
+    wait_for_app_to_active(sys_project_client, MONITORING_OPERATOR_APP)
+
+
+def validate_no_permission_cluster_monitoring(user_token):
+    client = get_client_for_token(user_token)
+    _, cluster = get_user_client_and_cluster(client)
+    actions = cluster.actions.keys()
+    assert "enableMonitoring" not in actions
+    assert "disableMonitoring" not in actions
+    assert "editMonitoring" not in actions
+
+
+def validate_no_permission_project_monitoring(user_token):
+    user_client = get_client_for_token(user_token)
+    project = user_client.reload(rbac_get_project())
+    actions = project.actions.keys()
+    assert "enableMonitoring" not in actions
+    assert "disableMonitoring" not in actions
+    assert "editMonitoring" not in actions
+
+
+def enable_project_monitoring(project, token):
+    client = get_client_for_token(token)
+    user_client, cluster = get_user_client_and_cluster(client)
+    system_project_client = namespace["system_project_client"]
+    project = user_client.reload(project)
+    project_client = get_project_client_for_token(project, token)
+
+    # enable the project monitoring
+    if project["enableProjectMonitoring"] is False:
+        assert "enableMonitoring" in project.actions.keys()
+        user_client.action(project, "enableMonitoring",
+                           answers=P_MONITORING_ANSWER,
+                           version=MONITORING_VERSION)
+    wait_for_app_to_active(project_client, PROJECT_MONITORING_APP)
+    wait_for_app_to_active(system_project_client, MONITORING_OPERATOR_APP)
+    # wait for targets to be up
+    wait_for_target_up(token, cluster, project, "expose-prometheus-metrics")
+    wait_for_target_up(token, cluster, project, "expose-grafana-metrics")
+
+
+def disable_project_monitoring(project, token):
+    user_client = get_client_for_token(token)
+    project = user_client.reload(project)
+    p_client = get_project_client_for_token(project, token)
+    # disable the project monitoring
+    assert "disableMonitoring" in project.actions.keys()
+    user_client.action(project, "disableMonitoring")
+    start = time.time()
+    while True:
+        if time.time() - start > 30:
+            raise AssertionError(
+                "Timed out waiting for disabling project monitoring")
+        apps = p_client.list_app(name=PROJECT_MONITORING_APP)
+        wl1 = p_client.list_workload(name=PROMETHEUS_PROJECT_MONITORING)
+        wl2 = p_client.list_workload(name=GRAFANA_PROJECT_MONITORING)
+        if len(apps.data) == 0 and len(wl1.data) == 0 and len(wl2.data) == 0:
+            break
+
+
+def validate_project_prometheus(project, token):
+    """
+    This function deploys a workload which exposes a metrics
+    in the target project, and validate if the metrics is scraped
+    by the project prometheus.
+    """
+
+    cluster = namespace["cluster"]
+    project_client = get_project_client_for_token(project, token)
+
+    # deploy a workload to test project monitoring
+    cluster_client = get_cluster_client_for_token(cluster, token)
+    ns = create_ns(cluster_client, cluster, project, random_name())
+    port = {"containerPort": 8080,
+            "type": "containerPort",
+            "kind": "NodePort",
+            "protocol": "TCP"}
+    metrics = [{"path": "/metrics",
+                "port": 8080,
+                "schema": "HTTP"}]
+    con = [{"name": "test-web",
+            "image": "loganhz/web",
+            "ports": [port]}]
+    wl_name = random_name()
+    workload = project_client.create_workload(name=wl_name,
+                                              containers=con,
+                                              namespaceId=ns.id,
+                                              workloadMetrics=metrics)
+    wait_for_wl_to_active(project_client, workload)
+    app = project_client.list_app(name=PROJECT_MONITORING_APP).data[0]
+    url = CATTLE_TEST_URL + '/k8s/clusters/' + cluster.id \
+        + '/api/v1/namespaces/' + app.targetNamespace \
+        + '/services/http:access-prometheus:80/proxy/api/v1/' \
+        + 'query?query=web_app_online_user_count'
+    headers1 = {'Authorization': 'Bearer ' + USER_TOKEN}
+    start = time.time()
+    while True:
+        result = requests.get(headers=headers1, url=url, verify=False).json()
+        if len(result["data"]["result"]) > 0:
+            project_client.delete(workload)
+            return
+        if time.time() - start > DEFAULT_MONITORING_TIMEOUT:
+            project_client.delete(workload)
+            raise AssertionError(
+                "Timed out waiting for the graph data available in Prometheus")
+        time.sleep(5)
+
+
+def check_permission_project_graph(project, workload, token, permission=True):
+    """
+    check if the user has the permission to see graphs in the project
+
+    :param project: the target project where graphs are from
+    :param workload:  the target workload in the project
+    :param token: the user's token
+    :param permission: the user can see graphs if permission is True
+    :return: None
+    """
+
+    p_id = project["id"]
+    client = get_client_for_token(token)
+    project_monitoring_obj = client.list_project_monitor_graph(projectId=p_id)
+    graphs_list = project_monitoring_obj.get("data")
+    if permission:
+        assert len(graphs_list) == NUM_PROJECT_MONITOR_GRAPH
+    else:
+        assert len(graphs_list) == 0
+
+    query1 = copy.deepcopy(cluster_query_template)
+    query1["obj"] = project_monitoring_obj
+    query1["filters"]["projectId"] = p_id
+    query1["filters"]["resourceType"] = "workload"
+    query1["metricParams"]["workloadName"] = workload.get("id")
+    res = client.action(**query1)
+    if permission:
+        start_time = time.time()
+        while time.time() - start_time < DEFAULT_TIMEOUT \
+                and "data" not in res.keys():
+            time.sleep(10)
+            res = client.action(**query1)
+        assert "data" in res.keys()
+        assert len(res.get("data")) > 0
+    else:
+        assert "data" not in res.keys()
+
+
+def check_permission_cluster_graph(cluster, token, permission=True):
+    """
+    check if the user has the permission to see graphs in the cluster
+
+    :param cluster: the target cluster where graphs are from
+    :param token: the user's token
+    :param permission: the user can see graphs if permission is True
+    :return: None
+    """
+
+    c_id = cluster["id"]
+    client = get_client_for_token(token)
+    cluster_monitoring_obj = client.list_cluster_monitor_graph(clusterId=c_id)
+    graphs_list = cluster_monitoring_obj.get("data")
+    if permission:
+        assert len(graphs_list) == NUM_CLUSTER_MONITOR_GRAPH
+    else:
+        assert len(graphs_list) == 0
+
+    query1 = copy.deepcopy(cluster_query_template)
+    query1["obj"] = cluster_monitoring_obj
+    query1["filters"]["clusterId"] = cluster.id
+    query1["filters"]["resourceType"] = "cluster"
+    res = client.action(**query1)
+    if permission:
+        start_time = time.time()
+        while time.time() - start_time < DEFAULT_TIMEOUT \
+                and "data" not in res.keys():
+            time.sleep(10)
+            res = client.action(**query1)
+        assert "data" in res.keys()
+        assert len(res.get("data")) > 0
+    else:
+        assert "data" not in res.keys()
+
+
+def validate_project_monitoring(project, token):
+    enable_project_monitoring(project, token)
+    validate_project_prometheus(project, token)
+    disable_project_monitoring(project, token)
