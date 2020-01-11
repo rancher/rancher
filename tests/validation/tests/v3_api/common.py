@@ -74,6 +74,7 @@ PROJECT_READ_ONLY = "read-only"
 rbac_data = {
     "project": None,
     "namespace": None,
+    "workload": None,
     "p_unshared": None,
     "ns_unshared": None,
     "wl_unshared": None,
@@ -1476,6 +1477,10 @@ def rbac_get_namespace():
     return rbac_data["namespace"]
 
 
+def rbac_get_workload():
+    return rbac_data["workload"]
+
+
 def rbac_get_unshared_project():
     return rbac_data["p_unshared"]
 
@@ -1497,6 +1502,15 @@ def rbac_prepare():
     project, ns = create_project_and_ns(ADMIN_TOKEN,
                                         cluster,
                                         random_test_name("p-test-rbac"))
+    con = [{"name": "test1",
+            "image": TEST_IMAGE}]
+    name = random_test_name("default")
+    p_client = get_project_client_for_token(project, ADMIN_TOKEN)
+    workload = p_client.create_workload(name=name,
+                                        containers=con,
+                                        namespaceId=ns.id)
+    validate_workload(p_client, workload, "deployment", ns.name)
+    rbac_data["workload"] = workload
     rbac_data["project"] = project
     rbac_data["namespace"] = ns
     # create new users
@@ -1531,8 +1545,6 @@ def rbac_prepare():
     p2, ns2 = create_project_and_ns(ADMIN_TOKEN,
                                     cluster,
                                     random_test_name("p-unshared"))
-    con = [{"name": "test1",
-            "image": TEST_IMAGE}]
     name = random_test_name("default")
     p_client = get_project_client_for_token(p2, ADMIN_TOKEN)
     workload = p_client.create_workload(name=name,
