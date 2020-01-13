@@ -16,6 +16,7 @@ DEFAULT_TIMEOUT = 120
 DEFAULT_MULTI_CLUSTER_APP_TIMEOUT = 300
 DEFAULT_APP_DELETION_TIMEOUT = 360
 DEFAULT_MONITORING_TIMEOUT = 180
+DEFAULT_CATALOG_TIMEOUT = 15
 MONITORING_VERSION = os.environ.get('MONITORING_VERSION', "0.0.5")
 
 CATTLE_TEST_URL = os.environ.get('CATTLE_TEST_URL', "http://localhost:80")
@@ -1596,3 +1597,21 @@ def create_catalog_external_id(catalog_name, template, version,
         return "catalog://?catalog=" + project_cluster_id + "/" \
                + catalog_name + "&type=" + catalog_type \
                + "Catalog&template=" + template + "&version=" + version
+
+
+def wait_for_catalog_active(client, catalog, timeout=DEFAULT_CATALOG_TIMEOUT):
+    time.sleep(.5)
+    catalog_data = client.list_catalog(name=catalog.name)
+    print(catalog_data)
+    start = time.time()
+    assert len(catalog_data) >= 1, "Cannot find catalog"
+    catalog = catalog_data["data"][0]
+    while catalog.state != "active":
+        if time.time() - start > timeout:
+            raise AssertionError(
+                "Timed out waiting for state to get to active")
+        time.sleep(.5)
+        catalog_data = client.list_catalog(name=catalog.name)
+        assert len(catalog_data) >= 1
+        catalog = catalog_data[0]
+    return catalog

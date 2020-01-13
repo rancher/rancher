@@ -70,10 +70,12 @@ app_create_name = create_prefix + "-app"
 app_validate_name = validate_prefix + "-app"
 # the pre_upgrade_externalId is for launching an app
 pre_upgrade_externalId = \
-    "catalog://?catalog=library&template=mysql&version=0.3.7"
+    create_catalog_external_id("test-catalog", "mysql", "1.3.1")
 # the post_upgrade_externalId is for upgrading the existing app
 post_upgrade_externalId = \
-    "catalog://?catalog=library&template=mysql&version=0.3.8"
+    create_catalog_external_id("test-catalog", "mysql", "1.3.2")
+catalogUrl = "https://github.com/rancher/integration-test-charts.git"
+catalogBranch = "validation-tests"
 
 if_post_upgrade = pytest.mark.skipif(
     upgrade_check_stage != "postupgrade",
@@ -457,11 +459,20 @@ def create_validate_wokloads_with_secret():
 @pytest.fixture(scope='module', autouse="True")
 def create_project_client(request):
     client = get_user_client()
+    admin_client = get_admin_client()
     clusters = client.list_cluster(name=cluster_name).data
     assert len(clusters) == 1
     cluster = clusters[0]
     create_kubeconfig(cluster)
     namespace["cluster"] = cluster
+    if len(admin_client.list_catalog(name="test-catalog")) == 0:
+        catalog = admin_client.create_catalog(
+            name="test-catalog",
+            baseType="catalog",
+            branch=catalogBranch,
+            kind="helm",
+            url=catalogUrl)
+        catalog = wait_for_catalog_active(admin_client, catalog)
 
 
 def create_project_resources():
@@ -606,6 +617,7 @@ def create_and_validate_catalog_app():
     p_client = namespace['p_client']
     ns = create_ns(get_cluster_client_for_token(cluster, USER_TOKEN),
                    cluster, namespace["project"], ns_name=app_ns)
+    print(pre_upgrade_externalId)
     app = p_client.create_app(
         answers=get_defaut_question_answers(get_user_client(),
                                             pre_upgrade_externalId),
