@@ -17,6 +17,7 @@ const (
 	ClusterLoggingFieldEnableJSONParsing      = "enableJSONParsing"
 	ClusterLoggingFieldFailedSpec             = "failedSpec"
 	ClusterLoggingFieldFluentForwarderConfig  = "fluentForwarderConfig"
+	ClusterLoggingFieldGraylogConfig          = "graylogConfig"
 	ClusterLoggingFieldIncludeSystemComponent = "includeSystemComponent"
 	ClusterLoggingFieldKafkaConfig            = "kafkaConfig"
 	ClusterLoggingFieldLabels                 = "labels"
@@ -47,6 +48,7 @@ type ClusterLogging struct {
 	EnableJSONParsing      bool                   `json:"enableJSONParsing,omitempty" yaml:"enableJSONParsing,omitempty"`
 	FailedSpec             *ClusterLoggingSpec    `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`
 	FluentForwarderConfig  *FluentForwarderConfig `json:"fluentForwarderConfig,omitempty" yaml:"fluentForwarderConfig,omitempty"`
+	GraylogConfig          *GraylogConfig         `json:"graylogConfig,omitempty" yaml:"graylogConfig,omitempty"`
 	IncludeSystemComponent *bool                  `json:"includeSystemComponent,omitempty" yaml:"includeSystemComponent,omitempty"`
 	KafkaConfig            *KafkaConfig           `json:"kafkaConfig,omitempty" yaml:"kafkaConfig,omitempty"`
 	Labels                 map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`

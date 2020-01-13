@@ -702,6 +702,10 @@ github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529/go.mod h1:DxrIzT+xaE7yg
 github.com/seccomp/libseccomp-golang v0.9.1/go.mod h1:GbW5+tmTXfcxTToHLXlScSlAvWlF4P2Ca7zGrPiEpWo=
 github.com/segmentio/kafka-go v0.3.4 h1:Mv9AcnCgU14/cU6Vd0wuRdG1FBO0HzXQLnjBduDLy70=
 github.com/segmentio/kafka-go v0.3.4/go.mod h1:OT5KXBPbaJJTcvokhWR2KFmm0niEx3mnccTwjmLvSi4=
+github.com/shanewxy/types v0.0.0-20200113101021-83c631fe1446 h1:sPRVIw2+NiaywcNuu9nSqj9RrwwYiVjdQjY3LQ9zVL4=
+github.com/shanewxy/types v0.0.0-20200113101021-83c631fe1446/go.mod h1:yYtjxRexsviS9aPO0qp1gqnMSLRRoe0JW6Mqu1EbJZM=
+github.com/shanewxy/types v0.0.0-20200113101526-752e4cde41a5 h1:6ZbhMA5h/bus5EsYTfUVHYlCSsgY98uwJHLgVf9vH+A=
+github.com/shanewxy/types v0.0.0-20200113101526-752e4cde41a5/go.mod h1:yYtjxRexsviS9aPO0qp1gqnMSLRRoe0JW6Mqu1EbJZM=
 github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24/go.mod h1:M+9NzErvs504Cn4c5DxATwIqPbtswREoFCre64PpcG4=
 github.com/shurcooL/httpfs v0.0.0-20171119174359-809beceb2371/go.mod h1:ZY1cvUeJuFPAdZ/B6v7RHavJWZn2YPVFQ1OSXhCGOkg=
 github.com/shurcooL/sanitized_anchor_name v1.0.0 h1:PdmoCO6wvbs+7yrJyMORt4/BmY5IYyJwS/kOiWx8mHo=

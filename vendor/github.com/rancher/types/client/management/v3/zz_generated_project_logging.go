@@ -13,6 +13,7 @@ const (
 	ProjectLoggingFieldElasticsearchConfig   = "elasticsearchConfig"
 	ProjectLoggingFieldEnableJSONParsing     = "enableJSONParsing"
 	ProjectLoggingFieldFluentForwarderConfig = "fluentForwarderConfig"
+	ProjectLoggingFieldGraylogConfig         = "graylogConfig"
 	ProjectLoggingFieldKafkaConfig           = "kafkaConfig"
 	ProjectLoggingFieldLabels                = "labels"
 	ProjectLoggingFieldName                  = "name"
@@ -40,6 +41,7 @@ type ProjectLogging struct {
 	ElasticsearchConfig   *ElasticsearchConfig   `json:"elasticsearchConfig,omitempty" yaml:"elasticsearchConfig,omitempty"`
 	EnableJSONParsing     bool                   `json:"enableJSONParsing,omitempty" yaml:"enableJSONParsing,omitempty"`
 	FluentForwarderConfig *FluentForwarderConfig `json:"fluentForwarderConfig,omitempty" yaml:"fluentForwarderConfig,omitempty"`
+	GraylogConfig         *GraylogConfig         `json:"graylogConfig,omitempty" yaml:"graylogConfig,omitempty"`
 	KafkaConfig           *KafkaConfig           `json:"kafkaConfig,omitempty" yaml:"kafkaConfig,omitempty"`
 	Labels                map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                  string                 `json:"name,omitempty" yaml:"name,omitempty"`
