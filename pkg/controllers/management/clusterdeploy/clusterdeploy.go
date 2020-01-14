@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -65,6 +66,7 @@ type clusterDeploy struct {
 }
 
 func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
+	logrus.Tracef("clusterDeploy: sync called for cluster [%s], key [%s]", cluster.Name, key)
 	var (
 		err, updateErr error
 	)
@@ -86,10 +88,12 @@ func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, 
 		} else {
 			cluster.Spec.RancherKubernetesEngineConfig.Authentication.Strategy = "x509"
 		}
+		logrus.Tracef("clusterDeploy: sync: cluster.Spec.RancherKubernetesEngineConfig.Authentication.Strategy set to [%s] for cluster [%s]", cluster.Spec.RancherKubernetesEngineConfig.Authentication.Strategy, cluster.Name)
 	}
 
 	err = cd.doSync(cluster)
 	if cluster != nil && !reflect.DeepEqual(cluster, original) {
+		logrus.Tracef("clusterDeploy: sync: cluster changed, calling Update on cluster [%s]", cluster.Name)
 		_, updateErr = cd.clusters.Update(cluster)
 	}
 
@@ -100,7 +104,10 @@ func (cd *clusterDeploy) sync(key string, cluster *v3.Cluster) (runtime.Object, 
 }
 
 func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
+	logrus.Tracef("clusterDeploy: doSync called for cluster [%s]", cluster.Name)
+
 	if !v3.ClusterConditionProvisioned.IsTrue(cluster) {
+		logrus.Tracef("clusterDeploy: doSync: cluster [%s] is not yet provisioned (ClusterConditionProvisioned is not True)", cluster.Name)
 		return nil
 	}
 
@@ -108,11 +115,13 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 	if err != nil {
 		return err
 	}
+	logrus.Tracef("clusterDeploy: doSync: found [%d] nodes for cluster [%s]", len(nodes), cluster.Name)
 	if len(nodes) == 0 {
 		return nil
 	}
 
 	_, err = v3.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
+		logrus.Tracef("clusterDeploy: doSync: Creating SystemAccount for cluster [%s]", cluster.Name)
 		return cluster, cd.systemAccountManager.CreateSystemAccount(cluster)
 	})
 	if err != nil {
@@ -153,10 +162,10 @@ func agentFeaturesChanged(desired, actual map[string]bool) bool {
 }
 
 func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desiredFeatures map[string]bool) bool {
+	logrus.Tracef("clusterDeploy: redeployAgent called for cluster [%s]", cluster.Name)
 	if !v3.ClusterConditionAgentDeployed.IsTrue(cluster) {
 		return true
 	}
-
 	forceDeploy := cluster.Annotations[AgentForceDeployAnn] == "true"
 	imageChange := cluster.Status.AgentImage != desiredAgent || cluster.Status.AuthImage != desiredAuth
 	agentFeaturesChanged := agentFeaturesChanged(desiredFeatures, cluster.Status.AgentFeatures)
@@ -181,13 +190,16 @@ func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desire
 		logrus.Infof("Redeploy Rancher Agents is needed for %s: forceDeploy=%v, agent/auth image changed=%v,"+
 			" private repo changed=%v, agent features changed=%v", cluster.Name, forceDeploy, imageChange, repoChange,
 			agentFeaturesChanged)
+		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AgentImage: [%s], desiredAgent: [%s]", cluster.Status.AgentImage, desiredAgent)
+		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AuthImage [%s], desiredAuth: [%s]", cluster.Status.AuthImage, desiredAuth)
+		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AgentFeatures [%v], desiredFeatures: [%v]", cluster.Status.AgentFeatures, desiredFeatures)
 		return true
 	}
 
 	na, ca := getAgentImages(cluster.Name)
 	if cluster.Status.AgentImage != na || cluster.Status.AgentImage != ca {
 		// downstream agent does not match, kick a redeploy with settings agent
-		logrus.Infof("Redeploy Rancher Agents due to Downstream Agent Image Mismatch for %s: was %s and will be %s",
+		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to downstream agent image mismatch for [%s]: was [%s] and will be [%s]",
 			cluster.Name, na, image.ResolveWithCluster(settings.AgentImage.Get(), cluster))
 		clearAgentImages(cluster.Name)
 		return true
@@ -205,10 +217,12 @@ func getDesiredImage(cluster *v3.Cluster) string {
 }
 
 func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
+	logrus.Tracef("clusterDeploy: deployAgent called for [%s]", cluster.Name)
 	desiredAgent := getDesiredImage(cluster)
 	if desiredAgent == "" || desiredAgent == "fixed" {
 		desiredAgent = image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
 	}
+	logrus.Tracef("clusterDeploy: deployAgent: desiredAgent is [%s] for cluster [%s]", desiredAgent, cluster.Name)
 
 	var desiredAuth string
 	if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
@@ -217,10 +231,12 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 			desiredAuth = image.ResolveWithCluster(settings.AuthImage.Get(), cluster)
 		}
 	}
+	logrus.Tracef("clusterDeploy: deployAgent: desiredAuth is [%s] for cluster [%s]", desiredAuth, cluster.Name)
 
 	desiredFeatures := map[string]bool{
 		features.Steve.Name(): features.Steve.Enabled(),
 	}
+	logrus.Tracef("clusterDeploy: deployAgent: desiredFeatures is [%v] for cluster [%s]", desiredFeatures, cluster.Name)
 
 	if !redeployAgent(cluster, desiredAgent, desiredAuth, desiredFeatures) {
 		return nil
@@ -237,24 +253,27 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 			return cluster, err
 		}
 		var output []byte
-		for i := 0; i < 3; i++ {
-			// This will fail almost always the first time because when we create the namespace in the file
-			// it won't have privileges.  Just stupidly try 3 times
+		for i := 0; i < 5; i++ {
+			// This will fail almost always the first time because when we create the namespace in the file it won't have privileges.
+			// This allows for 5*5 seconds for the cluster to be ready to apply the agent YAML before erroring out
+			logrus.Tracef("clusterDeploy: deployAgent: applying agent YAML for cluster [%s], try #%d: %v", cluster.Name, i+1, string(output))
 			output, err = kubectl.Apply(yaml, kubeConfig)
 			if err == nil {
+				logrus.Tracef("clusterDeploy: deployAgent: successfully applied agent YAML for cluster [%s], try #%d", cluster.Name, i+1)
 				break
 			}
-			time.Sleep(2 * time.Second)
+			logrus.Debugf("clusterDeploy: deployAgent: error while applying agent YAML for cluster [%s], try #%d", cluster.Name, i+1)
+			time.Sleep(5 * time.Second)
 		}
 		if err != nil {
-			return cluster, errors.WithMessage(types.NewErrors(err, errors.New(string(output))), "kubectl apply failed")
+			return cluster, errors.WithMessage(types.NewErrors(err, errors.New(formatKubectlApplyOutput(string(output)))), "Error while applying agent YAML, it will be retried automatically")
 		}
 		v3.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		if !cluster.Spec.LocalClusterAuthEndpoint.Enabled && cluster.Status.AppliedSpec.LocalClusterAuthEndpoint.Enabled && cluster.Status.AuthImage != "" {
 			output, err = kubectl.Delete([]byte(systemtemplate.AuthDaemonSet), kubeConfig)
 		}
 		if err != nil {
-			logrus.Debugf("Output from kubectl delete kube-api-auth DaemonSet, output: %s, err: %v", string(output), err)
+			logrus.Tracef("Output from kubectl delete kube-api-auth DaemonSet, output: %s, err: %v", string(output), err)
 			// Ignore if the resource does not exist and it returns 'daemonsets.apps "kube-api-auth" not found'
 			dsNotFoundError := "daemonsets.apps \"kube-api-auth\" not found"
 			if !strings.Contains(string(output), dsNotFoundError) {
@@ -303,6 +322,7 @@ func (cd *clusterDeploy) setNetworkPolicyAnn(cluster *v3.Cluster) error {
 }
 
 func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Config, error) {
+	logrus.Tracef("clusterDeploy: getKubeConfig called for cluster [%s]", cluster.Name)
 	user, err := cd.systemAccountManager.GetSystemUser(cluster.Name)
 	if err != nil {
 		return nil, err
@@ -317,8 +337,9 @@ func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Confi
 }
 
 func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage string, features map[string]bool) ([]byte, error) {
-	logrus.Debug("Desired agent image:", agentImage)
-	logrus.Debug("Desired auth image:", authImage)
+	logrus.Tracef("clusterDeploy: getYAML: Desired agent image is [%s] for cluster [%s]", agentImage, cluster.Name)
+	logrus.Tracef("clusterDeploy: getYAML: Desired auth image is [%s] for cluster [%s]", authImage, cluster.Name)
+	logrus.Tracef("clusterDeploy: getYAML: Desired features are [%v] for cluster [%s]", features, cluster.Name)
 
 	token, err := cd.systemAccountManager.GetOrCreateSystemClusterToken(cluster.Name)
 	if err != nil {
@@ -414,8 +435,21 @@ func getAgentImages(name string) (string, string) {
 }
 
 func clearAgentImages(name string) {
+	logrus.Tracef("clusterDeploy: clearAgentImages called for [%s]", name)
 	agentImagesMutex.Lock()
 	defer agentImagesMutex.Unlock()
 	delete(agentImages[nodeImage], name)
 	delete(agentImages[clusterImage], name)
+}
+
+func formatKubectlApplyOutput(log string) string {
+	// Strip newlines to compact output
+	log = strings.Replace(log, "\n", " ", -1)
+	// Strip token from output
+	tokenRegex := regexp.MustCompile(`^.*?\"token\":\"(.*?)\"`)
+	token := tokenRegex.FindStringSubmatch(log)
+	if len(token) == 2 {
+		log = strings.Replace(log, token[1], "REDACTED", 1)
+	}
+	return log
 }
