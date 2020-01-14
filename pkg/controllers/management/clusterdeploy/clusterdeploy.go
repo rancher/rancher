@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -253,7 +254,13 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 			output, err = kubectl.Delete([]byte(systemtemplate.AuthDaemonSet), kubeConfig)
 		}
 		if err != nil {
-			return cluster, errors.WithMessage(types.NewErrors(err, errors.New(string(output))), "kubectl delete failed")
+			logrus.Debugf("Output from kubectl delete kube-api-auth DaemonSet, output: %s, err: %v", string(output), err)
+			// Ignore if the resource does not exist and it returns 'daemonsets.apps "kube-api-auth" not found'
+			dsNotFoundError := "daemonsets.apps \"kube-api-auth\" not found"
+			if !strings.Contains(string(output), dsNotFoundError) {
+				return cluster, errors.WithMessage(types.NewErrors(err, errors.New(string(output))), "kubectl delete failed")
+			}
+			logrus.Debugf("Ignored '%s' error during delete kube-api-auth DaemonSet", dsNotFoundError)
 		}
 		v3.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		return cluster, nil
