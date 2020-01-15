@@ -1,7 +1,6 @@
 import os
 import pytest
 from .common import *  # NOQA
-from .test_bkp_restore import wait_for_backup_to_active
 from .test_rbac import create_user
 from rancher import ApiError
 import requests

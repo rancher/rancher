@@ -10,6 +10,7 @@ import ast
 import paramiko
 import rancher
 import pytest
+from urllib.parse import urlparse
 from rancher import ApiError
 from lib.aws import AmazonWebServices
 from copy import deepcopy
@@ -1837,3 +1838,156 @@ def generate_template_global_role(name, new_user_default=False, template=None):
         name = random_name()
     template["name"] = name
     return template
+
+
+def wait_for_backup_to_active(cluster, backupname,
+                              timeout=DEFAULT_TIMEOUT):
+    start = time.time()
+    etcdbackups = cluster.etcdBackups(name=backupname)
+    assert len(etcdbackups) == 1
+    etcdbackupdata = etcdbackups['data']
+    etcdbackupstate = etcdbackupdata[0]['state']
+    while etcdbackupstate != "active":
+        if time.time() - start > timeout:
+            raise AssertionError(
+                "Timed out waiting for state to get to active")
+        time.sleep(.5)
+        etcdbackups = cluster.etcdBackups(name=backupname)
+        assert len(etcdbackups) == 1
+        etcdbackupdata = etcdbackups['data']
+        etcdbackupstate = etcdbackupdata[0]['state']
+    print("BACKUP STATE")
+    print(etcdbackupstate)
+    return etcdbackupstate
+
+
+def wait_for_backup_to_delete(cluster, backupname,
+                              timeout=DEFAULT_TIMEOUT):
+    start = time.time()
+    etcdbackups = cluster.etcdBackups(name=backupname)
+    while len(etcdbackups) == 1:
+        if time.time() - start > timeout:
+            raise AssertionError(
+                "Timed out waiting for backup to be deleted")
+        time.sleep(.5)
+        etcdbackups = cluster.etcdBackups(name=backupname)
+
+
+def validate_backup_create(namespace, backup_info, backup_mode=None):
+    p_client = namespace["p_client"]
+    ns = namespace["ns"]
+    cluster = namespace["cluster"]
+    name = random_test_name("default")
+
+    if not hasattr(cluster, 'rancherKubernetesEngineConfig'):
+        assert False, "Cluster is not of type RKE"
+
+    con = [{"name": "test1",
+            "image": TEST_IMAGE}]
+    backup_info["workload"] = p_client.create_workload(name=name,
+                                                       containers=con,
+                                                       namespaceId=ns.id,
+                                                       daemonSetConfig={})
+    validate_workload(p_client, backup_info["workload"], "daemonSet", ns.name,
+                      len(get_schedulable_nodes(cluster)))
+    host = "test" + str(random_int(10000, 99999)) + ".com"
+    namespace["host"] = host
+    path = "/name.html"
+    rule = {"host": host,
+            "paths": [{"workloadIds": [backup_info["workload"].id],
+                       "targetPort": "80"}]}
+    p_client.create_ingress(name=name,
+                            namespaceId=ns.id,
+                            rules=[rule])
+    validate_ingress(p_client, cluster, [backup_info["workload"]], host, path)
+
+    # Perform Backup
+    backup = cluster.backupEtcd()
+    backup_info["backupname"] = backup['metadata']['name']
+    wait_for_backup_to_active(cluster, backup_info["backupname"])
+
+    # Get all the backup info
+    etcdbackups = cluster.etcdBackups(name=backup_info["backupname"])
+    backup_info["etcdbackupdata"] = etcdbackups['data']
+    backup_info["backup_id"] = backup_info["etcdbackupdata"][0]['id']
+
+    if backup_mode == "s3":
+        backupfileurl = backup_info["etcdbackupdata"][0]['filename']
+        # Check the backup filename exists in S3
+        parseurl = urlparse(backupfileurl)
+        backup_info["backupfilename"] = os.path.basename(parseurl.path)
+        backup_found = AmazonWebServices().s3_backup_check(
+            backup_info["backupfilename"])
+        assert backup_found, "the backup was not found in the S3 bucket"
+    elif backup_mode == 'filesystem':
+        for node in namespace['nodes']:
+            if 'etcd' not in node.roles:
+                continue
+            get_filesystem_snapshots = 'ls /opt/rke/etcd-snapshots'
+            response = node.execute_command(get_filesystem_snapshots)[0]
+            assert backup_info["etcdbackupdata"][0]['filename'] in response,\
+                "The filename doesn't match any of the files locally"
+    return namespace, backup_info
+
+
+def validate_backup_restore(namespace, backup_info):
+    p_client = namespace["p_client"]
+    ns = namespace["ns"]
+    client = get_user_client()
+    cluster = namespace["cluster"]
+    name = random_test_name("default")
+
+    host = namespace["host"]
+    path = "/name.html"
+    con = [{"name": "test1",
+            "image": TEST_IMAGE}]
+
+    # Create workload after backup
+    testworkload = p_client.create_workload(name=name,
+                                            containers=con,
+                                            namespaceId=ns.id)
+
+    validate_workload(p_client, testworkload, "deployment", ns.name)
+
+    # Perform Restore
+    cluster.restoreFromEtcdBackup(etcdBackupId=backup_info["backup_id"])
+    # After restore, validate cluster
+    validate_cluster(client, cluster, intermediate_state="updating",
+                     check_intermediate_state=True,
+                     skipIngresscheck=False)
+
+    # Verify the ingress created before taking the snapshot
+    validate_ingress(p_client, cluster, [backup_info["workload"]], host, path)
+
+    # Verify the workload created after getting a snapshot does not exist
+    # after restore
+    workload_list = p_client.list_workload(uuid=testworkload.uuid).data
+    print(len(workload_list))
+    assert len(workload_list) == 0, "workload shouldn't exist after restore"
+    return namespace, backup_info
+
+
+def validate_backup_delete(namespace, backup_info, backup_mode=None):
+    client = get_user_client()
+    cluster = namespace["cluster"]
+    client.delete(
+        cluster.etcdBackups(name=backup_info["backupname"])['data'][0]
+    )
+    wait_for_backup_to_delete(cluster, backup_info["backupname"])
+    assert len(cluster.etcdBackups(name=backup_info["backupname"])) == 0, \
+            "backup shouldn't be listed in the Cluster backups"
+    if backup_mode == "s3":
+        # Check the backup reference is deleted in Rancher and S3
+        backup_found = AmazonWebServices().s3_backup_check(
+            backup_info["backupfilename"])
+        assert_message = "The backup should't exist in the S3 bucket"
+        assert backup_found is False, assert_message
+    elif backup_mode == 'filesystem':
+        for node in namespace['nodes']:
+            if 'etcd' not in node.roles:
+                continue
+            get_filesystem_snapshots = 'ls /opt/rke/etcd-snapshots'
+            response = node.execute_command(get_filesystem_snapshots)[0]
+            filename = backup_info["etcdbackupdata"][0]['filename']
+            assert filename not in response, \
+                "The file still exist in the filesystem"
