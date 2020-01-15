@@ -21,7 +21,11 @@ const (
 
 func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	if err := apiContext.AccessControl.CanDo(mgmtv3.ClusterScanGroupVersionKind.Group, mgmtv3.ClusterScanResource.Name, "read", apiContext, resource.Values, apiContext.Schema); err == nil {
-		status := resource.Values["status"].(map[string]interface{})
+		s, ok := resource.Values["status"]
+		if !ok {
+			return
+		}
+		status := convert.ToMapInterface(s)
 		failed := false
 		completed := false
 		for _, cond := range convert.ToMapSlice(status["conditions"]) {
@@ -32,12 +36,12 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 				failed = true
 			}
 		}
+		if failed {
+			resource.Values["state"] = "error"
+			return
+		}
 		if completed {
-			if !failed {
-				resource.Links["report"] = apiContext.URLBuilder.Link("report", resource)
-			} else {
-				resource.Values["state"] = "error"
-			}
+			resource.Links["report"] = apiContext.URLBuilder.Link("report", resource)
 		}
 	}
 }

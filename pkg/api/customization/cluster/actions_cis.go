@@ -54,6 +54,10 @@ func (a ActionHandler) runCisScan(actionName string, action *types.Action, apiCo
 			fmt.Sprintf("cluster with id %v doesn't exist", apiContext.ID))
 	}
 
+	if cluster.Spec.WindowsPreferedCluster {
+		return httperror.WrapAPIError(err, httperror.InvalidAction,
+			fmt.Sprintf("cannot run scan on a windows cluster"))
+	}
 	if cluster.DeletionTimestamp != nil {
 		return httperror.NewAPIError(httperror.InvalidType,
 			fmt.Sprintf("cluster with id %v is being deleted", apiContext.ID))

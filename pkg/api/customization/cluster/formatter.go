@@ -51,22 +51,28 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 		if resource.Values["state"] == "active" {
 			isActiveCluster = true
 		}
-		canUpdateClusterFn := func(request *types.APIContext, clusterID string) bool {
-			cluster := map[string]interface{}{
-				"id": clusterID,
-			}
-			return request.AccessControl.CanDo(
-				v3.ClusterGroupVersionKind.Group,
-				v3.ClusterResource.Name,
-				"update",
-				request,
-				cluster,
-				resource.Schema) == nil
+		isWindowsCluster := false
+		if resource.Values["windowsPreferedCluster"] == true {
+			isWindowsCluster = true
 		}
-		canUpdateCluster := canUpdateClusterFn(request, resource.ID)
-		logrus.Debugf("user: %v, canUpdateCluster: %v", request.Request.Header.Get("Impersonate-User"), canUpdateCluster)
-		if isActiveCluster && canUpdateCluster {
-			resource.AddAction(request, v3.ClusterActionRunSecurityScan)
+		if isActiveCluster && !isWindowsCluster {
+			canUpdateClusterFn := func(request *types.APIContext, clusterID string) bool {
+				cluster := map[string]interface{}{
+					"id": clusterID,
+				}
+				return request.AccessControl.CanDo(
+					v3.ClusterGroupVersionKind.Group,
+					v3.ClusterResource.Name,
+					"update",
+					request,
+					cluster,
+					resource.Schema) == nil
+			}
+			canUpdateCluster := canUpdateClusterFn(request, resource.ID)
+			logrus.Debugf("isActiveCluster: %v isWindowsCluster: %v user: %v, canUpdateCluster: %v", isActiveCluster, isWindowsCluster, request.Request.Header.Get("Impersonate-User"), canUpdateCluster)
+			if canUpdateCluster {
+				resource.AddAction(request, v3.ClusterActionRunSecurityScan)
+			}
 		}
 	}
 
