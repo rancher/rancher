@@ -769,7 +769,10 @@ def create_and_vaildate_cluster(client, nodes,
 
 
 def random_node_name():
-    return "testauto" + "-" + str(random_int(100000, 999999))
+    if not HOST_NAME or HOST_NAME == "testcustom":
+        return "testauto" + "-" + str(random_int(100000, 999999))
+    else:
+        return HOST_NAME + "-" + str(random_int(100000, 999999))
 
 
 def evaluate_clustername():
