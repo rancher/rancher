@@ -132,7 +132,12 @@ func (ph *projectHandler) doSync(project *mgmtv3.Project, clusterName string) er
 }
 
 func (ph *projectHandler) ensureAppProjectName(appTargetNamespace string, project *mgmtv3.Project) (string, error) {
-	appProjectName, err := utils.EnsureAppProjectName(ph.app.agentNamespaceClient, project.Name, project.Spec.ClusterName, appTargetNamespace)
+	creator, err := ph.app.systemAccountManager.GetProjectSystemUser(project.Name)
+	if err != nil {
+		return "", err
+	}
+
+	appProjectName, err := utils.EnsureAppProjectName(ph.app.agentNamespaceClient, project.Name, project.Spec.ClusterName, appTargetNamespace, creator.Name)
 	if err != nil {
 		return "", err
 	}
