@@ -239,12 +239,11 @@ func (csh *cisScanHandler) deployApp(appInfo *appInfo) error {
 		return err
 	}
 
-	appProjectName, err := utils.EnsureAppProjectName(csh.userCtxNSClient, appDeployProjectID, appInfo.clusterName, v3.DefaultNamespaceForCis)
+	creator, err := csh.systemAccountManager.GetSystemUser(appInfo.clusterName)
 	if err != nil {
 		return err
 	}
-
-	creator, err := csh.systemAccountManager.GetSystemUser(appInfo.clusterName)
+	appProjectName, err := utils.EnsureAppProjectName(csh.userCtxNSClient, appDeployProjectID, appInfo.clusterName, v3.DefaultNamespaceForCis, creator.Name)
 	if err != nil {
 		return err
 	}

@@ -156,7 +156,12 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 		return errors.Wrap(err, "failed to get System Project ID")
 	}
 
-	appProjectName, err := utils.EnsureAppProjectName(app.agentNamespaceClient, appDeployProjectID, cluster.Name, appTargetNamespace)
+	creator, err := app.systemAccountManager.GetSystemUser(cluster.Name)
+	if err != nil {
+		return err
+	}
+
+	appProjectName, err := utils.EnsureAppProjectName(app.agentNamespaceClient, appDeployProjectID, cluster.Name, appTargetNamespace, creator.Name)
 	if err != nil {
 		return errors.Wrap(err, "failed to ensure monitoring project name")
 	}
@@ -184,11 +189,6 @@ func deploySystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) (backErr erro
 	// cannot overwrite mustAppAnswers
 	for mustKey, mustVal := range mustAppAnswers {
 		appAnswers[mustKey] = mustVal
-	}
-
-	creator, err := app.systemAccountManager.GetSystemUser(cluster.Name)
-	if err != nil {
-		return err
 	}
 
 	annotations := map[string]string{
