@@ -675,7 +675,7 @@ data:
   calico_backend: "bird"
 
   # Configure the MTU to use
-{{- if ne .MTU 0}}
+{{- if ne (default 0 .MTU) 0}}
   veth_mtu: "{{.MTU}}"
 {{- else }}
   veth_mtu: "1440"
@@ -1359,7 +1359,7 @@ data:
   calico_backend: "bird"
 
   # Configure the MTU to use
-{{- if ne .MTU 0}}
+{{- if ne (default 0 .MTU) 0}}
   veth_mtu: "{{.MTU}}"
 {{- else }}
   veth_mtu: "1440"
@@ -2098,7 +2098,7 @@ data:
   calico_backend: "bird"
 
   # Configure the MTU to use
-{{- if ne .MTU 0}}
+{{- if ne (default 0 .MTU) 0}}
   veth_mtu: "{{.MTU}}"
 {{- else }}
   veth_mtu: "1440"
@@ -2890,7 +2890,7 @@ data:
   calico_backend: "bird"
 
   # Configure the MTU to use
-{{- if ne .MTU 0}}
+{{- if ne (default 0 .MTU) 0}}
   veth_mtu: "{{.MTU}}"
 {{- else }}
   veth_mtu: "1440"
