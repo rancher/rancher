@@ -968,13 +968,15 @@ def register_host_after_delay(client, cluster, node_role, delay):
         time.sleep(delay)
 
 
-def create_and_validate_custom_host(node_roles):
+def create_and_validate_custom_host(node_roles, random_cluster_name=False):
     aws_nodes = \
         AmazonWebServices().create_multiple_nodes(
             len(node_roles), random_test_name(HOST_NAME))
 
     client = get_user_client()
-    cluster = client.create_cluster(name=evaluate_clustername(),
+    cluster_name = random_name() if random_cluster_name \
+        else evaluate_clustername()
+    cluster = client.create_cluster(name=cluster_name,
                                     driver="rancherKubernetesEngine",
                                     rancherKubernetesEngineConfig=rke_config)
     assert cluster.state == "provisioning"

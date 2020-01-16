@@ -32,8 +32,6 @@ def test_bkp_restore_s3_with_iam(
 
 
 def validate_backup_create_restore_delete(backup_mode):
-    ssh_user = os.environ.get('RANCHER_SSH_USER', "ubuntu")
-    ssh_key_path = ".ssh/jenkins-rke-validation.pem"
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     client = get_user_client()
@@ -122,7 +120,7 @@ def validate_backup_create_restore_delete(backup_mode):
             assert etcdbackupdata[0]['filename'] not in response
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope='function')
 def create_project_client(request):
     client, cluster = get_user_client_and_cluster()
     create_kubeconfig(cluster)
@@ -138,6 +136,7 @@ def create_project_client(request):
     def fin():
         client = get_user_client()
         client.delete(namespace["project"])
+
     request.addfinalizer(fin)
 
 
@@ -145,7 +144,7 @@ def create_project_client(request):
 def create_project_client_ec2(request):
     node_roles = [["controlplane"], ["etcd"],
                   ["worker"], ["worker"], ["worker"]]
-    cluster, aws_nodes = create_and_validate_custom_host(node_roles)
+    cluster, aws_nodes = create_and_validate_custom_host(node_roles, True)
     client = get_user_client()
     p, ns = create_project_and_ns(USER_TOKEN, cluster, "testsecret")
     p_client = get_project_client_for_token(p, USER_TOKEN)
@@ -264,7 +263,6 @@ def node_template_ec2_iam():
         "vpcId": AWS_VPC,
         "zone": AWS_ZONE
     }
-
     node_template = client.create_node_template(
         amazonec2Config=amazonec2Config,
         name=random_name(),
