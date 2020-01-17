@@ -2,10 +2,10 @@ package transform
 
 import (
 	"fmt"
-
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	"golang.org/x/sync/errgroup"
 )
 
 type TransformerFunc func(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, opt *types.QueryOptions) (map[string]interface{}, error)
@@ -77,18 +77,32 @@ func (s *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *ty
 		return data, nil
 	}
 
-	var result []map[string]interface{}
-	for _, item := range data {
-		item, err := s.Transformer(apiContext, schema, item, opt)
-		if err != nil {
-			return nil, err
-		}
+	var eg errgroup.Group
+	result := make([]map[string]interface{}, len(data))
+	for index, item := range data {
+		i, v := index, item
+		eg.Go(func() error {
+			val, err := s.Transformer(apiContext, schema, v, opt)
+			if err != nil {
+				return err
+			}
+			result[i] = val
+			return nil
+		})
+	}
+	err = eg.Wait()
+	if err != nil {
+		return nil, err
+	}
+
+	var resultFiltered []map[string]interface{}
+	for _, item := range result {
 		if item != nil {
-			result = append(result, item)
+			resultFiltered = append(resultFiltered, item)
 		}
 	}
 
-	return result, nil
+	return resultFiltered, nil
 }
 
 func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {

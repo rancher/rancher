@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/parse/builder"
@@ -57,14 +58,26 @@ func (j *EncodingResponseWriter) VersionBody(apiContext *types.APIContext, versi
 	return nil
 }
 func (j *EncodingResponseWriter) writeMapSlice(builder *builder.Builder, apiContext *types.APIContext, input []map[string]interface{}) *types.GenericCollection {
+	var convertWait sync.WaitGroup
+	var convertedList = make([]interface{}, len(input))
+
 	collection := newCollection(apiContext)
-	for _, value := range input {
-		converted := j.convert(builder, apiContext, value)
-		if converted != nil {
-			collection.Data = append(collection.Data, converted)
+	for index, value := range input {
+		convertWait.Add(1)
+		go func(i int, val map[string]interface{}) {
+			converted := j.convert(builder, apiContext, val)
+			if converted != nil {
+				convertedList[i] = j.convert(builder, apiContext, val)
+			}
+			convertWait.Done()
+		}(index, value)
+	}
+	convertWait.Wait()
+	for _, val := range convertedList {
+		if val != nil {
+			collection.Data = append(collection.Data, val)
 		}
 	}
-
 	if apiContext.Schema.CollectionFormatter != nil {
 		apiContext.Schema.CollectionFormatter(apiContext, collection)
 	}
@@ -73,19 +86,32 @@ func (j *EncodingResponseWriter) writeMapSlice(builder *builder.Builder, apiCont
 }
 
 func (j *EncodingResponseWriter) writeInterfaceSlice(builder *builder.Builder, apiContext *types.APIContext, input []interface{}) *types.GenericCollection {
+	var convertWait sync.WaitGroup
+	var convertedList = make([]interface{}, len(input))
+
 	collection := newCollection(apiContext)
-	for _, value := range input {
-		switch v := value.(type) {
-		case map[string]interface{}:
-			converted := j.convert(builder, apiContext, v)
-			if converted != nil {
-				collection.Data = append(collection.Data, converted)
+	for index, value := range input {
+		convertWait.Add(1)
+		go func(i int, val interface{}) {
+			fmt.Println(value)
+			switch v := val.(type) {
+			case map[string]interface{}:
+				converted := j.convert(builder, apiContext, v)
+				if converted != nil {
+					convertedList[i] = j.convert(builder, apiContext, v)
+				}
+			default:
+				convertedList[i] = v
 			}
-		default:
-			collection.Data = append(collection.Data, v)
+			convertWait.Done()
+		}(index, value)
+	}
+	convertWait.Wait()
+	for _, val := range convertedList {
+		if val != nil {
+			collection.Data = append(collection.Data, val)
 		}
 	}
-
 	if apiContext.Schema.CollectionFormatter != nil {
 		apiContext.Schema.CollectionFormatter(apiContext, collection)
 	}
