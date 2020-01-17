@@ -17,7 +17,6 @@ import (
 	rrbacv1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
-
 	v12 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -56,6 +55,7 @@ func newPandCLifecycles(management *config.ManagementContext) (*projectLifecycle
 		crtbLister:           management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
 		crtbClient:           management.Management.ClusterRoleTemplateBindings(""),
 		projectLister:        management.Management.Projects("").Controller().Lister(),
+		projects:             management.Management.Projects(""),
 		roleTemplateLister:   management.Management.RoleTemplates("").Controller().Lister(),
 		systemAccountManager: systemaccount.NewManager(management),
 	}
@@ -221,6 +221,7 @@ type mgr struct {
 	mgmt          *config.ManagementContext
 	nsLister      corev1.NamespaceLister
 	projectLister v3.ProjectLister
+	projects      v3.ProjectInterface
 
 	prtbLister           v3.ProjectRoleTemplateBindingLister
 	crtbLister           v3.ClusterRoleTemplateBindingLister
@@ -244,6 +245,7 @@ func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object
 		if err != nil {
 			return obj, err
 		}
+		// Attempt to use the cache first
 		projects, err := m.projectLister.List(metaAccessor.GetName(), labels.AsSelector())
 		if err != nil {
 			return obj, err
@@ -251,6 +253,16 @@ func (m *mgr) createProject(name string, cond condition.Cond, obj runtime.Object
 		if len(projects) > 0 {
 			return obj, nil
 		}
+
+		// Cache failed, try the API
+		projects2, err := m.projects.ListNamespaced(metaAccessor.GetName(), v1.ListOptions{LabelSelector: labels.String()})
+		if err != nil {
+			return obj, err
+		}
+		if len(projects2.Items) > 0 {
+			return obj, nil
+		}
+
 		creatorID, ok := metaAccessor.GetAnnotations()[creatorIDAnn]
 		if !ok {
 			logrus.Warnf("Cluster %v has no creatorId annotation. Cannot create %s project", metaAccessor.GetName(), name)
