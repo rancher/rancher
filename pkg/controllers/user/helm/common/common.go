@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -27,7 +28,8 @@ const (
 	base            = 32768
 	end             = 61000
 	tillerName      = "rancher-tiller"
-	helmName        = "rancher-helm"
+	HelmV2          = "rancher-helm"
+	HelmV3          = "helm_v3"
 	forceUpgradeStr = "--force"
 )
 
@@ -44,6 +46,21 @@ type HelmPath struct {
 	AppDirFull string
 	// /<app-sub>
 	AppDirInJail string
+	// /opt/jail/<app-name>/kustomize.sh
+	KustomizeFull string
+	// /kustomize.sh
+	KustomizeInJail string
+}
+
+//Labels that need added for kustomization
+type Label struct {
+	AppLabel string `json:"io.cattle.field/appId"`
+}
+
+//Marshal kustomization settings into YAML
+type Kustomization struct {
+	CommonLabel Label    `json:"commonLabels"`
+	Resrouces   []string `json:"resources"`
 }
 
 func ParseExternalID(externalID string) (string, string, error) {
@@ -125,7 +142,17 @@ func InstallCharts(tempDirs *HelmPath, port string, obj *v3.App) error {
 		return err
 	}
 	commands := make([]string, 0)
-	commands = append([]string{"upgrade", "--install", "--namespace", obj.Spec.TargetNamespace, obj.Name}, timeoutArgs...)
+	if IsHelm3(obj.Status.HelmVersion) {
+		err = createKustomizeFiles(tempDirs, obj.Name)
+		if err != nil {
+			return err
+		}
+		logrus.Infof("Installing chart using helm version: %s", HelmV3)
+		commands = append([]string{"upgrade", "--install", obj.Name, "--namespace", obj.Spec.TargetNamespace, "--kubeconfig", tempDirs.KubeConfigInJail, "--post-renderer", tempDirs.KustomizeInJail}, timeoutArgs...)
+	} else {
+		logrus.Infof("Installing chart using helm version: %s", HelmV2)
+		commands = append([]string{"upgrade", "--install", "--namespace", obj.Spec.TargetNamespace, obj.Name}, timeoutArgs...)
+	}
 	commands = append(commands, setValues...)
 	commands = append(commands, tempDirs.AppDirInJail)
 
@@ -134,10 +161,15 @@ func InstallCharts(tempDirs *HelmPath, port string, obj *v3.App) error {
 		// don't leave force recreate on the object
 		v3.AppConditionForceUpgrade.True(obj)
 	}
+	var cmd *exec.Cmd
 	// switch userTriggeredAction back
 	v3.AppConditionUserTriggeredAction.Unknown(obj)
-	cmd := exec.Command(helmName, commands...)
-	cmd.Env = []string{fmt.Sprintf("%s=%s", "HELM_HOST", "127.0.0.1:"+port)}
+	if IsHelm3(obj.Status.HelmVersion) {
+		cmd = exec.Command(HelmV3, commands...)
+	} else {
+		cmd = exec.Command(HelmV2, commands...)
+	}
+	cmd.Env = []string{fmt.Sprintf("%s=%s", "HELM_HOST", "127.0.0.1:"+port), fmt.Sprintf("%s=%s", "CATTLE_KUSTOMIZE_YAML", tempDirs.InJailPath)}
 	stderrBuf := &bytes.Buffer{}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = stderrBuf
@@ -169,8 +201,11 @@ func getTimeoutArgs(app *v3.App) []string {
 	if app.Spec.Wait {
 		timeoutArgs = append(timeoutArgs, "--wait")
 	}
-	timeoutArgs = append(timeoutArgs, "--timeout", strconv.Itoa(app.Spec.Timeout))
-
+	if app.Status.HelmVersion == HelmV3 {
+		timeoutArgs = append(timeoutArgs, "--timeout", fmt.Sprintf("%ss", strconv.Itoa(app.Spec.Timeout)))
+	} else {
+		timeoutArgs = append(timeoutArgs, "--timeout", strconv.Itoa(app.Spec.Timeout))
+	}
 	return timeoutArgs
 }
 
@@ -207,7 +242,14 @@ func GenerateAnswerSetValues(app *v3.App, tempDir *HelmPath, extraArgs map[strin
 }
 
 func DeleteCharts(tempDirs *HelmPath, port string, obj *v3.App) error {
-	cmd := exec.Command(helmName, "delete", "--purge", obj.Name)
+	var cmd *exec.Cmd
+	if IsHelm3(obj.Status.HelmVersion) {
+		logrus.Infof("Deleting chart using helm version: %s", HelmV3)
+		cmd = exec.Command(HelmV3, "uninstall", obj.Name, "--kubeconfig", tempDirs.KubeConfigInJail, "--namespace", obj.Spec.TargetNamespace)
+	} else {
+		logrus.Infof("Deleting chart using helm version: %s", HelmV2)
+		cmd = exec.Command(HelmV2, "delete", "--purge", obj.Name)
+	}
 	cmd.Env = []string{fmt.Sprintf("%s=%s", "HELM_HOST", "127.0.0.1:"+port)}
 	cmd, err := JailCommand(cmd, tempDirs.FullPath)
 	if err != nil {
@@ -234,6 +276,8 @@ func JailCommand(cmd *exec.Cmd, jailPath string) (*exec.Cmd, error) {
 	cmd.SysProcAttr.Credential = cred
 	cmd.SysProcAttr.Chroot = jailPath
 	cmd.Env = jailer.WhitelistEnvvars(cmd.Env)
+	cmd.Env = append(cmd.Env, "PWD=/")
+	cmd.Dir = "/"
 	return cmd, nil
 }
 
@@ -248,4 +292,44 @@ func escapeCommas(value string) string {
 		return value
 	}
 	return strings.Replace(value, ",", "\\,", -1)
+}
+
+// generates the kustomization yaml that is used by the helm 3 post rendered to
+// add the app labels needed to track the workloads with the app deployment
+func createKustomizeFiles(tempDirs *HelmPath, labelValue string) error {
+	var resources []string
+	resources = append(resources, "all.yaml")
+	k := Kustomization{Label{labelValue}, resources}
+	y, err := yaml.Marshal(k)
+	if err != nil {
+		return err
+	}
+	kpath := filepath.Join(tempDirs.FullPath, "/kustomization.yaml")
+	err = ioutil.WriteFile(kpath, y, 0644)
+	if err != nil {
+		return err
+	}
+	logrus.Debugf("successfully created kustomization.yaml in %s", kpath)
+
+	// set file link to ensure kustomize.sh works in dev move without having to copy
+	// the file to the "injail" location
+	if os.Getenv("CATTLE_DEV_MODE") != "" {
+		kpath = filepath.Join(tempDirs.InJailPath, "/kustomize.sh")
+		err = os.Link("./package/kustomize.sh", kpath)
+		if err != nil {
+			err = os.Link(filepath.Join(os.Getenv("DAPPER_SOURCE"), "package/kustomize.sh"), kpath)
+			if err != nil {
+				return err
+			}
+		}
+		logrus.Debugf("successfully linked kustomize.sh to %s", kpath)
+	}
+	return nil
+}
+
+func IsHelm3(helmName string) bool {
+	if helmName == HelmV3 {
+		return true
+	}
+	return false
 }

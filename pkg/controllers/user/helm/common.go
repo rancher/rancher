@@ -21,7 +21,6 @@ import (
 )
 
 const (
-	helmName    = "rancher-helm"
 	appLabel    = "io.cattle.field/appId"
 	failedLabel = "io.cattle.field/failed-revision"
 )
@@ -143,9 +142,19 @@ func (l *Lifecycle) generateTemplates(obj *v3.App) (string, string, *common.Helm
 		return "", "", nil, err
 	}
 
-	commands := append([]string{"template", appDir, "--name", obj.Name, "--namespace", obj.Spec.TargetNamespace}, setValues...)
-
-	cmd := exec.Command(helmName, commands...)
+	var commands []string
+	var cmd *exec.Cmd
+	if common.IsHelm3(obj.Status.HelmVersion) {
+		err = l.writeKubeConfig(obj, tempDir.KubeConfigFull, false)
+		if err != nil {
+			return "", "", nil, err
+		}
+		commands = append([]string{"template", obj.Name, appDir, "--namespace", obj.Spec.TargetNamespace, "--kubeconfig", tempDir.KubeConfigInJail}, setValues...)
+		cmd = exec.Command(common.HelmV3, commands...)
+	} else {
+		commands = append([]string{"template", appDir, "--name", obj.Name, "--namespace", obj.Spec.TargetNamespace}, setValues...)
+		cmd = exec.Command(common.HelmV2, commands...)
+	}
 	sbOut := &bytes.Buffer{}
 	sbErr := &bytes.Buffer{}
 	cmd.Stdout = sbOut
@@ -154,7 +163,6 @@ func (l *Lifecycle) generateTemplates(obj *v3.App) (string, string, *common.Helm
 	if err != nil {
 		return "", "", nil, err
 	}
-
 	if err := cmd.Start(); err != nil {
 		return "", "", nil, errors.Wrapf(err, "start helm template failed. %s", sbErr.String())
 	}
@@ -163,8 +171,14 @@ func (l *Lifecycle) generateTemplates(obj *v3.App) (string, string, *common.Helm
 	}
 
 	// notes.txt
-	commands = append([]string{"template", appDir, "--name", obj.Name, "--namespace", obj.Spec.TargetNamespace, "--notes"}, setValues...)
-	cmd = exec.Command(helmName, commands...)
+	// do not log --dry-run for helm 3 as it can contain sensitive information
+	if common.IsHelm3(obj.Status.HelmVersion) {
+		commands = append([]string{"upgrade", "--install", obj.Name, appDir, "--dry-run", "--namespace", obj.Spec.TargetNamespace, "--kubeconfig", tempDir.KubeConfigInJail}, setValues...)
+		cmd = exec.Command(common.HelmV3, commands...)
+	} else {
+		commands = append([]string{"template", appDir, "--name", obj.Name, "--namespace", obj.Spec.TargetNamespace, "--notes"}, setValues...)
+		cmd = exec.Command(common.HelmV2, commands...)
+	}
 	noteOut := &bytes.Buffer{}
 	sbErr = &bytes.Buffer{}
 	cmd.Stdout = noteOut
@@ -174,13 +188,21 @@ func (l *Lifecycle) generateTemplates(obj *v3.App) (string, string, *common.Helm
 		return "", "", nil, err
 	}
 	if err := cmd.Start(); err != nil {
-		return "", "", nil, errors.Wrapf(err, "start helm template --notes failed. %s", sbErr.String())
+		return "", "", nil, errors.Wrapf(err, "start helm template rendering notes failed. %s", sbErr.String())
 	}
 	if err := cmd.Wait(); err != nil {
-		return "", "", nil, errors.Wrapf(err, "wait helm template --notes failed. %s", sbErr.String())
+		return "", "", nil, errors.Wrapf(err, "wait helm template rendering notes failed. %s", sbErr.String())
 	}
 	template := sbOut.String()
 	notes := noteOut.String()
+	if common.IsHelm3(obj.Status.HelmVersion) {
+		splitNotes := strings.SplitAfter(notes, "NOTES:")
+		if len(splitNotes) > 1 {
+			notes = splitNotes[1]
+		} else {
+			notes = ""
+		}
+	}
 	return template, notes, tempDir, nil
 }
 
@@ -195,6 +217,8 @@ func createTempDir(obj *v3.App) (*common.HelmPath, error) {
 			InJailPath:       dir,
 			KubeConfigFull:   filepath.Join(dir, ".kubeconfig"),
 			KubeConfigInJail: filepath.Join(dir, ".kubeconfig"),
+			KustomizeFull:    filepath.Join(dir, "kustomize.sh"),
+			KustomizeInJail:  filepath.Join(dir, "kustomize.sh"),
 		}, nil
 	}
 
@@ -210,6 +234,8 @@ func createTempDir(obj *v3.App) (*common.HelmPath, error) {
 		InJailPath:       "/",
 		KubeConfigFull:   filepath.Join(jailer.BaseJailPath, jailDir, ".kubeconfig"),
 		KubeConfigInJail: "/.kubeconfig",
+		KustomizeFull:    filepath.Join(jailer.BaseJailPath, jailDir, "kustomize.sh"),
+		KustomizeInJail:  "/kustomize.sh",
 	}
 
 	return paths, nil

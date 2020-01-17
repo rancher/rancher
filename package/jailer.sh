@@ -17,6 +17,7 @@ mkdir -p /opt/jail/$NAME/management-state/node/nodes
 mkdir -p /opt/jail/$NAME/var/lib/rancher/management-state/bin
 mkdir -p /opt/jail/$NAME/management-state/bin
 mkdir -p /opt/jail/$NAME/tmp
+mkdir -p /opt/jail/$NAME/bin
 
 # Copy over required files to the jail
 if [[ -d /lib64 ]]; then
@@ -55,14 +56,32 @@ cp -r -l /opt/drivers/management-state/bin /opt/jail/$NAME/var/lib/rancher/manag
 # Hard link rancher-machine into the jail
 cp -l /usr/bin/rancher-machine /opt/jail/$NAME/usr/bin
 
-# Hard link helm into the jail
+# Hard link helm_2 into the jail
 cp -l /usr/bin/rancher-helm /opt/jail/$NAME/usr/bin
+
+# Hard link helm_3 into the jail
+cp -l /usr/bin/helm_v3 /opt/jail/$NAME/usr/bin
 
 # Hard link tiller into the jail
 cp -l /usr/bin/rancher-tiller /opt/jail/$NAME/usr/bin
 
+# Hard link kustomize into the jail
+cp -l /usr/bin/kustomize /opt/jail/$NAME/usr/bin
+
+# Hard link custom kustomize script into jail
+cp -l /usr/bin/kustomize.sh /opt/jail/$NAME
+
 # Hard link ssh into the jail
 cp -l /usr/bin/ssh /opt/jail/$NAME/usr/bin
+
+# Hard link cat into the jail
+cp -l /bin/cat /opt/jail/$NAME/bin/
+
+# Hard link bash into the jail
+cp -l /bin/bash /opt/jail/$NAME/bin/
+
+# Hard link rm into the jail
+cp -l /bin/rm /opt/jail/$NAME/bin/
 
 cd /dev
 # tar copy /dev excluding mqueue and shm

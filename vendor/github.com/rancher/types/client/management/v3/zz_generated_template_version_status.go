@@ -1,8 +1,10 @@
 package client
 
 const (
-	TemplateVersionStatusType = "templateVersionStatus"
+	TemplateVersionStatusType             = "templateVersionStatus"
+	TemplateVersionStatusFieldHelmVersion = "helmVersion"
 )
 
 type TemplateVersionStatus struct {
+	HelmVersion string `json:"helmVersion,omitempty" yaml:"helmVersion,omitempty"`
 }
