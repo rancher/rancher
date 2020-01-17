@@ -51,6 +51,7 @@ This repo is a meta-repo used for packaging and contains the majority of rancher
 * https://github.com/rancher/types
 * https://github.com/rancher/norman
 * https://github.com/rancher/kontainer-engine
+* https://github.com/rancher/machine
 * https://github.com/rancher/rke
 * https://github.com/rancher/ui
 
