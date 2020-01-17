@@ -261,7 +261,7 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 		},
 		Rules: rules,
 	})
-	if err != nil {
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return roleName, errors.Wrapf(err, "couldn't create role %v", roleName)
 	}
 
