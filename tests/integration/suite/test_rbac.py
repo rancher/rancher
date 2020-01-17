@@ -554,7 +554,7 @@ def test_member_can_perform_app_action(admin_mc, admin_pc, remove_resource,
     app = client.create_app(
         name="test-" + random_str(),
         externalId="catalog://?catalog=library&template"
-                   "=mysql&version=0.3.7&"
+                   "=mysql&version=1.3.1&"
                    "namespace=cattle-global-data",
         targetNamespace=ns.name,
         projectId=project.id
@@ -584,8 +584,8 @@ def test_member_can_perform_app_action(admin_mc, admin_pc, remove_resource,
     def _app_revisions_exist():
         a = admin_pc.client.reload(app)
         return len(a.revision().data) > 0
-
-    wait_for(_app_revisions_exist, fail_handler=lambda: 'no revisions exist')
+    wait_for(_app_revisions_exist, timeout=60,
+             fail_handler=lambda: 'no revisions exist')
     proj_user_client = user_project_client(user_mc, project)
     app = proj_user_client.reload(app)
     revID = app.revision().data[0]['id']

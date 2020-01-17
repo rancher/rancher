@@ -52,6 +52,7 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 		CatalogLister:         user.Management.Management.Catalogs("").Controller().Lister(),
 		ClusterCatalogLister:  user.Management.Management.ClusterCatalogs("").Controller().Lister(),
 		ProjectCatalogLister:  user.Management.Management.ProjectCatalogs("").Controller().Lister(),
+		TemplateVersionLister: user.Management.Management.CatalogTemplateVersions("").Controller().Lister(),
 		ClusterName:           user.ClusterName,
 		systemTokens:          user.Management.SystemTokens,
 		AppRevisionGetter:     user.Management.Project,
@@ -76,6 +77,7 @@ type Lifecycle struct {
 	CatalogLister         mgmtv3.CatalogLister
 	ClusterCatalogLister  mgmtv3.ClusterCatalogLister
 	ProjectCatalogLister  mgmtv3.ProjectCatalogLister
+	TemplateVersionLister mgmtv3.CatalogTemplateVersionLister
 	K8sClient             kubernetes.Interface
 	ClusterName           string
 	AppRevisionGetter     v3.AppRevisionsGetter
@@ -88,6 +90,14 @@ type Lifecycle struct {
 func (l *Lifecycle) Create(obj *v3.App) (runtime.Object, error) {
 	v3.AppConditionMigrated.True(obj)
 	v3.AppConditionUserTriggeredAction.Unknown(obj)
+	if obj.Spec.ExternalID != "" {
+		helmVersion, err := l.getHelmVersion(obj)
+		if err != nil {
+			return nil, err
+		}
+		obj.Status.HelmVersion = helmVersion
+	}
+
 	return obj, nil
 }
 
@@ -395,4 +405,16 @@ func isSame(obj *v3.App, revision *v3.AppRevision) bool {
 	}
 
 	return false
+}
+
+func (l *Lifecycle) getHelmVersion(obj *v3.App) (string, error) {
+	templateVersionID, templateVersionNamespace, err := hCommon.ParseExternalID(obj.Spec.ExternalID)
+	if err != nil {
+		return "", err
+	}
+	templateVersion, err := l.TemplateVersionLister.Get(templateVersionNamespace, templateVersionID)
+	if err != nil {
+		return "", err
+	}
+	return templateVersion.TemplateVersion.Status.HelmVersion, nil
 }

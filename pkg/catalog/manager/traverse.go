@@ -102,6 +102,7 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 		template.Spec.IconFilename = iconFilename
 		template.Spec.FolderName = chart
 		template.Spec.DisplayName = chart
+		template.Status.HelmVersion = catalog.Spec.HelmVersion
 		label := map[string]string{}
 		var versions []v3.TemplateVersionSpec
 		for _, version := range metadata {

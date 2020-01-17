@@ -171,6 +171,7 @@ func (m *Manager) createTemplateVersions(catalogName string, versionsSpec []v3.T
 	for _, spec := range versionsSpec {
 		templateVersion := &v3.CatalogTemplateVersion{}
 		templateVersion.Spec = spec
+		templateVersion.Status = v3.TemplateVersionStatus{HelmVersion: template.Status.HelmVersion}
 		templateVersion.Name = fmt.Sprintf("%s-%v", template.Name, spec.Version)
 		templateVersion.Namespace = template.Namespace
 		templateVersion.Labels = map[string]string{

@@ -9,6 +9,7 @@ replace (
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.3
+	github.com/rancher/types => github.com/brendarearden/types v0.0.0-20200303192431-db66b084c040
 
 	k8s.io/api => k8s.io/api v0.17.2
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.17.2
@@ -87,7 +88,7 @@ require (
 	github.com/rancher/security-scan v0.1.7-0.20200222041501-f7377f127168
 	github.com/rancher/steve v0.0.0-20200302231302-020fd6252623
 	github.com/rancher/system-upgrade-controller v0.3.1
-	github.com/rancher/types v0.0.0-20200304001827-068a357fa053
+	github.com/rancher/types v0.0.0-20200303162837-300a04e6f743
 	github.com/rancher/wrangler v0.5.1-0.20200302190048-e60d4be8fc9b
 	github.com/rancher/wrangler-api v0.5.0
 	github.com/robfig/cron v1.1.0

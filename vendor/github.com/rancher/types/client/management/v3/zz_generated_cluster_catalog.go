@@ -14,6 +14,7 @@ const (
 	ClusterCatalogFieldCreated              = "created"
 	ClusterCatalogFieldCreatorID            = "creatorId"
 	ClusterCatalogFieldDescription          = "description"
+	ClusterCatalogFieldHelmVersion          = "helmVersion"
 	ClusterCatalogFieldKind                 = "kind"
 	ClusterCatalogFieldLabels               = "labels"
 	ClusterCatalogFieldLastRefreshTimestamp = "lastRefreshTimestamp"
@@ -40,6 +41,7 @@ type ClusterCatalog struct {
 	Created              string             `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string             `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Description          string             `json:"description,omitempty" yaml:"description,omitempty"`
+	HelmVersion          string             `json:"helmVersion,omitempty" yaml:"helmVersion,omitempty"`
 	Kind                 string             `json:"kind,omitempty" yaml:"kind,omitempty"`
 	Labels               map[string]string  `json:"labels,omitempty" yaml:"labels,omitempty"`
 	LastRefreshTimestamp string             `json:"lastRefreshTimestamp,omitempty" yaml:"lastRefreshTimestamp,omitempty"`
