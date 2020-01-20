@@ -23,6 +23,7 @@ var authConfigTypes = []string{
 	client.ADFSConfigType,
 	client.KeyCloakConfigType,
 	client.OKTAConfigType,
+	client.ShibbolethConfigType,
 	client.GoogleOauthConfigType,
 }
 

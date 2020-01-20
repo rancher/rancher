@@ -32,6 +32,7 @@ var authProviderTypes = []string{
 	v3public.ADFSProviderType,
 	v3public.KeyCloakProviderType,
 	v3public.OKTAProviderType,
+	v3public.ShibbolethProviderType,
 	v3public.GoogleOAuthProviderType,
 }
 

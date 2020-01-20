@@ -54,6 +54,10 @@ func addAuthConfigs(management *config.ManagementContext) error {
 		return err
 	}
 
+	if err := addAuthConfig(saml.ShibbolethName, client.ShibbolethConfigType, false, management); err != nil {
+		return err
+	}
+
 	if err := addAuthConfig(googleoauth.Name, client.GoogleOauthConfigType, false, management); err != nil {
 		return err
 	}

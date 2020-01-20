@@ -170,6 +170,9 @@ func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) erro
 	case OKTAName:
 		root.Get("OktaACS").HandlerFunc(provider.ServeHTTP)
 		root.Get("OktaMetadata").HandlerFunc(provider.ServeHTTP)
+	case ShibbolethName:
+		root.Get("ShibbolethACS").HandlerFunc(provider.ServeHTTP)
+		root.Get("ShibbolethMetadata").HandlerFunc(provider.ServeHTTP)
 	}
 
 	appliedVersion = configToSet.ResourceVersion
@@ -180,6 +183,7 @@ func InitializeSamlServiceProvider(configToSet *v3.SamlConfig, name string) erro
 func AuthHandler() http.Handler {
 	root = mux.NewRouter()
 	root.Use(responsewriter.ContentTypeOptions)
+
 	root.Methods("POST").Path("/v1-saml/ping/saml/acs").Name("PingACS")
 	root.Methods("GET").Path("/v1-saml/ping/saml/metadata").Name("PingMetadata")
 
@@ -191,6 +195,9 @@ func AuthHandler() http.Handler {
 
 	root.Methods("POST").Path("/v1-saml/okta/saml/acs").Name("OktaACS")
 	root.Methods("GET").Path("/v1-saml/okta/saml/metadata").Name("OktaMetadata")
+
+	root.Methods("POST").Path("/v1-saml/shibboleth/saml/acs").Name("ShibbolethACS")
+	root.Methods("GET").Path("/v1-saml/shibboleth/saml/metadata").Name("ShibbolethMetadata")
 
 	return root
 }
