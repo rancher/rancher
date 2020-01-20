@@ -23,6 +23,7 @@ var TypeToFields = map[string][]string{
 	client.ADFSConfigType:            {client.ADFSConfigFieldSpKey},
 	client.KeyCloakConfigType:        {client.KeyCloakConfigFieldSpKey},
 	client.OKTAConfigType:            {client.OKTAConfigFieldSpKey},
+	client.ShibbolethConfigType:      {client.ShibbolethConfigFieldSpKey, client.ShibbolethConfigFieldServiceAccountPassword},
 	client.GoogleOauthConfigType:     {client.GoogleOauthConfigFieldOauthCredential, client.GoogleOauthConfigFieldServiceAccountCredential},
 }
 

@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -23,9 +24,10 @@ import (
 )
 
 const (
-	OpenLdapName = "openldap"
-	FreeIpaName  = "freeipa"
-	ObjectClass  = "objectClass"
+	OpenLdapName   = "openldap"
+	FreeIpaName    = "freeipa"
+	ShibbolethName = "shibboleth"
+	ObjectClass    = "objectClass"
 )
 
 var (
@@ -94,20 +96,22 @@ func (p *ldapProvider) AuthenticateUser(ctx context.Context, input interface{}) 
 	}
 
 	return principal, groupPrincipal, "", err
-
 }
 
+// searchKey can be user PrincipalID e.g. shibboleth_user://username with principalType of group for group search by user
 func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, myToken v3.Token) ([]v3.Principal, error) {
 	var principals []v3.Principal
 	var err error
 
 	config, caPool, err := p.getLDAPConfig()
 	if err != nil {
+		logrus.Warnf("ldap search principals failed to get ldap config: %s\n", err)
 		return principals, nil
 	}
 
-	lConn, err := p.ldapConnection(config, caPool)
+	lConn, err := ldap.Connect(config, caPool)
 	if err != nil {
+		logrus.Warnf("ldap search principals failed to connect to ldap: %s\n", err)
 		return principals, nil
 	}
 	defer lConn.Close()
@@ -139,6 +143,46 @@ func (p *ldapProvider) GetPrincipal(principalID string, token v3.Token) (v3.Prin
 	externalID, scope, err := p.getDNAndScopeFromPrincipalID(principalID)
 	if err != nil {
 		return v3.Principal{}, err
+	}
+
+	if p.samlSearchProvider() {
+		lConn, err := ldap.Connect(config, caPool)
+		if err != nil {
+			return v3.Principal{}, nil
+		}
+		defer lConn.Close()
+
+		if scope == p.userScope {
+			userPrincipals, err := p.searchUser(externalID, config, lConn)
+			if err != nil {
+				return v3.Principal{}, err
+			}
+
+			if len(userPrincipals) != 1 {
+				return v3.Principal{}, fmt.Errorf("get principal for %s returned %d results",
+					externalID, len(userPrincipals))
+			}
+
+			principal := &userPrincipals[0]
+			if p.isThisUserMe(token.UserPrincipal, *principal) {
+				principal.Me = true
+			}
+
+			return *principal, nil
+		}
+
+		if scope == p.groupScope {
+			groupPrincipals, err := p.searchGroup(externalID, config, lConn)
+			if err != nil {
+				return v3.Principal{}, err
+			}
+
+			if len(groupPrincipals) != 1 {
+				return v3.Principal{}, fmt.Errorf("get principal for %s returned %d results",
+					externalID, len(groupPrincipals))
+			}
+			return groupPrincipals[0], nil
+		}
 	}
 
 	principal, err := p.getPrincipal(externalID, scope, config, caPool)
@@ -179,11 +223,8 @@ func (p *ldapProvider) getLDAPConfig() (*v3.LdapConfig, *x509.CertPool, error) {
 		return nil, nil, fmt.Errorf("failed to retrieve %s, cannot read k8s Unstructured data", p.providerName)
 	}
 	storedLdapConfigMap := u.UnstructuredContent()
-
 	storedLdapConfig := &v3.LdapConfig{}
-
 	mapstructure.Decode(storedLdapConfigMap, storedLdapConfig)
-
 	metadataMap, ok := storedLdapConfigMap["metadata"].(map[string]interface{})
 	if !ok {
 		return nil, nil, fmt.Errorf("failed to retrieve %s metadata, cannot read k8s Unstructured data", p.providerName)
@@ -194,7 +235,7 @@ func (p *ldapProvider) getLDAPConfig() (*v3.LdapConfig, *x509.CertPool, error) {
 	storedLdapConfig.ObjectMeta = *objectMeta
 
 	if p.certs != storedLdapConfig.Certificate || p.caPool == nil {
-		pool, err := newCAPool(storedLdapConfig.Certificate)
+		pool, err := ldap.NewCAPool(storedLdapConfig.Certificate)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -212,15 +253,6 @@ func (p *ldapProvider) getLDAPConfig() (*v3.LdapConfig, *x509.CertPool, error) {
 	}
 
 	return storedLdapConfig, p.caPool, nil
-}
-
-func newCAPool(cert string) (*x509.CertPool, error) {
-	pool, err := x509.SystemCertPool()
-	if err != nil {
-		return nil, err
-	}
-	pool.AppendCertsFromPEM([]byte(cert))
-	return pool, nil
 }
 
 func (p *ldapProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
@@ -244,4 +276,12 @@ func (p *ldapProvider) getDNAndScopeFromPrincipalID(principalID string) (string,
 	scope := parts[0]
 	externalID := strings.TrimPrefix(parts[1], "//")
 	return externalID, scope, nil
+}
+
+// if provider only enabled for search by a SAML provider
+func (p *ldapProvider) samlSearchProvider() bool {
+	if p.providerName == ShibbolethName {
+		return true
+	}
+	return false
 }
