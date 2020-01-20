@@ -547,6 +547,15 @@ def get_schedulable_nodes(cluster, client=None, os_type=TEST_OS):
             schedulable_nodes.append(node)
     return schedulable_nodes
 
+def get_etcd_nodes(cluster, client=None):
+    if not client:
+        client = get_user_client()
+    nodes = client.list_node(clusterId=cluster.id).data
+    etcd_nodes = []
+    for node in nodes:
+        if node.etcd:
+            etcd_nodes.append(node)
+    return etcd_nodes
 
 def get_role_nodes(cluster, role, client=None):
     etcd_nodes = []
