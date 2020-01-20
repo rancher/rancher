@@ -145,6 +145,25 @@ func saveImages(targetImages []string) []string {
 	return saveImages
 }
 
+func checkImage(image string) error {
+	// ignore non prefixed images, also in types (image/mirror.go)
+	if strings.HasPrefix(image, "weaveworks") || strings.HasPrefix(image, "registry:") || strings.EqualFold(image, "busybox") {
+		return nil
+	}
+
+	imageNameTag := strings.Split(image, ":")
+	if len(imageNameTag) != 2 {
+		return fmt.Errorf("Can't extract tag from image [%s]", image)
+	}
+	if !strings.HasPrefix(imageNameTag[0], "rancher/") {
+		return fmt.Errorf("Image [%s] does not start with rancher/", image)
+	}
+	if strings.HasSuffix(imageNameTag[0], "-") {
+		return fmt.Errorf("Image [%s] has trailing '-', probably an error in image substitution", image)
+	}
+	return nil
+}
+
 func saveScript(arch string, targetImages []string) error {
 	filename := getScriptFilename(arch, "save")
 	log.Printf("Creating %s\n", filename)
@@ -171,6 +190,11 @@ func imagesText(arch string, targetImages []string) error {
 	save.Chmod(0755)
 
 	for _, image := range saveImages(targetImages) {
+		err := checkImage(image)
+		if err != nil {
+			return err
+		}
+
 		log.Println("Image:", image)
 		fmt.Fprintln(save, image)
 	}
