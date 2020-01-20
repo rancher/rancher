@@ -58,11 +58,14 @@ func (j *EncodingResponseWriter) VersionBody(apiContext *types.APIContext, versi
 	return nil
 }
 func (j *EncodingResponseWriter) writeMapSlice(builder *builder.Builder, apiContext *types.APIContext, input []map[string]interface{}) *types.GenericCollection {
-	var convertWait sync.WaitGroup
-	var convertedList = make([]interface{}, len(input))
+	var (
+		convertWait sync.WaitGroup
+		convertedList = make([]interface{}, len(input))
+	)
 
 	collection := newCollection(apiContext)
 	for index, value := range input {
+		// indexing converted values to maintain order
 		convertWait.Add(1)
 		go func(i int, val map[string]interface{}) {
 			converted := j.convert(builder, apiContext, val)
@@ -73,6 +76,7 @@ func (j *EncodingResponseWriter) writeMapSlice(builder *builder.Builder, apiCont
 		}(index, value)
 	}
 	convertWait.Wait()
+
 	for _, val := range convertedList {
 		if val != nil {
 			collection.Data = append(collection.Data, val)
@@ -107,11 +111,13 @@ func (j *EncodingResponseWriter) writeInterfaceSlice(builder *builder.Builder, a
 		}(index, value)
 	}
 	convertWait.Wait()
+
 	for _, val := range convertedList {
 		if val != nil {
 			collection.Data = append(collection.Data, val)
 		}
 	}
+
 	if apiContext.Schema.CollectionFormatter != nil {
 		apiContext.Schema.CollectionFormatter(apiContext, collection)
 	}

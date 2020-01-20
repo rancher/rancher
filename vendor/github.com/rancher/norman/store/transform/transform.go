@@ -2,6 +2,8 @@ package transform
 
 import (
 	"fmt"
+	"sync"
+
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
@@ -77,16 +79,22 @@ func (s *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *ty
 		return data, nil
 	}
 
-	var eg errgroup.Group
-	result := make([]map[string]interface{}, len(data))
-	for index, item := range data {
-		i, v := index, item
+	var (
+		eg errgroup.Group
+		m sync.Mutex
+		result []map[string]interface{}
+	)
+
+	for _, item := range data {
+		itemCopy := item
 		eg.Go(func() error {
-			val, err := s.Transformer(apiContext, schema, v, opt)
+			val, err := s.Transformer(apiContext, schema, itemCopy, opt)
 			if err != nil {
 				return err
 			}
-			result[i] = val
+			m.Lock()
+			result = append(result, val)
+			m.Unlock()
 			return nil
 		})
 	}
@@ -95,14 +103,7 @@ func (s *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *ty
 		return nil, err
 	}
 
-	var resultFiltered []map[string]interface{}
-	for _, item := range result {
-		if item != nil {
-			resultFiltered = append(resultFiltered, item)
-		}
-	}
-
-	return resultFiltered, nil
+	return result, nil
 }
 
 func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
