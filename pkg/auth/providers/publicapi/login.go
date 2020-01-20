@@ -144,6 +144,9 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	case client.OKTAProviderType:
 		input = &v3public.SamlLoginInput{}
 		providerName = saml.OKTAName
+	case client.ShibbolethProviderType:
+		input = &v3public.SamlLoginInput{}
+		providerName = saml.ShibbolethName
 	case client.GoogleOAuthProviderType:
 		input = &v3public.GoogleOauthLogin{}
 		providerName = googleoauth.Name
@@ -160,8 +163,9 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	// Authenticate User
 	// SAML's login flow is different from the other providers. Unlike the other providers, it gets the logged in user's data via a POST from
 	// the identity provider on a separate endpoint specifically for that.
+
 	if providerName == saml.PingName || providerName == saml.ADFSName || providerName == saml.KeyCloakName ||
-		providerName == saml.OKTAName {
+		providerName == saml.OKTAName || providerName == saml.ShibbolethName {
 		err = saml.PerformSamlLogin(providerName, request, input)
 		return v3.Token{}, "saml", err
 	}

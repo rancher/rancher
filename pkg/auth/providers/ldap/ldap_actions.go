@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
@@ -70,7 +71,7 @@ func (p *ldapProvider) testAndApply(actionName string, action *types.Action, req
 		config.ServiceAccountPassword = value
 	}
 
-	caPool, err := newCAPool(config.Certificate)
+	caPool, err := ldap.NewCAPool(config.Certificate)
 	if err != nil {
 		return err
 	}

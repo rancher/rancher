@@ -116,6 +116,13 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	providersByType[client.OKTAConfigType] = p
 	providersByType[publicclient.OKTAProviderType] = p
 
+	p = saml.Configure(ctx, mgmt, userMGR, tokenMGR, saml.ShibbolethName)
+	ProviderNames[saml.ShibbolethName] = true
+	UnrefreshableProviders[saml.ShibbolethName] = false
+	providers[saml.ShibbolethName] = p
+	providersByType[client.ShibbolethConfigType] = p
+	providersByType[publicclient.ShibbolethProviderType] = p
+
 	p = googleoauth.Configure(ctx, mgmt, userMGR, tokenMGR)
 	ProviderNames[googleoauth.Name] = true
 	ProvidersWithSecrets[googleoauth.Name] = true
