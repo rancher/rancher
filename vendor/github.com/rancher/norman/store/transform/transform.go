@@ -80,8 +80,8 @@ func (s *Store) List(apiContext *types.APIContext, schema *types.Schema, opt *ty
 	}
 
 	var (
-		eg errgroup.Group
-		m sync.Mutex
+		eg     errgroup.Group
+		m      sync.Mutex
 		result []map[string]interface{}
 	)
 
