@@ -1549,7 +1549,9 @@ def get_defaut_question_answers(client, externalId):
         return add_question
 
     questions_and_answers = {}
+    print(externalId)
     template_revs = client.list_template_version(externalId=externalId).data
+    print(template_revs)
     assert len(template_revs) == 1
     template_rev = template_revs[0]
     questions = template_rev.questions
