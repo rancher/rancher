@@ -1,0 +1,14 @@
+ssh_key_path: .ssh/$AWS_SSH_KEY_NAME
+nodes:
+  - address: $ip1
+    internal_address: $internalIp1 
+    user: ubuntu
+    role: [etcd, controlplane,worker]
+  - address: $ip2
+    internal_address: $internalIp2
+    user: ubuntu
+    role: [etcd, controlplane,worker]
+  - address: $ip3 
+    internal_address: $internalIp3
+    user: ubuntu
+    role: [etcd, controlplane,worker]

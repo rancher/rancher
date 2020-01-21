@@ -51,7 +51,7 @@ def test_deploy_rancher_server():
         "sudo docker exec rancher-server loglevel --set debug"
     aws_nodes[0].execute_command(RANCHER_SET_DEBUG_CMD)
 
-    token = get_admin_token(RANCHER_SERVER_URL)
+    token = set_url_password_token(RANCHER_SERVER_URL)
     admin_client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
                                   token=token, verify=False)
     AUTH_URL = RANCHER_SERVER_URL + \
@@ -132,27 +132,4 @@ def test_logging_elasticsearch():
     project = projects[0]
     p_client = get_project_client_for_token(project, USER_TOKEN)
     wait_for_app_to_active(p_client, "rancher-logging")
-
-
-def get_admin_token(RANCHER_SERVER_URL):
-    """Returns a ManagementContext for the default global admin user."""
-    CATTLE_AUTH_URL = \
-        RANCHER_SERVER_URL + "/v3-public/localproviders/local?action=login"
-    r = requests.post(CATTLE_AUTH_URL, json={
-        'username': 'admin',
-        'password': 'admin',
-        'responseType': 'json',
-    }, verify=False)
-    print(r.json())
-    token = r.json()['token']
-    print(token)
-    # Change admin password
-    client = rancher.Client(url=RANCHER_SERVER_URL+"/v3",
-                            token=token, verify=False)
-    admin_user = client.list_user(username="admin").data
-    admin_user[0].setpassword(newPassword=USER_PASSWORD)
-
-    # Set server-url settings
-    serverurl = client.list_setting(name="server-url").data
-    client.update(serverurl[0], value=RANCHER_SERVER_URL)
-    return token
+    
