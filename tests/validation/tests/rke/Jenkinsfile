@@ -5,9 +5,9 @@ node {
     checkout scm
 
     stage('Configure and Build') {
-      sh "./tests/rke/scripts/configure.sh"
+      sh "./tests/validation/tests/rke/scripts/configure.sh"
       sh "mkdir -p .ssh && echo \"${AWS_SSH_PEM_KEY}\" > .ssh/${AWS_SSH_KEY_NAME} && chmod 400 .ssh/*"
-      sh "./tests/rke/scripts/build.sh"
+      sh "./tests/validation/tests/rke/scripts/build.sh"
     }
     try {
       stage('Run Validation Tests') {
