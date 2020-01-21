@@ -104,7 +104,8 @@ rke_config_cis = {
                                              "ValidatingAdmissionWebhook,"
                                              "Priority,"
                                              "TaintNodesByCondition,"
-                                             "PersistentVolumeClaimResize",
+                                             "PersistentVolumeClaimResize,"
+                                             "EventRateLimit",
                  "profiling": False,
                  "service-account-lookup": True,
                  "tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_"
