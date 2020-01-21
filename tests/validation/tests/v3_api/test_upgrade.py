@@ -207,6 +207,11 @@ def test_create_and_validate_catalog_app():
     create_and_validate_catalog_app()
 
 
+@pytest.mark.run(order=6)
+def test_create_and_validate_ip_address_pods():
+    create_and_validate_ip_address_pods()
+
+
 # the flag if_upgarde_rancher is false all the time
 # because we do not have this option for the variable RANCHER_UPGRADE_CHECK
 # instead, we will have a new pipeline that calls this function directly
@@ -657,3 +662,10 @@ def validate_catalog_app(app_name, external_id):
         assert wl.state == "active"
         assert wl.workloadLabels.chart == chart, \
             "the chart version is wrong"
+
+
+def create_and_validate_ip_address_pods():
+    get_pods = "get pods --all-namespaces -o wide | grep ' 172.'"
+    pods_result = execute_kubectl_cmd(get_pods, json_out=False, stderr=True)
+    print(pods_result.decode('ascii'))
+    assert pods_result.decode('ascii') is '', "Pods have 172 IP address"

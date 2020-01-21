@@ -14,7 +14,8 @@ rke_config = {"authentication": {"type": "authnConfig", "strategy": "x509"},
 AUTO_DEPLOY_CUSTOM_CLUSTER = ast.literal_eval(
     os.environ.get('RANCHER_AUTO_DEPLOY_CUSTOM_CLUSTER', "True"))
 KEYPAIR_NAME_PREFIX = os.environ.get('RANCHER_KEYPAIR_NAME_PREFIX', "")
-
+RANCHER_CLUSTER_NAME = os.environ.get('RANCHER_CLUSTER_NAME',"")
+RANCHER_ELASTIC_SEARCH_ENDPOINT = os.environ.get('RANCHER_ELASTIC_SEARCH_ENDPOINT',"")
 
 def test_add_custom_host():
     aws_nodes = AmazonWebServices().create_multiple_nodes(
@@ -107,6 +108,30 @@ def test_delete_rancher_server():
     aws_nodes = AmazonWebServices().get_nodes(filters)
     assert len(aws_nodes) == 1
     AmazonWebServices().delete_nodes(aws_nodes)
+
+
+def test_logging_elasticsearch():
+    client = get_user_client()
+    cluster = get_cluster_by_name(client, RANCHER_CLUSTER_NAME)
+    cluster_name = cluster.name
+    cluster_logging = \
+        client.create_cluster_logging(name=random_test_name("elasticsearch"),
+                                      clusterId=cluster.id,
+                                      elasticsearchConfig={
+                                          "dateFormat": "YYYY-MM-DD",
+                                          "sslVerify": False,
+                                          "sslVersion": "TLSv1_2",
+                                          "indexPrefix": cluster_name,
+                                          "endpoint":
+                                              RANCHER_ELASTIC_SEARCH_ENDPOINT
+                                      }
+                                      )
+    projects = client.list_project(name="System",
+                                   clusterId=cluster.id).data
+    assert len(projects) == 1
+    project = projects[0]
+    p_client = get_project_client_for_token(project, USER_TOKEN)
+    wait_for_app_to_active(p_client, "rancher-logging")
 
 
 def get_admin_token(RANCHER_SERVER_URL):
