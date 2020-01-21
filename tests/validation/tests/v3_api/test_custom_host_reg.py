@@ -132,4 +132,3 @@ def test_logging_elasticsearch():
     project = projects[0]
     p_client = get_project_client_for_token(project, USER_TOKEN)
     wait_for_app_to_active(p_client, "rancher-logging")
-    
