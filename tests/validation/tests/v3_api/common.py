@@ -28,6 +28,7 @@ CATTLE_AUTH_URL = \
 ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', "None")
 USER_TOKEN = os.environ.get('USER_TOKEN', "None")
 USER_PASSWORD = os.environ.get('USER_PASSWORD', "None")
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', "None")
 
 kube_fname = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                           "k8s_kube_config")
@@ -414,7 +415,7 @@ def run_command_with_stderr(command, log_out=True):
                                          stderr=subprocess.PIPE)
         returncode = 0
     except subprocess.CalledProcessError as e:
-        output = e.output
+        output = e.stderr
         returncode = e.returncode
 
     if log_out:
@@ -1698,3 +1699,36 @@ def wait_for_catalog_active(client, catalog, timeout=DEFAULT_CATALOG_TIMEOUT):
         assert len(catalog_data) >= 1
         catalog = catalog_data[0]
     return catalog
+
+
+def readDataFile(data_dir, name):
+    fname = os.path.join(data_dir, name)
+    print("File: " + fname)
+    is_file = os.path.isfile(fname)
+    assert is_file
+    with open(fname) as f:
+        return f.read()
+
+
+def set_url_password_token(RANCHER_SERVER_URL):
+    """Returns a ManagementContext for the default global admin user."""
+    CATTLE_AUTH_URL = \
+        RANCHER_SERVER_URL + "/v3-public/localproviders/local?action=login"
+    r = requests.post(CATTLE_AUTH_URL, json={
+        'username': 'admin',
+        'password': 'admin',
+        'responseType': 'json',
+    }, verify=False)
+    print(r.json())
+    token = r.json()['token']
+    print(token)
+    # Change admin password
+    client = rancher.Client(url=RANCHER_SERVER_URL+"/v3",
+                            token=token, verify=False)
+    admin_user = client.list_user(username="admin").data
+    admin_user[0].setpassword(newPassword=ADMIN_PASSWORD)
+
+    # Set server-url settings
+    serverurl = client.list_setting(name="server-url").data
+    client.update(serverurl[0], value=RANCHER_SERVER_URL)
+    return token

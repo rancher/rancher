@@ -14,5 +14,9 @@ RUN wget https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERS
     wget https://github.com/rancher/rke/releases/download/$RKE_VERSION/rke_linux-amd64 && \
     mv rke_linux-amd64 /bin/rke && \
     chmod +x /bin/rke && \
+    wget https://get.helm.sh/helm-v3.0.2-linux-amd64.tar.gz && \
+    tar -x -f helm-v3.0.2-linux-amd64.tar.gz && \
+    mv linux-amd64/helm /bin/helm_v3 && \
+    chmod +x /bin/helm_v3 && \
     cd $WORKSPACE && \
     pip install -r requirements_v3api.txt

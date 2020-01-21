@@ -81,14 +81,3 @@ def create_rke_cluster_config(aws_nodes):
     f.write(rkeconfig)
     f.close()
     return clusterfilepath
-
-
-def readDataFile(data_dir, name):
-
-    fname = os.path.join(data_dir, name)
-    print("File Name is: ")
-    print(fname)
-    is_file = os.path.isfile(fname)
-    assert is_file
-    with open(fname) as f:
-        return f.read()
