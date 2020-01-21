@@ -30,6 +30,22 @@ func NewFormatter(schemas *types.Schemas, managementContext *config.ScaledContex
 	return &clusterFormatter
 }
 
+func canUserUpdateCluster(request *types.APIContext, resource *types.RawResource) bool {
+	if request == nil || resource == nil {
+		return false
+	}
+	cluster := map[string]interface{}{
+		"id": resource.ID,
+	}
+	return request.AccessControl.CanDo(
+		v3.ClusterGroupVersionKind.Group,
+		v3.ClusterResource.Name,
+		"update",
+		request,
+		cluster,
+		resource.Schema) == nil
+}
+
 func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawResource) {
 	if convert.ToBool(resource.Values["internal"]) {
 		delete(resource.Links, "remove")
@@ -47,22 +63,20 @@ func (f *Formatter) Formatter(request *types.APIContext, resource *types.RawReso
 			resource.AddAction(request, v3.ClusterActionBackupEtcd)
 			resource.AddAction(request, v3.ClusterActionRestoreFromEtcdBackup)
 		}
-		canUpdateClusterFn := func(request *types.APIContext, clusterID string) bool {
-			cluster := map[string]interface{}{
-				"id": clusterID,
-			}
-			return request.AccessControl.CanDo(
-				v3.ClusterGroupVersionKind.Group,
-				v3.ClusterResource.Name,
-				"update",
-				request,
-				cluster,
-				resource.Schema) == nil
+		isActiveCluster := false
+		if resource.Values["state"] == "active" {
+			isActiveCluster = true
 		}
-		canUpdateCluster := canUpdateClusterFn(request, resource.ID)
-		logrus.Debugf("user: %v, canUpdateCluster: %v", request.Request.Header.Get("Impersonate-User"), canUpdateCluster)
-		if canUpdateCluster {
-			resource.AddAction(request, v3.ClusterActionRunSecurityScan)
+		isWindowsCluster := false
+		if resource.Values["windowsPreferedCluster"] == true {
+			isWindowsCluster = true
+		}
+		if isActiveCluster && !isWindowsCluster {
+			canUpdateCluster := canUserUpdateCluster(request, resource)
+			logrus.Debugf("isActiveCluster: %v isWindowsCluster: %v user: %v, canUpdateCluster: %v", isActiveCluster, isWindowsCluster, request.Request.Header.Get("Impersonate-User"), canUpdateCluster)
+			if canUpdateCluster {
+				resource.AddAction(request, v3.ClusterActionRunSecurityScan)
+			}
 		}
 	}
 

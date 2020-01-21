@@ -73,6 +73,11 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 	if !v3.ClusterConditionReady.IsTrue(cluster) {
 		return cs, fmt.Errorf("cisScanHandler: Create: cluster %v not ready", cs.ClusterName)
 	}
+	if cluster.Spec.WindowsPreferedCluster {
+		v3.ClusterScanConditionFailed.True(cs)
+		v3.ClusterScanConditionFailed.Message(cs, "cannot run scan on a windows cluster")
+		return cs, nil
+	}
 	if !v3.ClusterScanConditionCreated.IsTrue(cs) {
 		logrus.Infof("cisScanHandler: Create: deploying helm chart")
 
@@ -197,7 +202,9 @@ func (csh *cisScanHandler) Remove(cs *v3.ClusterScan) (runtime.Object, error) {
 
 func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 	logrus.Debugf("cisScanHandler: Updated: %+v", cs)
-	if !v3.ClusterScanConditionCompleted.IsTrue(cs) && !v3.ClusterScanConditionRunCompleted.IsUnknown(cs) {
+	if v3.ClusterScanConditionCreated.IsTrue(cs) &&
+		!v3.ClusterScanConditionCompleted.IsTrue(cs) &&
+		!v3.ClusterScanConditionRunCompleted.IsUnknown(cs) {
 		// Delete the system helm chart
 		appInfo := &appInfo{
 			appName:     cs.Name,
