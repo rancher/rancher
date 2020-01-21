@@ -72,6 +72,19 @@ node {
             }
           }
 
+          stage('Enable logging') {
+            try {
+              if (RANCHER_ELASTIC_SEARCH_ENDPOINT != "") {
+                clusters.each { type, params ->
+                  enableLogging(type)
+                }
+              }
+            } catch(err) {
+              buildFail = true
+              echo "Error: " + err
+            }
+          }
+
           stage('Run Preupgrade') {
             try {
               clusters.each { cluster, param ->
@@ -366,6 +379,35 @@ def runProvision(def cluster, def exportString) {
     collectReports()
     containerCleanup()
   }
+}
+
+def enableLogging(def cluster) {
+  try {
+      def cluster_name = RANCHER_CLUSTER_NAME + "-${cluster}"
+      def reportName = "enable-logging-${cluster}"
+      htmlString = "--html=reports/${reportName}.html"
+      runString = "docker run --name ${containerName} -t --env-file .env " +
+        "${imageName} /bin/bash -c \'" +
+        "export RANCHER_CLUSTER_NAME=${cluster_name} && " +
+        "export CATTLE_TEST_URL=${CATTLE_TEST_URL} && " +
+        "export ADMIN_TOKEN=${ADMIN_TOKEN} && " +
+        "export USER_TOKEN=${USER_TOKEN} && " + 
+        "export RANCHER_ELASTIC_SEARCH_ENDPOINT=${RANCHER_ELASTIC_SEARCH_ENDPOINT} && " +
+        "pytest -v -s -k test_logging_elasticsearch ${testsDir} " +
+        "--junit-xml=reports/${reportName}.xml " +
+        "${htmlString}\'"
+      print("Running: ")
+      print(runString)
+      sh runString
+    } catch (err) {
+      echo "Error: " + err
+      echo "Enable logging failed"
+      currentBuild.result = 'FAILURE'
+      buildFail = true
+    } finally {
+      collectReports()
+      containerCleanup()
+    }
 }
 
 def runPreupgradeTests(def cluster, def validate, def create) {
