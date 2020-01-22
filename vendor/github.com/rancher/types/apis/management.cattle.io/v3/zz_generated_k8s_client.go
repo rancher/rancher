@@ -82,6 +82,8 @@ type Interface interface {
 	RKEK8sSystemImagesGetter
 	RKEK8sServiceOptionsGetter
 	RKEAddonsGetter
+	CisConfigsGetter
+	CisBenchmarkVersionsGetter
 }
 
 type Clients struct {
@@ -149,6 +151,8 @@ type Clients struct {
 	RKEK8sSystemImage                       RKEK8sSystemImageClient
 	RKEK8sServiceOption                     RKEK8sServiceOptionClient
 	RKEAddon                                RKEAddonClient
+	CisConfig                               CisConfigClient
+	CisBenchmarkVersion                     CisBenchmarkVersionClient
 }
 
 type Client struct {
@@ -218,6 +222,8 @@ type Client struct {
 	rkeK8sSystemImageControllers                       map[string]RKEK8sSystemImageController
 	rkeK8sServiceOptionControllers                     map[string]RKEK8sServiceOptionController
 	rkeAddonControllers                                map[string]RKEAddonController
+	cisConfigControllers                               map[string]CisConfigController
+	cisBenchmarkVersionControllers                     map[string]CisBenchmarkVersionController
 }
 
 func Factory(ctx context.Context, config rest.Config) (context.Context, controller.Starter, error) {
@@ -439,6 +445,12 @@ func NewClientsFromInterface(iface Interface) *Clients {
 		RKEAddon: &rkeAddonClient2{
 			iface: iface.RKEAddons(""),
 		},
+		CisConfig: &cisConfigClient2{
+			iface: iface.CisConfigs(""),
+		},
+		CisBenchmarkVersion: &cisBenchmarkVersionClient2{
+			iface: iface.CisBenchmarkVersions(""),
+		},
 	}
 }
 
@@ -517,6 +529,8 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		rkeK8sSystemImageControllers:                       map[string]RKEK8sSystemImageController{},
 		rkeK8sServiceOptionControllers:                     map[string]RKEK8sServiceOptionController{},
 		rkeAddonControllers:                                map[string]RKEAddonController{},
+		cisConfigControllers:                               map[string]CisConfigController{},
+		cisBenchmarkVersionControllers:                     map[string]CisBenchmarkVersionController{},
 	}, nil
 }
 
@@ -1332,6 +1346,32 @@ type RKEAddonsGetter interface {
 func (c *Client) RKEAddons(namespace string) RKEAddonInterface {
 	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &RKEAddonResource, RKEAddonGroupVersionKind, rkeAddonFactory{})
 	return &rkeAddonClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type CisConfigsGetter interface {
+	CisConfigs(namespace string) CisConfigInterface
+}
+
+func (c *Client) CisConfigs(namespace string) CisConfigInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &CisConfigResource, CisConfigGroupVersionKind, cisConfigFactory{})
+	return &cisConfigClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type CisBenchmarkVersionsGetter interface {
+	CisBenchmarkVersions(namespace string) CisBenchmarkVersionInterface
+}
+
+func (c *Client) CisBenchmarkVersions(namespace string) CisBenchmarkVersionInterface {
+	objectClient := objectclient.NewObjectClient(namespace, c.restClient, &CisBenchmarkVersionResource, CisBenchmarkVersionGroupVersionKind, cisBenchmarkVersionFactory{})
+	return &cisBenchmarkVersionClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

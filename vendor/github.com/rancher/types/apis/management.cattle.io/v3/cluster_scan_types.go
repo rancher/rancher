@@ -78,3 +78,29 @@ type ClusterScan struct {
 	Spec   ClusterScanSpec   `json:"spec"`
 	Status ClusterScanStatus `yaml:"status" json:"status,omitempty"`
 }
+
+type CisBenchmarkVersionInfo struct {
+	MinKubernetesVersion string `yaml:"min_kubernetes_version" json:"minKubernetesVersion"`
+}
+
+type CisConfigParams struct {
+	BenchmarkVersion string `yaml:"benchmark_version" json:"benchmarkVersion"`
+}
+
+type CisConfig struct {
+	types.Namespaced
+
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Params CisConfigParams `yaml:"params" json:"params,omitempty"`
+}
+
+type CisBenchmarkVersion struct {
+	types.Namespaced
+
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Info CisBenchmarkVersionInfo `json:"info" yaml:"info"`
+}

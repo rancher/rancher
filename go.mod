@@ -75,12 +75,12 @@ require (
 	github.com/rancher/kontainer-driver-metadata v0.0.0-20200113180946-882815341981
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20191210170908-feb98acd7948
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20191209163739-5b9227fe3222
+	github.com/rancher/norman v0.0.0-20200122231539-c95753fa5765
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.3
 	github.com/rancher/rke v1.1.0-rc4.0.20200113191058-38f9b2902ed9
 	github.com/rancher/security-scan v0.1.5
-	github.com/rancher/types v0.0.0-20191226173020-2acfcad7d968
+	github.com/rancher/types v0.0.0-20200123005858-1ea440f413a1
 	github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect

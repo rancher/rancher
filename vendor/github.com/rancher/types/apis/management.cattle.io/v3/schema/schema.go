@@ -47,6 +47,7 @@ var (
 		Init(mgmtSecretTypes).
 		Init(clusterTemplateTypes).
 		Init(driverMetadataTypes).
+		Init(driverMetadataCisTypes).
 		Init(encryptionTypes)
 
 	TokenSchemas = factory.Schemas(&Version).
@@ -105,6 +106,14 @@ func driverMetadataTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.RKEK8sSystemImage{}).
 		MustImport(&Version, v3.RKEK8sServiceOption{}).
 		MustImport(&Version, v3.RKEAddon{})
+}
+
+func driverMetadataCisTypes(schemas *types.Schemas) *types.Schemas {
+	return schemas.
+		AddMapperForType(&Version, v3.CisConfig{}, m.Drop{Field: "namespaceId"}).
+		AddMapperForType(&Version, v3.CisBenchmarkVersion{}, m.Drop{Field: "namespaceId"}).
+		MustImport(&Version, v3.CisConfig{}).
+		MustImport(&Version, v3.CisBenchmarkVersion{})
 }
 
 func catalogTypes(schemas *types.Schemas) *types.Schemas {

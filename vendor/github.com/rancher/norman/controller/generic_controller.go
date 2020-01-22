@@ -124,26 +124,37 @@ func (g *genericController) Enqueue(namespace, name string) {
 
 func (g *genericController) AddHandler(ctx context.Context, name string, handler HandlerFunc) {
 	g.Lock()
+	defer g.Unlock()
+
+	g.generation++
 	h := &handlerDef{
 		name:       name,
 		generation: g.generation,
 		handler:    handler,
 	}
-	g.handlers = append(g.handlers, h)
-	g.Unlock()
 
-	go func() {
+	go func(gen int) {
 		<-ctx.Done()
 		g.Lock()
-		var handlers []*handlerDef
+		defer g.Unlock()
+		var newHandlers []*handlerDef
 		for _, handler := range g.handlers {
-			if handler != h {
-				handlers = append(handlers, h)
+			if handler.generation == gen {
+				continue
 			}
+			newHandlers = append(newHandlers, handler)
 		}
-		g.handlers = handlers
-		g.Unlock()
-	}()
+		g.handlers = newHandlers
+	}(h.generation)
+
+	g.handlers = append(g.handlers, h)
+
+	if g.synced {
+		for _, key := range g.informer.GetStore().ListKeys() {
+			g.queue.AddRateLimited(key)
+		}
+	}
+
 }
 
 func (g *genericController) Sync(ctx context.Context) error {
@@ -214,25 +225,9 @@ func (g *genericController) Start(ctx context.Context, threadiness int) error {
 			threadiness = g.threadinessOverride
 		}
 		go g.run(ctx, threadiness)
+		g.running = true
 	}
 
-	if g.running {
-		for _, h := range g.handlers {
-			if h.generation != g.generation {
-				continue
-			}
-			for _, key := range g.informer.GetStore().ListKeys() {
-				g.queueObject(generationKey{
-					generation: g.generation,
-					key:        key,
-				})
-			}
-			break
-		}
-	}
-
-	g.generation++
-	g.running = true
 	return nil
 }
 
