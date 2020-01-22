@@ -31,6 +31,8 @@ var SourceTemplate = `
   time_format  %Y-%m-%dT%H:%M:%S
   tag  {{ .ContainerLogSourceTag }}.*
   format  json
+  skip_refresh_on_startup true
+  read_from_head true
 </source>
 {{end}}
 `
