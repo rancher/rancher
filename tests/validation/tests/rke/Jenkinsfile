@@ -1,33 +1,42 @@
-
-
 node {
   wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
-    checkout scm
+    withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                      string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                      string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY')
+                    ]) {
+      checkout scm
 
-    stage('Configure and Build') {
-      sh "./tests/validation/tests/rke/scripts/configure.sh"
-      sh "mkdir -p .ssh && echo \"${AWS_SSH_PEM_KEY}\" > .ssh/${AWS_SSH_KEY_NAME} && chmod 400 .ssh/*"
-      sh "./tests/validation/tests/rke/scripts/build.sh"
-    }
-    try {
-      stage('Run Validation Tests') {
-        try {
-          sh "docker run --name ${JOB_NAME}${env.BUILD_NUMBER}  --env-file .env " +
-             "rancher-validation-tests /bin/bash -c \'pytest -v -s --junit-xml=results.xml ${PYTEST_OPTIONS} tests/rke/\'"
-        } catch(err) {
-          echo 'Test run had failures. Collecting results...'
+      dir ("tests/validation") {
+        stage('Configure and Build') {
+          if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
+            dir(".ssh") {
+              def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
+              writeFile file: AWS_SSH_KEY_NAME, text: decoded
+            }
+          }
+          sh "./tests/rke/scripts/configure.sh"
         }
+      
+        try {
+          stage('Run Validation Tests') {
+            try {
+              sh "docker run --name ${JOB_NAME}${env.BUILD_NUMBER}  --env-file .env " +
+                "rancher-validation-tests /bin/bash -c \'pytest -v -s --junit-xml=results.xml ${PYTEST_OPTIONS} tests/rke/\'"
+            } catch(err) {
+              echo 'Test run had failures. Collecting results...'
+            }
+          }
 
+          stage('Test Report') {
+            sh "docker cp ${JOB_NAME}${env.BUILD_NUMBER}:/src/rancher-validation/results.xml ."
+            step([$class: 'JUnitResultArchiver', testResults: '**/results.xml'])
+            sh "docker rm -v ${JOB_NAME}${env.BUILD_NUMBER}"
+          }
+        } catch(err){
+          sh "docker stop ${JOB_NAME}${env.BUILD_NUMBER}"
+          sh "docker rm -v ${JOB_NAME}${env.BUILD_NUMBER}"
+        }
       }
-
-      stage('Test Report') {
-        sh "docker cp ${JOB_NAME}${env.BUILD_NUMBER}:/src/rancher-validation/results.xml ."
-        step([$class: 'JUnitResultArchiver', testResults: '**/results.xml'])
-        sh "docker rm -v ${JOB_NAME}${env.BUILD_NUMBER}"
-      }
-    } catch(err){
-      sh "docker stop ${JOB_NAME}${env.BUILD_NUMBER}"
-      sh "docker rm -v ${JOB_NAME}${env.BUILD_NUMBER}"
     }
   }
 }
