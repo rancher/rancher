@@ -12,6 +12,7 @@ import rancher
 import pytest
 from rancher import ApiError
 from lib.aws import AmazonWebServices
+from copy import deepcopy
 
 DEFAULT_TIMEOUT = 120
 DEFAULT_MULTI_CLUSTER_APP_TIMEOUT = 300
@@ -96,6 +97,50 @@ rbac_data = {
         PROJECT_MEMBER: {},
         PROJECT_READ_ONLY: {},
     }
+}
+
+# here are the global role templates used for
+# testing globalRoleBinding and groupRoleBinding
+TEMPLATE_MANAGE_CATALOG = {
+    "newUserDefault": "false",
+    "rules": [
+        {
+            "type": "/v3/schemas/policyRule",
+            "apiGroups": [
+                "management.cattle.io"
+            ],
+            "verbs": [
+                "*"
+            ],
+            "resources": [
+                "catalogs",
+                "templates",
+                "templateversions"
+            ]
+        }
+    ],
+    "name": "gr-test-manage-catalog",
+}
+
+TEMPLATE_LIST_CLUSTER = {
+    "newUserDefault": "false",
+    "rules": [
+        {
+            "type": "/v3/schemas/policyRule",
+            "apiGroups": [
+                "management.cattle.io"
+            ],
+            "verbs": [
+                "get",
+                "list",
+                "watch"
+            ],
+            "resources": [
+                "clusters"
+            ]
+        }
+    ],
+    "name": "gr-test-list-cluster",
 }
 
 
@@ -1723,7 +1768,7 @@ def set_url_password_token(RANCHER_SERVER_URL):
     token = r.json()['token']
     print(token)
     # Change admin password
-    client = rancher.Client(url=RANCHER_SERVER_URL+"/v3",
+    client = rancher.Client(url=RANCHER_SERVER_URL + "/v3",
                             token=token, verify=False)
     admin_user = client.list_user(username="admin").data
     admin_user[0].setpassword(newPassword=ADMIN_PASSWORD)
@@ -1732,3 +1777,54 @@ def set_url_password_token(RANCHER_SERVER_URL):
     serverurl = client.list_setting(name="server-url").data
     client.update(serverurl[0], value=RANCHER_SERVER_URL)
     return token
+
+
+def validate_create_catalog(token, catalog_name, branch, url, permission=True):
+    """
+    This function validates if the user has the permission to create a
+    global catalog.
+
+    :param token: user's token
+    :param catalog_name: the name of the catalog
+    :param branch: the branch of the git repo
+    :param url:  the url of the git repo
+    :param permission: boolean value, True if the user can create catalog
+    :return: the catalog object or None
+    """
+    client = get_client_for_token(token)
+    if not permission:
+        with pytest.raises(ApiError) as e:
+            client.create_catalog(name=catalog_name,
+                                  branch=branch,
+                                  url=url)
+        assert e.value.error.status == 403 and \
+            e.value.error.code == 'Forbidden', \
+            "user with no permission should receive 403: Forbidden"
+        return None
+    else:
+        try:
+            client.create_catalog(name=catalog_name,
+                                  branch=branch,
+                                  url=url)
+        except ApiError as e:
+            assert False, "user with permission should receive no exception:" \
+                          + str(e.error.status) + " " + e.error.code
+
+    catalog_list = client.list_catalog(name=catalog_name).data
+    assert len(catalog_list) == 1
+    return catalog_list[0]
+
+
+def generate_template_global_role(name, new_user_default=False, template=None):
+    """ generate a template that is used for creating a global role"""
+    if template is None:
+        template = TEMPLATE_MANAGE_CATALOG
+    template = deepcopy(template)
+    if new_user_default:
+        template["newUserDefault"] = "true"
+    else:
+        template["newUserDefault"] = "false"
+    if name is None:
+        name = random_name()
+    template["name"] = name
+    return template
