@@ -8,13 +8,14 @@ node {
 
       dir ("tests/validation") {
         stage('Configure and Build') {
+          sh "./tests/rke/scripts/configure.sh"
           if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
             dir(".ssh") {
               def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
               writeFile file: AWS_SSH_KEY_NAME, text: decoded
             }
           }
-          sh "./tests/rke/scripts/configure.sh"
+          sh "./tests/rke/scripts/build.sh"
         }
       
         try {

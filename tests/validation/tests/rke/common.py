@@ -1,8 +1,8 @@
 import time
 import os
 
-k8s_resurce_dir = os.path.dirname(os.path.realpath(__file__)) + \
-                  "/resources/k8s_ymls/"
+k8s_resurce_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 
+                          "resources/k8s_ymls/")
 
 
 def create_and_validate(

@@ -82,7 +82,7 @@ class KubectlClient(object):
             cmd, self._cli_options(**cli_options))
         print("Running kubectl command: {}".format(command))
         start_time = time.time()
-        result = self.run_command(command)
+        result = self.run_command_with_stderr(command)
         end_time = time.time()
         print('Run time for command {0}: {1} seconds'.format(
             command, end_time - start_time))
@@ -222,10 +222,11 @@ class KubectlClient(object):
 
     def run_command_with_stderr(self, command):
         try:
-            output = subprocess.check_output(command, shell=True,
+            return subprocess.check_output(command, shell=True,
                                              stderr=subprocess.PIPE)
-            returncode = 0
         except subprocess.CalledProcessError as e:
+            print(e.output)
+            print(e.stderr)
             output = e.output
             returncode = e.returncode
         print(returncode)
