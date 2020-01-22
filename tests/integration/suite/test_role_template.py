@@ -250,13 +250,17 @@ def test_role_template_update_inherited_role(admin_mc, remove_resource,
     # namespace for the user. There should be one for the rancher role
     # 'cloned_pm' and one for the k8s built-in role 'edit'
     rbac = kubernetes.client.RbacAuthorizationV1Api(admin_mc.k8s_client)
-    rbs = rbac.list_namespaced_role_binding(ns_name)
-    rb_dict = {}
-    for rb in rbs.items:
-        if rb.subjects[0].name == user_cloned_pm.user.id:
-            rb_dict[rb.role_ref.name] = rb
-    assert role_template_id in rb_dict
-    assert 'edit' in rb_dict
+
+    def _refresh_user_template():
+        rbs = rbac.list_namespaced_role_binding(ns_name)
+        rb_dict = {}
+        for rb in rbs.items:
+            if rb.subjects[0].name == user_cloned_pm.user.id:
+                rb_dict[rb.role_ref.name] = rb
+        return role_template_id in rb_dict and 'edit' in rb_dict
+
+    wait_for(_refresh_user_template,
+             fail_handler=lambda: 'role bindings do not exist')
 
     # now edit the roleTemplate to remove "edit" from inherited roles,
     # and add "view" to inherited roles
