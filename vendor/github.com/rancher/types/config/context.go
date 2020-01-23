@@ -61,6 +61,9 @@ type ScaledContext struct {
 	RBAC       rbacv1.Interface
 	Core       corev1.Interface
 	Storage    storagev1.Interface
+
+	RunContext        context.Context
+	managementContext *ManagementContext
 }
 
 func (c *ScaledContext) controllers() []controller.Starter {
@@ -73,12 +76,16 @@ func (c *ScaledContext) controllers() []controller.Starter {
 }
 
 func (c *ScaledContext) NewManagementContext() (*ManagementContext, error) {
+	if c.managementContext != nil {
+		return c.managementContext, nil
+	}
 	mgmt, err := NewManagementContext(c.RESTConfig)
 	if err != nil {
 		return nil, err
 	}
 	mgmt.Dialer = c.Dialer
 	mgmt.UserManager = c.UserManager
+	c.managementContext = mgmt
 	return mgmt, nil
 }
 
@@ -180,6 +187,7 @@ type UserContext struct {
 	UnversionedClient rest.Interface
 	APIExtClient      clientset.Interface
 	K8sClient         kubernetes.Interface
+	runContext        context.Context
 
 	APIAggregation apiregistrationv1.Interface
 	Apps           appsv1.Interface
@@ -358,6 +366,7 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 	context := &UserContext{
 		RESTConfig:  config,
 		ClusterName: clusterName,
+		runContext:  scaledContext.RunContext,
 	}
 
 	context.Management, err = scaledContext.NewManagementContext()
@@ -465,9 +474,10 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 
 func (w *UserContext) Start(ctx context.Context) error {
 	logrus.Info("Starting cluster controllers for ", w.ClusterName)
-	controllers := w.Management.controllers()
-	controllers = append(controllers, w.controllers()...)
-	return controller.SyncThenStart(ctx, 5, controllers...)
+	if err := controller.SyncThenStart(w.runContext, 50, w.Management.controllers()...); err != nil {
+		return err
+	}
+	return controller.SyncThenStart(ctx, 5, w.controllers()...)
 }
 
 func NewUserOnlyContext(config rest.Config) (*UserOnlyContext, error) {

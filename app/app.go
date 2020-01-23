@@ -84,6 +84,7 @@ func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config
 	}
 
 	scaledContext.UserManager = userManager
+	scaledContext.RunContext = ctx
 
 	return scaledContext, manager, nil
 }

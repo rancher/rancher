@@ -69,6 +69,8 @@ type Client struct {
 	RKEK8sSystemImage                       RKEK8sSystemImageOperations
 	RKEK8sServiceOption                     RKEK8sServiceOptionOperations
 	RKEAddon                                RKEAddonOperations
+	CisConfig                               CisConfigOperations
+	CisBenchmarkVersion                     CisBenchmarkVersionOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -143,6 +145,8 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.RKEK8sSystemImage = newRKEK8sSystemImageClient(client)
 	client.RKEK8sServiceOption = newRKEK8sServiceOptionClient(client)
 	client.RKEAddon = newRKEAddonClient(client)
+	client.CisConfig = newCisConfigClient(client)
+	client.CisBenchmarkVersion = newCisBenchmarkVersionClient(client)
 
 	return client, nil
 }
