@@ -5,23 +5,26 @@ from .common import *  # NOQA
 import pytest
 
 K8S_PREUPGRADE_IMAGE = os.environ.get(
-    'K8S_PREUPGRADE_IMAGE', 'v1.11.5-rancher1-1')
+    'RANCHER_K8S_PREUPGRADE_IMAGE', 'v1.16.4-rancher1-1')
 K8S_UPGRADE_IMAGE = os.environ.get(
-    'K8S_UPGRADE_IMAGE', 'v1.12.3-rancher1-1')
+    'RANCHER_K8S_UPGRADE_IMAGE', 'v1.17.0-rancher1-2')
 
 K8S_POSTUPGRADE_HYPERKUBE_IMAGE = os.environ.get(
-    'K8S_POSTUPGRADE_HYPERKUBE_IMAGE', 'rancher/hyperkube:v1.12.3-rancher1')
+    'RANCHER_K8S_POSTUPGRADE_HYPERKUBE_IMAGE', 'rancher/hyperkube:v1.17.0-rancher1')
 K8S_POSTUPGRADE_ETCD_IMAGE = os.environ.get(
-    'K8S_POSTUPGRADE_ETCD_IMAGE', 'rancher/coreos-etcd:v3.2.24')
+    'RANCHER_K8S_POSTUPGRADE_ETCD_IMAGE', 'rancher/coreos-etcd:v3.4.3-rancher1')
 K8S_POSTUPGRADE_SERVICE_SIDEKICK_IMAGE = os.environ.get(
-    'K8S_POSTUPGRADE_SERVICE_SIDEKICK_IMAGE', 'rancher/rke-tools:v0.1.16')
+    'RANCHER_K8S_POSTUPGRADE_SERVICE_SIDEKICK_IMAGE', 'rancher/rke-tools:v0.1.52')
 
 K8S_PREUPGRADE_HYPERKUBE_IMAGE = os.environ.get(
-    'K8S_PREUPGRADE_HYPERKUBE_IMAGE', 'rancher/hyperkube:v1.11.5-rancher1')
+    'RANCHER_K8S_PREUPGRADE_HYPERKUBE_IMAGE', 'rancher/hyperkube:v1.16.4-rancher1')
 K8S_PREUPGRADE_ETCD_IMAGE = os.environ.get(
-    'K8S_PREUPGRADE_ETCD_IMAGE', 'rancher/coreos-etcd:v3.2.18')
+    'RANCHER_K8S_PREUPGRADE_ETCD_IMAGE', 'rancher/coreos-etcd:v3.3.15-rancher1')
 K8S_PREUPGRADE_SERVICE_SIDEKICK_IMAGE = os.environ.get(
-    'K8S_PREUPGRADE_SERVICE_SIDEKICK_IMAGE', 'rancher/rke-tools:v0.1.15')
+    'RANCHER_K8S_PREUPGRADE_SERVICE_SIDEKICK_IMAGE', 'rancher/rke-tools:v0.1.52')
+
+K8S_ETCD_SYSTEM_IMAGE = os.environ.get(
+    'RANCHER_K8S_ETCD_SYSTEM_IMAGE', 'rancher/coreos-etcd:v3.4.3-rancher1')
 
 pre_config = {
         "etcd": K8S_PREUPGRADE_ETCD_IMAGE,
@@ -42,6 +45,17 @@ post_config = {
         "kube-apiserver": K8S_POSTUPGRADE_HYPERKUBE_IMAGE,
         "kubelet": K8S_POSTUPGRADE_HYPERKUBE_IMAGE
 }
+
+etcdupg_config = {
+        "etcd": "rancher/coreos-etcd:v3.4.3-rancher1",
+        "service-sidekick": K8S_PREUPGRADE_SERVICE_SIDEKICK_IMAGE,
+        "kube-proxy": K8S_PREUPGRADE_HYPERKUBE_IMAGE,
+        "kube-scheduler": K8S_PREUPGRADE_HYPERKUBE_IMAGE,
+        "kube-controller-manager": K8S_PREUPGRADE_HYPERKUBE_IMAGE,
+        "kube-apiserver": K8S_PREUPGRADE_HYPERKUBE_IMAGE,
+        "kubelet": K8S_PREUPGRADE_HYPERKUBE_IMAGE
+}
+
 
 
 def test_upgrade_1(test_name, cloud_provider, rke_client, kubectl):
@@ -156,8 +170,8 @@ def test_upgrade_3(test_name, cloud_provider, rke_client, kubectl):
     delete_nodes(cloud_provider, all_nodes)
 
 
-@pytest.mark.skipif(
-    True, reason="This test is skipped for now")
+#@pytest.mark.skipif(
+#    True, reason="This test is skipped for now")
 def test_upgrade_4(test_name, cloud_provider, rke_client, kubectl):
     """
     Update only one service in cluster k8s system images, cluster config:
@@ -167,6 +181,8 @@ def test_upgrade_4(test_name, cloud_provider, rke_client, kubectl):
     """
     rke_template = 'cluster_upgrade_4_1.yml.j2'
     all_nodes = cloud_provider.create_multiple_nodes(3, test_name)
+    print("K8S Pre Upgrade Image")
+    print(K8S_PREUPGRADE_IMAGE)
     rke_config = create_rke_cluster(
         rke_client, kubectl, all_nodes, rke_template,
         k8_rancher_image=K8S_PREUPGRADE_IMAGE)
@@ -176,11 +192,19 @@ def test_upgrade_4(test_name, cloud_provider, rke_client, kubectl):
 
     # Upgrade only the scheduler, yaml will replace `upgrade_k8_rancher_image`
     # for scheduler image only, the rest will keep pre-upgrade image
+    rke_template = 'cluster_upgrade_4_2.yml.j2'
+    #rke_config = create_rke_cluster(
+    #    rke_client, kubectl, all_nodes, rke_template,
+    #    k8_rancher_image=K8S_PREUPGRADE_IMAGE,
+    #    upgrade_k8_rancher_image=K8S_UPGRADE_IMAGE)
     rke_config = create_rke_cluster(
         rke_client, kubectl, all_nodes, rke_template,
-        k8_rancher_image=K8S_PREUPGRADE_IMAGE,
-        upgrade_k8_rancher_image=K8S_UPGRADE_IMAGE)
-    validate_k8s_service_images(all_nodes, post_config)
+        k8_rancher_image=K8S_PREUPGRADE_IMAGE)
+    print("POST CONFIG")
+    print(post_config)
+    print("SCHEDULER CONFIG")
+    print(etcdupg_config)
+    validate_k8s_service_images(all_nodes, etcdupg_config)
 
     # Rerun validation on existing and new resources
     validate_rke_cluster(
