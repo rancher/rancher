@@ -437,6 +437,7 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string, svcOp
 		"hostname-override":         host.HostnameOverride,
 		"kubeconfig":                pki.GetConfigPath(pki.KubeNodeCertName),
 		"pod-infra-container-image": c.Services.Kubelet.InfraContainerImage,
+		"node-ip":                   host.InternalAddress,
 		"root-dir":                  path.Join(prefixPath, "/var/lib/kubelet"),
 	}
 	if host.DockerInfo.OSType == "windows" { // compatible with Windows
@@ -452,9 +453,6 @@ func (c *Cluster) BuildKubeletProcess(host *hosts.Host, prefixPath string, svcOp
 
 	if host.IsControl && !host.IsWorker {
 		CommandArgs["register-with-taints"] = unschedulableControlTaint
-	}
-	if host.Address != host.InternalAddress {
-		CommandArgs["node-ip"] = host.InternalAddress
 	}
 	if len(c.CloudProvider.Name) > 0 {
 		CommandArgs["cloud-config"] = cloudConfigFileName
