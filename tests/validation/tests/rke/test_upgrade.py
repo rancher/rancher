@@ -5,23 +5,23 @@ from .common import *  # NOQA
 import pytest
 
 K8S_PREUPGRADE_IMAGE = os.environ.get(
-    'K8S_PREUPGRADE_IMAGE', 'v1.11.5-rancher1-1')
+    'RANCHER_K8S_PREUPGRADE_IMAGE', 'v1.16.4-rancher1-1')
 K8S_UPGRADE_IMAGE = os.environ.get(
-    'K8S_UPGRADE_IMAGE', 'v1.12.3-rancher1-1')
+    'RANCHER_K8S_UPGRADE_IMAGE', 'v1.17.0-rancher1-2')
 
 K8S_POSTUPGRADE_HYPERKUBE_IMAGE = os.environ.get(
-    'K8S_POSTUPGRADE_HYPERKUBE_IMAGE', 'rancher/hyperkube:v1.12.3-rancher1')
+    'RANCHER_K8S_POSTUPGRADE_HYPERKUBE_IMAGE', 'rancher/hyperkube:v1.17.0-rancher1')
 K8S_POSTUPGRADE_ETCD_IMAGE = os.environ.get(
-    'K8S_POSTUPGRADE_ETCD_IMAGE', 'rancher/coreos-etcd:v3.2.24')
+    'RANCHER_K8S_POSTUPGRADE_ETCD_IMAGE', 'rancher/coreos-etcd:v3.4.3-rancher1')
 K8S_POSTUPGRADE_SERVICE_SIDEKICK_IMAGE = os.environ.get(
-    'K8S_POSTUPGRADE_SERVICE_SIDEKICK_IMAGE', 'rancher/rke-tools:v0.1.16')
+    'RANCHER_K8S_POSTUPGRADE_SERVICE_SIDEKICK_IMAGE', 'rancher/rke-tools:v0.1.52')
 
 K8S_PREUPGRADE_HYPERKUBE_IMAGE = os.environ.get(
-    'K8S_PREUPGRADE_HYPERKUBE_IMAGE', 'rancher/hyperkube:v1.11.5-rancher1')
+    'RANCHER_K8S_PREUPGRADE_HYPERKUBE_IMAGE', 'rancher/hyperkube:v1.16.4-rancher1')
 K8S_PREUPGRADE_ETCD_IMAGE = os.environ.get(
-    'K8S_PREUPGRADE_ETCD_IMAGE', 'rancher/coreos-etcd:v3.2.18')
+    'RANCHER_K8S_PREUPGRADE_ETCD_IMAGE', 'rancher/coreos-etcd:v3.3.15-rancher1')
 K8S_PREUPGRADE_SERVICE_SIDEKICK_IMAGE = os.environ.get(
-    'K8S_PREUPGRADE_SERVICE_SIDEKICK_IMAGE', 'rancher/rke-tools:v0.1.15')
+    'RANCHER_K8S_PREUPGRADE_SERVICE_SIDEKICK_IMAGE', 'rancher/rke-tools:v0.1.52')
 
 pre_config = {
         "etcd": K8S_PREUPGRADE_ETCD_IMAGE,
