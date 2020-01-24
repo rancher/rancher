@@ -8,7 +8,7 @@ import (
 	"github.com/rancher/norman/authorization"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
+	v1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 )
 
 type AccessControl struct {
