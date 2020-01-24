@@ -1,10 +1,9 @@
 package rbac
 
 import (
-	"strings"
-
+	"fmt"
 	"github.com/rancher/norman/types/slice"
-	v1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
+	"github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -107,6 +106,41 @@ func (p *permissionIndex) get(subjectName, apiGroup, resource, verb string) []Li
 	return result
 }
 
+func (p *permissionIndex) validatePermission(subjectName, objID, objNamespace, apiGroup, resource, verb string) bool {
+	var roles map[string]bool
+	for _, binding := range p.getRoleBindings(subjectName) {
+		if binding.RoleRef.APIGroup != rbacGroup {
+			continue
+		}
+
+		if roles[fmt.Sprintf("%s:%s", binding.RoleRef.Kind, binding.RoleRef.Name)] {
+			continue
+		}
+		for _, rule := range p.getRules(binding.Namespace, binding.RoleRef.Kind, binding.RoleRef.Name) {
+			if !matches(rule.APIGroups, apiGroup) || !matches(rule.Resources, resource) {
+				continue
+			}
+			v := verb
+			if len(rule.ResourceNames) > 0 && verb == "list" {
+				v = "get"
+			}
+
+			if verb == "list" {
+				v = "get"
+			}
+
+			if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, v) {
+				for _, resourceName := range rule.ResourceNames {
+					if resourceName == objID {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
 func (p *permissionIndex) filterPermissions(result []ListPermission, namespace, kind, name, apiGroup, resource, verb string) []ListPermission {
 	nsForResourceNameGets := namespace
 	if namespace == "*" {
@@ -200,7 +234,7 @@ func matches(parts []string, val string) bool {
 		if value == "*" {
 			return true
 		}
-		if strings.EqualFold(value, val) {
+		if value == val {
 			return true
 		}
 	}
