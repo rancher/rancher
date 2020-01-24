@@ -1,6 +1,6 @@
 # cloud.google.com/go v0.38.0
 cloud.google.com/go/compute/metadata
-# github.com/Azure/azure-sdk-for-go v32.5.0+incompatible
+# github.com/Azure/azure-sdk-for-go v35.0.0+incompatible
 github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2017-09-30/containerservice
 github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2018-03-31/containerservice
 github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac
@@ -144,7 +144,7 @@ github.com/docker/docker/pkg/term/windows
 github.com/docker/go-connections/nat
 github.com/docker/go-connections/sockets
 github.com/docker/go-connections/tlsconfig
-# github.com/docker/go-units v0.3.3
+# github.com/docker/go-units v0.4.0
 github.com/docker/go-units
 # github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c
 github.com/docker/spdystream
@@ -160,13 +160,13 @@ github.com/fsnotify/fsnotify
 github.com/ghodss/yaml
 # github.com/go-ini/ini v1.37.0
 github.com/go-ini/ini
-# github.com/go-openapi/jsonpointer v0.19.2
+# github.com/go-openapi/jsonpointer v0.19.3
 github.com/go-openapi/jsonpointer
-# github.com/go-openapi/jsonreference v0.19.2
+# github.com/go-openapi/jsonreference v0.19.3
 github.com/go-openapi/jsonreference
-# github.com/go-openapi/spec v0.19.2
+# github.com/go-openapi/spec v0.19.3
 github.com/go-openapi/spec
-# github.com/go-openapi/swag v0.19.2
+# github.com/go-openapi/swag v0.19.5
 github.com/go-openapi/swag
 # github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
 github.com/gogo/protobuf/proto
@@ -186,7 +186,7 @@ github.com/google/go-cmp/cmp/internal/diff
 github.com/google/go-cmp/cmp/internal/flags
 github.com/google/go-cmp/cmp/internal/function
 github.com/google/go-cmp/cmp/internal/value
-# github.com/google/go-github v0.0.0-20170719170300-e062a8cd852f
+# github.com/google/go-github v17.0.0+incompatible
 github.com/google/go-github/github
 # github.com/google/go-querystring v1.0.0
 github.com/google/go-querystring/query
@@ -227,7 +227,7 @@ github.com/imdario/mergo
 github.com/jmespath/go-jmespath
 # github.com/jonboulle/clockwork v0.1.0
 github.com/jonboulle/clockwork
-# github.com/json-iterator/go v1.1.7
+# github.com/json-iterator/go v1.1.8
 github.com/json-iterator/go
 # github.com/knative/pkg v0.0.0-20190817231834-12ee58e32cc8 => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 github.com/knative/pkg/apis/istio
@@ -243,7 +243,7 @@ github.com/kr/text
 github.com/liggitt/tabwriter
 # github.com/magiconair/properties v1.8.1
 github.com/magiconair/properties
-# github.com/mailru/easyjson v0.0.0-20190614124828-94de47d64c63
+# github.com/mailru/easyjson v0.7.0
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
@@ -251,7 +251,7 @@ github.com/mailru/easyjson/jwriter
 github.com/maruel/panicparse/stack
 # github.com/mattn/go-colorable v0.1.0
 github.com/mattn/go-colorable
-# github.com/mattn/go-isatty v0.0.6
+# github.com/mattn/go-isatty v0.0.9
 github.com/mattn/go-isatty
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
@@ -305,13 +305,13 @@ github.com/prometheus/client_model/go
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 github.com/prometheus/common/model
-# github.com/prometheus/procfs v0.0.0-20190507164030-5867b95ac084
+# github.com/prometheus/procfs v0.0.2
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
-# github.com/rancher/kontainer-driver-metadata v0.0.0-20200113180946-882815341981
+# github.com/rancher/kontainer-driver-metadata v0.0.0-20200123225253-a5b9f3e0b2df
 github.com/rancher/kontainer-driver-metadata/rke
 github.com/rancher/kontainer-driver-metadata/rke/templates
-# github.com/rancher/kontainer-engine v0.0.4-dev.0.20191210170908-feb98acd7948
+# github.com/rancher/kontainer-engine v0.0.4-dev.0.20200123235809-1b6d4a82a415
 github.com/rancher/kontainer-engine/cluster
 github.com/rancher/kontainer-engine/drivers/aks
 github.com/rancher/kontainer-engine/drivers/eks
@@ -337,7 +337,7 @@ github.com/rancher/machine/libmachine/ssh
 github.com/rancher/machine/libmachine/state
 github.com/rancher/machine/libmachine/version
 github.com/rancher/machine/version
-# github.com/rancher/norman v0.0.0-20200122231539-c95753fa5765
+# github.com/rancher/norman v0.0.0-20200124050618-768222c62d5b
 github.com/rancher/norman/api
 github.com/rancher/norman/api/access
 github.com/rancher/norman/api/builtin
@@ -360,6 +360,7 @@ github.com/rancher/norman/pkg/dump
 github.com/rancher/norman/pkg/k8scheck
 github.com/rancher/norman/pkg/kwrapper/etcd
 github.com/rancher/norman/pkg/kwrapper/k8s
+github.com/rancher/norman/pkg/ratelimit
 github.com/rancher/norman/pkg/subscribe
 github.com/rancher/norman/resource
 github.com/rancher/norman/restwatch
@@ -384,7 +385,7 @@ github.com/rancher/norman/urlbuilder
 github.com/rancher/rdns-server/model
 # github.com/rancher/remotedialer v0.2.3
 github.com/rancher/remotedialer
-# github.com/rancher/rke v1.1.0-rc4.0.20200113191058-38f9b2902ed9
+# github.com/rancher/rke v1.1.0-rc4.0.20200123230443-25e7f987775d
 github.com/rancher/rke/addons
 github.com/rancher/rke/authz
 github.com/rancher/rke/cloudprovider
@@ -409,7 +410,7 @@ github.com/rancher/rke/util
 # github.com/rancher/security-scan v0.1.5
 github.com/rancher/security-scan/pkg/kb-summarizer/report
 github.com/rancher/security-scan/pkg/kb-summarizer/summarizer
-# github.com/rancher/types v0.0.0-20200123005858-1ea440f413a1
+# github.com/rancher/types v0.0.0-20200123224322-9adcafc483ee
 github.com/rancher/types/apis/apiregistration.k8s.io/v1
 github.com/rancher/types/apis/apps/v1
 github.com/rancher/types/apis/autoscaling/v2beta2
@@ -447,7 +448,7 @@ github.com/rancher/types/mapper
 github.com/rancher/types/peermanager
 github.com/rancher/types/status
 github.com/rancher/types/user
-# github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95
+# github.com/rancher/wrangler v0.4.0
 github.com/rancher/wrangler/pkg/leader
 github.com/rancher/wrangler/pkg/name
 github.com/rancher/wrangler/pkg/signals
@@ -475,7 +476,7 @@ github.com/spf13/afero/mem
 github.com/spf13/cast
 # github.com/spf13/jwalterweatherman v1.1.0
 github.com/spf13/jwalterweatherman
-# github.com/spf13/pflag v1.0.3
+# github.com/spf13/pflag v1.0.5
 github.com/spf13/pflag
 # github.com/spf13/viper v1.4.0
 github.com/spf13/viper
@@ -551,7 +552,7 @@ golang.org/x/crypto/scrypt
 golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/agent
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
+# golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
 golang.org/x/net/html
@@ -571,9 +572,9 @@ golang.org/x/oauth2/google
 golang.org/x/oauth2/internal
 golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
-# golang.org/x/sync v0.0.0-20190423024810-112230192c58
+# golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.0.0-20190804053845-51ab0e2deafa
+# golang.org/x/sys v0.0.0-20190826190057-c7b8b68b1456
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
 golang.org/x/sys/windows
@@ -614,7 +615,7 @@ google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/urlfetch
 # google.golang.org/genproto v0.0.0-20190502173448-54afdca5d873
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.23.0
+# google.golang.org/grpc v1.23.1
 google.golang.org/grpc
 google.golang.org/grpc/balancer
 google.golang.org/grpc/balancer/base
@@ -664,7 +665,7 @@ gopkg.in/ldap.v2
 gopkg.in/natefinch/lumberjack.v2
 # gopkg.in/yaml.v2 v2.2.4
 gopkg.in/yaml.v2
-# k8s.io/api v0.0.0 => k8s.io/api v0.0.0-20190918155943-95b840bb6a1f
+# k8s.io/api v0.17.2 => k8s.io/api v0.17.2
 k8s.io/api/admissionregistration/v1
 k8s.io/api/admissionregistration/v1beta1
 k8s.io/api/apps/v1
@@ -686,8 +687,10 @@ k8s.io/api/coordination/v1
 k8s.io/api/coordination/v1beta1
 k8s.io/api/core/v1
 k8s.io/api/discovery/v1alpha1
+k8s.io/api/discovery/v1beta1
 k8s.io/api/events/v1beta1
 k8s.io/api/extensions/v1beta1
+k8s.io/api/flowcontrol/v1alpha1
 k8s.io/api/networking/v1
 k8s.io/api/networking/v1beta1
 k8s.io/api/node/v1alpha1
@@ -703,7 +706,7 @@ k8s.io/api/settings/v1alpha1
 k8s.io/api/storage/v1
 k8s.io/api/storage/v1alpha1
 k8s.io/api/storage/v1beta1
-# k8s.io/apiextensions-apiserver v0.0.0 => k8s.io/apiextensions-apiserver v0.0.0-20190918161926-8f644eb6e783
+# k8s.io/apiextensions-apiserver v0.17.2 => k8s.io/apiextensions-apiserver v0.17.2
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
@@ -712,7 +715,7 @@ k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1
 k8s.io/apiextensions-apiserver/pkg/features
-# k8s.io/apimachinery v0.0.0 => k8s.io/apimachinery v0.0.0-20190913080033-27d36303b655
+# k8s.io/apimachinery v0.17.2 => k8s.io/apimachinery v0.17.2
 k8s.io/apimachinery/pkg/api/equality
 k8s.io/apimachinery/pkg/api/errors
 k8s.io/apimachinery/pkg/api/meta
@@ -762,9 +765,10 @@ k8s.io/apimachinery/pkg/version
 k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/netutil
 k8s.io/apimachinery/third_party/forked/golang/reflect
-# k8s.io/apiserver v0.0.0 => k8s.io/apiserver v0.0.0-20190918160949-bfa5e2e684ad
+# k8s.io/apiserver v0.17.2 => k8s.io/apiserver v0.17.2
 k8s.io/apiserver/pkg/admission
 k8s.io/apiserver/pkg/apis/apiserver
+k8s.io/apiserver/pkg/apis/apiserver/v1
 k8s.io/apiserver/pkg/apis/apiserver/v1alpha1
 k8s.io/apiserver/pkg/apis/audit
 k8s.io/apiserver/pkg/apis/audit/v1
@@ -779,9 +783,9 @@ k8s.io/apiserver/pkg/features
 k8s.io/apiserver/pkg/server/healthz
 k8s.io/apiserver/pkg/server/httplog
 k8s.io/apiserver/pkg/util/feature
-# k8s.io/cli-runtime v0.0.0 => k8s.io/cli-runtime v0.0.0-20190918162238-f783a3654da8
+# k8s.io/cli-runtime v0.17.2 => k8s.io/cli-runtime v0.17.2
 k8s.io/cli-runtime/pkg/printers
-# k8s.io/client-go v11.0.1-0.20190805182715-88a2adca7e76+incompatible => github.com/rancher/client-go v1.16.0-rancher.3
+# k8s.io/client-go v11.0.1-0.20190805182715-88a2adca7e76+incompatible => github.com/rancher/client-go v1.17.2-rancher.2
 k8s.io/client-go/discovery
 k8s.io/client-go/dynamic
 k8s.io/client-go/kubernetes
@@ -807,8 +811,10 @@ k8s.io/client-go/kubernetes/typed/coordination/v1
 k8s.io/client-go/kubernetes/typed/coordination/v1beta1
 k8s.io/client-go/kubernetes/typed/core/v1
 k8s.io/client-go/kubernetes/typed/discovery/v1alpha1
+k8s.io/client-go/kubernetes/typed/discovery/v1beta1
 k8s.io/client-go/kubernetes/typed/events/v1beta1
 k8s.io/client-go/kubernetes/typed/extensions/v1beta1
+k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1
 k8s.io/client-go/kubernetes/typed/networking/v1
 k8s.io/client-go/kubernetes/typed/networking/v1beta1
 k8s.io/client-go/kubernetes/typed/node/v1alpha1
@@ -855,19 +861,19 @@ k8s.io/client-go/util/jsonpath
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/retry
 k8s.io/client-go/util/workqueue
-# k8s.io/component-base v0.0.0 => k8s.io/component-base v0.0.0-20190918160511-547f6c5d7090
+# k8s.io/component-base v0.17.2 => k8s.io/component-base v0.17.2
 k8s.io/component-base/featuregate
 k8s.io/component-base/metrics
 k8s.io/component-base/metrics/legacyregistry
 k8s.io/component-base/version
-# k8s.io/klog v0.4.0
+# k8s.io/klog v1.0.0
 k8s.io/klog
-# k8s.io/kube-aggregator v0.0.0 => k8s.io/kube-aggregator v0.0.0-20190918161219-8c8f079fddc3
+# k8s.io/kube-aggregator v0.17.2 => k8s.io/kube-aggregator v0.17.2
 k8s.io/kube-aggregator/pkg/apis/apiregistration
 k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
-# k8s.io/kube-openapi v0.0.0-20190816220812-743ec37842bf
+# k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a
 k8s.io/kube-openapi/pkg/common
-# k8s.io/kubernetes v1.16.0 => k8s.io/kubernetes v1.16.0
+# k8s.io/kubernetes v1.17.2 => k8s.io/kubernetes v1.17.2
 k8s.io/kubernetes/pkg/api/service
 k8s.io/kubernetes/pkg/api/v1/pod
 k8s.io/kubernetes/pkg/apis/apps
@@ -894,9 +900,7 @@ k8s.io/kubernetes/pkg/security/apparmor
 k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp
 k8s.io/kubernetes/pkg/security/podsecuritypolicy/util
 k8s.io/kubernetes/pkg/util/parsers
-k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit
-k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1
-# k8s.io/utils v0.0.0-20190801114015-581e00157fb1
+# k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
 k8s.io/utils/buffer
 k8s.io/utils/integer
 k8s.io/utils/net

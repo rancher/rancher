@@ -491,7 +491,7 @@ func GenerateKubeletCertificate(ctx context.Context, certs map[string]Certificat
 	if caCrt == nil || caKey == nil {
 		return fmt.Errorf("CA Certificate or Key is empty")
 	}
-	log.Infof(ctx, "[certificates] Generating Kubernetes Kubelet certificates")
+	log.Debugf(ctx, "[certificates] Generating Kubernetes Kubelet certificates")
 	allHosts := hosts.NodesToHosts(rkeConfig.Nodes, "")
 	for _, host := range allHosts {
 		kubeletName := GetCrtNameForHost(host, KubeletCertName)
@@ -509,7 +509,7 @@ func GenerateKubeletCertificate(ctx context.Context, certs map[string]Certificat
 		if !rotate {
 			serviceKey = certs[kubeletName].Key
 		}
-		log.Infof(ctx, "[certificates] Generating %s certificate and key", kubeletName)
+		log.Debugf(ctx, "[certificates] Generating %s certificate and key", kubeletName)
 		kubeletCrt, kubeletKey, err := GenerateSignedCertAndKey(caCrt, caKey, true, kubeletName, kubeletAltNames, serviceKey, nil)
 		if err != nil {
 			return err

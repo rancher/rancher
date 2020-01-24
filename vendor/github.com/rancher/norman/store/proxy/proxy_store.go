@@ -20,7 +20,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -524,7 +523,7 @@ func splitID(id string) (string, string) {
 
 func getDeleteOption(req *http.Request) (*metav1.DeleteOptions, error) {
 	options := &metav1.DeleteOptions{}
-	if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), metainternalversion.SchemeGroupVersion, options); err != nil {
+	if err := metav1.ParameterCodec.DecodeParameters(req.URL.Query(), metav1.SchemeGroupVersion, options); err != nil {
 		return nil, err
 	}
 	prop := metav1.DeletePropagationBackground

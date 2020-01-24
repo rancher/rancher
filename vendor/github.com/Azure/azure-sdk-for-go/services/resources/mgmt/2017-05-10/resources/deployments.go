@@ -41,6 +41,78 @@ func NewDeploymentsClientWithBaseURI(baseURI string, subscriptionID string) Depl
 	return DeploymentsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
+// CalculateTemplateHash calculate the hash of the given template.
+// Parameters:
+// templateParameter - the template provided to calculate hash.
+func (client DeploymentsClient) CalculateTemplateHash(ctx context.Context, templateParameter interface{}) (result TemplateHashResult, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/DeploymentsClient.CalculateTemplateHash")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	req, err := client.CalculateTemplateHashPreparer(ctx, templateParameter)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "resources.DeploymentsClient", "CalculateTemplateHash", nil, "Failure preparing request")
+		return
+	}
+
+	resp, err := client.CalculateTemplateHashSender(req)
+	if err != nil {
+		result.Response = autorest.Response{Response: resp}
+		err = autorest.NewErrorWithError(err, "resources.DeploymentsClient", "CalculateTemplateHash", resp, "Failure sending request")
+		return
+	}
+
+	result, err = client.CalculateTemplateHashResponder(resp)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "resources.DeploymentsClient", "CalculateTemplateHash", resp, "Failure responding to request")
+	}
+
+	return
+}
+
+// CalculateTemplateHashPreparer prepares the CalculateTemplateHash request.
+func (client DeploymentsClient) CalculateTemplateHashPreparer(ctx context.Context, templateParameter interface{}) (*http.Request, error) {
+	const APIVersion = "2017-05-10"
+	queryParameters := map[string]interface{}{
+		"api-version": APIVersion,
+	}
+
+	preparer := autorest.CreatePreparer(
+		autorest.AsContentType("application/json; charset=utf-8"),
+		autorest.AsPost(),
+		autorest.WithBaseURL(client.BaseURI),
+		autorest.WithPath("/providers/Microsoft.Resources/calculateTemplateHash"),
+		autorest.WithJSON(templateParameter),
+		autorest.WithQueryParameters(queryParameters))
+	return preparer.Prepare((&http.Request{}).WithContext(ctx))
+}
+
+// CalculateTemplateHashSender sends the CalculateTemplateHash request. The method will close the
+// http.Response Body if it receives an error.
+func (client DeploymentsClient) CalculateTemplateHashSender(req *http.Request) (*http.Response, error) {
+	sd := autorest.GetSendDecorators(req.Context(), autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
+	return autorest.SendWithSender(client, req, sd...)
+}
+
+// CalculateTemplateHashResponder handles the response to the CalculateTemplateHash request. The method always
+// closes the http.Response Body.
+func (client DeploymentsClient) CalculateTemplateHashResponder(resp *http.Response) (result TemplateHashResult, err error) {
+	err = autorest.Respond(
+		resp,
+		client.ByInspecting(),
+		azure.WithErrorUnlessStatusCode(http.StatusOK),
+		autorest.ByUnmarshallingJSON(&result),
+		autorest.ByClosing())
+	result.Response = autorest.Response{Response: resp}
+	return
+}
+
 // Cancel you can cancel a deployment only if the provisioningState is Accepted or Running. After the deployment is
 // canceled, the provisioningState is set to Canceled. Canceling a template deployment stops the currently running
 // template deployment and leaves the resource group partially deployed.

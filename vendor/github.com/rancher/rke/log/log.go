@@ -13,6 +13,7 @@ const (
 )
 
 type logger interface {
+	Debugf(msg string, args ...interface{})
 	Infof(msg string, args ...interface{})
 	Warnf(msg string, args ...interface{})
 }
@@ -36,4 +37,8 @@ func Infof(ctx context.Context, msg string, args ...interface{}) {
 
 func Warnf(ctx context.Context, msg string, args ...interface{}) {
 	getLogger(ctx).Warnf(msg, args...)
+}
+
+func Debugf(ctx context.Context, msg string, args ...interface{}) {
+	getLogger(ctx).Debugf(msg, args...)
 }

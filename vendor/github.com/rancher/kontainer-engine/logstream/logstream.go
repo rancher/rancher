@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
+
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -21,6 +23,7 @@ type LogEvent struct {
 type Logger interface {
 	Infof(msg string, args ...interface{})
 	Warnf(msg string, args ...interface{})
+	Debugf(msg string, args ...interface{})
 }
 
 type LoggerStream interface {
@@ -67,6 +70,10 @@ func (l *loggerStream) Infof(msg string, args ...interface{}) {
 
 func (l *loggerStream) Warnf(msg string, args ...interface{}) {
 	l.write(true, msg, args...)
+}
+
+func (l *loggerStream) Debugf(msg string, args ...interface{}) {
+	logrus.Debugf(msg, args...)
 }
 
 func (l *loggerStream) write(error bool, msg string, args ...interface{}) {

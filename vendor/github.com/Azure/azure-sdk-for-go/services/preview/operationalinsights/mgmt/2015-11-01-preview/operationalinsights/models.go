@@ -872,11 +872,11 @@ type WorkspaceListUsagesResult struct {
 type WorkspaceProperties struct {
 	// ProvisioningState - The provisioning state of the workspace. Possible values include: 'Creating', 'Succeeded', 'Failed', 'Canceled', 'Deleting', 'ProvisioningAccount'
 	ProvisioningState EntityStatus `json:"provisioningState,omitempty"`
-	// Source - The source of the workspace.  Source defines where the workspace was created. 'Azure' implies it was created in Azure.  'External' implies it was created via the Operational Insights Portal. This value is set on the service side and read-only on the client side.
+	// Source - READ-ONLY; This is a read-only legacy property. It is always set to 'Azure' by the service. Kept here for backward compatibility.
 	Source *string `json:"source,omitempty"`
-	// CustomerID - The ID associated with the workspace.  Setting this value at creation time allows the workspace being created to be linked to an existing workspace.
+	// CustomerID - READ-ONLY; This is a read-only property. Represents the ID associated with the workspace.
 	CustomerID *string `json:"customerId,omitempty"`
-	// PortalURL - The URL of the Operational Insights portal for this workspace.  This value is set on the service side and read-only on the client side.
+	// PortalURL - READ-ONLY; This is a legacy property and is not used anymore. Kept here for backward compatibility.
 	PortalURL *string `json:"portalUrl,omitempty"`
 	// Sku - The SKU of the workspace.
 	Sku *Sku `json:"sku,omitempty"`

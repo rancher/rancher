@@ -3,6 +3,7 @@ package restwatch
 import (
 	"time"
 
+	"github.com/rancher/norman/pkg/ratelimit"
 	"k8s.io/client-go/rest"
 )
 
@@ -11,6 +12,11 @@ type WatchClient interface {
 }
 
 func UnversionedRESTClientFor(config *rest.Config) (rest.Interface, error) {
+	// k8s <= 1.16 would not rate limit when calling UnversionedRESTClientFor(config)
+	// this keeps that behavior which seems to be relied on in Rancher.
+	if config.QPS == 0.0 && config.RateLimiter == nil {
+		config.RateLimiter = ratelimit.None
+	}
 	client, err := rest.UnversionedRESTClientFor(config)
 	if err != nil {
 		return nil, err

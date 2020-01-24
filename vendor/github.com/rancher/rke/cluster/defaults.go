@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	apiserverv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
-	eventratelimitv1alpha1 "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1"
 )
 
 const (
@@ -294,7 +293,7 @@ func newDefaultAuditLogConfig() *v3.AuditLogConfig {
 	return c
 }
 
-func getEventRateLimitPluginFromConfig(c *eventratelimitv1alpha1.Configuration) (apiserverv1alpha1.AdmissionPluginConfiguration, error) {
+func getEventRateLimitPluginFromConfig(c *v3.Configuration) (apiserverv1alpha1.AdmissionPluginConfiguration, error) {
 	plugin := apiserverv1alpha1.AdmissionPluginConfiguration{
 		Name: EventRateLimitPluginName,
 		Configuration: &runtime.Unknown{
@@ -311,15 +310,15 @@ func getEventRateLimitPluginFromConfig(c *eventratelimitv1alpha1.Configuration) 
 	return plugin, nil
 }
 
-func newDefaultEventRateLimitConfig() *eventratelimitv1alpha1.Configuration {
-	return &eventratelimitv1alpha1.Configuration{
+func newDefaultEventRateLimitConfig() *v3.Configuration {
+	return &v3.Configuration{
 		TypeMeta: v1.TypeMeta{
 			Kind:       "Configuration",
-			APIVersion: eventratelimitv1alpha1.SchemeGroupVersion.String(),
+			APIVersion: v3.SchemeGroupVersion.String(),
 		},
-		Limits: []eventratelimitv1alpha1.Limit{
+		Limits: []v3.Limit{
 			{
-				Type:  eventratelimitv1alpha1.ServerLimitType,
+				Type:  v3.ServerLimitType,
 				QPS:   5000,
 				Burst: 20000,
 			},

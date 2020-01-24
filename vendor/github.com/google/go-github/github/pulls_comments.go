@@ -13,22 +13,26 @@ import (
 
 // PullRequestComment represents a comment left on a pull request.
 type PullRequestComment struct {
-	ID               *int       `json:"id,omitempty"`
-	InReplyTo        *int       `json:"in_reply_to,omitempty"`
-	Body             *string    `json:"body,omitempty"`
-	Path             *string    `json:"path,omitempty"`
-	DiffHunk         *string    `json:"diff_hunk,omitempty"`
-	Position         *int       `json:"position,omitempty"`
-	OriginalPosition *int       `json:"original_position,omitempty"`
-	CommitID         *string    `json:"commit_id,omitempty"`
-	OriginalCommitID *string    `json:"original_commit_id,omitempty"`
-	User             *User      `json:"user,omitempty"`
-	Reactions        *Reactions `json:"reactions,omitempty"`
-	CreatedAt        *time.Time `json:"created_at,omitempty"`
-	UpdatedAt        *time.Time `json:"updated_at,omitempty"`
-	URL              *string    `json:"url,omitempty"`
-	HTMLURL          *string    `json:"html_url,omitempty"`
-	PullRequestURL   *string    `json:"pull_request_url,omitempty"`
+	ID                  *int64     `json:"id,omitempty"`
+	InReplyTo           *int64     `json:"in_reply_to_id,omitempty"`
+	Body                *string    `json:"body,omitempty"`
+	Path                *string    `json:"path,omitempty"`
+	DiffHunk            *string    `json:"diff_hunk,omitempty"`
+	PullRequestReviewID *int64     `json:"pull_request_review_id,omitempty"`
+	Position            *int       `json:"position,omitempty"`
+	OriginalPosition    *int       `json:"original_position,omitempty"`
+	CommitID            *string    `json:"commit_id,omitempty"`
+	OriginalCommitID    *string    `json:"original_commit_id,omitempty"`
+	User                *User      `json:"user,omitempty"`
+	Reactions           *Reactions `json:"reactions,omitempty"`
+	CreatedAt           *time.Time `json:"created_at,omitempty"`
+	UpdatedAt           *time.Time `json:"updated_at,omitempty"`
+	// AuthorAssociation is the comment author's relationship to the pull request's repository.
+	// Possible values are "COLLABORATOR", "CONTRIBUTOR", "FIRST_TIMER", "FIRST_TIME_CONTRIBUTOR", "MEMBER", "OWNER", or "NONE".
+	AuthorAssociation *string `json:"author_association,omitempty"`
+	URL               *string `json:"url,omitempty"`
+	HTMLURL           *string `json:"html_url,omitempty"`
+	PullRequestURL    *string `json:"pull_request_url,omitempty"`
 }
 
 func (p PullRequestComment) String() string {
@@ -87,8 +91,8 @@ func (s *PullRequestsService) ListComments(ctx context.Context, owner string, re
 // GetComment fetches the specified pull request comment.
 //
 // GitHub API docs: https://developer.github.com/v3/pulls/comments/#get-a-single-comment
-func (s *PullRequestsService) GetComment(ctx context.Context, owner string, repo string, number int) (*PullRequestComment, *Response, error) {
-	u := fmt.Sprintf("repos/%v/%v/pulls/comments/%d", owner, repo, number)
+func (s *PullRequestsService) GetComment(ctx context.Context, owner string, repo string, commentID int64) (*PullRequestComment, *Response, error) {
+	u := fmt.Sprintf("repos/%v/%v/pulls/comments/%d", owner, repo, commentID)
 	req, err := s.client.NewRequest("GET", u, nil)
 	if err != nil {
 		return nil, nil, err
@@ -125,11 +129,38 @@ func (s *PullRequestsService) CreateComment(ctx context.Context, owner string, r
 	return c, resp, nil
 }
 
+// CreateCommentInReplyTo creates a new comment as a reply to an existing pull request comment.
+//
+// GitHub API docs: https://developer.github.com/v3/pulls/comments/#alternative-input
+func (s *PullRequestsService) CreateCommentInReplyTo(ctx context.Context, owner string, repo string, number int, body string, commentID int64) (*PullRequestComment, *Response, error) {
+	comment := &struct {
+		Body      string `json:"body,omitempty"`
+		InReplyTo int64  `json:"in_reply_to,omitempty"`
+	}{
+		Body:      body,
+		InReplyTo: commentID,
+	}
+	u := fmt.Sprintf("repos/%v/%v/pulls/%d/comments", owner, repo, number)
+	req, err := s.client.NewRequest("POST", u, comment)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	c := new(PullRequestComment)
+	resp, err := s.client.Do(ctx, req, c)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return c, resp, nil
+}
+
 // EditComment updates a pull request comment.
+// A non-nil comment.Body must be provided. Other comment fields should be left nil.
 //
 // GitHub API docs: https://developer.github.com/v3/pulls/comments/#edit-a-comment
-func (s *PullRequestsService) EditComment(ctx context.Context, owner string, repo string, number int, comment *PullRequestComment) (*PullRequestComment, *Response, error) {
-	u := fmt.Sprintf("repos/%v/%v/pulls/comments/%d", owner, repo, number)
+func (s *PullRequestsService) EditComment(ctx context.Context, owner string, repo string, commentID int64, comment *PullRequestComment) (*PullRequestComment, *Response, error) {
+	u := fmt.Sprintf("repos/%v/%v/pulls/comments/%d", owner, repo, commentID)
 	req, err := s.client.NewRequest("PATCH", u, comment)
 	if err != nil {
 		return nil, nil, err
@@ -147,8 +178,8 @@ func (s *PullRequestsService) EditComment(ctx context.Context, owner string, rep
 // DeleteComment deletes a pull request comment.
 //
 // GitHub API docs: https://developer.github.com/v3/pulls/comments/#delete-a-comment
-func (s *PullRequestsService) DeleteComment(ctx context.Context, owner string, repo string, number int) (*Response, error) {
-	u := fmt.Sprintf("repos/%v/%v/pulls/comments/%d", owner, repo, number)
+func (s *PullRequestsService) DeleteComment(ctx context.Context, owner string, repo string, commentID int64) (*Response, error) {
+	u := fmt.Sprintf("repos/%v/%v/pulls/comments/%d", owner, repo, commentID)
 	req, err := s.client.NewRequest("DELETE", u, nil)
 	if err != nil {
 		return nil, err
