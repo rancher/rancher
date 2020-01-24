@@ -770,7 +770,7 @@ data:
       "plugins": [
         {
           "type": "calico",
-{{- if ne .MTU 0}}
+{{- if ne (default 0 .MTU) 0}}
           "mtu": {{.MTU}},
 {{- end}}
           "log_level": "WARNING",
@@ -1380,7 +1380,7 @@ data:
       "plugins": [
         {
           "type": "calico",
-{{- if ne .MTU 0}}
+{{- if ne (default 0 .MTU) 0}}
           "mtu": {{.MTU}},
 {{- end}}
           "log_level": "WARNING",
@@ -1829,7 +1829,7 @@ data:
       "plugins": [
         {
           "type": "calico",
-{{- if ne .MTU 0}}
+{{- if ne (default 0 .MTU) 0}}
           "mtu": {{.MTU}},
 {{- end}}
           "log_level": "WARNING",
@@ -2459,7 +2459,7 @@ data:
       "plugins": [
         {
           "type": "calico",
-{{- if ne .MTU 0}}
+{{- if ne (default 0 .MTU) 0}}
           "mtu": {{.MTU}},
 {{- end}}
           "log_level": "WARNING",

@@ -5404,6 +5404,8 @@ type BackendAddressPoolPropertiesFormat struct {
 	LoadBalancingRules *[]SubResource `json:"loadBalancingRules,omitempty"`
 	// OutboundRule - READ-ONLY; Gets outbound rules that use this backend address pool.
 	OutboundRule *SubResource `json:"outboundRule,omitempty"`
+	// OutboundRules - READ-ONLY; Gets outbound rules that use this backend address pool.
+	OutboundRules *[]SubResource `json:"outboundRules,omitempty"`
 	// ProvisioningState - Get provisioning state of the public IP resource. Possible values are: 'Updating', 'Deleting', and 'Failed'.
 	ProvisioningState *string `json:"provisioningState,omitempty"`
 }
@@ -13524,7 +13526,7 @@ type OperationPropertiesFormatServiceSpecification struct {
 	LogSpecifications *[]LogSpecification `json:"logSpecifications,omitempty"`
 }
 
-// OutboundRule outbound pool of the load balancer.
+// OutboundRule outbound rule of the load balancer.
 type OutboundRule struct {
 	// OutboundRulePropertiesFormat - Properties of load balancer outbound rule.
 	*OutboundRulePropertiesFormat `json:"properties,omitempty"`
@@ -13605,7 +13607,7 @@ func (or *OutboundRule) UnmarshalJSON(body []byte) error {
 	return nil
 }
 
-// OutboundRulePropertiesFormat outbound pool of the load balancer.
+// OutboundRulePropertiesFormat outbound rule of the load balancer.
 type OutboundRulePropertiesFormat struct {
 	// AllocatedOutboundPorts - The number of outbound ports to be used for NAT.
 	AllocatedOutboundPorts *int32 `json:"allocatedOutboundPorts,omitempty"`
@@ -15001,6 +15003,8 @@ type PublicIPPrefixPropertiesFormat struct {
 	IPPrefix *string `json:"ipPrefix,omitempty"`
 	// PublicIPAddresses - The list of all referenced PublicIPAddresses
 	PublicIPAddresses *[]ReferencedPublicIPAddress `json:"publicIPAddresses,omitempty"`
+	// LoadBalancerFrontendIPConfiguration - READ-ONLY; The reference to load balancer frontend IP configuration associated with the public IP prefix.
+	LoadBalancerFrontendIPConfiguration *SubResource `json:"loadBalancerFrontendIpConfiguration,omitempty"`
 	// ResourceGUID - The resource GUID property of the public IP prefix resource.
 	ResourceGUID *string `json:"resourceGuid,omitempty"`
 	// ProvisioningState - The provisioning state of the Public IP prefix resource. Possible values are: 'Updating', 'Deleting', and 'Failed'.

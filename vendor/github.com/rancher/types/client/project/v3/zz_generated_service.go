@@ -35,6 +35,7 @@ const (
 	ServiceFieldState                    = "state"
 	ServiceFieldTargetDNSRecordIDs       = "targetDnsRecordIds"
 	ServiceFieldTargetWorkloadIDs        = "targetWorkloadIds"
+	ServiceFieldTopologyKeys             = "topologyKeys"
 	ServiceFieldTransitioning            = "transitioning"
 	ServiceFieldTransitioningMessage     = "transitioningMessage"
 	ServiceFieldUUID                     = "uuid"
@@ -72,6 +73,7 @@ type Service struct {
 	State                    string                 `json:"state,omitempty" yaml:"state,omitempty"`
 	TargetDNSRecordIDs       []string               `json:"targetDnsRecordIds,omitempty" yaml:"targetDnsRecordIds,omitempty"`
 	TargetWorkloadIDs        []string               `json:"targetWorkloadIds,omitempty" yaml:"targetWorkloadIds,omitempty"`
+	TopologyKeys             []string               `json:"topologyKeys,omitempty" yaml:"topologyKeys,omitempty"`
 	Transitioning            string                 `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage     string                 `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                     string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`

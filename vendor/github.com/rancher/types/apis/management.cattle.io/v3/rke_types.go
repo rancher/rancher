@@ -7,7 +7,6 @@ import (
 	apiserverv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
-	eventratelimitv1alpha1 "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1"
 )
 
 type RancherKubernetesEngineConfig struct {
@@ -288,8 +287,8 @@ type KubeAPIService struct {
 }
 
 type EventRateLimit struct {
-	Enabled       bool                                  `yaml:"enabled" json:"enabled,omitempty"`
-	Configuration *eventratelimitv1alpha1.Configuration `yaml:"configuration" json:"configuration,omitempty" norman:"type=map[json]"`
+	Enabled       bool           `yaml:"enabled" json:"enabled,omitempty"`
+	Configuration *Configuration `yaml:"configuration" json:"configuration,omitempty" norman:"type=map[json]"`
 }
 
 type AuditLog struct {

@@ -9,32 +9,33 @@ replace (
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.3
-	k8s.io/api => k8s.io/api v0.0.0-20190918155943-95b840bb6a1f
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.0.0-20190918161926-8f644eb6e783
-	k8s.io/apimachinery => k8s.io/apimachinery v0.0.0-20190913080033-27d36303b655
-	k8s.io/apiserver => k8s.io/apiserver v0.0.0-20190918160949-bfa5e2e684ad
-	k8s.io/cli-runtime => k8s.io/cli-runtime v0.0.0-20190918162238-f783a3654da8
-	k8s.io/client-go => github.com/rancher/client-go v1.16.0-rancher.3
-	k8s.io/cloud-provider => k8s.io/cloud-provider v0.0.0-20190918163234-a9c1f33e9fb9
-	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.0.0-20190918163108-da9fdfce26bb
-	k8s.io/code-generator => k8s.io/code-generator v0.0.0-20190912054826-cd179ad6a269
-	k8s.io/component-base => k8s.io/component-base v0.0.0-20190918160511-547f6c5d7090
-	k8s.io/cri-api => k8s.io/cri-api v0.0.0-20190828162817-608eb1dad4ac
-	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.0.0-20190918163402-db86a8c7bb21
-	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.0.0-20190918161219-8c8f079fddc3
-	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.0.0-20190918162944-7a93a0ddadd8
-	k8s.io/kube-proxy => k8s.io/kube-proxy v0.0.0-20190918162534-de037b596c1e
-	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.0.0-20190918162820-3b5c1246eb18
-	k8s.io/kubectl => k8s.io/kubectl v0.0.0-20190918164019-21692a0861df
-	k8s.io/kubelet => k8s.io/kubelet v0.0.0-20190918162654-250a1838aa2c
-	k8s.io/kubernetes => k8s.io/kubernetes v1.16.0
-	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.0.0-20190918163543-cfa506e53441
-	k8s.io/metrics => k8s.io/metrics v0.0.0-20190918162108-227c654b2546
-	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.0.0-20190918161442-d4c9c65c82af
+
+	k8s.io/api => k8s.io/api v0.17.2
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.17.2
+	k8s.io/apimachinery => k8s.io/apimachinery v0.17.2
+	k8s.io/apiserver => k8s.io/apiserver v0.17.2
+	k8s.io/cli-runtime => k8s.io/cli-runtime v0.17.2
+	k8s.io/client-go => github.com/rancher/client-go v1.17.2-rancher.2
+	k8s.io/cloud-provider => k8s.io/cloud-provider v0.17.2
+	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.17.2
+	k8s.io/code-generator => k8s.io/code-generator v0.17.2
+	k8s.io/component-base => k8s.io/component-base v0.17.2
+	k8s.io/cri-api => k8s.io/cri-api v0.17.2
+	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.17.2
+	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.17.2
+	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.17.2
+	k8s.io/kube-proxy => k8s.io/kube-proxy v0.17.2
+	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.17.2
+	k8s.io/kubectl => k8s.io/kubectl v0.17.2
+	k8s.io/kubelet => k8s.io/kubelet v0.17.2
+	k8s.io/kubernetes => k8s.io/kubernetes v1.17.2
+	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.17.2
+	k8s.io/metrics => k8s.io/metrics v0.17.2
+	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.17.2
 )
 
 require (
-	github.com/Azure/azure-sdk-for-go v32.5.0+incompatible
+	github.com/Azure/azure-sdk-for-go v35.0.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.9.0
 	github.com/Azure/go-autorest/autorest/adal v0.5.0
 	github.com/DataDog/zstd v1.4.1 // indirect
@@ -56,7 +57,7 @@ require (
 	github.com/elazarl/goproxy/ext v0.0.0-20190711103511-473e67f1d7d2 // indirect
 	github.com/frankban/quicktest v1.4.1 // indirect
 	github.com/ghodss/yaml v1.0.0
-	github.com/google/go-github v0.0.0-20170719170300-e062a8cd852f
+	github.com/google/go-github v17.0.0+incompatible
 	github.com/google/go-querystring v1.0.0
 	github.com/gorilla/mux v1.7.3
 	github.com/gorilla/websocket v1.4.1
@@ -72,16 +73,16 @@ require (
 	github.com/prometheus/client_golang v1.1.0
 	github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90
 	github.com/prometheus/common v0.6.0
-	github.com/rancher/kontainer-driver-metadata v0.0.0-20200113180946-882815341981
-	github.com/rancher/kontainer-engine v0.0.4-dev.0.20191210170908-feb98acd7948
+	github.com/rancher/kontainer-driver-metadata v0.0.0-20200123225253-a5b9f3e0b2df
+	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200123235809-1b6d4a82a415
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20200122231539-c95753fa5765
+	github.com/rancher/norman v0.0.0-20200124050618-768222c62d5b
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.3
-	github.com/rancher/rke v1.1.0-rc4.0.20200113191058-38f9b2902ed9
+	github.com/rancher/rke v1.1.0-rc4.0.20200123230443-25e7f987775d
 	github.com/rancher/security-scan v0.1.5
-	github.com/rancher/types v0.0.0-20200123005858-1ea440f413a1
-	github.com/rancher/wrangler v0.1.6-0.20190822171720-e78d8316ee95
+	github.com/rancher/types v0.0.0-20200123224322-9adcafc483ee
+	github.com/rancher/wrangler v0.4.0
 	github.com/robfig/cron v1.1.0
 	github.com/russellhaering/goxmldsig v0.0.0-20180122054445-a348271703b2 // indirect
 	github.com/satori/go.uuid v1.2.0
@@ -98,20 +99,20 @@ require (
 	github.com/xdg/stringprep v1.0.0 // indirect
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
-	golang.org/x/sync v0.0.0-20190423024810-112230192c58
+	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
-	google.golang.org/grpc v1.23.0
+	google.golang.org/grpc v1.23.1
 	gopkg.in/asn1-ber.v1 v1.0.0-20150924051756-4e86f4367175 // indirect
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/ldap.v2 v2.5.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.2.4
-	k8s.io/api v0.0.0
-	k8s.io/apiextensions-apiserver v0.0.0
-	k8s.io/apimachinery v0.0.0
-	k8s.io/apiserver v0.0.0
-	k8s.io/cli-runtime v0.0.0
+	k8s.io/api v0.17.2
+	k8s.io/apiextensions-apiserver v0.17.2
+	k8s.io/apimachinery v0.17.2
+	k8s.io/apiserver v0.17.2
+	k8s.io/cli-runtime v0.17.2
 	k8s.io/client-go v11.0.1-0.20190805182715-88a2adca7e76+incompatible
-	k8s.io/kubernetes v1.16.0
-	k8s.io/utils v0.0.0-20190801114015-581e00157fb1
+	k8s.io/kubernetes v1.17.2
+	k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
 )

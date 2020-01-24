@@ -18,6 +18,7 @@ type Reference struct {
 	Ref    *string    `json:"ref"`
 	URL    *string    `json:"url"`
 	Object *GitObject `json:"object"`
+	NodeID *string    `json:"node_id,omitempty"`
 }
 
 func (r Reference) String() string {

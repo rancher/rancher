@@ -139,7 +139,7 @@ func (c *client) CreateHook(pipeline *v3.Pipeline, accessToken string) (string, 
 		return "", err
 	}
 
-	return strconv.Itoa(hook.GetID()), err
+	return strconv.FormatInt(hook.GetID(), 10), err
 }
 
 func (c *client) DeleteHook(pipeline *v3.Pipeline, accessToken string) error {

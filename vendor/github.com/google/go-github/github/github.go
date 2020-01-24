@@ -27,10 +27,9 @@ import (
 )
 
 const (
-	libraryVersion = "8"
 	defaultBaseURL = "https://api.github.com/"
 	uploadBaseURL  = "https://uploads.github.com/"
-	userAgent      = "go-github/" + libraryVersion
+	userAgent      = "go-github"
 
 	headerRateLimit     = "X-RateLimit-Limit"
 	headerRateRemaining = "X-RateLimit-Remaining"
@@ -46,14 +45,8 @@ const (
 
 	// Media Type values to access preview APIs
 
-	// https://developer.github.com/changes/2015-03-09-licenses-api/
-	mediaTypeLicensesPreview = "application/vnd.github.drax-preview+json"
-
 	// https://developer.github.com/changes/2014-12-09-new-attributes-for-stars-api/
 	mediaTypeStarringPreview = "application/vnd.github.v3.star+json"
-
-	// https://developer.github.com/changes/2015-11-11-protected-branches-api/
-	mediaTypeProtectedBranchesPreview = "application/vnd.github.loki-preview+json"
 
 	// https://help.github.com/enterprise/2.4/admin/guides/migrations/exporting-the-github-com-organization-s-repositories/
 	mediaTypeMigrationsPreview = "application/vnd.github.wyandotte-preview+json"
@@ -66,10 +59,6 @@ const (
 
 	// https://developer.github.com/changes/2016-05-12-reactions-api-preview/
 	mediaTypeReactionsPreview = "application/vnd.github.squirrel-girl-preview"
-
-	// https://developer.github.com/changes/2016-04-01-squash-api-preview/
-	// https://developer.github.com/changes/2016-09-26-pull-request-merge-api-update/
-	mediaTypeSquashPreview = "application/vnd.github.polaris-preview+json"
 
 	// https://developer.github.com/changes/2016-04-04-git-signing-api-preview/
 	mediaTypeGitSigningPreview = "application/vnd.github.cryptographer-preview+json"
@@ -103,6 +92,36 @@ const (
 
 	// https://developer.github.com/changes/2017-07-17-update-topics-on-repositories/
 	mediaTypeTopicsPreview = "application/vnd.github.mercy-preview+json"
+
+	// https://developer.github.com/changes/2017-08-30-preview-nested-teams/
+	mediaTypeNestedTeamsPreview = "application/vnd.github.hellcat-preview+json"
+
+	// https://developer.github.com/changes/2017-11-09-repository-transfer-api-preview/
+	mediaTypeRepositoryTransferPreview = "application/vnd.github.nightshade-preview+json"
+
+	// https://developer.github.com/changes/2018-01-25-organization-invitation-api-preview/
+	mediaTypeOrganizationInvitationPreview = "application/vnd.github.dazzler-preview+json"
+
+	// https://developer.github.com/changes/2018-03-16-protected-branches-required-approving-reviews/
+	mediaTypeRequiredApprovingReviewsPreview = "application/vnd.github.luke-cage-preview+json"
+
+	// https://developer.github.com/changes/2018-02-22-label-description-search-preview/
+	mediaTypeLabelDescriptionSearchPreview = "application/vnd.github.symmetra-preview+json"
+
+	// https://developer.github.com/changes/2018-02-07-team-discussions-api/
+	mediaTypeTeamDiscussionsPreview = "application/vnd.github.echo-preview+json"
+
+	// https://developer.github.com/changes/2018-03-21-hovercard-api-preview/
+	mediaTypeHovercardPreview = "application/vnd.github.hagar-preview+json"
+
+	// https://developer.github.com/changes/2018-01-10-lock-reason-api-preview/
+	mediaTypeLockReasonPreview = "application/vnd.github.sailor-v-preview+json"
+
+	// https://developer.github.com/changes/2018-05-07-new-checks-api-public-beta/
+	mediaTypeCheckRunsPreview = "application/vnd.github.antiope-preview+json"
+
+	// https://developer.github.com/enterprise/2.13/v3/repos/pre_receive_hooks/
+	mediaTypePreReceiveHooksPreview = "application/vnd.github.eye-scream-preview"
 )
 
 // A Client manages communication with the GitHub API.
@@ -131,19 +150,22 @@ type Client struct {
 	Admin          *AdminService
 	Apps           *AppsService
 	Authorizations *AuthorizationsService
+	Checks         *ChecksService
 	Gists          *GistsService
 	Git            *GitService
 	Gitignores     *GitignoresService
 	Issues         *IssuesService
+	Licenses       *LicensesService
+	Marketplace    *MarketplaceService
+	Migrations     *MigrationService
 	Organizations  *OrganizationsService
 	Projects       *ProjectsService
 	PullRequests   *PullRequestsService
+	Reactions      *ReactionsService
 	Repositories   *RepositoriesService
 	Search         *SearchService
+	Teams          *TeamsService
 	Users          *UsersService
-	Licenses       *LicensesService
-	Migrations     *MigrationService
-	Reactions      *ReactionsService
 }
 
 type service struct {
@@ -220,11 +242,13 @@ func NewClient(httpClient *http.Client) *Client {
 	c.Admin = (*AdminService)(&c.common)
 	c.Apps = (*AppsService)(&c.common)
 	c.Authorizations = (*AuthorizationsService)(&c.common)
+	c.Checks = (*ChecksService)(&c.common)
 	c.Gists = (*GistsService)(&c.common)
 	c.Git = (*GitService)(&c.common)
 	c.Gitignores = (*GitignoresService)(&c.common)
 	c.Issues = (*IssuesService)(&c.common)
 	c.Licenses = (*LicensesService)(&c.common)
+	c.Marketplace = &MarketplaceService{client: c}
 	c.Migrations = (*MigrationService)(&c.common)
 	c.Organizations = (*OrganizationsService)(&c.common)
 	c.Projects = (*ProjectsService)(&c.common)
@@ -232,8 +256,40 @@ func NewClient(httpClient *http.Client) *Client {
 	c.Reactions = (*ReactionsService)(&c.common)
 	c.Repositories = (*RepositoriesService)(&c.common)
 	c.Search = (*SearchService)(&c.common)
+	c.Teams = (*TeamsService)(&c.common)
 	c.Users = (*UsersService)(&c.common)
 	return c
+}
+
+// NewEnterpriseClient returns a new GitHub API client with provided
+// base URL and upload URL (often the same URL).
+// If either URL does not have a trailing slash, one is added automatically.
+// If a nil httpClient is provided, http.DefaultClient will be used.
+//
+// Note that NewEnterpriseClient is a convenience helper only;
+// its behavior is equivalent to using NewClient, followed by setting
+// the BaseURL and UploadURL fields.
+func NewEnterpriseClient(baseURL, uploadURL string, httpClient *http.Client) (*Client, error) {
+	baseEndpoint, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.HasSuffix(baseEndpoint.Path, "/") {
+		baseEndpoint.Path += "/"
+	}
+
+	uploadEndpoint, err := url.Parse(uploadURL)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.HasSuffix(uploadEndpoint.Path, "/") {
+		uploadEndpoint.Path += "/"
+	}
+
+	c := NewClient(httpClient)
+	c.BaseURL = baseEndpoint
+	c.UploadURL = uploadEndpoint
+	return c, nil
 }
 
 // NewRequest creates an API request. A relative URL can be provided in urlStr,
@@ -242,17 +298,20 @@ func NewClient(httpClient *http.Client) *Client {
 // specified, the value pointed to by body is JSON encoded and included as the
 // request body.
 func (c *Client) NewRequest(method, urlStr string, body interface{}) (*http.Request, error) {
-	rel, err := url.Parse(urlStr)
+	if !strings.HasSuffix(c.BaseURL.Path, "/") {
+		return nil, fmt.Errorf("BaseURL must have a trailing slash, but %q does not", c.BaseURL)
+	}
+	u, err := c.BaseURL.Parse(urlStr)
 	if err != nil {
 		return nil, err
 	}
 
-	u := c.BaseURL.ResolveReference(rel)
-
 	var buf io.ReadWriter
 	if body != nil {
 		buf = new(bytes.Buffer)
-		err := json.NewEncoder(buf).Encode(body)
+		enc := json.NewEncoder(buf)
+		enc.SetEscapeHTML(false)
+		err := enc.Encode(body)
 		if err != nil {
 			return nil, err
 		}
@@ -277,12 +336,14 @@ func (c *Client) NewRequest(method, urlStr string, body interface{}) (*http.Requ
 // urlStr, in which case it is resolved relative to the UploadURL of the Client.
 // Relative URLs should always be specified without a preceding slash.
 func (c *Client) NewUploadRequest(urlStr string, reader io.Reader, size int64, mediaType string) (*http.Request, error) {
-	rel, err := url.Parse(urlStr)
+	if !strings.HasSuffix(c.UploadURL.Path, "/") {
+		return nil, fmt.Errorf("UploadURL must have a trailing slash, but %q does not", c.UploadURL)
+	}
+	u, err := c.UploadURL.Parse(urlStr)
 	if err != nil {
 		return nil, err
 	}
 
-	u := c.UploadURL.ResolveReference(rel)
 	req, err := http.NewRequest("POST", u.String(), reader)
 	if err != nil {
 		return nil, err
@@ -397,7 +458,7 @@ func parseRate(r *http.Response) Rate {
 // The provided ctx must be non-nil. If it is canceled or times out,
 // ctx.Err() will be returned.
 func (c *Client) Do(ctx context.Context, req *http.Request, v interface{}) (*Response, error) {
-	ctx, req = withContext(ctx, req)
+	req = withContext(ctx, req)
 
 	rateLimitCategory := category(req.URL.Path)
 
@@ -429,12 +490,7 @@ func (c *Client) Do(ctx context.Context, req *http.Request, v interface{}) (*Res
 
 		return nil, err
 	}
-
-	defer func() {
-		// Drain up to 512 bytes and close the body to let the Transport reuse the connection
-		io.CopyN(ioutil.Discard, resp.Body, 512)
-		resp.Body.Close()
-	}()
+	defer resp.Body.Close()
 
 	response := newResponse(resp)
 
@@ -444,18 +500,25 @@ func (c *Client) Do(ctx context.Context, req *http.Request, v interface{}) (*Res
 
 	err = CheckResponse(resp)
 	if err != nil {
-		// even though there was an error, we still return the response
-		// in case the caller wants to inspect it further
-		return response, err
+		// Even though there was an error, we still return the response
+		// in case the caller wants to inspect it further.
+		// However, if the error is AcceptedError, decode it below before
+		// returning from this function and closing the response body.
+		if _, ok := err.(*AcceptedError); !ok {
+			return response, err
+		}
 	}
 
 	if v != nil {
 		if w, ok := v.(io.Writer); ok {
 			io.Copy(w, resp.Body)
 		} else {
-			err = json.NewDecoder(resp.Body).Decode(v)
-			if err == io.EOF {
-				err = nil // ignore EOF errors caused by empty response body
+			decErr := json.NewDecoder(resp.Body).Decode(v)
+			if decErr == io.EOF {
+				decErr = nil // ignore EOF errors caused by empty response body
+			}
+			if decErr != nil {
+				err = decErr
 			}
 		}
 	}
@@ -552,7 +615,7 @@ func (*AcceptedError) Error() string {
 }
 
 // AbuseRateLimitError occurs when GitHub returns 403 Forbidden response with the
-// "documentation_url" field value equal to "https://developer.github.com/v3#abuse-rate-limits".
+// "documentation_url" field value equal to "https://developer.github.com/v3/#abuse-rate-limits".
 type AbuseRateLimitError struct {
 	Response *http.Response // HTTP response that caused this error
 	Message  string         `json:"message"` // error message
@@ -644,7 +707,7 @@ func CheckResponse(r *http.Response) error {
 			Response: errorResponse.Response,
 			Message:  errorResponse.Message,
 		}
-	case r.StatusCode == http.StatusForbidden && errorResponse.DocumentationURL == "https://developer.github.com/v3#abuse-rate-limits":
+	case r.StatusCode == http.StatusForbidden && strings.HasSuffix(errorResponse.DocumentationURL, "/v3/#abuse-rate-limits"):
 		abuseRateLimitError := &AbuseRateLimitError{
 			Response: errorResponse.Response,
 			Message:  errorResponse.Message,
@@ -810,14 +873,21 @@ func (t *UnauthenticatedRateLimitedTransport) RoundTrip(req *http.Request) (*htt
 	// To set extra querystring params, we must make a copy of the Request so
 	// that we don't modify the Request we were given. This is required by the
 	// specification of http.RoundTripper.
-	req = cloneRequest(req)
-	q := req.URL.Query()
+	//
+	// Since we are going to modify only req.URL here, we only need a deep copy
+	// of req.URL.
+	req2 := new(http.Request)
+	*req2 = *req
+	req2.URL = new(url.URL)
+	*req2.URL = *req.URL
+
+	q := req2.URL.Query()
 	q.Set("client_id", t.ClientID)
 	q.Set("client_secret", t.ClientSecret)
-	req.URL.RawQuery = q.Encode()
+	req2.URL.RawQuery = q.Encode()
 
 	// Make the HTTP request.
-	return t.transport().RoundTrip(req)
+	return t.transport().RoundTrip(req2)
 }
 
 // Client returns an *http.Client that makes requests which are subject to the
@@ -849,12 +919,24 @@ type BasicAuthTransport struct {
 
 // RoundTrip implements the RoundTripper interface.
 func (t *BasicAuthTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req = cloneRequest(req) // per RoundTrip contract
-	req.SetBasicAuth(t.Username, t.Password)
-	if t.OTP != "" {
-		req.Header.Set(headerOTP, t.OTP)
+	// To set extra headers, we must make a copy of the Request so
+	// that we don't modify the Request we were given. This is required by the
+	// specification of http.RoundTripper.
+	//
+	// Since we are going to modify only req.Header here, we only need a deep copy
+	// of req.Header.
+	req2 := new(http.Request)
+	*req2 = *req
+	req2.Header = make(http.Header, len(req.Header))
+	for k, s := range req.Header {
+		req2.Header[k] = append([]string(nil), s...)
 	}
-	return t.transport().RoundTrip(req)
+
+	req2.SetBasicAuth(t.Username, t.Password)
+	if t.OTP != "" {
+		req2.Header.Set(headerOTP, t.OTP)
+	}
+	return t.transport().RoundTrip(req2)
 }
 
 // Client returns an *http.Client that makes requests that are authenticated
@@ -868,20 +950,6 @@ func (t *BasicAuthTransport) transport() http.RoundTripper {
 		return t.Transport
 	}
 	return http.DefaultTransport
-}
-
-// cloneRequest returns a clone of the provided *http.Request. The clone is a
-// shallow copy of the struct and its Header map.
-func cloneRequest(r *http.Request) *http.Request {
-	// shallow copy of the struct
-	r2 := new(http.Request)
-	*r2 = *r
-	// deep copy of the Header
-	r2.Header = make(http.Header, len(r.Header))
-	for k, s := range r.Header {
-		r2.Header[k] = append([]string(nil), s...)
-	}
-	return r2
 }
 
 // formatRateReset formats d to look like "[rate reset in 2s]" or
@@ -916,6 +984,10 @@ func Bool(v bool) *bool { return &v }
 // Int is a helper routine that allocates a new int value
 // to store v and returns a pointer to it.
 func Int(v int) *int { return &v }
+
+// Int64 is a helper routine that allocates a new int64 value
+// to store v and returns a pointer to it.
+func Int64(v int64) *int64 { return &v }
 
 // String is a helper routine that allocates a new string value
 // to store v and returns a pointer to it.
