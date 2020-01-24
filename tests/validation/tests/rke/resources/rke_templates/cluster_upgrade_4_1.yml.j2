@@ -13,16 +13,8 @@ nodes:
   - address: {{ ip_address_2 }}
     user: {{ ssh_user_2 }}
     role: [worker]
-services:
-  etcd:
-    image: quay.io/coreos/etcd:latest
-  kube-api:
-    image: {{ k8_rancher_image }}
-  kube-controller:
-    image: {{ k8_rancher_image }}
-  scheduler:
-    image: {{ k8_rancher_image }}
-  kubelet:
-    image: {{ k8_rancher_image }}
-  kubeproxy:
-    image: {{ k8_rancher_image }}
+
+system_images:
+  etcd: rancher/coreos-etcd:v3.3.15-rancher1
+
+kubernetes_version: {{k8_rancher_image}}
