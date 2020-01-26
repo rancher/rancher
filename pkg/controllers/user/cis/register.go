@@ -5,6 +5,7 @@ import (
 
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
@@ -36,6 +37,9 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 		mgmtClusterScanClient,
 	}
 
+	cisConfig := mgmtContext.Management.CisConfigs(namespace.GlobalNamespace)
+	cisConfigLister := mgmtContext.Management.CisConfigs(namespace.GlobalNamespace).Controller().Lister()
+
 	clusterScanHandler := &cisScanHandler{
 		mgmtCtxClusterClient:         mgmtClusterClient,
 		mgmtCtxAppClient:             mgmtAppClient,
@@ -48,6 +52,8 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 		clusterLister:                clusterLister,
 		projectLister:                projectLister,
 		configMapsClient:             configMapsClient,
+		cisConfig:                    cisConfig,
+		cisConfigLister:              cisConfigLister,
 	}
 
 	pods.AddHandler(ctx, "podHandler", podHandler.Sync)

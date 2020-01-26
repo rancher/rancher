@@ -25,6 +25,7 @@ type ActionHandler struct {
 	ClusterTemplateClient         v3.ClusterTemplateInterface
 	ClusterTemplateRevisionClient v3.ClusterTemplateRevisionInterface
 	SubjectAccessReviewClient     v1.SubjectAccessReviewInterface
+	CisBenchmarkVersionLister     v3.CisBenchmarkVersionLister
 }
 
 func (a ActionHandler) ClusterActionHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {

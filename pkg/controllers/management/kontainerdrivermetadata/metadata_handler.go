@@ -24,15 +24,19 @@ import (
 )
 
 type MetadataController struct {
-	SystemImagesLister   v3.RKEK8sSystemImageLister
-	SystemImages         v3.RKEK8sSystemImageInterface
-	ServiceOptionsLister v3.RKEK8sServiceOptionLister
-	ServiceOptions       v3.RKEK8sServiceOptionInterface
-	AddonsLister         v3.RKEAddonLister
-	Addons               v3.RKEAddonInterface
-	SettingLister        v3.SettingLister
-	Settings             v3.SettingInterface
-	ctx                  context.Context
+	SystemImagesLister        v3.RKEK8sSystemImageLister
+	SystemImages              v3.RKEK8sSystemImageInterface
+	ServiceOptionsLister      v3.RKEK8sServiceOptionLister
+	ServiceOptions            v3.RKEK8sServiceOptionInterface
+	AddonsLister              v3.RKEAddonLister
+	Addons                    v3.RKEAddonInterface
+	SettingLister             v3.SettingLister
+	Settings                  v3.SettingInterface
+	CisConfigLister           v3.CisConfigLister
+	CisConfig                 v3.CisConfigInterface
+	CisBenchmarkVersionLister v3.CisBenchmarkVersionLister
+	CisBenchmarkVersion       v3.CisBenchmarkVersionInterface
+	ctx                       context.Context
 }
 
 type Data struct {
@@ -44,6 +48,8 @@ type Data struct {
 	RancherDefaultK8sVersions map[string]string
 
 	K8sVersionWindowsServiceOptions map[string]v3.KubernetesServicesOptions
+	CisConfigParams                 map[string]v3.CisConfigParams
+	CisBenchmarkVersionInfo         map[string]v3.CisBenchmarkVersionInfo
 }
 
 type TickerData struct {
@@ -82,15 +88,19 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 	mgmt := management.Management
 
 	m := &MetadataController{
-		SystemImagesLister:   mgmt.RKEK8sSystemImages("").Controller().Lister(),
-		SystemImages:         mgmt.RKEK8sSystemImages(""),
-		ServiceOptionsLister: mgmt.RKEK8sServiceOptions("").Controller().Lister(),
-		ServiceOptions:       mgmt.RKEK8sServiceOptions(""),
-		AddonsLister:         mgmt.RKEAddons("").Controller().Lister(),
-		Addons:               mgmt.RKEAddons(""),
-		SettingLister:        mgmt.Settings("").Controller().Lister(),
-		Settings:             mgmt.Settings(""),
-		ctx:                  ctx,
+		SystemImagesLister:        mgmt.RKEK8sSystemImages("").Controller().Lister(),
+		SystemImages:              mgmt.RKEK8sSystemImages(""),
+		ServiceOptionsLister:      mgmt.RKEK8sServiceOptions("").Controller().Lister(),
+		ServiceOptions:            mgmt.RKEK8sServiceOptions(""),
+		AddonsLister:              mgmt.RKEAddons("").Controller().Lister(),
+		Addons:                    mgmt.RKEAddons(""),
+		SettingLister:             mgmt.Settings("").Controller().Lister(),
+		Settings:                  mgmt.Settings(""),
+		CisConfigLister:           mgmt.CisConfigs("").Controller().Lister(),
+		CisConfig:                 mgmt.CisConfigs(""),
+		CisBenchmarkVersionLister: mgmt.CisBenchmarkVersions("").Controller().Lister(),
+		CisBenchmarkVersion:       mgmt.CisBenchmarkVersions(""),
+		ctx:                       ctx,
 	}
 
 	mgmt.Settings("").AddHandler(ctx, "rke-metadata-handler", m.sync)
@@ -103,7 +113,7 @@ func (m *MetadataController) sync(key string, setting *v3.Setting) (runtime.Obje
 
 	settingValues, err := getSettingValues()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error getting setting values: %v", err)
 	}
 
 	interval, err := parseTime(settingValues[refreshInterval])
@@ -209,7 +219,7 @@ func (m *MetadataController) refresh(url *URL, init bool) error {
 	}
 	defer deleteMap(url)
 	if err := m.Refresh(url, true); err != nil {
-		return err
+		return fmt.Errorf("error refreshing: %v", err)
 	}
 	setFinalPath(url)
 	return nil

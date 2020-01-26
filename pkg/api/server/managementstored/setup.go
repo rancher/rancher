@@ -131,6 +131,8 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.RKEK8sServiceOptionType,
 		client.RKEAddonType,
 		client.RoleTemplateType,
+		client.CisConfigType,
+		client.CisBenchmarkVersionType,
 		client.SettingType,
 		client.TemplateType,
 		client.TemplateVersionType,
@@ -262,6 +264,7 @@ func Clusters(schemas *types.Schemas, managementContext *config.ScaledContext, c
 		ClusterTemplateClient:         managementContext.Management.ClusterTemplates(""),
 		ClusterTemplateRevisionClient: managementContext.Management.ClusterTemplateRevisions(""),
 		SubjectAccessReviewClient:     managementContext.K8sClient.AuthorizationV1().SubjectAccessReviews(),
+		CisBenchmarkVersionLister:     managementContext.Management.CisBenchmarkVersions("").Controller().Lister(),
 	}
 
 	schema.ActionHandler = handler.ClusterActionHandler
@@ -716,14 +719,18 @@ func RoleTemplate(schemas *types.Schemas, management *config.ScaledContext) {
 func KontainerDriver(schemas *types.Schemas, management *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.KontainerDriverType)
 	metadataHandler := md.MetadataController{
-		SystemImagesLister:   management.Management.RKEK8sSystemImages("").Controller().Lister(),
-		SystemImages:         management.Management.RKEK8sSystemImages(""),
-		ServiceOptionsLister: management.Management.RKEK8sServiceOptions("").Controller().Lister(),
-		ServiceOptions:       management.Management.RKEK8sServiceOptions(""),
-		AddonsLister:         management.Management.RKEAddons("").Controller().Lister(),
-		Addons:               management.Management.RKEAddons(""),
-		SettingLister:        management.Management.Settings("").Controller().Lister(),
-		Settings:             management.Management.Settings(""),
+		SystemImagesLister:        management.Management.RKEK8sSystemImages("").Controller().Lister(),
+		SystemImages:              management.Management.RKEK8sSystemImages(""),
+		ServiceOptionsLister:      management.Management.RKEK8sServiceOptions("").Controller().Lister(),
+		ServiceOptions:            management.Management.RKEK8sServiceOptions(""),
+		AddonsLister:              management.Management.RKEAddons("").Controller().Lister(),
+		Addons:                    management.Management.RKEAddons(""),
+		CisConfigLister:           management.Management.CisConfigs("").Controller().Lister(),
+		CisConfig:                 management.Management.CisConfigs(""),
+		CisBenchmarkVersionLister: management.Management.CisBenchmarkVersions("").Controller().Lister(),
+		CisBenchmarkVersion:       management.Management.CisBenchmarkVersions(""),
+		SettingLister:             management.Management.Settings("").Controller().Lister(),
+		Settings:                  management.Management.Settings(""),
 	}
 	handler := kontainerdriver.ActionHandler{
 		KontainerDrivers:      management.Management.KontainerDrivers(""),
