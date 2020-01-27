@@ -76,6 +76,7 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
         withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                           string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
                           string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
+                          string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
                           string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD')]) {
 
           println "Branch: ${branch}"
