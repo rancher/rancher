@@ -38,6 +38,10 @@ func (l *ListPermissionStore) CheckUserPermission(subjectName, objID, objNamespa
 	return l.users.validatePermission(subjectName, objID, objNamespace, apiGroup, resource, verb)
 }
 
+func (l *ListPermissionStore) CheckUserCanAccess(subjectName, objID, objNamespace, apiGroup, resource, verb string) bool {
+	return l.users.userAccessCheck(subjectName, objID, objNamespace, apiGroup, resource, verb)
+}
+
 func (l *ListPermissionStore) GroupPermissions(subjectName, apiGroup, resource, verb string) ListPermissionSet {
 	return getFromIndex(subjectName, apiGroup, resource, verb, l.groups)
 }

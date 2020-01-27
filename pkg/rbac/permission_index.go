@@ -2,9 +2,8 @@ package rbac
 
 import (
 	"fmt"
-
 	"github.com/rancher/norman/types/slice"
-	v1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
+	"github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -107,17 +106,54 @@ func (p *permissionIndex) get(subjectName, apiGroup, resource, verb string) []Li
 	return result
 }
 
+// userAccessCheck returns true if the given use is able to perform the given verm on the object of the given id,
+// in the given namespace
+func (p *permissionIndex) userAccessCheck(subjectName, objID, objNamespace, apiGroup, resource, verb string) bool {
+	roleRefChecked := make(map[string]bool)
+
+	for _, binding := range p.getRoleBindings(subjectName) {
+		if roleRefChecked[binding.RoleRef.Name] {
+			continue
+		}
+
+		if binding.Namespace != objNamespace {
+			continue
+		}
+
+		if binding.RoleRef.APIGroup != rbacGroup {
+			continue
+		}
+
+		for _, rule := range p.getRules(binding.Namespace, binding.RoleRef.Kind, binding.RoleRef.Name) {
+			if !(slice.ContainsString(rule.Verbs, verb) && slice.ContainsString(rule.Verbs, "*")) {
+				continue
+			}
+
+			if slice.ContainsString(rule.ResourceNames, resource) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (p *permissionIndex) validatePermission(subjectName, objID, objNamespace, apiGroup, resource, verb string) bool {
-	var roles map[string]bool
+	roles := make(map[string][]rbacv1.PolicyRule)
 	for _, binding := range p.getRoleBindings(subjectName) {
 		if binding.RoleRef.APIGroup != rbacGroup {
 			continue
 		}
 
-		if roles[fmt.Sprintf("%s:%s", binding.RoleRef.Kind, binding.RoleRef.Name)] {
-			continue
+		var rules []rbacv1.PolicyRule
+		roleID := fmt.Sprintf("%s:%s:%s", binding.RoleRef.Kind, binding.Namespace, binding.RoleRef.Name)
+		if roles[roleID] != nil {
+			rules = roles[roleID]
+		} else {
+			rules = p.getRules(binding.Namespace, binding.RoleRef.Kind, binding.RoleRef.Name)
+			roles[roleID] = rules
 		}
-		for _, rule := range p.getRules(binding.Namespace, binding.RoleRef.Kind, binding.RoleRef.Name) {
+
+		for _, rule := range rules {
 			if !matches(rule.APIGroups, apiGroup) || !matches(rule.Resources, resource) {
 				continue
 			}
