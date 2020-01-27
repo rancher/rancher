@@ -114,21 +114,21 @@ func (p *permissionIndex) userAccess(subjectName, apiGroup, resource, verb strin
 	canAccess := make(map[string]bool)
 
 	for _, binding := range p.getRoleBindings(subjectName) {
-		for _, id := range p.getBindingAccess(binding.RoleRef.Name, binding.Namespace, binding.RoleRef.Kind, binding.RoleRef.APIGroup, resource, verb, roleRefChecked) {
+		for _, id := range p.getBindingAccess(binding.RoleRef.Name, binding.Namespace, binding.RoleRef.Kind, binding.RoleRef.APIGroup, resource, verb, roleRefChecked, canAccess) {
 			canAccess[id] = true
 		}
 
 	}
 
 	for _, binding := range p.getClusterRoleBindings(subjectName) {
-		for _, id := range p.getBindingAccess(binding.RoleRef.Name, "*", binding.RoleRef.Kind, binding.RoleRef.APIGroup, resource, verb, roleRefChecked) {
+		for _, id := range p.getBindingAccess(binding.RoleRef.Name, "*", binding.RoleRef.Kind, binding.RoleRef.APIGroup, resource, verb, roleRefChecked, canAccess) {
 			canAccess[id] = true
 		}
 	}
 	return canAccess
 }
 
-func (p *permissionIndex) getBindingAccess(roleName, bindingNamespace, roleKind, roleAPIGroup, resource, verb string, roleRefChecked map[string]bool) []string {
+func (p *permissionIndex) getBindingAccess(roleName, bindingNamespace, roleKind, roleAPIGroup, resource, verb string, roleRefChecked map[string]bool, canAccess map[string]bool) []string {
 	namespaces := make([]string, 0)
 
 	if roleRefChecked[fmt.Sprintf("%s:%s", bindingNamespace, roleName)] {
@@ -149,12 +149,12 @@ func (p *permissionIndex) getBindingAccess(roleName, bindingNamespace, roleKind,
 		}
 
 		if len(rule.ResourceNames) == 0 {
-			namespaces = append(namespaces, fmt.Sprintf("namespace:*"))
+			canAccess[fmt.Sprintf("%s:*", bindingNamespace)] = true
 			continue
 		}
 
 		for _, name := range rule.ResourceNames {
-			namespaces = append(namespaces, fmt.Sprintf("%s:%s", bindingNamespace, name))
+			canAccess[fmt.Sprintf("%s:%s", bindingNamespace, name)] = true
 		}
 	}
 }
