@@ -2,6 +2,7 @@ package rbac
 
 import (
 	"fmt"
+	"github.com/azure/azure-sdk-for-go/profiles/latest/cdn/mgmt/cdn"
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -106,35 +107,56 @@ func (p *permissionIndex) get(subjectName, apiGroup, resource, verb string) []Li
 	return result
 }
 
-// userAccessCheck returns true if the given use is able to perform the given verm on the object of the given id,
+// userAccessCheck returns true if the given use is able to perform the given verb on the object of the given id,
 // in the given namespace
-func (p *permissionIndex) userAccessCheck(subjectName, objID, objNamespace, apiGroup, resource, verb string) bool {
+func (p *permissionIndex) userAccess(subjectName, apiGroup, resource, verb string) map[string]bool {
 	roleRefChecked := make(map[string]bool)
+	canAccess := make(map[string]bool)
 
 	for _, binding := range p.getRoleBindings(subjectName) {
-		if roleRefChecked[binding.RoleRef.Name] {
-			continue
+		for _, id := range p.getBindingAccess(binding.RoleRef.Name, binding.Namespace, binding.RoleRef.Kind, binding.RoleRef.APIGroup, resource, verb, roleRefChecked) {
+			canAccess[id] = true
 		}
 
-		if binding.Namespace != objNamespace {
-			continue
-		}
+	}
 
-		if binding.RoleRef.APIGroup != rbacGroup {
-			continue
-		}
-
-		for _, rule := range p.getRules(binding.Namespace, binding.RoleRef.Kind, binding.RoleRef.Name) {
-			if !(slice.ContainsString(rule.Verbs, verb) && slice.ContainsString(rule.Verbs, "*")) {
-				continue
-			}
-
-			if slice.ContainsString(rule.ResourceNames, resource) {
-				return true
-			}
+	for _, binding := range p.getClusterRoleBindings(subjectName) {
+		for _, id := range p.getBindingAccess(binding.RoleRef.Name, "*", binding.RoleRef.Kind, binding.RoleRef.APIGroup, resource, verb, roleRefChecked) {
+			canAccess[id] = true
 		}
 	}
-	return false
+	return canAccess
+}
+
+func (p *permissionIndex) getBindingAccess(roleName, bindingNamespace, roleKind, roleAPIGroup, resource, verb string, roleRefChecked map[string]bool) []string {
+	namespaces := make([]string, 0)
+
+	if roleRefChecked[fmt.Sprintf("%s:%s", bindingNamespace, roleName)] {
+		return namespaces
+	}
+
+	if roleAPIGroup!= rbacGroup {
+		return namespaces
+	}
+
+	for _, rule := range p.getRules(bindingNamespace, roleKind, roleName) {
+		if !slice.ContainsString(rule.Resources, resource) {
+			continue
+		}
+
+		if !(slice.ContainsString(rule.Verbs, verb) && slice.ContainsString(rule.Verbs, "*")) {
+			continue
+		}
+
+		if len(rule.ResourceNames) == 0 {
+			namespaces = append(namespaces, fmt.Sprintf("namespace:*"))
+			continue
+		}
+
+		for _, name := range rule.ResourceNames {
+			namespaces = append(namespaces, fmt.Sprintf("%s:%s", bindingNamespace, name))
+		}
+	}
 }
 
 func (p *permissionIndex) validatePermission(subjectName, objID, objNamespace, apiGroup, resource, verb string) bool {
