@@ -2,7 +2,7 @@ package rbac
 
 import (
 	"fmt"
-	"github.com/azure/azure-sdk-for-go/profiles/latest/cdn/mgmt/cdn"
+
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -114,29 +114,23 @@ func (p *permissionIndex) userAccess(subjectName, apiGroup, resource, verb strin
 	canAccess := make(map[string]bool)
 
 	for _, binding := range p.getRoleBindings(subjectName) {
-		for _, id := range p.getBindingAccess(binding.RoleRef.Name, binding.Namespace, binding.RoleRef.Kind, binding.RoleRef.APIGroup, resource, verb, roleRefChecked, canAccess) {
-			canAccess[id] = true
-		}
+		p.getBindingAccess(binding.RoleRef.Name, binding.Namespace, binding.RoleRef.Kind, binding.RoleRef.APIGroup, resource, verb, roleRefChecked, canAccess)
 
 	}
 
 	for _, binding := range p.getClusterRoleBindings(subjectName) {
-		for _, id := range p.getBindingAccess(binding.RoleRef.Name, "*", binding.RoleRef.Kind, binding.RoleRef.APIGroup, resource, verb, roleRefChecked, canAccess) {
-			canAccess[id] = true
-		}
+		p.getBindingAccess(binding.RoleRef.Name, "*", binding.RoleRef.Kind, binding.RoleRef.APIGroup, resource, verb, roleRefChecked, canAccess)
 	}
 	return canAccess
 }
 
-func (p *permissionIndex) getBindingAccess(roleName, bindingNamespace, roleKind, roleAPIGroup, resource, verb string, roleRefChecked map[string]bool, canAccess map[string]bool) []string {
-	namespaces := make([]string, 0)
-
+func (p *permissionIndex) getBindingAccess(roleName, bindingNamespace, roleKind, roleAPIGroup, resource, verb string, roleRefChecked map[string]bool, canAccess map[string]bool) {
 	if roleRefChecked[fmt.Sprintf("%s:%s", bindingNamespace, roleName)] {
-		return namespaces
+		return
 	}
 
 	if roleAPIGroup!= rbacGroup {
-		return namespaces
+		return
 	}
 
 	for _, rule := range p.getRules(bindingNamespace, roleKind, roleName) {
@@ -157,47 +151,6 @@ func (p *permissionIndex) getBindingAccess(roleName, bindingNamespace, roleKind,
 			canAccess[fmt.Sprintf("%s:%s", bindingNamespace, name)] = true
 		}
 	}
-}
-
-func (p *permissionIndex) validatePermission(subjectName, objID, objNamespace, apiGroup, resource, verb string) bool {
-	roles := make(map[string][]rbacv1.PolicyRule)
-	for _, binding := range p.getRoleBindings(subjectName) {
-		if binding.RoleRef.APIGroup != rbacGroup {
-			continue
-		}
-
-		var rules []rbacv1.PolicyRule
-		roleID := fmt.Sprintf("%s:%s:%s", binding.RoleRef.Kind, binding.Namespace, binding.RoleRef.Name)
-		if roles[roleID] != nil {
-			rules = roles[roleID]
-		} else {
-			rules = p.getRules(binding.Namespace, binding.RoleRef.Kind, binding.RoleRef.Name)
-			roles[roleID] = rules
-		}
-
-		for _, rule := range rules {
-			if !matches(rule.APIGroups, apiGroup) || !matches(rule.Resources, resource) {
-				continue
-			}
-			v := verb
-			if len(rule.ResourceNames) > 0 && verb == "list" {
-				v = "get"
-			}
-
-			if verb == "list" {
-				v = "get"
-			}
-
-			if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, v) {
-				for _, resourceName := range rule.ResourceNames {
-					if resourceName == objID {
-						return true
-					}
-				}
-			}
-		}
-	}
-	return false
 }
 
 func (p *permissionIndex) filterPermissions(result []ListPermission, namespace, kind, name, apiGroup, resource, verb string) []ListPermission {

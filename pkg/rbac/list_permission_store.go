@@ -34,15 +34,7 @@ func (l *ListPermissionStore) UserPermissions(subjectName, apiGroup, resource, v
 	return getFromIndex(subjectName, apiGroup, resource, verb, l.users)
 }
 
-func (l *ListPermissionStore) CheckUserPermission(subjectName, objID, objNamespace, apiGroup, resource, verb string) bool {
-	return l.users.validatePermission(subjectName, objID, objNamespace, apiGroup, resource, verb)
-}
-
-func (l *ListPermissionStore) getUserPermissions(subjectName, objID, objNamespace, apiGroup, resource, verb string) map[string]bool {
-	return l.users.userAccess(subjectName, apiGroup, resource, verb)
-}
-
-func (l *ListPermissionStore) getGroupPermissions(subjectName, objID, objNamespace, apiGroup, resource, verb string) map[string]bool {
+func (l *ListPermissionStore) GetUserPermissions(subjectName, objID, objNamespace, apiGroup, resource, verb string) map[string]bool {
 	return l.users.userAccess(subjectName, apiGroup, resource, verb)
 }
 
@@ -50,8 +42,8 @@ func (l *ListPermissionStore) GroupPermissions(subjectName, apiGroup, resource, 
 	return getFromIndex(subjectName, apiGroup, resource, verb, l.groups)
 }
 
-func (l *ListPermissionStore) CheckGroupPermission(subjectName, objID, objNamespace, apiGroup, resource, verb string) bool {
-	return l.groups.validatePermission(subjectName, objID, objNamespace, apiGroup, resource, verb)
+func (l *ListPermissionStore) GetGroupPermissions(subjectName, objID, objNamespace, apiGroup, resource, verb string) map[string]bool {
+	return l.users.userAccess(subjectName, apiGroup, resource, verb)
 }
 
 func getFromIndex(subjectName, apiGroup, resource, verb string, index *permissionIndex) ListPermissionSet {

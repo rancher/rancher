@@ -24,26 +24,11 @@ func NewAccessControl(rbacClient v1.Interface) *AccessControl {
 }
 
 func (a *AccessControl) CanDo(apiGroup, resource, verb string, apiContext *types.APIContext, obj map[string]interface{}, schema *types.Schema) error {
-	var id string
-	var namespace string
+	permset := a.getPermissions(apiContext, apiGroup, resource, verb)
 
-	if obj != nil {
-		id, _ = obj["id"].(string)
-		namespace, _ = obj["namespaceId"].(string)
-		if namespace == "" {
-			pieces := strings.Split(id, ":")
-			if len(pieces) == 2 {
-				namespace = pieces[0]
-			}
-		}
-	} else {
-		id = "*"
-	}
-
-	if a.validatePermission(apiContext, id, namespace, apiGroup, resource, verb) {
+	if a.canAccess(obj, permset) {
 		return nil
 	}
-
 	return httperror.NewAPIError(httperror.PermissionDenied, fmt.Sprintf("can not %v %v ", verb, schema.ID))
 }
 
@@ -156,19 +141,6 @@ func (a *AccessControl) getPermissions(context *types.APIContext, apiGroup, reso
 	}
 
 	return permset
-}
-
-func (a *AccessControl) validatePermission(context *types.APIContext, id, namespace, apiGroup, resource, verb string) bool {
-	if a.permissionStore.CheckUserPermission(getUser(context), id, namespace, apiGroup, resource, verb) {
-		return true
-	}
-
-	for _, group := range getGroups(context) {
-		if a.permissionStore.CheckGroupPermission(group, id, namespace, apiGroup, resource, verb) {
-			return true
-		}
-	}
-	return false
 }
 
 func getUser(apiContext *types.APIContext) string {
