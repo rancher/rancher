@@ -1739,11 +1739,11 @@ def create_catalog_external_id(catalog_name, template, version,
 
 
 def wait_for_catalog_active(client, catalog, timeout=DEFAULT_CATALOG_TIMEOUT):
-    time.sleep(.5)
+    time.sleep(2)
     catalog_data = client.list_catalog(name=catalog.name)
     print(catalog_data)
     start = time.time()
-    assert len(catalog_data) >= 1, "Cannot find catalog"
+    assert len(catalog_data["data"]) >= 1, "Cannot find catalog"
     catalog = catalog_data["data"][0]
     while catalog.state != "active":
         if time.time() - start > timeout:
@@ -1751,8 +1751,8 @@ def wait_for_catalog_active(client, catalog, timeout=DEFAULT_CATALOG_TIMEOUT):
                 "Timed out waiting for state to get to active")
         time.sleep(.5)
         catalog_data = client.list_catalog(name=catalog.name)
-        assert len(catalog_data) >= 1
-        catalog = catalog_data[0]
+        assert len(catalog_data["data"]) >= 1
+        catalog = catalog_data["data"][0]
     return catalog
 
 
