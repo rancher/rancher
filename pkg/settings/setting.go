@@ -43,6 +43,7 @@ var (
 	RkeVersion                        = NewSetting("rke-version", "")
 	RkeMetadataConfig                 = NewSetting("rke-metadata-config", getMetadataConfig())
 	ServerImage                       = NewSetting("server-image", "rancher/rancher")
+	ServerLicense                     = NewSetting("server-license", "")
 	ServerURL                         = NewSetting("server-url", "")
 	ServerVersion                     = NewSetting("server-version", "dev")
 	SystemDefaultRegistry             = NewSetting("system-default-registry", "")
