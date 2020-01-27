@@ -31,6 +31,7 @@ node {
                       string(credentialsId: 'AZURE_CLIENT_SECRET', variable: 'RANCHER_AKS_SECRET_KEY'),
                       string(credentialsId: 'RANCHER_REGISTRY_USER_NAME', variable: 'RANCHER_REGISTRY_USER_NAME'),
                       string(credentialsId: 'RANCHER_REGISTRY_PASSWORD', variable: 'RANCHER_REGISTRY_PASSWORD'),
+                      string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
                       string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD'),
                       string(credentialsId: 'RANCHER_GKE_CREDENTIAL', variable: 'RANCHER_GKE_CREDENTIAL')]) {
       stage('Prechecks & checkout preupgrade branch') {
