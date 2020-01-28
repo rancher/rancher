@@ -67,5 +67,34 @@
   ],
   "test(group&)abc(group)": [
     "testuser9"
-  ]
+  ],
+  "nested_group_info": {
+    "users": [
+      "nestedtestuser1",
+      "nestedtestuser2",
+      "nestedtestuser3"
+    ],
+    "nestgroup1": {
+      "users": [
+        "nestedtestuser1"
+      ],
+      "groups": [
+        "nestgroup2"
+      ]
+    },
+    "nestgroup2": {
+      "users": [
+        "nestedtestuser2"
+      ],
+      "groups": [
+        "nestgroup3"
+      ]
+    },
+    "nestgroup3": {
+      "users": [
+        "nestedtestuser3"
+      ],
+      "groups": []
+    }
+  }
 }
