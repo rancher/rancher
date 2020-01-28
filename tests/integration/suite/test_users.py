@@ -3,6 +3,9 @@ from kubernetes.client import CustomObjectsApi
 from rancher import ApiError
 from .conftest import random_str, wait_for
 
+grbAnno = "cleanup.cattle.io/grbUpgradeCluster"
+rtAnno = "cleanup.cattle.io/rtUpgradeCluster"
+
 
 def test_user_cant_delete_self(admin_mc):
     client = admin_mc.client
@@ -28,7 +31,7 @@ def test_globalrolebinding_finalizer_cleanup(admin_mc, remove_resource):
         globalRoleId="admin", userId="u-" + random_str()
     )
     remove_resource(grb)
-    assert grb.annotations["field.cattle.io/grbUpgrade"] == "true"
+    assert grb.annotations[grbAnno] == "true"
 
     # create a grb without the rancher api with a bad finalizer
     api = CustomObjectsApi(admin_mc.k8s_client)
@@ -56,7 +59,7 @@ def test_globalrolebinding_finalizer_cleanup(admin_mc, remove_resource):
     def check_annotation():
         grb1 = client.by_id_globalRoleBinding(grb_k8s.id)
         try:
-            if grb1.annotations["field.cattle.io/grbUpgrade"] == "true":
+            if grb1.annotations[grbAnno] == "true":
                 return True
             else:
                 return False
@@ -82,7 +85,7 @@ def test_roletemplate_finalizer_cleanup(admin_mc, remove_resource):
     client = admin_mc.client
     rt = client.create_roleTemplate(name="rt-" + random_str())
     remove_resource(rt)
-    assert rt.annotations["field.cattle.io/rtUpgrade"] == "true"
+    assert rt.annotations[rtAnno] == "true"
 
     # create rt  without rancher api with a bad finalizer
     api = CustomObjectsApi(admin_mc.k8s_client)
@@ -111,7 +114,7 @@ def test_roletemplate_finalizer_cleanup(admin_mc, remove_resource):
     def check_annotation():
         rt1 = client.by_id_roleTemplate(rt_k8s.id)
         try:
-            if rt1.annotations["field.cattle.io/rtUpgrade"] == "true":
+            if rt1.annotations[rtAnno] == "true":
                 return True
             else:
                 return False
