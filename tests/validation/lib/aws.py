@@ -1,6 +1,8 @@
+import base64
 import boto3
 import logging
 import os
+import rsa
 import time
 
 from boto3.exceptions import Boto3Error
@@ -58,7 +60,9 @@ PRIVATE_IMAGES = {
     "ubuntu-18.04-docker-19.03": {
         'image': 'ami-066f14e43aebc7472', 'ssh_user': 'ubuntu'},
     "rhel-7.6-docker-18.09": {
-        'image': 'ami-094574ffb6efb3a9b', 'ssh_user': 'ec2-user'}}
+        'image': 'ami-094574ffb6efb3a9b', 'ssh_user': 'ec2-user'},
+    "windows-1903-docker-19.03": {
+        'image': 'ami-01797a7ad9e74e2de', 'ssh_user': 'Administrator'}}
 
 PUBLIC_AMI = {
     'us-east-2': {
@@ -479,3 +483,15 @@ class AmazonWebServices(CloudProviderBase):
                 }]
             }
         )
+
+    def decrypt_windows_password(self, instance_id):
+        password = ""
+        password_data = self._client.\
+            get_password_data(InstanceId=instance_id)['PasswordData']
+        if password_data:
+            password = base64.b64decode(password_data)
+            with open (self.get_ssh_key_path(AWS_SSH_KEY_NAME),'r') as privkeyfile:
+                priv = rsa.PrivateKey.load_pkcs1(privkeyfile.read())
+                password = rsa.decrypt(password,priv).decode('utf-8')
+
+        return password
