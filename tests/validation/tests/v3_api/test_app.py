@@ -565,8 +565,6 @@ def test_rbac_app_cluster_scope_delete_8():
 
 @pytest.fixture(scope='module', autouse="True")
 def create_project_client(request):
-    project_detail["cluster1"]["project1"] = rbac_data["project"]
-    project_detail["cluster1"]["namespace1"] = rbac_data["namespace"]
     user_token["user_c1_p1_owner"]["user"] = \
         rbac_data["users"][PROJECT_OWNER]["user"]
     user_token["user_c1_p1_owner"]["token"] = \
@@ -588,6 +586,7 @@ def create_project_client(request):
     cluster1 = clusters[0]
     cluster2 = clusters[1]
     assert len(clusters) > 0
+
     project_detail["cluster1"]["project2"], \
     project_detail["cluster1"]["namespace2"] = \
         create_project_and_ns(USER_TOKEN,
@@ -608,6 +607,11 @@ def create_project_client(request):
         kind="helm",
         url=CATALOG_URL)
     time.sleep(5)
+
+    user_c_client = get_cluster_client_for_token(cluster1, USER_TOKEN)
+    project_detail["cluster1"]["project1"] = rbac_data["project"]
+    project_detail["cluster1"]["namespace1"] = \
+        create_ns(user_c_client, cluster1, rbac_data["project"])
 
     # create users
     user_token["user_c1_p2_owner"]["user"], \
