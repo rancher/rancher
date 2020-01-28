@@ -17,4 +17,5 @@ pytest-ordering==0.6
 python-digitalocean==1.13.2
 PyYAML==5.2
 requests==2.22.0
+rsa==4.0
 websocket-client==0.53.0
