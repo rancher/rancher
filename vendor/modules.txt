@@ -383,7 +383,7 @@ github.com/rancher/norman/types/values
 github.com/rancher/norman/urlbuilder
 # github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 github.com/rancher/rdns-server/model
-# github.com/rancher/remotedialer v0.2.3
+# github.com/rancher/remotedialer v0.2.4
 github.com/rancher/remotedialer
 # github.com/rancher/rke v1.1.0-rc4.0.20200123230443-25e7f987775d
 github.com/rancher/rke/addons
