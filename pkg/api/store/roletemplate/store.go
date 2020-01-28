@@ -10,7 +10,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-const RTVersion = "field.cattle.io/rtUpgrade"
+const (
+	RTVersion    = "cleanup.cattle.io/rtUpgradeCluster"
+	OldRTVersion = "field.cattle.io/rtUpgrade"
+)
 
 func Wrap(store types.Store, rtLister v3.RoleTemplateLister) types.Store {
 	return &rtStore{

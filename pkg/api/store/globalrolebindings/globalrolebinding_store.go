@@ -9,7 +9,10 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const GrbVersion = "field.cattle.io/grbUpgrade"
+const (
+	GrbVersion    = "cleanup.cattle.io/grbUpgradeCluster"
+	OldGrbVersion = "field.cattle.io/grbUpgrade"
+)
 
 func Wrap(store types.Store, grLister v3.GlobalRoleLister) types.Store {
 	return &grbStore{

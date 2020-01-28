@@ -55,7 +55,7 @@ func TestEnqueuePrtbsOnRoleTemplateUpdate(t *testing.T) {
 		mockIndexer.Add(obj)
 	}
 
-	rtl := roleTemplateHandler{
+	rtl := roleTemplateLifecycle{
 		prtbIndexer: mockIndexer,
 		prtbClient: &fakes.ProjectRoleTemplateBindingInterfaceMock{
 			ControllerFunc: func() v3.ProjectRoleTemplateBindingController {

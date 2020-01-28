@@ -4,31 +4,30 @@ import (
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func newRTLifecycle(m *manager) *rtLifecycle {
-	return &rtLifecycle{m: m}
+func newRTLifecycle(m *manager) v3.RoleTemplateHandlerFunc {
+	rtSync := &rtSync{m: m}
+	return rtSync.sync
 }
 
-// rtLifecycle is responsible for ensuring that roleTemplates and their corresponding clusterRoles stay in sync.
+// rtSync is responsible for ensuring that roleTemplates and their corresponding clusterRoles stay in sync.
 // This means that if a roleTemplate's rules change, this handler will ensure the corresponding clusterRole's rules are changed
-// and if a roleTemplate is removed, the corresponding clusterRole is removed.
+//If a roleTemplate is removed the management lifecycle will remove the clusterRole from user clusters
 // This handler does not create new clusterRoles. They are created on the fly when a ProjectRoleTemplateBinding or
 // ClusterRoleTemplateBinding references the roleTemplates. This handler only ensures they remain in-sync after being created
-type rtLifecycle struct {
+type rtSync struct {
 	m *manager
 }
 
-func (c *rtLifecycle) Create(obj *v3.RoleTemplate) (runtime.Object, error) {
-	return obj, nil
-}
-
-func (c *rtLifecycle) Updated(obj *v3.RoleTemplate) (runtime.Object, error) {
-	// checky if there are any PRTBs/CRTBs referencing this RoleTemplate for this cluster
+func (c *rtSync) sync(key string, obj *v3.RoleTemplate) (runtime.Object, error) {
+	if obj == nil || obj.DeletionTimestamp != nil {
+		return nil, nil
+	}
+	// check if there are any PRTBs/CRTBs referencing this RoleTemplate for this cluster
 	prtbs, err := c.m.prtbIndexer.ByIndex(rtbByClusterAndRoleTemplateIndex, c.m.workload.ClusterName+"-"+obj.Name)
 	if err != nil {
 		return obj, err
@@ -46,19 +45,14 @@ func (c *rtLifecycle) Updated(obj *v3.RoleTemplate) (runtime.Object, error) {
 
 	// No RTBs referencing this RoleTemplate in this cluster, do not attempt to sync
 	if !hasRTBs {
-		return nil, nil
+		return obj, nil
 	}
 
 	err = c.syncRT(obj, hasPRTBs, prtbs, crtbs)
-	return nil, err
-}
-
-func (c *rtLifecycle) Remove(obj *v3.RoleTemplate) (runtime.Object, error) {
-	err := c.ensureRTDelete(obj)
 	return obj, err
 }
 
-func (c *rtLifecycle) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []interface{}, crtbs []interface{}) error {
+func (c *rtSync) syncRT(template *v3.RoleTemplate, usedInProjects bool, prtbs []interface{}, crtbs []interface{}) error {
 	roles := map[string]*v3.RoleTemplate{}
 	if err := c.m.gatherRoles(template, roles); err != nil {
 		return err
@@ -134,16 +128,5 @@ func (c *rtLifecycle) syncRT(template *v3.RoleTemplate, usedInProjects bool, prt
 			return err
 		}
 	}
-	return nil
-}
-
-func (c *rtLifecycle) ensureRTDelete(template *v3.RoleTemplate) error {
-	roleCli := c.m.workload.RBAC.ClusterRoles("")
-	if err := roleCli.Delete(template.Name, &metav1.DeleteOptions{}); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return errors.Wrapf(err, "error deleting clusterrole %v", template.Name)
-		}
-	}
-
 	return nil
 }
