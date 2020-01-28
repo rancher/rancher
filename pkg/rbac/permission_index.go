@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/rancher/norman/types/slice"
-	"github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
+	v1 "github.com/rancher/types/apis/rbac.authorization.k8s.io/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -129,7 +129,7 @@ func (p *permissionIndex) getBindingAccess(roleName, bindingNamespace, roleKind,
 		return
 	}
 
-	if roleAPIGroup!= rbacGroup {
+	if roleAPIGroup != rbacGroup {
 		return
 	}
 
@@ -138,7 +138,7 @@ func (p *permissionIndex) getBindingAccess(roleName, bindingNamespace, roleKind,
 			continue
 		}
 
-		if !(slice.ContainsString(rule.Verbs, verb) && slice.ContainsString(rule.Verbs, "*")) {
+		if !(slice.ContainsString(rule.Verbs, verb) || slice.ContainsString(rule.Verbs, "*")) {
 			continue
 		}
 

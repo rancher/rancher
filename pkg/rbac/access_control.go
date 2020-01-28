@@ -32,37 +32,8 @@ func (a *AccessControl) CanDo(apiGroup, resource, verb string, apiContext *types
 	return httperror.NewAPIError(httperror.PermissionDenied, fmt.Sprintf("can not %v %v ", verb, schema.ID))
 }
 
-
-func (a *AccessControl) CollectionCanDo(apiGroup, resource, verb string, apiContext *types.APIContext, data []interface{}, schema *types.Schema, fn func()) error {
-	var id string
-	var namespace string
-
-	for _, value := range data {
-		obj, ok := value.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		if obj != nil {
-			id, _ = obj["id"].(string)
-			namespace, _ = obj["namespaceId"].(string)
-			if namespace == "" {
-				pieces := strings.Split(id, ":")
-				if len(pieces) == 2 {
-					namespace = pieces[0]
-				}
-			}
-		} else {
-			id = "*"
-		}
-
-		if a.permissionStore.CheckUserCanAccess(getUser(apiContext), id, namespace, apiGroup, resource, verb) {
-
-		}
-	}
-
-
-
-	return httperror.NewAPIError(httperror.PermissionDenied, fmt.Sprintf("can not %v %v ", verb, schema.ID))
+func (a *AccessControl) CollectionCanDo(apiGroup, resource, verb string, apiContext *types.APIContext, data []interface{}, schema *types.Schema, fn func(map[string]interface{})) map[string]bool {
+	return a.getObjectsCanAccess(apiContext, apiGroup, resource, verb)
 }
 
 func (a *AccessControl) Filter(apiContext *types.APIContext, schema *types.Schema, obj map[string]interface{}, context map[string]string) map[string]interface{} {
@@ -141,6 +112,17 @@ func (a *AccessControl) getPermissions(context *types.APIContext, apiGroup, reso
 	}
 
 	return permset
+}
+
+func (a *AccessControl) getObjectsCanAccess(context *types.APIContext, apiGroup, resource, verb string) map[string]bool {
+	userAccessMap := a.permissionStore.GetUserPermissions(getUser(context), apiGroup, resource, verb)
+
+	for _, group := range getGroups(context) {
+		for key, val := range a.permissionStore.GetGroupPermissions(group, apiGroup, resource, verb) {
+			userAccessMap[key] = val
+		}
+	}
+	return userAccessMap
 }
 
 func getUser(apiContext *types.APIContext) string {

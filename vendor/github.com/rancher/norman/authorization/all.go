@@ -1,7 +1,9 @@
 package authorization
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -51,6 +53,36 @@ func (*AllAccess) CanDo(apiGroup, resource, verb string, apiContext *types.APICo
 		return nil
 	}
 	return httperror.NewAPIError(httperror.PermissionDenied, "can not perform "+verb+" "+schema.ID)
+}
+
+func (a *AllAccess) CollectionCanDo(apiGroup, resource, verb string, apiContext *types.APIContext, data []interface{}, schema *types.Schema, fn func(map[string]interface{})) map[string]bool {
+	accessMap := make(map[string]bool)
+	for _, val := range data {
+		obj, ok := val.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if err := a.CanDo(apiGroup, resource, verb, apiContext, obj, schema); err != nil {
+			continue
+		}
+
+		var id, namespace string
+
+		if obj != nil {
+			id, _ = obj["id"].(string)
+			namespace, _ = obj["namespaceId"].(string)
+			if namespace == "" {
+				pieces := strings.Split(id, ":")
+				if len(pieces) == 2 {
+					namespace = pieces[0]
+				}
+			}
+		} else {
+			id = "*"
+		}
+		accessMap[fmt.Sprintf("%s:%s", namespace, id)] = true
+	}
+	return accessMap
 }
 
 func (*AllAccess) Filter(apiContext *types.APIContext, schema *types.Schema, obj map[string]interface{}, context map[string]string) map[string]interface{} {

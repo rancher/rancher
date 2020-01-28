@@ -95,11 +95,10 @@ type AccessControl interface {
 	// CanDo function should not yet be used if a corresponding specific method exists. It has been added to
 	// satisfy a specific usecase for the short term until full-blown dynamic RBAC can be implemented.
 	CanDo(apiGroup, resource, verb string, apiContext *APIContext, obj map[string]interface{}, schema *Schema) error
-
+	CollectionCanDo(apiGroup, resource, verb string, apiContext *APIContext, data []interface{}, schema *Schema, fn func(map[string]interface{})) map[string]bool
 	Filter(apiContext *APIContext, schema *Schema, obj map[string]interface{}, context map[string]string) map[string]interface{}
 	FilterList(apiContext *APIContext, schema *Schema, obj []map[string]interface{}, context map[string]string) []map[string]interface{}
 }
-
 type APIContext struct {
 	Action                      string
 	ID                          string
