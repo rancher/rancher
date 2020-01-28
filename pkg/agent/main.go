@@ -261,8 +261,9 @@ func run() error {
 
 	onConnect := func(ctx context.Context) error {
 		connected()
-		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
-		if err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers, writeCertsOnly); err != nil {
+		connectConfigURL := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
+		upgradeStatusURL := fmt.Sprintf("https://%s/v3/connect/upgradestatus", serverURL.Host)
+		if err := rkenodeconfigclient.ConfigClient(ctx, connectConfigURL, upgradeStatusURL, headers, writeCertsOnly); err != nil {
 			return err
 		}
 
@@ -283,7 +284,7 @@ func run() error {
 			for {
 				select {
 				case <-time.After(2 * time.Minute):
-					err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers, writeCertsOnly)
+					err := rkenodeconfigclient.ConfigClient(ctx, connectConfigURL, upgradeStatusURL, headers, writeCertsOnly)
 					if err != nil {
 						logrus.Errorf("failed to check plan: %v", err)
 					}

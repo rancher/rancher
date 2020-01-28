@@ -1,6 +1,7 @@
 package rkenodeconfigclient
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -43,11 +44,18 @@ func newErrNodeOrClusterNotFound(msg, occursType string) *ErrNodeOrClusterNotFou
 	}
 }
 
-func ConfigClient(ctx context.Context, url string, header http.Header, writeCertOnly bool) error {
+type ErrClusterUpgrading struct {
+}
+
+func (e *ErrClusterUpgrading) Error() string {
+	return "cluster upgrading on rolling update, waiting for other nodes to be done"
+}
+
+func ConfigClient(ctx context.Context, connectConfigURL string, upgradeStatusURL string, header http.Header, writeCertOnly bool) error {
 	// try a few more times because there is a delay after registering a new node
 	nodeOrClusterNotFoundRetryLimit := 3
 	for {
-		nc, err := getConfig(client, url, header)
+		nc, err := getConfig(client, connectConfigURL, header)
 		if err != nil {
 			if _, ok := err.(*ErrNodeOrClusterNotFound); ok {
 				if nodeOrClusterNotFoundRetryLimit < 1 {
@@ -58,6 +66,11 @@ func ConfigClient(ctx context.Context, url string, header http.Header, writeCert
 				nodeOrClusterNotFoundRetryLimit--
 			}
 
+			if _, ok := err.(*ErrClusterUpgrading); ok {
+				logrus.Debugf("Waiting for node to be upgraded.")
+				return nil
+			}
+
 			logrus.Warnf("Error while getting agent config: %v", err)
 			time.Sleep(5 * time.Second)
 			continue
@@ -65,6 +78,16 @@ func ConfigClient(ctx context.Context, url string, header http.Header, writeCert
 
 		if nc != nil {
 			logrus.Debugf("Get agent config: %#v", nc)
+			if nc.UpgradeToken != "" {
+				if err := rkeworker.ExecutePlan(ctx, nc, writeCertOnly); err != nil {
+					return fmt.Errorf("error executing plan for node upgrade %v", err)
+				}
+				if err := sendUpgradeStatus(client, upgradeStatusURL, header, nc.UpgradeToken); err != nil {
+					return fmt.Errorf("error sending token for node upgrade %v", err)
+				}
+				return nil
+			}
+
 			return rkeworker.ExecutePlan(ctx, nc, writeCertOnly)
 		}
 
@@ -97,6 +120,10 @@ func getConfig(client *http.Client, url string, header http.Header) (*rkeworker.
 		return &rkeworker.NodeConfig{}, nil
 	}
 
+	if resp.StatusCode == http.StatusAccepted {
+		return nil, &ErrClusterUpgrading{}
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		respBytes, _ := ioutil.ReadAll(resp.Body)
 		errMsg := fmt.Sprintf("invalid response %d: %s", resp.StatusCode, string(respBytes))
@@ -112,4 +139,36 @@ func getConfig(client *http.Client, url string, header http.Header) (*rkeworker.
 
 	nc := &rkeworker.NodeConfig{}
 	return nc, json.NewDecoder(resp.Body).Decode(nc)
+}
+
+func sendUpgradeStatus(client *http.Client, upgradeStatusURL string, header http.Header, token string) error {
+	logrus.Debugf("Sending token %s", token)
+	req, err := http.NewRequest(http.MethodPost, upgradeStatusURL, bytes.NewBuffer([]byte(token)))
+	if err != nil {
+		return fmt.Errorf("error sending upgrade token [%s]: %v", token, err)
+	}
+
+	for k, v := range header {
+		req.Header[k] = v
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusServiceUnavailable || resp.StatusCode == http.StatusNotFound {
+		return nil
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		respBytes, _ := ioutil.ReadAll(resp.Body)
+		errMsg := fmt.Sprintf("sendToken invalid response %d: %s", resp.StatusCode, string(respBytes))
+		return errors.New(errMsg)
+	}
+
+	return nil
 }
