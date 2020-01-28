@@ -218,7 +218,44 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, err
 	}
 
+	setDefaultUpgradeStrategy(data)
+
 	return r.Store.Create(apiContext, schema, data)
+}
+
+func setDefaultUpgradeStrategy(data map[string]interface{}) {
+	rkeConfig := values.GetValueN(data, "rancherKubernetesEngineConfig")
+	if rkeConfig == nil {
+		return
+	}
+	rkeConfigMap := convert.ToMapInterface(rkeConfig)
+	upgradeStrategy := values.GetValueN(rkeConfigMap, "nodeUpgradeStrategy", "rollingUpdateStrategy")
+	if upgradeStrategy == nil {
+		rkeConfigMap["nodeUpgradeStrategy"] = map[string]map[string]interface{}{
+			"rollingUpdateStrategy": {
+				"maxUnavailable": "20%",
+			},
+		}
+		values.PutValue(data, rkeConfigMap, "rancherKubernetesEngineConfig")
+		return
+	}
+	upgradeMap := convert.ToMapInterface(upgradeStrategy)
+	toPut := false
+	if convert.ToString(values.GetValueN(upgradeMap, "maxUnavailable")) == "" {
+		upgradeMap["maxUnavailable"] = "20%"
+		toPut = true
+	}
+	toDrain := convert.ToBool(values.GetValueN(upgradeMap, "drain"))
+	if toDrain {
+		drainInput := values.GetValueN(upgradeMap, "nodeDrainInput")
+		if drainInput == nil {
+			upgradeMap["nodeDrainInput"] = v3.NodeDrainInput{}
+			toPut = true
+		}
+	}
+	if toPut {
+		values.PutValue(data, upgradeMap, "nodeUpgradeStrategy", "rollingUpdateStrategy")
+	}
 }
 
 func transposeNameFields(data map[string]interface{}, clusterConfigSchema *types.Schema) map[string]interface{} {

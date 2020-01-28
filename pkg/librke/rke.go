@@ -25,6 +25,10 @@ func (*rke) GeneratePlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEng
 	return cluster.GeneratePlan(ctx, rkeConfig.DeepCopy(), dockerInfo, data)
 }
 
+func (*rke) GenerateClusterPlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, dockerInfo types.Info, data map[string]interface{}) (v3.RKEClusterPlan, error) {
+	return cluster.GenerateClusterPlan(ctx, rkeConfig.DeepCopy(), dockerInfo, data)
+}
+
 func GetDockerInfo(node *v3.Node) (map[string]types.Info, error) {
 	infos := map[string]types.Info{}
 	if node.Status.DockerInfo != nil {

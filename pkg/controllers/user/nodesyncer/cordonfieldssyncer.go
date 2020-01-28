@@ -52,11 +52,7 @@ func (m *nodesSyncer) syncCordonFields(key string, obj *v3.Node) (runtime.Object
 		removeDrainCondition(nodeCopy)
 	}
 	nodeCopy.Spec.DesiredNodeUnschedulable = ""
-	_, err = m.machines.Update(nodeCopy)
-	if err != nil {
-		return nil, err
-	}
-	return nil, nil
+	return m.machines.Update(nodeCopy)
 }
 
 func (d *nodeDrain) drainNode(key string, obj *v3.Node) (runtime.Object, error) {
@@ -112,6 +108,11 @@ func (d *nodeDrain) updateNode(node *v3.Node, updateFunc func(node *v3.Node, ori
 		}
 	}
 	return updatedObj, err
+}
+
+func (d *nodeDrain) enqueueCluster(clusterName string) {
+	logrus.Infof("[cordonfieldssyncer] enqueue cluster [%s]", clusterName)
+	d.clusters.Controller().Enqueue("", clusterName)
 }
 
 func (d *nodeDrain) drain(ctx context.Context, obj *v3.Node, cancel context.CancelFunc) {
@@ -181,6 +182,7 @@ func (d *nodeDrain) drain(ctx context.Context, obj *v3.Node, cancel context.Canc
 				}
 				d.machines.Controller().Enqueue("", fmt.Sprintf("%s/%s", d.clusterName, obj.Name))
 			}
+			d.enqueueCluster(nodeCopy.Namespace)
 			cancel()
 		}
 	}
@@ -193,6 +195,7 @@ func (d *nodeDrain) resetDesiredNodeUnschedulable(obj *v3.Node) error {
 	if _, err := d.machines.Update(nodeCopy); err != nil {
 		return err
 	}
+	d.enqueueCluster(obj.Namespace)
 	return nil
 }
 

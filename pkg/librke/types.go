@@ -12,6 +12,7 @@ type RKE interface {
 	GenerateRKENodeCerts(ctx context.Context, rkeConfig v3.RancherKubernetesEngineConfig, nodeAddress string, certBundle map[string]pki.CertificatePKI) map[string]pki.CertificatePKI
 	GenerateCerts(config *v3.RancherKubernetesEngineConfig) (map[string]pki.CertificatePKI, error)
 	GeneratePlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, dockerInfo map[string]types.Info, data map[string]interface{}) (v3.RKEPlan, error)
+	GenerateClusterPlan(ctx context.Context, rkeConfig *v3.RancherKubernetesEngineConfig, dockerInfo types.Info, data map[string]interface{}) (v3.RKEClusterPlan, error)
 }
 
 func New() RKE {

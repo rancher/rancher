@@ -56,6 +56,7 @@ type nodeDrain struct {
 	clusterName          string
 	systemAccountManager *systemaccount.Manager
 	clusterLister        v3.ClusterLister
+	clusters             v3.ClusterInterface
 	machines             v3.NodeInterface
 	ctx                  context.Context
 	nodesToContext       map[string]context.CancelFunc
@@ -84,6 +85,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 		userManager:          cluster.Management.UserManager,
 		tokenClient:          cluster.Management.Management.Tokens(""),
 		userClient:           cluster.Management.Management.Users(""),
+		clusters:             cluster.Management.Management.Clusters(""),
 		kubeConfigGetter:     kubeConfigGetter,
 		clusterName:          cluster.ClusterName,
 		systemAccountManager: systemaccount.NewManager(cluster.Management),

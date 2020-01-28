@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strings"
 
@@ -22,14 +23,16 @@ import (
 	rkehosts "github.com/rancher/rke/hosts"
 	rkepki "github.com/rancher/rke/pki"
 	rkeservices "github.com/rancher/rke/services"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 )
 
 var (
-	b2Mount = "/mnt/sda1"
+	b2Mount               = "/mnt/sda1"
+	upgradeStatusEndpoint = "/upgradestatus"
+	waitForUpgrade        = "wait to be upgraded"
 )
 
 type RKENodeConfigServer struct {
@@ -40,6 +43,8 @@ type RKENodeConfigServer struct {
 	serviceOptions       v3.RKEK8sServiceOptionInterface
 	sysImagesLister      v3.RKEK8sSystemImageLister
 	sysImages            v3.RKEK8sSystemImageInterface
+	clusters             v3.ClusterInterface
+	nodes                v3.NodeInterface
 }
 
 func Handler(auth *tunnelserver.Authorizer, scaledContext *config.ScaledContext) http.Handler {
@@ -51,6 +56,8 @@ func Handler(auth *tunnelserver.Authorizer, scaledContext *config.ScaledContext)
 		serviceOptions:       scaledContext.Management.RKEK8sServiceOptions(""),
 		sysImagesLister:      scaledContext.Management.RKEK8sSystemImages("").Controller().Lister(),
 		sysImages:            scaledContext.Management.RKEK8sSystemImages(""),
+		clusters:             scaledContext.Management.Clusters(""),
+		nodes:                scaledContext.Management.Nodes(""),
 	}
 }
 
@@ -90,6 +97,31 @@ func (n *RKENodeConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 		return
 	}
 
+	if strings.HasSuffix(req.URL.Path, upgradeStatusEndpoint) {
+		body, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			logrus.Errorf("Failed to read upgrade token for node [%s]: [%v]", client.Node.Name, err)
+
+			rw.WriteHeader(http.StatusInternalServerError)
+			rw.Write([]byte("Failed to read upgrade token. Error: " + err.Error()))
+			return
+		}
+		token := string(body)
+		logrus.Infof("nodeserver received upgrade status for node [%s]: %s", client.Node.Name, token)
+		err = n.markUpgraded(client.Cluster.Name, client.Node, token)
+		if err != nil {
+			logrus.Errorf("Failed to update node [%s]: [%v]", client.Node.Name, err)
+
+			rw.WriteHeader(http.StatusInternalServerError)
+			rw.Write([]byte("Failed to update node. Error: " + err.Error()))
+			return
+		}
+		rw.WriteHeader(http.StatusOK)
+		logrus.Infof("upgrade trying to enqueue %s", client.Cluster.Name)
+		n.clusters.Controller().Enqueue("", client.Cluster.Name)
+		return
+	}
+
 	var nodeConfig *rkeworker.NodeConfig
 	if isNonWorkerOnly(client.Node.Status.NodeConfig.Role) {
 		nodeConfig, err = n.nonWorkerConfig(req.Context(), client.Cluster, client.Node)
@@ -98,7 +130,13 @@ func (n *RKENodeConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 			rw.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
+		logrus.Infof("getting nodeConfig for cluster %s node %s", client.Cluster.Name, client.Node.Name)
 		nodeConfig, err = n.nodeConfig(req.Context(), client.Cluster, client.Node)
+
+		if err != nil && err.Error() == waitForUpgrade {
+			rw.WriteHeader(http.StatusAccepted)
+			return
+		}
 	}
 
 	if err != nil {
@@ -120,6 +158,27 @@ func isNonWorkerOnly(role []string) bool {
 		return true
 	}
 	return false
+}
+
+func (n *RKENodeConfigServer) markUpgraded(clusterName string, node *v3.Node, receivedToken string) error {
+	currToken := v3.NodeConditionUpdated.GetReason(node)
+	if currToken == receivedToken {
+		if v3.NodeConditionUpdated.IsTrue(node) {
+			return nil
+		}
+
+		if v3.NodeConditionUpdated.IsUnknown(node) {
+			nodeCopy := node.DeepCopy()
+			v3.NodeConditionUpdated.True(nodeCopy)
+			nodeCopy.Spec.DesiredNodeUnschedulable = "false"
+
+			_, err := n.nodes.Update(nodeCopy)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.Cluster, node *v3.Node) (*rkeworker.NodeConfig, error) {
@@ -169,7 +228,41 @@ func (n *RKENodeConfigServer) nonWorkerConfig(ctx context.Context, cluster *v3.C
 	return nil, fmt.Errorf("failed to find plan for non-worker %s", node.Status.NodeConfig.Address)
 }
 
+func canProceed(cluster *v3.Cluster, node *v3.Node) (bool, string) {
+	nodeUpgradeStatus := cluster.Status.NodeUpgradeStatus
+	if nodeUpgradeStatus == nil {
+		return true, ""
+	}
+
+	if nodeUpgradeStatus.CurrentToken == "" {
+		return true, ""
+	}
+
+	if v3.NodeConditionRegistered.IsUnknown(node) {
+		// node registering for the first time
+		return true, ""
+	}
+
+	tokenMatch := v3.NodeConditionUpdated.GetReason(node) == nodeUpgradeStatus.CurrentToken
+
+	if tokenMatch {
+		if v3.NodeConditionUpdated.IsUnknown(node) {
+			return true, nodeUpgradeStatus.CurrentToken
+		}
+		return true, ""
+	}
+
+	return false, ""
+}
+
 func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluster, node *v3.Node) (*rkeworker.NodeConfig, error) {
+
+	toProceed, currHash := canProceed(cluster, node)
+	if !toProceed {
+		logrus.Infof("returning wait for %s", node.Name)
+		return nil, fmt.Errorf("%s", waitForUpgrade)
+	}
+
 	spec := cluster.Status.AppliedSpec.DeepCopy()
 
 	infos, err := librke.GetDockerInfo(node)
@@ -238,6 +331,11 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 				return nil, errors.Wrapf(err, "failed to marshal certificates bundle")
 			}
 			nc.Certs = certString
+
+			if currHash != "" {
+				logrus.Infof("nodeserver sending upgrade token for [%s]: %s", node.Name, currHash)
+				nc.UpgradeToken = currHash
+			}
 
 			return nc, nil
 		}
