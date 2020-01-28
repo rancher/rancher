@@ -143,6 +143,26 @@ TEMPLATE_LIST_CLUSTER = {
     "name": "gr-test-list-cluster",
 }
 
+# this is used when testing users from a auth provider
+AUTH_PROVIDER_NAME = os.environ.get('RANCHER_AUTH_PROVIDER', "")
+NESTED_GROUP_ENABLED = ast.literal_eval(
+    os.environ.get('RANCHER_NESTED_GROUP_ENABLED', "False"))
+# the shared password for all auth users
+AUTH_USER_PASSWORD = os.environ.get('RANCHER_AUTH_USER_PASSWORD', "")
+# the link to log in as an auth user
+LOGIN_AS_AUTH_USER_URL = \
+    CATTLE_TEST_URL + "/v3-public/" \
+    + AUTH_PROVIDER_NAME + "Providers/" \
+    + AUTH_PROVIDER_NAME.lower() + "?action=login"
+
+# This is used for nested group when a third part Auth is enabled
+nested_group = {
+    "auth_info": None,
+    "users": None,
+    "group_dic": None,
+    "groups": None
+}
+
 
 def is_windows(os_type=TEST_OS):
     return os_type == "windows"
@@ -2079,3 +2099,105 @@ def delete_crd(ns, file, kubectl_context):
     return execute_kubectl_cmd('delete -f ' + file + ' -n ' + ns.name,
                                json_out=False, stderr=True,
                                kubeconfig=kubectl_context).decode("ascii")
+
+
+def prepare_auth_data():
+    name = \
+        os.path.join(os.path.dirname(os.path.realpath(__file__)) + "/resource",
+                     AUTH_PROVIDER_NAME.lower() + ".json")
+    with open(name) as reader:
+        auth_data = reader.read()
+    raw = json.loads(auth_data).get("nested_group_info")
+
+    nested_group["auth_info"] = raw.copy()
+    nested_group["users"] = raw.get("users")
+    raw.pop("users")
+    nested_group["group_dic"] = raw
+    nested_group["groups"] = raw.keys()
+
+
+def is_nested():
+    """ check if the provided groups are nested groups,
+    return True if at least one of the groups contains other groups
+    """
+    count = 0
+    for user, group in nested_group["group_dic"].items():
+        if len(group) == 0:
+            count += 1
+    if count < len(nested_group["group_dic"]):
+        return True
+    return False
+
+
+def get_group(nested=False):
+    """ return a group or a nested group"""
+    if nested:
+        # return the name of a group that contains at least one other group
+        for item in nested_group["groups"]:
+            if len(nested_group["group_dic"].get(item).get("users")) == 0:
+                pass
+            sub_groups = nested_group["group_dic"].get(item).get("groups")
+            if len(sub_groups) == 0:
+                pass
+            for g in sub_groups:
+                if len(nested_group["group_dic"].get(g).get("users")) > 0:
+                    return item
+        assert False, "cannot find any valid nested group"
+
+    else:
+        # return the name of a group that has at least one direct user
+        for group in nested_group["groups"]:
+            if len(nested_group["group_dic"].get(group).get("users")) > 0:
+                return group
+        assert False, "cannot find any valid non-nested group"
+
+
+def get_user_by_group(group, nested=False):
+    """ return the list of uses in the group or nested group
+
+    if nested is False, return the direct users in the group;
+    otherwise, return all users including those from nested groups
+    """
+    def get_user_in_nested_group(group, source):
+        if group == "":
+            return []
+        users = source["group_dic"].get(group).get("users")
+        for sub_group in source["group_dic"].get(group).get("groups"):
+            temp = get_user_in_nested_group(sub_group, source)
+            for user in temp:
+                if user not in users:
+                    users.append(user)
+        return users
+
+    if nested:
+        users = get_user_in_nested_group(group, nested_group)
+        assert len(users) > 0, "no user in the group"
+    else:
+        users = nested_group["group_dic"].get(group).get("users")
+        assert users is not None, "no user in the group"
+    print("group: {}, users: {}".format(group, users))
+    return users
+
+
+def get_a_group_and_a_user_not_in_it(nested=False):
+    """ return a group or a nested group and a user that is not in the group"""
+    all_users = nested_group["users"]
+    for group in nested_group["groups"]:
+        group_users = get_user_by_group(group, nested)
+        for user in all_users:
+            if user not in group_users:
+                print("group: {}, user not in it: {}".format(group, user))
+                return group, user
+    assert False, "cannot find a group and a user not in it"
+
+
+def login_as_auth_user(username, password):
+    """ login with the user account from the auth provider,
+    and return the user token"""
+    r = requests.post(LOGIN_AS_AUTH_USER_URL, json={
+        'username': username,
+        'password': password,
+        'responseType': 'json',
+    }, verify=False)
+    assert r.status_code in [200, 201]
+    return r.json()['token']

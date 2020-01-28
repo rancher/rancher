@@ -1,20 +1,20 @@
 import urllib3
-from .common import *
+from .common import * # NOQA
 
 # This stops ssl warnings for insecure certs
 urllib3.disable_warnings()
 
 
 def pytest_configure(config):
-    if TEST_RBAC is False:
-        return
-    rbac_prepare()
+    if TEST_RBAC:
+        rbac_prepare()
+    if AUTH_PROVIDER_NAME != "":
+        prepare_auth_data()
 
 
 def pytest_unconfigure(config):
-    if TEST_RBAC is False:
-        return
-    rbac_cleanup()
+    if TEST_RBAC:
+        rbac_cleanup()
 
 
 @pytest.fixture
