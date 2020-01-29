@@ -6,5 +6,9 @@ server that will actually do a net.Dial on the client and pipe all bytes back an
 
 Fun times!
 
-Refer to `server/` and `client/` how to use.  Or don't.... This framework can hurt your head
+Refer to [`server/`](server/) and [`client/`](client/) how to use.  Or don't.... This framework can hurt your head
 trying to conceptualize.
+
+See also:
+
+* [inlets.dev](https://inlets.dev) which uses the client and server components to form a tunnel for clients behind NAT or firewalls.

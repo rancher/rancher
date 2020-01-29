@@ -23,7 +23,7 @@ func connectToProxy(rootCtx context.Context, proxyURL string, headers http.Heade
 	logrus.WithField("url", proxyURL).Info("Connecting to proxy")
 
 	if dialer == nil {
-		dialer = &websocket.Dialer{HandshakeTimeout:HandshakeTimeOut}
+		dialer = &websocket.Dialer{Proxy:http.ProxyFromEnvironment,HandshakeTimeout:HandshakeTimeOut}
 	}
 	ws, resp, err := dialer.Dial(proxyURL, headers)
 	if err != nil {

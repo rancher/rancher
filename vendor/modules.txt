@@ -272,7 +272,7 @@ github.com/pborman/uuid
 github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
-# github.com/prometheus/client_golang v1.1.0 => github.com/prometheus/client_golang v0.9.3
+# github.com/prometheus/client_golang v1.4.0 => github.com/prometheus/client_golang v0.9.3
 github.com/prometheus/client_golang/api
 github.com/prometheus/client_golang/api/prometheus/v1
 github.com/prometheus/client_golang/prometheus
@@ -361,8 +361,9 @@ github.com/rancher/norman/types/values
 github.com/rancher/norman/urlbuilder
 # github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 github.com/rancher/rdns-server/model
-# github.com/rancher/remotedialer v0.2.3-0.20190906213150-8b3983d91ed6
+# github.com/rancher/remotedialer v0.2.5
 github.com/rancher/remotedialer
+github.com/rancher/remotedialer/metrics
 # github.com/rancher/rke v1.0.4
 github.com/rancher/rke/addons
 github.com/rancher/rke/authz
