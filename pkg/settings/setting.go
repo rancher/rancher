@@ -15,7 +15,7 @@ var (
 	provider       Provider
 	InjectDefaults string
 
-	AgentImage                        = NewSetting("agent-image", "rancher/rancher-agent:master")
+	AgentImage                        = NewSetting("agent-image", "rancher/rancher-agent:master-head")
 	AuthImage                         = NewSetting("auth-image", v3.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
 	CACerts                           = NewSetting("cacerts", "")
 	CLIURLDarwin                      = NewSetting("cli-url-darwin", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-darwin-amd64-v1.0.0-alpha8.tar.gz")
