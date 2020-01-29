@@ -361,7 +361,7 @@ spec:
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
-	  maxUnavailable: 25%
+      maxUnavailable: 25%
 {{- end }}
 
 {{- if .AuthImage}}
