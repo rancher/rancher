@@ -356,8 +356,11 @@ def test_impersonation_passthrough(admin_mc, admin_cc, user_mc, user_factory,
     assert response.status.allowed is False
 
     # User2 is an owner/admin which allows them to impersonate
-    response = user2_auth.create_self_subject_access_review(access_review)
-    assert response.status.allowed is True
+    def _access_check():
+        response = user2_auth.create_self_subject_access_review(access_review)
+        return response.status.allowed is True
+
+    wait_for(_access_check, fail_handler=lambda: "user2 does not have access")
 
     # Add a role and role binding to user user1 allowing user1 to impersonate
     # user2
@@ -401,8 +404,11 @@ def test_impersonation_passthrough(admin_mc, admin_cc, user_mc, user_factory,
     })
 
     # User1 should now be abele to imerpsonate as user2
-    response = user1_auth.create_self_subject_access_review(access_review2)
-    assert response.status.allowed is True
+    def _access_check2():
+        response = user1_auth.create_self_subject_access_review(access_review2)
+        return response.status.allowed is True
+
+    wait_for(_access_check2, fail_handler=lambda: "user1 does not have access")
 
 
 def test_permissions_can_be_removed(admin_cc, admin_mc, user_mc, request,
