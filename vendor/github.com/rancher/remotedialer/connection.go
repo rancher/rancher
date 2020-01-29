@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/norman/metrics"
+	"github.com/rancher/remotedialer/metrics"
 )
 
 type connection struct {
