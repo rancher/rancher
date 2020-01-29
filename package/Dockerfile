@@ -15,6 +15,9 @@ ARG ARCH=amd64
 ARG IMAGE_REPO=rancher
 ARG SYSTEM_CHART_DEFAULT_BRANCH=release-v2.3
 
+# kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
+ARG RANCHER_METADATA_BRANCH=
+
 ENV CATTLE_SYSTEM_CHART_DEFAULT_BRANCH=$SYSTEM_CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.14.3-rancher1
 ENV CATTLE_K3S_VERSION v0.8.0
@@ -26,6 +29,7 @@ ENV TELEMETRY_VERSION v0.5.11
 ENV KUBECTL_VERSION v1.16.1
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.8
 ENV LINODE_UI_DRIVER_VERSION v0.3.0
+ENV RANCHER_METADATA_BRANCH ${RANCHER_METADATA_BRANCH}
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/library && \

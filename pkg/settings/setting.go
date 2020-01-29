@@ -154,9 +154,12 @@ func GetEnvKey(key string) string {
 func getMetadataConfig() string {
 	key := GetEnvKey("server-version")
 	rancherVersion := os.Getenv(key)
-	branch := "dev"
-	if releaseServerVersion(rancherVersion) {
-		branch = "master"
+	branch := os.Getenv("RANCHER_METADATA_BRANCH")
+	if branch == "" {
+		branch = "dev"
+		if releaseServerVersion(rancherVersion) {
+			branch = "master"
+		}
 	}
 	data := map[string]interface{}{
 		"url":                      "https://github.com/rancher/kontainer-driver-metadata.git",
