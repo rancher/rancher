@@ -6,8 +6,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
-	nm "github.com/rancher/norman/metrics"
 	"github.com/rancher/rancher/pkg/settings"
+	rm "github.com/rancher/remotedialer/metrics"
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -16,12 +16,12 @@ import (
 
 var (
 	targetMetricsByNameForClientKey = []interface{}{
-		nm.TotalAddWS, nm.TotalRemoveWS, nm.TotalAddConnectionsForWS, nm.TotalRemoveConnectionsForWS,
-		nm.TotalTransmitBytesOnWS, nm.TotalTransmitErrorBytesOnWS, nm.TotalReceiveBytesOnWS,
+		rm.TotalAddWS, rm.TotalRemoveWS, rm.TotalAddConnectionsForWS, rm.TotalRemoveConnectionsForWS,
+		rm.TotalTransmitBytesOnWS, rm.TotalTransmitErrorBytesOnWS, rm.TotalReceiveBytesOnWS,
 	}
 
 	targetMetricsByIPForPeer = []interface{}{
-		nm.TotalAddPeerAttempt, nm.TotalPeerConnected, nm.TotalPeerDisConnected,
+		rm.TotalAddPeerAttempt, rm.TotalPeerConnected, rm.TotalPeerDisConnected,
 	}
 )
 

@@ -70,15 +70,15 @@ require (
 	github.com/pborman/uuid v1.2.0
 	github.com/pierrec/lz4 v2.2.6+incompatible // indirect
 	github.com/pkg/errors v0.8.1
-	github.com/prometheus/client_golang v1.1.0
+	github.com/prometheus/client_golang v1.4.0
 	github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90
 	github.com/prometheus/common v0.6.0
 	github.com/rancher/kontainer-driver-metadata v0.0.0-20200123225253-a5b9f3e0b2df
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200123235809-1b6d4a82a415
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20200124050618-768222c62d5b
+	github.com/rancher/norman v0.0.0-20200129164956-acbc1114636d
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
-	github.com/rancher/remotedialer v0.2.3
+	github.com/rancher/remotedialer v0.2.5
 	github.com/rancher/rke v1.1.0-rc4.0.20200123230443-25e7f987775d
 	github.com/rancher/security-scan v0.1.5
 	github.com/rancher/types v0.0.0-20200123224322-9adcafc483ee
