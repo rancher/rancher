@@ -5,23 +5,20 @@ import (
 	"strings"
 
 	mVersion "github.com/mcuadros/go-version"
-	"github.com/rancher/rancher/pkg/settings"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
-
-	"github.com/sirupsen/logrus"
-
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rke/util"
+	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func GetCisConfigParams(
-	k8sVersion string,
+	name string,
 	cisConfigLister v3.CisConfigLister,
 	cisConfig v3.CisConfigInterface,
 ) (v3.CisConfigParams, error) {
-	name := util.GetTagMajorVersion(k8sVersion)
 	c, err := cisConfigLister.Get(namespace.GlobalNamespace, name)
 	if err != nil {
 		if !errors.IsNotFound(err) {
