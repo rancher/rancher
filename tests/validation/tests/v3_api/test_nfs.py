@@ -182,6 +182,7 @@ def create_project_client(request):
                   "name": pvc_name,
                   "volumeId": pv_object.id,
                   "namespaceId": ns.id,
+                  "storageClassId": "",
                   "resources": {"requests": {"storage": "10Gi"}}
                   }
     pvc_object = p_client.create_persistent_volume_claim(pvc_config)
