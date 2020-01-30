@@ -12,8 +12,10 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/controllers/user/cis"
+	"github.com/rancher/rancher/pkg/namespace"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -69,6 +71,19 @@ func (a ActionHandler) runCisScan(actionName string, action *types.Action, apiCo
 	if _, ok := cluster.Annotations[v3.RunCisScanAnnotation]; ok {
 		return httperror.WrapAPIError(err, httperror.Conflict,
 			fmt.Sprintf("CIS scan already running on cluster"))
+	}
+
+	if cisScanConfig.OverrideBenchmarkVersion != "" {
+		_, err := a.CisBenchmarkVersionLister.Get(namespace.GlobalNamespace, cisScanConfig.OverrideBenchmarkVersion)
+		if err != nil {
+			if kerrors.IsNotFound(err) {
+				return httperror.WrapAPIError(err, httperror.InvalidOption,
+					fmt.Sprintf("invalid override benchmark version specified"))
+			}
+			logrus.Errorf("error fetching cis benchmark version %v: %v", cisScanConfig.OverrideBenchmarkVersion, err)
+			return httperror.WrapAPIError(err, httperror.ServerError,
+				fmt.Sprintf("error fetching cis benchmark version %v", cisScanConfig.OverrideBenchmarkVersion))
+		}
 	}
 
 	newCisScan := cis.NewCisScan(cluster, cisScanConfig)

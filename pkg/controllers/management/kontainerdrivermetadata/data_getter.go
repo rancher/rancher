@@ -16,6 +16,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+func GetCisConfigParams(
+	k8sVersion string,
+	cisConfigLister v3.CisConfigLister,
+	cisConfig v3.CisConfigInterface,
+) (v3.CisConfigParams, error) {
+	name := util.GetTagMajorVersion(k8sVersion)
+	c, err := cisConfigLister.Get(namespace.GlobalNamespace, name)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return v3.CisConfigParams{}, err
+		}
+		c, err = cisConfig.GetNamespaced(namespace.GlobalNamespace, name, metav1.GetOptions{})
+		if err != nil {
+			return v3.CisConfigParams{}, err
+		}
+	}
+	return c.Params, nil
+}
+
 func GetRKESystemImages(k8sVersion string, sysImageLister v3.RKEK8sSystemImageLister, sysImages v3.RKEK8sSystemImageInterface) (v3.RKESystemImages, error) {
 	name := k8sVersion
 	sysImage, err := sysImageLister.Get(namespace.GlobalNamespace, name)

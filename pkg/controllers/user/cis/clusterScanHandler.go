@@ -8,6 +8,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/app/utils"
+	"github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	rcorev1 "github.com/rancher/types/apis/core/v1"
@@ -39,6 +40,8 @@ type cisScanHandler struct {
 	clusterNamespace             string
 	systemAccountManager         *systemaccount.Manager
 	configMapsClient             rcorev1.ConfigMapInterface
+	cisConfig                    v3.CisConfigInterface
+	cisConfigLister              v3.CisConfigLister
 }
 
 type appInfo struct {
@@ -80,11 +83,31 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 	}
 	if !v3.ClusterScanConditionCreated.IsTrue(cs) {
 		logrus.Infof("cisScanHandler: Create: deploying helm chart")
-
+		currentK8sVersion := cluster.Spec.RancherKubernetesEngineConfig.Version
+		cisConfigParams, err := kontainerdrivermetadata.GetCisConfigParams(
+			currentK8sVersion,
+			csh.cisConfigLister,
+			csh.cisConfig,
+		)
+		if err != nil {
+			logrus.Debugf("cisScanHandler: Create: benchmark version not found for k8s version: %v, using default",
+				currentK8sVersion)
+			cisConfigParams, err = kontainerdrivermetadata.GetCisConfigParams(
+				"default",
+				csh.cisConfigLister,
+				csh.cisConfig,
+			)
+			if err != nil {
+				return cs, fmt.Errorf("error fetching default cis config: %v", err)
+			}
+		}
+		logrus.Debugf("cisScanHandler: Create: k8sVersion: %v, benchmarkVersion: %v",
+			currentK8sVersion, cisConfigParams.BenchmarkVersion)
 		skipOverride := false
 		appInfo := &appInfo{
-			appName:     cs.Name,
-			clusterName: cs.Spec.ClusterID,
+			appName:                  cs.Name,
+			clusterName:              cs.Spec.ClusterID,
+			overrideBenchmarkVersion: cisConfigParams.BenchmarkVersion,
 		}
 		if cs.Spec.ScanConfig.CisScanConfig != nil {
 			if cs.Spec.ScanConfig.CisScanConfig.DebugMaster {
@@ -97,6 +120,8 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 				skipOverride = true
 			}
 			if cs.Spec.ScanConfig.CisScanConfig.OverrideBenchmarkVersion != "" {
+				logrus.Debugf("cisScanHandler: Create: user requested overrideBenchmarkVersion: %v",
+					cs.Spec.ScanConfig.CisScanConfig.OverrideBenchmarkVersion)
 				appInfo.overrideBenchmarkVersion = cs.Spec.ScanConfig.CisScanConfig.OverrideBenchmarkVersion
 			}
 		}
@@ -268,7 +293,7 @@ func (csh *cisScanHandler) deployApp(appInfo *appInfo) error {
 		"debugWorker":              appInfo.debugWorker,
 		"overrideBenchmarkVersion": appInfo.overrideBenchmarkVersion,
 	}
-	logrus.Debugf("appAnswers: %v", appAnswers)
+	logrus.Debugf("cisScanHandler: deployApp: appAnswers: %v", appAnswers)
 	app := &projv3.App{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{creatorIDAnno: creator.Name},

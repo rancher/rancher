@@ -41,6 +41,9 @@ type Data struct {
 
 	// K8sVersionWindowsServiceOptions - service options per windows k8s version
 	K8sVersionWindowsServiceOptions map[string]v3.KubernetesServicesOptions
+
+	CisConfigParams         map[string]v3.CisConfigParams
+	CisBenchmarkVersionInfo map[string]v3.CisBenchmarkVersionInfo
 }
 
 var (
@@ -79,6 +82,9 @@ func init() {
 	DriverData.K8sVersionWindowsServiceOptions = loadK8sVersionWindowsServiceOptions()
 	DriverData.K8sVersionDockerInfo = loadK8sVersionDockerInfo()
 
+	// CIS
+	DriverData.CisConfigParams = loadCisConfigParams()
+	DriverData.CisBenchmarkVersionInfo = loadCisBenchmarkVersionInfo()
 }
 
 func validateDefaultPresent(versions map[string]string) {

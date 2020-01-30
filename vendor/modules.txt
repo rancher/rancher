@@ -308,7 +308,7 @@ github.com/prometheus/common/model
 # github.com/prometheus/procfs v0.0.2
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
-# github.com/rancher/kontainer-driver-metadata v0.0.0-20200123225253-a5b9f3e0b2df
+# github.com/rancher/kontainer-driver-metadata v0.0.0-20200129225622-a00843f74fed
 github.com/rancher/kontainer-driver-metadata/rke
 github.com/rancher/kontainer-driver-metadata/rke/templates
 # github.com/rancher/kontainer-engine v0.0.4-dev.0.20200123235809-1b6d4a82a415

@@ -70,6 +70,12 @@ func (md *MetadataController) createOrUpdateMetadata(data Data) error {
 	if err := md.saveAddons(data.K8sVersionedTemplates); err != nil {
 		return err
 	}
+	if err := md.saveCisConfigParams(data.CisConfigParams); err != nil {
+		return fmt.Errorf("error saving cisDefaultConfigs: %v", err)
+	}
+	if err := md.saveCisBenchmarkVersions(data.CisBenchmarkVersionInfo); err != nil {
+		return fmt.Errorf("error saving cisBechmarkVersions: %v", err)
+	}
 	return nil
 }
 
@@ -83,6 +89,12 @@ func (md *MetadataController) createOrUpdateMetadataDefaults() error {
 	}
 	if err := md.saveAddons(rke.DriverData.K8sVersionedTemplates); err != nil {
 		return err
+	}
+	if err := md.saveCisConfigParams(rke.DriverData.CisConfigParams); err != nil {
+		return fmt.Errorf("error saving cisDefaultConfigs: %v", err)
+	}
+	if err := md.saveCisBenchmarkVersions(rke.DriverData.CisBenchmarkVersionInfo); err != nil {
+		return fmt.Errorf("error saving cisBechmarkVersions: %v", err)
 	}
 	return nil
 }
@@ -179,6 +191,26 @@ func (md *MetadataController) saveAddons(K8sVersionedTemplates map[string]map[st
 	for addon, template := range K8sVersionedTemplates[templates.TemplateKeys] {
 		if err := md.createOrUpdateAddonCRD(addon, template, rkeAddonKeys); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func (md *MetadataController) saveCisConfigParams(cisConfigParams map[string]v3.CisConfigParams) error {
+	for k8sVersion, cisConfigParam := range cisConfigParams {
+		logrus.Debugf("saveCisConfigParams k8sversion: %v cisConfigParam: %+v", k8sVersion, cisConfigParam)
+		if err := md.createOrUpdateCisConfigCRD(k8sVersion, cisConfigParam); err != nil {
+			return fmt.Errorf("error saving cisConfig: %v", err)
+		}
+	}
+	return nil
+}
+
+func (md *MetadataController) saveCisBenchmarkVersions(cisBenchmarkVersionInfo map[string]v3.CisBenchmarkVersionInfo) error {
+	for benchmarkVersion, info := range cisBenchmarkVersionInfo {
+		logrus.Debugf("saveCisBenchmarkVersions bechmarkVersion: %v info: %+v", benchmarkVersion, info)
+		if err := md.createOrUpdateCisBenchmarkVersionCRD(benchmarkVersion, info); err != nil {
+			return fmt.Errorf("error saving cisBenchmarkVersions: %v", err)
 		}
 	}
 	return nil
@@ -324,6 +356,86 @@ func (md *MetadataController) createOrUpdateAddonCRD(addonName, template string,
 		if _, err := md.Addons.Update(addonCopy); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (md *MetadataController) createOrUpdateCisConfigCRD(
+	k8sVersion string,
+	cisConfigParams v3.CisConfigParams,
+) error {
+	cisConfig, err := md.CisConfigLister.Get(namespace.GlobalNamespace, k8sVersion)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("error finding cisConfig for k8sVersion: %v", k8sVersion)
+		}
+		cisConfig = &v3.CisConfig{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       v3.CisConfigGroupVersionKind.Kind,
+				APIVersion: v3.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      k8sVersion,
+				Namespace: namespace.GlobalNamespace,
+			},
+			Params: cisConfigParams,
+		}
+		logrus.Debugf("driverMetadata: creating cisConfig CRD for k8sVersion: %v",
+			k8sVersion)
+		if _, err := md.CisConfig.Create(cisConfig); err != nil && !errors.IsAlreadyExists(err) {
+			return err
+		}
+		return nil
+	}
+	if reflect.DeepEqual(cisConfig.Params, cisConfigParams) {
+		return nil
+	}
+	logrus.Debugf("driverMetadata: cisConfigParams changed for k8sVersion: %v old: %v new: %v",
+		k8sVersion, cisConfig.Params, cisConfigParams)
+	cisConfigCopy := cisConfig.DeepCopy()
+	cisConfigCopy.Params = cisConfigParams
+	if _, err := md.CisConfig.Update(cisConfigCopy); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (md *MetadataController) createOrUpdateCisBenchmarkVersionCRD(
+	benchmarkVersion string,
+	cisBenchmarkVersionInfo v3.CisBenchmarkVersionInfo,
+) error {
+	cisBenchmarkVersion, err := md.CisBenchmarkVersionLister.Get(namespace.GlobalNamespace, benchmarkVersion)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("error finding cisBenchmarkVerionInfo for benchmarkVersion: %v", benchmarkVersion)
+		}
+		cisBenchmarkVersion = &v3.CisBenchmarkVersion{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       v3.CisBenchmarkVersionGroupVersionKind.Kind,
+				APIVersion: v3.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      benchmarkVersion,
+				Namespace: namespace.GlobalNamespace,
+			},
+			Info: cisBenchmarkVersionInfo,
+		}
+		logrus.Debugf("driverMetadata: creating cisBenchmarkVerion CRD for benchmarkVersion: %v",
+			benchmarkVersion)
+		if _, err := md.CisBenchmarkVersion.Create(cisBenchmarkVersion); err != nil && !errors.IsAlreadyExists(err) {
+			return err
+		}
+		return nil
+	}
+	if reflect.DeepEqual(cisBenchmarkVersion.Info, cisBenchmarkVersionInfo) {
+		return nil
+	}
+	logrus.Debugf("driverMetadata: cisBenchmarkVerionInfochanged for benchmarkVersion: %v old: %v new: %v",
+		benchmarkVersion, cisBenchmarkVersion.Info, cisBenchmarkVersionInfo)
+	cisBenchmarkVersionCopy := cisBenchmarkVersion.DeepCopy()
+	cisBenchmarkVersionCopy.Info = cisBenchmarkVersionInfo
+	if _, err := md.CisBenchmarkVersion.Update(cisBenchmarkVersionCopy); err != nil {
+		return err
 	}
 	return nil
 }
