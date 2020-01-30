@@ -844,6 +844,10 @@ def validate_cluster(client, cluster, intermediate_state="provisioning",
                                         daemonSetConfig={})
     validate_workload(p_client, workload, "daemonSet", ns.name,
                       len(get_schedulable_nodes(cluster, client)))
+    pods = p_client.list_pod(workloadId=workload["id"]).data
+    scale = len(pods)
+    # test service discovery
+    validate_service_discovery(workload, scale, p_client, ns, pods)
     if not skipIngresscheck:
         host = "test" + str(random_int(10000, 99999)) + ".com"
         path = "/name.html"
@@ -2225,3 +2229,15 @@ def login_as_auth_user(username, password):
     }, verify=False)
     assert r.status_code in [200, 201]
     return r.json()['token']
+
+
+def validate_service_discovery(workload, scale,
+                               p_client=None, ns=None, testclient_pods=None):
+    expected_ips = []
+    pods = p_client.list_pod(workloadId=workload["id"]).data
+    assert len(pods) == scale
+    for pod in pods:
+        expected_ips.append(pod["status"]["podIp"])
+    host = '{0}.{1}.svc.cluster.local'.format(workload.name, ns.id)
+    for pod in testclient_pods:
+        validate_dns_entry(pod, host, expected_ips)

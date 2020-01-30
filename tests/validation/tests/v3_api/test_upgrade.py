@@ -106,7 +106,7 @@ def test_validate_existing_wl():
 @if_post_upgrade
 @pytest.mark.run(order=2)
 def test_validate_existing_service_discovery():
-    validate_service_discovery(sd_name_validate,
+    validate_service_discovery_upgrade(sd_name_validate,
                                [sd_wlname1_validate, sd_wlname2_validate])
 
 
@@ -251,7 +251,7 @@ def validate_wl(workload_name, pod_count=2):
     workload = workloads[0]
     validate_workload(
         p_client, workload, "deployment", ns.name, pod_count=pod_count)
-    validate_service_discovery(workload_name, [workload_name])
+    validate_service_discovery_upgrade(workload_name, [workload_name])
 
 
 def create_and_validate_ingress_xip_io_daemon():
@@ -346,8 +346,9 @@ def modify_workload_validate_sd():
     p_client.update(sd_workload, scale=3, containers=sd_workload.containers)
     validate_wl(sd_wlname2_validate, 3)
 
-    validate_service_discovery(sd_name_validate,
-                               [sd_wlname1_validate, sd_wlname2_validate])
+    validate_service_discovery_upgrade(sd_name_validate,
+                                       [sd_wlname1_validate,
+                                        sd_wlname2_validate])
 
 
 def modify_workload_validate_secret():
@@ -421,11 +422,11 @@ def create_and_validate_service_discovery():
               "namespaceId": ns.id}
 
     create_dns_record(record, p_client)
-    validate_service_discovery(sd_name_create,
-                               [sd_wlname1_create, sd_wlname2_create])
+    validate_service_discovery_upgrade(sd_name_create,
+                                       [sd_wlname1_create, sd_wlname2_create])
 
 
-def validate_service_discovery(sd_record_name, workload_names):
+def validate_service_discovery_upgrade(sd_record_name, workload_names):
     p_client = namespace["p_client"]
     ns = namespace["ns"]
     target_wls = []
