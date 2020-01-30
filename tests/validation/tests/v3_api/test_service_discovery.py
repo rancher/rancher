@@ -29,25 +29,6 @@ def create_and_validate_wl(name, con, scale, type, p_client=None, ns=None):
     return workload
 
 
-def validate_service_discovery(workload, scale,
-                               p_client=None, ns=None, testclient_pods=None):
-    if p_client is None:
-        p_client = namespace["p_client"]
-    if ns is None:
-        ns = namespace["ns"]
-    if testclient_pods is None:
-        testclient_pods = namespace["testclient_pods"]
-
-    expected_ips = []
-    pods = p_client.list_pod(workloadId=workload["id"]).data
-    assert len(pods) == scale
-    for pod in pods:
-        expected_ips.append(pod["status"]["podIp"])
-    host = '{0}.{1}.svc.cluster.local'.format(workload.name, ns.id)
-    for pod in testclient_pods:
-        validate_dns_entry(pod, host, expected_ips)
-
-
 def update_and_validate_workload(workload, con, scale, p_client=None, ns=None):
     if p_client is None:
         p_client = namespace["p_client"]
@@ -88,14 +69,16 @@ def test_service_discovery_when_workload_scale_up():
     scale = 2
     workload = create_and_validate_wl(name, con, scale, type)
     # test service discovery
-    validate_service_discovery(workload, scale)
+    validate_service_discovery(workload, scale, namespace["p_client"],
+                               namespace["ns"], namespace["testclient_pods"])
 
     # workload scales up to 3 pods
     scale = 3
     update_and_validate_workload(workload, con, scale)
     # test service discovery
     time.sleep(DNS_RESOLUTION_DEFAULT_SECONDS)
-    validate_service_discovery(workload, scale)
+    validate_service_discovery(workload, scale, namespace["p_client"],
+                               namespace["ns"], namespace["testclient_pods"])
 
 
 def test_service_discovery_when_workload_scale_down():
@@ -108,14 +91,16 @@ def test_service_discovery_when_workload_scale_down():
     scale = 3
     workload = create_and_validate_wl(name, con, scale, type)
     # test service discovery
-    validate_service_discovery(workload, scale)
+    validate_service_discovery(workload, scale, namespace["p_client"],
+                               namespace["ns"], namespace["testclient_pods"])
 
     # workload scale down to 2 pods
     scale = 2
     update_and_validate_workload(workload, con, scale)
     # test service discovery
     time.sleep(DNS_RESOLUTION_DEFAULT_SECONDS)
-    validate_service_discovery(workload, scale)
+    validate_service_discovery(workload, scale, namespace["p_client"],
+                               namespace["ns"], namespace["testclient_pods"])
 
 
 def test_service_discovery_when_workload_upgrade():
@@ -128,7 +113,8 @@ def test_service_discovery_when_workload_upgrade():
     # deploy a workload
     workload = create_and_validate_wl(name, con, scale, type)
     # test service discovery
-    validate_service_discovery(workload, scale)
+    validate_service_discovery(workload, scale, namespace["p_client"],
+                               namespace["ns"], namespace["testclient_pods"])
 
     # upgrade
     con = [{"name": "test1",
@@ -136,7 +122,8 @@ def test_service_discovery_when_workload_upgrade():
     update_and_validate_workload(workload, con, scale)
     # test service discovery
     time.sleep(DNS_RESOLUTION_DEFAULT_SECONDS)
-    validate_service_discovery(workload, scale)
+    validate_service_discovery(workload, scale, namespace["p_client"],
+                               namespace["ns"], namespace["testclient_pods"])
 
     # upgrade again
     con = [{"name": "test1",
@@ -144,7 +131,8 @@ def test_service_discovery_when_workload_upgrade():
     update_and_validate_workload(workload, con, scale)
     # test service discovery
     time.sleep(DNS_RESOLUTION_DEFAULT_SECONDS)
-    validate_service_discovery(workload, scale)
+    validate_service_discovery(workload, scale, namespace["p_client"],
+                               namespace["ns"], namespace["testclient_pods"])
 
 
 def test_dns_record_type_workload_when_workload_scale_up():
