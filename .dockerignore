@@ -6,6 +6,7 @@
 ./.idea
 ./default.etcd
 ./package/rancher
+./package/agent
 ./tests/MANIFEST
 ./tests/.idea
 ./tests/.cache

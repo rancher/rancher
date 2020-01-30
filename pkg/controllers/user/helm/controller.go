@@ -53,7 +53,6 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 		CatalogLister:         user.Management.Management.Catalogs("").Controller().Lister(),
 		ClusterCatalogLister:  user.Management.Management.ClusterCatalogs("").Controller().Lister(),
 		ProjectCatalogLister:  user.Management.Management.ProjectCatalogs("").Controller().Lister(),
-		ListenConfigClient:    user.Management.Management.ListenConfigs(""),
 		ClusterName:           user.ClusterName,
 		AppRevisionGetter:     user.Management.Project,
 		AppGetter:             user.Management.Project,
@@ -77,7 +76,6 @@ type Lifecycle struct {
 	ClusterCatalogLister  mgmtv3.ClusterCatalogLister
 	ProjectCatalogLister  mgmtv3.ProjectCatalogLister
 	K8sClient             kubernetes.Interface
-	ListenConfigClient    mgmtv3.ListenConfigInterface
 	ClusterName           string
 	AppRevisionGetter     v3.AppRevisionsGetter
 	AppGetter             v3.AppsGetter

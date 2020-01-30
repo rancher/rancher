@@ -8,6 +8,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clusterrouter"
+	"github.com/rancher/steve/pkg/auth"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -19,6 +20,18 @@ import (
 type Authenticator interface {
 	Authenticate(req *http.Request) (authed bool, user string, groups []string, err error)
 	TokenFromRequest(req *http.Request) (*v3.Token, error)
+}
+
+func ToAuthMiddleware(a Authenticator) auth.Middleware {
+	f := func(req *http.Request) (user.Info, bool, error) {
+		authed, u, groups, err := a.Authenticate(req)
+		return &user.DefaultInfo{
+			Name:   u,
+			UID:    u,
+			Groups: groups,
+		}, authed, err
+	}
+	return auth.ToMiddleware(auth.AuthenticatorFunc(f))
 }
 
 func NewAuthenticator(ctx context.Context, mgmtCtx *config.ScaledContext) Authenticator {
@@ -107,7 +120,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (bool, string, []st
 		}
 	}
 
-	groups = append(groups, user.AllAuthenticated)
+	groups = append(groups, user.AllAuthenticated, "system:cattle:authenticated")
 
 	return true, token.UserID, groups, nil
 }

@@ -17,4 +17,9 @@ RKE_VERSION="$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')"
 # Inject Setting values
 DEFAULT_VALUES="{\"ui-index\":\"${UI_INDEX}\",\"rke-version\":\"${RKE_VERSION}\"}"
 
-CGO_ENABLED=0 go build -i -tags k8s -ldflags "-X main.VERSION=$VERSION -X github.com/rancher/rancher/pkg/settings.InjectDefaults=$DEFAULT_VALUES $LINKFLAGS" -o bin/rancher
+CGO_ENABLED=0 go build -i -tags k8s \
+  -ldflags \
+  "-X github.com/rancher/rancher/pkg/version.Version=$VERSION
+   -X github.com/rancher/rancher/pkg/version.GitCommit=$COMMIT
+   -X github.com/rancher/rancher/pkg/settings.InjectDefaults=$DEFAULT_VALUES $LINKFLAGS" \
+  -o bin/rancher

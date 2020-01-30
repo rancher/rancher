@@ -106,7 +106,6 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		client.GroupMemberType,
 		client.GroupType,
 		client.KontainerDriverType,
-		client.ListenConfigType,
 		client.MultiClusterAppType,
 		client.MultiClusterAppRevisionType,
 		client.MonitorMetricType,
