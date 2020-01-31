@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
@@ -64,6 +65,12 @@ func formGithubRedirectURLFromMap(config map[string]interface{}) string {
 	hostname, _ := config[client.GithubConfigFieldHostname].(string)
 	clientID, _ := config[client.GithubConfigFieldClientID].(string)
 	tls, _ := config[client.GithubConfigFieldTLS].(bool)
+
+	requestHostname := convert.ToString(config[".host"])
+	clientIDs := convert.ToMapInterface(config["hostnameToClientId"])
+	if otherID, ok := clientIDs[requestHostname]; ok {
+		clientID = convert.ToString(otherID)
+	}
 	return githubRedirectURL(hostname, clientID, tls)
 }
 
@@ -105,7 +112,7 @@ func (g *ghProvider) testAndApply(actionName string, action *types.Action, reque
 	}
 
 	//Call provider to testLogin
-	userPrincipal, groupPrincipals, providerInfo, err := g.LoginUser(githubLogin, &githubConfig, true)
+	userPrincipal, groupPrincipals, providerInfo, err := g.LoginUser("", githubLogin, &githubConfig, true)
 	if err != nil {
 		if httperror.IsAPIError(err) {
 			return err

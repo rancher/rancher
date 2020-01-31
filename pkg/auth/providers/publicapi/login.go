@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/auth/util"
 	"github.com/rancher/rancher/pkg/settings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
@@ -166,7 +167,8 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		return v3.Token{}, "saml", err
 	}
 
-	userPrincipal, groupPrincipals, providerToken, err = providers.AuthenticateUser(request.Request.Context(), input, providerName)
+	ctx := context.WithValue(request.Request.Context(), util.RequestKey, request.Request)
+	userPrincipal, groupPrincipals, providerToken, err = providers.AuthenticateUser(ctx, input, providerName)
 	if err != nil {
 		return v3.Token{}, "", err
 	}
