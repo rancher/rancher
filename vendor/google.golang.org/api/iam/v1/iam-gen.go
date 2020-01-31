@@ -1900,6 +1900,14 @@ type ServiceAccountKey struct {
 	//   "KEY_ALG_RSA_2048" - 2k RSA Key.
 	KeyAlgorithm string `json:"keyAlgorithm,omitempty"`
 
+	// KeyOrigin: The key origin.
+	//
+	// Possible values:
+	//   "ORIGIN_UNSPECIFIED" - Unspecified key origin.
+	//   "USER_PROVIDED" - Key is provided by user.
+	//   "GOOGLE_PROVIDED" - Key is provided by Google.
+	KeyOrigin string `json:"keyOrigin,omitempty"`
+
 	// Name: The resource name of the service account key in the following
 	// format
 	// `projects/{PROJECT_ID}/serviceAccounts/{ACCOUNT}/keys/{key}`.

@@ -6,7 +6,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/rancher/rancher/pkg/api/controllers/dynamiclistener"
 	"github.com/rancher/rancher/pkg/api/customization/clusterregistrationtokens"
 	"github.com/rancher/rancher/pkg/api/customization/vsphere"
 	managementapi "github.com/rancher/rancher/pkg/api/server"
@@ -16,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/requests/sar"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	webhook2 "github.com/rancher/rancher/pkg/auth/webhook"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	rancherdialer "github.com/rancher/rancher/pkg/dialer"
 	"github.com/rancher/rancher/pkg/httpproxy"
@@ -29,26 +29,27 @@ import (
 	"github.com/rancher/rancher/server/responsewriter"
 	"github.com/rancher/rancher/server/ui"
 	"github.com/rancher/rancher/server/whitelist"
+	"github.com/rancher/steve/pkg/auth"
 	managementSchema "github.com/rancher/types/apis/management.cattle.io/v3/schema"
 	"github.com/rancher/types/config"
 )
 
-func Start(ctx context.Context, httpPort, httpsPort int, localClusterEnabled bool, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager, auditLogWriter *audit.LogWriter) error {
+func Start(ctx context.Context, localClusterEnabled bool, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager, auditLogWriter *audit.LogWriter) (auth.Middleware, http.Handler, error) {
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	publicAPI, err := publicapi.NewHandler(ctx, scaledContext)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	k8sProxy := k8sProxyPkg.New(scaledContext, scaledContext.Dialer)
 
 	managementAPI, err := managementapi.New(ctx, scaledContext, clusterManager, k8sProxy, localClusterEnabled)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	root := mux.NewRouter()
@@ -59,14 +60,20 @@ func Start(ctx context.Context, httpPort, httpsPort int, localClusterEnabled boo
 
 	sar := sar.NewSubjectAccessReview(clusterManager)
 
-	authedHandler, err := requests.NewAuthenticationFilter(ctx, scaledContext, rawAuthedAPIs, sar)
-	if err != nil {
-		return err
+	auth := requests.NewAuthenticator(ctx, scaledContext)
+	authMiddleware := requests.ToAuthMiddleware(auth)
+	tokenReview := &webhook2.TokenReviewer{
+		Authenticator: auth,
 	}
 
-	metricsHandler, err := requests.NewAuthenticationFilter(ctx, scaledContext, metrics.NewMetricsHandler(scaledContext, promhttp.Handler()), sar)
+	authedHandler, err := requests.NewAuthenticationFilter(ctx, auth, scaledContext, rawAuthedAPIs, sar)
 	if err != nil {
-		return err
+		return nil, nil, err
+	}
+
+	metricsHandler, err := requests.NewAuthenticationFilter(ctx, auth, scaledContext, metrics.NewMetricsHandler(scaledContext, promhttp.Handler()), sar)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	websocketHandler := websocket.NewWebsocketHandler(authedHandler)
@@ -90,6 +97,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, localClusterEnabled boo
 	root.Handle("/v3/settings/cacerts", rawAuthedAPIs).Methods(http.MethodGet)
 	root.Handle("/v3/settings/first-login", rawAuthedAPIs).Methods(http.MethodGet)
 	root.Handle("/v3/settings/ui-pl", rawAuthedAPIs).Methods(http.MethodGet)
+	root.Handle("/v3/tokenreview", tokenReview).Methods(http.MethodPost)
 	root.PathPrefix("/metrics").Handler(metricsHandler)
 	root.PathPrefix("/v3").Handler(chainGzip.Handler(auditHandler))
 	root.PathPrefix("/hooks").Handler(webhookHandler)
@@ -117,8 +125,7 @@ func Start(ctx context.Context, httpPort, httpsPort int, localClusterEnabled boo
 
 	registerHealth(root)
 
-	dynamiclistener.Start(ctx, scaledContext, httpPort, httpsPort, root)
-	return nil
+	return authMiddleware, root, err
 }
 
 func newAuthed(tokenAPI http.Handler, managementAPI http.Handler, k8sproxy http.Handler, scaledContext *config.ScaledContext) *mux.Router {

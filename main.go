@@ -18,13 +18,15 @@ import (
 	"github.com/rancher/norman/pkg/kwrapper/k8s"
 	"github.com/rancher/rancher/app"
 	"github.com/rancher/rancher/pkg/logserver"
+	"github.com/rancher/rancher/pkg/version"
 	"github.com/rancher/wrangler/pkg/signals"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
 var (
-	VERSION = "dev"
+	profileAddress = "localhost:6060"
+	kubeConfig     string
 )
 
 func main() {
@@ -54,14 +56,14 @@ func main() {
 	var config app.Config
 
 	app := cli.NewApp()
-	app.Version = VERSION
+	app.Version = version.FriendlyVersion()
 	app.Usage = "Complete container management platform"
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:        "kubeconfig",
 			Usage:       "Kube config for accessing k8s cluster",
 			EnvVar:      "KUBECONFIG",
-			Destination: &config.KubeConfig,
+			Destination: &kubeConfig,
 		},
 		cli.BoolFlag{
 			Name:        "debug",
@@ -101,66 +103,71 @@ func main() {
 			Name:   "acme-domain",
 			EnvVar: "ACME_DOMAIN",
 			Usage:  "Domain to register with LetsEncrypt",
+			Value:  &config.ACMEDomains,
 		},
 		cli.BoolFlag{
 			Name:  "no-cacerts",
 			Usage: "Skip CA certs population in settings when set to true",
 		},
 		cli.StringFlag{
-			Name:   "audit-log-path",
-			EnvVar: "AUDIT_LOG_PATH",
-			Value:  "/var/log/auditlog/rancher-api-audit.log",
-			Usage:  "Log path for Rancher Server API. Default path is /var/log/auditlog/rancher-api-audit.log",
+			Name:        "audit-log-path",
+			EnvVar:      "AUDIT_LOG_PATH",
+			Value:       "/var/log/auditlog/rancher-api-audit.log",
+			Usage:       "Log path for Rancher Server API. Default path is /var/log/auditlog/rancher-api-audit.log",
+			Destination: &config.AuditLogPath,
 		},
 		cli.IntFlag{
-			Name:   "audit-log-maxage",
-			Value:  10,
-			EnvVar: "AUDIT_LOG_MAXAGE",
-			Usage:  "Defined the maximum number of days to retain old audit log files",
+			Name:        "audit-log-maxage",
+			Value:       10,
+			EnvVar:      "AUDIT_LOG_MAXAGE",
+			Usage:       "Defined the maximum number of days to retain old audit log files",
+			Destination: &config.AuditLogMaxage,
 		},
 		cli.IntFlag{
-			Name:   "audit-log-maxbackup",
-			Value:  10,
-			EnvVar: "AUDIT_LOG_MAXBACKUP",
-			Usage:  "Defines the maximum number of audit log files to retain",
+			Name:        "audit-log-maxbackup",
+			Value:       10,
+			EnvVar:      "AUDIT_LOG_MAXBACKUP",
+			Usage:       "Defines the maximum number of audit log files to retain",
+			Destination: &config.AuditLogMaxbackup,
 		},
 		cli.IntFlag{
-			Name:   "audit-log-maxsize",
-			Value:  100,
-			EnvVar: "AUDIT_LOG_MAXSIZE",
-			Usage:  "Defines the maximum size in megabytes of the audit log file before it gets rotated, default size is 100M",
+			Name:        "audit-log-maxsize",
+			Value:       100,
+			EnvVar:      "AUDIT_LOG_MAXSIZE",
+			Usage:       "Defines the maximum size in megabytes of the audit log file before it gets rotated, default size is 100M",
+			Destination: &config.AuditLogMaxsize,
 		},
 		cli.IntFlag{
-			Name:   "audit-level",
-			Value:  0,
-			EnvVar: "AUDIT_LEVEL",
-			Usage:  "Audit log level: 0 - disable audit log, 1 - log event metadata, 2 - log event metadata and request body, 3 - log event metadata, request body and response body",
+			Name:        "audit-level",
+			Value:       0,
+			EnvVar:      "AUDIT_LEVEL",
+			Usage:       "Audit log level: 0 - disable audit log, 1 - log event metadata, 2 - log event metadata and request body, 3 - log event metadata, request body and response body",
+			Destination: &config.AuditLevel,
+		},
+		cli.StringFlag{
+			Name:        "profile-listen-address",
+			Value:       "127.0.0.1:6060",
+			Usage:       "Address to listen on for profiling",
+			Destination: &profileAddress,
 		},
 		cli.StringFlag{
 			Name:        "features",
 			EnvVar:      "CATTLE_FEATURES",
 			Value:       "",
-			Usage:       "Decalare specific feature values on start up. Example: \"kontainer-driver=true\" - kontainer driver feature will be enabled despite false default value",
+			Usage:       "Declare specific feature values on start up. Example: \"kontainer-driver=true\" - kontainer driver feature will be enabled despite false default value",
 			Destination: &config.Features,
 		},
 	}
 
 	app.Action = func(c *cli.Context) error {
 		// enable profiler
-		go func() {
-			log.Println(http.ListenAndServe("localhost:6060", nil))
-		}()
-
-		config.ACMEDomains = c.GlobalStringSlice("acme-domain")
-		config.NoCACerts = c.Bool("no-cacerts")
-
-		config.AuditLevel = c.Int("audit-level")
-		config.AuditLogPath = c.String("audit-log-path")
-		config.AuditLogMaxage = c.Int("audit-log-maxage")
-		config.AuditLogMaxbackup = c.Int("audit-log-maxbackup")
-		config.AuditLogMaxsize = c.Int("audit-log-maxsize")
+		if profileAddress != "" {
+			go func() {
+				log.Println(http.ListenAndServe(profileAddress, nil))
+			}()
+		}
 		initLogs(c, config)
-		return run(config)
+		return run(c, config)
 	}
 
 	app.ExitErrHandler = func(c *cli.Context, err error) {
@@ -197,15 +204,15 @@ func migrateETCDlocal() {
 	os.Symlink("../etcd", "management-state/etcd")
 }
 
-func run(cfg app.Config) error {
-	logrus.Infof("Rancher version %s is starting", VERSION)
+func run(cli *cli.Context, cfg app.Config) error {
+	logrus.Infof("Rancher version %s is starting", version.FriendlyVersion())
 	logrus.Infof("Rancher arguments %+v", cfg)
 	dump.GoroutineDumpOn(syscall.SIGUSR1, syscall.SIGILL)
 	ctx := signals.SetupSignalHandler(context.Background())
 
 	migrateETCDlocal()
 
-	embedded, ctx, kubeConfig, err := k8s.GetConfig(ctx, cfg.K8sMode, cfg.KubeConfig)
+	embedded, ctx, kubeConfig, err := k8s.GetConfig(ctx, cfg.K8sMode, kubeConfig)
 	if err != nil {
 		return err
 	}
@@ -213,5 +220,10 @@ func run(cfg app.Config) error {
 
 	os.Unsetenv("KUBECONFIG")
 	kubeConfig.Timeout = 30 * time.Second
-	return app.Run(ctx, *kubeConfig, &cfg)
+	server, err := app.New(ctx, kubeConfig, &cfg)
+	if err != nil {
+		return err
+	}
+
+	return server.ListenAndServe(ctx)
 }

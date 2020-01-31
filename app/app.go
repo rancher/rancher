@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"net/http"
 	"os"
 
 	"github.com/rancher/norman/pkg/k8scheck"
@@ -21,24 +22,23 @@ import (
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/rancher/server"
-	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
+	"github.com/rancher/steve/pkg/auth"
 	"github.com/rancher/types/config"
 	"github.com/rancher/wrangler/pkg/leader"
 	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 	"k8s.io/client-go/rest"
 )
 
 type Config struct {
-	ACMEDomains       []string
+	ACMEDomains       cli.StringSlice
 	AddLocal          string
 	Embedded          bool
-	KubeConfig        string
 	HTTPListenPort    int
 	HTTPSListenPort   int
 	K8sMode           string
 	Debug             bool
 	NoCACerts         bool
-	ListenConfig      *v3.ListenConfig
 	AuditLogPath      string
 	AuditLogMaxage    int
 	AuditLogMaxsize   int
@@ -47,14 +47,34 @@ type Config struct {
 	Features          string
 }
 
+type Rancher struct {
+	Config         Config
+	Handler        http.Handler
+	Auth           auth.Middleware
+	ScaledContext  *config.ScaledContext
+	ClusterManager *clustermanager.Manager
+}
+
+func (r *Rancher) ListenAndServe(ctx context.Context) error {
+	if err := r.Start(ctx); err != nil {
+		return err
+	}
+
+	if err := tls.ListenAndServe(ctx, &r.ScaledContext.RESTConfig,
+		r.Handler,
+		r.Config.HTTPSListenPort,
+		r.Config.HTTPListenPort,
+		r.Config.ACMEDomains,
+		r.Config.NoCACerts); err != nil {
+		return err
+	}
+
+	<-ctx.Done()
+	return ctx.Err()
+}
+
 func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config) (*config.ScaledContext, *clustermanager.Manager, error) {
 	scaledContext, err := config.NewScaledContext(kubeConfig)
-	if err != nil {
-		return nil, nil, err
-	}
-	scaledContext.LocalConfig = &kubeConfig
-
-	cfg.ListenConfig, err = tls.ReadTLSConfig(cfg.ACMEDomains, cfg.NoCACerts)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -89,27 +109,45 @@ func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config
 	return scaledContext, manager, nil
 }
 
-func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
-	scaledContext, clusterManager, err := buildScaledContext(ctx, kubeConfig, cfg)
+func New(ctx context.Context, restConfig *rest.Config, cfg *Config) (*Rancher, error) {
+	scaledContext, clusterManager, err := buildScaledContext(ctx, *restConfig, cfg)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	auditLogWriter := audit.NewLogWriter(cfg.AuditLogPath, cfg.AuditLevel, cfg.AuditLogMaxage, cfg.AuditLogMaxbackup, cfg.AuditLogMaxsize)
 
-	if err := server.Start(ctx, cfg.HTTPListenPort, cfg.HTTPSListenPort, localClusterEnabled(*cfg), scaledContext, clusterManager, auditLogWriter); err != nil {
-		return err
+	authMiddleware, handler, err := server.Start(ctx, localClusterEnabled(*cfg), scaledContext, clusterManager, auditLogWriter)
+	if err != nil {
+		return nil, err
 	}
-
-	// this step needs to happen prior to starting scaled context to ensure
-	// cache works properly
-	features.InitializeFeatures(scaledContext, cfg.Features)
 
 	if os.Getenv("CATTLE_PROMETHEUS_METRICS") == "true" {
 		metrics.Register(ctx, scaledContext)
 	}
 
-	if err := scaledContext.Start(ctx); err != nil {
+	if auditLogWriter != nil {
+		go func() {
+			<-ctx.Done()
+			auditLogWriter.Output.Close()
+		}()
+	}
+
+	return &Rancher{
+		Config:         *cfg,
+		Handler:        handler,
+		Auth:           authMiddleware,
+		ScaledContext:  scaledContext,
+		ClusterManager: clusterManager,
+	}, nil
+}
+
+func (r *Rancher) Start(ctx context.Context) error {
+	// this step needs to happen prior to starting scaled context to ensure
+	// cache works properly
+	features.InitializeFeatures(r.ScaledContext, r.Config.Features)
+
+	if err := r.ScaledContext.Start(ctx); err != nil {
 		return err
 	}
 
@@ -118,57 +156,48 @@ func Run(ctx context.Context, kubeConfig rest.Config, cfg *Config) error {
 			return err
 		}
 
-		if err := cron.StartJailSyncCron(scaledContext); err != nil {
+		if err := cron.StartJailSyncCron(r.ScaledContext); err != nil {
 			return err
 		}
 	}
 
-	go leader.RunOrDie(ctx, "", "cattle-controllers", scaledContext.K8sClient, func(ctx context.Context) {
-		if scaledContext.PeerManager != nil {
-			scaledContext.PeerManager.Leader()
+	go leader.RunOrDie(ctx, "", "cattle-controllers", r.ScaledContext.K8sClient, func(ctx context.Context) {
+		if r.ScaledContext.PeerManager != nil {
+			r.ScaledContext.PeerManager.Leader()
 		}
 
-		management, err := scaledContext.NewManagementContext()
+		management, err := r.ScaledContext.NewManagementContext()
 		if err != nil {
 			panic(err)
 		}
 
-		managementController.Register(ctx, management, scaledContext.ClientGetter.(*clustermanager.Manager))
+		managementController.Register(ctx, management, r.ScaledContext.ClientGetter.(*clustermanager.Manager))
 		if err := management.Start(ctx); err != nil {
 			panic(err)
 		}
 
-		if err := addData(management, *cfg); err != nil {
+		if err := addData(management, r.Config); err != nil {
 			panic(err)
 		}
 
-		if err := telemetry.Start(ctx, cfg.HTTPSListenPort, scaledContext); err != nil {
+		if err := telemetry.Start(ctx, r.Config.HTTPSListenPort, r.ScaledContext); err != nil {
 			panic(err)
 		}
 
 		tokens.StartPurgeDaemon(ctx, management)
 		cronTime := settings.AuthUserInfoResyncCron.Get()
 		maxAge := settings.AuthUserInfoMaxAgeSeconds.Get()
-		providerrefresh.StartRefreshDaemon(ctx, scaledContext, management, cronTime, maxAge)
+		providerrefresh.StartRefreshDaemon(ctx, r.ScaledContext, management, cronTime, maxAge)
 		cleanupOrphanedSystemUsers(ctx, management)
 		logrus.Infof("Rancher startup complete")
 
 		<-ctx.Done()
 	})
 
-	<-ctx.Done()
-
-	if auditLogWriter != nil {
-		auditLogWriter.Output.Close()
-	}
-	return ctx.Err()
+	return nil
 }
 
 func addData(management *config.ManagementContext, cfg Config) error {
-	if err := addListenConfig(management, cfg); err != nil {
-		return err
-	}
-
 	adminName, err := addRoles(management)
 	if err != nil {
 		return err

@@ -211,7 +211,7 @@ func ToRESTConfig(cluster *v3.Cluster, context *config.ScaledContext) (*rest.Con
 	}
 
 	if cluster.Spec.Internal {
-		return context.LocalConfig, nil
+		return &context.RESTConfig, nil
 	}
 
 	if cluster.Status.APIEndpoint == "" || cluster.Status.CACert == "" || cluster.Status.ServiceAccountToken == "" {
