@@ -73,6 +73,10 @@ const (
 	ClusterDriverAKS      = "azureKubernetesService"
 )
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type Cluster struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object’s metadata. More info:

@@ -45,7 +45,6 @@ var (
 
 type ScaledContext struct {
 	ClientGetter      proxy.ClientGetter
-	LocalConfig       *rest.Config
 	RESTConfig        rest.Config
 	UnversionedClient rest.Interface
 	K8sClient         kubernetes.Interface
@@ -154,7 +153,6 @@ func (c *ScaledContext) Start(ctx context.Context) error {
 
 type ManagementContext struct {
 	ClientGetter      proxy.ClientGetter
-	LocalConfig       *rest.Config
 	RESTConfig        rest.Config
 	UnversionedClient rest.Interface
 	DynamicClient     k8dynamic.Interface

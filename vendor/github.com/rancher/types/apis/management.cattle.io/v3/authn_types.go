@@ -29,6 +29,10 @@ type Token struct {
 	Enabled         *bool             `json:"enabled,omitempty" norman:"default=true"`
 }
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type User struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -150,6 +154,10 @@ type GithubConfig struct {
 	TLS          bool   `json:"tls,omitempty" norman:"notnullable,default=true" norman:"required"`
 	ClientID     string `json:"clientId,omitempty" norman:"required"`
 	ClientSecret string `json:"clientSecret,omitempty" norman:"required,type=password"`
+
+	// AdditionalClientIDs is a map of clientID to client secrets
+	AdditionalClientIDs map[string]string `json:"additionalClientIds,omitempty" norman:"nocreate,noupdate"`
+	HostnameToClientID  map[string]string `json:"hostnameToClientId,omitempty" norman:"nocreate,noupdate"`
 }
 
 type GithubConfigTestOutput struct {

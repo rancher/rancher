@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	util2 "github.com/rancher/rancher/pkg/auth/util"
 	corev1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/apis/management.cattle.io/v3public"
@@ -94,11 +95,20 @@ func (g *ghProvider) getGithubConfigCR() (*v3.GithubConfig, error) {
 	storedGithubConfig.ObjectMeta = *typemeta
 
 	if storedGithubConfig.ClientSecret != "" {
-		value, err := common.ReadFromSecret(g.secrets, storedGithubConfig.ClientSecret, strings.ToLower(client.GithubConfigFieldClientSecret))
+		data, err := common.ReadFromSecretData(g.secrets, storedGithubConfig.ClientSecret)
 		if err != nil {
 			return nil, err
 		}
-		storedGithubConfig.ClientSecret = value
+		for k, v := range data {
+			if strings.EqualFold(k, client.GithubConfigFieldClientSecret) {
+				storedGithubConfig.ClientSecret = string(v)
+			} else {
+				if storedGithubConfig.AdditionalClientIDs == nil {
+					storedGithubConfig.AdditionalClientIDs = map[string]string{}
+				}
+				storedGithubConfig.AdditionalClientIDs[k] = strings.TrimSpace(string(v))
+			}
+		}
 	}
 
 	return storedGithubConfig, nil
@@ -134,10 +144,33 @@ func (g *ghProvider) AuthenticateUser(ctx context.Context, input interface{}) (v
 	if !ok {
 		return v3.Principal{}, nil, "", errors.New("unexpected input type")
 	}
-	return g.LoginUser(login, nil, false)
+	host := ""
+	req, ok := ctx.Value(util2.RequestKey).(*http.Request)
+	if ok {
+		host = util2.GetHost(req)
+	}
+	return g.LoginUser(host, login, nil, false)
 }
 
-func (g *ghProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v3.GithubConfig, test bool) (v3.Principal, []v3.Principal, string, error) {
+func choseClientID(host string, config *v3.GithubConfig) *v3.GithubConfig {
+	if host == "" {
+		return config
+	}
+
+	clientID := config.HostnameToClientID[host]
+	secretID := config.AdditionalClientIDs[clientID]
+	if secretID == "" {
+		return config
+	}
+
+	copy := *config
+	copy.ClientID = clientID
+	copy.ClientSecret = secretID
+
+	return &copy
+}
+
+func (g *ghProvider) LoginUser(host string, githubCredential *v3public.GithubLogin, config *v3.GithubConfig, test bool) (v3.Principal, []v3.Principal, string, error) {
 	var groupPrincipals []v3.Principal
 	var userPrincipal v3.Principal
 	var err error
@@ -149,6 +182,7 @@ func (g *ghProvider) LoginUser(githubCredential *v3public.GithubLogin, config *v
 		}
 	}
 
+	config = choseClientID(host, config)
 	securityCode := githubCredential.Code
 
 	accessToken, err := g.githubClient.getAccessToken(securityCode, config)

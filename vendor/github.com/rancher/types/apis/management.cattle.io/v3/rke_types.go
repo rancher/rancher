@@ -58,6 +58,15 @@ type RancherKubernetesEngineConfig struct {
 	RotateCertificates *RotateCertificates `yaml:"rotate_certificates,omitempty" json:"rotateCertificates,omitempty"`
 	// DNS Config
 	DNS *DNSConfig `yaml:"dns" json:"dns,omitempty"`
+	// Upgrade Strategy for the cluster
+	UpgradeStrategy *NodeUpgradeStrategy `yaml:"upgrade_strategy,omitempty" json:"upgradeStrategy,omitempty"`
+}
+
+type NodeUpgradeStrategy struct {
+	// MaxUnavailable input can be a number of nodes or a percentage of nodes (example, max_unavailable: 2 OR max_unavailable: 20%)
+	MaxUnavailable string          `yaml:"max_unavailable" json:"maxUnavailable,omitempty" norman:"min=1,default=10%"`
+	Drain          bool            `yaml:"drain" json:"drain,omitempty"`
+	DrainInput     *NodeDrainInput `yaml:"node_drain_input" json:"nodeDrainInput,omitempty"`
 }
 
 type BastionHost struct {

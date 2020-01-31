@@ -48,20 +48,31 @@ func CreateOrUpdateSecrets(secrets corev1.SecretInterface, secretInfo string, fi
 
 func ReadFromSecret(secrets corev1.SecretInterface, secretInfo string, field string) (string, error) {
 	if strings.HasPrefix(secretInfo, SecretsNamespace) {
-		split := strings.SplitN(secretInfo, ":", 2)
-		if len(split) == 2 {
-			secret, err := secrets.GetNamespaced(split[0], split[1], metav1.GetOptions{})
-			if err != nil {
-				return "", fmt.Errorf("error getting secret %s %v", secretInfo, err)
-			}
-			for key, val := range secret.Data {
-				if key == field {
-					return string(val), nil
-				}
+		data, err := ReadFromSecretData(secrets, secretInfo)
+		if err != nil {
+			return "", err
+		}
+		for key, val := range data {
+			if key == field {
+				return string(val), nil
 			}
 		}
 	}
 	return secretInfo, nil
+}
+
+func ReadFromSecretData(secrets corev1.SecretInterface, secretInfo string) (map[string][]byte, error) {
+	if strings.HasPrefix(secretInfo, SecretsNamespace) {
+		split := strings.SplitN(secretInfo, ":", 2)
+		if len(split) == 2 {
+			secret, err := secrets.GetNamespaced(split[0], split[1], metav1.GetOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("error getting secret %s %v", secretInfo, err)
+			}
+			return secret.Data, nil
+		}
+	}
+	return nil, nil
 }
 
 func GetName(configType string, field string) string {

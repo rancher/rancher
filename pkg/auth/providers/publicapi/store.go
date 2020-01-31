@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/store/empty"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/util"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/types/config"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +35,7 @@ func (s *authProvidersStore) ByID(apiContext *types.APIContext, schema *types.Sc
 	u, _ := o.(runtime.Unstructured)
 	config := u.UnstructuredContent()
 	if t, ok := config["type"].(string); ok && t != "" {
+		config[".host"] = util.GetHost(apiContext.Request)
 		provider, err := providers.GetProviderByType(t).TransformToAuthProvider(config)
 		if err != nil {
 			return nil, err
@@ -51,6 +53,7 @@ func (s *authProvidersStore) List(apiContext *types.APIContext, schema *types.Sc
 	for _, i := range list.Items {
 		if t, ok := i.Object["type"].(string); ok && t != "" {
 			if enabled, ok := i.Object["enabled"].(bool); ok && enabled {
+				i.Object[".host"] = util.GetHost(apiContext.Request)
 				provider, err := providers.GetProviderByType(t).TransformToAuthProvider(i.Object)
 				if err != nil {
 					return result, err
