@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemaccount"
+	"github.com/rancher/rke/util"
 	rcorev1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projv3 "github.com/rancher/types/apis/project.cattle.io/v3"
@@ -84,14 +85,15 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 	if !v3.ClusterScanConditionCreated.IsTrue(cs) {
 		logrus.Infof("cisScanHandler: Create: deploying helm chart")
 		currentK8sVersion := cluster.Spec.RancherKubernetesEngineConfig.Version
+		shortK8sVersion := util.GetTagMajorVersion(currentK8sVersion)
 		cisConfigParams, err := kontainerdrivermetadata.GetCisConfigParams(
-			currentK8sVersion,
+			shortK8sVersion,
 			csh.cisConfigLister,
 			csh.cisConfig,
 		)
 		if err != nil {
-			logrus.Debugf("cisScanHandler: Create: benchmark version not found for k8s version: %v, using default",
-				currentK8sVersion)
+			logrus.Debugf("cisScanHandler: Create: benchmark version not found for k8s version: %v(%v), using default",
+				currentK8sVersion, shortK8sVersion)
 			cisConfigParams, err = kontainerdrivermetadata.GetCisConfigParams(
 				"default",
 				csh.cisConfigLister,
