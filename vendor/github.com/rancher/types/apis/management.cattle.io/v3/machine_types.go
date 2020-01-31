@@ -302,17 +302,17 @@ type PublicEndpoint struct {
 type NodeDrainInput struct {
 	// Drain node even if there are pods not managed by a ReplicationController, Job, or DaemonSet
 	// Drain will not proceed without Force set to true if there are such pods
-	Force bool `json:"force,omitempty"`
+	Force bool `yaml:"force" json:"force,omitempty"`
 	// If there are DaemonSet-managed pods, drain will not proceed without IgnoreDaemonSets set to true
 	// (even when set to true, kubectl won't delete pods - so setting default to true)
-	IgnoreDaemonSets bool `json:"ignoreDaemonSets,omitempty" norman:"default=true"`
+	IgnoreDaemonSets bool `yaml:"ignore_daemonsets" json:"ignoreDaemonSets,omitempty" norman:"default=true"`
 	// Continue even if there are pods using emptyDir
-	DeleteLocalData bool `json:"deleteLocalData,omitempty"`
+	DeleteLocalData bool `yaml:"delete_local_data" json:"deleteLocalData,omitempty"`
 	//Period of time in seconds given to each pod to terminate gracefully.
 	// If negative, the default value specified in the pod will be used
-	GracePeriod int `json:"gracePeriod,omitempty" norman:"default=-1"`
+	GracePeriod int `yaml:"grace_period" json:"gracePeriod,omitempty" norman:"default=-1"`
 	// Time to wait (in seconds) before giving up for one try
-	Timeout int `json:"timeout" norman:"min=1,max=10800,default=60"`
+	Timeout int `yaml:"timeout" json:"timeout" norman:"min=1,max=10800,default=60"`
 }
 
 type CloudCredential struct {

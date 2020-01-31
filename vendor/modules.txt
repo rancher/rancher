@@ -425,7 +425,7 @@ github.com/rancher/security-scan/pkg/kb-summarizer/report
 github.com/rancher/security-scan/pkg/kb-summarizer/summarizer
 # github.com/rancher/steve v0.0.0-20200131054308-707b87671b8f
 github.com/rancher/steve/pkg/auth
-# github.com/rancher/types v0.0.0-20200123224322-9adcafc483ee
+# github.com/rancher/types v0.0.0-20200131180920-14c75a5fed93
 github.com/rancher/types/apis/apiregistration.k8s.io/v1
 github.com/rancher/types/apis/apps/v1
 github.com/rancher/types/apis/autoscaling/v2beta2

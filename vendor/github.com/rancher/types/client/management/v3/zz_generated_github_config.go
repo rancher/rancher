@@ -3,6 +3,7 @@ package client
 const (
 	GithubConfigType                     = "githubConfig"
 	GithubConfigFieldAccessMode          = "accessMode"
+	GithubConfigFieldAdditionalClientIDs = "additionalClientIds"
 	GithubConfigFieldAllowedPrincipalIDs = "allowedPrincipalIds"
 	GithubConfigFieldAnnotations         = "annotations"
 	GithubConfigFieldClientID            = "clientId"
@@ -11,6 +12,7 @@ const (
 	GithubConfigFieldCreatorID           = "creatorId"
 	GithubConfigFieldEnabled             = "enabled"
 	GithubConfigFieldHostname            = "hostname"
+	GithubConfigFieldHostnameToClientID  = "hostnameToClientId"
 	GithubConfigFieldLabels              = "labels"
 	GithubConfigFieldName                = "name"
 	GithubConfigFieldOwnerReferences     = "ownerReferences"
@@ -22,6 +24,7 @@ const (
 
 type GithubConfig struct {
 	AccessMode          string            `json:"accessMode,omitempty" yaml:"accessMode,omitempty"`
+	AdditionalClientIDs map[string]string `json:"additionalClientIds,omitempty" yaml:"additionalClientIds,omitempty"`
 	AllowedPrincipalIDs []string          `json:"allowedPrincipalIds,omitempty" yaml:"allowedPrincipalIds,omitempty"`
 	Annotations         map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	ClientID            string            `json:"clientId,omitempty" yaml:"clientId,omitempty"`
@@ -30,6 +33,7 @@ type GithubConfig struct {
 	CreatorID           string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Enabled             bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	Hostname            string            `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	HostnameToClientID  map[string]string `json:"hostnameToClientId,omitempty" yaml:"hostnameToClientId,omitempty"`
 	Labels              map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`

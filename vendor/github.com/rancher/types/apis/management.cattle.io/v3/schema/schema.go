@@ -660,12 +660,6 @@ func logTypes(schema *types.Schemas) *types.Schemas {
 
 func globalTypes(schema *types.Schemas) *types.Schemas {
 	return schema.
-		AddMapperForType(&Version, v3.ListenConfig{},
-			m.DisplayName{},
-			m.Drop{Field: "caKey"},
-			m.Drop{Field: "caCert"},
-		).
-		MustImport(&Version, v3.ListenConfig{}).
 		MustImportAndCustomize(&Version, v3.Setting{}, func(schema *types.Schema) {
 			schema.MustCustomizeField("name", func(f types.Field) types.Field {
 				f.Required = true
