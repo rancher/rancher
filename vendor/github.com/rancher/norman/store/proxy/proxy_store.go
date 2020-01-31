@@ -383,7 +383,7 @@ func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 	if name == "" {
 		generated, _ := values.GetValueN(data, "metadata", "generateName").(string)
 		if generated == "" {
-			values.PutValue(data, types.GenerateName(schema.ID), "metadata", "name")
+			values.PutValue(data, types.GenerateTypePrefix(schema.ID), "metadata", "generateName")
 		}
 	}
 
