@@ -18,7 +18,8 @@
     "run": {
         "skip-dirs": [
             "vendor",
-            "tests"
+            "tests",
+            "pkg/wrangler/generated"
         ],
         "tests": false,
         "timeout": "10m"
