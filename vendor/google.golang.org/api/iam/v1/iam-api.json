@@ -1193,7 +1193,7 @@
       }
     }
   },
-  "revision": "20190429",
+  "revision": "20190607",
   "rootUrl": "https://iam.googleapis.com/",
   "schemas": {
     "AdminAuditData": {
@@ -1961,6 +1961,20 @@
             "An unspecified key algorithm.",
             "1k RSA Key.",
             "2k RSA Key."
+          ],
+          "type": "string"
+        },
+        "keyOrigin": {
+          "description": "The key origin.",
+          "enum": [
+            "ORIGIN_UNSPECIFIED",
+            "USER_PROVIDED",
+            "GOOGLE_PROVIDED"
+          ],
+          "enumDescriptions": [
+            "Unspecified key origin.",
+            "Key is provided by user.",
+            "Key is provided by Google."
           ],
           "type": "string"
         },
