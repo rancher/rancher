@@ -17,3 +17,8 @@ func GenerateName(typeName string) string {
 	last := utilrand.String(5)
 	return fmt.Sprintf("%s-%s", strings.ToLower(base), last)
 }
+
+func GenerateTypePrefix(typeName string) string {
+	base := typeName[0:1] + lowerChars.ReplaceAllString(typeName[1:], "")
+	return strings.ToLower(base) + "-"
+}
