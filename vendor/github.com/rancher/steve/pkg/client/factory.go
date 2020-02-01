@@ -1,6 +1,8 @@
 package client
 
 import (
+	"time"
+
 	"github.com/rancher/steve/pkg/attributes"
 	"github.com/rancher/steve/pkg/schemaserver/types"
 	"k8s.io/client-go/dynamic"
@@ -8,8 +10,9 @@ import (
 )
 
 type Factory struct {
-	client dynamic.Interface
-	Config *rest.Config
+	client      dynamic.Interface
+	watchClient dynamic.Interface
+	Config      *rest.Config
 }
 
 func NewFactory(cfg *rest.Config) (*Factory, error) {
@@ -20,9 +23,17 @@ func NewFactory(cfg *rest.Config) (*Factory, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	newCfg = rest.CopyConfig(cfg)
+	newCfg.Timeout = 30 * time.Minute
+	wc, err := dynamic.NewForConfig(newCfg)
+	if err != nil {
+		return nil, err
+	}
 	return &Factory{
-		client: c,
-		Config: newCfg,
+		client:      c,
+		watchClient: wc,
+		Config:      newCfg,
 	}, nil
 }
 
@@ -33,4 +44,9 @@ func (p *Factory) DynamicClient() dynamic.Interface {
 func (p *Factory) Client(ctx *types.APIRequest, s *types.APISchema, namespace string) (dynamic.ResourceInterface, error) {
 	gvr := attributes.GVR(s)
 	return p.client.Resource(gvr).Namespace(namespace), nil
+}
+
+func (p *Factory) ClientForWatch(ctx *types.APIRequest, s *types.APISchema, namespace string) (dynamic.ResourceInterface, error) {
+	gvr := attributes.GVR(s)
+	return p.watchClient.Resource(gvr).Namespace(namespace), nil
 }

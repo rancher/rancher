@@ -27,12 +27,15 @@ type SchemasHandler interface {
 type handler struct {
 	sync.Mutex
 
+	ctx     context.Context
 	toSync  int32
 	schemas *schema2.Collection
 	client  discovery.DiscoveryInterface
 	crd     apiextcontrollerv1beta1.CustomResourceDefinitionClient
 	ssar    authorizationv1client.SelfSubjectAccessReviewInterface
 	handler SchemasHandler
+
+	running map[string]func()
 }
 
 func Register(ctx context.Context,
@@ -44,11 +47,13 @@ func Register(ctx context.Context,
 	schemas *schema2.Collection) (init func() error) {
 
 	h := &handler{
+		ctx:     ctx,
 		client:  discovery,
 		schemas: schemas,
 		handler: schemasHandler,
 		crd:     crd,
 		ssar:    ssar,
+		running: map[string]func(){},
 	}
 
 	apiService.OnChange(ctx, "schema", h.OnChangeAPIService)
@@ -126,12 +131,39 @@ func (h *handler) refreshAll() error {
 		filteredSchemas[id] = schema
 	}
 
+	h.startStopTemplate(filteredSchemas)
 	h.schemas.Reset(filteredSchemas)
 	if h.handler != nil {
 		return h.handler.OnSchemas(h.schemas)
 	}
 
 	return nil
+}
+
+func (h *handler) startStopTemplate(schemas map[string]*types.APISchema) {
+	for id := range schemas {
+		if _, ok := h.running[id]; ok {
+			continue
+		}
+		template := h.schemas.TemplateForSchemaID(id)
+		if template == nil || template.Start == nil {
+			continue
+		}
+
+		subCtx, cancel := context.WithCancel(h.ctx)
+		if err := template.Start(subCtx); err != nil {
+			logrus.Errorf("failed to start schema template: %s", id)
+			continue
+		}
+		h.running[id] = cancel
+	}
+
+	for id, cancel := range h.running {
+		if _, ok := schemas[id]; !ok {
+			cancel()
+			delete(h.running, id)
+		}
+	}
 }
 
 func (h *handler) allowed(schema *types.APISchema) (bool, error) {

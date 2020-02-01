@@ -3,7 +3,7 @@ package restwatch
 import (
 	"time"
 
-	"github.com/rancher/norman/pkg/ratelimit"
+	"github.com/rancher/wrangler/pkg/ratelimit"
 	"k8s.io/client-go/rest"
 )
 

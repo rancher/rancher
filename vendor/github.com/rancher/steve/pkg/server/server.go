@@ -88,6 +88,8 @@ func (c *Server) Handler(ctx context.Context) (http.Handler, error) {
 		return nil, err
 	}
 
+	c.Next = handler
+
 	for _, hook := range c.StartHooks {
 		if err := hook(ctx, c); err != nil {
 			return nil, err
@@ -108,7 +110,7 @@ func (c *Server) Handler(ctx context.Context) (http.Handler, error) {
 		}
 	}
 
-	return handler, nil
+	return c.Next, nil
 }
 
 func (c *Server) ListenAndServe(ctx context.Context, httpsPort, httpPort int, opts *server.ListenOpts) error {
