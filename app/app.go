@@ -18,12 +18,14 @@ import (
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/metrics"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/steve"
 	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/rancher/server"
 	"github.com/rancher/steve/pkg/auth"
+	steveserver "github.com/rancher/steve/pkg/server"
 	"github.com/rancher/types/config"
 	"github.com/rancher/wrangler/pkg/leader"
 	"github.com/sirupsen/logrus"
@@ -117,7 +119,7 @@ func New(ctx context.Context, restConfig *rest.Config, cfg *Config) (*Rancher, e
 		return nil, err
 	}
 
-	wranglerContext, err := wrangler.NewContext(&scaledContext.RESTConfig)
+	wranglerContext, err := wrangler.NewContext(steveserver.RestConfigDefaults(&scaledContext.RESTConfig))
 	if err != nil {
 		return nil, err
 	}
@@ -140,14 +142,16 @@ func New(ctx context.Context, restConfig *rest.Config, cfg *Config) (*Rancher, e
 		}()
 	}
 
-	return &Rancher{
+	rancher := &Rancher{
 		Config:          *cfg,
 		Handler:         handler,
 		Auth:            authMiddleware,
 		ScaledContext:   scaledContext,
 		WranglerContext: wranglerContext,
 		ClusterManager:  clusterManager,
-	}, nil
+	}
+
+	return rancher, nil
 }
 
 func (r *Rancher) Start(ctx context.Context) error {
@@ -211,6 +215,14 @@ func (r *Rancher) Start(ctx context.Context) error {
 		<-ctx.Done()
 	})
 
+	if features.Steve.Enabled() {
+		handler, err := newSteve(ctx, r)
+		if err != nil {
+			return err
+		}
+		r.Handler = handler
+	}
+
 	return nil
 }
 
@@ -262,4 +274,21 @@ func localClusterEnabled(cfg Config) bool {
 		return true
 	}
 	return false
+}
+
+func newSteve(ctx context.Context, rancher *Rancher) (http.Handler, error) {
+	cfg := steveserver.Server{
+		Controllers:    rancher.WranglerContext.Controllers,
+		RestConfig:     steveserver.RestConfigDefaults(&rancher.ScaledContext.RESTConfig),
+		Namespace:      "cattle-system",
+		AuthMiddleware: rancher.Auth,
+		Next:           rancher.Handler,
+		StartHooks: []steveserver.StartHook{
+			func(ctx context.Context, server *steveserver.Server) error {
+				return steve.Setup(server, rancher.WranglerContext)
+			},
+		},
+	}
+
+	return cfg.Handler(ctx)
 }
