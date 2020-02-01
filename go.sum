@@ -815,8 +815,8 @@ github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bH
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/security-scan v0.1.5 h1:J/LMSTNFSrq7BEfsWtIfHkEHJzg/KUelDTS2PHcZC5Y=
 github.com/rancher/security-scan v0.1.5/go.mod h1:WlLAocVyVQs5J8r0IiQXsp0ajVZO6hYi/Vo6zxjo73s=
-github.com/rancher/steve v0.0.0-20200131054308-707b87671b8f h1:aqd/wlZpGPM2QF8OWCEacgyVfYwyeXFPjyzew4Rs/t8=
-github.com/rancher/steve v0.0.0-20200131054308-707b87671b8f/go.mod h1:K1H9G6WzmRmE+kUIywbiPRadtIKKY/dzmtrVeNVfNs0=
+github.com/rancher/steve v0.0.0-20200131221047-91dde5ead6c8 h1:FKAWOiqh1fyN8lCO4f26/Hw0LFQBIthwCB7PXWvz1e8=
+github.com/rancher/steve v0.0.0-20200131221047-91dde5ead6c8/go.mod h1:K1H9G6WzmRmE+kUIywbiPRadtIKKY/dzmtrVeNVfNs0=
 github.com/rancher/types v0.0.0-20200123224322-9adcafc483ee h1:kYxNoRYCC9wP72ou8HxHwudy8fiE1iurEmASWFvMBT0=
 github.com/rancher/types v0.0.0-20200123224322-9adcafc483ee/go.mod h1:rN9IgDRV1O4HTJCLtpLqyUEfdPsoeBoH2wNUm8PPThk=
 github.com/rancher/types v0.0.0-20200131180920-14c75a5fed93 h1:gz66U6LOy9BbWnHFSl9jqzXyY62WyH+M8oOHImQZNdQ=
@@ -948,6 +948,7 @@ github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijb
 github.com/urfave/cli v1.22.1/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
 github.com/urfave/cli v1.22.2 h1:gsqYFH8bb9ekPA12kRo0hfjngWQjkJPlN9R0N78BoUo=
 github.com/urfave/cli v1.22.2/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
+github.com/urfave/cli/v2 v2.1.1 h1:Qt8FeAtxE/vfdrLmR3rxR6JRE0RoVmbXu8+6kZtYU4k=
 github.com/urfave/cli/v2 v2.1.1/go.mod h1:SE9GqnLQmjVa0iPEY0f1w3ygNIYcIJ0OKPMoW2caLfQ=
 github.com/urfave/negroni v1.0.0/go.mod h1:Meg73S6kFm/4PpbYdq35yYWoCZ9mS/YSx+lKnmiohz4=
 github.com/valyala/bytebufferpool v1.0.0/go.mod h1:6bBcMArwyJ5K/AmCkWv1jt77kVWyCJ6HpOuEn7z0Csc=
@@ -1273,6 +1274,7 @@ k8s.io/cli-runtime v0.17.2 h1:YH4txSplyGudvxjhAJeHEtXc7Tr/16clKGfN076ydGk=
 k8s.io/cli-runtime v0.17.2/go.mod h1:aa8t9ziyQdbkuizkNLAw3qe3srSyWh9zlSB7zTqRNPI=
 k8s.io/cloud-provider v0.17.2/go.mod h1:9rEcGqEsUFHxC83oMUGBcsXTBpRVNVPX/U+nyQJTvHU=
 k8s.io/cluster-bootstrap v0.17.2/go.mod h1:qiazpAM05fjAc+PEkrY8HSUhKlJSMBuLnVUSO6nvZL4=
+k8s.io/code-generator v0.17.2 h1:pTwl3rLB1fUyxmvEzmVPMM0tBSdUehd7z+bDzpj4lPE=
 k8s.io/code-generator v0.17.2/go.mod h1:DVmfPQgxQENqDIzVR2ddLXMH34qeszkKSdH/N+s+38s=
 k8s.io/component-base v0.17.2 h1:0XHf+cerTvL9I5Xwn9v+0jmqzGAZI7zNydv4tL6Cw6A=
 k8s.io/component-base v0.17.2/go.mod h1:zMPW3g5aH7cHJpKYQ/ZsGMcgbsA/VyhEugF3QT1awLs=

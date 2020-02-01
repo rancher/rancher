@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/tunnelserver"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/rancher/server"
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/rancher/types/config"
@@ -48,11 +49,12 @@ type Config struct {
 }
 
 type Rancher struct {
-	Config         Config
-	Handler        http.Handler
-	Auth           auth.Middleware
-	ScaledContext  *config.ScaledContext
-	ClusterManager *clustermanager.Manager
+	Config          Config
+	Handler         http.Handler
+	Auth            auth.Middleware
+	ScaledContext   *config.ScaledContext
+	WranglerContext *wrangler.Context
+	ClusterManager  *clustermanager.Manager
 }
 
 func (r *Rancher) ListenAndServe(ctx context.Context) error {
@@ -115,6 +117,11 @@ func New(ctx context.Context, restConfig *rest.Config, cfg *Config) (*Rancher, e
 		return nil, err
 	}
 
+	wranglerContext, err := wrangler.NewContext(&scaledContext.RESTConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	auditLogWriter := audit.NewLogWriter(cfg.AuditLogPath, cfg.AuditLevel, cfg.AuditLogMaxage, cfg.AuditLogMaxbackup, cfg.AuditLogMaxsize)
 
 	authMiddleware, handler, err := server.Start(ctx, localClusterEnabled(*cfg), scaledContext, clusterManager, auditLogWriter)
@@ -134,11 +141,12 @@ func New(ctx context.Context, restConfig *rest.Config, cfg *Config) (*Rancher, e
 	}
 
 	return &Rancher{
-		Config:         *cfg,
-		Handler:        handler,
-		Auth:           authMiddleware,
-		ScaledContext:  scaledContext,
-		ClusterManager: clusterManager,
+		Config:          *cfg,
+		Handler:         handler,
+		Auth:            authMiddleware,
+		ScaledContext:   scaledContext,
+		WranglerContext: wranglerContext,
+		ClusterManager:  clusterManager,
 	}, nil
 }
 
@@ -148,6 +156,10 @@ func (r *Rancher) Start(ctx context.Context) error {
 	features.InitializeFeatures(r.ScaledContext, r.Config.Features)
 
 	if err := r.ScaledContext.Start(ctx); err != nil {
+		return err
+	}
+
+	if err := r.WranglerContext.Start(ctx); err != nil {
 		return err
 	}
 
@@ -173,6 +185,11 @@ func (r *Rancher) Start(ctx context.Context) error {
 
 		managementController.Register(ctx, management, r.ScaledContext.ClientGetter.(*clustermanager.Manager))
 		if err := management.Start(ctx); err != nil {
+			panic(err)
+		}
+
+		managementController.RegisterWrangler(ctx, r.WranglerContext, management, r.ScaledContext.ClientGetter.(*clustermanager.Manager))
+		if err := r.WranglerContext.Start(ctx); err != nil {
 			panic(err)
 		}
 
