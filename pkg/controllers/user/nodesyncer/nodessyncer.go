@@ -189,7 +189,7 @@ func (m *nodesSyncer) updateLabels(node *corev1.Node, obj *v3.Node, nodePlan v3.
 }
 
 func (m *nodesSyncer) updateAnnotations(node *corev1.Node, obj *v3.Node, nodePlan v3.RKEConfigNodePlan) (*corev1.Node, *v3.Node, error) {
-	finalMap, changed := computeDelta(node.Annotations, nodePlan.Annotations, obj.Spec.MetadataUpdate.Annotations, nil)
+	finalMap, changed := computeDelta(node.Annotations, nodePlan.Annotations, obj.Spec.MetadataUpdate.Annotations, allowAllPolicy)
 	if !changed {
 		return node, obj, nil
 	}
@@ -227,6 +227,10 @@ func (m *nodesSyncer) syncLabels(key string, obj *v3.Node) (runtime.Object, erro
 
 func onlyKubeLabels(key string) bool {
 	return strings.Contains(key, "kubernetes.io")
+}
+
+func allowAllPolicy(_ string) bool {
+	return true
 }
 
 // computeDelta will return the final updated map to apply and a boolean indicating whether there are changes to be applied.
