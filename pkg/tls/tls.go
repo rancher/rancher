@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/dynamiclistener"
@@ -16,7 +17,12 @@ import (
 	"github.com/rancher/dynamiclistener/storage/kubernetes"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler-api/pkg/generated/controllers/core"
-	v1 "github.com/rancher/wrangler-api/pkg/generated/controllers/core/v1"
+	corev1controllers "github.com/rancher/wrangler-api/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/pkg/data"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
 
@@ -26,8 +32,55 @@ const (
 	rancherCACertsFile = "/etc/rancher/ssl/cacerts.pem"
 )
 
-func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.Handler, httpsPort, httpPort int, acmeDomains []string, noCACerts bool) error {
+func migrateCA(restConfig *rest.Config) (*core.Factory, error) {
 	core, err := core.NewFactoryFromConfig(restConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := core.Core().V1().Secret().Get("cattle-system", "serving-ca", metav1.GetOptions{}); err == nil {
+		return core, nil
+	}
+
+	dc, err := dynamic.NewForConfig(restConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	listenClient := dc.Resource(schema.GroupVersionResource{
+		Group:    "management.cattle.io",
+		Version:  "v3",
+		Resource: "listenconfigs",
+	})
+	obj, err := listenClient.Get("cli-config", metav1.GetOptions{})
+	if err != nil {
+		return core, nil
+	}
+
+	caCert := data.Object(obj.Object).String("caCert")
+	caKey := data.Object(obj.Object).String("caKey")
+
+	if len(caCert) == 0 || len(caKey) == 0 {
+		return core, nil
+	}
+
+	_, err = core.Core().V1().Secret().Create(&v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "serving-ca",
+			Namespace: "cattle-system",
+		},
+		Data: map[string][]byte{
+			v1.TLSCertKey:       []byte(caCert),
+			v1.TLSPrivateKeyKey: []byte(caKey),
+		},
+		StringData: nil,
+		Type:       v1.SecretTypeTLS,
+	})
+	return core, err
+}
+
+func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.Handler, httpsPort, httpPort int, acmeDomains []string, noCACerts bool) error {
+	core, err := migrateCA(restConfig)
 	if err != nil {
 		return err
 	}
@@ -50,7 +103,7 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 
 }
 
-func SetupListener(secrets v1.SecretController, acmeDomains []string, noCACerts bool) (*server.ListenOpts, error) {
+func SetupListener(secrets corev1controllers.SecretController, acmeDomains []string, noCACerts bool) (*server.ListenOpts, error) {
 	caForAgent, opts, err := readConfig(secrets, acmeDomains, noCACerts)
 	if err != nil {
 		return nil, err
@@ -68,6 +121,7 @@ func SetupListener(secrets v1.SecretController, acmeDomains []string, noCACerts 
 		opts.CAKey = caKey
 	}
 
+	caForAgent = strings.TrimSpace(caForAgent)
 	if settings.CACerts.Get() != caForAgent {
 		if err := settings.CACerts.Set(caForAgent); err != nil {
 			return nil, err
@@ -77,7 +131,7 @@ func SetupListener(secrets v1.SecretController, acmeDomains []string, noCACerts 
 	return opts, nil
 }
 
-func readConfig(secrets v1.SecretController, acmeDomains []string, noCACerts bool) (string, *server.ListenOpts, error) {
+func readConfig(secrets corev1controllers.SecretController, acmeDomains []string, noCACerts bool) (string, *server.ListenOpts, error) {
 	var (
 		ca  string
 		err error
