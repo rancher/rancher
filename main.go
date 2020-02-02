@@ -106,8 +106,9 @@ func main() {
 			Value:  &config.ACMEDomains,
 		},
 		cli.BoolFlag{
-			Name:  "no-cacerts",
-			Usage: "Skip CA certs population in settings when set to true",
+			Name:        "no-cacerts",
+			Usage:       "Skip CA certs population in settings when set to true",
+			Destination: &config.NoCACerts,
 		},
 		cli.StringFlag{
 			Name:        "audit-log-path",
