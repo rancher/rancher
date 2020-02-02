@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/wrangler/pkg/data/convert"
 	"github.com/rancher/wrangler/pkg/schemas/validation"
 	meta2 "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -220,6 +221,9 @@ type APIObjectList struct {
 }
 
 func (a *APIObject) Data() data.Object {
+	if unstr, ok := a.Object.(*unstructured.Unstructured); ok {
+		return unstr.Object
+	}
 	data, err := convert.EncodeToMap(a.Object)
 	if err != nil {
 		return convert.ToMapInterface(a.Object)

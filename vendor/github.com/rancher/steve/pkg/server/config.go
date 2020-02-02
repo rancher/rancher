@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/rancher/steve/pkg/schema"
@@ -16,6 +17,7 @@ import (
 	corev1 "github.com/rancher/wrangler-api/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler-api/pkg/generated/controllers/rbac"
 	rbacv1 "github.com/rancher/wrangler-api/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/pkg/ratelimit"
 	"github.com/rancher/wrangler/pkg/start"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -37,16 +39,25 @@ type Server struct {
 }
 
 type Controllers struct {
-	K8s      kubernetes.Interface
-	Core     corev1.Interface
-	RBAC     rbacv1.Interface
-	API      apiregistrationv1.Interface
-	CRD      apiextensionsv1beta1.Interface
-	starters []start.Starter
+	RestConfig *rest.Config
+	K8s        kubernetes.Interface
+	Core       corev1.Interface
+	RBAC       rbacv1.Interface
+	API        apiregistrationv1.Interface
+	CRD        apiextensionsv1beta1.Interface
+	starters   []start.Starter
 }
 
 func (c *Controllers) Start(ctx context.Context) error {
 	return start.All(ctx, 5, c.starters...)
+}
+
+func RestConfigDefaults(cfg *rest.Config) *rest.Config {
+	cfg = rest.CopyConfig(cfg)
+	cfg.Timeout = 15 * time.Minute
+	cfg.RateLimiter = ratelimit.None
+
+	return cfg
 }
 
 func NewController(cfg *rest.Config) (*Controllers, error) {
@@ -84,6 +95,7 @@ func NewController(cfg *rest.Config) (*Controllers, error) {
 	c.RBAC = rbac.Rbac().V1()
 	c.API = api.Apiregistration().V1()
 	c.CRD = crd.Apiextensions().V1beta1()
+	c.RestConfig = cfg
 
 	return c, nil
 }

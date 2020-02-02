@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"context"
 	"strings"
 
 	"github.com/rancher/steve/pkg/accesscontrol"
@@ -38,6 +39,7 @@ type Template struct {
 	Customize       func(*types.APISchema)
 	Formatter       types.Formatter
 	Store           types.Store
+	Start           func(ctx context.Context) error
 	StoreFactory    func(types.Store) types.Store
 	Mapper          schemas.Mapper
 	Columns         []table.Column
@@ -106,6 +108,10 @@ func (c *Collection) ByGVR(gvr schema.GroupVersionResource) string {
 
 func (c *Collection) ByGVK(gvk schema.GroupVersionKind) string {
 	return c.byGVK[gvk]
+}
+
+func (c *Collection) TemplateForSchemaID(id string) *Template {
+	return c.templates[id]
 }
 
 func (c *Collection) AddTemplate(template *Template) {

@@ -19,6 +19,7 @@ var (
 
 	UnsupportedStorageDrivers = newFeature("unsupported-storage-drivers", false)
 	IstioVirtualServiceUI     = newFeature("istio-virtual-service-ui", true)
+	Steve                     = newFeature("steve", false)
 )
 
 type feature struct {

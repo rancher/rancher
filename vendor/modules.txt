@@ -349,7 +349,7 @@ github.com/rancher/machine/libmachine/ssh
 github.com/rancher/machine/libmachine/state
 github.com/rancher/machine/libmachine/version
 github.com/rancher/machine/version
-# github.com/rancher/norman v0.0.0-20200131205419-91885aeab2b2
+# github.com/rancher/norman v0.0.0-20200202051408-9dd0f76a7e8b
 github.com/rancher/norman/api
 github.com/rancher/norman/api/access
 github.com/rancher/norman/api/builtin
@@ -372,7 +372,6 @@ github.com/rancher/norman/pkg/dump
 github.com/rancher/norman/pkg/k8scheck
 github.com/rancher/norman/pkg/kwrapper/etcd
 github.com/rancher/norman/pkg/kwrapper/k8s
-github.com/rancher/norman/pkg/ratelimit
 github.com/rancher/norman/pkg/subscribe
 github.com/rancher/norman/resource
 github.com/rancher/norman/restwatch
@@ -423,7 +422,7 @@ github.com/rancher/rke/util
 # github.com/rancher/security-scan v0.1.5
 github.com/rancher/security-scan/pkg/kb-summarizer/report
 github.com/rancher/security-scan/pkg/kb-summarizer/summarizer
-# github.com/rancher/steve v0.0.0-20200131221047-91dde5ead6c8
+# github.com/rancher/steve v0.0.0-20200202051353-139bacf74d17
 github.com/rancher/steve/pkg/accesscontrol
 github.com/rancher/steve/pkg/attributes
 github.com/rancher/steve/pkg/auth
@@ -492,7 +491,7 @@ github.com/rancher/types/mapper
 github.com/rancher/types/peermanager
 github.com/rancher/types/status
 github.com/rancher/types/user
-# github.com/rancher/wrangler v0.4.1-0.20200131051624-f65ef17f3764
+# github.com/rancher/wrangler v0.4.1
 github.com/rancher/wrangler/pkg/apply
 github.com/rancher/wrangler/pkg/apply/injectors
 github.com/rancher/wrangler/pkg/condition
@@ -509,6 +508,7 @@ github.com/rancher/wrangler/pkg/leader
 github.com/rancher/wrangler/pkg/merr
 github.com/rancher/wrangler/pkg/name
 github.com/rancher/wrangler/pkg/objectset
+github.com/rancher/wrangler/pkg/ratelimit
 github.com/rancher/wrangler/pkg/schemas
 github.com/rancher/wrangler/pkg/schemas/definition
 github.com/rancher/wrangler/pkg/schemas/mappers
