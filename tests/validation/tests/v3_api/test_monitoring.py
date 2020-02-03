@@ -40,6 +40,7 @@ etcd_graph_list = [
     "etcd-server-failed-proposal",
     "etcd-leader-change",
     "etcd-rpc-rate",
+    'etcd-peer-traffic'
 ]
 
 kube_component_graph_list = [
@@ -246,7 +247,7 @@ def test_rbac_project_owner_control_project_monitoring():
 
     if project["enableProjectMonitoring"] is True:
         assert "disableMonitoring" in project.actions.keys()
-        disable_project_monitoring(project)
+        disable_project_monitoring(project, user_token)
     validate_project_monitoring(project, user_token)
 
 
@@ -481,37 +482,55 @@ def create_project_client(request):
     request.addfinalizer(fin)
 
 
-def get_graph_data(query1, list_len, timeout=10):
+def check_data(source, target_list):
+    """ check if any graph is missing or any new graph is introduced"""
+    if not hasattr(source, "data"):
+        return False
+    data = source.get("data")
+    if len(data) == 0:
+        print("no graph is received")
+        return False
+    target_copy = copy.deepcopy(target_list)
+    res = []
+    extra = []
+    for item in data:
+        if not hasattr(item, "series"):
+            return False
+        if len(item.series) == 0:
+            print("no data point")
+            return False
+        name = item.get("graphID").split(":")[1]
+        res.append(name)
+        if name in target_list:
+            target_copy.remove(name)
+        else:
+            extra.append(name)
+
+    target_list.sort()
+    res.sort()
+    target_copy.sort()
+    extra.sort()
+    print("target graphs : {}".format(target_list))
+    print("actual graphs : {}".format(res))
+    print("missing graphs: {}".format(target_copy))
+    print("extra graphs  : {}".format(extra))
+    if len(target_copy) != 0 or len(extra) != 0:
+        return False
+    return True
+
+
+def validate_cluster_graph(action_query, resource_type, timeout=10):
+    target_graph_list = copy.deepcopy(name_mapping.get(resource_type))
     rancher_client, cluster = get_user_client_and_cluster()
     start = time.time()
     while True:
-        res = rancher_client.action(**query1)
-        if hasattr(res, "data") is True:
-            print("\nlength: ", len(res.data), "expected to be: ", list_len)
-            print(res.data)
-            if len(res.data) == list_len:
-                # check if all graphs have valid data points
-                for graph in res.data:
-                    if hasattr(graph, "series"):
-                        if len(graph.series) == 0:
-                            continue
-                return res.data
+        res = rancher_client.action(**action_query)
+        if check_data(res, target_graph_list):
+            return
         if time.time() - start > timeout:
             raise AssertionError(
                 "Timed out waiting for all graphs to be available")
         time.sleep(2)
-
-
-def validate_cluster_graph(action_query, resource_type):
-    target_graph_list = copy.deepcopy(name_mapping.get(resource_type))
-    graphs = get_graph_data(action_query, len(target_graph_list))
-    for item in graphs:
-        name = item.graphID.split(":")[1]
-        assert name is not None, " [cluster monitoring] invalid graph name"
-        assert name in target_graph_list, \
-            "[cluster monitoring] the graph {} is missing".format(name)
-        target_graph_list.remove(name)
-    assert len(target_graph_list) == 0, target_graph_list
 
 
 def wait_for_target_up(token, cluster, project, job):
