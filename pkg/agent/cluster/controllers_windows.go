@@ -1,5 +1,5 @@
 package cluster
 
-func RunControllers() error {
+func RunControllers(namespace, token, url string) error {
 	return nil
 }
