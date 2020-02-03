@@ -1,6 +1,7 @@
 from .common import *  # NOQA
 import pytest
 from .test_rbac import create_user
+from .test_rke_cluster_provisioning import create_and_validate_custom_host
 
 project_detail = {"cluster1": {"project1": None, "namespace1": None,
                                "project2": None, "namespace2": None,
@@ -581,24 +582,29 @@ def create_project_client(request):
         rbac_data["users"][CLUSTER_MEMBER]["user"]
     user_token["user_c1_member"]["token"] = \
         rbac_data["users"][CLUSTER_MEMBER]["token"]
-    client, clusters = get_user_client_and_cluster_app()
+    # create a cluster
+    node_roles = [["controlplane", "etcd", "worker"],
+                  ["worker"], ["worker"]]
+    cluster_list = []
+    cluster, aws_nodes = create_and_validate_custom_host(node_roles, True)
+    client, cluster_existing = get_user_client_and_cluster()
     admin_client = get_admin_client()
-    cluster1 = clusters[0]
-    cluster2 = clusters[1]
-    assert len(clusters) > 0
+    cluster_list.append(cluster_existing)
+    cluster_list.append(cluster)
+    assert len(cluster_list) > 1
 
     project_detail["cluster1"]["project2"], \
     project_detail["cluster1"]["namespace2"] = \
         create_project_and_ns(USER_TOKEN,
-                              cluster1,
+                              cluster_list[0],
                               random_test_name("testapp"))
     project_detail["cluster2"]["project1"], \
         project_detail["cluster2"]["namespace1"] = \
         create_project_and_ns(USER_TOKEN,
-                              cluster2,
+                              cluster_list[1],
                               random_test_name("testapp"))
-    project_detail["cluster1"]["cluster"] = cluster1
-    project_detail["cluster2"]["cluster"] = cluster2
+    project_detail["cluster1"]["cluster"] = cluster_list[0]
+    project_detail["cluster2"]["cluster"] = cluster_list[1]
 
     catalog = admin_client.create_catalog(
         name=CATALOG_NAME,
@@ -608,10 +614,10 @@ def create_project_client(request):
         url=CATALOG_URL)
     time.sleep(5)
 
-    user_c_client = get_cluster_client_for_token(cluster1, USER_TOKEN)
+    user_c_client = get_cluster_client_for_token(cluster_list[0], USER_TOKEN)
     project_detail["cluster1"]["project1"] = rbac_data["project"]
     project_detail["cluster1"]["namespace1"] = \
-        create_ns(user_c_client, cluster1, rbac_data["project"])
+        create_ns(user_c_client, cluster_list[0], rbac_data["project"])
 
     # create users
     user_token["user_c1_p2_owner"]["user"], \
@@ -645,6 +651,9 @@ def create_project_client(request):
         admin_client.delete(user_token["user_c2_p1_owner"]["user"])
         admin_client.delete(user_token["user_c2_owner"]["user"])
         admin_client.delete(user_token["user_standard"]["user"])
+        admin_client.delete(cluster)
+        if aws_nodes is not None:
+            delete_node(aws_nodes)
 
     request.addfinalizer(fin)
 
