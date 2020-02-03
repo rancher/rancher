@@ -13,7 +13,7 @@ import (
 
 var running bool
 
-func RunControllers() error {
+func RunControllers(namespace, token, url string) error {
 	if running {
 		return nil
 	}
@@ -34,9 +34,23 @@ func RunControllers() error {
 		return err
 	}
 
+	// ctx, _ := context.WithCancel(context.Background())
 	err = userOnly.Start(context.Background())
 	if err != nil {
 		return err
+	}
+
+	// namespace will be if steve is enabled
+	if namespace != "" {
+		if err := runSteve(context.Background(), url); err != nil {
+			return err
+		}
+
+		// logrus.Infof("Starting agent controllers for namespace [%s], url [%s]", namespace, url)
+		// if err := controllers.StartControllers(ctx, token, url, namespace); err != nil {
+		// 	cancel()
+		// 	return err
+		// }
 	}
 
 	running = true

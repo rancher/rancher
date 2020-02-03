@@ -71,6 +71,7 @@ type: Opaque
 data:
   url: "{{.URL}}"
   token: "{{.Token}}"
+  namespace: "{{.Namespace}}"
 
 ---
 
