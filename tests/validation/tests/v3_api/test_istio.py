@@ -1,5 +1,6 @@
 import copy
 import os
+import re
 
 import pytest
 import time
@@ -8,15 +9,19 @@ from subprocess import CalledProcessError
 
 from rancher import ApiError
 
+from .common import apply_crd
 from .common import check_condition
+from .common import compare_versions
 from .common import CLUSTER_MEMBER
 from .common import CLUSTER_OWNER
 from .common import create_kubeconfig
 from .common import create_project_and_ns
 from .common import create_ns
 from .common import DEFAULT_TIMEOUT
+from .common import delete_crd
 from .common import execute_kubectl_cmd
 from .common import get_cluster_client_for_token
+from .common import get_crd
 from .common import get_project_client_for_token
 from .common import get_user_client
 from .common import get_user_client_and_cluster
@@ -25,10 +30,13 @@ from .common import PROJECT_MEMBER
 from .common import PROJECT_OWNER
 from .common import PROJECT_READ_ONLY
 from .common import random_test_name
+from .common import rbac_get_kubeconfig_by_role
+from .common import rbac_get_namespace
 from .common import rbac_get_user_token_by_role
 from .common import requests
 from .common import run_command as run_command_common
 from .common import USER_TOKEN
+from .common import validate_all_workload_image_from_rancher
 from .common import wait_for_condition
 from .common import wait_for_pod_to_running
 from .common import wait_for_pods_in_workload
@@ -38,11 +46,14 @@ from .test_monitoring import C_MONITORING_ANSWERS
 
 ISTIO_PATH = os.path.join(
     os.path.dirname(os.path.realpath(__file__)), "resource/istio")
+ISTIO_CRD_PATH = os.path.join(ISTIO_PATH, "crds")
 ISTIO_TEMPLATE_ID = "cattle-global-data:system-library-rancher-istio"
 ISTIO_VERSION = os.environ.get('RANCHER_ISTIO_VERSION', "")
 ISTIO_INGRESSGATEWAY_NODEPORT = os.environ.get(
     'RANCHER_ISTIO_INGRESSGATEWAY_NODEPORT', 31380)
 ISTIO_BOOKINFO_QUERY_RESULT = "<title>Simple Bookstore App</title>"
+ISTIO_EXTERNAL_ID = "catalog://?catalog=system-library" \
+                    "&template=rancher-istio&version="
 
 DEFAULT_ANSWERS = {
     "enableCRDs": "true",
@@ -58,6 +69,53 @@ namespace = {"app_client": None, "app_ns": None, "gateway_url": None,
              "system_ns": None, "system_project": None,
              "istio_version": None, "istio_app": None}
 
+crd_test_data = [
+    ("policy.authentication.istio.io", "authenticationpolicy.yaml"),
+    # ("adapter.config.istio.io", "adapter.yaml"),
+    # ABOVE FAILS in current state: Rancher v2.3.5
+    # ("attributemanifest.config.istio.io", "attributemanifest.yaml"),
+    # ABOVE FAILS in current state: Rancher v2.3.5
+    ("handler.config.istio.io", "handler.yaml"),
+    # ("httpapispecbinding.config.istio.io", "httpapispecbinding.yaml"),
+    # ABOVE FAILS in current state: Rancher v2.3.5
+    # ("httpapispec.config.istio.io", "httpapispec.yaml"),
+    # ABOVE FAILS in current state: Rancher v2.3.5
+    ("quotaspecbinding.config.istio.io", "quotaspecbinding.yaml"),
+    ("quotaspec.config.istio.io", "quotaspec.yaml"),
+    ("rule.config.istio.io", "rule.yaml"),
+    # ("template.config.istio.io", "template.yaml"),
+    # ABOVE FAILS in current state: Rancher v2.3.5
+    ("destinationrule.networking.istio.io", "destinationrule.yaml"),
+    ("envoyfilter.networking.istio.io", "envoyfilter.yaml"),
+    ("gateway.networking.istio.io", "gateway.yaml"),
+    ("serviceentry.networking.istio.io", "serviceentry.yaml"),
+    ("sidecar.networking.istio.io", "sidecar.yaml"),
+    ("virtualservice.networking.istio.io", "virtualservice.yaml"),
+    ("rbacconfig.rbac.istio.io", "rbacconfig.yaml"),
+    ("servicerolebinding.rbac.istio.io", "servicerolebinding.yaml"),
+    ("servicerole.rbac.istio.io", "servicerole.yaml"),
+    ("authorizationpolicy.security.istio.io", "authorizationpolicy.yaml"),
+]
+
+
+def unsupported_istio_version():
+    if ISTIO_VERSION != "":
+        istio_version = ISTIO_VERSION
+    else:
+        client, _ = get_user_client_and_cluster()
+        istio_versions = list(client.list_template(
+            id=ISTIO_TEMPLATE_ID).data[0].versionLinks.keys())
+        print("istio_versions is: {}".format(istio_versions))
+        istio_version = istio_versions[len(istio_versions) - 1]
+    if compare_versions(istio_version, "1.4.3") < 0:
+        return True
+    return False
+
+
+skipif_older_istio = pytest.mark.skipif(unsupported_istio_version(),
+                                        reason='This test is not supported '
+                                               'for older Istio versions')
+
 
 def test_istio_resources():
     app_client = namespace["app_client"]
@@ -70,8 +128,24 @@ def test_istio_resources():
     create_and_test_bookinfo_routing(app_client, app_ns, gateway_url)
 
 
+@skipif_older_istio
+def test_istio_custom_answers(enable_all_options):
+    expected_deployments = [
+        "certmanager", "grafana", "istio-citadel", "istio-egressgateway",
+        "istio-galley", "istio-ilbgateway", "istio-ingressgateway",
+        "istio-pilot", "istio-policy", "istio-sidecar-injector",
+        "istio-telemetry", "istio-tracing", "istiocoredns", "kiali",
+        "prometheus"
+    ]
+    expected_daemonsets = ["istio-nodeagent"]
+    validate_all_workload_image_from_rancher(
+        get_system_client(USER_TOKEN), namespace["system_ns"],
+        ignore_pod_count=True, deployment_list=expected_deployments,
+        daemonset_list=expected_daemonsets)
+
+
 @if_test_rbac
-def test_rbac_cluster_owner_istio_metrics_allow_all(allow_all_access):
+def test_rbac_istio_metrics_allow_all_cluster_owner(allow_all_access):
     kiali_url, tracing_url, _, _ = get_urls()
     cluster_owner = rbac_get_user_token_by_role(CLUSTER_OWNER)
     validate_access(kiali_url, cluster_owner)
@@ -79,7 +153,7 @@ def test_rbac_cluster_owner_istio_metrics_allow_all(allow_all_access):
 
 
 @if_test_rbac
-def test_rbac_cluster_owner_istio_monitoring_allow_all(allow_all_access):
+def test_rbac_istio_monitoring_allow_all_cluster_owner(allow_all_access):
     _, _, grafana_url, prometheus_url = get_urls()
     cluster_owner = rbac_get_user_token_by_role(CLUSTER_OWNER)
     validate_access(grafana_url, cluster_owner)
@@ -87,7 +161,7 @@ def test_rbac_cluster_owner_istio_monitoring_allow_all(allow_all_access):
 
 
 @if_test_rbac
-def test_rbac_cluster_member_istio_metrics_allow_all(allow_all_access):
+def test_rbac_istio_metrics_allow_all_cluster_member(allow_all_access):
     kiali_url, tracing_url, _, _ = get_urls()
     cluster_member = rbac_get_user_token_by_role(CLUSTER_MEMBER)
     validate_access(kiali_url, cluster_member)
@@ -95,7 +169,7 @@ def test_rbac_cluster_member_istio_metrics_allow_all(allow_all_access):
 
 
 @if_test_rbac
-def test_rbac_cluster_member_istio_monitoring_allow_all(allow_all_access):
+def test_rbac_istio_monitoring_allow_all_cluster_member(allow_all_access):
     _, _, grafana_url, prometheus_url = get_urls()
     cluster_member = rbac_get_user_token_by_role(CLUSTER_MEMBER)
     validate_no_access(grafana_url, cluster_member)
@@ -103,7 +177,7 @@ def test_rbac_cluster_member_istio_monitoring_allow_all(allow_all_access):
 
 
 @if_test_rbac
-def test_rbac_project_owner_istio_metrics_allow_all(allow_all_access):
+def test_rbac_istio_metrics_allow_all_project_owner(allow_all_access):
     kiali_url, tracing_url, _, _ = get_urls()
     cluster_member = rbac_get_user_token_by_role(PROJECT_OWNER)
     validate_access(kiali_url, cluster_member)
@@ -111,7 +185,7 @@ def test_rbac_project_owner_istio_metrics_allow_all(allow_all_access):
 
 
 @if_test_rbac
-def test_rbac_project_owner_istio_monitoring_allow_all(allow_all_access):
+def test_rbac_istio_monitoring_allow_all_project_owner(allow_all_access):
     _, _, grafana_url, prometheus_url = get_urls()
     cluster_member = rbac_get_user_token_by_role(PROJECT_OWNER)
     validate_no_access(grafana_url, cluster_member)
@@ -119,7 +193,7 @@ def test_rbac_project_owner_istio_monitoring_allow_all(allow_all_access):
 
 
 @if_test_rbac
-def test_rbac_project_member_istio_metrics_allow_all(allow_all_access):
+def test_rbac_istio_metrics_allow_all_project_member(allow_all_access):
     kiali_url, tracing_url, _, _ = get_urls()
     cluster_member = rbac_get_user_token_by_role(PROJECT_MEMBER)
     validate_access(kiali_url, cluster_member)
@@ -127,7 +201,7 @@ def test_rbac_project_member_istio_metrics_allow_all(allow_all_access):
 
 
 @if_test_rbac
-def test_rbac_project_member_istio_monitoring_allow_all(allow_all_access):
+def test_rbac_istio_monitoring_allow_all_project_member(allow_all_access):
     _, _, grafana_url, prometheus_url = get_urls()
     cluster_member = rbac_get_user_token_by_role(PROJECT_MEMBER)
     validate_no_access(grafana_url, cluster_member)
@@ -135,7 +209,7 @@ def test_rbac_project_member_istio_monitoring_allow_all(allow_all_access):
 
 
 @if_test_rbac
-def test_rbac_project_read_istio_metrics_allow_all(allow_all_access):
+def test_rbac_istio_metrics_allow_all_project_read(allow_all_access):
     kiali_url, tracing_url, _, _ = get_urls()
     cluster_member = rbac_get_user_token_by_role(PROJECT_READ_ONLY)
     validate_access(kiali_url, cluster_member)
@@ -143,7 +217,7 @@ def test_rbac_project_read_istio_metrics_allow_all(allow_all_access):
 
 
 @if_test_rbac
-def test_rbac_project_read_istio_monitoring_allow_all(allow_all_access):
+def test_rbac_istio_monitoring_allow_all_project_read(allow_all_access):
     _, _, grafana_url, prometheus_url = get_urls()
     cluster_member = rbac_get_user_token_by_role(PROJECT_READ_ONLY)
     validate_no_access(grafana_url, cluster_member)
@@ -151,7 +225,7 @@ def test_rbac_project_read_istio_monitoring_allow_all(allow_all_access):
 
 
 @if_test_rbac
-def test_rbac_cluster_owner_istio_metrics_allow_none(default_access):
+def test_rbac_istio_metrics_allow_none_cluster_owner(default_access):
     kiali_url, tracing_url, _, _ = get_urls()
     cluster_owner = rbac_get_user_token_by_role(CLUSTER_OWNER)
     validate_access(kiali_url, cluster_owner)
@@ -159,7 +233,7 @@ def test_rbac_cluster_owner_istio_metrics_allow_none(default_access):
 
 
 @if_test_rbac
-def test_rbac_cluster_owner_istio_monitoring_allow_none(default_access):
+def test_rbac_istio_monitoring_allow_none_cluster_owner(default_access):
     _, _, grafana_url, prometheus_url = get_urls()
     cluster_owner = rbac_get_user_token_by_role(CLUSTER_OWNER)
     validate_access(grafana_url, cluster_owner)
@@ -167,7 +241,7 @@ def test_rbac_cluster_owner_istio_monitoring_allow_none(default_access):
 
 
 @if_test_rbac
-def test_rbac_cluster_member_istio_metrics_allow_none(default_access):
+def test_rbac_istio_metrics_allow_none_cluster_member(default_access):
     kiali_url, tracing_url, _, _ = get_urls()
     cluster_member = rbac_get_user_token_by_role(CLUSTER_MEMBER)
     validate_no_access(kiali_url, cluster_member)
@@ -175,7 +249,7 @@ def test_rbac_cluster_member_istio_metrics_allow_none(default_access):
 
 
 @if_test_rbac
-def test_rbac_cluster_member_istio_monitoring_allow_none(default_access):
+def test_rbac_istio_monitoring_allow_none_cluster_member(default_access):
     _, _, grafana_url, prometheus_url = get_urls()
     cluster_member = rbac_get_user_token_by_role(CLUSTER_MEMBER)
     validate_no_access(grafana_url, cluster_member)
@@ -183,7 +257,7 @@ def test_rbac_cluster_member_istio_monitoring_allow_none(default_access):
 
 
 @if_test_rbac
-def test_rbac_project_owner_istio_metrics_allow_none(default_access):
+def test_rbac_istio_metrics_allow_none_project_owner(default_access):
     kiali_url, tracing_url, _, _ = get_urls()
     cluster_member = rbac_get_user_token_by_role(PROJECT_OWNER)
     validate_no_access(kiali_url, cluster_member)
@@ -191,7 +265,7 @@ def test_rbac_project_owner_istio_metrics_allow_none(default_access):
 
 
 @if_test_rbac
-def test_rbac_project_owner_istio_monitoring_allow_none(default_access):
+def test_rbac_istio_monitoring_allow_none_project_owner(default_access):
     _, _, grafana_url, prometheus_url = get_urls()
     cluster_member = rbac_get_user_token_by_role(PROJECT_OWNER)
     validate_no_access(grafana_url, cluster_member)
@@ -199,7 +273,7 @@ def test_rbac_project_owner_istio_monitoring_allow_none(default_access):
 
 
 @if_test_rbac
-def test_rbac_project_member_istio_metrics_allow_none(default_access):
+def test_rbac_istio_metrics_allow_none_project_member(default_access):
     kiali_url, tracing_url, _, _ = get_urls()
     cluster_member = rbac_get_user_token_by_role(PROJECT_MEMBER)
     validate_no_access(kiali_url, cluster_member)
@@ -207,7 +281,7 @@ def test_rbac_project_member_istio_metrics_allow_none(default_access):
 
 
 @if_test_rbac
-def test_rbac_project_member_istio_monitoring_allow_none(default_access):
+def test_rbac_istio_monitoring_allow_none_project_member(default_access):
     _, _, grafana_url, prometheus_url = get_urls()
     cluster_member = rbac_get_user_token_by_role(PROJECT_MEMBER)
     validate_no_access(grafana_url, cluster_member)
@@ -215,7 +289,7 @@ def test_rbac_project_member_istio_monitoring_allow_none(default_access):
 
 
 @if_test_rbac
-def test_rbac_project_read_istio_metrics_allow_none(default_access):
+def test_rbac_istio_metrics_allow_none_project_read(default_access):
     kiali_url, tracing_url, _, _ = get_urls()
     cluster_member = rbac_get_user_token_by_role(PROJECT_READ_ONLY)
     validate_no_access(kiali_url, cluster_member)
@@ -223,7 +297,7 @@ def test_rbac_project_read_istio_metrics_allow_none(default_access):
 
 
 @if_test_rbac
-def test_rbac_project_read_istio_monitoring_allow_none(default_access):
+def test_rbac_istio_monitoring_allow_none_project_read(default_access):
     _, _, grafana_url, prometheus_url = get_urls()
     cluster_member = rbac_get_user_token_by_role(PROJECT_READ_ONLY)
     validate_no_access(grafana_url, cluster_member)
@@ -231,7 +305,7 @@ def test_rbac_project_read_istio_monitoring_allow_none(default_access):
 
 
 @if_test_rbac
-def test_rbac_cluster_member_istio_update():
+def test_rbac_istio_update_cluster_member():
     user = rbac_get_user_token_by_role(CLUSTER_MEMBER)
     with pytest.raises(ApiError) as e:
         update_istio_app({"FOO": "BAR"}, user)
@@ -241,7 +315,7 @@ def test_rbac_cluster_member_istio_update():
 
 
 @if_test_rbac
-def test_rbac_cluster_member_istio_disable():
+def test_rbac_istio_disable_cluster_member():
     user = rbac_get_user_token_by_role(CLUSTER_MEMBER)
     with pytest.raises(ApiError) as e:
         delete_istio_app(user)
@@ -251,17 +325,7 @@ def test_rbac_cluster_member_istio_disable():
 
 
 @if_test_rbac
-def test_rbac_project_owner_istio_disable():
-    user = rbac_get_user_token_by_role(PROJECT_OWNER)
-    with pytest.raises(ApiError) as e:
-        delete_istio_app(user)
-
-    assert e.value.error.status == 403
-    assert e.value.error.code == 'Forbidden'
-
-
-@if_test_rbac
-def test_rbac_project_owner_istio_update():
+def test_rbac_istio_update_project_owner():
     user = rbac_get_user_token_by_role(PROJECT_OWNER)
     with pytest.raises(ApiError) as e:
         update_istio_app({"FOO": "BAR"}, user)
@@ -271,7 +335,17 @@ def test_rbac_project_owner_istio_update():
 
 
 @if_test_rbac
-def test_rbac_project_member_istio_update():
+def test_rbac_istio_disable_project_owner():
+    user = rbac_get_user_token_by_role(PROJECT_OWNER)
+    with pytest.raises(ApiError) as e:
+        delete_istio_app(user)
+
+    assert e.value.error.status == 403
+    assert e.value.error.code == 'Forbidden'
+
+
+@if_test_rbac
+def test_rbac_istio_update_project_member():
     user = rbac_get_user_token_by_role(PROJECT_MEMBER)
     with pytest.raises(ApiError) as e:
         update_istio_app({"FOO": "BAR"}, user)
@@ -281,7 +355,7 @@ def test_rbac_project_member_istio_update():
 
 
 @if_test_rbac
-def test_rbac_project_member_istio_disable():
+def test_rbac_istio_disable_project_member():
     user = rbac_get_user_token_by_role(PROJECT_MEMBER)
     with pytest.raises(ApiError) as e:
         delete_istio_app(user)
@@ -291,7 +365,7 @@ def test_rbac_project_member_istio_disable():
 
 
 @if_test_rbac
-def test_rbac_project_read_istio_update():
+def test_rbac_istio_update_project_read():
     user = rbac_get_user_token_by_role(PROJECT_READ_ONLY)
     with pytest.raises(ApiError) as e:
         update_istio_app({"FOO": "BAR"}, user)
@@ -301,13 +375,55 @@ def test_rbac_project_read_istio_update():
 
 
 @if_test_rbac
-def test_rbac_project_read_istio_disable():
+def test_rbac_istio_disable_project_read():
     user = rbac_get_user_token_by_role(PROJECT_READ_ONLY)
     with pytest.raises(ApiError) as e:
         delete_istio_app(user)
 
     assert e.value.error.status == 403
     assert e.value.error.code == 'Forbidden'
+
+
+@if_test_rbac
+@skipif_older_istio
+@pytest.mark.parametrize("crd,manifest", crd_test_data)
+def test_rbac_istio_crds_project_owner(enable_certmanager, crd, manifest):
+    kubectl_context = rbac_get_kubeconfig_by_role(PROJECT_OWNER)
+    file = ISTIO_CRD_PATH + '/' + manifest
+    ns = rbac_get_namespace()
+    assert re.match("{}.* created".format(crd),
+                    apply_crd(ns, file, kubectl_context))
+    assert "Forbidden" not in get_crd(ns, crd, kubectl_context)
+    assert re.match("{}.* deleted".format(crd),
+                    delete_crd(ns, file, kubectl_context))
+
+
+@if_test_rbac
+@skipif_older_istio
+@pytest.mark.parametrize("crd,manifest", crd_test_data)
+def test_rbac_istio_crds_project_member(enable_certmanager, crd, manifest):
+    kubectl_context = rbac_get_kubeconfig_by_role(PROJECT_MEMBER)
+    file = ISTIO_CRD_PATH + '/' + manifest
+    ns = rbac_get_namespace()
+    assert re.match("{}.* created".format(crd),
+                    apply_crd(ns, file, kubectl_context))
+    assert "Forbidden" not in get_crd(ns, crd, kubectl_context)
+    assert re.match("{}.* deleted".format(crd),
+                    delete_crd(ns, file, kubectl_context))
+
+
+@if_test_rbac
+@skipif_older_istio
+@pytest.mark.parametrize("crd,manifest", crd_test_data)
+def test_rbac_istio_crds_project_read(enable_certmanager, crd, manifest):
+    kubectl_context = rbac_get_kubeconfig_by_role(PROJECT_READ_ONLY)
+    file = ISTIO_CRD_PATH + '/' + manifest
+    ns = rbac_get_namespace()
+    assert str(apply_crd(ns, file, kubectl_context)).startswith(
+        "Error from server (Forbidden)")
+    assert "Forbidden" not in get_crd(ns, crd, kubectl_context)
+    assert str(delete_crd(ns, file, kubectl_context)).startswith(
+        "Error from server (Forbidden)")
 
 
 def validate_access(url, user):
@@ -326,30 +442,30 @@ def validate_no_access(url, user):
     return response
 
 
-def update_istio_app(answers, user):
+def update_istio_app(answers, user, app=None, ns=None, project=None):
+    if app is None:
+        app = namespace["istio_app"]
+    if ns is None:
+        ns = namespace["system_ns"]
+    if project is None:
+        project = namespace["system_project"]
     p_client = get_system_client(user)
     updated_answers = copy.deepcopy(DEFAULT_ANSWERS)
     updated_answers.update(answers)
-    external_id = "catalog://?catalog=system-library" + \
-                  "&template=rancher-istio" + \
-                  "&version=" + namespace["istio_version"]
     namespace["istio_app"] = p_client.update(
-        obj=namespace["istio_app"],
-        externalId=external_id,
-        targetNamespace=namespace["system_ns"].name,
-        projectId=namespace["system_project"].id,
+        obj=app,
+        externalId=ISTIO_EXTERNAL_ID,
+        targetNamespace=ns.name,
+        projectId=project.id,
         answers=updated_answers)
     verify_istio_app_ready(p_client, namespace["istio_app"], 120, 120)
 
 
-def create_and_verify_istio_app(p_client, ns, project, version):
-    external_id = "catalog://?catalog=system-library" + \
-                  "&template=rancher-istio" + \
-                  "&version=" + version
+def create_and_verify_istio_app(p_client, ns, project):
     print("creating istio catalog app")
     app = p_client.create_app(
         name="cluster-istio",
-        externalId=external_id,
+        externalId=ISTIO_EXTERNAL_ID,
         targetNamespace=ns.name,
         projectId=project.id,
         answers=DEFAULT_ANSWERS
@@ -363,19 +479,39 @@ def delete_istio_app(user):
     p_client.delete(namespace["istio_app"])
 
 
-def verify_istio_app_ready(p_client, app, install_timeout, deploy_timeout):
-    print("Verify istio app installed condition")
-    wait_for_condition(
-        p_client, app, check_condition('Installed', 'True'), install_timeout)
-
-    print("Verify istio app deployment condition")
-    wait_for_condition(
-        p_client, app, check_condition('Deployed', 'True'), deploy_timeout)
+def verify_istio_app_ready(p_client, app, install_timeout, deploy_timeout,
+                           initial_run=True):
+    if initial_run:
+        print("Verify Istio App has installed and deployed properly")
+    if install_timeout <= 0 or deploy_timeout <= 0:
+        raise TimeoutError("Timeout waiting for istio to be properly "
+                           "installed and deployed.")
+    elif 'conditions' in app and not initial_run:
+        for cond in app['conditions']:
+            if "False" in cond['status'] and 'message' in cond \
+                    and "failed" in cond['message']:
+                raise AssertionError("Failed to properly install/deploy app. "
+                                     "Reason: {}".format(cond['message']))
+    try:
+        wait_for_condition(p_client, app, check_condition('Installed', 'True'),
+                           timeout=2)
+    except (Exception, TypeError):
+        verify_istio_app_ready(p_client, p_client.list_app(
+            name='cluster-istio').data[0], install_timeout-2, deploy_timeout,
+                               initial_run=False)
+    try:
+        wait_for_condition(p_client, app, check_condition('Deployed', 'True'),
+                           timeout=2)
+    except (Exception, TypeError):
+        verify_istio_app_ready(p_client, p_client.list_app(
+            name='cluster-istio').data[0], 2, deploy_timeout-2,
+                               initial_run=False)
 
 
 def get_urls():
     _, cluster = get_user_client_and_cluster()
-    if ISTIO_VERSION == "0.1.0" or ISTIO_VERSION == "0.1.1":
+    if namespace["istio_version"] == "0.1.0" \
+            or namespace["istio_version"] == "0.1.1":
         kiali_url = os.environ.get('CATTLE_TEST_URL', "") + \
             "/k8s/clusters/" + cluster.id + \
             "/api/v1/namespaces/istio-system/services/" \
@@ -625,14 +761,48 @@ def allow_all_access(request):
     update_istio_app(answers, USER_TOKEN)
 
 
+@pytest.fixture(scope='function')
+def enable_certmanager(request):
+    answers = {
+        "certmanager.enabled": "true",
+        "kiali.enabled": "true",
+        "tracing.enabled": "true",
+    }
+    update_istio_app(answers, USER_TOKEN)
+
+
+@pytest.fixture(scope='function')
+def enable_all_options(request):
+    answers = {
+        "certmanager.enabled": "true",
+        "gateways.istio-egressgateway.enabled": "true",
+        "gateways.istio-ilbgateway.enabled": "true",
+        "gateways.istio-ingressgateway.sds.enabled": "true",
+        "global.proxy.accessLogFile": "/dev/stdout",
+        "grafana.enabled": "true",
+        "istiocoredns.enabled": "true",
+        "kiali.dashboard.grafanaURL": "",
+        "kiali.enabled": "true",
+        "kiali.prometheusAddr": "http://prometheus:9090",
+        "nodeagent.enabled": "true",
+        "nodeagent.env.CA_ADDR": "istio-citadel:8060",
+        "nodeagent.env.CA_PROVIDER": "Citadel",
+        "prometheus.enabled": "true",
+        "tracing.enabled": "true",
+    }
+    update_istio_app(answers, USER_TOKEN)
+
+
 @pytest.fixture(scope='module', autouse="True")
 def create_project_client(request):
+    global DEFAULT_ANSWERS
+    global ISTIO_EXTERNAL_ID
     client, cluster = get_user_client_and_cluster()
     create_kubeconfig(cluster)
     projects = client.list_project(name='System', clusterId=cluster.id)
     if len(projects.data) == 0:
         raise AssertionError(
-            "System project not found in the cluster " + cluster.Name)
+            "System project not found in the cluster " + cluster.name)
     p = projects.data[0]
     p_client = get_project_client_for_token(p, USER_TOKEN)
     c_client = get_cluster_client_for_token(cluster, USER_TOKEN)
@@ -643,6 +813,7 @@ def create_project_client(request):
 
     if ISTIO_VERSION != "":
         istio_version = ISTIO_VERSION
+    ISTIO_EXTERNAL_ID += istio_version
     answers = {"global.rancher.clusterId": p.clusterId}
     DEFAULT_ANSWERS.update(answers)
 
@@ -654,10 +825,12 @@ def create_project_client(request):
         verify_admission_webhook()
 
         ns = create_ns(c_client, cluster, p, 'istio-system')
-        app = create_and_verify_istio_app(p_client, ns, p, istio_version)
+        app = create_and_verify_istio_app(p_client, ns, p)
     else:
         app = p_client.list_app(name='cluster-istio').data[0]
         ns = c_client.list_namespace(name='istio-system').data[0]
+        update_istio_app(DEFAULT_ANSWERS, USER_TOKEN,
+                         app=app, ns=ns, project=p)
 
     istio_project, app_ns = create_project_and_ns(
         USER_TOKEN, cluster,

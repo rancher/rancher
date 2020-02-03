@@ -1,0 +1,11 @@
+apiVersion: "config.istio.io/v1alpha2"
+kind: adapter
+metadata:
+  name: test
+spec:
+  description: test
+  session_based: false
+  templates:
+  - apigee-authorization
+  - apigee-analytics
+  config: fake

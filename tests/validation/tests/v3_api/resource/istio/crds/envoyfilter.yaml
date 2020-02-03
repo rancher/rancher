@@ -1,0 +1,38 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: test-ef
+spec:
+  workloadSelector:
+    labels:
+      app: reviews
+  configPatches:
+    # The first patch adds the lua filter to the listener/http connection manager
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        portNumber: 8080
+        filterChain:
+          filter:
+            name: "envoy.http_connection_manager"
+            subFilter:
+              name: "envoy.router"
+    patch:
+      operation: INSERT_BEFORE
+      value: # lua filter specification
+       name: envoy.lua
+       config:
+         inlineCode: |
+           function envoy_on_request(request_handle)
+             -- Make an HTTP call to an upstream host with the following headers, body, and timeout.
+             local headers, body = request_handle:httpCall(
+              "lua_cluster",
+              {
+               [":method"] = "POST",
+               [":path"] = "/acl",
+               [":authority"] = "internal.org.net"
+              },
+             "authorize call",
+             5000)
+           end

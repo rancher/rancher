@@ -1,0 +1,11 @@
+apiVersion: "rbac.istio.io/v1alpha1"
+kind: ServiceRole
+metadata:
+  name: test
+spec:
+  rules:
+  - services: ["products.svc.cluster.local"]
+    methods: ["GET", "HEAD"]
+    constraints:
+    - key: "destination.labels[version]"
+      values: ["v1", "v2"]

@@ -1,0 +1,38 @@
+apiVersion: config.istio.io/v1alpha2
+kind: HTTPAPISpec
+metadata:
+  name: petstore-test
+spec:
+  attributes:
+    attributes:
+      api.service:
+        stringValue: petstore.swagger.io
+      api.version:
+        stringValue: 1.0.0
+  patterns:
+  - attributes:
+      attributes:
+        api.operation:
+          stringValue: findPets
+    httpMethod: GET
+    uriTemplate: /api/pets
+  - attributes:
+      attributes:
+        api.operation:
+          stringValue: addPet
+    httpMethod: POST
+    uriTemplate: /api/pets
+  - attributes:
+      attributes:
+        api.operation:
+          stringValue: findPetById
+    httpMethod: GET
+    uriTemplate: /api/pets/{id}
+  - attributes:
+      attributes:
+        api.operation:
+          stringValue: deletePet
+    httpMethod: DELETE
+    uriTemplate: /api/pets/{id}
+  apiKeys:
+  - query: api-key

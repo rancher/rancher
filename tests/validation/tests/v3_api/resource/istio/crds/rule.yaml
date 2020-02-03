@@ -1,0 +1,9 @@
+apiVersion: config.istio.io/v1alpha2
+kind: rule
+metadata:
+  name: test
+spec:
+  actions:
+  - handler: fakehandler
+    instances:
+    - fakeinstance
