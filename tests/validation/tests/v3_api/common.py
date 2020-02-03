@@ -46,7 +46,6 @@ skip_test_windows_os = pytest.mark.skipif(
     reason='Tests Skipped for including Windows nodes cluster')
 
 CLUSTER_NAME = os.environ.get("RANCHER_CLUSTER_NAME", "")
-CLUSTER_NAME_2 = os.environ.get("RANCHER_CLUSTER_NAME_2", "")
 RANCHER_CLEANUP_CLUSTER = \
     ast.literal_eval(os.environ.get('RANCHER_CLEANUP_CLUSTER', "True"))
 env_file = os.path.join(
@@ -1780,21 +1779,6 @@ def check_condition(condition_type, status):
         return False
 
     return _find_condition
-
-
-def get_user_client_and_cluster_app():
-    clusters = []
-    client = get_user_client()
-    if CLUSTER_NAME != "" and CLUSTER_NAME_2 != "":
-        assert len(client.list_cluster(name=CLUSTER_NAME).data) != 0, \
-            "Cluster is not available: %r" % CLUSTER_NAME
-        assert len(client.list_cluster(name=CLUSTER_NAME_2).data) != 0, \
-            "Cluster is not available: %r" % CLUSTER_NAME_2
-        clusters.append(client.list_cluster(name=CLUSTER_NAME).data[0])
-        clusters.append(client.list_cluster(name=CLUSTER_NAME_2).data[0])
-    else:
-        clusters = client.list_cluster().data
-    return client, clusters
 
 
 def create_catalog_external_id(catalog_name, template, version,
