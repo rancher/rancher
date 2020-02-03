@@ -110,7 +110,7 @@ def test_delete_rancher_server():
     AmazonWebServices().delete_nodes(aws_nodes)
 
 
-def test_logging_elasticsearch():
+def test_cluster_enable_logging_elasticsearch():
     client = get_user_client()
     cluster = get_cluster_by_name(client, RANCHER_CLUSTER_NAME)
     cluster_name = cluster.name
