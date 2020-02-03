@@ -394,7 +394,7 @@ def enableLogging(def cluster) {
         "export ADMIN_TOKEN=${ADMIN_TOKEN} && " +
         "export USER_TOKEN=${USER_TOKEN} && " + 
         "export RANCHER_ELASTIC_SEARCH_ENDPOINT=${RANCHER_ELASTIC_SEARCH_ENDPOINT} && " +
-        "pytest -v -s -k test_logging_elasticsearch ${testsDir} " +
+        "pytest -v -s -k test_cluster_enable_logging_elasticsearch ${testsDir} " +
         "--junit-xml=reports/${reportName}.xml " +
         "${htmlString}\'"
       print("Running: ")
