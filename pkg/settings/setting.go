@@ -17,6 +17,8 @@ var (
 
 	AgentImage                        = NewSetting("agent-image", "rancher/rancher-agent:master-head")
 	AuthImage                         = NewSetting("auth-image", v3.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
+	AuthorizationCacheTTLSeconds      = NewSetting("authorization-cache-ttl-seconds", "10")
+	AuthorizationDenyCacheTTLSeconds  = NewSetting("authorization-deny-cache-ttl-seconds", "10")
 	CACerts                           = NewSetting("cacerts", "")
 	CLIURLDarwin                      = NewSetting("cli-url-darwin", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-darwin-amd64-v1.0.0-alpha8.tar.gz")
 	CLIURLLinux                       = NewSetting("cli-url-linux", "https://releases.rancher.com/cli/v1.0.0-alpha8/rancher-linux-amd64-v1.0.0-alpha8.tar.gz")
@@ -130,6 +132,20 @@ func (s Setting) Get() string {
 		return s.Default
 	}
 	return provider.Get(s.Name)
+}
+
+func (s Setting) GetInt() int {
+	v := s.Get()
+	i, err := strconv.Atoi(v)
+	if err == nil {
+		return i
+	}
+	logrus.Errorf("failed to parse setting %s=%s as int: %v", s.Name, v, err)
+	i, err = strconv.Atoi(s.Default)
+	if err != nil {
+		return 0
+	}
+	return i
 }
 
 func SetProvider(p Provider) error {

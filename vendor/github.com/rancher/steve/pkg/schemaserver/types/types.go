@@ -59,6 +59,13 @@ type NamedResourceCollection struct {
 	Data []NamedResource `json:"data,omitempty"`
 }
 
+var ReservedFields = map[string]bool{
+	"id":      true,
+	"type":    true,
+	"links":   true,
+	"actions": true,
+}
+
 type APISchema struct {
 	*schemas.Schema
 
@@ -75,8 +82,21 @@ type APISchema struct {
 	Store               Store                   `json:"-"`
 }
 
+func copyHandlers(m map[string]http.Handler) map[string]http.Handler {
+	if m == nil {
+		return nil
+	}
+	result := make(map[string]http.Handler, len(m))
+	for k, v := range m {
+		result[k] = v
+	}
+
+	return result
+}
 func (a *APISchema) DeepCopy() *APISchema {
 	r := *a
+	r.ActionHandlers = copyHandlers(a.ActionHandlers)
+	r.LinkHandlers = copyHandlers(a.ActionHandlers)
 	r.Schema = r.Schema.DeepCopy()
 	return &r
 }

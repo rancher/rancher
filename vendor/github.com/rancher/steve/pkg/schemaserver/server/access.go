@@ -9,49 +9,49 @@ import (
 	"github.com/rancher/wrangler/pkg/slice"
 )
 
-type AllAccess struct {
+type SchemaBasedAccess struct {
 }
 
-func (*AllAccess) CanCreate(apiOp *types.APIRequest, schema *types.APISchema) error {
+func (*SchemaBasedAccess) CanCreate(apiOp *types.APIRequest, schema *types.APISchema) error {
 	if slice.ContainsString(schema.CollectionMethods, http.MethodPost) {
 		return nil
 	}
 	return httperror.NewAPIError(validation.PermissionDenied, "can not create "+schema.ID)
 }
 
-func (*AllAccess) CanGet(apiOp *types.APIRequest, schema *types.APISchema) error {
+func (*SchemaBasedAccess) CanGet(apiOp *types.APIRequest, schema *types.APISchema) error {
 	if slice.ContainsString(schema.ResourceMethods, http.MethodGet) {
 		return nil
 	}
 	return httperror.NewAPIError(validation.PermissionDenied, "can not get "+schema.ID)
 }
 
-func (*AllAccess) CanList(apiOp *types.APIRequest, schema *types.APISchema) error {
+func (*SchemaBasedAccess) CanList(apiOp *types.APIRequest, schema *types.APISchema) error {
 	if slice.ContainsString(schema.CollectionMethods, http.MethodGet) {
 		return nil
 	}
 	return httperror.NewAPIError(validation.PermissionDenied, "can not list "+schema.ID)
 }
 
-func (*AllAccess) CanUpdate(apiOp *types.APIRequest, obj types.APIObject, schema *types.APISchema) error {
+func (*SchemaBasedAccess) CanUpdate(apiOp *types.APIRequest, obj types.APIObject, schema *types.APISchema) error {
 	if slice.ContainsString(schema.ResourceMethods, http.MethodPut) {
 		return nil
 	}
 	return httperror.NewAPIError(validation.PermissionDenied, "can not update "+schema.ID)
 }
 
-func (*AllAccess) CanDelete(apiOp *types.APIRequest, obj types.APIObject, schema *types.APISchema) error {
+func (*SchemaBasedAccess) CanDelete(apiOp *types.APIRequest, obj types.APIObject, schema *types.APISchema) error {
 	if slice.ContainsString(schema.ResourceMethods, http.MethodDelete) {
 		return nil
 	}
 	return httperror.NewAPIError(validation.PermissionDenied, "can not delete "+schema.ID)
 }
 
-func (a *AllAccess) CanWatch(apiOp *types.APIRequest, schema *types.APISchema) error {
+func (a *SchemaBasedAccess) CanWatch(apiOp *types.APIRequest, schema *types.APISchema) error {
 	return a.CanList(apiOp, schema)
 }
 
-func (*AllAccess) CanAction(apiOp *types.APIRequest, schema *types.APISchema, name string) error {
+func (*SchemaBasedAccess) CanAction(apiOp *types.APIRequest, schema *types.APISchema, name string) error {
 	if _, ok := schema.ActionHandlers[name]; ok {
 		return httperror.NewAPIError(validation.PermissionDenied, "no such action "+name)
 	}

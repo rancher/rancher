@@ -51,7 +51,7 @@ func setup(ctx context.Context, server *Server) (http.Handler, *schema.Collectio
 		return nil, nil, err
 	}
 
-	cf, err := client.NewFactory(server.RestConfig)
+	cf, err := client.NewFactory(server.RestConfig, server.AuthMiddleware != nil)
 	if err != nil {
 		return nil, nil, err
 	}

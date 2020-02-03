@@ -422,7 +422,7 @@ github.com/rancher/rke/util
 # github.com/rancher/security-scan v0.1.5
 github.com/rancher/security-scan/pkg/kb-summarizer/report
 github.com/rancher/security-scan/pkg/kb-summarizer/summarizer
-# github.com/rancher/steve v0.0.0-20200203183034-a32064f23893
+# github.com/rancher/steve v0.0.0-20200203215439-10418db4948e
 github.com/rancher/steve/pkg/accesscontrol
 github.com/rancher/steve/pkg/attributes
 github.com/rancher/steve/pkg/auth
@@ -881,6 +881,7 @@ k8s.io/apiserver/pkg/authentication/authenticator
 k8s.io/apiserver/pkg/authentication/token/cache
 k8s.io/apiserver/pkg/authentication/user
 k8s.io/apiserver/pkg/authorization/authorizer
+k8s.io/apiserver/pkg/authorization/authorizerfactory
 k8s.io/apiserver/pkg/endpoints/request
 k8s.io/apiserver/pkg/features
 k8s.io/apiserver/pkg/server/healthz
@@ -888,6 +889,7 @@ k8s.io/apiserver/pkg/server/httplog
 k8s.io/apiserver/pkg/util/feature
 k8s.io/apiserver/pkg/util/webhook
 k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
+k8s.io/apiserver/plugin/pkg/authorizer/webhook
 # k8s.io/cli-runtime v0.17.2 => k8s.io/cli-runtime v0.17.2
 k8s.io/cli-runtime/pkg/printers
 # k8s.io/client-go v11.0.1-0.20190805182715-88a2adca7e76+incompatible => github.com/rancher/client-go v1.17.2-rancher.2

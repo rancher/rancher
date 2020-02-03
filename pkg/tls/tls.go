@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/dynamiclistener"
@@ -80,6 +81,9 @@ func migrateCA(restConfig *rest.Config) (*core.Factory, error) {
 }
 
 func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.Handler, httpsPort, httpPort int, acmeDomains []string, noCACerts bool) error {
+	restConfig = rest.CopyConfig(restConfig)
+	restConfig.Timeout = 10 * time.Minute
+
 	core, err := migrateCA(restConfig)
 	if err != nil {
 		return err
