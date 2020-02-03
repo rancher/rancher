@@ -4,7 +4,6 @@ import os
 import random
 import subprocess
 import time
-import pytest
 import requests
 import ast
 import paramiko
@@ -235,6 +234,16 @@ def random_name():
     return "test" + "-" + str(random_int(10000, 99999))
 
 
+# Return value is negative if v1 < v2, zero if v1 == v2 and positive if v1 > v2
+def compare_versions(v1, v2):
+    if tuple(map(int, (v1.split(".")))) > tuple(map(int, (v2.split(".")))):
+        return 1
+    elif tuple(map(int, (v1.split(".")))) < tuple(map(int, (v2.split(".")))):
+        return -1
+    else:
+        return 0
+
+
 def create_project_and_ns(token, cluster, project_name=None, ns_name=None):
     client = get_client_for_token(token)
     p = create_project(client, cluster, project_name)
@@ -315,10 +324,10 @@ def change_member_role_in_project(client, user, prtb, role_template_id):
     return prtb
 
 
-def create_kubeconfig(cluster):
+def create_kubeconfig(cluster, file_name=kube_fname):
     generateKubeConfigOutput = cluster.generateKubeconfig()
     print(generateKubeConfigOutput.config)
-    file = open(kube_fname, "w")
+    file = open(file_name, "w")
     file.write(generateKubeConfigOutput.config)
     file.close()
 
@@ -331,38 +340,80 @@ def validate_psp_error_worklaod(p_client, workload, error_message):
     assert error_message in workload.transitioningMessage
 
 
+def validate_all_workload_image_from_rancher(project_client, ns, pod_count=1,
+                                             ignore_pod_count=False,
+                                             deployment_list=None,
+                                             daemonset_list=None,
+                                             cronjob_list=None):
+    if cronjob_list is None:
+        cronjob_list = []
+    if daemonset_list is None:
+        daemonset_list = []
+    if deployment_list is None:
+        deployment_list = []
+    workload_list = deployment_list + daemonset_list + cronjob_list
+
+    wls = project_client.list_workload(namespaceId=ns.id).data
+    assert len(workload_list) == len(wls), \
+        "Expected {} workload(s) to be present in {} namespace " \
+        "but there were {}".format(len(workload_list), ns.name, len(wls))
+
+    for workload_name in workload_list:
+        workloads = project_client.list_workload(name=workload_name,
+                                                 namespaceId=ns.id).data
+        assert len(workloads) == workload_list.count(workload_name), \
+            "Expected {} workload(s) to be present with name {} " \
+            "but there were {}".format(workload_list.count(workload_name),
+                                       workload_name, len(workloads))
+        for workload in workloads:
+            for container in workload.containers:
+                assert str(container.image).startswith("rancher/")
+            if workload_name in deployment_list:
+                validate_workload(project_client, workload, "deployment",
+                                  ns.name, pod_count=pod_count,
+                                  ignore_pod_count=ignore_pod_count)
+                deployment_list.remove(workload_name)
+            if workload_name in daemonset_list:
+                validate_workload(project_client, workload, "daemonSet",
+                                  ns.name, pod_count=pod_count,
+                                  ignore_pod_count=ignore_pod_count)
+                daemonset_list.remove(workload_name)
+            if workload_name in cronjob_list:
+                validate_workload(project_client, workload, "cronJob",
+                                  ns.name, pod_count=pod_count,
+                                  ignore_pod_count=ignore_pod_count)
+                cronjob_list.remove(workload_name)
+    # Final assertion to ensure all expected workloads have been validated
+    assert not deployment_list + daemonset_list + cronjob_list
+
+
 def validate_workload(p_client, workload, type, ns_name, pod_count=1,
-                      wait_for_cron_pods=60):
+                      wait_for_cron_pods=60, ignore_pod_count=False):
     workload = wait_for_wl_to_active(p_client, workload)
     assert workload.state == "active"
     # For cronjob, wait for the first pod to get created after
     # scheduled wait time
     if type == "cronJob":
         time.sleep(wait_for_cron_pods)
-    pods = wait_for_pods_in_workload(p_client, workload, pod_count)
-    assert len(pods) == pod_count
-    pods = p_client.list_pod(workloadId=workload.id).data
-    assert len(pods) == pod_count
-
+    if ignore_pod_count:
+        pods = p_client.list_pod(workloadId=workload.id).data
+    else:
+        pods = wait_for_pods_in_workload(p_client, workload, pod_count)
+        assert len(pods) == pod_count
+        pods = p_client.list_pod(workloadId=workload.id).data
+        assert len(pods) == pod_count
     for pod in pods:
-        wait_for_pod_to_running(p_client, pod)
+        p = wait_for_pod_to_running(p_client, pod)
+        assert p["status"]["phase"] == "Running"
+
     wl_result = execute_kubectl_cmd(
         "get " + type + " " + workload.name + " -n " + ns_name)
     if type == "deployment" or type == "statefulSet":
-        assert wl_result["status"]["readyReplicas"] == pod_count
+        assert wl_result["status"]["readyReplicas"] == len(pods)
     if type == "daemonSet":
-        assert wl_result["status"]["currentNumberScheduled"] == pod_count
+        assert wl_result["status"]["currentNumberScheduled"] == len(pods)
     if type == "cronJob":
-        assert len(wl_result["status"]["active"]) >= pod_count
-        return
-    for key, value in workload.workloadLabels.items():
-        label = key + "=" + value
-    get_pods = "get pods -l" + label + " -n " + ns_name
-    pods_result = execute_kubectl_cmd(get_pods)
-    assert len(pods_result["items"]) == pod_count
-    for pod in pods_result["items"]:
-        assert pod["status"]["phase"] == "Running"
-    return pods_result["items"]
+        assert len(wl_result["status"]["active"]) >= len(pods)
 
 
 def validate_workload_with_sidekicks(p_client, workload, type, ns_name,
@@ -424,9 +475,10 @@ def validate_workload_image(client, workload, expectedImage, ns):
     validate_pod_images(expectedImage, workload, ns.name)
 
 
-def execute_kubectl_cmd(cmd, json_out=True, stderr=False):
+def execute_kubectl_cmd(cmd, json_out=True, stderr=False,
+                        kubeconfig=kube_fname):
     command = 'kubectl --kubeconfig {0} {1}'.format(
-        kube_fname, cmd)
+        kubeconfig, cmd)
     if json_out:
         command += ' -o json'
     print("run cmd: \t{0}".format(command))
@@ -548,6 +600,7 @@ def get_schedulable_nodes(cluster, client=None, os_type=TEST_OS):
             schedulable_nodes.append(node)
     return schedulable_nodes
 
+
 def get_etcd_nodes(cluster, client=None):
     if not client:
         client = get_user_client()
@@ -557,6 +610,7 @@ def get_etcd_nodes(cluster, client=None):
         if node.etcd:
             etcd_nodes.append(node)
     return etcd_nodes
+
 
 def get_role_nodes(cluster, role, client=None):
     etcd_nodes = []
@@ -871,6 +925,7 @@ def validate_dns_entry_windows(pod, host, expected):
         return dig_validation_pass
     wait_for(callback=dig_check, timeout_message="Failed to resolve {0}".format(host))
 
+
 def wait_for_nodes_to_become_active(client, cluster, exception_list=[],
                                     retry_count=0):
     nodes = client.list_node(clusterId=cluster.id).data
@@ -1126,7 +1181,8 @@ def wait_for_pods_in_workload(p_client, workload, pod_count,
     while len(pods) != pod_count:
         if time.time() - start > timeout:
             raise AssertionError(
-                "Timed out waiting for state to get to active")
+                "Timed out waiting for pods in workload {}. Expected {}. "
+                "Got {}".format(workload.name, pod_count, len(pods)))
         time.sleep(.5)
         pods = p_client.list_pod(workloadId=workload.id).data
     return pods
@@ -1596,6 +1652,12 @@ def rbac_get_user_token_by_role(role):
     return None
 
 
+def rbac_get_kubeconfig_by_role(role):
+    if role in rbac_data["users"].keys():
+        return rbac_data["users"][role]["kubeconfig"]
+    return None
+
+
 def rbac_get_project():
     return rbac_data["project"]
 
@@ -1667,6 +1729,14 @@ def rbac_prepare():
                               rbac_data["users"][PROJECT_READ_ONLY]["user"],
                               project,
                               PROJECT_READ_ONLY)
+    # create kubeconfig files for each user
+    for key in rbac_data["users"]:
+        user_client = get_client_for_token(rbac_data["users"][key]["token"])
+        _, user_cluster = get_user_client_and_cluster(user_client)
+        rbac_data["users"][key]["kubeconfig"] = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)),
+            key + "_kubeconfig")
+        create_kubeconfig(user_cluster, rbac_data["users"][key]["kubeconfig"])
 
     # create another project that none of the above users are assigned to
     p2, ns2 = create_project_and_ns(ADMIN_TOKEN,
@@ -1991,3 +2061,21 @@ def validate_backup_delete(namespace, backup_info, backup_mode=None):
             filename = backup_info["etcdbackupdata"][0]['filename']
             assert filename not in response, \
                 "The file still exist in the filesystem"
+
+
+def apply_crd(ns, file, kubectl_context):
+    return execute_kubectl_cmd('apply -f ' + file + ' -n ' + ns.name,
+                               json_out=False, stderr=True,
+                               kubeconfig=kubectl_context).decode("ascii")
+
+
+def get_crd(ns, crd_name, kubectl_context):
+    return execute_kubectl_cmd('get ' + crd_name + ' -n ' + ns.name,
+                               json_out=False, stderr=True,
+                               kubeconfig=kubectl_context).decode("ascii")
+
+
+def delete_crd(ns, file, kubectl_context):
+    return execute_kubectl_cmd('delete -f ' + file + ' -n ' + ns.name,
+                               json_out=False, stderr=True,
+                               kubeconfig=kubectl_context).decode("ascii")
