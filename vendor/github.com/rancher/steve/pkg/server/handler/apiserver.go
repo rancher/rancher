@@ -18,7 +18,8 @@ import (
 
 func New(cfg *rest.Config, sf schema.Factory, authMiddleware auth.Middleware, next http.Handler, routerFunc router.RouterFunc) (http.Handler, error) {
 	var (
-		err error
+		proxy http.Handler
+		err   error
 	)
 
 	a := &apiServer{
@@ -27,9 +28,13 @@ func New(cfg *rest.Config, sf schema.Factory, authMiddleware auth.Middleware, ne
 	}
 	a.server.AccessControl = accesscontrol.NewAccessControl()
 
-	proxy, err := k8sproxy.Handler("/", cfg)
-	if err != nil {
-		return nil, err
+	if authMiddleware == nil {
+		proxy, err = k8sproxy.Handler("/", cfg)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		proxy = k8sproxy.ImpersonatingHandler("/", cfg)
 	}
 
 	w := authMiddleware.Wrap

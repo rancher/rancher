@@ -8,7 +8,7 @@ import (
 )
 
 type AccessControl struct {
-	server.AllAccess
+	server.SchemaBasedAccess
 }
 
 func NewAccessControl() *AccessControl {

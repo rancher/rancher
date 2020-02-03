@@ -19,12 +19,12 @@ type RequestHandler interface {
 }
 
 type Server struct {
-	ResponseWriters  map[string]types.ResponseWriter
-	Schemas          *types.APISchemas
-	Defaults         Defaults
-	AccessControl    types.AccessControl
-	Parser           parse.Parser
-	URLParser        parse.URLParser
+	ResponseWriters map[string]types.ResponseWriter
+	Schemas         *types.APISchemas
+	Defaults        Defaults
+	AccessControl   types.AccessControl
+	Parser          parse.Parser
+	URLParser       parse.URLParser
 }
 
 type Defaults struct {
@@ -39,7 +39,7 @@ type Defaults struct {
 
 func DefaultAPIServer() *Server {
 	s := &Server{
-		Schemas:          types.EmptyAPISchemas(),
+		Schemas: types.EmptyAPISchemas(),
 		ResponseWriters: map[string]types.ResponseWriter{
 			"json": &writer.EncodingResponseWriter{
 				ContentType: "application/json",
@@ -56,7 +56,7 @@ func DefaultAPIServer() *Server {
 				Encoder:     types.YAMLEncoder,
 			},
 		},
-		AccessControl: &AllAccess{},
+		AccessControl: &SchemaBasedAccess{},
 		Defaults: Defaults{
 			ByIDHandler:   handlers.ByIDHandler,
 			CreateHandler: handlers.CreateHandler,
@@ -140,8 +140,8 @@ func (s *Server) GetSchemas() *types.APISchemas {
 
 func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	s.Handle(&types.APIRequest{
-		Request:    req,
-		Response:   rw,
+		Request:  req,
+		Response: rw,
 	})
 }
 

@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -57,6 +58,10 @@ func toAPI(schema *types.APISchema, obj runtime.Object) types.APIObject {
 		return types.APIObject{}
 	}
 
+	if unstr, ok := obj.(*unstructured.Unstructured); ok {
+		obj = moveToUnderscore(unstr)
+	}
+
 	gvr := attributes.GVR(schema)
 
 	t := fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Version, gvr.Resource)
@@ -92,6 +97,37 @@ func (s *Store) byID(apiOp *types.APIRequest, schema *types.APISchema, id string
 	}
 
 	return k8sClient.Get(id, opts)
+}
+
+func moveFromUnderscore(obj map[string]interface{}) map[string]interface{} {
+	if obj == nil {
+		return nil
+	}
+	for k := range types.ReservedFields {
+		v, ok := obj["_"+k]
+		delete(obj, "_"+k)
+		delete(obj, k)
+		if ok {
+			obj[k] = v
+		}
+	}
+	return obj
+}
+
+func moveToUnderscore(obj *unstructured.Unstructured) *unstructured.Unstructured {
+	if obj == nil {
+		return nil
+	}
+
+	for k := range types.ReservedFields {
+		v, ok := obj.Object[k]
+		if ok {
+			delete(obj.Object, k)
+			obj.Object["_"+k] = v
+		}
+	}
+
+	return obj
 }
 
 func (s *Store) List(apiOp *types.APIRequest, schema *types.APISchema) (types.APIObjectList, error) {
@@ -270,6 +306,18 @@ func (s *Store) Update(apiOp *types.APIRequest, schema *types.APISchema, params 
 			return types.APIObject{}, err
 		}
 
+		if pType == apitypes.StrategicMergePatchType {
+			data := map[string]interface{}{}
+			if err := json.Unmarshal(bytes, &data); err != nil {
+				return types.APIObject{}, err
+			}
+			data = moveFromUnderscore(data)
+			bytes, err = json.Marshal(data)
+			if err != nil {
+				return types.APIObject{}, err
+			}
+		}
+
 		resp, err := k8sClient.Patch(id, pType, bytes, opts)
 		if err != nil {
 			return types.APIObject{}, err
@@ -288,7 +336,7 @@ func (s *Store) Update(apiOp *types.APIRequest, schema *types.APISchema, params 
 		return types.APIObject{}, err
 	}
 
-	resp, err := k8sClient.Update(&unstructured.Unstructured{Object: input}, metav1.UpdateOptions{})
+	resp, err := k8sClient.Update(&unstructured.Unstructured{Object: moveFromUnderscore(input)}, metav1.UpdateOptions{})
 	if err != nil {
 		return types.APIObject{}, err
 	}

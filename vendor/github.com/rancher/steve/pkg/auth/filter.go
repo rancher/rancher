@@ -13,6 +13,7 @@ import (
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/transport"
 )
 
 type Authenticator interface {
@@ -125,7 +126,7 @@ func (w *webhookAuth) Authenticate(req *http.Request) (user.Info, bool, error) {
 	return resp.User, ok, err
 }
 
-func ToMiddleware(auth Authenticator) func(rw http.ResponseWriter, req *http.Request, next http.Handler) {
+func ToMiddleware(auth Authenticator) Middleware {
 	return func(rw http.ResponseWriter, req *http.Request, next http.Handler) {
 		info, ok, err := auth.Authenticate(req)
 		if err != nil {
@@ -143,4 +144,25 @@ func ToMiddleware(auth Authenticator) func(rw http.ResponseWriter, req *http.Req
 		req = req.WithContext(ctx)
 		next.ServeHTTP(rw, req)
 	}
+}
+
+func Impersonation(req *http.Request) (user.Info, bool, error) {
+	userName := req.Header.Get(transport.ImpersonateUserHeader)
+	if userName == "" {
+		return nil, false, nil
+	}
+
+	result := user.DefaultInfo{
+		Name:   userName,
+		Groups: req.Header[transport.ImpersonateGroupHeader],
+		Extra:  map[string][]string{},
+	}
+
+	for k, v := range req.Header {
+		if strings.HasPrefix(k, transport.ImpersonateUserExtraHeaderPrefix) {
+			result.Extra[k[len(transport.ImpersonateUserExtraHeaderPrefix):]] = v
+		}
+	}
+
+	return &result, true, nil
 }

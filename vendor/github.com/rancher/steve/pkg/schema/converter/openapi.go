@@ -47,6 +47,13 @@ func modelToSchema(modelName string, k *proto.Kind) *types.APISchema {
 		}
 	}
 
+	for k, v := range s.ResourceFields {
+		if types.ReservedFields[k] {
+			s.ResourceFields["_"+k] = v
+			delete(s.ResourceFields, k)
+		}
+	}
+
 	return &s
 }
 

@@ -7,7 +7,9 @@ import (
 	"strings"
 
 	"github.com/rancher/wrangler/pkg/kubeconfig"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/proxy"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 )
@@ -21,6 +23,34 @@ func HandlerFromConfig(prefix, kubeConfig string) (http.Handler, error) {
 	}
 
 	return Handler(prefix, cfg)
+}
+
+func ImpersonatingHandler(prefix string, cfg *rest.Config) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		impersonate(rw, req, prefix, cfg)
+	})
+}
+
+func impersonate(rw http.ResponseWriter, req *http.Request, prefix string, cfg *rest.Config) {
+	user, ok := request.UserFrom(req.Context())
+	if !ok {
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	cfg = rest.CopyConfig(cfg)
+	cfg.Impersonate.UserName = user.GetName()
+	cfg.Impersonate.Groups = user.GetGroups()
+	cfg.Impersonate.Extra = user.GetExtra()
+
+	handler, err := Handler(prefix, cfg)
+	if err != nil {
+		logrus.Errorf("failed to impersonate %v for proxy: %v", user, err)
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	handler.ServeHTTP(rw, req)
 }
 
 // Mostly copied from "kubectl proxy" code
