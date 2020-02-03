@@ -2,6 +2,7 @@ package steve
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/settings"
@@ -10,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/steve/pkg/proxy"
 	"github.com/rancher/rancher/pkg/wrangler"
 	steve "github.com/rancher/steve/pkg/server"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 )
 
 func Setup(server *steve.Server, config *wrangler.Context) error {
@@ -21,9 +23,20 @@ func Setup(server *steve.Server, config *wrangler.Context) error {
 		return err
 	}
 
+	cfg := authorizerfactory.DelegatingAuthorizerConfig{
+		SubjectAccessReviewClient: config.K8s.AuthorizationV1().SubjectAccessReviews(),
+		AllowCacheTTL:             time.Second * time.Duration(settings.AuthorizationCacheTTLSeconds.GetInt()),
+		DenyCacheTTL:              time.Second * time.Duration(settings.AuthorizationDenyCacheTTLSeconds.GetInt()),
+	}
+
+	authorizer, err := cfg.New()
+	if err != nil {
+		return err
+	}
+
 	server.Next = newRouter(&handler{
 		GitHub:   server.AuthMiddleware.Wrap(githubHandler),
-		Proxy:    server.AuthMiddleware.Wrap(proxy.NewProxyHandler(config.K8s.AuthorizationV1(), config.TunnelServer)),
+		Proxy:    server.AuthMiddleware.Wrap(proxy.NewProxyHandler(authorizer, config.TunnelServer)),
 		NotFound: server.Next,
 	})
 

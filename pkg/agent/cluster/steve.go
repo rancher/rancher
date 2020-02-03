@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"strings"
 
+	"github.com/rancher/steve/pkg/auth"
 	"github.com/rancher/steve/pkg/server"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
@@ -34,8 +35,9 @@ func runSteve(ctx context.Context, webhookURL string) error {
 	// }
 
 	s := server.Server{
-		RestConfig: c,
-		Namespace:  strings.TrimSpace(string(ns)),
+		RestConfig:     c,
+		Namespace:      strings.TrimSpace(string(ns)),
+		AuthMiddleware: auth.ToMiddleware(auth.AuthenticatorFunc(auth.Impersonation)),
 	}
 
 	go func() {

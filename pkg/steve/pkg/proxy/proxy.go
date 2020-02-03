@@ -10,24 +10,23 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/steve/pkg/proxy"
-	v1 "github.com/rancher/types/apis/management.cattle.io/v3"
+	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	authzv1 "k8s.io/api/authorization/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	typedauthzv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	"k8s.io/client-go/rest"
 )
 
 type handler struct {
-	sarGetter    typedauthzv1.SubjectAccessReviewsGetter
+	authorizer   authorizer.Authorizer
 	tunnelServer *remotedialer.Server
 }
 
-func NewProxyHandler(sarGetter typedauthzv1.SubjectAccessReviewsGetter,
+func NewProxyHandler(authorizer authorizer.Authorizer,
 	tunnelServer *remotedialer.Server) http.Handler {
 	return &handler{
-		sarGetter:    sarGetter,
+		authorizer:   authorizer,
 		tunnelServer: tunnelServer,
 	}
 }
@@ -53,13 +52,12 @@ func (h *handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	parts := strings.Split(prefix, "/")
 	clusterID := parts[len(parts)-1]
 
-	if !h.canAccess(user, clusterID) {
+	if !h.canAccess(req.Context(), user, clusterID) {
 		rw.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	dialer := h.tunnelServer.Dialer(clusterID, 15*time.Second)
-	handler, err := h.next(clusterID, prefix, dialer)
+	handler, err := h.next(clusterID, prefix)
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
 		rw.Write([]byte(err.Error()))
@@ -69,52 +67,49 @@ func (h *handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	handler.ServeHTTP(rw, req)
 }
 
-func (h *handler) next(clusterID, prefix string, dialer remotedialer.Dialer) (http.Handler, error) {
+func (h *handler) dialer(ctx context.Context, network, address string) (net.Conn, error) {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, err
+	}
+	dialer := h.tunnelServer.Dialer(host, 15*time.Second)
+	return dialer(network, "127.0.0.1:8443")
+}
+
+func (h *handler) next(clusterID, prefix string) (http.Handler, error) {
 	cfg := &rest.Config{
-		Host:      "https://127.0.0.1:8443",
+		// this is bogus, the dialer will change it to 127.0.0.1:8443
+		Host:      "https://" + clusterID,
 		UserAgent: rest.DefaultKubernetesUserAgent() + " cluster " + clusterID,
 		TLSClientConfig: rest.TLSClientConfig{
 			Insecure: true,
 		},
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			return dialer(network, address)
-		},
+		// Ensure this function pointer does not change per invocation so that we don't
+		// blow out the cache.
+		Dial: h.dialer,
 	}
 
-	next, err := proxy.Handler(prefix, cfg)
-	if err != nil {
-		return nil, err
-	}
-
+	next := proxy.ImpersonatingHandler(prefix, cfg)
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		req.Header.Set("X-API-URL-Prefix", prefix)
 		next.ServeHTTP(rw, req)
 	}), nil
 }
 
-func (h *handler) canAccess(user user.Info, clusterID string) bool {
+func (h *handler) canAccess(ctx context.Context, user user.Info, clusterID string) bool {
 	extra := map[string]authzv1.ExtraValue{}
 	for k, v := range user.GetExtra() {
 		extra[k] = v
 	}
 
-	sar, err := h.sarGetter.SubjectAccessReviews().Create(&authzv1.SubjectAccessReview{
-		ObjectMeta: metav1.ObjectMeta{},
-		Spec: authzv1.SubjectAccessReviewSpec{
-			UID:    user.GetUID(),
-			User:   user.GetName(),
-			Groups: user.GetGroups(),
-			Extra:  extra,
-			ResourceAttributes: &authzv1.ResourceAttributes{
-				Verb:     "get",
-				Group:    v1.GroupName,
-				Version:  v1.Version,
-				Resource: "clusters",
-				Name:     clusterID,
-			},
-		},
-		Status: authzv1.SubjectAccessReviewStatus{},
+	resp, _, err := h.authorizer.Authorize(ctx, authorizer.AttributesRecord{
+		User:       user,
+		Verb:       "get",
+		APIGroup:   managementv3.GroupName,
+		APIVersion: managementv3.Version,
+		Resource:   "clusters",
+		Name:       clusterID,
 	})
 
-	return err == nil && sar.Status.Allowed
+	return err == nil && resp == authorizer.DecisionAllow
 }
