@@ -24,6 +24,7 @@ import (
 	"github.com/rancher/rancher/pkg/tunnelserver"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/rancher/server"
+	"github.com/rancher/remotedialer"
 	"github.com/rancher/steve/pkg/auth"
 	steveserver "github.com/rancher/steve/pkg/server"
 	"github.com/rancher/types/config"
@@ -119,7 +120,12 @@ func New(ctx context.Context, restConfig *rest.Config, cfg *Config) (*Rancher, e
 		return nil, err
 	}
 
-	wranglerContext, err := wrangler.NewContext(steveserver.RestConfigDefaults(&scaledContext.RESTConfig))
+	var tunnelServer *remotedialer.Server
+	if df, ok := scaledContext.Dialer.(*dialer.Factory); ok {
+		tunnelServer = df.TunnelServer
+	}
+
+	wranglerContext, err := wrangler.NewContext(steveserver.RestConfigDefaults(&scaledContext.RESTConfig), tunnelServer)
 	if err != nil {
 		return nil, err
 	}

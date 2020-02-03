@@ -228,7 +228,9 @@ func (h *clusterCache) start() {
 		}
 
 		event := eventObj.(event)
+		h.RLock()
 		w := h.watchers[event.gvr]
+		h.RUnlock()
 		if w == nil {
 			continue
 		}

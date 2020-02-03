@@ -3,6 +3,7 @@ package client
 const (
 	ClusterStatusType                                      = "clusterStatus"
 	ClusterStatusFieldAPIEndpoint                          = "apiEndpoint"
+	ClusterStatusFieldAgentFeatures                        = "agentFeatures"
 	ClusterStatusFieldAgentImage                           = "agentImage"
 	ClusterStatusFieldAllocatable                          = "allocatable"
 	ClusterStatusFieldAppliedEnableNetworkPolicy           = "appliedEnableNetworkPolicy"
@@ -26,6 +27,7 @@ const (
 
 type ClusterStatus struct {
 	APIEndpoint                          string                    `json:"apiEndpoint,omitempty" yaml:"apiEndpoint,omitempty"`
+	AgentFeatures                        map[string]bool           `json:"agentFeatures,omitempty" yaml:"agentFeatures,omitempty"`
 	AgentImage                           string                    `json:"agentImage,omitempty" yaml:"agentImage,omitempty"`
 	Allocatable                          map[string]string         `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
 	AppliedEnableNetworkPolicy           bool                      `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`

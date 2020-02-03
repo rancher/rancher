@@ -133,6 +133,7 @@ type ClusterStatus struct {
 	// https://kubernetes.io/docs/api-reference/v1.8/#componentstatus-v1-core
 	Driver                               string                    `json:"driver"`
 	AgentImage                           string                    `json:"agentImage"`
+	AgentFeatures                        map[string]bool           `json:"agentFeatures,omitempty"`
 	AuthImage                            string                    `json:"authImage"`
 	ComponentStatuses                    []ClusterComponentStatus  `json:"componentStatuses,omitempty"`
 	APIEndpoint                          string                    `json:"apiEndpoint,omitempty"`

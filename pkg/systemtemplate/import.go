@@ -10,6 +10,7 @@ import (
 	"text/template"
 
 	util "github.com/rancher/rancher/pkg/cluster"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/settings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
@@ -25,14 +26,18 @@ type context struct {
 	TokenKey              string
 	Token                 string
 	URL                   string
+	Namespace             string
 	URLPlain              string
 	IsWindowsCluster      bool
 	PrivateRegistryConfig string
 }
 
-func SystemTemplate(resp io.Writer, agentImage, authImage, token, url string, isWindowsCluster bool,
+func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool,
 	cluster *v3.Cluster) error {
-	d := md5.Sum([]byte(token))
+	if !features.Steve.Enabled() {
+		namespace = ""
+	}
+	d := md5.Sum([]byte(url + token + namespace))
 	tokenKey := hex.EncodeToString(d[:])[:7]
 
 	if authImage == "fixed" {
@@ -51,6 +56,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, token, url string, is
 		TokenKey:              tokenKey,
 		Token:                 base64.StdEncoding.EncodeToString([]byte(token)),
 		URL:                   base64.StdEncoding.EncodeToString([]byte(url)),
+		Namespace:             base64.StdEncoding.EncodeToString([]byte(namespace)),
 		URLPlain:              url,
 		IsWindowsCluster:      isWindowsCluster,
 		PrivateRegistryConfig: privateRegistryConfig,

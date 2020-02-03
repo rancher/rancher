@@ -267,7 +267,12 @@ func run() error {
 		}
 
 		if isCluster() {
-			err = cluster.RunControllers()
+			ns, err := cluster.Namespace()
+			if err != nil {
+				logrus.Fatal(err)
+			}
+
+			err = cluster.RunControllers(ns, token, server)
 			if err != nil {
 				logrus.Fatal(err)
 			}

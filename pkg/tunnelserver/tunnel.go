@@ -33,6 +33,10 @@ const (
 	Params = "X-API-Tunnel-Params"
 )
 
+var (
+	ErrClusterNotFound = errors.New("cluster not found")
+)
+
 type cluster struct {
 	Address string `json:"address"`
 	Token   string `json:"token"`
@@ -91,17 +95,6 @@ func (t *Authorizer) authorizeTunnel(req *http.Request) (string, bool, error) {
 	}
 
 	return "", false, err
-}
-
-func (t *Authorizer) AuthorizeLocalNode(username, password string) (string, []string, *v3.Cluster, bool) {
-	cluster, err := t.getClusterByToken(password)
-	if err != nil || cluster == nil || cluster.Status.Driver != v3.ClusterDriverLocal {
-		return "", nil, nil, false
-	}
-	if username == "kube-proxy" {
-		return "system:kube-proxy", nil, cluster, true
-	}
-	return "system:node:" + username, []string{"system:nodes"}, cluster, true
 }
 
 func (t *Authorizer) Authorize(req *http.Request) (*Client, bool, error) {
@@ -360,7 +353,7 @@ func (t *Authorizer) getClusterByToken(token string) (*v3.Cluster, error) {
 		return t.clusterLister.Get("", crt.Spec.ClusterName)
 	}
 
-	return nil, errors.New("cluster not found")
+	return nil, ErrClusterNotFound
 }
 
 func (t *Authorizer) crtIndex(obj interface{}) ([]string, error) {
@@ -383,4 +376,29 @@ func (t *Authorizer) toCustomConfig(machine *client.Node) *v3.CustomConfig {
 		return nil
 	}
 	return result
+}
+
+func (t *Authorizer) Authenticate(req *http.Request) (authed bool, user string, groups []string, err error) {
+	token := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
+	if token == "" {
+		return false, "", nil, nil
+	}
+
+	cluster, err := t.getClusterByToken(token)
+	if err == ErrClusterNotFound {
+		return false, "", nil, nil
+	}
+	if err != nil || cluster == nil {
+		return false, "", nil, err
+	}
+
+	return true, "system:cluster:" + cluster.Name,
+		[]string{
+			"system:authenticated",
+			"system:clusters",
+		}, nil
+}
+
+func (t *Authorizer) TokenFromRequest(req *http.Request) (*v3.Token, error) {
+	return nil, fmt.Errorf("token not found")
 }

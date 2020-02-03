@@ -122,6 +122,10 @@ func (f *feature) Enabled() bool {
 	return featureState.Default
 }
 
+func (f *feature) Name() string {
+	return f.name
+}
+
 // newFeature adds feature to global feature gate
 func newFeature(name string, def bool) *feature {
 	feature := &feature{

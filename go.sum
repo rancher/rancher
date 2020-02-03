@@ -826,12 +826,12 @@ github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde h1:+gd9up4jLeFeuNC5bH
 github.com/rancher/saml v0.0.0-20180713225824-ce1532152fde/go.mod h1:Bp1IBnlwVB1EqRfSKecoPyf+1Wjh8zykMjlq4vJJhxY=
 github.com/rancher/security-scan v0.1.5 h1:J/LMSTNFSrq7BEfsWtIfHkEHJzg/KUelDTS2PHcZC5Y=
 github.com/rancher/security-scan v0.1.5/go.mod h1:WlLAocVyVQs5J8r0IiQXsp0ajVZO6hYi/Vo6zxjo73s=
-github.com/rancher/steve v0.0.0-20200202051353-139bacf74d17 h1:ZLV2icRkC71Y/Czp/qqViYTNOLIGgNDq7ZjzpklWpM0=
-github.com/rancher/steve v0.0.0-20200202051353-139bacf74d17/go.mod h1:W92Ug8L4B0A2rovgpmvLIpvNhE+NQ9NfJ/sHuEwSw38=
+github.com/rancher/steve v0.0.0-20200203183034-a32064f23893 h1:iv18++88Ev6lp3yzw48yd5Ck3XXb9P+jw3d57740VQA=
+github.com/rancher/steve v0.0.0-20200203183034-a32064f23893/go.mod h1:W92Ug8L4B0A2rovgpmvLIpvNhE+NQ9NfJ/sHuEwSw38=
 github.com/rancher/types v0.0.0-20200123224322-9adcafc483ee h1:kYxNoRYCC9wP72ou8HxHwudy8fiE1iurEmASWFvMBT0=
 github.com/rancher/types v0.0.0-20200123224322-9adcafc483ee/go.mod h1:rN9IgDRV1O4HTJCLtpLqyUEfdPsoeBoH2wNUm8PPThk=
-github.com/rancher/types v0.0.0-20200131180920-14c75a5fed93 h1:gz66U6LOy9BbWnHFSl9jqzXyY62WyH+M8oOHImQZNdQ=
-github.com/rancher/types v0.0.0-20200131180920-14c75a5fed93/go.mod h1:rN9IgDRV1O4HTJCLtpLqyUEfdPsoeBoH2wNUm8PPThk=
+github.com/rancher/types v0.0.0-20200203183517-d6c661218ddf h1:edvgxMUDigKTJtP7ldwZbESji9XVjM71Lk9Czie9LqM=
+github.com/rancher/types v0.0.0-20200203183517-d6c661218ddf/go.mod h1:rN9IgDRV1O4HTJCLtpLqyUEfdPsoeBoH2wNUm8PPThk=
 github.com/rancher/wrangler v0.1.4/go.mod h1:EYP7cqpg42YqElaCm+U9ieSrGQKAXxUH5xsr+XGpWyE=
 github.com/rancher/wrangler v0.4.0/go.mod h1:1cR91WLhZgkZ+U4fV9nVuXqKurWbgXcIReU4wnQvTN8=
 github.com/rancher/wrangler v0.4.1 h1:kQLE6syPbX4ciwU4OF+EHIPT9zj6r6pyN83u9Gsv5eg=

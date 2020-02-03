@@ -61,6 +61,9 @@ func Start(ctx context.Context, localClusterEnabled bool, scaledContext *config.
 	sar := sar.NewSubjectAccessReview(clusterManager)
 
 	auth := requests.NewAuthenticator(ctx, scaledContext)
+	if f, ok := scaledContext.Dialer.(*rancherdialer.Factory); ok {
+		auth = requests.Chain(auth, f.TunnelAuthorizer)
+	}
 	authMiddleware := requests.ToAuthMiddleware(auth)
 	tokenReview := &webhook2.TokenReviewer{
 		Authenticator: auth,

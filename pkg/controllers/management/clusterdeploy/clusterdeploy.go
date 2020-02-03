@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/norman/types"
 	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/kubectl"
 	"github.com/rancher/rancher/pkg/settings"
@@ -131,9 +132,27 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 	return cd.setNetworkPolicyAnn(cluster)
 }
 
-func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string) bool {
+func agentFeaturesChanged(desired, actual map[string]bool) bool {
+	for k, v := range desired {
+		if actual[k] != v {
+			return true
+		}
+	}
+
+	// Check for enabled features in actual that don't exist in desired
+	for k, v := range actual {
+		if v && desired[k] != v {
+			return true
+		}
+	}
+
+	return false
+}
+
+func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desiredFeatures map[string]bool) bool {
 	forceDeploy := cluster.Annotations[AgentForceDeployAnn] == "true"
 	imageChange := cluster.Status.AgentImage != desiredAgent || cluster.Status.AuthImage != desiredAuth
+	agentFeaturesChanged := agentFeaturesChanged(desiredFeatures, cluster.Status.AgentFeatures)
 	repoChange := false
 	if cluster.Spec.RancherKubernetesEngineConfig != nil {
 		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
@@ -151,9 +170,10 @@ func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string) bool {
 		}
 	}
 
-	if forceDeploy || imageChange || repoChange {
+	if forceDeploy || imageChange || repoChange || agentFeaturesChanged {
 		logrus.Infof("Redeploy Rancher Agents is needed for %s: forceDeploy=%v, agent/auth image changed=%v,"+
-			" private repo changed=%v", cluster.Name, forceDeploy, imageChange, repoChange)
+			" private repo changed=%v, agent features changed=%v", cluster.Name, forceDeploy, imageChange, repoChange,
+			agentFeaturesChanged)
 		return true
 	}
 
@@ -191,7 +211,11 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 		}
 	}
 
-	if !redeployAgent(cluster, desiredAgent, desiredAuth) {
+	desiredFeatures := map[string]bool{
+		features.Steve.Name(): features.Steve.Enabled(),
+	}
+
+	if !redeployAgent(cluster, desiredAgent, desiredAuth, desiredFeatures) {
 		return nil
 	}
 
@@ -236,6 +260,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	}
 
 	cluster.Status.AgentImage = desiredAgent
+	cluster.Status.AgentFeatures = desiredFeatures
 	if cluster.Spec.DesiredAgentImage == "fixed" {
 		cluster.Spec.DesiredAgentImage = desiredAgent
 	}
@@ -293,7 +318,7 @@ func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage stri
 	}
 
 	buf := &bytes.Buffer{}
-	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, token, url, cluster.Spec.WindowsPreferedCluster,
+	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, cluster.Name, token, url, cluster.Spec.WindowsPreferedCluster,
 		cluster)
 
 	return buf.Bytes(), err

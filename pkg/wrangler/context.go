@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/wrangler/generated/controllers/management.cattle.io"
 	managementv3 "github.com/rancher/rancher/pkg/wrangler/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/remotedialer"
 	"github.com/rancher/steve/pkg/server"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/start"
@@ -14,9 +15,10 @@ import (
 type Context struct {
 	*server.Controllers
 
-	Apply    apply.Apply
-	Mgmt     managementv3.Interface
-	starters []start.Starter
+	Apply        apply.Apply
+	Mgmt         managementv3.Interface
+	TunnelServer *remotedialer.Server
+	starters     []start.Starter
 }
 
 func (w *Context) Start(ctx context.Context) error {
@@ -26,7 +28,7 @@ func (w *Context) Start(ctx context.Context) error {
 	return start.All(ctx, 5, w.starters...)
 }
 
-func NewContext(restConfig *rest.Config) (*Context, error) {
+func NewContext(restConfig *rest.Config, tunnelServer *remotedialer.Server) (*Context, error) {
 	steveControllers, err := server.NewController(restConfig)
 	if err != nil {
 		return nil, err
@@ -43,9 +45,10 @@ func NewContext(restConfig *rest.Config) (*Context, error) {
 	}
 
 	return &Context{
-		Controllers: steveControllers,
-		Apply:       apply,
-		Mgmt:        mgmt.Management().V3(),
+		Controllers:  steveControllers,
+		Apply:        apply,
+		Mgmt:         mgmt.Management().V3(),
+		TunnelServer: tunnelServer,
 		starters: []start.Starter{
 			mgmt,
 		},
