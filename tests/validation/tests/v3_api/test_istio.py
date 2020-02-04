@@ -112,11 +112,6 @@ def unsupported_istio_version():
     return False
 
 
-skipif_older_istio = pytest.mark.skipif(unsupported_istio_version(),
-                                        reason='This test is not supported '
-                                               'for older Istio versions')
-
-
 def test_istio_resources():
     app_client = namespace["app_client"]
     app_ns = namespace["app_ns"]
@@ -128,7 +123,6 @@ def test_istio_resources():
     create_and_test_bookinfo_routing(app_client, app_ns, gateway_url)
 
 
-@skipif_older_istio
 def test_istio_custom_answers(enable_all_options):
     expected_deployments = [
         "certmanager", "grafana", "istio-citadel", "istio-egressgateway",
@@ -385,7 +379,6 @@ def test_rbac_istio_disable_project_read():
 
 
 @if_test_rbac
-@skipif_older_istio
 @pytest.mark.parametrize("crd,manifest", crd_test_data)
 def test_rbac_istio_crds_project_owner(enable_certmanager, crd, manifest):
     kubectl_context = rbac_get_kubeconfig_by_role(PROJECT_OWNER)
@@ -399,7 +392,6 @@ def test_rbac_istio_crds_project_owner(enable_certmanager, crd, manifest):
 
 
 @if_test_rbac
-@skipif_older_istio
 @pytest.mark.parametrize("crd,manifest", crd_test_data)
 def test_rbac_istio_crds_project_member(enable_certmanager, crd, manifest):
     kubectl_context = rbac_get_kubeconfig_by_role(PROJECT_MEMBER)
@@ -413,7 +405,6 @@ def test_rbac_istio_crds_project_member(enable_certmanager, crd, manifest):
 
 
 @if_test_rbac
-@skipif_older_istio
 @pytest.mark.parametrize("crd,manifest", crd_test_data)
 def test_rbac_istio_crds_project_read(enable_certmanager, crd, manifest):
     kubectl_context = rbac_get_kubeconfig_by_role(PROJECT_READ_ONLY)
@@ -485,13 +476,14 @@ def verify_istio_app_ready(p_client, app, install_timeout, deploy_timeout,
         print("Verify Istio App has installed and deployed properly")
     if install_timeout <= 0 or deploy_timeout <= 0:
         raise TimeoutError("Timeout waiting for istio to be properly "
-                           "installed and deployed.")
+                           "installed and deployed.") from None
     elif 'conditions' in app and not initial_run:
         for cond in app['conditions']:
             if "False" in cond['status'] and 'message' in cond \
                     and "failed" in cond['message']:
-                raise AssertionError("Failed to properly install/deploy app. "
-                                     "Reason: {}".format(cond['message']))
+                raise AssertionError(
+                    "Failed to properly install/deploy app. Reason: {}".format(
+                        cond['message'])) from None
     try:
         wait_for_condition(p_client, app, check_condition('Installed', 'True'),
                            timeout=2)
