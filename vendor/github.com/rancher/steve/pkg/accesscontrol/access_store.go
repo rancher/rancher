@@ -5,6 +5,10 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
+type AccessSetLookup interface {
+	AccessFor(user user.Info) *AccessSet
+}
+
 type AccessStore struct {
 	users  *policyRuleIndex
 	groups *policyRuleIndex
