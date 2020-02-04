@@ -103,12 +103,13 @@ func (h *handler) canAccess(ctx context.Context, user user.Info, clusterID strin
 	}
 
 	resp, _, err := h.authorizer.Authorize(ctx, authorizer.AttributesRecord{
-		User:       user,
-		Verb:       "get",
-		APIGroup:   managementv3.GroupName,
-		APIVersion: managementv3.Version,
-		Resource:   "clusters",
-		Name:       clusterID,
+		ResourceRequest: true,
+		User:            user,
+		Verb:            "get",
+		APIGroup:        managementv3.GroupName,
+		APIVersion:      managementv3.Version,
+		Resource:        "clusters",
+		Name:            clusterID,
 	})
 
 	return err == nil && resp == authorizer.DecisionAllow
