@@ -186,7 +186,7 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		}
 	}
 
-	err := setKubernetesVersion(data)
+	err := setKubernetesVersion(data, true)
 	if err != nil {
 		return nil, err
 	}
@@ -474,7 +474,7 @@ func (r *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 		return nil, httperror.NewFieldAPIError(httperror.MissingRequired, "ClusterTemplateRevision", "this cluster is created from a clusterTemplateRevision, please pass the clusterTemplateRevision")
 	}
 
-	err = setKubernetesVersion(data)
+	err = setKubernetesVersion(data, false)
 	if err != nil {
 		return nil, err
 	}
@@ -563,14 +563,17 @@ func canUseClusterName(apiContext *types.APIContext, requestedName string) error
 	return nil
 }
 
-func setKubernetesVersion(data map[string]interface{}) error {
+func setKubernetesVersion(data map[string]interface{}, create bool) error {
 	rkeConfig, ok := values.GetValue(data, "rancherKubernetesEngineConfig")
 	if ok && rkeConfig != nil {
 		k8sVersion := values.GetValueN(data, "rancherKubernetesEngineConfig", "kubernetesVersion")
 		if k8sVersion == nil || k8sVersion == "" {
-			//set k8s version to system default on the spec
-			defaultVersion := settings.KubernetesVersion.Get()
-			values.PutValue(data, defaultVersion, "rancherKubernetesEngineConfig", "kubernetesVersion")
+			// Only set when its a new cluster
+			if create {
+				//set k8s version to system default on the spec
+				defaultVersion := settings.KubernetesVersion.Get()
+				values.PutValue(data, defaultVersion, "rancherKubernetesEngineConfig", "kubernetesVersion")
+			}
 		} else {
 			//if k8s version is already of rancher version form, noop
 			//if k8s version is of form 1.14.x, figure out the latest
@@ -638,7 +641,7 @@ func validateNetworkFlag(data map[string]interface{}, create bool) error {
 	rkeConfig := values.GetValueN(data, "rancherKubernetesEngineConfig")
 	plugin := convert.ToString(values.GetValueN(convert.ToMapInterface(rkeConfig), "network", "plugin"))
 
-	if enableNetworkPolicy == nil {
+	if enableNetworkPolicy == nil && create {
 		// setting default values for new clusters if value not passed
 		values.PutValue(data, false, "enableNetworkPolicy")
 	} else if value := convert.ToBool(enableNetworkPolicy); value {
