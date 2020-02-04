@@ -28,7 +28,7 @@ function Log-Fatal
     Write-Host -NoNewline -ForegroundColor DarkRed "FATA: "
     Write-Host -ForegroundColor Gray ("{0,-44}" -f ($args -join " "))
 
-    exit 255
+    throw "EXITED"
 }
 
 function Invoke-Script
@@ -40,10 +40,15 @@ function Invoke-Script
     try {
         Invoke-Expression -Command $File
         if (-not $?) {
-            Log-Fatal "Failed to invoke $File"
+            throw "CALLFAILED"
         }
     } catch {
-        Log-Fatal "Could not invoke $File, $($_.Exception.Message)"
+        $Msg = $_.Exception.Message
+        if ($Msg -eq "CALLFAILED") {
+            Log-Fatal "Failed to invoke $File"
+        } else {
+            Log-Fatal "Could not invoke $File, $Msg"
+        }
     }
 }
 
