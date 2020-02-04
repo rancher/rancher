@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/metrics"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/steve"
 	"github.com/rancher/rancher/pkg/telemetry"
@@ -25,6 +26,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/rancher/server"
 	"github.com/rancher/remotedialer"
+	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/auth"
 	steveserver "github.com/rancher/steve/pkg/server"
 	"github.com/rancher/types/config"
@@ -53,6 +55,7 @@ type Config struct {
 
 type Rancher struct {
 	Config          Config
+	AccessSetLookup accesscontrol.AccessSetLookup
 	Handler         http.Handler
 	Auth            auth.Middleware
 	ScaledContext   *config.ScaledContext
@@ -130,9 +133,11 @@ func New(ctx context.Context, restConfig *rest.Config, cfg *Config) (*Rancher, e
 		return nil, err
 	}
 
+	asl := accesscontrol.NewAccessStore(wranglerContext.RBAC)
+
 	auditLogWriter := audit.NewLogWriter(cfg.AuditLogPath, cfg.AuditLevel, cfg.AuditLogMaxage, cfg.AuditLogMaxbackup, cfg.AuditLogMaxsize)
 
-	authMiddleware, handler, err := server.Start(ctx, localClusterEnabled(*cfg), scaledContext, clusterManager, auditLogWriter)
+	authMiddleware, handler, err := server.Start(ctx, localClusterEnabled(*cfg), scaledContext, clusterManager, auditLogWriter, rbac.NewAccessControlHandler(asl))
 	if err != nil {
 		return nil, err
 	}
@@ -149,6 +154,7 @@ func New(ctx context.Context, restConfig *rest.Config, cfg *Config) (*Rancher, e
 	}
 
 	rancher := &Rancher{
+		AccessSetLookup: asl,
 		Config:          *cfg,
 		Handler:         handler,
 		Auth:            authMiddleware,
@@ -284,11 +290,12 @@ func localClusterEnabled(cfg Config) bool {
 
 func newSteve(ctx context.Context, rancher *Rancher) (http.Handler, error) {
 	cfg := steveserver.Server{
-		Controllers:    rancher.WranglerContext.Controllers,
-		RestConfig:     steveserver.RestConfigDefaults(&rancher.ScaledContext.RESTConfig),
-		Namespace:      "cattle-system",
-		AuthMiddleware: rancher.Auth,
-		Next:           rancher.Handler,
+		AccessSetLookup: rancher.AccessSetLookup,
+		Controllers:     rancher.WranglerContext.Controllers,
+		RestConfig:      steveserver.RestConfigDefaults(&rancher.ScaledContext.RESTConfig),
+		Namespace:       "cattle-system",
+		AuthMiddleware:  rancher.Auth,
+		Next:            rancher.Handler,
 		StartHooks: []steveserver.StartHook{
 			func(ctx context.Context, server *steveserver.Server) error {
 				return steve.Setup(server, rancher.WranglerContext)

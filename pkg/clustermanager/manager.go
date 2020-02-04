@@ -55,7 +55,7 @@ func NewManager(httpsPort int, context *config.ScaledContext) *Manager {
 	return &Manager{
 		httpsPort:     httpsPort,
 		ScaledContext: context,
-		accessControl: rbac.NewAccessControl(context.RBAC),
+		accessControl: rbac.NewContextBased(),
 		clusterLister: context.Management.Clusters("").Controller().Lister(),
 		clusters:      context.Management.Clusters(""),
 	}
