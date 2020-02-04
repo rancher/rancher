@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
@@ -151,6 +152,12 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 		return "", nil, errors.Wrapf(err, "parsing %s", settings.RotateCertsIfExpiringInDays.Get())
 	}
 
+	sans := []string{"localhost", "127.0.0.1"}
+	ip, err := net.ChooseHostInterface()
+	if err == nil {
+		sans = append(sans, ip.String())
+	}
+
 	opts := &server.ListenOpts{
 		Secrets:       secrets,
 		CAName:        "serving-ca",
@@ -160,6 +167,7 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 		TLSListenerConfig: dynamiclistener.Config{
 			TLSConfig:           tlsConfig,
 			ExpirationDaysCheck: expiration,
+			SANs:                sans,
 		},
 	}
 

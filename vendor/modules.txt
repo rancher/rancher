@@ -312,7 +312,7 @@ github.com/prometheus/common/model
 # github.com/prometheus/procfs v0.0.2
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
-# github.com/rancher/dynamiclistener v0.2.1-0.20200131054153-795bb90214d9
+# github.com/rancher/dynamiclistener v0.2.1-0.20200204194956-ece289ed54b1
 github.com/rancher/dynamiclistener
 github.com/rancher/dynamiclistener/cert
 github.com/rancher/dynamiclistener/factory

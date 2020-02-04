@@ -11,7 +11,6 @@ import (
 	"github.com/rancher/wrangler/pkg/start"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -132,7 +131,7 @@ func (s *storage) saveInK8s(secret *v1.Secret) (*v1.Secret, error) {
 	}
 
 	if existing, err := s.storage.Get(); err == nil && s.tls != nil {
-		if newSecret, updated, err := s.tls.Merge(secret, existing); err == nil && updated {
+		if newSecret, updated, err := s.tls.Merge(existing, secret); err == nil && updated {
 			secret = newSecret
 		}
 	}
@@ -142,9 +141,12 @@ func (s *storage) saveInK8s(secret *v1.Secret) (*v1.Secret, error) {
 		return nil, err
 	}
 
-	if equality.Semantic.DeepEqual(targetSecret.Annotations, secret.Annotations) &&
-		equality.Semantic.DeepEqual(targetSecret.Data, secret.Data) {
-		return secret, nil
+	if newSecret, updated, err := s.tls.Merge(targetSecret, secret); err != nil {
+		return nil, err
+	} else if !updated {
+		return newSecret, nil
+	} else {
+		secret = newSecret
 	}
 
 	targetSecret.Annotations = secret.Annotations
