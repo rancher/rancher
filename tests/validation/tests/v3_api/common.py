@@ -1547,9 +1547,16 @@ def get_defaut_question_answers(client, externalId):
             # only for type string . For other types error out
             if "required" in quest.keys():
                 if quest["required"]:
-                    assert quest["type"] == "string", \
-                        "Cannot set default for types other than string"
-                    answer = "fake"
+                    if quest["type"] == "enum" and "options" in quest.keys():
+                        answer = quest["options"][0]
+                    elif quest["type"] == "password":
+                        answer = "R@ncher135"
+                    elif quest["type"] == "string":
+                        answer = "fake"
+                    else:
+                        assert False, \
+                            "Cannot set default for types {}" \
+                            "".format(quest["type"])
         return answer
 
     def check_if_question_needed(questions_and_answers, ques):
@@ -1613,6 +1620,15 @@ def validate_app_deletion(client, app_id,
 
 
 def validate_catalog_app(proj_client, app, external_id, answer=None):
+    """
+    This method validates all the workloads deployed are in active state,
+    have correct version and validates the answers.
+    @param proj_client: Project client object of a existing project.
+    @param app: Deployed app object.
+    @param external_id: URl of app API.
+    @param answer: answer, app seek while deploying, body of the post call.
+    @return: Deployed app object.
+    """
     if answer is None:
         answers = get_defaut_question_answers(get_user_client(), external_id)
     else:
@@ -1623,21 +1639,39 @@ def validate_catalog_app(proj_client, app, external_id, answer=None):
         "the version of the app is not correct"
     # check if associated workloads are active
     ns = app.targetNamespace
-    pramaters = external_id.split('&')
-    assert len(pramaters) > 1, \
-        "Incorrect list of paramaters from catalog external ID"
-    chart = pramaters[len(pramaters)-2].split("=")[1] + "-" + \
-            pramaters[len(pramaters)-1].split("=")[1]
+    parameters = external_id.split('&')
+    assert len(parameters) > 1, \
+        "Incorrect list of parameters from catalog external ID"
+    chart = parameters[len(parameters)-2].split("=")[1] + "-" + \
+            parameters[len(parameters)-1].split("=")[1]
+    app_name = parameters[len(parameters)-2].split("=")[1]
     workloads = proj_client.list_workload(namespaceId=ns).data
     for wl in workloads:
         assert wl.state == "active"
-        assert wl.workloadLabels.chart == chart, \
-            "the chart version is wrong"
+        chart_deployed = get_chart_info(wl.workloadLabels)
+        # '-' check is to make sure chart has both app name and version.
+        if app_name in chart_deployed and '-' in chart_deployed:
+            assert chart_deployed == chart, "the chart version is wrong"
 
     # Validate_app_answers
     assert len(answers.items() - app["answers"].items()) == 0, \
         "Answers are not same as the original catalog answers"
     return app
+
+
+def get_chart_info(workloadlabels):
+    """
+    This method finds either 'chart' tag or
+    'helm.sh/chart' tag from workload API
+    @param workloadlabels: workloadslabel object
+    @return: chart value of workload e.g. 'app_name-version'
+    """
+    if "chart" in workloadlabels.keys():
+        return workloadlabels.chart
+    elif "helm.sh/chart" in workloadlabels.keys():
+        return workloadlabels["helm.sh/chart"]
+    else:
+        return ''
 
 
 def create_user(client, cattle_auth_url=CATTLE_AUTH_URL):
