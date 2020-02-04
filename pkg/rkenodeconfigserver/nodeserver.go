@@ -223,15 +223,11 @@ func (n *RKENodeConfigServer) nodeConfig(ctx context.Context, cluster *v3.Cluste
 			// Adding kubelet certificate
 			// Check if argument is set on kubelet for serving certificate
 			if rkepki.IsKubeletGenerateServingCertificateEnabledinConfig(rkeConfig) {
-				//			for _, command := range nc.Processes["kubelet"].Command {
-				//				if strings.Contains(command, "tls-cert-file") {
 				logrus.Debugf("nodeConfig: VerifyKubeletCAEnabled is true, generating kubelet certificate for [%s]", tempNode.Address)
 				err := rkepki.GenerateKubeletCertificate(ctx, bundle.Certs(), *rkeConfig, "", "", false)
 				if err != nil {
 					return nil, errors.Wrapf(err, "failed to generate kubelet certificate")
 				}
-				//					break
-				//				}
 			}
 			certString, err := bundle.Marshal()
 			if err != nil {
@@ -275,8 +271,8 @@ func augmentProcesses(token string, processes map[string]v3.Process, worker, b2d
 
 	if len(shared) > 0 {
 		agentImage := settings.AgentImage.Get()
-		nodeCommand := clusterregistrationtokens.NodeCommand(token, cluster) + " --no-register --only-write-certs"
-		args := []string{"--", "share-root.sh", strings.TrimPrefix(nodeCommand, "sudo "), "--node-name", nodeName}
+		nodeCommand := clusterregistrationtokens.NodeCommand(token, cluster) + " --no-register --only-write-certs --node-name " + nodeName
+		args := []string{"--", "share-root.sh", strings.TrimPrefix(nodeCommand, "sudo ")}
 		args = append(args, shared...)
 		privateRegistryConfig, _ := util.GenerateClusterPrivateRegistryDockerConfig(cluster)
 		processes["share-mnt"] = v3.Process{
