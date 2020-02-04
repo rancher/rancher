@@ -37,6 +37,13 @@ func (m *Manager) Sync(key string, obj *v3.Catalog) (runtime.Object, error) {
 		}
 	}
 
+	// if the catalog was processed but some templates had errors due to local/file urls or chart names
+	// that cannot be used as labels - the catalog is up to date, but had errors so we don't refresh
+	// to give time for the user to make the necessary corrections.
+	if v3.CatalogConditionProcessed.IsFalse(catalog) && v3.CatalogConditionRefreshed.IsTrue(catalog) {
+		return nil, nil
+	}
+
 	commit, helm, err := helmlib.NewForceUpdate(catalog)
 	if err != nil {
 		return m.updateCatalogError(catalog, err)

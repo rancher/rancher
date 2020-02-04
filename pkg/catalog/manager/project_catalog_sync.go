@@ -31,6 +31,13 @@ func (m *Manager) ProjectCatalogSync(key string, obj *v3.ProjectCatalog) (runtim
 		return nil, err
 	}
 
+	// if the catalog was processed but some templates had errors due to local/file urls or chart names
+	// that cannot be used as labels - the catalog is up to date, but had errors so we don't refresh
+	// to give time for the user to make the necessary corrections.
+	if v3.CatalogConditionProcessed.IsFalse(projectCatalog) && v3.CatalogConditionRefreshed.IsTrue(projectCatalog) {
+		return nil, nil
+	}
+
 	commit, helm, err := helmlib.NewForceUpdate(&projectCatalog.Catalog)
 	if err != nil {
 		return m.updateProjectCatalogError(projectCatalog, err)

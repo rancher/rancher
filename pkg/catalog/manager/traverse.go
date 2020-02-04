@@ -2,9 +2,11 @@ package manager
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/controller"
 	helmlib "github.com/rancher/rancher/pkg/catalog/helm"
 	cutils "github.com/rancher/rancher/pkg/catalog/utils"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -42,6 +44,8 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 	var errs []error
 	var updateErrors []error
 	var createErrors []error
+	var InvalidChartErrors []error
+	var errTemplateNames []string
 	var createdTemplates, updatedTemplates, deletedTemplates, failedTemplates int
 
 	if (v3.CatalogConditionRefreshed.IsUnknown(catalog) && !strings.Contains(v3.CatalogConditionRefreshed.GetStatus(catalog), "syncing catalog")) || v3.CatalogConditionRefreshed.IsTrue(catalog) || catalog.Status.Conditions == nil {
@@ -140,7 +144,16 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 			// for local cache rebuild
 			v.VersionDir = version.Dir
 			v.VersionName = version.Name
-			v.VersionURLs = version.URLs
+			if len(index.Hash) > 0 {
+				validVersions := getVersionsWithValidURL(version.URLs)
+				if len(validVersions) > 0 {
+					v.VersionURLs = validVersions
+				} else {
+					continue
+				}
+			} else {
+				v.VersionURLs = version.URLs
+			}
 
 			for _, versionSpec := range template.Spec.Versions {
 				// only set UpgradeVersionLinks once and not every loop
@@ -158,7 +171,6 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 			} else {
 				v.ExternalID = fmt.Sprintf("catalog://?catalog=%s/%s&type=%s&template=%s&version=%s", templateNamespace, catalog.Name, catalogType, template.Spec.FolderName, v.Version)
 			}
-
 			versions = append(versions, v)
 		}
 		var categories []string
@@ -218,6 +230,10 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 		if apierrors.IsNotFound(err) {
 			err = m.createTemplate(template, catalog)
 			if err != nil {
+				if _, ok := err.(*InvalidChartError); ok {
+					errTemplateNames = append(errTemplateNames, template.Name)
+					InvalidChartErrors = append(InvalidChartErrors, err)
+				}
 				createErrors = append(createErrors, err)
 				failedTemplates++
 			} else {
@@ -226,6 +242,10 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 		} else if err == nil {
 			err = m.updateTemplate(existing, template)
 			if err != nil {
+				if _, ok := err.(*InvalidChartError); ok {
+					errTemplateNames = append(errTemplateNames, template.Name)
+					InvalidChartErrors = append(InvalidChartErrors, err)
+				}
 				updateErrors = append(updateErrors, err)
 				failedTemplates++
 			} else {
@@ -273,6 +293,19 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 		errstrings = append(errstrings, fmt.Sprintf("failed to update templates. Multiple error(s) occurred: %v", updateErrors))
 	}
 	if len(errstrings) > 0 {
+		if isChartInvalidErrors(InvalidChartErrors, createErrors, updateErrors) {
+			maxTemplateNames := 5
+			forgetErrorsLen := len(InvalidChartErrors)
+			if forgetErrorsLen < 5 {
+				maxTemplateNames = forgetErrorsLen
+			}
+			setCatalogIgnoreErrorErrorState(cmt, catalog, projectCatalog, clusterCatalog, fmt.Sprintf("Error in chart(s): %s.... have invalid template url or name", strings.Join(errTemplateNames[:maxTemplateNames], " ; ")))
+			if _, err := m.updateCatalogInfo(cmt, catalogType, "", false, true); err != nil {
+				return err
+			}
+			logrus.Error(fmt.Sprintf("failed to sync templates. Multiple error(s) occured: %v", InvalidChartErrors))
+			return &controller.ForgetError{Err: errors.Errorf("failed to sync templates. Multiple error(s) occurred: %v", InvalidChartErrors)}
+		}
 		setCatalogErrorState(cmt, catalog, projectCatalog, clusterCatalog)
 		if _, err := m.updateCatalogInfo(cmt, catalogType, "", false, true); err != nil {
 			return err
@@ -314,7 +347,47 @@ type catalogYml struct {
 func setCatalogErrorState(cmt *CatalogInfo, catalog *v3.Catalog, projectCatalog *v3.ProjectCatalog, clusterCatalog *v3.ClusterCatalog) {
 	v3.CatalogConditionRefreshed.False(catalog)
 	v3.CatalogConditionRefreshed.Message(catalog, fmt.Sprintf("Error syncing catalog %v", catalog.Name))
+	v3.CatalogConditionProcessed.True(catalog)
 	cmt.catalog = catalog
 	cmt.projectCatalog = projectCatalog
 	cmt.clusterCatalog = clusterCatalog
+}
+
+func validVersionURL(versionURL string) bool {
+	url, err := url.Parse(versionURL)
+	if err != nil {
+		return false
+	}
+	if url.Scheme == "file" || url.Scheme == "local" {
+		return false
+	}
+	return true
+}
+
+func getVersionsWithValidURL(urls []string) []string {
+	var validURLs []string
+	for _, url := range urls {
+		if validVersionURL(url) {
+			validURLs = append(validURLs, url)
+		}
+	}
+	return validURLs
+}
+
+func setCatalogIgnoreErrorErrorState(cmt *CatalogInfo, catalog *v3.Catalog, projectCatalog *v3.ProjectCatalog, clusterCatalog *v3.ClusterCatalog, message string) {
+	v3.CatalogConditionProcessed.False(catalog)
+	v3.CatalogConditionProcessed.Message(catalog, message)
+	v3.CatalogConditionRefreshed.Message(catalog, "")
+	v3.CatalogConditionProcessed.ReasonAndMessageFromError(catalog, errors.New(message))
+	v3.CatalogConditionRefreshed.True(catalog)
+	cmt.catalog = catalog
+	cmt.projectCatalog = projectCatalog
+	cmt.clusterCatalog = clusterCatalog
+}
+
+func isChartInvalidErrors(forgetErrors, createErrors, updateErrors []error) bool {
+	if len(forgetErrors) == (len(createErrors) + len(updateErrors)) {
+		return true
+	}
+	return false
 }

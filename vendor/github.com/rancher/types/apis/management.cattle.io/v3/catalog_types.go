@@ -42,6 +42,7 @@ var (
 	CatalogConditionRefreshed  condition.Cond = "Refreshed"
 	CatalogConditionUpgraded   condition.Cond = "Upgraded"
 	CatalogConditionDiskCached condition.Cond = "DiskCached"
+	CatalogConditionProcessed  condition.Cond = "Processed"
 )
 
 type CatalogCondition struct {

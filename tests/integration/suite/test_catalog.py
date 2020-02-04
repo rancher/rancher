@@ -287,7 +287,7 @@ def test_catalog_refresh(admin_mc):
     assert len(out['catalogs']) > 0, 'no catalogs in response'
 
 
-def test_invalid_catalog_charts(admin_mc, remove_resource):
+def test_invalid_catalog_chart_names(admin_mc, remove_resource):
     """Test chart with too long name and chart with invalid
      name in catalog error properly"""
     client = admin_mc.client
@@ -313,10 +313,57 @@ def test_invalid_catalog_charts(admin_mc, remove_resource):
     assert "areallylongnamelikereallyreallylongwestillneedmorez234dasdfasd"\
         not in templates
     assert "bad-chart_name" not in templates
-    assert catalog.state == "refreshed"
-    assert catalog.transitioningMessage == "Error syncing catalog " + name
+    assert catalog.state == "processed"
+    assert catalog.transitioning == "error"
+    assert "Error in chart(s):" in catalog.transitioningMessage
+    assert "areallylongnamelikereallyreallylongwestillneedmorez234dasdfasd" \
+        in catalog.transitioningMessage
+    assert "bad-chart_name" in catalog.transitioningMessage
     # this will break if github repo changes
     assert len(templates) == 6
+    # checking that the errored catalog can be deleted successfully
+    client.delete(catalog)
+    wait_for_template_to_be_deleted(client, name)
+    assert not client.list_catalog(name=name).data
+
+
+def test_invalid_catalog_chart_urls(admin_mc, remove_resource):
+    """Test chart with file:// and local:// url paths"""
+    client = admin_mc.client
+    name = random_str()
+    url = "https://github.com/rancher/integration-test-charts"
+    catalog = client.create_catalog(name=name,
+                                    branch="invalid-urls",
+                                    url=url,
+                                    )
+    remove_resource(catalog)
+    wait_for_template_to_be_created(client, catalog.id)
+
+    def get_errored_catalog(catalog):
+        catalog = client.reload(catalog)
+        if catalog.transitioning == "error":
+            return catalog
+        return None
+    catalog = wait_for(lambda: get_errored_catalog(catalog),
+                       fail_handler=lambda:
+                       "catalog was not found in error state")
+    templates = client.list_template(catalogId=catalog.id).data
+
+    # url in index.yaml:
+    # local://azure-samples.github.io/helm-charts/aks-helloworld-0.1.0.tgz
+    assert "aks-goodbyeworld" not in templates
+    # url in index.yaml:
+    # file://azure-samples.github.io/helm-charts/aks-helloworld-0.1.0.tgz
+    assert "aks-helloworld" not in templates
+    assert catalog.state == "processed"
+    assert catalog.transitioning == "error"
+    assert "Error in chart(s):" in catalog.transitioningMessage
+    assert "aks-goodbyeworld" in catalog.transitioningMessage
+    assert "aks-helloworld" in catalog.transitioningMessage
+    # this will break if github repo changes
+    # valid url in index.yaml:
+    # https://azure-samples.github.io/helm-charts/azure-vote-0.1.0.tgz
+    assert len(templates) == 1
     # checking that the errored catalog can be deleted successfully
     client.delete(catalog)
     wait_for_template_to_be_deleted(client, name)

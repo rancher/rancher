@@ -30,6 +30,9 @@ func setRefreshed(catalog *v3.Catalog) bool {
 		v3.CatalogConditionRefreshed.True(catalog)
 		v3.CatalogConditionRefreshed.Reason(catalog, "")
 		v3.CatalogConditionRefreshed.Message(catalog, "")
+		v3.CatalogConditionProcessed.True(catalog)
+		v3.CatalogConditionProcessed.Message(catalog, "")
+		v3.CatalogConditionProcessed.Reason(catalog, "")
 		return true
 	}
 	return false

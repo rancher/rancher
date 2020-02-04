@@ -3,6 +3,7 @@ package manager
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/catalog/utils"
@@ -12,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 const (
@@ -19,7 +21,20 @@ const (
 	TemplateNameLabel = "catalog.cattle.io/template_name"
 )
 
+type InvalidChartError struct {
+	Err          string
+	TemplateName string
+}
+
+func (e *InvalidChartError) Error() string {
+	return fmt.Sprintf("failed %v %s", e.TemplateName, e.Err)
+}
+
 func (m *Manager) createTemplate(template v3.CatalogTemplate, catalog *v3.Catalog) error {
+	// check to see if the template has valid urls - do not process if none exist
+	if len(template.Spec.Versions) == 0 || template.Spec.Versions == nil {
+		return &InvalidChartError{"must have one or more valid urls", template.Name}
+	}
 	template.Labels = labels.Merge(template.Labels, map[string]string{
 		CatalogNameLabel: catalog.Name,
 	})
@@ -32,8 +47,13 @@ func (m *Manager) createTemplate(template v3.CatalogTemplate, catalog *v3.Catalo
 	}
 	logrus.Debugf("Creating template %s", template.Name)
 	//check label length to ensure template doesn't get created without template versions
-	if len(template.Name) > 63 {
-		return errors.Errorf("failed %v must be no more than 63 characters", template.Name)
+	labelErrString := validation.IsDNS1123Label(template.Name)
+	if len(labelErrString) > 0 {
+		return &InvalidChartError{strings.Join(labelErrString, ";"), template.Name}
+	}
+	subdomainErrString := validation.IsDNS1123Subdomain(template.Name)
+	if len(subdomainErrString) > 0 {
+		return &InvalidChartError{strings.Join(subdomainErrString, ";"), template.Name}
 	}
 	createdTemplate, err := m.templateClient.Create(&template)
 	if err != nil {
@@ -56,6 +76,10 @@ func (m *Manager) getTemplateMap(catalogName string, namespace string) (map[stri
 }
 
 func (m *Manager) updateTemplate(template *v3.CatalogTemplate, toUpdate v3.CatalogTemplate) error {
+	// check to see if the version has valid urls - do not process if none exist
+	if len(toUpdate.Spec.Versions) == 0 || toUpdate.Spec.Versions == nil {
+		return &InvalidChartError{"must have one or more valid urls", template.Name}
+	}
 	r, err := labels.NewRequirement(TemplateNameLabel, selection.Equals, []string{template.Name})
 	if err != nil {
 		return errors.Wrapf(err, "failed to find template version with label %v for %v", TemplateNameLabel, template.Name)
