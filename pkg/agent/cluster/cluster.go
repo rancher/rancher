@@ -25,7 +25,11 @@ const (
 )
 
 func Namespace() (string, error) {
-	return readKey(namespaceFilename)
+	ns, err := readKey(namespaceFilename)
+	if os.IsNotExist(err) {
+		return "", nil
+	}
+	return ns, err
 }
 
 func TokenAndURL() (string, string, error) {
