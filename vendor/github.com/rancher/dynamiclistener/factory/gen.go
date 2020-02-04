@@ -64,8 +64,8 @@ func collectCNs(secret *v1.Secret) (domains []string, ips []net.IP, hash string,
 	return
 }
 
-func (t *TLS) Merge(secret, other *v1.Secret) (*v1.Secret, bool, error) {
-	return t.AddCN(secret, cns(other)...)
+func (t *TLS) Merge(target, additional *v1.Secret) (*v1.Secret, bool, error) {
+	return t.AddCN(target, cns(additional)...)
 }
 
 func (t *TLS) Refresh(secret *v1.Secret) (*v1.Secret, error) {
@@ -83,6 +83,11 @@ func (t *TLS) AddCN(secret *v1.Secret, cn ...string) (*v1.Secret, bool, error) {
 
 	if !NeedsUpdate(secret, cn...) {
 		return secret, false, nil
+	}
+
+	secret = secret.DeepCopy()
+	if secret == nil {
+		secret = &v1.Secret{}
 	}
 
 	secret = populateCN(secret, cn...)
@@ -133,6 +138,10 @@ func populateCN(secret *v1.Secret, cn ...string) *v1.Secret {
 }
 
 func NeedsUpdate(secret *v1.Secret, cn ...string) bool {
+	if secret == nil {
+		return true
+	}
+
 	if secret.Annotations[Static] == "true" {
 		return false
 	}

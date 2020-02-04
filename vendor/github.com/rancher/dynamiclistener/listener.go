@@ -24,7 +24,7 @@ type TLSStorage interface {
 type TLSFactory interface {
 	Refresh(secret *v1.Secret) (*v1.Secret, error)
 	AddCN(secret *v1.Secret, cn ...string) (*v1.Secret, bool, error)
-	Merge(secret *v1.Secret, existing *v1.Secret) (*v1.Secret, bool, error)
+	Merge(target *v1.Secret, additional *v1.Secret) (*v1.Secret, bool, error)
 }
 
 type SetFactory interface {
