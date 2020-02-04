@@ -51,6 +51,8 @@ func NewLoggingTargetTestWrap(loggingTargets v3.LoggingTargets) LoggingTargetTes
 		return &kafkaTestWrap{loggingTargets.KafkaConfig}
 	} else if loggingTargets.FluentForwarderConfig != nil {
 		return &fluentForwarderTestWrap{loggingTargets.FluentForwarderConfig}
+	} else if loggingTargets.GraylogConfig != nil {
+		return &graylogTestWrap{loggingTargets.GraylogConfig}
 	} else if loggingTargets.CustomTargetConfig != nil {
 		return &customTargetTestWrap{loggingTargets.CustomTargetConfig}
 	}
