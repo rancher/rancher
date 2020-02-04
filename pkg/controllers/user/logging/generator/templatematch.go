@@ -16,6 +16,7 @@ var MatchTemplate = `
   {{- template "kafka" . -}}
   {{- template "syslog" . -}}
   {{- template "fluentforwarder" . -}}
+  {{- template "graylog" . -}}
   {{- template "custom" . -}}
   {{- template "buffer" . -}}
   </store>
@@ -213,6 +214,21 @@ var MatchTemplate = `
 	  standby
 	  {{end}}
 	</server>
+	{{end}}
+{{end}}
+{{end}}
+
+{{define "graylog"}}
+{{- if eq .CurrentTarget "graylog"}}
+    @type gelf
+	host {{.GraylogTemplateWrap.Host}}
+	port {{.GraylogTemplateWrap.Port}}
+	protocol {{.GraylogConfig.Protocol}}
+	{{- if .GraylogConfig.EnableTLS }}
+	tls true
+	{{end}}
+	{{- if and .GraylogConfig.ClientCert .GraylogConfig.ClientKey}}   
+	tls_options {"cert": "{{.CertFilePrefix}}_client-cert.pem", "key": "{{.CertFilePrefix}}_client-key.pem", "ca": "{{.CertFilePrefix}}_ca.pem", "all_ciphers": "true", "no_verify": "true"}
 	{{end}}
 {{end}}
 {{end}}
