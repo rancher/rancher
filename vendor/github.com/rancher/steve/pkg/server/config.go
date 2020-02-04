@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/rancher/steve/pkg/schema"
 	"github.com/rancher/steve/pkg/schemaserver/types"
@@ -30,6 +31,7 @@ type Server struct {
 
 	Namespace       string
 	BaseSchemas     *types.APISchemas
+	AccessSetLookup accesscontrol.AccessSetLookup
 	SchemaTemplates []schema.Template
 	AuthMiddleware  auth.Middleware
 	Next            http.Handler

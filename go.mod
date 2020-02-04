@@ -82,7 +82,7 @@ require (
 	github.com/rancher/remotedialer v0.2.5
 	github.com/rancher/rke v1.1.0-rc4.0.20200123230443-25e7f987775d
 	github.com/rancher/security-scan v0.1.5
-	github.com/rancher/steve v0.0.0-20200203215439-10418db4948e
+	github.com/rancher/steve v0.0.0-20200204211121-b51e14edfb6f
 	github.com/rancher/types v0.0.0-20200203183517-d6c661218ddf
 	github.com/rancher/wrangler v0.4.1
 	github.com/rancher/wrangler-api v0.4.1
