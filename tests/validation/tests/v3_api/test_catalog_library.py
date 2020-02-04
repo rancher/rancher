@@ -12,23 +12,24 @@ from .common import os
 from .common import pytest
 from .common import create_ns
 from .common import create_catalog_external_id
-from .common import get_defaut_question_answers
-from .common import validate_catalog_app
 from .common import validate_app_deletion
 from .common import get_user_client_and_cluster
 from .common import create_kubeconfig
 from .common import get_cluster_client_for_token
 from .common import create_project
 from .common import random_test_name
+from .common import get_defaut_question_answers
+from .common import validate_catalog_app
 from .common import get_project_client_for_token
 from .common import USER_TOKEN
+from .common import get_user_client
 
 
 cluster_info = {"cluster": None, "cluster_client": None,
                 "project": None, "project_client": None,
                 "user_client": None}
 catalog_filename = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                "cataloglib_appversion.json")
+                                "./resource/cataloglib_appversion.json")
 with open(catalog_filename, "r") as app_v:
     app_data = json.load(app_v)
 
@@ -39,6 +40,8 @@ def test_catalog_app_deploy(app_name, app_version):
     Runs for app from 'cataloglib_appversion.json',
     creates relevant namespace and deploy them.
     Validates status of the app, version and answer.
+    try block is to make sure apps are deleted even
+    after they fail to validate.
     """
     user_client = cluster_info["user_client"]
     project_client = cluster_info["project_client"]
@@ -50,19 +53,26 @@ def test_catalog_app_deploy(app_name, app_version):
     app_ext_id = create_catalog_external_id('library',
                                             app_name, app_version)
     answer = get_defaut_question_answers(user_client, app_ext_id)
-    app = project_client.create_app(
+    try:
+        app = project_client.create_app(
                                 name=random_test_name(),
                                 externalId=app_ext_id,
                                 targetNamespace=ns.name,
                                 projectId=ns.projectId,
                                 answers=answer)
-    validate_catalog_app(project_client, app, app_ext_id, answer)
+        validate_catalog_app(project_client, app, app_ext_id, answer)
+    except (AssertionError, RuntimeError):
+        project_client.delete(app)
+        validate_app_deletion(project_client, app.id)
+        user_client.delete(ns)
+        assert False, "App deployment/Validation failed."
     project_client.delete(app)
     validate_app_deletion(project_client, app.id)
+    user_client.delete(ns)
 
 
 @pytest.fixture(scope='module', autouse="True")
-def create_project_client():
+def create_project_client(request):
     """
     Creates project in a cluster and collects details of
     user, project and cluster
@@ -79,3 +89,9 @@ def create_project_client():
     cluster_info["project"] = project
     cluster_info["project_client"] = project_client
     cluster_info["user_client"] = user_client
+
+    def fin():
+        client = get_user_client()
+        client.delete(cluster_info["project"])
+
+    request.addfinalizer(fin)
