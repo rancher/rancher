@@ -1,0 +1,11 @@
+apiVersion: certmanager.k8s.io/v1alpha1
+kind: Order
+metadata:
+  name: fake-order
+spec:
+  commanName: testorder
+  csr: abcdef12345ghijk
+  issuerRef:
+    group: fake
+    kind: Issuer
+    name: test

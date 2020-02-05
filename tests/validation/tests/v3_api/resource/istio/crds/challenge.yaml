@@ -1,0 +1,17 @@
+apiVersion: certmanager.k8s.io/v1alpha1
+kind: Challenge
+metadata:
+  name: fake-challenge
+spec:
+  authzURL: https://acme-v02.api.letsencrypt.org/authz
+  dnsName: fake.com
+  solver:
+    ingress: testing
+  issuerRef:
+    group: fake
+    kind: Issuer
+    name: test
+  key: key
+  token: token
+  type: http01
+  url: https://acme-v02.api.letsencrypt.org/challenge
