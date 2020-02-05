@@ -13,6 +13,10 @@ from urllib.parse import urlparse
 from rancher import ApiError
 from lib.aws import AmazonWebServices
 from copy import deepcopy
+from threading import Lock
+from threading import Thread
+import websocket
+import base64
 
 DEFAULT_TIMEOUT = 120
 DEFAULT_MULTI_CLUSTER_APP_TIMEOUT = 300
@@ -2311,3 +2315,52 @@ def auth_resource_cleanup():
         user_crtbs = client.list_cluster_role_template_binding(userId=user.id)
         for crtb in user_crtbs:
             client.delete(crtb)
+
+
+class WebsocketLogParse:
+    """
+    the class is used for receiving and parsing the message
+    received from the websocket
+    """
+    def __init__(self):
+        self.lock = Lock()
+        self._last_message = ''
+
+    def receiver(self, socket, skip):
+        """
+        run a thread to receive and save the message from the web socket
+        :param socket: the socket connection
+        :param skip: if True skip the first char of the received message
+        """
+        while True:
+            try:
+                data = socket.recv()
+                # the message from the kubectl contains an extra char
+                if skip:
+                    data = data[1:]
+                if len(data) < 5:
+                    pass
+                data = base64.b64decode(data).decode()
+                self.lock.acquire()
+                self._last_message += data
+                self.lock.release()
+            except websocket.WebSocketConnectionClosedException:
+                print("Connection closed")
+                break
+
+    @staticmethod
+    def start_thread(target, args):
+        thread = Thread(target=target, args=args)
+        thread.daemon = True
+        thread.start()
+        time.sleep(1)
+
+    @property
+    def last_message(self):
+        return self._last_message
+
+    @last_message.setter
+    def last_message(self, value):
+        self.lock.acquire()
+        self._last_message = value
+        self.lock.release()
