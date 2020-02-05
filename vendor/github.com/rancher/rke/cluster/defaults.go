@@ -314,7 +314,7 @@ func newDefaultEventRateLimitConfig() *v3.Configuration {
 	return &v3.Configuration{
 		TypeMeta: v1.TypeMeta{
 			Kind:       "Configuration",
-			APIVersion: v3.SchemeGroupVersion.String(),
+			APIVersion: "eventratelimit.admission.k8s.io/v1alpha1",
 		},
 		Limits: []v3.Limit{
 			{
