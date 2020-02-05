@@ -123,6 +123,20 @@ func (g *genericController) Enqueue(namespace, name string) {
 }
 
 func (g *genericController) AddHandler(ctx context.Context, name string, handler HandlerFunc) {
+	t := getHandlerTransaction(ctx)
+	if t == nil {
+		g.addHandler(ctx, name, handler)
+		return
+	}
+
+	go func() {
+		if t.shouldContinue() {
+			g.addHandler(ctx, name, handler)
+		}
+	}()
+}
+
+func (g *genericController) addHandler(ctx context.Context, name string, handler HandlerFunc) {
 	g.Lock()
 	defer g.Unlock()
 
