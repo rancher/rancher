@@ -36,7 +36,7 @@ const (
 	nodeDirEnvKey     = "MACHINE_STORAGE_PATH="
 	nodeCmd           = "docker-machine"
 	ec2TagFlag        = "tags"
-	cmdTimeout        = 10 // *minutes
+	defaultCmdTimeout = 30 * time.Minute
 )
 
 func buildAgentCommand(node *v3.Node, dockerRun string) []string {
@@ -112,7 +112,7 @@ func buildCommand(nodeDir string, node *v3.Node, cmdArgs []string) (*exec.Cmd, c
 	// In dev_mode, don't need jail or reference to jail in command
 	if os.Getenv("CATTLE_DEV_MODE") != "" {
 		env := initEnviron(nodeDir)
-		ctx, cancel := context.WithTimeout(context.Background(), cmdTimeout*time.Minute)
+		ctx, cancel := context.WithTimeout(context.Background(), getTimeout())
 		command := exec.CommandContext(ctx, nodeCmd, cmdArgs...)
 		command.Env = env
 		return command, cancel, nil
@@ -123,7 +123,7 @@ func buildCommand(nodeDir string, node *v3.Node, cmdArgs []string) (*exec.Cmd, c
 		return nil, nil, errors.WithMessage(err, "get user cred error")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), cmdTimeout*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), getTimeout())
 	command := exec.CommandContext(ctx, nodeCmd, cmdArgs...)
 	command.SysProcAttr = &syscall.SysProcAttr{}
 	command.SysProcAttr.Credential = cred
@@ -325,4 +325,16 @@ func setEc2ClusterIDTag(data interface{}, clusterID string) {
 			m[ec2TagFlag] = convert.ToString(tags) + "," + tagValue
 		}
 	}
+}
+
+func getTimeout() time.Duration {
+	timeout := defaultCmdTimeout
+	timeoutStr := os.Getenv("CATTLE_CMD_TIMEOUT")
+	if timeoutStr != "" {
+		newTimeout, err := time.ParseDuration(timeoutStr)
+		if err == nil {
+			timeout = newTimeout
+		}
+	}
+	return timeout
 }
