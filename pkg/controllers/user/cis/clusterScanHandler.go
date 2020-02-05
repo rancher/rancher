@@ -3,6 +3,7 @@ package cis
 import (
 	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/labels"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -24,9 +25,14 @@ import (
 
 const (
 	NumberOfRetriesForConfigMapCreate = 3
+	NumberOfRetriesForPodRemoval      = 50
 	RetryIntervalInMilliseconds       = 100
 	ConfigFileName                    = "config.json"
 	CurrentBenchmarkKey               = "current"
+)
+
+var (
+	SonobuoyMasterLabel = map[string]string{"run": "sonobuoy-master"}
 )
 
 type cisScanHandler struct {
@@ -43,6 +49,7 @@ type cisScanHandler struct {
 	configMapsClient             rcorev1.ConfigMapInterface
 	cisConfig                    v3.CisConfigInterface
 	cisConfigLister              v3.CisConfigLister
+	podLister                    rcorev1.PodLister
 }
 
 type appInfo struct {
@@ -82,6 +89,27 @@ func (csh *cisScanHandler) Create(cs *v3.ClusterScan) (runtime.Object, error) {
 		v3.ClusterScanConditionFailed.Message(cs, "cannot run scan on a windows cluster")
 		return cs, nil
 	}
+
+	// Wait for complete pod removal from previous scan
+	removed := false
+	for retry := NumberOfRetriesForPodRemoval; retry > 0; retry-- {
+		pods, err := csh.podLister.List(
+			v3.DefaultNamespaceForCis,
+			labels.Set(SonobuoyMasterLabel).AsSelector(),
+		)
+		if err != nil {
+			logrus.Errorf("cisScanHandler: Create: error listing pods: %v", err)
+		}
+		if len(pods) == 0 {
+			removed = true
+			break
+		}
+		time.Sleep(RetryIntervalInMilliseconds * time.Millisecond)
+	}
+	if !removed {
+		return cs, fmt.Errorf("cisScanHandler: Create: runner pod from previous scan not deleted yet, will retry in a bit")
+	}
+
 	if !v3.ClusterScanConditionCreated.IsTrue(cs) {
 		logrus.Infof("cisScanHandler: Create: deploying helm chart")
 		currentK8sVersion := cluster.Spec.RancherKubernetesEngineConfig.Version
@@ -249,6 +277,21 @@ func (csh *cisScanHandler) Updated(cs *v3.ClusterScan) (runtime.Object, error) {
 					return nil, fmt.Errorf("cisScanHandler: Updated: error deleting configmap: %v", err)
 				}
 			}
+		}
+
+		// Wait for complete pod removal
+		removed := false
+		for retry := NumberOfRetriesForPodRemoval; retry > 0; retry-- {
+			time.Sleep(RetryIntervalInMilliseconds * time.Millisecond)
+			podName := fmt.Sprintf("security-scan-runner-%v", cs.Name)
+			_, err := csh.podLister.Get(v3.DefaultNamespaceForCis, podName)
+			if err != nil && kerrors.IsNotFound(err) {
+				removed = true
+				break
+			}
+		}
+		if !removed {
+			return cs, fmt.Errorf("cisScanHandler: Updated: runner pod not deleted yet, will retry in a bit")
 		}
 
 		cluster, err := csh.clusterLister.Get("", csh.clusterNamespace)
