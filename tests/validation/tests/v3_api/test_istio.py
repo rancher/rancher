@@ -80,6 +80,8 @@ crd_test_data = [
     # ABOVE FAILS in current state: Rancher v2.3.5
     # ("httpapispec.config.istio.io", "httpapispec.yaml"),
     # ABOVE FAILS in current state: Rancher v2.3.5
+    # ("instance.config.istio.io", "instance.yaml"),
+    # ABOVE FAILS in current state: Rancher v2.3.5
     ("quotaspecbinding.config.istio.io", "quotaspecbinding.yaml"),
     ("quotaspec.config.istio.io", "quotaspec.yaml"),
     ("rule.config.istio.io", "rule.yaml"),
@@ -95,21 +97,17 @@ crd_test_data = [
     ("servicerolebinding.rbac.istio.io", "servicerolebinding.yaml"),
     ("servicerole.rbac.istio.io", "servicerole.yaml"),
     ("authorizationpolicy.security.istio.io", "authorizationpolicy.yaml"),
+    # ("certificate.certmanager.k8s.io", "certificate.yaml"),
+    # ABOVE FAILS in current state: Rancher v2.3.5
+    # ("challenge.certmanager.k8s.io", "challenge.yaml"),
+    # ABOVE FAILS in current state: Rancher v2.3.5
+    # ("clusterissuer.certmanager.k8s.io", "clusterissuer.yaml"),
+    # ABOVE FAILS in current state: Rancher v2.3.5
+    # ("issuer.certmanager.k8s.io", "issuer.yaml"),
+    # ABOVE FAILS in current state: Rancher v2.3.5
+    # ("order.certmanager.k8s.io", "order.yaml"),
+    # ABOVE FAILS in current state: Rancher v2.3.5
 ]
-
-
-def unsupported_istio_version():
-    if ISTIO_VERSION != "":
-        istio_version = ISTIO_VERSION
-    else:
-        client, _ = get_user_client_and_cluster()
-        istio_versions = list(client.list_template(
-            id=ISTIO_TEMPLATE_ID).data[0].versionLinks.keys())
-        print("istio_versions is: {}".format(istio_versions))
-        istio_version = istio_versions[len(istio_versions) - 1]
-    if compare_versions(istio_version, "1.4.3") < 0:
-        return True
-    return False
 
 
 def test_istio_resources():
@@ -123,19 +121,32 @@ def test_istio_resources():
     create_and_test_bookinfo_routing(app_client, app_ns, gateway_url)
 
 
-def test_istio_custom_answers(enable_all_options):
+# Enables all possible istio custom answers with the exception of certmanager
+def test_istio_custom_answers(skipif_unsupported_istio_version,
+                              enable_all_options_except_certmanager):
     expected_deployments = [
-        "certmanager", "grafana", "istio-citadel", "istio-egressgateway",
-        "istio-galley", "istio-ilbgateway", "istio-ingressgateway",
-        "istio-pilot", "istio-policy", "istio-sidecar-injector",
-        "istio-telemetry", "istio-tracing", "istiocoredns", "kiali",
-        "prometheus"
+        "grafana", "istio-citadel", "istio-egressgateway", "istio-galley",
+        "istio-ilbgateway", "istio-ingressgateway", "istio-pilot",
+        "istio-policy", "istio-sidecar-injector", "istio-telemetry",
+        "istio-tracing", "istiocoredns", "kiali", "prometheus"
     ]
     expected_daemonsets = ["istio-nodeagent"]
     validate_all_workload_image_from_rancher(
         get_system_client(USER_TOKEN), namespace["system_ns"],
         ignore_pod_count=True, deployment_list=expected_deployments,
         daemonset_list=expected_daemonsets)
+
+
+# This is split out separately from test_istio_custom_answers because
+# certmanager creates its own crds outside of istio
+def test_istio_certmanager_enables(skipif_unsupported_istio_version,
+                                   enable_certmanager):
+    expected_deployments = [
+        "certmanager"
+    ]
+    validate_all_workload_image_from_rancher(
+        get_system_client(USER_TOKEN), namespace["system_ns"],
+        ignore_pod_count=True, deployment_list=expected_deployments)
 
 
 @if_test_rbac
@@ -380,7 +391,12 @@ def test_rbac_istio_disable_project_read():
 
 @if_test_rbac
 @pytest.mark.parametrize("crd,manifest", crd_test_data)
-def test_rbac_istio_crds_project_owner(enable_certmanager, crd, manifest):
+def test_rbac_istio_crds_project_owner(skipif_unsupported_istio_version,
+                                       update_answers, crd, manifest):
+    if "certmanager" in crd:
+        update_answers("enable_certmanager")
+    else :
+        update_answers("default_access")
     kubectl_context = rbac_get_kubeconfig_by_role(PROJECT_OWNER)
     file = ISTIO_CRD_PATH + '/' + manifest
     ns = rbac_get_namespace()
@@ -393,7 +409,12 @@ def test_rbac_istio_crds_project_owner(enable_certmanager, crd, manifest):
 
 @if_test_rbac
 @pytest.mark.parametrize("crd,manifest", crd_test_data)
-def test_rbac_istio_crds_project_member(enable_certmanager, crd, manifest):
+def test_rbac_istio_crds_project_member(skipif_unsupported_istio_version,
+                                        update_answers, crd, manifest):
+    if "certmanager" in crd:
+        update_answers("enable_certmanager")
+    else :
+        update_answers("default_access")
     kubectl_context = rbac_get_kubeconfig_by_role(PROJECT_MEMBER)
     file = ISTIO_CRD_PATH + '/' + manifest
     ns = rbac_get_namespace()
@@ -406,7 +427,12 @@ def test_rbac_istio_crds_project_member(enable_certmanager, crd, manifest):
 
 @if_test_rbac
 @pytest.mark.parametrize("crd,manifest", crd_test_data)
-def test_rbac_istio_crds_project_read(enable_certmanager, crd, manifest):
+def test_rbac_istio_crds_project_read(skipif_unsupported_istio_version,
+                                      update_answers, crd, manifest):
+    if "certmanager" in crd:
+        update_answers("enable_certmanager")
+    else :
+        update_answers("default_access")
     kubectl_context = rbac_get_kubeconfig_by_role(PROJECT_READ_ONLY)
     file = ISTIO_CRD_PATH + '/' + manifest
     ns = rbac_get_namespace()
@@ -733,56 +759,73 @@ def get_system_client(user):
     return get_project_client_for_token(p, user)
 
 
-@pytest.fixture(scope='function')
-def default_access(request):
-    answers = {
-        "kiali.enabled": "true",
-        "tracing.enabled": "true",
-    }
-    update_istio_app(answers, USER_TOKEN)
+@pytest.fixture()
+def update_answers():
+    def _update_answers(answer_type):
+        answers = {
+            "kiali.enabled": "true",
+            "tracing.enabled": "true",
+        }
+        if answer_type == "allow_all_access":
+            additional_answers = {
+                "global.members[0].kind": "Group",
+                "global.members[0].name": "system:authenticated",
+            }
+            answers.update(additional_answers)
+        elif answer_type == "enable_certmanager":
+            additional_answers = {"certmanager.enabled": "true"}
+            answers.update(additional_answers)
+        elif answer_type == "enable_all_options_except_certmanager":
+            additional_answers = {
+                "gateways.istio-egressgateway.enabled": "true",
+                "gateways.istio-ilbgateway.enabled": "true",
+                "gateways.istio-ingressgateway.sds.enabled": "true",
+                "global.proxy.accessLogFile": "/dev/stdout",
+                "grafana.enabled": "true",
+                "istiocoredns.enabled": "true",
+                "kiali.dashboard.grafanaURL": "",
+                "kiali.prometheusAddr": "http://prometheus:9090",
+                "nodeagent.enabled": "true",
+                "nodeagent.env.CA_ADDR": "istio-citadel:8060",
+                "nodeagent.env.CA_PROVIDER": "Citadel",
+                "prometheus.enabled": "true",
+            }
+            answers.update(additional_answers)
+        update_istio_app(answers, USER_TOKEN)
+    return _update_answers
+
+
+@pytest.fixture()
+def default_access(update_answers):
+    update_answers("default_access")
+
+
+@pytest.fixture()
+def allow_all_access(update_answers):
+    update_answers("allow_all_access")
+
+
+@pytest.fixture()
+def enable_certmanager(update_answers):
+    update_answers("enable_certmanager")
+
+
+@pytest.fixture()
+def enable_all_options_except_certmanager(update_answers):
+    update_answers("enable_all_options_except_certmanager")
 
 
 @pytest.fixture(scope='function')
-def allow_all_access(request):
-    answers = {
-        "global.members[0].kind": "Group",
-        "global.members[0].name": "system:authenticated",
-        "kiali.enabled": "true",
-        "tracing.enabled": "true",
-    }
-    update_istio_app(answers, USER_TOKEN)
-
-
-@pytest.fixture(scope='function')
-def enable_certmanager(request):
-    answers = {
-        "certmanager.enabled": "true",
-        "kiali.enabled": "true",
-        "tracing.enabled": "true",
-    }
-    update_istio_app(answers, USER_TOKEN)
-
-
-@pytest.fixture(scope='function')
-def enable_all_options(request):
-    answers = {
-        "certmanager.enabled": "true",
-        "gateways.istio-egressgateway.enabled": "true",
-        "gateways.istio-ilbgateway.enabled": "true",
-        "gateways.istio-ingressgateway.sds.enabled": "true",
-        "global.proxy.accessLogFile": "/dev/stdout",
-        "grafana.enabled": "true",
-        "istiocoredns.enabled": "true",
-        "kiali.dashboard.grafanaURL": "",
-        "kiali.enabled": "true",
-        "kiali.prometheusAddr": "http://prometheus:9090",
-        "nodeagent.enabled": "true",
-        "nodeagent.env.CA_ADDR": "istio-citadel:8060",
-        "nodeagent.env.CA_PROVIDER": "Citadel",
-        "prometheus.enabled": "true",
-        "tracing.enabled": "true",
-    }
-    update_istio_app(answers, USER_TOKEN)
+def skipif_unsupported_istio_version(request):
+    if ISTIO_VERSION != "":
+        istio_version = ISTIO_VERSION
+    else:
+        client, _ = get_user_client_and_cluster()
+        istio_versions = list(client.list_template(
+            id=ISTIO_TEMPLATE_ID).data[0].versionLinks.keys())
+        istio_version = istio_versions[len(istio_versions) - 1]
+    if compare_versions(istio_version, "1.4.3") < 0:
+        pytest.skip("This test is not supported for older Istio versions")
 
 
 @pytest.fixture(scope='module', autouse="True")
