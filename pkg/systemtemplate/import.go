@@ -10,7 +10,6 @@ import (
 	"text/template"
 
 	util "github.com/rancher/rancher/pkg/cluster"
-	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/settings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 )
@@ -20,6 +19,7 @@ var (
 )
 
 type context struct {
+	Features              string
 	CAChecksum            string
 	AgentImage            string
 	AuthImage             string
@@ -32,11 +32,24 @@ type context struct {
 	PrivateRegistryConfig string
 }
 
-func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool,
-	cluster *v3.Cluster) error {
-	if !features.Steve.Enabled() {
-		namespace = ""
+func toFeatureString(features map[string]bool) string {
+	buf := &strings.Builder{}
+	for k, v := range features {
+		if buf.Len() > 0 {
+			buf.WriteString(",")
+		}
+		buf.WriteString(k)
+		if v {
+			buf.WriteString("=true")
+		} else {
+			buf.WriteString("=false")
+		}
 	}
+	return buf.String()
+}
+
+func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster bool,
+	cluster *v3.Cluster, features map[string]bool) error {
 	d := md5.Sum([]byte(url + token + namespace))
 	tokenKey := hex.EncodeToString(d[:])[:7]
 
@@ -50,6 +63,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 	}
 
 	context := &context{
+		Features:              toFeatureString(features),
 		CAChecksum:            CAChecksum(),
 		AgentImage:            agentImage,
 		AuthImage:             authImage,

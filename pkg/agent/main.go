@@ -22,6 +22,7 @@ import (
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/cluster"
 	"github.com/rancher/rancher/pkg/agent/node"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/logserver"
 	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
 	"github.com/rancher/remotedialer"
@@ -44,6 +45,8 @@ func main() {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
+	initFeatures()
+
 	var err error
 
 	if os.Getenv("CLUSTER_CLEANUP") == "true" {
@@ -55,6 +58,10 @@ func main() {
 	if err != nil {
 		logrus.Fatal(err)
 	}
+}
+
+func initFeatures() {
+	features.InitializeFeatures(nil, os.Getenv("CATTLE_FEATURES"))
 }
 
 func isCluster() bool {

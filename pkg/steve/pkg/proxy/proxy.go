@@ -73,12 +73,12 @@ func (h *handler) dialer(ctx context.Context, network, address string) (net.Conn
 		return nil, err
 	}
 	dialer := h.tunnelServer.Dialer(host, 15*time.Second)
-	return dialer(network, "127.0.0.1:8443")
+	return dialer(network, "127.0.0.1:6443")
 }
 
 func (h *handler) next(clusterID, prefix string) (http.Handler, error) {
 	cfg := &rest.Config{
-		// this is bogus, the dialer will change it to 127.0.0.1:8443
+		// this is bogus, the dialer will change it to 127.0.0.1:6443
 		Host:      "https://" + clusterID,
 		UserAgent: rest.DefaultKubernetesUserAgent() + " cluster " + clusterID,
 		TLSClientConfig: rest.TLSClientConfig{
