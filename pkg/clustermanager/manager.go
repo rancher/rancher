@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	clusterController "github.com/rancher/rancher/pkg/controllers/user"
@@ -177,19 +178,29 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 		}
 	}()
 
+	transaction := controller.NewHandlerTransaction(rec.ctx)
 	if clusterOwner {
-		if err := clusterController.Register(rec.ctx, rec.cluster, rec.clusterRec, m, m); err != nil {
+		if err := clusterController.Register(transaction, rec.cluster, rec.clusterRec, m, m); err != nil {
+			transaction.Rollback()
 			return err
 		}
 	} else {
-		if err := clusterController.RegisterFollower(rec.ctx, rec.cluster, m, m); err != nil {
+		if err := clusterController.RegisterFollower(transaction, rec.cluster, m, m); err != nil {
+			transaction.Rollback()
 			return err
 		}
 	}
 
 	done := make(chan error, 1)
 	go func() {
-		done <- rec.cluster.Start(rec.ctx)
+		defer close(done)
+		err := rec.cluster.Start(rec.ctx)
+		if err == nil {
+			transaction.Commit()
+		} else {
+			transaction.Rollback()
+		}
+		done <- err
 	}()
 
 	select {
