@@ -31,6 +31,7 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 	mgmtClusterClient := mgmtContext.Management.Clusters(metav1.NamespaceAll)
 	mgmtClusterScanClient := mgmtContext.Management.ClusterScans(clusterName)
 	pods := userContext.Core.Pods(v3.DefaultNamespaceForCis)
+	podLister := userContext.Core.Pods(v3.DefaultNamespaceForCis).Controller().Lister()
 	configMapsClient := userContext.Core.ConfigMaps(v3.DefaultNamespaceForCis)
 
 	podHandler := &podHandler{
@@ -54,6 +55,7 @@ func Register(ctx context.Context, userContext *config.UserContext) {
 		configMapsClient:             configMapsClient,
 		cisConfig:                    cisConfig,
 		cisConfigLister:              cisConfigLister,
+		podLister:                    podLister,
 	}
 
 	pods.AddHandler(ctx, "podHandler", podHandler.Sync)
