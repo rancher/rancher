@@ -349,7 +349,7 @@ github.com/rancher/machine/libmachine/ssh
 github.com/rancher/machine/libmachine/state
 github.com/rancher/machine/libmachine/version
 github.com/rancher/machine/version
-# github.com/rancher/norman v0.0.0-20200206042542-ef3920abad1c
+# github.com/rancher/norman v0.0.0-20200206042542-ef3920abad1c => ../norman-v1
 github.com/rancher/norman/api
 github.com/rancher/norman/api/access
 github.com/rancher/norman/api/builtin
