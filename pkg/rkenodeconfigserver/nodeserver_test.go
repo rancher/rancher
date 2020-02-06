@@ -62,6 +62,14 @@ func TestAppendKubeletArgs(t *testing.T) {
 	}
 }
 
+func TestShareMntArgs(t *testing.T) {
+	augmentedProcesses := getAugmentedKubeletProcesses()
+	args := augmentedProcesses["share-mnt"].Args
+	// args should be "--", "share-root.sh", "node command in one string", "one argument per shared bind in kubelet process"
+	// By default, arg count is 3, plus 2 shared binds we use in the test
+	assert.Equal(t, 5, len(args), "args count for share-mnt should be the same")
+}
+
 func getKubeletProcess(commands []string) map[string]v3.Process {
 	return map[string]v3.Process{
 		"kubelet": v3.Process{
@@ -69,6 +77,21 @@ func getKubeletProcess(commands []string) map[string]v3.Process {
 			Command: commands,
 		},
 	}
+}
+
+func getAugmentedKubeletProcesses() map[string]v3.Process {
+	var cluster v3.Cluster
+	command := []string{"dummy"}
+	binds := []string{"/var/lib/kubelet:/var/lib/kubelet:shared,z", "/var/lib/rancher:/var/lib/rancher:shared,z"}
+	processes := map[string]v3.Process{
+		"kubelet": v3.Process{
+			Name:    "kubelet",
+			Command: command,
+			Binds:   binds,
+		},
+	}
+
+	return augmentProcesses("token", processes, true, false, "dummynode", &cluster)
 }
 
 func getCommandFromProcesses(processes map[string]v3.Process) map[string]struct{} {
