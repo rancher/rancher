@@ -18,6 +18,7 @@ const (
 	DigitalOceandriver = "digitalocean"
 	ExoscaleDriver     = "exoscale"
 	Linodedriver       = "linode"
+	OCIDriver          = "oci"
 	OTCDriver          = "otc"
 	OpenstackDriver    = "openstack"
 	PacketDriver       = "packet"
@@ -32,6 +33,7 @@ var driverData = map[string]map[string][]string{
 	DigitalOceandriver: {"privateCredentialFields": []string{"accessToken"}},
 	ExoscaleDriver:     {"privateCredentialFields": []string{"apiSecretKey"}},
 	Linodedriver:       {"privateCredentialFields": []string{"token"}, "passwordFields": []string{"rootPass"}},
+	OCIDriver:          {"publicCredentialFields": []string{"tenancyId", "userId", "fingerprint"}, "privateCredentialFields": []string{"privateKeyContents"}, "passwordFields": []string{"privateKeyPassphrase"}},
 	OTCDriver:          {"privateCredentialFields": []string{"accessKeySecret"}},
 	OpenstackDriver:    {"privateCredentialFields": []string{"password"}},
 	PacketDriver:       {"privateCredentialFields": []string{"apiKey"}},
@@ -89,6 +91,10 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	}
 	if err := addMachineDriver(Linodedriver, "https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.8/docker-machine-driver-linode_linux-amd64.zip",
 		"/assets/rancher-ui-driver-linode/component.js", "b31b6a504c59ee758d2dda83029fe4a85b3f5601e22dfa58700a5e6c8f450dc7", []string{"api.linode.com"}, linodeBuiltin, linodeBuiltin, management); err != nil {
+		return err
+	}
+	if err := addMachineDriver(OCIDriver, "https://github.com/rancher-plugins/rancher-machine-driver-oci/releases/download/v1.0.0/docker-machine-driver-oci-linux",
+		"", "ae62d1f7f9bc894e57af4f264ab6776824212fb5e1b59f657e3ad953b621eb5f", []string{"*.oraclecloud.com"}, false, false, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver(OpenstackDriver, "local://", "", "", nil, false, true, management); err != nil {
