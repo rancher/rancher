@@ -293,7 +293,6 @@ func newSteve(ctx context.Context, rancher *Rancher) (http.Handler, error) {
 		AccessSetLookup: rancher.AccessSetLookup,
 		Controllers:     rancher.WranglerContext.Controllers,
 		RestConfig:      steveserver.RestConfigDefaults(&rancher.ScaledContext.RESTConfig),
-		Namespace:       "cattle-system",
 		AuthMiddleware:  rancher.Auth,
 		Next:            rancher.Handler,
 		StartHooks: []steveserver.StartHook{

@@ -4,8 +4,6 @@ package cluster
 
 import (
 	"context"
-	"io/ioutil"
-	"strings"
 
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/rancher/steve/pkg/server"
@@ -13,18 +11,9 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-const (
-	nsFile = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
-)
-
 func runSteve(ctx context.Context, webhookURL string) error {
 	logrus.Info("Starting steve")
 	c, err := rest.InClusterConfig()
-	if err != nil {
-		return err
-	}
-
-	ns, err := ioutil.ReadFile(nsFile)
 	if err != nil {
 		return err
 	}
@@ -36,7 +25,6 @@ func runSteve(ctx context.Context, webhookURL string) error {
 
 	s := server.Server{
 		RestConfig:     c,
-		Namespace:      strings.TrimSpace(string(ns)),
 		AuthMiddleware: auth.ToMiddleware(auth.AuthenticatorFunc(auth.Impersonation)),
 	}
 
