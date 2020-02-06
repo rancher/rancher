@@ -19,12 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler-api/pkg/generated/controllers/core"
 	corev1controllers "github.com/rancher/wrangler-api/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/pkg/data"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
 
@@ -34,58 +29,11 @@ const (
 	rancherCACertsFile = "/etc/rancher/ssl/cacerts.pem"
 )
 
-func migrateCA(restConfig *rest.Config) (*core.Factory, error) {
-	core, err := core.NewFactoryFromConfig(restConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := core.Core().V1().Secret().Get("cattle-system", "serving-ca", metav1.GetOptions{}); err == nil {
-		return core, nil
-	}
-
-	dc, err := dynamic.NewForConfig(restConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	listenClient := dc.Resource(schema.GroupVersionResource{
-		Group:    "management.cattle.io",
-		Version:  "v3",
-		Resource: "listenconfigs",
-	})
-	obj, err := listenClient.Get("cli-config", metav1.GetOptions{})
-	if err != nil {
-		return core, nil
-	}
-
-	caCert := data.Object(obj.Object).String("caCert")
-	caKey := data.Object(obj.Object).String("caKey")
-
-	if len(caCert) == 0 || len(caKey) == 0 {
-		return core, nil
-	}
-
-	_, err = core.Core().V1().Secret().Create(&v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "serving-ca",
-			Namespace: "cattle-system",
-		},
-		Data: map[string][]byte{
-			v1.TLSCertKey:       []byte(caCert),
-			v1.TLSPrivateKeyKey: []byte(caKey),
-		},
-		StringData: nil,
-		Type:       v1.SecretTypeTLS,
-	})
-	return core, err
-}
-
 func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.Handler, httpsPort, httpPort int, acmeDomains []string, noCACerts bool) error {
 	restConfig = rest.CopyConfig(restConfig)
 	restConfig.Timeout = 10 * time.Minute
 
-	core, err := migrateCA(restConfig)
+	core, err := core.NewFactoryFromConfig(restConfig)
 	if err != nil {
 		return err
 	}
@@ -160,7 +108,7 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 
 	opts := &server.ListenOpts{
 		Secrets:       secrets,
-		CAName:        "serving-ca",
+		CAName:        "tls-rancher",
 		CANamespace:   "cattle-system",
 		CertNamespace: "cattle-system",
 		AcmeDomains:   acmeDomains,
