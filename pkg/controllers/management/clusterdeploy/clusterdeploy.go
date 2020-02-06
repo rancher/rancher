@@ -152,6 +152,10 @@ func agentFeaturesChanged(desired, actual map[string]bool) bool {
 }
 
 func redeployAgent(cluster *v3.Cluster, desiredAgent, desiredAuth string, desiredFeatures map[string]bool) bool {
+	if !v3.ClusterConditionAgentDeployed.IsTrue(cluster) {
+		return true
+	}
+
 	forceDeploy := cluster.Annotations[AgentForceDeployAnn] == "true"
 	imageChange := cluster.Status.AgentImage != desiredAgent || cluster.Status.AuthImage != desiredAuth
 	agentFeaturesChanged := agentFeaturesChanged(desiredFeatures, cluster.Status.AgentFeatures)
