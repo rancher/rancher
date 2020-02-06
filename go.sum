@@ -612,6 +612,8 @@ github.com/lucas-clemente/aes12 v0.0.0-20171027163421-cd47fb39b79f/go.mod h1:JpH
 github.com/lucas-clemente/quic-clients v0.1.0/go.mod h1:y5xVIEoObKqULIKivu+gD/LU90pL73bTdtQjPBvtCBk=
 github.com/lucas-clemente/quic-go v0.10.2/go.mod h1:hvaRS9IHjFLMq76puFJeWNfmn+H70QZ/CXoxqw9bzao=
 github.com/lucas-clemente/quic-go-certificates v0.0.0-20160823095156-d2f86524cced/go.mod h1:NCcRLrOTZbzhZvixZLlERbJtDtYsmMw8Jc4vS8Z0g58=
+github.com/luthermonson/types v0.0.0-20200206223645-59e67691f6b6 h1:1tx8GUeOzyuDKzqOaC4N0vHwcbkWS9gWOaCHp8GpTCI=
+github.com/luthermonson/types v0.0.0-20200206223645-59e67691f6b6/go.mod h1:iI5y24Z2Q/awC2kv6TcE5jkfD85XQTYW/iYP/kfv36U=
 github.com/magiconair/properties v1.7.6/go.mod h1:PppfXfuXeibc/6YijjN8zIbojt8czPbwD3XqdrwzmxQ=
 github.com/magiconair/properties v1.8.0/go.mod h1:PppfXfuXeibc/6YijjN8zIbojt8czPbwD3XqdrwzmxQ=
 github.com/magiconair/properties v1.8.1 h1:ZC2Vc7/ZFkGmsVC9KvOjumD+G5lXy2RtTKyzRKO2BQ4=
@@ -832,10 +834,6 @@ github.com/rancher/security-scan v0.1.5 h1:J/LMSTNFSrq7BEfsWtIfHkEHJzg/KUelDTS2P
 github.com/rancher/security-scan v0.1.5/go.mod h1:WlLAocVyVQs5J8r0IiQXsp0ajVZO6hYi/Vo6zxjo73s=
 github.com/rancher/steve v0.0.0-20200205043102-87a107e23e0d h1:tt5TNwjuAnJaeY0R3lMPpgsOsG8NIvLIR2qKsh1fnC8=
 github.com/rancher/steve v0.0.0-20200205043102-87a107e23e0d/go.mod h1:W92Ug8L4B0A2rovgpmvLIpvNhE+NQ9NfJ/sHuEwSw38=
-github.com/rancher/types v0.0.0-20200123224322-9adcafc483ee h1:kYxNoRYCC9wP72ou8HxHwudy8fiE1iurEmASWFvMBT0=
-github.com/rancher/types v0.0.0-20200123224322-9adcafc483ee/go.mod h1:rN9IgDRV1O4HTJCLtpLqyUEfdPsoeBoH2wNUm8PPThk=
-github.com/rancher/types v0.0.0-20200206043443-613aea836715 h1:ioIRtWg1X5sg53e6xCdogecJYL+oiAbw8ftld87Do7A=
-github.com/rancher/types v0.0.0-20200206043443-613aea836715/go.mod h1:iI5y24Z2Q/awC2kv6TcE5jkfD85XQTYW/iYP/kfv36U=
 github.com/rancher/wrangler v0.1.4/go.mod h1:EYP7cqpg42YqElaCm+U9ieSrGQKAXxUH5xsr+XGpWyE=
 github.com/rancher/wrangler v0.4.0/go.mod h1:1cR91WLhZgkZ+U4fV9nVuXqKurWbgXcIReU4wnQvTN8=
 github.com/rancher/wrangler v0.4.1 h1:kQLE6syPbX4ciwU4OF+EHIPT9zj6r6pyN83u9Gsv5eg=
