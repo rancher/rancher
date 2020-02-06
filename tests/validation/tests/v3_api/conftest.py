@@ -6,16 +6,15 @@ urllib3.disable_warnings()
 
 
 def pytest_configure(config):
-    if TEST_RBAC:
+    if TEST_RBAC and CATTLE_TEST_URL:
         rbac_prepare()
     if AUTH_PROVIDER_NAME != "":
         prepare_auth_data()
 
 
 def pytest_unconfigure(config):
-    if TEST_RBAC:
+    if TEST_RBAC and CATTLE_TEST_URL:
         rbac_cleanup()
-
 
 @pytest.fixture
 def remove_resource(request):

@@ -21,7 +21,7 @@ DEFAULT_MONITORING_TIMEOUT = 180
 DEFAULT_CATALOG_TIMEOUT = 15
 MONITORING_VERSION = os.environ.get('RANCHER_MONITORING_VERSION', "0.0.7")
 
-CATTLE_TEST_URL = os.environ.get('CATTLE_TEST_URL', "http://localhost:80")
+CATTLE_TEST_URL = os.environ.get('CATTLE_TEST_URL', "")
 CATTLE_API_URL = CATTLE_TEST_URL + "/v3"
 CATTLE_AUTH_URL = \
     CATTLE_TEST_URL + "/v3-public/localproviders/local?action=login"
