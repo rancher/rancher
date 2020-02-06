@@ -185,7 +185,8 @@ def test_relative_paths(admin_mc, admin_pc, remove_resource):
 
     client = admin_mc.client
     catalogname = "cat-" + random_str()
-    url = "https://raw.githubusercontent.com/daxmc99/chart-test/master"
+    url = "https://raw.githubusercontent.com/rancher/integration-test-charts"\
+        "/relative-path"
     catalog = client.create_catalog(catalogName=catalogname, branch="master",
                                     url=url)
     remove_resource(catalog)
@@ -203,8 +204,8 @@ def test_relative_paths(admin_mc, admin_pc, remove_resource):
     mysqlha = admin_pc.client.create_app(name="app-" + random_str(),
                                          externalId="catalog://?catalog=" +
                                                     catalog.id +
-                                                    "&template=mysqlha"
-                                                    "&version=0.8.0",
+                                                    "&template=mysql"
+                                                    "&version=1.6.2",
                                          targetNamespace=ns.name,
                                          projectId=admin_pc.project.id)
     remove_resource(mysqlha)

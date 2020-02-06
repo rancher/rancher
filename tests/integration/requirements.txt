@@ -3,13 +3,13 @@ websocket-client==0.56.0
 PyJWT==1.7.1
 
 flake8==3.7.7
-flask==1.0.2
+flask==1.1.1
 pytest==4.4.1
 pytest-repeat==0.8.0
 pytest-xdist==1.28.0
 pyyaml==5.1
 netaddr==0.7.19
 requests==2.21.0
-kubernetes==9.0.0
+kubernetes==11.0.0b2
 jinja2>=2.10
 cryptography==2.6.1

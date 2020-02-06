@@ -30,7 +30,7 @@ def test_app_mysql(admin_pc, admin_mc):
     }
     client.create_app(
         name=name,
-        externalId="catalog://?catalog=library&template=mysql&version=0.3.7&"
+        externalId="catalog://?catalog=library&template=mysql&version=1.3.1&"
                    "namespace=cattle-global-data",
         targetNamespace=ns.name,
         projectId=admin_pc.project.id,
@@ -55,7 +55,7 @@ def test_app_wordpress(admin_pc, admin_mc):
         "externalDatabase.port": "3306",
         "externalDatabase.user": "",
         "image.repository": "bitnami/wordpress",
-        "image.tag": "4.9.4",
+        "image.tag": "5.2.3",
         "ingress.enabled": "true",
         "ingress.hosts[0].name": "xip.io",
         "mariadb.enabled": "true",
@@ -78,7 +78,7 @@ def test_app_wordpress(admin_pc, admin_mc):
         "wordpressUsername": "user"
     }
     external_id = "catalog://?catalog=library&template=wordpress" \
-                  "&version=1.0.5&namespace=cattle-global-data"
+                  "&version=7.3.8&namespace=cattle-global-data"
     client.create_app(
         name=name,
         externalId=external_id,
@@ -239,7 +239,7 @@ def test_helm_timeout(admin_pc, admin_mc, remove_resource):
     # result in failure
     app1 = client.create_app(
         name="app-" + random_str(),
-        externalId="catalog://?catalog=library&template=mysql&version=0.3.7&"
+        externalId="catalog://?catalog=library&template=mysql&version=1.3.1&"
                    "namespace=cattle-global-data",
         targetNamespace=ns.name,
         projectId=admin_pc.project.id,
@@ -295,7 +295,7 @@ def test_app_custom_values_file(admin_pc, admin_mc):
     app = client.create_app(
         name=random_str(),
         externalId="catalog://?catalog=library&template=docker-registry"
-                   "&version=1.6.1&namespace=cattle-global-data",
+                   "&version=1.8.1&namespace=cattle-global-data",
         targetNamespace=ns.name,
         projectId=admin_pc.project.id,
         valuesYaml=values_yaml,
@@ -316,8 +316,8 @@ def test_app_create_validation(admin_mc, admin_pc, custom_catalog,
     """Test create validation for apps. This test will set the rancher version
     explicitly and attempt to create apps with rancher version requirements.
     """
-    # 1.6.0 uses 2.0.0-2.2.0
-    # 1.6.2 uses 2.1.0-2.3.0
+    # 2.3.1 uses 2.4.1-2.6.0
+    # 2.7.0 uses 2.5.0-2.7.0
     client = admin_mc.client
 
     c_name = random_str()
@@ -332,7 +332,7 @@ def test_app_create_validation(admin_mc, admin_pc, custom_catalog,
 
     app_data = {
         'name': random_str(),
-        'externalId': cat_base+"1.6.2",
+        'externalId': cat_base+"2.7.0",
         'targetNamespace': ns.name,
         'projectId': admin_pc.project.id,
         "answers": [{
@@ -342,7 +342,7 @@ def test_app_create_validation(admin_mc, admin_pc, custom_catalog,
             "values": {
                 "defaultImage": "true",
                 "image.repository": "chartmuseum/chartmuseum",
-                "image.tag": "v0.7.1",
+                "image.tag": "v0.11.0",
                 "env.open.STORAGE": "local",
                 "gcp.secret.enabled": "false",
                 "gcp.secret.key": "credentials.json",
@@ -360,25 +360,25 @@ def test_app_create_validation(admin_mc, admin_pc, custom_catalog,
         }]
     }
 
-    set_server_version(client, "2.1.0-beta2")
+    set_server_version(client, "2.4.2-beta2")
 
-    # First try requires a min of 2.1 so an error should be returned
+    # First try requires a min of 2.5.0 so an error should be returned
     with pytest.raises(ApiError) as e:
         app1 = admin_pc.client.create_app(app_data)
         remove_resource(app1)
     assert e.value.error.status == 422
     assert e.value.error.message == 'rancher min version not met'
 
-    set_server_version(client, "2.3.1")
+    set_server_version(client, "2.7.1")
 
-    # Second try requires a max of 2.3 so an error should be returned
+    # Second try requires a max of 2.7.0 so an error should be returned
     with pytest.raises(ApiError) as e:
         app1 = admin_pc.client.create_app(app_data)
         remove_resource(app1)
     assert e.value.error.status == 422
     assert e.value.error.message == 'rancher max version exceeded'
 
-    set_server_version(client, "2.2.1-rc4")
+    set_server_version(client, "2.5.1-rc4")
 
     # Third try should work
     app1 = admin_pc.client.create_app(app_data)
@@ -392,8 +392,8 @@ def test_app_update_validation(admin_mc, admin_pc, custom_catalog,
     """Test update validation for apps. This test will set the rancher version
     explicitly and attempt to update apps with rancher version requirements.
     """
-    # 1.6.0 uses 2.0.0-2.2.0
-    # 1.6.2 uses 2.1.0-2.3.0
+    # 2.3.1 uses 2.4.1-2.6.0
+    # 2.7.0 uses 2.5.0-2.7.0
     client = admin_mc.client
 
     c_name = random_str()
@@ -408,7 +408,7 @@ def test_app_update_validation(admin_mc, admin_pc, custom_catalog,
 
     app_data = {
         'name': random_str(),
-        'externalId': cat_base+"1.6.0",
+        'externalId': cat_base+"2.3.1",
         'targetNamespace': ns.name,
         'projectId': admin_pc.project.id,
         "answers": [{
@@ -418,7 +418,7 @@ def test_app_update_validation(admin_mc, admin_pc, custom_catalog,
             "values": {
                 "defaultImage": "true",
                 "image.repository": "chartmuseum/chartmuseum",
-                "image.tag": "v0.7.1",
+                "image.tag": "v0.9.0",
                 "env.open.STORAGE": "local",
                 "gcp.secret.enabled": "false",
                 "gcp.secret.key": "credentials.json",
@@ -436,9 +436,9 @@ def test_app_update_validation(admin_mc, admin_pc, custom_catalog,
         }]
     }
 
-    set_server_version(client, "2.1.0-rc3")
+    set_server_version(client, "2.4.2-rc3")
 
-    # Launch the app version 1.6.0 with rancher 2.1.0-rc3
+    # Launch the app version 2.3.1 with rancher 2.4.2-rc3
     app1 = admin_pc.client.create_app(app_data)
     remove_resource(app1)
     wait_for_workload(admin_pc.client, ns.name, count=1)
@@ -447,20 +447,20 @@ def test_app_update_validation(admin_mc, admin_pc, custom_catalog,
         'obj': app1,
         'action_name': 'upgrade',
         'answers': app_data['answers'],
-        'externalId': cat_base+"1.6.2",
+        'externalId': cat_base+"2.7.0",
         'forceUpgrade': False,
     }
 
-    # Attempt to upgrade, app version 1.6.2 requires a min of 2.1.0 so this
+    # Attempt to upgrade, app version 2.7.0 requires a min of 2.5.0 so this
     # will error
     with pytest.raises(ApiError) as e:
         app1 = client.action(**upgrade_dict)
     assert e.value.error.status == 422
     assert e.value.error.message == 'rancher min version not met'
 
-    set_server_version(client, "2.3.1")
+    set_server_version(client, "2.7.1")
 
-    # # Second try requires a max of 2.3.0 so an error should be returned
+    # # Second try requires a max of 2.7.0 so an error should be returned
     with pytest.raises(ApiError) as e:
         app1 = client.action(**upgrade_dict)
     assert e.value.error.status == 422
@@ -473,8 +473,8 @@ def test_app_rollback_validation(admin_mc, admin_pc, custom_catalog,
     """Test rollback validation for apps. This test will set the rancher version
     explicitly and attempt to rollback apps with rancher version requirements.
     """
-    # 1.6.0 uses 2.0.0-2.2.0
-    # 1.6.2 uses 2.1.0-2.3.0
+    # 2.3.1 uses 2.4.1-2.6.0
+    # 2.7.0 uses 2.5.0-2.7.0
     client = admin_mc.client
 
     c_name = random_str()
@@ -489,7 +489,7 @@ def test_app_rollback_validation(admin_mc, admin_pc, custom_catalog,
 
     app_data = {
         'name': random_str(),
-        'externalId': cat_base+"1.6.0",
+        'externalId': cat_base+"2.3.1",
         'targetNamespace': ns.name,
         'projectId': admin_pc.project.id,
         "answers": [{
@@ -499,7 +499,7 @@ def test_app_rollback_validation(admin_mc, admin_pc, custom_catalog,
             "values": {
                 "defaultImage": "true",
                 "image.repository": "chartmuseum/chartmuseum",
-                "image.tag": "v0.7.1",
+                "image.tag": "v0.9.0",
                 "env.open.STORAGE": "local",
                 "gcp.secret.enabled": "false",
                 "gcp.secret.key": "credentials.json",
@@ -517,9 +517,9 @@ def test_app_rollback_validation(admin_mc, admin_pc, custom_catalog,
         }]
     }
 
-    set_server_version(client, "2.1.0")
+    set_server_version(client, "2.5.0")
 
-    # Launch the app version 1.6.0 with rancher 2.1.0-rc3
+    # Launch the app version 2.3.1 with rancher 2.4.2
     app1 = admin_pc.client.create_app(app_data)
     remove_resource(app1)
     wait_for_workload(admin_pc.client, ns.name, count=1)
@@ -540,7 +540,7 @@ def test_app_rollback_validation(admin_mc, admin_pc, custom_catalog,
         'obj': app1,
         'action_name': 'upgrade',
         'answers': app_data['answers'],
-        'externalId': cat_base+"1.6.2",
+        'externalId': cat_base+"2.7.0",
         'forceUpgrade': False,
     }
 
@@ -564,9 +564,9 @@ def test_app_rollback_validation(admin_mc, admin_pc, custom_catalog,
         'forceUpgrade': False,
     }
 
-    set_server_version(client, "2.3.1")
+    set_server_version(client, "2.6.1")
 
-    # Rollback requires a max of 2.2.0 so an error should be returned
+    # Rollback requires a max of 2.6.0 so an error should be returned
     with pytest.raises(ApiError) as e:
         client.action(**rollback_dict)
     assert e.value.error.status == 422
@@ -574,7 +574,7 @@ def test_app_rollback_validation(admin_mc, admin_pc, custom_catalog,
 
     set_server_version(client, "2.0.0-rc3")
 
-    # Second try requires a min of 2.0.0 so an error should be returned
+    # Second try requires a min of 2.4.1 so an error should be returned
     with pytest.raises(ApiError) as e:
         client.action(**rollback_dict)
 
