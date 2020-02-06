@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type NamespacedServiceAccountTokenController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler NamespacedServiceAccountTokenHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler NamespacedServiceAccountTokenHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *namespacedServiceAccountTokenClient) AddClusterScopedLifecycle(ctx cont
 func (s *namespacedServiceAccountTokenClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle NamespacedServiceAccountTokenLifecycle) {
 	sync := NewNamespacedServiceAccountTokenLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type NamespacedServiceAccountTokenIndexer func(obj *NamespacedServiceAccountToken) ([]string, error)
-
-type NamespacedServiceAccountTokenClientCache interface {
-	Get(namespace, name string) (*NamespacedServiceAccountToken, error)
-	List(namespace string, selector labels.Selector) ([]*NamespacedServiceAccountToken, error)
-
-	Index(name string, indexer NamespacedServiceAccountTokenIndexer)
-	GetIndexed(name, key string) ([]*NamespacedServiceAccountToken, error)
-}
-
-type NamespacedServiceAccountTokenClient interface {
-	Create(*NamespacedServiceAccountToken) (*NamespacedServiceAccountToken, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*NamespacedServiceAccountToken, error)
-	Update(*NamespacedServiceAccountToken) (*NamespacedServiceAccountToken, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*NamespacedServiceAccountTokenList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() NamespacedServiceAccountTokenClientCache
-
-	OnCreate(ctx context.Context, name string, sync NamespacedServiceAccountTokenChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync NamespacedServiceAccountTokenChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync NamespacedServiceAccountTokenChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() NamespacedServiceAccountTokenInterface
-}
-
-type namespacedServiceAccountTokenClientCache struct {
-	client *namespacedServiceAccountTokenClient2
-}
-
-type namespacedServiceAccountTokenClient2 struct {
-	iface      NamespacedServiceAccountTokenInterface
-	controller NamespacedServiceAccountTokenController
-}
-
-func (n *namespacedServiceAccountTokenClient2) Interface() NamespacedServiceAccountTokenInterface {
-	return n.iface
-}
-
-func (n *namespacedServiceAccountTokenClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *namespacedServiceAccountTokenClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *namespacedServiceAccountTokenClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *namespacedServiceAccountTokenClient2) Create(obj *NamespacedServiceAccountToken) (*NamespacedServiceAccountToken, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *namespacedServiceAccountTokenClient2) Get(namespace, name string, opts metav1.GetOptions) (*NamespacedServiceAccountToken, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *namespacedServiceAccountTokenClient2) Update(obj *NamespacedServiceAccountToken) (*NamespacedServiceAccountToken, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *namespacedServiceAccountTokenClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *namespacedServiceAccountTokenClient2) List(namespace string, opts metav1.ListOptions) (*NamespacedServiceAccountTokenList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *namespacedServiceAccountTokenClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *namespacedServiceAccountTokenClientCache) Get(namespace, name string) (*NamespacedServiceAccountToken, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *namespacedServiceAccountTokenClientCache) List(namespace string, selector labels.Selector) ([]*NamespacedServiceAccountToken, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *namespacedServiceAccountTokenClient2) Cache() NamespacedServiceAccountTokenClientCache {
-	n.loadController()
-	return &namespacedServiceAccountTokenClientCache{
-		client: n,
-	}
-}
-
-func (n *namespacedServiceAccountTokenClient2) OnCreate(ctx context.Context, name string, sync NamespacedServiceAccountTokenChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &namespacedServiceAccountTokenLifecycleDelegate{create: sync})
-}
-
-func (n *namespacedServiceAccountTokenClient2) OnChange(ctx context.Context, name string, sync NamespacedServiceAccountTokenChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &namespacedServiceAccountTokenLifecycleDelegate{update: sync})
-}
-
-func (n *namespacedServiceAccountTokenClient2) OnRemove(ctx context.Context, name string, sync NamespacedServiceAccountTokenChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &namespacedServiceAccountTokenLifecycleDelegate{remove: sync})
-}
-
-func (n *namespacedServiceAccountTokenClientCache) Index(name string, indexer NamespacedServiceAccountTokenIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*NamespacedServiceAccountToken); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *namespacedServiceAccountTokenClientCache) GetIndexed(name, key string) ([]*NamespacedServiceAccountToken, error) {
-	var result []*NamespacedServiceAccountToken
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*NamespacedServiceAccountToken); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *namespacedServiceAccountTokenClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type namespacedServiceAccountTokenLifecycleDelegate struct {
-	create NamespacedServiceAccountTokenChangeHandlerFunc
-	update NamespacedServiceAccountTokenChangeHandlerFunc
-	remove NamespacedServiceAccountTokenChangeHandlerFunc
-}
-
-func (n *namespacedServiceAccountTokenLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *namespacedServiceAccountTokenLifecycleDelegate) Create(obj *NamespacedServiceAccountToken) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *namespacedServiceAccountTokenLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *namespacedServiceAccountTokenLifecycleDelegate) Remove(obj *NamespacedServiceAccountToken) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *namespacedServiceAccountTokenLifecycleDelegate) Updated(obj *NamespacedServiceAccountToken) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

@@ -6,6 +6,7 @@ package fakes
 import (
 	context "context"
 	sync "sync"
+	time "time"
 
 	controller "github.com/rancher/norman/controller"
 	objectclient "github.com/rancher/norman/objectclient"
@@ -146,6 +147,7 @@ var (
 	lockEventControllerMockAddFeatureHandler              sync.RWMutex
 	lockEventControllerMockAddHandler                     sync.RWMutex
 	lockEventControllerMockEnqueue                        sync.RWMutex
+	lockEventControllerMockEnqueueAfter                   sync.RWMutex
 	lockEventControllerMockGeneric                        sync.RWMutex
 	lockEventControllerMockInformer                       sync.RWMutex
 	lockEventControllerMockLister                         sync.RWMutex
@@ -177,6 +179,9 @@ var _ v1a.EventController = &EventControllerMock{}
 //             },
 //             EnqueueFunc: func(namespace string, name string)  {
 // 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
 //             },
 //             GenericFunc: func() controller.GenericController {
 // 	               panic("mock out the Generic method")
@@ -214,6 +219,9 @@ type EventControllerMock struct {
 
 	// EnqueueFunc mocks the Enqueue method.
 	EnqueueFunc func(namespace string, name string)
+
+	// EnqueueAfterFunc mocks the EnqueueAfter method.
+	EnqueueAfterFunc func(namespace string, name string, after time.Duration)
 
 	// GenericFunc mocks the Generic method.
 	GenericFunc func() controller.GenericController
@@ -282,6 +290,15 @@ type EventControllerMock struct {
 			Namespace string
 			// Name is the name argument value.
 			Name string
+		}
+		// EnqueueAfter holds details about calls to the EnqueueAfter method.
+		EnqueueAfter []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
+			// Name is the name argument value.
+			Name string
+			// After is the after argument value.
+			After time.Duration
 		}
 		// Generic holds details about calls to the Generic method.
 		Generic []struct {
@@ -511,6 +528,45 @@ func (mock *EventControllerMock) EnqueueCalls() []struct {
 	lockEventControllerMockEnqueue.RLock()
 	calls = mock.calls.Enqueue
 	lockEventControllerMockEnqueue.RUnlock()
+	return calls
+}
+
+// EnqueueAfter calls EnqueueAfterFunc.
+func (mock *EventControllerMock) EnqueueAfter(namespace string, name string, after time.Duration) {
+	if mock.EnqueueAfterFunc == nil {
+		panic("EventControllerMock.EnqueueAfterFunc: method is nil but EventController.EnqueueAfter was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Name      string
+		After     time.Duration
+	}{
+		Namespace: namespace,
+		Name:      name,
+		After:     after,
+	}
+	lockEventControllerMockEnqueueAfter.Lock()
+	mock.calls.EnqueueAfter = append(mock.calls.EnqueueAfter, callInfo)
+	lockEventControllerMockEnqueueAfter.Unlock()
+	mock.EnqueueAfterFunc(namespace, name, after)
+}
+
+// EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
+// Check the length with:
+//     len(mockedEventController.EnqueueAfterCalls())
+func (mock *EventControllerMock) EnqueueAfterCalls() []struct {
+	Namespace string
+	Name      string
+	After     time.Duration
+} {
+	var calls []struct {
+		Namespace string
+		Name      string
+		After     time.Duration
+	}
+	lockEventControllerMockEnqueueAfter.RLock()
+	calls = mock.calls.EnqueueAfter
+	lockEventControllerMockEnqueueAfter.RUnlock()
 	return calls
 }
 

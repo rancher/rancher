@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type SourceCodeProviderConfigController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler SourceCodeProviderConfigHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler SourceCodeProviderConfigHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *sourceCodeProviderConfigClient) AddClusterScopedLifecycle(ctx context.C
 func (s *sourceCodeProviderConfigClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle SourceCodeProviderConfigLifecycle) {
 	sync := NewSourceCodeProviderConfigLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type SourceCodeProviderConfigIndexer func(obj *SourceCodeProviderConfig) ([]string, error)
-
-type SourceCodeProviderConfigClientCache interface {
-	Get(namespace, name string) (*SourceCodeProviderConfig, error)
-	List(namespace string, selector labels.Selector) ([]*SourceCodeProviderConfig, error)
-
-	Index(name string, indexer SourceCodeProviderConfigIndexer)
-	GetIndexed(name, key string) ([]*SourceCodeProviderConfig, error)
-}
-
-type SourceCodeProviderConfigClient interface {
-	Create(*SourceCodeProviderConfig) (*SourceCodeProviderConfig, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*SourceCodeProviderConfig, error)
-	Update(*SourceCodeProviderConfig) (*SourceCodeProviderConfig, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*SourceCodeProviderConfigList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() SourceCodeProviderConfigClientCache
-
-	OnCreate(ctx context.Context, name string, sync SourceCodeProviderConfigChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync SourceCodeProviderConfigChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync SourceCodeProviderConfigChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() SourceCodeProviderConfigInterface
-}
-
-type sourceCodeProviderConfigClientCache struct {
-	client *sourceCodeProviderConfigClient2
-}
-
-type sourceCodeProviderConfigClient2 struct {
-	iface      SourceCodeProviderConfigInterface
-	controller SourceCodeProviderConfigController
-}
-
-func (n *sourceCodeProviderConfigClient2) Interface() SourceCodeProviderConfigInterface {
-	return n.iface
-}
-
-func (n *sourceCodeProviderConfigClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *sourceCodeProviderConfigClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *sourceCodeProviderConfigClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *sourceCodeProviderConfigClient2) Create(obj *SourceCodeProviderConfig) (*SourceCodeProviderConfig, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *sourceCodeProviderConfigClient2) Get(namespace, name string, opts metav1.GetOptions) (*SourceCodeProviderConfig, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *sourceCodeProviderConfigClient2) Update(obj *SourceCodeProviderConfig) (*SourceCodeProviderConfig, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *sourceCodeProviderConfigClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *sourceCodeProviderConfigClient2) List(namespace string, opts metav1.ListOptions) (*SourceCodeProviderConfigList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *sourceCodeProviderConfigClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *sourceCodeProviderConfigClientCache) Get(namespace, name string) (*SourceCodeProviderConfig, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *sourceCodeProviderConfigClientCache) List(namespace string, selector labels.Selector) ([]*SourceCodeProviderConfig, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *sourceCodeProviderConfigClient2) Cache() SourceCodeProviderConfigClientCache {
-	n.loadController()
-	return &sourceCodeProviderConfigClientCache{
-		client: n,
-	}
-}
-
-func (n *sourceCodeProviderConfigClient2) OnCreate(ctx context.Context, name string, sync SourceCodeProviderConfigChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &sourceCodeProviderConfigLifecycleDelegate{create: sync})
-}
-
-func (n *sourceCodeProviderConfigClient2) OnChange(ctx context.Context, name string, sync SourceCodeProviderConfigChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &sourceCodeProviderConfigLifecycleDelegate{update: sync})
-}
-
-func (n *sourceCodeProviderConfigClient2) OnRemove(ctx context.Context, name string, sync SourceCodeProviderConfigChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &sourceCodeProviderConfigLifecycleDelegate{remove: sync})
-}
-
-func (n *sourceCodeProviderConfigClientCache) Index(name string, indexer SourceCodeProviderConfigIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*SourceCodeProviderConfig); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *sourceCodeProviderConfigClientCache) GetIndexed(name, key string) ([]*SourceCodeProviderConfig, error) {
-	var result []*SourceCodeProviderConfig
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*SourceCodeProviderConfig); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *sourceCodeProviderConfigClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type sourceCodeProviderConfigLifecycleDelegate struct {
-	create SourceCodeProviderConfigChangeHandlerFunc
-	update SourceCodeProviderConfigChangeHandlerFunc
-	remove SourceCodeProviderConfigChangeHandlerFunc
-}
-
-func (n *sourceCodeProviderConfigLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *sourceCodeProviderConfigLifecycleDelegate) Create(obj *SourceCodeProviderConfig) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *sourceCodeProviderConfigLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *sourceCodeProviderConfigLifecycleDelegate) Remove(obj *SourceCodeProviderConfig) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *sourceCodeProviderConfigLifecycleDelegate) Updated(obj *SourceCodeProviderConfig) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

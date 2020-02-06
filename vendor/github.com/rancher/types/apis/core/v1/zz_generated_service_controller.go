@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -73,6 +74,7 @@ type ServiceController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ServiceHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ServiceHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -327,184 +329,4 @@ func (s *serviceClient) AddClusterScopedLifecycle(ctx context.Context, name, clu
 func (s *serviceClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ServiceLifecycle) {
 	sync := NewServiceLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type ServiceIndexer func(obj *v1.Service) ([]string, error)
-
-type ServiceClientCache interface {
-	Get(namespace, name string) (*v1.Service, error)
-	List(namespace string, selector labels.Selector) ([]*v1.Service, error)
-
-	Index(name string, indexer ServiceIndexer)
-	GetIndexed(name, key string) ([]*v1.Service, error)
-}
-
-type ServiceClient interface {
-	Create(*v1.Service) (*v1.Service, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*v1.Service, error)
-	Update(*v1.Service) (*v1.Service, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*ServiceList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() ServiceClientCache
-
-	OnCreate(ctx context.Context, name string, sync ServiceChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync ServiceChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync ServiceChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() ServiceInterface
-}
-
-type serviceClientCache struct {
-	client *serviceClient2
-}
-
-type serviceClient2 struct {
-	iface      ServiceInterface
-	controller ServiceController
-}
-
-func (n *serviceClient2) Interface() ServiceInterface {
-	return n.iface
-}
-
-func (n *serviceClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *serviceClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *serviceClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *serviceClient2) Create(obj *v1.Service) (*v1.Service, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *serviceClient2) Get(namespace, name string, opts metav1.GetOptions) (*v1.Service, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *serviceClient2) Update(obj *v1.Service) (*v1.Service, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *serviceClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *serviceClient2) List(namespace string, opts metav1.ListOptions) (*ServiceList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *serviceClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *serviceClientCache) Get(namespace, name string) (*v1.Service, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *serviceClientCache) List(namespace string, selector labels.Selector) ([]*v1.Service, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *serviceClient2) Cache() ServiceClientCache {
-	n.loadController()
-	return &serviceClientCache{
-		client: n,
-	}
-}
-
-func (n *serviceClient2) OnCreate(ctx context.Context, name string, sync ServiceChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &serviceLifecycleDelegate{create: sync})
-}
-
-func (n *serviceClient2) OnChange(ctx context.Context, name string, sync ServiceChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &serviceLifecycleDelegate{update: sync})
-}
-
-func (n *serviceClient2) OnRemove(ctx context.Context, name string, sync ServiceChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &serviceLifecycleDelegate{remove: sync})
-}
-
-func (n *serviceClientCache) Index(name string, indexer ServiceIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*v1.Service); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *serviceClientCache) GetIndexed(name, key string) ([]*v1.Service, error) {
-	var result []*v1.Service
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*v1.Service); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *serviceClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type serviceLifecycleDelegate struct {
-	create ServiceChangeHandlerFunc
-	update ServiceChangeHandlerFunc
-	remove ServiceChangeHandlerFunc
-}
-
-func (n *serviceLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *serviceLifecycleDelegate) Create(obj *v1.Service) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *serviceLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *serviceLifecycleDelegate) Remove(obj *v1.Service) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *serviceLifecycleDelegate) Updated(obj *v1.Service) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

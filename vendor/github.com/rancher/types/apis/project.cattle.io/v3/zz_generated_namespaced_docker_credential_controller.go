@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type NamespacedDockerCredentialController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler NamespacedDockerCredentialHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler NamespacedDockerCredentialHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *namespacedDockerCredentialClient) AddClusterScopedLifecycle(ctx context
 func (s *namespacedDockerCredentialClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle NamespacedDockerCredentialLifecycle) {
 	sync := NewNamespacedDockerCredentialLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type NamespacedDockerCredentialIndexer func(obj *NamespacedDockerCredential) ([]string, error)
-
-type NamespacedDockerCredentialClientCache interface {
-	Get(namespace, name string) (*NamespacedDockerCredential, error)
-	List(namespace string, selector labels.Selector) ([]*NamespacedDockerCredential, error)
-
-	Index(name string, indexer NamespacedDockerCredentialIndexer)
-	GetIndexed(name, key string) ([]*NamespacedDockerCredential, error)
-}
-
-type NamespacedDockerCredentialClient interface {
-	Create(*NamespacedDockerCredential) (*NamespacedDockerCredential, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*NamespacedDockerCredential, error)
-	Update(*NamespacedDockerCredential) (*NamespacedDockerCredential, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*NamespacedDockerCredentialList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() NamespacedDockerCredentialClientCache
-
-	OnCreate(ctx context.Context, name string, sync NamespacedDockerCredentialChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync NamespacedDockerCredentialChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync NamespacedDockerCredentialChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() NamespacedDockerCredentialInterface
-}
-
-type namespacedDockerCredentialClientCache struct {
-	client *namespacedDockerCredentialClient2
-}
-
-type namespacedDockerCredentialClient2 struct {
-	iface      NamespacedDockerCredentialInterface
-	controller NamespacedDockerCredentialController
-}
-
-func (n *namespacedDockerCredentialClient2) Interface() NamespacedDockerCredentialInterface {
-	return n.iface
-}
-
-func (n *namespacedDockerCredentialClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *namespacedDockerCredentialClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *namespacedDockerCredentialClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *namespacedDockerCredentialClient2) Create(obj *NamespacedDockerCredential) (*NamespacedDockerCredential, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *namespacedDockerCredentialClient2) Get(namespace, name string, opts metav1.GetOptions) (*NamespacedDockerCredential, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *namespacedDockerCredentialClient2) Update(obj *NamespacedDockerCredential) (*NamespacedDockerCredential, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *namespacedDockerCredentialClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *namespacedDockerCredentialClient2) List(namespace string, opts metav1.ListOptions) (*NamespacedDockerCredentialList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *namespacedDockerCredentialClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *namespacedDockerCredentialClientCache) Get(namespace, name string) (*NamespacedDockerCredential, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *namespacedDockerCredentialClientCache) List(namespace string, selector labels.Selector) ([]*NamespacedDockerCredential, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *namespacedDockerCredentialClient2) Cache() NamespacedDockerCredentialClientCache {
-	n.loadController()
-	return &namespacedDockerCredentialClientCache{
-		client: n,
-	}
-}
-
-func (n *namespacedDockerCredentialClient2) OnCreate(ctx context.Context, name string, sync NamespacedDockerCredentialChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &namespacedDockerCredentialLifecycleDelegate{create: sync})
-}
-
-func (n *namespacedDockerCredentialClient2) OnChange(ctx context.Context, name string, sync NamespacedDockerCredentialChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &namespacedDockerCredentialLifecycleDelegate{update: sync})
-}
-
-func (n *namespacedDockerCredentialClient2) OnRemove(ctx context.Context, name string, sync NamespacedDockerCredentialChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &namespacedDockerCredentialLifecycleDelegate{remove: sync})
-}
-
-func (n *namespacedDockerCredentialClientCache) Index(name string, indexer NamespacedDockerCredentialIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*NamespacedDockerCredential); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *namespacedDockerCredentialClientCache) GetIndexed(name, key string) ([]*NamespacedDockerCredential, error) {
-	var result []*NamespacedDockerCredential
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*NamespacedDockerCredential); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *namespacedDockerCredentialClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type namespacedDockerCredentialLifecycleDelegate struct {
-	create NamespacedDockerCredentialChangeHandlerFunc
-	update NamespacedDockerCredentialChangeHandlerFunc
-	remove NamespacedDockerCredentialChangeHandlerFunc
-}
-
-func (n *namespacedDockerCredentialLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *namespacedDockerCredentialLifecycleDelegate) Create(obj *NamespacedDockerCredential) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *namespacedDockerCredentialLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *namespacedDockerCredentialLifecycleDelegate) Remove(obj *NamespacedDockerCredential) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *namespacedDockerCredentialLifecycleDelegate) Updated(obj *NamespacedDockerCredential) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type MultiClusterAppRevisionController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler MultiClusterAppRevisionHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler MultiClusterAppRevisionHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *multiClusterAppRevisionClient) AddClusterScopedLifecycle(ctx context.Co
 func (s *multiClusterAppRevisionClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle MultiClusterAppRevisionLifecycle) {
 	sync := NewMultiClusterAppRevisionLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type MultiClusterAppRevisionIndexer func(obj *MultiClusterAppRevision) ([]string, error)
-
-type MultiClusterAppRevisionClientCache interface {
-	Get(namespace, name string) (*MultiClusterAppRevision, error)
-	List(namespace string, selector labels.Selector) ([]*MultiClusterAppRevision, error)
-
-	Index(name string, indexer MultiClusterAppRevisionIndexer)
-	GetIndexed(name, key string) ([]*MultiClusterAppRevision, error)
-}
-
-type MultiClusterAppRevisionClient interface {
-	Create(*MultiClusterAppRevision) (*MultiClusterAppRevision, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*MultiClusterAppRevision, error)
-	Update(*MultiClusterAppRevision) (*MultiClusterAppRevision, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*MultiClusterAppRevisionList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() MultiClusterAppRevisionClientCache
-
-	OnCreate(ctx context.Context, name string, sync MultiClusterAppRevisionChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync MultiClusterAppRevisionChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync MultiClusterAppRevisionChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() MultiClusterAppRevisionInterface
-}
-
-type multiClusterAppRevisionClientCache struct {
-	client *multiClusterAppRevisionClient2
-}
-
-type multiClusterAppRevisionClient2 struct {
-	iface      MultiClusterAppRevisionInterface
-	controller MultiClusterAppRevisionController
-}
-
-func (n *multiClusterAppRevisionClient2) Interface() MultiClusterAppRevisionInterface {
-	return n.iface
-}
-
-func (n *multiClusterAppRevisionClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *multiClusterAppRevisionClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *multiClusterAppRevisionClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *multiClusterAppRevisionClient2) Create(obj *MultiClusterAppRevision) (*MultiClusterAppRevision, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *multiClusterAppRevisionClient2) Get(namespace, name string, opts metav1.GetOptions) (*MultiClusterAppRevision, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *multiClusterAppRevisionClient2) Update(obj *MultiClusterAppRevision) (*MultiClusterAppRevision, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *multiClusterAppRevisionClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *multiClusterAppRevisionClient2) List(namespace string, opts metav1.ListOptions) (*MultiClusterAppRevisionList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *multiClusterAppRevisionClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *multiClusterAppRevisionClientCache) Get(namespace, name string) (*MultiClusterAppRevision, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *multiClusterAppRevisionClientCache) List(namespace string, selector labels.Selector) ([]*MultiClusterAppRevision, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *multiClusterAppRevisionClient2) Cache() MultiClusterAppRevisionClientCache {
-	n.loadController()
-	return &multiClusterAppRevisionClientCache{
-		client: n,
-	}
-}
-
-func (n *multiClusterAppRevisionClient2) OnCreate(ctx context.Context, name string, sync MultiClusterAppRevisionChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &multiClusterAppRevisionLifecycleDelegate{create: sync})
-}
-
-func (n *multiClusterAppRevisionClient2) OnChange(ctx context.Context, name string, sync MultiClusterAppRevisionChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &multiClusterAppRevisionLifecycleDelegate{update: sync})
-}
-
-func (n *multiClusterAppRevisionClient2) OnRemove(ctx context.Context, name string, sync MultiClusterAppRevisionChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &multiClusterAppRevisionLifecycleDelegate{remove: sync})
-}
-
-func (n *multiClusterAppRevisionClientCache) Index(name string, indexer MultiClusterAppRevisionIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*MultiClusterAppRevision); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *multiClusterAppRevisionClientCache) GetIndexed(name, key string) ([]*MultiClusterAppRevision, error) {
-	var result []*MultiClusterAppRevision
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*MultiClusterAppRevision); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *multiClusterAppRevisionClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type multiClusterAppRevisionLifecycleDelegate struct {
-	create MultiClusterAppRevisionChangeHandlerFunc
-	update MultiClusterAppRevisionChangeHandlerFunc
-	remove MultiClusterAppRevisionChangeHandlerFunc
-}
-
-func (n *multiClusterAppRevisionLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *multiClusterAppRevisionLifecycleDelegate) Create(obj *MultiClusterAppRevision) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *multiClusterAppRevisionLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *multiClusterAppRevisionLifecycleDelegate) Remove(obj *MultiClusterAppRevision) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *multiClusterAppRevisionLifecycleDelegate) Updated(obj *MultiClusterAppRevision) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

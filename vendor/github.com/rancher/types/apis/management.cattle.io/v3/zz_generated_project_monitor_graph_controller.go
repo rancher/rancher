@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type ProjectMonitorGraphController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ProjectMonitorGraphHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ProjectMonitorGraphHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *projectMonitorGraphClient) AddClusterScopedLifecycle(ctx context.Contex
 func (s *projectMonitorGraphClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ProjectMonitorGraphLifecycle) {
 	sync := NewProjectMonitorGraphLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type ProjectMonitorGraphIndexer func(obj *ProjectMonitorGraph) ([]string, error)
-
-type ProjectMonitorGraphClientCache interface {
-	Get(namespace, name string) (*ProjectMonitorGraph, error)
-	List(namespace string, selector labels.Selector) ([]*ProjectMonitorGraph, error)
-
-	Index(name string, indexer ProjectMonitorGraphIndexer)
-	GetIndexed(name, key string) ([]*ProjectMonitorGraph, error)
-}
-
-type ProjectMonitorGraphClient interface {
-	Create(*ProjectMonitorGraph) (*ProjectMonitorGraph, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*ProjectMonitorGraph, error)
-	Update(*ProjectMonitorGraph) (*ProjectMonitorGraph, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*ProjectMonitorGraphList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() ProjectMonitorGraphClientCache
-
-	OnCreate(ctx context.Context, name string, sync ProjectMonitorGraphChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync ProjectMonitorGraphChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync ProjectMonitorGraphChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() ProjectMonitorGraphInterface
-}
-
-type projectMonitorGraphClientCache struct {
-	client *projectMonitorGraphClient2
-}
-
-type projectMonitorGraphClient2 struct {
-	iface      ProjectMonitorGraphInterface
-	controller ProjectMonitorGraphController
-}
-
-func (n *projectMonitorGraphClient2) Interface() ProjectMonitorGraphInterface {
-	return n.iface
-}
-
-func (n *projectMonitorGraphClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *projectMonitorGraphClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *projectMonitorGraphClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *projectMonitorGraphClient2) Create(obj *ProjectMonitorGraph) (*ProjectMonitorGraph, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *projectMonitorGraphClient2) Get(namespace, name string, opts metav1.GetOptions) (*ProjectMonitorGraph, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *projectMonitorGraphClient2) Update(obj *ProjectMonitorGraph) (*ProjectMonitorGraph, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *projectMonitorGraphClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *projectMonitorGraphClient2) List(namespace string, opts metav1.ListOptions) (*ProjectMonitorGraphList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *projectMonitorGraphClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *projectMonitorGraphClientCache) Get(namespace, name string) (*ProjectMonitorGraph, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *projectMonitorGraphClientCache) List(namespace string, selector labels.Selector) ([]*ProjectMonitorGraph, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *projectMonitorGraphClient2) Cache() ProjectMonitorGraphClientCache {
-	n.loadController()
-	return &projectMonitorGraphClientCache{
-		client: n,
-	}
-}
-
-func (n *projectMonitorGraphClient2) OnCreate(ctx context.Context, name string, sync ProjectMonitorGraphChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &projectMonitorGraphLifecycleDelegate{create: sync})
-}
-
-func (n *projectMonitorGraphClient2) OnChange(ctx context.Context, name string, sync ProjectMonitorGraphChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &projectMonitorGraphLifecycleDelegate{update: sync})
-}
-
-func (n *projectMonitorGraphClient2) OnRemove(ctx context.Context, name string, sync ProjectMonitorGraphChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &projectMonitorGraphLifecycleDelegate{remove: sync})
-}
-
-func (n *projectMonitorGraphClientCache) Index(name string, indexer ProjectMonitorGraphIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*ProjectMonitorGraph); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *projectMonitorGraphClientCache) GetIndexed(name, key string) ([]*ProjectMonitorGraph, error) {
-	var result []*ProjectMonitorGraph
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*ProjectMonitorGraph); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *projectMonitorGraphClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type projectMonitorGraphLifecycleDelegate struct {
-	create ProjectMonitorGraphChangeHandlerFunc
-	update ProjectMonitorGraphChangeHandlerFunc
-	remove ProjectMonitorGraphChangeHandlerFunc
-}
-
-func (n *projectMonitorGraphLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *projectMonitorGraphLifecycleDelegate) Create(obj *ProjectMonitorGraph) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *projectMonitorGraphLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *projectMonitorGraphLifecycleDelegate) Remove(obj *ProjectMonitorGraph) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *projectMonitorGraphLifecycleDelegate) Updated(obj *ProjectMonitorGraph) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

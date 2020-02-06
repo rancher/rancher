@@ -6,6 +6,7 @@ package fakes
 import (
 	context "context"
 	sync "sync"
+	time "time"
 
 	controller "github.com/rancher/norman/controller"
 	objectclient "github.com/rancher/norman/objectclient"
@@ -145,6 +146,7 @@ var (
 	lockRKEK8sSystemImageControllerMockAddFeatureHandler              sync.RWMutex
 	lockRKEK8sSystemImageControllerMockAddHandler                     sync.RWMutex
 	lockRKEK8sSystemImageControllerMockEnqueue                        sync.RWMutex
+	lockRKEK8sSystemImageControllerMockEnqueueAfter                   sync.RWMutex
 	lockRKEK8sSystemImageControllerMockGeneric                        sync.RWMutex
 	lockRKEK8sSystemImageControllerMockInformer                       sync.RWMutex
 	lockRKEK8sSystemImageControllerMockLister                         sync.RWMutex
@@ -176,6 +178,9 @@ var _ v3.RKEK8sSystemImageController = &RKEK8sSystemImageControllerMock{}
 //             },
 //             EnqueueFunc: func(namespace string, name string)  {
 // 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
 //             },
 //             GenericFunc: func() controller.GenericController {
 // 	               panic("mock out the Generic method")
@@ -213,6 +218,9 @@ type RKEK8sSystemImageControllerMock struct {
 
 	// EnqueueFunc mocks the Enqueue method.
 	EnqueueFunc func(namespace string, name string)
+
+	// EnqueueAfterFunc mocks the EnqueueAfter method.
+	EnqueueAfterFunc func(namespace string, name string, after time.Duration)
 
 	// GenericFunc mocks the Generic method.
 	GenericFunc func() controller.GenericController
@@ -281,6 +289,15 @@ type RKEK8sSystemImageControllerMock struct {
 			Namespace string
 			// Name is the name argument value.
 			Name string
+		}
+		// EnqueueAfter holds details about calls to the EnqueueAfter method.
+		EnqueueAfter []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
+			// Name is the name argument value.
+			Name string
+			// After is the after argument value.
+			After time.Duration
 		}
 		// Generic holds details about calls to the Generic method.
 		Generic []struct {
@@ -510,6 +527,45 @@ func (mock *RKEK8sSystemImageControllerMock) EnqueueCalls() []struct {
 	lockRKEK8sSystemImageControllerMockEnqueue.RLock()
 	calls = mock.calls.Enqueue
 	lockRKEK8sSystemImageControllerMockEnqueue.RUnlock()
+	return calls
+}
+
+// EnqueueAfter calls EnqueueAfterFunc.
+func (mock *RKEK8sSystemImageControllerMock) EnqueueAfter(namespace string, name string, after time.Duration) {
+	if mock.EnqueueAfterFunc == nil {
+		panic("RKEK8sSystemImageControllerMock.EnqueueAfterFunc: method is nil but RKEK8sSystemImageController.EnqueueAfter was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Name      string
+		After     time.Duration
+	}{
+		Namespace: namespace,
+		Name:      name,
+		After:     after,
+	}
+	lockRKEK8sSystemImageControllerMockEnqueueAfter.Lock()
+	mock.calls.EnqueueAfter = append(mock.calls.EnqueueAfter, callInfo)
+	lockRKEK8sSystemImageControllerMockEnqueueAfter.Unlock()
+	mock.EnqueueAfterFunc(namespace, name, after)
+}
+
+// EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
+// Check the length with:
+//     len(mockedRKEK8sSystemImageController.EnqueueAfterCalls())
+func (mock *RKEK8sSystemImageControllerMock) EnqueueAfterCalls() []struct {
+	Namespace string
+	Name      string
+	After     time.Duration
+} {
+	var calls []struct {
+		Namespace string
+		Name      string
+		After     time.Duration
+	}
+	lockRKEK8sSystemImageControllerMockEnqueueAfter.RLock()
+	calls = mock.calls.EnqueueAfter
+	lockRKEK8sSystemImageControllerMockEnqueueAfter.RUnlock()
 	return calls
 }
 

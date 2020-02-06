@@ -24,13 +24,6 @@ type Interface interface {
 	DestinationRulesGetter
 }
 
-type Clients struct {
-	Interface Interface
-
-	VirtualService  VirtualServiceClient
-	DestinationRule DestinationRuleClient
-}
-
 type Client struct {
 	sync.Mutex
 	restClient rest.Interface
@@ -38,48 +31,6 @@ type Client struct {
 
 	virtualServiceControllers  map[string]VirtualServiceController
 	destinationRuleControllers map[string]DestinationRuleController
-}
-
-func Factory(ctx context.Context, config rest.Config) (context.Context, controller.Starter, error) {
-	c, err := NewForConfig(config)
-	if err != nil {
-		return ctx, nil, err
-	}
-
-	cs := NewClientsFromInterface(c)
-
-	ctx = context.WithValue(ctx, contextKeyType{}, c)
-	ctx = context.WithValue(ctx, contextClientsKeyType{}, cs)
-	return ctx, c, nil
-}
-
-func ClientsFrom(ctx context.Context) *Clients {
-	return ctx.Value(contextClientsKeyType{}).(*Clients)
-}
-
-func From(ctx context.Context) Interface {
-	return ctx.Value(contextKeyType{}).(Interface)
-}
-
-func NewClients(config rest.Config) (*Clients, error) {
-	iface, err := NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-	return NewClientsFromInterface(iface), nil
-}
-
-func NewClientsFromInterface(iface Interface) *Clients {
-	return &Clients{
-		Interface: iface,
-
-		VirtualService: &virtualServiceClient2{
-			iface: iface.VirtualServices(""),
-		},
-		DestinationRule: &destinationRuleClient2{
-			iface: iface.DestinationRules(""),
-		},
-	}
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {

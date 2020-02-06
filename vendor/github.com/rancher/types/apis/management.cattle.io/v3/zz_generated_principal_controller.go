@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -71,6 +72,7 @@ type PrincipalController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler PrincipalHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler PrincipalHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -325,184 +327,4 @@ func (s *principalClient) AddClusterScopedLifecycle(ctx context.Context, name, c
 func (s *principalClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle PrincipalLifecycle) {
 	sync := NewPrincipalLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type PrincipalIndexer func(obj *Principal) ([]string, error)
-
-type PrincipalClientCache interface {
-	Get(namespace, name string) (*Principal, error)
-	List(namespace string, selector labels.Selector) ([]*Principal, error)
-
-	Index(name string, indexer PrincipalIndexer)
-	GetIndexed(name, key string) ([]*Principal, error)
-}
-
-type PrincipalClient interface {
-	Create(*Principal) (*Principal, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*Principal, error)
-	Update(*Principal) (*Principal, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*PrincipalList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() PrincipalClientCache
-
-	OnCreate(ctx context.Context, name string, sync PrincipalChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync PrincipalChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync PrincipalChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() PrincipalInterface
-}
-
-type principalClientCache struct {
-	client *principalClient2
-}
-
-type principalClient2 struct {
-	iface      PrincipalInterface
-	controller PrincipalController
-}
-
-func (n *principalClient2) Interface() PrincipalInterface {
-	return n.iface
-}
-
-func (n *principalClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *principalClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *principalClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *principalClient2) Create(obj *Principal) (*Principal, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *principalClient2) Get(namespace, name string, opts metav1.GetOptions) (*Principal, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *principalClient2) Update(obj *Principal) (*Principal, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *principalClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *principalClient2) List(namespace string, opts metav1.ListOptions) (*PrincipalList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *principalClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *principalClientCache) Get(namespace, name string) (*Principal, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *principalClientCache) List(namespace string, selector labels.Selector) ([]*Principal, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *principalClient2) Cache() PrincipalClientCache {
-	n.loadController()
-	return &principalClientCache{
-		client: n,
-	}
-}
-
-func (n *principalClient2) OnCreate(ctx context.Context, name string, sync PrincipalChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &principalLifecycleDelegate{create: sync})
-}
-
-func (n *principalClient2) OnChange(ctx context.Context, name string, sync PrincipalChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &principalLifecycleDelegate{update: sync})
-}
-
-func (n *principalClient2) OnRemove(ctx context.Context, name string, sync PrincipalChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &principalLifecycleDelegate{remove: sync})
-}
-
-func (n *principalClientCache) Index(name string, indexer PrincipalIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*Principal); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *principalClientCache) GetIndexed(name, key string) ([]*Principal, error) {
-	var result []*Principal
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*Principal); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *principalClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type principalLifecycleDelegate struct {
-	create PrincipalChangeHandlerFunc
-	update PrincipalChangeHandlerFunc
-	remove PrincipalChangeHandlerFunc
-}
-
-func (n *principalLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *principalLifecycleDelegate) Create(obj *Principal) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *principalLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *principalLifecycleDelegate) Remove(obj *Principal) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *principalLifecycleDelegate) Updated(obj *Principal) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

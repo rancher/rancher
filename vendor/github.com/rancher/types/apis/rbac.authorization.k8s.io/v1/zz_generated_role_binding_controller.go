@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -73,6 +74,7 @@ type RoleBindingController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler RoleBindingHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler RoleBindingHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -327,184 +329,4 @@ func (s *roleBindingClient) AddClusterScopedLifecycle(ctx context.Context, name,
 func (s *roleBindingClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle RoleBindingLifecycle) {
 	sync := NewRoleBindingLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type RoleBindingIndexer func(obj *v1.RoleBinding) ([]string, error)
-
-type RoleBindingClientCache interface {
-	Get(namespace, name string) (*v1.RoleBinding, error)
-	List(namespace string, selector labels.Selector) ([]*v1.RoleBinding, error)
-
-	Index(name string, indexer RoleBindingIndexer)
-	GetIndexed(name, key string) ([]*v1.RoleBinding, error)
-}
-
-type RoleBindingClient interface {
-	Create(*v1.RoleBinding) (*v1.RoleBinding, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*v1.RoleBinding, error)
-	Update(*v1.RoleBinding) (*v1.RoleBinding, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*RoleBindingList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() RoleBindingClientCache
-
-	OnCreate(ctx context.Context, name string, sync RoleBindingChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync RoleBindingChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync RoleBindingChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() RoleBindingInterface
-}
-
-type roleBindingClientCache struct {
-	client *roleBindingClient2
-}
-
-type roleBindingClient2 struct {
-	iface      RoleBindingInterface
-	controller RoleBindingController
-}
-
-func (n *roleBindingClient2) Interface() RoleBindingInterface {
-	return n.iface
-}
-
-func (n *roleBindingClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *roleBindingClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *roleBindingClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *roleBindingClient2) Create(obj *v1.RoleBinding) (*v1.RoleBinding, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *roleBindingClient2) Get(namespace, name string, opts metav1.GetOptions) (*v1.RoleBinding, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *roleBindingClient2) Update(obj *v1.RoleBinding) (*v1.RoleBinding, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *roleBindingClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *roleBindingClient2) List(namespace string, opts metav1.ListOptions) (*RoleBindingList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *roleBindingClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *roleBindingClientCache) Get(namespace, name string) (*v1.RoleBinding, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *roleBindingClientCache) List(namespace string, selector labels.Selector) ([]*v1.RoleBinding, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *roleBindingClient2) Cache() RoleBindingClientCache {
-	n.loadController()
-	return &roleBindingClientCache{
-		client: n,
-	}
-}
-
-func (n *roleBindingClient2) OnCreate(ctx context.Context, name string, sync RoleBindingChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &roleBindingLifecycleDelegate{create: sync})
-}
-
-func (n *roleBindingClient2) OnChange(ctx context.Context, name string, sync RoleBindingChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &roleBindingLifecycleDelegate{update: sync})
-}
-
-func (n *roleBindingClient2) OnRemove(ctx context.Context, name string, sync RoleBindingChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &roleBindingLifecycleDelegate{remove: sync})
-}
-
-func (n *roleBindingClientCache) Index(name string, indexer RoleBindingIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*v1.RoleBinding); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *roleBindingClientCache) GetIndexed(name, key string) ([]*v1.RoleBinding, error) {
-	var result []*v1.RoleBinding
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*v1.RoleBinding); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *roleBindingClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type roleBindingLifecycleDelegate struct {
-	create RoleBindingChangeHandlerFunc
-	update RoleBindingChangeHandlerFunc
-	remove RoleBindingChangeHandlerFunc
-}
-
-func (n *roleBindingLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *roleBindingLifecycleDelegate) Create(obj *v1.RoleBinding) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *roleBindingLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *roleBindingLifecycleDelegate) Remove(obj *v1.RoleBinding) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *roleBindingLifecycleDelegate) Updated(obj *v1.RoleBinding) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

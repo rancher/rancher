@@ -6,6 +6,7 @@ package fakes
 import (
 	context "context"
 	sync "sync"
+	time "time"
 
 	controller "github.com/rancher/norman/controller"
 	objectclient "github.com/rancher/norman/objectclient"
@@ -145,6 +146,7 @@ var (
 	lockMultiClusterAppControllerMockAddFeatureHandler              sync.RWMutex
 	lockMultiClusterAppControllerMockAddHandler                     sync.RWMutex
 	lockMultiClusterAppControllerMockEnqueue                        sync.RWMutex
+	lockMultiClusterAppControllerMockEnqueueAfter                   sync.RWMutex
 	lockMultiClusterAppControllerMockGeneric                        sync.RWMutex
 	lockMultiClusterAppControllerMockInformer                       sync.RWMutex
 	lockMultiClusterAppControllerMockLister                         sync.RWMutex
@@ -176,6 +178,9 @@ var _ v3.MultiClusterAppController = &MultiClusterAppControllerMock{}
 //             },
 //             EnqueueFunc: func(namespace string, name string)  {
 // 	               panic("mock out the Enqueue method")
+//             },
+//             EnqueueAfterFunc: func(namespace string, name string, after time.Duration)  {
+// 	               panic("mock out the EnqueueAfter method")
 //             },
 //             GenericFunc: func() controller.GenericController {
 // 	               panic("mock out the Generic method")
@@ -213,6 +218,9 @@ type MultiClusterAppControllerMock struct {
 
 	// EnqueueFunc mocks the Enqueue method.
 	EnqueueFunc func(namespace string, name string)
+
+	// EnqueueAfterFunc mocks the EnqueueAfter method.
+	EnqueueAfterFunc func(namespace string, name string, after time.Duration)
 
 	// GenericFunc mocks the Generic method.
 	GenericFunc func() controller.GenericController
@@ -281,6 +289,15 @@ type MultiClusterAppControllerMock struct {
 			Namespace string
 			// Name is the name argument value.
 			Name string
+		}
+		// EnqueueAfter holds details about calls to the EnqueueAfter method.
+		EnqueueAfter []struct {
+			// Namespace is the namespace argument value.
+			Namespace string
+			// Name is the name argument value.
+			Name string
+			// After is the after argument value.
+			After time.Duration
 		}
 		// Generic holds details about calls to the Generic method.
 		Generic []struct {
@@ -510,6 +527,45 @@ func (mock *MultiClusterAppControllerMock) EnqueueCalls() []struct {
 	lockMultiClusterAppControllerMockEnqueue.RLock()
 	calls = mock.calls.Enqueue
 	lockMultiClusterAppControllerMockEnqueue.RUnlock()
+	return calls
+}
+
+// EnqueueAfter calls EnqueueAfterFunc.
+func (mock *MultiClusterAppControllerMock) EnqueueAfter(namespace string, name string, after time.Duration) {
+	if mock.EnqueueAfterFunc == nil {
+		panic("MultiClusterAppControllerMock.EnqueueAfterFunc: method is nil but MultiClusterAppController.EnqueueAfter was just called")
+	}
+	callInfo := struct {
+		Namespace string
+		Name      string
+		After     time.Duration
+	}{
+		Namespace: namespace,
+		Name:      name,
+		After:     after,
+	}
+	lockMultiClusterAppControllerMockEnqueueAfter.Lock()
+	mock.calls.EnqueueAfter = append(mock.calls.EnqueueAfter, callInfo)
+	lockMultiClusterAppControllerMockEnqueueAfter.Unlock()
+	mock.EnqueueAfterFunc(namespace, name, after)
+}
+
+// EnqueueAfterCalls gets all the calls that were made to EnqueueAfter.
+// Check the length with:
+//     len(mockedMultiClusterAppController.EnqueueAfterCalls())
+func (mock *MultiClusterAppControllerMock) EnqueueAfterCalls() []struct {
+	Namespace string
+	Name      string
+	After     time.Duration
+} {
+	var calls []struct {
+		Namespace string
+		Name      string
+		After     time.Duration
+	}
+	lockMultiClusterAppControllerMockEnqueueAfter.RLock()
+	calls = mock.calls.EnqueueAfter
+	lockMultiClusterAppControllerMockEnqueueAfter.RUnlock()
 	return calls
 }
 

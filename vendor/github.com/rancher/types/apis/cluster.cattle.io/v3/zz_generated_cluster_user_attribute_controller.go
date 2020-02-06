@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type ClusterUserAttributeController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ClusterUserAttributeHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterUserAttributeHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *clusterUserAttributeClient) AddClusterScopedLifecycle(ctx context.Conte
 func (s *clusterUserAttributeClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ClusterUserAttributeLifecycle) {
 	sync := NewClusterUserAttributeLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type ClusterUserAttributeIndexer func(obj *ClusterUserAttribute) ([]string, error)
-
-type ClusterUserAttributeClientCache interface {
-	Get(namespace, name string) (*ClusterUserAttribute, error)
-	List(namespace string, selector labels.Selector) ([]*ClusterUserAttribute, error)
-
-	Index(name string, indexer ClusterUserAttributeIndexer)
-	GetIndexed(name, key string) ([]*ClusterUserAttribute, error)
-}
-
-type ClusterUserAttributeClient interface {
-	Create(*ClusterUserAttribute) (*ClusterUserAttribute, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*ClusterUserAttribute, error)
-	Update(*ClusterUserAttribute) (*ClusterUserAttribute, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*ClusterUserAttributeList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() ClusterUserAttributeClientCache
-
-	OnCreate(ctx context.Context, name string, sync ClusterUserAttributeChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync ClusterUserAttributeChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync ClusterUserAttributeChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() ClusterUserAttributeInterface
-}
-
-type clusterUserAttributeClientCache struct {
-	client *clusterUserAttributeClient2
-}
-
-type clusterUserAttributeClient2 struct {
-	iface      ClusterUserAttributeInterface
-	controller ClusterUserAttributeController
-}
-
-func (n *clusterUserAttributeClient2) Interface() ClusterUserAttributeInterface {
-	return n.iface
-}
-
-func (n *clusterUserAttributeClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *clusterUserAttributeClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *clusterUserAttributeClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *clusterUserAttributeClient2) Create(obj *ClusterUserAttribute) (*ClusterUserAttribute, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *clusterUserAttributeClient2) Get(namespace, name string, opts metav1.GetOptions) (*ClusterUserAttribute, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *clusterUserAttributeClient2) Update(obj *ClusterUserAttribute) (*ClusterUserAttribute, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *clusterUserAttributeClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *clusterUserAttributeClient2) List(namespace string, opts metav1.ListOptions) (*ClusterUserAttributeList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *clusterUserAttributeClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *clusterUserAttributeClientCache) Get(namespace, name string) (*ClusterUserAttribute, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *clusterUserAttributeClientCache) List(namespace string, selector labels.Selector) ([]*ClusterUserAttribute, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *clusterUserAttributeClient2) Cache() ClusterUserAttributeClientCache {
-	n.loadController()
-	return &clusterUserAttributeClientCache{
-		client: n,
-	}
-}
-
-func (n *clusterUserAttributeClient2) OnCreate(ctx context.Context, name string, sync ClusterUserAttributeChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &clusterUserAttributeLifecycleDelegate{create: sync})
-}
-
-func (n *clusterUserAttributeClient2) OnChange(ctx context.Context, name string, sync ClusterUserAttributeChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &clusterUserAttributeLifecycleDelegate{update: sync})
-}
-
-func (n *clusterUserAttributeClient2) OnRemove(ctx context.Context, name string, sync ClusterUserAttributeChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &clusterUserAttributeLifecycleDelegate{remove: sync})
-}
-
-func (n *clusterUserAttributeClientCache) Index(name string, indexer ClusterUserAttributeIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*ClusterUserAttribute); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *clusterUserAttributeClientCache) GetIndexed(name, key string) ([]*ClusterUserAttribute, error) {
-	var result []*ClusterUserAttribute
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*ClusterUserAttribute); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *clusterUserAttributeClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type clusterUserAttributeLifecycleDelegate struct {
-	create ClusterUserAttributeChangeHandlerFunc
-	update ClusterUserAttributeChangeHandlerFunc
-	remove ClusterUserAttributeChangeHandlerFunc
-}
-
-func (n *clusterUserAttributeLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *clusterUserAttributeLifecycleDelegate) Create(obj *ClusterUserAttribute) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *clusterUserAttributeLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *clusterUserAttributeLifecycleDelegate) Remove(obj *ClusterUserAttribute) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *clusterUserAttributeLifecycleDelegate) Updated(obj *ClusterUserAttribute) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

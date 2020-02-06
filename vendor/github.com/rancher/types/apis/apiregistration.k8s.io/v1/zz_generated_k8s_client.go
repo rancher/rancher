@@ -23,57 +23,12 @@ type Interface interface {
 	APIServicesGetter
 }
 
-type Clients struct {
-	Interface Interface
-
-	APIService APIServiceClient
-}
-
 type Client struct {
 	sync.Mutex
 	restClient rest.Interface
 	starters   []controller.Starter
 
 	apiServiceControllers map[string]APIServiceController
-}
-
-func Factory(ctx context.Context, config rest.Config) (context.Context, controller.Starter, error) {
-	c, err := NewForConfig(config)
-	if err != nil {
-		return ctx, nil, err
-	}
-
-	cs := NewClientsFromInterface(c)
-
-	ctx = context.WithValue(ctx, contextKeyType{}, c)
-	ctx = context.WithValue(ctx, contextClientsKeyType{}, cs)
-	return ctx, c, nil
-}
-
-func ClientsFrom(ctx context.Context) *Clients {
-	return ctx.Value(contextClientsKeyType{}).(*Clients)
-}
-
-func From(ctx context.Context) Interface {
-	return ctx.Value(contextKeyType{}).(Interface)
-}
-
-func NewClients(config rest.Config) (*Clients, error) {
-	iface, err := NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-	return NewClientsFromInterface(iface), nil
-}
-
-func NewClientsFromInterface(iface Interface) *Clients {
-	return &Clients{
-		Interface: iface,
-
-		APIService: &apiServiceClient2{
-			iface: iface.APIServices(""),
-		},
-	}
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {

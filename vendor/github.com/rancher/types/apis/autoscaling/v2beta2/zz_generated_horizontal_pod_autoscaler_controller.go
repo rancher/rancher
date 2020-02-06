@@ -2,6 +2,7 @@ package v2beta2
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -73,6 +74,7 @@ type HorizontalPodAutoscalerController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler HorizontalPodAutoscalerHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler HorizontalPodAutoscalerHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -327,184 +329,4 @@ func (s *horizontalPodAutoscalerClient) AddClusterScopedLifecycle(ctx context.Co
 func (s *horizontalPodAutoscalerClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle HorizontalPodAutoscalerLifecycle) {
 	sync := NewHorizontalPodAutoscalerLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type HorizontalPodAutoscalerIndexer func(obj *v2beta2.HorizontalPodAutoscaler) ([]string, error)
-
-type HorizontalPodAutoscalerClientCache interface {
-	Get(namespace, name string) (*v2beta2.HorizontalPodAutoscaler, error)
-	List(namespace string, selector labels.Selector) ([]*v2beta2.HorizontalPodAutoscaler, error)
-
-	Index(name string, indexer HorizontalPodAutoscalerIndexer)
-	GetIndexed(name, key string) ([]*v2beta2.HorizontalPodAutoscaler, error)
-}
-
-type HorizontalPodAutoscalerClient interface {
-	Create(*v2beta2.HorizontalPodAutoscaler) (*v2beta2.HorizontalPodAutoscaler, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*v2beta2.HorizontalPodAutoscaler, error)
-	Update(*v2beta2.HorizontalPodAutoscaler) (*v2beta2.HorizontalPodAutoscaler, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*HorizontalPodAutoscalerList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() HorizontalPodAutoscalerClientCache
-
-	OnCreate(ctx context.Context, name string, sync HorizontalPodAutoscalerChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync HorizontalPodAutoscalerChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync HorizontalPodAutoscalerChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() HorizontalPodAutoscalerInterface
-}
-
-type horizontalPodAutoscalerClientCache struct {
-	client *horizontalPodAutoscalerClient2
-}
-
-type horizontalPodAutoscalerClient2 struct {
-	iface      HorizontalPodAutoscalerInterface
-	controller HorizontalPodAutoscalerController
-}
-
-func (n *horizontalPodAutoscalerClient2) Interface() HorizontalPodAutoscalerInterface {
-	return n.iface
-}
-
-func (n *horizontalPodAutoscalerClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *horizontalPodAutoscalerClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *horizontalPodAutoscalerClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *horizontalPodAutoscalerClient2) Create(obj *v2beta2.HorizontalPodAutoscaler) (*v2beta2.HorizontalPodAutoscaler, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *horizontalPodAutoscalerClient2) Get(namespace, name string, opts metav1.GetOptions) (*v2beta2.HorizontalPodAutoscaler, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *horizontalPodAutoscalerClient2) Update(obj *v2beta2.HorizontalPodAutoscaler) (*v2beta2.HorizontalPodAutoscaler, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *horizontalPodAutoscalerClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *horizontalPodAutoscalerClient2) List(namespace string, opts metav1.ListOptions) (*HorizontalPodAutoscalerList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *horizontalPodAutoscalerClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *horizontalPodAutoscalerClientCache) Get(namespace, name string) (*v2beta2.HorizontalPodAutoscaler, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *horizontalPodAutoscalerClientCache) List(namespace string, selector labels.Selector) ([]*v2beta2.HorizontalPodAutoscaler, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *horizontalPodAutoscalerClient2) Cache() HorizontalPodAutoscalerClientCache {
-	n.loadController()
-	return &horizontalPodAutoscalerClientCache{
-		client: n,
-	}
-}
-
-func (n *horizontalPodAutoscalerClient2) OnCreate(ctx context.Context, name string, sync HorizontalPodAutoscalerChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &horizontalPodAutoscalerLifecycleDelegate{create: sync})
-}
-
-func (n *horizontalPodAutoscalerClient2) OnChange(ctx context.Context, name string, sync HorizontalPodAutoscalerChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &horizontalPodAutoscalerLifecycleDelegate{update: sync})
-}
-
-func (n *horizontalPodAutoscalerClient2) OnRemove(ctx context.Context, name string, sync HorizontalPodAutoscalerChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &horizontalPodAutoscalerLifecycleDelegate{remove: sync})
-}
-
-func (n *horizontalPodAutoscalerClientCache) Index(name string, indexer HorizontalPodAutoscalerIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*v2beta2.HorizontalPodAutoscaler); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *horizontalPodAutoscalerClientCache) GetIndexed(name, key string) ([]*v2beta2.HorizontalPodAutoscaler, error) {
-	var result []*v2beta2.HorizontalPodAutoscaler
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*v2beta2.HorizontalPodAutoscaler); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *horizontalPodAutoscalerClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type horizontalPodAutoscalerLifecycleDelegate struct {
-	create HorizontalPodAutoscalerChangeHandlerFunc
-	update HorizontalPodAutoscalerChangeHandlerFunc
-	remove HorizontalPodAutoscalerChangeHandlerFunc
-}
-
-func (n *horizontalPodAutoscalerLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *horizontalPodAutoscalerLifecycleDelegate) Create(obj *v2beta2.HorizontalPodAutoscaler) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *horizontalPodAutoscalerLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *horizontalPodAutoscalerLifecycleDelegate) Remove(obj *v2beta2.HorizontalPodAutoscaler) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *horizontalPodAutoscalerLifecycleDelegate) Updated(obj *v2beta2.HorizontalPodAutoscaler) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

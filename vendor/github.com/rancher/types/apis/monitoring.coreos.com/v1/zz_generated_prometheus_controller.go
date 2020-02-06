@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"time"
 
 	v1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/rancher/norman/controller"
@@ -73,6 +74,7 @@ type PrometheusController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler PrometheusHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler PrometheusHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -327,184 +329,4 @@ func (s *prometheusClient) AddClusterScopedLifecycle(ctx context.Context, name, 
 func (s *prometheusClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle PrometheusLifecycle) {
 	sync := NewPrometheusLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type PrometheusIndexer func(obj *v1.Prometheus) ([]string, error)
-
-type PrometheusClientCache interface {
-	Get(namespace, name string) (*v1.Prometheus, error)
-	List(namespace string, selector labels.Selector) ([]*v1.Prometheus, error)
-
-	Index(name string, indexer PrometheusIndexer)
-	GetIndexed(name, key string) ([]*v1.Prometheus, error)
-}
-
-type PrometheusClient interface {
-	Create(*v1.Prometheus) (*v1.Prometheus, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*v1.Prometheus, error)
-	Update(*v1.Prometheus) (*v1.Prometheus, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*PrometheusList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() PrometheusClientCache
-
-	OnCreate(ctx context.Context, name string, sync PrometheusChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync PrometheusChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync PrometheusChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() PrometheusInterface
-}
-
-type prometheusClientCache struct {
-	client *prometheusClient2
-}
-
-type prometheusClient2 struct {
-	iface      PrometheusInterface
-	controller PrometheusController
-}
-
-func (n *prometheusClient2) Interface() PrometheusInterface {
-	return n.iface
-}
-
-func (n *prometheusClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *prometheusClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *prometheusClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *prometheusClient2) Create(obj *v1.Prometheus) (*v1.Prometheus, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *prometheusClient2) Get(namespace, name string, opts metav1.GetOptions) (*v1.Prometheus, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *prometheusClient2) Update(obj *v1.Prometheus) (*v1.Prometheus, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *prometheusClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *prometheusClient2) List(namespace string, opts metav1.ListOptions) (*PrometheusList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *prometheusClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *prometheusClientCache) Get(namespace, name string) (*v1.Prometheus, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *prometheusClientCache) List(namespace string, selector labels.Selector) ([]*v1.Prometheus, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *prometheusClient2) Cache() PrometheusClientCache {
-	n.loadController()
-	return &prometheusClientCache{
-		client: n,
-	}
-}
-
-func (n *prometheusClient2) OnCreate(ctx context.Context, name string, sync PrometheusChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &prometheusLifecycleDelegate{create: sync})
-}
-
-func (n *prometheusClient2) OnChange(ctx context.Context, name string, sync PrometheusChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &prometheusLifecycleDelegate{update: sync})
-}
-
-func (n *prometheusClient2) OnRemove(ctx context.Context, name string, sync PrometheusChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &prometheusLifecycleDelegate{remove: sync})
-}
-
-func (n *prometheusClientCache) Index(name string, indexer PrometheusIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*v1.Prometheus); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *prometheusClientCache) GetIndexed(name, key string) ([]*v1.Prometheus, error) {
-	var result []*v1.Prometheus
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*v1.Prometheus); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *prometheusClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type prometheusLifecycleDelegate struct {
-	create PrometheusChangeHandlerFunc
-	update PrometheusChangeHandlerFunc
-	remove PrometheusChangeHandlerFunc
-}
-
-func (n *prometheusLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *prometheusLifecycleDelegate) Create(obj *v1.Prometheus) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *prometheusLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *prometheusLifecycleDelegate) Remove(obj *v1.Prometheus) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *prometheusLifecycleDelegate) Updated(obj *v1.Prometheus) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

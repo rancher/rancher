@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type ClusterScanController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ClusterScanHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterScanHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *clusterScanClient) AddClusterScopedLifecycle(ctx context.Context, name,
 func (s *clusterScanClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ClusterScanLifecycle) {
 	sync := NewClusterScanLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type ClusterScanIndexer func(obj *ClusterScan) ([]string, error)
-
-type ClusterScanClientCache interface {
-	Get(namespace, name string) (*ClusterScan, error)
-	List(namespace string, selector labels.Selector) ([]*ClusterScan, error)
-
-	Index(name string, indexer ClusterScanIndexer)
-	GetIndexed(name, key string) ([]*ClusterScan, error)
-}
-
-type ClusterScanClient interface {
-	Create(*ClusterScan) (*ClusterScan, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*ClusterScan, error)
-	Update(*ClusterScan) (*ClusterScan, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*ClusterScanList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() ClusterScanClientCache
-
-	OnCreate(ctx context.Context, name string, sync ClusterScanChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync ClusterScanChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync ClusterScanChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() ClusterScanInterface
-}
-
-type clusterScanClientCache struct {
-	client *clusterScanClient2
-}
-
-type clusterScanClient2 struct {
-	iface      ClusterScanInterface
-	controller ClusterScanController
-}
-
-func (n *clusterScanClient2) Interface() ClusterScanInterface {
-	return n.iface
-}
-
-func (n *clusterScanClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *clusterScanClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *clusterScanClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *clusterScanClient2) Create(obj *ClusterScan) (*ClusterScan, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *clusterScanClient2) Get(namespace, name string, opts metav1.GetOptions) (*ClusterScan, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *clusterScanClient2) Update(obj *ClusterScan) (*ClusterScan, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *clusterScanClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *clusterScanClient2) List(namespace string, opts metav1.ListOptions) (*ClusterScanList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *clusterScanClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *clusterScanClientCache) Get(namespace, name string) (*ClusterScan, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *clusterScanClientCache) List(namespace string, selector labels.Selector) ([]*ClusterScan, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *clusterScanClient2) Cache() ClusterScanClientCache {
-	n.loadController()
-	return &clusterScanClientCache{
-		client: n,
-	}
-}
-
-func (n *clusterScanClient2) OnCreate(ctx context.Context, name string, sync ClusterScanChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &clusterScanLifecycleDelegate{create: sync})
-}
-
-func (n *clusterScanClient2) OnChange(ctx context.Context, name string, sync ClusterScanChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &clusterScanLifecycleDelegate{update: sync})
-}
-
-func (n *clusterScanClient2) OnRemove(ctx context.Context, name string, sync ClusterScanChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &clusterScanLifecycleDelegate{remove: sync})
-}
-
-func (n *clusterScanClientCache) Index(name string, indexer ClusterScanIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*ClusterScan); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *clusterScanClientCache) GetIndexed(name, key string) ([]*ClusterScan, error) {
-	var result []*ClusterScan
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*ClusterScan); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *clusterScanClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type clusterScanLifecycleDelegate struct {
-	create ClusterScanChangeHandlerFunc
-	update ClusterScanChangeHandlerFunc
-	remove ClusterScanChangeHandlerFunc
-}
-
-func (n *clusterScanLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *clusterScanLifecycleDelegate) Create(obj *ClusterScan) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *clusterScanLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *clusterScanLifecycleDelegate) Remove(obj *ClusterScan) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *clusterScanLifecycleDelegate) Updated(obj *ClusterScan) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

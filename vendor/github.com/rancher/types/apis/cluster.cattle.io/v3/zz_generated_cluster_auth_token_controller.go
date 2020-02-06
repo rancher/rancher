@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type ClusterAuthTokenController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ClusterAuthTokenHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterAuthTokenHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *clusterAuthTokenClient) AddClusterScopedLifecycle(ctx context.Context, 
 func (s *clusterAuthTokenClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ClusterAuthTokenLifecycle) {
 	sync := NewClusterAuthTokenLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type ClusterAuthTokenIndexer func(obj *ClusterAuthToken) ([]string, error)
-
-type ClusterAuthTokenClientCache interface {
-	Get(namespace, name string) (*ClusterAuthToken, error)
-	List(namespace string, selector labels.Selector) ([]*ClusterAuthToken, error)
-
-	Index(name string, indexer ClusterAuthTokenIndexer)
-	GetIndexed(name, key string) ([]*ClusterAuthToken, error)
-}
-
-type ClusterAuthTokenClient interface {
-	Create(*ClusterAuthToken) (*ClusterAuthToken, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*ClusterAuthToken, error)
-	Update(*ClusterAuthToken) (*ClusterAuthToken, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*ClusterAuthTokenList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() ClusterAuthTokenClientCache
-
-	OnCreate(ctx context.Context, name string, sync ClusterAuthTokenChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync ClusterAuthTokenChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync ClusterAuthTokenChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() ClusterAuthTokenInterface
-}
-
-type clusterAuthTokenClientCache struct {
-	client *clusterAuthTokenClient2
-}
-
-type clusterAuthTokenClient2 struct {
-	iface      ClusterAuthTokenInterface
-	controller ClusterAuthTokenController
-}
-
-func (n *clusterAuthTokenClient2) Interface() ClusterAuthTokenInterface {
-	return n.iface
-}
-
-func (n *clusterAuthTokenClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *clusterAuthTokenClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *clusterAuthTokenClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *clusterAuthTokenClient2) Create(obj *ClusterAuthToken) (*ClusterAuthToken, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *clusterAuthTokenClient2) Get(namespace, name string, opts metav1.GetOptions) (*ClusterAuthToken, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *clusterAuthTokenClient2) Update(obj *ClusterAuthToken) (*ClusterAuthToken, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *clusterAuthTokenClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *clusterAuthTokenClient2) List(namespace string, opts metav1.ListOptions) (*ClusterAuthTokenList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *clusterAuthTokenClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *clusterAuthTokenClientCache) Get(namespace, name string) (*ClusterAuthToken, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *clusterAuthTokenClientCache) List(namespace string, selector labels.Selector) ([]*ClusterAuthToken, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *clusterAuthTokenClient2) Cache() ClusterAuthTokenClientCache {
-	n.loadController()
-	return &clusterAuthTokenClientCache{
-		client: n,
-	}
-}
-
-func (n *clusterAuthTokenClient2) OnCreate(ctx context.Context, name string, sync ClusterAuthTokenChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &clusterAuthTokenLifecycleDelegate{create: sync})
-}
-
-func (n *clusterAuthTokenClient2) OnChange(ctx context.Context, name string, sync ClusterAuthTokenChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &clusterAuthTokenLifecycleDelegate{update: sync})
-}
-
-func (n *clusterAuthTokenClient2) OnRemove(ctx context.Context, name string, sync ClusterAuthTokenChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &clusterAuthTokenLifecycleDelegate{remove: sync})
-}
-
-func (n *clusterAuthTokenClientCache) Index(name string, indexer ClusterAuthTokenIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*ClusterAuthToken); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *clusterAuthTokenClientCache) GetIndexed(name, key string) ([]*ClusterAuthToken, error) {
-	var result []*ClusterAuthToken
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*ClusterAuthToken); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *clusterAuthTokenClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type clusterAuthTokenLifecycleDelegate struct {
-	create ClusterAuthTokenChangeHandlerFunc
-	update ClusterAuthTokenChangeHandlerFunc
-	remove ClusterAuthTokenChangeHandlerFunc
-}
-
-func (n *clusterAuthTokenLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *clusterAuthTokenLifecycleDelegate) Create(obj *ClusterAuthToken) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *clusterAuthTokenLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *clusterAuthTokenLifecycleDelegate) Remove(obj *ClusterAuthToken) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *clusterAuthTokenLifecycleDelegate) Updated(obj *ClusterAuthToken) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type CisBenchmarkVersionController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler CisBenchmarkVersionHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler CisBenchmarkVersionHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *cisBenchmarkVersionClient) AddClusterScopedLifecycle(ctx context.Contex
 func (s *cisBenchmarkVersionClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle CisBenchmarkVersionLifecycle) {
 	sync := NewCisBenchmarkVersionLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type CisBenchmarkVersionIndexer func(obj *CisBenchmarkVersion) ([]string, error)
-
-type CisBenchmarkVersionClientCache interface {
-	Get(namespace, name string) (*CisBenchmarkVersion, error)
-	List(namespace string, selector labels.Selector) ([]*CisBenchmarkVersion, error)
-
-	Index(name string, indexer CisBenchmarkVersionIndexer)
-	GetIndexed(name, key string) ([]*CisBenchmarkVersion, error)
-}
-
-type CisBenchmarkVersionClient interface {
-	Create(*CisBenchmarkVersion) (*CisBenchmarkVersion, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*CisBenchmarkVersion, error)
-	Update(*CisBenchmarkVersion) (*CisBenchmarkVersion, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*CisBenchmarkVersionList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() CisBenchmarkVersionClientCache
-
-	OnCreate(ctx context.Context, name string, sync CisBenchmarkVersionChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync CisBenchmarkVersionChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync CisBenchmarkVersionChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() CisBenchmarkVersionInterface
-}
-
-type cisBenchmarkVersionClientCache struct {
-	client *cisBenchmarkVersionClient2
-}
-
-type cisBenchmarkVersionClient2 struct {
-	iface      CisBenchmarkVersionInterface
-	controller CisBenchmarkVersionController
-}
-
-func (n *cisBenchmarkVersionClient2) Interface() CisBenchmarkVersionInterface {
-	return n.iface
-}
-
-func (n *cisBenchmarkVersionClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *cisBenchmarkVersionClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *cisBenchmarkVersionClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *cisBenchmarkVersionClient2) Create(obj *CisBenchmarkVersion) (*CisBenchmarkVersion, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *cisBenchmarkVersionClient2) Get(namespace, name string, opts metav1.GetOptions) (*CisBenchmarkVersion, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *cisBenchmarkVersionClient2) Update(obj *CisBenchmarkVersion) (*CisBenchmarkVersion, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *cisBenchmarkVersionClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *cisBenchmarkVersionClient2) List(namespace string, opts metav1.ListOptions) (*CisBenchmarkVersionList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *cisBenchmarkVersionClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *cisBenchmarkVersionClientCache) Get(namespace, name string) (*CisBenchmarkVersion, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *cisBenchmarkVersionClientCache) List(namespace string, selector labels.Selector) ([]*CisBenchmarkVersion, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *cisBenchmarkVersionClient2) Cache() CisBenchmarkVersionClientCache {
-	n.loadController()
-	return &cisBenchmarkVersionClientCache{
-		client: n,
-	}
-}
-
-func (n *cisBenchmarkVersionClient2) OnCreate(ctx context.Context, name string, sync CisBenchmarkVersionChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &cisBenchmarkVersionLifecycleDelegate{create: sync})
-}
-
-func (n *cisBenchmarkVersionClient2) OnChange(ctx context.Context, name string, sync CisBenchmarkVersionChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &cisBenchmarkVersionLifecycleDelegate{update: sync})
-}
-
-func (n *cisBenchmarkVersionClient2) OnRemove(ctx context.Context, name string, sync CisBenchmarkVersionChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &cisBenchmarkVersionLifecycleDelegate{remove: sync})
-}
-
-func (n *cisBenchmarkVersionClientCache) Index(name string, indexer CisBenchmarkVersionIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*CisBenchmarkVersion); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *cisBenchmarkVersionClientCache) GetIndexed(name, key string) ([]*CisBenchmarkVersion, error) {
-	var result []*CisBenchmarkVersion
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*CisBenchmarkVersion); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *cisBenchmarkVersionClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type cisBenchmarkVersionLifecycleDelegate struct {
-	create CisBenchmarkVersionChangeHandlerFunc
-	update CisBenchmarkVersionChangeHandlerFunc
-	remove CisBenchmarkVersionChangeHandlerFunc
-}
-
-func (n *cisBenchmarkVersionLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *cisBenchmarkVersionLifecycleDelegate) Create(obj *CisBenchmarkVersion) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *cisBenchmarkVersionLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *cisBenchmarkVersionLifecycleDelegate) Remove(obj *CisBenchmarkVersion) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *cisBenchmarkVersionLifecycleDelegate) Updated(obj *CisBenchmarkVersion) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

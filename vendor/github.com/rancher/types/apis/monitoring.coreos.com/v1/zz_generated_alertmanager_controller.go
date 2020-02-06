@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"time"
 
 	v1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/rancher/norman/controller"
@@ -73,6 +74,7 @@ type AlertmanagerController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler AlertmanagerHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler AlertmanagerHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -327,184 +329,4 @@ func (s *alertmanagerClient) AddClusterScopedLifecycle(ctx context.Context, name
 func (s *alertmanagerClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle AlertmanagerLifecycle) {
 	sync := NewAlertmanagerLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type AlertmanagerIndexer func(obj *v1.Alertmanager) ([]string, error)
-
-type AlertmanagerClientCache interface {
-	Get(namespace, name string) (*v1.Alertmanager, error)
-	List(namespace string, selector labels.Selector) ([]*v1.Alertmanager, error)
-
-	Index(name string, indexer AlertmanagerIndexer)
-	GetIndexed(name, key string) ([]*v1.Alertmanager, error)
-}
-
-type AlertmanagerClient interface {
-	Create(*v1.Alertmanager) (*v1.Alertmanager, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*v1.Alertmanager, error)
-	Update(*v1.Alertmanager) (*v1.Alertmanager, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*AlertmanagerList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() AlertmanagerClientCache
-
-	OnCreate(ctx context.Context, name string, sync AlertmanagerChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync AlertmanagerChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync AlertmanagerChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() AlertmanagerInterface
-}
-
-type alertmanagerClientCache struct {
-	client *alertmanagerClient2
-}
-
-type alertmanagerClient2 struct {
-	iface      AlertmanagerInterface
-	controller AlertmanagerController
-}
-
-func (n *alertmanagerClient2) Interface() AlertmanagerInterface {
-	return n.iface
-}
-
-func (n *alertmanagerClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *alertmanagerClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *alertmanagerClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *alertmanagerClient2) Create(obj *v1.Alertmanager) (*v1.Alertmanager, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *alertmanagerClient2) Get(namespace, name string, opts metav1.GetOptions) (*v1.Alertmanager, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *alertmanagerClient2) Update(obj *v1.Alertmanager) (*v1.Alertmanager, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *alertmanagerClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *alertmanagerClient2) List(namespace string, opts metav1.ListOptions) (*AlertmanagerList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *alertmanagerClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *alertmanagerClientCache) Get(namespace, name string) (*v1.Alertmanager, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *alertmanagerClientCache) List(namespace string, selector labels.Selector) ([]*v1.Alertmanager, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *alertmanagerClient2) Cache() AlertmanagerClientCache {
-	n.loadController()
-	return &alertmanagerClientCache{
-		client: n,
-	}
-}
-
-func (n *alertmanagerClient2) OnCreate(ctx context.Context, name string, sync AlertmanagerChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &alertmanagerLifecycleDelegate{create: sync})
-}
-
-func (n *alertmanagerClient2) OnChange(ctx context.Context, name string, sync AlertmanagerChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &alertmanagerLifecycleDelegate{update: sync})
-}
-
-func (n *alertmanagerClient2) OnRemove(ctx context.Context, name string, sync AlertmanagerChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &alertmanagerLifecycleDelegate{remove: sync})
-}
-
-func (n *alertmanagerClientCache) Index(name string, indexer AlertmanagerIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*v1.Alertmanager); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *alertmanagerClientCache) GetIndexed(name, key string) ([]*v1.Alertmanager, error) {
-	var result []*v1.Alertmanager
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*v1.Alertmanager); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *alertmanagerClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type alertmanagerLifecycleDelegate struct {
-	create AlertmanagerChangeHandlerFunc
-	update AlertmanagerChangeHandlerFunc
-	remove AlertmanagerChangeHandlerFunc
-}
-
-func (n *alertmanagerLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *alertmanagerLifecycleDelegate) Create(obj *v1.Alertmanager) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *alertmanagerLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *alertmanagerLifecycleDelegate) Remove(obj *v1.Alertmanager) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *alertmanagerLifecycleDelegate) Updated(obj *v1.Alertmanager) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

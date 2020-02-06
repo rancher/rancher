@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type NodePoolController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler NodePoolHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler NodePoolHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *nodePoolClient) AddClusterScopedLifecycle(ctx context.Context, name, cl
 func (s *nodePoolClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle NodePoolLifecycle) {
 	sync := NewNodePoolLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type NodePoolIndexer func(obj *NodePool) ([]string, error)
-
-type NodePoolClientCache interface {
-	Get(namespace, name string) (*NodePool, error)
-	List(namespace string, selector labels.Selector) ([]*NodePool, error)
-
-	Index(name string, indexer NodePoolIndexer)
-	GetIndexed(name, key string) ([]*NodePool, error)
-}
-
-type NodePoolClient interface {
-	Create(*NodePool) (*NodePool, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*NodePool, error)
-	Update(*NodePool) (*NodePool, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*NodePoolList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() NodePoolClientCache
-
-	OnCreate(ctx context.Context, name string, sync NodePoolChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync NodePoolChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync NodePoolChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() NodePoolInterface
-}
-
-type nodePoolClientCache struct {
-	client *nodePoolClient2
-}
-
-type nodePoolClient2 struct {
-	iface      NodePoolInterface
-	controller NodePoolController
-}
-
-func (n *nodePoolClient2) Interface() NodePoolInterface {
-	return n.iface
-}
-
-func (n *nodePoolClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *nodePoolClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *nodePoolClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *nodePoolClient2) Create(obj *NodePool) (*NodePool, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *nodePoolClient2) Get(namespace, name string, opts metav1.GetOptions) (*NodePool, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *nodePoolClient2) Update(obj *NodePool) (*NodePool, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *nodePoolClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *nodePoolClient2) List(namespace string, opts metav1.ListOptions) (*NodePoolList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *nodePoolClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *nodePoolClientCache) Get(namespace, name string) (*NodePool, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *nodePoolClientCache) List(namespace string, selector labels.Selector) ([]*NodePool, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *nodePoolClient2) Cache() NodePoolClientCache {
-	n.loadController()
-	return &nodePoolClientCache{
-		client: n,
-	}
-}
-
-func (n *nodePoolClient2) OnCreate(ctx context.Context, name string, sync NodePoolChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &nodePoolLifecycleDelegate{create: sync})
-}
-
-func (n *nodePoolClient2) OnChange(ctx context.Context, name string, sync NodePoolChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &nodePoolLifecycleDelegate{update: sync})
-}
-
-func (n *nodePoolClient2) OnRemove(ctx context.Context, name string, sync NodePoolChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &nodePoolLifecycleDelegate{remove: sync})
-}
-
-func (n *nodePoolClientCache) Index(name string, indexer NodePoolIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*NodePool); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *nodePoolClientCache) GetIndexed(name, key string) ([]*NodePool, error) {
-	var result []*NodePool
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*NodePool); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *nodePoolClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type nodePoolLifecycleDelegate struct {
-	create NodePoolChangeHandlerFunc
-	update NodePoolChangeHandlerFunc
-	remove NodePoolChangeHandlerFunc
-}
-
-func (n *nodePoolLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *nodePoolLifecycleDelegate) Create(obj *NodePool) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *nodePoolLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *nodePoolLifecycleDelegate) Remove(obj *NodePool) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *nodePoolLifecycleDelegate) Updated(obj *NodePool) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type MultiClusterAppController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler MultiClusterAppHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler MultiClusterAppHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *multiClusterAppClient) AddClusterScopedLifecycle(ctx context.Context, n
 func (s *multiClusterAppClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle MultiClusterAppLifecycle) {
 	sync := NewMultiClusterAppLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type MultiClusterAppIndexer func(obj *MultiClusterApp) ([]string, error)
-
-type MultiClusterAppClientCache interface {
-	Get(namespace, name string) (*MultiClusterApp, error)
-	List(namespace string, selector labels.Selector) ([]*MultiClusterApp, error)
-
-	Index(name string, indexer MultiClusterAppIndexer)
-	GetIndexed(name, key string) ([]*MultiClusterApp, error)
-}
-
-type MultiClusterAppClient interface {
-	Create(*MultiClusterApp) (*MultiClusterApp, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*MultiClusterApp, error)
-	Update(*MultiClusterApp) (*MultiClusterApp, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*MultiClusterAppList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() MultiClusterAppClientCache
-
-	OnCreate(ctx context.Context, name string, sync MultiClusterAppChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync MultiClusterAppChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync MultiClusterAppChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() MultiClusterAppInterface
-}
-
-type multiClusterAppClientCache struct {
-	client *multiClusterAppClient2
-}
-
-type multiClusterAppClient2 struct {
-	iface      MultiClusterAppInterface
-	controller MultiClusterAppController
-}
-
-func (n *multiClusterAppClient2) Interface() MultiClusterAppInterface {
-	return n.iface
-}
-
-func (n *multiClusterAppClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *multiClusterAppClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *multiClusterAppClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *multiClusterAppClient2) Create(obj *MultiClusterApp) (*MultiClusterApp, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *multiClusterAppClient2) Get(namespace, name string, opts metav1.GetOptions) (*MultiClusterApp, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *multiClusterAppClient2) Update(obj *MultiClusterApp) (*MultiClusterApp, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *multiClusterAppClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *multiClusterAppClient2) List(namespace string, opts metav1.ListOptions) (*MultiClusterAppList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *multiClusterAppClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *multiClusterAppClientCache) Get(namespace, name string) (*MultiClusterApp, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *multiClusterAppClientCache) List(namespace string, selector labels.Selector) ([]*MultiClusterApp, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *multiClusterAppClient2) Cache() MultiClusterAppClientCache {
-	n.loadController()
-	return &multiClusterAppClientCache{
-		client: n,
-	}
-}
-
-func (n *multiClusterAppClient2) OnCreate(ctx context.Context, name string, sync MultiClusterAppChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &multiClusterAppLifecycleDelegate{create: sync})
-}
-
-func (n *multiClusterAppClient2) OnChange(ctx context.Context, name string, sync MultiClusterAppChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &multiClusterAppLifecycleDelegate{update: sync})
-}
-
-func (n *multiClusterAppClient2) OnRemove(ctx context.Context, name string, sync MultiClusterAppChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &multiClusterAppLifecycleDelegate{remove: sync})
-}
-
-func (n *multiClusterAppClientCache) Index(name string, indexer MultiClusterAppIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*MultiClusterApp); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *multiClusterAppClientCache) GetIndexed(name, key string) ([]*MultiClusterApp, error) {
-	var result []*MultiClusterApp
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*MultiClusterApp); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *multiClusterAppClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type multiClusterAppLifecycleDelegate struct {
-	create MultiClusterAppChangeHandlerFunc
-	update MultiClusterAppChangeHandlerFunc
-	remove MultiClusterAppChangeHandlerFunc
-}
-
-func (n *multiClusterAppLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *multiClusterAppLifecycleDelegate) Create(obj *MultiClusterApp) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *multiClusterAppLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *multiClusterAppLifecycleDelegate) Remove(obj *MultiClusterApp) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *multiClusterAppLifecycleDelegate) Updated(obj *MultiClusterApp) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

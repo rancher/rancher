@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type ClusterRoleController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ClusterRoleHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterRoleHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *clusterRoleClient) AddClusterScopedLifecycle(ctx context.Context, name,
 func (s *clusterRoleClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ClusterRoleLifecycle) {
 	sync := NewClusterRoleLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type ClusterRoleIndexer func(obj *v1.ClusterRole) ([]string, error)
-
-type ClusterRoleClientCache interface {
-	Get(namespace, name string) (*v1.ClusterRole, error)
-	List(namespace string, selector labels.Selector) ([]*v1.ClusterRole, error)
-
-	Index(name string, indexer ClusterRoleIndexer)
-	GetIndexed(name, key string) ([]*v1.ClusterRole, error)
-}
-
-type ClusterRoleClient interface {
-	Create(*v1.ClusterRole) (*v1.ClusterRole, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*v1.ClusterRole, error)
-	Update(*v1.ClusterRole) (*v1.ClusterRole, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*ClusterRoleList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() ClusterRoleClientCache
-
-	OnCreate(ctx context.Context, name string, sync ClusterRoleChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync ClusterRoleChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync ClusterRoleChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() ClusterRoleInterface
-}
-
-type clusterRoleClientCache struct {
-	client *clusterRoleClient2
-}
-
-type clusterRoleClient2 struct {
-	iface      ClusterRoleInterface
-	controller ClusterRoleController
-}
-
-func (n *clusterRoleClient2) Interface() ClusterRoleInterface {
-	return n.iface
-}
-
-func (n *clusterRoleClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *clusterRoleClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *clusterRoleClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *clusterRoleClient2) Create(obj *v1.ClusterRole) (*v1.ClusterRole, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *clusterRoleClient2) Get(namespace, name string, opts metav1.GetOptions) (*v1.ClusterRole, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *clusterRoleClient2) Update(obj *v1.ClusterRole) (*v1.ClusterRole, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *clusterRoleClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *clusterRoleClient2) List(namespace string, opts metav1.ListOptions) (*ClusterRoleList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *clusterRoleClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *clusterRoleClientCache) Get(namespace, name string) (*v1.ClusterRole, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *clusterRoleClientCache) List(namespace string, selector labels.Selector) ([]*v1.ClusterRole, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *clusterRoleClient2) Cache() ClusterRoleClientCache {
-	n.loadController()
-	return &clusterRoleClientCache{
-		client: n,
-	}
-}
-
-func (n *clusterRoleClient2) OnCreate(ctx context.Context, name string, sync ClusterRoleChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &clusterRoleLifecycleDelegate{create: sync})
-}
-
-func (n *clusterRoleClient2) OnChange(ctx context.Context, name string, sync ClusterRoleChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &clusterRoleLifecycleDelegate{update: sync})
-}
-
-func (n *clusterRoleClient2) OnRemove(ctx context.Context, name string, sync ClusterRoleChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &clusterRoleLifecycleDelegate{remove: sync})
-}
-
-func (n *clusterRoleClientCache) Index(name string, indexer ClusterRoleIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*v1.ClusterRole); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *clusterRoleClientCache) GetIndexed(name, key string) ([]*v1.ClusterRole, error) {
-	var result []*v1.ClusterRole
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*v1.ClusterRole); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *clusterRoleClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type clusterRoleLifecycleDelegate struct {
-	create ClusterRoleChangeHandlerFunc
-	update ClusterRoleChangeHandlerFunc
-	remove ClusterRoleChangeHandlerFunc
-}
-
-func (n *clusterRoleLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *clusterRoleLifecycleDelegate) Create(obj *v1.ClusterRole) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *clusterRoleLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *clusterRoleLifecycleDelegate) Remove(obj *v1.ClusterRole) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *clusterRoleLifecycleDelegate) Updated(obj *v1.ClusterRole) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

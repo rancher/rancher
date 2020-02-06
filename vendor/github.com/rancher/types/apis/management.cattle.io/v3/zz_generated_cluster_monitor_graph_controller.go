@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type ClusterMonitorGraphController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ClusterMonitorGraphHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterMonitorGraphHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *clusterMonitorGraphClient) AddClusterScopedLifecycle(ctx context.Contex
 func (s *clusterMonitorGraphClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ClusterMonitorGraphLifecycle) {
 	sync := NewClusterMonitorGraphLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type ClusterMonitorGraphIndexer func(obj *ClusterMonitorGraph) ([]string, error)
-
-type ClusterMonitorGraphClientCache interface {
-	Get(namespace, name string) (*ClusterMonitorGraph, error)
-	List(namespace string, selector labels.Selector) ([]*ClusterMonitorGraph, error)
-
-	Index(name string, indexer ClusterMonitorGraphIndexer)
-	GetIndexed(name, key string) ([]*ClusterMonitorGraph, error)
-}
-
-type ClusterMonitorGraphClient interface {
-	Create(*ClusterMonitorGraph) (*ClusterMonitorGraph, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*ClusterMonitorGraph, error)
-	Update(*ClusterMonitorGraph) (*ClusterMonitorGraph, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*ClusterMonitorGraphList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() ClusterMonitorGraphClientCache
-
-	OnCreate(ctx context.Context, name string, sync ClusterMonitorGraphChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync ClusterMonitorGraphChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync ClusterMonitorGraphChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() ClusterMonitorGraphInterface
-}
-
-type clusterMonitorGraphClientCache struct {
-	client *clusterMonitorGraphClient2
-}
-
-type clusterMonitorGraphClient2 struct {
-	iface      ClusterMonitorGraphInterface
-	controller ClusterMonitorGraphController
-}
-
-func (n *clusterMonitorGraphClient2) Interface() ClusterMonitorGraphInterface {
-	return n.iface
-}
-
-func (n *clusterMonitorGraphClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *clusterMonitorGraphClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *clusterMonitorGraphClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *clusterMonitorGraphClient2) Create(obj *ClusterMonitorGraph) (*ClusterMonitorGraph, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *clusterMonitorGraphClient2) Get(namespace, name string, opts metav1.GetOptions) (*ClusterMonitorGraph, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *clusterMonitorGraphClient2) Update(obj *ClusterMonitorGraph) (*ClusterMonitorGraph, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *clusterMonitorGraphClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *clusterMonitorGraphClient2) List(namespace string, opts metav1.ListOptions) (*ClusterMonitorGraphList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *clusterMonitorGraphClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *clusterMonitorGraphClientCache) Get(namespace, name string) (*ClusterMonitorGraph, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *clusterMonitorGraphClientCache) List(namespace string, selector labels.Selector) ([]*ClusterMonitorGraph, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *clusterMonitorGraphClient2) Cache() ClusterMonitorGraphClientCache {
-	n.loadController()
-	return &clusterMonitorGraphClientCache{
-		client: n,
-	}
-}
-
-func (n *clusterMonitorGraphClient2) OnCreate(ctx context.Context, name string, sync ClusterMonitorGraphChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &clusterMonitorGraphLifecycleDelegate{create: sync})
-}
-
-func (n *clusterMonitorGraphClient2) OnChange(ctx context.Context, name string, sync ClusterMonitorGraphChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &clusterMonitorGraphLifecycleDelegate{update: sync})
-}
-
-func (n *clusterMonitorGraphClient2) OnRemove(ctx context.Context, name string, sync ClusterMonitorGraphChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &clusterMonitorGraphLifecycleDelegate{remove: sync})
-}
-
-func (n *clusterMonitorGraphClientCache) Index(name string, indexer ClusterMonitorGraphIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*ClusterMonitorGraph); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *clusterMonitorGraphClientCache) GetIndexed(name, key string) ([]*ClusterMonitorGraph, error) {
-	var result []*ClusterMonitorGraph
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*ClusterMonitorGraph); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *clusterMonitorGraphClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type clusterMonitorGraphLifecycleDelegate struct {
-	create ClusterMonitorGraphChangeHandlerFunc
-	update ClusterMonitorGraphChangeHandlerFunc
-	remove ClusterMonitorGraphChangeHandlerFunc
-}
-
-func (n *clusterMonitorGraphLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *clusterMonitorGraphLifecycleDelegate) Create(obj *ClusterMonitorGraph) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *clusterMonitorGraphLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *clusterMonitorGraphLifecycleDelegate) Remove(obj *ClusterMonitorGraph) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *clusterMonitorGraphLifecycleDelegate) Updated(obj *ClusterMonitorGraph) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

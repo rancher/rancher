@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type ClusterAlertGroupController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ClusterAlertGroupHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterAlertGroupHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *clusterAlertGroupClient) AddClusterScopedLifecycle(ctx context.Context,
 func (s *clusterAlertGroupClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ClusterAlertGroupLifecycle) {
 	sync := NewClusterAlertGroupLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type ClusterAlertGroupIndexer func(obj *ClusterAlertGroup) ([]string, error)
-
-type ClusterAlertGroupClientCache interface {
-	Get(namespace, name string) (*ClusterAlertGroup, error)
-	List(namespace string, selector labels.Selector) ([]*ClusterAlertGroup, error)
-
-	Index(name string, indexer ClusterAlertGroupIndexer)
-	GetIndexed(name, key string) ([]*ClusterAlertGroup, error)
-}
-
-type ClusterAlertGroupClient interface {
-	Create(*ClusterAlertGroup) (*ClusterAlertGroup, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*ClusterAlertGroup, error)
-	Update(*ClusterAlertGroup) (*ClusterAlertGroup, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*ClusterAlertGroupList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() ClusterAlertGroupClientCache
-
-	OnCreate(ctx context.Context, name string, sync ClusterAlertGroupChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync ClusterAlertGroupChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync ClusterAlertGroupChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() ClusterAlertGroupInterface
-}
-
-type clusterAlertGroupClientCache struct {
-	client *clusterAlertGroupClient2
-}
-
-type clusterAlertGroupClient2 struct {
-	iface      ClusterAlertGroupInterface
-	controller ClusterAlertGroupController
-}
-
-func (n *clusterAlertGroupClient2) Interface() ClusterAlertGroupInterface {
-	return n.iface
-}
-
-func (n *clusterAlertGroupClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *clusterAlertGroupClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *clusterAlertGroupClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *clusterAlertGroupClient2) Create(obj *ClusterAlertGroup) (*ClusterAlertGroup, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *clusterAlertGroupClient2) Get(namespace, name string, opts metav1.GetOptions) (*ClusterAlertGroup, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *clusterAlertGroupClient2) Update(obj *ClusterAlertGroup) (*ClusterAlertGroup, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *clusterAlertGroupClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *clusterAlertGroupClient2) List(namespace string, opts metav1.ListOptions) (*ClusterAlertGroupList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *clusterAlertGroupClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *clusterAlertGroupClientCache) Get(namespace, name string) (*ClusterAlertGroup, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *clusterAlertGroupClientCache) List(namespace string, selector labels.Selector) ([]*ClusterAlertGroup, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *clusterAlertGroupClient2) Cache() ClusterAlertGroupClientCache {
-	n.loadController()
-	return &clusterAlertGroupClientCache{
-		client: n,
-	}
-}
-
-func (n *clusterAlertGroupClient2) OnCreate(ctx context.Context, name string, sync ClusterAlertGroupChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &clusterAlertGroupLifecycleDelegate{create: sync})
-}
-
-func (n *clusterAlertGroupClient2) OnChange(ctx context.Context, name string, sync ClusterAlertGroupChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &clusterAlertGroupLifecycleDelegate{update: sync})
-}
-
-func (n *clusterAlertGroupClient2) OnRemove(ctx context.Context, name string, sync ClusterAlertGroupChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &clusterAlertGroupLifecycleDelegate{remove: sync})
-}
-
-func (n *clusterAlertGroupClientCache) Index(name string, indexer ClusterAlertGroupIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*ClusterAlertGroup); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *clusterAlertGroupClientCache) GetIndexed(name, key string) ([]*ClusterAlertGroup, error) {
-	var result []*ClusterAlertGroup
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*ClusterAlertGroup); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *clusterAlertGroupClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type clusterAlertGroupLifecycleDelegate struct {
-	create ClusterAlertGroupChangeHandlerFunc
-	update ClusterAlertGroupChangeHandlerFunc
-	remove ClusterAlertGroupChangeHandlerFunc
-}
-
-func (n *clusterAlertGroupLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *clusterAlertGroupLifecycleDelegate) Create(obj *ClusterAlertGroup) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *clusterAlertGroupLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *clusterAlertGroupLifecycleDelegate) Remove(obj *ClusterAlertGroup) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *clusterAlertGroupLifecycleDelegate) Updated(obj *ClusterAlertGroup) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

@@ -2,6 +2,7 @@ package v1beta1
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -73,6 +74,7 @@ type CronJobController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler CronJobHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler CronJobHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -327,184 +329,4 @@ func (s *cronJobClient) AddClusterScopedLifecycle(ctx context.Context, name, clu
 func (s *cronJobClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle CronJobLifecycle) {
 	sync := NewCronJobLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type CronJobIndexer func(obj *v1beta1.CronJob) ([]string, error)
-
-type CronJobClientCache interface {
-	Get(namespace, name string) (*v1beta1.CronJob, error)
-	List(namespace string, selector labels.Selector) ([]*v1beta1.CronJob, error)
-
-	Index(name string, indexer CronJobIndexer)
-	GetIndexed(name, key string) ([]*v1beta1.CronJob, error)
-}
-
-type CronJobClient interface {
-	Create(*v1beta1.CronJob) (*v1beta1.CronJob, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*v1beta1.CronJob, error)
-	Update(*v1beta1.CronJob) (*v1beta1.CronJob, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*CronJobList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() CronJobClientCache
-
-	OnCreate(ctx context.Context, name string, sync CronJobChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync CronJobChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync CronJobChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() CronJobInterface
-}
-
-type cronJobClientCache struct {
-	client *cronJobClient2
-}
-
-type cronJobClient2 struct {
-	iface      CronJobInterface
-	controller CronJobController
-}
-
-func (n *cronJobClient2) Interface() CronJobInterface {
-	return n.iface
-}
-
-func (n *cronJobClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *cronJobClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *cronJobClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *cronJobClient2) Create(obj *v1beta1.CronJob) (*v1beta1.CronJob, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *cronJobClient2) Get(namespace, name string, opts metav1.GetOptions) (*v1beta1.CronJob, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *cronJobClient2) Update(obj *v1beta1.CronJob) (*v1beta1.CronJob, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *cronJobClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *cronJobClient2) List(namespace string, opts metav1.ListOptions) (*CronJobList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *cronJobClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *cronJobClientCache) Get(namespace, name string) (*v1beta1.CronJob, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *cronJobClientCache) List(namespace string, selector labels.Selector) ([]*v1beta1.CronJob, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *cronJobClient2) Cache() CronJobClientCache {
-	n.loadController()
-	return &cronJobClientCache{
-		client: n,
-	}
-}
-
-func (n *cronJobClient2) OnCreate(ctx context.Context, name string, sync CronJobChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &cronJobLifecycleDelegate{create: sync})
-}
-
-func (n *cronJobClient2) OnChange(ctx context.Context, name string, sync CronJobChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &cronJobLifecycleDelegate{update: sync})
-}
-
-func (n *cronJobClient2) OnRemove(ctx context.Context, name string, sync CronJobChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &cronJobLifecycleDelegate{remove: sync})
-}
-
-func (n *cronJobClientCache) Index(name string, indexer CronJobIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*v1beta1.CronJob); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *cronJobClientCache) GetIndexed(name, key string) ([]*v1beta1.CronJob, error) {
-	var result []*v1beta1.CronJob
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*v1beta1.CronJob); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *cronJobClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type cronJobLifecycleDelegate struct {
-	create CronJobChangeHandlerFunc
-	update CronJobChangeHandlerFunc
-	remove CronJobChangeHandlerFunc
-}
-
-func (n *cronJobLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *cronJobLifecycleDelegate) Create(obj *v1beta1.CronJob) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *cronJobLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *cronJobLifecycleDelegate) Remove(obj *v1beta1.CronJob) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *cronJobLifecycleDelegate) Updated(obj *v1beta1.CronJob) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

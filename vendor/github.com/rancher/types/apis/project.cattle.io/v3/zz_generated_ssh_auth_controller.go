@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type SSHAuthController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler SSHAuthHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler SSHAuthHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *sshAuthClient) AddClusterScopedLifecycle(ctx context.Context, name, clu
 func (s *sshAuthClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle SSHAuthLifecycle) {
 	sync := NewSSHAuthLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type SSHAuthIndexer func(obj *SSHAuth) ([]string, error)
-
-type SSHAuthClientCache interface {
-	Get(namespace, name string) (*SSHAuth, error)
-	List(namespace string, selector labels.Selector) ([]*SSHAuth, error)
-
-	Index(name string, indexer SSHAuthIndexer)
-	GetIndexed(name, key string) ([]*SSHAuth, error)
-}
-
-type SSHAuthClient interface {
-	Create(*SSHAuth) (*SSHAuth, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*SSHAuth, error)
-	Update(*SSHAuth) (*SSHAuth, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*SSHAuthList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() SSHAuthClientCache
-
-	OnCreate(ctx context.Context, name string, sync SSHAuthChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync SSHAuthChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync SSHAuthChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() SSHAuthInterface
-}
-
-type sshAuthClientCache struct {
-	client *sshAuthClient2
-}
-
-type sshAuthClient2 struct {
-	iface      SSHAuthInterface
-	controller SSHAuthController
-}
-
-func (n *sshAuthClient2) Interface() SSHAuthInterface {
-	return n.iface
-}
-
-func (n *sshAuthClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *sshAuthClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *sshAuthClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *sshAuthClient2) Create(obj *SSHAuth) (*SSHAuth, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *sshAuthClient2) Get(namespace, name string, opts metav1.GetOptions) (*SSHAuth, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *sshAuthClient2) Update(obj *SSHAuth) (*SSHAuth, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *sshAuthClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *sshAuthClient2) List(namespace string, opts metav1.ListOptions) (*SSHAuthList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *sshAuthClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *sshAuthClientCache) Get(namespace, name string) (*SSHAuth, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *sshAuthClientCache) List(namespace string, selector labels.Selector) ([]*SSHAuth, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *sshAuthClient2) Cache() SSHAuthClientCache {
-	n.loadController()
-	return &sshAuthClientCache{
-		client: n,
-	}
-}
-
-func (n *sshAuthClient2) OnCreate(ctx context.Context, name string, sync SSHAuthChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &sshAuthLifecycleDelegate{create: sync})
-}
-
-func (n *sshAuthClient2) OnChange(ctx context.Context, name string, sync SSHAuthChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &sshAuthLifecycleDelegate{update: sync})
-}
-
-func (n *sshAuthClient2) OnRemove(ctx context.Context, name string, sync SSHAuthChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &sshAuthLifecycleDelegate{remove: sync})
-}
-
-func (n *sshAuthClientCache) Index(name string, indexer SSHAuthIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*SSHAuth); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *sshAuthClientCache) GetIndexed(name, key string) ([]*SSHAuth, error) {
-	var result []*SSHAuth
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*SSHAuth); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *sshAuthClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type sshAuthLifecycleDelegate struct {
-	create SSHAuthChangeHandlerFunc
-	update SSHAuthChangeHandlerFunc
-	remove SSHAuthChangeHandlerFunc
-}
-
-func (n *sshAuthLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *sshAuthLifecycleDelegate) Create(obj *SSHAuth) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *sshAuthLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *sshAuthLifecycleDelegate) Remove(obj *SSHAuth) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *sshAuthLifecycleDelegate) Updated(obj *SSHAuth) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

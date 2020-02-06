@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -73,6 +74,7 @@ type LimitRangeController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler LimitRangeHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler LimitRangeHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -327,184 +329,4 @@ func (s *limitRangeClient) AddClusterScopedLifecycle(ctx context.Context, name, 
 func (s *limitRangeClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle LimitRangeLifecycle) {
 	sync := NewLimitRangeLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type LimitRangeIndexer func(obj *v1.LimitRange) ([]string, error)
-
-type LimitRangeClientCache interface {
-	Get(namespace, name string) (*v1.LimitRange, error)
-	List(namespace string, selector labels.Selector) ([]*v1.LimitRange, error)
-
-	Index(name string, indexer LimitRangeIndexer)
-	GetIndexed(name, key string) ([]*v1.LimitRange, error)
-}
-
-type LimitRangeClient interface {
-	Create(*v1.LimitRange) (*v1.LimitRange, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*v1.LimitRange, error)
-	Update(*v1.LimitRange) (*v1.LimitRange, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*LimitRangeList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() LimitRangeClientCache
-
-	OnCreate(ctx context.Context, name string, sync LimitRangeChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync LimitRangeChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync LimitRangeChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() LimitRangeInterface
-}
-
-type limitRangeClientCache struct {
-	client *limitRangeClient2
-}
-
-type limitRangeClient2 struct {
-	iface      LimitRangeInterface
-	controller LimitRangeController
-}
-
-func (n *limitRangeClient2) Interface() LimitRangeInterface {
-	return n.iface
-}
-
-func (n *limitRangeClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *limitRangeClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *limitRangeClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *limitRangeClient2) Create(obj *v1.LimitRange) (*v1.LimitRange, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *limitRangeClient2) Get(namespace, name string, opts metav1.GetOptions) (*v1.LimitRange, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *limitRangeClient2) Update(obj *v1.LimitRange) (*v1.LimitRange, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *limitRangeClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *limitRangeClient2) List(namespace string, opts metav1.ListOptions) (*LimitRangeList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *limitRangeClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *limitRangeClientCache) Get(namespace, name string) (*v1.LimitRange, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *limitRangeClientCache) List(namespace string, selector labels.Selector) ([]*v1.LimitRange, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *limitRangeClient2) Cache() LimitRangeClientCache {
-	n.loadController()
-	return &limitRangeClientCache{
-		client: n,
-	}
-}
-
-func (n *limitRangeClient2) OnCreate(ctx context.Context, name string, sync LimitRangeChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &limitRangeLifecycleDelegate{create: sync})
-}
-
-func (n *limitRangeClient2) OnChange(ctx context.Context, name string, sync LimitRangeChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &limitRangeLifecycleDelegate{update: sync})
-}
-
-func (n *limitRangeClient2) OnRemove(ctx context.Context, name string, sync LimitRangeChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &limitRangeLifecycleDelegate{remove: sync})
-}
-
-func (n *limitRangeClientCache) Index(name string, indexer LimitRangeIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*v1.LimitRange); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *limitRangeClientCache) GetIndexed(name, key string) ([]*v1.LimitRange, error) {
-	var result []*v1.LimitRange
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*v1.LimitRange); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *limitRangeClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type limitRangeLifecycleDelegate struct {
-	create LimitRangeChangeHandlerFunc
-	update LimitRangeChangeHandlerFunc
-	remove LimitRangeChangeHandlerFunc
-}
-
-func (n *limitRangeLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *limitRangeLifecycleDelegate) Create(obj *v1.LimitRange) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *limitRangeLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *limitRangeLifecycleDelegate) Remove(obj *v1.LimitRange) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *limitRangeLifecycleDelegate) Updated(obj *v1.LimitRange) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

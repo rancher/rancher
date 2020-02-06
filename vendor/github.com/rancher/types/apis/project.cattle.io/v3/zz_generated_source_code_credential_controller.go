@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type SourceCodeCredentialController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler SourceCodeCredentialHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler SourceCodeCredentialHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *sourceCodeCredentialClient) AddClusterScopedLifecycle(ctx context.Conte
 func (s *sourceCodeCredentialClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle SourceCodeCredentialLifecycle) {
 	sync := NewSourceCodeCredentialLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type SourceCodeCredentialIndexer func(obj *SourceCodeCredential) ([]string, error)
-
-type SourceCodeCredentialClientCache interface {
-	Get(namespace, name string) (*SourceCodeCredential, error)
-	List(namespace string, selector labels.Selector) ([]*SourceCodeCredential, error)
-
-	Index(name string, indexer SourceCodeCredentialIndexer)
-	GetIndexed(name, key string) ([]*SourceCodeCredential, error)
-}
-
-type SourceCodeCredentialClient interface {
-	Create(*SourceCodeCredential) (*SourceCodeCredential, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*SourceCodeCredential, error)
-	Update(*SourceCodeCredential) (*SourceCodeCredential, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*SourceCodeCredentialList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() SourceCodeCredentialClientCache
-
-	OnCreate(ctx context.Context, name string, sync SourceCodeCredentialChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync SourceCodeCredentialChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync SourceCodeCredentialChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() SourceCodeCredentialInterface
-}
-
-type sourceCodeCredentialClientCache struct {
-	client *sourceCodeCredentialClient2
-}
-
-type sourceCodeCredentialClient2 struct {
-	iface      SourceCodeCredentialInterface
-	controller SourceCodeCredentialController
-}
-
-func (n *sourceCodeCredentialClient2) Interface() SourceCodeCredentialInterface {
-	return n.iface
-}
-
-func (n *sourceCodeCredentialClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *sourceCodeCredentialClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *sourceCodeCredentialClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *sourceCodeCredentialClient2) Create(obj *SourceCodeCredential) (*SourceCodeCredential, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *sourceCodeCredentialClient2) Get(namespace, name string, opts metav1.GetOptions) (*SourceCodeCredential, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *sourceCodeCredentialClient2) Update(obj *SourceCodeCredential) (*SourceCodeCredential, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *sourceCodeCredentialClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *sourceCodeCredentialClient2) List(namespace string, opts metav1.ListOptions) (*SourceCodeCredentialList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *sourceCodeCredentialClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *sourceCodeCredentialClientCache) Get(namespace, name string) (*SourceCodeCredential, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *sourceCodeCredentialClientCache) List(namespace string, selector labels.Selector) ([]*SourceCodeCredential, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *sourceCodeCredentialClient2) Cache() SourceCodeCredentialClientCache {
-	n.loadController()
-	return &sourceCodeCredentialClientCache{
-		client: n,
-	}
-}
-
-func (n *sourceCodeCredentialClient2) OnCreate(ctx context.Context, name string, sync SourceCodeCredentialChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &sourceCodeCredentialLifecycleDelegate{create: sync})
-}
-
-func (n *sourceCodeCredentialClient2) OnChange(ctx context.Context, name string, sync SourceCodeCredentialChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &sourceCodeCredentialLifecycleDelegate{update: sync})
-}
-
-func (n *sourceCodeCredentialClient2) OnRemove(ctx context.Context, name string, sync SourceCodeCredentialChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &sourceCodeCredentialLifecycleDelegate{remove: sync})
-}
-
-func (n *sourceCodeCredentialClientCache) Index(name string, indexer SourceCodeCredentialIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*SourceCodeCredential); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *sourceCodeCredentialClientCache) GetIndexed(name, key string) ([]*SourceCodeCredential, error) {
-	var result []*SourceCodeCredential
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*SourceCodeCredential); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *sourceCodeCredentialClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type sourceCodeCredentialLifecycleDelegate struct {
-	create SourceCodeCredentialChangeHandlerFunc
-	update SourceCodeCredentialChangeHandlerFunc
-	remove SourceCodeCredentialChangeHandlerFunc
-}
-
-func (n *sourceCodeCredentialLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *sourceCodeCredentialLifecycleDelegate) Create(obj *SourceCodeCredential) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *sourceCodeCredentialLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *sourceCodeCredentialLifecycleDelegate) Remove(obj *SourceCodeCredential) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *sourceCodeCredentialLifecycleDelegate) Updated(obj *SourceCodeCredential) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }
