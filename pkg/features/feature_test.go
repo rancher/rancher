@@ -30,3 +30,10 @@ func TestApplyArgumentDefaults(t *testing.T) {
 		assert.NotNil(err)
 	}
 }
+
+func TestInitializeNil(t *testing.T) {
+	assert := assert.New(t)
+	assert.False(Steve.Enabled())
+	InitializeFeatures(nil, "steve=true")
+	assert.True(Steve.Enabled())
+}

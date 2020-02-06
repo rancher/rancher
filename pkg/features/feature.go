@@ -35,6 +35,10 @@ func InitializeFeatures(ctx *config.ScaledContext, featureArgs string) {
 		logrus.Errorf("failed to apply feature args: %v", err)
 	}
 
+	if ctx == nil {
+		return
+	}
+
 	// creates any features in map that do not exist, updates features with new default value
 	for key, f := range features {
 		f.featuresLister = ctx.Management.Features("").Controller().Lister()
@@ -112,6 +116,10 @@ func applyArgumentDefaults(featureArgs string) error {
 // Enabled returns whether the Feature is enabled in the global feature gate.
 // This should be primarily used for schema enable function and add feature handler functions
 func (f *feature) Enabled() bool {
+	if f.featuresLister == nil {
+		return f.def
+	}
+
 	featureState, err := f.featuresLister.Get("", f.name)
 	if err != nil {
 		return false
