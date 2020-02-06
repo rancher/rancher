@@ -31,6 +31,7 @@ type ListenOpts struct {
 	CAName            string
 	CertBackup        string
 	AcmeDomains       []string
+	BindHost          string
 	TLSListenerConfig dynamiclistener.Config
 }
 
@@ -52,7 +53,7 @@ func ListenAndServe(ctx context.Context, httpsPort, httpPort int, handler http.H
 	errorLog := log.New(logger.WriterLevel(logrus.DebugLevel), "", log.LstdFlags)
 
 	if httpsPort > 0 {
-		tlsTCPListener, err := dynamiclistener.NewTCPListener("0.0.0.0", httpsPort)
+		tlsTCPListener, err := dynamiclistener.NewTCPListener(opts.BindHost, httpsPort)
 		if err != nil {
 			return err
 		}
@@ -72,7 +73,7 @@ func ListenAndServe(ctx context.Context, httpsPort, httpPort int, handler http.H
 		targetHandler = dynamiclistener.HTTPRedirect(targetHandler)
 
 		go func() {
-			logrus.Infof("Listening on 0.0.0.0:%d", httpsPort)
+			logrus.Infof("Listening on %s:%d", opts.BindHost, httpsPort)
 			err := tlsServer.Serve(dynListener)
 			if err != http.ErrServerClosed && err != nil {
 				logrus.Fatalf("https server failed: %v", err)
@@ -86,12 +87,12 @@ func ListenAndServe(ctx context.Context, httpsPort, httpPort int, handler http.H
 
 	if httpPort > 0 {
 		httpServer := http.Server{
-			Addr:     fmt.Sprintf("0.0.0.0:%d", httpPort),
+			Addr:     fmt.Sprintf("%s:%d", opts.BindHost, httpPort),
 			Handler:  targetHandler,
 			ErrorLog: errorLog,
 		}
 		go func() {
-			logrus.Infof("Listening on 0.0.0.0:%d", httpPort)
+			logrus.Infof("Listening on %s:%d", opts.BindHost, httpPort)
 			err := httpServer.ListenAndServe()
 			if err != http.ErrServerClosed && err != nil {
 				logrus.Fatalf("http server failed: %v", err)
