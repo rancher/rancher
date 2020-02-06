@@ -34,7 +34,7 @@ import (
 	"github.com/rancher/types/config"
 )
 
-func Start(ctx context.Context, localClusterEnabled bool, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager, auditLogWriter *audit.LogWriter) (auth.Middleware, http.Handler, error) {
+func Start(ctx context.Context, localClusterEnabled bool, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager, auditLogWriter *audit.LogWriter, authz auth.Middleware) (auth.Middleware, http.Handler, error) {
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext)
 	if err != nil {
 		return nil, nil, err
@@ -73,6 +73,7 @@ func Start(ctx context.Context, localClusterEnabled bool, scaledContext *config.
 	if err != nil {
 		return nil, nil, err
 	}
+	authedHandler = authz.Wrap(authedHandler)
 
 	metricsHandler, err := requests.NewAuthenticationFilter(ctx, auth, scaledContext, metrics.NewMetricsHandler(scaledContext, promhttp.Handler()), sar)
 	if err != nil {

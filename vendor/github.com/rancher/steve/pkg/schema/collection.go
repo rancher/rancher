@@ -29,7 +29,7 @@ type Collection struct {
 	byGVR      map[schema.GroupVersionResource]string
 	byGVK      map[schema.GroupVersionKind]string
 
-	as *accesscontrol.AccessStore
+	as accesscontrol.AccessSetLookup
 }
 
 type Template struct {
@@ -46,7 +46,7 @@ type Template struct {
 	ComputedColumns func(data.Object)
 }
 
-func NewCollection(baseSchema *types.APISchemas, access *accesscontrol.AccessStore) *Collection {
+func NewCollection(baseSchema *types.APISchemas, access accesscontrol.AccessSetLookup) *Collection {
 	return &Collection{
 		baseSchema: baseSchema,
 		schemas:    map[string]*types.APISchema{},

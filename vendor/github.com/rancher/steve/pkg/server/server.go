@@ -61,7 +61,12 @@ func setup(ctx context.Context, server *Server) (http.Handler, *schema.Collectio
 	server.BaseSchemas = resources.DefaultSchemas(server.BaseSchemas, server.K8s.Discovery(), ccache)
 	server.SchemaTemplates = append(server.SchemaTemplates, resources.DefaultSchemaTemplates(cf)...)
 
-	sf := schema.NewCollection(server.BaseSchemas, accesscontrol.NewAccessStore(server.RBAC))
+	asl := server.AccessSetLookup
+	if asl == nil {
+		asl = accesscontrol.NewAccessStore(server.RBAC)
+	}
+
+	sf := schema.NewCollection(server.BaseSchemas, asl)
 	sync := schemacontroller.Register(ctx,
 		server.K8s.Discovery(),
 		server.CRD.CustomResourceDefinition(),
