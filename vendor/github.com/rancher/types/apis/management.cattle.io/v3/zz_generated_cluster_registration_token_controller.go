@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type ClusterRegistrationTokenController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ClusterRegistrationTokenHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterRegistrationTokenHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *clusterRegistrationTokenClient) AddClusterScopedLifecycle(ctx context.C
 func (s *clusterRegistrationTokenClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ClusterRegistrationTokenLifecycle) {
 	sync := NewClusterRegistrationTokenLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type ClusterRegistrationTokenIndexer func(obj *ClusterRegistrationToken) ([]string, error)
-
-type ClusterRegistrationTokenClientCache interface {
-	Get(namespace, name string) (*ClusterRegistrationToken, error)
-	List(namespace string, selector labels.Selector) ([]*ClusterRegistrationToken, error)
-
-	Index(name string, indexer ClusterRegistrationTokenIndexer)
-	GetIndexed(name, key string) ([]*ClusterRegistrationToken, error)
-}
-
-type ClusterRegistrationTokenClient interface {
-	Create(*ClusterRegistrationToken) (*ClusterRegistrationToken, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*ClusterRegistrationToken, error)
-	Update(*ClusterRegistrationToken) (*ClusterRegistrationToken, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*ClusterRegistrationTokenList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() ClusterRegistrationTokenClientCache
-
-	OnCreate(ctx context.Context, name string, sync ClusterRegistrationTokenChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync ClusterRegistrationTokenChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync ClusterRegistrationTokenChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() ClusterRegistrationTokenInterface
-}
-
-type clusterRegistrationTokenClientCache struct {
-	client *clusterRegistrationTokenClient2
-}
-
-type clusterRegistrationTokenClient2 struct {
-	iface      ClusterRegistrationTokenInterface
-	controller ClusterRegistrationTokenController
-}
-
-func (n *clusterRegistrationTokenClient2) Interface() ClusterRegistrationTokenInterface {
-	return n.iface
-}
-
-func (n *clusterRegistrationTokenClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *clusterRegistrationTokenClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *clusterRegistrationTokenClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *clusterRegistrationTokenClient2) Create(obj *ClusterRegistrationToken) (*ClusterRegistrationToken, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *clusterRegistrationTokenClient2) Get(namespace, name string, opts metav1.GetOptions) (*ClusterRegistrationToken, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *clusterRegistrationTokenClient2) Update(obj *ClusterRegistrationToken) (*ClusterRegistrationToken, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *clusterRegistrationTokenClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *clusterRegistrationTokenClient2) List(namespace string, opts metav1.ListOptions) (*ClusterRegistrationTokenList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *clusterRegistrationTokenClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *clusterRegistrationTokenClientCache) Get(namespace, name string) (*ClusterRegistrationToken, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *clusterRegistrationTokenClientCache) List(namespace string, selector labels.Selector) ([]*ClusterRegistrationToken, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *clusterRegistrationTokenClient2) Cache() ClusterRegistrationTokenClientCache {
-	n.loadController()
-	return &clusterRegistrationTokenClientCache{
-		client: n,
-	}
-}
-
-func (n *clusterRegistrationTokenClient2) OnCreate(ctx context.Context, name string, sync ClusterRegistrationTokenChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &clusterRegistrationTokenLifecycleDelegate{create: sync})
-}
-
-func (n *clusterRegistrationTokenClient2) OnChange(ctx context.Context, name string, sync ClusterRegistrationTokenChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &clusterRegistrationTokenLifecycleDelegate{update: sync})
-}
-
-func (n *clusterRegistrationTokenClient2) OnRemove(ctx context.Context, name string, sync ClusterRegistrationTokenChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &clusterRegistrationTokenLifecycleDelegate{remove: sync})
-}
-
-func (n *clusterRegistrationTokenClientCache) Index(name string, indexer ClusterRegistrationTokenIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*ClusterRegistrationToken); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *clusterRegistrationTokenClientCache) GetIndexed(name, key string) ([]*ClusterRegistrationToken, error) {
-	var result []*ClusterRegistrationToken
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*ClusterRegistrationToken); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *clusterRegistrationTokenClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type clusterRegistrationTokenLifecycleDelegate struct {
-	create ClusterRegistrationTokenChangeHandlerFunc
-	update ClusterRegistrationTokenChangeHandlerFunc
-	remove ClusterRegistrationTokenChangeHandlerFunc
-}
-
-func (n *clusterRegistrationTokenLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *clusterRegistrationTokenLifecycleDelegate) Create(obj *ClusterRegistrationToken) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *clusterRegistrationTokenLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *clusterRegistrationTokenLifecycleDelegate) Remove(obj *ClusterRegistrationToken) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *clusterRegistrationTokenLifecycleDelegate) Updated(obj *ClusterRegistrationToken) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

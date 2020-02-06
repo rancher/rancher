@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -73,6 +74,7 @@ type EndpointsController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler EndpointsHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler EndpointsHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -327,184 +329,4 @@ func (s *endpointsClient) AddClusterScopedLifecycle(ctx context.Context, name, c
 func (s *endpointsClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle EndpointsLifecycle) {
 	sync := NewEndpointsLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type EndpointsIndexer func(obj *v1.Endpoints) ([]string, error)
-
-type EndpointsClientCache interface {
-	Get(namespace, name string) (*v1.Endpoints, error)
-	List(namespace string, selector labels.Selector) ([]*v1.Endpoints, error)
-
-	Index(name string, indexer EndpointsIndexer)
-	GetIndexed(name, key string) ([]*v1.Endpoints, error)
-}
-
-type EndpointsClient interface {
-	Create(*v1.Endpoints) (*v1.Endpoints, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*v1.Endpoints, error)
-	Update(*v1.Endpoints) (*v1.Endpoints, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*EndpointsList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() EndpointsClientCache
-
-	OnCreate(ctx context.Context, name string, sync EndpointsChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync EndpointsChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync EndpointsChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() EndpointsInterface
-}
-
-type endpointsClientCache struct {
-	client *endpointsClient2
-}
-
-type endpointsClient2 struct {
-	iface      EndpointsInterface
-	controller EndpointsController
-}
-
-func (n *endpointsClient2) Interface() EndpointsInterface {
-	return n.iface
-}
-
-func (n *endpointsClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *endpointsClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *endpointsClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *endpointsClient2) Create(obj *v1.Endpoints) (*v1.Endpoints, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *endpointsClient2) Get(namespace, name string, opts metav1.GetOptions) (*v1.Endpoints, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *endpointsClient2) Update(obj *v1.Endpoints) (*v1.Endpoints, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *endpointsClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *endpointsClient2) List(namespace string, opts metav1.ListOptions) (*EndpointsList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *endpointsClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *endpointsClientCache) Get(namespace, name string) (*v1.Endpoints, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *endpointsClientCache) List(namespace string, selector labels.Selector) ([]*v1.Endpoints, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *endpointsClient2) Cache() EndpointsClientCache {
-	n.loadController()
-	return &endpointsClientCache{
-		client: n,
-	}
-}
-
-func (n *endpointsClient2) OnCreate(ctx context.Context, name string, sync EndpointsChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &endpointsLifecycleDelegate{create: sync})
-}
-
-func (n *endpointsClient2) OnChange(ctx context.Context, name string, sync EndpointsChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &endpointsLifecycleDelegate{update: sync})
-}
-
-func (n *endpointsClient2) OnRemove(ctx context.Context, name string, sync EndpointsChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &endpointsLifecycleDelegate{remove: sync})
-}
-
-func (n *endpointsClientCache) Index(name string, indexer EndpointsIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*v1.Endpoints); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *endpointsClientCache) GetIndexed(name, key string) ([]*v1.Endpoints, error) {
-	var result []*v1.Endpoints
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*v1.Endpoints); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *endpointsClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type endpointsLifecycleDelegate struct {
-	create EndpointsChangeHandlerFunc
-	update EndpointsChangeHandlerFunc
-	remove EndpointsChangeHandlerFunc
-}
-
-func (n *endpointsLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *endpointsLifecycleDelegate) Create(obj *v1.Endpoints) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *endpointsLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *endpointsLifecycleDelegate) Remove(obj *v1.Endpoints) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *endpointsLifecycleDelegate) Updated(obj *v1.Endpoints) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

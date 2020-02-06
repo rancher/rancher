@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -71,6 +72,7 @@ type GlobalRoleController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler GlobalRoleHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler GlobalRoleHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -325,184 +327,4 @@ func (s *globalRoleClient) AddClusterScopedLifecycle(ctx context.Context, name, 
 func (s *globalRoleClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle GlobalRoleLifecycle) {
 	sync := NewGlobalRoleLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type GlobalRoleIndexer func(obj *GlobalRole) ([]string, error)
-
-type GlobalRoleClientCache interface {
-	Get(namespace, name string) (*GlobalRole, error)
-	List(namespace string, selector labels.Selector) ([]*GlobalRole, error)
-
-	Index(name string, indexer GlobalRoleIndexer)
-	GetIndexed(name, key string) ([]*GlobalRole, error)
-}
-
-type GlobalRoleClient interface {
-	Create(*GlobalRole) (*GlobalRole, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*GlobalRole, error)
-	Update(*GlobalRole) (*GlobalRole, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*GlobalRoleList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() GlobalRoleClientCache
-
-	OnCreate(ctx context.Context, name string, sync GlobalRoleChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync GlobalRoleChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync GlobalRoleChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() GlobalRoleInterface
-}
-
-type globalRoleClientCache struct {
-	client *globalRoleClient2
-}
-
-type globalRoleClient2 struct {
-	iface      GlobalRoleInterface
-	controller GlobalRoleController
-}
-
-func (n *globalRoleClient2) Interface() GlobalRoleInterface {
-	return n.iface
-}
-
-func (n *globalRoleClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *globalRoleClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *globalRoleClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *globalRoleClient2) Create(obj *GlobalRole) (*GlobalRole, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *globalRoleClient2) Get(namespace, name string, opts metav1.GetOptions) (*GlobalRole, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *globalRoleClient2) Update(obj *GlobalRole) (*GlobalRole, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *globalRoleClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *globalRoleClient2) List(namespace string, opts metav1.ListOptions) (*GlobalRoleList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *globalRoleClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *globalRoleClientCache) Get(namespace, name string) (*GlobalRole, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *globalRoleClientCache) List(namespace string, selector labels.Selector) ([]*GlobalRole, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *globalRoleClient2) Cache() GlobalRoleClientCache {
-	n.loadController()
-	return &globalRoleClientCache{
-		client: n,
-	}
-}
-
-func (n *globalRoleClient2) OnCreate(ctx context.Context, name string, sync GlobalRoleChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &globalRoleLifecycleDelegate{create: sync})
-}
-
-func (n *globalRoleClient2) OnChange(ctx context.Context, name string, sync GlobalRoleChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &globalRoleLifecycleDelegate{update: sync})
-}
-
-func (n *globalRoleClient2) OnRemove(ctx context.Context, name string, sync GlobalRoleChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &globalRoleLifecycleDelegate{remove: sync})
-}
-
-func (n *globalRoleClientCache) Index(name string, indexer GlobalRoleIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*GlobalRole); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *globalRoleClientCache) GetIndexed(name, key string) ([]*GlobalRole, error) {
-	var result []*GlobalRole
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*GlobalRole); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *globalRoleClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type globalRoleLifecycleDelegate struct {
-	create GlobalRoleChangeHandlerFunc
-	update GlobalRoleChangeHandlerFunc
-	remove GlobalRoleChangeHandlerFunc
-}
-
-func (n *globalRoleLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *globalRoleLifecycleDelegate) Create(obj *GlobalRole) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *globalRoleLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *globalRoleLifecycleDelegate) Remove(obj *GlobalRole) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *globalRoleLifecycleDelegate) Updated(obj *GlobalRole) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

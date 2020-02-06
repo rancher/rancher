@@ -153,6 +153,8 @@ spec:
         - name: cluster-register
           imagePullPolicy: IfNotPresent
           env:
+          - name: CATTLE_FEATURES
+            value: "{{.Features}}"
           - name: CATTLE_SERVER
             value: "{{.URLPlain}}"
           - name: CATTLE_CA_CHECKSUM

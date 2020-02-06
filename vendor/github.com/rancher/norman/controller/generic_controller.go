@@ -50,6 +50,7 @@ type GenericController interface {
 	AddHandler(ctx context.Context, name string, handler HandlerFunc)
 	HandlerCount() int
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -122,7 +123,31 @@ func (g *genericController) Enqueue(namespace, name string) {
 	}
 }
 
+func (g *genericController) EnqueueAfter(namespace, name string, after time.Duration) {
+	key := name
+	if namespace != "" {
+		key = namespace + "/" + name
+	}
+	if g.queue != nil {
+		g.queue.AddAfter(key, after)
+	}
+}
+
 func (g *genericController) AddHandler(ctx context.Context, name string, handler HandlerFunc) {
+	t := getHandlerTransaction(ctx)
+	if t == nil {
+		g.addHandler(ctx, name, handler)
+		return
+	}
+
+	go func() {
+		if t.shouldContinue() {
+			g.addHandler(ctx, name, handler)
+		}
+	}()
+}
+
+func (g *genericController) addHandler(ctx context.Context, name string, handler HandlerFunc) {
 	g.Lock()
 	defer g.Unlock()
 

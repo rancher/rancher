@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type ClusterTemplateController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ClusterTemplateHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ClusterTemplateHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *clusterTemplateClient) AddClusterScopedLifecycle(ctx context.Context, n
 func (s *clusterTemplateClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ClusterTemplateLifecycle) {
 	sync := NewClusterTemplateLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type ClusterTemplateIndexer func(obj *ClusterTemplate) ([]string, error)
-
-type ClusterTemplateClientCache interface {
-	Get(namespace, name string) (*ClusterTemplate, error)
-	List(namespace string, selector labels.Selector) ([]*ClusterTemplate, error)
-
-	Index(name string, indexer ClusterTemplateIndexer)
-	GetIndexed(name, key string) ([]*ClusterTemplate, error)
-}
-
-type ClusterTemplateClient interface {
-	Create(*ClusterTemplate) (*ClusterTemplate, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*ClusterTemplate, error)
-	Update(*ClusterTemplate) (*ClusterTemplate, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*ClusterTemplateList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() ClusterTemplateClientCache
-
-	OnCreate(ctx context.Context, name string, sync ClusterTemplateChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync ClusterTemplateChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync ClusterTemplateChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() ClusterTemplateInterface
-}
-
-type clusterTemplateClientCache struct {
-	client *clusterTemplateClient2
-}
-
-type clusterTemplateClient2 struct {
-	iface      ClusterTemplateInterface
-	controller ClusterTemplateController
-}
-
-func (n *clusterTemplateClient2) Interface() ClusterTemplateInterface {
-	return n.iface
-}
-
-func (n *clusterTemplateClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *clusterTemplateClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *clusterTemplateClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *clusterTemplateClient2) Create(obj *ClusterTemplate) (*ClusterTemplate, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *clusterTemplateClient2) Get(namespace, name string, opts metav1.GetOptions) (*ClusterTemplate, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *clusterTemplateClient2) Update(obj *ClusterTemplate) (*ClusterTemplate, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *clusterTemplateClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *clusterTemplateClient2) List(namespace string, opts metav1.ListOptions) (*ClusterTemplateList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *clusterTemplateClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *clusterTemplateClientCache) Get(namespace, name string) (*ClusterTemplate, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *clusterTemplateClientCache) List(namespace string, selector labels.Selector) ([]*ClusterTemplate, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *clusterTemplateClient2) Cache() ClusterTemplateClientCache {
-	n.loadController()
-	return &clusterTemplateClientCache{
-		client: n,
-	}
-}
-
-func (n *clusterTemplateClient2) OnCreate(ctx context.Context, name string, sync ClusterTemplateChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &clusterTemplateLifecycleDelegate{create: sync})
-}
-
-func (n *clusterTemplateClient2) OnChange(ctx context.Context, name string, sync ClusterTemplateChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &clusterTemplateLifecycleDelegate{update: sync})
-}
-
-func (n *clusterTemplateClient2) OnRemove(ctx context.Context, name string, sync ClusterTemplateChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &clusterTemplateLifecycleDelegate{remove: sync})
-}
-
-func (n *clusterTemplateClientCache) Index(name string, indexer ClusterTemplateIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*ClusterTemplate); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *clusterTemplateClientCache) GetIndexed(name, key string) ([]*ClusterTemplate, error) {
-	var result []*ClusterTemplate
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*ClusterTemplate); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *clusterTemplateClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type clusterTemplateLifecycleDelegate struct {
-	create ClusterTemplateChangeHandlerFunc
-	update ClusterTemplateChangeHandlerFunc
-	remove ClusterTemplateChangeHandlerFunc
-}
-
-func (n *clusterTemplateLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *clusterTemplateLifecycleDelegate) Create(obj *ClusterTemplate) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *clusterTemplateLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *clusterTemplateLifecycleDelegate) Remove(obj *ClusterTemplate) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *clusterTemplateLifecycleDelegate) Updated(obj *ClusterTemplate) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

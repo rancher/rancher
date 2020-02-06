@@ -2,6 +2,7 @@ package v1beta1
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -73,6 +74,7 @@ type IngressController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler IngressHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler IngressHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -327,184 +329,4 @@ func (s *ingressClient) AddClusterScopedLifecycle(ctx context.Context, name, clu
 func (s *ingressClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle IngressLifecycle) {
 	sync := NewIngressLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type IngressIndexer func(obj *v1beta1.Ingress) ([]string, error)
-
-type IngressClientCache interface {
-	Get(namespace, name string) (*v1beta1.Ingress, error)
-	List(namespace string, selector labels.Selector) ([]*v1beta1.Ingress, error)
-
-	Index(name string, indexer IngressIndexer)
-	GetIndexed(name, key string) ([]*v1beta1.Ingress, error)
-}
-
-type IngressClient interface {
-	Create(*v1beta1.Ingress) (*v1beta1.Ingress, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*v1beta1.Ingress, error)
-	Update(*v1beta1.Ingress) (*v1beta1.Ingress, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*IngressList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() IngressClientCache
-
-	OnCreate(ctx context.Context, name string, sync IngressChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync IngressChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync IngressChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() IngressInterface
-}
-
-type ingressClientCache struct {
-	client *ingressClient2
-}
-
-type ingressClient2 struct {
-	iface      IngressInterface
-	controller IngressController
-}
-
-func (n *ingressClient2) Interface() IngressInterface {
-	return n.iface
-}
-
-func (n *ingressClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *ingressClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *ingressClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *ingressClient2) Create(obj *v1beta1.Ingress) (*v1beta1.Ingress, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *ingressClient2) Get(namespace, name string, opts metav1.GetOptions) (*v1beta1.Ingress, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *ingressClient2) Update(obj *v1beta1.Ingress) (*v1beta1.Ingress, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *ingressClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *ingressClient2) List(namespace string, opts metav1.ListOptions) (*IngressList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *ingressClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *ingressClientCache) Get(namespace, name string) (*v1beta1.Ingress, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *ingressClientCache) List(namespace string, selector labels.Selector) ([]*v1beta1.Ingress, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *ingressClient2) Cache() IngressClientCache {
-	n.loadController()
-	return &ingressClientCache{
-		client: n,
-	}
-}
-
-func (n *ingressClient2) OnCreate(ctx context.Context, name string, sync IngressChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &ingressLifecycleDelegate{create: sync})
-}
-
-func (n *ingressClient2) OnChange(ctx context.Context, name string, sync IngressChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &ingressLifecycleDelegate{update: sync})
-}
-
-func (n *ingressClient2) OnRemove(ctx context.Context, name string, sync IngressChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &ingressLifecycleDelegate{remove: sync})
-}
-
-func (n *ingressClientCache) Index(name string, indexer IngressIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*v1beta1.Ingress); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *ingressClientCache) GetIndexed(name, key string) ([]*v1beta1.Ingress, error) {
-	var result []*v1beta1.Ingress
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*v1beta1.Ingress); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *ingressClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type ingressLifecycleDelegate struct {
-	create IngressChangeHandlerFunc
-	update IngressChangeHandlerFunc
-	remove IngressChangeHandlerFunc
-}
-
-func (n *ingressLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *ingressLifecycleDelegate) Create(obj *v1beta1.Ingress) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *ingressLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *ingressLifecycleDelegate) Remove(obj *v1beta1.Ingress) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *ingressLifecycleDelegate) Updated(obj *v1beta1.Ingress) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

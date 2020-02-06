@@ -132,6 +132,9 @@ func (cd *clusterDeploy) doSync(cluster *v3.Cluster) error {
 	return cd.setNetworkPolicyAnn(cluster)
 }
 
+// agentFeaturesChanged will treat a missing key as false. This means we only detect changes
+// when we set a feature to true so we can't reliably set a feature to false that is enabled by default.
+// This behavior makes adding new def false features not cause the agent to redeploy.
 func agentFeaturesChanged(desired, actual map[string]bool) bool {
 	for k, v := range desired {
 		if actual[k] != v {
@@ -139,9 +142,8 @@ func agentFeaturesChanged(desired, actual map[string]bool) bool {
 		}
 	}
 
-	// Check for enabled features in actual that don't exist in desired
 	for k, v := range actual {
-		if v && desired[k] != v {
+		if desired[k] != v {
 			return true
 		}
 	}
@@ -225,7 +227,7 @@ func (cd *clusterDeploy) deployAgent(cluster *v3.Cluster) error {
 	}
 
 	if _, err = v3.ClusterConditionAgentDeployed.Do(cluster, func() (runtime.Object, error) {
-		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth)
+		yaml, err := cd.getYAML(cluster, desiredAgent, desiredAuth, desiredFeatures)
 		if err != nil {
 			return cluster, err
 		}
@@ -303,7 +305,7 @@ func (cd *clusterDeploy) getKubeConfig(cluster *v3.Cluster) (*clientcmdapi.Confi
 	return cd.clusterManager.KubeConfig(cluster.Name, token), nil
 }
 
-func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage string) ([]byte, error) {
+func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage string, features map[string]bool) ([]byte, error) {
 	logrus.Debug("Desired agent image:", agentImage)
 	logrus.Debug("Desired auth image:", authImage)
 
@@ -319,7 +321,7 @@ func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage stri
 
 	buf := &bytes.Buffer{}
 	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, cluster.Name, token, url, cluster.Spec.WindowsPreferedCluster,
-		cluster)
+		cluster, features)
 
 	return buf.Bytes(), err
 }

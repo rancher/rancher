@@ -73,12 +73,12 @@ func (h *handler) dialer(ctx context.Context, network, address string) (net.Conn
 		return nil, err
 	}
 	dialer := h.tunnelServer.Dialer(host, 15*time.Second)
-	return dialer(network, "127.0.0.1:8443")
+	return dialer(network, "127.0.0.1:6443")
 }
 
 func (h *handler) next(clusterID, prefix string) (http.Handler, error) {
 	cfg := &rest.Config{
-		// this is bogus, the dialer will change it to 127.0.0.1:8443
+		// this is bogus, the dialer will change it to 127.0.0.1:6443
 		Host:      "https://" + clusterID,
 		UserAgent: rest.DefaultKubernetesUserAgent() + " cluster " + clusterID,
 		TLSClientConfig: rest.TLSClientConfig{
@@ -103,12 +103,13 @@ func (h *handler) canAccess(ctx context.Context, user user.Info, clusterID strin
 	}
 
 	resp, _, err := h.authorizer.Authorize(ctx, authorizer.AttributesRecord{
-		User:       user,
-		Verb:       "get",
-		APIGroup:   managementv3.GroupName,
-		APIVersion: managementv3.Version,
-		Resource:   "clusters",
-		Name:       clusterID,
+		ResourceRequest: true,
+		User:            user,
+		Verb:            "get",
+		APIGroup:        managementv3.GroupName,
+		APIVersion:      managementv3.Version,
+		Resource:        "clusters",
+		Name:            clusterID,
 	})
 
 	return err == nil && resp == authorizer.DecisionAllow

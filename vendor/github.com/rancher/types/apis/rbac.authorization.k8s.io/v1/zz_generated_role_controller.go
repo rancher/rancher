@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -73,6 +74,7 @@ type RoleController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler RoleHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler RoleHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -327,184 +329,4 @@ func (s *roleClient) AddClusterScopedLifecycle(ctx context.Context, name, cluste
 func (s *roleClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle RoleLifecycle) {
 	sync := NewRoleLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type RoleIndexer func(obj *v1.Role) ([]string, error)
-
-type RoleClientCache interface {
-	Get(namespace, name string) (*v1.Role, error)
-	List(namespace string, selector labels.Selector) ([]*v1.Role, error)
-
-	Index(name string, indexer RoleIndexer)
-	GetIndexed(name, key string) ([]*v1.Role, error)
-}
-
-type RoleClient interface {
-	Create(*v1.Role) (*v1.Role, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*v1.Role, error)
-	Update(*v1.Role) (*v1.Role, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*RoleList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() RoleClientCache
-
-	OnCreate(ctx context.Context, name string, sync RoleChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync RoleChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync RoleChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() RoleInterface
-}
-
-type roleClientCache struct {
-	client *roleClient2
-}
-
-type roleClient2 struct {
-	iface      RoleInterface
-	controller RoleController
-}
-
-func (n *roleClient2) Interface() RoleInterface {
-	return n.iface
-}
-
-func (n *roleClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *roleClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *roleClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *roleClient2) Create(obj *v1.Role) (*v1.Role, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *roleClient2) Get(namespace, name string, opts metav1.GetOptions) (*v1.Role, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *roleClient2) Update(obj *v1.Role) (*v1.Role, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *roleClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *roleClient2) List(namespace string, opts metav1.ListOptions) (*RoleList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *roleClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *roleClientCache) Get(namespace, name string) (*v1.Role, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *roleClientCache) List(namespace string, selector labels.Selector) ([]*v1.Role, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *roleClient2) Cache() RoleClientCache {
-	n.loadController()
-	return &roleClientCache{
-		client: n,
-	}
-}
-
-func (n *roleClient2) OnCreate(ctx context.Context, name string, sync RoleChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &roleLifecycleDelegate{create: sync})
-}
-
-func (n *roleClient2) OnChange(ctx context.Context, name string, sync RoleChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &roleLifecycleDelegate{update: sync})
-}
-
-func (n *roleClient2) OnRemove(ctx context.Context, name string, sync RoleChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &roleLifecycleDelegate{remove: sync})
-}
-
-func (n *roleClientCache) Index(name string, indexer RoleIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*v1.Role); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *roleClientCache) GetIndexed(name, key string) ([]*v1.Role, error) {
-	var result []*v1.Role
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*v1.Role); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *roleClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type roleLifecycleDelegate struct {
-	create RoleChangeHandlerFunc
-	update RoleChangeHandlerFunc
-	remove RoleChangeHandlerFunc
-}
-
-func (n *roleLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *roleLifecycleDelegate) Create(obj *v1.Role) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *roleLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *roleLifecycleDelegate) Remove(obj *v1.Role) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *roleLifecycleDelegate) Updated(obj *v1.Role) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

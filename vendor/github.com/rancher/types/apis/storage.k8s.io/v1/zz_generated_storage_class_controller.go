@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type StorageClassController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler StorageClassHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler StorageClassHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *storageClassClient) AddClusterScopedLifecycle(ctx context.Context, name
 func (s *storageClassClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle StorageClassLifecycle) {
 	sync := NewStorageClassLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type StorageClassIndexer func(obj *v1.StorageClass) ([]string, error)
-
-type StorageClassClientCache interface {
-	Get(namespace, name string) (*v1.StorageClass, error)
-	List(namespace string, selector labels.Selector) ([]*v1.StorageClass, error)
-
-	Index(name string, indexer StorageClassIndexer)
-	GetIndexed(name, key string) ([]*v1.StorageClass, error)
-}
-
-type StorageClassClient interface {
-	Create(*v1.StorageClass) (*v1.StorageClass, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*v1.StorageClass, error)
-	Update(*v1.StorageClass) (*v1.StorageClass, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*StorageClassList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() StorageClassClientCache
-
-	OnCreate(ctx context.Context, name string, sync StorageClassChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync StorageClassChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync StorageClassChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() StorageClassInterface
-}
-
-type storageClassClientCache struct {
-	client *storageClassClient2
-}
-
-type storageClassClient2 struct {
-	iface      StorageClassInterface
-	controller StorageClassController
-}
-
-func (n *storageClassClient2) Interface() StorageClassInterface {
-	return n.iface
-}
-
-func (n *storageClassClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *storageClassClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *storageClassClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *storageClassClient2) Create(obj *v1.StorageClass) (*v1.StorageClass, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *storageClassClient2) Get(namespace, name string, opts metav1.GetOptions) (*v1.StorageClass, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *storageClassClient2) Update(obj *v1.StorageClass) (*v1.StorageClass, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *storageClassClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *storageClassClient2) List(namespace string, opts metav1.ListOptions) (*StorageClassList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *storageClassClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *storageClassClientCache) Get(namespace, name string) (*v1.StorageClass, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *storageClassClientCache) List(namespace string, selector labels.Selector) ([]*v1.StorageClass, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *storageClassClient2) Cache() StorageClassClientCache {
-	n.loadController()
-	return &storageClassClientCache{
-		client: n,
-	}
-}
-
-func (n *storageClassClient2) OnCreate(ctx context.Context, name string, sync StorageClassChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &storageClassLifecycleDelegate{create: sync})
-}
-
-func (n *storageClassClient2) OnChange(ctx context.Context, name string, sync StorageClassChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &storageClassLifecycleDelegate{update: sync})
-}
-
-func (n *storageClassClient2) OnRemove(ctx context.Context, name string, sync StorageClassChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &storageClassLifecycleDelegate{remove: sync})
-}
-
-func (n *storageClassClientCache) Index(name string, indexer StorageClassIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*v1.StorageClass); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *storageClassClientCache) GetIndexed(name, key string) ([]*v1.StorageClass, error) {
-	var result []*v1.StorageClass
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*v1.StorageClass); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *storageClassClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type storageClassLifecycleDelegate struct {
-	create StorageClassChangeHandlerFunc
-	update StorageClassChangeHandlerFunc
-	remove StorageClassChangeHandlerFunc
-}
-
-func (n *storageClassLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *storageClassLifecycleDelegate) Create(obj *v1.StorageClass) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *storageClassLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *storageClassLifecycleDelegate) Remove(obj *v1.StorageClass) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *storageClassLifecycleDelegate) Updated(obj *v1.StorageClass) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

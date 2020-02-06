@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type ProjectController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ProjectHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ProjectHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *projectClient) AddClusterScopedLifecycle(ctx context.Context, name, clu
 func (s *projectClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ProjectLifecycle) {
 	sync := NewProjectLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type ProjectIndexer func(obj *Project) ([]string, error)
-
-type ProjectClientCache interface {
-	Get(namespace, name string) (*Project, error)
-	List(namespace string, selector labels.Selector) ([]*Project, error)
-
-	Index(name string, indexer ProjectIndexer)
-	GetIndexed(name, key string) ([]*Project, error)
-}
-
-type ProjectClient interface {
-	Create(*Project) (*Project, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*Project, error)
-	Update(*Project) (*Project, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*ProjectList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() ProjectClientCache
-
-	OnCreate(ctx context.Context, name string, sync ProjectChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync ProjectChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync ProjectChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() ProjectInterface
-}
-
-type projectClientCache struct {
-	client *projectClient2
-}
-
-type projectClient2 struct {
-	iface      ProjectInterface
-	controller ProjectController
-}
-
-func (n *projectClient2) Interface() ProjectInterface {
-	return n.iface
-}
-
-func (n *projectClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *projectClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *projectClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *projectClient2) Create(obj *Project) (*Project, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *projectClient2) Get(namespace, name string, opts metav1.GetOptions) (*Project, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *projectClient2) Update(obj *Project) (*Project, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *projectClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *projectClient2) List(namespace string, opts metav1.ListOptions) (*ProjectList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *projectClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *projectClientCache) Get(namespace, name string) (*Project, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *projectClientCache) List(namespace string, selector labels.Selector) ([]*Project, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *projectClient2) Cache() ProjectClientCache {
-	n.loadController()
-	return &projectClientCache{
-		client: n,
-	}
-}
-
-func (n *projectClient2) OnCreate(ctx context.Context, name string, sync ProjectChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &projectLifecycleDelegate{create: sync})
-}
-
-func (n *projectClient2) OnChange(ctx context.Context, name string, sync ProjectChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &projectLifecycleDelegate{update: sync})
-}
-
-func (n *projectClient2) OnRemove(ctx context.Context, name string, sync ProjectChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &projectLifecycleDelegate{remove: sync})
-}
-
-func (n *projectClientCache) Index(name string, indexer ProjectIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*Project); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *projectClientCache) GetIndexed(name, key string) ([]*Project, error) {
-	var result []*Project
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*Project); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *projectClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type projectLifecycleDelegate struct {
-	create ProjectChangeHandlerFunc
-	update ProjectChangeHandlerFunc
-	remove ProjectChangeHandlerFunc
-}
-
-func (n *projectLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *projectLifecycleDelegate) Create(obj *Project) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *projectLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *projectLifecycleDelegate) Remove(obj *Project) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *projectLifecycleDelegate) Updated(obj *Project) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

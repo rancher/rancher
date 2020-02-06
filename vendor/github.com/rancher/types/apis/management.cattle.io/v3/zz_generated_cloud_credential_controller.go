@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type CloudCredentialController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler CloudCredentialHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler CloudCredentialHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *cloudCredentialClient) AddClusterScopedLifecycle(ctx context.Context, n
 func (s *cloudCredentialClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle CloudCredentialLifecycle) {
 	sync := NewCloudCredentialLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type CloudCredentialIndexer func(obj *CloudCredential) ([]string, error)
-
-type CloudCredentialClientCache interface {
-	Get(namespace, name string) (*CloudCredential, error)
-	List(namespace string, selector labels.Selector) ([]*CloudCredential, error)
-
-	Index(name string, indexer CloudCredentialIndexer)
-	GetIndexed(name, key string) ([]*CloudCredential, error)
-}
-
-type CloudCredentialClient interface {
-	Create(*CloudCredential) (*CloudCredential, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*CloudCredential, error)
-	Update(*CloudCredential) (*CloudCredential, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*CloudCredentialList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() CloudCredentialClientCache
-
-	OnCreate(ctx context.Context, name string, sync CloudCredentialChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync CloudCredentialChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync CloudCredentialChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() CloudCredentialInterface
-}
-
-type cloudCredentialClientCache struct {
-	client *cloudCredentialClient2
-}
-
-type cloudCredentialClient2 struct {
-	iface      CloudCredentialInterface
-	controller CloudCredentialController
-}
-
-func (n *cloudCredentialClient2) Interface() CloudCredentialInterface {
-	return n.iface
-}
-
-func (n *cloudCredentialClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *cloudCredentialClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *cloudCredentialClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *cloudCredentialClient2) Create(obj *CloudCredential) (*CloudCredential, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *cloudCredentialClient2) Get(namespace, name string, opts metav1.GetOptions) (*CloudCredential, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *cloudCredentialClient2) Update(obj *CloudCredential) (*CloudCredential, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *cloudCredentialClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *cloudCredentialClient2) List(namespace string, opts metav1.ListOptions) (*CloudCredentialList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *cloudCredentialClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *cloudCredentialClientCache) Get(namespace, name string) (*CloudCredential, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *cloudCredentialClientCache) List(namespace string, selector labels.Selector) ([]*CloudCredential, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *cloudCredentialClient2) Cache() CloudCredentialClientCache {
-	n.loadController()
-	return &cloudCredentialClientCache{
-		client: n,
-	}
-}
-
-func (n *cloudCredentialClient2) OnCreate(ctx context.Context, name string, sync CloudCredentialChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &cloudCredentialLifecycleDelegate{create: sync})
-}
-
-func (n *cloudCredentialClient2) OnChange(ctx context.Context, name string, sync CloudCredentialChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &cloudCredentialLifecycleDelegate{update: sync})
-}
-
-func (n *cloudCredentialClient2) OnRemove(ctx context.Context, name string, sync CloudCredentialChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &cloudCredentialLifecycleDelegate{remove: sync})
-}
-
-func (n *cloudCredentialClientCache) Index(name string, indexer CloudCredentialIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*CloudCredential); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *cloudCredentialClientCache) GetIndexed(name, key string) ([]*CloudCredential, error) {
-	var result []*CloudCredential
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*CloudCredential); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *cloudCredentialClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type cloudCredentialLifecycleDelegate struct {
-	create CloudCredentialChangeHandlerFunc
-	update CloudCredentialChangeHandlerFunc
-	remove CloudCredentialChangeHandlerFunc
-}
-
-func (n *cloudCredentialLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *cloudCredentialLifecycleDelegate) Create(obj *CloudCredential) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *cloudCredentialLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *cloudCredentialLifecycleDelegate) Remove(obj *CloudCredential) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *cloudCredentialLifecycleDelegate) Updated(obj *CloudCredential) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

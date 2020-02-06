@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type PipelineSettingController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler PipelineSettingHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler PipelineSettingHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *pipelineSettingClient) AddClusterScopedLifecycle(ctx context.Context, n
 func (s *pipelineSettingClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle PipelineSettingLifecycle) {
 	sync := NewPipelineSettingLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type PipelineSettingIndexer func(obj *PipelineSetting) ([]string, error)
-
-type PipelineSettingClientCache interface {
-	Get(namespace, name string) (*PipelineSetting, error)
-	List(namespace string, selector labels.Selector) ([]*PipelineSetting, error)
-
-	Index(name string, indexer PipelineSettingIndexer)
-	GetIndexed(name, key string) ([]*PipelineSetting, error)
-}
-
-type PipelineSettingClient interface {
-	Create(*PipelineSetting) (*PipelineSetting, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*PipelineSetting, error)
-	Update(*PipelineSetting) (*PipelineSetting, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*PipelineSettingList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() PipelineSettingClientCache
-
-	OnCreate(ctx context.Context, name string, sync PipelineSettingChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync PipelineSettingChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync PipelineSettingChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() PipelineSettingInterface
-}
-
-type pipelineSettingClientCache struct {
-	client *pipelineSettingClient2
-}
-
-type pipelineSettingClient2 struct {
-	iface      PipelineSettingInterface
-	controller PipelineSettingController
-}
-
-func (n *pipelineSettingClient2) Interface() PipelineSettingInterface {
-	return n.iface
-}
-
-func (n *pipelineSettingClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *pipelineSettingClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *pipelineSettingClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *pipelineSettingClient2) Create(obj *PipelineSetting) (*PipelineSetting, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *pipelineSettingClient2) Get(namespace, name string, opts metav1.GetOptions) (*PipelineSetting, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *pipelineSettingClient2) Update(obj *PipelineSetting) (*PipelineSetting, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *pipelineSettingClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *pipelineSettingClient2) List(namespace string, opts metav1.ListOptions) (*PipelineSettingList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *pipelineSettingClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *pipelineSettingClientCache) Get(namespace, name string) (*PipelineSetting, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *pipelineSettingClientCache) List(namespace string, selector labels.Selector) ([]*PipelineSetting, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *pipelineSettingClient2) Cache() PipelineSettingClientCache {
-	n.loadController()
-	return &pipelineSettingClientCache{
-		client: n,
-	}
-}
-
-func (n *pipelineSettingClient2) OnCreate(ctx context.Context, name string, sync PipelineSettingChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &pipelineSettingLifecycleDelegate{create: sync})
-}
-
-func (n *pipelineSettingClient2) OnChange(ctx context.Context, name string, sync PipelineSettingChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &pipelineSettingLifecycleDelegate{update: sync})
-}
-
-func (n *pipelineSettingClient2) OnRemove(ctx context.Context, name string, sync PipelineSettingChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &pipelineSettingLifecycleDelegate{remove: sync})
-}
-
-func (n *pipelineSettingClientCache) Index(name string, indexer PipelineSettingIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*PipelineSetting); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *pipelineSettingClientCache) GetIndexed(name, key string) ([]*PipelineSetting, error) {
-	var result []*PipelineSetting
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*PipelineSetting); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *pipelineSettingClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type pipelineSettingLifecycleDelegate struct {
-	create PipelineSettingChangeHandlerFunc
-	update PipelineSettingChangeHandlerFunc
-	remove PipelineSettingChangeHandlerFunc
-}
-
-func (n *pipelineSettingLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *pipelineSettingLifecycleDelegate) Create(obj *PipelineSetting) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *pipelineSettingLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *pipelineSettingLifecycleDelegate) Remove(obj *PipelineSetting) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *pipelineSettingLifecycleDelegate) Updated(obj *PipelineSetting) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -73,6 +74,7 @@ type PersistentVolumeClaimController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler PersistentVolumeClaimHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler PersistentVolumeClaimHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -327,184 +329,4 @@ func (s *persistentVolumeClaimClient) AddClusterScopedLifecycle(ctx context.Cont
 func (s *persistentVolumeClaimClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle PersistentVolumeClaimLifecycle) {
 	sync := NewPersistentVolumeClaimLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type PersistentVolumeClaimIndexer func(obj *v1.PersistentVolumeClaim) ([]string, error)
-
-type PersistentVolumeClaimClientCache interface {
-	Get(namespace, name string) (*v1.PersistentVolumeClaim, error)
-	List(namespace string, selector labels.Selector) ([]*v1.PersistentVolumeClaim, error)
-
-	Index(name string, indexer PersistentVolumeClaimIndexer)
-	GetIndexed(name, key string) ([]*v1.PersistentVolumeClaim, error)
-}
-
-type PersistentVolumeClaimClient interface {
-	Create(*v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*v1.PersistentVolumeClaim, error)
-	Update(*v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*PersistentVolumeClaimList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() PersistentVolumeClaimClientCache
-
-	OnCreate(ctx context.Context, name string, sync PersistentVolumeClaimChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync PersistentVolumeClaimChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync PersistentVolumeClaimChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() PersistentVolumeClaimInterface
-}
-
-type persistentVolumeClaimClientCache struct {
-	client *persistentVolumeClaimClient2
-}
-
-type persistentVolumeClaimClient2 struct {
-	iface      PersistentVolumeClaimInterface
-	controller PersistentVolumeClaimController
-}
-
-func (n *persistentVolumeClaimClient2) Interface() PersistentVolumeClaimInterface {
-	return n.iface
-}
-
-func (n *persistentVolumeClaimClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *persistentVolumeClaimClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *persistentVolumeClaimClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *persistentVolumeClaimClient2) Create(obj *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *persistentVolumeClaimClient2) Get(namespace, name string, opts metav1.GetOptions) (*v1.PersistentVolumeClaim, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *persistentVolumeClaimClient2) Update(obj *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *persistentVolumeClaimClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *persistentVolumeClaimClient2) List(namespace string, opts metav1.ListOptions) (*PersistentVolumeClaimList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *persistentVolumeClaimClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *persistentVolumeClaimClientCache) Get(namespace, name string) (*v1.PersistentVolumeClaim, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *persistentVolumeClaimClientCache) List(namespace string, selector labels.Selector) ([]*v1.PersistentVolumeClaim, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *persistentVolumeClaimClient2) Cache() PersistentVolumeClaimClientCache {
-	n.loadController()
-	return &persistentVolumeClaimClientCache{
-		client: n,
-	}
-}
-
-func (n *persistentVolumeClaimClient2) OnCreate(ctx context.Context, name string, sync PersistentVolumeClaimChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &persistentVolumeClaimLifecycleDelegate{create: sync})
-}
-
-func (n *persistentVolumeClaimClient2) OnChange(ctx context.Context, name string, sync PersistentVolumeClaimChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &persistentVolumeClaimLifecycleDelegate{update: sync})
-}
-
-func (n *persistentVolumeClaimClient2) OnRemove(ctx context.Context, name string, sync PersistentVolumeClaimChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &persistentVolumeClaimLifecycleDelegate{remove: sync})
-}
-
-func (n *persistentVolumeClaimClientCache) Index(name string, indexer PersistentVolumeClaimIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*v1.PersistentVolumeClaim); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *persistentVolumeClaimClientCache) GetIndexed(name, key string) ([]*v1.PersistentVolumeClaim, error) {
-	var result []*v1.PersistentVolumeClaim
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*v1.PersistentVolumeClaim); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *persistentVolumeClaimClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type persistentVolumeClaimLifecycleDelegate struct {
-	create PersistentVolumeClaimChangeHandlerFunc
-	update PersistentVolumeClaimChangeHandlerFunc
-	remove PersistentVolumeClaimChangeHandlerFunc
-}
-
-func (n *persistentVolumeClaimLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *persistentVolumeClaimLifecycleDelegate) Create(obj *v1.PersistentVolumeClaim) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *persistentVolumeClaimLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *persistentVolumeClaimLifecycleDelegate) Remove(obj *v1.PersistentVolumeClaim) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *persistentVolumeClaimLifecycleDelegate) Updated(obj *v1.PersistentVolumeClaim) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

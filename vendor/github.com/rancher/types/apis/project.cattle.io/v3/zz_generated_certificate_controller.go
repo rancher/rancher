@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type CertificateController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler CertificateHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler CertificateHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *certificateClient) AddClusterScopedLifecycle(ctx context.Context, name,
 func (s *certificateClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle CertificateLifecycle) {
 	sync := NewCertificateLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type CertificateIndexer func(obj *Certificate) ([]string, error)
-
-type CertificateClientCache interface {
-	Get(namespace, name string) (*Certificate, error)
-	List(namespace string, selector labels.Selector) ([]*Certificate, error)
-
-	Index(name string, indexer CertificateIndexer)
-	GetIndexed(name, key string) ([]*Certificate, error)
-}
-
-type CertificateClient interface {
-	Create(*Certificate) (*Certificate, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*Certificate, error)
-	Update(*Certificate) (*Certificate, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*CertificateList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() CertificateClientCache
-
-	OnCreate(ctx context.Context, name string, sync CertificateChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync CertificateChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync CertificateChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() CertificateInterface
-}
-
-type certificateClientCache struct {
-	client *certificateClient2
-}
-
-type certificateClient2 struct {
-	iface      CertificateInterface
-	controller CertificateController
-}
-
-func (n *certificateClient2) Interface() CertificateInterface {
-	return n.iface
-}
-
-func (n *certificateClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *certificateClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *certificateClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *certificateClient2) Create(obj *Certificate) (*Certificate, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *certificateClient2) Get(namespace, name string, opts metav1.GetOptions) (*Certificate, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *certificateClient2) Update(obj *Certificate) (*Certificate, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *certificateClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *certificateClient2) List(namespace string, opts metav1.ListOptions) (*CertificateList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *certificateClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *certificateClientCache) Get(namespace, name string) (*Certificate, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *certificateClientCache) List(namespace string, selector labels.Selector) ([]*Certificate, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *certificateClient2) Cache() CertificateClientCache {
-	n.loadController()
-	return &certificateClientCache{
-		client: n,
-	}
-}
-
-func (n *certificateClient2) OnCreate(ctx context.Context, name string, sync CertificateChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &certificateLifecycleDelegate{create: sync})
-}
-
-func (n *certificateClient2) OnChange(ctx context.Context, name string, sync CertificateChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &certificateLifecycleDelegate{update: sync})
-}
-
-func (n *certificateClient2) OnRemove(ctx context.Context, name string, sync CertificateChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &certificateLifecycleDelegate{remove: sync})
-}
-
-func (n *certificateClientCache) Index(name string, indexer CertificateIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*Certificate); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *certificateClientCache) GetIndexed(name, key string) ([]*Certificate, error) {
-	var result []*Certificate
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*Certificate); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *certificateClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type certificateLifecycleDelegate struct {
-	create CertificateChangeHandlerFunc
-	update CertificateChangeHandlerFunc
-	remove CertificateChangeHandlerFunc
-}
-
-func (n *certificateLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *certificateLifecycleDelegate) Create(obj *Certificate) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *certificateLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *certificateLifecycleDelegate) Remove(obj *Certificate) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *certificateLifecycleDelegate) Updated(obj *Certificate) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

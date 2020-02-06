@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -73,6 +74,7 @@ type DaemonSetController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler DaemonSetHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler DaemonSetHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -327,184 +329,4 @@ func (s *daemonSetClient) AddClusterScopedLifecycle(ctx context.Context, name, c
 func (s *daemonSetClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle DaemonSetLifecycle) {
 	sync := NewDaemonSetLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type DaemonSetIndexer func(obj *v1.DaemonSet) ([]string, error)
-
-type DaemonSetClientCache interface {
-	Get(namespace, name string) (*v1.DaemonSet, error)
-	List(namespace string, selector labels.Selector) ([]*v1.DaemonSet, error)
-
-	Index(name string, indexer DaemonSetIndexer)
-	GetIndexed(name, key string) ([]*v1.DaemonSet, error)
-}
-
-type DaemonSetClient interface {
-	Create(*v1.DaemonSet) (*v1.DaemonSet, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*v1.DaemonSet, error)
-	Update(*v1.DaemonSet) (*v1.DaemonSet, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*DaemonSetList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() DaemonSetClientCache
-
-	OnCreate(ctx context.Context, name string, sync DaemonSetChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync DaemonSetChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync DaemonSetChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() DaemonSetInterface
-}
-
-type daemonSetClientCache struct {
-	client *daemonSetClient2
-}
-
-type daemonSetClient2 struct {
-	iface      DaemonSetInterface
-	controller DaemonSetController
-}
-
-func (n *daemonSetClient2) Interface() DaemonSetInterface {
-	return n.iface
-}
-
-func (n *daemonSetClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *daemonSetClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *daemonSetClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *daemonSetClient2) Create(obj *v1.DaemonSet) (*v1.DaemonSet, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *daemonSetClient2) Get(namespace, name string, opts metav1.GetOptions) (*v1.DaemonSet, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *daemonSetClient2) Update(obj *v1.DaemonSet) (*v1.DaemonSet, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *daemonSetClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *daemonSetClient2) List(namespace string, opts metav1.ListOptions) (*DaemonSetList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *daemonSetClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *daemonSetClientCache) Get(namespace, name string) (*v1.DaemonSet, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *daemonSetClientCache) List(namespace string, selector labels.Selector) ([]*v1.DaemonSet, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *daemonSetClient2) Cache() DaemonSetClientCache {
-	n.loadController()
-	return &daemonSetClientCache{
-		client: n,
-	}
-}
-
-func (n *daemonSetClient2) OnCreate(ctx context.Context, name string, sync DaemonSetChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &daemonSetLifecycleDelegate{create: sync})
-}
-
-func (n *daemonSetClient2) OnChange(ctx context.Context, name string, sync DaemonSetChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &daemonSetLifecycleDelegate{update: sync})
-}
-
-func (n *daemonSetClient2) OnRemove(ctx context.Context, name string, sync DaemonSetChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &daemonSetLifecycleDelegate{remove: sync})
-}
-
-func (n *daemonSetClientCache) Index(name string, indexer DaemonSetIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*v1.DaemonSet); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *daemonSetClientCache) GetIndexed(name, key string) ([]*v1.DaemonSet, error) {
-	var result []*v1.DaemonSet
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*v1.DaemonSet); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *daemonSetClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type daemonSetLifecycleDelegate struct {
-	create DaemonSetChangeHandlerFunc
-	update DaemonSetChangeHandlerFunc
-	remove DaemonSetChangeHandlerFunc
-}
-
-func (n *daemonSetLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *daemonSetLifecycleDelegate) Create(obj *v1.DaemonSet) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *daemonSetLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *daemonSetLifecycleDelegate) Remove(obj *v1.DaemonSet) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *daemonSetLifecycleDelegate) Updated(obj *v1.DaemonSet) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

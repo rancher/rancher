@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type ProjectAlertRuleController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ProjectAlertRuleHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ProjectAlertRuleHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *projectAlertRuleClient) AddClusterScopedLifecycle(ctx context.Context, 
 func (s *projectAlertRuleClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ProjectAlertRuleLifecycle) {
 	sync := NewProjectAlertRuleLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type ProjectAlertRuleIndexer func(obj *ProjectAlertRule) ([]string, error)
-
-type ProjectAlertRuleClientCache interface {
-	Get(namespace, name string) (*ProjectAlertRule, error)
-	List(namespace string, selector labels.Selector) ([]*ProjectAlertRule, error)
-
-	Index(name string, indexer ProjectAlertRuleIndexer)
-	GetIndexed(name, key string) ([]*ProjectAlertRule, error)
-}
-
-type ProjectAlertRuleClient interface {
-	Create(*ProjectAlertRule) (*ProjectAlertRule, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*ProjectAlertRule, error)
-	Update(*ProjectAlertRule) (*ProjectAlertRule, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*ProjectAlertRuleList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() ProjectAlertRuleClientCache
-
-	OnCreate(ctx context.Context, name string, sync ProjectAlertRuleChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync ProjectAlertRuleChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync ProjectAlertRuleChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() ProjectAlertRuleInterface
-}
-
-type projectAlertRuleClientCache struct {
-	client *projectAlertRuleClient2
-}
-
-type projectAlertRuleClient2 struct {
-	iface      ProjectAlertRuleInterface
-	controller ProjectAlertRuleController
-}
-
-func (n *projectAlertRuleClient2) Interface() ProjectAlertRuleInterface {
-	return n.iface
-}
-
-func (n *projectAlertRuleClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *projectAlertRuleClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *projectAlertRuleClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *projectAlertRuleClient2) Create(obj *ProjectAlertRule) (*ProjectAlertRule, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *projectAlertRuleClient2) Get(namespace, name string, opts metav1.GetOptions) (*ProjectAlertRule, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *projectAlertRuleClient2) Update(obj *ProjectAlertRule) (*ProjectAlertRule, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *projectAlertRuleClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *projectAlertRuleClient2) List(namespace string, opts metav1.ListOptions) (*ProjectAlertRuleList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *projectAlertRuleClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *projectAlertRuleClientCache) Get(namespace, name string) (*ProjectAlertRule, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *projectAlertRuleClientCache) List(namespace string, selector labels.Selector) ([]*ProjectAlertRule, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *projectAlertRuleClient2) Cache() ProjectAlertRuleClientCache {
-	n.loadController()
-	return &projectAlertRuleClientCache{
-		client: n,
-	}
-}
-
-func (n *projectAlertRuleClient2) OnCreate(ctx context.Context, name string, sync ProjectAlertRuleChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &projectAlertRuleLifecycleDelegate{create: sync})
-}
-
-func (n *projectAlertRuleClient2) OnChange(ctx context.Context, name string, sync ProjectAlertRuleChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &projectAlertRuleLifecycleDelegate{update: sync})
-}
-
-func (n *projectAlertRuleClient2) OnRemove(ctx context.Context, name string, sync ProjectAlertRuleChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &projectAlertRuleLifecycleDelegate{remove: sync})
-}
-
-func (n *projectAlertRuleClientCache) Index(name string, indexer ProjectAlertRuleIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*ProjectAlertRule); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *projectAlertRuleClientCache) GetIndexed(name, key string) ([]*ProjectAlertRule, error) {
-	var result []*ProjectAlertRule
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*ProjectAlertRule); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *projectAlertRuleClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type projectAlertRuleLifecycleDelegate struct {
-	create ProjectAlertRuleChangeHandlerFunc
-	update ProjectAlertRuleChangeHandlerFunc
-	remove ProjectAlertRuleChangeHandlerFunc
-}
-
-func (n *projectAlertRuleLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *projectAlertRuleLifecycleDelegate) Create(obj *ProjectAlertRule) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *projectAlertRuleLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *projectAlertRuleLifecycleDelegate) Remove(obj *ProjectAlertRule) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *projectAlertRuleLifecycleDelegate) Updated(obj *ProjectAlertRule) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

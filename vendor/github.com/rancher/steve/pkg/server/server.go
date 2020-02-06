@@ -23,10 +23,6 @@ func setDefaults(server *Server) error {
 		return ErrConfigRequired
 	}
 
-	if server.Namespace == "" {
-		server.Namespace = "steve"
-	}
-
 	if server.Controllers == nil {
 		var err error
 		server.Controllers, err = NewController(server.RestConfig)

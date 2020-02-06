@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type ProjectCatalogController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ProjectCatalogHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ProjectCatalogHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *projectCatalogClient) AddClusterScopedLifecycle(ctx context.Context, na
 func (s *projectCatalogClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ProjectCatalogLifecycle) {
 	sync := NewProjectCatalogLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type ProjectCatalogIndexer func(obj *ProjectCatalog) ([]string, error)
-
-type ProjectCatalogClientCache interface {
-	Get(namespace, name string) (*ProjectCatalog, error)
-	List(namespace string, selector labels.Selector) ([]*ProjectCatalog, error)
-
-	Index(name string, indexer ProjectCatalogIndexer)
-	GetIndexed(name, key string) ([]*ProjectCatalog, error)
-}
-
-type ProjectCatalogClient interface {
-	Create(*ProjectCatalog) (*ProjectCatalog, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*ProjectCatalog, error)
-	Update(*ProjectCatalog) (*ProjectCatalog, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*ProjectCatalogList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() ProjectCatalogClientCache
-
-	OnCreate(ctx context.Context, name string, sync ProjectCatalogChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync ProjectCatalogChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync ProjectCatalogChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() ProjectCatalogInterface
-}
-
-type projectCatalogClientCache struct {
-	client *projectCatalogClient2
-}
-
-type projectCatalogClient2 struct {
-	iface      ProjectCatalogInterface
-	controller ProjectCatalogController
-}
-
-func (n *projectCatalogClient2) Interface() ProjectCatalogInterface {
-	return n.iface
-}
-
-func (n *projectCatalogClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *projectCatalogClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *projectCatalogClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *projectCatalogClient2) Create(obj *ProjectCatalog) (*ProjectCatalog, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *projectCatalogClient2) Get(namespace, name string, opts metav1.GetOptions) (*ProjectCatalog, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *projectCatalogClient2) Update(obj *ProjectCatalog) (*ProjectCatalog, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *projectCatalogClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *projectCatalogClient2) List(namespace string, opts metav1.ListOptions) (*ProjectCatalogList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *projectCatalogClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *projectCatalogClientCache) Get(namespace, name string) (*ProjectCatalog, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *projectCatalogClientCache) List(namespace string, selector labels.Selector) ([]*ProjectCatalog, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *projectCatalogClient2) Cache() ProjectCatalogClientCache {
-	n.loadController()
-	return &projectCatalogClientCache{
-		client: n,
-	}
-}
-
-func (n *projectCatalogClient2) OnCreate(ctx context.Context, name string, sync ProjectCatalogChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &projectCatalogLifecycleDelegate{create: sync})
-}
-
-func (n *projectCatalogClient2) OnChange(ctx context.Context, name string, sync ProjectCatalogChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &projectCatalogLifecycleDelegate{update: sync})
-}
-
-func (n *projectCatalogClient2) OnRemove(ctx context.Context, name string, sync ProjectCatalogChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &projectCatalogLifecycleDelegate{remove: sync})
-}
-
-func (n *projectCatalogClientCache) Index(name string, indexer ProjectCatalogIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*ProjectCatalog); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *projectCatalogClientCache) GetIndexed(name, key string) ([]*ProjectCatalog, error) {
-	var result []*ProjectCatalog
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*ProjectCatalog); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *projectCatalogClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type projectCatalogLifecycleDelegate struct {
-	create ProjectCatalogChangeHandlerFunc
-	update ProjectCatalogChangeHandlerFunc
-	remove ProjectCatalogChangeHandlerFunc
-}
-
-func (n *projectCatalogLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *projectCatalogLifecycleDelegate) Create(obj *ProjectCatalog) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *projectCatalogLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *projectCatalogLifecycleDelegate) Remove(obj *ProjectCatalog) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *projectCatalogLifecycleDelegate) Updated(obj *ProjectCatalog) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

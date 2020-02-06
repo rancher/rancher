@@ -185,6 +185,9 @@ func NewAPIClient(opts *ClientOpts) (APIBaseClient, error) {
 	client.Timeout = opts.Timeout
 
 	if opts.CACerts != "" {
+		if Debug {
+			fmt.Println("Some CAcerts are provided.")
+		}
 		roots := x509.NewCertPool()
 		ok := roots.AppendCertsFromPEM([]byte(opts.CACerts))
 		if !ok {
@@ -194,15 +197,30 @@ func NewAPIClient(opts *ClientOpts) (APIBaseClient, error) {
 			TLSClientConfig: &tls.Config{
 				RootCAs: roots,
 			},
+			Proxy: http.ProxyFromEnvironment,
 		}
 		client.Transport = tr
 	}
 
 	if opts.Insecure {
+		if Debug {
+			fmt.Println("Insecure TLS set.")
+		}
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: opts.Insecure,
 			},
+			Proxy: http.ProxyFromEnvironment,
+		}
+		client.Transport = tr
+	}
+
+	if !(opts.Insecure) && (opts.CACerts == "") {
+		if Debug {
+			fmt.Println("Insecure TLS not set and no CAcerts is provided.")
+		}
+		tr := &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
 		}
 		client.Transport = tr
 	}

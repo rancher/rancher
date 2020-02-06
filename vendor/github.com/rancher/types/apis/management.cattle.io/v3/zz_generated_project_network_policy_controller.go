@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type ProjectNetworkPolicyController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ProjectNetworkPolicyHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ProjectNetworkPolicyHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *projectNetworkPolicyClient) AddClusterScopedLifecycle(ctx context.Conte
 func (s *projectNetworkPolicyClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ProjectNetworkPolicyLifecycle) {
 	sync := NewProjectNetworkPolicyLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type ProjectNetworkPolicyIndexer func(obj *ProjectNetworkPolicy) ([]string, error)
-
-type ProjectNetworkPolicyClientCache interface {
-	Get(namespace, name string) (*ProjectNetworkPolicy, error)
-	List(namespace string, selector labels.Selector) ([]*ProjectNetworkPolicy, error)
-
-	Index(name string, indexer ProjectNetworkPolicyIndexer)
-	GetIndexed(name, key string) ([]*ProjectNetworkPolicy, error)
-}
-
-type ProjectNetworkPolicyClient interface {
-	Create(*ProjectNetworkPolicy) (*ProjectNetworkPolicy, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*ProjectNetworkPolicy, error)
-	Update(*ProjectNetworkPolicy) (*ProjectNetworkPolicy, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*ProjectNetworkPolicyList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() ProjectNetworkPolicyClientCache
-
-	OnCreate(ctx context.Context, name string, sync ProjectNetworkPolicyChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync ProjectNetworkPolicyChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync ProjectNetworkPolicyChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() ProjectNetworkPolicyInterface
-}
-
-type projectNetworkPolicyClientCache struct {
-	client *projectNetworkPolicyClient2
-}
-
-type projectNetworkPolicyClient2 struct {
-	iface      ProjectNetworkPolicyInterface
-	controller ProjectNetworkPolicyController
-}
-
-func (n *projectNetworkPolicyClient2) Interface() ProjectNetworkPolicyInterface {
-	return n.iface
-}
-
-func (n *projectNetworkPolicyClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *projectNetworkPolicyClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *projectNetworkPolicyClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *projectNetworkPolicyClient2) Create(obj *ProjectNetworkPolicy) (*ProjectNetworkPolicy, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *projectNetworkPolicyClient2) Get(namespace, name string, opts metav1.GetOptions) (*ProjectNetworkPolicy, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *projectNetworkPolicyClient2) Update(obj *ProjectNetworkPolicy) (*ProjectNetworkPolicy, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *projectNetworkPolicyClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *projectNetworkPolicyClient2) List(namespace string, opts metav1.ListOptions) (*ProjectNetworkPolicyList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *projectNetworkPolicyClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *projectNetworkPolicyClientCache) Get(namespace, name string) (*ProjectNetworkPolicy, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *projectNetworkPolicyClientCache) List(namespace string, selector labels.Selector) ([]*ProjectNetworkPolicy, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *projectNetworkPolicyClient2) Cache() ProjectNetworkPolicyClientCache {
-	n.loadController()
-	return &projectNetworkPolicyClientCache{
-		client: n,
-	}
-}
-
-func (n *projectNetworkPolicyClient2) OnCreate(ctx context.Context, name string, sync ProjectNetworkPolicyChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &projectNetworkPolicyLifecycleDelegate{create: sync})
-}
-
-func (n *projectNetworkPolicyClient2) OnChange(ctx context.Context, name string, sync ProjectNetworkPolicyChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &projectNetworkPolicyLifecycleDelegate{update: sync})
-}
-
-func (n *projectNetworkPolicyClient2) OnRemove(ctx context.Context, name string, sync ProjectNetworkPolicyChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &projectNetworkPolicyLifecycleDelegate{remove: sync})
-}
-
-func (n *projectNetworkPolicyClientCache) Index(name string, indexer ProjectNetworkPolicyIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*ProjectNetworkPolicy); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *projectNetworkPolicyClientCache) GetIndexed(name, key string) ([]*ProjectNetworkPolicy, error) {
-	var result []*ProjectNetworkPolicy
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*ProjectNetworkPolicy); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *projectNetworkPolicyClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type projectNetworkPolicyLifecycleDelegate struct {
-	create ProjectNetworkPolicyChangeHandlerFunc
-	update ProjectNetworkPolicyChangeHandlerFunc
-	remove ProjectNetworkPolicyChangeHandlerFunc
-}
-
-func (n *projectNetworkPolicyLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *projectNetworkPolicyLifecycleDelegate) Create(obj *ProjectNetworkPolicy) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *projectNetworkPolicyLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *projectNetworkPolicyLifecycleDelegate) Remove(obj *ProjectNetworkPolicy) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *projectNetworkPolicyLifecycleDelegate) Updated(obj *ProjectNetworkPolicy) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

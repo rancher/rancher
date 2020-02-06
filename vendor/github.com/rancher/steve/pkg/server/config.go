@@ -29,7 +29,6 @@ type Server struct {
 
 	RestConfig *rest.Config
 
-	Namespace       string
 	BaseSchemas     *types.APISchemas
 	AccessSetLookup accesscontrol.AccessSetLookup
 	SchemaTemplates []schema.Template

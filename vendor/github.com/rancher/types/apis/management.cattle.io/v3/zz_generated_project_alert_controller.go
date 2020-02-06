@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type ProjectAlertController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ProjectAlertHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ProjectAlertHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *projectAlertClient) AddClusterScopedLifecycle(ctx context.Context, name
 func (s *projectAlertClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ProjectAlertLifecycle) {
 	sync := NewProjectAlertLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type ProjectAlertIndexer func(obj *ProjectAlert) ([]string, error)
-
-type ProjectAlertClientCache interface {
-	Get(namespace, name string) (*ProjectAlert, error)
-	List(namespace string, selector labels.Selector) ([]*ProjectAlert, error)
-
-	Index(name string, indexer ProjectAlertIndexer)
-	GetIndexed(name, key string) ([]*ProjectAlert, error)
-}
-
-type ProjectAlertClient interface {
-	Create(*ProjectAlert) (*ProjectAlert, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*ProjectAlert, error)
-	Update(*ProjectAlert) (*ProjectAlert, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*ProjectAlertList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() ProjectAlertClientCache
-
-	OnCreate(ctx context.Context, name string, sync ProjectAlertChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync ProjectAlertChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync ProjectAlertChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() ProjectAlertInterface
-}
-
-type projectAlertClientCache struct {
-	client *projectAlertClient2
-}
-
-type projectAlertClient2 struct {
-	iface      ProjectAlertInterface
-	controller ProjectAlertController
-}
-
-func (n *projectAlertClient2) Interface() ProjectAlertInterface {
-	return n.iface
-}
-
-func (n *projectAlertClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *projectAlertClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *projectAlertClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *projectAlertClient2) Create(obj *ProjectAlert) (*ProjectAlert, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *projectAlertClient2) Get(namespace, name string, opts metav1.GetOptions) (*ProjectAlert, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *projectAlertClient2) Update(obj *ProjectAlert) (*ProjectAlert, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *projectAlertClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *projectAlertClient2) List(namespace string, opts metav1.ListOptions) (*ProjectAlertList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *projectAlertClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *projectAlertClientCache) Get(namespace, name string) (*ProjectAlert, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *projectAlertClientCache) List(namespace string, selector labels.Selector) ([]*ProjectAlert, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *projectAlertClient2) Cache() ProjectAlertClientCache {
-	n.loadController()
-	return &projectAlertClientCache{
-		client: n,
-	}
-}
-
-func (n *projectAlertClient2) OnCreate(ctx context.Context, name string, sync ProjectAlertChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &projectAlertLifecycleDelegate{create: sync})
-}
-
-func (n *projectAlertClient2) OnChange(ctx context.Context, name string, sync ProjectAlertChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &projectAlertLifecycleDelegate{update: sync})
-}
-
-func (n *projectAlertClient2) OnRemove(ctx context.Context, name string, sync ProjectAlertChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &projectAlertLifecycleDelegate{remove: sync})
-}
-
-func (n *projectAlertClientCache) Index(name string, indexer ProjectAlertIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*ProjectAlert); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *projectAlertClientCache) GetIndexed(name, key string) ([]*ProjectAlert, error) {
-	var result []*ProjectAlert
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*ProjectAlert); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *projectAlertClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type projectAlertLifecycleDelegate struct {
-	create ProjectAlertChangeHandlerFunc
-	update ProjectAlertChangeHandlerFunc
-	remove ProjectAlertChangeHandlerFunc
-}
-
-func (n *projectAlertLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *projectAlertLifecycleDelegate) Create(obj *ProjectAlert) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *projectAlertLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *projectAlertLifecycleDelegate) Remove(obj *ProjectAlert) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *projectAlertLifecycleDelegate) Updated(obj *ProjectAlert) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type CisConfigController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler CisConfigHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler CisConfigHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *cisConfigClient) AddClusterScopedLifecycle(ctx context.Context, name, c
 func (s *cisConfigClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle CisConfigLifecycle) {
 	sync := NewCisConfigLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type CisConfigIndexer func(obj *CisConfig) ([]string, error)
-
-type CisConfigClientCache interface {
-	Get(namespace, name string) (*CisConfig, error)
-	List(namespace string, selector labels.Selector) ([]*CisConfig, error)
-
-	Index(name string, indexer CisConfigIndexer)
-	GetIndexed(name, key string) ([]*CisConfig, error)
-}
-
-type CisConfigClient interface {
-	Create(*CisConfig) (*CisConfig, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*CisConfig, error)
-	Update(*CisConfig) (*CisConfig, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*CisConfigList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() CisConfigClientCache
-
-	OnCreate(ctx context.Context, name string, sync CisConfigChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync CisConfigChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync CisConfigChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() CisConfigInterface
-}
-
-type cisConfigClientCache struct {
-	client *cisConfigClient2
-}
-
-type cisConfigClient2 struct {
-	iface      CisConfigInterface
-	controller CisConfigController
-}
-
-func (n *cisConfigClient2) Interface() CisConfigInterface {
-	return n.iface
-}
-
-func (n *cisConfigClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *cisConfigClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *cisConfigClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *cisConfigClient2) Create(obj *CisConfig) (*CisConfig, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *cisConfigClient2) Get(namespace, name string, opts metav1.GetOptions) (*CisConfig, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *cisConfigClient2) Update(obj *CisConfig) (*CisConfig, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *cisConfigClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *cisConfigClient2) List(namespace string, opts metav1.ListOptions) (*CisConfigList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *cisConfigClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *cisConfigClientCache) Get(namespace, name string) (*CisConfig, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *cisConfigClientCache) List(namespace string, selector labels.Selector) ([]*CisConfig, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *cisConfigClient2) Cache() CisConfigClientCache {
-	n.loadController()
-	return &cisConfigClientCache{
-		client: n,
-	}
-}
-
-func (n *cisConfigClient2) OnCreate(ctx context.Context, name string, sync CisConfigChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &cisConfigLifecycleDelegate{create: sync})
-}
-
-func (n *cisConfigClient2) OnChange(ctx context.Context, name string, sync CisConfigChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &cisConfigLifecycleDelegate{update: sync})
-}
-
-func (n *cisConfigClient2) OnRemove(ctx context.Context, name string, sync CisConfigChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &cisConfigLifecycleDelegate{remove: sync})
-}
-
-func (n *cisConfigClientCache) Index(name string, indexer CisConfigIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*CisConfig); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *cisConfigClientCache) GetIndexed(name, key string) ([]*CisConfig, error) {
-	var result []*CisConfig
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*CisConfig); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *cisConfigClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type cisConfigLifecycleDelegate struct {
-	create CisConfigChangeHandlerFunc
-	update CisConfigChangeHandlerFunc
-	remove CisConfigChangeHandlerFunc
-}
-
-func (n *cisConfigLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *cisConfigLifecycleDelegate) Create(obj *CisConfig) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *cisConfigLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *cisConfigLifecycleDelegate) Remove(obj *CisConfig) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *cisConfigLifecycleDelegate) Updated(obj *CisConfig) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

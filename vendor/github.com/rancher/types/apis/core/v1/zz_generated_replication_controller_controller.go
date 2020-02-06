@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -73,6 +74,7 @@ type ReplicationControllerController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ReplicationControllerHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ReplicationControllerHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -327,184 +329,4 @@ func (s *replicationControllerClient) AddClusterScopedLifecycle(ctx context.Cont
 func (s *replicationControllerClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ReplicationControllerLifecycle) {
 	sync := NewReplicationControllerLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type ReplicationControllerIndexer func(obj *v1.ReplicationController) ([]string, error)
-
-type ReplicationControllerClientCache interface {
-	Get(namespace, name string) (*v1.ReplicationController, error)
-	List(namespace string, selector labels.Selector) ([]*v1.ReplicationController, error)
-
-	Index(name string, indexer ReplicationControllerIndexer)
-	GetIndexed(name, key string) ([]*v1.ReplicationController, error)
-}
-
-type ReplicationControllerClient interface {
-	Create(*v1.ReplicationController) (*v1.ReplicationController, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*v1.ReplicationController, error)
-	Update(*v1.ReplicationController) (*v1.ReplicationController, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*ReplicationControllerList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() ReplicationControllerClientCache
-
-	OnCreate(ctx context.Context, name string, sync ReplicationControllerChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync ReplicationControllerChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync ReplicationControllerChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() ReplicationControllerInterface
-}
-
-type replicationControllerClientCache struct {
-	client *replicationControllerClient2
-}
-
-type replicationControllerClient2 struct {
-	iface      ReplicationControllerInterface
-	controller ReplicationControllerController
-}
-
-func (n *replicationControllerClient2) Interface() ReplicationControllerInterface {
-	return n.iface
-}
-
-func (n *replicationControllerClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *replicationControllerClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *replicationControllerClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *replicationControllerClient2) Create(obj *v1.ReplicationController) (*v1.ReplicationController, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *replicationControllerClient2) Get(namespace, name string, opts metav1.GetOptions) (*v1.ReplicationController, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *replicationControllerClient2) Update(obj *v1.ReplicationController) (*v1.ReplicationController, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *replicationControllerClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *replicationControllerClient2) List(namespace string, opts metav1.ListOptions) (*ReplicationControllerList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *replicationControllerClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *replicationControllerClientCache) Get(namespace, name string) (*v1.ReplicationController, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *replicationControllerClientCache) List(namespace string, selector labels.Selector) ([]*v1.ReplicationController, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *replicationControllerClient2) Cache() ReplicationControllerClientCache {
-	n.loadController()
-	return &replicationControllerClientCache{
-		client: n,
-	}
-}
-
-func (n *replicationControllerClient2) OnCreate(ctx context.Context, name string, sync ReplicationControllerChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &replicationControllerLifecycleDelegate{create: sync})
-}
-
-func (n *replicationControllerClient2) OnChange(ctx context.Context, name string, sync ReplicationControllerChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &replicationControllerLifecycleDelegate{update: sync})
-}
-
-func (n *replicationControllerClient2) OnRemove(ctx context.Context, name string, sync ReplicationControllerChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &replicationControllerLifecycleDelegate{remove: sync})
-}
-
-func (n *replicationControllerClientCache) Index(name string, indexer ReplicationControllerIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*v1.ReplicationController); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *replicationControllerClientCache) GetIndexed(name, key string) ([]*v1.ReplicationController, error) {
-	var result []*v1.ReplicationController
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*v1.ReplicationController); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *replicationControllerClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type replicationControllerLifecycleDelegate struct {
-	create ReplicationControllerChangeHandlerFunc
-	update ReplicationControllerChangeHandlerFunc
-	remove ReplicationControllerChangeHandlerFunc
-}
-
-func (n *replicationControllerLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *replicationControllerLifecycleDelegate) Create(obj *v1.ReplicationController) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *replicationControllerLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *replicationControllerLifecycleDelegate) Remove(obj *v1.ReplicationController) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *replicationControllerLifecycleDelegate) Updated(obj *v1.ReplicationController) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

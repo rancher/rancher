@@ -2,6 +2,7 @@ package v1beta1
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type PodSecurityPolicyController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler PodSecurityPolicyHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler PodSecurityPolicyHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *podSecurityPolicyClient) AddClusterScopedLifecycle(ctx context.Context,
 func (s *podSecurityPolicyClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle PodSecurityPolicyLifecycle) {
 	sync := NewPodSecurityPolicyLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type PodSecurityPolicyIndexer func(obj *v1beta1.PodSecurityPolicy) ([]string, error)
-
-type PodSecurityPolicyClientCache interface {
-	Get(namespace, name string) (*v1beta1.PodSecurityPolicy, error)
-	List(namespace string, selector labels.Selector) ([]*v1beta1.PodSecurityPolicy, error)
-
-	Index(name string, indexer PodSecurityPolicyIndexer)
-	GetIndexed(name, key string) ([]*v1beta1.PodSecurityPolicy, error)
-}
-
-type PodSecurityPolicyClient interface {
-	Create(*v1beta1.PodSecurityPolicy) (*v1beta1.PodSecurityPolicy, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*v1beta1.PodSecurityPolicy, error)
-	Update(*v1beta1.PodSecurityPolicy) (*v1beta1.PodSecurityPolicy, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*PodSecurityPolicyList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() PodSecurityPolicyClientCache
-
-	OnCreate(ctx context.Context, name string, sync PodSecurityPolicyChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync PodSecurityPolicyChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync PodSecurityPolicyChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() PodSecurityPolicyInterface
-}
-
-type podSecurityPolicyClientCache struct {
-	client *podSecurityPolicyClient2
-}
-
-type podSecurityPolicyClient2 struct {
-	iface      PodSecurityPolicyInterface
-	controller PodSecurityPolicyController
-}
-
-func (n *podSecurityPolicyClient2) Interface() PodSecurityPolicyInterface {
-	return n.iface
-}
-
-func (n *podSecurityPolicyClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *podSecurityPolicyClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *podSecurityPolicyClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *podSecurityPolicyClient2) Create(obj *v1beta1.PodSecurityPolicy) (*v1beta1.PodSecurityPolicy, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *podSecurityPolicyClient2) Get(namespace, name string, opts metav1.GetOptions) (*v1beta1.PodSecurityPolicy, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *podSecurityPolicyClient2) Update(obj *v1beta1.PodSecurityPolicy) (*v1beta1.PodSecurityPolicy, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *podSecurityPolicyClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *podSecurityPolicyClient2) List(namespace string, opts metav1.ListOptions) (*PodSecurityPolicyList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *podSecurityPolicyClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *podSecurityPolicyClientCache) Get(namespace, name string) (*v1beta1.PodSecurityPolicy, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *podSecurityPolicyClientCache) List(namespace string, selector labels.Selector) ([]*v1beta1.PodSecurityPolicy, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *podSecurityPolicyClient2) Cache() PodSecurityPolicyClientCache {
-	n.loadController()
-	return &podSecurityPolicyClientCache{
-		client: n,
-	}
-}
-
-func (n *podSecurityPolicyClient2) OnCreate(ctx context.Context, name string, sync PodSecurityPolicyChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &podSecurityPolicyLifecycleDelegate{create: sync})
-}
-
-func (n *podSecurityPolicyClient2) OnChange(ctx context.Context, name string, sync PodSecurityPolicyChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &podSecurityPolicyLifecycleDelegate{update: sync})
-}
-
-func (n *podSecurityPolicyClient2) OnRemove(ctx context.Context, name string, sync PodSecurityPolicyChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &podSecurityPolicyLifecycleDelegate{remove: sync})
-}
-
-func (n *podSecurityPolicyClientCache) Index(name string, indexer PodSecurityPolicyIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*v1beta1.PodSecurityPolicy); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *podSecurityPolicyClientCache) GetIndexed(name, key string) ([]*v1beta1.PodSecurityPolicy, error) {
-	var result []*v1beta1.PodSecurityPolicy
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*v1beta1.PodSecurityPolicy); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *podSecurityPolicyClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type podSecurityPolicyLifecycleDelegate struct {
-	create PodSecurityPolicyChangeHandlerFunc
-	update PodSecurityPolicyChangeHandlerFunc
-	remove PodSecurityPolicyChangeHandlerFunc
-}
-
-func (n *podSecurityPolicyLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *podSecurityPolicyLifecycleDelegate) Create(obj *v1beta1.PodSecurityPolicy) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *podSecurityPolicyLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *podSecurityPolicyLifecycleDelegate) Remove(obj *v1beta1.PodSecurityPolicy) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *podSecurityPolicyLifecycleDelegate) Updated(obj *v1beta1.PodSecurityPolicy) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

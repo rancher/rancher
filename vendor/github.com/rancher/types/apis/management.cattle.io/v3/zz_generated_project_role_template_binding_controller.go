@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type ProjectRoleTemplateBindingController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ProjectRoleTemplateBindingHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ProjectRoleTemplateBindingHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *projectRoleTemplateBindingClient) AddClusterScopedLifecycle(ctx context
 func (s *projectRoleTemplateBindingClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ProjectRoleTemplateBindingLifecycle) {
 	sync := NewProjectRoleTemplateBindingLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type ProjectRoleTemplateBindingIndexer func(obj *ProjectRoleTemplateBinding) ([]string, error)
-
-type ProjectRoleTemplateBindingClientCache interface {
-	Get(namespace, name string) (*ProjectRoleTemplateBinding, error)
-	List(namespace string, selector labels.Selector) ([]*ProjectRoleTemplateBinding, error)
-
-	Index(name string, indexer ProjectRoleTemplateBindingIndexer)
-	GetIndexed(name, key string) ([]*ProjectRoleTemplateBinding, error)
-}
-
-type ProjectRoleTemplateBindingClient interface {
-	Create(*ProjectRoleTemplateBinding) (*ProjectRoleTemplateBinding, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*ProjectRoleTemplateBinding, error)
-	Update(*ProjectRoleTemplateBinding) (*ProjectRoleTemplateBinding, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*ProjectRoleTemplateBindingList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() ProjectRoleTemplateBindingClientCache
-
-	OnCreate(ctx context.Context, name string, sync ProjectRoleTemplateBindingChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync ProjectRoleTemplateBindingChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync ProjectRoleTemplateBindingChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() ProjectRoleTemplateBindingInterface
-}
-
-type projectRoleTemplateBindingClientCache struct {
-	client *projectRoleTemplateBindingClient2
-}
-
-type projectRoleTemplateBindingClient2 struct {
-	iface      ProjectRoleTemplateBindingInterface
-	controller ProjectRoleTemplateBindingController
-}
-
-func (n *projectRoleTemplateBindingClient2) Interface() ProjectRoleTemplateBindingInterface {
-	return n.iface
-}
-
-func (n *projectRoleTemplateBindingClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *projectRoleTemplateBindingClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *projectRoleTemplateBindingClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *projectRoleTemplateBindingClient2) Create(obj *ProjectRoleTemplateBinding) (*ProjectRoleTemplateBinding, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *projectRoleTemplateBindingClient2) Get(namespace, name string, opts metav1.GetOptions) (*ProjectRoleTemplateBinding, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *projectRoleTemplateBindingClient2) Update(obj *ProjectRoleTemplateBinding) (*ProjectRoleTemplateBinding, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *projectRoleTemplateBindingClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *projectRoleTemplateBindingClient2) List(namespace string, opts metav1.ListOptions) (*ProjectRoleTemplateBindingList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *projectRoleTemplateBindingClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *projectRoleTemplateBindingClientCache) Get(namespace, name string) (*ProjectRoleTemplateBinding, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *projectRoleTemplateBindingClientCache) List(namespace string, selector labels.Selector) ([]*ProjectRoleTemplateBinding, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *projectRoleTemplateBindingClient2) Cache() ProjectRoleTemplateBindingClientCache {
-	n.loadController()
-	return &projectRoleTemplateBindingClientCache{
-		client: n,
-	}
-}
-
-func (n *projectRoleTemplateBindingClient2) OnCreate(ctx context.Context, name string, sync ProjectRoleTemplateBindingChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &projectRoleTemplateBindingLifecycleDelegate{create: sync})
-}
-
-func (n *projectRoleTemplateBindingClient2) OnChange(ctx context.Context, name string, sync ProjectRoleTemplateBindingChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &projectRoleTemplateBindingLifecycleDelegate{update: sync})
-}
-
-func (n *projectRoleTemplateBindingClient2) OnRemove(ctx context.Context, name string, sync ProjectRoleTemplateBindingChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &projectRoleTemplateBindingLifecycleDelegate{remove: sync})
-}
-
-func (n *projectRoleTemplateBindingClientCache) Index(name string, indexer ProjectRoleTemplateBindingIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*ProjectRoleTemplateBinding); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *projectRoleTemplateBindingClientCache) GetIndexed(name, key string) ([]*ProjectRoleTemplateBinding, error) {
-	var result []*ProjectRoleTemplateBinding
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*ProjectRoleTemplateBinding); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *projectRoleTemplateBindingClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type projectRoleTemplateBindingLifecycleDelegate struct {
-	create ProjectRoleTemplateBindingChangeHandlerFunc
-	update ProjectRoleTemplateBindingChangeHandlerFunc
-	remove ProjectRoleTemplateBindingChangeHandlerFunc
-}
-
-func (n *projectRoleTemplateBindingLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *projectRoleTemplateBindingLifecycleDelegate) Create(obj *ProjectRoleTemplateBinding) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *projectRoleTemplateBindingLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *projectRoleTemplateBindingLifecycleDelegate) Remove(obj *ProjectRoleTemplateBinding) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *projectRoleTemplateBindingLifecycleDelegate) Updated(obj *ProjectRoleTemplateBinding) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

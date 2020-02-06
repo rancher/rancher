@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -73,6 +74,7 @@ type ResourceQuotaController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ResourceQuotaHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ResourceQuotaHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -327,184 +329,4 @@ func (s *resourceQuotaClient) AddClusterScopedLifecycle(ctx context.Context, nam
 func (s *resourceQuotaClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ResourceQuotaLifecycle) {
 	sync := NewResourceQuotaLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type ResourceQuotaIndexer func(obj *v1.ResourceQuota) ([]string, error)
-
-type ResourceQuotaClientCache interface {
-	Get(namespace, name string) (*v1.ResourceQuota, error)
-	List(namespace string, selector labels.Selector) ([]*v1.ResourceQuota, error)
-
-	Index(name string, indexer ResourceQuotaIndexer)
-	GetIndexed(name, key string) ([]*v1.ResourceQuota, error)
-}
-
-type ResourceQuotaClient interface {
-	Create(*v1.ResourceQuota) (*v1.ResourceQuota, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*v1.ResourceQuota, error)
-	Update(*v1.ResourceQuota) (*v1.ResourceQuota, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*ResourceQuotaList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() ResourceQuotaClientCache
-
-	OnCreate(ctx context.Context, name string, sync ResourceQuotaChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync ResourceQuotaChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync ResourceQuotaChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() ResourceQuotaInterface
-}
-
-type resourceQuotaClientCache struct {
-	client *resourceQuotaClient2
-}
-
-type resourceQuotaClient2 struct {
-	iface      ResourceQuotaInterface
-	controller ResourceQuotaController
-}
-
-func (n *resourceQuotaClient2) Interface() ResourceQuotaInterface {
-	return n.iface
-}
-
-func (n *resourceQuotaClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *resourceQuotaClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *resourceQuotaClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *resourceQuotaClient2) Create(obj *v1.ResourceQuota) (*v1.ResourceQuota, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *resourceQuotaClient2) Get(namespace, name string, opts metav1.GetOptions) (*v1.ResourceQuota, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *resourceQuotaClient2) Update(obj *v1.ResourceQuota) (*v1.ResourceQuota, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *resourceQuotaClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *resourceQuotaClient2) List(namespace string, opts metav1.ListOptions) (*ResourceQuotaList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *resourceQuotaClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *resourceQuotaClientCache) Get(namespace, name string) (*v1.ResourceQuota, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *resourceQuotaClientCache) List(namespace string, selector labels.Selector) ([]*v1.ResourceQuota, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *resourceQuotaClient2) Cache() ResourceQuotaClientCache {
-	n.loadController()
-	return &resourceQuotaClientCache{
-		client: n,
-	}
-}
-
-func (n *resourceQuotaClient2) OnCreate(ctx context.Context, name string, sync ResourceQuotaChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &resourceQuotaLifecycleDelegate{create: sync})
-}
-
-func (n *resourceQuotaClient2) OnChange(ctx context.Context, name string, sync ResourceQuotaChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &resourceQuotaLifecycleDelegate{update: sync})
-}
-
-func (n *resourceQuotaClient2) OnRemove(ctx context.Context, name string, sync ResourceQuotaChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &resourceQuotaLifecycleDelegate{remove: sync})
-}
-
-func (n *resourceQuotaClientCache) Index(name string, indexer ResourceQuotaIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*v1.ResourceQuota); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *resourceQuotaClientCache) GetIndexed(name, key string) ([]*v1.ResourceQuota, error) {
-	var result []*v1.ResourceQuota
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*v1.ResourceQuota); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *resourceQuotaClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type resourceQuotaLifecycleDelegate struct {
-	create ResourceQuotaChangeHandlerFunc
-	update ResourceQuotaChangeHandlerFunc
-	remove ResourceQuotaChangeHandlerFunc
-}
-
-func (n *resourceQuotaLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *resourceQuotaLifecycleDelegate) Create(obj *v1.ResourceQuota) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *resourceQuotaLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *resourceQuotaLifecycleDelegate) Remove(obj *v1.ResourceQuota) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *resourceQuotaLifecycleDelegate) Updated(obj *v1.ResourceQuota) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

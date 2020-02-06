@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -73,6 +74,7 @@ type ReplicaSetController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler ReplicaSetHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler ReplicaSetHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -327,184 +329,4 @@ func (s *replicaSetClient) AddClusterScopedLifecycle(ctx context.Context, name, 
 func (s *replicaSetClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle ReplicaSetLifecycle) {
 	sync := NewReplicaSetLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type ReplicaSetIndexer func(obj *v1.ReplicaSet) ([]string, error)
-
-type ReplicaSetClientCache interface {
-	Get(namespace, name string) (*v1.ReplicaSet, error)
-	List(namespace string, selector labels.Selector) ([]*v1.ReplicaSet, error)
-
-	Index(name string, indexer ReplicaSetIndexer)
-	GetIndexed(name, key string) ([]*v1.ReplicaSet, error)
-}
-
-type ReplicaSetClient interface {
-	Create(*v1.ReplicaSet) (*v1.ReplicaSet, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*v1.ReplicaSet, error)
-	Update(*v1.ReplicaSet) (*v1.ReplicaSet, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*ReplicaSetList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() ReplicaSetClientCache
-
-	OnCreate(ctx context.Context, name string, sync ReplicaSetChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync ReplicaSetChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync ReplicaSetChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() ReplicaSetInterface
-}
-
-type replicaSetClientCache struct {
-	client *replicaSetClient2
-}
-
-type replicaSetClient2 struct {
-	iface      ReplicaSetInterface
-	controller ReplicaSetController
-}
-
-func (n *replicaSetClient2) Interface() ReplicaSetInterface {
-	return n.iface
-}
-
-func (n *replicaSetClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *replicaSetClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *replicaSetClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *replicaSetClient2) Create(obj *v1.ReplicaSet) (*v1.ReplicaSet, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *replicaSetClient2) Get(namespace, name string, opts metav1.GetOptions) (*v1.ReplicaSet, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *replicaSetClient2) Update(obj *v1.ReplicaSet) (*v1.ReplicaSet, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *replicaSetClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *replicaSetClient2) List(namespace string, opts metav1.ListOptions) (*ReplicaSetList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *replicaSetClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *replicaSetClientCache) Get(namespace, name string) (*v1.ReplicaSet, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *replicaSetClientCache) List(namespace string, selector labels.Selector) ([]*v1.ReplicaSet, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *replicaSetClient2) Cache() ReplicaSetClientCache {
-	n.loadController()
-	return &replicaSetClientCache{
-		client: n,
-	}
-}
-
-func (n *replicaSetClient2) OnCreate(ctx context.Context, name string, sync ReplicaSetChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &replicaSetLifecycleDelegate{create: sync})
-}
-
-func (n *replicaSetClient2) OnChange(ctx context.Context, name string, sync ReplicaSetChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &replicaSetLifecycleDelegate{update: sync})
-}
-
-func (n *replicaSetClient2) OnRemove(ctx context.Context, name string, sync ReplicaSetChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &replicaSetLifecycleDelegate{remove: sync})
-}
-
-func (n *replicaSetClientCache) Index(name string, indexer ReplicaSetIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*v1.ReplicaSet); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *replicaSetClientCache) GetIndexed(name, key string) ([]*v1.ReplicaSet, error) {
-	var result []*v1.ReplicaSet
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*v1.ReplicaSet); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *replicaSetClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type replicaSetLifecycleDelegate struct {
-	create ReplicaSetChangeHandlerFunc
-	update ReplicaSetChangeHandlerFunc
-	remove ReplicaSetChangeHandlerFunc
-}
-
-func (n *replicaSetLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *replicaSetLifecycleDelegate) Create(obj *v1.ReplicaSet) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *replicaSetLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *replicaSetLifecycleDelegate) Remove(obj *v1.ReplicaSet) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *replicaSetLifecycleDelegate) Updated(obj *v1.ReplicaSet) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

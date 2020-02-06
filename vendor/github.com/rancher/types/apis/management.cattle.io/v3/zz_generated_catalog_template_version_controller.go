@@ -2,6 +2,7 @@ package v3
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -72,6 +73,7 @@ type CatalogTemplateVersionController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler CatalogTemplateVersionHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler CatalogTemplateVersionHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -326,184 +328,4 @@ func (s *catalogTemplateVersionClient) AddClusterScopedLifecycle(ctx context.Con
 func (s *catalogTemplateVersionClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle CatalogTemplateVersionLifecycle) {
 	sync := NewCatalogTemplateVersionLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type CatalogTemplateVersionIndexer func(obj *CatalogTemplateVersion) ([]string, error)
-
-type CatalogTemplateVersionClientCache interface {
-	Get(namespace, name string) (*CatalogTemplateVersion, error)
-	List(namespace string, selector labels.Selector) ([]*CatalogTemplateVersion, error)
-
-	Index(name string, indexer CatalogTemplateVersionIndexer)
-	GetIndexed(name, key string) ([]*CatalogTemplateVersion, error)
-}
-
-type CatalogTemplateVersionClient interface {
-	Create(*CatalogTemplateVersion) (*CatalogTemplateVersion, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*CatalogTemplateVersion, error)
-	Update(*CatalogTemplateVersion) (*CatalogTemplateVersion, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*CatalogTemplateVersionList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() CatalogTemplateVersionClientCache
-
-	OnCreate(ctx context.Context, name string, sync CatalogTemplateVersionChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync CatalogTemplateVersionChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync CatalogTemplateVersionChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() CatalogTemplateVersionInterface
-}
-
-type catalogTemplateVersionClientCache struct {
-	client *catalogTemplateVersionClient2
-}
-
-type catalogTemplateVersionClient2 struct {
-	iface      CatalogTemplateVersionInterface
-	controller CatalogTemplateVersionController
-}
-
-func (n *catalogTemplateVersionClient2) Interface() CatalogTemplateVersionInterface {
-	return n.iface
-}
-
-func (n *catalogTemplateVersionClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *catalogTemplateVersionClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *catalogTemplateVersionClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *catalogTemplateVersionClient2) Create(obj *CatalogTemplateVersion) (*CatalogTemplateVersion, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *catalogTemplateVersionClient2) Get(namespace, name string, opts metav1.GetOptions) (*CatalogTemplateVersion, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *catalogTemplateVersionClient2) Update(obj *CatalogTemplateVersion) (*CatalogTemplateVersion, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *catalogTemplateVersionClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *catalogTemplateVersionClient2) List(namespace string, opts metav1.ListOptions) (*CatalogTemplateVersionList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *catalogTemplateVersionClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *catalogTemplateVersionClientCache) Get(namespace, name string) (*CatalogTemplateVersion, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *catalogTemplateVersionClientCache) List(namespace string, selector labels.Selector) ([]*CatalogTemplateVersion, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *catalogTemplateVersionClient2) Cache() CatalogTemplateVersionClientCache {
-	n.loadController()
-	return &catalogTemplateVersionClientCache{
-		client: n,
-	}
-}
-
-func (n *catalogTemplateVersionClient2) OnCreate(ctx context.Context, name string, sync CatalogTemplateVersionChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &catalogTemplateVersionLifecycleDelegate{create: sync})
-}
-
-func (n *catalogTemplateVersionClient2) OnChange(ctx context.Context, name string, sync CatalogTemplateVersionChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &catalogTemplateVersionLifecycleDelegate{update: sync})
-}
-
-func (n *catalogTemplateVersionClient2) OnRemove(ctx context.Context, name string, sync CatalogTemplateVersionChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &catalogTemplateVersionLifecycleDelegate{remove: sync})
-}
-
-func (n *catalogTemplateVersionClientCache) Index(name string, indexer CatalogTemplateVersionIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*CatalogTemplateVersion); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *catalogTemplateVersionClientCache) GetIndexed(name, key string) ([]*CatalogTemplateVersion, error) {
-	var result []*CatalogTemplateVersion
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*CatalogTemplateVersion); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *catalogTemplateVersionClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type catalogTemplateVersionLifecycleDelegate struct {
-	create CatalogTemplateVersionChangeHandlerFunc
-	update CatalogTemplateVersionChangeHandlerFunc
-	remove CatalogTemplateVersionChangeHandlerFunc
-}
-
-func (n *catalogTemplateVersionLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *catalogTemplateVersionLifecycleDelegate) Create(obj *CatalogTemplateVersion) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *catalogTemplateVersionLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *catalogTemplateVersionLifecycleDelegate) Remove(obj *CatalogTemplateVersion) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *catalogTemplateVersionLifecycleDelegate) Updated(obj *CatalogTemplateVersion) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }

@@ -26,15 +26,6 @@ type Interface interface {
 	ReplicaSetsGetter
 }
 
-type Clients struct {
-	Interface Interface
-
-	Deployment  DeploymentClient
-	DaemonSet   DaemonSetClient
-	StatefulSet StatefulSetClient
-	ReplicaSet  ReplicaSetClient
-}
-
 type Client struct {
 	sync.Mutex
 	restClient rest.Interface
@@ -44,54 +35,6 @@ type Client struct {
 	daemonSetControllers   map[string]DaemonSetController
 	statefulSetControllers map[string]StatefulSetController
 	replicaSetControllers  map[string]ReplicaSetController
-}
-
-func Factory(ctx context.Context, config rest.Config) (context.Context, controller.Starter, error) {
-	c, err := NewForConfig(config)
-	if err != nil {
-		return ctx, nil, err
-	}
-
-	cs := NewClientsFromInterface(c)
-
-	ctx = context.WithValue(ctx, contextKeyType{}, c)
-	ctx = context.WithValue(ctx, contextClientsKeyType{}, cs)
-	return ctx, c, nil
-}
-
-func ClientsFrom(ctx context.Context) *Clients {
-	return ctx.Value(contextClientsKeyType{}).(*Clients)
-}
-
-func From(ctx context.Context) Interface {
-	return ctx.Value(contextKeyType{}).(Interface)
-}
-
-func NewClients(config rest.Config) (*Clients, error) {
-	iface, err := NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-	return NewClientsFromInterface(iface), nil
-}
-
-func NewClientsFromInterface(iface Interface) *Clients {
-	return &Clients{
-		Interface: iface,
-
-		Deployment: &deploymentClient2{
-			iface: iface.Deployments(""),
-		},
-		DaemonSet: &daemonSetClient2{
-			iface: iface.DaemonSets(""),
-		},
-		StatefulSet: &statefulSetClient2{
-			iface: iface.StatefulSets(""),
-		},
-		ReplicaSet: &replicaSetClient2{
-			iface: iface.ReplicaSets(""),
-		},
-	}
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {

@@ -2,6 +2,7 @@ package v3public
 
 import (
 	"context"
+	"time"
 
 	"github.com/rancher/norman/controller"
 	"github.com/rancher/norman/objectclient"
@@ -71,6 +72,7 @@ type AuthProviderController interface {
 	AddClusterScopedHandler(ctx context.Context, name, clusterName string, handler AuthProviderHandlerFunc)
 	AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, handler AuthProviderHandlerFunc)
 	Enqueue(namespace, name string)
+	EnqueueAfter(namespace, name string, after time.Duration)
 	Sync(ctx context.Context) error
 	Start(ctx context.Context, threadiness int) error
 }
@@ -325,184 +327,4 @@ func (s *authProviderClient) AddClusterScopedLifecycle(ctx context.Context, name
 func (s *authProviderClient) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle AuthProviderLifecycle) {
 	sync := NewAuthProviderLifecycleAdapter(name+"_"+clusterName, true, s, lifecycle)
 	s.Controller().AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync)
-}
-
-type AuthProviderIndexer func(obj *AuthProvider) ([]string, error)
-
-type AuthProviderClientCache interface {
-	Get(namespace, name string) (*AuthProvider, error)
-	List(namespace string, selector labels.Selector) ([]*AuthProvider, error)
-
-	Index(name string, indexer AuthProviderIndexer)
-	GetIndexed(name, key string) ([]*AuthProvider, error)
-}
-
-type AuthProviderClient interface {
-	Create(*AuthProvider) (*AuthProvider, error)
-	Get(namespace, name string, opts metav1.GetOptions) (*AuthProvider, error)
-	Update(*AuthProvider) (*AuthProvider, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	List(namespace string, opts metav1.ListOptions) (*AuthProviderList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	Cache() AuthProviderClientCache
-
-	OnCreate(ctx context.Context, name string, sync AuthProviderChangeHandlerFunc)
-	OnChange(ctx context.Context, name string, sync AuthProviderChangeHandlerFunc)
-	OnRemove(ctx context.Context, name string, sync AuthProviderChangeHandlerFunc)
-	Enqueue(namespace, name string)
-
-	Generic() controller.GenericController
-	ObjectClient() *objectclient.ObjectClient
-	Interface() AuthProviderInterface
-}
-
-type authProviderClientCache struct {
-	client *authProviderClient2
-}
-
-type authProviderClient2 struct {
-	iface      AuthProviderInterface
-	controller AuthProviderController
-}
-
-func (n *authProviderClient2) Interface() AuthProviderInterface {
-	return n.iface
-}
-
-func (n *authProviderClient2) Generic() controller.GenericController {
-	return n.iface.Controller().Generic()
-}
-
-func (n *authProviderClient2) ObjectClient() *objectclient.ObjectClient {
-	return n.Interface().ObjectClient()
-}
-
-func (n *authProviderClient2) Enqueue(namespace, name string) {
-	n.iface.Controller().Enqueue(namespace, name)
-}
-
-func (n *authProviderClient2) Create(obj *AuthProvider) (*AuthProvider, error) {
-	return n.iface.Create(obj)
-}
-
-func (n *authProviderClient2) Get(namespace, name string, opts metav1.GetOptions) (*AuthProvider, error) {
-	return n.iface.GetNamespaced(namespace, name, opts)
-}
-
-func (n *authProviderClient2) Update(obj *AuthProvider) (*AuthProvider, error) {
-	return n.iface.Update(obj)
-}
-
-func (n *authProviderClient2) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	return n.iface.DeleteNamespaced(namespace, name, options)
-}
-
-func (n *authProviderClient2) List(namespace string, opts metav1.ListOptions) (*AuthProviderList, error) {
-	return n.iface.List(opts)
-}
-
-func (n *authProviderClient2) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return n.iface.Watch(opts)
-}
-
-func (n *authProviderClientCache) Get(namespace, name string) (*AuthProvider, error) {
-	return n.client.controller.Lister().Get(namespace, name)
-}
-
-func (n *authProviderClientCache) List(namespace string, selector labels.Selector) ([]*AuthProvider, error) {
-	return n.client.controller.Lister().List(namespace, selector)
-}
-
-func (n *authProviderClient2) Cache() AuthProviderClientCache {
-	n.loadController()
-	return &authProviderClientCache{
-		client: n,
-	}
-}
-
-func (n *authProviderClient2) OnCreate(ctx context.Context, name string, sync AuthProviderChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-create", &authProviderLifecycleDelegate{create: sync})
-}
-
-func (n *authProviderClient2) OnChange(ctx context.Context, name string, sync AuthProviderChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name+"-change", &authProviderLifecycleDelegate{update: sync})
-}
-
-func (n *authProviderClient2) OnRemove(ctx context.Context, name string, sync AuthProviderChangeHandlerFunc) {
-	n.loadController()
-	n.iface.AddLifecycle(ctx, name, &authProviderLifecycleDelegate{remove: sync})
-}
-
-func (n *authProviderClientCache) Index(name string, indexer AuthProviderIndexer) {
-	err := n.client.controller.Informer().GetIndexer().AddIndexers(map[string]cache.IndexFunc{
-		name: func(obj interface{}) ([]string, error) {
-			if v, ok := obj.(*AuthProvider); ok {
-				return indexer(v)
-			}
-			return nil, nil
-		},
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (n *authProviderClientCache) GetIndexed(name, key string) ([]*AuthProvider, error) {
-	var result []*AuthProvider
-	objs, err := n.client.controller.Informer().GetIndexer().ByIndex(name, key)
-	if err != nil {
-		return nil, err
-	}
-	for _, obj := range objs {
-		if v, ok := obj.(*AuthProvider); ok {
-			result = append(result, v)
-		}
-	}
-
-	return result, nil
-}
-
-func (n *authProviderClient2) loadController() {
-	if n.controller == nil {
-		n.controller = n.iface.Controller()
-	}
-}
-
-type authProviderLifecycleDelegate struct {
-	create AuthProviderChangeHandlerFunc
-	update AuthProviderChangeHandlerFunc
-	remove AuthProviderChangeHandlerFunc
-}
-
-func (n *authProviderLifecycleDelegate) HasCreate() bool {
-	return n.create != nil
-}
-
-func (n *authProviderLifecycleDelegate) Create(obj *AuthProvider) (runtime.Object, error) {
-	if n.create == nil {
-		return obj, nil
-	}
-	return n.create(obj)
-}
-
-func (n *authProviderLifecycleDelegate) HasFinalize() bool {
-	return n.remove != nil
-}
-
-func (n *authProviderLifecycleDelegate) Remove(obj *AuthProvider) (runtime.Object, error) {
-	if n.remove == nil {
-		return obj, nil
-	}
-	return n.remove(obj)
-}
-
-func (n *authProviderLifecycleDelegate) Updated(obj *AuthProvider) (runtime.Object, error) {
-	if n.update == nil {
-		return obj, nil
-	}
-	return n.update(obj)
 }
