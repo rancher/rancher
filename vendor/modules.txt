@@ -892,7 +892,7 @@ k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
 k8s.io/apiserver/plugin/pkg/authorizer/webhook
 # k8s.io/cli-runtime v0.17.2 => k8s.io/cli-runtime v0.17.2
 k8s.io/cli-runtime/pkg/printers
-# k8s.io/client-go v11.0.1-0.20190805182715-88a2adca7e76+incompatible => github.com/rancher/client-go v1.17.2-rancher.2
+# k8s.io/client-go v11.0.1-0.20190805182715-88a2adca7e76+incompatible => github.com/rancher/client-go v1.17.2-rancher.3
 k8s.io/client-go/discovery
 k8s.io/client-go/discovery/fake
 k8s.io/client-go/dynamic

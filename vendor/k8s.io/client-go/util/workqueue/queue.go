@@ -55,7 +55,9 @@ func newQueue(c clock.Clock, metrics queueMetrics, updatePeriod time.Duration) *
 		metrics:                    metrics,
 		unfinishedWorkUpdatePeriod: updatePeriod,
 	}
-	go t.updateUnfinishedWorkLoop()
+	// When we scale to 1000's of clusters we end up spending a large percentage of
+	// our time waking up and doing nothing across 10s of thousands of goroutines.
+	// go t.updateUnfinishedWorkLoop()
 	return t
 }
 
