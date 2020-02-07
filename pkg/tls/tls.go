@@ -57,7 +57,7 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 }
 
 func SetupListener(secrets corev1controllers.SecretController, acmeDomains []string, noCACerts bool) (*server.ListenOpts, error) {
-	caForAgent, opts, err := readConfig(secrets, acmeDomains, noCACerts)
+	caForAgent, noCACerts, opts, err := readConfig(secrets, acmeDomains, noCACerts)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func SetupListener(secrets corev1controllers.SecretController, acmeDomains []str
 	return opts, nil
 }
 
-func readConfig(secrets corev1controllers.SecretController, acmeDomains []string, noCACerts bool) (string, *server.ListenOpts, error) {
+func readConfig(secrets corev1controllers.SecretController, acmeDomains []string, noCACerts bool) (string, bool, *server.ListenOpts, error) {
 	var (
 		ca  string
 		err error
@@ -92,12 +92,12 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 
 	tlsConfig, err := BaseTLSConfig()
 	if err != nil {
-		return "", nil, err
+		return "", noCACerts, nil, err
 	}
 
 	expiration, err := strconv.Atoi(settings.RotateCertsIfExpiringInDays.Get())
 	if err != nil {
-		return "", nil, errors.Wrapf(err, "parsing %s", settings.RotateCertsIfExpiringInDays.Get())
+		return "", noCACerts, nil, errors.Wrapf(err, "parsing %s", settings.RotateCertsIfExpiringInDays.Get())
 	}
 
 	sans := []string{"localhost", "127.0.0.1"}
@@ -122,7 +122,7 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 	// ACME / Let's Encrypt
 	// If --acme-domain is set, configure and return
 	if len(acmeDomains) > 0 {
-		return "", opts, nil
+		return "", true, opts, nil
 	}
 
 	// Mounted certificates
@@ -132,7 +132,7 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 
 	// If certificate file exists but not certificate key, or other way around, error out
 	if (certFileExists && !keyFileExists) || (!certFileExists && keyFileExists) {
-		return "", nil, fmt.Errorf("invalid SSL configuration found, please set both certificate file and certificate key file (one is missing)")
+		return "", noCACerts, nil, fmt.Errorf("invalid SSL configuration found, please set both certificate file and certificate key file (one is missing)")
 	}
 
 	caFileExists := fileExists(rancherCACertsFile)
@@ -141,22 +141,22 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 	if certFileExists && keyFileExists {
 		cert, err := tls.LoadX509KeyPair(rancherCertFile, rancherKeyFile)
 		if err != nil {
-			return "", nil, err
+			return "", noCACerts, nil, err
 		}
 		opts.TLSListenerConfig.TLSConfig.Certificates = []tls.Certificate{cert}
 
 		// Selfsigned needs cacerts, recognized CA needs --no-cacerts but can't be used together
 		if (caFileExists && noCACerts) || (!caFileExists && !noCACerts) {
-			return "", nil, fmt.Errorf("invalid SSL configuration found, please set cacerts when using self signed certificates or use --no-cacerts when using certificates from a recognized Certificate Authority, do not use both at the same time")
+			return "", noCACerts, nil, fmt.Errorf("invalid SSL configuration found, please set cacerts when using self signed certificates or use --no-cacerts when using certificates from a recognized Certificate Authority, do not use both at the same time")
 		}
 		// Load cacerts if exists
 		if caFileExists {
 			ca, err = readPEM(rancherCACertsFile)
 			if err != nil {
-				return "", nil, err
+				return "", noCACerts, nil, err
 			}
 		}
-		return ca, opts, nil
+		return ca, noCACerts, opts, nil
 	}
 
 	// External termination
@@ -165,16 +165,16 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 	if caFileExists {
 		// We can't have --no-cacerts
 		if noCACerts {
-			return "", nil, fmt.Errorf("invalid SSL configuration found, please set cacerts when using self signed certificates or use --no-cacerts when using certificates from a recognized Certificate Authority, do not use both at the same time")
+			return "", noCACerts, nil, fmt.Errorf("invalid SSL configuration found, please set cacerts when using self signed certificates or use --no-cacerts when using certificates from a recognized Certificate Authority, do not use both at the same time")
 		}
 		ca, err = readPEM(rancherCACertsFile)
 		if err != nil {
-			return "", nil, err
+			return "", noCACerts, nil, err
 		}
 	}
 
 	// No certificates mounted or only --no-cacerts used
-	return ca, opts, nil
+	return ca, noCACerts, opts, nil
 }
 
 func fileExists(path string) bool {
