@@ -3,6 +3,7 @@ package cert
 import (
 	"bytes"
 	"crypto"
+	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/x509"
@@ -28,6 +29,38 @@ type CertificateInfo struct {
 	Version                 int       `json:"version"`
 }
 
+func matchAndKeySize(publicKey crypto.PublicKey, privateKey crypto.PrivateKey) (string, int, bool) {
+	if algo, size, ok := rsaMatchAndKeySize(publicKey, privateKey); ok {
+		return algo, size, ok
+	}
+
+	pubKey, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return "", 0, false
+	}
+
+	privKey, ok := privateKey.(*ecdsa.PrivateKey)
+	if !ok {
+		return "", 0, false
+	}
+
+	return "ECC", 256, privKey.X.Cmp(pubKey.X) == 0 && privKey.Y.Cmp(privKey.Y) == 0
+}
+
+func rsaMatchAndKeySize(publicKey crypto.PublicKey, privateKey crypto.PrivateKey) (string, int, bool) {
+	pubKey, ok := publicKey.(*rsa.PublicKey)
+	if !ok {
+		return "", 0, false
+	}
+
+	privKey, ok := privateKey.(*rsa.PrivateKey)
+	if !ok {
+		return "", 0, false
+	}
+
+	return "RSA", len(privKey.N.Bytes()), pubKey.N.Cmp(privKey.N) == 0
+}
+
 func Info(pemCerts, pemKey string) (*CertificateInfo, error) {
 	block, _ := pem.Decode([]byte(pemKey))
 	if block == nil {
@@ -38,7 +71,9 @@ func Info(pemCerts, pemKey string) (*CertificateInfo, error) {
 	var err error
 	if key, err = x509.ParsePKCS1PrivateKey(block.Bytes); err != nil {
 		if key, err = x509.ParsePKCS8PrivateKey(block.Bytes); err != nil {
-			return nil, errors.Wrap(err, "failed to parse key: key must be PEM encoded PKCS1 or PKCS8")
+			if key, err = x509.ParseECPrivateKey(block.Bytes); err != nil {
+				return nil, errors.Wrap(err, "failed to parse key: key must be PEM encoded EC, PKCS1, or PKCS8")
+			}
 		}
 	}
 
@@ -56,27 +91,18 @@ func Info(pemCerts, pemKey string) (*CertificateInfo, error) {
 			return nil, errors.Wrap(err, "failed to parse certificate")
 		}
 
-		pubKey, ok := cert.PublicKey.(*rsa.PublicKey)
+		algo, size, ok := matchAndKeySize(cert.PublicKey, key)
 		if !ok {
 			continue
 		}
 
-		privKey, ok := key.(*rsa.PrivateKey)
-		if !ok {
-			continue
-		}
-
-		if pubKey.N.Cmp(privKey.N) != 0 {
-			continue
-		}
-
-		certInfo.Algorithm = "RSA"
+		certInfo.Algorithm = algo
 		certInfo.Fingerprint = fingerprint(block.Bytes)
 		certInfo.CN = cert.Subject.CommonName
 		certInfo.ExpiresAt = cert.NotAfter
 		certInfo.IssuedAt = cert.NotBefore
 		certInfo.Issuer = cert.Issuer.CommonName
-		certInfo.KeySize = len(privKey.N.Bytes())
+		certInfo.KeySize = size
 		certInfo.SerialNumber = cert.SerialNumber.String()
 		certInfo.Version = cert.Version
 
