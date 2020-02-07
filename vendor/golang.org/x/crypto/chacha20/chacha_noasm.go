@@ -6,11 +6,8 @@
 
 package chacha20
 
-const (
-	bufSize = 64
-	haveAsm = false
-)
+const bufSize = blockSize
 
-func (*Cipher) xorKeyStreamAsm(dst, src []byte) {
-	panic("not implemented")
+func (s *Cipher) xorKeyStreamBlocks(dst, src []byte) {
+	s.xorKeyStreamBlocksGeneric(dst, src)
 }

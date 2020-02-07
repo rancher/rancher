@@ -19,7 +19,7 @@
 // The differences in this and the original implementation are
 // due to the calling conventions and initialization of constants.
 
-// +build ppc64le,!gccgo,!appengine
+// +build !gccgo,!appengine
 
 #include "textflag.h"
 
@@ -31,24 +31,7 @@
 #define TMP  R15
 
 #define CONSTBASE  R16
-
-#define X0   R11
-#define X1   R12
-#define X2   R14
-#define X3   R15
-#define X4   R16
-#define X5   R17
-#define X6   R18
-#define X7   R19
-#define X8   R20
-#define X9   R21
-#define X10  R22
-#define X11  R23
-#define X12  R24
-#define X13  R25
-#define X14  R26
-#define X15  R27
-
+#define BLOCKS R17
 
 DATA consts<>+0x00(SB)/8, $0x3320646e61707865
 DATA consts<>+0x08(SB)/8, $0x6b20657479622d32
@@ -72,13 +55,13 @@ DATA consts<>+0x90(SB)/8, $0x0000000100000000
 DATA consts<>+0x98(SB)/8, $0x0000000300000002
 GLOBL consts<>(SB), RODATA, $0xa0
 
-//func chaCha20_ctr32_vsx(out, inp []byte, len int, key *[32]byte, counter *[16]byte)
+//func chaCha20_ctr32_vsx(out, inp *byte, len int, key *[8]uint32, counter *uint32)
 TEXT ·chaCha20_ctr32_vsx(SB),NOSPLIT,$64-40
 	MOVD out+0(FP), OUT
 	MOVD inp+8(FP), INP
 	MOVD len+16(FP), LEN
 	MOVD key+24(FP), KEY
-	MOVD cnt+32(FP), CNT
+	MOVD counter+32(FP), CNT
 
 	// Addressing for constants
 	MOVD $consts<>+0x00(SB), CONSTBASE
@@ -86,6 +69,7 @@ TEXT ·chaCha20_ctr32_vsx(SB),NOSPLIT,$64-40
 	MOVD $32, R9
 	MOVD $48, R10
 	MOVD $64, R11
+	SRD $6, LEN, BLOCKS
 	// V16
 	LXVW4X (CONSTBASE)(R0), VS48
 	ADD $80,CONSTBASE
@@ -429,9 +413,9 @@ loop_vsx:
 	BNE  loop_outer_vsx
 
 done_vsx:
-	// Increment counter by 4
+	// Increment counter by number of 64 byte blocks
 	MOVD (CNT), R14
-	ADD  $4, R14
+	ADD  BLOCKS, R14
 	MOVD R14, (CNT)
 	RET
 

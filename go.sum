@@ -802,8 +802,8 @@ github.com/rancher/client-go v1.17.2-rancher.3 h1:zvwcY1iBSbS0jiOtZp+TkskVVGU03B
 github.com/rancher/client-go v1.17.2-rancher.3/go.mod h1:QAzRgsa0C2xl4/eVpeVAZMvikCn8Nm81yqVx3Kk9XYI=
 github.com/rancher/dynamiclistener v0.2.1-0.20200131054153-795bb90214d9 h1:3VeB9YexEi9drVsdQEWx33MnI7hFBJXQ4Etly8M1Ox8=
 github.com/rancher/dynamiclistener v0.2.1-0.20200131054153-795bb90214d9/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
-github.com/rancher/dynamiclistener v0.2.1-0.20200206061255-6281628cd4d5 h1:IzV8feEHnMtiZNXC3jR5aJd8x51/bvxAkvmqdw4CdyE=
-github.com/rancher/dynamiclistener v0.2.1-0.20200206061255-6281628cd4d5/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
+github.com/rancher/dynamiclistener v0.2.1-0.20200207212838-3f92468568bb h1:sDWxUEC3Yfptd9waLac9CCy3dHriZgDXn6/DjNGObzs=
+github.com/rancher/dynamiclistener v0.2.1-0.20200207212838-3f92468568bb/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20200123225253-a5b9f3e0b2df/go.mod h1:MkY6hsQLw3cHrb0V/Fmn4ur2c5PBIpLIe+gvMWoTXGI=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20200129225622-a00843f74fed h1:khos5xy4swXQ5gwo9OaAtsEpKBZksLjw+DoncA33nCg=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20200129225622-a00843f74fed/go.mod h1:MkY6hsQLw3cHrb0V/Fmn4ur2c5PBIpLIe+gvMWoTXGI=
@@ -1038,8 +1038,8 @@ golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8/go.mod h1:yigFU9vqHzYiE8U
 golang.org/x/crypto v0.0.0-20190617133340-57b3e21c3d56/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
 golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
 golang.org/x/crypto v0.0.0-20190911031432-227b76d455e7/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
-golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550 h1:ObdrDkeb4kJdCP557AjRjq69pTHfNouLtWZG7j9rPN8=
-golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
+golang.org/x/crypto v0.0.0-20200207205829-a95e85b341fd h1:Wf+k80tMDcKkeQiGIgNFmhv4GDSTXoUBhm+33x2ApdA=
+golang.org/x/crypto v0.0.0-20200207205829-a95e85b341fd/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
 golang.org/x/exp v0.0.0-20190121172915-509febef88a4/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
 golang.org/x/exp v0.0.0-20190125153040-c74c464bbbf2/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
 golang.org/x/exp v0.0.0-20190312203227-4b39c73a6495/go.mod h1:ZjyILWgesfNpC6sMxTJOJm9Kp84zZh5NQWvqDGG3Qr8=
