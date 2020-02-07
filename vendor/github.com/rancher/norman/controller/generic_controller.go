@@ -176,7 +176,7 @@ func (g *genericController) addHandler(ctx context.Context, name string, handler
 
 	if g.synced {
 		for _, key := range g.informer.GetStore().ListKeys() {
-			g.queue.AddRateLimited(key)
+			g.queue.Add(key)
 		}
 	}
 
