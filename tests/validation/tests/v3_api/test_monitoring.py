@@ -522,6 +522,12 @@ def check_data(source, target_list):
 def validate_cluster_graph(action_query, resource_type, timeout=10):
     target_graph_list = copy.deepcopy(name_mapping.get(resource_type))
     rancher_client, cluster = get_user_client_and_cluster()
+    # handle the special case that if the graph etcd-peer-traffic is
+    # is not available if there is only one etcd node in the cluster
+    if resource_type == "etcd":
+        nodes = get_etcd_nodes(cluster, rancher_client)
+        if len(nodes) == 1:
+            target_graph_list.remove("etcd-peer-traffic")
     start = time.time()
     while True:
         res = rancher_client.action(**action_query)
