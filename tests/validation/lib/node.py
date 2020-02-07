@@ -9,6 +9,8 @@ logging.getLogger("paramiko").setLevel(logging.CRITICAL)
 DOCKER_INSTALLED = os.environ.get("DOCKER_INSTALLED", "true")
 DOCKER_INSTALL_CMD = (
     "curl https://releases.rancher.com/install-docker/{0}.sh | sh")
+DOCKER_INSTALL_CMD_RHEL8 = (
+    "sudo dnf install docker-ce-{0} --nobest -y")
 
 
 class Node(object):
@@ -51,7 +53,7 @@ class Node(object):
         self._roles = r
 
     def wait_for_ssh_ready(self):
-        command = 'whomai'
+        command = 'whoami'
         start_time = int(time.time())
         logs_while_waiting = ''
         while int(time.time()) - start_time < 100:
@@ -63,6 +65,7 @@ class Node(object):
                 if result and len(result) == 3 and result[1].readable():
                     result = [result[1].read(), result[2].read()]
                     self._ssh_client.close()
+                    print("Successfully connected to node '{}' by SSH".format(self.public_ip_address))
                     return True
             except Exception as e:
                 self._ssh_client.close()
@@ -88,6 +91,7 @@ class Node(object):
         return result
 
     def install_docker(self):
+        print("Installing Docker version {}".format(self.docker_version))
         # TODO: Fix to install native on RHEL 7.4
         command = (
             "{} && sudo usermod -aG docker {} && sudo systemctl enable docker"
@@ -96,10 +100,30 @@ class Node(object):
                 self.ssh_user))
         return self.execute_command(command)
 
+    def install_docker_rhel8(self):
+        print("RHEL8 detected, installing Docker version {}".format(self.docker_version))
+        command = (
+            "sudo dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo &&" +
+            "sudo sed -i '/^gpgkey=https:\/\/download.docker.com\/linux\/centos\/gpg/a module_hotfixes=True' /etc/yum.repos.d/docker-ce.repo &&")
+        command += ("{} &&".format(DOCKER_INSTALL_CMD_RHEL8.format(self.docker_version)))
+        command += ("sudo usermod -aG docker {} &&".format(self.ssh_user))
+        command += (
+            "sudo systemctl --now enable docker &&" +
+            "sudo iptables -P FORWARD ACCEPT &&" +
+            "echo 'net.ipv4.ip_forward = 1' | sudo tee -a /etc/sysctl.d/50-docker-forward.conf &&" +
+            "for mod in ip_tables ip_vs_sh ip_vs ip_vs_rr ip_vs_wrr; do sudo modprobe $mod; echo $mod | sudo tee -a /etc/modules-load.d/iptables.conf; done &&" +
+            "sudo dnf -y install network-scripts &&" +
+            "sudo systemctl enable network &&" +
+            "sudo systemctl disable NetworkManager")
+        return self.execute_command(command)
+
     def ready_node(self):
         self.wait_for_ssh_ready()
         if DOCKER_INSTALLED.lower() == 'false':
-            self.install_docker()
+            if self.os_version.startswith('rhel-8'):
+                self.install_docker_rhel8()
+            else:
+                self.install_docker()
 
     def docker_ps(self, all=False, includeall=False):
         result = self.execute_command(

@@ -74,13 +74,17 @@ PUBLIC_AMI = {
             'image': 'ami-965e6bf3', 'ssh_user': 'ubuntu'},
         "rhel-7.4": {
             'image': 'ami-0b1e356e', 'ssh_user': 'ec2-user'},
+        "rhel-8.1": {
+            'image': 'ami-0fdea47967124a409', 'ssh_user': 'ec2-user'},
         "ros-1.4.0": {
             'image': 'ami-504b7435', 'ssh_user': 'rancher'}},
     'us-east-1': {
         "ubuntu-16.04": {
             'image': 'ami-cf6c47aa', 'ssh_user': 'ubuntu'},
         "rhel-7.4": {
-            'image': 'ami-0b1e356e', 'ssh_user': 'ec2-user'}}
+            'image': 'ami-0b1e356e', 'ssh_user': 'ec2-user'},
+        "rhel-8.1": {
+            'image': 'ami-09b947b170ccd0dbc', 'ssh_user': 'ec2-user'}}
 }
 
 
@@ -181,6 +185,7 @@ class AmazonWebServices(CloudProviderBase):
             args["IamInstanceProfile"] = {'Name': AWS_IAM_PROFILE}
 
         instance = self._client.run_instances(**args)
+
         node = Node(
             provider_node_id=instance['Instances'][0]['InstanceId'],
             state=instance['Instances'][0]['State']['Name'],
@@ -197,6 +202,7 @@ class AmazonWebServices(CloudProviderBase):
         if wait_for_ready:
             node = self.wait_for_node_state(node)
             node.ready_node()
+
         return node
 
     def create_multiple_nodes(
