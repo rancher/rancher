@@ -43,6 +43,9 @@ func (ph *podHandler) Sync(key string, pod *corev1.Pod) (runtime.Object, error) 
 		v3.ClusterScanConditionRunCompleted.True(cs)
 		if done != "true" {
 			v3.ClusterScanConditionFailed.True(cs)
+			if done != "error" {
+				v3.ClusterScanConditionFailed.Message(cs, done)
+			}
 		}
 		_, err = ph.mgmtCtxClusterScanClient.Update(cs)
 		if err != nil {
