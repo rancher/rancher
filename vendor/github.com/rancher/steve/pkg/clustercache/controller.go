@@ -15,20 +15,15 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	schema2 "k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/dynamic/dynamicinformer"
+	"k8s.io/client-go/metadata"
+	"k8s.io/client-go/metadata/metadatainformer"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-)
-
-var (
-	logOnce = sync.Once{}
 )
 
 type Handler func(gvr schema2.GroupVersionResource, key string, obj runtime.Object) error
 
 type ClusterCache interface {
-	AddController(gvk schema2.GroupVersionKind, informer cache.SharedIndexInformer)
 	List(gvr schema2.GroupVersionResource) []interface{}
 	OnAdd(ctx context.Context, handler Handler)
 	OnRemove(ctx context.Context, handler Handler)
@@ -56,7 +51,7 @@ type clusterCache struct {
 
 	ctx               context.Context
 	typed             map[schema2.GroupVersionKind]cache.SharedIndexInformer
-	informerFactory   dynamicinformer.DynamicSharedInformerFactory
+	informerFactory   metadatainformer.SharedInformerFactory
 	controllerFactory generic.ControllerManager
 	watchers          map[schema2.GroupVersionResource]*watcher
 	workqueue         workqueue.DelayingInterface
@@ -66,20 +61,16 @@ type clusterCache struct {
 	changeHandlers cancelCollection
 }
 
-func NewClusterCache(ctx context.Context, client dynamic.Interface) ClusterCache {
+func NewClusterCache(ctx context.Context, client metadata.Interface) ClusterCache {
 	c := &clusterCache{
 		ctx:             ctx,
 		typed:           map[schema2.GroupVersionKind]cache.SharedIndexInformer{},
-		informerFactory: dynamicinformer.NewDynamicSharedInformerFactory(client, 2*time.Hour),
+		informerFactory: metadatainformer.NewSharedInformerFactory(client, 2*time.Hour),
 		watchers:        map[schema2.GroupVersionResource]*watcher{},
 		workqueue:       workqueue.NewNamedDelayingQueue("cluster-cache"),
 	}
 	go c.start()
 	return c
-}
-
-func (h *clusterCache) AddController(gvk schema2.GroupVersionKind, informer cache.SharedIndexInformer) {
-	h.typed[gvk] = informer
 }
 
 func validSchema(schema *types.APISchema) bool {
@@ -170,7 +161,7 @@ func (h *clusterCache) OnSchemas(schemas *schema.Collection) error {
 			w.start = true
 		}
 
-		logrus.Infof("Watching counts for %s", gvk.String())
+		logrus.Infof("Watching metadata for %s", gvk.String())
 		h.addResourceEventHandler(gvr, w.informer)
 		name := fmt.Sprintf("meta %s", gvk)
 		h.controllerFactory.AddHandler(ctx, gvk, w.informer, name, func(key string, obj runtime.Object) (object runtime.Object, e error) {
@@ -180,7 +171,7 @@ func (h *clusterCache) OnSchemas(schemas *schema.Collection) error {
 
 	for gvr, w := range h.watchers {
 		if !gvrs[gvr] {
-			logrus.Infof("Stopping count watch on %s", gvr)
+			logrus.Infof("Stopping metadata watch on %s", gvr)
 			w.cancel()
 			delete(h.watchers, gvr)
 		}

@@ -30,6 +30,7 @@ import (
 	"github.com/rancher/steve/pkg/auth"
 	steveserver "github.com/rancher/steve/pkg/server"
 	"github.com/rancher/types/config"
+	"github.com/rancher/wrangler/pkg/crd"
 	"github.com/rancher/wrangler/pkg/leader"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -81,9 +82,31 @@ func (r *Rancher) ListenAndServe(ctx context.Context) error {
 	return ctx.Err()
 }
 
+func initFeatures(ctx context.Context, scaledContext *config.ScaledContext, cfg *Config) error {
+	factory, err := crd.NewFactoryFromClient(&scaledContext.RESTConfig)
+	if err != nil {
+		return err
+	}
+
+	if _, err := factory.CreateCRDs(ctx, crd.NonNamespacedType("Feature.management.cattle.io/v3")); err != nil {
+		return err
+	}
+
+	scaledContext.Management.Features("").Controller()
+	if err := scaledContext.Start(ctx); err != nil {
+		return err
+	}
+	features.InitializeFeatures(scaledContext, cfg.Features)
+	return nil
+}
+
 func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config) (*config.ScaledContext, *clustermanager.Manager, error) {
 	scaledContext, err := config.NewScaledContext(kubeConfig)
 	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := initFeatures(ctx, scaledContext, cfg); err != nil {
 		return nil, nil, err
 	}
 
@@ -133,7 +156,7 @@ func New(ctx context.Context, restConfig *rest.Config, cfg *Config) (*Rancher, e
 		return nil, err
 	}
 
-	asl := accesscontrol.NewAccessStore(wranglerContext.RBAC)
+	asl := accesscontrol.NewAccessStore(ctx, features.Steve.Enabled(), wranglerContext.RBAC)
 
 	auditLogWriter := audit.NewLogWriter(cfg.AuditLogPath, cfg.AuditLevel, cfg.AuditLogMaxage, cfg.AuditLogMaxbackup, cfg.AuditLogMaxsize)
 
@@ -167,10 +190,6 @@ func New(ctx context.Context, restConfig *rest.Config, cfg *Config) (*Rancher, e
 }
 
 func (r *Rancher) Start(ctx context.Context) error {
-	// this step needs to happen prior to starting scaled context to ensure
-	// cache works properly
-	features.InitializeFeatures(r.ScaledContext, r.Config.Features)
-
 	if err := r.ScaledContext.Start(ctx); err != nil {
 		return err
 	}

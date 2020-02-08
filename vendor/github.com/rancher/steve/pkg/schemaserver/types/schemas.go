@@ -10,14 +10,14 @@ import (
 type APISchemas struct {
 	InternalSchemas *schemas.Schemas
 	Schemas         map[string]*APISchema
-	index map[string]*APISchema
+	index           map[string]*APISchema
 }
 
 func EmptyAPISchemas() *APISchemas {
 	return &APISchemas{
 		InternalSchemas: schemas.EmptySchemas(),
 		Schemas:         map[string]*APISchema{},
-		index:map[string]*APISchema{},
+		index:           map[string]*APISchema{},
 	}
 }
 

@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/rancher/rancher/pkg/features"
+	v3 "github.com/rancher/rancher/pkg/wrangler/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/steve/pkg/proxy"
 	managementv3 "github.com/rancher/types/apis/management.cattle.io/v3"
@@ -18,39 +20,50 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type handler struct {
+type Handler struct {
 	authorizer   authorizer.Authorizer
 	tunnelServer *remotedialer.Server
+	clusters     v3.ClusterCache
 }
 
 func NewProxyHandler(authorizer authorizer.Authorizer,
-	tunnelServer *remotedialer.Server) http.Handler {
-	return &handler{
+	tunnelServer *remotedialer.Server,
+	clusters v3.ClusterCache) *Handler {
+	return &Handler{
 		authorizer:   authorizer,
 		tunnelServer: tunnelServer,
+		clusters:     clusters,
 	}
 }
 
-func (h *handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+func (h *Handler) MatchNonLegacy(prefix string) mux.MatcherFunc {
+	return func(req *http.Request, match *mux.RouteMatch) bool {
+		clusterID := strings.TrimPrefix(req.URL.Path, prefix)
+		clusterID = strings.SplitN(clusterID, "/", 2)[0]
+		if match.Vars == nil {
+			match.Vars = map[string]string{}
+		}
+		match.Vars["clusterID"] = clusterID
+
+		cluster, err := h.clusters.Get(clusterID)
+		if err != nil {
+			return true
+		}
+
+		// No steve means we are upgrading a node that doesn't have the right proxy
+		return cluster.Status.AgentFeatures[features.Steve.Name()]
+	}
+}
+
+func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	user, ok := request.UserFrom(req.Context())
 	if !ok {
 		rw.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	prefix, ok := mux.Vars(req)["prefix"]
-	if !ok {
-		rw.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	if !strings.HasPrefix(prefix, "/") {
-		// may not include first slash and should
-		prefix = "/" + prefix
-	}
-
-	parts := strings.Split(prefix, "/")
-	clusterID := parts[len(parts)-1]
+	prefix := "/" + mux.Vars(req)["prefix"]
+	clusterID := mux.Vars(req)["clusterID"]
 
 	if !h.canAccess(req.Context(), user, clusterID) {
 		rw.WriteHeader(http.StatusUnauthorized)
@@ -67,7 +80,7 @@ func (h *handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	handler.ServeHTTP(rw, req)
 }
 
-func (h *handler) dialer(ctx context.Context, network, address string) (net.Conn, error) {
+func (h *Handler) dialer(ctx context.Context, network, address string) (net.Conn, error) {
 	host, _, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
@@ -76,7 +89,7 @@ func (h *handler) dialer(ctx context.Context, network, address string) (net.Conn
 	return dialer(network, "127.0.0.1:6443")
 }
 
-func (h *handler) next(clusterID, prefix string) (http.Handler, error) {
+func (h *Handler) next(clusterID, prefix string) (http.Handler, error) {
 	cfg := &rest.Config{
 		// this is bogus, the dialer will change it to 127.0.0.1:6443
 		Host:      "https://" + clusterID,
@@ -96,7 +109,7 @@ func (h *handler) next(clusterID, prefix string) (http.Handler, error) {
 	}), nil
 }
 
-func (h *handler) canAccess(ctx context.Context, user user.Info, clusterID string) bool {
+func (h *Handler) canAccess(ctx context.Context, user user.Info, clusterID string) bool {
 	extra := map[string]authzv1.ExtraValue{}
 	for k, v := range user.GetExtra() {
 		extra[k] = v

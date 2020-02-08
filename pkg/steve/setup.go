@@ -34,10 +34,15 @@ func Setup(server *steve.Server, config *wrangler.Context) error {
 		return err
 	}
 
+	proxy := proxy.NewProxyHandler(authorizer,
+		config.TunnelServer,
+		config.Mgmt.Cluster().Cache())
+
 	server.Next = newRouter(&handler{
-		GitHub:   server.AuthMiddleware.Wrap(githubHandler),
-		Proxy:    server.AuthMiddleware.Wrap(proxy.NewProxyHandler(authorizer, config.TunnelServer)),
-		NotFound: server.Next,
+		GitHub:       server.AuthMiddleware.Wrap(githubHandler),
+		Proxy:        server.AuthMiddleware.Wrap(proxy),
+		ProxyMatcher: proxy.MatchNonLegacy,
+		NotFound:     server.Next,
 	})
 
 	// wrap with UI
@@ -47,15 +52,16 @@ func Setup(server *steve.Server, config *wrangler.Context) error {
 }
 
 type handler struct {
-	GitHub   http.Handler
-	Proxy    http.Handler
-	NotFound http.Handler
+	GitHub       http.Handler
+	Proxy        http.Handler
+	ProxyMatcher func(string) mux.MatcherFunc
+	NotFound     http.Handler
 }
 
 func newRouter(h *handler) http.Handler {
 	mux := mux.NewRouter()
 	mux.Handle("/v1/github{path:.*}", h.GitHub)
-	mux.Handle("/{prefix:k8s/clusters/[^/]+}{suffix:.*}", h.Proxy)
+	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:.*}").MatcherFunc(h.ProxyMatcher("/k8s/clusters/")).Handler(h.Proxy)
 	mux.NotFoundHandler = h.NotFound
 	return mux
 }

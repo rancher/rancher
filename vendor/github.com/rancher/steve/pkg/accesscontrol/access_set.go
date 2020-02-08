@@ -7,6 +7,7 @@ import (
 )
 
 type AccessSet struct {
+	ID  string
 	set map[key]resourceAccessSet
 }
 

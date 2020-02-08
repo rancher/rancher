@@ -2,12 +2,14 @@ package client
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/rancher/steve/pkg/attributes"
 	"github.com/rancher/steve/pkg/schemaserver/types"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/rest"
 )
 
@@ -15,25 +17,49 @@ type Factory struct {
 	impersonate    bool
 	clientCfg      *rest.Config
 	watchClientCfg *rest.Config
-	client         dynamic.Interface
+	metadata       metadata.Interface
 	Config         *rest.Config
+}
+
+type addQuery struct {
+	values map[string]string
+	next   http.RoundTripper
+}
+
+func (a *addQuery) RoundTrip(req *http.Request) (*http.Response, error) {
+	q := req.URL.Query()
+	for k, v := range a.values {
+		q.Set(k, v)
+	}
+	req.Header.Set("Accept", "application/json;as=Table;v=v1;g=meta.k8s.io")
+	req.URL.RawQuery = q.Encode()
+	return a.next.RoundTrip(req)
 }
 
 func NewFactory(cfg *rest.Config, impersonate bool) (*Factory, error) {
 	clientCfg := rest.CopyConfig(cfg)
 	clientCfg.QPS = 10000
 	clientCfg.Burst = 100
+	clientCfg.AcceptContentTypes = "application/json;as=Table;v=v1;g=meta.k8s.io"
+	clientCfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+		return &addQuery{
+			values: map[string]string{
+				"includeObject": "Object",
+			},
+			next: rt,
+		}
+	})
 
 	watchClientCfg := rest.CopyConfig(cfg)
 	watchClientCfg.Timeout = 30 * time.Minute
 
-	dc, err := dynamic.NewForConfig(watchClientCfg)
+	md, err := metadata.NewForConfig(cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Factory{
-		client:         dc,
+		metadata:       md,
 		impersonate:    impersonate,
 		clientCfg:      clientCfg,
 		watchClientCfg: watchClientCfg,
@@ -41,8 +67,8 @@ func NewFactory(cfg *rest.Config, impersonate bool) (*Factory, error) {
 	}, nil
 }
 
-func (p *Factory) DynamicClient() dynamic.Interface {
-	return p.client
+func (p *Factory) MetadataClient() metadata.Interface {
+	return p.metadata
 }
 
 func (p *Factory) Client(ctx *types.APIRequest, s *types.APISchema, namespace string) (dynamic.ResourceInterface, error) {

@@ -11,7 +11,6 @@ func DefaultTemplate(clientGetter proxy.ClientGetter) schema.Template {
 	return schema.Template{
 		Store:     proxy.NewProxyStore(clientGetter),
 		Formatter: Formatter,
-		Mapper:    &DefaultColumns{},
 	}
 }
 
