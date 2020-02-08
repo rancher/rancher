@@ -156,7 +156,7 @@ func New(ctx context.Context, restConfig *rest.Config, cfg *Config) (*Rancher, e
 		return nil, err
 	}
 
-	asl := accesscontrol.NewAccessStore(wranglerContext.RBAC)
+	asl := accesscontrol.NewAccessStore(ctx, features.Steve.Enabled(), wranglerContext.RBAC)
 
 	auditLogWriter := audit.NewLogWriter(cfg.AuditLogPath, cfg.AuditLevel, cfg.AuditLogMaxage, cfg.AuditLogMaxbackup, cfg.AuditLogMaxsize)
 
