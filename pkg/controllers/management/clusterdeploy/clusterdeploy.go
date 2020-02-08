@@ -320,6 +320,7 @@ func (cd *clusterDeploy) getYAML(cluster *v3.Cluster, agentImage, authImage stri
 
 	url := settings.ServerURL.Get()
 	if url == "" {
+		cd.clusters.Controller().EnqueueAfter("", cluster.Name, time.Second)
 		return nil, fmt.Errorf("waiting for server-url setting to be set")
 	}
 
