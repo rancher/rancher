@@ -44,6 +44,15 @@ func newPolicyRuleIndex(user bool, rbac v1.Interface) *policyRuleIndex {
 
 func (p *policyRuleIndex) clusterRoleBindingBySubjectIndexer(crb *rbacv1.ClusterRoleBinding) (result []string, err error) {
 	for _, subject := range crb.Subjects {
+		if subject.APIGroup == rbacGroup && subject.Kind == p.kind && crb.RoleRef.Kind == "ClusterRole" {
+			result = append(result, subject.Name)
+		}
+	}
+	return
+}
+
+func (p *policyRuleIndex) roleBindingBySubject(rb *rbacv1.RoleBinding) (result []string, err error) {
+	for _, subject := range rb.Subjects {
 		if subject.APIGroup == rbacGroup && subject.Kind == p.kind {
 			result = append(result, subject.Name)
 		}
@@ -51,13 +60,26 @@ func (p *policyRuleIndex) clusterRoleBindingBySubjectIndexer(crb *rbacv1.Cluster
 	return
 }
 
-func (p *policyRuleIndex) roleBindingBySubject(crb *rbacv1.RoleBinding) (result []string, err error) {
-	for _, subject := range crb.Subjects {
-		if subject.APIGroup == rbacGroup && subject.Kind == p.kind {
-			result = append(result, subject.Name)
+func (p *policyRuleIndex) addRolesToMap(roles map[roleKey]struct{}, subjectName string) {
+	for _, crb := range p.getClusterRoleBindings(subjectName) {
+		roles[roleKey{
+			name: crb.RoleRef.Name,
+		}] = struct{}{}
+	}
+
+	for _, rb := range p.getRoleBindings(subjectName) {
+		switch rb.RoleRef.Kind {
+		case "Role":
+			roles[roleKey{
+				name:      rb.RoleRef.Name,
+				namespace: rb.Namespace,
+			}] = struct{}{}
+		case "ClusterRole":
+			roles[roleKey{
+				name: rb.RoleRef.Name,
+			}] = struct{}{}
 		}
 	}
-	return
 }
 
 func (p *policyRuleIndex) get(subjectName string) *AccessSet {

@@ -96,7 +96,9 @@ func (s *Store) byID(apiOp *types.APIRequest, schema *types.APISchema, id string
 		return nil, err
 	}
 
-	return k8sClient.Get(id, opts)
+	obj, err := k8sClient.Get(id, opts)
+	rowToObject(obj)
+	return obj, err
 }
 
 func moveFromUnderscore(obj map[string]interface{}) map[string]interface{} {
@@ -130,6 +132,51 @@ func moveToUnderscore(obj *unstructured.Unstructured) *unstructured.Unstructured
 	return obj
 }
 
+func rowToObject(obj *unstructured.Unstructured) {
+	if obj.Object["kind"] != "Table" ||
+		obj.Object["apiVersion"] != "meta.k8s.io/v1" {
+		return
+	}
+
+	items := tableToObjects(obj.Object)
+	if len(items) == 1 {
+		obj.Object = items[0].Object
+	}
+}
+
+func tableToList(obj *unstructured.UnstructuredList) {
+	if obj.Object["kind"] != "Table" ||
+		obj.Object["apiVersion"] != "meta.k8s.io/v1" {
+		return
+	}
+
+	obj.Items = tableToObjects(obj.Object)
+}
+
+func tableToObjects(obj map[string]interface{}) []unstructured.Unstructured {
+	var result []unstructured.Unstructured
+
+	rows, _ := obj["rows"].([]interface{})
+	for _, row := range rows {
+		m, ok := row.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		cells := m["cells"]
+		object, ok := m["object"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		data.PutValue(object, cells, "metadata", "fields")
+		result = append(result, unstructured.Unstructured{
+			Object: object,
+		})
+	}
+
+	return result
+}
+
 func (s *Store) List(apiOp *types.APIRequest, schema *types.APISchema) (types.APIObjectList, error) {
 	k8sClient, err := s.clientGetter.Client(apiOp, schema, apiOp.Namespace)
 	if err != nil {
@@ -145,6 +192,8 @@ func (s *Store) List(apiOp *types.APIRequest, schema *types.APISchema) (types.AP
 	if err != nil {
 		return types.APIObjectList{}, err
 	}
+
+	tableToList(resultList)
 
 	result := types.APIObjectList{
 		Revision: resultList.GetResourceVersion(),
@@ -228,6 +277,10 @@ func (s *Store) toAPIEvent(apiOp *types.APIRequest, schema *types.APISchema, et 
 		name = types.RemoveAPIEvent
 	case watch.Added:
 		name = types.CreateAPIEvent
+	}
+
+	if unstr, ok := obj.(*unstructured.Unstructured); ok {
+		rowToObject(unstr)
 	}
 
 	event := types.APIEvent{

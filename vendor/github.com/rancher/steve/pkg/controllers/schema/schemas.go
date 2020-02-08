@@ -10,14 +10,21 @@ import (
 	schema2 "github.com/rancher/steve/pkg/schema"
 	"github.com/rancher/steve/pkg/schema/converter"
 	"github.com/rancher/steve/pkg/schemaserver/types"
+	"github.com/rancher/steve/pkg/server/resources/common"
 	apiextcontrollerv1beta1 "github.com/rancher/wrangler-api/pkg/generated/controllers/apiextensions.k8s.io/v1beta1"
 	v1 "github.com/rancher/wrangler-api/pkg/generated/controllers/apiregistration.k8s.io/v1"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/client-go/discovery"
 	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	apiv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+)
+
+var (
+	listPool = semaphore.NewWeighted(10)
 )
 
 type SchemasHandler interface {
@@ -31,14 +38,14 @@ type handler struct {
 	toSync  int32
 	schemas *schema2.Collection
 	client  discovery.DiscoveryInterface
+	cols    *common.DynamicColumns
 	crd     apiextcontrollerv1beta1.CustomResourceDefinitionClient
 	ssar    authorizationv1client.SelfSubjectAccessReviewInterface
 	handler SchemasHandler
-
-	running map[string]func()
 }
 
 func Register(ctx context.Context,
+	cols *common.DynamicColumns,
 	discovery discovery.DiscoveryInterface,
 	crd apiextcontrollerv1beta1.CustomResourceDefinitionController,
 	apiService v1.APIServiceController,
@@ -48,12 +55,12 @@ func Register(ctx context.Context,
 
 	h := &handler{
 		ctx:     ctx,
+		cols:    cols,
 		client:  discovery,
 		schemas: schemas,
 		handler: schemasHandler,
 		crd:     crd,
 		ssar:    ssar,
-		running: map[string]func(){},
 	}
 
 	apiService.OnChange(ctx, "schema", h.OnChangeAPIService)
@@ -105,6 +112,28 @@ func isListWatchable(schema *types.APISchema) bool {
 	return canList && canWatch
 }
 
+func (h *handler) getColumns(ctx context.Context, schemas map[string]*types.APISchema) error {
+	eg := errgroup.Group{}
+
+	for _, schema := range schemas {
+		if !isListWatchable(schema) {
+			continue
+		}
+
+		if err := listPool.Acquire(ctx, 1); err != nil {
+			return err
+		}
+
+		s := schema
+		eg.Go(func() error {
+			defer listPool.Release(1)
+			return h.cols.SetColumns(s)
+		})
+	}
+
+	return eg.Wait()
+}
+
 func (h *handler) refreshAll() error {
 	h.Lock()
 	defer h.Unlock()
@@ -131,39 +160,16 @@ func (h *handler) refreshAll() error {
 		filteredSchemas[id] = schema
 	}
 
-	h.startStopTemplate(filteredSchemas)
+	if err := h.getColumns(h.ctx, filteredSchemas); err != nil {
+		return err
+	}
+
 	h.schemas.Reset(filteredSchemas)
 	if h.handler != nil {
 		return h.handler.OnSchemas(h.schemas)
 	}
 
 	return nil
-}
-
-func (h *handler) startStopTemplate(schemas map[string]*types.APISchema) {
-	for id := range schemas {
-		if _, ok := h.running[id]; ok {
-			continue
-		}
-		template := h.schemas.TemplateForSchemaID(id)
-		if template == nil || template.Start == nil {
-			continue
-		}
-
-		subCtx, cancel := context.WithCancel(h.ctx)
-		if err := template.Start(subCtx); err != nil {
-			logrus.Errorf("failed to start schema template: %s", id)
-			continue
-		}
-		h.running[id] = cancel
-	}
-
-	for id, cancel := range h.running {
-		if _, ok := schemas[id]; !ok {
-			cancel()
-			delete(h.running, id)
-		}
-	}
 }
 
 func (h *handler) allowed(schema *types.APISchema) (bool, error) {

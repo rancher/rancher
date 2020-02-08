@@ -422,7 +422,7 @@ github.com/rancher/rke/util
 # github.com/rancher/security-scan v0.1.5
 github.com/rancher/security-scan/pkg/kb-summarizer/report
 github.com/rancher/security-scan/pkg/kb-summarizer/summarizer
-# github.com/rancher/steve v0.0.0-20200205043102-87a107e23e0d
+# github.com/rancher/steve v0.0.0-20200208200547-12df5d1a3d6b
 github.com/rancher/steve/pkg/accesscontrol
 github.com/rancher/steve/pkg/attributes
 github.com/rancher/steve/pkg/auth
@@ -498,6 +498,7 @@ github.com/rancher/wrangler/pkg/condition
 github.com/rancher/wrangler/pkg/controller-gen
 github.com/rancher/wrangler/pkg/controller-gen/args
 github.com/rancher/wrangler/pkg/controller-gen/generators
+github.com/rancher/wrangler/pkg/crd
 github.com/rancher/wrangler/pkg/data
 github.com/rancher/wrangler/pkg/data/convert
 github.com/rancher/wrangler/pkg/generic
@@ -649,6 +650,7 @@ golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
 # golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 golang.org/x/sync/errgroup
+golang.org/x/sync/semaphore
 # golang.org/x/sys v0.0.0-20191010194322-b09406accb47
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
@@ -897,8 +899,6 @@ k8s.io/cli-runtime/pkg/printers
 k8s.io/client-go/discovery
 k8s.io/client-go/discovery/fake
 k8s.io/client-go/dynamic
-k8s.io/client-go/dynamic/dynamicinformer
-k8s.io/client-go/dynamic/dynamiclister
 k8s.io/client-go/informers
 k8s.io/client-go/informers/admissionregistration
 k8s.io/client-go/informers/admissionregistration/v1
@@ -1034,6 +1034,9 @@ k8s.io/client-go/listers/settings/v1alpha1
 k8s.io/client-go/listers/storage/v1
 k8s.io/client-go/listers/storage/v1alpha1
 k8s.io/client-go/listers/storage/v1beta1
+k8s.io/client-go/metadata
+k8s.io/client-go/metadata/metadatainformer
+k8s.io/client-go/metadata/metadatalister
 k8s.io/client-go/pkg/apis/clientauthentication
 k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1
 k8s.io/client-go/pkg/apis/clientauthentication/v1beta1

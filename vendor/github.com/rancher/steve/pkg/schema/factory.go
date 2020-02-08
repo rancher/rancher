@@ -3,13 +3,12 @@ package schema
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/attributes"
-	"github.com/rancher/steve/pkg/schema/table"
 	"github.com/rancher/steve/pkg/schemaserver/builtin"
 	"github.com/rancher/steve/pkg/schemaserver/types"
-	"github.com/rancher/wrangler/pkg/schemas"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -18,19 +17,31 @@ func newSchemas() (*types.APISchemas, error) {
 	if err := apiSchemas.AddSchemas(builtin.Schemas); err != nil {
 		return nil, err
 	}
-	apiSchemas.InternalSchemas.DefaultMapper = func() schemas.Mapper {
-		return newDefaultMapper()
-	}
 
 	return apiSchemas, nil
 }
 
 func (c *Collection) Schemas(user user.Info) (*types.APISchemas, error) {
 	access := c.as.AccessFor(user)
-	return c.schemasForSubject(access)
+	val, ok := c.cache.Get(access.ID)
+	if ok {
+		schemas, _ := val.(*types.APISchemas)
+		return schemas, nil
+	}
+
+	schemas, err := c.schemasForSubject(access)
+	if err != nil {
+		return nil, err
+	}
+
+	c.cache.Add(access.ID, schemas, 24*time.Hour)
+	return schemas, nil
 }
 
 func (c *Collection) schemasForSubject(access *accesscontrol.AccessSet) (*types.APISchemas, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
 	result, err := newSchemas()
 	if err != nil {
 		return nil, err
@@ -81,8 +92,6 @@ func (c *Collection) schemasForSubject(access *accesscontrol.AccessSet) (*types.
 			s.CollectionMethods = append(s.CollectionMethods, http.MethodPost)
 		}
 
-		c.applyTemplates(result, s)
-
 		if err := result.AddSchema(*s); err != nil {
 			return nil, err
 		}
@@ -91,7 +100,10 @@ func (c *Collection) schemasForSubject(access *accesscontrol.AccessSet) (*types.
 	return result, nil
 }
 
-func (c *Collection) applyTemplates(schemas *types.APISchemas, schema *types.APISchema) {
+func (c *Collection) applyTemplates(schema *types.APISchema) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
 	templates := []*Template{
 		c.templates[schema.ID],
 		c.templates[fmt.Sprintf("%s/%s", attributes.Group(schema), attributes.Kind(schema))],
@@ -101,9 +113,6 @@ func (c *Collection) applyTemplates(schemas *types.APISchemas, schema *types.API
 	for _, t := range templates {
 		if t == nil {
 			continue
-		}
-		if t.Mapper != nil {
-			schemas.InternalSchemas.AddMapper(schema.ID, t.Mapper)
 		}
 		if schema.Formatter == nil {
 			schema.Formatter = t.Formatter
@@ -117,9 +126,6 @@ func (c *Collection) applyTemplates(schemas *types.APISchemas, schema *types.API
 		}
 		if t.Customize != nil {
 			t.Customize(schema)
-		}
-		if len(t.Columns) > 0 {
-			schemas.InternalSchemas.AddMapper(schema.ID, table.NewColumns(t.ComputedColumns, t.Columns...))
 		}
 	}
 }

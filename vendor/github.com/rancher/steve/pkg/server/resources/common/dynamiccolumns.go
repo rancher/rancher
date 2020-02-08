@@ -1,11 +1,12 @@
 package common
 
 import (
-	"net/http"
+	"fmt"
 
 	"github.com/rancher/steve/pkg/attributes"
-	"github.com/rancher/steve/pkg/schema/table"
 	"github.com/rancher/steve/pkg/schemaserver/types"
+	"github.com/rancher/wrangler/pkg/ratelimit"
+	"k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -18,6 +19,11 @@ type DynamicColumns struct {
 	client *rest.RESTClient
 }
 
+type ColumnDefinition struct {
+	metav1.TableColumnDefinition `json:",inline"`
+	Field                        string `json:"field,omitempty"`
+}
+
 func NewDynamicColumns(config *rest.Config) (*DynamicColumns, error) {
 	c, err := newClient(config)
 	if err != nil {
@@ -26,15 +32,6 @@ func NewDynamicColumns(config *rest.Config) (*DynamicColumns, error) {
 	return &DynamicColumns{
 		client: c,
 	}, nil
-}
-
-func hasGet(methods []string) bool {
-	for _, method := range methods {
-		if method == http.MethodGet {
-			return true
-		}
-	}
-	return false
 }
 
 func (d *DynamicColumns) SetColumns(schema *types.APISchema) error {
@@ -46,11 +43,6 @@ func (d *DynamicColumns) SetColumns(schema *types.APISchema) error {
 	if gvr.Resource == "" {
 		return nil
 	}
-	nsed := attributes.Namespaced(schema)
-
-	if !hasGet(schema.CollectionMethods) {
-		return nil
-	}
 
 	r := d.client.Get()
 	if gvr.Group == "" {
@@ -59,33 +51,29 @@ func (d *DynamicColumns) SetColumns(schema *types.APISchema) error {
 		r.Prefix("apis", gvr.Group)
 	}
 	r.Prefix(gvr.Version)
-	if nsed {
-		r.Prefix("namespaces", "default")
-	}
 	r.Prefix(gvr.Resource)
+	r.VersionedParams(&metav1.ListOptions{
+		Limit: 1,
+	}, metav1.ParameterCodec)
 
 	obj, err := r.Do().Get()
 	if err != nil {
-		return err
+		return nil
 	}
 	t, ok := obj.(*metav1.Table)
 	if !ok {
 		return nil
 	}
 
-	var cols []table.Column
-	for _, cd := range t.ColumnDefinitions {
-		cols = append(cols, table.Column{
-			Name:   cd.Name,
-			Field:  "metadata.computed.fields." + cd.Name,
-			Type:   cd.Type,
-			Format: cd.Format,
-		})
-	}
-
-	if len(cols) > 0 {
+	if len(t.ColumnDefinitions) > 0 {
+		var cols []ColumnDefinition
+		for i, colDef := range t.ColumnDefinitions {
+			cols = append(cols, ColumnDefinition{
+				TableColumnDefinition: colDef,
+				Field:                 fmt.Sprintf("$.metadata.fields[%d]", i),
+			})
+		}
 		attributes.SetColumns(schema, cols)
-		schema.Attributes["server-side-column"] = "true"
 	}
 
 	return nil
@@ -93,6 +81,9 @@ func (d *DynamicColumns) SetColumns(schema *types.APISchema) error {
 
 func newClient(config *rest.Config) (*rest.RESTClient, error) {
 	scheme := runtime.NewScheme()
+	if err := internalversion.AddToScheme(scheme); err != nil {
+		return nil, err
+	}
 	if err := metav1.AddMetaToScheme(scheme); err != nil {
 		return nil, err
 	}
@@ -101,9 +92,9 @@ func newClient(config *rest.Config) (*rest.RESTClient, error) {
 	}
 
 	config = rest.CopyConfig(config)
+	config.RateLimiter = ratelimit.None
 	config.UserAgent = rest.DefaultKubernetesUserAgent()
-	config.AcceptContentTypes = "application/json;as=Table;v=v1beta1;g=meta.k8s.io"
-	config.ContentType = "application/json;as=Table;v=v1beta1;g=meta.k8s.io"
+	config.AcceptContentTypes = "application/json;as=Table;v=v1;g=meta.k8s.io"
 	config.GroupVersion = &schema.GroupVersion{}
 	config.NegotiatedSerializer = serializer.NewCodecFactory(scheme)
 	config.APIPath = "/"

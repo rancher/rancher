@@ -73,7 +73,7 @@ func refresh(gv schema.GroupVersion, groupToPreferredVersion map[string]string, 
 		if schema == nil {
 			schema = &types.APISchema{
 				Schema: &schemas.Schema{
-					ID:      GVKToSchemaID(gvk),
+					ID: GVKToSchemaID(gvk),
 				},
 			}
 			attributes.SetGVK(schema, gvk)

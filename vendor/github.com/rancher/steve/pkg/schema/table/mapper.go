@@ -9,10 +9,12 @@ import (
 )
 
 type Column struct {
-	Name   string `json:"name,omitempty"`
-	Field  string `json:"field,omitempty"`
-	Type   string `json:"type,omitempty"`
-	Format string `json:"format,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Field       string `json:"field,omitempty"`
+	Type        string `json:"type,omitempty"`
+	Format      string `json:"format,omitempty"`
+	Description string `json:"description,omitempty"`
+	Priority    int    `json:"priority,omitempty"`
 }
 
 type Table struct {

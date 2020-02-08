@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/steve/pkg/schemaserver/types"
 	"github.com/rancher/steve/pkg/server/handler"
 	"github.com/rancher/steve/pkg/server/resources"
+	"github.com/rancher/steve/pkg/server/resources/common"
 )
 
 var ErrConfigRequired = errors.New("rest config is required")
@@ -52,18 +53,24 @@ func setup(ctx context.Context, server *Server) (http.Handler, *schema.Collectio
 		return nil, nil, err
 	}
 
-	ccache := clustercache.NewClusterCache(ctx, cf.DynamicClient())
+	ccache := clustercache.NewClusterCache(ctx, cf.MetadataClient())
 
 	server.BaseSchemas = resources.DefaultSchemas(server.BaseSchemas, server.K8s.Discovery(), ccache)
 	server.SchemaTemplates = append(server.SchemaTemplates, resources.DefaultSchemaTemplates(cf)...)
 
 	asl := server.AccessSetLookup
 	if asl == nil {
-		asl = accesscontrol.NewAccessStore(server.RBAC)
+		asl = accesscontrol.NewAccessStore(ctx, true, server.RBAC)
 	}
 
-	sf := schema.NewCollection(server.BaseSchemas, asl)
+	cols, err := common.NewDynamicColumns(server.RestConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	sf := schema.NewCollection(ctx, server.BaseSchemas, asl)
 	sync := schemacontroller.Register(ctx,
+		cols,
 		server.K8s.Discovery(),
 		server.CRD.CustomResourceDefinition(),
 		server.API.APIService(),
