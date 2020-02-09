@@ -2383,3 +2383,16 @@ class WebsocketLogParse:
         self.lock.acquire()
         self._last_message = value
         self.lock.release()
+
+
+def wait_for_cluster_delete(client, cluster_name, timeout=DEFAULT_TIMEOUT):
+    start = time.time()
+    cluster = client.list_cluster(name=cluster_name).data
+    cluster_count = len(cluster)
+    while cluster_count != 0:
+        if time.time() - start > timeout:
+            raise AssertionError(
+                "Timed out waiting for cluster to get deleted")
+        time.sleep(.5)
+        cluster = client.list_cluster(name=cluster_name).data
+        cluster_count = len(cluster)
