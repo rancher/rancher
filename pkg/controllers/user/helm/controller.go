@@ -20,7 +20,7 @@ import (
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
-	"github.com/rancher/types/user"
+	"github.com/rancher/types/config/systemtokens"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -46,7 +46,6 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 		SystemAccountManager:  systemaccount.NewManager(user.Management),
 		TokenClient:           user.Management.Management.Tokens(""),
 		UserClient:            user.Management.Management.Users(""),
-		UserManager:           user.Management.UserManager,
 		K8sClient:             user.K8sClient,
 		TemplateVersionClient: user.Management.Management.CatalogTemplateVersions(""),
 		TemplateClient:        user.Management.Management.CatalogTemplates(""),
@@ -54,6 +53,7 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 		ClusterCatalogLister:  user.Management.Management.ClusterCatalogs("").Controller().Lister(),
 		ProjectCatalogLister:  user.Management.Management.ProjectCatalogs("").Controller().Lister(),
 		ClusterName:           user.ClusterName,
+		systemTokens:          user.Management.SystemTokens,
 		AppRevisionGetter:     user.Management.Project,
 		AppGetter:             user.Management.Project,
 		AppsLister:            user.Management.Project.Apps("").Controller().Lister(),
@@ -66,9 +66,9 @@ func Register(ctx context.Context, user *config.UserContext, kubeConfigGetter co
 }
 
 type Lifecycle struct {
+	systemTokens          systemtokens.Interface
 	KubeConfigGetter      common.KubeConfigGetter
 	SystemAccountManager  *systemaccount.Manager
-	UserManager           user.Manager
 	TokenClient           mgmtv3.TokenInterface
 	UserClient            mgmtv3.UserInterface
 	TemplateVersionClient mgmtv3.CatalogTemplateVersionInterface
@@ -365,7 +365,7 @@ func (l *Lifecycle) writeKubeConfig(obj *v3.App, kubePath string, remove bool) e
 	} else if errors.IsNotFound(err) && remove {
 		token, err = l.SystemAccountManager.GetOrCreateProjectSystemToken(obj.Namespace)
 	} else if err == nil {
-		token, err = l.UserManager.EnsureToken(helmTokenPrefix+user.Name, description, "helm", user.Name)
+		token, err = l.systemTokens.EnsureSystemToken(helmTokenPrefix+user.Name, description, "helm", user.Name, nil)
 	}
 	if err != nil {
 		return err

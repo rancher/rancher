@@ -440,7 +440,7 @@ github.com/rancher/steve/pkg/server/resources/common
 github.com/rancher/steve/pkg/server/resources/counts
 github.com/rancher/steve/pkg/server/router
 github.com/rancher/steve/pkg/server/store/proxy
-# github.com/rancher/types v0.0.0-20200303162105-663798392529
+# github.com/rancher/types v0.0.0-20200303162105-663798392529 => github.com/cbron/types v0.0.0-20200303182937-e5aaec5bd368
 github.com/rancher/types/apis/apiregistration.k8s.io/v1
 github.com/rancher/types/apis/apps/v1
 github.com/rancher/types/apis/autoscaling/v2beta2
@@ -472,6 +472,7 @@ github.com/rancher/types/compose
 github.com/rancher/types/condition
 github.com/rancher/types/config
 github.com/rancher/types/config/dialer
+github.com/rancher/types/config/systemtokens
 github.com/rancher/types/factory
 github.com/rancher/types/image
 github.com/rancher/types/kdm
