@@ -1810,7 +1810,11 @@ def rbac_prepare():
 
 def rbac_cleanup():
     """ remove the project, namespace and users created for the RBAC tests"""
-    client = get_admin_client()
+    try:
+        client = get_admin_client()
+    except:
+        print("Not able to get admin client. Not performing RBAC cleanup")
+        return
     for _, value in rbac_data["users"].items():
         try:
             client.delete(value["user"])
