@@ -40,6 +40,7 @@ var (
 func NewConfigSyncer(ctx context.Context, cluster *config.UserContext, alertManager *manager.AlertManager, operatorCRDManager *manager.PromOperatorCRDManager) *ConfigSyncer {
 	return &ConfigSyncer{
 		apps:                    cluster.Management.Project.Apps(metav1.NamespaceAll),
+		appLister:               cluster.Management.Project.Apps(metav1.NamespaceAll).Controller().Lister(),
 		secretsGetter:           cluster.Core,
 		clusterAlertGroupLister: cluster.Management.Management.ClusterAlertGroups(cluster.ClusterName).Controller().Lister(),
 		projectAlertGroupLister: cluster.Management.Management.ProjectAlertGroups("").Controller().Lister(),
@@ -56,6 +57,7 @@ func NewConfigSyncer(ctx context.Context, cluster *config.UserContext, alertMana
 
 type ConfigSyncer struct {
 	apps                    projectv3.AppInterface
+	appLister               projectv3.AppLister
 	secretsGetter           v1.SecretsGetter
 	projectAlertGroupLister v3.ProjectAlertGroupLister
 	clusterAlertGroupLister v3.ClusterAlertGroupLister
@@ -597,7 +599,7 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 
 func (d *ConfigSyncer) isAppDeploy(appNamespace string) (bool, error) {
 	appName, _ := monitorutil.ClusterAlertManagerInfo()
-	app, err := d.apps.GetNamespaced(appNamespace, appName, metav1.GetOptions{})
+	app, err := d.appLister.Get(appNamespace, appName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return false, nil

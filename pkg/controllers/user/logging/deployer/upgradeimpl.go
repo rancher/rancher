@@ -46,6 +46,7 @@ func NewService() *LoggingService {
 func (l *LoggingService) Init(cluster *config.UserContext) {
 	ad := &AppDeployer{
 		AppsGetter: cluster.Management.Project,
+		AppsLister: cluster.Management.Project.Apps("").Controller().Lister(),
 		Namespaces: cluster.Core.Namespaces(metav1.NamespaceAll),
 	}
 
@@ -112,7 +113,7 @@ func (l *LoggingService) Upgrade(currentVersion string) (string, error) {
 		return "", errors.New("get system project failed")
 	}
 
-	app, err := l.appDeployer.AppsGetter.Apps(metav1.NamespaceAll).GetNamespaced(systemProject.Name, appName, metav1.GetOptions{})
+	app, err := l.appDeployer.AppsLister.Get(systemProject.Name, appName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return newFullVersion, nil

@@ -83,7 +83,14 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	projects.AddClusterScopedLifecycle(ctx, "project-precan-alert-controller", cluster.ClusterName, projectLifecycle)
 
 	statesyncer.StartStateSyncer(ctx, cluster, alertmanager)
-	initClusterPreCanAlerts(clusterAlertGroups, clusterAlertRules, cluster.ClusterName)
+
+	i := &initClusterAlerts{
+		clusterAlertGroups:      clusterAlertGroups,
+		clusterAlertGroupLister: cluster.Management.Management.ClusterAlertGroups("").Controller().Lister(),
+		clusterAlertRules:       clusterAlertRules,
+		clusterAlertRuleLister:  cluster.Management.Management.ClusterAlertRules("").Controller().Lister(),
+	}
+	initClusterPreCanAlerts(i, cluster.ClusterName)
 
 	nodeSyncer := &windowsNodeSyner{
 		clusterName:       cluster.ClusterName,

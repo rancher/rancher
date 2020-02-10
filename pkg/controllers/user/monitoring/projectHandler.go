@@ -24,7 +24,7 @@ const (
 
 type projectHandler struct {
 	clusterName         string
-	cattleClusterClient mgmtv3.ClusterInterface
+	clusterLister       mgmtv3.ClusterLister
 	cattleProjectClient mgmtv3.ProjectInterface
 	prtbClient          mgmtv3.ProjectRoleTemplateBindingInterface
 	prtbIndexer         cache.Indexer
@@ -38,7 +38,7 @@ func (ph *projectHandler) sync(key string, project *mgmtv3.Project) (runtime.Obj
 	}
 
 	clusterID := project.Spec.ClusterName
-	cluster, err := ph.cattleClusterClient.Get(clusterID, metav1.GetOptions{})
+	cluster, err := ph.clusterLister.Get("", clusterID)
 	if err != nil {
 		return project, errors.Wrapf(err, "failed to find Cluster %s", clusterID)
 	}
