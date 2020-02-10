@@ -534,14 +534,7 @@ func Feature(schemas *types.Schemas) {
 }
 
 func LoggingTypes(schemas *types.Schemas, management *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler) {
-	handler := logging.NewHandler(
-		management.Dialer,
-		clusterManager,
-		management.Project,
-		management.Management.Projects("").Controller().Lister(),
-		management.Management.ProjectLoggings("").Controller().Lister(),
-		management.Management.CatalogTemplates("").Controller().Lister(),
-	)
+	handler := logging.NewHandler(management, clusterManager)
 
 	schema := schemas.Schema(&managementschema.Version, client.ClusterLoggingType)
 	schema.CollectionFormatter = logging.CollectionFormatter

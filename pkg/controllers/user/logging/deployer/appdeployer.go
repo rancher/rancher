@@ -29,6 +29,7 @@ const (
 
 type AppDeployer struct {
 	AppsGetter projectv3.AppsGetter
+	AppsLister projectv3.AppLister
 	Namespaces v1.NamespaceInterface
 	PodLister  v1.PodLister
 }
@@ -55,6 +56,14 @@ func (d *AppDeployer) initNamespace(name string) error {
 func (d *AppDeployer) cleanup(appName, appTargetNamespace, projectID string) error {
 	_, projectName := ref.Parse(projectID)
 
+	if _, err := d.AppsLister.Get(projectName, appName); err != nil {
+		if apierrors.IsNotFound(err) {
+			// the app doesn't exist
+			return nil
+		}
+		return err
+	}
+
 	if err := d.AppsGetter.Apps(projectName).Delete(appName, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -67,7 +76,7 @@ func (d *AppDeployer) deploy(app *projectv3.App, systemWriteKeys []string) error
 		return err
 	}
 
-	current, err := d.AppsGetter.Apps(app.Namespace).Get(app.Name, metav1.GetOptions{})
+	current, err := d.AppsLister.Get(app.Namespace, app.Name)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return errors.Wrapf(err, "failed to query app %s:%s", app.Namespace, app.Name)

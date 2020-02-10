@@ -42,9 +42,10 @@ func Register(ctx context.Context, agentContext *config.UserContext) {
 
 	// operator handler
 	oh := &operatorHandler{
-		clusterName:         clusterName,
-		cattleClusterClient: cattleClustersClient,
-		app:                 ah,
+		clusterName:   clusterName,
+		clusters:      cattleClustersClient,
+		clusterLister: mgmtContext.Clusters(metav1.NamespaceAll).Controller().Lister(),
+		app:           ah,
 	}
 	cattleClustersClient.AddHandler(ctx, "prometheus-operator-handler", oh.syncCluster)
 	cattleProjectsClient.Controller().AddClusterScopedHandler(ctx, "prometheus-operator-handler", clusterName, oh.syncProject)
@@ -82,7 +83,7 @@ func Register(ctx context.Context, agentContext *config.UserContext) {
 	// project handler
 	ph := &projectHandler{
 		clusterName:         clusterName,
-		cattleClusterClient: cattleClustersClient,
+		clusterLister:       mgmtContext.Clusters(metav1.NamespaceAll).Controller().Lister(),
 		cattleProjectClient: cattleProjectsClient,
 		prtbIndexer:         prtbInformer.GetIndexer(),
 		prtbClient:          mgmtContext.ProjectRoleTemplateBindings(""),

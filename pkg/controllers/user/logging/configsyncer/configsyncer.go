@@ -41,6 +41,7 @@ func NewConfigSyncer(cluster *config.UserContext, SecretManager *SecretManager) 
 
 	return &ConfigSyncer{
 		apps:                 cluster.Management.Project.Apps(metav1.NamespaceAll),
+		appLister:            cluster.Management.Project.Apps(metav1.NamespaceAll).Controller().Lister(),
 		clusterName:          clusterName,
 		clusterLoggingLister: clusterLoggingLister,
 		projectLoggingLister: projectLoggingLister,
@@ -53,6 +54,7 @@ func NewConfigSyncer(cluster *config.UserContext, SecretManager *SecretManager) 
 
 type ConfigSyncer struct {
 	apps                 projectv3.AppInterface
+	appLister            projectv3.AppLister
 	clusterName          string
 	clusterLoggingLister mgmtv3.ClusterLoggingLister
 	projectLoggingLister mgmtv3.ProjectLoggingLister
@@ -140,7 +142,7 @@ func (s *ConfigSyncer) sync() error {
 
 func (s *ConfigSyncer) isAppDeploy(appNamespace string) (bool, error) {
 	appName := loggingconfig.AppName
-	app, err := s.apps.GetNamespaced(appNamespace, appName, metav1.GetOptions{})
+	app, err := s.appLister.Get(appNamespace, appName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return false, nil
