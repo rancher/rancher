@@ -4,11 +4,14 @@ node {
   def rootPath = "/src/rancher-validation/"
   def setupContainer = "${JOB_NAME}${env.BUILD_NUMBER}_setup"
   def testContainer = "${JOB_NAME}${env.BUILD_NUMBER}_test"
+  def deleteContainer = "${JOB_NAME}${env.BUILD_NUMBER}_delete"
 
   def deployPytestOptions = "-k test_deploy_rancher_server"
+  def deletePytestOptions = "-k test_delete_rancher_server"
 
   def setupResultsOut = "setup-results.xml"
   def testResultsOut = "results.xml"
+  def deleteResultsOut = "delete-results.xml"
   def imageName = "rancher-validation-${JOB_NAME}${env.BUILD_NUMBER}"
   def testsDir = "tests/v3_api/"
 
@@ -70,6 +73,7 @@ node {
             sh "docker run --name ${setupContainer} -t --env-file ${envFile} " +
               "${imageName} /bin/bash -c \'pytest -v -s --junit-xml=${setupResultsOut} " +
               "${deployPytestOptions} ${testsDir}\'"
+            RANCHER_DEPLOYED = true
 
             // copy file containing CATTLE_TEST_URL, ADMIN_TOKEN, USER_TOKEN and load into environment variables
             sh "docker cp ${setupContainer}:${rootPath}${testsDir}${rancherConfig} ."
@@ -82,30 +86,53 @@ node {
               "&& export RANCHER_CLUSTER_NAME=${env.CLUSTER_NAME} " + "&& pytest -v -s --junit-xml=${testResultsOut} " +
               "${PYTEST_OPTIONS} ${testsDir}\'"
           } catch(err) {
+            RANCHER_DEPLOYED = false
             echo "Error: " + err
             echo 'Test run had failures. Collecting results...'
+          }finally {
+        stage('Delete Rancher Server') {
+          try {
+             if (env.RANCHER_DELETE_SERVER.toLowerCase() == "true" && RANCHER_DEPLOYED) {
+                sh "docker run --name ${deleteContainer} -t --env-file ${envFile} " +
+                "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} && " +
+                "export ADMIN_TOKEN=${env.ADMIN_TOKEN} && export USER_TOKEN=${env.USER_TOKEN} &&"+
+                 "pytest -v -s --junit-xml=${deleteResultsOut} " +
+                "${deletePytestOptions} ${testsDir}\'"
+                }
+            else {
+              echo "Rancher server not deployed, skipping delete."
+            }
+          } catch(err) {
+            echo "Error: " + err
+            currentBuild.result = 'FAILURE'
           }
         }
-
+      }
+      }
         stage('Test Report') {
           // copy and archive test results
           sh "docker cp ${setupContainer}:${rootPath}${setupResultsOut} ."
           sh "docker cp ${testContainer}:${rootPath}${testResultsOut} ."
+          sh "docker cp ${deleteContainer}:${rootPath}${deleteResultsOut} ."
 
           step([$class: 'JUnitResultArchiver', testResults: "**/${setupResultsOut}"])
           step([$class: 'JUnitResultArchiver', testResults: "**/${testResultsOut}"])
+          step([$class: 'JUnitResultArchiver', testResults: "**/${deleteResultsOut}"])
 
           sh "docker rm -v ${setupContainer}"
           sh "docker rm -v ${testContainer}"
+          sh "docker rm -v ${deleteContainer}"
           sh "docker rmi ${imageName}"
         }
       } catch(err){
         sh "docker stop ${setupContainer}"
         sh "docker stop ${testContainer}"
+        sh "docker stop ${deleteContainer}"
 
         sh "docker rm -v ${setupContainer}"
         sh "docker rm -v ${testContainer}"
-        
+        sh "docker rm -v ${deleteContainer}"
+
         sh "docker rmi ${imageName}"
       }
     }

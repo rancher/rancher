@@ -107,7 +107,7 @@ def test_delete_rancher_server():
          'Values': [ip_address]}]
     aws_nodes = AmazonWebServices().get_nodes(filters)
     assert len(aws_nodes) == 1
-    AmazonWebServices().delete_nodes(aws_nodes)
+    AmazonWebServices().delete_nodes(aws_nodes, wait_for_deleted=True)
 
 
 def test_cluster_enable_logging_elasticsearch():
