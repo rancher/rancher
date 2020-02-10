@@ -62,6 +62,15 @@ type DefaultURLBuilder struct {
 	query           url.Values
 }
 
+func (u *DefaultURLBuilder) Marker(marker string) string {
+	newValues := url.Values{}
+	for k, v := range u.query {
+		newValues[k] = v
+	}
+	newValues.Set("continue", marker)
+	return u.Current() + "?" + newValues.Encode()
+}
+
 func (u *DefaultURLBuilder) Link(schema *types.APISchema, id string, linkName string) string {
 	return u.schemaURL(schema, id, linkName)
 }

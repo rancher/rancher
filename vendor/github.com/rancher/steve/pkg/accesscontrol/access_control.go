@@ -17,8 +17,8 @@ func NewAccessControl() *AccessControl {
 
 func (a *AccessControl) CanWatch(apiOp *types.APIRequest, schema *types.APISchema) error {
 	access := GetAccessListMap(schema)
-	if !access.Grants("watch", "*", "*") {
-		return fmt.Errorf("watch not allowed")
+	if _, ok := access["watch"]; ok {
+		return nil
 	}
-	return nil
+	return fmt.Errorf("watch not allowed")
 }

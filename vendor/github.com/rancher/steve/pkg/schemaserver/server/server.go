@@ -165,6 +165,8 @@ func (s *Server) handle(apiOp *types.APIRequest, parser parse.Parser) {
 		apiOp.WriteResponse(code, obj)
 	} else if list, ok := data.(types.APIObjectList); ok {
 		apiOp.WriteResponseList(code, list)
+	} else if code > http.StatusOK {
+		apiOp.Response.WriteHeader(code)
 	}
 }
 

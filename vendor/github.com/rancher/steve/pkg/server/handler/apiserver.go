@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/steve/pkg/schemaserver/urlbuilder"
 	"github.com/rancher/steve/pkg/server/router"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/rest"
 )
 
@@ -57,9 +57,9 @@ type apiServer struct {
 }
 
 func (a *apiServer) common(rw http.ResponseWriter, req *http.Request) (*types.APIRequest, bool) {
-	user := &user.DefaultInfo{
-		Name:   "admin",
-		Groups: []string{"system:masters"},
+	user, ok := request.UserFrom(req.Context())
+	if !ok {
+		return nil, false
 	}
 
 	schemas, err := a.sf.Schemas(user)

@@ -3,6 +3,7 @@ package writer
 import (
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/rancher/steve/pkg/schemaserver/types"
 )
@@ -99,6 +100,14 @@ func (j *EncodingResponseWriter) addLinks(schema *types.APISchema, context *type
 	}
 }
 
+func getLimit(req *http.Request) int {
+	limit, err := strconv.Atoi(req.Header.Get("limit"))
+	if err == nil && limit > 0 {
+		return limit
+	}
+	return 0
+}
+
 func newCollection(apiOp *types.APIRequest, list types.APIObjectList) *types.GenericCollection {
 	result := &types.GenericCollection{
 		Collection: types.Collection{
@@ -112,6 +121,18 @@ func newCollection(apiOp *types.APIRequest, list types.APIObjectList) *types.Gen
 			Continue: list.Continue,
 			Revision: list.Revision,
 		},
+	}
+
+	partial := list.Continue != "" || apiOp.Query.Get("continue") != ""
+	if partial {
+		result.Pagination = &types.Pagination{
+			Limit:   getLimit(apiOp.Request),
+			First:   apiOp.URLBuilder.Current(),
+			Partial: true,
+		}
+		if list.Continue != "" {
+			result.Pagination.Next = apiOp.URLBuilder.Marker(list.Continue)
+		}
 	}
 
 	if apiOp.Method == http.MethodGet {

@@ -26,6 +26,13 @@ type RawResource struct {
 	APIObject   APIObject         `json:"-" yaml:"-"`
 }
 
+type Pagination struct {
+	Limit   int    `json:"limit,omitempty"`
+	First   string `json:"first,omitempty"`
+	Next    string `json:"next,omitempty"`
+	Partial bool   `json:"partial,omitempty"`
+}
+
 func (r *RawResource) MarshalJSON() ([]byte, error) {
 	type r_ RawResource
 	outer, err := json.Marshal((*r_)(r))
@@ -160,6 +167,7 @@ type URLBuilder interface {
 	ResourceLink(schema *APISchema, id string) string
 	Link(schema *APISchema, id string, linkName string) string
 	Action(schema *APISchema, id string, action string) string
+	Marker(marker string) string
 
 	RelativeToRoot(path string) string
 }

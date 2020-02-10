@@ -1,6 +1,7 @@
 package resources
 
 import (
+	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/client"
 	"github.com/rancher/steve/pkg/clustercache"
 	"github.com/rancher/steve/pkg/schema"
@@ -21,8 +22,8 @@ func DefaultSchemas(baseSchema *types.APISchemas, discovery discovery.DiscoveryI
 	return baseSchema
 }
 
-func DefaultSchemaTemplates(cf *client.Factory) []schema.Template {
+func DefaultSchemaTemplates(cf *client.Factory, lookup accesscontrol.AccessSetLookup) []schema.Template {
 	return []schema.Template{
-		common.DefaultTemplate(cf),
+		common.DefaultTemplate(cf, lookup),
 	}
 }
