@@ -15,7 +15,7 @@ import (
 	v1 "github.com/rancher/types/apis/core/v1"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
-	"github.com/rancher/types/user"
+	"github.com/rancher/types/config/systemtokens"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -49,7 +49,7 @@ type nodesSyncer struct {
 }
 
 type nodeDrain struct {
-	userManager          user.Manager
+	systemTokens         systemtokens.Interface
 	tokenClient          v3.TokenInterface
 	userClient           v3.UserInterface
 	kubeConfigGetter     common.KubeConfigGetter
@@ -81,7 +81,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 	}
 
 	d := &nodeDrain{
-		userManager:          cluster.Management.UserManager,
+		systemTokens:         cluster.Management.SystemTokens,
 		tokenClient:          cluster.Management.Management.Tokens(""),
 		userClient:           cluster.Management.Management.Users(""),
 		kubeConfigGetter:     kubeConfigGetter,
