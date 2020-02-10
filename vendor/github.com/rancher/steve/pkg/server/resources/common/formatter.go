@@ -1,15 +1,16 @@
 package common
 
 import (
+	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/schema"
 	"github.com/rancher/steve/pkg/schemaserver/types"
 	"github.com/rancher/steve/pkg/server/store/proxy"
 	"k8s.io/apimachinery/pkg/api/meta"
 )
 
-func DefaultTemplate(clientGetter proxy.ClientGetter) schema.Template {
+func DefaultTemplate(clientGetter proxy.ClientGetter, asl accesscontrol.AccessSetLookup) schema.Template {
 	return schema.Template{
-		Store:     proxy.NewProxyStore(clientGetter),
+		Store:     proxy.NewProxyStore(clientGetter, asl),
 		Formatter: Formatter,
 	}
 }

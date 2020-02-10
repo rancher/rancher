@@ -232,15 +232,22 @@ func (s *Store) getCount(apiOp *types.APIRequest) Count {
 
 	for _, schema := range s.schemasToWatch(apiOp) {
 		gvr := attributes.GVR(schema)
+		access, _ := attributes.Access(schema).(accesscontrol.AccessListByVerb)
 
 		rev := 0
 		itemCount := ItemCount{
 			Namespaces: map[string]int{},
 		}
 
+		all := access.Grants("list", "*", "*")
+
 		for _, obj := range s.ccache.List(gvr) {
-			_, ns, revision, ok := getInfo(obj)
+			name, ns, revision, ok := getInfo(obj)
 			if !ok {
+				continue
+			}
+
+			if !all && !access.Grants("list", ns, name) && !access.Grants("get", ns, name) {
 				continue
 			}
 

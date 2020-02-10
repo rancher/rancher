@@ -72,7 +72,19 @@ func (c *Collection) schemasForSubject(access *accesscontrol.AccessSet) (*types.
 		}
 
 		if len(verbAccess) == 0 {
-			continue
+			if gr.Group == "" && gr.Resource == "namespaces" {
+				var accessList accesscontrol.AccessList
+				for _, ns := range access.Namespaces() {
+					accessList = append(accessList, accesscontrol.Access{
+						Namespace:    "*",
+						ResourceName: ns,
+					})
+				}
+				verbAccess["list"] = accessList
+				verbAccess["watch"] = accessList
+			} else {
+				continue
+			}
 		}
 
 		s = s.DeepCopy()

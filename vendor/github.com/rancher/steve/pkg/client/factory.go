@@ -72,15 +72,23 @@ func (p *Factory) MetadataClient() metadata.Interface {
 }
 
 func (p *Factory) Client(ctx *types.APIRequest, s *types.APISchema, namespace string) (dynamic.ResourceInterface, error) {
-	return p.newClient(ctx, p.clientCfg, s, namespace)
+	return newClient(ctx, p.clientCfg, s, namespace, p.impersonate)
+}
+
+func (p *Factory) AdminClient(ctx *types.APIRequest, s *types.APISchema, namespace string) (dynamic.ResourceInterface, error) {
+	return newClient(ctx, p.clientCfg, s, namespace, false)
 }
 
 func (p *Factory) ClientForWatch(ctx *types.APIRequest, s *types.APISchema, namespace string) (dynamic.ResourceInterface, error) {
-	return p.newClient(ctx, p.watchClientCfg, s, namespace)
+	return newClient(ctx, p.watchClientCfg, s, namespace, p.impersonate)
 }
 
-func (p *Factory) newClient(ctx *types.APIRequest, cfg *rest.Config, s *types.APISchema, namespace string) (dynamic.ResourceInterface, error) {
-	if p.impersonate {
+func (p *Factory) AdminClientForWatch(ctx *types.APIRequest, s *types.APISchema, namespace string) (dynamic.ResourceInterface, error) {
+	return newClient(ctx, p.watchClientCfg, s, namespace, false)
+}
+
+func newClient(ctx *types.APIRequest, cfg *rest.Config, s *types.APISchema, namespace string, impersonate bool) (dynamic.ResourceInterface, error) {
+	if impersonate {
 		user, ok := request.UserFrom(ctx.Context())
 		if !ok {
 			return nil, fmt.Errorf("user not found for impersonation")

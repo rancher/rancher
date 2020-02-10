@@ -1,9 +1,12 @@
 package accesscontrol
 
 import (
+	"sort"
+
 	"github.com/rancher/steve/pkg/attributes"
 	"github.com/rancher/steve/pkg/schemaserver/types"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type AccessSet struct {
@@ -16,6 +19,26 @@ type resourceAccessSet map[Access]bool
 type key struct {
 	verb string
 	gr   schema.GroupResource
+}
+
+func (a *AccessSet) Namespaces() (result []string) {
+	set := map[string]bool{}
+	for k, as := range a.set {
+		if k.verb != "get" && k.verb != "list" {
+			continue
+		}
+		for access := range as {
+			if access.Namespace == all {
+				continue
+			}
+			set[access.Namespace] = true
+		}
+	}
+	for k := range set {
+		result = append(result, k)
+	}
+	sort.Strings(result)
+	return
 }
 
 func (a *AccessSet) Merge(right *AccessSet) {
@@ -36,6 +59,7 @@ func (a *AccessSet) Merge(right *AccessSet) {
 }
 
 func (a AccessSet) AccessListFor(verb string, gr schema.GroupResource) (result AccessList) {
+	dedup := map[Access]bool{}
 	for _, v := range []string{all, verb} {
 		for _, g := range []string{all, gr.Group} {
 			for _, r := range []string{all, gr.Resource} {
@@ -46,10 +70,14 @@ func (a AccessSet) AccessListFor(verb string, gr schema.GroupResource) (result A
 						Resource: r,
 					},
 				}] {
-					result = append(result, k)
+					dedup[k] = true
 				}
 			}
 		}
+	}
+
+	for k := range dedup {
+		result = append(result, k)
 	}
 
 	return
@@ -74,6 +102,41 @@ type AccessListByVerb map[string]AccessList
 
 func (a AccessListByVerb) Grants(verb, namespace, name string) bool {
 	return a[verb].Grants(namespace, name)
+}
+
+func (a AccessListByVerb) All(verb string) bool {
+	return a.Grants(verb, all, all)
+}
+
+type Resources struct {
+	All   bool
+	Names sets.String
+}
+
+func (a AccessListByVerb) Granted(verb string) (result map[string]Resources) {
+	result = map[string]Resources{}
+
+	// if list, we need to check get also
+	verbs := []string{verb}
+	if verb == "list" {
+		verbs = append(verbs, "get")
+	}
+
+	for _, verb := range verbs {
+		for _, access := range a[verb] {
+			resources := result[access.Namespace]
+			if access.ResourceName == all {
+				resources.All = true
+			} else {
+				if resources.Names == nil {
+					resources.Names = sets.String{}
+				}
+				resources.Names.Insert(access.ResourceName)
+			}
+			result[access.Namespace] = resources
+		}
+	}
+	return result
 }
 
 func (a AccessListByVerb) AnyVerb(verb ...string) bool {

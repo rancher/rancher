@@ -53,15 +53,15 @@ func setup(ctx context.Context, server *Server) (http.Handler, *schema.Collectio
 		return nil, nil, err
 	}
 
-	ccache := clustercache.NewClusterCache(ctx, cf.MetadataClient())
-
-	server.BaseSchemas = resources.DefaultSchemas(server.BaseSchemas, server.K8s.Discovery(), ccache)
-	server.SchemaTemplates = append(server.SchemaTemplates, resources.DefaultSchemaTemplates(cf)...)
-
 	asl := server.AccessSetLookup
 	if asl == nil {
 		asl = accesscontrol.NewAccessStore(ctx, true, server.RBAC)
 	}
+
+	ccache := clustercache.NewClusterCache(ctx, cf.MetadataClient())
+
+	server.BaseSchemas = resources.DefaultSchemas(server.BaseSchemas, server.K8s.Discovery(), ccache)
+	server.SchemaTemplates = append(server.SchemaTemplates, resources.DefaultSchemaTemplates(cf, asl)...)
 
 	cols, err := common.NewDynamicColumns(server.RestConfig)
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 	"regexp"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/steve/pkg/accesscontrol"
 	"github.com/rancher/steve/pkg/attributes"
 	"github.com/rancher/steve/pkg/schemaserver/types"
 	"github.com/rancher/wrangler/pkg/data"
@@ -19,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	apitypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 )
@@ -29,17 +31,24 @@ var (
 
 type ClientGetter interface {
 	Client(ctx *types.APIRequest, schema *types.APISchema, namespace string) (dynamic.ResourceInterface, error)
+	AdminClient(ctx *types.APIRequest, schema *types.APISchema, namespace string) (dynamic.ResourceInterface, error)
 	ClientForWatch(ctx *types.APIRequest, schema *types.APISchema, namespace string) (dynamic.ResourceInterface, error)
+	AdminClientForWatch(ctx *types.APIRequest, schema *types.APISchema, namespace string) (dynamic.ResourceInterface, error)
 }
 
 type Store struct {
 	clientGetter ClientGetter
 }
 
-func NewProxyStore(clientGetter ClientGetter) types.Store {
+func NewProxyStore(clientGetter ClientGetter, lookup accesscontrol.AccessSetLookup) types.Store {
 	return &errorStore{
-		Store: &Store{
-			clientGetter: clientGetter,
+		Store: &WatchRefresh{
+			Store: &RBACStore{
+				Store: &Store{
+					clientGetter: clientGetter,
+				},
+			},
+			asl: lookup,
 		},
 	}
 }
@@ -177,18 +186,43 @@ func tableToObjects(obj map[string]interface{}) []unstructured.Unstructured {
 	return result
 }
 
-func (s *Store) List(apiOp *types.APIRequest, schema *types.APISchema) (types.APIObjectList, error) {
-	k8sClient, err := s.clientGetter.Client(apiOp, schema, apiOp.Namespace)
+func (s *Store) ByNames(apiOp *types.APIRequest, schema *types.APISchema, names sets.String) (types.APIObjectList, error) {
+	adminClient, err := s.clientGetter.AdminClient(apiOp, schema, apiOp.Namespace)
 	if err != nil {
 		return types.APIObjectList{}, err
 	}
 
+	objs, err := s.list(apiOp, schema, adminClient)
+	if err != nil {
+		return types.APIObjectList{}, err
+	}
+
+	var filtered []types.APIObject
+	for _, obj := range objs.Objects {
+		if names.Has(obj.Name()) {
+			filtered = append(filtered, obj)
+		}
+	}
+
+	objs.Objects = filtered
+	return objs, nil
+}
+
+func (s *Store) List(apiOp *types.APIRequest, schema *types.APISchema) (types.APIObjectList, error) {
+	client, err := s.clientGetter.Client(apiOp, schema, apiOp.Namespace)
+	if err != nil {
+		return types.APIObjectList{}, err
+	}
+	return s.list(apiOp, schema, client)
+}
+
+func (s *Store) list(apiOp *types.APIRequest, schema *types.APISchema, client dynamic.ResourceInterface) (types.APIObjectList, error) {
 	opts := metav1.ListOptions{}
 	if err := decodeParams(apiOp, &opts); err != nil {
 		return types.APIObjectList{}, nil
 	}
 
-	resultList, err := k8sClient.List(opts)
+	resultList, err := client.List(opts)
 	if err != nil {
 		return types.APIObjectList{}, err
 	}
@@ -255,15 +289,41 @@ func (s *Store) listAndWatch(apiOp *types.APIRequest, k8sClient dynamic.Resource
 	}
 }
 
-func (s *Store) Watch(apiOp *types.APIRequest, schema *types.APISchema, w types.WatchRequest) (chan types.APIEvent, error) {
-	k8sClient, err := s.clientGetter.ClientForWatch(apiOp, schema, apiOp.Namespace)
+func (s *Store) WatchNames(apiOp *types.APIRequest, schema *types.APISchema, w types.WatchRequest, names sets.String) (chan types.APIEvent, error) {
+	adminClient, err := s.clientGetter.ClientForWatch(apiOp, schema, apiOp.Namespace)
+	if err != nil {
+		return nil, err
+	}
+	c, err := s.watch(apiOp, schema, w, adminClient)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make(chan types.APIEvent)
 	go func() {
-		s.listAndWatch(apiOp, k8sClient, schema, w, result)
+		defer close(result)
+		for item := range c {
+			if item.Error != nil && names.Has(item.Object.Name()) {
+				result <- item
+			}
+		}
+	}()
+
+	return result, nil
+}
+
+func (s *Store) Watch(apiOp *types.APIRequest, schema *types.APISchema, w types.WatchRequest) (chan types.APIEvent, error) {
+	client, err := s.clientGetter.ClientForWatch(apiOp, schema, apiOp.Namespace)
+	if err != nil {
+		return nil, err
+	}
+	return s.watch(apiOp, schema, w, client)
+}
+
+func (s *Store) watch(apiOp *types.APIRequest, schema *types.APISchema, w types.WatchRequest, client dynamic.ResourceInterface) (chan types.APIEvent, error) {
+	result := make(chan types.APIEvent)
+	go func() {
+		s.listAndWatch(apiOp, client, schema, w, result)
 		logrus.Debugf("closing watcher for %s", schema.ID)
 		close(result)
 	}()
