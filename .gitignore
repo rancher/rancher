@@ -11,6 +11,7 @@
 /tests/MANIFEST
 /tests/integration/MANIFEST
 tests/integration/MANIFEST
+tests/integration/.idea/
 /tests/.cache
 /tests/.tox
 /tests/integration/.tox/
