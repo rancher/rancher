@@ -101,16 +101,16 @@ func initFeatures(ctx context.Context, scaledContext *config.ScaledContext, cfg 
 }
 
 func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config) (*config.ScaledContext, *clustermanager.Manager, error) {
+	if err := k8scheck.Wait(ctx, kubeConfig); err != nil {
+		return nil, nil, err
+	}
+
 	scaledContext, err := config.NewScaledContext(kubeConfig)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	if err := initFeatures(ctx, scaledContext, cfg); err != nil {
-		return nil, nil, err
-	}
-
-	if err := k8scheck.Wait(ctx, kubeConfig); err != nil {
 		return nil, nil, err
 	}
 
