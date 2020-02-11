@@ -32,13 +32,14 @@ import (
 )
 
 type Manager struct {
-	httpsPort     int
-	ScaledContext *config.ScaledContext
-	clusterLister v3.ClusterLister
-	clusters      v3.ClusterInterface
-	controllers   sync.Map
-	accessControl types.AccessControl
-	dialer        dialer.Factory
+	httpsPort          int
+	ScaledContext      *config.ScaledContext
+	clusterLister      v3.ClusterLister
+	clusters           v3.ClusterInterface
+	controllers        sync.Map
+	watchAccessControl types.AccessControl
+	accessControl      types.AccessControl
+	dialer             dialer.Factory
 }
 
 type record struct {
@@ -54,11 +55,12 @@ type record struct {
 
 func NewManager(httpsPort int, context *config.ScaledContext) *Manager {
 	return &Manager{
-		httpsPort:     httpsPort,
-		ScaledContext: context,
-		accessControl: rbac.NewContextBased(),
-		clusterLister: context.Management.Clusters("").Controller().Lister(),
-		clusters:      context.Management.Clusters(""),
+		httpsPort:          httpsPort,
+		ScaledContext:      context,
+		accessControl:      rbac.NewContextBased(),
+		watchAccessControl: rbac.NewAccessControl(context.RBAC),
+		clusterLister:      context.Management.Clusters("").Controller().Lister(),
+		clusters:           context.Management.Clusters(""),
 	}
 }
 
@@ -372,6 +374,10 @@ func (m *Manager) AccessControl(apiContext *types.APIContext, storageContext typ
 		return nil, err
 	}
 	if record == nil {
+		if apiContext.Request.Method == http.MethodGet && apiContext.Type == "subscribe" {
+			// Watches should not cache the RBAC because it is long lived
+			return m.watchAccessControl, nil
+		}
 		return m.accessControl, nil
 	}
 	return record.accessControl, nil
