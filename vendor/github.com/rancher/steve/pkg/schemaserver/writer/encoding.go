@@ -48,6 +48,10 @@ func (j *EncodingResponseWriter) convertList(apiOp *types.APIRequest, input type
 		apiOp.Schema.CollectionFormatter(apiOp, collection)
 	}
 
+	if collection.Data == nil {
+		collection.Data = []*types.RawResource{}
+	}
+
 	return collection
 }
 

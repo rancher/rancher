@@ -28,7 +28,7 @@ func (a *AccessSet) Namespaces() (result []string) {
 			continue
 		}
 		for access := range as {
-			if access.Namespace == all {
+			if access.Namespace == All {
 				continue
 			}
 			set[access.Namespace] = true
@@ -60,9 +60,9 @@ func (a *AccessSet) Merge(right *AccessSet) {
 
 func (a AccessSet) AccessListFor(verb string, gr schema.GroupResource) (result AccessList) {
 	dedup := map[Access]bool{}
-	for _, v := range []string{all, verb} {
-		for _, g := range []string{all, gr.Group} {
-			for _, r := range []string{all, gr.Resource} {
+	for _, v := range []string{All, verb} {
+		for _, g := range []string{All, gr.Group} {
+			for _, r := range []string{All, gr.Resource} {
 				for k := range a.set[key{
 					verb: v,
 					gr: schema.GroupResource{
@@ -105,7 +105,7 @@ func (a AccessListByVerb) Grants(verb, namespace, name string) bool {
 }
 
 func (a AccessListByVerb) All(verb string) bool {
-	return a.Grants(verb, all, all)
+	return a.Grants(verb, All, All)
 }
 
 type Resources struct {
@@ -125,7 +125,7 @@ func (a AccessListByVerb) Granted(verb string) (result map[string]Resources) {
 	for _, verb := range verbs {
 		for _, access := range a[verb] {
 			resources := result[access.Namespace]
-			if access.ResourceName == all {
+			if access.ResourceName == All {
 				resources.All = true
 			} else {
 				if resources.Names == nil {
@@ -170,11 +170,11 @@ func (a Access) Grants(namespace, name string) bool {
 }
 
 func (a Access) nsOK(namespace string) bool {
-	return a.Namespace == all || a.Namespace == namespace
+	return a.Namespace == All || a.Namespace == namespace
 }
 
 func (a Access) nameOK(name string) bool {
-	return a.ResourceName == all || a.ResourceName == name
+	return a.ResourceName == All || a.ResourceName == name
 }
 
 func GetAccessListMap(s *types.APISchema) AccessListByVerb {
