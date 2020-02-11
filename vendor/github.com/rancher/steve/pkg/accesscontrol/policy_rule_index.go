@@ -8,7 +8,7 @@ import (
 
 const (
 	rbacGroup = "rbac.authorization.k8s.io"
-	all       = "*"
+	All       = "*"
 )
 
 type policyRuleIndex struct {
@@ -90,7 +90,7 @@ func (p *policyRuleIndex) get(subjectName string) *AccessSet {
 	}
 
 	for _, binding := range p.getClusterRoleBindings(subjectName) {
-		p.addAccess(result, all, binding.RoleRef)
+		p.addAccess(result, All, binding.RoleRef)
 	}
 
 	return result
@@ -102,7 +102,7 @@ func (p *policyRuleIndex) addAccess(accessSet *AccessSet, namespace string, role
 			for _, resource := range rule.Resources {
 				names := rule.ResourceNames
 				if len(names) == 0 {
-					names = []string{all}
+					names = []string{All}
 				}
 				for _, resourceName := range names {
 					for _, verb := range rule.Verbs {
