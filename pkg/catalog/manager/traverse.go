@@ -266,7 +266,7 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 	v3.CatalogConditionDiskCached.True(catalog)
 	var errstrings []string
 	if len(createErrors) > 0 {
-		errstrings = append(errstrings, fmt.Sprintf("failed to create templates. Multiple error(s) occured: %v", createErrors))
+		errstrings = append(errstrings, fmt.Sprintf("failed to create templates. Multiple error(s) occurred: %v", createErrors))
 	}
 	if len(updateErrors) > 0 {
 		errstrings = append(errstrings, fmt.Sprintf("failed to update templates. Multiple error(s) occurred: %v", updateErrors))
