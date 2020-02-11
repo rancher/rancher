@@ -191,6 +191,16 @@ def test_node_driver_schema(admin_mc):
                 'Driver {} has field {}'.format(driver, field)
 
 
+def test_amazon_node_driver_schema(admin_mc):
+    """Test amazon node driver schema supports AWS-specific resource fields"""
+    required_fields = ['encryptEbsVolume']
+    client = admin_mc.client
+    schema = client.schema.types['amazonec2config']
+    for field in required_fields:
+        assert field in schema.resourceFields, \
+            'amazonec2config missing support for field {}'.format(field)
+
+
 def create_node_template(client):
     cloud_credential = client.create_cloud_credential(
         azurecredentialConfig={"clientId": "test",
