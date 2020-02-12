@@ -132,11 +132,14 @@ type ReplicationControllerClient struct {
 
 type ReplicationControllerOperations interface {
 	List(opts *types.ListOpts) (*ReplicationControllerCollection, error)
+	ListAll(opts *types.ListOpts) (*ReplicationControllerCollection, error)
 	Create(opts *ReplicationController) (*ReplicationController, error)
 	Update(existing *ReplicationController, updates interface{}) (*ReplicationController, error)
 	Replace(existing *ReplicationController) (*ReplicationController, error)
 	ByID(id string) (*ReplicationController, error)
 	Delete(container *ReplicationController) error
+
+	ActionRedeploy(resource *ReplicationController) error
 }
 
 func newReplicationControllerClient(apiClient *Client) *ReplicationControllerClient {
@@ -170,6 +173,24 @@ func (c *ReplicationControllerClient) List(opts *types.ListOpts) (*ReplicationCo
 	return resp, err
 }
 
+func (c *ReplicationControllerClient) ListAll(opts *types.ListOpts) (*ReplicationControllerCollection, error) {
+	resp := &ReplicationControllerCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
+	return resp, err
+}
+
 func (cc *ReplicationControllerCollection) Next() (*ReplicationControllerCollection, error) {
 	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
 		resp := &ReplicationControllerCollection{}
@@ -188,4 +209,9 @@ func (c *ReplicationControllerClient) ByID(id string) (*ReplicationController, e
 
 func (c *ReplicationControllerClient) Delete(container *ReplicationController) error {
 	return c.apiClient.Ops.DoResourceDelete(ReplicationControllerType, &container.Resource)
+}
+
+func (c *ReplicationControllerClient) ActionRedeploy(resource *ReplicationController) error {
+	err := c.apiClient.Ops.DoAction(ReplicationControllerType, "redeploy", &resource.Resource, nil, nil)
+	return err
 }

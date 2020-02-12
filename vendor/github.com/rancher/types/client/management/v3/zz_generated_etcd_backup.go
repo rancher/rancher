@@ -58,6 +58,7 @@ type EtcdBackupClient struct {
 
 type EtcdBackupOperations interface {
 	List(opts *types.ListOpts) (*EtcdBackupCollection, error)
+	ListAll(opts *types.ListOpts) (*EtcdBackupCollection, error)
 	Create(opts *EtcdBackup) (*EtcdBackup, error)
 	Update(existing *EtcdBackup, updates interface{}) (*EtcdBackup, error)
 	Replace(existing *EtcdBackup) (*EtcdBackup, error)
@@ -93,6 +94,24 @@ func (c *EtcdBackupClient) List(opts *types.ListOpts) (*EtcdBackupCollection, er
 	resp := &EtcdBackupCollection{}
 	err := c.apiClient.Ops.DoList(EtcdBackupType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *EtcdBackupClient) ListAll(opts *types.ListOpts) (*EtcdBackupCollection, error) {
+	resp := &EtcdBackupCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

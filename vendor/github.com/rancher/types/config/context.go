@@ -36,6 +36,7 @@ import (
 	k8dynamic "k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 var (
@@ -45,6 +46,7 @@ var (
 
 type ScaledContext struct {
 	ClientGetter      proxy.ClientGetter
+	KubeConfig        clientcmdapi.Config
 	RESTConfig        rest.Config
 	UnversionedClient rest.Interface
 	K8sClient         kubernetes.Interface

@@ -42,6 +42,7 @@ type RKEAddonClient struct {
 
 type RKEAddonOperations interface {
 	List(opts *types.ListOpts) (*RKEAddonCollection, error)
+	ListAll(opts *types.ListOpts) (*RKEAddonCollection, error)
 	Create(opts *RKEAddon) (*RKEAddon, error)
 	Update(existing *RKEAddon, updates interface{}) (*RKEAddon, error)
 	Replace(existing *RKEAddon) (*RKEAddon, error)
@@ -77,6 +78,24 @@ func (c *RKEAddonClient) List(opts *types.ListOpts) (*RKEAddonCollection, error)
 	resp := &RKEAddonCollection{}
 	err := c.apiClient.Ops.DoList(RKEAddonType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *RKEAddonClient) ListAll(opts *types.ListOpts) (*RKEAddonCollection, error) {
+	resp := &RKEAddonCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

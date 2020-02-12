@@ -70,6 +70,7 @@ type ClusterAlertClient struct {
 
 type ClusterAlertOperations interface {
 	List(opts *types.ListOpts) (*ClusterAlertCollection, error)
+	ListAll(opts *types.ListOpts) (*ClusterAlertCollection, error)
 	Create(opts *ClusterAlert) (*ClusterAlert, error)
 	Update(existing *ClusterAlert, updates interface{}) (*ClusterAlert, error)
 	Replace(existing *ClusterAlert) (*ClusterAlert, error)
@@ -105,6 +106,24 @@ func (c *ClusterAlertClient) List(opts *types.ListOpts) (*ClusterAlertCollection
 	resp := &ClusterAlertCollection{}
 	err := c.apiClient.Ops.DoList(ClusterAlertType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *ClusterAlertClient) ListAll(opts *types.ListOpts) (*ClusterAlertCollection, error) {
+	resp := &ClusterAlertCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

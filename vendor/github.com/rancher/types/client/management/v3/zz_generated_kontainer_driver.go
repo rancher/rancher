@@ -64,6 +64,7 @@ type KontainerDriverClient struct {
 
 type KontainerDriverOperations interface {
 	List(opts *types.ListOpts) (*KontainerDriverCollection, error)
+	ListAll(opts *types.ListOpts) (*KontainerDriverCollection, error)
 	Create(opts *KontainerDriver) (*KontainerDriver, error)
 	Update(existing *KontainerDriver, updates interface{}) (*KontainerDriver, error)
 	Replace(existing *KontainerDriver) (*KontainerDriver, error)
@@ -105,6 +106,24 @@ func (c *KontainerDriverClient) List(opts *types.ListOpts) (*KontainerDriverColl
 	resp := &KontainerDriverCollection{}
 	err := c.apiClient.Ops.DoList(KontainerDriverType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *KontainerDriverClient) ListAll(opts *types.ListOpts) (*KontainerDriverCollection, error) {
+	resp := &KontainerDriverCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

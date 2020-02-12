@@ -48,6 +48,7 @@ type NamespacedDockerCredentialClient struct {
 
 type NamespacedDockerCredentialOperations interface {
 	List(opts *types.ListOpts) (*NamespacedDockerCredentialCollection, error)
+	ListAll(opts *types.ListOpts) (*NamespacedDockerCredentialCollection, error)
 	Create(opts *NamespacedDockerCredential) (*NamespacedDockerCredential, error)
 	Update(existing *NamespacedDockerCredential, updates interface{}) (*NamespacedDockerCredential, error)
 	Replace(existing *NamespacedDockerCredential) (*NamespacedDockerCredential, error)
@@ -83,6 +84,24 @@ func (c *NamespacedDockerCredentialClient) List(opts *types.ListOpts) (*Namespac
 	resp := &NamespacedDockerCredentialCollection{}
 	err := c.apiClient.Ops.DoList(NamespacedDockerCredentialType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *NamespacedDockerCredentialClient) ListAll(opts *types.ListOpts) (*NamespacedDockerCredentialCollection, error) {
+	resp := &NamespacedDockerCredentialCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

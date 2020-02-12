@@ -3,20 +3,15 @@ package k8s
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"os"
 
+	"github.com/rancher/wrangler/pkg/kubeconfig"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func Auto(ctx context.Context) (bool, context.Context, *rest.Config, error) {
-	return GetConfig(ctx, "auto", os.Getenv("KUBECONFIG"))
-}
-
-func GetConfig(ctx context.Context, k8sMode string, kubeConfig string) (bool, context.Context, *rest.Config, error) {
+func GetConfig(ctx context.Context, k8sMode string, kubeConfig string) (bool, clientcmd.ClientConfig, error) {
 	var (
-		cfg *rest.Config
+		cfg clientcmd.ClientConfig
 		err error
 	)
 
@@ -26,33 +21,30 @@ func GetConfig(ctx context.Context, k8sMode string, kubeConfig string) (bool, co
 	case "embedded":
 		return getEmbedded(ctx)
 	case "external":
-		cfg, err = getExternal(kubeConfig)
+		cfg = getExternal(kubeConfig)
 	default:
-		return false, nil, nil, fmt.Errorf("invalid k8s-mode %s", k8sMode)
+		return false, nil, fmt.Errorf("invalid k8s-mode %s", k8sMode)
 	}
 
-	return false, ctx, cfg, err
+	return false, cfg, err
 }
 
-func getAuto(ctx context.Context, kubeConfig string) (bool, context.Context, *rest.Config, error) {
-	if kubeConfig != "" {
-		cfg, err := getExternal(kubeConfig)
-		return false, ctx, cfg, err
-	}
-
-	if config, err := rest.InClusterConfig(); err == nil {
-		if config.BearerToken == "" {
-			tokenBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
-			if err == nil {
-				config.BearerToken = string(tokenBytes)
-			}
-		}
-		return false, ctx, config, nil
+func getAuto(ctx context.Context, kubeConfig string) (bool, clientcmd.ClientConfig, error) {
+	if isManual(kubeConfig) {
+		return false, kubeconfig.GetNonInteractiveClientConfig(kubeConfig), nil
 	}
 
 	return getEmbedded(ctx)
 }
 
-func getExternal(kubeConfig string) (*rest.Config, error) {
-	return clientcmd.BuildConfigFromFlags("", kubeConfig)
+func isManual(kubeConfig string) bool {
+	if kubeConfig != "" {
+		return true
+	}
+	_, inClusterErr := rest.InClusterConfig()
+	return inClusterErr == nil
+}
+
+func getExternal(kubeConfig string) clientcmd.ClientConfig {
+	return kubeconfig.GetNonInteractiveClientConfig(kubeConfig)
 }

@@ -62,6 +62,7 @@ type RoleTemplateClient struct {
 
 type RoleTemplateOperations interface {
 	List(opts *types.ListOpts) (*RoleTemplateCollection, error)
+	ListAll(opts *types.ListOpts) (*RoleTemplateCollection, error)
 	Create(opts *RoleTemplate) (*RoleTemplate, error)
 	Update(existing *RoleTemplate, updates interface{}) (*RoleTemplate, error)
 	Replace(existing *RoleTemplate) (*RoleTemplate, error)
@@ -97,6 +98,24 @@ func (c *RoleTemplateClient) List(opts *types.ListOpts) (*RoleTemplateCollection
 	resp := &RoleTemplateCollection{}
 	err := c.apiClient.Ops.DoList(RoleTemplateType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *RoleTemplateClient) ListAll(opts *types.ListOpts) (*RoleTemplateCollection, error) {
+	resp := &RoleTemplateCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

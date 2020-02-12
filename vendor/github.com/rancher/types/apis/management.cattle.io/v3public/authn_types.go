@@ -100,6 +100,10 @@ type PingProvider struct {
 	SamlProvider `json:",inline"`
 }
 
+type ShibbolethProvider struct {
+	SamlProvider `json:",inline"`
+}
+
 type ADFSProvider struct {
 	SamlProvider `json:",inline"`
 }

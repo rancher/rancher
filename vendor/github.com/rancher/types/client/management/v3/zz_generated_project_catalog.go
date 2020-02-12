@@ -68,6 +68,7 @@ type ProjectCatalogClient struct {
 
 type ProjectCatalogOperations interface {
 	List(opts *types.ListOpts) (*ProjectCatalogCollection, error)
+	ListAll(opts *types.ListOpts) (*ProjectCatalogCollection, error)
 	Create(opts *ProjectCatalog) (*ProjectCatalog, error)
 	Update(existing *ProjectCatalog, updates interface{}) (*ProjectCatalog, error)
 	Replace(existing *ProjectCatalog) (*ProjectCatalog, error)
@@ -107,6 +108,24 @@ func (c *ProjectCatalogClient) List(opts *types.ListOpts) (*ProjectCatalogCollec
 	resp := &ProjectCatalogCollection{}
 	err := c.apiClient.Ops.DoList(ProjectCatalogType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *ProjectCatalogClient) ListAll(opts *types.ListOpts) (*ProjectCatalogCollection, error) {
+	resp := &ProjectCatalogCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

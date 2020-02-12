@@ -42,6 +42,7 @@ type RKEK8sSystemImageClient struct {
 
 type RKEK8sSystemImageOperations interface {
 	List(opts *types.ListOpts) (*RKEK8sSystemImageCollection, error)
+	ListAll(opts *types.ListOpts) (*RKEK8sSystemImageCollection, error)
 	Create(opts *RKEK8sSystemImage) (*RKEK8sSystemImage, error)
 	Update(existing *RKEK8sSystemImage, updates interface{}) (*RKEK8sSystemImage, error)
 	Replace(existing *RKEK8sSystemImage) (*RKEK8sSystemImage, error)
@@ -77,6 +78,24 @@ func (c *RKEK8sSystemImageClient) List(opts *types.ListOpts) (*RKEK8sSystemImage
 	resp := &RKEK8sSystemImageCollection{}
 	err := c.apiClient.Ops.DoList(RKEK8sSystemImageType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *RKEK8sSystemImageClient) ListAll(opts *types.ListOpts) (*RKEK8sSystemImageCollection, error) {
+	resp := &RKEK8sSystemImageCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

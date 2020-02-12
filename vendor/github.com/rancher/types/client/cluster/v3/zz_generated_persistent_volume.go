@@ -110,6 +110,7 @@ type PersistentVolumeClient struct {
 
 type PersistentVolumeOperations interface {
 	List(opts *types.ListOpts) (*PersistentVolumeCollection, error)
+	ListAll(opts *types.ListOpts) (*PersistentVolumeCollection, error)
 	Create(opts *PersistentVolume) (*PersistentVolume, error)
 	Update(existing *PersistentVolume, updates interface{}) (*PersistentVolume, error)
 	Replace(existing *PersistentVolume) (*PersistentVolume, error)
@@ -145,6 +146,24 @@ func (c *PersistentVolumeClient) List(opts *types.ListOpts) (*PersistentVolumeCo
 	resp := &PersistentVolumeCollection{}
 	err := c.apiClient.Ops.DoList(PersistentVolumeType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *PersistentVolumeClient) ListAll(opts *types.ListOpts) (*PersistentVolumeCollection, error) {
+	resp := &PersistentVolumeCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

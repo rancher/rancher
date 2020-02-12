@@ -78,6 +78,7 @@ type NodeTemplateClient struct {
 
 type NodeTemplateOperations interface {
 	List(opts *types.ListOpts) (*NodeTemplateCollection, error)
+	ListAll(opts *types.ListOpts) (*NodeTemplateCollection, error)
 	Create(opts *NodeTemplate) (*NodeTemplate, error)
 	Update(existing *NodeTemplate, updates interface{}) (*NodeTemplate, error)
 	Replace(existing *NodeTemplate) (*NodeTemplate, error)
@@ -113,6 +114,24 @@ func (c *NodeTemplateClient) List(opts *types.ListOpts) (*NodeTemplateCollection
 	resp := &NodeTemplateCollection{}
 	err := c.apiClient.Ops.DoList(NodeTemplateType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *NodeTemplateClient) ListAll(opts *types.ListOpts) (*NodeTemplateCollection, error) {
+	resp := &NodeTemplateCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

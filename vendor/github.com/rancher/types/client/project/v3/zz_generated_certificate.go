@@ -70,6 +70,7 @@ type CertificateClient struct {
 
 type CertificateOperations interface {
 	List(opts *types.ListOpts) (*CertificateCollection, error)
+	ListAll(opts *types.ListOpts) (*CertificateCollection, error)
 	Create(opts *Certificate) (*Certificate, error)
 	Update(existing *Certificate, updates interface{}) (*Certificate, error)
 	Replace(existing *Certificate) (*Certificate, error)
@@ -105,6 +106,24 @@ func (c *CertificateClient) List(opts *types.ListOpts) (*CertificateCollection, 
 	resp := &CertificateCollection{}
 	err := c.apiClient.Ops.DoList(CertificateType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *CertificateClient) ListAll(opts *types.ListOpts) (*CertificateCollection, error) {
+	resp := &CertificateCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

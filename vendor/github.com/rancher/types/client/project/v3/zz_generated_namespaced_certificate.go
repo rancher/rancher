@@ -70,6 +70,7 @@ type NamespacedCertificateClient struct {
 
 type NamespacedCertificateOperations interface {
 	List(opts *types.ListOpts) (*NamespacedCertificateCollection, error)
+	ListAll(opts *types.ListOpts) (*NamespacedCertificateCollection, error)
 	Create(opts *NamespacedCertificate) (*NamespacedCertificate, error)
 	Update(existing *NamespacedCertificate, updates interface{}) (*NamespacedCertificate, error)
 	Replace(existing *NamespacedCertificate) (*NamespacedCertificate, error)
@@ -105,6 +106,24 @@ func (c *NamespacedCertificateClient) List(opts *types.ListOpts) (*NamespacedCer
 	resp := &NamespacedCertificateCollection{}
 	err := c.apiClient.Ops.DoList(NamespacedCertificateType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *NamespacedCertificateClient) ListAll(opts *types.ListOpts) (*NamespacedCertificateCollection, error) {
+	resp := &NamespacedCertificateCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

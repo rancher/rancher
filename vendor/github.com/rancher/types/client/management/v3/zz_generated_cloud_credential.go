@@ -42,6 +42,7 @@ type CloudCredentialClient struct {
 
 type CloudCredentialOperations interface {
 	List(opts *types.ListOpts) (*CloudCredentialCollection, error)
+	ListAll(opts *types.ListOpts) (*CloudCredentialCollection, error)
 	Create(opts *CloudCredential) (*CloudCredential, error)
 	Update(existing *CloudCredential, updates interface{}) (*CloudCredential, error)
 	Replace(existing *CloudCredential) (*CloudCredential, error)
@@ -77,6 +78,24 @@ func (c *CloudCredentialClient) List(opts *types.ListOpts) (*CloudCredentialColl
 	resp := &CloudCredentialCollection{}
 	err := c.apiClient.Ops.DoList(CloudCredentialType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *CloudCredentialClient) ListAll(opts *types.ListOpts) (*CloudCredentialCollection, error) {
+	resp := &CloudCredentialCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

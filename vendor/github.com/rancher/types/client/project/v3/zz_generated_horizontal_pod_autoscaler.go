@@ -70,6 +70,7 @@ type HorizontalPodAutoscalerClient struct {
 
 type HorizontalPodAutoscalerOperations interface {
 	List(opts *types.ListOpts) (*HorizontalPodAutoscalerCollection, error)
+	ListAll(opts *types.ListOpts) (*HorizontalPodAutoscalerCollection, error)
 	Create(opts *HorizontalPodAutoscaler) (*HorizontalPodAutoscaler, error)
 	Update(existing *HorizontalPodAutoscaler, updates interface{}) (*HorizontalPodAutoscaler, error)
 	Replace(existing *HorizontalPodAutoscaler) (*HorizontalPodAutoscaler, error)
@@ -105,6 +106,24 @@ func (c *HorizontalPodAutoscalerClient) List(opts *types.ListOpts) (*HorizontalP
 	resp := &HorizontalPodAutoscalerCollection{}
 	err := c.apiClient.Ops.DoList(HorizontalPodAutoscalerType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *HorizontalPodAutoscalerClient) ListAll(opts *types.ListOpts) (*HorizontalPodAutoscalerCollection, error) {
+	resp := &HorizontalPodAutoscalerCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 
