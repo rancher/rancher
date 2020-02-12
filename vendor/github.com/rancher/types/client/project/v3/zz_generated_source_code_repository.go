@@ -64,6 +64,7 @@ type SourceCodeRepositoryClient struct {
 
 type SourceCodeRepositoryOperations interface {
 	List(opts *types.ListOpts) (*SourceCodeRepositoryCollection, error)
+	ListAll(opts *types.ListOpts) (*SourceCodeRepositoryCollection, error)
 	Create(opts *SourceCodeRepository) (*SourceCodeRepository, error)
 	Update(existing *SourceCodeRepository, updates interface{}) (*SourceCodeRepository, error)
 	Replace(existing *SourceCodeRepository) (*SourceCodeRepository, error)
@@ -99,6 +100,24 @@ func (c *SourceCodeRepositoryClient) List(opts *types.ListOpts) (*SourceCodeRepo
 	resp := &SourceCodeRepositoryCollection{}
 	err := c.apiClient.Ops.DoList(SourceCodeRepositoryType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *SourceCodeRepositoryClient) ListAll(opts *types.ListOpts) (*SourceCodeRepositoryCollection, error) {
+	resp := &SourceCodeRepositoryCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

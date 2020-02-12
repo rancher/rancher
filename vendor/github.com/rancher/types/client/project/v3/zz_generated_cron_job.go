@@ -132,11 +132,14 @@ type CronJobClient struct {
 
 type CronJobOperations interface {
 	List(opts *types.ListOpts) (*CronJobCollection, error)
+	ListAll(opts *types.ListOpts) (*CronJobCollection, error)
 	Create(opts *CronJob) (*CronJob, error)
 	Update(existing *CronJob, updates interface{}) (*CronJob, error)
 	Replace(existing *CronJob) (*CronJob, error)
 	ByID(id string) (*CronJob, error)
 	Delete(container *CronJob) error
+
+	ActionRedeploy(resource *CronJob) error
 }
 
 func newCronJobClient(apiClient *Client) *CronJobClient {
@@ -170,6 +173,24 @@ func (c *CronJobClient) List(opts *types.ListOpts) (*CronJobCollection, error) {
 	return resp, err
 }
 
+func (c *CronJobClient) ListAll(opts *types.ListOpts) (*CronJobCollection, error) {
+	resp := &CronJobCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
+	return resp, err
+}
+
 func (cc *CronJobCollection) Next() (*CronJobCollection, error) {
 	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
 		resp := &CronJobCollection{}
@@ -188,4 +209,9 @@ func (c *CronJobClient) ByID(id string) (*CronJob, error) {
 
 func (c *CronJobClient) Delete(container *CronJob) error {
 	return c.apiClient.Ops.DoResourceDelete(CronJobType, &container.Resource)
+}
+
+func (c *CronJobClient) ActionRedeploy(resource *CronJob) error {
+	err := c.apiClient.Ops.DoAction(CronJobType, "redeploy", &resource.Resource, nil, nil)
+	return err
 }

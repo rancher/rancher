@@ -46,6 +46,7 @@ type PrometheusRuleClient struct {
 
 type PrometheusRuleOperations interface {
 	List(opts *types.ListOpts) (*PrometheusRuleCollection, error)
+	ListAll(opts *types.ListOpts) (*PrometheusRuleCollection, error)
 	Create(opts *PrometheusRule) (*PrometheusRule, error)
 	Update(existing *PrometheusRule, updates interface{}) (*PrometheusRule, error)
 	Replace(existing *PrometheusRule) (*PrometheusRule, error)
@@ -81,6 +82,24 @@ func (c *PrometheusRuleClient) List(opts *types.ListOpts) (*PrometheusRuleCollec
 	resp := &PrometheusRuleCollection{}
 	err := c.apiClient.Ops.DoList(PrometheusRuleType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *PrometheusRuleClient) ListAll(opts *types.ListOpts) (*PrometheusRuleCollection, error) {
+	resp := &PrometheusRuleCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

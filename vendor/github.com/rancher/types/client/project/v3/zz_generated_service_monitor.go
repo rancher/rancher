@@ -62,6 +62,7 @@ type ServiceMonitorClient struct {
 
 type ServiceMonitorOperations interface {
 	List(opts *types.ListOpts) (*ServiceMonitorCollection, error)
+	ListAll(opts *types.ListOpts) (*ServiceMonitorCollection, error)
 	Create(opts *ServiceMonitor) (*ServiceMonitor, error)
 	Update(existing *ServiceMonitor, updates interface{}) (*ServiceMonitor, error)
 	Replace(existing *ServiceMonitor) (*ServiceMonitor, error)
@@ -97,6 +98,24 @@ func (c *ServiceMonitorClient) List(opts *types.ListOpts) (*ServiceMonitorCollec
 	resp := &ServiceMonitorCollection{}
 	err := c.apiClient.Ops.DoList(ServiceMonitorType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *ServiceMonitorClient) ListAll(opts *types.ListOpts) (*ServiceMonitorCollection, error) {
+	resp := &ServiceMonitorCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

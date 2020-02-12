@@ -80,6 +80,7 @@ type TemplateVersionClient struct {
 
 type TemplateVersionOperations interface {
 	List(opts *types.ListOpts) (*TemplateVersionCollection, error)
+	ListAll(opts *types.ListOpts) (*TemplateVersionCollection, error)
 	Create(opts *TemplateVersion) (*TemplateVersion, error)
 	Update(existing *TemplateVersion, updates interface{}) (*TemplateVersion, error)
 	Replace(existing *TemplateVersion) (*TemplateVersion, error)
@@ -115,6 +116,24 @@ func (c *TemplateVersionClient) List(opts *types.ListOpts) (*TemplateVersionColl
 	resp := &TemplateVersionCollection{}
 	err := c.apiClient.Ops.DoList(TemplateVersionType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *TemplateVersionClient) ListAll(opts *types.ListOpts) (*TemplateVersionCollection, error) {
+	resp := &TemplateVersionCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

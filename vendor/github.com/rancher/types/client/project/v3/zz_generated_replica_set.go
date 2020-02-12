@@ -132,11 +132,14 @@ type ReplicaSetClient struct {
 
 type ReplicaSetOperations interface {
 	List(opts *types.ListOpts) (*ReplicaSetCollection, error)
+	ListAll(opts *types.ListOpts) (*ReplicaSetCollection, error)
 	Create(opts *ReplicaSet) (*ReplicaSet, error)
 	Update(existing *ReplicaSet, updates interface{}) (*ReplicaSet, error)
 	Replace(existing *ReplicaSet) (*ReplicaSet, error)
 	ByID(id string) (*ReplicaSet, error)
 	Delete(container *ReplicaSet) error
+
+	ActionRedeploy(resource *ReplicaSet) error
 }
 
 func newReplicaSetClient(apiClient *Client) *ReplicaSetClient {
@@ -170,6 +173,24 @@ func (c *ReplicaSetClient) List(opts *types.ListOpts) (*ReplicaSetCollection, er
 	return resp, err
 }
 
+func (c *ReplicaSetClient) ListAll(opts *types.ListOpts) (*ReplicaSetCollection, error) {
+	resp := &ReplicaSetCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
+	return resp, err
+}
+
 func (cc *ReplicaSetCollection) Next() (*ReplicaSetCollection, error) {
 	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
 		resp := &ReplicaSetCollection{}
@@ -188,4 +209,9 @@ func (c *ReplicaSetClient) ByID(id string) (*ReplicaSet, error) {
 
 func (c *ReplicaSetClient) Delete(container *ReplicaSet) error {
 	return c.apiClient.Ops.DoResourceDelete(ReplicaSetType, &container.Resource)
+}
+
+func (c *ReplicaSetClient) ActionRedeploy(resource *ReplicaSet) error {
+	err := c.apiClient.Ops.DoAction(ReplicaSetType, "redeploy", &resource.Resource, nil, nil)
+	return err
 }

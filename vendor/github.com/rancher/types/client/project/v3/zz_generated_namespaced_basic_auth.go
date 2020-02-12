@@ -50,6 +50,7 @@ type NamespacedBasicAuthClient struct {
 
 type NamespacedBasicAuthOperations interface {
 	List(opts *types.ListOpts) (*NamespacedBasicAuthCollection, error)
+	ListAll(opts *types.ListOpts) (*NamespacedBasicAuthCollection, error)
 	Create(opts *NamespacedBasicAuth) (*NamespacedBasicAuth, error)
 	Update(existing *NamespacedBasicAuth, updates interface{}) (*NamespacedBasicAuth, error)
 	Replace(existing *NamespacedBasicAuth) (*NamespacedBasicAuth, error)
@@ -85,6 +86,24 @@ func (c *NamespacedBasicAuthClient) List(opts *types.ListOpts) (*NamespacedBasic
 	resp := &NamespacedBasicAuthCollection{}
 	err := c.apiClient.Ops.DoList(NamespacedBasicAuthType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *NamespacedBasicAuthClient) ListAll(opts *types.ListOpts) (*NamespacedBasicAuthCollection, error) {
+	resp := &NamespacedBasicAuthCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

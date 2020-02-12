@@ -54,6 +54,7 @@ type NamespaceClient struct {
 
 type NamespaceOperations interface {
 	List(opts *types.ListOpts) (*NamespaceCollection, error)
+	ListAll(opts *types.ListOpts) (*NamespaceCollection, error)
 	Create(opts *Namespace) (*Namespace, error)
 	Update(existing *Namespace, updates interface{}) (*Namespace, error)
 	Replace(existing *Namespace) (*Namespace, error)
@@ -91,6 +92,24 @@ func (c *NamespaceClient) List(opts *types.ListOpts) (*NamespaceCollection, erro
 	resp := &NamespaceCollection{}
 	err := c.apiClient.Ops.DoList(NamespaceType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *NamespaceClient) ListAll(opts *types.ListOpts) (*NamespaceCollection, error) {
+	resp := &NamespaceCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

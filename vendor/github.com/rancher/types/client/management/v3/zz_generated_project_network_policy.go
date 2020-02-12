@@ -54,6 +54,7 @@ type ProjectNetworkPolicyClient struct {
 
 type ProjectNetworkPolicyOperations interface {
 	List(opts *types.ListOpts) (*ProjectNetworkPolicyCollection, error)
+	ListAll(opts *types.ListOpts) (*ProjectNetworkPolicyCollection, error)
 	Create(opts *ProjectNetworkPolicy) (*ProjectNetworkPolicy, error)
 	Update(existing *ProjectNetworkPolicy, updates interface{}) (*ProjectNetworkPolicy, error)
 	Replace(existing *ProjectNetworkPolicy) (*ProjectNetworkPolicy, error)
@@ -89,6 +90,24 @@ func (c *ProjectNetworkPolicyClient) List(opts *types.ListOpts) (*ProjectNetwork
 	resp := &ProjectNetworkPolicyCollection{}
 	err := c.apiClient.Ops.DoList(ProjectNetworkPolicyType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *ProjectNetworkPolicyClient) ListAll(opts *types.ListOpts) (*ProjectNetworkPolicyCollection, error) {
+	resp := &ProjectNetworkPolicyCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

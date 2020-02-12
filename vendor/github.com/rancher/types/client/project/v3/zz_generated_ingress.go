@@ -62,6 +62,7 @@ type IngressClient struct {
 
 type IngressOperations interface {
 	List(opts *types.ListOpts) (*IngressCollection, error)
+	ListAll(opts *types.ListOpts) (*IngressCollection, error)
 	Create(opts *Ingress) (*Ingress, error)
 	Update(existing *Ingress, updates interface{}) (*Ingress, error)
 	Replace(existing *Ingress) (*Ingress, error)
@@ -97,6 +98,24 @@ func (c *IngressClient) List(opts *types.ListOpts) (*IngressCollection, error) {
 	resp := &IngressCollection{}
 	err := c.apiClient.Ops.DoList(IngressType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *IngressClient) ListAll(opts *types.ListOpts) (*IngressCollection, error) {
+	resp := &IngressCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

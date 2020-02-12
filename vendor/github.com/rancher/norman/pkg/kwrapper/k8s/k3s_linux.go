@@ -12,7 +12,6 @@ import (
 
 	"github.com/rancher/norman/pkg/kwrapper/etcd"
 	"github.com/sirupsen/logrus"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -20,26 +19,26 @@ var (
 	kubeConfig = ".kube/k3s.yaml"
 )
 
-func getEmbedded(ctx context.Context) (bool, context.Context, *rest.Config, error) {
+func getEmbedded(ctx context.Context) (bool, clientcmd.ClientConfig, error) {
 	var (
 		err error
 	)
 
 	etcdEndpoints, err := etcd.RunETCD(ctx, "./management-state")
 	if err != nil {
-		return false, ctx, nil, err
+		return false, nil, err
 	}
 
 	kubeConfig, err := k3sServer(ctx, etcdEndpoints)
 	if err != nil {
-		return false, ctx, nil, err
+		return false, nil, err
 	}
 
 	os.Setenv("KUBECONFIG", kubeConfig)
-	restConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeConfig}, &clientcmd.ConfigOverrides{}).ClientConfig()
+	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeConfig}, &clientcmd.ConfigOverrides{})
 
-	return true, ctx, restConfig, err
+	return true, clientConfig, nil
 }
 
 func k3sServer(ctx context.Context, endpoints []string) (string, error) {

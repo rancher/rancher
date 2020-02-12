@@ -566,6 +566,7 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 		MustImportAndCustomize(&Version, v3.ADFSConfig{}, configSchema).
 		MustImportAndCustomize(&Version, v3.KeyCloakConfig{}, configSchema).
 		MustImportAndCustomize(&Version, v3.OKTAConfig{}, configSchema).
+		MustImportAndCustomize(&Version, v3.ShibbolethConfig{}, configSchema).
 		MustImport(&Version, v3.SamlConfigTestInput{}).
 		MustImport(&Version, v3.SamlConfigTestOutput{}).
 		//GoogleOAuth Config

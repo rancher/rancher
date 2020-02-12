@@ -56,6 +56,7 @@ type GatewayClient struct {
 
 type GatewayOperations interface {
 	List(opts *types.ListOpts) (*GatewayCollection, error)
+	ListAll(opts *types.ListOpts) (*GatewayCollection, error)
 	Create(opts *Gateway) (*Gateway, error)
 	Update(existing *Gateway, updates interface{}) (*Gateway, error)
 	Replace(existing *Gateway) (*Gateway, error)
@@ -91,6 +92,24 @@ func (c *GatewayClient) List(opts *types.ListOpts) (*GatewayCollection, error) {
 	resp := &GatewayCollection{}
 	err := c.apiClient.Ops.DoList(GatewayType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *GatewayClient) ListAll(opts *types.ListOpts) (*GatewayCollection, error) {
+	resp := &GatewayCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 
