@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
-	"time"
 
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/ehazlett/simplelog"
@@ -213,15 +212,14 @@ func run(cli *cli.Context, cfg app.Config) error {
 
 	migrateETCDlocal()
 
-	embedded, ctx, kubeConfig, err := k8s.GetConfig(ctx, cfg.K8sMode, kubeConfig)
+	embedded, clientConfig, err := k8s.GetConfig(ctx, cfg.K8sMode, kubeConfig)
 	if err != nil {
 		return err
 	}
 	cfg.Embedded = embedded
 
 	os.Unsetenv("KUBECONFIG")
-	kubeConfig.Timeout = 30 * time.Second
-	server, err := app.New(ctx, kubeConfig, &cfg)
+	server, err := app.New(ctx, clientConfig, &cfg)
 	if err != nil {
 		return err
 	}

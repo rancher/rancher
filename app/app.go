@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/rancher/norman/pkg/k8scheck"
 	"github.com/rancher/rancher/pkg/audit"
@@ -34,7 +35,7 @@ import (
 	"github.com/rancher/wrangler/pkg/leader"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 type Config struct {
@@ -100,15 +101,27 @@ func initFeatures(ctx context.Context, scaledContext *config.ScaledContext, cfg 
 	return nil
 }
 
-func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config) (*config.ScaledContext, *clustermanager.Manager, error) {
-	if err := k8scheck.Wait(ctx, kubeConfig); err != nil {
-		return nil, nil, err
-	}
-
-	scaledContext, err := config.NewScaledContext(kubeConfig)
+func buildScaledContext(ctx context.Context, clientConfig clientcmd.ClientConfig, cfg *Config) (*config.ScaledContext, *clustermanager.Manager, error) {
+	restConfig, err := clientConfig.ClientConfig()
 	if err != nil {
 		return nil, nil, err
 	}
+	restConfig.Timeout = 30 * time.Second
+
+	kubeConfig, err := clientConfig.RawConfig()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := k8scheck.Wait(ctx, *restConfig); err != nil {
+		return nil, nil, err
+	}
+
+	scaledContext, err := config.NewScaledContext(*restConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	scaledContext.KubeConfig = kubeConfig
 
 	if err := initFeatures(ctx, scaledContext, cfg); err != nil {
 		return nil, nil, err
@@ -140,8 +153,8 @@ func buildScaledContext(ctx context.Context, kubeConfig rest.Config, cfg *Config
 	return scaledContext, manager, nil
 }
 
-func New(ctx context.Context, restConfig *rest.Config, cfg *Config) (*Rancher, error) {
-	scaledContext, clusterManager, err := buildScaledContext(ctx, *restConfig, cfg)
+func New(ctx context.Context, clientConfig clientcmd.ClientConfig, cfg *Config) (*Rancher, error) {
+	scaledContext, clusterManager, err := buildScaledContext(ctx, clientConfig, cfg)
 	if err != nil {
 		return nil, err
 	}
