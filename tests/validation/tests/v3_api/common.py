@@ -98,6 +98,12 @@ rbac_data = {
     }
 }
 
+auth_rbac_data = {
+    "project": None,
+    "namespace": None,
+    "users": {}
+}
+
 # here are the global role templates used for
 # testing globalRoleBinding and groupRoleBinding
 TEMPLATE_MANAGE_CATALOG = {
@@ -144,6 +150,9 @@ TEMPLATE_LIST_CLUSTER = {
 
 # this is used when testing users from a auth provider
 AUTH_PROVIDER_NAME = os.environ.get('RANCHER_AUTH_PROVIDER', "")
+if AUTH_PROVIDER_NAME not in ["activeDirectory", "freeIpa", "openLdap", ""]:
+    pytest.fail("Invalid RANCHER_AUTH_PROVIDER. Please provide one of: "
+                "activeDirectory, freeIpa, or openLdap (case sensitive).")
 NESTED_GROUP_ENABLED = ast.literal_eval(
     os.environ.get('RANCHER_NESTED_GROUP_ENABLED', "False"))
 # the shared password for all auth users
@@ -153,6 +162,7 @@ LOGIN_AS_AUTH_USER_URL = \
     CATTLE_TEST_URL + "/v3-public/" \
     + AUTH_PROVIDER_NAME + "Providers/" \
     + AUTH_PROVIDER_NAME.lower() + "?action=login"
+CATTLE_AUTH_PRINCIPAL_URL = CATTLE_TEST_URL + "/v3/principals?action=search"
 
 # This is used for nested group when a third part Auth is enabled
 nested_group = {
@@ -161,6 +171,12 @@ nested_group = {
     "group_dic": None,
     "groups": None
 }
+if_test_group_rbac = pytest.mark.skipif(TEST_RBAC is False
+                                        or not AUTH_PROVIDER_NAME
+                                        or not AUTH_USER_PASSWORD,
+                                        reason='Group RBAC tests are skipped.'
+                                               'Likely required AUTH env '
+                                               'variables have not been set.')
 
 
 def is_windows(os_type=TEST_OS):
@@ -2219,6 +2235,18 @@ def get_a_group_and_a_user_not_in_it(nested=False):
     assert False, "cannot find a group and a user not in it"
 
 
+def get_group_principal_id(group_name, token=ADMIN_TOKEN, expected_status=200):
+    """ get the group's principal id from the auth provider"""
+    headers = {'Authorization': 'Bearer ' + token}
+    r = requests.post(CATTLE_AUTH_PRINCIPAL_URL,
+                      json={'name': group_name,
+                            'principalType': 'group',
+                            'responseType': 'json'},
+                      verify=False, headers=headers)
+    assert r.status_code == expected_status
+    return r.json()['data'][0]["id"]
+
+
 def login_as_auth_user(username, password):
     """ login with the user account from the auth provider,
     and return the user token"""
@@ -2228,7 +2256,7 @@ def login_as_auth_user(username, password):
         'responseType': 'json',
     }, verify=False)
     assert r.status_code in [200, 201]
-    return r.json()['token']
+    return r.json()
 
 
 def validate_service_discovery(workload, scale,
@@ -2241,3 +2269,46 @@ def validate_service_discovery(workload, scale,
     host = '{0}.{1}.svc.cluster.local'.format(workload.name, ns.id)
     for pod in testclient_pods:
         validate_dns_entry(pod, host, expected_ips)
+
+
+def auth_get_project():
+    return auth_rbac_data["project"]
+
+
+def auth_get_namespace():
+    return auth_rbac_data["namespace"]
+
+
+def auth_get_user_token(username):
+    if username in auth_rbac_data["users"].keys():
+        return auth_rbac_data["users"][username].token
+    return None
+
+
+def add_role_to_user(user, role):
+    """this function adds a user from the auth provider to given cluster"""
+    admin_client, cluster = get_global_admin_client_and_cluster()
+    project = auth_get_project()
+    ns = auth_get_namespace()
+    if not (project and ns):
+        project, ns = create_project_and_ns(ADMIN_TOKEN, cluster,
+                                            random_test_name("p-test-auth"))
+        auth_rbac_data["project"] = project
+        auth_rbac_data["namespace"] = ns
+    if role in [PROJECT_OWNER, PROJECT_MEMBER, PROJECT_READ_ONLY]:
+        assign_members_to_project(admin_client, user, project, role)
+    else:
+        assign_members_to_cluster(admin_client, user, cluster, role)
+    auth_rbac_data["users"][user.username] = user
+
+
+def auth_resource_cleanup():
+    """ remove the project and namespace created for the AUTH tests"""
+    client, cluster = get_global_admin_client_and_cluster()
+    client.delete(auth_rbac_data["project"])
+    auth_rbac_data["project"] = None
+    auth_rbac_data["ns"] = None
+    for username, user in auth_rbac_data["users"].items():
+        user_crtbs = client.list_cluster_role_template_binding(userId=user.id)
+        for crtb in user_crtbs:
+            client.delete(crtb)

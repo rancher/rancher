@@ -15,9 +15,9 @@ Prerequisite:
 BRANCH = "dev"
 URL = "https://git.rancher.io/system-charts"
 # the link to search principals in the auth provider
-CATTLE_AUTH_PRINCIPAL_URL = CATTLE_TEST_URL + "/v3/principals?action=search"
 
 
+@if_test_group_rbac
 def test_ggrb_1(remove_resource):
     """ test that when a global role is assigned to a group,
     all users in the group will get the permission;
@@ -32,7 +32,7 @@ def test_ggrb_1(remove_resource):
     # check that users can not create catalogs
     for user in users:
         validate_permission_create_catalog(user, False)
-    g_id = get_group_principal_id(target_group_name, ADMIN_TOKEN)
+    g_id = get_group_principal_id(target_group_name)
     ggrb = get_admin_client().create_global_role_binding(
         globalRoleId="catalogs-manage", groupPrincipalId=g_id)
     # check that users can create catalogs now
@@ -46,6 +46,7 @@ def test_ggrb_1(remove_resource):
         validate_permission_create_catalog(user, False)
 
 
+@if_test_group_rbac
 def test_ggrb_2(remove_resource):
     """ test that after editing the global role, users'
     permissions reflect the changes
@@ -72,7 +73,7 @@ def test_ggrb_2(remove_resource):
                                              template=TEMPLATE_MANAGE_CATALOG)
     gr = admin_c.create_global_role(template)
     remove_resource(gr)
-    g_id = get_group_principal_id(target_group_name, ADMIN_TOKEN)
+    g_id = get_group_principal_id(target_group_name)
     ggrb = get_admin_client().create_global_role_binding(
         globalRoleId=gr["id"], groupPrincipalId=g_id)
     # check that users can create catalogs now, but not list clusters
@@ -109,6 +110,7 @@ def test_ggrb_2(remove_resource):
         validate_permission_list_cluster(user, 0)
 
 
+@if_test_group_rbac
 def test_ggrb_3(remove_resource):
     """ test that when a global role is assigned to a group,
     all users in the group get the permission from the role,
@@ -133,7 +135,7 @@ def test_ggrb_3(remove_resource):
     # check that user not in the group can not list clusters
     validate_permission_list_cluster(user1, 0)
 
-    g_id = get_group_principal_id(target_g, ADMIN_TOKEN)
+    g_id = get_group_principal_id(target_g)
     # create a custom global role that permits listing clusters
     admin_c = get_admin_client()
     template = generate_template_global_role(name=random_name(),
@@ -177,37 +179,25 @@ rbac_create_delete_ggrb = [
 ]
 
 
-@if_test_rbac
+@if_test_group_rbac
 @pytest.mark.parametrize(["role", "expected_count"], rbac_list_ggrb)
 def test_rbac_ggrb_list(role, expected_count):
     token = rbac_get_user_token_by_role(role)
     validate_permission_list_ggrb(token, expected_count)
 
 
-@if_test_rbac
+@if_test_group_rbac
 @pytest.mark.parametrize(["role", "permission"], rbac_create_delete_ggrb)
 def test_rbac_ggrb_create(role, permission):
     token = rbac_get_user_token_by_role(role)
     validate_permission_create_ggrb(token, permission)
 
 
-@if_test_rbac
+@if_test_group_rbac
 @pytest.mark.parametrize(["role", "permission"], rbac_create_delete_ggrb)
 def test_rbac_ggrb_delete(role, permission):
     token = rbac_get_user_token_by_role(role)
     validate_permission_delete_ggrb(token, permission)
-
-
-def get_group_principal_id(group_name, token, expected_status=200):
-    """ get the group's principal id from the auth provider"""
-    headers = {'Authorization': 'Bearer ' + token}
-    r = requests.post(CATTLE_AUTH_PRINCIPAL_URL,
-                      json={'name': group_name,
-                            'principalType': 'group',
-                            'responseType': 'json'},
-                      verify=False, headers=headers)
-    assert r.status_code == expected_status
-    return r.json()['data'][0]["id"]
 
 
 def validate_permission_list_cluster(username, num=0):
@@ -217,7 +207,7 @@ def validate_permission_list_cluster(username, num=0):
     :param username: username from the auth provider
     :param num: expected number of clusters
     """
-    token = login_as_auth_user(username, AUTH_USER_PASSWORD)
+    token = login_as_auth_user(username, AUTH_USER_PASSWORD)['token']
     user_client = get_client_for_token(token)
     clusters = user_client.list_cluster().data
     assert len(clusters) == num
@@ -228,7 +218,7 @@ def validate_permission_create_catalog(username, permission=False):
     create new catalog
     """
     name = random_name()
-    token = login_as_auth_user(username, AUTH_USER_PASSWORD)
+    token = login_as_auth_user(username, AUTH_USER_PASSWORD)['token']
     return validate_create_catalog(token, catalog_name=name, branch=BRANCH,
                                    url=URL, permission=permission)
 
@@ -247,7 +237,7 @@ def validate_permission_create_ggrb(token, permission=False):
     create group global role bindings
     """
     target_group_name = get_group()
-    g_id = get_group_principal_id(target_group_name, ADMIN_TOKEN)
+    g_id = get_group_principal_id(target_group_name)
     role = generate_a_global_role()
     client = get_client_for_token(token)
     if not permission:

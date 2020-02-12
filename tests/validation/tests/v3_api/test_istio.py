@@ -9,6 +9,10 @@ from subprocess import CalledProcessError
 
 from rancher import ApiError
 
+from .common import add_role_to_user
+from .common import auth_get_user_token
+from .common import auth_resource_cleanup
+from .common import AUTH_USER_PASSWORD
 from .common import apply_crd
 from .common import check_condition
 from .common import compare_versions
@@ -20,12 +24,19 @@ from .common import create_ns
 from .common import DEFAULT_TIMEOUT
 from .common import delete_crd
 from .common import execute_kubectl_cmd
+from .common import get_a_group_and_a_user_not_in_it
+from .common import get_client_for_token
 from .common import get_cluster_client_for_token
 from .common import get_crd
+from .common import get_group_principal_id
 from .common import get_project_client_for_token
+from .common import get_user_by_group
 from .common import get_user_client
 from .common import get_user_client_and_cluster
+from .common import if_test_group_rbac
 from .common import if_test_rbac
+from .common import login_as_auth_user
+from .common import NESTED_GROUP_ENABLED
 from .common import PROJECT_MEMBER
 from .common import PROJECT_OWNER
 from .common import PROJECT_READ_ONLY
@@ -443,6 +454,27 @@ def test_rbac_istio_crds_project_read(skipif_unsupported_istio_version,
         "Error from server (Forbidden)")
 
 
+@if_test_group_rbac
+def test_rbac_istio_group_access(auth_cluster_access, update_answers):
+    group, users, noauth_user = auth_cluster_access
+    update_answers("allow_group_access", group=group)
+    kiali_url, tracing_url, grafana_url, prometheus_url = get_urls()
+    for user in users:
+        user_token = auth_get_user_token(user)
+        print("Validating {} has access.".format(user))
+        validate_access(kiali_url, user_token)
+        validate_access(tracing_url, user_token)
+        validate_no_access(grafana_url, user_token)
+        validate_no_access(prometheus_url, user_token)
+
+    print("Validating {} does not have access.".format(noauth_user))
+    noauth_token = auth_get_user_token(noauth_user)
+    validate_no_access(kiali_url, noauth_token)
+    validate_no_access(tracing_url, noauth_token)
+    validate_no_access(grafana_url, noauth_token)
+    validate_no_access(prometheus_url, noauth_token)
+
+
 def validate_access(url, user):
     headers = {'Authorization': 'Bearer ' + user}
     response = requests.get(headers=headers, url=url, verify=False)
@@ -759,9 +791,27 @@ def get_system_client(user):
     return get_project_client_for_token(p, user)
 
 
+def add_user_to_cluster(username):
+    class User(object):
+        def __init__(self, u_name, user_id, token):
+            self.username = u_name
+            self.id = user_id
+            self.token = token
+    user_data = login_as_auth_user(username, AUTH_USER_PASSWORD)
+    u_id = user_data['userId']
+    u_token = user_data['token']
+    user_obj = User(username, u_id, u_token)
+    add_role_to_user(user_obj, CLUSTER_MEMBER)
+    # Enable one of these two below options to get around Issue #25365
+    get_client_for_token(u_token)
+    # headers = {'Authorization': 'Bearer ' + u_token}
+    # url = os.environ.get('CATTLE_TEST_URL', "") + "/v3/users?me=true"
+    # response = requests.get(headers=headers, url=url, verify=False)
+
+
 @pytest.fixture()
 def update_answers():
-    def _update_answers(answer_type):
+    def _update_answers(answer_type, group=None):
         answers = {
             "kiali.enabled": "true",
             "tracing.enabled": "true",
@@ -770,6 +820,13 @@ def update_answers():
             additional_answers = {
                 "global.members[0].kind": "Group",
                 "global.members[0].name": "system:authenticated",
+            }
+            answers.update(additional_answers)
+        elif answer_type == "allow_group_access":
+            group_id = get_group_principal_id(group)
+            additional_answers = {
+                "global.members[0].kind": "Group",
+                "global.members[0].name": group_id,
             }
             answers.update(additional_answers)
         elif answer_type == "enable_certmanager":
@@ -826,6 +883,21 @@ def skipif_unsupported_istio_version(request):
         istio_version = istio_versions[len(istio_versions) - 1]
     if compare_versions(istio_version, "1.4.3") < 0:
         pytest.skip("This test is not supported for older Istio versions")
+
+
+@pytest.fixture(scope='function')
+def auth_cluster_access(request):
+    group, noauth_user = get_a_group_and_a_user_not_in_it(
+        NESTED_GROUP_ENABLED)
+    users = get_user_by_group(group, NESTED_GROUP_ENABLED)
+    for user in users:
+        add_user_to_cluster(user)
+    add_user_to_cluster(noauth_user)
+
+    def fin():
+        auth_resource_cleanup()
+    request.addfinalizer(fin)
+    return group, users, noauth_user
 
 
 @pytest.fixture(scope='module', autouse="True")
