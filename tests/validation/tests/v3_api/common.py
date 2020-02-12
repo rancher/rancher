@@ -171,12 +171,11 @@ nested_group = {
     "group_dic": None,
     "groups": None
 }
-if_test_group_rbac = pytest.mark.skipif(TEST_RBAC is False
-                                        or not AUTH_PROVIDER_NAME
+if_test_group_rbac = pytest.mark.skipif(not AUTH_PROVIDER_NAME
                                         or not AUTH_USER_PASSWORD,
                                         reason='Group RBAC tests are skipped.'
-                                               'Likely required AUTH env '
-                                               'variables have not been set.')
+                                               'Required AUTH env variables '
+                                               'have not been set.')
 
 
 def is_windows(os_type=TEST_OS):

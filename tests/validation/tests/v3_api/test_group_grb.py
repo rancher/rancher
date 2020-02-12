@@ -179,21 +179,21 @@ rbac_create_delete_ggrb = [
 ]
 
 
-@if_test_group_rbac
+@if_test_rbac
 @pytest.mark.parametrize(["role", "expected_count"], rbac_list_ggrb)
 def test_rbac_ggrb_list(role, expected_count):
     token = rbac_get_user_token_by_role(role)
     validate_permission_list_ggrb(token, expected_count)
 
 
-@if_test_group_rbac
+@if_test_rbac
 @pytest.mark.parametrize(["role", "permission"], rbac_create_delete_ggrb)
 def test_rbac_ggrb_create(role, permission):
     token = rbac_get_user_token_by_role(role)
     validate_permission_create_ggrb(token, permission)
 
 
-@if_test_group_rbac
+@if_test_rbac
 @pytest.mark.parametrize(["role", "permission"], rbac_create_delete_ggrb)
 def test_rbac_ggrb_delete(role, permission):
     token = rbac_get_user_token_by_role(role)
