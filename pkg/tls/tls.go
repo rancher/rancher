@@ -113,9 +113,10 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 		CertNamespace: "cattle-system",
 		AcmeDomains:   acmeDomains,
 		TLSListenerConfig: dynamiclistener.Config{
-			TLSConfig:           tlsConfig,
-			ExpirationDaysCheck: expiration,
-			SANs:                sans,
+			TLSConfig:             tlsConfig,
+			ExpirationDaysCheck:   expiration,
+			SANs:                  sans,
+			CloseConnOnCertChange: true,
 		},
 	}
 

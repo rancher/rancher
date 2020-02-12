@@ -802,8 +802,8 @@ github.com/rancher/client-go v1.17.2-rancher.3 h1:zvwcY1iBSbS0jiOtZp+TkskVVGU03B
 github.com/rancher/client-go v1.17.2-rancher.3/go.mod h1:QAzRgsa0C2xl4/eVpeVAZMvikCn8Nm81yqVx3Kk9XYI=
 github.com/rancher/dynamiclistener v0.2.1-0.20200131054153-795bb90214d9 h1:3VeB9YexEi9drVsdQEWx33MnI7hFBJXQ4Etly8M1Ox8=
 github.com/rancher/dynamiclistener v0.2.1-0.20200131054153-795bb90214d9/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
-github.com/rancher/dynamiclistener v0.2.1-0.20200207212838-3f92468568bb h1:sDWxUEC3Yfptd9waLac9CCy3dHriZgDXn6/DjNGObzs=
-github.com/rancher/dynamiclistener v0.2.1-0.20200207212838-3f92468568bb/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
+github.com/rancher/dynamiclistener v0.2.1-0.20200212211344-5276ad483add h1:O3guyXVrYCgKjrPUtOUA2/WLeC/pYIUk7nWgmJoh22Y=
+github.com/rancher/dynamiclistener v0.2.1-0.20200212211344-5276ad483add/go.mod h1:9WusTANoiRr8cDWCTtf5txieulezHbpv4vhLADPp0zU=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20200123225253-a5b9f3e0b2df/go.mod h1:MkY6hsQLw3cHrb0V/Fmn4ur2c5PBIpLIe+gvMWoTXGI=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20200129225622-a00843f74fed h1:khos5xy4swXQ5gwo9OaAtsEpKBZksLjw+DoncA33nCg=
 github.com/rancher/kontainer-driver-metadata v0.0.0-20200129225622-a00843f74fed/go.mod h1:MkY6hsQLw3cHrb0V/Fmn4ur2c5PBIpLIe+gvMWoTXGI=
