@@ -59,4 +59,10 @@ func Register(ctx context.Context, management *config.ManagementContext, manager
 
 	// Register last
 	auth.RegisterLate(ctx, management)
+
+	// Ensure caches are available for user controllers, these are used as part of
+	// registration
+	management.Management.ClusterAlertGroups("").Controller()
+	management.Management.ClusterAlertRules("").Controller()
+
 }

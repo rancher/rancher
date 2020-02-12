@@ -35,23 +35,27 @@ var settings = map[string]string{
 func Register(ctx context.Context, cluster *config.UserContext) {
 	projects := cluster.Management.Management.Projects("")
 	projectSyncer := &Syncer{
-		systemAccountManager:      systemaccount.NewManager(cluster.Management),
-		configMaps:                cluster.Core.ConfigMaps(""),
-		configMapLister:           cluster.Core.ConfigMaps("").Controller().Lister(),
-		sourceCodeProviderConfigs: cluster.Management.Project.SourceCodeProviderConfigs(""),
-		pipelineSettings:          cluster.Management.Project.PipelineSettings(""),
+		systemAccountManager:           systemaccount.NewManager(cluster.Management),
+		configMaps:                     cluster.Core.ConfigMaps(""),
+		configMapLister:                cluster.Core.ConfigMaps("").Controller().Lister(),
+		sourceCodeProviderConfigs:      cluster.Management.Project.SourceCodeProviderConfigs(""),
+		sourceCodeProviderConfigLister: cluster.Management.Project.SourceCodeProviderConfigs("").Controller().Lister(),
+		pipelineSettings:               cluster.Management.Project.PipelineSettings(""),
+		pipelineSettingLister:          cluster.Management.Project.PipelineSettings("").Controller().Lister(),
 	}
 
 	projects.AddClusterScopedHandler(ctx, "pipeline-controller", cluster.ClusterName, projectSyncer.Sync)
 }
 
 type Syncer struct {
-	systemAccountManager      *systemaccount.Manager
-	configMaps                v1.ConfigMapInterface
-	configMapLister           v1.ConfigMapLister
-	sourceCodeProviderConfigs pv3.SourceCodeProviderConfigInterface
-	pipelineSettings          pv3.PipelineSettingInterface
-	clusterName               string
+	systemAccountManager           *systemaccount.Manager
+	configMaps                     v1.ConfigMapInterface
+	configMapLister                v1.ConfigMapLister
+	sourceCodeProviderConfigs      pv3.SourceCodeProviderConfigInterface
+	sourceCodeProviderConfigLister pv3.SourceCodeProviderConfigLister
+	pipelineSettings               pv3.PipelineSettingInterface
+	pipelineSettingLister          pv3.PipelineSettingLister
+	clusterName                    string
 }
 
 func (l *Syncer) Sync(key string, obj *v3.Project) (runtime.Object, error) {
@@ -89,7 +93,16 @@ func (l *Syncer) addSourceCodeProviderConfigs(obj *v3.Project) error {
 }
 
 func (l *Syncer) addSourceCodeProviderConfig(name, pType string, enabled bool, obj *v3.Project) error {
-	_, err := l.sourceCodeProviderConfigs.ObjectClient().Create(&pv3.SourceCodeProviderConfig{
+	_, err := l.sourceCodeProviderConfigLister.Get(obj.Name, name)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+	} else {
+		return nil
+	}
+
+	_, err = l.sourceCodeProviderConfigs.ObjectClient().Create(&pv3.SourceCodeProviderConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: obj.Name,
@@ -116,6 +129,15 @@ func (l *Syncer) addPipelineSettings(obj *v3.Project) error {
 }
 
 func (l *Syncer) addPipelineSetting(settingName string, value string, obj *v3.Project) error {
+	_, err := l.pipelineSettingLister.Get(obj.Name, settingName)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+	} else {
+		return nil
+	}
+
 	setting := &pv3.PipelineSetting{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      settingName,

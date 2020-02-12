@@ -42,11 +42,13 @@ type Deployer struct {
 	notifierLister          mgmtv3.NotifierLister
 	projectLister           mgmtv3.ProjectLister
 	clusters                mgmtv3.ClusterInterface
+	clusterLister           mgmtv3.ClusterLister
 	appDeployer             *appDeployer
 }
 
 type appDeployer struct {
 	appsGetter           projectv3.AppsGetter
+	appsLister           projectv3.AppLister
 	namespaces           v1.NamespaceInterface
 	secrets              v1.SecretInterface
 	templateLister       mgmtv3.CatalogTemplateLister
@@ -59,6 +61,7 @@ func NewDeployer(cluster *config.UserContext, manager *manager.AlertManager) *De
 	appsgetter := cluster.Management.Project
 	ad := &appDeployer{
 		appsGetter:           appsgetter,
+		appsLister:           cluster.Management.Project.Apps("").Controller().Lister(),
 		namespaces:           cluster.Core.Namespaces(metav1.NamespaceAll),
 		secrets:              cluster.Core.Secrets(metav1.NamespaceAll),
 		templateLister:       cluster.Management.Management.CatalogTemplates(namespace.GlobalNamespace).Controller().Lister(),
@@ -75,6 +78,7 @@ func NewDeployer(cluster *config.UserContext, manager *manager.AlertManager) *De
 		notifierLister:          cluster.Management.Management.Notifiers(cluster.ClusterName).Controller().Lister(),
 		projectLister:           cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
 		clusters:                cluster.Management.Management.Clusters(metav1.NamespaceAll),
+		clusterLister:           cluster.Management.Management.Clusters(metav1.NamespaceAll).Controller().Lister(),
 		appDeployer:             ad,
 	}
 }
@@ -111,7 +115,7 @@ func (d *Deployer) sync() error {
 		return fmt.Errorf("check alertmanager deployment failed, %v", err)
 	}
 
-	cluster, err := d.clusters.Get(d.clusterName, metav1.GetOptions{})
+	cluster, err := d.clusterLister.Get("", d.clusterName)
 	if err != nil {
 		return fmt.Errorf("get cluster %s failed, %v", d.clusterName, err)
 	}
@@ -129,15 +133,11 @@ func (d *Deployer) sync() error {
 		}
 
 		if !reflect.DeepEqual(cluster, newCluster) {
-			_, err = d.clusters.Update(newCluster)
+			cluster, err := d.clusters.Update(newCluster)
 			if err != nil {
 				return fmt.Errorf("update cluster %v failed, %v", d.clusterName, err)
 			}
 
-			cluster, err := d.clusters.Get(d.clusterName, metav1.GetOptions{})
-			if err != nil {
-				return fmt.Errorf("get cluster %s failed, %v", d.clusterName, err)
-			}
 			newCluster = cluster.DeepCopy()
 		}
 
@@ -225,6 +225,13 @@ func (d *appDeployer) cleanup(appName, appTargetNamespace, systemProjectID strin
 	var errgrp errgroup.Group
 
 	errgrp.Go(func() error {
+		if _, err := d.appsLister.Get(systemProjectName, appName); err != nil {
+			if apierrors.IsNotFound(err) {
+				// the app doesn't exist
+				return nil
+			}
+			return err
+		}
 		return d.appsGetter.Apps(systemProjectName).Delete(appName, &metav1.DeleteOptions{})
 	})
 
@@ -278,7 +285,7 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 		return false, fmt.Errorf("create secret %s:%s failed, %v", appTargetNamespace, appName, err)
 	}
 
-	app, err := d.appsGetter.Apps(systemProjectName).Get(appName, metav1.GetOptions{})
+	app, err := d.appsLister.Get(systemProjectName, appName)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return false, fmt.Errorf("failed to query %q App in %s Project, %v", appName, systemProjectName, err)
 	}

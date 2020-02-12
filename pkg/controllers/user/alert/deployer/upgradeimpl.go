@@ -38,19 +38,21 @@ const (
 )
 
 type AlertService struct {
-	clusterName        string
-	clusterLister      v3.ClusterLister
-	catalogLister      v3.CatalogLister
-	apps               projectv3.AppInterface
-	oldClusterAlerts   v3.ClusterAlertInterface
-	oldProjectAlerts   v3.ProjectAlertInterface
-	clusterAlertGroups v3.ClusterAlertGroupInterface
-	projectAlertGroups v3.ProjectAlertGroupInterface
-	clusterAlertRules  v3.ClusterAlertRuleInterface
-	projectAlertRules  v3.ProjectAlertRuleInterface
-	projectLister      v3.ProjectLister
-	namespaces         v1.NamespaceInterface
-	templateLister     v3.CatalogTemplateLister
+	clusterName           string
+	clusterLister         v3.ClusterLister
+	catalogLister         v3.CatalogLister
+	apps                  projectv3.AppInterface
+	appLister             projectv3.AppLister
+	oldClusterAlerts      v3.ClusterAlertInterface
+	oldProjectAlerts      v3.ProjectAlertInterface
+	oldProjectAlertLister v3.ProjectAlertLister
+	clusterAlertGroups    v3.ClusterAlertGroupInterface
+	projectAlertGroups    v3.ProjectAlertGroupInterface
+	clusterAlertRules     v3.ClusterAlertRuleInterface
+	projectAlertRules     v3.ProjectAlertRuleInterface
+	projectLister         v3.ProjectLister
+	namespaces            v1.NamespaceInterface
+	templateLister        v3.CatalogTemplateLister
 }
 
 func NewService() *AlertService {
@@ -63,12 +65,14 @@ func (l *AlertService) Init(cluster *config.UserContext) {
 	l.catalogLister = cluster.Management.Management.Catalogs(metav1.NamespaceAll).Controller().Lister()
 	l.oldClusterAlerts = cluster.Management.Management.ClusterAlerts(cluster.ClusterName)
 	l.oldProjectAlerts = cluster.Management.Management.ProjectAlerts(metav1.NamespaceAll)
+	l.oldProjectAlertLister = cluster.Management.Management.ProjectAlerts("").Controller().Lister()
 	l.clusterAlertGroups = cluster.Management.Management.ClusterAlertGroups(cluster.ClusterName)
 	l.projectAlertGroups = cluster.Management.Management.ProjectAlertGroups(metav1.NamespaceAll)
 	l.clusterAlertRules = cluster.Management.Management.ClusterAlertRules(cluster.ClusterName)
 	l.projectAlertRules = cluster.Management.Management.ProjectAlertRules(metav1.NamespaceAll)
 	l.projectLister = cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister()
 	l.apps = cluster.Management.Project.Apps(metav1.NamespaceAll)
+	l.appLister = cluster.Management.Project.Apps("").Controller().Lister()
 	l.namespaces = cluster.Core.Namespaces(metav1.NamespaceAll)
 	l.templateLister = cluster.Management.Management.CatalogTemplates(metav1.NamespaceAll).Controller().Lister()
 
@@ -132,7 +136,7 @@ func (l *AlertService) Upgrade(currentVersion string) (string, error) {
 	if systemProject == nil {
 		return "", fmt.Errorf("get system project failed")
 	}
-	app, err := l.apps.GetNamespaced(systemProject.Name, appName, metav1.GetOptions{})
+	app, err := l.appLister.Get(systemProject.Name, appName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return newVersion, nil
@@ -270,13 +274,13 @@ func (l *AlertService) migrateLegacyClusterAlert() error {
 }
 
 func (l *AlertService) migrateLegacyProjectAlert() error {
-	oldProjectAlert, err := l.oldProjectAlerts.List(metav1.ListOptions{})
+	oldProjectAlert, err := l.oldProjectAlertLister.List("", labels.NewSelector())
 	if err != nil {
 		return fmt.Errorf("get old project alert failed, %s", err)
 	}
 
-	oldProjectAlertGroup := make(map[string][]v3.ProjectAlert)
-	for _, v := range oldProjectAlert.Items {
+	oldProjectAlertGroup := make(map[string][]*v3.ProjectAlert)
+	for _, v := range oldProjectAlert {
 		if controller.ObjectInCluster(l.clusterName, v) {
 			oldProjectAlertGroup[v.Spec.ProjectName] = append(oldProjectAlertGroup[v.Spec.ProjectName], v)
 		}
@@ -383,12 +387,12 @@ func (l *AlertService) removeLegacyAlerting() error {
 }
 
 func (l *AlertService) removeFinalizerFromLegacyAlerting() error {
-	oldProjectAlert, err := l.oldProjectAlerts.List(metav1.ListOptions{})
+	oldProjectAlert, err := l.oldProjectAlertLister.List("", labels.NewSelector())
 	if err != nil {
 		return errors.Wrap(err, "list legacy projectAlerts failed")
 	}
 
-	for _, v := range oldProjectAlert.Items {
+	for _, v := range oldProjectAlert {
 		newObj := v.DeepCopy()
 		newObj.SetFinalizers([]string{})
 		if !reflect.DeepEqual(newObj, v) {

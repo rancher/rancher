@@ -21,6 +21,7 @@ import (
 	mgmtv3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	mgmtv3client "github.com/rancher/types/client/management/v3"
+	"github.com/rancher/types/config"
 	"github.com/rancher/types/config/dialer"
 
 	"github.com/pkg/errors"
@@ -47,14 +48,14 @@ type Handler struct {
 	projectLoggingLister mgmtv3.ProjectLoggingLister
 }
 
-func NewHandler(dialer dialer.Factory, clusterManager *clustermanager.Manager, appsGetter projectv3.AppsGetter, projectLister mgmtv3.ProjectLister, projectLoggingLister mgmtv3.ProjectLoggingLister, templateLister mgmtv3.CatalogTemplateLister) *Handler {
+func NewHandler(management *config.ScaledContext, clusterManager *clustermanager.Manager) *Handler {
 	return &Handler{
 		clusterManager:       clusterManager,
-		dialerFactory:        dialer,
-		appsGetter:           appsGetter,
-		projectLister:        projectLister,
-		templateLister:       templateLister,
-		projectLoggingLister: projectLoggingLister,
+		dialerFactory:        management.Dialer,
+		appsGetter:           management.Project,
+		projectLister:        management.Management.Projects("").Controller().Lister(),
+		templateLister:       management.Management.CatalogTemplates("").Controller().Lister(),
+		projectLoggingLister: management.Management.ProjectLoggings("").Controller().Lister(),
 	}
 }
 

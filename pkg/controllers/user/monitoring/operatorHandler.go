@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/app/utils"
+	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/monitoring"
@@ -18,9 +19,10 @@ import (
 )
 
 type operatorHandler struct {
-	clusterName         string
-	cattleClusterClient mgmtv3.ClusterInterface
-	app                 *appHandler
+	clusterName   string
+	clusters      mgmtv3.ClusterInterface
+	clusterLister mgmtv3.ClusterLister
+	app           *appHandler
 }
 
 func (h *operatorHandler) syncCluster(key string, obj *mgmtv3.Cluster) (runtime.Object, error) {
@@ -52,7 +54,7 @@ func (h *operatorHandler) syncCluster(key string, obj *mgmtv3.Cluster) (runtime.
 	}
 
 	if newCluster != nil && !reflect.DeepEqual(newCluster, obj) {
-		if newCluster, err = h.cattleClusterClient.Update(newCluster); err != nil {
+		if newCluster, err = h.clusters.Update(newCluster); err != nil {
 			return nil, err
 		}
 		return newCluster, nil
@@ -66,7 +68,7 @@ func (h *operatorHandler) syncProject(key string, project *mgmtv3.Project) (runt
 	}
 
 	clusterID := project.Spec.ClusterName
-	cluster, err := h.cattleClusterClient.Get(clusterID, metav1.GetOptions{})
+	cluster, err := h.clusterLister.Get("", clusterID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to find Cluster %s", clusterID)
 	}
@@ -94,7 +96,7 @@ func (h *operatorHandler) syncProject(key string, project *mgmtv3.Project) (runt
 	}
 
 	if newCluster != nil && !reflect.DeepEqual(newCluster, cluster) {
-		if _, err = h.cattleClusterClient.Update(newCluster); err != nil {
+		if _, err = h.clusters.Update(newCluster); err != nil {
 			return nil, err
 		}
 	}
@@ -109,7 +111,7 @@ func withdrawSystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) error {
 		mgmtv3.ClusterConditionMonitoringEnabled.GetStatus(cluster) == ""
 	//status false and empty should withdraw. when status unknown, it means the deployment has error while deploying apps
 	isOperatorDeploying := !mgmtv3.ClusterConditionPrometheusOperatorDeployed.IsFalse(cluster)
-	areAllOwnedProjectMonitoringDisabling, err := allOwnedProjectsMonitoringDisabling(app.cattleProjectClient)
+	areAllOwnedProjectMonitoringDisabling, err := allOwnedProjectsMonitoringDisabling(app.projectLister)
 	if err != nil {
 		mgmtv3.ClusterConditionPrometheusOperatorDeployed.Unknown(cluster)
 		mgmtv3.ClusterConditionPrometheusOperatorDeployed.ReasonAndMessageFromError(cluster, errors.Wrap(err, "failed to list owned projects of cluster"))
@@ -133,13 +135,13 @@ func withdrawSystemMonitor(cluster *mgmtv3.Cluster, app *appHandler) error {
 	return nil
 }
 
-func allOwnedProjectsMonitoringDisabling(projectClient mgmtv3.ProjectInterface) (bool, error) {
-	ownedProjectList, err := projectClient.List(metav1.ListOptions{})
+func allOwnedProjectsMonitoringDisabling(projectClient mgmtv3.ProjectLister) (bool, error) {
+	ownedProjectList, err := projectClient.List("", labels.NewSelector())
 	if err != nil {
 		return false, err
 	}
 
-	for _, ownedProject := range ownedProjectList.Items {
+	for _, ownedProject := range ownedProjectList {
 		if ownedProject.Spec.EnableProjectMonitoring {
 			return false, nil
 		}
