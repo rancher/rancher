@@ -66,6 +66,7 @@ type ProjectClient struct {
 
 type ProjectOperations interface {
 	List(opts *types.ListOpts) (*ProjectCollection, error)
+	ListAll(opts *types.ListOpts) (*ProjectCollection, error)
 	Create(opts *Project) (*Project, error)
 	Update(existing *Project, updates interface{}) (*Project, error)
 	Replace(existing *Project) (*Project, error)
@@ -113,6 +114,24 @@ func (c *ProjectClient) List(opts *types.ListOpts) (*ProjectCollection, error) {
 	resp := &ProjectCollection{}
 	err := c.apiClient.Ops.DoList(ProjectType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *ProjectClient) ListAll(opts *types.ListOpts) (*ProjectCollection, error) {
+	resp := &ProjectCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

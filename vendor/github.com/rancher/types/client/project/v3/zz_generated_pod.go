@@ -126,6 +126,7 @@ type PodClient struct {
 
 type PodOperations interface {
 	List(opts *types.ListOpts) (*PodCollection, error)
+	ListAll(opts *types.ListOpts) (*PodCollection, error)
 	Create(opts *Pod) (*Pod, error)
 	Update(existing *Pod, updates interface{}) (*Pod, error)
 	Replace(existing *Pod) (*Pod, error)
@@ -161,6 +162,24 @@ func (c *PodClient) List(opts *types.ListOpts) (*PodCollection, error) {
 	resp := &PodCollection{}
 	err := c.apiClient.Ops.DoList(PodType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *PodClient) ListAll(opts *types.ListOpts) (*PodCollection, error) {
+	resp := &PodCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

@@ -74,6 +74,7 @@ type DynamicSchemaClient struct {
 
 type DynamicSchemaOperations interface {
 	List(opts *types.ListOpts) (*DynamicSchemaCollection, error)
+	ListAll(opts *types.ListOpts) (*DynamicSchemaCollection, error)
 	Create(opts *DynamicSchema) (*DynamicSchema, error)
 	Update(existing *DynamicSchema, updates interface{}) (*DynamicSchema, error)
 	Replace(existing *DynamicSchema) (*DynamicSchema, error)
@@ -109,6 +110,24 @@ func (c *DynamicSchemaClient) List(opts *types.ListOpts) (*DynamicSchemaCollecti
 	resp := &DynamicSchemaCollection{}
 	err := c.apiClient.Ops.DoList(DynamicSchemaType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *DynamicSchemaClient) ListAll(opts *types.ListOpts) (*DynamicSchemaCollection, error) {
+	resp := &DynamicSchemaCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

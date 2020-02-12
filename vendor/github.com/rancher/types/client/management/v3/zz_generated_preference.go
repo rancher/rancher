@@ -44,6 +44,7 @@ type PreferenceClient struct {
 
 type PreferenceOperations interface {
 	List(opts *types.ListOpts) (*PreferenceCollection, error)
+	ListAll(opts *types.ListOpts) (*PreferenceCollection, error)
 	Create(opts *Preference) (*Preference, error)
 	Update(existing *Preference, updates interface{}) (*Preference, error)
 	Replace(existing *Preference) (*Preference, error)
@@ -79,6 +80,24 @@ func (c *PreferenceClient) List(opts *types.ListOpts) (*PreferenceCollection, er
 	resp := &PreferenceCollection{}
 	err := c.apiClient.Ops.DoList(PreferenceType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *PreferenceClient) ListAll(opts *types.ListOpts) (*PreferenceCollection, error) {
+	resp := &PreferenceCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

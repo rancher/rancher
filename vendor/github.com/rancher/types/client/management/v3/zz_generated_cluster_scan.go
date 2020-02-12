@@ -58,6 +58,7 @@ type ClusterScanClient struct {
 
 type ClusterScanOperations interface {
 	List(opts *types.ListOpts) (*ClusterScanCollection, error)
+	ListAll(opts *types.ListOpts) (*ClusterScanCollection, error)
 	Create(opts *ClusterScan) (*ClusterScan, error)
 	Update(existing *ClusterScan, updates interface{}) (*ClusterScan, error)
 	Replace(existing *ClusterScan) (*ClusterScan, error)
@@ -93,6 +94,24 @@ func (c *ClusterScanClient) List(opts *types.ListOpts) (*ClusterScanCollection, 
 	resp := &ClusterScanCollection{}
 	err := c.apiClient.Ops.DoList(ClusterScanType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *ClusterScanClient) ListAll(opts *types.ListOpts) (*ClusterScanCollection, error) {
+	resp := &ClusterScanCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

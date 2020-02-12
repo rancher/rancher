@@ -46,6 +46,7 @@ type PodSecurityPolicyTemplateProjectBindingClient struct {
 
 type PodSecurityPolicyTemplateProjectBindingOperations interface {
 	List(opts *types.ListOpts) (*PodSecurityPolicyTemplateProjectBindingCollection, error)
+	ListAll(opts *types.ListOpts) (*PodSecurityPolicyTemplateProjectBindingCollection, error)
 	Create(opts *PodSecurityPolicyTemplateProjectBinding) (*PodSecurityPolicyTemplateProjectBinding, error)
 	Update(existing *PodSecurityPolicyTemplateProjectBinding, updates interface{}) (*PodSecurityPolicyTemplateProjectBinding, error)
 	Replace(existing *PodSecurityPolicyTemplateProjectBinding) (*PodSecurityPolicyTemplateProjectBinding, error)
@@ -81,6 +82,24 @@ func (c *PodSecurityPolicyTemplateProjectBindingClient) List(opts *types.ListOpt
 	resp := &PodSecurityPolicyTemplateProjectBindingCollection{}
 	err := c.apiClient.Ops.DoList(PodSecurityPolicyTemplateProjectBindingType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *PodSecurityPolicyTemplateProjectBindingClient) ListAll(opts *types.ListOpts) (*PodSecurityPolicyTemplateProjectBindingCollection, error) {
+	resp := &PodSecurityPolicyTemplateProjectBindingCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

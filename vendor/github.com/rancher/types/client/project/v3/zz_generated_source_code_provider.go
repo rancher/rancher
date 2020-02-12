@@ -44,6 +44,7 @@ type SourceCodeProviderClient struct {
 
 type SourceCodeProviderOperations interface {
 	List(opts *types.ListOpts) (*SourceCodeProviderCollection, error)
+	ListAll(opts *types.ListOpts) (*SourceCodeProviderCollection, error)
 	Create(opts *SourceCodeProvider) (*SourceCodeProvider, error)
 	Update(existing *SourceCodeProvider, updates interface{}) (*SourceCodeProvider, error)
 	Replace(existing *SourceCodeProvider) (*SourceCodeProvider, error)
@@ -79,6 +80,24 @@ func (c *SourceCodeProviderClient) List(opts *types.ListOpts) (*SourceCodeProvid
 	resp := &SourceCodeProviderCollection{}
 	err := c.apiClient.Ops.DoList(SourceCodeProviderType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *SourceCodeProviderClient) ListAll(opts *types.ListOpts) (*SourceCodeProviderCollection, error) {
+	resp := &SourceCodeProviderCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

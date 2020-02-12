@@ -132,11 +132,14 @@ type StatefulSetClient struct {
 
 type StatefulSetOperations interface {
 	List(opts *types.ListOpts) (*StatefulSetCollection, error)
+	ListAll(opts *types.ListOpts) (*StatefulSetCollection, error)
 	Create(opts *StatefulSet) (*StatefulSet, error)
 	Update(existing *StatefulSet, updates interface{}) (*StatefulSet, error)
 	Replace(existing *StatefulSet) (*StatefulSet, error)
 	ByID(id string) (*StatefulSet, error)
 	Delete(container *StatefulSet) error
+
+	ActionRedeploy(resource *StatefulSet) error
 }
 
 func newStatefulSetClient(apiClient *Client) *StatefulSetClient {
@@ -170,6 +173,24 @@ func (c *StatefulSetClient) List(opts *types.ListOpts) (*StatefulSetCollection, 
 	return resp, err
 }
 
+func (c *StatefulSetClient) ListAll(opts *types.ListOpts) (*StatefulSetCollection, error) {
+	resp := &StatefulSetCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
+	return resp, err
+}
+
 func (cc *StatefulSetCollection) Next() (*StatefulSetCollection, error) {
 	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
 		resp := &StatefulSetCollection{}
@@ -188,4 +209,9 @@ func (c *StatefulSetClient) ByID(id string) (*StatefulSet, error) {
 
 func (c *StatefulSetClient) Delete(container *StatefulSet) error {
 	return c.apiClient.Ops.DoResourceDelete(StatefulSetType, &container.Resource)
+}
+
+func (c *StatefulSetClient) ActionRedeploy(resource *StatefulSet) error {
+	err := c.apiClient.Ops.DoAction(StatefulSetType, "redeploy", &resource.Resource, nil, nil)
+	return err
 }

@@ -74,6 +74,7 @@ type DNSRecordClient struct {
 
 type DNSRecordOperations interface {
 	List(opts *types.ListOpts) (*DNSRecordCollection, error)
+	ListAll(opts *types.ListOpts) (*DNSRecordCollection, error)
 	Create(opts *DNSRecord) (*DNSRecord, error)
 	Update(existing *DNSRecord, updates interface{}) (*DNSRecord, error)
 	Replace(existing *DNSRecord) (*DNSRecord, error)
@@ -109,6 +110,24 @@ func (c *DNSRecordClient) List(opts *types.ListOpts) (*DNSRecordCollection, erro
 	resp := &DNSRecordCollection{}
 	err := c.apiClient.Ops.DoList(DNSRecordType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *DNSRecordClient) ListAll(opts *types.ListOpts) (*DNSRecordCollection, error) {
+	resp := &DNSRecordCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

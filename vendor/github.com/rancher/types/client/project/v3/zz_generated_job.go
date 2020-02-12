@@ -132,6 +132,7 @@ type JobClient struct {
 
 type JobOperations interface {
 	List(opts *types.ListOpts) (*JobCollection, error)
+	ListAll(opts *types.ListOpts) (*JobCollection, error)
 	Create(opts *Job) (*Job, error)
 	Update(existing *Job, updates interface{}) (*Job, error)
 	Replace(existing *Job) (*Job, error)
@@ -167,6 +168,24 @@ func (c *JobClient) List(opts *types.ListOpts) (*JobCollection, error) {
 	resp := &JobCollection{}
 	err := c.apiClient.Ops.DoList(JobType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *JobClient) ListAll(opts *types.ListOpts) (*JobCollection, error) {
+	resp := &JobCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

@@ -44,6 +44,7 @@ type FeatureClient struct {
 
 type FeatureOperations interface {
 	List(opts *types.ListOpts) (*FeatureCollection, error)
+	ListAll(opts *types.ListOpts) (*FeatureCollection, error)
 	Create(opts *Feature) (*Feature, error)
 	Update(existing *Feature, updates interface{}) (*Feature, error)
 	Replace(existing *Feature) (*Feature, error)
@@ -79,6 +80,24 @@ func (c *FeatureClient) List(opts *types.ListOpts) (*FeatureCollection, error) {
 	resp := &FeatureCollection{}
 	err := c.apiClient.Ops.DoList(FeatureType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *FeatureClient) ListAll(opts *types.ListOpts) (*FeatureCollection, error) {
+	resp := &FeatureCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

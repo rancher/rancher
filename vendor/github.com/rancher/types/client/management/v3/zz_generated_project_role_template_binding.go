@@ -56,6 +56,7 @@ type ProjectRoleTemplateBindingClient struct {
 
 type ProjectRoleTemplateBindingOperations interface {
 	List(opts *types.ListOpts) (*ProjectRoleTemplateBindingCollection, error)
+	ListAll(opts *types.ListOpts) (*ProjectRoleTemplateBindingCollection, error)
 	Create(opts *ProjectRoleTemplateBinding) (*ProjectRoleTemplateBinding, error)
 	Update(existing *ProjectRoleTemplateBinding, updates interface{}) (*ProjectRoleTemplateBinding, error)
 	Replace(existing *ProjectRoleTemplateBinding) (*ProjectRoleTemplateBinding, error)
@@ -91,6 +92,24 @@ func (c *ProjectRoleTemplateBindingClient) List(opts *types.ListOpts) (*ProjectR
 	resp := &ProjectRoleTemplateBindingCollection{}
 	err := c.apiClient.Ops.DoList(ProjectRoleTemplateBindingType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *ProjectRoleTemplateBindingClient) ListAll(opts *types.ListOpts) (*ProjectRoleTemplateBindingCollection, error) {
+	resp := &ProjectRoleTemplateBindingCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

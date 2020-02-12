@@ -60,6 +60,7 @@ type GlobalDNSClient struct {
 
 type GlobalDNSOperations interface {
 	List(opts *types.ListOpts) (*GlobalDNSCollection, error)
+	ListAll(opts *types.ListOpts) (*GlobalDNSCollection, error)
 	Create(opts *GlobalDNS) (*GlobalDNS, error)
 	Update(existing *GlobalDNS, updates interface{}) (*GlobalDNS, error)
 	Replace(existing *GlobalDNS) (*GlobalDNS, error)
@@ -99,6 +100,24 @@ func (c *GlobalDNSClient) List(opts *types.ListOpts) (*GlobalDNSCollection, erro
 	resp := &GlobalDNSCollection{}
 	err := c.apiClient.Ops.DoList(GlobalDNSType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *GlobalDNSClient) ListAll(opts *types.ListOpts) (*GlobalDNSCollection, error) {
+	resp := &GlobalDNSCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

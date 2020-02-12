@@ -148,6 +148,7 @@ type PrometheusClient struct {
 
 type PrometheusOperations interface {
 	List(opts *types.ListOpts) (*PrometheusCollection, error)
+	ListAll(opts *types.ListOpts) (*PrometheusCollection, error)
 	Create(opts *Prometheus) (*Prometheus, error)
 	Update(existing *Prometheus, updates interface{}) (*Prometheus, error)
 	Replace(existing *Prometheus) (*Prometheus, error)
@@ -183,6 +184,24 @@ func (c *PrometheusClient) List(opts *types.ListOpts) (*PrometheusCollection, er
 	resp := &PrometheusCollection{}
 	err := c.apiClient.Ops.DoList(PrometheusType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *PrometheusClient) ListAll(opts *types.ListOpts) (*PrometheusCollection, error) {
+	resp := &PrometheusCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

@@ -60,6 +60,7 @@ type ProjectMonitorGraphClient struct {
 
 type ProjectMonitorGraphOperations interface {
 	List(opts *types.ListOpts) (*ProjectMonitorGraphCollection, error)
+	ListAll(opts *types.ListOpts) (*ProjectMonitorGraphCollection, error)
 	Create(opts *ProjectMonitorGraph) (*ProjectMonitorGraph, error)
 	Update(existing *ProjectMonitorGraph, updates interface{}) (*ProjectMonitorGraph, error)
 	Replace(existing *ProjectMonitorGraph) (*ProjectMonitorGraph, error)
@@ -97,6 +98,24 @@ func (c *ProjectMonitorGraphClient) List(opts *types.ListOpts) (*ProjectMonitorG
 	resp := &ProjectMonitorGraphCollection{}
 	err := c.apiClient.Ops.DoList(ProjectMonitorGraphType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *ProjectMonitorGraphClient) ListAll(opts *types.ListOpts) (*ProjectMonitorGraphCollection, error) {
+	resp := &ProjectMonitorGraphCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

@@ -62,6 +62,7 @@ type ProjectAlertGroupClient struct {
 
 type ProjectAlertGroupOperations interface {
 	List(opts *types.ListOpts) (*ProjectAlertGroupCollection, error)
+	ListAll(opts *types.ListOpts) (*ProjectAlertGroupCollection, error)
 	Create(opts *ProjectAlertGroup) (*ProjectAlertGroup, error)
 	Update(existing *ProjectAlertGroup, updates interface{}) (*ProjectAlertGroup, error)
 	Replace(existing *ProjectAlertGroup) (*ProjectAlertGroup, error)
@@ -97,6 +98,24 @@ func (c *ProjectAlertGroupClient) List(opts *types.ListOpts) (*ProjectAlertGroup
 	resp := &ProjectAlertGroupCollection{}
 	err := c.apiClient.Ops.DoList(ProjectAlertGroupType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *ProjectAlertGroupClient) ListAll(opts *types.ListOpts) (*ProjectAlertGroupCollection, error) {
+	resp := &ProjectAlertGroupCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

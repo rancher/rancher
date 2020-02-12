@@ -60,6 +60,7 @@ type ClusterMonitorGraphClient struct {
 
 type ClusterMonitorGraphOperations interface {
 	List(opts *types.ListOpts) (*ClusterMonitorGraphCollection, error)
+	ListAll(opts *types.ListOpts) (*ClusterMonitorGraphCollection, error)
 	Create(opts *ClusterMonitorGraph) (*ClusterMonitorGraph, error)
 	Update(existing *ClusterMonitorGraph, updates interface{}) (*ClusterMonitorGraph, error)
 	Replace(existing *ClusterMonitorGraph) (*ClusterMonitorGraph, error)
@@ -97,6 +98,24 @@ func (c *ClusterMonitorGraphClient) List(opts *types.ListOpts) (*ClusterMonitorG
 	resp := &ClusterMonitorGraphCollection{}
 	err := c.apiClient.Ops.DoList(ClusterMonitorGraphType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *ClusterMonitorGraphClient) ListAll(opts *types.ListOpts) (*ClusterMonitorGraphCollection, error) {
+	resp := &ClusterMonitorGraphCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

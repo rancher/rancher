@@ -48,6 +48,7 @@ type DockerCredentialClient struct {
 
 type DockerCredentialOperations interface {
 	List(opts *types.ListOpts) (*DockerCredentialCollection, error)
+	ListAll(opts *types.ListOpts) (*DockerCredentialCollection, error)
 	Create(opts *DockerCredential) (*DockerCredential, error)
 	Update(existing *DockerCredential, updates interface{}) (*DockerCredential, error)
 	Replace(existing *DockerCredential) (*DockerCredential, error)
@@ -83,6 +84,24 @@ func (c *DockerCredentialClient) List(opts *types.ListOpts) (*DockerCredentialCo
 	resp := &DockerCredentialCollection{}
 	err := c.apiClient.Ops.DoList(DockerCredentialType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *DockerCredentialClient) ListAll(opts *types.ListOpts) (*DockerCredentialCollection, error) {
+	resp := &DockerCredentialCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

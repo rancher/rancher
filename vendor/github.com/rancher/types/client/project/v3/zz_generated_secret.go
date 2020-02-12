@@ -52,6 +52,7 @@ type SecretClient struct {
 
 type SecretOperations interface {
 	List(opts *types.ListOpts) (*SecretCollection, error)
+	ListAll(opts *types.ListOpts) (*SecretCollection, error)
 	Create(opts *Secret) (*Secret, error)
 	Update(existing *Secret, updates interface{}) (*Secret, error)
 	Replace(existing *Secret) (*Secret, error)
@@ -87,6 +88,24 @@ func (c *SecretClient) List(opts *types.ListOpts) (*SecretCollection, error) {
 	resp := &SecretCollection{}
 	err := c.apiClient.Ops.DoList(SecretType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *SecretClient) ListAll(opts *types.ListOpts) (*SecretCollection, error) {
+	resp := &SecretCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

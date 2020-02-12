@@ -48,6 +48,7 @@ type GlobalRoleClient struct {
 
 type GlobalRoleOperations interface {
 	List(opts *types.ListOpts) (*GlobalRoleCollection, error)
+	ListAll(opts *types.ListOpts) (*GlobalRoleCollection, error)
 	Create(opts *GlobalRole) (*GlobalRole, error)
 	Update(existing *GlobalRole, updates interface{}) (*GlobalRole, error)
 	Replace(existing *GlobalRole) (*GlobalRole, error)
@@ -83,6 +84,24 @@ func (c *GlobalRoleClient) List(opts *types.ListOpts) (*GlobalRoleCollection, er
 	resp := &GlobalRoleCollection{}
 	err := c.apiClient.Ops.DoList(GlobalRoleType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *GlobalRoleClient) ListAll(opts *types.ListOpts) (*GlobalRoleCollection, error) {
+	resp := &GlobalRoleCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

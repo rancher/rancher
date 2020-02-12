@@ -58,6 +58,7 @@ type DestinationRuleClient struct {
 
 type DestinationRuleOperations interface {
 	List(opts *types.ListOpts) (*DestinationRuleCollection, error)
+	ListAll(opts *types.ListOpts) (*DestinationRuleCollection, error)
 	Create(opts *DestinationRule) (*DestinationRule, error)
 	Update(existing *DestinationRule, updates interface{}) (*DestinationRule, error)
 	Replace(existing *DestinationRule) (*DestinationRule, error)
@@ -93,6 +94,24 @@ func (c *DestinationRuleClient) List(opts *types.ListOpts) (*DestinationRuleColl
 	resp := &DestinationRuleCollection{}
 	err := c.apiClient.Ops.DoList(DestinationRuleType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *DestinationRuleClient) ListAll(opts *types.ListOpts) (*DestinationRuleCollection, error) {
+	resp := &DestinationRuleCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

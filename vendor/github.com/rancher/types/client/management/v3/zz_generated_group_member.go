@@ -44,6 +44,7 @@ type GroupMemberClient struct {
 
 type GroupMemberOperations interface {
 	List(opts *types.ListOpts) (*GroupMemberCollection, error)
+	ListAll(opts *types.ListOpts) (*GroupMemberCollection, error)
 	Create(opts *GroupMember) (*GroupMember, error)
 	Update(existing *GroupMember, updates interface{}) (*GroupMember, error)
 	Replace(existing *GroupMember) (*GroupMember, error)
@@ -79,6 +80,24 @@ func (c *GroupMemberClient) List(opts *types.ListOpts) (*GroupMemberCollection, 
 	resp := &GroupMemberCollection{}
 	err := c.apiClient.Ops.DoList(GroupMemberType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *GroupMemberClient) ListAll(opts *types.ListOpts) (*GroupMemberCollection, error) {
+	resp := &GroupMemberCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

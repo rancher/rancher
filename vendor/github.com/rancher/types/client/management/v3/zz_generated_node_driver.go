@@ -64,6 +64,7 @@ type NodeDriverClient struct {
 
 type NodeDriverOperations interface {
 	List(opts *types.ListOpts) (*NodeDriverCollection, error)
+	ListAll(opts *types.ListOpts) (*NodeDriverCollection, error)
 	Create(opts *NodeDriver) (*NodeDriver, error)
 	Update(existing *NodeDriver, updates interface{}) (*NodeDriver, error)
 	Replace(existing *NodeDriver) (*NodeDriver, error)
@@ -103,6 +104,24 @@ func (c *NodeDriverClient) List(opts *types.ListOpts) (*NodeDriverCollection, er
 	resp := &NodeDriverCollection{}
 	err := c.apiClient.Ops.DoList(NodeDriverType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *NodeDriverClient) ListAll(opts *types.ListOpts) (*NodeDriverCollection, error) {
+	resp := &NodeDriverCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

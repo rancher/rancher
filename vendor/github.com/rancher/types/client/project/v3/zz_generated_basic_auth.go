@@ -50,6 +50,7 @@ type BasicAuthClient struct {
 
 type BasicAuthOperations interface {
 	List(opts *types.ListOpts) (*BasicAuthCollection, error)
+	ListAll(opts *types.ListOpts) (*BasicAuthCollection, error)
 	Create(opts *BasicAuth) (*BasicAuth, error)
 	Update(existing *BasicAuth, updates interface{}) (*BasicAuth, error)
 	Replace(existing *BasicAuth) (*BasicAuth, error)
@@ -85,6 +86,24 @@ func (c *BasicAuthClient) List(opts *types.ListOpts) (*BasicAuthCollection, erro
 	resp := &BasicAuthCollection{}
 	err := c.apiClient.Ops.DoList(BasicAuthType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *BasicAuthClient) ListAll(opts *types.ListOpts) (*BasicAuthCollection, error) {
+	resp := &BasicAuthCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 
