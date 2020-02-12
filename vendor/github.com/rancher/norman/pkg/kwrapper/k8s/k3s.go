@@ -6,10 +6,9 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
-func getEmbedded(ctx context.Context) (bool, context.Context, *rest.Config, error) {
-	return false, ctx, nil, fmt.Errorf("embedded only supported on linux")
-
+func getEmbedded(ctx context.Context) (bool, clientcmd.ClientConfig, error) {
+	return false, nil, fmt.Errorf("embedded only supported on linux")
 }

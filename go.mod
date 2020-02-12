@@ -77,7 +77,7 @@ require (
 	github.com/rancher/kontainer-driver-metadata v0.0.0-20200129225622-a00843f74fed
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200123235809-1b6d4a82a415
 	github.com/rancher/machine v0.15.0-rancher25
-	github.com/rancher/norman v0.0.0-20200212213223-041e16049781
+	github.com/rancher/norman v0.0.0-20200212222655-bf773d02101e
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.5
 	github.com/rancher/rke v1.1.0-rc4.0.20200205094053-56d4c1b93702
