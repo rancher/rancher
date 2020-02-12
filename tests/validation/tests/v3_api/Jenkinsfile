@@ -36,7 +36,8 @@ node {
                       string(credentialsId: 'RANCHER_REGISTRY_PASSWORD', variable: 'RANCHER_REGISTRY_PASSWORD'),
                       string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
                       string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD'),
-                      string(credentialsId: 'RANCHER_GKE_CREDENTIAL', variable: 'RANCHER_GKE_CREDENTIAL')]) {
+                      string(credentialsId: 'RANCHER_GKE_CREDENTIAL', variable: 'RANCHER_GKE_CREDENTIAL'),
+                      string(credentialsId: 'RANCHER_AUTH_USER_PASSWORD', variable: 'RANCHER_AUTH_USER_PASSWORD')]) {
                         
       stage('Checkout') {
         deleteDir()
