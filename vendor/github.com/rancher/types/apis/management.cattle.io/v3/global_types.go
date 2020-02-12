@@ -18,6 +18,15 @@ type Feature struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Value   *bool `json:"value" norman:"required"`
-	Default bool  `json:"default" norman:"nocreate,noupdate"`
+	Spec   FeatureSpec   `json:"spec"`
+	Status FeatureStatus `json:"status"`
+}
+
+type FeatureSpec struct {
+	Value *bool `json:"value" norman:"required"`
+}
+
+type FeatureStatus struct {
+	Dynamic bool `json:"dynamic"`
+	Default bool `json:"default"`
 }
