@@ -5,8 +5,7 @@ from .common import get_user_client_and_cluster
 from .common import get_project_client_for_token
 from .common import WebsocketLogParse
 from .common import USER_TOKEN
-import websocket
-import ssl
+from .common import create_connection
 import base64
 import time
 import pytest
@@ -105,25 +104,6 @@ def create_project_client(request):
     namespace["pod"] = pod
     namespace["cluster"] = cluster
     namespace["shell_url"] = cluster.get("links").get("shell")
-
-
-def create_connection(url, subprotocols):
-    """
-    create a webscoket connection and check if it is connected
-
-    :param url: the url to connect to
-    :param subprotocols: the list of subprotocols
-    :return:
-    """
-    ws = websocket.create_connection(
-        url=url,
-        sslopt={"cert_reqs": ssl.CERT_NONE},
-        subprotocols=subprotocols,
-        timeout=10,
-        cookie="R_SESS=" + USER_TOKEN
-    )
-    assert ws.connected, "failed to build the websocket"
-    return ws
 
 
 def send_a_command(ws_connection, command):
