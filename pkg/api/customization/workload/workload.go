@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/rancher/norman/api/access"
@@ -29,10 +28,6 @@ import (
 const (
 	workloadRevisions    = "revisions"
 	DeprecatedRollbackTo = "deprecated.deployment.rollback.to"
-)
-
-var (
-	allowRedeployTypes = map[string]bool{"cronJob": true, "deployment": true, "replicationController": true, "statefulSet": true, "daemonSet": true, "replicaSet": true}
 )
 
 type ActionWrapper struct {
@@ -69,8 +64,6 @@ func (a ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 			return httperror.NewAPIError(httperror.InvalidAction, fmt.Sprintf("Pause deployment %s before resume", deployment.ID))
 		}
 		return updatePause(apiContext, false, deployment, "resume")
-	case "redeploy":
-		return updateTimestamp(apiContext, deployment)
 	}
 	return nil
 }
@@ -210,19 +203,7 @@ func (a ActionWrapper) rollbackDeployment(apiContext *types.APIContext, clusterC
 	}
 	return nil
 }
-func updateTimestamp(apiContext *types.APIContext, workload projectclient.Workload) error {
-	timestamp := time.Now().UTC().Format(time.RFC3339)
-	data, err := convert.EncodeToMap(workload)
-	if err != nil {
-		return httperror.WrapAPIError(err, httperror.ServerError, "Failed to parse workload")
-	}
-	values.PutValue(data, timestamp, "annotations", "cattle.io/timestamp")
-	err = update(apiContext, data, workload.ID)
-	if err != nil {
-		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Error redeploying workload %s : %s", workload.ID, err.Error()))
-	}
-	return nil
-}
+
 func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHandler) error {
 	if apiContext.Link == workloadRevisions {
 		var deployment projectclient.Workload
@@ -243,10 +224,6 @@ func Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.Links["self"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)
 	resource.Links["remove"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)
 	resource.Links["update"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)
-	//add redeploy action to the workload types that support redeploy
-	if _, ok := allowRedeployTypes[resource.Type]; ok {
-		resource.Actions["redeploy"] = apiContext.URLBuilder.ActionLinkByID(workloadSchema, workloadID, "redeploy")
-	}
 
 	delete(resource.Values, "nodeId")
 }
