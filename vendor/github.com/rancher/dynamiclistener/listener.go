@@ -237,8 +237,8 @@ func (c *closeWrapper) close() error {
 }
 
 func (c *closeWrapper) Close() error {
-	c.l.Lock()
-	defer c.l.Unlock()
+	c.l.connLock.Lock()
+	defer c.l.connLock.Unlock()
 	return c.close()
 }
 
