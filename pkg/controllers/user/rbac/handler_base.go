@@ -28,7 +28,6 @@ import (
 
 const (
 	rtbOwnerLabel                    = "authz.cluster.cattle.io/rtb-owner"
-	clusterRoleOwner                 = "authz.cluster.cattle.io/clusterrole-owner"
 	projectIDAnnotation              = "field.cattle.io/projectId"
 	prtbByProjectIndex               = "authz.cluster.cattle.io/prtb-by-project"
 	prtbByProjecSubjectIndex         = "authz.cluster.cattle.io/prtb-by-project-subject"
@@ -100,7 +99,6 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	}
 	workload.Management.Management.Projects("").AddClusterScopedLifecycle(ctx, "project-namespace-auth", workload.ClusterName, newProjectLifecycle(r))
 	workload.Management.Management.ProjectRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-prtb-sync", workload.ClusterName, newPRTBLifecycle(r))
-	workload.RBAC.ClusterRoles("").AddHandler(ctx, "cluster-clusterrole-sync", newClusterRoleHandler(r).sync)
 	workload.RBAC.ClusterRoleBindings("").AddHandler(ctx, "legacy-crb-cleaner-sync", newLegacyCRBCleaner(r).sync)
 	workload.Management.Management.ClusterRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-crtb-sync", workload.ClusterName, newCRTBLifecycle(r))
 	workload.Management.Management.Clusters("").AddHandler(ctx, "global-admin-cluster-sync", newClusterHandler(workload))
@@ -115,9 +113,15 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		LimitRangeLister:    workload.Core.LimitRanges("").Controller().Lister(),
 		ProjectLister:       workload.Management.Management.Projects(workload.ClusterName).Controller().Lister(),
 	}
-
 	workload.Core.Namespaces("").AddLifecycle(ctx, "namespace-auth", newNamespaceLifecycle(r, sync))
-	workload.Management.Management.RoleTemplates("").AddHandler(ctx, "cluster-roletemplate-sync", newRTLifecycle(r))
+
+	// This method for creating a lifecycle creates a cluster scoped handler for a non-cluster scoped resource.
+	// This means that when the cluster is deleted, cleanup logic in the mgmt cluster will remove the finalizer added by this
+	// lifecycle, but during normal operation the events received by the handler will not be filtered to match the cluster
+	// (because the resource -roleTemplate and globalRoleBinding- are global resources)
+	rti := workload.Management.Management.RoleTemplates("")
+	rtSync := v3.NewRoleTemplateLifecycleAdapter("cluster-roletemplate-sync_"+workload.ClusterName, true, rti, newRTLifecycle(r))
+	workload.Management.Management.RoleTemplates("").AddHandler(ctx, "cluster-roletemplate-sync", rtSync)
 }
 
 type manager struct {
@@ -195,8 +199,7 @@ func (m *manager) createClusterRole(rt *v3.RoleTemplate) error {
 	logrus.Infof("Creating clusterRole for roleTemplate %v (%v).", rt.DisplayName, rt.Name)
 	_, err := m.clusterRoles.Create(&rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        rt.Name,
-			Annotations: map[string]string{clusterRoleOwner: rt.Name},
+			Name: rt.Name,
 		},
 		Rules: rt.Rules,
 	})

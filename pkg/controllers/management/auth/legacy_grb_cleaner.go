@@ -28,39 +28,25 @@ func (p *grbCleaner) sync(key string, obj *v3.GlobalRoleBinding) (runtime.Object
 		return obj, nil
 	}
 
-	obj.SetFinalizers(cleanFinalizers(obj.GetFinalizers(), "clusterscoped.controller.cattle.io/grb-sync_"))
-	cleanAnnotations := cleanAnnotations(obj.GetAnnotations(), "lifecycle.cattle.io/create.grb-sync_")
+	obj = p.cleanFinalizers(obj)
 
-	if cleanAnnotations == nil {
-		cleanAnnotations = make(map[string]string)
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+		obj.SetAnnotations(annotations)
 	}
-	delete(cleanAnnotations, grbstore.OldGrbVersion)
-	cleanAnnotations[grbstore.GrbVersion] = "true"
-	obj.SetAnnotations(cleanAnnotations)
+	obj.Annotations[grbstore.GrbVersion] = "true"
 	return p.mgmt.Management.GlobalRoleBindings("").Update(obj)
 }
 
-// cleanFinalizers takes a list of finalizers and removes any finalizer that has the matching prefix
-func cleanFinalizers(finalizers []string, prefix string) []string {
+func (p *grbCleaner) cleanFinalizers(obj *v3.GlobalRoleBinding) *v3.GlobalRoleBinding {
 	var newFinalizers []string
-	for _, finalizer := range finalizers {
-		if strings.HasPrefix(finalizer, prefix) {
+	for _, finalizer := range obj.GetFinalizers() {
+		if strings.HasPrefix(finalizer, "clusterscoped.controller.cattle.io/grb-sync_") {
 			continue
 		}
 		newFinalizers = append(newFinalizers, finalizer)
 	}
-	return newFinalizers
-}
-
-// cleanAnnotations takes an objects annotations and removes any annotation that has the matching prefix
-// returning a new map
-func cleanAnnotations(annotations map[string]string, prefix string) map[string]string {
-	newAnnos := make(map[string]string)
-	for k, v := range annotations {
-		if strings.HasPrefix(k, prefix) {
-			continue
-		}
-		newAnnos[k] = v
-	}
-	return newAnnos
+	obj.SetFinalizers(newFinalizers)
+	return obj
 }
