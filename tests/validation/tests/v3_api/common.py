@@ -3,6 +3,7 @@ import json
 import os
 import random
 import subprocess
+import ssl
 import time
 import requests
 import ast
@@ -2351,7 +2352,7 @@ class WebsocketLogParse:
         :param socket: the socket connection
         :param skip: if True skip the first char of the received message
         """
-        while True:
+        while True and socket.connected:
             try:
                 data = socket.recv()
                 # the message from the kubectl contains an extra char
@@ -2365,6 +2366,9 @@ class WebsocketLogParse:
                 self.lock.release()
             except websocket.WebSocketConnectionClosedException:
                 print("Connection closed")
+                break
+            except websocket.WebSocketProtocolException as wpe:
+                print("Error: {}".format(wpe))
                 break
 
     @staticmethod
@@ -2396,3 +2400,21 @@ def wait_for_cluster_delete(client, cluster_name, timeout=DEFAULT_TIMEOUT):
         time.sleep(.5)
         cluster = client.list_cluster(name=cluster_name).data
         cluster_count = len(cluster)
+
+
+def create_connection(url, subprotocols):
+    """
+    create a webscoket connection and check if it is connected
+    :param url: the url to connect to
+    :param subprotocols: the list of subprotocols
+    :return:
+    """
+    ws = websocket.create_connection(
+        url=url,
+        sslopt={"cert_reqs": ssl.CERT_NONE},
+        subprotocols=subprotocols,
+        timeout=10,
+        cookie="R_SESS=" + USER_TOKEN
+    )
+    assert ws.connected, "failed to build the websocket"
+    return ws
