@@ -549,9 +549,17 @@ def test_app_rollback_validation(admin_mc, admin_pc, custom_catalog,
 
     def _app_revisions():
         app = admin_pc.client.reload(app1)
-        return len(app.revision().data) > 1
+        if len(app.revision().data) > 1:
+            return app.appRevisionId != original_rev
+        return False
 
-    wait_for(_app_revisions, fail_handler=lambda: 'app did not upgrade')
+    def _app_fail():
+        app = admin_pc.client.reload(app1)
+        return 'app did not upgrade: {}'.format(app)
+
+    wait_for(_app_revisions,
+             fail_handler=_app_fail,
+             timeout=90)
 
     app1 = admin_pc.client.reload(app1)
 
