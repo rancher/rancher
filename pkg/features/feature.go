@@ -13,19 +13,22 @@ import (
 )
 
 var (
-	features = make(map[string]*feature)
+	features = make(map[string]*Feature)
 
 	// Features, ex.: ClusterRandomName = newFeature("cluster-randomizer", false)
 
-	UnsupportedStorageDrivers = newFeature("unsupported-storage-drivers", false)
-	IstioVirtualServiceUI     = newFeature("istio-virtual-service-ui", true)
-	Steve                     = newFeature("steve", false)
+	UnsupportedStorageDrivers = newFeature("unsupported-storage-drivers", false, true)
+	IstioVirtualServiceUI     = newFeature("istio-virtual-service-ui", true, true)
+	Steve                     = newFeature("steve", false, false)
 )
 
-type feature struct {
-	name           string
-	def            bool
-	featuresLister v3.FeatureLister
+type Feature struct {
+	name string
+	// val is the effective value- it is equal to default until explicitly changed
+	val bool
+	def bool
+	// if a feature is not dynamic, then rancher must be restarted when the value is changed
+	dynamic bool
 }
 
 // InitializeFeatures updates feature default if given valid --features flag and creates/updates necessary features in k8s
@@ -41,9 +44,7 @@ func InitializeFeatures(ctx *config.ScaledContext, featureArgs string) {
 
 	// creates any features in map that do not exist, updates features with new default value
 	for key, f := range features {
-		f.featuresLister = ctx.Management.Features("").Controller().Lister()
-
-		oldFeatureState, err := ctx.Management.Features("").Get(key, v1.GetOptions{})
+		featureState, err := ctx.Management.Features("").Get(key, v1.GetOptions{})
 		if err != nil {
 			if !errors.IsNotFound(err) {
 				logrus.Errorf("unable to retrieve feature %s in initialize features: %v", f.name, err)
@@ -54,22 +55,47 @@ func InitializeFeatures(ctx *config.ScaledContext, featureArgs string) {
 				ObjectMeta: v1.ObjectMeta{
 					Name: f.name,
 				},
-				Default: f.def,
-				Value:   nil,
+				Spec: v3.FeatureSpec{
+					Value: nil,
+				},
+				Status: v3.FeatureStatus{
+					Default: f.def,
+					Dynamic: f.dynamic,
+				},
 			}
 
 			if _, err := ctx.Management.Features("").Create(newFeature); err != nil {
 				logrus.Errorf("unable to create feature %s in initialize features: %v", f.name, err)
 			}
 		} else {
-			// checks if developer has changed default value from previous rancher version
-			if oldFeatureState.Default != f.def {
-				newFeatureState := oldFeatureState.DeepCopy()
-				newFeatureState.Default = f.def
-				if _, err := ctx.Management.Features("").Update(newFeatureState); err != nil {
-					logrus.Errorf("unable to update feature %s in initialize features: %v", f.name, err)
+			errMsg := "unable to update feature %s in initialize features: %v"
+			// checks if default value has changed
+			if featureState.Status.Default != f.def {
+				newFeatureState := featureState.DeepCopy()
+				newFeatureState.Status.Default = f.def
+				if featureState, err = ctx.Management.Features("").Update(newFeatureState); err != nil {
+					logrus.Errorf(errMsg, f.name, err)
 				}
 			}
+
+			// checks if developer has changed dynamic value from previous rancher version
+			if featureState.Status.Dynamic != f.dynamic {
+				newFeatureState := featureState.DeepCopy()
+				newFeatureState.Status.Dynamic = f.dynamic
+				if featureState, err = ctx.Management.Features("").Update(newFeatureState); err != nil {
+					logrus.Errorf(errMsg, f.name, err)
+				}
+			}
+
+			if featureState.Spec.Value == nil {
+				continue
+			}
+
+			if *featureState.Spec.Value == f.val {
+				continue
+			}
+
+			f.Set(*featureState.Spec.Value)
 		}
 	}
 }
@@ -108,38 +134,42 @@ func applyArgumentDefaults(featureArgs string) error {
 	// only want to apply defaults once all args have been parsed and validated
 	for k, v := range applyFeatureDefaults {
 		features[k].def = v
+		features[k].val = v
 	}
 
 	return nil
 }
 
-// Enabled returns whether the Feature is enabled in the global feature gate.
-// This should be primarily used for schema enable function and add feature handler functions
-func (f *feature) Enabled() bool {
-	if f.featuresLister == nil {
-		return f.def
-	}
-
-	featureState, err := f.featuresLister.Get("", f.name)
-	if err != nil {
-		return false
-	}
-	if featureState.Value != nil {
-		return *featureState.Value
-	}
-	return featureState.Default
+// Enabled returns whether the feature is enabled
+func (f *Feature) Enabled() bool {
+	return f.val
 }
 
-func (f *feature) Name() string {
+// Dynamic returns whether the feature is dynamic. Rancher must be restarted when
+// a non-dynamic feature's effective value is changed.
+func (f *Feature) Dynamic() bool {
+	return f.dynamic
+}
+
+func (f *Feature) Set(val bool) {
+	f.val = val
+}
+
+func (f *Feature) Name() string {
 	return f.name
 }
 
-// newFeature adds feature to global feature gate
-func newFeature(name string, def bool) *feature {
-	feature := &feature{
-		name,
-		def,
-		nil,
+func GetFeatureByName(name string) *Feature {
+	return features[name]
+}
+
+// newFeature adds feature to the global feature map
+func newFeature(name string, def bool, dynamic bool) *Feature {
+	feature := &Feature{
+		name:    name,
+		def:     def,
+		val:     def,
+		dynamic: dynamic,
 	}
 
 	// feature will be stored in feature map, features contained in feature

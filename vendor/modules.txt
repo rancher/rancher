@@ -453,7 +453,7 @@ github.com/rancher/steve/pkg/server/resources/common
 github.com/rancher/steve/pkg/server/resources/counts
 github.com/rancher/steve/pkg/server/router
 github.com/rancher/steve/pkg/server/store/proxy
-# github.com/rancher/types v0.0.0-20200212214726-81cb4e45035d
+# github.com/rancher/types v0.0.0-20200212235033-1a68e3c2bb35
 github.com/rancher/types/apis/apiregistration.k8s.io/v1
 github.com/rancher/types/apis/apps/v1
 github.com/rancher/types/apis/autoscaling/v2beta2

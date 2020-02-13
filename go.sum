@@ -835,8 +835,8 @@ github.com/rancher/steve v0.0.0-20200211040242-51274d07e7c7 h1:L7p2NL3pQTk+gPcPh
 github.com/rancher/steve v0.0.0-20200211040242-51274d07e7c7/go.mod h1:dlylt+RJ+/ZCo05kz/AmuMJKhFb6OL2tbaK3CuHxDBQ=
 github.com/rancher/types v0.0.0-20200123224322-9adcafc483ee h1:kYxNoRYCC9wP72ou8HxHwudy8fiE1iurEmASWFvMBT0=
 github.com/rancher/types v0.0.0-20200123224322-9adcafc483ee/go.mod h1:rN9IgDRV1O4HTJCLtpLqyUEfdPsoeBoH2wNUm8PPThk=
-github.com/rancher/types v0.0.0-20200212214726-81cb4e45035d h1:iDKTnNiB4QJosnMP+JjPptLswdofG4RbP8Av0npPGJ4=
-github.com/rancher/types v0.0.0-20200212214726-81cb4e45035d/go.mod h1:aAVkeUAkMjB1JZE5QxZI9xmM87oZIQYgaSRiCwqN9zw=
+github.com/rancher/types v0.0.0-20200212235033-1a68e3c2bb35 h1:ANHcTl3xUTYg/9yyX6aamb/9P1MU53rBR/gae6dXWmI=
+github.com/rancher/types v0.0.0-20200212235033-1a68e3c2bb35/go.mod h1:aAVkeUAkMjB1JZE5QxZI9xmM87oZIQYgaSRiCwqN9zw=
 github.com/rancher/wrangler v0.1.4/go.mod h1:EYP7cqpg42YqElaCm+U9ieSrGQKAXxUH5xsr+XGpWyE=
 github.com/rancher/wrangler v0.4.0/go.mod h1:1cR91WLhZgkZ+U4fV9nVuXqKurWbgXcIReU4wnQvTN8=
 github.com/rancher/wrangler v0.4.1 h1:kQLE6syPbX4ciwU4OF+EHIPT9zj6r6pyN83u9Gsv5eg=
