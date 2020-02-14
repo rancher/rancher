@@ -113,7 +113,7 @@ func (v *Validator) validateEnforcement(request *types.APIContext, data map[stri
 	}
 
 	if !canAccess {
-		return httperror.NewFieldAPIError(httperror.PermissionDenied, "", "No permission to access clusterTemplateRevision")
+		return httperror.NewFieldAPIError(httperror.NotFound, "", "The clusterTemplateRevision is not found")
 	}
 	return nil
 }
