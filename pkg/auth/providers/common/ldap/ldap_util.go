@@ -28,6 +28,10 @@ type ConfigAttributes struct {
 	UserObjectClass             string
 }
 
+func Connect(config *v3.LdapConfig, caPool *x509.CertPool) (*ldapv2.Conn, error) {
+	return NewLDAPConn(config.Servers, config.TLS, config.Port, config.ConnectionTimeout, caPool)
+}
+
 func NewLDAPConn(servers []string, TLS bool, port int64, connectionTimeout int64, caPool *x509.CertPool) (*ldapv2.Conn, error) {
 	logrus.Debug("Now creating Ldap connection")
 	var lConn *ldapv2.Conn
@@ -97,13 +101,23 @@ func IsType(search []*ldapv2.EntryAttribute, varType string) bool {
 		if attrib.Name == "objectClass" {
 			for _, val := range attrib.Values {
 				if strings.EqualFold(val, varType) {
+					logrus.Debugf("ldap IsType found object of type %s", varType)
 					return true
 				}
 			}
 		}
 	}
-	logrus.Debugf("Failed to determine if object is type: %s", varType)
+	logrus.Debugf("ldap IsType failed to determine if object is type: %s", varType)
 	return false
+}
+
+func GetAttributeValuesByName(search []*ldapv2.EntryAttribute, attributeName string) []string {
+	for _, attrib := range search {
+		if attrib.Name == attributeName {
+			return attrib.Values
+		}
+	}
+	return []string{}
 }
 
 func GetUserSearchAttributes(memberOfAttribute, ObjectClass string, config *v3.ActiveDirectoryConfig) []string {
@@ -289,4 +303,28 @@ func Min(a int, b int) int {
 		return a
 	}
 	return b
+}
+
+func NewCAPool(cert string) (*x509.CertPool, error) {
+	pool, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, err
+	}
+	pool.AppendCertsFromPEM([]byte(cert))
+	return pool, nil
+}
+
+func ValidateLdapConfig(ldapConfig *v3.LdapConfig, certpool *x509.CertPool) (bool, error) {
+	if len(ldapConfig.Servers) != 1 {
+		return false, nil
+	}
+
+	lConn, err := Connect(ldapConfig, certpool)
+	if err != nil {
+		return false, err
+	}
+	defer lConn.Close()
+
+	logrus.Debugf("validated ldap configuration: %s", ldapConfig.Servers[0])
+	return true, nil
 }

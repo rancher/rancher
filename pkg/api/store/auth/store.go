@@ -13,18 +13,27 @@ import (
 	client "github.com/rancher/types/client/management/v3"
 )
 
-var TypeToFields = map[string][]string{
-	client.GithubConfigType:          {client.GithubConfigFieldClientSecret},
-	client.ActiveDirectoryConfigType: {client.ActiveDirectoryConfigFieldServiceAccountPassword},
-	client.AzureADConfigType:         {client.AzureADConfigFieldApplicationSecret},
-	client.OpenLdapConfigType:        {client.LdapConfigFieldServiceAccountPassword},
-	client.FreeIpaConfigType:         {client.LdapConfigFieldServiceAccountPassword},
-	client.PingConfigType:            {client.PingConfigFieldSpKey},
-	client.ADFSConfigType:            {client.ADFSConfigFieldSpKey},
-	client.KeyCloakConfigType:        {client.KeyCloakConfigFieldSpKey},
-	client.OKTAConfigType:            {client.OKTAConfigFieldSpKey},
-	client.GoogleOauthConfigType:     {client.GoogleOauthConfigFieldOauthCredential, client.GoogleOauthConfigFieldServiceAccountCredential},
-}
+var (
+	TypeToFields = map[string][]string{
+		client.GithubConfigType:          {client.GithubConfigFieldClientSecret},
+		client.ActiveDirectoryConfigType: {client.ActiveDirectoryConfigFieldServiceAccountPassword},
+		client.AzureADConfigType:         {client.AzureADConfigFieldApplicationSecret},
+		client.OpenLdapConfigType:        {client.LdapConfigFieldServiceAccountPassword},
+		client.FreeIpaConfigType:         {client.LdapConfigFieldServiceAccountPassword},
+		client.PingConfigType:            {client.PingConfigFieldSpKey},
+		client.ADFSConfigType:            {client.ADFSConfigFieldSpKey},
+		client.KeyCloakConfigType:        {client.KeyCloakConfigFieldSpKey},
+		client.OKTAConfigType:            {client.OKTAConfigFieldSpKey},
+		client.ShibbolethConfigType:      {client.ShibbolethConfigFieldSpKey},
+		client.GoogleOauthConfigType:     {client.GoogleOauthConfigFieldOauthCredential, client.GoogleOauthConfigFieldServiceAccountCredential},
+	}
+
+	SubTypeToFields = map[string]map[string][]string{
+		client.ShibbolethConfigType: {
+			client.ShibbolethConfigFieldOpenLdapConfig: {client.LdapConfigFieldServiceAccountPassword},
+		},
+	}
+)
 
 func Wrap(store types.Store, secrets corev1.SecretInterface) types.Store {
 	return &Store{
@@ -45,15 +54,46 @@ func (s *Store) Update(apiContext *types.APIContext, schema *types.Schema, data 
 	}
 
 	kind := convert.ToString(authType)
-	fields := TypeToFields[kind]
+	fields, ok := TypeToFields[kind]
+	subFields, subOk := SubTypeToFields[kind]
+	if !ok && !subOk {
+		return s.Store.Update(apiContext, schema, data, id)
+	}
+
+	var err error
 	for _, field := range fields {
 		if val, ok := data[field]; ok {
-			val := convert.ToString(val)
-			if err := common.CreateOrUpdateSecrets(s.Secrets, val, strings.ToLower(field), strings.ToLower(kind)); err != nil {
-				return nil, fmt.Errorf("error creating secret for %s:%s", kind, field)
+			data[field], err = s.CreateOrUpdateSecrets(convert.ToString(val), field, kind)
+			if err != nil {
+				return nil, err
 			}
-			data[field] = fmt.Sprintf("%s:%s-%s", namespace.GlobalNamespace, strings.ToLower(kind), strings.ToLower(field))
 		}
 	}
+
+	// subfields for embedded configs, see saml group search using openldap
+	for subField, subFieldList := range subFields {
+		if subData, ok := data[subField]; ok {
+			subData, casteOk := subData.(map[string]interface{})
+			if !casteOk {
+				continue
+			}
+			for _, field := range subFieldList {
+				if val, ok := subData[field]; ok {
+					subData[field], err = s.CreateOrUpdateSecrets(convert.ToString(val), field, kind)
+					if err != nil {
+						return nil, err
+					}
+				}
+			}
+		}
+	}
+
 	return s.Store.Update(apiContext, schema, data, id)
+}
+
+func (s *Store) CreateOrUpdateSecrets(value, field, kind string) (string, error) {
+	if err := common.CreateOrUpdateSecrets(s.Secrets, value, strings.ToLower(field), strings.ToLower(kind)); err != nil {
+		return "", fmt.Errorf("error creating secret for %s:%s", kind, field)
+	}
+	return fmt.Sprintf("%s:%s-%s", namespace.GlobalNamespace, strings.ToLower(kind), strings.ToLower(field)), nil
 }

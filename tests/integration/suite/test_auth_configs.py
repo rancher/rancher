@@ -15,7 +15,7 @@ def test_auth_configs(admin_mc):
 
     configs = client.list_auth_config()
 
-    assert configs.pagination.total == 11
+    assert configs.pagination.total == 12
 
     gh = None
     local = None
@@ -28,6 +28,7 @@ def test_auth_configs(admin_mc):
     keycloak = None
     okta = None
     googleoauth = None
+    shibboleth = None
 
     for c in configs:
         if c.type == "githubConfig":
@@ -52,6 +53,8 @@ def test_auth_configs(admin_mc):
             okta = c
         elif c.type == "googleOauthConfig":
             googleoauth = c
+        elif c.type == "shibbolethConfig":
+            shibboleth = c
 
     for x in [gh, local, ad, azure, openldap,
               freeIpa, ping, adfs, keycloak, okta, googleoauth]:
@@ -83,6 +86,8 @@ def test_auth_configs(admin_mc):
 
     assert googleoauth.actions.configureTest
     assert googleoauth.actions.testAndApply
+
+    assert shibboleth.actions.testAndEnable
 
 
 def test_auth_config_secrets(admin_mc):
