@@ -4,7 +4,7 @@ set -e
 source $(dirname $0)/version
 
 ARCH=${ARCH:-"amd64"}
-SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH:-"release-v2.3"}
+SYSTEM_CHART_DEFAULT_BRANCH=${SYSTEM_CHART_DEFAULT_BRANCH:-"istio-1.4.4"}
 SUFFIX=""
 [ "${ARCH}" != "amd64" ] && SUFFIX="_${ARCH}"
 
