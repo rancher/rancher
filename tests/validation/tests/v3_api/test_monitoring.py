@@ -120,6 +120,8 @@ P_MONITORING_ANSWER = {"prometheus.retention": "12h",
                        "prometheus.resources.core.limits.memory": "1000Mi",
                        "prometheus.persistent.useReleaseName": "true"}
 
+MONITORING_VERSION = os.environ.get('RANCHER_MONITORING_VERSION', "")
+MONITORING_TEMPLATE_ID = "cattle-global-data:system-library-rancher-monitoring"
 CLUSTER_MONITORING_APP = "cluster-monitoring"
 MONITORING_OPERATOR_APP = "monitoring-operator"
 PROJECT_MONITORING_APP = "project-monitoring"
@@ -451,6 +453,7 @@ def test_rbac_cluster_owner_control_cluster_monitoring():
 
 @pytest.fixture(scope="module", autouse="True")
 def create_project_client(request):
+    global MONITORING_VERSION
     rancher_client, cluster = get_user_client_and_cluster()
     create_kubeconfig(cluster)
     project = create_project(rancher_client, cluster,
@@ -463,6 +466,11 @@ def create_project_client(request):
     namespace["system_project"] = system_project
     namespace["system_project_client"] = sys_proj_client
 
+    monitoring_template = rancher_client.list_template(
+        id=MONITORING_TEMPLATE_ID).data[0]
+    if MONITORING_VERSION == "":
+        MONITORING_VERSION = monitoring_template.defaultVersion
+    print("MONITORING_VERSION=" + MONITORING_VERSION)
     # enable the cluster monitoring
     if cluster["enableClusterMonitoring"] is False:
         rancher_client.action(cluster, "enableMonitoring",
