@@ -10,7 +10,7 @@ node {
   def rancherConfig = "rancher_env.config"
 
   def TESTS_TO_RUN =  [ "test_wl", "test_dns_record", "test_rbac","test_connectivity", "test_ingress",
-                        "test_secrets", "test_registry", "test_service_discovery"]
+                        "test_secrets", "test_registry", "test_service_discovery", "test_websocket"]
 
   if (env.RANCHER_SKIP_INGRESS == "True") { 
     TESTS_TO_RUN = TESTS_TO_RUN - ["test_ingress"]
