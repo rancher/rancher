@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 function mirror_image {
   image_src="${1}"
