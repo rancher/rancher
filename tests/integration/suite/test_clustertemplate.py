@@ -242,6 +242,7 @@ def test_creation_standard_user(admin_mc, remove_resource, user_factory):
     assert e.value.error.status == 403
 
 
+@pytest.mark.nonparallel
 def test_check_enforcement(admin_mc, remove_resource, user_factory):
     cluster_template = create_cluster_template(admin_mc, remove_resource,
                                                [], admin_mc)
