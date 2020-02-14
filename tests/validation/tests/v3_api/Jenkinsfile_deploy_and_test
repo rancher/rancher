@@ -23,119 +23,124 @@ node {
     branch = "${env.branch}"
   }
 
-  wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]){
-      withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-                      string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                      string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'RANCHER_EKS_ACCESS_KEY'),
-                      string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'RANCHER_EKS_SECRET_KEY'),
-                      string(credentialsId: 'DO_ACCESSKEY', variable: 'DO_ACCESSKEY'),
-                      string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
-                      string(credentialsId: 'RANCHER_SSH_KEY', variable: 'RANCHER_SSH_KEY'),
-                      string(credentialsId: 'AZURE_SUBSCRIPTION_ID', variable: 'AZURE_SUBSCRIPTION_ID'),
-                      string(credentialsId: 'AZURE_TENANT_ID', variable: 'AZURE_TENANT_ID'),
-                      string(credentialsId: 'AZURE_CLIENT_ID', variable: 'AZURE_CLIENT_ID'),
-                      string(credentialsId: 'AZURE_CLIENT_SECRET', variable: 'AZURE_CLIENT_SECRET'),
-                      string(credentialsId: 'AZURE_SUBSCRIPTION_ID', variable: 'RANCHER_AKS_SUBSCRIPTION_ID'),
-                      string(credentialsId: 'AZURE_TENANT_ID', variable: 'RANCHER_AKS_TENANT_ID'),
-                      string(credentialsId: 'AZURE_CLIENT_ID', variable: 'RANCHER_AKS_CLIENT_ID'),
-                      string(credentialsId: 'AZURE_CLIENT_SECRET', variable: 'RANCHER_AKS_SECRET_KEY'),
-                      string(credentialsId: 'RANCHER_REGISTRY_USER_NAME', variable: 'RANCHER_REGISTRY_USER_NAME'),
-                      string(credentialsId: 'RANCHER_REGISTRY_PASSWORD', variable: 'RANCHER_REGISTRY_PASSWORD'),
-                      string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
-                      string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD'),
-                      string(credentialsId: 'RANCHER_GKE_CREDENTIAL', variable: 'RANCHER_GKE_CREDENTIAL')]) {
-    stage('Checkout') {
-      deleteDir()
-      checkout([
-                $class: 'GitSCM',
-                branches: [[name: "*/${branch}"]],
-                extensions: scm.extensions + [[$class: 'CleanCheckout']],
-                userRemoteConfigs: scm.userRemoteConfigs
-              ])
-    }
-
-    dir ("tests/validation") {
-      stage('Configure and Build') {
-        if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
-          dir(".ssh") {
-            def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
-            writeFile file: AWS_SSH_KEY_NAME, text: decoded
-          }
-        }
-    
-        sh "./tests/v3_api/scripts/configure.sh"
-        sh "./tests/v3_api/scripts/build.sh"
+  wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm', 'defaultFg': 2, 'defaultBg':1]) {
+    withCredentials([ string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'RANCHER_EKS_ACCESS_KEY'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'RANCHER_EKS_SECRET_KEY'),
+                    string(credentialsId: 'DO_ACCESSKEY', variable: 'DO_ACCESSKEY'),
+                    string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
+                    string(credentialsId: 'RANCHER_SSH_KEY', variable: 'RANCHER_SSH_KEY'),
+                    string(credentialsId: 'AZURE_SUBSCRIPTION_ID', variable: 'AZURE_SUBSCRIPTION_ID'),
+                    string(credentialsId: 'AZURE_TENANT_ID', variable: 'AZURE_TENANT_ID'),
+                    string(credentialsId: 'AZURE_CLIENT_ID', variable: 'AZURE_CLIENT_ID'),
+                    string(credentialsId: 'AZURE_CLIENT_SECRET', variable: 'AZURE_CLIENT_SECRET'),
+                    string(credentialsId: 'AZURE_SUBSCRIPTION_ID', variable: 'RANCHER_AKS_SUBSCRIPTION_ID'),
+                    string(credentialsId: 'AZURE_TENANT_ID', variable: 'RANCHER_AKS_TENANT_ID'),
+                    string(credentialsId: 'AZURE_CLIENT_ID', variable: 'RANCHER_AKS_CLIENT_ID'),
+                    string(credentialsId: 'AZURE_CLIENT_SECRET', variable: 'RANCHER_AKS_SECRET_KEY'),
+                    string(credentialsId: 'RANCHER_REGISTRY_USER_NAME', variable: 'RANCHER_REGISTRY_USER_NAME'),
+                    string(credentialsId: 'RANCHER_REGISTRY_PASSWORD', variable: 'RANCHER_REGISTRY_PASSWORD'),
+                    string(credentialsId: 'ADMIN_PASSWORD', variable: 'ADMIN_PASSWORD'),
+                    string(credentialsId: 'USER_PASSWORD', variable: 'USER_PASSWORD'),
+                    string(credentialsId: 'RANCHER_GKE_CREDENTIAL', variable: 'RANCHER_GKE_CREDENTIAL')]) {
+      stage('Checkout') {
+        deleteDir()
+        checkout([
+                  $class: 'GitSCM',
+                  branches: [[name: "*/${branch}"]],
+                  extensions: scm.extensions + [[$class: 'CleanCheckout']],
+                  userRemoteConfigs: scm.userRemoteConfigs
+                ])
       }
-      try {
-        stage('Run Validation Tests') {
-          try {
-            // deploy rancher server
-            sh "docker run --name ${setupContainer} -t --env-file ${envFile} " +
-              "${imageName} /bin/bash -c \'pytest -v -s --junit-xml=${setupResultsOut} " +
-              "${deployPytestOptions} ${testsDir}\'"
-            RANCHER_DEPLOYED = true
 
-            // copy file containing CATTLE_TEST_URL, ADMIN_TOKEN, USER_TOKEN and load into environment variables
-            sh "docker cp ${setupContainer}:${rootPath}${testsDir}${rancherConfig} ."
-            load rancherConfig
+      dir ("tests/validation") {
+        try {
+          stage('Configure and Build') {
+            if (env.AWS_SSH_PEM_KEY && env.AWS_SSH_KEY_NAME) {
+              dir(".ssh") {
+                def decoded = new String(AWS_SSH_PEM_KEY.decodeBase64())
+                writeFile file: AWS_SSH_KEY_NAME, text: decoded
+              }
+            }
+        
+            sh "./tests/v3_api/scripts/configure.sh"
+            sh "./tests/v3_api/scripts/build.sh"
+          }
+        
+          stage('Deploy Rancher Server') {
+            try {
+              // deploy rancher server
+              sh "docker run --name ${setupContainer} -t --env-file ${envFile} " +
+                "${imageName} /bin/bash -c \'pytest -v -s --junit-xml=${setupResultsOut} " +
+                "${deployPytestOptions} ${testsDir}\'"
+              RANCHER_DEPLOYED = true
 
-            // run tests
-            sh "docker run --name ${testContainer} -t --env-file ${envFile} " +
-              "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} " +
-              "&& export ADMIN_TOKEN=${env.ADMIN_TOKEN} && export USER_TOKEN=${env.USER_TOKEN} "+
-              "&& export RANCHER_CLUSTER_NAME=${env.CLUSTER_NAME} " + "&& pytest -v -s --junit-xml=${testResultsOut} " +
-              "${PYTEST_OPTIONS} ${testsDir}\'"
-          } catch(err) {
-            RANCHER_DEPLOYED = false
-            echo "Error: " + err
-            echo 'Test run had failures. Collecting results...'
-          }finally {
-        stage('Delete Rancher Server') {
-          try {
-             if (env.RANCHER_DELETE_SERVER.toLowerCase() == "true" && RANCHER_DEPLOYED) {
+              // copy file containing CATTLE_TEST_URL, ADMIN_TOKEN, USER_TOKEN and load into environment variables
+              sh "docker cp ${setupContainer}:${rootPath}${testsDir}${rancherConfig} ."
+              load rancherConfig
+              
+            } catch(err) {
+              echo "Error: " + err
+              RANCHER_DEPLOYED = false
+            }
+          }
+
+          stage('Run Validation Tests') {
+            try { 
+              // run tests
+              sh "docker run --name ${testContainer} -t --env-file ${envFile} " +
+                "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} " +
+                "&& export ADMIN_TOKEN=${env.ADMIN_TOKEN} && export USER_TOKEN=${env.USER_TOKEN} "+
+                "&& export RANCHER_CLUSTER_NAME=${env.CLUSTER_NAME} " + "&& pytest -v -s --junit-xml=${testResultsOut} " +
+                "${PYTEST_OPTIONS} ${testsDir}\'"
+            } catch(err) {
+              echo "Error: " + err
+              echo 'Test run had failures. Collecting results...'
+            }
+          }
+        } catch(err) {
+          echo "Error: " + err
+        } finally {
+          stage('Delete Rancher Server') {
+            try {
+              if (env.RANCHER_DELETE_SERVER.toLowerCase() == "true" && RANCHER_DEPLOYED) {
                 sh "docker run --name ${deleteContainer} -t --env-file ${envFile} " +
                 "${imageName} /bin/bash -c \'export CATTLE_TEST_URL=${env.CATTLE_TEST_URL} && " +
-                "export ADMIN_TOKEN=${env.ADMIN_TOKEN} && export USER_TOKEN=${env.USER_TOKEN} &&"+
-                 "pytest -v -s --junit-xml=${deleteResultsOut} " +
+                "export ADMIN_TOKEN=${env.ADMIN_TOKEN} && export USER_TOKEN=${env.USER_TOKEN} && "+
+                "pytest -v -s --junit-xml=${deleteResultsOut} " +
                 "${deletePytestOptions} ${testsDir}\'"
-                }
-            else {
-              echo "Rancher server not deployed, skipping delete."
+                sh "docker cp ${deleteContainer}:${rootPath}${deleteResultsOut} ."
+                step([$class: 'JUnitResultArchiver', testResults: "**/${deleteResultsOut}"])
+              }
+              else {
+                echo "Rancher server not deployed, skipping delete."
+              }
+            } catch(err) {
+              echo "Error: " + err
+              currentBuild.result = 'FAILURE'
             }
-          } catch(err) {
-            echo "Error: " + err
-            currentBuild.result = 'FAILURE'
           }
-        }
-      }
-      }
-        stage('Test Report') {
-          // copy and archive test results
-          sh "docker cp ${setupContainer}:${rootPath}${setupResultsOut} ."
-          sh "docker cp ${testContainer}:${rootPath}${testResultsOut} ."
-          sh "docker cp ${deleteContainer}:${rootPath}${deleteResultsOut} ."
+          
+          stage('Test Report') {
+            // copy and archive test results
+            sh "docker cp ${setupContainer}:${rootPath}${setupResultsOut} ."
+            sh "docker cp ${testContainer}:${rootPath}${testResultsOut} ."
+            step([$class: 'JUnitResultArchiver', testResults: "**/${setupResultsOut}"])
+            step([$class: 'JUnitResultArchiver', testResults: "**/${testResultsOut}"])
+          }
 
-          step([$class: 'JUnitResultArchiver', testResults: "**/${setupResultsOut}"])
-          step([$class: 'JUnitResultArchiver', testResults: "**/${testResultsOut}"])
-          step([$class: 'JUnitResultArchiver', testResults: "**/${deleteResultsOut}"])
+          sh "docker stop ${setupContainer}"
+          sh "docker stop ${testContainer}"
+          sh "docker stop ${deleteContainer}"
 
           sh "docker rm -v ${setupContainer}"
           sh "docker rm -v ${testContainer}"
           sh "docker rm -v ${deleteContainer}"
+
           sh "docker rmi ${imageName}"
-        }
-      } catch(err){
-        sh "docker stop ${setupContainer}"
-        sh "docker stop ${testContainer}"
-        sh "docker stop ${deleteContainer}"
-
-        sh "docker rm -v ${setupContainer}"
-        sh "docker rm -v ${testContainer}"
-        sh "docker rm -v ${deleteContainer}"
-
-        sh "docker rmi ${imageName}"
-      }
-    }
-  }
-}
-}
+        } // finally
+      } // dir 
+    } // creds
+  } // wrap 
+} // node
