@@ -516,3 +516,28 @@ class AmazonWebServices(CloudProviderBase):
                 password = rsa.decrypt(password,priv).decode('utf-8')
 
         return password
+
+    def get_ebs_volumes(self, provider_node_id):
+        node_filter = [{
+            'Name': 'attachment.instance-id', 'Values': [provider_node_id]}]
+        try:
+            response = self._client.describe_volumes(Filters=node_filter)
+            volumes = response.get('Volumes', [])
+            return volumes
+        except (Boto3Error, RuntimeError) as e:
+            msg = "Failed while querying instance '{}' volumes!: {}".format(
+                provider_node_id, str(e))
+            raise RuntimeError(msg)
+
+    def get_security_group_name(self, security_group_id):
+        security_group_filter = [{
+            'Name': 'group-id', 'Values': [security_group_id]}]
+        try:
+            response = self._client.describe_security_groups(Filters=security_group_filter)
+            security_groups = response.get('SecurityGroups', [])
+            if len(security_groups) > 0:
+                return security_groups[0]['GroupName']
+        except Boto3Error as e:
+            msg = "Failed while querying security group name for '{}' in region {}: {}".format(
+                security_group_id, AWS_REGION, str(e))
+            raise RuntimeError(msg)

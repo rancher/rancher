@@ -660,7 +660,8 @@ def test_delete_cluster():
 
 
 def validate_rke_dm_host_1(node_template,
-                           rancherKubernetesEngineConfig=rke_config):
+                           rancherKubernetesEngineConfig=rke_config,
+                           attemptDelete=True):
     client = get_user_client()
     nodes = []
     node_name = random_node_name()
@@ -672,9 +673,12 @@ def validate_rke_dm_host_1(node_template,
             "quantity": 1,
             "clusterId": None}
     nodes.append(node)
-    cluster, node_pools = create_and_vaildate_cluster(
+    cluster, node_pools = create_and_validate_cluster(
         client, nodes, rancherKubernetesEngineConfig)
-    cluster_cleanup(client, cluster)
+    if attemptDelete:
+        cluster_cleanup(client, cluster)
+    else:
+        return cluster, node_pools
 
 
 def validate_rke_dm_host_2(node_template,
@@ -703,7 +707,7 @@ def validate_rke_dm_host_2(node_template,
             "worker": True,
             "quantity": 3}
     nodes.append(node)
-    cluster, node_pools = create_and_vaildate_cluster(
+    cluster, node_pools = create_and_validate_cluster(
         client, nodes, rancherKubernetesEngineConfig, clusterName)
     if attemptDelete:
         cluster_cleanup(client, cluster)
@@ -734,7 +738,7 @@ def validate_rke_dm_host_3(node_template,
             "worker": True,
             "quantity": 3}
     nodes.append(node)
-    cluster, node_pools = create_and_vaildate_cluster(
+    cluster, node_pools = create_and_validate_cluster(
         client, nodes, rancherKubernetesEngineConfig)
     cluster_cleanup(client, cluster)
 
@@ -754,7 +758,7 @@ def validate_rke_dm_host_4(node_template,
             "worker": True,
             "quantity": 1}
     nodes.append(node)
-    cluster, node_pools = create_and_vaildate_cluster(
+    cluster, node_pools = create_and_validate_cluster(
         client, nodes, rancherKubernetesEngineConfig)
     assert len(cluster.nodes()) == 1
     node1 = cluster.nodes().data[0]
@@ -777,7 +781,7 @@ def validate_rke_dm_host_4(node_template,
     cluster_cleanup(client, cluster)
 
 
-def create_and_vaildate_cluster(client, nodes,
+def create_and_validate_cluster(client, nodes,
                                 rancherKubernetesEngineConfig=rke_config,
                                 clusterName=None):
 
