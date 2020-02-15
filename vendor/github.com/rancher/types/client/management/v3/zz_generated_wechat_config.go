@@ -2,6 +2,7 @@ package client
 
 const (
 	WechatConfigType                  = "wechatConfig"
+	WechatConfigFieldAPIURL           = "apiUrl"
 	WechatConfigFieldAgent            = "agent"
 	WechatConfigFieldCorp             = "corp"
 	WechatConfigFieldDefaultRecipient = "defaultRecipient"
@@ -11,6 +12,7 @@ const (
 )
 
 type WechatConfig struct {
+	APIURL           string `json:"apiUrl,omitempty" yaml:"apiUrl,omitempty"`
 	Agent            string `json:"agent,omitempty" yaml:"agent,omitempty"`
 	Corp             string `json:"corp,omitempty" yaml:"corp,omitempty"`
 	DefaultRecipient string `json:"defaultRecipient,omitempty" yaml:"defaultRecipient,omitempty"`
