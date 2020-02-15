@@ -1,8 +1,53 @@
-import pytest
+"""
+This test suite contains tests to validate ingress create/edit/delete with
+different possible way and with different roles of users.
+Test requirement:
+Below Env variables need to set
+CATTLE_TEST_URL - url to rancher server
+ADMIN_TOKEN - Admin token from rancher
+USER_TOKEN - User token from rancher
+RANCHER_CLUSTER_NAME - Cluster name to run test on
+RANCHER_TEST_RBAC - Boolean (Optional), To run role based tests.
+"""
 
-from .common import *  # NOQA
+from .common import CLUSTER_MEMBER
+from .common import CLUSTER_OWNER
+from .common import PROJECT_READ_ONLY
+from .common import PROJECT_OWNER
+from .common import PROJECT_MEMBER
+from .common import TEST_IMAGE
+from .common import random_test_name
+from .common import validate_workload
+from .common import get_schedulable_nodes
+from .common import validate_ingress
+from .common import wait_for_pods_in_workload
+from .common import validate_ingress_using_endpoint
+from .common import rbac_get_user_token_by_role
+from .common import pytest
+from .common import rbac_get_project
+from .common import rbac_get_namespace
+from .common import if_test_rbac
+from .common import get_project_client_for_token
+from .common import ApiError
+from .common import time
+from .common import get_user_client_and_cluster
+from .common import create_kubeconfig
+from .common import create_project_and_ns
+from .common import USER_TOKEN
+from .common import get_user_client
+from .common import DEFAULT_TIMEOUT
+from .common import rbac_get_workload
+from .common import wait_for_ingress_to_active
+
 
 namespace = {"p_client": None, "ns": None, "cluster": None, "project": None}
+rbac_role_list = [
+                  CLUSTER_OWNER,
+                  CLUSTER_MEMBER,
+                  PROJECT_OWNER,
+                  PROJECT_MEMBER,
+                  PROJECT_READ_ONLY
+                 ]
 
 
 def test_ingress():
@@ -319,6 +364,132 @@ def test_ingress_xip_io():
                                       namespaceId=ns.id,
                                       rules=[rule])
     validate_ingress_using_endpoint(namespace["p_client"], ingress, [workload])
+
+
+@if_test_rbac
+@pytest.mark.parametrize("role", rbac_role_list)
+def test_rbac_ingress_create(role):
+    """
+    This test creates first workload as cluster owner and then creates ingress
+    as user i.e. role in parameter and validates the ingress created.
+    @param role: User role in rancher eg. project owner, project member etc
+    """
+    token = rbac_get_user_token_by_role(role)
+    project = rbac_get_project()
+    ns = rbac_get_namespace()
+    workload = rbac_get_workload()
+    p_client = get_project_client_for_token(project, token)
+    name = random_test_name("default")
+
+    host = "xip.io"
+    rule = {"host": host,
+            "paths": [{"workloadIds": [workload.id], "targetPort": "80"}]}
+    if role in (CLUSTER_MEMBER, PROJECT_READ_ONLY):
+        with pytest.raises(ApiError) as e:
+            p_client.create_ingress(name=name,
+                                    namespaceId=ns.id,
+                                    rules=[rule])
+        assert e.value.error.status == 403
+        assert e.value.error.code == 'Forbidden'
+    else:
+        ingress = p_client.create_ingress(name=name,
+                                          namespaceId=ns.id,
+                                          rules=[rule])
+        wait_for_ingress_to_active(p_client, ingress)
+        p_client.delete(ingress)
+
+
+@if_test_rbac
+@pytest.mark.parametrize("role", rbac_role_list)
+def test_rbac_ingress_edit(role):
+    """
+    This test creates two workloads and then creates ingress with two targets
+    and validates it.
+    @param role: User role in rancher eg. project owner, project member etc
+    """
+    c_owner_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
+    token = rbac_get_user_token_by_role(role)
+    project = rbac_get_project()
+    ns = rbac_get_namespace()
+    workload = rbac_get_workload()
+    p_client_for_c_owner = get_project_client_for_token(project, c_owner_token)
+    p_client = get_project_client_for_token(project, token)
+
+    host = "xip.io"
+    path = "/name.html"
+    rule_1 = {"host": host,
+              "paths": [{"workloadIds": [workload.id], "targetPort": "80"}]}
+    rule_2 = {"host": host,
+              "paths": [{"path": path, "workloadIds": [workload.id],
+                         "targetPort": "80"}]}
+    name = random_test_name("default")
+    ingress = p_client_for_c_owner.create_ingress(name=name, namespaceId=ns.id,
+                                                  rules=[rule_1])
+    wait_for_ingress_to_active(p_client_for_c_owner, ingress)
+    if role in (CLUSTER_MEMBER, PROJECT_READ_ONLY):
+        with pytest.raises(ApiError) as e:
+            ingress = p_client.update(ingress, rules=[rule_2])
+            wait_for_ingress_to_active(p_client, ingress)
+        assert e.value.error.status == 403
+        assert e.value.error.code == 'Forbidden'
+    else:
+        ingress = p_client.update(ingress, rules=[rule_2])
+        wait_for_ingress_to_active(p_client, ingress)
+    p_client_for_c_owner.delete(ingress)
+
+
+@if_test_rbac
+@pytest.mark.parametrize("role", rbac_role_list)
+def test_rbac_ingress_delete(role):
+    """
+    This test creates two workloads and then creates ingress with two targets
+    and validates it.
+    @param role: User role in rancher eg. project owner, project member etc
+    """
+    c_owner_token = rbac_get_user_token_by_role(CLUSTER_OWNER)
+    token = rbac_get_user_token_by_role(role)
+    project = rbac_get_project()
+    ns = rbac_get_namespace()
+    workload = rbac_get_workload()
+    p_client_for_c_owner = get_project_client_for_token(project, c_owner_token)
+    p_client = get_project_client_for_token(project, token)
+    name = random_test_name("default")
+
+    host = "xip.io"
+    rule = {"host": host,
+            "paths": [{"workloadIds": [workload.id], "targetPort": "80"}]}
+
+    ingress = p_client_for_c_owner.create_ingress(name=name, namespaceId=ns.id,
+                                                  rules=[rule])
+    wait_for_ingress_to_active(p_client_for_c_owner, ingress)
+    if role in (CLUSTER_MEMBER, PROJECT_READ_ONLY):
+        with pytest.raises(ApiError) as e:
+            p_client.delete(ingress)
+        assert e.value.error.status == 403
+        assert e.value.error.code == 'Forbidden'
+        p_client_for_c_owner.delete(ingress)
+    else:
+        p_client.delete(ingress)
+        validate_ingress_deleted(p_client, ingress)
+
+
+def validate_ingress_deleted(client, ingress, timeout=DEFAULT_TIMEOUT):
+    """
+    Checks whether ingress got deleted successfully.
+    Validates if ingress is null in for current object client.
+    @param client: Object client use to create ingress
+    @param ingress: ingress object subjected to be deleted
+    @param timeout: Max time to keep checking whether ingress is deleted or not
+    """
+    time.sleep(2)
+    start = time.time()
+    ingresses = client.list_ingress(uuid=ingress.uuid).data
+    while len(ingresses) != 0:
+        if time.time() - start > timeout:
+            raise AssertionError(
+                "Timed out waiting for ingress to be deleted")
+        time.sleep(.5)
+        ingresses = client.list_ingress(uuid=ingress.uuid).data
 
 
 @pytest.fixture(scope='module', autouse="True")
