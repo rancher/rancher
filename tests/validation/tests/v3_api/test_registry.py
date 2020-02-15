@@ -145,7 +145,7 @@ def test_edit_registry_all_namespace():
     delete_registry(p_client, registry)
 
 
-def test_cross_namespace_registry_access():
+def test_registry_cross_namespace_access():
     """
     This test creates two namespace and creates registry for first namespace.
     It creates two workload in each namespace.
@@ -165,7 +165,7 @@ def test_cross_namespace_registry_access():
 
 @if_test_rbac
 @pytest.mark.parametrize("role", rbac_role_list)
-def test_rbac_create_registry_single_namespace(role):
+def test_rbac_registry_create_single_namespace(role):
     """
     Creates registry with given role to a single namespace
     Runs only if RANCHER_TEST_RBAC is True in env. variable
@@ -187,7 +187,7 @@ def test_rbac_create_registry_single_namespace(role):
 
 @if_test_rbac
 @pytest.mark.parametrize("role", rbac_role_list)
-def test_create_registry_all_namespace(role):
+def test_rbac_registry_create_all_namespace(role):
     """
     Runs only if RANCHER_TEST_RBAC is True in env. variable.
     Creates registry scoped all namespace and for
@@ -217,7 +217,7 @@ def test_create_registry_all_namespace(role):
 
 @if_test_rbac
 @pytest.mark.parametrize("role", rbac_role_list)
-def test_rbac_delete_registry_single_namespace(role):
+def test_rbac_registry_delete_single_namespace(role):
     """
     Runs only if RANCHER_TEST_RBAC is True in env. variable.
     Creates a registry for single namespace, deploys a workload
@@ -250,7 +250,7 @@ def test_rbac_delete_registry_single_namespace(role):
 
 @if_test_rbac
 @pytest.mark.parametrize("role", rbac_role_list)
-def test_rbac_delete_registry_all_namespace(role):
+def test_rbac_registry_delete_all_namespace(role):
     """
     Runs only if RANCHER_TEST_RBAC is True in env. variable.
     Creates a registry scoped for all namespace, deploys a workload
@@ -285,7 +285,7 @@ def test_rbac_delete_registry_all_namespace(role):
 
 @if_test_rbac
 @pytest.mark.parametrize("role", rbac_role_list)
-def test_rbac_edit_registry_single_namespace(role):
+def test_rbac_registry_edit_single_namespace(role):
     """
     Runs only if RANCHER_TEST_RBAC is True in env. variable.
     Creates registry with invalid credential for single namespace,
@@ -334,7 +334,7 @@ def test_rbac_edit_registry_single_namespace(role):
 
 @if_test_rbac
 @pytest.mark.parametrize("role", rbac_role_list)
-def test_rbac_edit_registry_all_namespace(role):
+def test_rbac_registry_edit_all_namespace(role):
     """
     Runs only if RANCHER_TEST_RBAC is True in env. variable.
     Creates registry with invalid credential scoped for all namespace,
@@ -385,7 +385,7 @@ def test_rbac_edit_registry_all_namespace(role):
 
 
 @if_test_rbac
-def test_rbac_cross_project_registry_access():
+def test_rbac_registry_cross_project_access():
     """
     Get project1 and namespace1 from project owner role
     Creates project2 and namespace2 using same user.
