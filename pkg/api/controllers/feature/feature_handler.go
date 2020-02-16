@@ -11,8 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func Register(ctx context.Context, management *config.ManagementContext) {
-	management.Management.Features("").AddHandler(ctx, "features-restart-handler", sync)
+func Register(ctx context.Context, scaled *config.ScaledContext) {
+	scaled.Management.Features("").AddHandler(ctx, "features-restart-handler", sync)
 }
 
 func sync(key string, obj *v3.Feature) (runtime.Object, error) {
