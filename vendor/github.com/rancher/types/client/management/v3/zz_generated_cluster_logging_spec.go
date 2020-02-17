@@ -8,6 +8,7 @@ const (
 	ClusterLoggingSpecFieldElasticsearchConfig    = "elasticsearchConfig"
 	ClusterLoggingSpecFieldEnableJSONParsing      = "enableJSONParsing"
 	ClusterLoggingSpecFieldFluentForwarderConfig  = "fluentForwarderConfig"
+	ClusterLoggingSpecFieldGraylogConfig          = "graylogConfig"
 	ClusterLoggingSpecFieldIncludeSystemComponent = "includeSystemComponent"
 	ClusterLoggingSpecFieldKafkaConfig            = "kafkaConfig"
 	ClusterLoggingSpecFieldOutputFlushInterval    = "outputFlushInterval"
@@ -23,6 +24,7 @@ type ClusterLoggingSpec struct {
 	ElasticsearchConfig    *ElasticsearchConfig   `json:"elasticsearchConfig,omitempty" yaml:"elasticsearchConfig,omitempty"`
 	EnableJSONParsing      bool                   `json:"enableJSONParsing,omitempty" yaml:"enableJSONParsing,omitempty"`
 	FluentForwarderConfig  *FluentForwarderConfig `json:"fluentForwarderConfig,omitempty" yaml:"fluentForwarderConfig,omitempty"`
+	GraylogConfig          *GraylogConfig         `json:"graylogConfig,omitempty" yaml:"graylogConfig,omitempty"`
 	IncludeSystemComponent *bool                  `json:"includeSystemComponent,omitempty" yaml:"includeSystemComponent,omitempty"`
 	KafkaConfig            *KafkaConfig           `json:"kafkaConfig,omitempty" yaml:"kafkaConfig,omitempty"`
 	OutputFlushInterval    int64                  `json:"outputFlushInterval,omitempty" yaml:"outputFlushInterval,omitempty"`

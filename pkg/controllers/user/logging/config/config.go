@@ -42,6 +42,7 @@ const (
 	Syslog          = "syslog"
 	FluentForwarder = "fluentforwarder"
 	CustomTarget    = "customtarget"
+	Graylog         = "graylog"
 )
 
 const (

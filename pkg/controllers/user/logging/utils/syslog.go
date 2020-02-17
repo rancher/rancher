@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config/dialer"
 )
@@ -20,18 +21,8 @@ func (w *syslogTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog bo
 	//TODO: for udp we can't use cluster dialer now, how to handle in cluster deploy syslog
 	syslogTestData := newRFC5424Message(w.Severity, w.Program, w.Token, testMessage)
 	if w.Protocol == "udp" {
-		conn, err := net.Dial("udp", w.Endpoint)
-		if err != nil {
-			return errors.Wrapf(err, "couldn't dail udp endpoint %s", w.Endpoint)
-		}
-		defer conn.Close()
-
-		if includeSendTestLog {
-			return writeToUDPConn(syslogTestData, w.Endpoint)
-		}
-		return nil
+		return testReachableUDP(includeSendTestLog, w.Endpoint, syslogTestData)
 	}
-
 	var tlsConfig *tls.Config
 	if w.EnableTLS {
 		hostName, _, err := net.SplitHostPort(w.Endpoint)
@@ -44,28 +35,7 @@ func (w *syslogTestWrap) TestReachable(dial dialer.Dialer, includeSendTestLog bo
 			return err
 		}
 	}
-
-	conn, err := newTCPConn(dial, w.Endpoint, tlsConfig, true)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	if !includeSendTestLog {
-		return nil
-	}
-
-	if _, err = conn.Write(syslogTestData); err != nil {
-		return errors.Wrapf(err, "couldn't write data to syslog %s", w.Endpoint)
-	}
-
-	// try read to check whether the server close connect already
-	// because can't set read deadline for remote dialer, so if the error is timeout will treat as remote server not close the connection
-	if _, err := readDataWithTimeout(conn); err != nil && err != errReadDataTimeout {
-		return errors.Wrapf(err, "couldn't read data from syslog %s", w.Endpoint)
-	}
-
-	return nil
+	return testReachableTCP(dial, includeSendTestLog, w.Endpoint, tlsConfig, syslogTestData)
 }
 
 func newRFC5424Message(severityStr, app, token, msg string) []byte {

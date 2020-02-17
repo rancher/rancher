@@ -246,6 +246,10 @@ func GetSSLConfig(target mgmtv3.LoggingTargets) (string, string, string) {
 		certificate = target.CustomTargetConfig.Certificate
 		clientCert = target.CustomTargetConfig.ClientCert
 		clientKey = target.CustomTargetConfig.ClientKey
+	} else if target.GraylogConfig != nil {
+		certificate = target.GraylogConfig.Certificate
+		clientCert = target.GraylogConfig.ClientCert
+		clientKey = target.GraylogConfig.ClientKey
 	}
 
 	return certificate, clientCert, clientKey

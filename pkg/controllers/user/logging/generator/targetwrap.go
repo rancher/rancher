@@ -21,6 +21,7 @@ type LoggingTargetTemplateWrap struct {
 	KafkaTemplateWrap
 	FluentForwarderTemplateWrap
 	CustomTargetWrap
+	GraylogTemplateWrap
 }
 
 type ClusterLoggingTemplateWrap struct {
@@ -164,6 +165,12 @@ type CustomTargetWrap struct {
 	v3.CustomTargetConfig
 }
 
+type GraylogTemplateWrap struct {
+	v3.GraylogConfig
+	Host string
+	Port string
+}
+
 func NewLoggingTargetTemplateWrap(loggingTagets v3.LoggingTargets) (wrapLogging *LoggingTargetTemplateWrap, err error) {
 	wp := &LoggingTargetTemplateWrap{}
 	if loggingTagets.ElasticsearchConfig != nil {
@@ -214,6 +221,16 @@ func NewLoggingTargetTemplateWrap(loggingTagets v3.LoggingTargets) (wrapLogging 
 		}
 		wp.FluentForwarderTemplateWrap = *wrap
 		wp.CurrentTarget = loggingconfig.FluentForwarder
+		return wp, nil
+
+	} else if loggingTagets.GraylogConfig != nil {
+
+		wrap, err := newGraylogTemplateWrap(loggingTagets.GraylogConfig)
+		if err != nil {
+			return nil, err
+		}
+		wp.GraylogTemplateWrap = *wrap
+		wp.CurrentTarget = loggingconfig.Graylog
 		return wp, nil
 
 	} else if loggingTagets.CustomTargetConfig != nil {
@@ -328,6 +345,18 @@ func newFluentForwarderTemplateWrap(fluentForwarderConfig *v3.FluentForwarderCon
 		FluentForwarderConfig: *fluentForwarderConfig,
 		EnableShareKey:        enableShareKey,
 		FluentServers:         fss,
+	}, nil
+}
+
+func newGraylogTemplateWrap(graylogConfig *v3.GraylogConfig) (*GraylogTemplateWrap, error) {
+	host, port, err := net.SplitHostPort(graylogConfig.Endpoint)
+	if err != nil {
+		return nil, err
+	}
+	return &GraylogTemplateWrap{
+		GraylogConfig: *graylogConfig,
+		Host:          host,
+		Port:          port,
 	}, nil
 }
 

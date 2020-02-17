@@ -51,6 +51,7 @@ type LoggingTargets struct {
 	SyslogConfig          *SyslogConfig          `json:"syslogConfig,omitempty"`
 	FluentForwarderConfig *FluentForwarderConfig `json:"fluentForwarderConfig,omitempty"`
 	CustomTargetConfig    *CustomTargetConfig    `json:"customTargetConfig,omitempty"`
+	GraylogConfig         *GraylogConfig         `json:"graylogConfig,omitempty"`
 }
 
 type ClusterLoggingSpec struct {
@@ -175,6 +176,16 @@ type CustomTargetConfig struct {
 	Certificate string `json:"certificate,omitempty"`
 	ClientCert  string `json:"clientCert,omitempty"`
 	ClientKey   string `json:"clientKey,omitempty"`
+}
+
+type GraylogConfig struct {
+	Endpoint    string `json:"endpoint,omitempty" norman:"required"`
+	Protocol    string `json:"protocol,omitempty" norman:"default=udp,type=enum,options=udp|tcp"`
+	EnableTLS   bool   `json:"enableTls,omitempty" norman:"default=false"`
+	Certificate string `json:"certificate,omitempty"`
+	ClientCert  string `json:"clientCert,omitempty"`
+	ClientKey   string `json:"clientKey,omitempty"`
+	SSLVerify   bool   `json:"sslVerify,omitempty"`
 }
 
 type ClusterTestInput struct {

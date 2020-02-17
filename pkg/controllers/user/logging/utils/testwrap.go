@@ -51,6 +51,8 @@ func NewLoggingTargetTestWrap(loggingTargets v3.LoggingTargets) LoggingTargetTes
 		return &kafkaTestWrap{loggingTargets.KafkaConfig}
 	} else if loggingTargets.FluentForwarderConfig != nil {
 		return &fluentForwarderTestWrap{loggingTargets.FluentForwarderConfig}
+	} else if loggingTargets.GraylogConfig != nil {
+		return &graylogTestWrap{loggingTargets.GraylogConfig}
 	} else if loggingTargets.CustomTargetConfig != nil {
 		return &customTargetTestWrap{loggingTargets.CustomTargetConfig}
 	}
@@ -80,6 +82,43 @@ func testReachableHTTP(dial dialer.Dialer, req *http.Request, tlsConfig *tls.Con
 			return errors.Wrapf(err, "couldn't read response body from %s, response code is %v", req.URL.String(), res.StatusCode)
 		}
 		return fmt.Errorf("response code from %s is %v, not include in the 2xx success HTTP status codes, response body: %s", req.URL.String(), res.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+func testReachableUDP(includeSendTestLog bool, endpoint string, testData []byte) error {
+	conn, err := net.Dial("udp", endpoint)
+	if err != nil {
+		return errors.Wrapf(err, "couldn't dail udp endpoint %s", endpoint)
+	}
+	defer conn.Close()
+
+	if includeSendTestLog {
+		return writeToUDPConn(testData, endpoint)
+	}
+	return nil
+}
+
+func testReachableTCP(dial dialer.Dialer, includeSendTestLog bool, endpoint string, tlsConfig *tls.Config, testData []byte) error {
+	conn, err := newTCPConn(dial, endpoint, tlsConfig, true)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	if !includeSendTestLog {
+		return nil
+	}
+
+	if _, err = conn.Write(testData); err != nil {
+		return errors.Wrapf(err, "couldn't write data to tcp endpoint %s", endpoint)
+	}
+
+	// try read to check whether the server close connect already
+	// because can't set read deadline for remote dialer, so if the error is timeout will treat as remote server not close the connection
+	if _, err := readDataWithTimeout(conn); err != nil && err != errReadDataTimeout {
+		return errors.Wrapf(err, "couldn't read data from tcp endpoint %s", endpoint)
 	}
 
 	return nil
