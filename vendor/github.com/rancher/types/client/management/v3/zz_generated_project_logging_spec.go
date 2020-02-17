@@ -7,6 +7,7 @@ const (
 	ProjectLoggingSpecFieldElasticsearchConfig   = "elasticsearchConfig"
 	ProjectLoggingSpecFieldEnableJSONParsing     = "enableJSONParsing"
 	ProjectLoggingSpecFieldFluentForwarderConfig = "fluentForwarderConfig"
+	ProjectLoggingSpecFieldGraylogConfig         = "graylogConfig"
 	ProjectLoggingSpecFieldKafkaConfig           = "kafkaConfig"
 	ProjectLoggingSpecFieldOutputFlushInterval   = "outputFlushInterval"
 	ProjectLoggingSpecFieldOutputTags            = "outputTags"
@@ -21,6 +22,7 @@ type ProjectLoggingSpec struct {
 	ElasticsearchConfig   *ElasticsearchConfig   `json:"elasticsearchConfig,omitempty" yaml:"elasticsearchConfig,omitempty"`
 	EnableJSONParsing     bool                   `json:"enableJSONParsing,omitempty" yaml:"enableJSONParsing,omitempty"`
 	FluentForwarderConfig *FluentForwarderConfig `json:"fluentForwarderConfig,omitempty" yaml:"fluentForwarderConfig,omitempty"`
+	GraylogConfig         *GraylogConfig         `json:"graylogConfig,omitempty" yaml:"graylogConfig,omitempty"`
 	KafkaConfig           *KafkaConfig           `json:"kafkaConfig,omitempty" yaml:"kafkaConfig,omitempty"`
 	OutputFlushInterval   int64                  `json:"outputFlushInterval,omitempty" yaml:"outputFlushInterval,omitempty"`
 	OutputTags            map[string]string      `json:"outputTags,omitempty" yaml:"outputTags,omitempty"`
