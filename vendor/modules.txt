@@ -320,7 +320,7 @@ github.com/rancher/dynamiclistener/server
 github.com/rancher/dynamiclistener/storage/file
 github.com/rancher/dynamiclistener/storage/kubernetes
 github.com/rancher/dynamiclistener/storage/memory
-# github.com/rancher/kontainer-driver-metadata v0.0.0-20200129225622-a00843f74fed
+# github.com/rancher/kontainer-driver-metadata v0.0.0-20200218183853-2f58a2f30054
 github.com/rancher/kontainer-driver-metadata/rke
 github.com/rancher/kontainer-driver-metadata/rke/templates
 # github.com/rancher/kontainer-engine v0.0.4-dev.0.20200123235809-1b6d4a82a415
@@ -397,7 +397,7 @@ github.com/rancher/rdns-server/model
 # github.com/rancher/remotedialer v0.2.5
 github.com/rancher/remotedialer
 github.com/rancher/remotedialer/metrics
-# github.com/rancher/rke v1.1.0-rc4.0.20200205094053-56d4c1b93702
+# github.com/rancher/rke v1.1.0-rc6
 github.com/rancher/rke/addons
 github.com/rancher/rke/authz
 github.com/rancher/rke/cloudprovider
@@ -453,7 +453,7 @@ github.com/rancher/steve/pkg/server/resources/common
 github.com/rancher/steve/pkg/server/resources/counts
 github.com/rancher/steve/pkg/server/router
 github.com/rancher/steve/pkg/server/store/proxy
-# github.com/rancher/types v0.0.0-20200214232147-540555f93bc1
+# github.com/rancher/types v0.0.0-20200218191331-dc762fc27c91
 github.com/rancher/types/apis/apiregistration.k8s.io/v1
 github.com/rancher/types/apis/apps/v1
 github.com/rancher/types/apis/autoscaling/v2beta2
@@ -754,7 +754,7 @@ gopkg.in/ini.v1
 gopkg.in/ldap.v2
 # gopkg.in/natefinch/lumberjack.v2 v2.0.0
 gopkg.in/natefinch/lumberjack.v2
-# gopkg.in/yaml.v2 v2.2.4
+# gopkg.in/yaml.v2 v2.2.5
 gopkg.in/yaml.v2
 # k8s.io/api v0.17.2 => k8s.io/api v0.17.2
 k8s.io/api/admissionregistration/v1
@@ -1118,6 +1118,8 @@ k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1beta1
 # k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a
 k8s.io/kube-openapi/pkg/common
 k8s.io/kube-openapi/pkg/util/proto
+# k8s.io/kubectl v0.17.2 => k8s.io/kubectl v0.17.2
+k8s.io/kubectl/pkg/drain
 # k8s.io/kubernetes v1.17.2 => k8s.io/kubernetes v1.17.2
 k8s.io/kubernetes/pkg/api/service
 k8s.io/kubernetes/pkg/api/v1/pod

@@ -97,9 +97,16 @@ metadata:
   labels:
     k8s-app: metrics-server
 spec:
+{{if .Replicas}}
+  replicas: {{.Replicas}}
+{{end}}
   selector:
     matchLabels:
       k8s-app: metrics-server
+{{if .UpdateStrategy}}
+  strategy:
+{{ toYaml .UpdateStrategy | indent 4}}
+{{end}}
   template:
     metadata:
       name: metrics-server

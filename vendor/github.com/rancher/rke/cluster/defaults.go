@@ -16,8 +16,10 @@ import (
 	"github.com/rancher/rke/util"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	apiserverv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 )
@@ -76,6 +78,29 @@ const (
 	KubeAPIArgAuditPolicyFile             = "audit-policy-file"
 	DefaultKubeAPIArgAuditLogPathValue    = "/var/log/kube-audit/audit-log.json"
 	DefaultKubeAPIArgAuditPolicyFileValue = "/etc/kubernetes/audit-policy.yaml"
+
+	DefaultMaxUnavailable            = "10%"
+	DefaultNodeDrainTimeout          = 120
+	DefaultNodeDrainGracePeriod      = -1
+	DefaultNodeDrainIgnoreDaemonsets = true
+)
+
+var (
+	DefaultDaemonSetMaxUnavailable        = intstr.FromInt(1)
+	DefaultDeploymentUpdateStrategyParams = intstr.FromString("25%")
+	DefaultDaemonSetUpdateStrategy        = appsv1.DaemonSetUpdateStrategy{
+		Type:          appsv1.RollingUpdateDaemonSetStrategyType,
+		RollingUpdate: &appsv1.RollingUpdateDaemonSet{MaxUnavailable: &DefaultDaemonSetMaxUnavailable},
+	}
+	DefaultDeploymentUpdateStrategy = appsv1.DeploymentStrategy{
+		Type: appsv1.RollingUpdateDeploymentStrategyType,
+		RollingUpdate: &appsv1.RollingUpdateDeployment{
+			MaxUnavailable: &DefaultDeploymentUpdateStrategyParams,
+			MaxSurge:       &DefaultDeploymentUpdateStrategyParams,
+		},
+	}
+	DefaultClusterProportionalAutoscalerLinearParams = v3.LinearAutoscalerParams{CoresPerReplica: 128, NodesPerReplica: 4, Min: 1, PreventSinglePointFailure: true}
+	DefaultMonitoringAddonReplicas                   = int32(1)
 )
 
 type ExternalFlags struct {
@@ -188,8 +213,33 @@ func (c *Cluster) setClusterDefaults(ctx context.Context, flags ExternalFlags) e
 	c.setClusterServicesDefaults()
 	c.setClusterNetworkDefaults()
 	c.setClusterAuthnDefaults()
-
+	c.setNodeUpgradeStrategy()
+	c.setAddonsDefaults()
 	return nil
+}
+
+func (c *Cluster) setNodeUpgradeStrategy() {
+	if c.UpgradeStrategy == nil {
+		logrus.Info("No input provided for maxUnavailable, setting it to default value of 10%")
+		c.UpgradeStrategy = &v3.NodeUpgradeStrategy{
+			MaxUnavailable: DefaultMaxUnavailable,
+		}
+		return
+	}
+	setDefaultIfEmpty(&c.UpgradeStrategy.MaxUnavailable, DefaultMaxUnavailable)
+	if !c.UpgradeStrategy.Drain {
+		return
+	}
+	if c.UpgradeStrategy.DrainInput == nil {
+		c.UpgradeStrategy.DrainInput = &v3.NodeDrainInput{
+			IgnoreDaemonSets: DefaultNodeDrainIgnoreDaemonsets,
+			// default to 120 seems to work better for controlplane nodes
+			Timeout: DefaultNodeDrainTimeout,
+			//Period of time in seconds given to each pod to terminate gracefully.
+			// If negative, the default value specified in the pod will be used
+			GracePeriod: DefaultNodeDrainGracePeriod,
+		}
+	}
 }
 
 func (c *Cluster) setClusterServicesDefaults() {
@@ -537,4 +587,43 @@ func GetExternalFlags(local, updateOnly, disablePortCheck bool, configDir, clust
 		ConfigDir:        configDir,
 		ClusterFilePath:  clusterFilePath,
 	}
+}
+
+func (c *Cluster) setAddonsDefaults() {
+	c.Ingress.UpdateStrategy = setDaemonsetAddonDefaults(c.Ingress.UpdateStrategy)
+	c.Network.UpdateStrategy = setDaemonsetAddonDefaults(c.Network.UpdateStrategy)
+	c.DNS.UpdateStrategy = setDeploymentAddonDefaults(c.DNS.UpdateStrategy)
+	if c.DNS.LinearAutoscalerParams == nil {
+		c.DNS.LinearAutoscalerParams = &DefaultClusterProportionalAutoscalerLinearParams
+	}
+	c.Monitoring.UpdateStrategy = setDeploymentAddonDefaults(c.Monitoring.UpdateStrategy)
+	if c.Monitoring.Replicas == nil {
+		c.Monitoring.Replicas = &DefaultMonitoringAddonReplicas
+	}
+}
+
+func setDaemonsetAddonDefaults(updateStrategy *appsv1.DaemonSetUpdateStrategy) *appsv1.DaemonSetUpdateStrategy {
+	if updateStrategy != nil && updateStrategy.Type != appsv1.RollingUpdateDaemonSetStrategyType {
+		return updateStrategy
+	}
+	if updateStrategy == nil || updateStrategy.RollingUpdate == nil || updateStrategy.RollingUpdate.MaxUnavailable == nil {
+		return &DefaultDaemonSetUpdateStrategy
+	}
+	return updateStrategy
+}
+
+func setDeploymentAddonDefaults(updateStrategy *appsv1.DeploymentStrategy) *appsv1.DeploymentStrategy {
+	if updateStrategy != nil && updateStrategy.Type != appsv1.RollingUpdateDeploymentStrategyType {
+		return updateStrategy
+	}
+	if updateStrategy == nil || updateStrategy.RollingUpdate == nil {
+		return &DefaultDeploymentUpdateStrategy
+	}
+	if updateStrategy.RollingUpdate.MaxUnavailable == nil {
+		updateStrategy.RollingUpdate.MaxUnavailable = &DefaultDeploymentUpdateStrategyParams
+	}
+	if updateStrategy.RollingUpdate.MaxSurge == nil {
+		updateStrategy.RollingUpdate.MaxSurge = &DefaultDeploymentUpdateStrategyParams
+	}
+	return updateStrategy
 }

@@ -195,9 +195,13 @@ spec:
           hostPath:
             path: /opt/cni/bin
   updateStrategy:
+{{if .UpdateStrategy}}
+{{ toYaml .UpdateStrategy | indent 4}}
+{{else}}
+    type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 20%
-    type: RollingUpdate
+{{end}}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -449,9 +453,13 @@ spec:
           hostPath:
             path: /opt/cni/bin
   updateStrategy:
+{{if .UpdateStrategy}}
+{{ toYaml .UpdateStrategy | indent 4}}
+{{else}}
+    type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 20%
-    type: RollingUpdate
+{{end}}
 `
 
 const FlannelTemplateV116 = `
@@ -700,7 +708,11 @@ spec:
           hostPath:
             path: /opt/cni/bin
   updateStrategy:
+{{if .UpdateStrategy}}
+{{ toYaml .UpdateStrategy | indent 4}}
+{{else}}
+    type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 20%
-    type: RollingUpdate
+{{end}}
 `
