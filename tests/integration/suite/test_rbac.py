@@ -422,6 +422,7 @@ def test_permissions_can_be_removed(admin_cc, admin_mc, user_mc, request,
             projectId=admin_pc_instance.project.id,
         )
         remove_resource(prtb)
+        wait_until_available(user_mc.client, admin_pc_instance.project)
         return admin_pc_instance, prtb
 
     admin_pc1, _ = create_project_and_add_user()
@@ -451,17 +452,16 @@ def test_permissions_can_be_removed(admin_cc, admin_mc, user_mc, request,
         return ClusterContext(user_mc, cluster, client)
 
     user_cc = new_user_cc(user_mc)
-    assert len(user_cc.client.list_namespace()) == 1
+    wait_for(lambda: ns_count(user_cc.client, 1), timeout=60)
 
     add_namespace_to_project(admin_pc2)
 
     user_cc = new_user_cc(user_mc)
-    assert len(user_cc.client.list_namespace()) == 2
-
+    wait_for(lambda: ns_count(user_cc.client, 2), timeout=60)
     admin_mc.client.delete(prtb2)
 
     user_cc = new_user_cc(user_mc)
-    wait_for(lambda: ns_count(user_cc.client, 1), timeout=30)
+    wait_for(lambda: ns_count(user_cc.client, 1), timeout=60)
 
 
 def ns_count(client, count):
