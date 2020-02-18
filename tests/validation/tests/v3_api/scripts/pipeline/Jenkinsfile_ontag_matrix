@@ -164,6 +164,7 @@ if ( true == via_webhook() && (!(rancher_version ==~ rancher_version_regex)) ) {
                     jobs["ec2"] = { build job: 'rancher-v3_ontag_ec2_certification', parameters: params }
                     jobs["az"] = { build job: 'rancher-v3_ontag_az_certification', parameters: params }
                     jobs["custom"] = { build job: 'rancher-v3_ontag_custom_certification', parameters: params}
+                    jobs["windows"] = { build job: 'rancher-v3_ontag_windows_certification', parameters: params}
 
                     // Rancher server 2 is used to test GKE, EKS, AKS and Imported clusters
                     jobs["gke"] = { build job: 'rancher-v3_ontag_gke_certification', parameters: params2 }

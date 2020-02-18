@@ -32,7 +32,47 @@ rke_config = {
     "network":
         {"plugin": "canal",
          "type": "networkConfig",
-         "options": {"flannelBackendType": "vxlan"}},
+         "options": {"flannel_backend_type": "vxlan"}},
+    "services": {
+        "etcd": {
+            "extraArgs":
+                {"heartbeat-interval": 500,
+                 "election-timeout": 5000},
+            "snapshot": False,
+            "backupConfig":
+                {"intervalHours": 12, "retention": 6, "type": "backupConfig"},
+            "creation": "12h",
+            "retention": "72h",
+            "type": "etcdService"},
+        "kubeApi": {
+            "alwaysPullImages": False,
+            "podSecurityPolicy": False,
+            "serviceNodePortRange": "30000-32767",
+            "type": "kubeAPIService"}},
+    "sshAgentAuth": False}
+
+rke_config_windows = {
+    "addonJobTimeout": 30,
+    "authentication":
+    {"strategy": "x509",
+     "type": "authnConfig"},
+    "ignoreDockerVersion": True,
+    "ingress":
+        {"provider": "nginx",
+         "type": "ingressConfig"},
+    "monitoring":
+        {"provider": "metrics-server",
+         "type": "monitoringConfig"},
+    "network": {
+      "mtu": 0,
+      "plugin": "flannel",
+      "type": "networkConfig",
+      "options": {
+        "flannel_backend_type": "vxlan",
+        "flannel_backend_port": "4789",
+        "flannel_backend_vni": "4096"
+      }
+    },
     "services": {
         "etcd": {
             "extraArgs":
@@ -66,7 +106,7 @@ rke_config_cis = {
     "network":
         {"plugin": "canal",
          "type": "networkConfig",
-         "options": {"flannelBackendType": "vxlan"}},
+         "options": {"flannel_backend_type": "vxlan"}},
     "services": {
         "etcd": {
             "extraArgs":
@@ -976,21 +1016,41 @@ def create_and_validate_custom_host(node_roles, random_cluster_name=False):
         AmazonWebServices().create_multiple_nodes(
             len(node_roles), random_test_name(HOST_NAME))
 
+    cluster, nodes = create_custom_host_from_nodes(aws_nodes, node_roles, random_cluster_name)
+    cluster = validate_cluster(client, cluster, check_intermediate_state=False, k8s_version=K8S_VERSION)
+    return cluster, nodes
+
+
+def create_custom_host_from_nodes(nodes, node_roles, random_cluster_name=False, windows=False):
     client = get_user_client()
     cluster_name = random_name() if random_cluster_name \
         else evaluate_clustername()
+    
+    if windows:
+        config = rke_config_windows
+    else:
+        config = rke_config
+
     cluster = client.create_cluster(name=cluster_name,
                                     driver="rancherKubernetesEngine",
-                                    rancherKubernetesEngineConfig=rke_config)
+                                    rancherKubernetesEngineConfig=config,
+                                    windowsPreferedCluster=windows)
     assert cluster.state == "provisioning"
+    
     i = 0
-    for aws_node in aws_nodes:
+    for aws_node in nodes:
         docker_run_cmd = \
             get_custom_host_registration_cmd(client, cluster, node_roles[i],
                                              aws_node)
+        print("Docker run command: " + docker_run_cmd)
+
         for nr in node_roles[i]:
             aws_node.roles.append(nr)
-        aws_node.execute_command(docker_run_cmd)
+        
+        result = aws_node.execute_command(docker_run_cmd)
+        print(result)
         i += 1
-    cluster = validate_cluster(client, cluster, k8s_version=K8S_VERSION)
-    return cluster, aws_nodes
+
+    cluster = validate_cluster_state(client, cluster, check_intermediate_state=False)
+    
+    return cluster, nodes

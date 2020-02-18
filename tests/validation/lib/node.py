@@ -41,6 +41,15 @@ class Node(object):
         self._ssh_client = paramiko.SSHClient()
         self._ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.ssh_port = '22'
+        self._ssh_password = None
+
+    @property
+    def ssh_password(self):
+        return self._ssh_password
+    
+    @ssh_password.setter
+    def ssh_password(self, password):
+        self._ssh_password = password
 
     @property
     def roles(self):
@@ -51,7 +60,7 @@ class Node(object):
         self._roles = r
 
     def wait_for_ssh_ready(self):
-        command = 'whomai'
+        command = 'whoami'
         start_time = int(time.time())
         logs_while_waiting = ''
         while int(time.time()) - start_time < 100:
@@ -76,9 +85,15 @@ class Node(object):
     def execute_command(self, command):
         result = None
         try:
-            self._ssh_client.connect(
+            if self.ssh_password is not None:
+                self._ssh_client.connect(
                 self.public_ip_address, username=self.ssh_user,
-                key_filename=self.ssh_key_path, port=self.ssh_port)
+                password=self.ssh_password, port=self.ssh_port)
+            else:
+                self._ssh_client.connect(
+                    self.public_ip_address, username=self.ssh_user,
+                    key_filename=self.ssh_key_path, port=self.ssh_port)
+            
             result = self._ssh_client.exec_command(command)
             if result and len(result) == 3 and result[1].readable():
                 result = [str(result[1].read(), 'utf-8'),
@@ -97,7 +112,8 @@ class Node(object):
         return self.execute_command(command)
 
     def ready_node(self):
-        self.wait_for_ssh_ready()
+        if "windows" not in self.os_version:
+            self.wait_for_ssh_ready()
         if DOCKER_INSTALLED.lower() == 'false':
             self.install_docker()
 
