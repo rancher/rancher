@@ -377,6 +377,24 @@ def remove_resource(admin_mc, request):
 
 
 @pytest.fixture
+def remove_resouce_func(request):
+    """Call the delete_func passing in the name of the resource. This is useful
+    when dealing with the k8s clients for objects that don't exist in the
+    Rancher client
+    """
+    def _cleanup(delete_func, name):
+        def clean():
+            try:
+                delete_func(name)
+            except ApiException as e:
+                body = json.loads(e.body)
+                if body["code"] != 404:
+                    raise e
+        request.addfinalizer(clean)
+    return _cleanup
+
+
+@pytest.fixture
 def raw_remove_custom_resource(admin_mc, request):
     """Remove a custom resource, using the k8s client, after a test finishes
     even if the test fails. This should only be used if remove_resource, which
