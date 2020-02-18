@@ -1068,13 +1068,20 @@ def get_custom_host_registration_cmd(client, cluster, roles, node):
         cluster_token = cluster_tokens[0]
     else:
         cluster_token = create_custom_host_registration_token(client, cluster)
-    cmd = cluster_token.nodeCommand
-    for role in roles:
-        assert role in allowed_roles
-        cmd += " --" + role
+    
     additional_options = " --address " + node.public_ip_address + \
-                         " --internal-address " + node.private_ip_address
-    cmd += additional_options
+                            " --internal-address " + node.private_ip_address
+
+    if 'windows' in node.os_version:
+        cmd = cluster_token.windowsNodeCommand
+        cmd = cmd.replace('| iex', '--worker' + additional_options + ' | iex ')
+    else:
+        cmd = cluster_token.nodeCommand
+        for role in roles:
+            assert role in allowed_roles
+            cmd += " --" + role
+        
+        cmd += additional_options
     return cmd
 
 

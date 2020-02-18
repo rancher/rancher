@@ -12,11 +12,14 @@ node {
   def TESTS_TO_RUN =  [ "test_wl", "test_dns_record", "test_rbac","test_connectivity", "test_ingress",
                         "test_secrets", "test_registry", "test_service_discovery", "test_websocket"]
 
+  def WINDOWS_PYTEST_OPTIONS = "-k \"test_ingress or test_rbac or test_sa or test_secrets or test_service_discovery or test_workload\""
+
   if (env.RANCHER_SKIP_INGRESS == "True") { 
     TESTS_TO_RUN = TESTS_TO_RUN - ["test_ingress"]
   }
 
-  def PYTEST_OPTIONS = "-k \"" + TESTS_TO_RUN.join(" or ") +"\""
+  def LINUX_PYTEST_OPTIONS = "-k \"" + TESTS_TO_RUN.join(" or ") +"\""
+  def PYTEST_OPTIONS = LINUX_PYTEST_OPTIONS
 
   def branch = "master"
   if ("${env.branch}" != "null" && "${env.branch}" != "") {
@@ -77,6 +80,10 @@ node {
               // copy file containing CATTLE_TEST_URL & ADMIN_TOKEN and load into environment variables
               sh "docker cp ${provisionContainer}:${rootPath}${testsDir}${rancherConfig} ."
               load rancherConfig
+
+              if (env.RANCHER_TEST_OS == 'windows') {
+                PYTEST_OPTIONS = WINDOWS_PYTEST_OPTIONS
+              }
 
               sh "docker run --name ${testContainer}  --env-file .env " +
                 "${imageName} /bin/bash -c \'export RANCHER_CLUSTER_NAME=${env.CLUSTER_NAME} && pytest -v -s --junit-xml=${testResultsOut} ${PYTEST_OPTIONS} ${testsDir}\'"

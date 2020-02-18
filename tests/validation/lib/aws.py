@@ -31,6 +31,8 @@ AWS_IAM_PROFILE = os.environ.get("AWS_IAM_PROFILE", "")
 AWS_AMI = os.environ.get("AWS_AMI", "")
 AWS_USER = os.environ.get("AWS_USER", "ubuntu")
 AWS_HOSTED_ZONE_ID = os.environ.get("AWS_HOSTED_ZONE_ID", "")
+AWS_VOLUME_SIZE = os.environ.get("AWS_VOLUME_SIZE", "50")
+AWS_WINDOWS_VOLUME_SIZE = os.environ.get("AWS_WINDOWS_VOLUME_SIZE", "100")
 
 PRIVATE_IMAGES = {
     "rancheros-v1.5.1-docker-native": {
@@ -64,7 +66,7 @@ PRIVATE_IMAGES = {
     "rhel-7.6-docker-18.09": {
         'image': 'ami-094574ffb6efb3a9b', 'ssh_user': 'ec2-user'},
     "windows-1903-docker-19.03": {
-        'image': 'ami-01797a7ad9e74e2de', 'ssh_user': 'Administrator'}}
+        'image': 'ami-0f5bea682d4bdd318', 'ssh_user': 'Administrator'}}
 
 PUBLIC_AMI = {
     'us-east-2': {
@@ -161,8 +163,16 @@ class AmazonWebServices(CloudProviderBase):
             ssh_private_key = self.master_ssh_key
             ssh_private_key_path = self.master_ssh_key_path
 
+        if os_version is not None:
+            if 'windows' in os_version:
+                volume_size = AWS_WINDOWS_VOLUME_SIZE
+                instance_type = 't3.xlarge'
+            else:
+                volume_size = AWS_VOLUME_SIZE
+                instance_type = AWS_INSTANCE_TYPE
+
         args = {"ImageId": image,
-                "InstanceType": AWS_INSTANCE_TYPE,
+                "InstanceType": instance_type,
                 "MinCount": 1,
                 "MaxCount": 1,
                 "TagSpecifications": [{'ResourceType': 'instance', 'Tags': [
@@ -175,7 +185,7 @@ class AmazonWebServices(CloudProviderBase):
                     'Groups': AWS_SECURITY_GROUPS}],
                 "Placement": {'AvailabilityZone': AWS_REGION_AZ},
                 "BlockDeviceMappings":
-                    [{"DeviceName": "/dev/sda1", "Ebs": {"VolumeSize": 50}}]
+                    [{"DeviceName": "/dev/sda1", "Ebs": {"VolumeSize": int(volume_size)}}]
                 }
         if len(AWS_IAM_PROFILE) > 0:
             args["IamInstanceProfile"] = {'Name': AWS_IAM_PROFILE}
@@ -218,7 +228,16 @@ class AmazonWebServices(CloudProviderBase):
                 self.reboot_nodes(nodes)
                 time.sleep(10)
                 nodes = self.wait_for_nodes_state(nodes)
+
+            # wait for window nodes to come up so we can decrypt the password
+            if os_version is not None:
+                if 'windows' in os_version:
+                    time.sleep(60 * 6)
+
             for node in nodes:
+                if os_version is not None:
+                    if 'windows' in os_version:
+                        node.ssh_password = self.decrypt_windows_password(node.provider_node_id)
                 node.ready_node()
         return nodes
 
