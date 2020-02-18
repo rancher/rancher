@@ -74,16 +74,16 @@ require (
 	github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90
 	github.com/prometheus/common v0.6.0
 	github.com/rancher/dynamiclistener v0.2.1-0.20200213165308-111c5b43e932
-	github.com/rancher/kontainer-driver-metadata v0.0.0-20200129225622-a00843f74fed
+	github.com/rancher/kontainer-driver-metadata v0.0.0-20200218183853-2f58a2f30054
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200123235809-1b6d4a82a415
 	github.com/rancher/machine v0.15.0-rancher25
 	github.com/rancher/norman v0.0.0-20200212222655-bf773d02101e
 	github.com/rancher/rdns-server v0.0.0-20180802070304-bf662911db6a
 	github.com/rancher/remotedialer v0.2.5
-	github.com/rancher/rke v1.1.0-rc4.0.20200205094053-56d4c1b93702
+	github.com/rancher/rke v1.1.0-rc6
 	github.com/rancher/security-scan v0.1.5
 	github.com/rancher/steve v0.0.0-20200214232004-4218314653de
-	github.com/rancher/types v0.0.0-20200214232147-540555f93bc1
+	github.com/rancher/types v0.0.0-20200218191331-dc762fc27c91
 	github.com/rancher/wrangler v0.4.2-0.20200215064225-8abf292acf7b
 	github.com/rancher/wrangler-api v0.4.1
 	github.com/robfig/cron v1.1.0
@@ -109,7 +109,7 @@ require (
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/ldap.v2 v2.5.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
-	gopkg.in/yaml.v2 v2.2.4
+	gopkg.in/yaml.v2 v2.2.5
 	k8s.io/api v0.17.2
 	k8s.io/apiextensions-apiserver v0.17.2
 	k8s.io/apimachinery v0.17.2

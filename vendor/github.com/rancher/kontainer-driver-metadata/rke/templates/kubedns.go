@@ -46,7 +46,11 @@ spec:
           - --target=Deployment/kube-dns
           # When cluster is using large nodes(with more cores), "coresPerReplica" should dominate.
           # If using small nodes, "nodesPerReplica" should dominate.
+{{if .LinearAutoscalerParams}}
+          - --default-params={"linear":{{.LinearAutoscalerParams}}}
+{{else}}
           - --default-params={"linear":{"coresPerReplica":128,"nodesPerReplica":4,"min":1}}
+{{end}}
           - --logtostderr=true
           - --v=2
 ---
@@ -116,9 +120,13 @@ spec:
   # 2. Default is 1.
   # 3. Will be tuned in real time if DNS horizontal auto-scaling is turned on.
   strategy:
+{{if .UpdateStrategy}}
+{{ toYaml .UpdateStrategy | indent 4}}
+{{else}}
     rollingUpdate:
       maxSurge: 10%
       maxUnavailable: 0
+{{end}}
   selector:
     matchLabels:
       k8s-app: kube-dns
@@ -377,7 +385,11 @@ spec:
           - --target=Deployment/kube-dns
           # When cluster is using large nodes(with more cores), "coresPerReplica" should dominate.
           # If using small nodes, "nodesPerReplica" should dominate.
+{{if .LinearAutoscalerParams}}
+          - --default-params={"linear":{{.LinearAutoscalerParams}}}
+{{else}}
           - --default-params={"linear":{"coresPerReplica":128,"nodesPerReplica":4,"min":1,"preventSinglePointFailure":true}}
+{{end}}
           - --logtostderr=true
           - --v=2
 ---
@@ -447,9 +459,13 @@ spec:
   # 2. Default is 1.
   # 3. Will be tuned in real time if DNS horizontal auto-scaling is turned on.
   strategy:
+{{if .UpdateStrategy}}
+{{ toYaml .UpdateStrategy | indent 4}}
+{{else}}
     rollingUpdate:
       maxSurge: 10%
       maxUnavailable: 0
+{{end}}
   selector:
     matchLabels:
       k8s-app: kube-dns
