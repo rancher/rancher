@@ -34,8 +34,7 @@ var (
 )
 
 const (
-	Token  = "X-API-Tunnel-Token"
-	Params = "X-API-Tunnel-Params"
+	Token = "X-API-Tunnel-Token"
 )
 
 func main() {
@@ -163,8 +162,8 @@ func run() error {
 	}
 
 	headers := map[string][]string{
-		Token:  {token},
-		Params: {base64.StdEncoding.EncodeToString(bytes)},
+		Token:                      {token},
+		rkenodeconfigclient.Params: {base64.StdEncoding.EncodeToString(bytes)},
 	}
 
 	serverURL, err := url.Parse(server)
@@ -269,7 +268,8 @@ func run() error {
 	onConnect := func(ctx context.Context) error {
 		connected()
 		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
-		if err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers, writeCertsOnly); err != nil {
+		interval, err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers, writeCertsOnly)
+		if err != nil {
 			return err
 		}
 
@@ -291,18 +291,23 @@ func run() error {
 		}
 
 		go func() {
-			logrus.Infof("Starting plan monitor")
+			logrus.Infof("Starting plan monitor, checking every %v seconds", interval)
+			tt := time.Duration(interval) * time.Second
 			for {
 				select {
-				case <-time.After(2 * time.Minute):
-					err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers, writeCertsOnly)
+				case <-time.After(tt):
+					receivedInterval, err := rkenodeconfigclient.ConfigClient(ctx, connectConfig, headers, writeCertsOnly)
 					if err != nil {
 						logrus.Errorf("failed to check plan: %v", err)
+					} else if receivedInterval != 0 && receivedInterval != interval {
+						tt = time.Duration(receivedInterval) * time.Second
+						logrus.Infof("Plan monitor checking %v seconds", receivedInterval)
 					}
 				case <-ctx.Done():
 					return
 				}
 			}
+
 		}()
 
 		return nil
