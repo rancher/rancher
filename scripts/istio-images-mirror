@@ -16,7 +16,7 @@ quay.io/coreos/prometheus-operator rancher/coreos-prometheus-operator v0.36.0
 quay.io/coreos/prometheus-config-reloader rancher/coreos-prometheus-config-reloader v0.36.0
 quay.io/coreos/kube-state-metrics rancher/coreos-kube-state-metrics v1.9.4
 plugins/docker rancher/plugins-docker 18.09
-minio/minio rancher/minio-minio RELEASE.2019-09-25T18-25-51Z
+minio/minio rancher/minio-minio RELEASE.2020-02-07T23-28-16Z
 grafana/grafana rancher/grafana-grafana 6.6.1
 prom/prometheus rancher/prom-prometheus v2.16.0
 prom/alertmanager rancher/prom-alertmanager v0.20.0
@@ -29,3 +29,4 @@ quay.io/calico/node rancher/calico-node v3.10.2
 quay.io/calico/cni rancher/calico-cni v3.10.2
 quay.io/calico/kube-controllers rancher/calico-kube-controllers v3.10.2
 quay.io/calico/pod2daemon-flexvol rancher/calico-pod2daemon-flexvol v3.10.2
+us.gcr.io/k8s-artifacts-prod/external-dns/external-dns rancher/kubernetes-external-dns v0.6.0
