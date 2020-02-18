@@ -281,3 +281,65 @@ def test_project_action_set_pspt(admin_mc, admin_pc,
     wait_for(check_project)
 
     set_cluster_psp(admin_mc, "false")
+
+
+def test_psp_annotations(admin_mc, remove_resouce_func):
+    """Test that a psp with a pspt owner annotation will get cleaned up if the
+    parent pspt does not exist"""
+    k8s_client = kubernetes_api_client(admin_mc.client, 'local')
+    policy = kubernetes.client.PolicyV1beta1Api(api_client=k8s_client)
+    kubernetes.client.PolicyV1beta1PodSecurityPolicy
+    psp_name = random_str()
+    args = {
+        'metadata': {
+            'name': psp_name
+        },
+        'spec': {
+            "allowPrivilegeEscalation": True,
+            "fsGroup": {
+                "rule": "RunAsAny"
+            },
+            "runAsUser": {
+                "rule": "RunAsAny"
+            },
+            "seLinux": {
+                "rule": "RunAsAny"
+            },
+            "supplementalGroups": {
+                "rule": "RunAsAny"
+            },
+            "volumes": [
+                "*"
+            ]
+        }
+    }
+
+    psp = policy.create_pod_security_policy(args)
+    remove_resouce_func(policy.delete_pod_security_policy, psp_name)
+    psp = policy.read_pod_security_policy(psp_name)
+    assert psp is not None
+
+    anno = {
+        'metadata': {
+            'annotations': {
+                'serviceaccount.cluster.cattle.io/pod-security': 'doesntexist'
+            }
+        }
+    }
+    # Add the annotation the controller is looking for
+    psp = policy.patch_pod_security_policy(psp_name, anno)
+
+    # Controller will delete the PSP as the parent PSPT doesn't exist
+    def _get_psp():
+        try:
+            policy.read_pod_security_policy(psp_name)
+            return False
+        except ApiException as e:
+            if e.status != 404:
+                raise e
+            return True
+    wait_for(_get_psp, fail_handler=lambda: "psp was not cleaned up")
+
+    with pytest.raises(ApiException) as e:
+        policy.read_pod_security_policy(psp_name)
+    assert e.value.status == 404
