@@ -968,6 +968,26 @@ def validate_dns_entry_windows(pod, host, expected):
     wait_for(callback=dig_check, timeout_message="Failed to resolve {0}".format(host))
 
 
+def validate_dns_record_deleted(client, dns_record, timeout=DEFAULT_TIMEOUT):
+    """
+    Checks whether dns_record got deleted successfully.
+    Validates if dns_record is null in for current object client.
+    @param client: Object client use to create dns_record
+    @param dns_record: record object subjected to be deleted
+    @param timeout: Max time to keep checking whether record is deleted or not
+    """
+    time.sleep(2)
+    start = time.time()
+    records = client.list_dns_record(name=dns_record.name, ).data
+    while len(records) != 0:
+        if time.time() - start > timeout:
+            raise AssertionError(
+                "Timed out waiting for record {} to be deleted"
+                "".format(dns_record.name))
+        time.sleep(.5)
+        records = client.list_dns_record(name=dns_record.name, ).data
+
+
 def wait_for_nodes_to_become_active(client, cluster, exception_list=[],
                                     retry_count=0):
     nodes = client.list_node(clusterId=cluster.id).data
