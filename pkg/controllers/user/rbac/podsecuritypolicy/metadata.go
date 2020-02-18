@@ -7,4 +7,5 @@ const (
 	podSecurityPolicyTemplateVersionAnnotation = "serviceaccount.cluster.cattle.io/pod-security-version"
 	projectIDAnnotation                        = "field.cattle.io/projectId"
 	podSecurityPolicy                          = "PodSecurityPolicy"
+	podSecurityPolicyTemplateUpgrade           = "cleanup.cattle.io/psptUpgrade"
 )
